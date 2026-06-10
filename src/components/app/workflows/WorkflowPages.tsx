@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type FocusEvent as ReactFocusEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Background,
@@ -65,7 +65,6 @@ import {
   TerminalSquare,
   Trash2,
   User,
-  Wand2,
   X,
   type LucideIcon
 } from "lucide-react";
@@ -109,6 +108,7 @@ import {
   CodeFile,
   RenameNodeResult,
   MockSession,
+  EnvironmentConfig,
   WorkflowStatusKind,
   WorkflowHealthItem,
   WorkflowHealthSummary,
@@ -130,6 +130,7 @@ import {
   sessionStorageKey,
   settingsStorageKey,
   PersistedAppState,
+  WorkflowRunRecord,
   node,
   systemNode,
   edge,
@@ -172,7 +173,7 @@ import {
   parseJsonObject,
   formatFormValue,
   parseFormValue,
-  createStateSnapshotForStep,
+  summarizeStateValue,
   getDefaultPopoverPosition,
   clampPopoverPosition,
   getUniqueWorkflowName,
@@ -329,7 +330,10 @@ export function Topbar({
   onRun,
   onStep,
   onShowCode,
-  onAutoLayout
+  environments,
+  activeEnvironmentId,
+  onSelectEnvironment,
+  onSaveEnvironments
 }: {
   template: Template;
   workflowName: string;
@@ -341,10 +345,14 @@ export function Topbar({
   onRun: () => void;
   onStep: () => void;
   onShowCode: () => void;
-  onAutoLayout: () => void;
+  environments: EnvironmentConfig[];
+  activeEnvironmentId: string;
+  onSelectEnvironment: (environmentId: string) => void;
+  onSaveEnvironments: (environments: EnvironmentConfig[], activeEnvironmentId: string) => void;
 }) {
   const [draftName, setDraftName] = useState(workflowName);
   const [exportOpen, setExportOpen] = useState(false);
+  const activeEnvironment = environments.find((item) => item.id === activeEnvironmentId) ?? environments[0];
 
   useEffect(() => {
     setDraftName(workflowName);
@@ -419,7 +427,7 @@ export function Topbar({
         </div>
       </div>
 
-      <WorkflowStatusPrompt template={template} schemaSaved={schemaSaved} />
+      <WorkflowStatusPrompt template={template} schemaSaved={schemaSaved} activeEnvironment={activeEnvironment} />
 
       <nav className="toolbar-actions" aria-label="工作流操作">
         <div className={`export-menu ${exportOpen ? "open" : ""}`} onBlur={(event) => {
@@ -461,10 +469,12 @@ export function Topbar({
           <Code2 size={16} />
           查看代码
         </button>
-        <button className="tool-button" onClick={onAutoLayout}>
-          <Wand2 size={16} />
-          自动布局
-        </button>
+        <EnvironmentMenu
+          environments={environments}
+          activeEnvironmentId={activeEnvironmentId}
+          onSelectEnvironment={onSelectEnvironment}
+          onSaveEnvironments={onSaveEnvironments}
+        />
         <button className={`tool-button ${schemaSaved ? "saved" : ""}`}>
           {schemaSaved ? <Check size={16} /> : <Save size={16} />}
           保存
@@ -474,8 +484,245 @@ export function Topbar({
   );
 }
 
-export function WorkflowStatusPrompt({ template, schemaSaved }: { template: Template; schemaSaved: boolean }) {
-  const health = useMemo(() => getWorkflowHealth(template, schemaSaved), [template, schemaSaved]);
+export function EnvironmentMenu({
+  environments,
+  activeEnvironmentId,
+  onSelectEnvironment,
+  onSaveEnvironments
+}: {
+  environments: EnvironmentConfig[];
+  activeEnvironmentId: string;
+  onSelectEnvironment: (environmentId: string) => void;
+  onSaveEnvironments: (environments: EnvironmentConfig[], activeEnvironmentId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const activeEnvironment = environments.find((item) => item.id === activeEnvironmentId) ?? environments[0];
+
+  function selectEnvironment(environmentId: string) {
+    onSelectEnvironment(environmentId);
+    setOpen(false);
+  }
+
+  return (
+    <>
+      <div className={`export-menu environment-menu ${open ? "open" : ""}`} onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setOpen(false);
+        }
+      }}>
+        <button className="tool-button environment-trigger" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="menu">
+          <Settings2 size={16} />
+          <span>{activeEnvironment?.name ?? "全局环境"}</span>
+          <ChevronDown size={14} />
+        </button>
+        {open && (
+          <div className="export-menu-popover environment-menu-popover glass" role="menu">
+            {environments.map((environment) => (
+              <button
+                role="menuitem"
+                className={`environment-menu-item ${environment.id === activeEnvironmentId ? "active" : ""}`}
+                key={environment.id}
+                onClick={() => selectEnvironment(environment.id)}
+              >
+                <span>
+                  <strong>{environment.name}</strong>
+                  <small>{environment.model || "未配置模型"} · {environment.baseUrl || "未配置 Base URL"}</small>
+                </span>
+                {environment.id === activeEnvironmentId ? <Check size={15} /> : null}
+              </button>
+            ))}
+            <button
+              role="menuitem"
+              className="environment-config-entry"
+              onClick={() => {
+                setConfigOpen(true);
+                setOpen(false);
+              }}
+            >
+              <Settings2 size={15} />
+              打开配置面板
+            </button>
+          </div>
+        )}
+      </div>
+
+      <EnvironmentConfigModal
+        open={configOpen}
+        environments={environments}
+        activeEnvironmentId={activeEnvironmentId}
+        onClose={() => setConfigOpen(false)}
+        onSave={(nextEnvironments, nextActiveId) => {
+          onSaveEnvironments(nextEnvironments, nextActiveId);
+          setConfigOpen(false);
+        }}
+      />
+    </>
+  );
+}
+
+export function EnvironmentConfigModal({
+  open,
+  environments,
+  activeEnvironmentId,
+  onClose,
+  onSave
+}: {
+  open: boolean;
+  environments: EnvironmentConfig[];
+  activeEnvironmentId: string;
+  onClose: () => void;
+  onSave: (environments: EnvironmentConfig[], activeEnvironmentId: string) => void;
+}) {
+  const [drafts, setDrafts] = useState<EnvironmentConfig[]>(environments);
+  const [selectedId, setSelectedId] = useState(activeEnvironmentId);
+  const selectedEnvironment = drafts.find((item) => item.id === selectedId) ?? drafts[0];
+
+  useEffect(() => {
+    if (!open) return;
+    setDrafts(environments);
+    setSelectedId(environments.some((item) => item.id === activeEnvironmentId) ? activeEnvironmentId : environments[0]?.id ?? "");
+  }, [activeEnvironmentId, environments, open]);
+
+  if (!open) return null;
+
+  function closeFromBackdrop(event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  }
+
+  function updateSelected(field: keyof EnvironmentConfig, value: string) {
+    setDrafts((items) => items.map((item) => (item.id === selectedEnvironment.id ? { ...item, [field]: value } : item)));
+  }
+
+  function addEnvironment() {
+    const next: EnvironmentConfig = {
+      id: `environment-${Date.now()}`,
+      name: `Environment ${drafts.length + 1}`,
+      baseUrl: "",
+      apiKey: "",
+      model: "gpt-4.1-mini",
+      searchApiUrl: "",
+      searchApiKey: "",
+      databaseUrl: "",
+      fileStoragePath: "",
+      note: ""
+    };
+    setDrafts((items) => [...items, next]);
+    setSelectedId(next.id);
+  }
+
+  function deleteSelected() {
+    if (!selectedEnvironment || drafts.length <= 1) return;
+    const nextDrafts = drafts.filter((item) => item.id !== selectedEnvironment.id);
+    setDrafts(nextDrafts);
+    setSelectedId(nextDrafts[0].id);
+  }
+
+  function saveDrafts() {
+    const normalized = drafts.map((item, index) => ({
+      ...item,
+      name: item.name.trim() || `Environment ${index + 1}`,
+      model: item.model.trim() || "gpt-4.1-mini"
+    }));
+    const nextActiveId = normalized.some((item) => item.id === selectedId) ? selectedId : normalized[0].id;
+    onSave(normalized, nextActiveId);
+  }
+
+  return (
+    <div className="code-modal-backdrop" onMouseDown={closeFromBackdrop}>
+      <section className="code-modal environment-config-modal glass" role="dialog" aria-modal="true" aria-label="全局环境配置">
+        <header className="code-modal-titlebar">
+          <div className="code-modal-heading">
+            <Settings2 size={20} />
+            <div>
+              <h2>全局环境配置</h2>
+              <p>配置多套本地 mock 运行环境，仅保存在当前浏览器。</p>
+            </div>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label="关闭环境配置面板">
+            <X size={20} />
+          </button>
+        </header>
+
+        <div className="environment-config-body">
+          <aside className="environment-list" aria-label="环境列表">
+            {drafts.map((environment) => (
+              <button
+                className={`environment-list-item ${environment.id === selectedEnvironment?.id ? "active" : ""}`}
+                key={environment.id}
+                onClick={() => setSelectedId(environment.id)}
+              >
+                <strong>{environment.name || "未命名环境"}</strong>
+                <span>{environment.model || "未配置模型"}</span>
+              </button>
+            ))}
+            <button className="add-environment-button" onClick={addEnvironment}>
+              <Plus size={15} />
+              新增环境
+            </button>
+          </aside>
+
+          {selectedEnvironment ? (
+            <main className="environment-form">
+              <div className="environment-form-grid">
+                <EnvironmentField label="环境名" value={selectedEnvironment.name} onChange={(value) => updateSelected("name", value)} />
+                <EnvironmentField label="默认模型" value={selectedEnvironment.model} onChange={(value) => updateSelected("model", value)} />
+                <EnvironmentField label="Base URL" value={selectedEnvironment.baseUrl} onChange={(value) => updateSelected("baseUrl", value)} />
+                <EnvironmentField label="API Key" type="password" value={selectedEnvironment.apiKey} onChange={(value) => updateSelected("apiKey", value)} />
+                <EnvironmentField label="搜索 API URL" value={selectedEnvironment.searchApiUrl} onChange={(value) => updateSelected("searchApiUrl", value)} />
+                <EnvironmentField label="搜索 API Key" type="password" value={selectedEnvironment.searchApiKey} onChange={(value) => updateSelected("searchApiKey", value)} />
+                <EnvironmentField label="数据库 URL" value={selectedEnvironment.databaseUrl} onChange={(value) => updateSelected("databaseUrl", value)} />
+                <EnvironmentField label="文件存储路径" value={selectedEnvironment.fileStoragePath} onChange={(value) => updateSelected("fileStoragePath", value)} />
+                <label className="environment-form-field wide">
+                  <span>备注</span>
+                  <textarea value={selectedEnvironment.note} onChange={(event) => updateSelected("note", event.target.value)} />
+                </label>
+              </div>
+
+              <div className="environment-modal-actions">
+                <button className="tool-button danger" onClick={deleteSelected} disabled={drafts.length <= 1}>
+                  <Trash2 size={15} />
+                  删除环境
+                </button>
+                <div>
+                  <button className="tool-button" onClick={onClose}>取消</button>
+                  <button className="tool-button primary" onClick={saveDrafts}>
+                    <Check size={15} />
+                    保存环境配置
+                  </button>
+                </div>
+              </div>
+            </main>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export function EnvironmentField({
+  label,
+  value,
+  type = "text",
+  onChange
+}: {
+  label: string;
+  value: string;
+  type?: "text" | "password";
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="environment-form-field">
+      <span>{label}</span>
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+export function WorkflowStatusPrompt({ template, schemaSaved, activeEnvironment }: { template: Template; schemaSaved: boolean; activeEnvironment?: EnvironmentConfig }) {
+  const health = useMemo(() => getWorkflowHealth(template, schemaSaved, activeEnvironment), [activeEnvironment, template, schemaSaved]);
   const [pinnedOpen, setPinnedOpen] = useState(false);
   const [hoverOpen, setHoverOpen] = useState(false);
   const open = pinnedOpen || hoverOpen;
@@ -756,6 +1003,7 @@ export function Canvas({
   workflowDescription,
   activeRunItem,
   selection,
+  configTarget,
   schemaSaved,
   layoutPulse,
   nodePositions,
@@ -769,6 +1017,7 @@ export function Canvas({
   onCreateEdge,
   onReconnectEdge,
   onQuickAddNode,
+  onUpdateNode,
   draggingPaletteNode,
   onFinishNodeDrag,
   onDeleteNode,
@@ -778,6 +1027,7 @@ export function Canvas({
   workflowDescription: string;
   activeRunItem: string;
   selection: Selection;
+  configTarget: ConfigTarget | null;
   schemaSaved: boolean;
   layoutPulse: boolean;
   nodePositions: Record<string, { x: number; y: number }>;
@@ -786,17 +1036,17 @@ export function Canvas({
   onOpenConfig: (target: ConfigTarget) => void;
   onCloseConfig: () => void;
   onWorkflowDescription: (value: string) => void;
-  onGenerateWorkflow: () => void;
+  onGenerateWorkflow: (description?: string) => void;
   onCreateNode: (payload: CreateNodePayload) => void;
   onCreateEdge: (connection: Connection) => void;
   onReconnectEdge: (edgeId: string, connection: Connection) => void;
   onQuickAddNode: (sourceId: string, side: EdgeSide, payload: Pick<CreateNodePayload, "label" | "kind">) => void;
+  onUpdateNode: (nodeId: string, updates: Partial<Pick<FlowNode, "subtitle" | "logic" | "reads" | "writes" | "code" | "codeReview" | "codeSnapshots" | "control">>) => void;
   draggingPaletteNode: CreateNodePayload | null;
   onFinishNodeDrag: () => void;
   onDeleteNode: (nodeId: string) => void;
   onDeleteEdge: (edgeId: string) => void;
 }) {
-  const [descriptionCollapsed, setDescriptionCollapsed] = useState(false);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<ReactFlowNode<WorkflowNodeData>, ReactFlowEdge> | null>(null);
   const reactFlowNodes = useMemo<ReactFlowNode<WorkflowNodeData>[]>(
     () =>
@@ -977,30 +1227,411 @@ export function Canvas({
         <MiniMap position="bottom-right" pannable zoomable />
       </ReactFlow>
 
-      <div className={`canvas-toolbar glass ${descriptionCollapsed ? "collapsed" : ""}`}>
-        <div className="description-head">
-          <button className="description-toggle" onClick={() => setDescriptionCollapsed((value) => !value)} aria-expanded={!descriptionCollapsed}>
-            <span className="canvas-title">工作流描述</span>
-            {descriptionCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </button>
-          {!descriptionCollapsed && (
-            <button className="tool-button primary compact" onClick={onGenerateWorkflow}>
-              <Wand2 size={15} />
-              生成工作流和 Schema
-            </button>
-          )}
+      <WorkflowAssistant
+        workflowDescription={workflowDescription}
+        template={template}
+        selection={selection}
+        configTarget={configTarget}
+        activeRunItem={activeRunItem}
+        onWorkflowDescription={onWorkflowDescription}
+        onGenerateWorkflow={onGenerateWorkflow}
+        onOpenConfig={onOpenConfig}
+        onUpdateNode={onUpdateNode}
+      />
+    </section>
+  );
+}
+
+type AssistantMessage = {
+  id: string;
+  role: "assistant" | "user";
+  text: string;
+};
+
+type NodeUpdatePatch = Partial<Pick<FlowNode, "subtitle" | "logic" | "reads" | "writes" | "code" | "codeReview" | "codeSnapshots" | "control">>;
+
+function uniqueSchemaFields(fields: string[]) {
+  const validFields = new Set(schemaFields.map((field) => field.name));
+  return Array.from(new Set(fields.filter((field) => validFields.has(field))));
+}
+
+function extractMentionedSchemaFields(text: string) {
+  const normalizedText = text.toLowerCase();
+  return schemaFields.filter((field) => normalizedText.includes(field.name.toLowerCase())).map((field) => field.name);
+}
+
+function extractFieldsNearMarker(text: string, markers: string[], stopMarkers: string[]) {
+  const lowerText = text.toLowerCase();
+  const markerIndex = markers.map((marker) => lowerText.indexOf(marker.toLowerCase())).filter((index) => index >= 0).sort((a, b) => a - b)[0];
+  if (markerIndex === undefined) return [];
+
+  const stopIndex = stopMarkers
+    .map((marker) => lowerText.indexOf(marker.toLowerCase(), markerIndex + 1))
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b)[0];
+  const segment = text.slice(markerIndex, stopIndex ?? text.length);
+  return extractMentionedSchemaFields(segment);
+}
+
+function parseAssistantConfigRequest(text: string, node: FlowNode): NodeUpdatePatch {
+  const reads = extractFieldsNearMarker(text, ["读取", "读 ", "read"], ["写入", "输出", "write"]);
+  const writes = extractFieldsNearMarker(text, ["写入", "输出", "write"], ["读取", "read"]);
+  const mentionedFields = extractMentionedSchemaFields(text);
+  const nextReads = uniqueSchemaFields(reads.length ? reads : node.reads);
+  const nextWrites = uniqueSchemaFields(writes.length ? writes : node.writes);
+  const purposeMatch = text.match(/(?:目的|用途|purpose)\s*(?:改成|改为|为|:|：)?\s*([^。.\n]+)/i);
+  const logicMatch = text.match(/(?:逻辑|logic)\s*(?:改成|改为|为|:|：)?\s*([^。.\n]+)/i);
+  const patch: NodeUpdatePatch = {};
+
+  if (reads.length || mentionedFields.length) {
+    patch.reads = nextReads;
+  }
+  if (writes.length || mentionedFields.length) {
+    patch.writes = nextWrites;
+  }
+  if (purposeMatch?.[1]?.trim()) {
+    patch.subtitle = purposeMatch[1].trim();
+  }
+  if (logicMatch?.[1]?.trim()) {
+    patch.logic = logicMatch[1].trim();
+  }
+
+  if (!Object.keys(patch).length) {
+    patch.logic = `${node.logic}\n根据助手请求补充配置意图：${text}`;
+  }
+
+  return patch;
+}
+
+function getAssistantTargetNode(template: Template, selection: Selection, configTarget: ConfigTarget | null, activeRunItem: string) {
+  if (configTarget?.type === "node") {
+    return template.nodes.find((item) => item.id === configTarget.id);
+  }
+  if (selection.type === "node") {
+    return template.nodes.find((item) => item.id === selection.id);
+  }
+  if (activeRunItem) {
+    return template.nodes.find((item) => item.id === activeRunItem);
+  }
+  return undefined;
+}
+
+function isNodeRepairRequest(text: string) {
+  return /修复|bug|报错|错误|失败|异常|代码|debug|fix/i.test(text);
+}
+
+function isNodeConfigRequest(text: string) {
+  return /配置|读取|写入|目的|逻辑|read|write|purpose|logic/i.test(text) || extractMentionedSchemaFields(text).length > 0;
+}
+
+function mergeFields(current: string[], additions: string[]) {
+  return uniqueSchemaFields([...current, ...additions]);
+}
+
+function getAssistantRepairPatch(node: FlowNode, request: string): { patch: NodeUpdatePatch; summary: string } {
+  if (node.kind === "router" || node.kind === "loop") {
+    return {
+      patch: {
+        logic: `${node.logic}\nAI 修复建议：保持分支配置由控制边管理，并在运行前确认每个分支都有目标节点。请求：${request}`
+      },
+      summary: "逻辑说明"
+    };
+  }
+
+  const fnName = getNodeFnName(node);
+  const baseLogic = `AI 修复：为 ${node.label} 增加输入校验、异常处理和可观察的失败输出。`;
+  const beforeCode = getNodeCode(node);
+
+  if (node.kind === "http") {
+    const afterCode = `import os
+import requests
+
+
+def ${fnName}(state: State):
+    url = os.environ.get("SEARCH_API_URL")
+    api_key = os.environ.get("SEARCH_API_KEY")
+    query = state.get("query") or state.get("user_input") or ""
+
+    if not url or not api_key:
+        return {
+            "api_error": "SEARCH_API_URL or SEARCH_API_KEY is missing",
+            "draft_answer": "搜索服务暂未配置，请先检查当前环境变量。"
+        }
+
+    try:
+        response = requests.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={"query": query},
+            timeout=30
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except requests.RequestException as error:
+        return {
+            "api_error": str(error),
+            "draft_answer": "搜索请求失败，已保留错误信息供日志排查。"
+        }
+    except ValueError:
+        return {
+            "api_error": "Search API returned invalid JSON",
+            "draft_answer": response.text[:500]
+        }
+
+    return {
+        "api_result": payload,
+        "draft_answer": str(payload)
+    }`;
+
+    return {
+      patch: {
+        reads: mergeFields(node.reads, ["query"]),
+        writes: mergeFields(node.writes, ["api_result", "draft_answer"]),
+        logic: `${baseLogic} 缺少 SEARCH_API_URL 或 SEARCH_API_KEY 时不直接抛出未处理异常，请求失败时返回 api_error 和 draft_answer。`,
+        codeReview: { before: beforeCode, after: afterCode, summary: request }
+      },
+      summary: "代码、逻辑、读取字段、写入字段"
+    };
+  }
+
+  if (node.kind === "llm" || node.kind === "agent") {
+    const afterCode = `def ${fnName}(state: State):
+    messages = state.get("messages") or []
+    user_text = state.get("query") or state.get("user_input") or ""
+
+    if not messages and user_text:
+        messages = [{"role": "user", "content": user_text}]
+
+    content = "模拟模型回复：" + (user_text or "已收到请求")
+    return {
+        "draft_answer": content,
+        "messages": messages + [{"role": "assistant", "content": content}]
+    }`;
+
+    return {
+      patch: {
+        reads: mergeFields(node.reads, ["messages"]),
+        writes: mergeFields(node.writes, ["draft_answer", "messages"]),
+        logic: `${baseLogic} 增加 messages 默认值和模型输出兜底，避免空消息导致运行失败。`,
+        codeReview: { before: beforeCode, after: afterCode, summary: request }
+      },
+      summary: "代码、逻辑、读取字段、写入字段"
+    };
+  }
+
+  if (node.kind === "tool" || node.kind === "database" || node.kind === "file") {
+    const afterCode = `def ${fnName}(state: State):
+    try:
+        result = {
+            "node": "${node.label}",
+            "status": "ok",
+            "input": state
+        }
+    except Exception as error:
+        result = {
+            "node": "${node.label}",
+            "status": "error",
+            "message": str(error)
+        }
+
+    return {
+        "tool_result": str(result)
+    }`;
+
+    return {
+      patch: {
+        writes: mergeFields(node.writes, node.kind === "database" ? ["tool_result"] : ["tool_result"]),
+        logic: `${baseLogic} 增加参数缺失保护，返回可展示的 mock 结果而不是中断流程。`,
+        codeReview: { before: beforeCode, after: afterCode, summary: request }
+      },
+      summary: "代码、逻辑、写入字段"
+    };
+  }
+
+  const afterCode = `def ${fnName}(state: State):
+    output = {}
+${node.writes.length ? node.writes.map((field) => `    output["${field}"] = state.get("${field}") or "mock_${field}"`).join("\n") : `    output["draft_answer"] = state.get("draft_answer") or "节点已完成"`}
+    return output`;
+
+  return {
+    patch: {
+      logic: `${baseLogic} 增加 state.get 读取和默认返回，避免 KeyError 或空输出。`,
+      codeReview: { before: beforeCode, after: afterCode, summary: request }
+    },
+    summary: "代码、逻辑"
+  };
+}
+
+export function WorkflowAssistant({
+  workflowDescription,
+  template,
+  selection,
+  configTarget,
+  activeRunItem,
+  onWorkflowDescription,
+  onGenerateWorkflow,
+  onOpenConfig,
+  onUpdateNode
+}: {
+  workflowDescription: string;
+  template: Template;
+  selection: Selection;
+  configTarget: ConfigTarget | null;
+  activeRunItem: string;
+  onWorkflowDescription: (value: string) => void;
+  onGenerateWorkflow: (description?: string) => void;
+  onOpenConfig: (target: ConfigTarget) => void;
+  onUpdateNode: (nodeId: string, updates: NodeUpdatePatch) => void;
+}) {
+  const targetNode = getAssistantTargetNode(template, selection, configTarget, activeRunItem);
+  const [messages, setMessages] = useState<AssistantMessage[]>([
+    {
+      id: "welcome",
+      role: "assistant",
+      text: "描述你想生成的工作流，或打开一个节点后让我修改它的配置和代码。"
+    }
+  ]);
+  const [draft, setDraft] = useState(workflowDescription);
+  const [open, setOpen] = useState(false);
+  const syncedDescriptionRef = useRef(workflowDescription);
+
+  useEffect(() => {
+    if (workflowDescription === syncedDescriptionRef.current) return;
+    syncedDescriptionRef.current = workflowDescription;
+    setDraft(workflowDescription);
+  }, [workflowDescription]);
+
+  function createMessageId(role: AssistantMessage["role"]) {
+    return `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  }
+
+  function commitDraft({ generate }: { generate: boolean }) {
+    const nextDescription = draft.trim();
+    if (!nextDescription) {
+      if (generate) onGenerateWorkflow(workflowDescription);
+      return;
+    }
+
+    if (!generate && (isNodeRepairRequest(nextDescription) || isNodeConfigRequest(nextDescription))) {
+      if (!targetNode) {
+        setMessages((items) => [
+          ...items,
+          { id: createMessageId("user"), role: "user", text: nextDescription },
+          {
+            id: createMessageId("assistant"),
+            role: "assistant",
+            text: "请先打开或选择一个节点，我才能确认要修改哪个节点。"
+          }
+        ]);
+        setDraft("");
+        return;
+      }
+
+      const result = isNodeRepairRequest(nextDescription)
+        ? getAssistantRepairPatch(targetNode, nextDescription)
+        : {
+            patch: parseAssistantConfigRequest(nextDescription, targetNode),
+            summary: "配置"
+          };
+      onUpdateNode(targetNode.id, result.patch);
+      onOpenConfig({ type: "node", id: targetNode.id });
+      setMessages((items) => [
+        ...items,
+        { id: createMessageId("user"), role: "user", text: nextDescription },
+        {
+          id: createMessageId("assistant"),
+          role: "assistant",
+          text: `已修改 ${targetNode.label}：${result.summary}。`
+        }
+      ]);
+      setDraft("");
+      return;
+    }
+
+    onWorkflowDescription(nextDescription);
+    syncedDescriptionRef.current = nextDescription;
+    setMessages((items) => [
+      ...items,
+      { id: createMessageId("user"), role: "user", text: nextDescription },
+      {
+        id: createMessageId("assistant"),
+        role: "assistant",
+        text: generate ? "我会根据这段描述生成工作流和 State Schema。" : "收到。你可以继续补充，或打开节点后让我修改配置和代码。"
+      }
+    ]);
+    setDraft("");
+
+    if (generate) {
+      onGenerateWorkflow(nextDescription);
+    }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    commitDraft({ generate: false });
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    commitDraft({ generate: false });
+  }
+
+  function handleBlur(event: ReactFocusEvent<HTMLElement>) {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setOpen(false);
+  }
+
+  return (
+    <section
+      className={`workflow-assistant ${open ? "open" : ""}`}
+      aria-label="AI 助手"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={handleBlur}
+    >
+      <button className="assistant-trigger" aria-label="展开 AI 助手对话框">
+        <Sparkles size={22} />
+      </button>
+
+      <div className="assistant-panel glass">
+        <div className="assistant-head">
+          <div>
+            <span>AI 助手</span>
+            <small>{targetNode ? "节点协作" : "工作流生成"}</small>
+          </div>
+          <Bot size={20} />
         </div>
 
-        {!descriptionCollapsed && (
-          <div className="workflow-description-editor">
-            <textarea
-              value={workflowDescription}
-              onChange={(event) => onWorkflowDescription(event.target.value)}
-              placeholder="描述你想生成的工作流，例如：根据用户输入做条件分支，summary 走摘要节点，rewrite 走改写节点。"
-              spellCheck={false}
-            />
+        <div className="assistant-messages" aria-live="polite">
+          {messages.map((message) => (
+            <div className={`assistant-message ${message.role}`} key={message.id}>
+              <span>{message.text}</span>
+            </div>
+          ))}
+        </div>
+
+        <form className="assistant-composer" onSubmit={handleSubmit}>
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={targetNode ? "描述要修改当前节点的配置或代码..." : "描述你想生成的工作流..."}
+            spellCheck={false}
+          />
+          <div className="assistant-actions">
+            <div className={`assistant-context ${targetNode ? "active" : ""}`}>
+              {targetNode ? `当前节点：${targetNode.label} · ${targetNode.kind}` : "未选择节点"}
+            </div>
+            <button className="assistant-send" type="submit" aria-label="发送描述">
+              <ArrowRight size={16} />
+            </button>
           </div>
-        )}
+        </form>
       </div>
     </section>
   );
@@ -1199,6 +1830,12 @@ export function Inspector({
   template,
   runIndex,
   activeRunItem,
+  stateValues,
+  updatedStateFields,
+  runHistory,
+  selectedRunHistoryId,
+  onOpenRunHistory,
+  onStateFieldChange,
   onSaveSchema
 }: {
   collapsed: boolean;
@@ -1209,21 +1846,27 @@ export function Inspector({
   template: Template;
   runIndex: number;
   activeRunItem: string;
+  stateValues: Record<string, unknown>;
+  updatedStateFields: string[];
+  runHistory: WorkflowRunRecord[];
+  selectedRunHistoryId: string | null;
+  onOpenRunHistory: (run: WorkflowRunRecord) => void;
+  onStateFieldChange: (fieldName: string, value: unknown) => void;
   onSaveSchema: () => void;
 }) {
   if (collapsed) {
     return (
-      <button className="floating-collapser right glass" onClick={() => onCollapsed(false)} aria-label="展开配置面板">
-        <ChevronLeft size={18} />
-        <span>配置</span>
+      <button className="floating-collapser left state-collapser glass" onClick={() => onCollapsed(false)} aria-label="展开 State 面板">
+        <ChevronRight size={18} />
+        <span>State</span>
       </button>
     );
   }
 
   return (
     <aside className="inspector floating-panel glass">
-      <button className="inspector-collapse icon-button" onClick={() => onCollapsed(true)} aria-label="折叠配置面板">
-        <ChevronRight size={16} />
+      <button className="inspector-collapse icon-button" onClick={() => onCollapsed(true)} aria-label="折叠 State 面板">
+        <ChevronLeft size={16} />
       </button>
       <div className="inspector-scroll">
         <StateInspector
@@ -1231,6 +1874,12 @@ export function Inspector({
           template={template}
           runIndex={runIndex}
           activeRunItem={activeRunItem}
+          stateValues={stateValues}
+          updatedStateFields={updatedStateFields}
+          runHistory={runHistory}
+          selectedRunHistoryId={selectedRunHistoryId}
+          onOpenRunHistory={onOpenRunHistory}
+          onStateFieldChange={onStateFieldChange}
           schemaSaved={schemaSaved}
           onSaveSchema={onSaveSchema}
           onTab={onTab}
@@ -1245,7 +1894,13 @@ export function StateInspector({
   template,
   runIndex,
   activeRunItem,
+  stateValues,
+  updatedStateFields,
+  runHistory,
+  selectedRunHistoryId,
+  onOpenRunHistory,
   schemaSaved,
+  onStateFieldChange,
   onSaveSchema,
   onTab
 }: {
@@ -1253,7 +1908,13 @@ export function StateInspector({
   template: Template;
   runIndex: number;
   activeRunItem: string;
+  stateValues: Record<string, unknown>;
+  updatedStateFields: string[];
+  runHistory: WorkflowRunRecord[];
+  selectedRunHistoryId: string | null;
+  onOpenRunHistory: (run: WorkflowRunRecord) => void;
   schemaSaved: boolean;
+  onStateFieldChange: (fieldName: string, value: unknown) => void;
   onSaveSchema: () => void;
   onTab: (tab: StateTab) => void;
 }) {
@@ -1282,17 +1943,7 @@ export function StateInspector({
             <span>顶部状态提示会显示当前下一步、完整性和可运行状态。这里保留 State Schema 配置入口。</span>
           </div>
 
-          <div className="field-list">
-            {schemaFields.map((field) => (
-              <div className="field-row" key={field.name}>
-                <div>
-                  <strong>{field.name}</strong>
-                  <span>{field.note}</span>
-                </div>
-                <em>{field.type}</em>
-              </div>
-            ))}
-          </div>
+          <StateSchemaFields stateValues={stateValues} autoOpenFields={updatedStateFields} highlightedFields={updatedStateFields} onStateFieldChange={onStateFieldChange} />
 
           <button className="add-field">
             <Plus size={16} />
@@ -1307,12 +1958,59 @@ export function StateInspector({
       )}
 
       {activeTab === "代码" && <InspectorCode title="State 代码" code={getStateCode()} />}
-      {activeTab === "历史记录" && <StateHistory template={template} runIndex={runIndex} activeRunItem={activeRunItem} />}
+      {activeTab === "历史记录" && <StateHistory runIndex={runIndex} activeRunItem={activeRunItem} runHistory={runHistory} selectedRunHistoryId={selectedRunHistoryId} onOpenRunHistory={onOpenRunHistory} />}
     </div>
   );
 }
 
-export function getWorkflowHealth(template: Template, schemaSaved: boolean): WorkflowHealthSummary {
+type EnvironmentVariableRequirement = {
+  key: keyof EnvironmentConfig;
+  label: string;
+};
+
+type EnvironmentVariableIssue = {
+  node: FlowNode;
+  missing: EnvironmentVariableRequirement[];
+};
+
+export function getNodeEnvironmentRequirements(node: FlowNode): EnvironmentVariableRequirement[] {
+  if (node.kind === "llm" || node.kind === "agent") {
+    return [
+      { key: "baseUrl", label: "Base URL" },
+      { key: "apiKey", label: "API Key" },
+      { key: "model", label: "默认模型" }
+    ];
+  }
+
+  if (node.kind === "http" || node.kind === "tool") {
+    return [
+      { key: "searchApiUrl", label: "搜索 API URL" },
+      { key: "searchApiKey", label: "搜索 API Key" }
+    ];
+  }
+
+  if (node.kind === "database") {
+    return [{ key: "databaseUrl", label: "数据库 URL" }];
+  }
+
+  if (node.kind === "file") {
+    return [{ key: "fileStoragePath", label: "文件存储路径" }];
+  }
+
+  return [];
+}
+
+export function getEnvironmentVariableIssues(template: Template, activeEnvironment?: EnvironmentConfig): EnvironmentVariableIssue[] {
+  return template.nodes
+    .map((nodeItem) => {
+      const required = getNodeEnvironmentRequirements(nodeItem);
+      const missing = required.filter((item) => !String(activeEnvironment?.[item.key] ?? "").trim());
+      return { node: nodeItem, missing };
+    })
+    .filter((item) => item.missing.length);
+}
+
+export function getWorkflowHealth(template: Template, schemaSaved: boolean, activeEnvironment?: EnvironmentConfig): WorkflowHealthSummary {
   const startCount = template.nodes.filter((item) => item.id === "start").length;
   const endCount = template.nodes.filter((item) => item.id === "end").length;
   const ids = template.nodes.map((item) => item.id);
@@ -1332,8 +2030,11 @@ export function getWorkflowHealth(template: Template, schemaSaved: boolean): Wor
     const connected = new Set(template.edges.filter((edgeItem) => edgeItem.from === item.id).map((edgeItem) => edgeItem.label));
     return branches.includes("continue") && (branches.includes("end") || branches.includes("exit")) && branches.every((branch) => connected.has(branch));
   });
+  const environmentIssues = getEnvironmentVariableIssues(template, activeEnvironment);
+  const environmentOk = environmentIssues.length === 0;
   const checks: WorkflowHealthItem[] = [
     { ok: schemaSaved, label: schemaSaved ? "State Schema 已保存" : "缺少 State Schema" },
+    { ok: environmentOk, label: environmentOk ? "环境变量配置完整" : `${environmentIssues.length} 个节点缺少环境变量配置` },
     { ok: startCount === 1, label: startCount === 1 ? "有且只有一个 Start 节点" : "需要有且只有一个 Start 节点" },
     { ok: endCount >= 1, label: endCount >= 1 ? "至少一个 End 节点" : "至少需要一个 End 节点" },
     { ok: uniqueIds && uniqueNames, label: uniqueIds && uniqueNames ? "节点名字和 ID 均唯一" : "节点名字或 ID 存在重复" },
@@ -1349,53 +2050,236 @@ export function getWorkflowHealth(template: Template, schemaSaved: boolean): Wor
   const firstIssue = failed[0]?.label;
   const summary = canRun ? "工作流完整，可运行" : firstIssue ?? "工作流需要检查";
   const guidance = canRun
-    ? "当前工作流结构完整，State Schema 已保存，可以运行或单步运行。"
-    : "第一步：保存 State Schema。边只连接节点，条件分支和循环由 Router / Loop 节点表达。";
+    ? "当前工作流结构完整，State Schema 和环境变量均已配置，可以运行或单步运行。"
+    : environmentOk
+      ? "第一步：保存 State Schema。边只连接节点，条件分支和循环由 Router / Loop 节点表达。"
+      : "请先补齐当前环境中的节点变量参数，再运行或单步运行。";
 
   return { status, summary, guidance, canRun, checks };
 }
 
-export function StateHistory({ template, runIndex, activeRunItem }: { template: Template; runIndex: number; activeRunItem: string }) {
-  const visibleSteps = runIndex < 0 ? [] : template.runOrder.slice(0, runIndex + 1);
-  const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
+export function StateSchemaFields({
+  stateValues,
+  autoOpenFields,
+  highlightedFields,
+  onStateFieldChange
+}: {
+  stateValues: Record<string, unknown>;
+  autoOpenFields: string[];
+  highlightedFields: string[];
+  onStateFieldChange: (fieldName: string, value: unknown) => void;
+}) {
+  const [openFields, setOpenFields] = useState<Record<string, boolean>>({});
+  const highlightedFieldSet = useMemo(() => new Set(highlightedFields), [highlightedFields]);
 
   useEffect(() => {
-    setOpenItems({});
-  }, [template.id]);
-
-  if (!visibleSteps.length) {
-    return (
-      <div className="hint-box">
-        <Sparkles size={16} />
-        <span>运行或单步运行后，这里会保存每一次 State 变化后的状态。</span>
-      </div>
-    );
-  }
+    if (!autoOpenFields.length) return;
+    setOpenFields((items) => ({
+      ...items,
+      ...Object.fromEntries(autoOpenFields.map((field) => [field, true]))
+    }));
+  }, [autoOpenFields]);
 
   return (
-    <div className="state-history">
-      {visibleSteps.map((itemId, index) => {
-        const nodeItem = template.nodes.find((item) => item.id === itemId);
-        const edgeItem = template.edges.find((item) => item.id === itemId);
-        const key = `${itemId}-${index}`;
-        const open = openItems[key] ?? index === visibleSteps.length - 1;
-        const snapshot = createStateSnapshotForStep(template, itemId, index);
+    <div className="field-list schema-field-list">
+      {schemaFields.map((field) => {
+        const open = openFields[field.name] ?? false;
+        const highlighted = highlightedFieldSet.has(field.name);
+        const value = stateValues[field.name] ?? parseFormValue(field.defaultValue);
+        const defaultValue = parseFormValue(field.defaultValue);
 
         return (
-          <section className="history-item" key={key}>
-            <button className="history-toggle" onClick={() => setOpenItems((items) => ({ ...items, [key]: !open }))} aria-expanded={open}>
+          <section className={`field-row schema-field ${open ? "open" : ""} ${highlighted ? "updated" : ""}`} key={field.name}>
+            <button className="schema-field-toggle" onClick={() => setOpenFields((items) => ({ ...items, [field.name]: !open }))} aria-expanded={open}>
               <div>
-                <strong>{index + 1}. {nodeItem?.label ?? edgeItem?.label ?? itemId}</strong>
-                <span>{itemId === activeRunItem ? "当前步骤" : nodeItem ? "节点执行后" : "边通过后"}</span>
+                <strong>{field.name}</strong>
+                <span>{field.note}</span>
               </div>
-              {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              <div className="schema-field-meta">
+                {highlighted && <span className="schema-field-update-badge">运行更新</span>}
+                <em>{field.type}</em>
+                {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              </div>
             </button>
-            {open && <pre className="code-view">{formatJson(snapshot)}</pre>}
+
+            {open && (
+              <div className="schema-field-editor">
+                <div className="schema-field-facts">
+                  <span>默认值 <code>{summarizeStateValue(defaultValue)}</code></span>
+                  <span>当前值 <code>{summarizeStateValue(value)}</code></span>
+                </div>
+                <label>
+                  字段值
+                  <textarea
+                    value={formatFormValue(value)}
+                    onChange={(event) => onStateFieldChange(field.name, parseFormValue(event.currentTarget.value))}
+                    rows={field.type === "object" || field.type === "list" ? 5 : 3}
+                  />
+                </label>
+                <button className="tool-button compact" onClick={() => onStateFieldChange(field.name, defaultValue)}>
+                  <RefreshCcw size={14} />
+                  重置为默认值
+                </button>
+              </div>
+            )}
           </section>
         );
       })}
     </div>
   );
+}
+
+export function StateHistory({
+  runIndex,
+  activeRunItem,
+  runHistory,
+  selectedRunHistoryId,
+  onOpenRunHistory
+}: {
+  runIndex: number;
+  activeRunItem: string;
+  runHistory: WorkflowRunRecord[];
+  selectedRunHistoryId: string | null;
+  onOpenRunHistory: (run: WorkflowRunRecord) => void;
+}) {
+  if (!runHistory.length) {
+    return (
+      <div className="hint-box">
+        <Sparkles size={16} />
+        <span>完整运行一次工作流后，这里会保存一条历史记录。单步运行只推进执行轨迹，不会创建历史记录。</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {runIndex >= 0 && (
+        <div className="hint-box">
+          <Sparkles size={16} />
+          <span>当前执行位置：{activeRunItem || "ready"}。历史记录只在整轮运行完成后新增。</span>
+        </div>
+      )}
+      <div className="state-history">
+        {runHistory.map((run, index) => (
+          <section className={`history-item ${selectedRunHistoryId === run.id ? "active" : ""}`} key={run.id}>
+            <button className="history-toggle" onClick={() => onOpenRunHistory(run)} aria-label={`查看第 ${runHistory.length - index} 次运行详情`}>
+              <div>
+                <strong>{runHistory.length - index}. {run.workflowName}</strong>
+                <span>{formatRunTime(run.createdAt)} · {run.nodeCount} 个节点 · {run.status === "success" ? "运行成功" : run.status}</span>
+              </div>
+              <ChevronRight size={15} />
+            </button>
+            <p className="history-summary">{run.outputSummary}</p>
+          </section>
+        ))}
+      </div>
+    </>
+  );
+}
+
+export function RunHistoryDetail({ run, onClose }: { run: WorkflowRunRecord; onClose: () => void }) {
+  const windowRef = useRef<HTMLElement | null>(null);
+  const [openNodeIds, setOpenNodeIds] = useState<Record<string, boolean>>(() => {
+    const firstNode = run.nodes[0];
+    return firstNode ? { [`${firstNode.id}-0`]: true } : {};
+  });
+
+  useEffect(() => {
+    windowRef.current?.focus();
+  }, [run.id]);
+
+  function scrollFloatingWindow(delta: number) {
+    if (!windowRef.current) return;
+    windowRef.current.scrollTop += delta;
+  }
+
+  return (
+    <section
+      ref={windowRef}
+      className="history-floating-window glass"
+      role="dialog"
+      aria-modal="false"
+      aria-label="运行历史详情"
+      tabIndex={-1}
+      onWheel={(event) => {
+        scrollFloatingWindow(event.deltaY);
+        event.preventDefault();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "PageDown") {
+          scrollFloatingWindow(windowRef.current?.clientHeight ?? 420);
+          event.preventDefault();
+        }
+        if (event.key === "PageUp") {
+          scrollFloatingWindow(-(windowRef.current?.clientHeight ?? 420));
+          event.preventDefault();
+        }
+        if (event.key === "ArrowDown") {
+          scrollFloatingWindow(72);
+          event.preventDefault();
+        }
+        if (event.key === "ArrowUp") {
+          scrollFloatingWindow(-72);
+          event.preventDefault();
+        }
+      }}
+    >
+      <div className="history-floating-head">
+        <div>
+          <h3>{run.workflowName}</h3>
+          <p>{formatRunTime(run.createdAt)} · {run.nodeCount} 个节点 · 运行成功</p>
+        </div>
+        <button className="icon-button" onClick={onClose} aria-label="关闭历史详情">
+          <X size={16} />
+        </button>
+      </div>
+
+      <div className="history-node-list">
+        {run.nodes.map((nodeItem, index) => {
+          const stepId = `${nodeItem.id}-${index}`;
+          const open = openNodeIds[stepId] ?? false;
+
+          return (
+            <section className={`history-node ${open ? "open" : ""}`} key={`${run.id}-${stepId}`}>
+              <button
+                className="history-step-toggle"
+                onClick={() => setOpenNodeIds((items) => ({ ...items, [stepId]: !open }))}
+                aria-expanded={open}
+              >
+                <span>{index + 1}</span>
+                <strong>{nodeItem.label}</strong>
+                {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+
+              {open && (
+                <div className="history-step-fields">
+                  <div className="history-step-field">
+                    <span>输入</span>
+                    <pre className="code-view">{formatJson(nodeItem.input)}</pre>
+                  </div>
+                  <div className="history-step-field">
+                    <span>输出</span>
+                    <pre className="code-view">{formatJson(nodeItem.output)}</pre>
+                  </div>
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function formatRunTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 export function ConfigPopover({
@@ -1408,9 +2292,11 @@ export function ConfigPopover({
   onDeleteEdge,
   onRenameNode,
   onUpdateEdge,
+  onUpdateNode,
   onAddControlBranch,
   onUpdateControlBranch,
   onDeleteControlBranch,
+  activeEnvironment,
   onClose
 }: {
   target: ConfigTarget | null;
@@ -1422,9 +2308,11 @@ export function ConfigPopover({
   onDeleteEdge: (edgeId: string) => void;
   onRenameNode: (nodeId: string, nextName: string) => RenameNodeResult;
   onUpdateEdge: (edgeId: string, updates: Partial<Pick<FlowEdge, "label" | "sourceHandle" | "targetHandle">>) => void;
+  onUpdateNode: (nodeId: string, updates: Partial<Pick<FlowNode, "subtitle" | "logic" | "reads" | "writes" | "code" | "codeReview" | "codeSnapshots" | "control">>) => void;
   onAddControlBranch: (nodeId: string) => void;
   onUpdateControlBranch: (nodeId: string, branch: string, updates: { label?: string; target?: string }) => void;
   onDeleteControlBranch: (nodeId: string, branch: string) => void;
+  activeEnvironment?: EnvironmentConfig;
   onClose: () => void;
 }) {
   const expanded = target?.type === "node";
@@ -1517,6 +2405,7 @@ export function ConfigPopover({
     setConfiguredReads((items) => {
       const next = items.map((item, itemIndex) => (itemIndex === index ? field : item));
       resetNodeTestForFields(next, configuredWrites);
+      if (node) onUpdateNode(node.id, { reads: next });
       return next;
     });
   }
@@ -1525,6 +2414,7 @@ export function ConfigPopover({
     setConfiguredWrites((items) => {
       const next = items.map((item, itemIndex) => (itemIndex === index ? field : item));
       resetNodeTestForFields(configuredReads, next);
+      if (node) onUpdateNode(node.id, { writes: next });
       return next;
     });
   }
@@ -1533,6 +2423,7 @@ export function ConfigPopover({
     setConfiguredReads((items) => {
       const next = [...items, schemaFields.find((field) => !items.includes(field.name))?.name ?? schemaFields[0].name];
       resetNodeTestForFields(next, configuredWrites);
+      if (node) onUpdateNode(node.id, { reads: next });
       return next;
     });
   }
@@ -1541,6 +2432,7 @@ export function ConfigPopover({
     setConfiguredWrites((items) => {
       const next = [...items, schemaFields.find((field) => !items.includes(field.name))?.name ?? schemaFields[0].name];
       resetNodeTestForFields(configuredReads, next);
+      if (node) onUpdateNode(node.id, { writes: next });
       return next;
     });
   }
@@ -1549,6 +2441,7 @@ export function ConfigPopover({
     setConfiguredReads((items) => {
       const next = items.filter((_, itemIndex) => itemIndex !== index);
       resetNodeTestForFields(next, configuredWrites);
+      if (node) onUpdateNode(node.id, { reads: next });
       return next;
     });
   }
@@ -1557,6 +2450,7 @@ export function ConfigPopover({
     setConfiguredWrites((items) => {
       const next = items.filter((_, itemIndex) => itemIndex !== index);
       resetNodeTestForFields(configuredReads, next);
+      if (node) onUpdateNode(node.id, { writes: next });
       return next;
     });
   }
@@ -1707,7 +2601,9 @@ export function ConfigPopover({
             onRunTest={runNodeTest}
             onFillCurrentState={fillNodeTestFromCurrentState}
             template={template}
+            activeEnvironment={activeEnvironment}
             onRenameNode={onRenameNode}
+            onUpdateNode={onUpdateNode}
             onAddControlBranch={onAddControlBranch}
             onUpdateControlBranch={onUpdateControlBranch}
             onDeleteControlBranch={onDeleteControlBranch}
@@ -1725,6 +2621,42 @@ export function ConfigPopover({
       </div>
     </section>
   );
+}
+
+type CodeDiffLine = {
+  lineNumber: number;
+  before: string;
+  after: string;
+  status: "same" | "changed" | "added" | "removed";
+};
+
+function createCodeDiffLines(beforeCode: string, afterCode: string): CodeDiffLine[] {
+  const beforeLines = beforeCode.split("\n");
+  const afterLines = afterCode.split("\n");
+  const lineCount = Math.max(beforeLines.length, afterLines.length);
+
+  return Array.from({ length: lineCount }, (_, index) => {
+    const before = beforeLines[index] ?? "";
+    const after = afterLines[index] ?? "";
+    const beforeExists = index < beforeLines.length;
+    const afterExists = index < afterLines.length;
+    const status = before === after ? "same" : beforeExists && afterExists ? "changed" : beforeExists ? "removed" : "added";
+
+    return {
+      lineNumber: index + 1,
+      before,
+      after,
+      status
+    };
+  });
+}
+
+function pushCodeSnapshot(snapshots: string[] | undefined, code: string) {
+  const trimmedCode = code.trim();
+  if (!trimmedCode) return snapshots ?? [];
+  const current = snapshots ?? [];
+  if (current[current.length - 1] === code) return current;
+  return [...current, code].slice(-10);
 }
 
 export function NodeInspector({
@@ -1748,7 +2680,9 @@ export function NodeInspector({
   onRunTest,
   onFillCurrentState,
   template,
+  activeEnvironment,
   onRenameNode,
+  onUpdateNode,
   onAddControlBranch,
   onUpdateControlBranch,
   onDeleteControlBranch
@@ -1773,7 +2707,9 @@ export function NodeInspector({
   onRunTest: () => void;
   onFillCurrentState: () => void;
   template: Template;
+  activeEnvironment?: EnvironmentConfig;
   onRenameNode: (nodeId: string, nextName: string) => RenameNodeResult;
+  onUpdateNode: (nodeId: string, updates: Partial<Pick<FlowNode, "subtitle" | "logic" | "reads" | "writes" | "code" | "codeReview" | "codeSnapshots" | "control">>) => void;
   onAddControlBranch: (nodeId: string) => void;
   onUpdateControlBranch: (nodeId: string, branch: string, updates: { label?: string; target?: string }) => void;
   onDeleteControlBranch: (nodeId: string, branch: string) => void;
@@ -1784,6 +2720,10 @@ export function NodeInspector({
   const [nameError, setNameError] = useState("");
   const [purposeDraft, setPurposeDraft] = useState(node.subtitle);
   const [logicDraft, setLogicDraft] = useState(node.logic);
+  const codeReview = node.codeReview;
+  const codeSnapshots = node.codeSnapshots ?? [];
+  const currentCode = getNodeCode(node, template);
+  const diffLines = codeReview ? createCodeDiffLines(codeReview.before, codeReview.after) : [];
 
   useEffect(() => {
     setNameDraft(node.label);
@@ -1792,7 +2732,7 @@ export function NodeInspector({
     setLogicDraft(node.logic);
     setCodeDraft(getNodeCode(node, template));
     setCodeCollapsed(false);
-  }, [node.id, node.control, template]);
+  }, [node.id, node.subtitle, node.logic, node.code, node.codeReview, node.control, node.reads, node.writes, template]);
 
   function commitNodeName() {
     if (node.kind === "system") return;
@@ -1807,8 +2747,54 @@ export function NodeInspector({
   }
 
   function generateCodeFromConfig() {
-    setCodeDraft(getGeneratedNodeCode(node, purposeDraft, logicDraft));
+    const nextCode = getGeneratedNodeCode(node, purposeDraft, logicDraft);
+    setCodeDraft(nextCode);
     setCodeCollapsed(false);
+    onUpdateNode(node.id, {
+      subtitle: purposeDraft,
+      logic: logicDraft,
+      code: nextCode,
+      codeReview: undefined,
+      codeSnapshots: pushCodeSnapshot(node.codeSnapshots, currentCode)
+    });
+  }
+
+  function persistNodeConfig(updates: Partial<Pick<FlowNode, "subtitle" | "logic" | "code">>) {
+    if (node.kind === "system") return;
+    if (updates.code !== undefined && updates.code !== currentCode) {
+      onUpdateNode(node.id, { ...updates, codeReview: undefined, codeSnapshots: pushCodeSnapshot(node.codeSnapshots, currentCode) });
+      return;
+    }
+    onUpdateNode(node.id, updates);
+  }
+
+  function acceptCodeReview() {
+    if (!codeReview) return;
+    onUpdateNode(node.id, {
+      code: codeReview.after,
+      codeReview: undefined,
+      codeSnapshots: pushCodeSnapshot(node.codeSnapshots, codeReview.before)
+    });
+    setCodeDraft(codeReview.after);
+  }
+
+  function rejectCodeReview() {
+    if (!codeReview) return;
+    onUpdateNode(node.id, {
+      codeReview: undefined
+    });
+    setCodeDraft(codeReview.before);
+  }
+
+  function rollbackCodeSnapshot() {
+    const previousCode = codeSnapshots[codeSnapshots.length - 1];
+    if (!previousCode) return;
+    onUpdateNode(node.id, {
+      code: previousCode,
+      codeReview: undefined,
+      codeSnapshots: codeSnapshots.slice(0, -1)
+    });
+    setCodeDraft(previousCode);
   }
 
   return (
@@ -1845,6 +2831,7 @@ export function NodeInspector({
           <NodeTypeDetails
             node={node}
             template={template}
+            activeEnvironment={activeEnvironment}
             onAddControlBranch={onAddControlBranch}
             onUpdateControlBranch={onUpdateControlBranch}
             onDeleteControlBranch={onDeleteControlBranch}
@@ -1856,6 +2843,7 @@ export function NodeInspector({
               className="config-textarea compact"
               value={purposeDraft}
               onChange={(event) => setPurposeDraft(event.target.value)}
+              onBlur={() => persistNodeConfig({ subtitle: purposeDraft })}
               spellCheck={false}
             />
           </div>
@@ -1872,6 +2860,7 @@ export function NodeInspector({
               className="config-textarea"
               value={logicDraft}
               onChange={(event) => setLogicDraft(event.target.value)}
+              onBlur={() => persistNodeConfig({ logic: logicDraft })}
               spellCheck={false}
             />
           </div>
@@ -1908,7 +2897,65 @@ export function NodeInspector({
               {codeCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
             </button>
             {!codeCollapsed && (
-              <textarea className="code-editor" value={codeDraft} onChange={(event) => setCodeDraft(event.target.value)} spellCheck={false} />
+              <div className="code-review-shell">
+                <div className="code-review-actions">
+                  {codeReview ? (
+                    <span className="code-review-status">AI 修改待确认</span>
+                  ) : (
+                    <span className="code-review-status neutral">当前版本</span>
+                  )}
+                  <div>
+                    <button className="icon-button" onClick={rollbackCodeSnapshot} disabled={!codeSnapshots.length} aria-label="回退到上一个代码快照">
+                      <RefreshCcw size={15} />
+                    </button>
+                    {codeReview ? (
+                      <>
+                        <button className="icon-button success" onClick={acceptCodeReview} aria-label="接受 AI 代码修改">
+                          <Check size={15} />
+                        </button>
+                        <button className="icon-button danger" onClick={rejectCodeReview} aria-label="拒绝 AI 代码修改">
+                          <X size={15} />
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                {codeReview ? (
+                  <div className="code-diff-grid" aria-label="代码修改对比">
+                    <div className="code-diff-pane">
+                      <div className="code-diff-title">修改前</div>
+                      <pre className="code-diff-view">
+                        {diffLines.map((line) => (
+                          <span className={`code-diff-line ${line.status === "added" ? "same" : line.status}`} key={`before-${line.lineNumber}`}>
+                            <em>{line.lineNumber}</em>
+                            <code>{line.before || " "}</code>
+                          </span>
+                        ))}
+                      </pre>
+                    </div>
+                    <div className="code-diff-pane">
+                      <div className="code-diff-title">修改后</div>
+                      <pre className="code-diff-view">
+                        {diffLines.map((line) => (
+                          <span className={`code-diff-line ${line.status === "removed" ? "same" : line.status}`} key={`after-${line.lineNumber}`}>
+                            <em>{line.lineNumber}</em>
+                            <code>{line.after || " "}</code>
+                          </span>
+                        ))}
+                      </pre>
+                    </div>
+                  </div>
+                ) : (
+                  <textarea
+                    className="code-editor"
+                    value={codeDraft}
+                    onChange={(event) => setCodeDraft(event.target.value)}
+                    onBlur={() => persistNodeConfig({ code: codeDraft })}
+                    spellCheck={false}
+                  />
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -1935,12 +2982,14 @@ export function NodeInspector({
 export function NodeTypeDetails({
   node,
   template,
+  activeEnvironment,
   onAddControlBranch,
   onUpdateControlBranch,
   onDeleteControlBranch
 }: {
   node: FlowNode;
   template: Template;
+  activeEnvironment?: EnvironmentConfig;
   onAddControlBranch: (nodeId: string) => void;
   onUpdateControlBranch: (nodeId: string, branch: string, updates: { label?: string; target?: string }) => void;
   onDeleteControlBranch: (nodeId: string, branch: string) => void;
@@ -1989,37 +3038,24 @@ export function NodeTypeDetails({
 
   if (node.kind === "http") {
     return (
-      <div className="config-card">
-        <h3>第三方系统接入</h3>
-        <p>method：POST</p>
-        <p>url：SEARCH_API_URL</p>
-        <p>secret：SEARCH_API_KEY</p>
-        <p>timeout：30s · retry：2 · error strategy：raise</p>
-      </div>
+      <EnvironmentParameterForm node={node} activeEnvironment={activeEnvironment} />
     );
   }
 
   if (node.kind === "database" || node.kind === "file") {
     return (
-      <div className="config-card">
-        <h3>外部数据源</h3>
-        <p>{node.kind === "database" ? "database type：PostgreSQL" : "source type：local / cloud / s3 / drive"}</p>
-        <p>input mapping：State 字段映射到请求参数</p>
-        <p>output mapping：结果写回 State</p>
-        <p>error strategy：raise / retry / fallback</p>
-      </div>
+      <EnvironmentParameterForm node={node} activeEnvironment={activeEnvironment} />
     );
   }
 
   if (node.kind === "llm") {
     return (
-      <div className="config-card">
-        <h3>LLM 配置</h3>
-        <p>model：gpt-4.1-mini</p>
-        <p>system prompt：你是一个教学助手</p>
-        <p>temperature：0.7</p>
-      </div>
+      <EnvironmentParameterForm node={node} activeEnvironment={activeEnvironment} />
     );
+  }
+
+  if (node.kind === "agent" || node.kind === "tool") {
+    return <EnvironmentParameterForm node={node} activeEnvironment={activeEnvironment} />;
   }
 
   if (node.kind === "system") {
@@ -2032,6 +3068,151 @@ export function NodeTypeDetails({
   }
 
   return null;
+}
+
+type NodeParameterSource = "environment" | "custom";
+
+type NodeParameterDefinition = {
+  name: string;
+  label: string;
+  envKey?: keyof EnvironmentConfig;
+  defaultValue?: string;
+  secret?: boolean;
+};
+
+export function getNodeParameterDefinitions(node: FlowNode): { title: string; note: string; parameters: NodeParameterDefinition[] } | null {
+  if (node.kind === "llm" || node.kind === "agent") {
+    return {
+      title: node.kind === "agent" ? "Agent 模型与工具意图配置" : "LLM 配置",
+      note: "模型连接参数建议来自当前全局环境，也可以在节点内自定义覆盖。",
+      parameters: [
+        { name: "model", label: "model", envKey: "model", defaultValue: "gpt-4.1-mini" },
+        { name: "baseUrl", label: "base url", envKey: "baseUrl" },
+        { name: "apiKey", label: "api key", envKey: "apiKey", secret: true },
+        { name: "systemPrompt", label: "system prompt", defaultValue: node.kind === "agent" ? "你是一个可调用工具的教学 Agent" : "你是一个教学助手" },
+        { name: "temperature", label: "temperature", defaultValue: "0.7" }
+      ]
+    };
+  }
+
+  if (node.kind === "http" || node.kind === "tool") {
+    return {
+      title: node.kind === "tool" ? "工具 / 第三方系统接入" : "第三方系统接入",
+      note: "URL 和密钥需要在当前环境中配置，或在节点内自定义覆盖。",
+      parameters: [
+        { name: "method", label: "method", defaultValue: "POST" },
+        { name: "url", label: "url", envKey: "searchApiUrl" },
+        { name: "secret", label: "secret", envKey: "searchApiKey", secret: true },
+        { name: "timeout", label: "timeout", defaultValue: "30s" },
+        { name: "retry", label: "retry", defaultValue: "2" },
+        { name: "errorStrategy", label: "error strategy", defaultValue: "raise" }
+      ]
+    };
+  }
+
+  if (node.kind === "database") {
+    return {
+      title: "数据库参数配置",
+      note: "数据库 URL 需要在当前环境中配置，或在节点内自定义覆盖。",
+      parameters: [
+        { name: "databaseType", label: "database type", defaultValue: "PostgreSQL" },
+        { name: "databaseUrl", label: "database url", envKey: "databaseUrl" },
+        { name: "inputMapping", label: "input mapping", defaultValue: "State 字段映射到查询参数" },
+        { name: "outputMapping", label: "output mapping", defaultValue: "结果写回 State" },
+        { name: "errorStrategy", label: "error strategy", defaultValue: "raise" }
+      ]
+    };
+  }
+
+  if (node.kind === "file") {
+    return {
+      title: "文件 / 云盘参数配置",
+      note: "文件存储路径需要在当前环境中配置，或在节点内自定义覆盖。",
+      parameters: [
+        { name: "sourceType", label: "source type", defaultValue: "local / cloud / s3 / drive" },
+        { name: "fileStoragePath", label: "file storage path", envKey: "fileStoragePath" },
+        { name: "inputMapping", label: "input mapping", defaultValue: "State 字段映射到文件请求" },
+        { name: "outputMapping", label: "output mapping", defaultValue: "读取结果写回 State" },
+        { name: "errorStrategy", label: "error strategy", defaultValue: "raise" }
+      ]
+    };
+  }
+
+  return null;
+}
+
+export function EnvironmentParameterForm({ node, activeEnvironment }: { node: FlowNode; activeEnvironment?: EnvironmentConfig }) {
+  const definition = getNodeParameterDefinitions(node);
+  const [sources, setSources] = useState<Record<string, NodeParameterSource>>({});
+  const [customValues, setCustomValues] = useState<Record<string, string>>({});
+  const missingRequired = getNodeEnvironmentRequirements(node).filter((item) => !String(activeEnvironment?.[item.key] ?? "").trim());
+
+  useEffect(() => {
+    if (!definition) return;
+    setSources(Object.fromEntries(definition.parameters.map((item) => [item.name, item.envKey ? "environment" : "custom"])));
+    setCustomValues(Object.fromEntries(definition.parameters.map((item) => [item.name, item.defaultValue ?? ""])));
+  }, [activeEnvironment?.id, definition?.title, node.id]);
+
+  if (!definition) return null;
+
+  function getEnvironmentLabel(parameter: NodeParameterDefinition) {
+    if (!parameter.envKey) return "";
+    return activeEnvironment?.name ? `当前环境：${activeEnvironment.name}` : "当前环境";
+  }
+
+  function getEnvironmentValue(parameter: NodeParameterDefinition) {
+    return String(parameter.envKey ? activeEnvironment?.[parameter.envKey] ?? "" : "");
+  }
+
+  return (
+    <div className="config-card parameter-card">
+      <div className="card-title-row">
+        <h3>{definition.title}</h3>
+        <span className={`parameter-status ${missingRequired.length ? "warning" : "ok"}`}>
+          {missingRequired.length ? `${missingRequired.length} 项待配置` : "环境变量已配置"}
+        </span>
+      </div>
+      <p className="parameter-note">{definition.note}</p>
+      {missingRequired.length ? (
+        <div className="hint-box warning parameter-warning">
+          <AlertTriangle size={16} />
+          <span>当前环境缺少 {missingRequired.map((item) => item.label).join("、")}，该节点运行检查不会通过。</span>
+        </div>
+      ) : null}
+
+      <div className="parameter-form">
+        {definition.parameters.map((parameter) => {
+          const source = sources[parameter.name] ?? (parameter.envKey ? "environment" : "custom");
+          const environmentValue = getEnvironmentValue(parameter);
+          const customValue = customValues[parameter.name] ?? parameter.defaultValue ?? "";
+          const effectiveValue = source === "environment" ? environmentValue : customValue;
+          const missing = !String(effectiveValue).trim();
+
+          return (
+            <label className={`parameter-row ${missing ? "missing" : ""}`} key={parameter.name}>
+              <span>{parameter.label}</span>
+              <select
+                value={source}
+                disabled={!parameter.envKey}
+                onChange={(event) => setSources((items) => ({ ...items, [parameter.name]: event.target.value as NodeParameterSource }))}
+              >
+                {parameter.envKey ? <option value="environment">{getEnvironmentLabel(parameter)}</option> : null}
+                <option value="custom">自定义</option>
+              </select>
+              <input
+                type={parameter.secret ? "password" : "text"}
+                value={effectiveValue}
+                readOnly={source === "environment"}
+                placeholder={source === "environment" ? "当前环境未配置" : "输入自定义参数"}
+                onChange={(event) => setCustomValues((items) => ({ ...items, [parameter.name]: event.target.value }))}
+              />
+              <small>{missing ? "未配置" : source === "environment" ? "来自环境配置" : "节点自定义"}</small>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export function ControlBranchEditor({
@@ -2530,4 +3711,3 @@ export function LogView({ template, runIndex }: { template: Template; runIndex: 
     </div>
   );
 }
-

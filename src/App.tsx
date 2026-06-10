@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { type Connection } from "@xyflow/react";
 import { Navigate, Route as RouterRoute, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import { mockStudentProfile } from "./data/mockStudentProfile";
@@ -12,10 +12,14 @@ import {
   type ConfigTarget,
   type CreateNodePayload,
   type EdgeSide,
+  type EnvironmentConfig,
   type FlowEdge,
+  type FlowNode,
   type MockSession,
   type MockTask,
   type PersistedAppState,
+  type PersistedRunHistory,
+  type PersistedStateValues,
   type RenameNodeResult,
   type Selection,
   type StateTab,
@@ -25,7 +29,10 @@ import {
   addBranch,
   createBlankWorkflow,
   createPaletteNode,
+  createRuntimeStateSnapshot,
+  createWorkflowRunRecord,
   edge,
+  getDefaultStateValues,
   getAutoEdgeHandles,
   getControlBranches,
   getEdgeDefaults,
@@ -37,13 +44,15 @@ import {
   inferTemplateIdFromDescription,
   isControlNode,
   isEdgeSideHandle,
+  mergeBuiltinWorkflows,
   mergeStoredTasks,
   mockCourses,
   mockTasks,
-  nodePalette,
   readMockSession,
+  readStoredMockSettings,
   readStoredAppState,
   sessionStorageKey,
+  settingsStorageKey,
   storageKey,
   templates
 } from "./app/model";
@@ -60,12 +69,23 @@ import {
   Inspector,
   NotFoundPage,
   PlaceholderShell,
+  RunHistoryDetail,
   RunPanel,
-  Sidebar,
   TaskDetailPage,
   TasksPage,
   Topbar
 } from "./components/app";
+
+function stableStateValue(value: unknown) {
+  if (value === undefined) return "__undefined__";
+  if (!value || typeof value !== "object" || Array.isArray(value)) return JSON.stringify(value);
+
+  try {
+    return JSON.stringify(value, Object.keys(value as Record<string, unknown>).sort());
+  } catch {
+    return String(value);
+  }
+}
 
 export default function App() {
   const navigate = useNavigate();
@@ -81,7 +101,8 @@ export default function App() {
 
   const [initialState] = useState(() => {
     const stored = readStoredAppState();
-    const workflows = stored.workflows?.length ? stored.workflows : templates;
+    const settings = readStoredMockSettings();
+    const workflows = mergeBuiltinWorkflows(stored.workflows);
     const activeTemplateId = routeWorkflowId ?? stored.activeTemplateId ?? "showcase";
     const activeTemplate = workflows.find((item) => item.id === activeTemplateId) ?? workflows[0] ?? templates[0];
     const workflowDescription =
@@ -98,7 +119,10 @@ export default function App() {
       activeTaskId: mockTasks.some((item) => item.id === routeTaskId) ? routeTaskId : mockTasks[0].id,
       workflowDescription,
       schemaSaved: stored.schemaSaved ?? false,
-      nodePositions: stored.nodePositions ?? {}
+      nodePositions: stored.nodePositions ?? {},
+      stateValues: stored.stateValues ?? {},
+      runHistory: stored.runHistory ?? {},
+      settings
     };
   });
   const [session, setSession] = useState<MockSession | null>(() => readMockSession());
@@ -113,19 +137,23 @@ export default function App() {
   const [configTarget, setConfigTarget] = useState<ConfigTarget | null>(null);
   const [schemaSaved, setSchemaSaved] = useState(initialState.schemaSaved);
   const [stateTab, setStateTab] = useState<StateTab>("Schema");
-  const [searchTerm, setSearchTerm] = useState("");
   const [bottomOpen, setBottomOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<BottomTab>("运行结果");
   const [runIndex, setRunIndex] = useState(-1);
   const [isRunning, setIsRunning] = useState(false);
   const [layoutPulse, setLayoutPulse] = useState(false);
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [homeSidebarCollapsed, setHomeSidebarCollapsed] = useState(false);
   const [workflowViewMode, setWorkflowViewMode] = useState<WorkflowViewMode>("gallery");
   const [draggingPaletteNode, setDraggingPaletteNode] = useState<CreateNodePayload | null>(null);
   const [codeModalOpen, setCodeModalOpen] = useState(false);
   const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>(initialState.nodePositions);
+  const [environments, setEnvironments] = useState<EnvironmentConfig[]>(initialState.settings.environments);
+  const [activeEnvironmentId, setActiveEnvironmentId] = useState(initialState.settings.activeEnvironmentId);
+  const [stateValues, setStateValues] = useState<PersistedStateValues>(initialState.stateValues);
+  const [runHistory, setRunHistory] = useState<PersistedRunHistory>(initialState.runHistory);
+  const [selectedRunHistoryId, setSelectedRunHistoryId] = useState<string | null>(null);
+  const activeRunSessionRef = useRef<string | null>(null);
 
   const activeTemplate = useMemo(
     () => (routeWorkflowId ? workflows.find((item) => item.id === routeWorkflowId) : undefined) ?? workflows.find((item) => item.id === activeTemplateId) ?? workflows[0] ?? templates[0],
@@ -141,6 +169,19 @@ export default function App() {
   const activeTask = routeTask ?? tasks.find((item) => item.id === activeTaskId) ?? tasks[0] ?? mockTasks[0];
 
   const activeRunItem = runIndex >= 0 ? activeTemplate.runOrder[runIndex] ?? "" : "";
+  const activeStateValues = useMemo(() => ({ ...getDefaultStateValues(), ...(stateValues[activeTemplate.id] ?? {}) }), [activeTemplate.id, stateValues]);
+  const visibleStateValues = useMemo(() => {
+    if (runIndex < 0 || !activeRunItem) return activeStateValues;
+    return createRuntimeStateSnapshot(activeTemplate, activeStateValues, runIndex);
+  }, [activeRunItem, activeStateValues, activeTemplate, runIndex]);
+  const updatedStateFields = useMemo(() => {
+    if (runIndex < 0 || runIndex >= activeTemplate.runOrder.length - 1) return [];
+    const previousState = runIndex > 0 ? createRuntimeStateSnapshot(activeTemplate, activeStateValues, runIndex - 1) : activeStateValues;
+    const fields = new Set([...Object.keys(previousState), ...Object.keys(visibleStateValues)]);
+    return Array.from(fields).filter((field) => stableStateValue(previousState[field]) !== stableStateValue(visibleStateValues[field]));
+  }, [activeStateValues, activeTemplate, runIndex, visibleStateValues]);
+  const activeRunHistory = runHistory[activeTemplate.id] ?? [];
+  const selectedRunHistory = activeRunHistory.find((item) => item.id === selectedRunHistoryId) ?? null;
   const configNode = configTarget?.type === "node" ? activeTemplate.nodes.find((item) => item.id === configTarget.id) : undefined;
   const configEdge = configTarget?.type === "edge" ? activeTemplate.edges.find((item) => item.id === configTarget.id) : undefined;
 
@@ -154,6 +195,8 @@ export default function App() {
     setConfigTarget(null);
     setRunIndex(-1);
     setIsRunning(false);
+    activeRunSessionRef.current = null;
+    setSelectedRunHistoryId(null);
     setBottomOpen(false);
     setNodePositions({});
   }, [activeTemplateId, routeWorkflowId, workflows]);
@@ -180,15 +223,50 @@ export default function App() {
         activeTemplateId: activeTemplate.id,
         workflowDescription,
         schemaSaved,
-        nodePositions
+        nodePositions,
+        stateValues,
+        runHistory
       } satisfies PersistedAppState)
     );
-  }, [activeTemplate.id, nodePositions, schemaSaved, tasks, workflowDescription, workflows]);
+  }, [activeTemplate.id, nodePositions, runHistory, schemaSaved, stateValues, tasks, workflowDescription, workflows]);
+
+  useEffect(() => {
+    const safeEnvironments = environments.length ? environments : initialState.settings.environments;
+    const safeActiveId = safeEnvironments.some((item) => item.id === activeEnvironmentId) ? activeEnvironmentId : safeEnvironments[0].id;
+    const settings = readStoredMockSettings();
+    window.localStorage.setItem(
+      settingsStorageKey,
+      JSON.stringify({
+        ...settings,
+        environments: safeEnvironments,
+        activeEnvironmentId: safeActiveId
+      })
+    );
+    if (safeActiveId !== activeEnvironmentId) {
+      setActiveEnvironmentId(safeActiveId);
+    }
+  }, [activeEnvironmentId, environments, initialState.settings.environments]);
 
   useEffect(() => {
     if (!isRunning) return;
 
     if (runIndex >= activeTemplate.runOrder.length - 1) {
+      const runSessionId = activeRunSessionRef.current;
+      if (runSessionId) {
+        setRunHistory((history) => {
+          const existing = history[activeTemplate.id] ?? [];
+          if (existing.some((item) => item.id === runSessionId)) return history;
+          const record = {
+            ...createWorkflowRunRecord(activeTemplate, activeStateValues, existing.length + 1),
+            id: runSessionId
+          };
+          return {
+            ...history,
+            [activeTemplate.id]: [record, ...existing].slice(0, 20)
+          };
+        });
+        activeRunSessionRef.current = null;
+      }
       setIsRunning(false);
       return;
     }
@@ -198,7 +276,7 @@ export default function App() {
     }, 760);
 
     return () => window.clearTimeout(timer);
-  }, [isRunning, runIndex, activeTemplate.runOrder.length]);
+  }, [activeStateValues, activeTemplate, isRunning, runIndex]);
 
   useEffect(() => {
     if (!draggingPaletteNode) return;
@@ -219,6 +297,8 @@ export default function App() {
     setConfigTarget(null);
     setRunIndex(-1);
     setIsRunning(false);
+    activeRunSessionRef.current = null;
+    setSelectedRunHistoryId(null);
     setBottomOpen(false);
     setNodePositions({});
   }
@@ -322,6 +402,8 @@ export default function App() {
     setConfigTarget(null);
     setRunIndex(-1);
     setIsRunning(false);
+    activeRunSessionRef.current = null;
+    setSelectedRunHistoryId(null);
     setBottomOpen(false);
     setNodePositions({});
     navigate(`/workflows/${nextWorkflow.id}`);
@@ -657,6 +739,28 @@ export default function App() {
     );
   }
 
+  function updateCanvasNode(nodeId: string, updates: Partial<Pick<FlowNode, "subtitle" | "logic" | "reads" | "writes" | "code" | "codeReview" | "codeSnapshots" | "control">>) {
+    setWorkflows((items) =>
+      items.map((item) =>
+        item.id === activeTemplate.id
+          ? {
+              ...item,
+              nodes: item.nodes.map((nodeItem) =>
+                nodeItem.id === nodeId
+                  ? {
+                      ...nodeItem,
+                      ...updates,
+                      reads: updates.reads ? updates.reads.filter(Boolean) : nodeItem.reads,
+                      writes: updates.writes ? updates.writes.filter(Boolean) : nodeItem.writes
+                    }
+                  : nodeItem
+              )
+            }
+          : item
+      )
+    );
+  }
+
   function updateControlBranch(nodeId: string, branch: string, updates: { label?: string; target?: string }) {
     const nextLabel = updates.label?.trim() || branch;
     setWorkflows((items) =>
@@ -813,6 +917,8 @@ export default function App() {
       setConfigTarget(null);
       setRunIndex(-1);
       setIsRunning(false);
+      activeRunSessionRef.current = null;
+      setSelectedRunHistoryId(null);
       setBottomOpen(false);
       setNodePositions({});
     }
@@ -821,6 +927,8 @@ export default function App() {
   function returnHome() {
     setActiveChapterId(undefined);
     setIsRunning(false);
+    activeRunSessionRef.current = null;
+    setSelectedRunHistoryId(null);
     setBottomOpen(false);
     setConfigTarget(null);
     setCodeModalOpen(false);
@@ -833,8 +941,10 @@ export default function App() {
     navigate("/login", { replace: true });
   }
 
-  function generateWorkflowFromDescription() {
-    const nextTemplateId = inferTemplateIdFromDescription(workflowDescription);
+  function generateWorkflowFromDescription(description = workflowDescription) {
+    const nextDescription = description.trim() || workflowDescription;
+    setWorkflowDescription(nextDescription);
+    const nextTemplateId = inferTemplateIdFromDescription(nextDescription);
     setActiveTemplateId(nextTemplateId);
     setSchemaSaved(true);
     setStateTab("Schema");
@@ -842,10 +952,23 @@ export default function App() {
     setConfigTarget(null);
     setRunIndex(-1);
     setIsRunning(false);
+    activeRunSessionRef.current = null;
+    setSelectedRunHistoryId(null);
     setBottomOpen(false);
     setNodePositions({});
     setLayoutPulse(true);
     window.setTimeout(() => setLayoutPulse(false), 720);
+  }
+
+  function updateStateField(fieldName: string, value: unknown) {
+    setStateValues((values) => ({
+      ...values,
+      [activeTemplate.id]: {
+        ...values[activeTemplate.id],
+        [fieldName]: value
+      }
+    }));
+    setSchemaSaved(false);
   }
 
   function runFlow() {
@@ -857,10 +980,11 @@ export default function App() {
     }
     setBottomOpen(true);
     setActiveTab("执行轨迹");
-    setStateTab("历史记录");
+    setStateTab("Schema");
     setRightCollapsed(false);
     setRunIndex(0);
     setIsRunning(true);
+    activeRunSessionRef.current = `${activeTemplate.id}-${Date.now()}`;
   }
 
   function stepFlow() {
@@ -872,9 +996,10 @@ export default function App() {
     }
     setBottomOpen(true);
     setActiveTab("执行轨迹");
-    setStateTab("历史记录");
+    setStateTab("Schema");
     setRightCollapsed(false);
     setIsRunning(false);
+    activeRunSessionRef.current = null;
     setRunIndex((value) => (value + 1 >= activeTemplate.runOrder.length ? 0 : value + 1));
   }
 
@@ -886,11 +1011,6 @@ export default function App() {
     setLayoutPulse(true);
     window.setTimeout(() => setLayoutPulse(false), 720);
   }
-
-  const filteredPalette = nodePalette.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => item.includes(searchTerm.trim()))
-  }));
 
   function completeAuth(nextSession: MockSession) {
     window.localStorage.setItem(sessionStorageKey, JSON.stringify(nextSession));
@@ -1015,6 +1135,7 @@ export default function App() {
         workflowDescription={workflowDescription}
         activeRunItem={activeRunItem}
         selection={selection}
+        configTarget={configTarget}
         schemaSaved={schemaSaved}
         layoutPulse={layoutPulse}
         nodePositions={nodePositions}
@@ -1028,6 +1149,7 @@ export default function App() {
         onCreateEdge={createCanvasEdge}
         onReconnectEdge={reconnectCanvasEdge}
         onQuickAddNode={quickAddCanvasNode}
+        onUpdateNode={updateCanvasNode}
         draggingPaletteNode={draggingPaletteNode}
         onFinishNodeDrag={() => setDraggingPaletteNode(null)}
         onDeleteNode={deleteCanvasNode}
@@ -1042,21 +1164,15 @@ export default function App() {
         onRenameWorkflow={renameActiveWorkflow}
         onRun={runFlow}
         onStep={stepFlow}
-  onShowCode={showCode}
-  onAutoLayout={autoLayout}
-  nodePositions={nodePositions}
-/>
-
-      <Sidebar
-        collapsed={leftCollapsed}
-        onCollapsed={setLeftCollapsed}
-        searchTerm={searchTerm}
-        onSearch={setSearchTerm}
-        filteredPalette={filteredPalette}
-        activeTemplateId={activeTemplateId}
-        onTemplate={switchTemplate}
-        onCreateNode={createCanvasNode}
-        onStartNodeDrag={setDraggingPaletteNode}
+        onShowCode={showCode}
+        nodePositions={nodePositions}
+        environments={environments}
+        activeEnvironmentId={activeEnvironmentId}
+        onSelectEnvironment={setActiveEnvironmentId}
+        onSaveEnvironments={(nextEnvironments, nextActiveId) => {
+          setEnvironments(nextEnvironments);
+          setActiveEnvironmentId(nextActiveId);
+        }}
       />
 
       <Inspector
@@ -1068,8 +1184,18 @@ export default function App() {
         template={activeTemplate}
         runIndex={runIndex}
         activeRunItem={activeRunItem}
+        stateValues={visibleStateValues}
+        updatedStateFields={updatedStateFields}
+        runHistory={activeRunHistory}
+        selectedRunHistoryId={selectedRunHistoryId}
+        onOpenRunHistory={(run) => setSelectedRunHistoryId(run.id)}
+        onStateFieldChange={updateStateField}
         onSaveSchema={() => setSchemaSaved(true)}
       />
+
+      {selectedRunHistory && (
+        <RunHistoryDetail key={selectedRunHistory.id} run={selectedRunHistory} onClose={() => setSelectedRunHistoryId(null)} />
+      )}
 
       <ConfigPopover
         target={configTarget}
@@ -1080,10 +1206,12 @@ export default function App() {
         onDeleteEdge={deleteCanvasEdge}
         onRenameNode={renameCanvasNode}
         onUpdateEdge={updateCanvasEdge}
+        onUpdateNode={updateCanvasNode}
         onAddControlBranch={addControlBranch}
         onUpdateControlBranch={updateControlBranch}
         onDeleteControlBranch={deleteControlBranch}
         template={activeTemplate}
+        activeEnvironment={environments.find((item) => item.id === activeEnvironmentId) ?? environments[0]}
         onClose={() => setConfigTarget(null)}
       />
 

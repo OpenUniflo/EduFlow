@@ -128,7 +128,8 @@ import {
   NodeWorkbenchTab,
   storageKey,
   sessionStorageKey,
-  settingsStorageKey,
+  readStoredMockSettings,
+  writeStoredMockSettings,
   PersistedAppState,
   node,
   systemNode,
@@ -214,19 +215,17 @@ export function PlaceholderShell({
 }
 
 export function SettingsPage({ session }: { session: MockSession | null }) {
-  const [settings, setSettings] = useState(() => {
-    try {
-      const raw = window.localStorage.getItem(settingsStorageKey);
-      return raw ? JSON.parse(raw) as { dailyReminder: boolean; compactMode: boolean; emailDigest: boolean } : { dailyReminder: true, compactMode: false, emailDigest: true };
-    } catch {
-      return { dailyReminder: true, compactMode: false, emailDigest: true };
-    }
-  });
+  const [settings, setSettings] = useState(() => readStoredMockSettings());
+  const preferenceItems = [
+    ["dailyReminder", "每日学习提醒", "在工作台显示今日学习提示"],
+    ["compactMode", "紧凑模式", "课程与任务列表使用更紧凑的间距"],
+    ["emailDigest", "邮件摘要", "模拟接收每周学习摘要"]
+  ] as const;
 
-  function updateSetting(key: keyof typeof settings) {
+  function updateSetting(key: (typeof preferenceItems)[number][0]) {
     setSettings((value) => {
       const next = { ...value, [key]: !value[key] };
-      window.localStorage.setItem(settingsStorageKey, JSON.stringify(next));
+      writeStoredMockSettings(next);
       return next;
     });
   }
@@ -241,17 +240,13 @@ export function SettingsPage({ session }: { session: MockSession | null }) {
         </div>
       </header>
       <div className="placeholder-grid">
-        {[
-          ["dailyReminder", "每日学习提醒", "在工作台显示今日学习提示"],
-          ["compactMode", "紧凑模式", "课程与任务列表使用更紧凑的间距"],
-          ["emailDigest", "邮件摘要", "模拟接收每周学习摘要"]
-        ].map(([key, title, note]) => (
+        {preferenceItems.map(([key, title, note]) => (
           <article key={key} className="placeholder-card glass">
             <div>
               <h3>{title}</h3>
               <p>{note}</p>
             </div>
-            <button className={`toggle-button ${settings[key as keyof typeof settings] ? "active" : ""}`} onClick={() => updateSetting(key as keyof typeof settings)} aria-pressed={settings[key as keyof typeof settings]}>
+            <button className={`toggle-button ${settings[key] ? "active" : ""}`} onClick={() => updateSetting(key)} aria-pressed={settings[key]}>
               <span />
             </button>
           </article>

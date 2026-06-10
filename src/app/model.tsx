@@ -27,6 +27,13 @@ export type FlowNode = {
   reads: string[];
   writes: string[];
   logic: string;
+  code?: string;
+  codeReview?: {
+    before: string;
+    after: string;
+    summary: string;
+  };
+  codeSnapshots?: string[];
   control?: {
     branches: string[];
   };
@@ -56,6 +63,29 @@ export type Template = {
   result: string;
   code: string;
 };
+
+export type PersistedStateValues = Record<string, Record<string, unknown>>;
+
+export type WorkflowRunNodeRecord = {
+  id: string;
+  label: string;
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+};
+
+export type WorkflowRunRecord = {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  createdAt: string;
+  status: "success";
+  nodeCount: number;
+  outputSummary: string;
+  finalState: Record<string, unknown>;
+  nodes: WorkflowRunNodeRecord[];
+};
+
+export type PersistedRunHistory = Record<string, WorkflowRunRecord[]>;
 
 export type CourseSection = {
   id: string;
@@ -226,6 +256,165 @@ export const schemaFields: Field[] = [
 ];
 
 export const templates: Template[] = [
+  {
+    id: "support-ticket-showcase",
+    name: "客服工单处理闭环",
+    description: "模拟售后客服工单：清洗输入、读取附件、查询客户资料、按问题类型分流，并通过 Agent + Tool 循环生成可归档回复。",
+    nodes: [
+      systemNode("start", "START", 20, 300),
+      {
+        ...node("clean_ticket", "清洗工单", "Function Node", "function", 170, 300, ["user_input"], ["query", "messages", "iteration"], "提取用户诉求、订单线索和联系方式，初始化消息历史与循环次数。"),
+        code: `def clean_ticket(state: State):
+    text = state["user_input"].strip()
+    return {
+        "query": text,
+        "messages": [{"role": "user", "content": text}],
+        "iteration": 0
+    }`
+      },
+      {
+        ...node("read_attachment", "读取附件", "File / Cloud Drive Node", "file", 350, 170, ["query"], ["draft_answer"], "读取用户上传的截图、发票或日志摘要，作为后续判断的上下文。"),
+        code: `def read_attachment(state: State):
+    return {
+        "draft_answer": "附件摘要：包含订单号、付款截图和用户描述的问题现象。"
+    }`
+      },
+      {
+        ...node("query_customer", "查询客户资料", "Database Node", "database", 350, 430, ["query"], ["api_result"], "根据工单线索查询客户等级、订单状态、历史售后记录。"),
+        code: `def query_customer(state: State):
+    return {
+        "api_result": {
+            "customer_tier": "gold",
+            "order_status": "paid",
+            "last_ticket": "none"
+        }
+    }`
+      },
+      {
+        ...node("classify_ticket", "分类工单", "Function Node", "function", 540, 300, ["query", "draft_answer", "api_result"], ["task_type"], "根据用户诉求与客户资料判断 refund / technical / account / human_review。"),
+        code: `def classify_ticket(state: State):
+    text = state["query"]
+    if "退款" in text or "退货" in text:
+        task_type = "refund"
+    elif "登录" in text or "账号" in text:
+        task_type = "account"
+    elif "报错" in text or "无法使用" in text:
+        task_type = "technical"
+    else:
+        task_type = "human_review"
+    return {"task_type": task_type}`
+      },
+      node("ticket_router", "工单路由", "Router Node", "router", 735, 300, ["task_type"], [], "读取 task_type，将工单分发到退款、技术、账号或人工复核路径。", { branches: ["refund", "technical", "account", "human_review"] }),
+      {
+        ...node("search_policy", "检索知识库", "HTTP API Node", "http", 960, 135, ["query", "task_type"], ["api_result", "draft_answer"], "调用知识库检索售后政策、处理话术和故障排查步骤。"),
+        code: `def search_policy(state: State):
+    return {
+        "api_result": {"policy": "符合条件可优先补偿或退款"},
+        "draft_answer": "知识库建议：先核验订单，再给出可执行处理方案。"
+    }`
+      },
+      {
+        ...node("draft_reply", "生成回复草稿", "LLM Node", "llm", 960, 300, ["query", "api_result", "draft_answer"], ["draft_answer"], "结合客户资料、附件摘要和知识库结果生成客服回复草稿。"),
+        code: `def draft_reply(state: State):
+    return {
+        "draft_answer": "您好，我们已核验订单和问题描述，将按售后政策为您处理。"
+    }`
+      },
+      {
+        ...node("support_agent", "客服 Agent", "Agent Node", "agent", 1170, 300, ["messages", "query", "draft_answer", "tool_result", "iteration"], ["messages", "should_continue", "tool_name", "tool_args", "iteration", "draft_answer"], "判断是否还需要查询订单、物流或优惠券状态；拿到工具结果后决定是否结束。"),
+        code: `def support_agent(state: State):
+    iteration = state.get("iteration", 0)
+    should_continue = iteration < 1
+    return {
+        "messages": state["messages"] + [{"role": "assistant", "content": "需要补充订单状态。" if should_continue else "信息已完整，可以回复。"}],
+        "should_continue": should_continue,
+        "tool_name": "order_status" if should_continue else None,
+        "tool_args": {"query": state["query"]} if should_continue else None,
+        "iteration": iteration + 1,
+        "draft_answer": state.get("draft_answer", "")
+    }`
+      },
+      node("agent_loop", "复核循环", "Loop Node", "loop", 1390, 300, ["should_continue"], [], "根据 should_continue 控制 Agent 是否继续调用工具。", { branches: ["continue", "end"] }),
+      {
+        ...node("order_tool", "订单工具", "Tool Node", "tool", 1390, 515, ["tool_name", "tool_args", "messages"], ["tool_result", "messages"], "调用内部订单、物流或优惠券工具，并把结果写回消息历史。"),
+        code: `def order_tool(state: State):
+    result = "订单状态：已付款，物流未发出，可走优先退款。"
+    return {
+        "tool_result": result,
+        "messages": state["messages"] + [{"role": "tool", "content": result}]
+    }`
+      },
+      {
+        ...node("format_reply", "格式化回复", "State Transform Node", "transform", 1610, 300, ["draft_answer", "tool_result", "task_type"], ["final_answer"], "将草稿、工具结果和工单分类整理成可发送的标准客服回复。"),
+        code: `def format_reply(state: State):
+    return {
+        "final_answer": f"处理类型：{state['task_type']}。回复：{state['draft_answer']} {state.get('tool_result') or ''}"
+    }`
+      },
+      {
+        ...node("archive_ticket", "归档工单", "Output Node", "output", 1810, 300, ["final_answer"], ["messages"], "记录最终回复、处理类型和客服操作结果，完成工单闭环。"),
+        code: `def archive_ticket(state: State):
+    return {
+        "messages": state["messages"] + [{"role": "system", "content": state["final_answer"]}]
+    }`
+      },
+      systemNode("end", "END", 2000, 300)
+    ],
+    edges: [
+      edge("e-support-start-clean", "start", "clean_ticket", "next"),
+      edge("e-support-clean-file", "clean_ticket", "read_attachment", "next"),
+      edge("e-support-file-db", "read_attachment", "query_customer", "next"),
+      edge("e-support-db-classify", "query_customer", "classify_ticket", "next"),
+      edge("e-support-classify-router", "classify_ticket", "ticket_router", "next"),
+      edge("e-support-router-refund", "ticket_router", "search_policy", "refund"),
+      edge("e-support-router-technical", "ticket_router", "search_policy", "technical"),
+      edge("e-support-router-account", "ticket_router", "support_agent", "account"),
+      edge("e-support-router-human", "ticket_router", "format_reply", "human_review"),
+      edge("e-support-policy-draft", "search_policy", "draft_reply", "next"),
+      edge("e-support-draft-agent", "draft_reply", "support_agent", "next"),
+      edge("e-support-agent-loop", "support_agent", "agent_loop", "next"),
+      edge("e-support-loop-tool", "agent_loop", "order_tool", "continue"),
+      edge("e-support-tool-agent", "order_tool", "support_agent", "next"),
+      edge("e-support-loop-format", "agent_loop", "format_reply", "end"),
+      edge("e-support-format-output", "format_reply", "archive_ticket", "next"),
+      edge("e-support-output-end", "archive_ticket", "end", "next")
+    ],
+    runOrder: [
+      "start",
+      "e-support-start-clean",
+      "clean_ticket",
+      "e-support-clean-file",
+      "read_attachment",
+      "e-support-file-db",
+      "query_customer",
+      "e-support-db-classify",
+      "classify_ticket",
+      "e-support-classify-router",
+      "ticket_router",
+      "e-support-router-refund",
+      "search_policy",
+      "e-support-policy-draft",
+      "draft_reply",
+      "e-support-draft-agent",
+      "support_agent",
+      "e-support-agent-loop",
+      "agent_loop",
+      "e-support-loop-tool",
+      "order_tool",
+      "e-support-tool-agent",
+      "support_agent",
+      "e-support-agent-loop",
+      "agent_loop",
+      "e-support-loop-format",
+      "format_reply",
+      "e-support-format-output",
+      "archive_ticket",
+      "e-support-output-end",
+      "end"
+    ],
+    result: "final_answer: 处理类型：refund。您好，我们已核验订单和售后政策，可为该订单优先发起退款，并已记录工单处理结果。",
+    code: "查看全部代码会展示客服工单处理的分文件 LangGraph 原型代码。"
+  },
   {
     id: "showcase",
     name: "EduFlow LangGraph 示例",
@@ -1033,6 +1222,74 @@ export const storageKey = "eduflow.prototype.state.v1";
 export const sessionStorageKey = "eduflow.mock.session.v1";
 export const settingsStorageKey = "eduflow.mock.settings.v1";
 
+export type EnvironmentConfig = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  searchApiUrl: string;
+  searchApiKey: string;
+  databaseUrl: string;
+  fileStoragePath: string;
+  note: string;
+};
+
+export type MockSettings = {
+  dailyReminder: boolean;
+  compactMode: boolean;
+  emailDigest: boolean;
+  environments: EnvironmentConfig[];
+  activeEnvironmentId: string;
+};
+
+export const defaultEnvironments: EnvironmentConfig[] = [
+  {
+    id: "development",
+    name: "Development",
+    baseUrl: "https://api.dev.eduflow.local/v1",
+    apiKey: "dev_mock_key",
+    model: "gpt-4.1-mini",
+    searchApiUrl: "https://search.dev.eduflow.local/query",
+    searchApiKey: "dev_search_key",
+    databaseUrl: "postgres://localhost:5432/eduflow_dev",
+    fileStoragePath: "/tmp/eduflow/dev",
+    note: "本地开发和课堂演示使用。"
+  },
+  {
+    id: "staging",
+    name: "Staging",
+    baseUrl: "https://api.staging.eduflow.local/v1",
+    apiKey: "staging_mock_key",
+    model: "gpt-4.1",
+    searchApiUrl: "https://search.staging.eduflow.local/query",
+    searchApiKey: "staging_search_key",
+    databaseUrl: "postgres://staging.internal:5432/eduflow",
+    fileStoragePath: "s3://eduflow-staging/files",
+    note: "接近线上配置的集成测试环境。"
+  },
+  {
+    id: "production",
+    name: "Production",
+    baseUrl: "https://api.eduflow.local/v1",
+    apiKey: "",
+    model: "gpt-4.1",
+    searchApiUrl: "https://search.eduflow.local/query",
+    searchApiKey: "",
+    databaseUrl: "postgres://prod.internal:5432/eduflow",
+    fileStoragePath: "s3://eduflow-prod/files",
+    note: "生产环境示例，密钥留空。"
+  }
+];
+
+export const defaultMockSettings: MockSettings = {
+  dailyReminder: true,
+  compactMode: false,
+  emailDigest: true,
+  environments: defaultEnvironments,
+  activeEnvironmentId: defaultEnvironments[0].id
+};
+
 export type PersistedAppState = {
   workflows?: Template[];
   tasks?: MockTask[];
@@ -1040,6 +1297,8 @@ export type PersistedAppState = {
   workflowDescription?: string;
   schemaSaved?: boolean;
   nodePositions?: Record<string, { x: number; y: number }>;
+  stateValues?: PersistedStateValues;
+  runHistory?: PersistedRunHistory;
 };
 
 export function node(
@@ -1128,6 +1387,9 @@ export function getNodeFnName(node: FlowNode) {
 export function getNodeCode(node: FlowNode, template?: Template) {
   if ((node.kind === "router" || node.kind === "loop") && template) {
     return getControlNodeCode(node, template);
+  }
+  if (node.code?.trim()) {
+    return node.code;
   }
   return getGeneratedNodeCode(node, node.subtitle, node.logic);
 }
@@ -1712,6 +1974,7 @@ export function downloadJson(fileName: string, payload: unknown) {
 
 export function inferTemplateIdFromDescription(description: string) {
   const text = description.toLowerCase();
+  if (/客服|工单|售后|退款|退货|订单|客户|support|ticket|refund|customer/.test(text)) return "support-ticket-showcase";
   if (/langgraph|stategraph|完整|router.*loop|loop.*router|第三方/.test(text)) return "showcase";
   if (/agent|工具|tool|循环|搜索|调用/.test(text)) return "showcase";
   if (/条件|分支|router|路由|判断|选择/.test(text)) return "branch";
@@ -1809,6 +2072,10 @@ export function parseFormValue(value: string) {
   return value;
 }
 
+export function getDefaultStateValues() {
+  return Object.fromEntries(schemaFields.map((field) => [field.name, parseFormValue(field.defaultValue)]));
+}
+
 export function createStateSnapshotForStep(template: Template, itemId: string, index: number) {
   const nodeItem = template.nodes.find((item) => item.id === itemId);
   const edgeItem = template.edges.find((item) => item.id === itemId);
@@ -1848,6 +2115,81 @@ export function createStateSnapshotForStep(template: Template, itemId: string, i
   }
 
   return base;
+}
+
+export function createRuntimeStateSnapshot(template: Template, stateValues: Record<string, unknown>, runIndex: number) {
+  const state: Record<string, unknown> = { ...getDefaultStateValues(), ...stateValues };
+  const visibleSteps = runIndex < 0 ? [] : template.runOrder.slice(0, runIndex + 1);
+
+  visibleSteps.forEach((itemId, index) => {
+    const nodeItem = template.nodes.find((item) => item.id === itemId);
+    const edgeItem = template.edges.find((item) => item.id === itemId);
+
+    state.messages = template.runOrder.slice(0, index + 1).filter((item) => template.nodes.some((nodeItem) => nodeItem.id === item));
+
+    if (nodeItem) {
+      nodeItem.writes.forEach((field) => {
+        state[field] = getMockFieldValue(field, nodeItem);
+      });
+    }
+
+    if (edgeItem && isControlOutletEdge(edgeItem, template)) {
+      state.task_type = edgeItem.label;
+      state.should_continue = edgeItem.label === "continue";
+    }
+
+    if ((template.id === "agent" || template.id === "showcase") && itemId === "tool") {
+      state.tool_result = "检索到 3 条相关资料";
+    }
+
+    if (itemId === "end") {
+      state.final_answer = template.result;
+      state.should_continue = false;
+    }
+  });
+
+  return state;
+}
+
+export function createWorkflowRunRecord(template: Template, stateValues: Record<string, unknown>, runNumber: number): WorkflowRunRecord {
+  const nodeSteps = template.runOrder.reduce<WorkflowRunNodeRecord[]>((records, itemId, index) => {
+    const nodeItem = template.nodes.find((item) => item.id === itemId);
+    if (!nodeItem) return records;
+
+    const snapshot = createStateSnapshotForStep(template, itemId, index);
+    const input = {
+      ...createNodeTestInput(nodeItem),
+      ...Object.fromEntries(nodeItem.reads.map((field) => [field, stateValues[field] ?? snapshot[field] ?? getMockFieldValue(field, nodeItem)]))
+    };
+    const output = createNodeTestOutput(nodeItem, input);
+
+    records.push({
+      id: nodeItem.id,
+      label: nodeItem.label,
+      input,
+      output
+    });
+    return records;
+  }, []);
+
+  const finalState = createRuntimeStateSnapshot(template, stateValues, template.runOrder.length - 1);
+
+  return {
+    id: `${template.id}-${Date.now()}-${runNumber}`,
+    workflowId: template.id,
+    workflowName: template.name,
+    createdAt: new Date().toISOString(),
+    status: "success",
+    nodeCount: nodeSteps.length,
+    outputSummary: String(finalState.final_answer || template.result || "运行完成"),
+    finalState,
+    nodes: nodeSteps
+  };
+}
+
+export function summarizeStateValue(value: unknown) {
+  const formatted = typeof value === "string" ? value : formatJson(value);
+  return formatted.length > 64 ? `${formatted.slice(0, 61)}...` : formatted || "空";
 }
 
 export function getDefaultPopoverPosition(expanded = false): PopoverPosition {
@@ -1974,6 +2316,44 @@ export function readStoredAppState(): PersistedAppState {
   }
 }
 
+export function mergeBuiltinWorkflows(storedWorkflows: Template[] | undefined) {
+  if (!storedWorkflows?.length) return templates;
+
+  const storedIds = new Set(storedWorkflows.map((item) => item.id));
+  const missingTemplates = templates.filter((item) => !storedIds.has(item.id));
+  return [...missingTemplates, ...storedWorkflows];
+}
+
+export function normalizeMockSettings(value: Partial<MockSettings> | null | undefined): MockSettings {
+  const environments = Array.isArray(value?.environments) && value.environments.length ? value.environments : defaultMockSettings.environments;
+  const activeEnvironmentId = environments.some((item) => item.id === value?.activeEnvironmentId)
+    ? value?.activeEnvironmentId ?? environments[0].id
+    : environments[0].id;
+
+  return {
+    dailyReminder: value?.dailyReminder ?? defaultMockSettings.dailyReminder,
+    compactMode: value?.compactMode ?? defaultMockSettings.compactMode,
+    emailDigest: value?.emailDigest ?? defaultMockSettings.emailDigest,
+    environments,
+    activeEnvironmentId
+  };
+}
+
+export function readStoredMockSettings(): MockSettings {
+  try {
+    const raw = window.localStorage.getItem(settingsStorageKey);
+    return normalizeMockSettings(raw ? JSON.parse(raw) as Partial<MockSettings> : null);
+  } catch {
+    return defaultMockSettings;
+  }
+}
+
+export function writeStoredMockSettings(updates: Partial<MockSettings>) {
+  const next = normalizeMockSettings({ ...readStoredMockSettings(), ...updates });
+  window.localStorage.setItem(settingsStorageKey, JSON.stringify(next));
+  return next;
+}
+
 export function mergeStoredTasks(storedTasks: MockTask[]) {
   return mockTasks.map((task) => storedTasks.find((item) => item.id === task.id) ?? task);
 }
@@ -1988,4 +2368,3 @@ export function readMockSession(): MockSession | null {
     return null;
   }
 }
-
