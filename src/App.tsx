@@ -75,6 +75,13 @@ import {
   TasksPage,
   Topbar
 } from "./components/app";
+import { AtlasHome } from "./v2/pages/AtlasHome";
+import { CourseCenterPage, CourseGraphPage } from "./v2/pages/CoursePages";
+import { LessonPage } from "./v2/pages/LessonPage";
+import { WorkflowLibraryPage } from "./v2/pages/WorkflowLibraryPage";
+import { GlobalNav } from "./v2/components/GlobalNav";
+import { practices } from "./v2/data";
+import { markPracticeComplete } from "./v2/progress";
 
 function stableStateValue(value: unknown) {
   if (value === undefined) return "__undefined__";
@@ -265,6 +272,7 @@ export default function App() {
             [activeTemplate.id]: [record, ...existing].slice(0, 20)
           };
         });
+        markPracticeComplete(activeTemplate.id);
         activeRunSessionRef.current = null;
       }
       setIsRunning(false);
@@ -932,7 +940,7 @@ export default function App() {
     setBottomOpen(false);
     setConfigTarget(null);
     setCodeModalOpen(false);
-    navigate("/workflows");
+    navigate("/");
   }
 
   function logout() {
@@ -1019,7 +1027,7 @@ export default function App() {
     const redirectTo =
       from && typeof from === "object" && "pathname" in from
         ? `${String(from.pathname)}${"search" in from ? String(from.search) : ""}`
-        : "/workflows";
+        : "/";
     navigate(redirectTo, { replace: true });
   }
 
@@ -1043,42 +1051,27 @@ export default function App() {
     onLogout: logout
   };
 
-  const workflowLibrary = (
-    <main className="app-shell">
-      <div className="workspace-glow" aria-hidden="true" />
-      <HomePage
-        {...layoutProps}
-        activeSection="workflows"
-        viewMode={workflowViewMode}
-        workflows={workflows}
-        activeTemplateId={activeTemplateId}
-        onViewMode={setWorkflowViewMode}
-        onOpenWorkflow={openWorkflow}
-        onCreateWorkflow={createWorkflow}
-        onDeleteWorkflow={deleteWorkflow}
-      />
-    </main>
-  );
+  const atlasHome = session ? <AtlasHome session={session} onLogout={logout} /> : null;
 
-  const coursesPage = (
-    <main className="app-shell">
-      <div className="workspace-glow" aria-hidden="true" />
-      <CourseShell {...layoutProps} activeSection="courses">
-        <CoursesPage courses={mockCourses} onOpenCourse={openCourse} />
-      </CourseShell>
-    </main>
-  );
+  const workflowLibrary = session ? (
+    <WorkflowLibraryPage
+      session={session}
+      onLogout={logout}
+      viewMode={workflowViewMode}
+      workflows={workflows}
+      activeTemplateId={activeTemplateId}
+      onViewMode={setWorkflowViewMode}
+      onOpenWorkflow={openWorkflow}
+      onCreateWorkflow={createWorkflow}
+      onDeleteWorkflow={deleteWorkflow}
+    />
+  ) : null;
 
-  const courseDetailPage = routeCourse ? (
-    <main className="app-shell">
-      <div className="workspace-glow" aria-hidden="true" />
-      <CourseShell {...layoutProps} activeSection="courses">
-        <CourseDetailPage course={routeCourse} onBack={openCourses} onOpenChapter={openChapter} onOpenWorkflow={openWorkflow} />
-      </CourseShell>
-    </main>
-  ) : (
-    <NotFoundPage onHome={returnHome} />
-  );
+  const coursesPage = session ? <CourseCenterPage session={session} onLogout={logout} /> : null;
+
+  const courseDetailPage = session ? <CourseGraphPage session={session} onLogout={logout} /> : null;
+
+  const lessonPage = session ? <LessonPage session={session} onLogout={logout} /> : null;
 
   const chapterPage = routeCourse && activeChapter ? (
     <main className="app-shell">
@@ -1128,8 +1121,9 @@ export default function App() {
   );
 
   const canvasPage = routeTemplate ? (
-    <main className="app-shell">
+    <main className="app-shell atlas-canvas-shell">
       <div className="workspace-glow" aria-hidden="true" />
+      {session ? <div className="atlas-canvas-nav"><GlobalNav active="workflows" session={session} onLogout={logout} /></div> : null}
       <Canvas
         template={activeTemplate}
         workflowDescription={workflowDescription}
@@ -1160,7 +1154,7 @@ export default function App() {
         workflowName={activeTemplate.name}
         schemaSaved={schemaSaved}
         isRunning={isRunning}
-        onBack={returnHome}
+        onBack={() => navigate("/workflows")}
         onRenameWorkflow={renameActiveWorkflow}
         onRun={runFlow}
         onStep={stepFlow}
@@ -1225,6 +1219,12 @@ export default function App() {
         onToggle={() => setBottomOpen((value) => !value)}
         onTab={setActiveTab}
       />
+      {practices.some((item) => item.templateId === activeTemplate.id) && activeRunHistory.length ? (
+        <aside className="atlas-canvas-acceptance glass-v2">
+          <div><strong>验收通过</strong><span>结构 92 · 行为 88 · 结果 90 · 轨迹 94</span></div>
+          <div><span>模型调用 {Math.max(2, Math.round(activeTemplate.nodes.length / 2))}</span><span>工具调用 {activeTemplate.nodes.filter((item) => item.kind === "tool").length}</span><span>总分 91</span></div>
+        </aside>
+      ) : null}
     </main>
   ) : (
     <NotFoundPage onHome={returnHome} />
@@ -1260,21 +1260,21 @@ export default function App() {
         <WorkflowProvider value={workflowContextValue}>
           <TaskProvider value={taskContextValue}>
             <Routes>
-              <RouterRoute path="/login" element={session ? <Navigate to="/workflows" replace /> : <AuthPage mode="login" />} />
-              <RouterRoute path="/register" element={session ? <Navigate to="/workflows" replace /> : <AuthPage mode="register" />} />
-              <RouterRoute path="/" element={protectedElement(<Navigate to="/workflows" replace />)} />
+              <RouterRoute path="/login" element={session ? <Navigate to="/" replace /> : <AuthPage mode="login" />} />
+              <RouterRoute path="/register" element={session ? <Navigate to="/" replace /> : <AuthPage mode="register" />} />
+              <RouterRoute path="/" element={protectedElement(atlasHome)} />
               <RouterRoute path="/workflows" element={protectedElement(workflowLibrary)} />
               <RouterRoute path="/workflows/:workflowId" element={protectedElement(canvasPage)} />
               <RouterRoute path="/courses" element={protectedElement(coursesPage)} />
               <RouterRoute path="/courses/:courseId" element={protectedElement(courseDetailPage)} />
-              <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={protectedElement(chapterPage)} />
-              <RouterRoute path="/tasks" element={protectedElement(tasksPage)} />
-              <RouterRoute path="/tasks/:taskId" element={protectedElement(taskDetailPage)} />
-              <RouterRoute path="/profile" element={protectedElement(profilePage)} />
-              <RouterRoute path="/settings" element={protectedElement(<PlaceholderShell {...layoutProps} activeSection="settings" page="settings" session={session} />)} />
-              <RouterRoute path="/notifications" element={protectedElement(<PlaceholderShell {...layoutProps} activeSection="notifications" page="notifications" session={session} />)} />
-              <RouterRoute path="/messages" element={protectedElement(<PlaceholderShell {...layoutProps} activeSection="messages" page="messages" session={session} />)} />
-              <RouterRoute path="*" element={<NotFoundPage onHome={returnHome} />} />
+              <RouterRoute path="/courses/:courseId/materials/:materialId" element={protectedElement(lessonPage)} />
+              <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={<Navigate to="/courses/agentic-ai" replace />} />
+              <RouterRoute path="/tasks/*" element={<Navigate to="/" replace />} />
+              <RouterRoute path="/profile/*" element={<Navigate to="/" replace />} />
+              <RouterRoute path="/settings/*" element={<Navigate to="/" replace />} />
+              <RouterRoute path="/notifications/*" element={<Navigate to="/" replace />} />
+              <RouterRoute path="/messages/*" element={<Navigate to="/" replace />} />
+              <RouterRoute path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </TaskProvider>
         </WorkflowProvider>

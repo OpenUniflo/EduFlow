@@ -407,7 +407,7 @@ export function Topbar({
           <Network size={20} />
         </div>
         <div>
-          <div className="eyebrow">EduFlow</div>
+          <div className="eyebrow">知序 · WORKFLOW</div>
           <input
             className="workflow-name-input"
             value={draftName}

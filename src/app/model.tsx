@@ -417,7 +417,7 @@ export const templates: Template[] = [
   },
   {
     id: "showcase",
-    name: "EduFlow LangGraph 示例",
+    name: "知序 LangGraph 示例",
     description: "节点承载逻辑，边只做连接；Router 和 Loop 节点汇总条件编译逻辑。",
     nodes: [
       systemNode("start", "START", 20, 250),
@@ -601,6 +601,153 @@ graph.add_conditional_edges(
 )
 graph.add_edge("search_tool", "observation")
 graph.add_edge("observation", "agent")`
+  },
+  {
+    id: "lesson-04-direct",
+    name: "Direct · 政策简报基线",
+    description: "一次生成三所高校的生成式 AI 政策比较简报，用作速度、成本、覆盖度和引用可靠性的基线。",
+    nodes: [
+      systemNode("start", "START", 60, 240),
+      node("brief_input", "研究任务", "Input Node", "function", 220, 205, ["user_input"], ["query"], "接收政策比较任务和 800-1200 字输出约束。"),
+      node("direct_writer", "Direct Writer", "LLM Node", "llm", 470, 205, ["query"], ["final_answer"], "不调用外部工具，直接使用模型已有知识生成简报。"),
+      node("constraint_check", "约束检查", "Function Node", "function", 720, 205, ["final_answer"], ["draft_answer"], "检查三所高校、风险和三条建议是否出现。"),
+      systemNode("end", "END", 960, 240)
+    ],
+    edges: [
+      edge("e-direct-1", "start", "brief_input"),
+      edge("e-direct-2", "brief_input", "direct_writer"),
+      edge("e-direct-3", "direct_writer", "constraint_check"),
+      edge("e-direct-4", "constraint_check", "end")
+    ],
+    runOrder: ["start", "e-direct-1", "brief_input", "e-direct-2", "direct_writer", "e-direct-3", "constraint_check", "e-direct-4", "end"],
+    result: "final_answer: 已生成政策简报基线；覆盖三所高校与三条建议，但没有主动检索，引用可靠性需要人工核验。",
+    code: `graph.add_node("direct_writer", direct_writer)
+graph.add_node("constraint_check", constraint_check)
+graph.add_edge(START, "direct_writer")
+graph.add_edge("direct_writer", "constraint_check")
+graph.add_edge("constraint_check", END)`
+  },
+  {
+    id: "lesson-04-react",
+    name: "ReAct · 搜索与观察循环",
+    description: "边判断信息缺口、边调用官方来源搜索工具，并依据观察结果决定继续检索或结束。",
+    nodes: [
+      systemNode("start", "START", 40, 260),
+      node("react_agent", "ReAct Agent", "Agent Node", "agent", 210, 220, ["user_input", "messages", "tool_result", "iteration"], ["messages", "tool_name", "tool_args", "should_continue", "iteration", "draft_answer"], "维护当前子目标，选择高校官方政策搜索或结束。"),
+      node("react_route", "继续检索？", "Loop Node", "loop", 470, 220, ["should_continue"], [], "根据覆盖度、来源可信度和最大步数决定继续或结束。", { branches: ["continue", "end"] }),
+      node("official_search", "官方来源搜索", "Tool Node", "tool", 500, 430, ["tool_name", "tool_args"], ["tool_result", "messages"], "限定高校官方域名搜索政策页面和教务处 PDF。"),
+      node("source_validator", "来源验证", "Function Node", "function", 760, 430, ["tool_result"], ["api_result"], "检查来源域名、发布日期和政策主体。"),
+      node("brief_formatter", "政策简报", "LLM Node", "llm", 760, 160, ["messages", "draft_answer", "api_result"], ["final_answer"], "在满足覆盖和引用条件后生成结构化简报。"),
+      systemNode("end", "END", 1010, 220)
+    ],
+    edges: [
+      edge("e-react-1", "start", "react_agent"),
+      edge("e-react-2", "react_agent", "react_route"),
+      edge("e-react-3", "react_route", "official_search", "continue"),
+      edge("e-react-4", "official_search", "source_validator"),
+      edge("e-react-5", "source_validator", "react_agent"),
+      edge("e-react-6", "react_route", "brief_formatter", "end"),
+      edge("e-react-7", "brief_formatter", "end")
+    ],
+    runOrder: ["start", "e-react-1", "react_agent", "e-react-2", "react_route", "e-react-3", "official_search", "e-react-4", "source_validator", "e-react-5", "react_agent", "e-react-2", "react_route", "e-react-6", "brief_formatter", "e-react-7", "end"],
+    result: "final_answer: 已完成三所高校政策比较，保留四条官方来源，并记录一次低可信来源被拒绝的观察轨迹。",
+    code: `graph.add_conditional_edges(
+    "react_agent",
+    route_action,
+    {"search": "official_search", "done": "brief_formatter"}
+)
+graph.add_edge("official_search", "source_validator")
+graph.add_edge("source_validator", "react_agent")`
+  },
+  {
+    id: "lesson-04-plan",
+    name: "Plan-and-Execute · 结构化研究计划",
+    description: "先生成包含输入、输出和完成条件的计划，再逐项收集资料、抽取政策、比较差异并验证引用。",
+    nodes: [
+      systemNode("start", "START", 40, 250),
+      node("planner", "Planner", "LLM Node", "llm", 200, 215, ["user_input"], ["messages", "draft_answer"], "把任务拆分为约束识别、资料收集、可信度验证、条款抽取、比较、写作和验收。"),
+      node("plan_review", "计划检查", "Function Node", "function", 440, 215, ["draft_answer"], ["api_result"], "检查每一步是否具有输入、输出和完成条件。"),
+      node("executor", "Executor", "Agent Node", "agent", 680, 215, ["messages", "api_result"], ["tool_name", "tool_args", "tool_result", "draft_answer"], "按计划逐项执行搜索、抽取和比较任务。"),
+      node("completion_check", "Completion Check", "Function Node", "function", 920, 215, ["draft_answer", "tool_result"], ["final_answer"], "验证三校覆盖、四条引用、风险和三条建议。"),
+      systemNode("end", "END", 1160, 250)
+    ],
+    edges: [
+      edge("e-plan-1", "start", "planner"),
+      edge("e-plan-2", "planner", "plan_review"),
+      edge("e-plan-3", "plan_review", "executor"),
+      edge("e-plan-4", "executor", "completion_check"),
+      edge("e-plan-5", "completion_check", "end")
+    ],
+    runOrder: ["start", "e-plan-1", "planner", "e-plan-2", "plan_review", "e-plan-3", "executor", "e-plan-4", "completion_check", "e-plan-5", "end"],
+    result: "final_answer: 结构化计划的六个步骤已逐项完成，三所高校、四条引用、风险和三条建议均通过检查。",
+    code: `graph.add_edge(START, "planner")
+graph.add_edge("planner", "plan_review")
+graph.add_edge("plan_review", "executor")
+graph.add_edge("executor", "completion_check")
+graph.add_edge("completion_check", END)`
+  },
+  {
+    id: "lesson-04-replan",
+    name: "Replanning · 失败与目标变化",
+    description: "当搜索超时、来源缺失或用户追加隐私要求时，保留已完成结果并只修改剩余计划。",
+    nodes: [
+      systemNode("start", "START", 40, 260),
+      node("planner", "Planner", "LLM Node", "llm", 190, 220, ["user_input"], ["messages", "draft_answer"], "生成初始研究计划和验收标准。"),
+      node("executor", "Executor", "Agent Node", "agent", 420, 220, ["messages", "draft_answer"], ["tool_result", "api_result", "should_continue"], "执行当前步骤并记录已完成产物。"),
+      node("success_check", "步骤成功？", "Router Node", "router", 660, 220, ["tool_result", "should_continue"], [], "区分成功、失败和整体完成。", { branches: ["continue", "replan", "done"] }),
+      node("replanner", "Replanner", "LLM Node", "llm", 660, 450, ["messages", "tool_result", "api_result"], ["draft_answer", "messages"], "保留有效结果，为超时、来源缺失或新增隐私要求修改剩余步骤。"),
+      node("final_report", "最终简报", "Output Node", "output", 910, 160, ["draft_answer", "api_result"], ["final_answer"], "输出更新后的政策比较和建议。"),
+      systemNode("end", "END", 1140, 220)
+    ],
+    edges: [
+      edge("e-replan-1", "start", "planner"),
+      edge("e-replan-2", "planner", "executor"),
+      edge("e-replan-3", "executor", "success_check"),
+      edge("e-replan-4", "success_check", "executor", "continue"),
+      edge("e-replan-5", "success_check", "replanner", "replan"),
+      edge("e-replan-6", "replanner", "executor"),
+      edge("e-replan-7", "success_check", "final_report", "done"),
+      edge("e-replan-8", "final_report", "end")
+    ],
+    runOrder: ["start", "e-replan-1", "planner", "e-replan-2", "executor", "e-replan-3", "success_check", "e-replan-5", "replanner", "e-replan-6", "executor", "e-replan-3", "success_check", "e-replan-7", "final_report", "e-replan-8", "end"],
+    result: "final_answer: 已保留高校 A/B 的结果，为高校 C 使用替代来源，并把新增隐私要求写入剩余计划和最终验收。",
+    code: `graph.add_conditional_edges(
+    "success_check",
+    route_result,
+    {"continue": "executor", "replan": "replanner", "done": "final_report"}
+)
+graph.add_edge("replanner", "executor")`
+  },
+  {
+    id: "lesson-04-evaluator",
+    name: "Evaluator-Optimizer · 结构化质量控制",
+    description: "用覆盖、引用、准确性、风险、字数和建议等结构化 Rubric 控制生成与返工。",
+    nodes: [
+      systemNode("start", "START", 40, 260),
+      node("generator", "Generator", "LLM Node", "llm", 200, 220, ["user_input"], ["draft_answer"], "生成包含比较、风险和建议的政策简报初稿。"),
+      node("evaluator", "Evaluator", "LLM Node", "llm", 440, 220, ["draft_answer"], ["api_result", "should_continue"], "使用结构化 Rubric 输出通过项、失败项和可执行修订建议。"),
+      node("quality_route", "通过？", "Router Node", "router", 680, 220, ["api_result", "should_continue"], [], "通过则输出，否则进入优化器。", { branches: ["pass", "revise"] }),
+      node("optimizer", "Optimizer", "LLM Node", "llm", 690, 430, ["draft_answer", "api_result"], ["draft_answer"], "根据失败项补齐高校覆盖、引用、隐私风险和可执行建议。"),
+      node("final_output", "验收结果", "Output Node", "output", 920, 160, ["draft_answer", "api_result"], ["final_answer"], "输出最终简报和验收得分。"),
+      systemNode("end", "END", 1160, 220)
+    ],
+    edges: [
+      edge("e-eval-1", "start", "generator"),
+      edge("e-eval-2", "generator", "evaluator"),
+      edge("e-eval-3", "evaluator", "quality_route"),
+      edge("e-eval-4", "quality_route", "optimizer", "revise"),
+      edge("e-eval-5", "optimizer", "evaluator"),
+      edge("e-eval-6", "quality_route", "final_output", "pass"),
+      edge("e-eval-7", "final_output", "end")
+    ],
+    runOrder: ["start", "e-eval-1", "generator", "e-eval-2", "evaluator", "e-eval-3", "quality_route", "e-eval-4", "optimizer", "e-eval-5", "evaluator", "e-eval-3", "quality_route", "e-eval-6", "final_output", "e-eval-7", "end"],
+    result: "final_answer: 第二轮已满足三校覆盖、四条引用、隐私与公平风险、三条建议和 800-1200 字约束。",
+    code: `graph.add_conditional_edges(
+    "quality_route",
+    route_quality,
+    {"pass": "final_output", "revise": "optimizer"}
+)
+graph.add_edge("optimizer", "evaluator")`
   }
 ];
 
@@ -1218,9 +1365,9 @@ export const stateTabs = ["Schema", "代码", "历史记录"] as const;
 export type StateTab = (typeof stateTabs)[number];
 export const nodeWorkbenchTabs = ["配置", "测试运行", "日志"] as const;
 export type NodeWorkbenchTab = (typeof nodeWorkbenchTabs)[number];
-export const storageKey = "eduflow.prototype.state.v1";
-export const sessionStorageKey = "eduflow.mock.session.v1";
-export const settingsStorageKey = "eduflow.mock.settings.v1";
+export const storageKey = "knowledge-atlas.workflow-state.v2";
+export const sessionStorageKey = "knowledge-atlas.mock-session.v2";
+export const settingsStorageKey = "knowledge-atlas.workflow-settings.v2";
 
 export type EnvironmentConfig = {
   id: string;
@@ -2004,14 +2151,14 @@ export function getNodeKindLabel(kind: NodeKind) {
 export function getMockFieldValue(field: string, node: FlowNode): unknown {
   const values: Record<string, unknown> = {
     user_input: "总结这份文件",
-    query: "EduFlow workflow",
+    query: "Knowledge Atlas workflow",
     messages: ["用户请求", `${node.label} 准备执行`],
     task_type: "agent",
     api_result: { items: 3 },
     draft_answer: `${node.label} 的草稿输出`,
     should_continue: node.kind === "agent" ? false : true,
     tool_name: "search_api",
-    tool_args: { query: "EduFlow workflow" },
+    tool_args: { query: "Knowledge Atlas workflow" },
     tool_result: "检索到 3 条相关资料",
     final_answer: `${node.label} 的测试输出`,
     iteration: 1
@@ -2319,9 +2466,14 @@ export function readStoredAppState(): PersistedAppState {
 export function mergeBuiltinWorkflows(storedWorkflows: Template[] | undefined) {
   if (!storedWorkflows?.length) return templates;
 
-  const storedIds = new Set(storedWorkflows.map((item) => item.id));
+  const normalizedStoredWorkflows = storedWorkflows.map((item) =>
+    item.id === "showcase" && item.name === "EduFlow LangGraph 示例"
+      ? { ...item, name: "知序 LangGraph 示例" }
+      : item
+  );
+  const storedIds = new Set(normalizedStoredWorkflows.map((item) => item.id));
   const missingTemplates = templates.filter((item) => !storedIds.has(item.id));
-  return [...missingTemplates, ...storedWorkflows];
+  return [...missingTemplates, ...normalizedStoredWorkflows];
 }
 
 export function normalizeMockSettings(value: Partial<MockSettings> | null | undefined): MockSettings {
