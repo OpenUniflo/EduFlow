@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { type Connection } from "@xyflow/react";
 import { Navigate, Route as RouterRoute, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
-import { mockStudentProfile } from "./data/mockStudentProfile";
-import { ProfilePage } from "./components/profile/ProfilePage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { NavigationProvider } from "./contexts/NavigationContext";
 import { TaskProvider } from "./contexts/TaskContext";
@@ -79,6 +77,7 @@ import { AtlasHome } from "./v2/pages/AtlasHome";
 import { CourseCenterPage, CourseGraphPage } from "./v2/pages/CoursePages";
 import { LessonPage } from "./v2/pages/LessonPage";
 import { WorkflowLibraryPage } from "./v2/pages/WorkflowLibraryPage";
+import { ProfileKnowledgePage } from "./v2/pages/ProfileKnowledgePage";
 import { GlobalNav } from "./v2/components/GlobalNav";
 import { practices } from "./v2/data";
 import { markPracticeComplete } from "./v2/progress";
@@ -92,6 +91,15 @@ function stableStateValue(value: unknown) {
   } catch {
     return String(value);
   }
+}
+
+function getAuthRedirect(state: unknown) {
+  if (!state || typeof state !== "object" || !("from" in state)) return "/";
+  const from = (state as { from?: unknown }).from;
+  if (!from || typeof from !== "object" || !("pathname" in from)) return "/";
+  const pathname = String((from as { pathname: unknown }).pathname);
+  const search = "search" in from ? String((from as { search?: unknown }).search ?? "") : "";
+  return `${pathname}${search}`;
 }
 
 export default function App() {
@@ -348,11 +356,6 @@ export default function App() {
   function openProfile() {
     setActiveChapterId(undefined);
     navigate("/profile");
-  }
-
-  function openProfileTarget(targetUrl: string) {
-    const url = new URL(targetUrl, window.location.origin);
-    navigate(url.pathname + url.search);
   }
 
   function updateTask(taskId: string, updater: (task: MockTask) => MockTask) {
@@ -1023,12 +1026,7 @@ export default function App() {
   function completeAuth(nextSession: MockSession) {
     window.localStorage.setItem(sessionStorageKey, JSON.stringify(nextSession));
     setSession(nextSession);
-    const from = location.state && typeof location.state === "object" && "from" in location.state ? location.state.from : null;
-    const redirectTo =
-      from && typeof from === "object" && "pathname" in from
-        ? `${String(from.pathname)}${"search" in from ? String(from.search) : ""}`
-        : "/";
-    navigate(redirectTo, { replace: true });
+    navigate(getAuthRedirect(location.state), { replace: true });
   }
 
   function protectedElement(element: ReactNode) {
@@ -1111,14 +1109,7 @@ export default function App() {
     <NotFoundPage onHome={returnHome} />
   );
 
-  const profilePage = (
-    <main className="app-shell profile-app-shell">
-      <div className="workspace-glow" aria-hidden="true" />
-      <CourseShell {...layoutProps} activeSection="profile">
-        <ProfilePage profile={mockStudentProfile} onOpenCourse={openCourse} onOpenTasks={() => openTasks()} onNavigateTarget={openProfileTarget} />
-      </CourseShell>
-    </main>
-  );
+  const profilePage = session ? <ProfileKnowledgePage session={session} onLogout={logout} /> : null;
 
   const canvasPage = routeTemplate ? (
     <main className="app-shell atlas-canvas-shell">
@@ -1260,8 +1251,8 @@ export default function App() {
         <WorkflowProvider value={workflowContextValue}>
           <TaskProvider value={taskContextValue}>
             <Routes>
-              <RouterRoute path="/login" element={session ? <Navigate to="/" replace /> : <AuthPage mode="login" />} />
-              <RouterRoute path="/register" element={session ? <Navigate to="/" replace /> : <AuthPage mode="register" />} />
+              <RouterRoute path="/login" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
+              <RouterRoute path="/register" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
               <RouterRoute path="/" element={protectedElement(atlasHome)} />
               <RouterRoute path="/workflows" element={protectedElement(workflowLibrary)} />
               <RouterRoute path="/workflows/:workflowId" element={protectedElement(canvasPage)} />
@@ -1270,7 +1261,8 @@ export default function App() {
               <RouterRoute path="/courses/:courseId/materials/:materialId" element={protectedElement(lessonPage)} />
               <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={<Navigate to="/courses/agentic-ai" replace />} />
               <RouterRoute path="/tasks/*" element={<Navigate to="/" replace />} />
-              <RouterRoute path="/profile/*" element={<Navigate to="/" replace />} />
+              <RouterRoute path="/profile" element={protectedElement(profilePage)} />
+              <RouterRoute path="/profile/*" element={<Navigate to="/profile" replace />} />
               <RouterRoute path="/settings/*" element={<Navigate to="/" replace />} />
               <RouterRoute path="/notifications/*" element={<Navigate to="/" replace />} />
               <RouterRoute path="/messages/*" element={<Navigate to="/" replace />} />

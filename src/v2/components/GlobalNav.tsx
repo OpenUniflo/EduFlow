@@ -8,7 +8,7 @@ export function GlobalNav({
   session,
   onLogout
 }: {
-  active: "atlas" | "courses" | "workflows";
+  active: "atlas" | "courses" | "workflows" | "profile";
   session?: MockSession | null;
   onLogout?: () => void;
 }) {
@@ -67,7 +67,7 @@ export function GlobalNav({
             type="button"
             aria-label="展开导航菜单"
             aria-expanded={open}
-            onClick={() => setOpen((value) => !value)}
+            onClick={() => setOpen(true)}
           >
             <ChevronDown size={16} />
           </button>
@@ -96,12 +96,28 @@ export function GlobalNav({
           {session && onLogout ? (
             <>
               <div className="atlas-nav-divider" />
-              <div className="atlas-account-row">
+              <div
+                className={`atlas-account-row ${active === "profile" ? "active" : ""}`}
+                role="link"
+                tabIndex={0}
+                onClick={() => { setOpen(false); navigate("/profile"); }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setOpen(false);
+                    navigate("/profile");
+                  }
+                }}
+              >
                 <div>
                   <strong>{session.name}</strong>
                   <span>{session.email}</span>
                 </div>
-                <button onClick={onLogout} aria-label="退出登录"><LogOut size={16} /></button>
+                {active === "profile" ? <span className="atlas-current-tag">当前</span> : null}
+                <button
+                  onClick={(event) => { event.stopPropagation(); onLogout(); }}
+                  aria-label="退出登录"
+                ><LogOut size={16} /></button>
               </div>
             </>
           ) : null}
@@ -110,4 +126,3 @@ export function GlobalNav({
     </nav>
   );
 }
-
