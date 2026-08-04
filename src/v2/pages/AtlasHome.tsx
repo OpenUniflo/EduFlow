@@ -3,9 +3,13 @@ import { ArrowRight, FileText, Minus, Pause, Play, Plus, RefreshCcw, Send, Uploa
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
+import { courseKnowledgeReferences } from "../data";
+import { globalKnowledgeGraph } from "../knowledge/graph";
+import { buildAtlasKnowledgeLayout, atlasDomainLayout } from "../knowledge/atlasLayout";
 
 type AtlasNode = {
   id: string;
+  kind: "domain" | "knowledge";
   name: string;
   category: string;
   color: string;
@@ -17,72 +21,65 @@ type AtlasNode = {
   courses: number;
   description: string;
   tags: string[];
-  minor?: boolean;
   related: string[];
+  prerequisites: string[];
+  courseId?: string;
   projection?: { x: number; y: number; z: number; radius: number };
 };
 
-const palette = ["#78a7ee", "#9a8ee6", "#70c4a5", "#ec92aa", "#eca86c", "#77b7c8"];
-const featuredSeed = [
-  ["agentic-ai", "Agentic AI", "人工智能 · 课程主题", 0, -110, -90, 80, 20, 68, 1, "围绕规划、工具调用、记忆、运行时、评测与治理构建可执行的智能体系统。", ["大语言模型", "工具调用", "多智能体", "评测与治理"]],
-  ["machine-learning", "机器学习", "数据与算法 · 知识领域", 1, 240, -185, 50, 18, 118, 0, "从监督学习、无监督学习到深度学习，建立数据驱动的建模方法。", ["统计学", "深度学习", "数据分析"]],
-  ["education-ai", "教育 AI", "教育技术 · 课程主题", 5, -20, 145, -80, 19, 88, 0, "将知识图谱、生成式 AI、学习分析与教学设计结合，形成可交互学习系统。", ["学习科学", "课程设计", "知识图谱"]],
-  ["language-learning", "语言学习", "语言与人文 · 知识领域", 3, -350, -210, 80, 17, 126, 0, "涵盖语法、表达、阅读、写作与跨文化交流的语言能力体系。", ["学术写作", "跨文化交流"]],
-  ["business-analysis", "商业分析", "商业与社会 · 课程主题", 4, 340, 75, -25, 16, 84, 0, "连接数据、商业问题与决策，形成可执行的分析结论。", ["数据分析", "创新创业"]],
-  ["biology", "生命科学", "自然科学 · 知识领域", 2, 40, -300, 100, 18, 134, 0, "研究生命结构、遗传、进化、生态和复杂生物系统。", ["气候环境", "数据建模"]]
-] as const;
-
 function createAtlas() {
-  const nodes: AtlasNode[] = featuredSeed.map((item) => ({
-    id: item[0],
-    name: item[1],
-    category: item[2],
-    color: palette[item[3]],
-    x: item[4],
-    y: item[5],
-    z: item[6],
-    radius: item[7],
-    knowledge: item[8],
-    courses: item[9],
-    description: item[10],
-    tags: [...item[11]],
-    related: []
-  }));
-  const featured = [...nodes];
-  let seed = 42;
-  const random = () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
-  featured.forEach((parent, cluster) => {
-    for (let index = 0; index < 24; index += 1) {
-      const angle = random() * Math.PI * 2;
-      const distance = 45 + random() * 145;
-      nodes.push({
-        id: `minor-${cluster}-${index}`,
-        name: "关联知识",
-        category: "知识节点",
-        color: parent.color,
-        x: parent.x + Math.cos(angle) * distance,
-        y: parent.y + Math.sin(angle) * distance * 0.65,
-        z: parent.z + (random() - 0.5) * 200,
-        radius: 3 + random() * 5,
-        knowledge: 0,
-        courses: 0,
-        description: "",
-        tags: [],
-        minor: true,
-        related: []
-      });
-    }
+  const layout = buildAtlasKnowledgeLayout(globalKnowledgeGraph);
+  const domainById = new Map(globalKnowledgeGraph.domains.map((domain) => [domain.id, domain]));
+  const clusterById = new Map(globalKnowledgeGraph.clusters.map((cluster) => [cluster.id, cluster]));
+  const curriculumIds = new Set(courseKnowledgeReferences.map((reference) => reference.nodeId));
+  const nodes: AtlasNode[] = globalKnowledgeGraph.domains.map((domain) => {
+    const position = atlasDomainLayout[domain.id] ?? { x: 0, y: 0, z: 0 };
+    const domainNodes = globalKnowledgeGraph.nodes.filter((node) => node.domainId === domain.id);
+    return {
+      id: domain.id,
+      kind: "domain",
+      name: domain.title,
+      category: "全局知识领域",
+      color: domain.color,
+      x: position.x,
+      y: position.y,
+      z: position.z ?? 0,
+      radius: domainNodes.length ? 18 : 13,
+      knowledge: domainNodes.length,
+      courses: domain.id === "agentic-ai" ? 1 : 0,
+      description: domain.description ?? "",
+      tags: globalKnowledgeGraph.clusters.filter((cluster) => cluster.domainId === domain.id).map((cluster) => cluster.title).slice(0, 4),
+      related: [],
+      prerequisites: [],
+      courseId: domain.id === "agentic-ai" ? "agentic-ai" : undefined
+    };
   });
-  const edges: Array<[string, string]> = [];
-  featured.forEach((parent, cluster) => {
-    const clusterNodes = nodes.filter((node) => node.id.startsWith(`minor-${cluster}-`));
-    clusterNodes.forEach((node, index) => {
-      if (index === 0) edges.push([parent.id, node.id]);
-      else edges.push([node.id, clusterNodes[Math.max(0, index - 1 - Math.floor(random() * 3))].id]);
-      if (index > 2 && random() > 0.76) edges.push([node.id, clusterNodes[Math.floor(random() * index)].id]);
+  globalKnowledgeGraph.nodes.forEach((node) => {
+    const domain = domainById.get(node.domainId);
+    const position = layout[node.id] ?? { x: 0, y: 0, z: 0 };
+    const incident = globalKnowledgeGraph.edges.filter((edge) => edge.source === node.id || edge.target === node.id);
+    nodes.push({
+      id: node.id,
+      kind: "knowledge",
+      name: node.title,
+      category: `${domain?.title ?? node.domainId} · ${clusterById.get(node.clusterId ?? "")?.title ?? "知识节点"}`,
+      color: domain?.color ?? "#697ee6",
+      x: position.x,
+      y: position.y,
+      z: position.z ?? 0,
+      radius: 4.5 + Math.min(3.5, incident.length * 0.28),
+      knowledge: 1,
+      courses: curriculumIds.has(node.id) ? 1 : 0,
+      description: node.description,
+      tags: node.tags ?? [clusterById.get(node.clusterId ?? "")?.title ?? domain?.title ?? "知识节点"],
+      related: [],
+      prerequisites: globalKnowledgeGraph.edges
+        .filter((edge) => edge.target === node.id && edge.relation === "prerequisite")
+        .map((edge) => globalKnowledgeGraph.nodes.find((item) => item.id === edge.source)?.title ?? edge.source),
+      courseId: curriculumIds.has(node.id) ? "agentic-ai" : undefined
     });
   });
-  edges.push(["agentic-ai", "education-ai"], ["agentic-ai", "machine-learning"], ["machine-learning", "business-analysis"], ["education-ai", "language-learning"], ["biology", "machine-learning"]);
+  const edges: Array<[string, string]> = globalKnowledgeGraph.edges.map((edge) => [edge.source, edge.target]);
   const byId = Object.fromEntries(nodes.map((node) => [node.id, node]));
   edges.forEach(([from, to]) => {
     byId[from]?.related.push(to);
@@ -92,15 +89,8 @@ function createAtlas() {
 }
 
 const atlas = createAtlas();
+const featuredKnowledgeIds = new Set(["PY01", "PY06", "PY18", "PY46", "PY57", "PY58", "PY62", "PY49", "PY50", "PY76", "T01", "RT01"]);
 const generationStages = ["读取课件", "识别章节", "提取知识节点", "分析前置依赖", "生成实训目标", "完成课程"];
-const atlasPrerequisites: Record<string, string[]> = {
-  "agentic-ai": ["机器学习", "大语言模型基础", "教育 AI 场景认知"],
-  "machine-learning": ["数据分析", "概率统计", "线性代数"],
-  "education-ai": ["学习科学", "课程设计", "生成式 AI 基础"],
-  "language-learning": ["语言学基础", "阅读与写作", "跨文化交流"],
-  "business-analysis": ["数据分析", "统计推断", "商业问题建模"],
-  biology: ["基础化学", "科学研究方法", "数据建模"]
-};
 
 export function AtlasHome({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -191,7 +181,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
         const projection = node.projection!;
         const isSelected = node.id === selectedId;
         const related = selectedId && (isSelected || atlas.byId[selectedId].related.includes(node.id));
-        const alpha = selectedId ? (isSelected ? 1 : related ? 0.84 : node.minor ? 0.06 : 0.14) : node.minor ? 0.48 : 0.8;
+        const alpha = selectedId ? (isSelected ? 1 : related ? 0.84 : 0.12) : node.kind === "domain" ? 0.92 : 0.62;
         const radius = projection.radius * (isSelected ? 1.18 : node.id === state.hoveredId ? 1.1 : 1);
         if (isSelected || node.id === state.hoveredId) {
           ctx.beginPath();
@@ -207,8 +197,8 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
         ctx.arc(projection.x, projection.y, radius, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
-        if (!node.minor && (isSelected || node.id === state.hoveredId || node.radius >= 18)) {
-          ctx.font = "600 12px Inter, system-ui";
+        if (isSelected || node.id === state.hoveredId || node.kind === "domain" || featuredKnowledgeIds.has(node.id)) {
+          ctx.font = `${node.kind === "domain" ? "600 12px" : "560 9px"} Inter, system-ui`;
           ctx.textAlign = "center";
           ctx.fillStyle = `rgba(40,56,78,${selectedId && !related ? 0.16 : 0.86})`;
           ctx.fillText(node.name, projection.x, projection.y + radius + 16);
@@ -275,7 +265,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
     state.dragging = false;
     if (!state.moved) {
       const node = hit(event.clientX, event.clientY);
-      if (node && !node.minor) setSelectedId(node.id);
+      if (node) setSelectedId(node.id);
     }
     state.autoResumeAt = performance.now() + 1800;
   }
@@ -400,13 +390,13 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
           <section className="atlas-node-dependencies">
             <h3>前置依赖</h3>
             <div>
-              {(atlasPrerequisites[selected.id] ?? ["通识基础"]).map((dependency) => (
+              {selected.prerequisites.length ? selected.prerequisites.map((dependency) => (
                 <span key={dependency}><ArrowRight size={12} />{dependency}</span>
-              ))}
+              )) : <span>暂无严格前置依赖</span>}
             </div>
           </section>
           <div className="atlas-panel-actions">
-            <button className="atlas-primary" disabled={selected.id !== "agentic-ai"} onClick={() => navigate("/courses/agentic-ai")}>
+            <button className="atlas-primary" disabled={!selected.courseId} onClick={() => selected.courseId && navigate(`/courses/${selected.courseId}`)}>
               查看对应课程 <ArrowRight size={16} />
             </button>
             <button className="atlas-secondary" onClick={() => { setPrompt(`围绕“${selected.name}”创建一门课程，设计清晰的前置依赖与实训。`); setSelectedId(null); }}>

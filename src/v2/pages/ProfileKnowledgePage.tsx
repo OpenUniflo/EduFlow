@@ -27,16 +27,16 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
-import { courseEdges, courseStages, knowledgeNodes, practices } from "../data";
+import { courseKnowledgeReferences, practices } from "../data";
 import { useLearningProgress } from "../progress";
 import { GlobalNav } from "../components/GlobalNav";
+import { globalKnowledgeGraph } from "../knowledge/graph";
 import { buildPersonalKnowledgeGraph } from "../profile/profileGraph";
+import { demoUserKnowledge } from "../profile/demoUserKnowledge";
 import type { PersonalKnowledgeNode, PersonalKnowledgeViewMode } from "../profile/types";
 
 const WORLD_WIDTH = 1440;
 const WORLD_HEIGHT = 900;
-const COURSE_ID = "agentic-ai";
-
 const modeLabels: Record<PersonalKnowledgeViewMode, string> = {
   knowledge: "我的知识",
   history: "学习轨迹",
@@ -63,7 +63,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   const navigate = useNavigate();
   const progress = useLearningProgress();
   const graph = useMemo(
-    () => buildPersonalKnowledgeGraph(knowledgeNodes, courseEdges, practices, courseStages, progress),
+    () => buildPersonalKnowledgeGraph(globalKnowledgeGraph, demoUserKnowledge, practices, courseKnowledgeReferences, progress),
     [progress]
   );
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -83,10 +83,12 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
     const rect = viewportRef.current?.getBoundingClientRect();
     const width = rect?.width ?? window.innerWidth;
     const height = rect?.height ?? window.innerHeight;
-    const scale = Math.max(0.5, Math.min(width / WORLD_WIDTH, height / WORLD_HEIGHT) * 1.03);
+    const leftInset = width >= 900 ? 300 : 0;
+    const availableWidth = width - leftInset;
+    const scale = Math.max(0.5, Math.min(availableWidth / WORLD_WIDTH, height / WORLD_HEIGHT) * 1.03);
     setTransform({
       scale,
-      x: (width - WORLD_WIDTH * scale) / 2,
+      x: leftInset + (availableWidth - WORLD_WIDTH * scale) / 2,
       y: (height - WORLD_HEIGHT * scale) / 2
     });
   }, []);
@@ -129,9 +131,9 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
     setMode(nextMode);
     setSelectedId(null);
     setConnectionPanelOpen(nextMode === "connection");
-    if (nextMode === "history") showToast("学习轨迹按课程依赖与完成状态推断");
+    if (nextMode === "history") showToast("学习轨迹来自个人知识状态与课程实训证据");
     if (nextMode === "practice") showToast("已突出完成的工作流实训与关联知识");
-    if (nextMode === "connection") showToast("当前课程数据形成 1 座知识岛，未生成虚假跨域连接");
+    if (nextMode === "connection") showToast(`正在分析 ${graph.summary.islandCount} 座知识岛之间的潜在连接`);
   }
 
   function locateNode(node: PersonalKnowledgeNode, openDetail = true) {
@@ -225,8 +227,12 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   }
 
   function openCourse(node: PersonalKnowledgeNode) {
-    if (node.materialId) navigate(`/courses/${COURSE_ID}/materials/${node.materialId}`);
-    else navigate(`/courses/${COURSE_ID}`);
+    if (node.courseId && node.materialId) navigate(`/courses/${node.courseId}/materials/${node.materialId}`);
+    else if (node.courseId) navigate(`/courses/${node.courseId}`);
+    else {
+      navigate("/courses");
+      showToast("该全局知识节点暂未绑定课程，已打开课程中心");
+    }
   }
 
   function openPractice(node: PersonalKnowledgeNode) {
@@ -300,20 +306,26 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
             <filter id="personal-selected-glow" x="-120%" y="-120%" width="340%" height="340%"><feDropShadow dx="0" dy="0" stdDeviation="9" floodColor="#5b7cfa" floodOpacity=".48" /></filter>
           </defs>
           <g className="personal-world">
-            <ellipse className="personal-island-halo" cx="770" cy="425" rx="355" ry="275" />
-            <g className="personal-island-overview">
-              <circle cx="770" cy="425" r="62" />
-              <text x="770" y="419">Agentic AI</text>
-              <text x="770" y="441">{graph.summary.largestIslandSize} 个核心知识 · {graph.summary.learning} 个学习中</text>
-            </g>
-            <text className="personal-island-title" x="455" y="165">Agentic AI</text>
-            <text className="personal-island-meta" x="455" y="184">{graph.summary.largestIslandSize} 个核心知识 · {graph.summary.learning} 个学习中 · 当前个人知识岛</text>
+            {graph.islands.map((island) => {
+              const cx = island.bounds.x + island.bounds.width / 2;
+              const cy = island.bounds.y + island.bounds.height / 2;
+              return <g key={island.id}>
+                <ellipse className="personal-island-halo" cx={cx} cy={cy} rx={island.bounds.width / 2} ry={island.bounds.height / 2} />
+                <g className="personal-island-overview">
+                  <circle cx={cx} cy={cy} r="62" />
+                  <text x={cx} y={cy - 6}>{island.title}</text>
+                  <text x={cx} y={cy + 16}>{island.size} 个核心知识 · {island.learningCount} 个学习中</text>
+                </g>
+                <text className="personal-island-title" x={island.bounds.x + 26} y={island.bounds.y + 26}>{island.title}</text>
+                <text className="personal-island-meta" x={island.bounds.x + 26} y={island.bounds.y + 46}>{island.size} 个核心知识 · {island.learningCount} 个学习中 · 动态知识岛</text>
+              </g>;
+            })}
 
-            {graph.stages.map((stage) => (
-              <g className="personal-stage" key={stage.id}>
-                <rect x={stage.x} y={stage.y} width={stage.width} height={stage.height} rx="34" />
-                <text x={stage.x + 18} y={stage.y + 26}>{stage.title}</text>
-                <text className="personal-stage-count" x={stage.x + 18} y={stage.y + 43}>{stage.nodeCount} 个节点</text>
+            {graph.clusters.map((cluster) => (
+              <g className="personal-stage" key={cluster.id}>
+                <rect x={cluster.x} y={cluster.y} width={cluster.width} height={cluster.height} rx="34" />
+                <text x={cluster.x + 18} y={cluster.y + 26}>{cluster.title}</text>
+                <text className="personal-stage-count" x={cluster.x + 18} y={cluster.y + 43}>{cluster.nodeCount} 个节点</text>
               </g>
             ))}
 
@@ -321,12 +333,13 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
               const source = nodeById.get(edge.source);
               const target = nodeById.get(edge.target);
               if (!source || !target) return null;
+              if (mode !== "connection" && (edge.isPotential || source.isPotentialBridge || target.isPotentialBridge)) return null;
               const midpoint = (source.x + target.x) / 2;
-              const historyActive = source.isCore && target.isCore;
+              const historyActive = edge.effective;
               return (
                 <path
-                  key={`${edge.source}-${edge.target}`}
-                  className={`personal-edge ${historyActive ? "history-active" : ""}`}
+                  key={edge.id}
+                  className={`personal-edge ${historyActive ? "history-active" : ""} ${edge.isPotential ? "potential" : ""} ${edge.kind === "cross" ? "cross" : ""}`}
                   d={`M${source.x} ${source.y} C${midpoint} ${source.y}, ${midpoint} ${target.y}, ${target.x} ${target.y}`}
                 />
               );
@@ -345,11 +358,12 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
             })}
 
             {graph.nodes.map((node) => {
+              if (mode !== "connection" && node.isPotentialBridge) return null;
               const selectedNode = selectedId === node.id;
               const hasEvidence = evidenceByNode.has(node.id);
               return (
                 <g
-                  className={`personal-node status-${node.status} ${node.isCore ? "core" : "context"} ${hasEvidence ? "has-evidence" : ""} ${selectedNode ? "selected" : ""}`}
+                  className={`personal-node status-${node.status} ${node.isCore ? "core" : "context"} ${node.isPotentialBridge ? "potential-bridge" : ""} ${hasEvidence ? "has-evidence" : ""} ${selectedNode ? "selected" : ""}`}
                   key={node.id}
                   transform={`translate(${node.x} ${node.y})`}
                   role="button"
@@ -366,7 +380,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
                   {hasEvidence ? <circle className="personal-evidence-dot" cx="19" cy="-18" r="4" /> : null}
                   <g className="personal-node-copy">
                     <text className="personal-node-title" y={node.status === "learning" ? 45 : 40}>{node.title}</text>
-                    <text className="personal-node-status" y={node.status === "learning" ? 58 : 53}>{statusLabels[node.status]}{node.status === "learning" ? ` · ${node.progress}%` : ""}</text>
+                    <text className="personal-node-status" y={node.status === "learning" ? 58 : 53}>{node.isPotentialBridge ? "Potential Bridge" : statusLabels[node.status]}{node.status === "learning" ? ` · ${node.progress}%` : ""}</text>
                   </g>
                 </g>
               );
@@ -379,26 +393,27 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
         {mode === "connection" && !selected ? (
           <>
             <div className="personal-drawer-head">
-              <span><small>CONNECTION ANALYSIS</small><h2>个人知识结构分析</h2><p>查看当前课程知识如何形成有效结构。</p></span>
+              <span><small>CONNECTION ANALYSIS</small><h2>个人知识结构分析</h2><p>基于全局知识图分析当前知识岛与潜在成长路径。</p></span>
               <button onClick={() => setConnectionPanelOpen(false)} aria-label="关闭连接分析"><X size={17} /></button>
             </div>
             <section><h3>知识结构</h3><div className="personal-drawer-list"><span><small>知识岛</small><strong>{graph.summary.islandCount} 个</strong></span><span><small>最大知识岛</small><strong>{graph.summary.largestIslandName} · {graph.summary.largestIslandSize}</strong></span><span><small>知识连接度</small><strong>{graph.summary.connectivity}%</strong></span></div></section>
             <section><h3>已建立连接</h3><div className="personal-drawer-list"><span><small>知识依赖</small><strong>{graph.summary.dependencyConnections} 条</strong></span><span><small>实训关联</small><strong>{graph.summary.practiceConnections} 条</strong></span><span><small>项目组合</small><strong>{graph.summary.projectConnections} 条</strong></span><span><small>跨领域桥梁</small><strong>{graph.summary.crossDomainConnections} 条</strong></span></div></section>
-            <section><h3>跨领域连接</h3><div className="personal-empty-analysis"><GitBranch size={20} /><strong>暂未形成跨领域桥梁</strong><p>当前数据只包含 Agentic AI 课程。系统不会为了视觉完整而生成虚假知识连接。</p></div></section>
+            <section><h3>潜在连接</h3>{graph.potentialBridges.length ? <div className="personal-drawer-list">{graph.potentialBridges.map((bridge) => <button key={bridge.nodeId} onClick={() => { const target = nodeById.get(bridge.nodeId); if (target) locateNode(target); }}><small>Potential Bridge</small><strong>{bridge.title}</strong><span>{bridge.missingNodeIds.length} 个待形成节点</span></button>)}</div> : <div className="personal-empty-analysis"><GitBranch size={20} /><strong>暂未发现潜在桥梁</strong><p>当前全局关系中没有满足分析条件的跨岛路径。</p></div>}</section>
             <div className="personal-drawer-actions"><button className="primary" onClick={currentLearning}>定位当前学习</button><button onClick={() => selectMode("knowledge")}>返回我的知识</button></div>
           </>
         ) : selected ? (
           <>
             <div className="personal-drawer-head">
-              <span><small>{selected.stageTitle}</small><h2>{selected.title}</h2><p>{selected.description}</p><i className={`status-${selected.status}`}>{statusLabels[selected.status]}{selected.status === "learning" ? ` · ${selected.progress}%` : ""}</i></span>
+              <span><small>{selected.domainTitle} · {selected.clusterTitle}</small><h2>{selected.title}</h2><p>{selected.description}</p><i className={`status-${selected.status}`}>{selected.isPotentialBridge ? "Potential Bridge" : statusLabels[selected.status]}{selected.status === "learning" ? ` · ${selected.progress}%` : ""}</i></span>
               <button onClick={() => setSelectedId(null)} aria-label="关闭节点详情"><X size={17} /></button>
             </div>
             <section><h3>当前掌握</h3><div className="personal-progress-card"><span><small>课程学习进度</small><strong>{selected.progress ? `${selected.progress}%` : statusLabels[selected.status]}</strong></span><i><b style={{ width: `${selected.progress || 8}%` }} /></i></div></section>
-            <section><h3>学习与实践证据</h3><div className="personal-drawer-list">{selected.evidence.map((item, index) => <span key={item}><small>证据 {String(index + 1).padStart(2, "0")}</small><strong>{item}</strong></span>)}</div></section>
+            <section><h3>学习与实践证据</h3>{selected.evidence.length ? <div className="personal-drawer-list">{selected.evidence.map((item, index) => <span key={item}><small>证据 {String(index + 1).padStart(2, "0")}</small><strong>{item}</strong></span>)}</div> : <div className="personal-empty-analysis"><CircleDot size={18} /><strong>尚无学习证据</strong><p>全局知识节点不会因为出现在图中而自动视为已掌握。</p></div>}</section>
             <section><h3>主要关联</h3><div className="personal-relation-tags">{[...selected.prerequisiteIds, ...selected.nextIds].map((id) => { const related = nodeById.get(id); return related ? <button key={id} onClick={() => locateNode(related)}>{related.title}<ArrowRight size={12} /></button> : null; })}</div></section>
             {selected.status === "explore" ? <div className="personal-explore-note"><CircleDot size={18} /><span><strong>一跳可探索知识</strong><p>它与当前已掌握或学习中的节点直接相关，但尚未计入你的核心知识。</p></span></div> : null}
+            {selected.isPotentialBridge ? <div className="personal-explore-note"><GitBranch size={18} /><span><strong>潜在知识桥梁</strong><p>{graph.potentialBridges.find((bridge) => bridge.nodeId === selected.id)?.description ?? "完成相关知识路径后，可以连接当前知识岛。"}</p></span></div> : null}
             <div className="personal-drawer-actions">
-              <button className="primary" onClick={() => openCourse(selected)}>{selected.status === "explore" ? "查看学习路径" : "继续学习"}<BookOpen size={14} /></button>
+              <button className="primary" onClick={() => openCourse(selected)}>{selected.courseId ? (selected.status === "explore" ? "查看学习路径" : "继续学习") : "查看可用课程"}<BookOpen size={14} /></button>
               <button onClick={() => openPractice(selected)}>进入实训<Workflow size={14} /></button>
               <button onClick={() => selectMode("history")}>查看学习轨迹</button>
             </div>

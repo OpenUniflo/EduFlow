@@ -1,4 +1,5 @@
-import type { AcceptanceSpec, CourseStage, KnowledgeNode, Practice } from "./types";
+import { getKnowledgeNode } from "./knowledge/selectors";
+import type { AcceptanceSpec, CourseKnowledgeReference, CourseStage, KnowledgeNode, Practice } from "./types";
 
 export const COURSE_ID = "agentic-ai";
 export const MATERIAL_ID = "lesson-04";
@@ -83,36 +84,43 @@ export const courseStages: CourseStage[] = [
   }
 ];
 
-type GraphNodeSeed = Omit<KnowledgeNode, "color">;
-const graphNode = (seed: GraphNodeSeed): KnowledgeNode => ({
-  ...seed,
-  color: courseStages.find((stage) => stage.id === seed.stageId)?.color ?? "#697ee6"
-});
-
-export const knowledgeNodes: KnowledgeNode[] = [
-  graphNode({ id: "H01", title: "Agentic AI 全景", practiceTitle: "能力边界标注", lesson: 1, stageId: "foundations", description: "理解 Agent、Workflow 与自动化系统的边界。", prerequisites: [], materialIds: [], status: "completed", x: 40, y: 245 }),
-  graphNode({ id: "P01", title: "任务环境建模", practiceTitle: "任务环境说明书", lesson: 2, stageId: "foundations", description: "识别目标、环境、约束、动作和完成条件。", prerequisites: ["H01"], materialIds: [], status: "completed", x: 310, y: 120 }),
-  graphNode({ id: "P05", title: "完成条件与约束", practiceTitle: "验收条件设计", lesson: 2, stageId: "foundations", description: "把自然语言要求转化为可检查的完成条件。", prerequisites: ["H01"], materialIds: [], status: "completed", x: 310, y: 380 }),
-  graphNode({ id: "A05", title: "经典与现代 Agent", practiceTitle: "架构演进比较", lesson: 3, stageId: "paradigms", description: "从经典智能体架构理解现代 LLM Agent 的演进。", prerequisites: ["P01", "P05"], materialIds: [], status: "completed", x: 580, y: 245 }),
-  graphNode({ id: "R02", title: "ReAct 与推理循环", practiceTitle: "ReAct 工具循环", lesson: 4, stageId: "paradigms", description: "让推理、行动与观察组成可审计闭环。", prerequisites: ["A05"], materialIds: [MATERIAL_ID], practiceId: "lesson-04-react", status: "learning", x: 850, y: 120 }),
-  graphNode({ id: "R05", title: "规划、重规划与反思", practiceTitle: "五种范式比较", lesson: 4, stageId: "paradigms", description: "比较 Direct、Plan-and-Execute、Replanning 与 Evaluator–Optimizer。", prerequisites: ["A05"], materialIds: [MATERIAL_ID], practiceId: "lesson-04-plan", status: "learning", x: 850, y: 380 }),
-  graphNode({ id: "W05", title: "混合架构与 HITL", practiceTitle: "HITL 模板比较", lesson: 5, stageId: "paradigms", description: "组合固定流程、Agent 决策、Evaluator 与人工审批。", prerequisites: ["R02", "R05"], materialIds: [], status: "available", x: 1120, y: 245 }),
-  graphNode({ id: "C05", title: "最小 Agent", practiceTitle: "最小 Agent 搭建", lesson: 6, stageId: "system", description: "搭建输入、模型、状态与输出组成的最小 Agent。", prerequisites: ["W05"], materialIds: [], status: "available", x: 1390, y: 95 }),
-  graphNode({ id: "I03", title: "结构化输出", practiceTitle: "Schema 配置实训", lesson: 7, stageId: "system", description: "使用 JSON Schema 保证节点间可靠传递数据。", prerequisites: ["C05"], materialIds: [], status: "available", x: 1390, y: 265 }),
-  graphNode({ id: "I04", title: "Context Engineering", practiceTitle: "上下文构建实训", lesson: 7, stageId: "system", description: "组织指令、历史、知识、记忆与工具结果。", prerequisites: ["C05"], materialIds: [], status: "available", x: 1390, y: 435 }),
-  graphNode({ id: "T01", title: "Tool Use", practiceTitle: "计算工具接入", lesson: 8, stageId: "capabilities", description: "让 Agent 根据任务决定何时调用外部工具。", prerequisites: ["I03"], materialIds: [], status: "available", x: 1660, y: 70 }),
-  graphNode({ id: "T04", title: "错误与重试", practiceTitle: "失败恢复实训", lesson: 8, stageId: "capabilities", description: "处理参数校验、超时、失败、重试与回退。", prerequisites: ["T01"], materialIds: [], status: "available", x: 1660, y: 215 }),
-  graphNode({ id: "K03", title: "RAG 与引用", practiceTitle: "知识问答流程", lesson: 9, stageId: "capabilities", description: "构建检索、重排序、注入与来源追踪链路。", prerequisites: ["I03", "I04"], materialIds: [], status: "locked", x: 1660, y: 370 }),
-  graphNode({ id: "K05", title: "长期记忆", practiceTitle: "偏好记忆实训", lesson: 9, stageId: "capabilities", description: "理解记忆读取、条件写入、冲突更新与遗忘。", prerequisites: ["K03"], materialIds: [], status: "locked", x: 1660, y: 520 }),
-  graphNode({ id: "RT01", title: "Agent Loop", practiceTitle: "循环 Agent 搭建", lesson: 10, stageId: "capabilities", description: "构造 Observe–Think–Act 的自主执行循环。", prerequisites: ["T04", "K03", "K05"], materialIds: [], status: "locked", x: 1930, y: 160 }),
-  graphNode({ id: "RT05", title: "Checkpoint 与审计", practiceTitle: "暂停恢复实训", lesson: 10, stageId: "capabilities", description: "保存中间状态、恢复执行并记录完整轨迹。", prerequisites: ["RT01"], materialIds: [], status: "locked", x: 1930, y: 350 }),
-  graphNode({ id: "WF05", title: "Agentic Workflow", practiceTitle: "课程主工作流", lesson: 11, stageId: "workflows", description: "组合确定性链路、Agent Island、Evaluator 与审批。", prerequisites: ["RT01", "RT05"], materialIds: [], status: "locked", x: 2200, y: 255 }),
-  graphNode({ id: "MA02", title: "Supervisor", practiceTitle: "多 Agent 调度", lesson: 12, stageId: "workflows", description: "由中央 Agent 分配任务并整合专业 Agent 结果。", prerequisites: ["WF05"], materialIds: [], status: "locked", x: 2470, y: 120 }),
-  graphNode({ id: "MA05", title: "Skill / MCP / A2A", practiceTitle: "能力封装实训", lesson: 12, stageId: "workflows", description: "理解能力封装、工具协议与 Agent 远程协作。", prerequisites: ["WF05"], materialIds: [], status: "locked", x: 2470, y: 390 }),
-  graphNode({ id: "E03", title: "结果与轨迹评测", practiceTitle: "评测规则配置", lesson: 13, stageId: "production", description: "分别评测最终结果、计划、工具调用与中间步骤。", prerequisites: ["MA02"], materialIds: [], status: "locked", x: 2740, y: 70 }),
-  graphNode({ id: "S04", title: "Guardrail 与权限", practiceTitle: "综合安全链", lesson: 14, stageId: "production", description: "使用 Guardrail、Sandbox 与最小权限控制风险。", prerequisites: ["MA05", "E03"], materialIds: [], status: "locked", x: 2740, y: 285 }),
-  graphNode({ id: "F06", title: "综合系统与答辩", practiceTitle: "Agentic AI 综合项目", lesson: 15, stageId: "frontier", description: "完成系统实现、架构决策、评测、安全报告与答辩。", prerequisites: ["S04"], materialIds: [], status: "locked", x: 3010, y: 285 })
+export const courseKnowledgeReferences: CourseKnowledgeReference[] = [
+  { nodeId: "H01", practiceTitle: "能力边界标注", lesson: 1, stageId: "foundations", prerequisiteNodeIds: [], materialIds: [], status: "completed", x: 40, y: 245 },
+  { nodeId: "P01", practiceTitle: "任务环境说明书", lesson: 2, stageId: "foundations", prerequisiteNodeIds: ["H01"], materialIds: [], status: "completed", x: 310, y: 120 },
+  { nodeId: "P05", practiceTitle: "验收条件设计", lesson: 2, stageId: "foundations", prerequisiteNodeIds: ["H01"], materialIds: [], status: "completed", x: 310, y: 380 },
+  { nodeId: "A05", practiceTitle: "架构演进比较", lesson: 3, stageId: "paradigms", prerequisiteNodeIds: ["P01", "P05"], materialIds: [], status: "completed", x: 580, y: 245 },
+  { nodeId: "R02", practiceTitle: "ReAct 工具循环", lesson: 4, stageId: "paradigms", prerequisiteNodeIds: ["A05"], materialIds: [MATERIAL_ID], practiceId: "lesson-04-react", status: "learning", x: 850, y: 120 },
+  { nodeId: "R05", practiceTitle: "五种范式比较", lesson: 4, stageId: "paradigms", prerequisiteNodeIds: ["A05"], materialIds: [MATERIAL_ID], practiceId: "lesson-04-plan", status: "learning", x: 850, y: 380 },
+  { nodeId: "W05", practiceTitle: "HITL 模板比较", lesson: 5, stageId: "paradigms", prerequisiteNodeIds: ["R02", "R05"], materialIds: [], status: "available", x: 1120, y: 245 },
+  { nodeId: "C05", practiceTitle: "最小 Agent 搭建", lesson: 6, stageId: "system", prerequisiteNodeIds: ["W05"], materialIds: [], status: "available", x: 1390, y: 95 },
+  { nodeId: "I03", practiceTitle: "Schema 配置实训", lesson: 7, stageId: "system", prerequisiteNodeIds: ["C05"], materialIds: [], status: "available", x: 1390, y: 265 },
+  { nodeId: "I04", practiceTitle: "上下文构建实训", lesson: 7, stageId: "system", prerequisiteNodeIds: ["C05"], materialIds: [], status: "available", x: 1390, y: 435 },
+  { nodeId: "T01", practiceTitle: "计算工具接入", lesson: 8, stageId: "capabilities", prerequisiteNodeIds: ["I03"], materialIds: [], status: "available", x: 1660, y: 70 },
+  { nodeId: "T04", practiceTitle: "失败恢复实训", lesson: 8, stageId: "capabilities", prerequisiteNodeIds: ["T01"], materialIds: [], status: "available", x: 1660, y: 215 },
+  { nodeId: "K03", practiceTitle: "知识问答流程", lesson: 9, stageId: "capabilities", prerequisiteNodeIds: ["I03", "I04"], materialIds: [], status: "locked", x: 1660, y: 370 },
+  { nodeId: "K05", practiceTitle: "偏好记忆实训", lesson: 9, stageId: "capabilities", prerequisiteNodeIds: ["K03"], materialIds: [], status: "locked", x: 1660, y: 520 },
+  { nodeId: "RT01", practiceTitle: "循环 Agent 搭建", lesson: 10, stageId: "capabilities", prerequisiteNodeIds: ["T04", "K03", "K05"], materialIds: [], status: "locked", x: 1930, y: 160 },
+  { nodeId: "RT05", practiceTitle: "暂停恢复实训", lesson: 10, stageId: "capabilities", prerequisiteNodeIds: ["RT01"], materialIds: [], status: "locked", x: 1930, y: 350 },
+  { nodeId: "WF05", practiceTitle: "课程主工作流", lesson: 11, stageId: "workflows", prerequisiteNodeIds: ["RT01", "RT05"], materialIds: [], status: "locked", x: 2200, y: 255 },
+  { nodeId: "MA02", practiceTitle: "多 Agent 调度", lesson: 12, stageId: "workflows", prerequisiteNodeIds: ["WF05"], materialIds: [], status: "locked", x: 2470, y: 120 },
+  { nodeId: "MA05", practiceTitle: "能力封装实训", lesson: 12, stageId: "workflows", prerequisiteNodeIds: ["WF05"], materialIds: [], status: "locked", x: 2470, y: 390 },
+  { nodeId: "E03", practiceTitle: "评测规则配置", lesson: 13, stageId: "production", prerequisiteNodeIds: ["MA02"], materialIds: [], status: "locked", x: 2740, y: 70 },
+  { nodeId: "S04", practiceTitle: "综合安全链", lesson: 14, stageId: "production", prerequisiteNodeIds: ["MA05", "E03"], materialIds: [], status: "locked", x: 2740, y: 285 },
+  { nodeId: "F06", practiceTitle: "Agentic AI 综合项目", lesson: 15, stageId: "frontier", prerequisiteNodeIds: ["S04"], materialIds: [], status: "locked", x: 3010, y: 285 }
 ];
+
+export const knowledgeNodes: KnowledgeNode[] = courseKnowledgeReferences.map((reference) => {
+  const node = getKnowledgeNode(reference.nodeId);
+  if (!node) throw new Error(`Unknown curriculum knowledge node: ${reference.nodeId}`);
+  return {
+    ...reference,
+    id: node.id,
+    title: node.title,
+    description: node.description,
+    prerequisites: reference.prerequisiteNodeIds,
+    color: courseStages.find((stage) => stage.id === reference.stageId)?.color ?? "#697ee6"
+  };
+});
 
 export const practices: Practice[] = [
   {

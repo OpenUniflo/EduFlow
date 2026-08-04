@@ -12,21 +12,26 @@ export type CourseStage = {
   outcome: string;
 };
 
-export type KnowledgeNode = {
-  id: string;
-  title: string;
+export type CourseKnowledgeReference = {
+  nodeId: string;
   lesson: number;
   stageId: string;
-  description: string;
-  prerequisites: string[];
+  prerequisiteNodeIds: string[];
   materialIds: string[];
   practiceId?: string;
   practiceTitle: string;
-  icon?: string;
   status: LearningStatus;
-  color: string;
   x: number;
   y: number;
+};
+
+export type KnowledgeNode = CourseKnowledgeReference & {
+  id: string;
+  title: string;
+  description: string;
+  prerequisites: string[];
+  color: string;
+  icon?: string;
 };
 
 export type Practice = {
