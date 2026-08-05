@@ -5,11 +5,12 @@ import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
 import { courseKnowledgeReferences } from "../data";
 import { globalKnowledgeGraph } from "../knowledge/graph";
-import { buildAtlasKnowledgeLayout, atlasDomainLayout } from "../knowledge/atlasLayout";
+import { buildAtlasKnowledgeLayout } from "../knowledge/atlasLayout";
+import { getKnowledgeEdgeLayoutWeight } from "../knowledge/graphLayout";
+import type { KnowledgeEdge } from "../knowledge/types";
 
 type AtlasNode = {
   id: string;
-  kind: "domain" | "knowledge";
   name: string;
   category: string;
   color: string;
@@ -32,35 +33,12 @@ function createAtlas() {
   const domainById = new Map(globalKnowledgeGraph.domains.map((domain) => [domain.id, domain]));
   const clusterById = new Map(globalKnowledgeGraph.clusters.map((cluster) => [cluster.id, cluster]));
   const curriculumIds = new Set(courseKnowledgeReferences.map((reference) => reference.nodeId));
-  const nodes: AtlasNode[] = globalKnowledgeGraph.domains.map((domain) => {
-    const position = atlasDomainLayout[domain.id] ?? { x: 0, y: 0, z: 0 };
-    const domainNodes = globalKnowledgeGraph.nodes.filter((node) => node.domainId === domain.id);
-    return {
-      id: domain.id,
-      kind: "domain",
-      name: domain.title,
-      category: "全局知识领域",
-      color: domain.color,
-      x: position.x,
-      y: position.y,
-      z: position.z ?? 0,
-      radius: domainNodes.length ? 18 : 13,
-      knowledge: domainNodes.length,
-      courses: domain.id === "agentic-ai" ? 1 : 0,
-      description: domain.description ?? "",
-      tags: globalKnowledgeGraph.clusters.filter((cluster) => cluster.domainId === domain.id).map((cluster) => cluster.title).slice(0, 4),
-      related: [],
-      prerequisites: [],
-      courseId: domain.id === "agentic-ai" ? "agentic-ai" : undefined
-    };
-  });
-  globalKnowledgeGraph.nodes.forEach((node) => {
+  const nodes: AtlasNode[] = globalKnowledgeGraph.nodes.map((node) => {
     const domain = domainById.get(node.domainId);
     const position = layout[node.id] ?? { x: 0, y: 0, z: 0 };
     const incident = globalKnowledgeGraph.edges.filter((edge) => edge.source === node.id || edge.target === node.id);
-    nodes.push({
+    return {
       id: node.id,
-      kind: "knowledge",
       name: node.title,
       category: `${domain?.title ?? node.domainId} · ${clusterById.get(node.clusterId ?? "")?.title ?? "知识节点"}`,
       color: domain?.color ?? "#697ee6",
@@ -77,13 +55,13 @@ function createAtlas() {
         .filter((edge) => edge.target === node.id && edge.relation === "prerequisite")
         .map((edge) => globalKnowledgeGraph.nodes.find((item) => item.id === edge.source)?.title ?? edge.source),
       courseId: curriculumIds.has(node.id) ? "agentic-ai" : undefined
-    });
+    };
   });
-  const edges: Array<[string, string]> = globalKnowledgeGraph.edges.map((edge) => [edge.source, edge.target]);
-  const byId = Object.fromEntries(nodes.map((node) => [node.id, node]));
-  edges.forEach(([from, to]) => {
-    byId[from]?.related.push(to);
-    byId[to]?.related.push(from);
+  const edges = globalKnowledgeGraph.edges;
+  const byId: Record<string, AtlasNode> = Object.fromEntries(nodes.map((node) => [node.id, node]));
+  edges.forEach((edge) => {
+    byId[edge.source]?.related.push(edge.target);
+    byId[edge.target]?.related.push(edge.source);
   });
   return { nodes, edges, byId };
 }
@@ -166,22 +144,23 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
       if (!paused && !state.dragging && now > state.autoResumeAt && !selectedId) state.rotationY += delta * 0.000032;
       ctx.clearRect(0, 0, width, height);
       atlas.nodes.forEach((node) => { node.projection = project(node); });
-      atlas.edges.forEach(([from, to]) => {
-        const source = atlas.byId[from].projection!;
-        const target = atlas.byId[to].projection!;
-        const direct = selectedId && (from === selectedId || to === selectedId);
+      atlas.edges.forEach((edge: KnowledgeEdge) => {
+        const source = atlas.byId[edge.source].projection!;
+        const target = atlas.byId[edge.target].projection!;
+        const direct = selectedId && (edge.source === selectedId || edge.target === selectedId);
+        const relationWeight = getKnowledgeEdgeLayoutWeight(edge);
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
         ctx.lineTo(target.x, target.y);
-        ctx.strokeStyle = direct ? rgba(atlas.byId[selectedId].color, 0.72) : selectedId ? "rgba(104,126,160,.025)" : "rgba(104,126,160,.08)";
-        ctx.lineWidth = direct ? 1.7 : 0.65;
+        ctx.strokeStyle = direct ? rgba(atlas.byId[selectedId].color, 0.72) : selectedId ? "rgba(104,126,160,.018)" : `rgba(104,126,160,${0.035 + relationWeight * 0.032})`;
+        ctx.lineWidth = direct ? 1.7 : 0.42 + relationWeight * 0.2;
         ctx.stroke();
       });
       [...atlas.nodes].sort((a, b) => a.projection!.z - b.projection!.z).forEach((node) => {
         const projection = node.projection!;
         const isSelected = node.id === selectedId;
         const related = selectedId && (isSelected || atlas.byId[selectedId].related.includes(node.id));
-        const alpha = selectedId ? (isSelected ? 1 : related ? 0.84 : 0.12) : node.kind === "domain" ? 0.92 : 0.62;
+        const alpha = selectedId ? (isSelected ? 1 : related ? 0.84 : 0.11) : 0.68;
         const radius = projection.radius * (isSelected ? 1.18 : node.id === state.hoveredId ? 1.1 : 1);
         if (isSelected || node.id === state.hoveredId) {
           ctx.beginPath();
@@ -197,8 +176,8 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
         ctx.arc(projection.x, projection.y, radius, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
-        if (isSelected || node.id === state.hoveredId || node.kind === "domain" || featuredKnowledgeIds.has(node.id)) {
-          ctx.font = `${node.kind === "domain" ? "600 12px" : "560 9px"} Inter, system-ui`;
+        if (isSelected || node.id === state.hoveredId || featuredKnowledgeIds.has(node.id)) {
+          ctx.font = "560 9px Inter, system-ui";
           ctx.textAlign = "center";
           ctx.fillStyle = `rgba(40,56,78,${selectedId && !related ? 0.16 : 0.86})`;
           ctx.fillText(node.name, projection.x, projection.y + radius + 16);

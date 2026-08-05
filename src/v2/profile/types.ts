@@ -25,6 +25,7 @@ export type PersonalKnowledgeNode = {
   description: string;
   domainId: string;
   domainTitle: string;
+  domainColor: string;
   clusterId?: string;
   clusterTitle: string;
   islandId: string | null;
@@ -52,6 +53,7 @@ export type PersonalKnowledgeEdge = {
   kind: PersonalKnowledgeEdgeKind;
   effective: boolean;
   isPotential: boolean;
+  isCrossIsland: boolean;
 };
 
 export type PersonalPracticeEvidence = {
@@ -64,17 +66,6 @@ export type PersonalPracticeEvidence = {
   y: number;
 };
 
-export type PersonalKnowledgeCluster = {
-  id: string;
-  title: string;
-  islandId: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  nodeCount: number;
-};
-
 export type PersonalKnowledgeIsland = {
   id: string;
   nodeIds: string[];
@@ -83,6 +74,8 @@ export type PersonalKnowledgeIsland = {
   size: number;
   learningCount: number;
   bounds: { x: number; y: number; width: number; height: number };
+  contourPath: string;
+  label: { x: number; y: number };
 };
 
 export type PotentialBridgeSuggestion = {
@@ -115,7 +108,6 @@ export type PersonalKnowledgeGraph = {
   nodes: PersonalKnowledgeNode[];
   edges: PersonalKnowledgeEdge[];
   practices: PersonalPracticeEvidence[];
-  clusters: PersonalKnowledgeCluster[];
   islands: PersonalKnowledgeIsland[];
   potentialBridges: PotentialBridgeSuggestion[];
   summary: PersonalKnowledgeSummary;

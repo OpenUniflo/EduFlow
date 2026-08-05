@@ -2,7 +2,7 @@ import type { KnowledgeEdge, KnowledgeGraph } from "./types";
 
 export type PotentialBridge = {
   nodeId: string;
-  componentIndexes: number[];
+  groupIndexes: number[];
   pathNodeIds: string[];
   pathEdgeIds: string[];
   missingNodeIds: string[];
@@ -69,15 +69,15 @@ export function calculateCrossDomainConnections(graph: KnowledgeGraph, coreNodeI
   }).length;
 }
 
-function nearestCorePaths(start: string, adjacency: Map<string, Set<string>>, componentByNode: Map<string, number>, maxDepth: number) {
+function nearestCorePaths(start: string, adjacency: Map<string, Set<string>>, groupByNode: Map<string, number>, maxDepth: number) {
   const queue: Array<{ id: string; path: string[] }> = [{ id: start, path: [start] }];
   const visited = new Set([start]);
   const paths = new Map<number, string[]>();
   while (queue.length) {
     const current = queue.shift();
     if (!current || current.path.length - 1 > maxDepth) continue;
-    const componentIndex = componentByNode.get(current.id);
-    if (componentIndex !== undefined && !paths.has(componentIndex)) paths.set(componentIndex, current.path);
+    const groupIndex = groupByNode.get(current.id);
+    if (groupIndex !== undefined && !paths.has(groupIndex)) paths.set(groupIndex, current.path);
     if (paths.size >= 2 && current.path.length - 1 >= maxDepth) continue;
     adjacency.get(current.id)?.forEach((neighbor) => {
       if (visited.has(neighbor)) return;
@@ -90,11 +90,11 @@ function nearestCorePaths(start: string, adjacency: Map<string, Set<string>>, co
 
 export function findPotentialBridges(
   graph: KnowledgeGraph,
-  components: string[][],
+  groups: string[][],
   coreNodeIds: Iterable<string>,
   options: { maxDepth?: number; limit?: number } = {}
 ): PotentialBridge[] {
-  if (components.length < 2) return [];
+  if (groups.length < 2) return [];
   const maxDepth = options.maxDepth ?? 6;
   const limit = options.limit ?? 3;
   const core = new Set(coreNodeIds);
@@ -104,14 +104,14 @@ export function findPotentialBridges(
     edgeByPair.set(`${edge.source}:${edge.target}`, edge);
     edgeByPair.set(`${edge.target}:${edge.source}`, edge);
   });
-  const componentByNode = new Map<string, number>();
-  components.forEach((component, index) => component.forEach((id) => componentByNode.set(id, index)));
+  const groupByNode = new Map<string, number>();
+  groups.forEach((group, index) => group.forEach((id) => groupByNode.set(id, index)));
   const adjacency = makeAdjacency(graph.nodes.map((node) => node.id), graph.edges);
 
   return graph.nodes
     .filter((node) => !core.has(node.id))
     .flatMap((node) => {
-      const paths = nearestCorePaths(node.id, adjacency, componentByNode, maxDepth);
+      const paths = nearestCorePaths(node.id, adjacency, groupByNode, maxDepth);
       if (paths.size < 2) return [];
       const rankedPaths = Array.from(paths.entries())
         .sort((left, right) => left[1].length - right[1].length || left[0] - right[0])
@@ -126,7 +126,7 @@ export function findPotentialBridges(
       const totalDistance = rankedPaths.reduce((sum, [, path]) => sum + path.length - 1, 0);
       return [{
         nodeId: node.id,
-        componentIndexes: rankedPaths.map(([index]) => index),
+        groupIndexes: rankedPaths.map(([index]) => index),
         pathNodeIds,
         pathEdgeIds,
         missingNodeIds: pathNodeIds.filter((id) => !core.has(id)),

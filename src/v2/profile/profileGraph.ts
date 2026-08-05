@@ -1,13 +1,14 @@
-import type { LearningProgress, CourseKnowledgeReference, Practice } from "../types";
-import type { KnowledgeEdge, KnowledgeGraph, KnowledgeRelation } from "../knowledge/types";
+import type { CourseKnowledgeReference, LearningProgress, Practice } from "../types";
+import { detectWeightedCommunities, type GraphCommunity } from "../knowledge/community";
 import {
   calculateCrossDomainConnections,
   calculateKnowledgeConnectivity,
-  findConnectedComponents,
   findPotentialBridges
 } from "../knowledge/graphAlgorithms";
+import { getKnowledgeEdgeLayoutWeight } from "../knowledge/graphLayout";
+import type { KnowledgeEdge, KnowledgeGraph, KnowledgeRelation } from "../knowledge/types";
+import { buildPersonalForceLayout } from "./personalLayout";
 import type {
-  PersonalKnowledgeCluster,
   PersonalKnowledgeEdge,
   PersonalKnowledgeGraph,
   PersonalKnowledgeIsland,
@@ -17,10 +18,6 @@ import type {
 } from "./types";
 
 const COURSE_ID = "agentic-ai";
-const ISLAND_WIDTH = 540;
-const ISLAND_HEIGHT = 620;
-const ISLAND_GAP = 170;
-const WORLD_MARGIN = 70;
 
 const practiceFallbackKnowledge: Record<string, string> = {
   "lesson-04-direct": "A05",
@@ -46,130 +43,97 @@ function getOtherEnd(id: string, edge: KnowledgeEdge) {
   return edge.source === id ? edge.target : edge.source;
 }
 
-function makeIslandTitle(component: string[], graph: KnowledgeGraph, duplicateIndex: number) {
+function dominantDomainId(nodeIds: string[], graph: KnowledgeGraph) {
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
-  const domainById = new Map(graph.domains.map((domain) => [domain.id, domain]));
   const counts = new Map<string, number>();
-  component.forEach((id) => {
+  nodeIds.forEach((id) => {
     const domainId = nodeById.get(id)?.domainId;
     if (domainId) counts.set(domainId, (counts.get(domainId) ?? 0) + 1);
   });
-  const domainIds = Array.from(counts).sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])).map(([id]) => id);
-  const title = domainIds.slice(0, 2).map((id) => domainById.get(id)?.title ?? id).join(" × ") || "Knowledge Island";
+  return Array.from(counts).sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0];
+}
+
+function makeIslandTitle(nodeIds: string[], graph: KnowledgeGraph, duplicateIndex: number, qualifyWithCluster: boolean) {
+  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+  const domainById = new Map(graph.domains.map((domain) => [domain.id, domain]));
+  const clusterById = new Map(graph.clusters.map((cluster) => [cluster.id, cluster]));
+  const counts = new Map<string, number>();
+  nodeIds.forEach((id) => {
+    const domainId = nodeById.get(id)?.domainId;
+    if (domainId) counts.set(domainId, (counts.get(domainId) ?? 0) + 1);
+  });
+  const domainIds = Array.from(counts)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([id]) => id);
+  const primaryCount = counts.get(domainIds[0]) ?? 0;
+  const visibleDomains = primaryCount / Math.max(1, nodeIds.length) >= 0.66 ? domainIds.slice(0, 1) : domainIds.slice(0, 2);
+  let title = visibleDomains.map((id) => domainById.get(id)?.title ?? id).join(" × ") || "Knowledge Island";
+  if (qualifyWithCluster && visibleDomains.length === 1) {
+    const clusterCounts = new Map<string, number>();
+    nodeIds.forEach((id) => {
+      const node = nodeById.get(id);
+      if (node?.domainId === visibleDomains[0] && node.clusterId) {
+        clusterCounts.set(node.clusterId, (clusterCounts.get(node.clusterId) ?? 0) + 1);
+      }
+    });
+    const clusterId = Array.from(clusterCounts)
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0];
+    if (clusterId) title = `${title} · ${clusterById.get(clusterId)?.title ?? clusterId}`;
+  }
   return { domainIds, title: duplicateIndex > 1 ? `${title} ${duplicateIndex}` : title };
 }
 
 function selectExploreNodes(
   graph: KnowledgeGraph,
   coreIds: Set<string>,
-  components: string[][],
+  communities: GraphCommunity[],
   excludedIds: Set<string>
 ) {
-  const componentByCore = new Map<string, number>();
-  components.forEach((component, index) => component.forEach((id) => componentByCore.set(id, index)));
-  const candidateScores = new Map<string, { componentIndex: number; coreNeighbors: number; relationScore: number; strength: number }>();
+  const communityByCore = new Map<string, string>();
+  communities.forEach((community) => community.nodeIds.forEach((id) => communityByCore.set(id, community.id)));
+  const candidates = new Map<string, {
+    communityId: string;
+    coreNeighbors: number;
+    relationScore: number;
+    layoutWeight: number;
+  }>();
 
   graph.nodes.forEach((node) => {
     if (coreIds.has(node.id) || excludedIds.has(node.id)) return;
     const incident = getIncidentEdges(node.id, graph.edges).filter((edge) => coreIds.has(getOtherEnd(node.id, edge)));
     if (!incident.length) return;
-    const componentCounts = new Map<number, number>();
+    const weightsByCommunity = new Map<string, number>();
     incident.forEach((edge) => {
-      const componentIndex = componentByCore.get(getOtherEnd(node.id, edge));
-      if (componentIndex !== undefined) componentCounts.set(componentIndex, (componentCounts.get(componentIndex) ?? 0) + 1);
+      const communityId = communityByCore.get(getOtherEnd(node.id, edge));
+      if (communityId) {
+        weightsByCommunity.set(communityId, (weightsByCommunity.get(communityId) ?? 0) + getKnowledgeEdgeLayoutWeight(edge));
+      }
     });
-    const rankedComponents = Array.from(componentCounts).sort((left, right) => right[1] - left[1] || left[0] - right[0]);
-    if (!rankedComponents.length) return;
-    candidateScores.set(node.id, {
-      componentIndex: rankedComponents[0][0],
+    const communityId = Array.from(weightsByCommunity)
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0];
+    if (!communityId) return;
+    candidates.set(node.id, {
+      communityId,
       coreNeighbors: incident.length,
       relationScore: Math.max(...incident.map((edge) => relationPriority[edge.relation])),
-      strength: Math.max(...incident.map((edge) => edge.strength ?? 0))
+      layoutWeight: incident.reduce((sum, edge) => sum + getKnowledgeEdgeLayoutWeight(edge), 0)
     });
   });
 
-  const selected = new Map<string, number>();
-  components.forEach((_, componentIndex) => {
-    Array.from(candidateScores)
-      .filter(([, score]) => score.componentIndex === componentIndex)
+  const selected = new Map<string, string>();
+  communities.forEach((community) => {
+    Array.from(candidates)
+      .filter(([, score]) => score.communityId === community.id)
       .sort((left, right) =>
         right[1].coreNeighbors - left[1].coreNeighbors ||
         right[1].relationScore - left[1].relationScore ||
-        right[1].strength - left[1].strength ||
+        right[1].layoutWeight - left[1].layoutWeight ||
         left[0].localeCompare(right[0])
       )
       .slice(0, 3)
-      .forEach(([id]) => selected.set(id, componentIndex));
+      .forEach(([id]) => selected.set(id, community.id));
   });
   return selected;
-}
-
-function layoutComponents(components: string[][], exploreById: Map<string, number>, graph: KnowledgeGraph) {
-  const positions = new Map<string, { x: number; y: number; islandId: string | null }>();
-  const bounds = new Map<string, PersonalKnowledgeIsland["bounds"]>();
-  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
-  components.forEach((component, componentIndex) => {
-    const islandId = `personal-island-${componentIndex + 1}`;
-    const x = WORLD_MARGIN + componentIndex * (ISLAND_WIDTH + ISLAND_GAP);
-    const y = 135;
-    bounds.set(islandId, { x, y, width: ISLAND_WIDTH, height: ISLAND_HEIGHT });
-    const columns = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(component.length))));
-    const rows = Math.ceil(component.length / columns);
-    const xStep = (ISLAND_WIDTH - 150) / Math.max(1, columns - 1);
-    const yStep = Math.min(125, (ISLAND_HEIGHT - 230) / Math.max(1, rows - 1));
-    const layoutOrder = [...component].sort((left, right) =>
-      (nodeById.get(left)?.clusterId ?? "").localeCompare(nodeById.get(right)?.clusterId ?? "") || left.localeCompare(right)
-    );
-    layoutOrder.forEach((id, index) => {
-      positions.set(id, {
-        x: x + 75 + (index % columns) * xStep,
-        y: y + 105 + Math.floor(index / columns) * yStep,
-        islandId
-      });
-    });
-    const exploreIds = Array.from(exploreById).filter(([, owner]) => owner === componentIndex).map(([id]) => id);
-    exploreIds.forEach((id, index) => {
-      positions.set(id, { x: x + 110 + index * 145, y: y + ISLAND_HEIGHT - 62, islandId });
-    });
-  });
-  return { positions, bounds };
-}
-
-function layoutPotentialNodes(ids: string[], positions: Map<string, { x: number; y: number; islandId: string | null }>, componentCount: number) {
-  const firstGapX = WORLD_MARGIN + ISLAND_WIDTH + ISLAND_GAP / 2;
-  ids.forEach((id, index) => {
-    if (positions.has(id)) return;
-    positions.set(id, {
-      x: componentCount > 1 ? firstGapX + ((index % 2) * 56 - 28) : WORLD_MARGIN + ISLAND_WIDTH + 100,
-      y: 235 + index * 78,
-      islandId: null
-    });
-  });
-}
-
-function makeClusters(nodes: PersonalKnowledgeNode[], graph: KnowledgeGraph): PersonalKnowledgeCluster[] {
-  const clusterById = new Map(graph.clusters.map((cluster) => [cluster.id, cluster]));
-  const grouped = new Map<string, PersonalKnowledgeNode[]>();
-  nodes.filter((node) => node.islandId && !node.isPotentialBridge).forEach((node) => {
-    const key = `${node.islandId}:${node.clusterId ?? node.domainId}`;
-    grouped.set(key, [...(grouped.get(key) ?? []), node]);
-  });
-  return Array.from(grouped.entries()).map(([id, items]) => {
-    const minX = Math.min(...items.map((node) => node.x));
-    const maxX = Math.max(...items.map((node) => node.x));
-    const minY = Math.min(...items.map((node) => node.y));
-    const maxY = Math.max(...items.map((node) => node.y));
-    return {
-      id,
-      title: clusterById.get(items[0].clusterId ?? "")?.title ?? items[0].domainTitle,
-      islandId: items[0].islandId as string,
-      x: minX - 48,
-      y: minY - 58,
-      width: maxX - minX + 96,
-      height: maxY - minY + 116,
-      nodeCount: items.length
-    };
-  });
 }
 
 function makePracticeEvidence(
@@ -213,42 +177,57 @@ export function buildPersonalKnowledgeGraph(
   });
 
   const effectiveEdges = graph.edges.filter((edge) => coreIds.has(edge.source) && coreIds.has(edge.target));
-  const components = findConnectedComponents(coreIds, effectiveEdges);
-  const potentialBridges = findPotentialBridges(graph, components, coreIds, { maxDepth: 6, limit: 3 });
+  const communities = detectWeightedCommunities(coreIds, effectiveEdges, { resolution: 0.18, minSize: 5 });
+  const potentialBridges = findPotentialBridges(graph, communities.map((community) => community.nodeIds), coreIds, { maxDepth: 6, limit: 3 });
   const potentialPathIds = new Set(potentialBridges.flatMap((bridge) => bridge.missingNodeIds));
   const potentialEdgeIds = new Set(potentialBridges.flatMap((bridge) => bridge.pathEdgeIds));
-  const exploreById = selectExploreNodes(graph, coreIds, components, potentialPathIds);
-  const { positions, bounds } = layoutComponents(components, exploreById, graph);
-  layoutPotentialNodes(Array.from(potentialPathIds), positions, components.length);
-
+  const exploreById = selectExploreNodes(graph, coreIds, communities, potentialPathIds);
   const visibleIds = new Set([...coreIds, ...exploreById.keys(), ...potentialPathIds]);
   const visibleGraphEdges = graph.edges.filter((edge) => {
     if (!visibleIds.has(edge.source) || !visibleIds.has(edge.target)) return false;
     if (!potentialPathIds.has(edge.source) && !potentialPathIds.has(edge.target)) return true;
     return potentialEdgeIds.has(edge.id);
   });
+  const normalNodeIds = Array.from(visibleIds).filter((id) => !potentialPathIds.has(id)).sort();
+  const potentialNodeIds = Array.from(potentialPathIds).sort();
+  const personalLayout = buildPersonalForceLayout(
+    normalNodeIds,
+    potentialNodeIds,
+    visibleGraphEdges,
+    communities,
+    potentialBridges
+  );
+
   const islands: PersonalKnowledgeIsland[] = [];
   const duplicateTitles = new Map<string, number>();
-  components.forEach((component, index) => {
-    const base = makeIslandTitle(component, graph, 1);
+  const domainCommunityCounts = new Map<string, number>();
+  personalLayout.communityLayouts.forEach((communityLayout) => {
+    const domainId = dominantDomainId(communityLayout.nodeIds, graph);
+    if (domainId) domainCommunityCounts.set(domainId, (domainCommunityCounts.get(domainId) ?? 0) + 1);
+  });
+  personalLayout.communityLayouts.forEach((communityLayout) => {
+    const domainId = dominantDomainId(communityLayout.nodeIds, graph);
+    const qualifyWithCluster = Boolean(domainId && (domainCommunityCounts.get(domainId) ?? 0) > 1);
+    const base = makeIslandTitle(communityLayout.nodeIds, graph, 1, qualifyWithCluster);
     const duplicateIndex = (duplicateTitles.get(base.title) ?? 0) + 1;
     duplicateTitles.set(base.title, duplicateIndex);
-    const titled = makeIslandTitle(component, graph, duplicateIndex);
-    const islandId = `personal-island-${index + 1}`;
+    const titled = makeIslandTitle(communityLayout.nodeIds, graph, duplicateIndex, qualifyWithCluster);
     islands.push({
-      id: islandId,
-      nodeIds: component,
+      id: communityLayout.id,
+      nodeIds: communityLayout.nodeIds,
       domainIds: titled.domainIds,
       title: titled.title,
-      size: component.length,
-      learningCount: component.filter((id) => recordById.get(id)?.status === "learning").length,
-      bounds: bounds.get(islandId) as PersonalKnowledgeIsland["bounds"]
+      size: communityLayout.nodeIds.length,
+      learningCount: communityLayout.nodeIds.filter((id) => recordById.get(id)?.status === "learning").length,
+      bounds: communityLayout.bounds,
+      contourPath: communityLayout.path,
+      label: communityLayout.label
     });
   });
 
   const nodes: PersonalKnowledgeNode[] = Array.from(visibleIds).flatMap((id) => {
     const source = nodeById.get(id);
-    const position = positions.get(id);
+    const position = personalLayout.positions[id];
     if (!source || !position) return [];
     const record = recordById.get(id);
     const course = curriculumById.get(id);
@@ -263,9 +242,10 @@ export function buildPersonalKnowledgeGraph(
       description: source.description,
       domainId: source.domainId,
       domainTitle: domainById.get(source.domainId)?.title ?? source.domainId,
+      domainColor: domainById.get(source.domainId)?.color ?? "#78a7ee",
       clusterId: source.clusterId,
       clusterTitle: clusterById.get(source.clusterId ?? "")?.title ?? domainById.get(source.domainId)?.title ?? source.domainId,
-      islandId: position.islandId,
+      islandId: potentialPathIds.has(id) ? null : personalLayout.communityByNode.get(id) ?? null,
       status: record?.status ?? "explore",
       progress: record?.mastery ?? 0,
       x: position.x,
@@ -285,11 +265,12 @@ export function buildPersonalKnowledgeGraph(
       ]
     }];
   });
-
+  const personalNodeById = new Map(nodes.map((node) => [node.id, node]));
   const personalEdges: PersonalKnowledgeEdge[] = visibleGraphEdges.map((edge) => {
-    const source = nodeById.get(edge.source);
-    const target = nodeById.get(edge.target);
+    const source = personalNodeById.get(edge.source);
+    const target = personalNodeById.get(edge.target);
     const isPotential = potentialPathIds.has(edge.source) || potentialPathIds.has(edge.target);
+    const isCrossIsland = Boolean(source?.islandId && target?.islandId && source.islandId !== target.islandId);
     return {
       id: edge.id,
       source: edge.source,
@@ -297,11 +278,12 @@ export function buildPersonalKnowledgeGraph(
       relation: edge.relation,
       effective: coreIds.has(edge.source) && coreIds.has(edge.target),
       isPotential,
-      kind: isPotential ? "potential" : source?.domainId !== target?.domainId ? "cross" : "dependency"
+      isCrossIsland,
+      kind: isPotential ? "potential" : isCrossIsland ? "cross" : "dependency"
     };
   });
   const practiceEvidence = makePracticeEvidence(practices, nodes, progress);
-  const largestIsland = islands[0];
+  const largestIsland = [...islands].sort((left, right) => right.size - left.size || left.id.localeCompare(right.id))[0];
   const currentLearningId = [...userKnowledge]
     .filter((record) => record.status === "learning")
     .sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? ""))[0]?.nodeId ?? null;
@@ -311,7 +293,6 @@ export function buildPersonalKnowledgeGraph(
     nodes,
     edges: personalEdges,
     practices: practiceEvidence,
-    clusters: makeClusters(nodes, graph),
     islands,
     potentialBridges: potentialBridges.map((bridge) => ({
       nodeId: bridge.nodeId,

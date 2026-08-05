@@ -324,11 +324,12 @@
   transition: opacity 0.2s ease;
 }
 
-.personal-island-halo {
-  fill: rgba(105, 126, 230, 0.025);
-  stroke: rgba(105, 126, 230, 0.13);
-  stroke-width: 1.1;
-  stroke-dasharray: 4 11;
+.personal-island-contour {
+  fill: rgba(105, 126, 230, 0.032);
+  stroke: rgba(105, 126, 230, 0.14);
+  stroke-width: 1.15;
+  stroke-dasharray: 3 9;
+  transition: fill 0.24s ease, stroke 0.24s ease, opacity 0.24s ease;
 }
 
 .personal-island-title {
@@ -342,60 +343,18 @@
   font-size: 9px;
 }
 
-.personal-island-overview {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.personal-island-overview circle {
-  fill: rgba(255, 255, 255, 0.52);
-  stroke: rgba(105, 126, 230, 0.24);
-  filter: url(#personal-blue-glow);
-}
-
-.personal-island-overview text {
-  fill: #43516b;
-  text-anchor: middle;
-  font-size: 16px;
-  font-weight: 760;
-}
-
-.personal-island-overview text:last-child {
-  fill: #8b97aa;
-  font-size: 9px;
-  font-weight: 500;
-}
-
-.personal-stage {
-  opacity: 0.7;
-  transition: opacity 0.22s ease;
-}
-
-.personal-stage rect {
-  fill: rgba(255, 255, 255, 0.055);
-  stroke: rgba(106, 124, 157, 0.1);
-  stroke-dasharray: 3 7;
-}
-
-.personal-stage text {
-  fill: #7e8ba1;
-  font-size: 10px;
-  font-weight: 720;
-}
-
-.personal-stage .personal-stage-count {
-  fill: #a0aabc;
-  font-size: 7px;
-  font-weight: 500;
-}
-
 .personal-edge {
   fill: none;
   stroke: #8f9db6;
   stroke-width: 1.1;
   opacity: 0.3;
   transition: opacity 0.25s, stroke 0.25s, stroke-width 0.25s;
+}
+
+.personal-edge.cross-island {
+  stroke: #7685a6;
+  stroke-width: 0.85;
+  opacity: 0.22;
 }
 
 .personal-node {
@@ -415,6 +374,7 @@
 }
 
 .personal-node-inner {
+  fill: var(--domain-color, #78a7ee);
   stroke: rgba(255, 255, 255, 0.92);
   stroke-width: 0.8;
 }
@@ -424,7 +384,6 @@
 }
 
 .personal-node.status-mastered .personal-node-inner {
-  fill: #65b895;
   filter: url(#personal-green-glow);
 }
 
@@ -434,7 +393,6 @@
 }
 
 .personal-node.status-learning .personal-node-inner {
-  fill: #6987f5;
   filter: url(#personal-blue-glow);
 }
 
@@ -445,8 +403,9 @@
 }
 
 .personal-node.status-explore .personal-node-inner {
-  fill: #f7f9fd;
-  stroke: #a8b2c2;
+  fill: var(--domain-color, #78a7ee);
+  fill-opacity: 0.34;
+  stroke: rgba(122, 136, 164, 0.66);
   stroke-dasharray: 2 2;
 }
 
@@ -457,7 +416,7 @@
 }
 
 .personal-node.potential-bridge .personal-node-inner {
-  fill: #f0ebff;
+  fill: rgba(255, 255, 255, 0.86);
   stroke: #8968da;
 }
 
@@ -467,7 +426,7 @@
 }
 
 .personal-node.status-gap .personal-node-inner {
-  fill: #edbf72;
+  fill: var(--domain-color, #edbf72);
 }
 
 .personal-node:hover .personal-node-outer,
@@ -633,27 +592,32 @@
   opacity: 0.72;
 }
 
-.personal-mode-connection .personal-island-halo {
+.personal-mode-connection .personal-edge.cross-island {
+  stroke: #6578c8;
+  stroke-width: 1.25;
+  opacity: 0.52;
+}
+
+.personal-mode-connection .personal-island-contour {
+  fill: rgba(105, 126, 230, 0.045);
   stroke-width: 1.8;
   opacity: 1;
 }
 
 .personal-zoom-island .personal-node,
 .personal-zoom-island .personal-edge,
-.personal-zoom-island .personal-stage,
-.personal-zoom-island .personal-island-title,
-.personal-zoom-island .personal-island-meta,
 .personal-zoom-island .personal-practice-evidence {
   opacity: 0;
   pointer-events: none;
 }
 
-.personal-zoom-island .personal-island-overview {
-  opacity: 1;
+.personal-zoom-island .personal-island-contour {
+  fill: rgba(105, 126, 230, 0.06);
+  stroke: rgba(105, 126, 230, 0.2);
 }
 
-.personal-zoom-cluster .personal-node-copy,
-.personal-zoom-cluster .personal-practice-evidence text {
+.personal-zoom-community .personal-node-copy,
+.personal-zoom-community .personal-practice-evidence text {
   opacity: 0;
 }
 

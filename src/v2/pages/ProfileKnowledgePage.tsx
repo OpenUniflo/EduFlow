@@ -22,6 +22,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent
 } from "react";
@@ -31,12 +32,11 @@ import { courseKnowledgeReferences, practices } from "../data";
 import { useLearningProgress } from "../progress";
 import { GlobalNav } from "../components/GlobalNav";
 import { globalKnowledgeGraph } from "../knowledge/graph";
+import { PERSONAL_WORLD_HEIGHT, PERSONAL_WORLD_WIDTH } from "../profile/personalLayout";
 import { buildPersonalKnowledgeGraph } from "../profile/profileGraph";
 import { demoUserKnowledge } from "../profile/demoUserKnowledge";
 import type { PersonalKnowledgeNode, PersonalKnowledgeViewMode } from "../profile/types";
 
-const WORLD_WIDTH = 1440;
-const WORLD_HEIGHT = 900;
 const modeLabels: Record<PersonalKnowledgeViewMode, string> = {
   knowledge: "我的知识",
   history: "学习轨迹",
@@ -77,7 +77,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   const [toast, setToast] = useState("");
   const selected = selectedId ? graph.nodes.find((node) => node.id === selectedId) ?? null : null;
   const drawerOpen = Boolean(selected || (mode === "connection" && connectionPanelOpen));
-  const zoomLevel = transform.scale < 0.48 ? "island" : transform.scale < 0.82 ? "cluster" : "node";
+  const zoomLevel = transform.scale < 0.48 ? "island" : transform.scale < 0.82 ? "community" : "node";
 
   const fitGraph = useCallback(() => {
     const rect = viewportRef.current?.getBoundingClientRect();
@@ -85,11 +85,11 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
     const height = rect?.height ?? window.innerHeight;
     const leftInset = width >= 900 ? 300 : 0;
     const availableWidth = width - leftInset;
-    const scale = Math.max(0.5, Math.min(availableWidth / WORLD_WIDTH, height / WORLD_HEIGHT) * 1.03);
+    const scale = Math.max(0.5, Math.min(availableWidth / PERSONAL_WORLD_WIDTH, height / PERSONAL_WORLD_HEIGHT) * 1.03);
     setTransform({
       scale,
-      x: leftInset + (availableWidth - WORLD_WIDTH * scale) / 2,
-      y: (height - WORLD_HEIGHT * scale) / 2
+      x: leftInset + (availableWidth - PERSONAL_WORLD_WIDTH * scale) / 2,
+      y: (height - PERSONAL_WORLD_HEIGHT * scale) / 2
     });
   }, []);
 
@@ -299,33 +299,18 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
         onPointerCancel={pointerUp}
         onWheel={wheel}
       >
-        <svg className="personal-graph" width={WORLD_WIDTH} height={WORLD_HEIGHT} viewBox={`0 0 ${WORLD_WIDTH} ${WORLD_HEIGHT}`} style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }} aria-label="个人知识群岛图谱">
+        <svg className="personal-graph" width={PERSONAL_WORLD_WIDTH} height={PERSONAL_WORLD_HEIGHT} viewBox={`0 0 ${PERSONAL_WORLD_WIDTH} ${PERSONAL_WORLD_HEIGHT}`} style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` }} aria-label="个人知识群岛图谱">
           <defs>
             <filter id="personal-green-glow" x="-100%" y="-100%" width="300%" height="300%"><feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#55ae89" floodOpacity=".35" /></filter>
             <filter id="personal-blue-glow" x="-100%" y="-100%" width="300%" height="300%"><feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#6f89ef" floodOpacity=".46" /></filter>
             <filter id="personal-selected-glow" x="-120%" y="-120%" width="340%" height="340%"><feDropShadow dx="0" dy="0" stdDeviation="9" floodColor="#5b7cfa" floodOpacity=".48" /></filter>
           </defs>
           <g className="personal-world">
-            {graph.islands.map((island) => {
-              const cx = island.bounds.x + island.bounds.width / 2;
-              const cy = island.bounds.y + island.bounds.height / 2;
-              return <g key={island.id}>
-                <ellipse className="personal-island-halo" cx={cx} cy={cy} rx={island.bounds.width / 2} ry={island.bounds.height / 2} />
-                <g className="personal-island-overview">
-                  <circle cx={cx} cy={cy} r="62" />
-                  <text x={cx} y={cy - 6}>{island.title}</text>
-                  <text x={cx} y={cy + 16}>{island.size} 个核心知识 · {island.learningCount} 个学习中</text>
-                </g>
-                <text className="personal-island-title" x={island.bounds.x + 26} y={island.bounds.y + 26}>{island.title}</text>
-                <text className="personal-island-meta" x={island.bounds.x + 26} y={island.bounds.y + 46}>{island.size} 个核心知识 · {island.learningCount} 个学习中 · 动态知识岛</text>
-              </g>;
-            })}
-
-            {graph.clusters.map((cluster) => (
-              <g className="personal-stage" key={cluster.id}>
-                <rect x={cluster.x} y={cluster.y} width={cluster.width} height={cluster.height} rx="34" />
-                <text x={cluster.x + 18} y={cluster.y + 26}>{cluster.title}</text>
-                <text className="personal-stage-count" x={cluster.x + 18} y={cluster.y + 43}>{cluster.nodeCount} 个节点</text>
+            {graph.islands.map((island) => (
+              <g className="personal-island" key={island.id}>
+                <path className="personal-island-contour" d={island.contourPath} />
+                <text className="personal-island-title" x={island.label.x} y={island.label.y}>{island.title}</text>
+                <text className="personal-island-meta" x={island.label.x} y={island.label.y + 19}>{island.size} 个核心知识 · {island.learningCount} 个学习中</text>
               </g>
             ))}
 
@@ -339,7 +324,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
               return (
                 <path
                   key={edge.id}
-                  className={`personal-edge ${historyActive ? "history-active" : ""} ${edge.isPotential ? "potential" : ""} ${edge.kind === "cross" ? "cross" : ""}`}
+                  className={`personal-edge ${historyActive ? "history-active" : ""} ${edge.isPotential ? "potential" : ""} ${edge.isCrossIsland ? "cross-island" : ""}`}
                   d={`M${source.x} ${source.y} C${midpoint} ${source.y}, ${midpoint} ${target.y}, ${target.x} ${target.y}`}
                 />
               );
@@ -366,6 +351,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
                   className={`personal-node status-${node.status} ${node.isCore ? "core" : "context"} ${node.isPotentialBridge ? "potential-bridge" : ""} ${hasEvidence ? "has-evidence" : ""} ${selectedNode ? "selected" : ""}`}
                   key={node.id}
                   transform={`translate(${node.x} ${node.y})`}
+                  style={{ "--domain-color": node.domainColor } as CSSProperties}
                   role="button"
                   tabIndex={0}
                   data-personal-interactive
