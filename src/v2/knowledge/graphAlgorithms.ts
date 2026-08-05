@@ -9,7 +9,7 @@ export type PotentialBridge = {
   score: number;
 };
 
-function makeAdjacency(nodeIds: Iterable<string>, edges: KnowledgeEdge[]) {
+export function buildStructuralAdjacency(nodeIds: Iterable<string>, edges: KnowledgeEdge[]) {
   const adjacency = new Map<string, Set<string>>();
   Array.from(nodeIds).forEach((id) => adjacency.set(id, new Set()));
   edges.forEach((edge) => {
@@ -20,9 +20,20 @@ function makeAdjacency(nodeIds: Iterable<string>, edges: KnowledgeEdge[]) {
   return adjacency;
 }
 
+export function buildDirectedLearningAdjacency(nodeIds: Iterable<string>, edges: KnowledgeEdge[]) {
+  const adjacency = new Map<string, Set<string>>();
+  Array.from(nodeIds).forEach((id) => adjacency.set(id, new Set()));
+  edges.forEach((edge) => {
+    if (!adjacency.has(edge.source) || !adjacency.has(edge.target)) return;
+    adjacency.get(edge.source)?.add(edge.target);
+    if (edge.relation === "related") adjacency.get(edge.target)?.add(edge.source);
+  });
+  return adjacency;
+}
+
 export function findConnectedComponents(nodeIds: Iterable<string>, edges: KnowledgeEdge[]) {
   const ids = Array.from(new Set(nodeIds));
-  const adjacency = makeAdjacency(ids, edges);
+  const adjacency = buildStructuralAdjacency(ids, edges);
   const visited = new Set<string>();
   const components: string[][] = [];
 
@@ -69,23 +80,25 @@ export function calculateCrossDomainConnections(graph: KnowledgeGraph, coreNodeI
   }).length;
 }
 
-function nearestCorePaths(start: string, adjacency: Map<string, Set<string>>, groupByNode: Map<string, number>, maxDepth: number) {
-  const queue: Array<{ id: string; path: string[] }> = [{ id: start, path: [start] }];
-  const visited = new Set([start]);
-  const paths = new Map<number, string[]>();
+function directedPathBetweenGroups(
+  sources: string[],
+  targetIds: Set<string>,
+  adjacency: Map<string, Set<string>>,
+  maxDepth: number
+) {
+  const queue: Array<{ id: string; path: string[] }> = sources.sort().map((id) => ({ id, path: [id] }));
+  const visited = new Set(sources);
   while (queue.length) {
     const current = queue.shift();
     if (!current || current.path.length - 1 > maxDepth) continue;
-    const groupIndex = groupByNode.get(current.id);
-    if (groupIndex !== undefined && !paths.has(groupIndex)) paths.set(groupIndex, current.path);
-    if (paths.size >= 2 && current.path.length - 1 >= maxDepth) continue;
+    if (current.path.length > 1 && targetIds.has(current.id)) return current.path;
     adjacency.get(current.id)?.forEach((neighbor) => {
       if (visited.has(neighbor)) return;
       visited.add(neighbor);
       queue.push({ id: neighbor, path: [...current.path, neighbor] });
     });
   }
-  return paths;
+  return undefined;
 }
 
 export function findPotentialBridges(
@@ -104,35 +117,40 @@ export function findPotentialBridges(
     edgeByPair.set(`${edge.source}:${edge.target}`, edge);
     edgeByPair.set(`${edge.target}:${edge.source}`, edge);
   });
-  const groupByNode = new Map<string, number>();
-  groups.forEach((group, index) => group.forEach((id) => groupByNode.set(id, index)));
-  const adjacency = makeAdjacency(graph.nodes.map((node) => node.id), graph.edges);
+  const adjacency = buildDirectedLearningAdjacency(graph.nodes.map((node) => node.id), graph.edges);
+  const paths: Array<{ sourceGroup: number; targetGroup: number; path: string[] }> = [];
+  groups.forEach((sourceGroup, sourceGroupIndex) => groups.forEach((targetGroup, targetGroupIndex) => {
+    if (sourceGroupIndex === targetGroupIndex) return;
+    const path = directedPathBetweenGroups(sourceGroup, new Set(targetGroup), adjacency, maxDepth);
+    if (path?.some((id) => !core.has(id))) paths.push({ sourceGroup: sourceGroupIndex, targetGroup: targetGroupIndex, path });
+  }));
 
-  return graph.nodes
-    .filter((node) => !core.has(node.id))
-    .flatMap((node) => {
-      const paths = nearestCorePaths(node.id, adjacency, groupByNode, maxDepth);
-      if (paths.size < 2) return [];
-      const rankedPaths = Array.from(paths.entries())
-        .sort((left, right) => left[1].length - right[1].length || left[0] - right[0])
-        .slice(0, 2);
-      const pathNodeIds = Array.from(new Set(rankedPaths.flatMap(([, path]) => path)));
-      const pathEdgeIds = Array.from(new Set(rankedPaths.flatMap(([, path]) => path.slice(1).flatMap((id, index) => {
+  const suggestions = paths.map(({ sourceGroup, targetGroup, path }) => {
+      const missingNodeIds = path.filter((id) => !core.has(id));
+      const nodeId = missingNodeIds[Math.floor((missingNodeIds.length - 1) / 2)];
+      const pathEdgeIds = path.slice(1).flatMap((id, index) => {
         const edge = edgeByPair.get(`${path[index]}:${id}`);
         return edge ? [edge.id] : [];
-      }))));
-      const adjacentCoreCount = Array.from(adjacency.get(node.id) ?? []).filter((id) => core.has(id)).length;
-      const crossDomainNeighbors = Array.from(adjacency.get(node.id) ?? []).filter((id) => nodeById.get(id)?.domainId !== node.domainId).length;
-      const totalDistance = rankedPaths.reduce((sum, [, path]) => sum + path.length - 1, 0);
-      return [{
-        nodeId: node.id,
-        groupIndexes: rankedPaths.map(([index]) => index),
-        pathNodeIds,
+      });
+      const node = nodeById.get(nodeId);
+      const crossDomainNeighbors = Array.from(adjacency.get(nodeId) ?? []).filter((id) => nodeById.get(id)?.domainId !== node?.domainId).length;
+      return {
+        nodeId,
+        groupIndexes: [sourceGroup, targetGroup],
+        pathNodeIds: path,
         pathEdgeIds,
-        missingNodeIds: pathNodeIds.filter((id) => !core.has(id)),
-        score: paths.size * 100 + adjacentCoreCount * 25 + crossDomainNeighbors * 12 - totalDistance * 8
-      }];
-    })
+        missingNodeIds,
+        score: 200 + crossDomainNeighbors * 12 - path.length * 8
+      };
+    });
+  const bestByNode = new Map<string, PotentialBridge>();
+  suggestions.forEach((suggestion) => {
+    const current = bestByNode.get(suggestion.nodeId);
+    if (!current || suggestion.score > current.score || (suggestion.score === current.score && suggestion.pathNodeIds.join(":") < current.pathNodeIds.join(":"))) {
+      bestByNode.set(suggestion.nodeId, suggestion);
+    }
+  });
+  return Array.from(bestByNode.values())
     .sort((left, right) => right.score - left.score || left.missingNodeIds.length - right.missingNodeIds.length || left.nodeId.localeCompare(right.nodeId))
     .slice(0, limit);
 }

@@ -1,20 +1,19 @@
-import type { KnowledgeRelation } from "../knowledge/types";
+import type { KnowledgeEvidence, KnowledgeRelation, KnowledgeScope, MasteryOrigin } from "../knowledge/types";
 
 export type UserKnowledgeStatus = "mastered" | "learning";
 export type PersonalKnowledgeStatus = UserKnowledgeStatus | "explore" | "gap";
 export type PersonalKnowledgeViewMode = "knowledge" | "history" | "practice" | "connection";
 export type PersonalKnowledgeEdgeKind = "dependency" | "practice" | "project" | "cross" | "potential";
 
-export type UserKnowledgeEvidence = {
-  type: string;
-  label: string;
-  refId?: string;
-};
+export type UserKnowledgeEvidence = KnowledgeEvidence;
 
 export type UserKnowledgeRecord = {
   nodeId: string;
   status: UserKnowledgeStatus;
   mastery?: number;
+  masteryOrigin?: MasteryOrigin;
+  sourceNodeId?: string;
+  sourceNodeIds?: string[];
   updatedAt?: string;
   evidence?: UserKnowledgeEvidence[];
 };
@@ -23,6 +22,7 @@ export type PersonalKnowledgeNode = {
   id: string;
   title: string;
   description: string;
+  scope: KnowledgeScope;
   domainId: string;
   domainTitle: string;
   domainColor: string;
@@ -95,6 +95,7 @@ export type PersonalKnowledgeSummary = {
   largestIslandName: string;
   largestIslandSize: number;
   crossDomainConnections: number;
+  crossIslandConnections: number;
   connectivity: number;
   dependencyConnections: number;
   practiceConnections: number;

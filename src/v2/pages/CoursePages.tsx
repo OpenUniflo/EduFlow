@@ -20,9 +20,9 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
-import { courseEdges, courseStages, knowledgeNodes, practices, stageEdges } from "../data";
+import { courseChapterEdges, courseChapters, courseSkillTreeEdges, courseSkillTreeNodes, practices } from "../data";
 import { useLearningProgress } from "../progress";
-import type { CourseStage, KnowledgeNode } from "../types";
+import type { CourseChapterProjection, CourseSkillTreeNode } from "../types";
 import { GlobalNav } from "../components/GlobalNav";
 
 export function CourseCenterPage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
@@ -75,11 +75,11 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
             </div>
             <div className="atlas-recent-mini-map" aria-label="课程技能树缩略图">
               <div className="atlas-mini-map-scene">
-                {courseStages.map((stage, index) => (
+                {courseChapters.map((stage, index) => (
                   <i key={stage.id} style={{ "--i": index, "--color": stage.color } as CSSProperties} />
                 ))}
               </div>
-              <span>7 个篇章 · 68 个知识点</span>
+              <span>{courseChapters.length} 个篇章 · {courseSkillTreeNodes.length} 个原子知识点</span>
             </div>
           </article>
         </section>
@@ -91,7 +91,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
               <div className="atlas-card-accent" />
               <div className="atlas-course-preview" aria-hidden="true">
                 <div className="atlas-mini-map-scene compact">
-                  {courseStages.slice(0, 6).map((stage, index) => (
+                  {courseChapters.slice(0, 6).map((stage, index) => (
                     <i key={stage.id} style={{ "--i": index, "--color": stage.color } as CSSProperties} />
                   ))}
                 </div>
@@ -99,7 +99,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
               <div className="atlas-pill">学习中 · Agentic AI</div>
               <h3>智能体系统设计与实践</h3>
               <p>从概念、问题建模和推理范式出发，逐步构建可运行、可评测、可治理的 Agent 系统。</p>
-              <div className="atlas-course-meta"><span>15 课</span><span>68 节点</span><span>5 实训</span></div>
+              <div className="atlas-course-meta"><span>15 课</span><span>{courseSkillTreeNodes.length} 原子节点</span><span>{practices.length} 实训</span></div>
               <div className="atlas-progress-row"><div className="atlas-progress-track"><i style={{ width: `${Math.max(36, practicePercent)}%` }} /></div><strong>{Math.max(36, practicePercent)}%</strong></div>
             </article>
             <button className="atlas-course-card atlas-new-course glass-v2" onClick={() => navigate("/")}>
@@ -114,7 +114,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
   );
 }
 
-type SelectedNode = { kind: "stage"; item: CourseStage } | { kind: "knowledge"; item: KnowledgeNode };
+type SelectedNode = { kind: "stage"; item: CourseChapterProjection } | { kind: "knowledge"; item: CourseSkillTreeNode };
 
 export function CourseGraphPage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
   const navigate = useNavigate();
@@ -167,15 +167,15 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
     return () => window.cancelAnimationFrame(frame);
   }, [view]);
 
-  const currentItems = view === "overview" ? courseStages : knowledgeNodes;
-  const currentEdges = view === "overview" ? stageEdges.map(([source, target]) => ({ source, target })) : courseEdges;
+  const currentItems = view === "overview" ? courseChapters : courseSkillTreeNodes;
+  const currentEdges = view === "overview" ? courseChapterEdges : courseSkillTreeEdges;
   const searchResult = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return null;
     return currentItems.find((item) => {
       const haystack = "outcome" in item
         ? [item.id, item.title, item.outcome, item.description]
-        : [item.id, item.title, item.practiceTitle, `第 ${item.lesson} 课`, item.stageId, item.description];
+        : [item.id, item.title, item.practiceTitle, `第 ${item.lesson} 课`, item.chapterId, item.description];
       return haystack.some((value) => value.toLowerCase().includes(needle));
     }) ?? null;
   }, [currentItems, query]);
@@ -185,9 +185,9 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
     if (searchResult) locate(searchResult);
   }, [searchResult]);
 
-  function changeView(next: "overview" | "full", stageId?: string) {
+  function changeView(next: "overview" | "full", chapterId?: string) {
     setView(next);
-    setFocusStage(stageId ?? null);
+    setFocusStage(chapterId ?? null);
     setSelected(null);
     setMaterialsOpen(false);
     setDrawerTab("detail");
@@ -196,7 +196,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
   }
 
   function fitGraph(targetView = view) {
-    const items = targetView === "overview" ? courseStages : knowledgeNodes;
+    const items = targetView === "overview" ? courseChapters : courseSkillTreeNodes;
     const minX = Math.min(...items.map((item) => item.x));
     const maxX = Math.max(...items.map((item) => item.x + 205));
     const minY = Math.min(...items.map((item) => item.y));
@@ -212,29 +212,29 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
     });
   }
 
-  function selectItem(item: CourseStage | KnowledgeNode) {
+  function selectItem(item: CourseChapterProjection | CourseSkillTreeNode) {
     setMaterialsOpen(false);
     setDrawerTab("detail");
-    setSelected(view === "overview" ? { kind: "stage", item: item as CourseStage } : { kind: "knowledge", item: item as KnowledgeNode });
+    setSelected(view === "overview" ? { kind: "stage", item: item as CourseChapterProjection } : { kind: "knowledge", item: item as CourseSkillTreeNode });
   }
 
   function selectPrerequisite(id: string) {
-    const target = knowledgeNodes.find((item) => item.id === id);
+    const target = courseSkillTreeNodes.find((item) => item.id === id);
     if (!target) return;
     setMaterialsOpen(false);
     setDrawerTab("detail");
     setSelected({ kind: "knowledge", item: target });
-    setFocusStage(target.stageId);
+    setFocusStage(target.chapterId);
     setSearchMatch(null);
     window.requestAnimationFrame(() => locate(target));
   }
 
-  function queueSelect(item: CourseStage | KnowledgeNode) {
+  function queueSelect(item: CourseChapterProjection | CourseSkillTreeNode) {
     if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
     clickTimerRef.current = window.setTimeout(() => selectItem(item), 220);
   }
 
-  function expandItem(item: CourseStage | KnowledgeNode) {
+  function expandItem(item: CourseChapterProjection | CourseSkillTreeNode) {
     if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
     if (view === "overview") {
       changeView("full", item.id);
@@ -276,7 +276,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
     });
   }
 
-  function locate(item: CourseStage | KnowledgeNode) {
+  function locate(item: CourseChapterProjection | CourseSkillTreeNode) {
     const rect = viewportRef.current?.getBoundingClientRect();
     setTransform((current) => ({
       ...current,
@@ -285,25 +285,25 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
     }));
   }
 
-  function nodeTitle(item: CourseStage | KnowledgeNode) {
+  function nodeTitle(item: CourseChapterProjection | CourseSkillTreeNode) {
     if (mode === "knowledge") return item.title;
     if ("outcome" in item) return item.outcome;
     return item.practiceTitle;
   }
 
-  function relation(item: CourseStage | KnowledgeNode) {
+  function relation(item: CourseChapterProjection | CourseSkillTreeNode) {
     if (!focusStage) return "normal";
     if (view === "overview") {
       if (item.id === focusStage) return "focused";
-      return stageEdges.some(([a, b]) => (a === focusStage && b === item.id) || (b === focusStage && a === item.id)) ? "related" : "dimmed";
+      return courseChapterEdges.some(({ source, target }) => (source === focusStage && target === item.id) || (target === focusStage && source === item.id)) ? "related" : "dimmed";
     }
-    const node = item as KnowledgeNode;
-    if (node.stageId === focusStage) return "focused";
-    const focusedIds = knowledgeNodes.filter((entry) => entry.stageId === focusStage).map((entry) => entry.id);
-    return courseEdges.some((edge) => (focusedIds.includes(edge.source) && edge.target === node.id) || (focusedIds.includes(edge.target) && edge.source === node.id)) ? "related" : "dimmed";
+    const node = item as CourseSkillTreeNode;
+    if (node.chapterId === focusStage) return "focused";
+    const focusedIds = courseSkillTreeNodes.filter((entry) => entry.chapterId === focusStage).map((entry) => entry.id);
+    return courseSkillTreeEdges.some((edge) => (focusedIds.includes(edge.source) && edge.target === node.id) || (focusedIds.includes(edge.target) && edge.source === node.id)) ? "related" : "dimmed";
   }
 
-  const focusedNodes = view === "full" && focusStage ? knowledgeNodes.filter((node) => node.stageId === focusStage) : [];
+  const focusedNodes = view === "full" && focusStage ? courseSkillTreeNodes.filter((node) => node.chapterId === focusStage) : [];
   const hull = focusedNodes.length ? {
     x: Math.min(...focusedNodes.map((node) => node.x)) - 38,
     y: Math.min(...focusedNodes.map((node) => node.y)) - 44,
@@ -311,12 +311,12 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
     height: Math.max(...focusedNodes.map((node) => node.y + 84)) - Math.min(...focusedNodes.map((node) => node.y)) + 88
   } : null;
 
-  const statusLabel = (item: CourseStage | KnowledgeNode) => {
+  const statusLabel = (item: CourseChapterProjection | CourseSkillTreeNode) => {
     if ("progress" in item) return item.progress >= 100 ? "已完成" : item.progress ? "学习中" : "可学习";
     return ({ completed: "已完成", learning: "学习中", available: "可学习", locked: "未解锁" })[item.status];
   };
 
-  function nodeProgress(item: CourseStage | KnowledgeNode) {
+  function nodeProgress(item: CourseChapterProjection | CourseSkillTreeNode) {
     if ("progress" in item) return item.id === "paradigms" ? Math.max(item.progress, Math.round((completed / 5) * 100)) : item.progress;
     if (item.lesson === 4) return Math.max(58, Math.round((completed / 5) * 100));
     if (item.status === "completed") return 100;
@@ -335,9 +335,9 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
         <div>
           <span>AGENTIC AI</span>
           <strong>{view === "overview" ? (mode === "knowledge" ? "课程篇章总览" : "篇章实训成果") : `完整课程${mode === "knowledge" ? "技能树" : "实训树"}`}</strong>
-          {view === "full" ? <small>/ {focusStage ? courseStages.find((item) => item.id === focusStage)?.title : "全课程"}</small> : null}
+          {view === "full" ? <small>/ {focusStage ? courseChapters.find((item) => item.id === focusStage)?.title : "全课程"}</small> : null}
         </div>
-        {focusStage ? <button className="atlas-skill-focus" onClick={() => setFocusStage(null)}>聚焦：{courseStages.find((item) => item.id === focusStage)?.title}<X size={12} /></button> : null}
+        {focusStage ? <button className="atlas-skill-focus" onClick={() => setFocusStage(null)}>聚焦：{courseChapters.find((item) => item.id === focusStage)?.title}<X size={12} /></button> : null}
       </header>
 
       <div ref={viewportRef} className={`atlas-graph-stage ${drawerOpen ? "drawer-open" : ""}`} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onWheel={wheel}>
@@ -349,7 +349,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
             </defs>
             {hull ? <>
               <rect className="atlas-chapter-hull" x={hull.x} y={hull.y} width={hull.width} height={hull.height} rx="28" />
-              <text className="atlas-chapter-label" x={hull.x + 16} y={hull.y + 24}>{courseStages.find((stage) => stage.id === focusStage)?.title}</text>
+              <text className="atlas-chapter-label" x={hull.x + 16} y={hull.y + 24}>{courseChapters.find((stage) => stage.id === focusStage)?.title}</text>
             </> : null}
             {currentEdges.map((edge) => {
               const source = currentItems.find((item) => item.id === edge.source);
@@ -382,7 +382,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
                 <span className="atlas-node-main">
                   <i className={`atlas-node-status ${"status" in item ? item.status : progressValue >= 100 ? "completed" : "learning"}`}>{mode === "knowledge" ? "◆" : <Settings2 size={11} />}</i>
                   <strong>{nodeTitle(item)}</strong>
-                  <small>{view === "overview" ? `${(item as CourseStage).lessonIds.length} 课 · ${statusLabel(item)}` : `第 ${(item as KnowledgeNode).lesson} 课 · ${statusLabel(item)}`}</small>
+                  <small>{view === "overview" ? `${(item as CourseChapterProjection).lessonIds.length} 课 · ${statusLabel(item)}` : `第 ${(item as CourseSkillTreeNode).lesson} 课 · ${statusLabel(item)}`}</small>
                   <em>{view === "overview" ? `双击展开完整${mode === "knowledge" ? "技能树" : "实训树"}` : `单击查看${mode === "knowledge" ? "课件与前置要求" : "工作流与交付物"}`}</em>
                   <span className="atlas-node-expand-mark">↗</span>
                 </span>
@@ -443,8 +443,8 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
           <section className="atlas-drawer-section">
             <h3>前置要求</h3>
             <div className="atlas-requirement-list">
-              {selected.kind === "knowledge" && selected.item.prerequisites.length ? selected.item.prerequisites.map((id) => {
-                const prerequisite = knowledgeNodes.find((item) => item.id === id);
+              {selected.kind === "knowledge" && courseSkillTreeEdges.some((edge) => edge.relation === "prerequisite" && edge.target === selected.item.id) ? courseSkillTreeEdges.filter((edge) => edge.relation === "prerequisite" && edge.target === selected.item.id).map((edge) => edge.source).map((id) => {
+                const prerequisite = courseSkillTreeNodes.find((item) => item.id === id);
                 if (!prerequisite) return null;
                 return (
                   <button className="atlas-requirement interactive" key={id} onClick={() => selectPrerequisite(id)}>
@@ -480,7 +480,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
                 <FileText size={15} />查看课件详情
               </button>
             ) : selected.item.lesson === 4 ? (
-              <button className="atlas-primary" onClick={() => navigate(`/workflows/${selected.item.practiceId ?? "lesson-04-react"}`)}>
+              <button className="atlas-primary" onClick={() => navigate(`/workflows/${selected.item.practiceIds[0] ?? "lesson-04-react"}`)}>
                 <Network size={15} />进入工作流画布
               </button>
             ) : <button className="atlas-primary" onClick={() => setToast(true)}>进入工作流画布</button>}

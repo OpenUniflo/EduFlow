@@ -1,173 +1,108 @@
-import { getKnowledgeNode } from "./knowledge/selectors";
-import type { AcceptanceSpec, CourseKnowledgeReference, CourseStage, KnowledgeNode, Practice } from "./types";
+import { globalKnowledgeGraph } from "./knowledge/graph";
+import type {
+  AcceptanceSpec,
+  CourseChapterProjection,
+  CourseCurriculum,
+  CourseSkillTreeEdge,
+  CourseSkillTreeNode,
+  CurriculumChapter,
+  CurriculumCoverage,
+  CurriculumLesson,
+  CurriculumOutcome,
+  CurriculumSequence,
+  Practice,
+  PracticeCoverage
+} from "./types";
 
 export const COURSE_ID = "agentic-ai";
 export const MATERIAL_ID = "lesson-04";
 
-export const courseStages: CourseStage[] = [
-  {
-    id: "foundations",
-    title: "概念与问题建模",
-    description: "建立智能体概念、任务环境和问题形式化基础。",
-    lessonIds: ["L01", "L02"],
-    color: "#78a7ee",
-    x: 80,
-    y: 310,
-    progress: 100,
-    outcome: "任务环境说明书"
-  },
-  {
-    id: "paradigms",
-    title: "架构与推理范式",
-    description: "比较经典架构、ReAct、Plan-and-Execute 与反思范式。",
-    lessonIds: ["L03", "L04", "L05"],
-    color: "#9a8ee6",
-    x: 340,
-    y: 150,
-    progress: 72,
-    outcome: "范式选择报告"
-  },
-  {
-    id: "system",
-    title: "Agent 系统构成",
-    description: "理解模型、指令、上下文、Runtime 与安全控制点。",
-    lessonIds: ["L06", "L07"],
-    color: "#eca86c",
-    x: 340,
-    y: 450,
-    progress: 46,
-    outcome: "最小 Agent MVP"
-  },
-  {
-    id: "capabilities",
-    title: "工具、知识与记忆",
-    description: "让 Agent 使用工具、检索知识并维护状态与长期记忆。",
-    lessonIds: ["L08", "L09", "L10"],
-    color: "#70c4a5",
-    x: 640,
-    y: 300,
-    progress: 28,
-    outcome: "受控单 Agent"
-  },
-  {
-    id: "workflows",
-    title: "工作流与多智能体",
-    description: "构造路由、并行、Evaluator、Human 与多智能体协作。",
-    lessonIds: ["L11", "L12"],
-    color: "#77b7c8",
-    x: 950,
-    y: 150,
-    progress: 8,
-    outcome: "完整 Agentic Workflow"
-  },
-  {
-    id: "production",
-    title: "评测、安全与生产化",
-    description: "建立评测、可观测性、Guardrail、权限与部署能力。",
-    lessonIds: ["L13", "L14"],
-    color: "#ec92aa",
-    x: 950,
-    y: 450,
-    progress: 0,
-    outcome: "可信生产系统"
-  },
-  {
-    id: "frontier",
-    title: "前沿与综合项目",
-    description: "汇总课程成果，完成系统实现、答辩、评测与安全报告。",
-    lessonIds: ["L15"],
-    color: "#697ee6",
-    x: 1240,
-    y: 300,
-    progress: 0,
-    outcome: "Agentic AI 综合项目"
-  }
+export const agenticCurriculum: CourseCurriculum = {
+  id: "curriculum-agentic-ai-v1",
+  courseId: COURSE_ID,
+  generationMode: "auto-fixed-count",
+  requestedChapterCount: 7
+};
+
+export const curriculumChapters: CurriculumChapter[] = [
+  { id: "foundations", courseId: COURSE_ID, title: "概念与问题建模", description: "建立智能体概念、任务环境和问题形式化基础。", lessonIds: ["L01", "L02"], order: 1, color: "#78a7ee", progress: 100, outcome: "任务环境说明书" },
+  { id: "paradigms", courseId: COURSE_ID, title: "架构与推理范式", description: "比较经典架构、ReAct、Planning、Replanning 与反思范式。", lessonIds: ["L03", "L04", "L05"], order: 2, color: "#9a8ee6", progress: 72, outcome: "范式选择报告" },
+  { id: "system", courseId: COURSE_ID, title: "Agent 系统构成", description: "理解输入、模型、上下文、状态与结构化输出。", lessonIds: ["L06", "L07"], order: 3, color: "#eca86c", progress: 46, outcome: "最小 Agent MVP" },
+  { id: "capabilities", courseId: COURSE_ID, title: "工具、知识与记忆", description: "让 Agent 使用工具、检索知识并维护工作状态与记忆。", lessonIds: ["L08", "L09", "L10"], order: 4, color: "#70c4a5", progress: 28, outcome: "受控单 Agent" },
+  { id: "workflows", courseId: COURSE_ID, title: "工作流与多智能体", description: "构造路由、评估、人工协作与多智能体工作流。", lessonIds: ["L11", "L12"], order: 5, color: "#77b7c8", progress: 8, outcome: "完整 Agentic Workflow" },
+  { id: "production", courseId: COURSE_ID, title: "评测、安全与生产化", description: "建立评测、可观测性、Guardrail、权限与部署能力。", lessonIds: ["L13", "L14"], order: 6, color: "#ec92aa", progress: 0, outcome: "可信生产系统" },
+  { id: "frontier", courseId: COURSE_ID, title: "综合项目", description: "综合运用课程覆盖的原子能力完成系统项目。", lessonIds: ["L15"], order: 7, color: "#697ee6", progress: 0, outcome: "Agentic AI 综合项目" }
 ];
 
-export const courseKnowledgeReferences: CourseKnowledgeReference[] = [
-  { nodeId: "H01", practiceTitle: "能力边界标注", lesson: 1, stageId: "foundations", prerequisiteNodeIds: [], materialIds: [], status: "completed", x: 40, y: 245 },
-  { nodeId: "P01", practiceTitle: "任务环境说明书", lesson: 2, stageId: "foundations", prerequisiteNodeIds: ["H01"], materialIds: [], status: "completed", x: 310, y: 120 },
-  { nodeId: "P05", practiceTitle: "验收条件设计", lesson: 2, stageId: "foundations", prerequisiteNodeIds: ["H01"], materialIds: [], status: "completed", x: 310, y: 380 },
-  { nodeId: "A05", practiceTitle: "架构演进比较", lesson: 3, stageId: "paradigms", prerequisiteNodeIds: ["P01", "P05"], materialIds: [], status: "completed", x: 580, y: 245 },
-  { nodeId: "R02", practiceTitle: "ReAct 工具循环", lesson: 4, stageId: "paradigms", prerequisiteNodeIds: ["A05"], materialIds: [MATERIAL_ID], practiceId: "lesson-04-react", status: "learning", x: 850, y: 120 },
-  { nodeId: "R05", practiceTitle: "五种范式比较", lesson: 4, stageId: "paradigms", prerequisiteNodeIds: ["A05"], materialIds: [MATERIAL_ID], practiceId: "lesson-04-plan", status: "learning", x: 850, y: 380 },
-  { nodeId: "W05", practiceTitle: "HITL 模板比较", lesson: 5, stageId: "paradigms", prerequisiteNodeIds: ["R02", "R05"], materialIds: [], status: "available", x: 1120, y: 245 },
-  { nodeId: "C05", practiceTitle: "最小 Agent 搭建", lesson: 6, stageId: "system", prerequisiteNodeIds: ["W05"], materialIds: [], status: "available", x: 1390, y: 95 },
-  { nodeId: "I03", practiceTitle: "Schema 配置实训", lesson: 7, stageId: "system", prerequisiteNodeIds: ["C05"], materialIds: [], status: "available", x: 1390, y: 265 },
-  { nodeId: "I04", practiceTitle: "上下文构建实训", lesson: 7, stageId: "system", prerequisiteNodeIds: ["C05"], materialIds: [], status: "available", x: 1390, y: 435 },
-  { nodeId: "T01", practiceTitle: "计算工具接入", lesson: 8, stageId: "capabilities", prerequisiteNodeIds: ["I03"], materialIds: [], status: "available", x: 1660, y: 70 },
-  { nodeId: "T04", practiceTitle: "失败恢复实训", lesson: 8, stageId: "capabilities", prerequisiteNodeIds: ["T01"], materialIds: [], status: "available", x: 1660, y: 215 },
-  { nodeId: "K03", practiceTitle: "知识问答流程", lesson: 9, stageId: "capabilities", prerequisiteNodeIds: ["I03", "I04"], materialIds: [], status: "locked", x: 1660, y: 370 },
-  { nodeId: "K05", practiceTitle: "偏好记忆实训", lesson: 9, stageId: "capabilities", prerequisiteNodeIds: ["K03"], materialIds: [], status: "locked", x: 1660, y: 520 },
-  { nodeId: "RT01", practiceTitle: "循环 Agent 搭建", lesson: 10, stageId: "capabilities", prerequisiteNodeIds: ["T04", "K03", "K05"], materialIds: [], status: "locked", x: 1930, y: 160 },
-  { nodeId: "RT05", practiceTitle: "暂停恢复实训", lesson: 10, stageId: "capabilities", prerequisiteNodeIds: ["RT01"], materialIds: [], status: "locked", x: 1930, y: 350 },
-  { nodeId: "WF05", practiceTitle: "课程主工作流", lesson: 11, stageId: "workflows", prerequisiteNodeIds: ["RT01", "RT05"], materialIds: [], status: "locked", x: 2200, y: 255 },
-  { nodeId: "MA02", practiceTitle: "多 Agent 调度", lesson: 12, stageId: "workflows", prerequisiteNodeIds: ["WF05"], materialIds: [], status: "locked", x: 2470, y: 120 },
-  { nodeId: "MA05", practiceTitle: "能力封装实训", lesson: 12, stageId: "workflows", prerequisiteNodeIds: ["WF05"], materialIds: [], status: "locked", x: 2470, y: 390 },
-  { nodeId: "E03", practiceTitle: "评测规则配置", lesson: 13, stageId: "production", prerequisiteNodeIds: ["MA02"], materialIds: [], status: "locked", x: 2740, y: 70 },
-  { nodeId: "S04", practiceTitle: "综合安全链", lesson: 14, stageId: "production", prerequisiteNodeIds: ["MA05", "E03"], materialIds: [], status: "locked", x: 2740, y: 285 },
-  { nodeId: "F06", practiceTitle: "Agentic AI 综合项目", lesson: 15, stageId: "frontier", prerequisiteNodeIds: ["S04"], materialIds: [], status: "locked", x: 3010, y: 285 }
+const lessonTitles = [
+  "Agent、Workflow 与自动化", "任务环境与完成条件", "Agent 架构演进", "推理、规划与反思", "Human-in-the-loop",
+  "最小 Agent 构成", "结构化输出与上下文", "工具使用", "知识与记忆", "Agent Runtime",
+  "Agentic Workflow", "多智能体与能力协议", "评测与可观测性", "安全与生产服务", "综合系统项目"
 ];
 
-export const knowledgeNodes: KnowledgeNode[] = courseKnowledgeReferences.map((reference) => {
-  const node = getKnowledgeNode(reference.nodeId);
-  if (!node) throw new Error(`Unknown curriculum knowledge node: ${reference.nodeId}`);
-  return {
-    ...reference,
-    id: node.id,
-    title: node.title,
-    description: node.description,
-    prerequisites: reference.prerequisiteNodeIds,
-    color: courseStages.find((stage) => stage.id === reference.stageId)?.color ?? "#697ee6"
-  };
+export const curriculumLessons: CurriculumLesson[] = lessonTitles.map((title, index) => {
+  const id = `L${String(index + 1).padStart(2, "0")}`;
+  const chapter = curriculumChapters.find((item) => item.lessonIds.includes(id));
+  if (!chapter) throw new Error(`Lesson ${id} has no curriculum chapter.`);
+  return { id, courseId: COURSE_ID, chapterId: chapter.id, title, order: index + 1 };
 });
 
-export const practices: Practice[] = [
+export const curriculumOutcomes: CurriculumOutcome[] = [
   {
-    id: "lesson-04-direct",
-    title: "Direct 基线实验",
-    paradigm: "Direct",
-    description: "一次生成政策简报，观察速度、成本与信息缺口。",
-    templateId: "lesson-04-direct",
-    acceptanceSpecId: "lesson-04-comparison",
-    estimatedMinutes: 5
-  },
-  {
-    id: "lesson-04-react",
-    title: "ReAct 工具循环",
-    paradigm: "ReAct",
-    description: "通过搜索、观察和停止条件完成开放式资料任务。",
-    templateId: "lesson-04-react",
-    acceptanceSpecId: "lesson-04-comparison",
-    estimatedMinutes: 7
-  },
-  {
-    id: "lesson-04-plan",
-    title: "Plan-and-Execute",
-    paradigm: "Plan-and-Execute",
-    description: "先生成可检查计划，再逐项收集、比较和验证。",
-    templateId: "lesson-04-plan",
-    acceptanceSpecId: "lesson-04-comparison",
-    estimatedMinutes: 7
-  },
-  {
-    id: "lesson-04-replan",
-    title: "Replanning",
-    paradigm: "Replanning",
-    description: "遇到搜索超时或新增隐私要求时，仅修改剩余计划。",
-    templateId: "lesson-04-replan",
-    acceptanceSpecId: "lesson-04-comparison",
-    estimatedMinutes: 6
-  },
-  {
-    id: "lesson-04-evaluator",
-    title: "Evaluator-Optimizer",
-    paradigm: "Evaluator-Optimizer",
-    description: "使用结构化 Rubric 检查覆盖、引用、风险和建议。",
-    templateId: "lesson-04-evaluator",
-    acceptanceSpecId: "lesson-04-comparison",
-    estimatedMinutes: 5
+    id: "outcome-agentic-ai-capstone",
+    courseId: COURSE_ID,
+    title: "Agentic AI 综合系统与答辩",
+    description: "综合系统实现、架构决策、评测、安全报告与答辩，是课程成果而非知识节点。",
+    kind: "project",
+    lessonId: "L15",
+    legacySourceNodeId: "F06"
   }
+];
+
+const coverageSeed: Array<[lessonId: string, role: CurriculumCoverage["role"], nodeIds: string[]]> = [
+  ["L01", "introduce", ["AG01", "H02", "H03"]],
+  ["L02", "introduce", ["P01", "P02", "P03", "P05"]],
+  ["L03", "introduce", ["A01", "A02", "R01"]],
+  ["L04", "introduce", ["R10", "R03", "R04", "R11", "R06", "R07", "R08", "R09"]],
+  ["L05", "introduce", ["W01", "W02"]],
+  ["L06", "introduce", ["C01", "C02", "C03", "C04"]],
+  ["L07", "introduce", ["I01", "I02", "I05", "I04"]],
+  ["L08", "introduce", ["T11", "T12", "T03", "T14", "T15", "T06", "T07", "T08", "T09", "T10"]],
+  ["L09", "introduce", ["K01", "K12", "K13", "K14", "K15", "K16", "K04", "K05"]],
+  ["L10", "introduce", ["RT01", "RT02", "RT03", "RT14", "RT15", "RT06", "BR01"]],
+  ["L11", "introduce", ["W13", "W04", "WF03", "WF05"]],
+  ["L11", "apply", ["R06", "R09", "W02"]],
+  ["L12", "introduce", ["MA02", "MA12", "MA03", "MA04", "MA15", "MA06", "MA07"]],
+  ["L13", "introduce", ["E12", "E13", "E14", "E05", "E06", "E07"]],
+  ["L14", "introduce", ["S01", "S02", "S03", "S14", "S15", "S06", "S07", "S08"]],
+  ["L15", "assess", ["P05", "R06", "I05", "T15", "K14", "RT15", "WF05", "MA12", "E13", "S01", "S08"]]
+];
+
+export const curriculumCoverages: CurriculumCoverage[] = coverageSeed.flatMap(([lessonId, role, nodeIds]) =>
+  nodeIds.map((nodeId, index) => ({ id: `coverage-${lessonId}-${role}-${String(index + 1).padStart(2, "0")}`, courseId: COURSE_ID, lessonId, nodeId, role }))
+);
+
+export const curriculumSequences: CurriculumSequence[] = curriculumLessons.slice(1).map((lesson, index) => ({
+  id: `sequence-${String(index + 1).padStart(2, "0")}`,
+  courseId: COURSE_ID,
+  sourceLessonId: curriculumLessons[index].id,
+  targetLessonId: lesson.id
+}));
+
+export const practices: Practice[] = [
+  { id: "lesson-04-direct", title: "Direct 基线实验", paradigm: "Direct", description: "一次生成政策简报，观察速度、成本与信息缺口。", templateId: "lesson-04-direct", acceptanceSpecId: "lesson-04-comparison", estimatedMinutes: 5 },
+  { id: "lesson-04-react", title: "ReAct 工具循环", paradigm: "ReAct", description: "通过搜索、观察和停止条件完成开放式资料任务。", templateId: "lesson-04-react", acceptanceSpecId: "lesson-04-comparison", estimatedMinutes: 7 },
+  { id: "lesson-04-plan", title: "Plan-and-Execute", paradigm: "Plan-and-Execute", description: "先生成可检查计划，再逐项收集、比较和验证。", templateId: "lesson-04-plan", acceptanceSpecId: "lesson-04-comparison", estimatedMinutes: 7 },
+  { id: "lesson-04-replan", title: "Replanning", paradigm: "Replanning", description: "遇到搜索超时或新增隐私要求时，仅修改剩余计划。", templateId: "lesson-04-replan", acceptanceSpecId: "lesson-04-comparison", estimatedMinutes: 6 },
+  { id: "lesson-04-evaluator", title: "Evaluator-Optimizer", paradigm: "Evaluator-Optimizer", description: "使用结构化 Rubric 检查覆盖、引用、风险和建议。", templateId: "lesson-04-evaluator", acceptanceSpecId: "lesson-04-comparison", estimatedMinutes: 5 }
+];
+
+export const practiceCoverages: PracticeCoverage[] = [
+  { id: "practice-coverage-direct", practiceId: "lesson-04-direct", nodeId: "R01", role: "practice" },
+  { id: "practice-coverage-react", practiceId: "lesson-04-react", nodeId: "R10", role: "assess" },
+  { id: "practice-coverage-plan", practiceId: "lesson-04-plan", nodeId: "R04", role: "assess" },
+  { id: "practice-coverage-replan", practiceId: "lesson-04-replan", nodeId: "R06", role: "assess" },
+  { id: "practice-coverage-evaluator", practiceId: "lesson-04-evaluator", nodeId: "R09", role: "assess" }
 ];
 
 export const acceptanceSpec: AcceptanceSpec = {
@@ -181,17 +116,86 @@ export const acceptanceSpec: AcceptanceSpec = {
   ]
 };
 
-export const courseEdges = knowledgeNodes.flatMap((node) =>
-  node.prerequisites.map((source) => ({ source, target: node.id }))
-);
+const chapterPositions = [
+  { x: 80, y: 310 }, { x: 340, y: 150 }, { x: 340, y: 450 }, { x: 640, y: 300 },
+  { x: 950, y: 150 }, { x: 950, y: 450 }, { x: 1240, y: 300 }
+];
 
-export const stageEdges = [
-  ["foundations", "paradigms"],
-  ["foundations", "system"],
-  ["paradigms", "capabilities"],
-  ["system", "capabilities"],
-  ["capabilities", "workflows"],
-  ["capabilities", "production"],
-  ["workflows", "frontier"],
-  ["production", "frontier"]
-] as const;
+export const courseChapters: CourseChapterProjection[] = curriculumChapters.map((chapter, index) => ({
+  ...chapter,
+  ...chapterPositions[index]
+}));
+
+const nodeById = new Map(globalKnowledgeGraph.nodes.map((node) => [node.id, node]));
+const lessonById = new Map(curriculumLessons.map((lesson) => [lesson.id, lesson]));
+const chapterById = new Map(courseChapters.map((chapter) => [chapter.id, chapter]));
+
+export const courseSkillTreeNodes: CourseSkillTreeNode[] = Array.from(new Set(curriculumCoverages.map((coverage) => coverage.nodeId))).map((nodeId) => {
+  const knowledge = nodeById.get(nodeId);
+  const nodeCoverage = curriculumCoverages.filter((coverage) => coverage.nodeId === nodeId);
+  const firstCoverage = [...nodeCoverage].sort((left, right) => (lessonById.get(left.lessonId)?.order ?? 0) - (lessonById.get(right.lessonId)?.order ?? 0))[0];
+  const lesson = lessonById.get(firstCoverage.lessonId);
+  const chapter = chapterById.get(lesson?.chapterId ?? "");
+  if (!knowledge || !lesson || !chapter) throw new Error(`Cannot project curriculum node: ${nodeId}`);
+  const peers = curriculumCoverages.filter((coverage) => coverage.lessonId === lesson.id && coverage.role === firstCoverage.role);
+  const peerIndex = peers.findIndex((coverage) => coverage.nodeId === nodeId);
+  const practiceIds = practiceCoverages.filter((coverage) => coverage.nodeId === nodeId).map((coverage) => coverage.practiceId);
+  const firstPractice = practices.find((practice) => practice.id === practiceIds[0]);
+  const status = lesson.order <= 3 ? "completed" : lesson.order === 4 ? "learning" : lesson.order <= 7 ? "available" : "locked";
+  return {
+    id: knowledge.id,
+    knowledge,
+    title: knowledge.title,
+    description: knowledge.description,
+    scope: knowledge.scope,
+    lessonId: lesson.id,
+    lesson: lesson.order,
+    chapterId: chapter.id,
+    coverageRoles: Array.from(new Set(nodeCoverage.map((coverage) => coverage.role))),
+    materialIds: lesson.id === "L04" ? [MATERIAL_ID] : [],
+    practiceIds,
+    practiceTitle: firstPractice?.title ?? `${knowledge.title} 学习活动`,
+    status,
+    x: 40 + (lesson.order - 1) * 250,
+    y: 54 + (peerIndex % 5) * 116,
+    color: chapter.color
+  };
+});
+
+const courseNodeIds = new Set(courseSkillTreeNodes.map((node) => node.id));
+export const courseSkillTreeEdges: CourseSkillTreeEdge[] = globalKnowledgeGraph.edges
+  .filter((edge) => courseNodeIds.has(edge.source) && courseNodeIds.has(edge.target))
+  .map((edge) => ({ id: edge.id, source: edge.source, target: edge.target, relation: edge.relation }));
+
+const chapterEdgeKeys = new Set<string>();
+function addChapterEdge(source: string, target: string) {
+  if (source !== target) chapterEdgeKeys.add(`${source}:${target}`);
+}
+
+courseSkillTreeEdges.forEach((edge) => {
+  const sourceChapters = curriculumCoverages.filter((coverage) => coverage.nodeId === edge.source).map((coverage) => lessonById.get(coverage.lessonId)?.chapterId).filter(Boolean) as string[];
+  const targetChapters = curriculumCoverages.filter((coverage) => coverage.nodeId === edge.target).map((coverage) => lessonById.get(coverage.lessonId)?.chapterId).filter(Boolean) as string[];
+  sourceChapters.forEach((source) => targetChapters.forEach((target) => addChapterEdge(source, target)));
+});
+curriculumSequences.forEach((sequence) => {
+  const source = lessonById.get(sequence.sourceLessonId)?.chapterId;
+  const target = lessonById.get(sequence.targetLessonId)?.chapterId;
+  if (source && target) addChapterEdge(source, target);
+});
+
+export const courseChapterEdges = Array.from(chapterEdgeKeys).sort().map((key, index) => {
+  const [source, target] = key.split(":");
+  return { id: `chapter-projection-${index + 1}`, source, target };
+});
+
+/** Deleting a course removes only curriculum associations; knowledge is intentionally not accepted as input. */
+export function deleteCourseCurriculum(courseId: string) {
+  return {
+    curricula: agenticCurriculum.courseId === courseId ? [] : [agenticCurriculum],
+    chapters: curriculumChapters.filter((chapter) => chapter.courseId !== courseId),
+    lessons: curriculumLessons.filter((lesson) => lesson.courseId !== courseId),
+    curriculumCoverages: curriculumCoverages.filter((coverage) => coverage.courseId !== courseId),
+    curriculumSequences: curriculumSequences.filter((sequence) => sequence.courseId !== courseId),
+    practiceCoverages
+  };
+}

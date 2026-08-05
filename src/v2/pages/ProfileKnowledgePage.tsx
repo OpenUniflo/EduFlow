@@ -28,13 +28,12 @@ import {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
-import { courseKnowledgeReferences, practices } from "../data";
+import { curriculumCoverages, curriculumLessons, practiceCoverages, practices } from "../data";
 import { useLearningProgress } from "../progress";
 import { GlobalNav } from "../components/GlobalNav";
-import { globalKnowledgeGraph } from "../knowledge/graph";
 import { PERSONAL_WORLD_HEIGHT, PERSONAL_WORLD_WIDTH } from "../profile/personalLayout";
 import { buildPersonalKnowledgeGraph } from "../profile/profileGraph";
-import { demoUserKnowledge } from "../profile/demoUserKnowledge";
+import { demoPersonalKnowledgeGraph, demoUserKnowledge } from "../profile/demoUserKnowledge";
 import type { PersonalKnowledgeNode, PersonalKnowledgeViewMode } from "../profile/types";
 
 const modeLabels: Record<PersonalKnowledgeViewMode, string> = {
@@ -63,7 +62,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   const navigate = useNavigate();
   const progress = useLearningProgress();
   const graph = useMemo(
-    () => buildPersonalKnowledgeGraph(globalKnowledgeGraph, demoUserKnowledge, practices, courseKnowledgeReferences, progress),
+    () => buildPersonalKnowledgeGraph(demoPersonalKnowledgeGraph, demoUserKnowledge, practices, curriculumCoverages, curriculumLessons, practiceCoverages, progress),
     [progress]
   );
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -281,6 +280,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
         <div className="personal-structure-row"><span>知识岛</span><strong>{graph.summary.islandCount} 个</strong></div>
         <div className="personal-structure-row"><span>最大知识岛</span><strong>{graph.summary.largestIslandName} · {graph.summary.largestIslandSize}</strong></div>
         <div className="personal-structure-row"><span>跨领域连接</span><strong>{graph.summary.crossDomainConnections} 条</strong></div>
+        <div className="personal-structure-row"><span>跨知识岛连接</span><strong>{graph.summary.crossIslandConnections} 条</strong></div>
         <button className="personal-connectivity" onClick={() => selectMode("connection")}>
           <span><span title="衡量核心知识中进入有效结构的比例，不是考试成绩。">知识连接度 ⓘ</span><strong>{graph.summary.connectivity}% <ArrowRight size={12} /></strong></span>
           <i><b style={{ width: `${graph.summary.connectivity}%` }} /></i>
@@ -383,7 +383,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
               <button onClick={() => setConnectionPanelOpen(false)} aria-label="关闭连接分析"><X size={17} /></button>
             </div>
             <section><h3>知识结构</h3><div className="personal-drawer-list"><span><small>知识岛</small><strong>{graph.summary.islandCount} 个</strong></span><span><small>最大知识岛</small><strong>{graph.summary.largestIslandName} · {graph.summary.largestIslandSize}</strong></span><span><small>知识连接度</small><strong>{graph.summary.connectivity}%</strong></span></div></section>
-            <section><h3>已建立连接</h3><div className="personal-drawer-list"><span><small>知识依赖</small><strong>{graph.summary.dependencyConnections} 条</strong></span><span><small>实训关联</small><strong>{graph.summary.practiceConnections} 条</strong></span><span><small>项目组合</small><strong>{graph.summary.projectConnections} 条</strong></span><span><small>跨领域桥梁</small><strong>{graph.summary.crossDomainConnections} 条</strong></span></div></section>
+            <section><h3>已建立连接</h3><div className="personal-drawer-list"><span><small>知识关系</small><strong>{graph.summary.dependencyConnections} 条</strong></span><span><small>实训关联</small><strong>{graph.summary.practiceConnections} 条</strong></span><span><small>跨领域连接</small><strong>{graph.summary.crossDomainConnections} 条</strong></span><span><small>跨知识岛连接</small><strong>{graph.summary.crossIslandConnections} 条</strong></span></div></section>
             <section><h3>潜在连接</h3>{graph.potentialBridges.length ? <div className="personal-drawer-list">{graph.potentialBridges.map((bridge) => <button key={bridge.nodeId} onClick={() => { const target = nodeById.get(bridge.nodeId); if (target) locateNode(target); }}><small>Potential Bridge</small><strong>{bridge.title}</strong><span>{bridge.missingNodeIds.length} 个待形成节点</span></button>)}</div> : <div className="personal-empty-analysis"><GitBranch size={20} /><strong>暂未发现潜在桥梁</strong><p>当前全局关系中没有满足分析条件的跨岛路径。</p></div>}</section>
             <div className="personal-drawer-actions"><button className="primary" onClick={currentLearning}>定位当前学习</button><button onClick={() => selectMode("knowledge")}>返回我的知识</button></div>
           </>

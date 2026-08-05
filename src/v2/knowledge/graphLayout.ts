@@ -2,9 +2,7 @@ import type { KnowledgeEdge, KnowledgeGraphLayout, KnowledgeRelation } from "./t
 
 export const relationLayoutWeights: Record<KnowledgeRelation, number> = {
   prerequisite: 1.35,
-  "implementation-support": 1.12,
-  "practice-support": 0.88,
-  conceptual: 0.7,
+  enables: 1.08,
   related: 0.5
 };
 
@@ -50,7 +48,10 @@ function stableInitialPosition(id: string, dimensions: 2 | 3): Vector {
 }
 
 export function getKnowledgeEdgeLayoutWeight(edge: KnowledgeEdge) {
-  return relationLayoutWeights[edge.relation] * Math.max(0.15, edge.strength ?? 1);
+  const strength = edge.relation === "prerequisite"
+    ? edge.strength === "hard" ? 1 : 0.72
+    : edge.strength ?? 1;
+  return relationLayoutWeights[edge.relation] * Math.max(0.15, strength);
 }
 
 function normalizePositions(positions: Map<string, Vector>, width: number, height: number, depth: number, dimensions: 2 | 3) {

@@ -15,7 +15,6 @@ export function detectWeightedCommunities(
   const allowed = new Set(ids);
   const activeEdges = edges.filter((edge) => allowed.has(edge.source) && allowed.has(edge.target));
   const resolution = options.resolution ?? 0.24;
-  const minSize = options.minSize ?? 3;
   const maxPasses = options.maxPasses ?? 30;
   const adjacency = new Map(ids.map((id) => [id, new Map<string, number>()]));
   activeEdges.forEach((edge) => {
@@ -65,26 +64,9 @@ export function detectWeightedCommunities(
     return result;
   };
 
-  let communities = grouped();
-  while (communities.size > 1) {
-    const undersized = Array.from(communities.entries())
-      .filter(([, members]) => members.length < minSize)
-      .sort((left, right) => left[1].length - right[1].length || left[0].localeCompare(right[0]))[0];
-    if (!undersized) break;
-    const [communityId, members] = undersized;
-    const neighborWeights = new Map<string, number>();
-    members.forEach((id) => adjacency.get(id)?.forEach((weight, neighbor) => {
-      const neighborCommunity = membership.get(neighbor) as string;
-      if (neighborCommunity !== communityId) {
-        neighborWeights.set(neighborCommunity, (neighborWeights.get(neighborCommunity) ?? 0) + weight);
-      }
-    }));
-    const target = Array.from(neighborWeights)
-      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0];
-    if (!target) break;
-    members.forEach((id) => membership.set(id, target));
-    communities = grouped();
-  }
+  // minSize is intentionally not used to merge small communities. A small, dense
+  // community is valid and a sparse bridge must not force it into a larger island.
+  const communities = grouped();
 
   return Array.from(communities.values())
     .map((members) => members.sort())

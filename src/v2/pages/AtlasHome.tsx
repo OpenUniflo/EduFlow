@@ -3,7 +3,7 @@ import { ArrowRight, FileText, Minus, Pause, Play, Plus, RefreshCcw, Send, Uploa
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
-import { courseKnowledgeReferences } from "../data";
+import { curriculumCoverages } from "../data";
 import { globalKnowledgeGraph } from "../knowledge/graph";
 import { buildAtlasKnowledgeLayout } from "../knowledge/atlasLayout";
 import { getKnowledgeEdgeLayoutWeight } from "../knowledge/graphLayout";
@@ -29,14 +29,20 @@ type AtlasNode = {
 };
 
 function createAtlas() {
-  const layout = buildAtlasKnowledgeLayout(globalKnowledgeGraph);
+  const activeNodeIds = new Set(globalKnowledgeGraph.nodes.filter((node) => node.scope === "global" && node.status === "active").map((node) => node.id));
+  const atlasGraph = {
+    ...globalKnowledgeGraph,
+    nodes: globalKnowledgeGraph.nodes.filter((node) => activeNodeIds.has(node.id)),
+    edges: globalKnowledgeGraph.edges.filter((edge) => activeNodeIds.has(edge.source) && activeNodeIds.has(edge.target))
+  };
+  const layout = buildAtlasKnowledgeLayout(atlasGraph);
   const domainById = new Map(globalKnowledgeGraph.domains.map((domain) => [domain.id, domain]));
   const clusterById = new Map(globalKnowledgeGraph.clusters.map((cluster) => [cluster.id, cluster]));
-  const curriculumIds = new Set(courseKnowledgeReferences.map((reference) => reference.nodeId));
-  const nodes: AtlasNode[] = globalKnowledgeGraph.nodes.map((node) => {
-    const domain = domainById.get(node.domainId);
+  const curriculumIds = new Set(curriculumCoverages.map((coverage) => coverage.nodeId));
+  const nodes: AtlasNode[] = atlasGraph.nodes.map((node) => {
+    const domain = domainById.get(node.domainId ?? "");
     const position = layout[node.id] ?? { x: 0, y: 0, z: 0 };
-    const incident = globalKnowledgeGraph.edges.filter((edge) => edge.source === node.id || edge.target === node.id);
+    const incident = atlasGraph.edges.filter((edge) => edge.source === node.id || edge.target === node.id);
     return {
       id: node.id,
       name: node.title,
@@ -51,13 +57,13 @@ function createAtlas() {
       description: node.description,
       tags: node.tags ?? [clusterById.get(node.clusterId ?? "")?.title ?? domain?.title ?? "知识节点"],
       related: [],
-      prerequisites: globalKnowledgeGraph.edges
+      prerequisites: atlasGraph.edges
         .filter((edge) => edge.target === node.id && edge.relation === "prerequisite")
-        .map((edge) => globalKnowledgeGraph.nodes.find((item) => item.id === edge.source)?.title ?? edge.source),
+        .map((edge) => atlasGraph.nodes.find((item) => item.id === edge.source)?.title ?? edge.source),
       courseId: curriculumIds.has(node.id) ? "agentic-ai" : undefined
     };
   });
-  const edges = globalKnowledgeGraph.edges;
+  const edges = atlasGraph.edges;
   const byId: Record<string, AtlasNode> = Object.fromEntries(nodes.map((node) => [node.id, node]));
   edges.forEach((edge) => {
     byId[edge.source]?.related.push(edge.target);
@@ -67,7 +73,7 @@ function createAtlas() {
 }
 
 const atlas = createAtlas();
-const featuredKnowledgeIds = new Set(["PY01", "PY06", "PY18", "PY46", "PY57", "PY58", "PY62", "PY49", "PY50", "PY76", "T01", "RT01"]);
+const featuredKnowledgeIds = new Set(["PY01", "PY06", "PY18", "PY46", "PY57", "PY58", "PY62", "PY49", "PY50", "PY76", "T11", "RT01"]);
 const generationStages = ["读取课件", "识别章节", "提取知识节点", "分析前置依赖", "生成实训目标", "完成课程"];
 
 export function AtlasHome({ session, onLogout }: { session: MockSession; onLogout: () => void }) {

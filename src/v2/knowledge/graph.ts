@@ -4,10 +4,11 @@ import type {
   KnowledgeEdge,
   KnowledgeGraph,
   KnowledgeNode,
-  KnowledgeRelation
+  KnowledgeNodeRevision,
+  KnowledgeNodeType
 } from "./types";
 
-const sourceMetadata = { source: "Python Engineering · Python 工程能力岛.md" } as const;
+const DEMO_TIME = "2026-08-01T00:00:00.000Z";
 
 export const knowledgeDomains: KnowledgeDomain[] = [
   { id: "agentic-ai", title: "Agentic AI", description: "规划、工具、记忆、运行时、评测与治理组成的智能体系统知识。", color: "#78a7ee" },
@@ -37,156 +38,260 @@ export const knowledgeClusters: KnowledgeCluster[] = [
   { id: "python-deployment", domainId: "python-engineering", title: "Production & Deployment" }
 ];
 
-const agentic = (id: string, title: string, clusterId: string, description: string, tags?: string[]): KnowledgeNode => ({
-  id,
-  title,
-  domainId: "agentic-ai",
-  clusterId,
-  description,
-  tags
-});
+function criteria(title: string, type: KnowledgeNodeType) {
+  const action = type === "procedural" ? "独立完成" : type === "representational" ? "正确解释并使用" : type === "meta" ? "判断适用条件并运用" : "清楚解释";
+  return [
+    `能${action}${title}的核心目标与边界`,
+    `能在具体场景中识别${title}的正确用法与常见误用`,
+    `能用可检查的示例证明对${title}的掌握`
+  ];
+}
 
-const python = (id: string, title: string, clusterId: string, description: string): KnowledgeNode => ({
-  id,
-  title,
-  domainId: "python-engineering",
-  clusterId,
-  description,
-  metadata: sourceMetadata
+function globalNode(
+  id: string,
+  title: string,
+  domainId: "agentic-ai" | "python-engineering",
+  clusterId: string,
+  description: string,
+  type: KnowledgeNodeType,
+  masteryCriteria = criteria(title, type),
+  tags?: string[]
+): KnowledgeNode {
+  return {
+    id,
+    title,
+    description,
+    type,
+    masteryCriteria,
+    scope: "global",
+    domainId,
+    clusterId,
+    provenance: [{ sourceType: "global-catalog", sourceId: `${domainId}-v1`, discoveredAt: DEMO_TIME }],
+    currentRevisionId: `${id}-r1`,
+    status: "active",
+    createdAt: DEMO_TIME,
+    updatedAt: DEMO_TIME,
+    tags
+  };
+}
+
+const a = (id: string, title: string, clusterId: string, description: string, type: KnowledgeNodeType, mastery?: string[], tags?: string[]) =>
+  globalNode(id, title, "agentic-ai", clusterId, description, type, mastery, tags);
+const p = (id: string, title: string, clusterId: string, description: string, type: KnowledgeNodeType = "conceptual") =>
+  globalNode(id, title, "python-engineering", clusterId, description, type);
+const legacy = (id: string, title: string, clusterId: string, supersededBy: string[]) => ({
+  ...a(id, title, clusterId, "Knowledge Architecture v1 前的复合节点，仅为历史 identity 与 lineage 保留。", "meta", ["历史节点不再直接评测；应使用其原子 successor 的 mastery criteria。"]),
+  status: "superseded" as const,
+  supersededBy
 });
 
 export const knowledgeNodes: KnowledgeNode[] = [
-  agentic("H01", "Agentic AI 全景", "agentic-foundations", "理解 Agent、Workflow 与自动化系统的边界。"),
-  agentic("P01", "任务环境建模", "agentic-foundations", "识别目标、环境、约束、动作和完成条件。"),
-  agentic("P05", "完成条件与约束", "agentic-foundations", "把自然语言要求转化为可检查的完成条件。"),
-  agentic("A05", "经典与现代 Agent", "agentic-paradigms", "从经典智能体架构理解现代 LLM Agent 的演进。"),
-  agentic("R02", "ReAct 与推理循环", "agentic-paradigms", "让推理、行动与观察组成可审计闭环。"),
-  agentic("R05", "规划、重规划与反思", "agentic-paradigms", "比较 Direct、Plan-and-Execute、Replanning 与 Evaluator–Optimizer。"),
-  agentic("W05", "混合架构与 HITL", "agentic-paradigms", "组合固定流程、Agent 决策、Evaluator 与人工审批。"),
-  agentic("C05", "最小 Agent", "agentic-system", "搭建输入、模型、状态与输出组成的最小 Agent。"),
-  agentic("I03", "结构化输出与 Schema", "agentic-system", "使用结构化 Schema 保证节点间可靠传递数据。"),
-  agentic("I04", "Context Engineering", "agentic-system", "组织指令、历史、知识、记忆与工具结果。"),
-  agentic("T01", "Tool Use / Function Calling", "agentic-capabilities", "让 Agent 根据任务决定何时调用外部工具。"),
-  agentic("T02", "Tool Schema", "agentic-capabilities", "使用稳定的名称、参数类型与返回结构定义工具接口。"),
-  agentic("T04", "Tool Failure / Retry", "agentic-capabilities", "处理参数校验、超时、失败、重试与回退。"),
-  agentic("T05", "副作用、权限与人工审批", "agentic-capabilities", "控制工具副作用、权限边界与高风险人工确认。"),
-  agentic("K02", "文档解析、Chunk 与 Embedding", "agentic-capabilities", "把文档解析为可检索、可引用的知识单元。"),
-  agentic("K03", "RAG 与引用", "agentic-capabilities", "构建检索、重排序、注入与来源追踪链路。"),
-  agentic("K04", "Session / Working State", "agentic-capabilities", "维护一次任务或会话中的工作状态。"),
-  agentic("K05", "长期记忆", "agentic-capabilities", "理解记忆读取、条件写入、冲突更新与遗忘。"),
-  agentic("RT01", "Agent Loop", "agentic-runtime", "构造 Observe–Think–Act 的自主执行循环。"),
-  agentic("RT02", "状态机与任务生命周期", "agentic-runtime", "使用状态机表达 Agent 任务的创建、运行、等待、失败与完成。"),
-  agentic("RT04", "Runtime Limit / Recovery", "agentic-runtime", "管理运行时限制、失败恢复与安全终止。"),
-  agentic("RT05", "Checkpoint 与审计", "agentic-runtime", "保存中间状态、恢复执行并记录完整轨迹。"),
-  agentic("W03", "Orchestrator–Worker", "agentic-runtime", "由协调者拆分任务并调度 Worker 完成子任务。"),
-  agentic("WF03", "Orchestrator–Worker 构造", "agentic-runtime", "把 Orchestrator–Worker 范式实现为可执行工作流。"),
-  agentic("WF05", "Agentic Workflow", "agentic-runtime", "组合确定性链路、Agent、Evaluator 与审批。"),
-  agentic("MA02", "Supervisor", "agentic-runtime", "由中央 Agent 分配任务并整合专业 Agent 结果。"),
-  agentic("MA05", "Tool / Skill / Plugin / MCP / A2A", "agentic-runtime", "理解能力封装、工具协议与 Agent 远程协作。"),
-  agentic("E02", "测试集与基准任务", "agentic-production", "使用稳定测试集和基准任务评估 Agent。"),
-  agentic("E03", "结果与轨迹评测", "agentic-production", "分别评测最终结果、计划、工具调用与中间步骤。"),
-  agentic("E04", "可观测性与运行调试", "agentic-production", "使用日志、指标和 Trace 调试 Agent 运行。"),
-  agentic("E05", "Regression Test", "agentic-production", "用回归测试防止 Agent 能力和行为意外退化。"),
-  agentic("S04", "Guardrail 与权限", "agentic-production", "使用 Guardrail、Sandbox 与最小权限控制风险。"),
-  agentic("S05", "API、数据库、队列与部署", "agentic-production", "将 Agent 作为包含 API、异步任务、状态和部署的生产服务。"),
-  agentic("F06", "综合系统与答辩", "agentic-production", "完成系统实现、架构决策、评测、安全报告与答辩。"),
-  agentic("BR01", "Async Tool Execution", "agentic-runtime", "在异步 Runtime 中可靠执行外部工具并处理结果、超时与任务生命周期。", ["async", "tool", "runtime"]),
+  legacy("H01", "Agentic AI 全景", "agentic-foundations", ["AG01", "H02", "H03"]),
+  legacy("A05", "经典与现代 Agent", "agentic-paradigms", ["A01", "A02"]),
+  legacy("R02", "ReAct 与推理循环", "agentic-paradigms", ["R01", "R10"]),
+  legacy("R05", "规划、重规划与反思", "agentic-paradigms", ["R03", "R04", "R11", "R06", "R07", "R08", "R09"]),
+  legacy("W05", "混合架构与 HITL", "agentic-paradigms", ["W01", "W02", "WF05"]),
+  legacy("C05", "最小 Agent", "agentic-system", ["C01", "C02", "C03", "C04"]),
+  legacy("I03", "结构化输出与 Schema", "agentic-system", ["I01", "I02", "I05"]),
+  legacy("T01", "Tool Use / Function Calling", "agentic-capabilities", ["T11", "T12", "T03", "T14", "T15", "T06"]),
+  legacy("T02", "Tool Schema", "agentic-capabilities", ["T11", "I02"]),
+  legacy("T04", "Tool Failure / Retry", "agentic-capabilities", ["T07", "T08"]),
+  legacy("T05", "副作用、权限与人工审批", "agentic-capabilities", ["T09", "T10", "W02"]),
+  legacy("K02", "文档解析、Chunk 与 Embedding", "agentic-capabilities", ["K01", "K12", "K13"]),
+  legacy("K03", "RAG 与引用", "agentic-capabilities", ["K14", "K15", "K16"]),
+  legacy("RT04", "Runtime Limit / Recovery", "agentic-runtime", ["RT03", "RT14"]),
+  legacy("RT05", "Checkpoint 与审计", "agentic-runtime", ["RT15", "RT06"]),
+  legacy("W03", "Orchestrator–Worker", "agentic-runtime", ["W13", "W04", "WF03"]),
+  legacy("MA05", "Tool / Skill / Plugin / MCP / A2A", "agentic-runtime", ["MA03", "MA04", "MA15", "MA06", "MA07"]),
+  legacy("E02", "测试集与基准任务", "agentic-production", ["E12"]),
+  legacy("E03", "结果与轨迹评测", "agentic-production", ["E13", "E14"]),
+  legacy("E04", "可观测性与运行调试", "agentic-production", ["E06", "E07"]),
+  legacy("S04", "Guardrail 与权限", "agentic-production", ["S01", "S02", "S03"]),
+  legacy("S05", "API、数据库、队列与部署", "agentic-production", ["S14", "S15", "S06", "S07", "S08"]),
+  a("AG01", "Agent", "agentic-foundations", "理解能感知状态、选择动作并朝目标推进的智能体。", "conceptual"),
+  a("H02", "Workflow", "agentic-foundations", "理解由显式步骤和控制关系组成的工作流。", "conceptual"),
+  a("H03", "Automation System", "agentic-foundations", "理解确定性自动化系统的能力边界。", "conceptual"),
+  a("P01", "Task Environment", "agentic-foundations", "描述 Agent 可观察、可行动的任务环境。", "representational"),
+  a("P02", "Goal", "agentic-foundations", "把用户意图表述为可推进的目标。", "representational"),
+  a("P03", "Constraint", "agentic-foundations", "表达任务执行过程中不得违反的限制。", "representational"),
+  a("P05", "Completion Condition", "agentic-foundations", "把自然语言要求转化为可检查的完成条件。", "procedural"),
+  a("A01", "Classical Agent Architecture", "agentic-paradigms", "解释感知、决策、行动等经典智能体构件。", "conceptual"),
+  a("A02", "LLM Agent Architecture", "agentic-paradigms", "解释模型、上下文、工具、状态与运行时的协作。", "conceptual"),
+  a("R01", "Reasoning Loop", "agentic-paradigms", "组织可观察的推理、行动与反馈循环。", "meta"),
+  a("R10", "ReAct", "agentic-paradigms", "交替执行 Reason、Act 与 Observation。", "procedural"),
+  a("R03", "Planning", "agentic-paradigms", "在执行前形成有目标、有依赖的行动计划。", "meta"),
+  a("R04", "Plan-and-Execute", "agentic-paradigms", "先生成可检查计划，再按步骤执行并收集结果。", "procedural"),
+  a("R11", "Plan Monitoring", "agentic-paradigms", "比较计划预期与实际观察并识别偏差。", "meta"),
+  a("R06", "Replanning", "agentic-paradigms", "根据新观察保留已完成步骤并调整剩余计划。", "procedural", [
+    "能说明什么时候需要触发 Replanning",
+    "能保留已完成步骤并修改剩余计划",
+    "能根据新的 Observation 调整后续计划",
+    "能区分 Replanning 与完整重新规划"
+  ]),
+  a("R07", "Reflection", "agentic-paradigms", "回顾执行轨迹并提炼可用于后续行动的改进。", "meta"),
+  a("R08", "Evaluator", "agentic-paradigms", "使用明确标准判断输出或轨迹质量。", "meta"),
+  a("R09", "Evaluator-Optimizer", "agentic-paradigms", "让 Evaluator 反馈驱动 Optimizer 迭代输出。", "procedural"),
+  a("W01", "Human-in-the-loop", "agentic-paradigms", "在关键决策点引入人的判断和反馈。", "procedural"),
+  a("W02", "Approval Gate", "agentic-paradigms", "在高风险动作前建立显式审批边界。", "procedural"),
+  a("C01", "Agent Input", "agentic-system", "定义 Agent 接收的任务输入和上下文入口。", "representational"),
+  a("C02", "Model Invocation", "agentic-system", "以受控参数调用模型并处理响应。", "procedural"),
+  a("C03", "Agent State", "agentic-system", "表示 Agent 一次运行中的持久和临时状态。", "representational"),
+  a("C04", "Agent Output", "agentic-system", "定义 Agent 对调用者交付的结果契约。", "representational"),
+  a("I01", "Structured Output", "agentic-system", "让模型输出满足机器可处理的明确结构。", "representational"),
+  a("I02", "Schema", "agentic-system", "定义字段、类型、约束和嵌套关系。", "representational"),
+  a("I05", "Schema Validation", "agentic-system", "验证结构化输出并报告可定位的错误。", "procedural"),
+  a("I04", "Context Engineering", "agentic-system", "选择并组织指令、历史、知识、记忆与工具结果。", "procedural"),
+  a("T11", "Tool Interface", "agentic-capabilities", "定义 Agent 可发现和调用的工具契约。", "representational"),
+  a("T12", "Function Calling", "agentic-capabilities", "使用模型的函数调用协议表达工具请求。", "procedural"),
+  a("T03", "Tool Selection", "agentic-capabilities", "根据任务和工具描述选择合适工具。", "meta"),
+  a("T14", "Tool Arguments", "agentic-capabilities", "生成并校验符合接口的工具参数。", "representational"),
+  a("T15", "Tool Execution", "agentic-capabilities", "调用外部能力并管理一次执行。", "procedural"),
+  a("T06", "Tool Result", "agentic-capabilities", "解析、归一化并注入工具执行结果。", "representational"),
+  a("T07", "Tool Failure", "agentic-capabilities", "识别参数、权限、超时和执行失败。", "conceptual"),
+  a("T08", "Tool Retry", "agentic-capabilities", "对可恢复工具失败实施有界重试。", "procedural"),
+  a("T09", "Tool Permission", "agentic-capabilities", "限制工具可访问的资源和动作。", "procedural"),
+  a("T10", "Tool Approval", "agentic-capabilities", "对高风险工具动作请求人工确认。", "procedural"),
+  a("K01", "Document Parsing", "agentic-capabilities", "从文档载体提取结构化内容。", "procedural"),
+  a("K12", "Chunking", "agentic-capabilities", "把内容切分为语义完整、可检索单元。", "procedural"),
+  a("K13", "Embedding", "agentic-capabilities", "将内容编码为可比较的向量表示。", "representational"),
+  a("K14", "Retrieval", "agentic-capabilities", "从知识源召回与查询相关的候选内容。", "procedural"),
+  a("K15", "Reranking", "agentic-capabilities", "对召回候选按任务相关性重新排序。", "procedural"),
+  a("K16", "Citation", "agentic-capabilities", "把生成结论追溯到明确来源。", "procedural"),
+  a("K04", "Working State", "agentic-capabilities", "维护一次任务或会话中的工作状态。", "representational"),
+  a("K05", "Long-term Memory", "agentic-capabilities", "跨会话读取、写入、更新和遗忘记忆。", "procedural"),
+  a("RT01", "Agent Loop", "agentic-runtime", "构造 Observe–Think–Act 的自主执行循环。", "procedural"),
+  a("RT02", "Task State Machine", "agentic-runtime", "用状态和转换表达 Agent 任务生命周期。", "representational"),
+  a("RT03", "Runtime Limit", "agentic-runtime", "为步骤、次数、时间和资源设置运行边界。", "procedural"),
+  a("RT14", "Failure Recovery", "agentic-runtime", "从可恢复运行失败中安全继续或降级。", "procedural"),
+  a("RT15", "Checkpoint", "agentic-runtime", "保存可用于恢复执行的完整中间状态。", "procedural"),
+  a("RT06", "Audit Trail", "agentic-runtime", "记录可追溯的输入、决策、动作与结果。", "representational"),
+  a("W13", "Orchestrator", "agentic-runtime", "拆分任务并协调多个执行单元。", "procedural"),
+  a("W04", "Worker", "agentic-runtime", "接收明确子任务并返回受约束结果。", "procedural"),
+  a("WF03", "Orchestrator-Worker Workflow", "agentic-runtime", "把协调者与 Worker 组织成可执行工作流。", "procedural"),
+  a("WF05", "Agentic Workflow", "agentic-runtime", "组合确定性步骤、Agent 决策、评估与审批。", "procedural"),
+  a("MA02", "Supervisor", "agentic-runtime", "由中央 Agent 分配任务并整合专业 Agent 结果。", "procedural"),
+  a("MA12", "Multi-agent Delegation", "agentic-runtime", "在多个 Agent 之间分配职责和上下文。", "procedural"),
+  a("MA03", "Tool", "agentic-runtime", "理解可调用、具有输入输出契约的原子外部能力。", "conceptual"),
+  a("MA04", "Skill", "agentic-runtime", "理解封装知识、指令和工作流的可复用能力。", "conceptual"),
+  a("MA15", "Plugin", "agentic-runtime", "理解打包技能、工具与集成的扩展单元。", "conceptual"),
+  a("MA06", "Model Context Protocol", "agentic-runtime", "理解 MCP 的客户端、服务端与能力发现边界。", "conceptual"),
+  a("MA07", "Agent-to-Agent Protocol", "agentic-runtime", "理解远程 Agent 之间的能力发现与任务协作。", "conceptual"),
+  a("E12", "Benchmark Task", "agentic-production", "设计可重复执行、结果可比较的基准任务。", "procedural"),
+  a("E13", "Outcome Evaluation", "agentic-production", "依据验收标准评测最终结果。", "procedural"),
+  a("E14", "Trajectory Evaluation", "agentic-production", "评测计划、工具调用和中间步骤。", "procedural"),
+  a("E05", "Regression Test", "agentic-production", "用固定用例识别 Agent 能力与行为退化。", "procedural"),
+  a("E06", "Observability", "agentic-production", "用日志、指标和 Trace 观察 Agent 系统。", "conceptual"),
+  a("E07", "Runtime Debugging", "agentic-production", "依据运行信号定位 Agent 执行故障。", "procedural"),
+  a("S01", "Guardrail", "agentic-production", "在输入、输出和动作边界实施安全规则。", "procedural"),
+  a("S02", "Sandbox", "agentic-production", "在隔离环境限制代码与工具副作用。", "procedural"),
+  a("S03", "Least Privilege", "agentic-production", "仅授予完成任务所需的最小权限。", "conceptual"),
+  a("S14", "API Service", "agentic-production", "通过稳定接口提供 Agent 服务。", "procedural"),
+  a("S15", "Database Persistence", "agentic-production", "将 Agent 状态与业务数据可靠持久化。", "procedural"),
+  a("S06", "Task Queue", "agentic-production", "用队列缓冲、排序和分发异步任务。", "procedural"),
+  a("S07", "Worker", "agentic-production", "从任务队列消费并执行 Agent 工作。", "procedural"),
+  a("S08", "Deployment", "agentic-production", "把 Agent 服务发布到可运行环境。", "procedural"),
+  a("BR01", "Async Tool Execution", "agentic-runtime", "在异步 Runtime 中可靠执行外部工具并处理结果、超时与生命周期。", "procedural", undefined, ["async", "tool", "runtime"]),
 
-  python("PY01", "Python Runtime", "python-runtime", "理解 Python 程序的运行环境与执行模型。"),
-  python("PY02", "Object / Reference", "python-runtime", "理解对象、引用及变量绑定。"),
-  python("PY03", "Built-in Types", "python-runtime", "掌握 Python 内置类型及其基本行为。"),
-  python("PY04", "Expressions", "python-runtime", "使用表达式组合值、运算和调用。"),
-  python("PY05", "Control Flow", "python-runtime", "使用条件与循环控制程序执行。"),
-  python("PY06", "Function", "python-runtime", "定义参数、返回值与可复用的函数行为。"),
-  python("PY07", "Scope", "python-runtime", "理解局部、闭包与模块作用域。"),
-  python("PY08", "Module", "python-engineering-foundation", "用模块组织和复用 Python 代码。"),
-  python("PY09", "Exception", "python-engineering-foundation", "使用异常表达和处理失败。"),
-  python("PY18", "JSON", "python-data", "在 Python 与外部系统之间交换结构化 JSON 数据。"),
-  python("PY19", "File / Path", "python-data", "可靠读写文件并操作路径。"),
-  python("PY27", "Type Hint", "python-engineering-foundation", "用类型标注描述函数和数据结构的接口。"),
-  python("PY34", "Project Structure", "python-engineering-foundation", "组织可维护的包、模块、配置与测试目录。"),
-  python("PY37", "pytest", "python-observability", "使用 pytest 编写和运行自动化测试。"),
-  python("PY45", "HTTP", "python-http-api", "理解 HTTP 请求、响应与接口交互。"),
-  python("PY46", "HTTP Client", "python-http-api", "使用 Python HTTP Client 调用外部 API。"),
-  python("PY49", "Pydantic", "python-http-api", "用类型驱动的数据模型完成解析与校验。"),
-  python("PY50", "FastAPI", "python-http-api", "基于类型和 ASGI 构建 Python API 服务。"),
-  python("PY51", "Authentication", "python-http-api", "处理服务和外部 API 的身份认证。"),
-  python("PY53", "Thread / Process / GIL", "python-async", "理解线程、进程与 GIL 对并发执行的影响。"),
-  python("PY56", "Event Loop", "python-async", "理解事件循环如何调度非阻塞工作。"),
-  python("PY57", "async / await", "python-async", "使用 async / await 表达异步控制流。"),
-  python("PY58", "Task", "python-async", "创建、调度和等待异步任务。"),
-  python("PY61", "Timeout / Cancellation", "python-async", "为异步任务设置超时并安全取消。"),
-  python("PY62", "Retry / Backoff", "python-async", "使用重试与退避恢复暂时性失败。"),
-  python("PY64", "SQL", "python-persistence", "使用 SQL 查询和修改关系数据。"),
-  python("PY67", "SQLAlchemy", "python-persistence", "使用 SQLAlchemy 组织数据库访问与事务。"),
-  python("PY71", "Redis", "python-persistence", "使用 Redis 保存缓存、队列和短期状态。"),
-  python("PY72", "Persistence", "python-persistence", "为应用状态设计可靠持久化。"),
-  python("PY76", "State Machine", "python-architecture", "使用状态与转换表达应用生命周期。"),
-  python("PY78", "Background Task", "python-architecture", "将非即时工作交给后台任务执行。"),
-  python("PY79", "Task Queue / Worker", "python-architecture", "使用任务队列与 Worker 调度后台工作。"),
-  python("PY81", "Plugin / Registry", "python-architecture", "通过注册表发现和管理可插拔能力。"),
-  python("PY82", "Dynamic Import", "python-architecture", "在运行时动态加载 Python 模块与能力。"),
-  python("PY85", "Unit Test", "python-observability", "隔离验证函数和模块的局部行为。"),
-  python("PY86", "Integration Test", "python-observability", "验证多个组件与外部依赖的协同行为。"),
-  python("PY89", "Structured Logging", "python-observability", "输出可查询、可关联的结构化日志。"),
-  python("PY90", "Metrics", "python-observability", "用指标观测服务健康与性能。"),
-  python("PY91", "Trace / Span", "python-observability", "用 Trace 与 Span 追踪跨组件执行路径。"),
-  python("PY94", "ASGI", "python-deployment", "理解 Python 异步 Web 服务接口。"),
-  python("PY95", "Docker", "python-deployment", "使用容器打包一致的运行环境。"),
-  python("PY97", "Secrets", "python-deployment", "安全管理认证令牌和运行时秘密。"),
-  python("PY98", "Deployment", "python-deployment", "将 Python 服务部署到可运行环境。")
+  p("PY01", "Python Runtime", "python-runtime", "理解 Python 程序的运行环境与执行模型。"),
+  p("PY02", "Object / Reference", "python-runtime", "理解对象、引用及变量绑定。"),
+  p("PY03", "Built-in Types", "python-runtime", "掌握 Python 内置类型及其基本行为。"),
+  p("PY04", "Expressions", "python-runtime", "使用表达式组合值、运算和调用。", "language"),
+  p("PY05", "Control Flow", "python-runtime", "使用条件与循环控制程序执行。", "language"),
+  p("PY06", "Function", "python-runtime", "定义参数、返回值与可复用函数行为。", "language"),
+  p("PY07", "Scope", "python-runtime", "理解局部、闭包与模块作用域。"),
+  p("PY08", "Module", "python-engineering-foundation", "用模块组织和复用 Python 代码。", "procedural"),
+  p("PY09", "Exception", "python-engineering-foundation", "使用异常表达和处理失败。", "procedural"),
+  p("PY18", "JSON", "python-data", "在 Python 与外部系统之间交换结构化 JSON 数据。", "representational"),
+  p("PY19", "File / Path", "python-data", "可靠读写文件并操作路径。", "procedural"),
+  p("PY27", "Type Hint", "python-engineering-foundation", "用类型标注描述函数和数据结构接口。", "language"),
+  p("PY34", "Project Structure", "python-engineering-foundation", "组织可维护的包、模块、配置与测试目录。", "procedural"),
+  p("PY37", "pytest", "python-observability", "使用 pytest 编写和运行自动化测试。", "procedural"),
+  p("PY45", "HTTP", "python-http-api", "理解 HTTP 请求、响应与接口交互。"),
+  p("PY46", "HTTP Client", "python-http-api", "使用 Python HTTP Client 调用外部 API。", "procedural"),
+  p("PY49", "Pydantic", "python-http-api", "用类型驱动的数据模型完成解析与校验。", "procedural"),
+  p("PY50", "FastAPI", "python-http-api", "基于类型和 ASGI 构建 Python API 服务。", "procedural"),
+  p("PY51", "Authentication", "python-http-api", "处理服务和外部 API 的身份认证。", "procedural"),
+  p("PY53", "Thread", "python-async", "使用线程并理解共享内存并发。"),
+  p("PY54", "Process", "python-async", "使用进程获得隔离与 CPU 并行。"),
+  p("PY55", "Global Interpreter Lock", "python-async", "解释 GIL 对 Python 线程执行的影响。"),
+  p("PY56", "Event Loop", "python-async", "理解事件循环如何调度非阻塞工作。"),
+  p("PY57", "async / await", "python-async", "使用 async / await 表达异步控制流。", "language"),
+  p("PY58", "Async Task", "python-async", "创建、调度和等待异步任务。", "procedural"),
+  p("PY61", "Timeout", "python-async", "为异步操作设置有界执行时间。", "procedural"),
+  p("PY63", "Cancellation", "python-async", "请求取消并安全清理异步任务。", "procedural"),
+  p("PY62", "Retry / Backoff", "python-async", "使用重试与退避恢复暂时性失败。", "procedural"),
+  p("PY64", "SQL", "python-persistence", "使用 SQL 查询和修改关系数据。", "language"),
+  p("PY67", "SQLAlchemy", "python-persistence", "使用 SQLAlchemy 组织数据库访问与事务。", "procedural"),
+  p("PY71", "Redis", "python-persistence", "使用 Redis 保存缓存与短期状态。", "procedural"),
+  p("PY72", "Persistence", "python-persistence", "为应用状态设计可靠持久化。", "procedural"),
+  p("PY76", "State Machine", "python-architecture", "使用状态与转换表达应用生命周期。", "representational"),
+  p("PY78", "Background Task", "python-architecture", "将非即时工作交给后台执行。", "procedural"),
+  p("PY79", "Task Queue", "python-architecture", "使用队列缓冲并分发后台任务。", "procedural"),
+  p("PY80", "Queue Worker", "python-architecture", "消费队列消息并可靠执行后台工作。", "procedural"),
+  p("PY81", "Python Plugin", "python-architecture", "定义并加载可插拔 Python 能力。", "procedural"),
+  p("PY83", "Plugin Registry", "python-architecture", "注册、发现和选择可插拔能力。", "procedural"),
+  p("PY82", "Dynamic Import", "python-architecture", "在运行时动态加载 Python 模块。", "procedural"),
+  p("PY85", "Unit Test", "python-observability", "隔离验证函数和模块的局部行为。", "procedural"),
+  p("PY86", "Integration Test", "python-observability", "验证多个组件与外部依赖的协同行为。", "procedural"),
+  p("PY89", "Structured Logging", "python-observability", "输出可查询、可关联的结构化日志。", "procedural"),
+  p("PY90", "Metrics", "python-observability", "用指标观测服务健康与性能。", "procedural"),
+  p("PY91", "Trace / Span", "python-observability", "追踪跨组件执行路径。", "procedural"),
+  p("PY94", "ASGI", "python-deployment", "理解 Python 异步 Web 服务接口。"),
+  p("PY95", "Docker", "python-deployment", "使用容器打包一致运行环境。", "procedural"),
+  p("PY97", "Secrets", "python-deployment", "安全管理认证令牌和运行时秘密。", "procedural"),
+  p("PY98", "Deployment", "python-deployment", "将 Python 服务部署到可运行环境。", "procedural")
 ];
 
-type EdgeSeed = [source: string, target: string, relation: KnowledgeRelation, strength?: number, description?: string];
-const edgeSeeds: EdgeSeed[] = [
-  ["H01", "P01", "prerequisite"], ["H01", "P05", "prerequisite"], ["P01", "A05", "prerequisite"], ["P05", "A05", "prerequisite"],
-  ["A05", "R02", "prerequisite"], ["A05", "R05", "prerequisite"], ["R02", "W05", "prerequisite"], ["R05", "W05", "prerequisite"],
-  ["W05", "C05", "prerequisite"], ["C05", "I03", "prerequisite"], ["C05", "I04", "prerequisite"], ["I03", "T01", "prerequisite"],
-  ["T01", "T04", "prerequisite"], ["I03", "K03", "prerequisite"], ["I04", "K03", "prerequisite"], ["K03", "K05", "prerequisite"],
-  ["T04", "RT01", "prerequisite"], ["K03", "RT01", "prerequisite"], ["K05", "RT01", "prerequisite"], ["RT01", "RT05", "prerequisite"],
-  ["RT01", "WF05", "prerequisite"], ["RT05", "WF05", "prerequisite"], ["WF05", "MA02", "prerequisite"], ["WF05", "MA05", "prerequisite"],
-  ["MA02", "E03", "prerequisite"], ["MA05", "S04", "prerequisite"], ["E03", "S04", "prerequisite"], ["S04", "F06", "prerequisite"],
-  ["T01", "T02", "conceptual"], ["K04", "K05", "conceptual"], ["RT02", "RT04", "conceptual"], ["RT04", "RT05", "prerequisite"],
-  ["W03", "WF03", "implementation-support"], ["E02", "E03", "prerequisite"], ["E03", "E05", "practice-support"], ["E04", "S05", "implementation-support"],
-
-  ["PY01", "PY02", "prerequisite"], ["PY02", "PY03", "prerequisite"], ["PY03", "PY04", "prerequisite"], ["PY04", "PY05", "prerequisite"], ["PY05", "PY06", "prerequisite"],
-  ["PY06", "PY07", "prerequisite"], ["PY06", "PY08", "prerequisite"], ["PY06", "PY09", "prerequisite"], ["PY08", "PY34", "prerequisite"],
-  ["PY01", "PY06", "conceptual", 0.7, "文档中的个人星图简化主干。"], ["PY06", "PY18", "conceptual", 0.65, "文档 Demo 中 Function 到 JSON 的简化结构。"],
-  ["PY08", "PY45", "conceptual", 0.7, "文档 Demo 中 Module 到 HTTP 的简化结构。"], ["PY45", "PY46", "prerequisite"],
-  ["PY46", "PY56", "conceptual", 0.65, "文档 Demo 中 HTTP Client 到异步执行区域的简化结构。"], ["PY53", "PY56", "prerequisite"],
-  ["PY56", "PY57", "prerequisite"], ["PY57", "PY58", "prerequisite"], ["PY58", "PY61", "conceptual", 0.75], ["PY61", "PY62", "prerequisite"],
-  ["PY18", "PY45", "prerequisite"], ["PY49", "PY50", "prerequisite"], ["PY64", "PY67", "conceptual"], ["PY71", "PY72", "conceptual"],
-  ["PY76", "PY78", "prerequisite"], ["PY78", "PY79", "prerequisite"], ["PY81", "PY82", "conceptual"],
-  ["PY37", "PY85", "conceptual"], ["PY85", "PY86", "prerequisite"], ["PY89", "PY90", "conceptual"], ["PY90", "PY91", "conceptual"],
-  ["PY50", "PY94", "implementation-support"], ["PY94", "PY95", "conceptual"], ["PY95", "PY98", "implementation-support"], ["PY51", "PY97", "conceptual"],
-
-  ["PY18", "I03", "implementation-support"], ["PY27", "I03", "implementation-support"], ["PY49", "I03", "implementation-support"],
-  ["PY06", "T01", "implementation-support"], ["PY27", "T01", "implementation-support"], ["PY49", "T01", "implementation-support"],
-  ["PY18", "T02", "implementation-support"], ["PY27", "T02", "implementation-support"], ["PY49", "T02", "implementation-support"],
-  ["PY46", "T01", "implementation-support"], ["PY09", "T04", "implementation-support"], ["PY61", "T04", "implementation-support"], ["PY62", "T04", "implementation-support"],
-  ["PY51", "T05", "implementation-support"], ["PY97", "T05", "implementation-support"], ["PY18", "K02", "implementation-support"], ["PY19", "K02", "implementation-support"],
-  ["PY64", "K04", "implementation-support"], ["PY67", "K04", "implementation-support"], ["PY71", "K04", "implementation-support"], ["PY72", "K04", "implementation-support"],
-  ["PY64", "K05", "implementation-support"], ["PY67", "K05", "implementation-support"], ["PY71", "K05", "implementation-support"], ["PY72", "K05", "implementation-support"],
-  ["PY76", "RT02", "prerequisite"], ["PY56", "RT01", "implementation-support"], ["PY57", "RT01", "implementation-support"], ["PY58", "RT01", "implementation-support"],
-  ["PY78", "W03", "implementation-support"], ["PY79", "W03", "implementation-support"], ["PY78", "WF03", "implementation-support"], ["PY79", "WF03", "implementation-support"],
-  ["PY81", "MA05", "implementation-support"], ["PY82", "MA05", "implementation-support"],
-  ["PY37", "E02", "practice-support"], ["PY85", "E02", "practice-support"], ["PY86", "E02", "practice-support"],
-  ["PY89", "E04", "implementation-support"], ["PY90", "E04", "implementation-support"], ["PY91", "E04", "implementation-support"],
-  ["PY50", "S05", "implementation-support"], ["PY94", "S05", "implementation-support"], ["PY95", "S05", "implementation-support"], ["PY98", "S05", "implementation-support"],
-
-  ["PY46", "BR01", "prerequisite"], ["PY57", "BR01", "prerequisite"], ["PY58", "BR01", "prerequisite"],
-  ["T01", "BR01", "prerequisite"], ["T02", "BR01", "prerequisite"], ["BR01", "RT01", "implementation-support"]
-];
-
-export const knowledgeEdges: KnowledgeEdge[] = edgeSeeds.map(([source, target, relation, strength, description], index) => ({
-  id: `knowledge-edge-${String(index + 1).padStart(3, "0")}`,
-  source,
-  target,
-  relation,
-  directed: relation !== "conceptual" && relation !== "related",
-  strength: strength ?? (relation === "prerequisite" ? 1 : 0.82),
-  description
+export const knowledgeNodeRevisions: KnowledgeNodeRevision[] = knowledgeNodes.map((node) => ({
+  id: node.currentRevisionId,
+  nodeId: node.id,
+  version: 1,
+  title: node.title,
+  description: node.description,
+  type: node.type,
+  masteryCriteria: node.masteryCriteria,
+  createdBy: "global-admin-demo",
+  createdAt: node.createdAt ?? DEMO_TIME,
+  changeReason: "Knowledge Architecture v1 atomic ontology"
 }));
+
+type EdgeSeed =
+  | [string, string, "prerequisite", "hard" | "soft", string?]
+  | [string, string, "enables" | "related", number, string?];
+
+const edgeSeeds: EdgeSeed[] = [
+  ["H03", "H02", "related", 0.55], ["H02", "AG01", "related", 0.62], ["P02", "P01", "prerequisite", "soft"], ["P03", "P01", "prerequisite", "soft"], ["P01", "P05", "enables", 0.8],
+  ["AG01", "A01", "prerequisite", "soft"], ["A01", "A02", "prerequisite", "soft"], ["A02", "R01", "prerequisite", "soft"], ["R01", "R10", "enables", 0.9],
+  ["R03", "R04", "prerequisite", "hard"], ["R04", "R11", "prerequisite", "hard"], ["R11", "R06", "prerequisite", "hard"], ["R11", "R07", "enables", 0.78], ["R08", "R09", "prerequisite", "hard"], ["R07", "R09", "enables", 0.76],
+  ["W01", "W02", "enables", 0.8], ["P03", "W02", "enables", 0.65], ["C01", "C02", "prerequisite", "soft"], ["C02", "C04", "enables", 0.7], ["C03", "RT01", "enables", 0.88],
+  ["I02", "I01", "enables", 0.9], ["I02", "I05", "prerequisite", "hard"], ["I05", "I01", "enables", 0.9], ["I04", "C02", "enables", 0.8],
+  ["T11", "T12", "enables", 0.9], ["T11", "T03", "prerequisite", "soft"], ["T03", "T14", "enables", 0.8], ["T14", "T15", "prerequisite", "hard"], ["T15", "T06", "prerequisite", "hard"],
+  ["T07", "T08", "prerequisite", "hard"], ["T09", "T10", "enables", 0.75], ["W02", "T10", "enables", 0.85], ["T06", "RT01", "enables", 0.7],
+  ["K01", "K12", "prerequisite", "hard"], ["K12", "K13", "enables", 0.82], ["K13", "K14", "enables", 0.9], ["K14", "K15", "prerequisite", "soft"], ["K15", "K16", "enables", 0.8], ["K04", "K05", "related", 0.68],
+  ["RT01", "RT02", "related", 0.72], ["RT02", "RT03", "enables", 0.62], ["RT03", "RT14", "enables", 0.78], ["RT02", "RT15", "enables", 0.85], ["RT15", "RT06", "enables", 0.88],
+  ["W13", "W04", "enables", 0.9], ["W13", "WF03", "enables", 0.9], ["W04", "WF03", "enables", 0.9], ["WF03", "WF05", "related", 0.7], ["MA02", "MA12", "enables", 0.84],
+  ["MA03", "MA04", "related", 0.64], ["MA04", "MA15", "related", 0.7], ["MA03", "MA06", "related", 0.74], ["MA07", "MA12", "enables", 0.7],
+  ["E12", "E13", "enables", 0.88], ["E12", "E14", "enables", 0.82], ["E13", "E05", "enables", 0.86], ["E14", "E05", "enables", 0.74], ["E06", "E07", "enables", 0.9],
+  ["S01", "S02", "related", 0.62], ["S01", "S03", "related", 0.72], ["S14", "S15", "related", 0.66], ["S06", "S07", "prerequisite", "hard"], ["S14", "S08", "enables", 0.72], ["S15", "S08", "enables", 0.7], ["S07", "S08", "enables", 0.76],
+  ["PY01", "PY02", "prerequisite", "hard"], ["PY02", "PY03", "prerequisite", "soft"], ["PY03", "PY04", "prerequisite", "hard"], ["PY04", "PY05", "prerequisite", "hard"], ["PY05", "PY06", "prerequisite", "hard"],
+  ["PY06", "PY07", "prerequisite", "hard"], ["PY06", "PY08", "enables", 0.8], ["PY09", "PY46", "enables", 0.55], ["PY08", "PY34", "enables", 0.82], ["PY18", "PY45", "enables", 0.62], ["PY45", "PY46", "prerequisite", "hard"],
+  ["PY53", "PY55", "related", 0.8], ["PY54", "PY55", "related", 0.68], ["PY56", "PY57", "prerequisite", "hard"], ["PY57", "PY58", "prerequisite", "hard"], ["PY58", "PY61", "enables", 0.84], ["PY58", "PY63", "enables", 0.8], ["PY61", "PY62", "enables", 0.64],
+  ["PY64", "PY67", "enables", 0.85], ["PY71", "PY72", "enables", 0.72], ["PY76", "PY78", "enables", 0.68], ["PY78", "PY79", "enables", 0.8], ["PY79", "PY80", "prerequisite", "hard"],
+  ["PY81", "PY83", "enables", 0.86], ["PY82", "PY81", "enables", 0.8], ["PY37", "PY85", "enables", 0.8], ["PY85", "PY86", "prerequisite", "soft"], ["PY89", "PY90", "related", 0.66], ["PY90", "PY91", "related", 0.72],
+  ["PY49", "PY50", "enables", 0.9], ["PY94", "PY50", "enables", 0.88], ["PY50", "PY98", "enables", 0.72], ["PY95", "PY98", "enables", 0.8], ["PY51", "PY97", "related", 0.62],
+  ["PY18", "I01", "enables", 0.66, "JSON provides a concrete representation for structured model output."], ["PY27", "I02", "enables", 0.7], ["PY49", "I05", "enables", 0.88],
+  ["PY06", "T11", "enables", 0.7], ["PY27", "T11", "enables", 0.72], ["PY49", "T14", "enables", 0.82], ["PY46", "T15", "enables", 0.8], ["PY09", "T07", "enables", 0.76], ["PY62", "T08", "enables", 0.84],
+  ["PY19", "K01", "enables", 0.78], ["PY64", "K04", "enables", 0.62], ["PY67", "K05", "enables", 0.7], ["PY71", "K04", "enables", 0.75], ["PY72", "K05", "enables", 0.72],
+  ["PY76", "RT02", "enables", 0.9], ["PY78", "W04", "enables", 0.65], ["PY80", "W04", "enables", 0.82], ["PY81", "MA15", "enables", 0.68], ["PY83", "MA15", "enables", 0.7],
+  ["PY85", "E12", "enables", 0.78], ["PY86", "E05", "enables", 0.78], ["PY89", "E06", "enables", 0.86], ["PY90", "E06", "enables", 0.86], ["PY91", "E07", "enables", 0.82],
+  ["PY50", "S14", "enables", 0.9], ["PY67", "S15", "enables", 0.85], ["PY79", "S06", "enables", 0.88], ["PY80", "S07", "enables", 0.88], ["PY95", "S08", "enables", 0.9],
+  ["PY46", "BR01", "enables", 0.76], ["PY57", "BR01", "enables", 0.95, "async/await enables non-blocking tool execution."], ["PY58", "BR01", "enables", 0.9], ["PY61", "BR01", "enables", 0.8], ["PY63", "BR01", "enables", 0.8],
+  ["T11", "BR01", "prerequisite", "hard"], ["T15", "BR01", "prerequisite", "hard"], ["BR01", "RT01", "enables", 0.9, "Async tool execution enables a responsive agent runtime."]
+];
+
+export const knowledgeEdges: KnowledgeEdge[] = edgeSeeds.map(([source, target, relation, strength, reason], index) => relation === "prerequisite"
+  ? { id: `knowledge-edge-${String(index + 1).padStart(3, "0")}`, source, target, relation, strength: strength as "hard" | "soft", reason }
+  : { id: `knowledge-edge-${String(index + 1).padStart(3, "0")}`, source, target, relation, strength: strength as number, reason });
 
 function assertUnique(label: string, ids: string[]) {
   const seen = new Set<string>();
@@ -200,22 +305,25 @@ function validateGraph(graph: KnowledgeGraph) {
   assertUnique("domain", graph.domains.map((item) => item.id));
   assertUnique("cluster", graph.clusters.map((item) => item.id));
   assertUnique("node", graph.nodes.map((item) => item.id));
+  assertUnique("revision", graph.revisions.map((item) => item.id));
   assertUnique("edge", graph.edges.map((item) => item.id));
   const domainIds = new Set(graph.domains.map((item) => item.id));
   const clusterById = new Map(graph.clusters.map((item) => [item.id, item]));
   const nodeIds = new Set(graph.nodes.map((item) => item.id));
-  graph.clusters.forEach((cluster) => {
-    if (!domainIds.has(cluster.domainId)) throw new Error(`Unknown domain for cluster ${cluster.id}: ${cluster.domainId}`);
-  });
+  const revisionById = new Map(graph.revisions.map((item) => [item.id, item]));
   graph.nodes.forEach((node) => {
-    if (!domainIds.has(node.domainId)) throw new Error(`Unknown domain for node ${node.id}: ${node.domainId}`);
+    if (node.scope !== "global") throw new Error(`Global graph contains non-global node: ${node.id}`);
+    if (!node.masteryCriteria.length) throw new Error(`Knowledge node has no mastery criteria: ${node.id}`);
+    if (node.domainId && !domainIds.has(node.domainId)) throw new Error(`Unknown domain for node ${node.id}: ${node.domainId}`);
     if (node.clusterId) {
       const cluster = clusterById.get(node.clusterId);
       if (!cluster || cluster.domainId !== node.domainId) throw new Error(`Invalid cluster for node ${node.id}: ${node.clusterId}`);
     }
+    if (revisionById.get(node.currentRevisionId)?.nodeId !== node.id) throw new Error(`Invalid current revision for node ${node.id}`);
   });
   graph.edges.forEach((edge) => {
     if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) throw new Error(`Invalid edge endpoints: ${edge.source} -> ${edge.target}`);
+    if (edge.relation !== "prerequisite" && edge.strength !== undefined && (edge.strength < 0 || edge.strength > 1)) throw new Error(`Invalid relation strength: ${edge.id}`);
   });
 }
 
@@ -223,6 +331,7 @@ export const globalKnowledgeGraph: KnowledgeGraph = {
   domains: knowledgeDomains,
   clusters: knowledgeClusters,
   nodes: knowledgeNodes,
+  revisions: knowledgeNodeRevisions,
   edges: knowledgeEdges
 };
 

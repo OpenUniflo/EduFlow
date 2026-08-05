@@ -1,4 +1,4 @@
-import type { CourseKnowledgeReference, LearningProgress, Practice } from "../types";
+import type { CurriculumCoverage, CurriculumLesson, LearningProgress, Practice, PracticeCoverage } from "../types";
 import { detectWeightedCommunities, type GraphCommunity } from "../knowledge/community";
 import {
   calculateCrossDomainConnections,
@@ -20,18 +20,16 @@ import type {
 const COURSE_ID = "agentic-ai";
 
 const practiceFallbackKnowledge: Record<string, string> = {
-  "lesson-04-direct": "A05",
-  "lesson-04-react": "R02",
-  "lesson-04-plan": "R05",
-  "lesson-04-replan": "R05",
-  "lesson-04-evaluator": "R05"
+  "lesson-04-direct": "R01",
+  "lesson-04-react": "R10",
+  "lesson-04-plan": "R04",
+  "lesson-04-replan": "R06",
+  "lesson-04-evaluator": "R09"
 };
 
 const relationPriority: Record<KnowledgeRelation, number> = {
   prerequisite: 5,
-  "implementation-support": 4,
-  "practice-support": 3,
-  conceptual: 2,
+  enables: 3,
   related: 1
 };
 
@@ -138,10 +136,11 @@ function selectExploreNodes(
 
 function makePracticeEvidence(
   practices: Practice[],
+  practiceCoverage: PracticeCoverage[],
   nodes: PersonalKnowledgeNode[],
   progress: LearningProgress
 ): PersonalPracticeEvidence[] {
-  const nodeByPractice = new Map(nodes.filter((node) => node.practiceId).map((node) => [node.practiceId as string, node.id]));
+  const nodeByPractice = new Map(practiceCoverage.map((coverage) => [coverage.practiceId, coverage.nodeId]));
   return practices.flatMap((practice, index) => {
     const knowledgeId = nodeByPractice.get(practice.id) ?? practiceFallbackKnowledge[practice.id];
     const node = nodes.find((entry) => entry.id === knowledgeId);
@@ -163,21 +162,25 @@ export function buildPersonalKnowledgeGraph(
   graph: KnowledgeGraph,
   userKnowledge: UserKnowledgeRecord[],
   practices: Practice[],
-  curriculum: CourseKnowledgeReference[],
+  curriculum: CurriculumCoverage[],
+  lessons: CurriculumLesson[],
+  practiceCoverage: PracticeCoverage[],
   progress: LearningProgress
 ): PersonalKnowledgeGraph {
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
   const domainById = new Map(graph.domains.map((domain) => [domain.id, domain]));
   const clusterById = new Map(graph.clusters.map((cluster) => [cluster.id, cluster]));
   const recordById = new Map(userKnowledge.map((record) => [record.nodeId, record]));
-  const curriculumById = new Map(curriculum.map((reference) => [reference.nodeId, reference]));
+  const curriculumById = new Map(curriculum.map((coverage) => [coverage.nodeId, coverage]));
+  const lessonById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
+  const practiceByNode = new Map(practiceCoverage.map((coverage) => [coverage.nodeId, coverage.practiceId]));
   const coreIds = new Set(userKnowledge.map((record) => record.nodeId));
   userKnowledge.forEach((record) => {
     if (!nodeById.has(record.nodeId)) throw new Error(`Unknown user knowledge node: ${record.nodeId}`);
   });
 
   const effectiveEdges = graph.edges.filter((edge) => coreIds.has(edge.source) && coreIds.has(edge.target));
-  const communities = detectWeightedCommunities(coreIds, effectiveEdges, { resolution: 0.18, minSize: 5 });
+  const communities = detectWeightedCommunities(coreIds, effectiveEdges, { resolution: 0.32 });
   const potentialBridges = findPotentialBridges(graph, communities.map((community) => community.nodeIds), coreIds, { maxDepth: 6, limit: 3 });
   const potentialPathIds = new Set(potentialBridges.flatMap((bridge) => bridge.missingNodeIds));
   const potentialEdgeIds = new Set(potentialBridges.flatMap((bridge) => bridge.pathEdgeIds));
@@ -231,20 +234,22 @@ export function buildPersonalKnowledgeGraph(
     if (!source || !position) return [];
     const record = recordById.get(id);
     const course = curriculumById.get(id);
+    const lesson = course ? lessonById.get(course.lessonId) : undefined;
     const incident = visibleGraphEdges.filter((edge) => edge.source === id || edge.target === id);
     const completedEvidence = practices.filter((practice) => {
-      const knowledgeId = practiceFallbackKnowledge[practice.id] ?? curriculum.find((item) => item.practiceId === practice.id)?.nodeId;
+      const knowledgeId = practiceCoverage.find((item) => item.practiceId === practice.id)?.nodeId ?? practiceFallbackKnowledge[practice.id];
       return knowledgeId === id && progress.completedPracticeIds.includes(practice.id);
     });
     return [{
       id,
       title: source.title,
       description: source.description,
-      domainId: source.domainId,
-      domainTitle: domainById.get(source.domainId)?.title ?? source.domainId,
-      domainColor: domainById.get(source.domainId)?.color ?? "#78a7ee",
+      scope: source.scope,
+      domainId: source.domainId ?? "personal",
+      domainTitle: domainById.get(source.domainId ?? "")?.title ?? (source.scope === "user" ? "个人知识" : source.domainId ?? "Knowledge"),
+      domainColor: domainById.get(source.domainId ?? "")?.color ?? (source.scope === "user" ? "#f2a65a" : "#78a7ee"),
       clusterId: source.clusterId,
-      clusterTitle: clusterById.get(source.clusterId ?? "")?.title ?? domainById.get(source.domainId)?.title ?? source.domainId,
+      clusterTitle: clusterById.get(source.clusterId ?? "")?.title ?? domainById.get(source.domainId ?? "")?.title ?? (source.scope === "user" ? "个人知识" : source.domainId ?? "Knowledge"),
       islandId: potentialPathIds.has(id) ? null : personalLayout.communityByNode.get(id) ?? null,
       status: record?.status ?? "explore",
       progress: record?.mastery ?? 0,
@@ -253,12 +258,12 @@ export function buildPersonalKnowledgeGraph(
       isCore: Boolean(record),
       isPotentialBridge: potentialPathIds.has(id),
       courseId: course ? COURSE_ID : undefined,
-      lesson: course?.lesson,
-      materialId: course?.materialIds[0],
-      practiceId: course?.practiceId,
-      practiceTitle: course?.practiceTitle,
-      prerequisiteIds: incident.filter((edge) => edge.target === id).map((edge) => edge.source),
-      nextIds: incident.filter((edge) => edge.source === id).map((edge) => edge.target),
+      lesson: lesson?.order,
+      materialId: lesson?.id === "L04" ? "lesson-04" : undefined,
+      practiceId: practiceByNode.get(id),
+      practiceTitle: practices.find((practice) => practice.id === practiceByNode.get(id))?.title,
+      prerequisiteIds: incident.filter((edge) => edge.relation === "prerequisite" && edge.target === id).map((edge) => edge.source),
+      nextIds: incident.filter((edge) => edge.relation === "prerequisite" && edge.source === id).map((edge) => edge.target),
       evidence: [
         ...(record?.evidence?.map((evidence) => evidence.label) ?? []),
         ...completedEvidence.map((practice) => `已完成实训 · ${practice.title}`)
@@ -282,7 +287,7 @@ export function buildPersonalKnowledgeGraph(
       kind: isPotential ? "potential" : isCrossIsland ? "cross" : "dependency"
     };
   });
-  const practiceEvidence = makePracticeEvidence(practices, nodes, progress);
+  const practiceEvidence = makePracticeEvidence(practices, practiceCoverage, nodes, progress);
   const largestIsland = [...islands].sort((left, right) => right.size - left.size || left.id.localeCompare(right.id))[0];
   const currentLearningId = [...userKnowledge]
     .filter((record) => record.status === "learning")
@@ -310,6 +315,7 @@ export function buildPersonalKnowledgeGraph(
       largestIslandName: largestIsland?.title ?? "—",
       largestIslandSize: largestIsland?.size ?? 0,
       crossDomainConnections: calculateCrossDomainConnections(graph, coreIds, effectiveEdges),
+      crossIslandConnections: personalEdges.filter((edge) => edge.effective && edge.isCrossIsland).length,
       connectivity: calculateKnowledgeConnectivity(coreIds, effectiveEdges),
       dependencyConnections: effectiveEdges.length,
       practiceConnections: practiceEvidence.filter((practice) => practice.completed).length,

@@ -1,47 +1,17 @@
 # EduFlow Repository Instructions
 
-## Knowledge Graph Architecture
+## Knowledge Architecture invariants
 
-### Single Global Knowledge Graph
-
-- EduFlow MUST maintain exactly one system-level Global Knowledge Graph. Python Engineering, Agentic AI, Machine Learning, and other domains MUST be registered in that same graph.
-- All factual knowledge relationships MUST use the shared `KnowledgeEdge` schema. Pages MUST NOT assemble domain-specific or cross-domain graphs with special-case logic.
-
-### KnowledgeNode Is the Atomic Unit
-
-- A real `KnowledgeNode` is the only atomic node that Global and Personal Knowledge Atlas views may render.
-- Domain, Cluster, Course, Chapter, Community, and Island are metadata or view concepts. They MUST NOT be fabricated as peer knowledge nodes for layout or visual completeness.
-- Fake nodes or edges MUST NOT be created to fill space, form islands, create bridges, or improve composition.
-
-### Metadata Does Not Dictate Layout
-
-- `domainId` and `clusterId` describe knowledge. They MAY support search, filters, labels, community naming, recommendations, and weak algorithmic priors.
-- Domain or cluster metadata MUST NOT directly determine node coordinates, Knowledge Island membership, or graph community membership.
-- Atlas spatial structure MUST be driven primarily by `KnowledgeEdge`, `relation`, and `strength`. Strongly related nodes should naturally remain closer than weakly related nodes.
-
-### Global Atlas Rendering
-
-- The homepage Global Knowledge Atlas MUST render real KnowledgeNodes and KnowledgeEdges without explicit Domain center nodes, Cluster rectangles, chapter containers, or manually drawn islands.
-- Global layout MUST be deterministic for the same graph data. Force initialization, simulation order, and any depth assignment MUST be stable rather than refreshed with unseeded randomness.
-- Force simulation MUST run when graph data changes and stabilize before rendering. Camera rotation and projection MUST remain separate from force simulation.
-
-### Personal Atlas Is a Derived Subgraph
-
-- The Personal Knowledge Atlas MUST be derived from `Global Knowledge Graph + User Knowledge State`; it is never a separately maintained knowledge ontology.
-- `mastered`, `learning`, `mastery`, progress, and evidence belong only to user state and MUST NOT be written into `KnowledgeNode`.
-- `explore` MUST NOT be persisted as user state. It MUST be derived from relevant neighbors of the user's core mastered/learning nodes.
-- Global and Personal Atlas views MUST share graph-driven layout principles, KnowledgeNode/edge visual grammar, selection, and hover behavior. The Personal view may additionally encode user state, evidence, communities, and connection analysis.
-
-### Knowledge Islands Are Community Views
-
-- A Personal Knowledge Island MUST be produced from graph community structure: relatively dense internal connections and relatively sparse external connections.
-- Community membership MUST NOT be implemented as `groupBy(domainId)`, `groupBy(clusterId)`, or course chapter grouping.
-- A Connected Component only answers whether nodes are reachable. It MUST NOT automatically be treated as one Knowledge Island; one connected component may contain several communities connected by sparse bridge edges.
-- An Island is a region, not a node. It MUST be rendered as a hull, contour, halo, or background around real KnowledgeNodes. Do not create an Island center circle or other nonexistent graph node.
-- Cross-community edges MAY remain visible as thin bridges and MUST NOT force their communities to merge solely because the graph becomes connected.
-- Potential Bridge nodes are analysis results. They MUST remain outside the user's core graph until learned and SHOULD appear only in Connection Analysis near the communities and path endpoints they could connect.
-
-### Course Skill Tree Is a Different View
-
-- Global Knowledge Atlas and Personal Knowledge Atlas are graph exploration views. A Course Skill Tree is a curriculum view and MAY use chapters, stages, prerequisites, and deterministic DAG layout.
-- Course chapter or skill-tree layout conventions MUST NOT be applied to Global or Personal Knowledge Atlas pages.
+- EduFlow MUST use one shared knowledge model across Global, Tenant, User, Personal, and Course views. A `KnowledgeNode` is the smallest independently teachable, assessable, reusable knowledge or capability unit; it is not the smallest vocabulary fragment.
+- Course, Chapter, Lesson, Stage, Learning Outcome, Project, Domain, Cluster, Community, and Island MUST NOT be represented as `KnowledgeNode`.
+- Persistent nodes MUST use exactly one scope: `global`, `tenant`, or `user`. A course is provenance and a curriculum container, never a persistent node owner. Deleting a course MUST NOT delete knowledge discovered from it or its mastery/evidence.
+- Node identity is stable. Content changes MUST create `KnowledgeNodeRevision`; referenced nodes are deprecated or superseded, never physically deleted.
+- Factual knowledge-to-knowledge relations MUST use `KnowledgeRelation` and only `prerequisite`, `enables`, or `related`. Prerequisite direction and hard/soft strength MUST be preserved.
+- Mapping, promotion, curriculum coverage, practice coverage, and curriculum sequence MUST use their own models. `Mapping != Merge`, `Mapping != Promotion`, and mapping MUST NOT copy mastery.
+- Course ingestion MUST first produce a course-faithful User Knowledge Graph. It MUST NOT automatically retrieve, replace, merge, or map Global/Tenant nodes. Similarity analysis is an explicit user-triggered action.
+- Global Atlas MUST render only real Global KnowledgeNodes. Personal Atlas MAY render visible Global, Tenant, and User nodes plus user state and derived explore nodes. Course Skill Tree MAY reference all three scopes.
+- Personal mastery and evidence bind stable node IDs; evidence MAY bind the revision observed. They MUST NOT be stored on `KnowledgeNode`.
+- Community is a graph-analysis result and Knowledge Island is its region/hull visualization. `Community != Chapter`, `Domain != Community`, `Cluster != Community`, and connected components MUST NOT be treated automatically as communities.
+- Domain, cluster, chapter, and community metadata MUST NOT dictate atlas coordinates. Layout and community structure MUST be driven primarily by real `KnowledgeRelation` structure and strength.
+- Fake nodes or edges MUST NOT be created for composition, layout, bridges, islands, or Demo appearance. Structural algorithms MAY view relations as undirected; learning-path algorithms MUST respect prerequisite direction.
+- Course Skill Tree MUST be derived from the atomic knowledge graph plus curriculum coverage/sequence. It MUST NOT maintain a second hand-authored knowledge graph or duplicate prerequisite facts.
