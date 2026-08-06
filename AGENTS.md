@@ -43,4 +43,9 @@
 - Atlas layouts MUST be deterministic for identical graph data and driven by real relation structure.
 - Global and Personal views use force layout without metadata centers. Course Full and Chapter Overview use deterministic layered DAG layout.
 - Course nodes MUST NOT overlap, share coordinates, or use modulo-based placement. Edges MUST route outside node interiors with readable source/target ports.
+- Course graph production rendering uses React Flow + ELK hierarchical layout.
+- Chapter and Atomic views MUST share one hierarchical course topology and MUST NOT use unrelated independent layout systems.
+- Global and Personal Atlas MUST use the same `KnowledgeAtlasScene` renderer.
+- Renderer-specific graph objects are projections only and MUST NOT become domain data.
+- Custom layout/routing code MUST NOT duplicate functionality owned by ELK or the Force Graph engine.
 - Changes MUST pass TypeScript compilation and production build. Relevant pages MUST be checked for runtime errors.

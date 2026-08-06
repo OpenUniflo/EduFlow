@@ -1,7 +1,6 @@
 import type { CurriculumCoverage, CurriculumLesson, LearningProgress, Practice, PracticeCoverage } from "../types";
 import { calculateCrossDomainConnections, calculateKnowledgeConnectivity } from "../knowledge/graphAlgorithms";
 import type { KnowledgeGraph } from "../knowledge/types";
-import { buildPersonalForceLayout } from "./personalLayout";
 import type { CurriculumContext, PersonalKnowledgeGraph, PersonalKnowledgeNode, PracticeContext, UserKnowledgeRecord } from "./types";
 
 const MATERIAL_BY_LESSON: Record<string, string[]> = { L04: ["lesson-04"] };
@@ -48,14 +47,14 @@ export function buildPersonalKnowledgeGraph(
     .map((record) => record.nodeId));
   const exploreIds = getDirectExploreNodeIds(graph, coreIds);
   const visibleIds = new Set([...coreIds, ...exploreIds]);
-  const visibleEdges = graph.edges.filter((edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target));
-  const positions = buildPersonalForceLayout(visibleIds, visibleEdges);
+  // Explore-to-Explore facts remain in the domain graph but are intentionally
+  // omitted from the default Personal Atlas projection to reduce visual noise.
+  const visibleEdges = graph.edges.filter((edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target) && (coreIds.has(edge.source) || coreIds.has(edge.target)));
   const effectiveEdges = visibleEdges.filter((edge) => coreIds.has(edge.source) && coreIds.has(edge.target));
 
   const nodes: PersonalKnowledgeNode[] = Array.from(visibleIds).sort().flatMap((id) => {
     const source = nodeById.get(id);
-    const position = positions[id];
-    if (!source || source.status !== "active" || !position) return [];
+    if (!source || source.status !== "active") return [];
     const record = recordById.get(id);
     const curriculumContexts: CurriculumContext[] = (curriculumByNode.get(id) ?? []).flatMap((coverage) => {
       const lesson = lessonById.get(coverage.lessonId);
@@ -92,8 +91,6 @@ export function buildPersonalKnowledgeGraph(
       domainColor: domainById.get(source.domainId ?? "")?.color ?? (source.scope === "user" ? "#f2a65a" : "#78a7ee"),
       status: record?.status ?? "explore",
       progress: record?.mastery ?? 0,
-      x: position.x,
-      y: position.y,
       isCore: coreIds.has(id),
       curriculumContexts,
       practiceContexts,

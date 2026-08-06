@@ -93,12 +93,11 @@ export type CourseSkillTreeNode = {
   practiceIds: string[];
   practiceTitle: string;
   status: LearningStatus;
-  x: number;
-  y: number;
   color: string;
 };
 
-export type CourseChapterProjection = CurriculumChapter & { x: number; y: number };
+/** Presentation chapter identity. Renderer geometry is added only by the course graph adapter. */
+export type CourseChapterProjection = CurriculumChapter;
 export type CourseSkillTreeEdge = KnowledgeEdge;
 export type CourseChapterEdge = {
   id: string;

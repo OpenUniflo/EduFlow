@@ -111,6 +111,7 @@ function stronglyConnectedComponents(nodeIds: string[], edges: DirectedEdge[]) {
   return components;
 }
 
+/** @deprecated Production course rendering is owned by ELK. Retained for tests and migration comparison only. */
 export function buildLayeredDagLayout(
   nodeIds: Iterable<string>,
   edges: DirectedEdge[],

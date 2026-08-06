@@ -1,5 +1,5 @@
 import { globalKnowledgeGraph } from "./knowledge/graph";
-import { assertDirectedAcyclic, buildLayeredDagLayout, transitiveReduction } from "./knowledge/graphAlgorithms";
+import { assertDirectedAcyclic, transitiveReduction } from "./knowledge/graphAlgorithms";
 import type {
   AcceptanceSpec,
   CourseChapterEdge,
@@ -139,14 +139,6 @@ function primaryCoverageFor(nodeId: string) {
 const primaryCoverageByNode = new Map(Array.from(courseNodeIds, (nodeId) => [nodeId, primaryCoverageFor(nodeId)]));
 const primaryChapterByNode = new Map(Array.from(primaryCoverageByNode, ([nodeId, coverage]) => [nodeId, lessonById.get(coverage.lessonId)?.chapterId]));
 const mainCourseEdges = courseSkillTreeEdges.filter((edge) => edge.relation !== "related");
-const fullLayout = buildLayeredDagLayout(courseNodeIds, mainCourseEdges, (id) => coverageOrder(primaryCoverageByNode.get(id)), {
-  layerGap: 272,
-  rowGap: 134,
-  marginX: 48,
-  marginY: 54,
-  sweeps: 6
-});
-
 export const courseSkillTreeNodes: CourseSkillTreeNode[] = Array.from(courseNodeIds).sort().map((nodeId) => {
   const knowledge = nodeById.get(nodeId);
   const primaryCoverage = primaryCoverageByNode.get(nodeId);
@@ -181,19 +173,10 @@ export const courseSkillTreeNodes: CourseSkillTreeNode[] = Array.from(courseNode
     practiceIds,
     practiceTitle: practiceContexts[0]?.title ?? `${knowledge.title} 学习活动`,
     status,
-    x: fullLayout[nodeId].x,
-    y: fullLayout[nodeId].y,
     color: chapter.color
   };
 });
 
-const NODE_WIDTH = 196;
-const NODE_HEIGHT = 104;
-courseSkillTreeNodes.forEach((node, index) => courseSkillTreeNodes.slice(index + 1).forEach((other) => {
-  if (node.x === other.x && node.y === other.y) throw new Error(`Course nodes share coordinates: ${node.id}, ${other.id}`);
-  const overlaps = node.x < other.x + NODE_WIDTH && node.x + NODE_WIDTH > other.x && node.y < other.y + NODE_HEIGHT && node.y + NODE_HEIGHT > other.y;
-  if (overlaps) throw new Error(`Course nodes overlap: ${node.id}, ${other.id}`);
-}));
 if (courseSkillTreeNodes.reduce((sum, node) => sum + node.curriculumContexts.length, 0) !== curriculumCoverages.filter((coverage) => courseNodeIds.has(coverage.nodeId)).length) {
   throw new Error("Course curriculum N:M projection lost coverage records");
 }
@@ -244,14 +227,7 @@ curriculumChapters.filter((chapter) => chapter.order > 1 && !incidentChapterIds.
 const aggregatedChapterEdges = Array.from(chapterEdgeByPair.values()).sort((left, right) => left.source.localeCompare(right.source) || left.target.localeCompare(right.target));
 assertDirectedAcyclic(curriculumChapters.map((chapter) => chapter.id), aggregatedChapterEdges);
 export const courseChapterEdges: CourseChapterEdge[] = transitiveReduction(curriculumChapters.map((chapter) => chapter.id), aggregatedChapterEdges);
-const chapterLayout = buildLayeredDagLayout(curriculumChapters.map((chapter) => chapter.id), courseChapterEdges, (id) => chapterById.get(id)?.order ?? 0, {
-  layerGap: 300,
-  rowGap: 178,
-  marginX: 80,
-  marginY: 100,
-  sweeps: 6
-});
-export const courseChapters: CourseChapterProjection[] = curriculumChapters.map((chapter) => ({ ...chapter, ...chapterLayout[chapter.id] }));
+export const courseChapters: CourseChapterProjection[] = curriculumChapters.map((chapter) => ({ ...chapter }));
 
 /** Deleting a course removes only curriculum associations; knowledge is intentionally not accepted as input. */
 export function deleteCourseCurriculum(courseId: string) {

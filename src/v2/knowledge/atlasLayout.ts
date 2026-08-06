@@ -1,6 +1,7 @@
 import { runDeterministicForceLayout } from "./graphLayout";
 import type { KnowledgeGraph } from "./types";
 
+/** @deprecated Production Atlas coordinates are owned by react-force-graph-3d. */
 export function buildAtlasKnowledgeLayout(graph: KnowledgeGraph) {
   return runDeterministicForceLayout(
     graph.nodes.map((node) => node.id),

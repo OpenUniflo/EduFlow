@@ -74,7 +74,8 @@ import {
   Topbar
 } from "./components/app";
 import { AtlasHome } from "./v2/pages/AtlasHome";
-import { CourseCenterPage, CourseGraphPage } from "./v2/pages/CoursePages";
+import { CourseCenterPage } from "./v2/pages/CoursePages";
+import { CourseGraphPage } from "./v2/pages/CourseGraphPage";
 import { LessonPage } from "./v2/pages/LessonPage";
 import { WorkflowLibraryPage } from "./v2/pages/WorkflowLibraryPage";
 import { ProfileKnowledgePage } from "./v2/pages/ProfileKnowledgePage";

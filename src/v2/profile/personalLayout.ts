@@ -5,6 +5,7 @@ export const PERSONAL_WORLD_WIDTH = 1420;
 export const PERSONAL_WORLD_HEIGHT = 880;
 
 /** Personal Atlas is a single relation-driven force graph with no metadata anchors. */
+/** @deprecated Production Atlas coordinates are owned by react-force-graph-3d. */
 export function buildPersonalForceLayout(nodeIds: Iterable<string>, edges: KnowledgeEdge[]): KnowledgeGraphLayout {
   const centered = runDeterministicForceLayout(nodeIds, edges, {
     dimensions: 2,

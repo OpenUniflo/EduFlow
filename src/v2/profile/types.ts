@@ -47,8 +47,6 @@ export type PersonalKnowledgeNode = {
   domainColor?: string;
   status: PersonalKnowledgeStatus;
   progress: number;
-  x: number;
-  y: number;
   isCore: boolean;
   curriculumContexts: CurriculumContext[];
   practiceContexts: PracticeContext[];
