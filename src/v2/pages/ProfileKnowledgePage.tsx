@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, CircleDot, Crosshair, History, Layers3, Maximize2, Minus, Network, Plus, RotateCcw, Send, Sparkles, Workflow, X } from "lucide-react";
+import { ArrowRight, BookOpen, CircleDot, Crosshair, Maximize2, Minus, Network, Plus, RotateCcw, Send, Sparkles, Workflow, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
@@ -9,9 +9,8 @@ import { buildPersonalAtlasProjection } from "../knowledge/projections/atlasProj
 import { useLearningProgress } from "../progress";
 import { demoPersonalKnowledgeGraph, demoUserKnowledge } from "../profile/demoUserKnowledge";
 import { buildPersonalKnowledgeGraph } from "../profile/profileGraph";
-import type { PersonalKnowledgeNode, PersonalKnowledgeViewMode } from "../profile/types";
+import type { PersonalKnowledgeNode } from "../profile/types";
 
-const modeLabels: Record<PersonalKnowledgeViewMode, string> = { knowledge: "我的知识", history: "学习轨迹", practice: "实训成果" };
 const statusLabels = { mastered: "已掌握", learning: "学习中", explore: "可探索" } as const;
 const relationLabels = { prerequisite: "前置依赖", enables: "能力支持", related: "知识相关" } as const;
 
@@ -28,12 +27,11 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   const sceneRef = useRef<KnowledgeAtlasSceneHandle>(null);
   const toastTimerRef = useRef<number | null>(null);
   const graph = useMemo(() => buildPersonalKnowledgeGraph(demoPersonalKnowledgeGraph, demoUserKnowledge, practices, curriculumCoverages, curriculumLessons, practiceCoverages, progress), [progress]);
-  const [mode, setMode] = useState<PersonalKnowledgeViewMode>("knowledge");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchMatchId, setSearchMatchId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
-  const atlas = useMemo(() => buildPersonalAtlasProjection(graph, searchMatchId), [graph, searchMatchId]);
+  const atlas = useMemo(() => buildPersonalAtlasProjection(graph), [graph]);
   const selected = selectedId ? graph.nodes.find((node) => node.id === selectedId) ?? null : null;
   const drawerOpen = Boolean(selected);
   const nodeById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph.nodes]);
@@ -41,12 +39,11 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   useEffect(() => {
     function escape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
-      if (selectedId) setSelectedId(null);
-      else if (mode !== "knowledge") setMode("knowledge");
+      if (selectedId) { setSelectedId(null); setSearchMatchId(null); }
     }
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
-  }, [mode, selectedId]);
+  }, [selectedId]);
   useEffect(() => () => { if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current); }, []);
 
   function showToast(message: string) {
@@ -55,16 +52,8 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
     toastTimerRef.current = window.setTimeout(() => setToast(""), 2400);
   }
 
-  function selectMode(nextMode: PersonalKnowledgeViewMode) {
-    setMode(nextMode);
-    setSelectedId(null);
-    if (nextMode === "history") showToast("学习轨迹来自个人知识状态与课程证据");
-    if (nextMode === "practice") showToast("实训成果继续使用 PracticeCoverage N:M 证据");
-  }
-
   function locateNode(node: PersonalKnowledgeNode, openDetail = true) {
     setSearchMatchId(node.id);
-    sceneRef.current?.focus(node.id);
     if (openDetail) setSelectedId(node.id);
   }
 
@@ -108,7 +97,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   const incidentEdges = selected ? graph.edges.filter((edge) => edge.source === selected.id || edge.target === selected.id) : [];
 
   return (
-    <main className={`personal-atlas-page personal-mode-${mode} ${drawerOpen ? "has-drawer" : ""}`}>
+    <main className={`personal-atlas-page ${drawerOpen ? "has-drawer" : ""}`}>
       <GlobalNav active="profile" session={session} onLogout={onLogout} />
       <header className="personal-page-title"><h1>我的知识空间</h1><p>Personal Knowledge Atlas</p></header>
       <aside className="personal-summary glass-v2">
@@ -125,28 +114,27 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
       </aside>
 
       <div className="personal-canvas">
-        <KnowledgeAtlasScene ref={sceneRef} variant="personal" nodes={atlas.nodes} edges={atlas.edges} selectedId={selectedId} autoRotate={false} onNodeClick={(node) => setSelectedId(node.id)} onBackgroundClick={() => setSelectedId(null)} />
+        <KnowledgeAtlasScene ref={sceneRef} variant="personal" nodes={atlas.nodes} edges={atlas.edges} selectedId={selectedId} searchMatchId={searchMatchId} currentLearningId={graph.summary.currentLearningId} autoRotate={false} onNodeClick={(node) => setSelectedId(node.id)} onBackgroundClick={() => { setSelectedId(null); setSearchMatchId(null); }} />
       </div>
 
       <aside className={`personal-drawer glass-v2 ${drawerOpen ? "open" : ""}`}>
         {selected ? <>
-          <div className="personal-drawer-head"><span><small>{selected.domainTitle ?? "个人知识"} · {selected.scope}</small><h2>{selected.title}</h2><p>{selected.description}</p><i className={`status-${selected.status}`}>{statusLabels[selected.status]}{selected.status === "learning" ? ` · ${selected.progress}%` : ""}</i></span><button onClick={() => setSelectedId(null)} aria-label="关闭节点详情"><X size={17} /></button></div>
+          <div className="personal-drawer-head"><span><small>{selected.domainTitle ?? "个人知识"} · {selected.scope}</small><h2>{selected.title}</h2><p>{selected.description}</p><i className={`status-${selected.status}`}>{statusLabels[selected.status]}{selected.status === "learning" ? ` · ${selected.progress}%` : ""}</i></span><button onClick={() => { setSelectedId(null); setSearchMatchId(null); }} aria-label="关闭节点详情"><X size={17} /></button></div>
           <section><h3>当前掌握</h3><div className="personal-progress-card"><span><small>个人知识状态</small><strong>{selected.progress ? `${selected.progress}%` : statusLabels[selected.status]}</strong></span><i><b style={{ width: `${selected.progress || 8}%` }} /></i></div></section>
           <section><h3>课程上下文</h3>{selected.curriculumContexts.length ? <div className="personal-drawer-list">{selected.curriculumContexts.map((context) => <span key={context.coverageId}><small>第 {context.lessonOrder} 课 · {context.role}</small><strong>{context.lessonId}</strong></span>)}</div> : <div className="personal-empty-analysis"><CircleDot size={18} /><strong>暂无课程引用</strong><p>知识节点可独立于课程存在。</p></div>}</section>
           <section><h3>学习与实践证据</h3>{selected.evidence.length ? <div className="personal-drawer-list">{selected.evidence.map((item, index) => <span key={`${item}-${index}`}><small>证据 {String(index + 1).padStart(2, "0")}</small><strong>{item}</strong></span>)}</div> : <div className="personal-empty-analysis"><CircleDot size={18} /><strong>尚无学习证据</strong><p>节点出现在图中不会自动视为已掌握。</p></div>}</section>
           <section><h3>直接知识关系</h3><div className="personal-relation-tags">{incidentEdges.map((edge) => { const other = nodeById.get(edge.source === selected.id ? edge.target : edge.source); return other ? <button key={edge.id} onClick={() => locateNode(other)}><small>{relationLabels[edge.relation]}</small>{other.title}<ArrowRight size={12} /></button> : null; })}</div></section>
           {selected.status === "explore" ? <div className="personal-explore-note"><CircleDot size={18} /><span><strong>一跳可探索知识</strong><p>它与至少一个核心节点直接相关，但尚未进入你的掌握或学习状态。</p></span></div> : null}
-          <div className="personal-drawer-actions"><button className="primary" onClick={() => openCourse(selected)}>查看课程上下文<BookOpen size={14} /></button><button onClick={() => openPractice(selected)}>进入实训<Workflow size={14} /></button><button onClick={() => selectMode("history")}>查看学习轨迹</button></div>
+          <div className="personal-drawer-actions"><button className="primary" onClick={() => openCourse(selected)}>查看课程上下文<BookOpen size={14} /></button><button onClick={() => openPractice(selected)}>进入实训<Workflow size={14} /></button></div>
         </> : null}
       </aside>
 
       <div className={`personal-toolbar glass-v2 ${drawerOpen ? "drawer-open" : ""}`} data-personal-interactive>
         <button onClick={() => sceneRef.current?.zoomBy(1.14)} data-tip="放大" aria-label="放大"><Plus size={17} /></button><button onClick={() => sceneRef.current?.zoomBy(0.88)} data-tip="缩小" aria-label="缩小"><Minus size={17} /></button><button onClick={() => { sceneRef.current?.fit(); showToast("已适配个人知识图"); }} data-tip="适配知识图" aria-label="适配知识图"><Maximize2 size={17} /></button><button onClick={currentLearning} data-tip="定位当前学习" aria-label="定位当前学习"><Crosshair size={17} /></button><span />
-        <button className={mode === "knowledge" ? "active" : ""} onClick={() => selectMode("knowledge")} data-tip="我的知识" aria-label="我的知识"><Network size={17} /></button><button className={mode === "history" ? "active" : ""} onClick={() => selectMode("history")} data-tip="学习轨迹" aria-label="学习轨迹"><History size={17} /></button><button className={mode === "practice" ? "active" : ""} onClick={() => selectMode("practice")} data-tip="实训成果" aria-label="实训成果"><Workflow size={17} /></button><span /><button onClick={() => { sceneRef.current?.reset(); setSearchMatchId(null); selectMode("knowledge"); }} data-tip="重置视图" aria-label="重置视图"><RotateCcw size={17} /></button>
+        <button onClick={() => { sceneRef.current?.reset(); setSelectedId(null); setSearchMatchId(null); }} data-tip="重置视图" aria-label="重置视图"><RotateCcw size={17} /></button>
       </div>
       <div className="personal-legend glass-v2"><span><i className="dot mastered" />已掌握</span><span><i className="dot learning" />学习中</span><span><i className="dot explore" />可探索</span><span><i className="diamond" />实训验证</span></div>
       <form className="personal-ai" onSubmit={(event) => { event.preventDefault(); askKnowledgeSpace(query); }} data-personal-interactive><div className="personal-ai-box glass-v2"><span><Sparkles size={15} /></span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索知识，或基于我的知识空间提问……" aria-label="搜索或向个人知识空间提问" /><button type="submit" aria-label="发送"><Send size={16} /></button></div><div className="personal-ai-suggestions"><button type="button" onClick={() => askKnowledgeSpace("我下一步应该学什么？")}>我下一步应该学什么？</button><button type="button" onClick={() => askKnowledgeSpace("显示直接关联的可探索知识")}>直接关联哪些知识？</button><button type="button" onClick={() => askKnowledgeSpace("我的知识结构如何？")}>我的知识结构如何？</button></div></form>
-      <div className={`personal-mode-note glass-v2 ${mode !== "knowledge" ? "show" : ""}`}><Layers3 size={13} /><span>{modeLabels[mode]}{mode === "history" ? " · 基于知识状态与证据" : ""}</span></div>
       <div className={`personal-toast ${toast ? "show" : ""}`}>{toast}</div>
     </main>
   );

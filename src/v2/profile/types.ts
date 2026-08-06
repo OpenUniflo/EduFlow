@@ -3,8 +3,6 @@ import type { KnowledgeEdge, KnowledgeEvidence, KnowledgeScope, MasteryOrigin } 
 
 export type UserKnowledgeStatus = "mastered" | "learning";
 export type PersonalKnowledgeStatus = UserKnowledgeStatus | "explore";
-export type PersonalKnowledgeViewMode = "knowledge" | "history" | "practice";
-
 export type UserKnowledgeEvidence = KnowledgeEvidence;
 
 export type UserKnowledgeRecord = {

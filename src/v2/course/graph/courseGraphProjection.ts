@@ -32,7 +32,7 @@ export type CourseGraphProjection = {
   edges: CourseProjectionEdge[];
 };
 
-export function buildCourseGraphProjection(view: CourseGraphView, focusedChapterId: string | null, selectedKnowledgeId: string | null): CourseGraphProjection {
+export function buildCourseGraphProjection(view: CourseGraphView, focusedChapterId: string | null): CourseGraphProjection {
   const expandedIds = new Set(view === "full" ? courseChapters.map((chapter) => chapter.id) : view === "focused" && focusedChapterId ? [focusedChapterId] : []);
   const nodes: CourseProjectionNode[] = courseChapters.map((chapter) => ({
     id: `chapter:${chapter.id}`,
@@ -82,10 +82,7 @@ export function buildCourseGraphProjection(view: CourseGraphView, focusedChapter
 
   if (view === "full") {
     courseSkillTreeEdges
-      .filter((edge) => {
-        if (edge.relation === "related" && edge.source !== selectedKnowledgeId && edge.target !== selectedKnowledgeId) return false;
-        return true;
-      })
+      .filter((edge) => edge.relation !== "related")
       .forEach((edge) => edges.push({
         id: edge.id,
         source: `knowledge:${edge.source}`,

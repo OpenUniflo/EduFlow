@@ -15,8 +15,6 @@ export type AtlasSceneNode = {
   isCore: boolean;
   progress: number;
   featured?: boolean;
-  currentLearning?: boolean;
-  searchMatch?: boolean;
   knowledge?: KnowledgeNode;
   source?: PersonalKnowledgeNode;
   courseId?: string;
@@ -61,7 +59,7 @@ export function buildGlobalAtlasProjection(): AtlasSceneProjection {
   };
 }
 
-export function buildPersonalAtlasProjection(graph: PersonalKnowledgeGraph, searchMatchId?: string | null): AtlasSceneProjection {
+export function buildPersonalAtlasProjection(graph: PersonalKnowledgeGraph): AtlasSceneProjection {
   return {
     nodes: graph.nodes.map((node) => ({
       id: node.id,
@@ -72,8 +70,6 @@ export function buildPersonalAtlasProjection(graph: PersonalKnowledgeGraph, sear
       status: node.status,
       isCore: node.isCore,
       progress: node.progress,
-      currentLearning: node.id === graph.summary.currentLearningId,
-      searchMatch: node.id === searchMatchId,
       source: node
     })),
     edges: graph.edges.map((edge) => ({ ...edge }))

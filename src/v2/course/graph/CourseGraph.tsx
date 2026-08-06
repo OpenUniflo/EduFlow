@@ -1,4 +1,4 @@
-import { BaseEdge, Handle, Position, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type EdgeProps, type Node, type NodeProps } from "@xyflow/react";
+import { BaseEdge, getSmoothStepPath, Handle, Position, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type EdgeProps, type Node, type NodeProps } from "@xyflow/react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import "@xyflow/react/dist/style.css";
 import type { CourseChapterProjection, CourseSkillTreeNode } from "../../types";
@@ -30,7 +30,7 @@ function ChapterNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
   return (
     <div className={`course-flow-chapter ${data.expanded ? "expanded" : "collapsed"} ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": chapter.color } as React.CSSProperties} onDoubleClick={(event) => { event.stopPropagation(); data.onChapterDoubleClick?.(chapter); }}>
       <Handle type="target" id="in" position={Position.Left} />
-      <div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")}</small><strong>{data.mode === "practice" ? chapter.outcome : chapter.title}</strong><em>{chapter.lessonIds.length} 课 · {progress >= 100 ? "已完成" : progress ? `学习中 ${progress}%` : "可学习"}</em></span></div>
+      <div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")}</small><strong>{chapter.title}</strong><em>{chapter.lessonIds.length} 课 · {progress >= 100 ? "已完成" : progress ? `学习中 ${progress}%` : "可学习"}</em></span></div>
       {!data.expanded ? <><p>{chapter.description}</p><b>双击原位展开</b></> : <div className="course-flow-chapter-caption">{chapter.title} · 原子知识与实训伴生层</div>}
       <Handle type="source" id="out" position={Position.Right} />
     </div>
@@ -39,25 +39,44 @@ function ChapterNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
 
 function KnowledgeNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
   const node = data.knowledge!;
-  const title = data.mode === "practice" ? node.practiceTitle : node.title;
   const status = { completed: "已完成", learning: "学习中", available: "可学习", locked: "未解锁" }[node.status];
+  const practiceStatus = node.status === "completed" ? "已验证" : node.status === "learning" ? "进行中" : node.status === "locked" ? "待解锁" : "可开始";
+  const hasPractice = node.practiceContexts.length > 0;
   return (
-    <div className={`course-flow-knowledge status-${node.status} ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": node.color } as React.CSSProperties}>
+    <div className={`course-flow-knowledge status-${node.status} mode-${data.mode} ${hasPractice ? "has-practice" : ""} ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": node.color } as React.CSSProperties}>
       <Handle type="target" id="in" position={Position.Left} />
-      <span className="course-flow-knowledge-icon">{data.mode === "practice" ? "◇" : "◆"}</span>
-      <strong>{title}</strong>
-      <small>第 {node.lesson} 课 · {status}</small>
-      <em>{node.practiceContexts.length ? `${node.practiceContexts.length} 项实训伴生` : "课程知识节点"}</em>
+      {hasPractice ? <div className="course-flow-card course-flow-practice-card">
+        <span className="course-flow-knowledge-icon">◇</span>
+        <strong>{node.practiceTitle}</strong>
+        <small>{node.practiceContexts.length} 项实训 · {practiceStatus}</small>
+        <em>PracticeCoverage 伴生层</em>
+      </div> : null}
+      <div className="course-flow-card course-flow-knowledge-card">
+        <span className="course-flow-knowledge-icon">◆</span>
+        <strong>{node.title}</strong>
+        <small>第 {node.lesson} 课 · {status}</small>
+        <em>{hasPractice ? `${node.practiceContexts.length} 项实训伴生` : "课程知识节点"}</em>
+      </div>
       <Handle type="source" id="out" position={Position.Right} />
     </div>
   );
 }
 
-function CourseEdge({ data, markerEnd }: EdgeProps<Edge<CourseFlowEdgeData>>) {
-  if (!data?.path) return null;
+function CourseEdge({ data, markerEnd, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition }: EdgeProps<Edge<CourseFlowEdgeData>>) {
+  if (!data) return null;
+  const path = data.routing === "elk" && data.path ? data.path : getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: 10,
+    offset: data.kind === "chapter" ? 34 : 24
+  })[0];
   const className = ["course-flow-edge", data.relation, data.sourceKind === "curriculum-sequence" ? "sequence" : "knowledge-derived", data.strength === "hard" ? "hard" : data.strength === "soft" ? "soft" : "", data.highlighted ? "highlighted" : ""].filter(Boolean).join(" ");
   const title = data.sourceKind === "curriculum-sequence" ? "教学顺序补充连接 · 非知识事实" : data.kind === "chapter" ? `${data.supportCount} 个底层知识依赖` : data.relation;
-  return <><BaseEdge path={data.path} markerEnd={markerEnd} className={className} /><title>{title}</title></>;
+  return <><BaseEdge path={path} markerEnd={markerEnd} className={className} /><title>{title}</title></>;
 }
 
 const nodeTypes = { chapter: ChapterNode, knowledge: KnowledgeNode };
@@ -66,19 +85,27 @@ const edgeTypes = { course: CourseEdge };
 const CourseGraphInner = forwardRef<CourseGraphHandle, Props>(function CourseGraphInner(props, ref) {
   const instance = useReactFlow();
   const chapterClickTimer = useRef<number | null>(null);
-  const projection = useMemo(() => buildCourseGraphProjection(props.view, props.focusedChapterId, props.selectedId?.replace("knowledge:", "") ?? null), [props.focusedChapterId, props.selectedId, props.view]);
-  const [flow, setFlow] = useState<ReturnType<typeof toReactFlow>>({ nodes: [], edges: [] });
+  const layoutRequestRef = useRef(0);
+  const fittedStructureRef = useRef<string | null>(null);
+  const projection = useMemo(() => buildCourseGraphProjection(props.view, props.focusedChapterId), [props.focusedChapterId, props.view]);
+  const [layout, setLayout] = useState<Awaited<ReturnType<typeof layoutCourseGraph>> | null>(null);
+  const structureKey = `${props.view}:${props.focusedChapterId ?? "all-collapsed"}`;
 
   useEffect(() => {
-    let active = true;
+    const request = ++layoutRequestRef.current;
     layoutCourseGraph(projection).then((layout) => {
-      if (!active) return;
-      const next = toReactFlow(layout, props.mode, props.selectedId, props.searchMatchId);
-      setFlow({ nodes: next.nodes.map((node) => node.data.kind === "chapter" ? { ...node, data: { ...node.data, onChapterDoubleClick: props.onChapterDoubleClick } } : node), edges: next.edges });
+      if (request !== layoutRequestRef.current) return;
+      setLayout(layout);
+      if (fittedStructureRef.current === structureKey) return;
+      fittedStructureRef.current = structureKey;
       window.requestAnimationFrame(() => instance.fitView({ padding: 0.14, duration: 520, maxZoom: props.view === "full" ? 0.76 : 1.05 }));
     });
-    return () => { active = false; };
-  }, [instance, projection, props.mode, props.searchMatchId, props.selectedId, props.view]);
+  }, [instance, projection, props.view, structureKey]);
+
+  const flow = useMemo(
+    () => layout ? toReactFlow(layout, props.mode, props.selectedId, props.searchMatchId, props.onChapterDoubleClick) : { nodes: [], edges: [] },
+    [layout, props.mode, props.onChapterDoubleClick, props.searchMatchId, props.selectedId]
+  );
 
   useImperativeHandle(ref, () => ({
     fit: () => instance.fitView({ padding: 0.14, duration: 420, maxZoom: props.view === "full" ? 0.76 : 1.05 }),

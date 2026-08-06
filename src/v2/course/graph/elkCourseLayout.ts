@@ -1,11 +1,39 @@
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { ElkExtendedEdge, ElkNode, ElkPoint } from "elkjs/lib/elk-api";
+import { courseChapterEdges, courseChapters, courseSkillTreeEdges, courseSkillTreeNodes } from "../../data";
+import type { CourseSkillTreeEdge } from "../../types";
 import type { CourseGraphProjection, CourseProjectionEdge, CourseProjectionNode } from "./courseGraphProjection";
 
 export const COURSE_ATOMIC_WIDTH = 194;
 export const COURSE_ATOMIC_HEIGHT = 108;
 export const COURSE_CHAPTER_WIDTH = 232;
 export const COURSE_CHAPTER_HEIGHT = 126;
+
+const CHAPTER_HEADER_HEIGHT = 88;
+const CHAPTER_PADDING_X = 28;
+const CHAPTER_PADDING_BOTTOM = 28;
+const MACRO_LAYER_GAP = 150;
+const MACRO_NODE_GAP = 84;
+const GRAPH_PADDING = 54;
+
+export type ChapterMacroLayout = {
+  chapterId: string;
+  nodeId: string;
+  layer: number;
+  orderInLayer: number;
+  x: number;
+  y: number;
+  collapsedWidth: number;
+  collapsedHeight: number;
+};
+
+export type ChapterLocalLayout = {
+  chapterId: string;
+  width: number;
+  height: number;
+  nodes: Array<{ nodeId: string; x: number; y: number; width: number; height: number }>;
+  edgePaths: Map<string, string>;
+};
 
 export type CourseLayoutNode = CourseProjectionNode & {
   x: number;
@@ -15,7 +43,8 @@ export type CourseLayoutNode = CourseProjectionNode & {
 };
 
 export type CourseLayoutEdge = CourseProjectionEdge & {
-  path: string;
+  path?: string;
+  routing: "elk" | "react-flow";
 };
 
 export type CourseLayout = {
@@ -25,46 +54,14 @@ export type CourseLayout = {
   height: number;
 };
 
+type CourseLayoutBasis = {
+  macro: ChapterMacroLayout[];
+  macroEdgePaths: Map<string, string>;
+  locals: Map<string, ChapterLocalLayout>;
+};
+
 const elk = new ELK();
-
-function elkNode(node: CourseProjectionNode, children: CourseProjectionNode[]): ElkNode {
-  const expanded = node.kind === "chapter" && node.expanded;
-  return {
-    id: node.id,
-    ...(expanded ? {} : {
-      width: node.kind === "chapter" ? COURSE_CHAPTER_WIDTH : COURSE_ATOMIC_WIDTH,
-      height: node.kind === "chapter" ? COURSE_CHAPTER_HEIGHT : COURSE_ATOMIC_HEIGHT
-    }),
-    children: expanded ? children.map((child) => elkNode(child, [])) : undefined,
-    layoutOptions: {
-      "org.eclipse.elk.layered.layering.strategy": "NETWORK_SIMPLEX",
-      "org.eclipse.elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
-      "org.eclipse.elk.padding": expanded ? "[top=88,left=28,bottom=28,right=28]" : "[top=0,left=0,bottom=0,right=0]",
-      "org.eclipse.elk.spacing.nodeNode": expanded ? "42" : "32"
-    }
-  };
-}
-
-function edgeToElk(edge: CourseProjectionEdge): ElkExtendedEdge {
-  return {
-    id: edge.id,
-    sources: [edge.source],
-    targets: [edge.target]
-  };
-}
-
-function pointsToPath(points: ElkPoint[]) {
-  if (!points.length) return "";
-  return points.map((point, index) => `${index ? "L" : "M"}${point.x} ${point.y}`).join(" ");
-}
-
-function sectionPath(edge: ElkExtendedEdge, offsetX = 0, offsetY = 0) {
-  return (edge.sections ?? []).map((section) => pointsToPath([
-    { x: section.startPoint.x + offsetX, y: section.startPoint.y + offsetY },
-    ...(section.bendPoints ?? []).map((point) => ({ x: point.x + offsetX, y: point.y + offsetY })),
-    { x: section.endPoint.x + offsetX, y: section.endPoint.y + offsetY }
-  ])).join(" ");
-}
+let basisPromise: Promise<CourseLayoutBasis> | null = null;
 
 const layeredOptions = {
   "org.eclipse.elk.algorithm": "layered",
@@ -80,155 +77,233 @@ const layeredOptions = {
   "org.eclipse.elk.layered.spacing.edgeNodeBetweenLayers": "42"
 };
 
-async function layoutFocusedGraph(projection: CourseGraphProjection): Promise<CourseLayout> {
-  const expandedChapter = projection.nodes.find((node) => node.kind === "chapter" && node.expanded);
-  if (!expandedChapter) throw new Error("Focused course projection has no expanded chapter");
-  const atomicNodes = projection.nodes.filter((node) => node.parentId === expandedChapter.id).sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
-  const atomicEdges = projection.edges.filter((edge) => edge.kind === "knowledge");
-  const internalGraph: ElkNode = {
-    id: `${expandedChapter.id}:internal`,
-    children: atomicNodes.map((node) => elkNode(node, [])),
-    edges: atomicEdges.map(edgeToElk),
-    layoutOptions: { ...layeredOptions, "org.eclipse.elk.padding": "[top=88,left=28,bottom=28,right=28]", "org.eclipse.elk.spacing.nodeNode": "42", "org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers": "74" }
-  };
-  const internalResult = await elk.layout(internalGraph);
-  const expandedWidth = Math.max(COURSE_CHAPTER_WIDTH, internalResult.width ?? COURSE_CHAPTER_WIDTH);
-  const expandedHeight = Math.max(COURSE_CHAPTER_HEIGHT, internalResult.height ?? COURSE_CHAPTER_HEIGHT);
-  const chapterNodes = projection.nodes.filter((node) => node.kind === "chapter").sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
-  const chapterEdges = projection.edges.filter((edge) => edge.kind === "chapter");
-  const macroGraph: ElkNode = {
-    id: "course-root",
-    children: chapterNodes.map((node) => ({ id: node.id, width: node.id === expandedChapter.id ? expandedWidth : COURSE_CHAPTER_WIDTH, height: node.id === expandedChapter.id ? expandedHeight : COURSE_CHAPTER_HEIGHT })),
-    edges: chapterEdges.map(edgeToElk),
-    layoutOptions: { ...layeredOptions, "org.eclipse.elk.padding": "[top=54,left=54,bottom=54,right=54]" }
-  };
-  const macroResult = await elk.layout(macroGraph);
-  const macroById = new Map((macroResult.children ?? []).map((node) => [node.id, node]));
-  const expandedMacro = macroById.get(expandedChapter.id);
-  const nodes: CourseLayoutNode[] = chapterNodes.map((node) => {
-    const result = macroById.get(node.id);
-    return { ...node, x: result?.x ?? 0, y: result?.y ?? 0, width: result?.width ?? COURSE_CHAPTER_WIDTH, height: result?.height ?? COURSE_CHAPTER_HEIGHT };
-  });
-  (internalResult.children ?? []).forEach((child) => {
-    const source = atomicNodes.find((node) => node.id === child.id);
-    if (source) nodes.push({ ...source, x: child.x ?? 0, y: child.y ?? 0, width: child.width ?? COURSE_ATOMIC_WIDTH, height: child.height ?? COURSE_ATOMIC_HEIGHT });
-  });
-  const macroPaths = new Map((macroResult.edges ?? []).map((edge) => [edge.id, sectionPath(edge)]));
-  const internalPaths = new Map((internalResult.edges ?? []).map((edge) => [edge.id, sectionPath(edge, expandedMacro?.x ?? 0, expandedMacro?.y ?? 0)]));
+function pointsToPath(points: ElkPoint[]) {
+  if (!points.length) return "";
+  return points.map((point, index) => `${index ? "L" : "M"}${point.x} ${point.y}`).join(" ");
+}
+
+function sectionPath(edge: ElkExtendedEdge, offsetX = 0, offsetY = 0) {
+  return (edge.sections ?? []).map((section) => pointsToPath([
+    { x: section.startPoint.x + offsetX, y: section.startPoint.y + offsetY },
+    ...(section.bendPoints ?? []).map((point) => ({ x: point.x + offsetX, y: point.y + offsetY })),
+    { x: section.endPoint.x + offsetX, y: section.endPoint.y + offsetY }
+  ])).join(" ");
+}
+
+function edgeToElk(edge: { id: string; source: string; target: string }): ElkExtendedEdge {
+  return { id: edge.id, sources: [edge.source], targets: [edge.target] };
+}
+
+function knowledgeProjectionEdge(edge: CourseSkillTreeEdge): CourseProjectionEdge {
   return {
-    nodes,
-    edges: projection.edges.map((edge) => ({ ...edge, path: edge.kind === "chapter" ? macroPaths.get(edge.id) ?? "" : internalPaths.get(edge.id) ?? "" })),
-    width: macroResult.width ?? 1200,
-    height: macroResult.height ?? 720
+    id: edge.id,
+    source: `knowledge:${edge.source}`,
+    target: `knowledge:${edge.target}`,
+    kind: "knowledge",
+    relation: edge.relation,
+    sourceKind: "knowledge",
+    supportCount: 1,
+    strength: edge.strength,
+    sourceEdge: edge
   };
 }
 
-async function layoutFullGraph(projection: CourseGraphProjection): Promise<CourseLayout> {
-  const chapterNodes = projection.nodes.filter((node) => node.kind === "chapter").sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
-  const knowledgeEdges = projection.edges.filter((edge) => edge.kind === "knowledge");
-  const childrenByParent = new Map(chapterNodes.map((chapter) => [
-    chapter.id,
-    projection.nodes
-      .filter((node) => node.parentId === chapter.id)
-      .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
-  ]));
-  const parentByKnowledgeId = new Map(
-    projection.nodes
-      .filter((node) => node.kind === "knowledge" && node.parentId)
-      .map((node) => [node.id, node.parentId!])
-  );
-  const internalEdgesByChapter = new Map<string, CourseProjectionEdge[]>();
-  const crossChapterEdges: CourseProjectionEdge[] = [];
-  knowledgeEdges.forEach((edge) => {
-    const sourceParent = parentByKnowledgeId.get(edge.source);
-    const targetParent = parentByKnowledgeId.get(edge.target);
-    if (sourceParent && sourceParent === targetParent) {
-      internalEdgesByChapter.set(sourceParent, [...(internalEdgesByChapter.get(sourceParent) ?? []), edge]);
-    } else {
-      crossChapterEdges.push(edge);
-    }
-  });
+async function buildMacroLayout() {
+  const macroEdges: CourseProjectionEdge[] = courseChapterEdges.map((edge) => ({
+    id: edge.id,
+    source: `chapter:${edge.source}`,
+    target: `chapter:${edge.target}`,
+    kind: "chapter",
+    relation: edge.primaryRelation,
+    sourceKind: edge.sourceKind,
+    supportCount: edge.supportCount,
+    sourceEdge: edge
+  }));
   const graph: ElkNode = {
-    id: "course-root",
-    children: chapterNodes.map((chapter) => ({
-      ...elkNode(chapter, childrenByParent.get(chapter.id) ?? []),
-      edges: (internalEdgesByChapter.get(chapter.id) ?? []).map(edgeToElk)
-    })),
-    edges: crossChapterEdges.map(edgeToElk),
+    id: "course-macro",
+    children: courseChapters
+      .slice()
+      .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
+      .map((chapter) => ({ id: `chapter:${chapter.id}`, width: COURSE_CHAPTER_WIDTH, height: COURSE_CHAPTER_HEIGHT })),
+    edges: macroEdges.map(edgeToElk),
+    layoutOptions: { ...layeredOptions, "org.eclipse.elk.padding": `[top=${GRAPH_PADDING},left=${GRAPH_PADDING},bottom=${GRAPH_PADDING},right=${GRAPH_PADDING}]` }
+  };
+  const result = await elk.layout(graph);
+  const children = result.children ?? [];
+  const layerXs = Array.from(new Set(children.map((node) => Math.round(node.x ?? 0)))).sort((left, right) => left - right);
+  const macro: ChapterMacroLayout[] = [];
+  layerXs.forEach((layerX, layer) => {
+    children
+      .filter((node) => Math.abs((node.x ?? 0) - layerX) < 2)
+      .sort((left, right) => (left.y ?? 0) - (right.y ?? 0) || left.id.localeCompare(right.id))
+      .forEach((node, orderInLayer) => macro.push({
+        chapterId: node.id.replace("chapter:", ""),
+        nodeId: node.id,
+        layer,
+        orderInLayer,
+        x: node.x ?? 0,
+        y: node.y ?? 0,
+        collapsedWidth: COURSE_CHAPTER_WIDTH,
+        collapsedHeight: COURSE_CHAPTER_HEIGHT
+      }));
+  });
+  return {
+    macro,
+    macroEdgePaths: new Map((result.edges ?? []).map((edge) => [edge.id, sectionPath(edge)]))
+  };
+}
+
+async function buildChapterLocalLayout(chapterId: string): Promise<ChapterLocalLayout> {
+  const nodes = courseSkillTreeNodes
+    .filter((node) => node.chapterId === chapterId)
+    .sort((left, right) => left.lesson - right.lesson || left.id.localeCompare(right.id));
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const edges = courseSkillTreeEdges
+    .filter((edge) => edge.relation !== "related" && nodeIds.has(edge.source) && nodeIds.has(edge.target))
+    .map(knowledgeProjectionEdge);
+  const graph: ElkNode = {
+    id: `chapter:${chapterId}:local`,
+    children: nodes.map((node) => ({ id: `knowledge:${node.id}`, width: COURSE_ATOMIC_WIDTH, height: COURSE_ATOMIC_HEIGHT })),
+    edges: edges.map(edgeToElk),
     layoutOptions: {
       ...layeredOptions,
-      "org.eclipse.elk.hierarchyHandling": "INCLUDE_CHILDREN",
-      "org.eclipse.elk.padding": "[top=54,left=54,bottom=54,right=54]",
-      "org.eclipse.elk.spacing.nodeNode": "96",
-      "org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers": "160"
+      "org.eclipse.elk.padding": `[top=${CHAPTER_HEADER_HEIGHT},left=${CHAPTER_PADDING_X},bottom=${CHAPTER_PADDING_BOTTOM},right=${CHAPTER_PADDING_X}]`,
+      "org.eclipse.elk.spacing.nodeNode": "42",
+      "org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers": "74"
     }
   };
   const result = await elk.layout(graph);
-  const projectionById = new Map(projection.nodes.map((node) => [node.id, node]));
-  const nodes: CourseLayoutNode[] = [];
-  const edgePaths = new Map<string, string>();
-
-  function collect(container: ElkNode, offsetX: number, offsetY: number) {
-    (container.edges ?? []).forEach((edge) => edgePaths.set(edge.id, sectionPath(edge, offsetX, offsetY)));
-    (container.children ?? []).forEach((child) => {
-      const source = projectionById.get(child.id);
-      const localX = child.x ?? 0;
-      const localY = child.y ?? 0;
-      if (source) nodes.push({ ...source, x: localX, y: localY, width: child.width ?? COURSE_ATOMIC_WIDTH, height: child.height ?? COURSE_ATOMIC_HEIGHT });
-      collect(child, offsetX + localX, offsetY + localY);
-    });
-  }
-  collect(result, 0, 0);
-
   return {
-    nodes,
-    edges: knowledgeEdges.map((edge) => ({ ...edge, path: edgePaths.get(edge.id) ?? "" })),
-    width: result.width ?? 2400,
-    height: result.height ?? 1600
+    chapterId,
+    width: Math.max(COURSE_CHAPTER_WIDTH, result.width ?? COURSE_CHAPTER_WIDTH),
+    height: Math.max(COURSE_CHAPTER_HEIGHT, result.height ?? COURSE_CHAPTER_HEIGHT),
+    nodes: (result.children ?? []).map((node) => ({
+      nodeId: node.id,
+      x: node.x ?? 0,
+      y: node.y ?? 0,
+      width: node.width ?? COURSE_ATOMIC_WIDTH,
+      height: node.height ?? COURSE_ATOMIC_HEIGHT
+    })),
+    edgePaths: new Map((result.edges ?? []).map((edge) => [edge.id, sectionPath(edge)]))
   };
+}
+
+async function buildCourseLayoutBasis(): Promise<CourseLayoutBasis> {
+  const [macroResult, localResults] = await Promise.all([
+    buildMacroLayout(),
+    Promise.all(courseChapters.map((chapter) => buildChapterLocalLayout(chapter.id)))
+  ]);
+  return {
+    ...macroResult,
+    locals: new Map(localResults.map((local) => [local.chapterId, local]))
+  };
+}
+
+export function getCourseLayoutBasis() {
+  basisPromise ??= buildCourseLayoutBasis();
+  return basisPromise;
+}
+
+function composeChapterPositions(basis: CourseLayoutBasis, expandedIds: Set<string>) {
+  const sizeById = new Map(basis.macro.map((macro) => {
+    const local = basis.locals.get(macro.chapterId);
+    const expanded = expandedIds.has(macro.chapterId);
+    return [macro.chapterId, {
+      width: expanded ? local?.width ?? COURSE_CHAPTER_WIDTH : COURSE_CHAPTER_WIDTH,
+      height: expanded ? local?.height ?? COURSE_CHAPTER_HEIGHT : COURSE_CHAPTER_HEIGHT
+    }];
+  }));
+  const layerIndexes = Array.from(new Set(basis.macro.map((macro) => macro.layer))).sort((left, right) => left - right);
+  const layerLeft = new Map<number, number>();
+  let cursorX = Math.min(...basis.macro.map((macro) => macro.x));
+  layerIndexes.forEach((layer) => {
+    layerLeft.set(layer, cursorX);
+    const width = Math.max(...basis.macro.filter((macro) => macro.layer === layer).map((macro) => sizeById.get(macro.chapterId)?.width ?? COURSE_CHAPTER_WIDTH));
+    cursorX += width + MACRO_LAYER_GAP;
+  });
+
+  const positions = new Map<string, { x: number; y: number; width: number; height: number }>();
+  layerIndexes.forEach((layer) => {
+    const entries = basis.macro.filter((macro) => macro.layer === layer).sort((left, right) => left.orderInLayer - right.orderInLayer);
+    const desiredCenters = entries.map((entry) => entry.y + entry.collapsedHeight / 2);
+    const centers: number[] = [];
+    entries.forEach((entry, index) => {
+      const height = sizeById.get(entry.chapterId)?.height ?? COURSE_CHAPTER_HEIGHT;
+      if (!index) centers.push(desiredCenters[index]);
+      else {
+        const previous = entries[index - 1];
+        const previousHeight = sizeById.get(previous.chapterId)?.height ?? COURSE_CHAPTER_HEIGHT;
+        centers.push(Math.max(desiredCenters[index], centers[index - 1] + previousHeight / 2 + MACRO_NODE_GAP + height / 2));
+      }
+    });
+    const desiredMean = desiredCenters.reduce((sum, value) => sum + value, 0) / Math.max(1, desiredCenters.length);
+    const actualMean = centers.reduce((sum, value) => sum + value, 0) / Math.max(1, centers.length);
+    const shift = desiredMean - actualMean;
+    entries.forEach((entry, index) => {
+      const size = sizeById.get(entry.chapterId) ?? { width: COURSE_CHAPTER_WIDTH, height: COURSE_CHAPTER_HEIGHT };
+      positions.set(entry.chapterId, { x: layerLeft.get(layer) ?? entry.x, y: centers[index] + shift - size.height / 2, ...size });
+    });
+  });
+
+  const minX = Math.min(...Array.from(positions.values(), (position) => position.x));
+  const minY = Math.min(...Array.from(positions.values(), (position) => position.y));
+  const offsetX = minX < GRAPH_PADDING ? GRAPH_PADDING - minX : 0;
+  const offsetY = minY < GRAPH_PADDING ? GRAPH_PADDING - minY : 0;
+  positions.forEach((position, id) => positions.set(id, { ...position, x: position.x + offsetX, y: position.y + offsetY }));
+  return positions;
 }
 
 export async function layoutCourseGraph(projection: CourseGraphProjection): Promise<CourseLayout> {
-  // ELK compound graphs cannot mix edges terminating on a parent with edges
-  // terminating on that parent's children. Focused mode therefore uses two
-  // ELK passes: one for the expanded chapter and one for the shared macro DAG.
-  if (projection.view === "focused") return layoutFocusedGraph(projection);
-  if (projection.view === "full") return layoutFullGraph(projection);
-  const childrenByParent = new Map<string, CourseProjectionNode[]>();
-  projection.nodes.filter((node) => node.parentId).forEach((node) => childrenByParent.set(node.parentId!, [...(childrenByParent.get(node.parentId!) ?? []), node]));
-  childrenByParent.forEach((children) => children.sort((left, right) => left.order - right.order || left.id.localeCompare(right.id)));
-  const rootNodes = projection.nodes.filter((node) => !node.parentId).sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
-  const graph: ElkNode = {
-    id: "course-root",
-    children: rootNodes.map((node) => elkNode(node, childrenByParent.get(node.id) ?? [])),
-    edges: projection.edges.map(edgeToElk),
-    layoutOptions: {
-      ...layeredOptions,
-      "org.eclipse.elk.hierarchyHandling": "INCLUDE_CHILDREN",
-      "org.eclipse.elk.padding": "[top=54,left=54,bottom=54,right=54]"
-    }
-  };
-  const result = await elk.layout(graph);
+  const basis = await getCourseLayoutBasis();
+  const expandedIds = new Set(projection.nodes.filter((node) => node.kind === "chapter" && node.expanded).map((node) => node.chapter!.id));
+  const chapterPositions = composeChapterPositions(basis, expandedIds);
   const projectionById = new Map(projection.nodes.map((node) => [node.id, node]));
   const nodes: CourseLayoutNode[] = [];
-  const edgePaths = new Map<string, string>();
 
-  function collect(container: ElkNode, offsetX: number, offsetY: number) {
-    (container.edges ?? []).forEach((edge) => edgePaths.set(edge.id, sectionPath(edge, offsetX, offsetY)));
-    (container.children ?? []).forEach((child) => {
-      const source = projectionById.get(child.id);
-      const localX = child.x ?? 0;
-      const localY = child.y ?? 0;
-      if (source) nodes.push({ ...source, x: localX, y: localY, width: child.width ?? COURSE_ATOMIC_WIDTH, height: child.height ?? COURSE_ATOMIC_HEIGHT });
-      collect(child, offsetX + localX, offsetY + localY);
+  projection.nodes.filter((node) => node.kind === "chapter").forEach((node) => {
+    const position = chapterPositions.get(node.chapter!.id);
+    nodes.push({
+      ...node,
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      width: position?.width ?? COURSE_CHAPTER_WIDTH,
+      height: position?.height ?? COURSE_CHAPTER_HEIGHT
     });
-  }
-  collect(result, 0, 0);
+  });
+  projection.nodes.filter((node) => node.kind === "knowledge" && node.parentId).forEach((node) => {
+    const local = basis.locals.get(node.knowledge!.chapterId);
+    const localNode = local?.nodes.find((item) => item.nodeId === node.id);
+    nodes.push({
+      ...node,
+      x: localNode?.x ?? CHAPTER_PADDING_X,
+      y: localNode?.y ?? CHAPTER_HEADER_HEIGHT,
+      width: localNode?.width ?? COURSE_ATOMIC_WIDTH,
+      height: localNode?.height ?? COURSE_ATOMIC_HEIGHT
+    });
+  });
 
-  return {
-    nodes,
-    edges: projection.edges.map((edge) => ({ ...edge, path: edgePaths.get(edge.id) ?? "" })),
-    width: result.width ?? 1200,
-    height: result.height ?? 720
-  };
+  const edges = projection.edges.map<CourseLayoutEdge>((edge) => {
+    if (edge.kind === "chapter") {
+      return {
+        ...edge,
+        path: projection.view === "overview" ? basis.macroEdgePaths.get(edge.id) : undefined,
+        routing: projection.view === "overview" ? "elk" : "react-flow"
+      };
+    }
+    const source = projectionById.get(edge.source);
+    const target = projectionById.get(edge.target);
+    const sameChapter = source?.parentId && source.parentId === target?.parentId;
+    if (!sameChapter || !source?.knowledge) return { ...edge, routing: "react-flow" };
+    const chapterPosition = chapterPositions.get(source.knowledge.chapterId);
+    const localPath = basis.locals.get(source.knowledge.chapterId)?.edgePaths.get(edge.id);
+    return {
+      ...edge,
+      path: localPath && chapterPosition ? localPath.replace(/([ML])(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_match, command: string, x: string, y: string) => `${command}${Number(x) + chapterPosition.x} ${Number(y) + chapterPosition.y}`) : undefined,
+      routing: localPath ? "elk" : "react-flow"
+    };
+  });
+
+  const width = Math.max(...nodes.filter((node) => node.kind === "chapter").map((node) => node.x + node.width), 1200) + GRAPH_PADDING;
+  const height = Math.max(...nodes.filter((node) => node.kind === "chapter").map((node) => node.y + node.height), 720) + GRAPH_PADDING;
+  return { nodes, edges, width, height };
 }

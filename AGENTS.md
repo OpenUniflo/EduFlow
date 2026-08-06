@@ -48,4 +48,9 @@
 - Global and Personal Atlas MUST use the same `KnowledgeAtlasScene` renderer.
 - Renderer-specific graph objects are projections only and MUST NOT become domain data.
 - Custom layout/routing code MUST NOT duplicate functionality owned by ELK or the Force Graph engine.
+- Layout stability is a product invariant.
+- Selection, hover, search, drawer state, and knowledge/practice presentation mode MUST NOT alter graph layout.
+- Only structural graph changes may trigger ELK or force-layout recomputation.
+- Course Overview, Focused, and Full views MUST share the same Chapter macro topology.
+- Personal and Global Atlas selection MUST operate as camera/highlight presentation over a stable knowledge layout.
 - Changes MUST pass TypeScript compilation and production build. Relevant pages MUST be checked for runtime errors.

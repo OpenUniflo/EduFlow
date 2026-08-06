@@ -315,239 +315,6 @@
   cursor: grabbing;
 }
 
-.personal-graph {
-  position: absolute;
-  top: 0;
-  left: 0;
-  overflow: visible;
-  transform-origin: 0 0;
-  transition: opacity 0.2s ease;
-}
-
-.personal-edge {
-  fill: none;
-  stroke: #8f9db6;
-  stroke-width: 1.1;
-  opacity: 0.3;
-  transition: opacity 0.25s, stroke 0.25s, stroke-width 0.25s;
-}
-
-.personal-edge.selected-relation {
-  stroke: #637ce0;
-  stroke-width: 2;
-  opacity: 0.78;
-}
-
-.personal-node {
-  cursor: pointer;
-  outline: none;
-  transition: opacity 0.22s;
-}
-
-.personal-node-hit {
-  fill: transparent;
-}
-
-.personal-node-outer {
-  fill: rgba(255, 255, 255, 0.28);
-  stroke-width: 1.2;
-  transition: fill 0.18s, stroke 0.18s, stroke-width 0.18s, filter 0.18s;
-}
-
-.personal-node-inner {
-  fill: var(--domain-color, #78a7ee);
-  stroke: rgba(255, 255, 255, 0.92);
-  stroke-width: 0.8;
-}
-
-.personal-node.status-mastered .personal-node-outer {
-  stroke: rgba(69, 173, 130, 0.36);
-}
-
-.personal-node.status-mastered .personal-node-inner {
-  filter: url(#personal-green-glow);
-}
-
-.personal-node.status-learning .personal-node-outer {
-  stroke: rgba(91, 124, 250, 0.58);
-  stroke-width: 1.6;
-}
-
-.personal-node.status-learning .personal-node-inner {
-  filter: url(#personal-blue-glow);
-}
-
-.personal-node.status-explore .personal-node-outer {
-  fill: rgba(255, 255, 255, 0.15);
-  stroke: rgba(121, 136, 166, 0.32);
-  stroke-dasharray: 3 5;
-}
-
-.personal-node.status-explore .personal-node-inner {
-  fill: var(--domain-color, #78a7ee);
-  fill-opacity: 0.34;
-  stroke: rgba(122, 136, 164, 0.66);
-  stroke-dasharray: 2 2;
-}
-
-.personal-node:hover .personal-node-outer,
-.personal-node:focus .personal-node-outer {
-  fill: rgba(255, 255, 255, 0.48);
-  stroke-width: 2;
-  filter: url(#personal-blue-glow);
-}
-
-.personal-node.selected .personal-node-outer,
-.personal-node.selected .personal-node-inner {
-  filter: url(#personal-selected-glow);
-}
-
-.personal-node.selected .personal-node-outer {
-  stroke: #526fdc;
-  stroke-width: 2.4;
-}
-
-.personal-node-title,
-.personal-node-status {
-  text-anchor: middle;
-  pointer-events: none;
-  paint-order: stroke;
-  stroke: rgba(249, 251, 255, 0.94);
-  stroke-linejoin: round;
-}
-
-.personal-node-title {
-  fill: #344056;
-  stroke-width: 3px;
-  font-size: 10px;
-  font-weight: 680;
-}
-
-.personal-node-status {
-  fill: #8c98aa;
-  stroke-width: 2.5px;
-  font-size: 7px;
-}
-
-.personal-evidence-dot {
-  fill: #46a87e;
-  stroke: #fff;
-  stroke-width: 1;
-}
-
-.personal-node-pulse {
-  fill: none;
-  stroke: #6f89ef;
-  stroke-width: 1.1;
-  opacity: 0.44;
-  animation: personal-node-pulse 3.2s ease-out infinite;
-}
-
-@keyframes personal-node-pulse {
-  0% { r: 24; opacity: 0.44; }
-  72%, 100% { r: 36; opacity: 0; }
-}
-
-.personal-practice-evidence {
-  cursor: pointer;
-  transition: opacity 0.22s;
-}
-
-.personal-practice-evidence path {
-  fill: none;
-  stroke: #56a889;
-  stroke-width: 1;
-  stroke-dasharray: 3 6;
-  opacity: 0.32;
-}
-
-.personal-practice-evidence circle {
-  fill: #d8dee8;
-  stroke: #fff;
-  stroke-width: 1;
-}
-
-.personal-practice-evidence.completed circle {
-  fill: #56a889;
-}
-
-.personal-practice-evidence text {
-  fill: #8693a7;
-  font-size: 7px;
-  paint-order: stroke;
-  stroke: rgba(249, 251, 255, 0.9);
-  stroke-width: 2px;
-}
-
-.personal-practice-evidence.pending {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.personal-mode-history .personal-edge {
-  opacity: 0.08;
-}
-
-.personal-mode-history .personal-edge.history-active {
-  stroke: #657de0;
-  stroke-width: 2.2;
-  opacity: 0.82;
-}
-
-.personal-mode-history .personal-node {
-  opacity: 0.3;
-}
-
-.personal-mode-history .personal-node.core {
-  opacity: 1;
-}
-
-.personal-mode-practice .personal-node {
-  opacity: 0.26;
-}
-
-.personal-mode-practice .personal-node.has-evidence {
-  opacity: 1;
-}
-
-.personal-mode-practice .personal-edge {
-  opacity: 0.06;
-}
-
-.personal-mode-practice .personal-practice-evidence {
-  opacity: 0.35;
-  pointer-events: auto;
-}
-
-.personal-mode-practice .personal-practice-evidence.completed {
-  opacity: 1;
-}
-
-.personal-mode-practice .personal-practice-evidence.completed path {
-  stroke-width: 2;
-  opacity: 0.86;
-}
-
-.personal-node-copy {
-  transition: opacity 0.18s ease;
-}
-
-.personal-zoom-far .personal-node-copy,
-.personal-zoom-far .personal-practice-evidence text,
-.personal-zoom-medium .personal-node.context .personal-node-copy,
-.personal-zoom-medium .personal-practice-evidence text {
-  opacity: 0;
-}
-
-.personal-zoom-far .personal-node.force-label .personal-node-copy,
-.personal-zoom-medium .personal-node.force-label .personal-node-copy {
-  opacity: 1;
-}
-
-.personal-zoom-far .personal-node.context {
-  opacity: 0.58;
-}
-
 .personal-drawer {
   position: absolute;
   top: 88px;
@@ -1000,32 +767,6 @@
 .personal-legend i.line.practice { border-top-style: dashed; border-color: #56a889; }
 .personal-legend i.line.cross { border-color: #8a72d9; }
 
-.personal-mode-note {
-  position: absolute;
-  top: 28px;
-  right: 24px;
-  z-index: 42;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: 8px 10px;
-  border-color: rgba(255, 255, 255, 0.86);
-  border-radius: 12px;
-  color: #637088;
-  background: rgba(255, 255, 255, 0.68);
-  font-size: 9px;
-  visibility: hidden;
-  opacity: 0;
-  transform: translateY(-5px);
-  transition: 0.2s;
-}
-
-.personal-mode-note.show {
-  visibility: visible;
-  opacity: 1;
-  transform: none;
-}
-
 .personal-toast {
   position: absolute;
   bottom: 99px;
@@ -1070,7 +811,6 @@
   .personal-toolbar.drawer-open { top: 82px; right: 18px; }
   .personal-ai { bottom: 16px; width: calc(100vw - 28px); }
   .personal-ai-suggestions { display: none; }
-  .personal-mode-note { top: 22px; right: 14px; }
 }
 
 body {
@@ -1711,7 +1451,10 @@ body {
 }
 
 .knowledge-atlas-scene {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -5018,14 +4761,50 @@ body {
 }
 
 .course-flow-knowledge {
+  overflow: visible;
+}
+
+.course-flow-card {
+  position: absolute;
+  top: 0;
+  right: 8px;
+  bottom: 8px;
+  left: 0;
   padding: 14px 14px 11px 43px;
   border: 1.5px solid #93a3bd;
   border-radius: 17px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 10px 24px rgba(72, 92, 130, 0.1);
+  transition: inset 0.22s ease, opacity 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
 }
 
-.course-flow-knowledge.selected {
+.course-flow-knowledge-card {
+  z-index: 2;
+}
+
+.course-flow-practice-card {
+  inset: 8px 0 0 8px;
+  z-index: 1;
+  border-color: color-mix(in srgb, var(--node-color) 46%, #aeb9ca);
+  background: color-mix(in srgb, var(--node-color) 8%, rgba(255, 255, 255, 0.96));
+  opacity: 0.64;
+}
+
+.course-flow-knowledge.mode-practice .course-flow-knowledge-card {
+  inset: 8px 0 0 8px;
+  z-index: 1;
+  opacity: 0.56;
+}
+
+.course-flow-knowledge.mode-practice .course-flow-practice-card {
+  inset: 0 8px 8px 0;
+  z-index: 2;
+  opacity: 1;
+}
+
+.course-flow-knowledge.selected:not(.has-practice) .course-flow-knowledge-card,
+.course-flow-knowledge.selected.mode-knowledge .course-flow-knowledge-card,
+.course-flow-knowledge.selected.mode-practice .course-flow-practice-card {
   border: 2.5px solid #5b7cfa;
 }
 
@@ -5047,7 +4826,7 @@ body {
 .course-flow-knowledge.status-learning .course-flow-knowledge-icon { border-color: #5b7cfa; }
 .course-flow-knowledge.status-locked .course-flow-knowledge-icon { border-color: #adb7c5; }
 
-.course-flow-knowledge strong {
+.course-flow-card strong {
   display: -webkit-box;
   overflow: hidden;
   min-height: 35px;
@@ -5059,8 +4838,8 @@ body {
   -webkit-line-clamp: 2;
 }
 
-.course-flow-knowledge small,
-.course-flow-knowledge em {
+.course-flow-card small,
+.course-flow-card em {
   display: block;
   margin-top: 6px;
   overflow: hidden;
