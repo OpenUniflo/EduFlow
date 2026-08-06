@@ -37,7 +37,6 @@ function createAtlas() {
   };
   const layout = buildAtlasKnowledgeLayout(atlasGraph);
   const domainById = new Map(globalKnowledgeGraph.domains.map((domain) => [domain.id, domain]));
-  const clusterById = new Map(globalKnowledgeGraph.clusters.map((cluster) => [cluster.id, cluster]));
   const curriculumIds = new Set(curriculumCoverages.map((coverage) => coverage.nodeId));
   const nodes: AtlasNode[] = atlasGraph.nodes.map((node) => {
     const domain = domainById.get(node.domainId ?? "");
@@ -46,7 +45,7 @@ function createAtlas() {
     return {
       id: node.id,
       name: node.title,
-      category: `${domain?.title ?? node.domainId} · ${clusterById.get(node.clusterId ?? "")?.title ?? "知识节点"}`,
+      category: domain?.title ?? node.domainId ?? "知识节点",
       color: domain?.color ?? "#697ee6",
       x: position.x,
       y: position.y,
@@ -55,7 +54,7 @@ function createAtlas() {
       knowledge: 1,
       courses: curriculumIds.has(node.id) ? 1 : 0,
       description: node.description,
-      tags: node.tags ?? [clusterById.get(node.clusterId ?? "")?.title ?? domain?.title ?? "知识节点"],
+      tags: node.tags ?? [domain?.title ?? "知识节点"],
       related: [],
       prerequisites: atlasGraph.edges
         .filter((edge) => edge.target === node.id && edge.relation === "prerequisite")

@@ -1,6 +1,8 @@
 import { globalKnowledgeGraph } from "./knowledge/graph";
+import { assertDirectedAcyclic, buildLayeredDagLayout, transitiveReduction } from "./knowledge/graphAlgorithms";
 import type {
   AcceptanceSpec,
+  CourseChapterEdge,
   CourseChapterProjection,
   CourseCurriculum,
   CourseSkillTreeEdge,
@@ -116,31 +118,51 @@ export const acceptanceSpec: AcceptanceSpec = {
   ]
 };
 
-const chapterPositions = [
-  { x: 80, y: 310 }, { x: 340, y: 150 }, { x: 340, y: 450 }, { x: 640, y: 300 },
-  { x: 950, y: 150 }, { x: 950, y: 450 }, { x: 1240, y: 300 }
-];
-
-export const courseChapters: CourseChapterProjection[] = curriculumChapters.map((chapter, index) => ({
-  ...chapter,
-  ...chapterPositions[index]
-}));
-
 const nodeById = new Map(globalKnowledgeGraph.nodes.map((node) => [node.id, node]));
 const lessonById = new Map(curriculumLessons.map((lesson) => [lesson.id, lesson]));
-const chapterById = new Map(courseChapters.map((chapter) => [chapter.id, chapter]));
+const chapterById = new Map(curriculumChapters.map((chapter) => [chapter.id, chapter]));
+const courseNodeIds = new Set(curriculumCoverages.map((coverage) => coverage.nodeId).filter((id) => nodeById.get(id)?.status === "active"));
+export const courseSkillTreeEdges: CourseSkillTreeEdge[] = globalKnowledgeGraph.edges
+  .filter((edge) => courseNodeIds.has(edge.source) && courseNodeIds.has(edge.target))
+  .map((edge) => ({ ...edge }));
 
-export const courseSkillTreeNodes: CourseSkillTreeNode[] = Array.from(new Set(curriculumCoverages.map((coverage) => coverage.nodeId))).map((nodeId) => {
+function coverageOrder(coverage?: CurriculumCoverage) {
+  return coverage ? lessonById.get(coverage.lessonId)?.order ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
+}
+
+function primaryCoverageFor(nodeId: string) {
+  const coverages = curriculumCoverages.filter((coverage) => coverage.nodeId === nodeId);
+  const introduced = coverages.filter((coverage) => coverage.role === "introduce");
+  return [...(introduced.length ? introduced : coverages)].sort((left, right) => coverageOrder(left) - coverageOrder(right) || left.id.localeCompare(right.id))[0];
+}
+
+const primaryCoverageByNode = new Map(Array.from(courseNodeIds, (nodeId) => [nodeId, primaryCoverageFor(nodeId)]));
+const primaryChapterByNode = new Map(Array.from(primaryCoverageByNode, ([nodeId, coverage]) => [nodeId, lessonById.get(coverage.lessonId)?.chapterId]));
+const mainCourseEdges = courseSkillTreeEdges.filter((edge) => edge.relation !== "related");
+const fullLayout = buildLayeredDagLayout(courseNodeIds, mainCourseEdges, (id) => coverageOrder(primaryCoverageByNode.get(id)), {
+  layerGap: 272,
+  rowGap: 134,
+  marginX: 48,
+  marginY: 54,
+  sweeps: 6
+});
+
+export const courseSkillTreeNodes: CourseSkillTreeNode[] = Array.from(courseNodeIds).sort().map((nodeId) => {
   const knowledge = nodeById.get(nodeId);
-  const nodeCoverage = curriculumCoverages.filter((coverage) => coverage.nodeId === nodeId);
-  const firstCoverage = [...nodeCoverage].sort((left, right) => (lessonById.get(left.lessonId)?.order ?? 0) - (lessonById.get(right.lessonId)?.order ?? 0))[0];
-  const lesson = lessonById.get(firstCoverage.lessonId);
-  const chapter = chapterById.get(lesson?.chapterId ?? "");
-  if (!knowledge || !lesson || !chapter) throw new Error(`Cannot project curriculum node: ${nodeId}`);
-  const peers = curriculumCoverages.filter((coverage) => coverage.lessonId === lesson.id && coverage.role === firstCoverage.role);
-  const peerIndex = peers.findIndex((coverage) => coverage.nodeId === nodeId);
-  const practiceIds = practiceCoverages.filter((coverage) => coverage.nodeId === nodeId).map((coverage) => coverage.practiceId);
-  const firstPractice = practices.find((practice) => practice.id === practiceIds[0]);
+  const primaryCoverage = primaryCoverageByNode.get(nodeId);
+  const lesson = primaryCoverage ? lessonById.get(primaryCoverage.lessonId) : undefined;
+  const chapter = lesson ? chapterById.get(lesson.chapterId) : undefined;
+  if (!knowledge || !primaryCoverage || !lesson || !chapter) throw new Error(`Cannot project curriculum node: ${nodeId}`);
+  const curriculumContexts = curriculumCoverages.filter((coverage) => coverage.nodeId === nodeId).map((coverage) => {
+    const contextLesson = lessonById.get(coverage.lessonId);
+    if (!contextLesson) throw new Error(`Unknown lesson for coverage: ${coverage.id}`);
+    return { ...coverage, lessonOrder: contextLesson.order, chapterId: contextLesson.chapterId };
+  }).sort((left, right) => left.lessonOrder - right.lessonOrder || left.id.localeCompare(right.id));
+  const practiceContexts = practiceCoverages.filter((coverage) => coverage.nodeId === nodeId).flatMap((coverage) => {
+    const practice = practices.find((item) => item.id === coverage.practiceId);
+    return practice ? [{ ...coverage, title: practice.title, templateId: practice.templateId }] : [];
+  });
+  const practiceIds = practiceContexts.map((context) => context.practiceId);
   const status = lesson.order <= 3 ? "completed" : lesson.order === 4 ? "learning" : lesson.order <= 7 ? "available" : "locked";
   return {
     id: knowledge.id,
@@ -148,45 +170,88 @@ export const courseSkillTreeNodes: CourseSkillTreeNode[] = Array.from(new Set(cu
     title: knowledge.title,
     description: knowledge.description,
     scope: knowledge.scope,
+    primaryCoverage: { ...primaryCoverage, lessonOrder: lesson.order, chapterId: chapter.id },
+    curriculumContexts,
+    practiceContexts,
     lessonId: lesson.id,
     lesson: lesson.order,
     chapterId: chapter.id,
-    coverageRoles: Array.from(new Set(nodeCoverage.map((coverage) => coverage.role))),
-    materialIds: lesson.id === "L04" ? [MATERIAL_ID] : [],
+    coverageRoles: Array.from(new Set(curriculumContexts.map((coverage) => coverage.role))),
+    materialIds: curriculumContexts.flatMap((coverage) => coverage.lessonId === "L04" ? [MATERIAL_ID] : []),
     practiceIds,
-    practiceTitle: firstPractice?.title ?? `${knowledge.title} 学习活动`,
+    practiceTitle: practiceContexts[0]?.title ?? `${knowledge.title} 学习活动`,
     status,
-    x: 40 + (lesson.order - 1) * 250,
-    y: 54 + (peerIndex % 5) * 116,
+    x: fullLayout[nodeId].x,
+    y: fullLayout[nodeId].y,
     color: chapter.color
   };
 });
 
-const courseNodeIds = new Set(courseSkillTreeNodes.map((node) => node.id));
-export const courseSkillTreeEdges: CourseSkillTreeEdge[] = globalKnowledgeGraph.edges
-  .filter((edge) => courseNodeIds.has(edge.source) && courseNodeIds.has(edge.target))
-  .map((edge) => ({ id: edge.id, source: edge.source, target: edge.target, relation: edge.relation }));
-
-const chapterEdgeKeys = new Set<string>();
-function addChapterEdge(source: string, target: string) {
-  if (source !== target) chapterEdgeKeys.add(`${source}:${target}`);
+const NODE_WIDTH = 196;
+const NODE_HEIGHT = 104;
+courseSkillTreeNodes.forEach((node, index) => courseSkillTreeNodes.slice(index + 1).forEach((other) => {
+  if (node.x === other.x && node.y === other.y) throw new Error(`Course nodes share coordinates: ${node.id}, ${other.id}`);
+  const overlaps = node.x < other.x + NODE_WIDTH && node.x + NODE_WIDTH > other.x && node.y < other.y + NODE_HEIGHT && node.y + NODE_HEIGHT > other.y;
+  if (overlaps) throw new Error(`Course nodes overlap: ${node.id}, ${other.id}`);
+}));
+if (courseSkillTreeNodes.reduce((sum, node) => sum + node.curriculumContexts.length, 0) !== curriculumCoverages.filter((coverage) => courseNodeIds.has(coverage.nodeId)).length) {
+  throw new Error("Course curriculum N:M projection lost coverage records");
+}
+if (courseSkillTreeNodes.reduce((sum, node) => sum + node.practiceContexts.length, 0) !== practiceCoverages.filter((coverage) => courseNodeIds.has(coverage.nodeId)).length) {
+  throw new Error("Course practice N:M projection lost coverage records");
 }
 
-courseSkillTreeEdges.forEach((edge) => {
-  const sourceChapters = curriculumCoverages.filter((coverage) => coverage.nodeId === edge.source).map((coverage) => lessonById.get(coverage.lessonId)?.chapterId).filter(Boolean) as string[];
-  const targetChapters = curriculumCoverages.filter((coverage) => coverage.nodeId === edge.target).map((coverage) => lessonById.get(coverage.lessonId)?.chapterId).filter(Boolean) as string[];
-  sourceChapters.forEach((source) => targetChapters.forEach((target) => addChapterEdge(source, target)));
-});
-curriculumSequences.forEach((sequence) => {
-  const source = lessonById.get(sequence.sourceLessonId)?.chapterId;
-  const target = lessonById.get(sequence.targetLessonId)?.chapterId;
-  if (source && target) addChapterEdge(source, target);
+const chapterEdgeByPair = new Map<string, CourseChapterEdge>();
+mainCourseEdges.forEach((edge) => {
+  const source = primaryChapterByNode.get(edge.source);
+  const target = primaryChapterByNode.get(edge.target);
+  if (!source || !target || source === target) return;
+  const key = `${source}:${target}`;
+  const current = chapterEdgeByPair.get(key) ?? {
+    id: `chapter-projection-${source}-${target}`,
+    source,
+    target,
+    primaryRelation: edge.relation === "prerequisite" ? "prerequisite" as const : "enables" as const,
+    sourceKind: "knowledge" as const,
+    prerequisiteCount: 0,
+    enablesCount: 0,
+    supportCount: 0
+  };
+  if (edge.relation === "prerequisite") current.prerequisiteCount += 1;
+  else current.enablesCount += 1;
+  current.supportCount += 1;
+  current.primaryRelation = current.prerequisiteCount > 0 ? "prerequisite" : "enables";
+  chapterEdgeByPair.set(key, current);
 });
 
-export const courseChapterEdges = Array.from(chapterEdgeKeys).sort().map((key, index) => {
-  const [source, target] = key.split(":");
-  return { id: `chapter-projection-${index + 1}`, source, target };
+const incidentChapterIds = new Set(Array.from(chapterEdgeByPair.values()).flatMap((edge) => [edge.source, edge.target]));
+curriculumChapters.filter((chapter) => chapter.order > 1 && !incidentChapterIds.has(chapter.id)).forEach((chapter) => {
+  const sequence = [...curriculumSequences].reverse().find((item) => lessonById.get(item.targetLessonId)?.chapterId === chapter.id && lessonById.get(item.sourceLessonId)?.chapterId !== chapter.id);
+  const source = sequence ? lessonById.get(sequence.sourceLessonId)?.chapterId : undefined;
+  if (!source) return;
+  chapterEdgeByPair.set(`${source}:${chapter.id}`, {
+    id: `chapter-sequence-${source}-${chapter.id}`,
+    source,
+    target: chapter.id,
+    primaryRelation: "sequence",
+    sourceKind: "curriculum-sequence",
+    prerequisiteCount: 0,
+    enablesCount: 0,
+    supportCount: 0
+  });
 });
+
+const aggregatedChapterEdges = Array.from(chapterEdgeByPair.values()).sort((left, right) => left.source.localeCompare(right.source) || left.target.localeCompare(right.target));
+assertDirectedAcyclic(curriculumChapters.map((chapter) => chapter.id), aggregatedChapterEdges);
+export const courseChapterEdges: CourseChapterEdge[] = transitiveReduction(curriculumChapters.map((chapter) => chapter.id), aggregatedChapterEdges);
+const chapterLayout = buildLayeredDagLayout(curriculumChapters.map((chapter) => chapter.id), courseChapterEdges, (id) => chapterById.get(id)?.order ?? 0, {
+  layerGap: 300,
+  rowGap: 178,
+  marginX: 80,
+  marginY: 100,
+  sweeps: 6
+});
+export const courseChapters: CourseChapterProjection[] = curriculumChapters.map((chapter) => ({ ...chapter, ...chapterLayout[chapter.id] }));
 
 /** Deleting a course removes only curriculum associations; knowledge is intentionally not accepted as input. */
 export function deleteCourseCurriculum(courseId: string) {

@@ -3,7 +3,6 @@ import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "./types";
 
 const nodeById = new Map(globalKnowledgeGraph.nodes.map((node) => [node.id, node]));
 const domainById = new Map(globalKnowledgeGraph.domains.map((domain) => [domain.id, domain]));
-const clusterById = new Map(globalKnowledgeGraph.clusters.map((cluster) => [cluster.id, cluster]));
 const edgesByNode = new Map<string, KnowledgeEdge[]>();
 
 globalKnowledgeGraph.edges.forEach((edge) => {
@@ -17,10 +16,6 @@ export function getKnowledgeNode(id: string) {
 
 export function getKnowledgeDomain(id: string) {
   return domainById.get(id);
-}
-
-export function getKnowledgeCluster(id?: string) {
-  return id ? clusterById.get(id) : undefined;
 }
 
 export function getNodesByDomain(domainId: string) {

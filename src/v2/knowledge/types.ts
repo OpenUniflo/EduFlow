@@ -24,7 +24,6 @@ export type KnowledgeNode = {
   scope: KnowledgeScope;
   ownerId?: string;
   domainId?: string;
-  clusterId?: string;
   provenance: KnowledgeProvenance[];
   currentRevisionId: string;
   status: KnowledgeNodeStatus;
@@ -58,13 +57,6 @@ export type KnowledgeDomain = {
   color: string;
 };
 
-export type KnowledgeCluster = {
-  id: string;
-  domainId: string;
-  title: string;
-  description?: string;
-};
-
 export type KnowledgeRelationType = "prerequisite" | "enables" | "related";
 export type KnowledgeRelation = KnowledgeRelationType;
 
@@ -89,7 +81,6 @@ export type KnowledgeEdge = PrerequisiteKnowledgeRelation | AssociativeKnowledge
 
 export type KnowledgeGraph = {
   domains: KnowledgeDomain[];
-  clusters: KnowledgeCluster[];
   nodes: KnowledgeNode[];
   revisions: KnowledgeNodeRevision[];
   edges: KnowledgeEdge[];

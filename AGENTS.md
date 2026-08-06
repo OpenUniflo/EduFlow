@@ -1,17 +1,46 @@
 # EduFlow Repository Instructions
 
-## Knowledge Architecture invariants
+## Knowledge and Curriculum Boundaries
 
-- EduFlow MUST use one shared knowledge model across Global, Tenant, User, Personal, and Course views. A `KnowledgeNode` is the smallest independently teachable, assessable, reusable knowledge or capability unit; it is not the smallest vocabulary fragment.
-- Course, Chapter, Lesson, Stage, Learning Outcome, Project, Domain, Cluster, Community, and Island MUST NOT be represented as `KnowledgeNode`.
-- Persistent nodes MUST use exactly one scope: `global`, `tenant`, or `user`. A course is provenance and a curriculum container, never a persistent node owner. Deleting a course MUST NOT delete knowledge discovered from it or its mastery/evidence.
-- Node identity is stable. Content changes MUST create `KnowledgeNodeRevision`; referenced nodes are deprecated or superseded, never physically deleted.
-- Factual knowledge-to-knowledge relations MUST use `KnowledgeRelation` and only `prerequisite`, `enables`, or `related`. Prerequisite direction and hard/soft strength MUST be preserved.
-- Mapping, promotion, curriculum coverage, practice coverage, and curriculum sequence MUST use their own models. `Mapping != Merge`, `Mapping != Promotion`, and mapping MUST NOT copy mastery.
-- Course ingestion MUST first produce a course-faithful User Knowledge Graph. It MUST NOT automatically retrieve, replace, merge, or map Global/Tenant nodes. Similarity analysis is an explicit user-triggered action.
-- Global Atlas MUST render only real Global KnowledgeNodes. Personal Atlas MAY render visible Global, Tenant, and User nodes plus user state and derived explore nodes. Course Skill Tree MAY reference all three scopes.
-- Personal mastery and evidence bind stable node IDs; evidence MAY bind the revision observed. They MUST NOT be stored on `KnowledgeNode`.
-- Community is a graph-analysis result and Knowledge Island is its region/hull visualization. `Community != Chapter`, `Domain != Community`, `Cluster != Community`, and connected components MUST NOT be treated automatically as communities.
-- Domain, cluster, chapter, and community metadata MUST NOT dictate atlas coordinates. Layout and community structure MUST be driven primarily by real `KnowledgeRelation` structure and strength.
-- Fake nodes or edges MUST NOT be created for composition, layout, bridges, islands, or Demo appearance. Structural algorithms MAY view relations as undirected; learning-path algorithms MUST respect prerequisite direction.
-- Course Skill Tree MUST be derived from the atomic knowledge graph plus curriculum coverage/sequence. It MUST NOT maintain a second hand-authored knowledge graph or duplicate prerequisite facts.
+- EduFlow MUST maintain one shared Knowledge Graph composed of `KnowledgeNode`, `KnowledgeEdge`, and user-owned `UserKnowledgeState`.
+- Global Atlas, Personal Atlas, and Course Skill Tree are views over that shared graph. They MUST NOT maintain separate knowledge facts.
+- Curriculum data is separate: Course, Chapter, Lesson, CurriculumCoverage, CurriculumSequence, Material, Practice, and PracticeCoverage may reference stable node IDs but MUST NOT duplicate KnowledgeEdge facts.
+
+## KnowledgeNode Is Atomic
+
+- A `KnowledgeNode` is the smallest independently teachable, assessable, and reusable knowledge or capability unit.
+- Course, Chapter, Lesson, Stage, Outcome, Project, Community, Island, Domain, and Cluster MUST NOT be KnowledgeNodes.
+- Persistent scope is exactly `global`, `tenant`, or `user`; Course is provenance and curriculum context, never node ownership.
+- Stable node identity, revision history, provenance, lifecycle, mappings, mastery, and evidence lineage MUST be preserved across edits, split, merge, course deletion, and mapping.
+
+## Relations and Metadata
+
+- Knowledge-to-knowledge facts use only `prerequisite`, `enables`, or `related` KnowledgeEdges.
+- CurriculumCoverage, PracticeCoverage, KnowledgeMapping, and Promotion MUST remain separate from KnowledgeEdge.
+- `domainId` is metadata for color, filtering, search, statistics, and details. It MUST NOT determine coordinates or grouping.
+- `clusterId` and persistent Knowledge Cluster structures MUST NOT be added to the v1 core model.
+- Fake nodes or edges MUST NOT be created for layout, composition, islands, bridges, chapters, or demos.
+
+## Atlas Views
+
+- Global Atlas renders active Global-scope nodes and factual edges only.
+- Personal Atlas core nodes are active mastered/learning nodes with UserKnowledgeState. Explore nodes are all active non-core nodes directly connected to any core node, treating edge direction as irrelevant for one-hop visibility.
+- Personal Atlas uses deterministic relation-driven force layout. It MUST NOT use domain, cluster, chapter, community, or island anchors.
+- Community detection is an optional analysis technique, not a required product entity or visible region. Default Personal Atlas MUST NOT render community/island hulls, titles, quotas, or potential bridges.
+- Personal edges use a neutral undirected visual by default while preserving their factual relation and direction in data and details.
+
+## Course Views
+
+- Full Skill Tree renders CurriculumCoverage-referenced active KnowledgeNodes and their shared KnowledgeEdges.
+- Full Skill Tree uses prerequisite/enables for layered DAG rank; related edges are hidden unless their endpoint is selected.
+- Chapter Overview is a derived aggregation of the atomic course graph by each node's primary chapter. It is not a second knowledge graph.
+- Primary chapter is the earliest `introduce` coverage, falling back to the earliest coverage.
+- Chapter edges aggregate prerequisite/enables counts per ordered chapter pair and undergo transitive reduction. CurriculumSequence may constrain or minimally connect the projection but MUST NOT become a KnowledgeEdge.
+- CurriculumCoverage and PracticeCoverage remain N:M. Lesson or chapter fields MUST NOT be written into KnowledgeNode.
+
+## Layout and Validation
+
+- Atlas layouts MUST be deterministic for identical graph data and driven by real relation structure.
+- Global and Personal views use force layout without metadata centers. Course Full and Chapter Overview use deterministic layered DAG layout.
+- Course nodes MUST NOT overlap, share coordinates, or use modulo-based placement. Edges MUST route outside node interiors with readable source/target ports.
+- Changes MUST pass TypeScript compilation and production build. Relevant pages MUST be checked for runtime errors.

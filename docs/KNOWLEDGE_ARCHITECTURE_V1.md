@@ -2,15 +2,23 @@
 
 ## 1. Goals
 
-Knowledge Architecture v1 gives EduFlow one durable semantic model for public, institutional, and personal knowledge while keeping curricula, user state, mappings, and graph analysis separate. It prioritizes stable identity, auditable evolution, course-local discovery, reusable atomic knowledge, and graph-driven Atlas views.
+Knowledge Architecture v1 gives EduFlow one durable semantic model for public, institutional, and personal knowledge while keeping curricula and user state separate. The first product version has two core layers:
+
+```text
+Knowledge Layer                   Curriculum Layer
+├── KnowledgeNode                ├── Course / Chapter / Lesson
+├── KnowledgeEdge                ├── CurriculumCoverage / Sequence
+└── UserKnowledgeState           └── Material / Practice / PracticeCoverage
+```
+
+Global Atlas, Personal Atlas, and Course Skill Tree are views over these shared identities, never separate stores of knowledge facts. Mapping, revisions, provenance, lifecycle, and promotion remain supporting governance models without becoming view-specific ontology layers.
 
 ## 2. Terminology
 
 - **Knowledge ontology:** persistent KnowledgeNodes and factual KnowledgeRelations.
 - **Global / Tenant / User graph:** scope-filtered views over the shared model.
 - **Curriculum:** a course-specific teaching arrangement of knowledge.
-- **Community:** a relatively dense structural subgraph with sparser external connections.
-- **Knowledge Island:** a visual region around a community's real nodes.
+- **Community:** an optional graph-analysis result, not a required product entity or default visible region.
 - **Mapping:** a declared semantic correspondence between independently existing nodes.
 - **Promotion:** a governed request to create or select a node in a broader scope.
 
@@ -20,7 +28,7 @@ Knowledge Architecture v1 gives EduFlow one durable semantic model for public, i
 
 An atomic node should support an independent lesson objective, mastery decision, evidence item, prerequisite, and reuse across courses. “Atomic” does not mean the smallest word or term: splitting stops when the child would no longer have independent teaching, assessment, or mastery value.
 
-Course, Chapter, Lesson, Stage, Learning Outcome, Project, Community, Island, Domain, and Cluster are not KnowledgeNodes.
+Course, Chapter, Lesson, Stage, Learning Outcome, Project, Community, Island, Domain, and Cluster are not KnowledgeNodes. Knowledge Cluster is not part of the v1 core data model.
 
 ## 4. Node types
 
@@ -100,7 +108,7 @@ Evidence binds the node ID and may capture `nodeRevisionId` at creation time. Ev
 
 ## 15. Global Graph
 
-The Global Graph is the `scope=global` subgraph maintained by system administrators. It contains only real atomic public nodes and factual relations between them. Domain/cluster remain labels and weak analysis priors, not graph nodes or coordinate owners.
+The Global Graph is the `scope=global` subgraph maintained by system administrators. It contains only real atomic public nodes and factual relations between them. Domain is descriptive metadata only; it is never a graph node, layout group, community, or coordinate owner.
 
 ## 16. Tenant Graph
 
@@ -128,6 +136,8 @@ Chapter generation supports `auto`, `auto-fixed-count`, `follow-source`, and `ma
 
 A Chapter is an ordered curriculum container with a course-local identity, title, description, outcome, and lesson membership. It may be informed by graph structure but does not share community identity or membership logic. **Community != Chapter. Cluster != Chapter.**
 
+Domain is descriptive metadata, never structural membership. **Domain != Community. Domain != Chapter.**
+
 ## 21. Lesson
 
 A Lesson is an ordered teaching unit inside a chapter. Lesson order is curriculum sequence, not a knowledge prerequisite fact.
@@ -146,23 +156,27 @@ A Lesson is an ordered teaching unit inside a chapter. Lesson order is curriculu
 
 ## 25. Community
 
-A Community is a derived graph-analysis result: relatively dense internal structure with sparser external links. Detection uses real relations and weights, can span domains, is not `groupBy(domainId|clusterId|chapter)`, and may change with user state. A connected component may contain several communities joined by sparse bridges; small authentic communities must not be forcibly absorbed solely to satisfy a minimum size.
+Community detection is an optional graph-analysis technique for future advanced analysis. It is not required to construct Personal Atlas, does not determine visible-node selection or layout, and is not a persistent product entity. If used later, it must operate on real relations, may span domains, and must never be implemented as `groupBy(domainId|chapter)`.
 
 ## 26. Knowledge Island
 
-A Knowledge Island is the UI rendering of a community as hull, contour, halo, or region around real nodes. It is never a center node. Cross-community edges may remain thin visible bridges.
+Knowledge Island is not part of the v1 default product model or rendering. Personal Atlas does not render island hulls, contours, titles, centers, quotas, or cross-island metrics. Any future island visualization would be a temporary view of an optional Community result, never a node or knowledge fact.
 
 ## 27. Global Atlas
 
-Global Atlas answers “世界里有哪些知识，它们如何关联？” It renders only active/deprecated-as-context Global nodes and factual Global KnowledgeRelations. It never renders Tenant/User/Course/Domain/Cluster/Chapter/Community/Island nodes. Deterministic force geometry is relation-driven.
+Global Atlas answers “世界里有哪些知识，它们如何关联？” It renders active Global nodes and factual Global KnowledgeRelations. Superseded nodes remain in lineage data but are not rendered by default. It never renders Tenant/User/Course/Domain/Chapter/Community/Island nodes. Deterministic force geometry is relation-driven and independent of curriculum.
 
 ## 28. Personal Atlas
 
-Personal Atlas answers “我真正掌握/学习了哪些知识，它们如何连接？” Its visible graph may contain known Global, Tenant, and User nodes, user mastery/evidence, derived explore neighbors, communities, and connection analysis. Potential bridge nodes are analysis-only and hidden outside Connection Analysis. `crossDomainConnections` compares domain metadata; `crossIslandConnections` compares current community membership.
+Personal Atlas answers “我真正掌握/学习了哪些知识，它们如何连接？” Core is exactly the active Global, Tenant, or User nodes with mastered/learning UserKnowledgeState. Explore is every active non-core node directly connected to at least one core node, ignoring direction for visibility. The visible graph is Core plus all direct one-hop Explore nodes and every factual edge whose endpoints are both visible.
+
+Default rendering is a deterministic force graph with neutral undirected edge visuals. It does not run Community detection, use per-community quotas, add multi-hop candidates, or expose Potential Bridge / Connection Analysis. Direction and relation semantics remain available in data and selected-node details. `crossDomainConnections` compares domain metadata; cross-island metrics do not exist in v1.
 
 ## 29. Course Skill Tree
 
-Course Skill Tree answers “这门课准备怎样组织知识？” Full Skill Tree renders the atomic nodes referenced by CurriculumCoverage and the real KnowledgeRelations among them, with curriculum annotations. Chapter Overview is a projection of that same DAG plus explicit CurriculumSequence; chapter edges are derived, not hand-authored as a second graph.
+Course Skill Tree answers “这门课准备怎样组织知识？” Full Skill Tree renders the active atomic nodes referenced by CurriculumCoverage and the real KnowledgeRelations among them, with N:M curriculum/practice contexts. Dependency rank uses prerequisite/enables; related is detail context rather than default structure.
+
+Chapter Overview is the chapter aggregation of that same atomic DAG, not a second graph. Each node has one projection-only primary chapter: earliest `introduce`, otherwise earliest coverage. Cross-chapter prerequisite/enables facts are grouped into one ordered chapter pair with support counts, checked for cycles, and transitively reduced. CurriculumSequence can constrain ranking or minimally connect an otherwise isolated chapter, but never becomes a KnowledgeRelation.
 
 Structural adjacency may treat all relation types as undirected for layout/community/reachability. Directed learning adjacency preserves prerequisite/enables direction and is used for learning paths.
 
@@ -176,11 +190,14 @@ Structural adjacency may treat all relation types as undirected for layout/commu
 6. Course deletion cannot delete KnowledgeNodes, mastery, evidence, or historical provenance.
 7. Mapping never mutates nodes or copies mastery.
 8. Global Atlas filters `scope=global`; Personal/Course views do not assume all nodes are Global.
-9. Community, Domain, Cluster, Chapter, and Course identities are distinct.
+9. Community, Domain, Chapter, and Course identities are distinct; Knowledge Cluster is absent from the v1 core model.
 10. No layout-only node or edge may enter the ontology.
+11. Personal visible nodes equal active Core plus all direct one-hop Explore nodes.
+12. Curriculum and Practice projections preserve all N:M coverage records.
+13. Chapter dependency pairs are unique and derived only from primary membership.
 
 ## 31. Explicit non-goals / forbidden shortcuts
 
-V1 does not require full admin or curriculum-editing UI, database migrations, production embeddings, or inferred cross-mapping mastery. It forbids automatic Global/Tenant recall during course generation, course-scoped persistent nodes, physical deletion of referenced nodes, mastery replication through mapping, chapter/community equivalence, domain-driven coordinates, fake layout bridges, duplicated `prerequisiteNodeIds`, and hand-maintained `stageEdges`.
+V1 does not require full admin or curriculum-editing UI, database migrations, production embeddings, inferred cross-mapping mastery, Community/Island UI, Potential Bridge, prerequisite-gap UI, learning-path recommendations, or advanced recommendation models. It forbids automatic Global/Tenant recall during course generation, course-scoped persistent nodes, physical deletion of referenced nodes, mastery replication through mapping, chapter/community equivalence, domain-driven coordinates, fake layout bridges, duplicated `prerequisiteNodeIds`, and hand-maintained `stageEdges`.
 
-The Python ontology retains some broad nodes for a later bounded cleanup; v1 splits the clearest violations (thread/process/GIL, timeout/cancellation, task queue/worker, plugin/registry) and forbids adding new composite nodes.
+The Python ontology retains some broad nodes for a later bounded cleanup; v1 splits the clearest violations (thread/process/GIL, timeout/cancellation, task queue/worker, plugin/registry) and forbids adding new composite nodes. A legacy composite ID is retained as `superseded` and is never reused for one atomic successor.

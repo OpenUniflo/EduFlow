@@ -1,13 +1,4 @@
-import type { KnowledgeEdge, KnowledgeGraph } from "./types";
-
-export type PotentialBridge = {
-  nodeId: string;
-  groupIndexes: number[];
-  pathNodeIds: string[];
-  pathEdgeIds: string[];
-  missingNodeIds: string[];
-  score: number;
-};
+import type { KnowledgeEdge, KnowledgeGraph, KnowledgeGraphLayout } from "./types";
 
 export function buildStructuralAdjacency(nodeIds: Iterable<string>, edges: KnowledgeEdge[]) {
   const adjacency = new Map<string, Set<string>>();
@@ -80,77 +71,137 @@ export function calculateCrossDomainConnections(graph: KnowledgeGraph, coreNodeI
   }).length;
 }
 
-function directedPathBetweenGroups(
-  sources: string[],
-  targetIds: Set<string>,
-  adjacency: Map<string, Set<string>>,
-  maxDepth: number
-) {
-  const queue: Array<{ id: string; path: string[] }> = sources.sort().map((id) => ({ id, path: [id] }));
-  const visited = new Set(sources);
-  while (queue.length) {
-    const current = queue.shift();
-    if (!current || current.path.length - 1 > maxDepth) continue;
-    if (current.path.length > 1 && targetIds.has(current.id)) return current.path;
-    adjacency.get(current.id)?.forEach((neighbor) => {
-      if (visited.has(neighbor)) return;
-      visited.add(neighbor);
-      queue.push({ id: neighbor, path: [...current.path, neighbor] });
+type DirectedEdge = { source: string; target: string };
+
+function stronglyConnectedComponents(nodeIds: string[], edges: DirectedEdge[]) {
+  const adjacency = new Map(nodeIds.map((id) => [id, [] as string[]]));
+  edges.forEach((edge) => adjacency.get(edge.source)?.push(edge.target));
+  adjacency.forEach((targets) => targets.sort());
+  let cursor = 0;
+  const indexes = new Map<string, number>();
+  const lowLinks = new Map<string, number>();
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  const components: string[][] = [];
+  function visit(id: string) {
+    indexes.set(id, cursor);
+    lowLinks.set(id, cursor);
+    cursor += 1;
+    stack.push(id);
+    onStack.add(id);
+    adjacency.get(id)?.forEach((target) => {
+      if (!indexes.has(target)) {
+        visit(target);
+        lowLinks.set(id, Math.min(lowLinks.get(id) as number, lowLinks.get(target) as number));
+      } else if (onStack.has(target)) {
+        lowLinks.set(id, Math.min(lowLinks.get(id) as number, indexes.get(target) as number));
+      }
     });
+    if (lowLinks.get(id) !== indexes.get(id)) return;
+    const component: string[] = [];
+    while (stack.length) {
+      const member = stack.pop() as string;
+      onStack.delete(member);
+      component.push(member);
+      if (member === id) break;
+    }
+    components.push(component.sort());
   }
-  return undefined;
+  nodeIds.forEach((id) => { if (!indexes.has(id)) visit(id); });
+  return components;
 }
 
-export function findPotentialBridges(
-  graph: KnowledgeGraph,
-  groups: string[][],
-  coreNodeIds: Iterable<string>,
-  options: { maxDepth?: number; limit?: number } = {}
-): PotentialBridge[] {
-  if (groups.length < 2) return [];
-  const maxDepth = options.maxDepth ?? 6;
-  const limit = options.limit ?? 3;
-  const core = new Set(coreNodeIds);
-  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
-  const edgeByPair = new Map<string, KnowledgeEdge>();
-  graph.edges.forEach((edge) => {
-    edgeByPair.set(`${edge.source}:${edge.target}`, edge);
-    edgeByPair.set(`${edge.target}:${edge.source}`, edge);
+export function buildLayeredDagLayout(
+  nodeIds: Iterable<string>,
+  edges: DirectedEdge[],
+  stableOrder: (id: string) => number,
+  config: { layerGap?: number; rowGap?: number; marginX?: number; marginY?: number; sweeps?: number } = {}
+): KnowledgeGraphLayout {
+  const ids = Array.from(new Set(nodeIds)).sort((left, right) => stableOrder(left) - stableOrder(right) || left.localeCompare(right));
+  const allowed = new Set(ids);
+  const activeEdges = edges.filter((edge) => allowed.has(edge.source) && allowed.has(edge.target) && edge.source !== edge.target);
+  const components = stronglyConnectedComponents(ids, activeEdges);
+  const componentByNode = new Map<string, number>();
+  components.forEach((component, index) => component.forEach((id) => componentByNode.set(id, index)));
+  const componentEdges = new Map<number, Set<number>>(components.map((_, index) => [index, new Set()]));
+  const indegree = new Map<number, number>(components.map((_, index) => [index, 0]));
+  activeEdges.forEach((edge) => {
+    const source = componentByNode.get(edge.source) as number;
+    const target = componentByNode.get(edge.target) as number;
+    if (source === target || componentEdges.get(source)?.has(target)) return;
+    componentEdges.get(source)?.add(target);
+    indegree.set(target, (indegree.get(target) ?? 0) + 1);
   });
-  const adjacency = buildDirectedLearningAdjacency(graph.nodes.map((node) => node.id), graph.edges);
-  const paths: Array<{ sourceGroup: number; targetGroup: number; path: string[] }> = [];
-  groups.forEach((sourceGroup, sourceGroupIndex) => groups.forEach((targetGroup, targetGroupIndex) => {
-    if (sourceGroupIndex === targetGroupIndex) return;
-    const path = directedPathBetweenGroups(sourceGroup, new Set(targetGroup), adjacency, maxDepth);
-    if (path?.some((id) => !core.has(id))) paths.push({ sourceGroup: sourceGroupIndex, targetGroup: targetGroupIndex, path });
-  }));
-
-  const suggestions = paths.map(({ sourceGroup, targetGroup, path }) => {
-      const missingNodeIds = path.filter((id) => !core.has(id));
-      const nodeId = missingNodeIds[Math.floor((missingNodeIds.length - 1) / 2)];
-      const pathEdgeIds = path.slice(1).flatMap((id, index) => {
-        const edge = edgeByPair.get(`${path[index]}:${id}`);
-        return edge ? [edge.id] : [];
-      });
-      const node = nodeById.get(nodeId);
-      const crossDomainNeighbors = Array.from(adjacency.get(nodeId) ?? []).filter((id) => nodeById.get(id)?.domainId !== node?.domainId).length;
-      return {
-        nodeId,
-        groupIndexes: [sourceGroup, targetGroup],
-        pathNodeIds: path,
-        pathEdgeIds,
-        missingNodeIds,
-        score: 200 + crossDomainNeighbors * 12 - path.length * 8
-      };
+  const componentOrder = (index: number) => Math.min(...components[index].map(stableOrder));
+  const queue = components.map((_, index) => index).filter((index) => indegree.get(index) === 0)
+    .sort((left, right) => componentOrder(left) - componentOrder(right) || left - right);
+  const rank = new Map<number, number>(components.map((_, index) => [index, 0]));
+  while (queue.length) {
+    const source = queue.shift() as number;
+    Array.from(componentEdges.get(source) ?? []).sort((left, right) => componentOrder(left) - componentOrder(right) || left - right).forEach((target) => {
+      rank.set(target, Math.max(rank.get(target) ?? 0, (rank.get(source) ?? 0) + 1));
+      indegree.set(target, (indegree.get(target) ?? 0) - 1);
+      if (indegree.get(target) === 0) {
+        queue.push(target);
+        queue.sort((left, right) => componentOrder(left) - componentOrder(right) || left - right);
+      }
     });
-  const bestByNode = new Map<string, PotentialBridge>();
-  suggestions.forEach((suggestion) => {
-    const current = bestByNode.get(suggestion.nodeId);
-    if (!current || suggestion.score > current.score || (suggestion.score === current.score && suggestion.pathNodeIds.join(":") < current.pathNodeIds.join(":"))) {
-      bestByNode.set(suggestion.nodeId, suggestion);
+  }
+  const rankByNode = new Map(ids.map((id) => [id, rank.get(componentByNode.get(id) as number) ?? 0]));
+  const maxRank = Math.max(0, ...rankByNode.values());
+  const layers = Array.from({ length: maxRank + 1 }, () => [] as string[]);
+  ids.forEach((id) => layers[rankByNode.get(id) ?? 0].push(id));
+  const incoming = new Map(ids.map((id) => [id, [] as string[]]));
+  const outgoing = new Map(ids.map((id) => [id, [] as string[]]));
+  activeEdges.forEach((edge) => { incoming.get(edge.target)?.push(edge.source); outgoing.get(edge.source)?.push(edge.target); });
+  const sweeps = config.sweeps ?? 4;
+  for (let sweep = 0; sweep < sweeps; sweep += 1) {
+    const forward = sweep % 2 === 0;
+    const layerIndexes = forward ? layers.map((_, index) => index) : layers.map((_, index) => index).reverse();
+    const positions = new Map<string, number>();
+    layers.forEach((layer) => layer.forEach((id, index) => positions.set(id, index)));
+    layerIndexes.forEach((layerIndex) => {
+      const neighbors = forward ? incoming : outgoing;
+      layers[layerIndex].sort((left, right) => {
+        const score = (id: string) => {
+          const values = (neighbors.get(id) ?? []).map((neighbor) => positions.get(neighbor)).filter((value): value is number => value !== undefined);
+          return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : stableOrder(id);
+        };
+        return score(left) - score(right) || stableOrder(left) - stableOrder(right) || left.localeCompare(right);
+      });
+      layers[layerIndex].forEach((id, index) => positions.set(id, index));
+    });
+  }
+  const maxRows = Math.max(1, ...layers.map((layer) => layer.length));
+  const layerGap = config.layerGap ?? 270;
+  const rowGap = config.rowGap ?? 132;
+  const marginX = config.marginX ?? 50;
+  const marginY = config.marginY ?? 50;
+  return Object.fromEntries(layers.flatMap((layer, layerIndex) => layer.map((id, rowIndex) => [id, {
+    x: marginX + layerIndex * layerGap,
+    y: marginY + (rowIndex + (maxRows - layer.length) / 2) * rowGap
+  }])));
+}
+
+export function assertDirectedAcyclic(nodeIds: Iterable<string>, edges: DirectedEdge[]) {
+  const ids = Array.from(new Set(nodeIds));
+  if (stronglyConnectedComponents(ids, edges).some((component) => component.length > 1)) throw new Error("Directed graph contains a cycle");
+}
+
+export function transitiveReduction<T extends DirectedEdge>(nodeIds: Iterable<string>, edges: T[]): T[] {
+  const ids = new Set(nodeIds);
+  return edges.filter((edge, skippedIndex) => {
+    const adjacency = new Map(Array.from(ids, (id) => [id, [] as string[]]));
+    edges.forEach((candidate, index) => { if (index !== skippedIndex) adjacency.get(candidate.source)?.push(candidate.target); });
+    const visited = new Set([edge.source]);
+    const queue = [...(adjacency.get(edge.source) ?? [])];
+    while (queue.length) {
+      const current = queue.shift() as string;
+      if (current === edge.target) return false;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      queue.push(...(adjacency.get(current) ?? []));
     }
+    return true;
   });
-  return Array.from(bestByNode.values())
-    .sort((left, right) => right.score - left.score || left.missingNodeIds.length - right.missingNodeIds.length || left.nodeId.localeCompare(right.nodeId))
-    .slice(0, limit);
 }

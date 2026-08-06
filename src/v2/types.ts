@@ -1,4 +1,4 @@
-import type { KnowledgeNode, KnowledgeRelationType, KnowledgeScope } from "./knowledge/types";
+import type { KnowledgeEdge, KnowledgeNode, KnowledgeScope } from "./knowledge/types";
 
 export type LearningStatus = "completed" | "learning" | "available" | "locked";
 export type CurriculumGenerationMode = "auto" | "auto-fixed-count" | "follow-source" | "manual";
@@ -65,6 +65,16 @@ export type CurriculumSequence = {
   targetLessonId: string;
 };
 
+export type CourseCurriculumContext = CurriculumCoverage & {
+  lessonOrder: number;
+  chapterId: string;
+};
+
+export type CoursePracticeContext = PracticeCoverage & {
+  title: string;
+  templateId: string;
+};
+
 /** Presentation-only projection derived from KnowledgeNode + curriculum data. */
 export type CourseSkillTreeNode = {
   id: string;
@@ -72,6 +82,9 @@ export type CourseSkillTreeNode = {
   title: string;
   description: string;
   scope: KnowledgeScope;
+  primaryCoverage: CourseCurriculumContext;
+  curriculumContexts: CourseCurriculumContext[];
+  practiceContexts: CoursePracticeContext[];
   lessonId: string;
   lesson: number;
   chapterId: string;
@@ -86,11 +99,16 @@ export type CourseSkillTreeNode = {
 };
 
 export type CourseChapterProjection = CurriculumChapter & { x: number; y: number };
-export type CourseSkillTreeEdge = {
+export type CourseSkillTreeEdge = KnowledgeEdge;
+export type CourseChapterEdge = {
   id: string;
   source: string;
   target: string;
-  relation: KnowledgeRelationType;
+  primaryRelation: "prerequisite" | "enables" | "sequence";
+  sourceKind: "knowledge" | "curriculum-sequence";
+  prerequisiteCount: number;
+  enablesCount: number;
+  supportCount: number;
 };
 
 export type Practice = {

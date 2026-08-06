@@ -324,25 +324,6 @@
   transition: opacity 0.2s ease;
 }
 
-.personal-island-contour {
-  fill: rgba(105, 126, 230, 0.032);
-  stroke: rgba(105, 126, 230, 0.14);
-  stroke-width: 1.15;
-  stroke-dasharray: 3 9;
-  transition: fill 0.24s ease, stroke 0.24s ease, opacity 0.24s ease;
-}
-
-.personal-island-title {
-  fill: #5d6b84;
-  font-size: 16px;
-  font-weight: 750;
-}
-
-.personal-island-meta {
-  fill: #97a3b4;
-  font-size: 9px;
-}
-
 .personal-edge {
   fill: none;
   stroke: #8f9db6;
@@ -351,10 +332,10 @@
   transition: opacity 0.25s, stroke 0.25s, stroke-width 0.25s;
 }
 
-.personal-edge.cross-island {
-  stroke: #7685a6;
-  stroke-width: 0.85;
-  opacity: 0.22;
+.personal-edge.selected-relation {
+  stroke: #637ce0;
+  stroke-width: 2;
+  opacity: 0.78;
 }
 
 .personal-node {
@@ -407,26 +388,6 @@
   fill-opacity: 0.34;
   stroke: rgba(122, 136, 164, 0.66);
   stroke-dasharray: 2 2;
-}
-
-.personal-node.potential-bridge .personal-node-outer {
-  fill: rgba(142, 112, 225, 0.08);
-  stroke: rgba(126, 91, 218, 0.7);
-  stroke-dasharray: 4 4;
-}
-
-.personal-node.potential-bridge .personal-node-inner {
-  fill: rgba(255, 255, 255, 0.86);
-  stroke: #8968da;
-}
-
-.personal-node.status-gap .personal-node-outer {
-  stroke: #d69b48;
-  stroke-dasharray: 3 4;
-}
-
-.personal-node.status-gap .personal-node-inner {
-  fill: var(--domain-color, #edbf72);
 }
 
 .personal-node:hover .personal-node-outer,
@@ -567,58 +528,24 @@
   opacity: 0.86;
 }
 
-.personal-mode-connection .personal-node {
-  opacity: 0.48;
+.personal-node-copy {
+  transition: opacity 0.18s ease;
 }
 
-.personal-mode-connection .personal-node.core {
-  opacity: 0.86;
+.personal-zoom-far .personal-node-copy,
+.personal-zoom-far .personal-practice-evidence text,
+.personal-zoom-medium .personal-node.context .personal-node-copy,
+.personal-zoom-medium .personal-practice-evidence text {
+  opacity: 0;
 }
 
-.personal-mode-connection .personal-node.potential-bridge {
-  opacity: 0.96;
-}
-
-.personal-mode-connection .personal-edge {
-  stroke: #687dd2;
-  stroke-width: 1.45;
-  opacity: 0.48;
-}
-
-.personal-mode-connection .personal-edge.potential {
-  stroke: #8768da;
-  stroke-width: 1.7;
-  stroke-dasharray: 5 7;
-  opacity: 0.72;
-}
-
-.personal-mode-connection .personal-edge.cross-island {
-  stroke: #6578c8;
-  stroke-width: 1.25;
-  opacity: 0.52;
-}
-
-.personal-mode-connection .personal-island-contour {
-  fill: rgba(105, 126, 230, 0.045);
-  stroke-width: 1.8;
+.personal-zoom-far .personal-node.force-label .personal-node-copy,
+.personal-zoom-medium .personal-node.force-label .personal-node-copy {
   opacity: 1;
 }
 
-.personal-zoom-island .personal-node,
-.personal-zoom-island .personal-edge,
-.personal-zoom-island .personal-practice-evidence {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.personal-zoom-island .personal-island-contour {
-  fill: rgba(105, 126, 230, 0.06);
-  stroke: rgba(105, 126, 230, 0.2);
-}
-
-.personal-zoom-community .personal-node-copy,
-.personal-zoom-community .personal-practice-evidence text {
-  opacity: 0;
+.personal-zoom-far .personal-node.context {
+  opacity: 0.58;
 }
 
 .personal-drawer {
@@ -4904,8 +4831,8 @@ body {
 }
 
 .atlas-graph-world {
-  width: 3300px;
-  height: 720px;
+  width: 6000px;
+  height: 5200px;
 }
 
 .atlas-graph-lines path {
@@ -4930,6 +4857,38 @@ body {
   opacity: 0.13;
 }
 
+.atlas-graph-lines path.prerequisite.hard {
+  stroke: #7f8fad;
+  stroke-width: 2.4px;
+  opacity: 0.88;
+}
+
+.atlas-graph-lines path.prerequisite.soft {
+  stroke: #9aa8be;
+  stroke-width: 1.7px;
+  opacity: 0.62;
+}
+
+.atlas-graph-lines path.enables {
+  stroke: #7fa3ab;
+  stroke-width: 1.45px;
+  opacity: 0.54;
+}
+
+.atlas-graph-lines path.related {
+  stroke: #a6a1bd;
+  stroke-width: 1.2px;
+  stroke-dasharray: 4 6;
+  opacity: 0.45;
+}
+
+.atlas-graph-lines path.sequence {
+  stroke: #a4adbd;
+  stroke-width: 1.2px;
+  stroke-dasharray: 5 6;
+  opacity: 0.52;
+}
+
 .atlas-chapter-hull {
   fill: rgba(91, 124, 250, 0.055);
   stroke: rgba(91, 124, 250, 0.23);
@@ -4945,9 +4904,9 @@ body {
 }
 
 .atlas-skill-node {
-  width: 184px;
-  height: 84px;
-  min-height: 84px;
+  width: 196px;
+  height: 104px;
+  min-height: 104px;
   padding: 0;
   overflow: visible;
   border: 0;
@@ -4986,7 +4945,7 @@ body {
 
 .atlas-node-main {
   z-index: 2;
-  padding: 15px 16px 12px 42px;
+  padding: 13px 14px 10px 42px;
   border: 1.7px solid #90a3c4;
   background: rgba(255, 255, 255, 0.94);
   text-align: left;
@@ -5063,13 +5022,16 @@ body {
 .atlas-node-status.locked { border-color: #a7b0be; }
 
 .atlas-node-main > strong {
-  display: block;
+  display: -webkit-box;
   overflow: hidden;
+  min-height: 35px;
   color: #1d2940;
   font-size: 14px;
   line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .atlas-node-main > small,
@@ -5082,7 +5044,6 @@ body {
   font-style: normal;
   font-weight: 600;
   line-height: 1;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
