@@ -1,5 +1,11 @@
 # EduFlow Repository Instructions
 
+## Package Manager
+
+- pnpm is the only supported package manager. Dependency changes MUST update `pnpm-lock.yaml` with pnpm.
+- `package-lock.json`, `yarn.lock`, and other competing lockfiles MUST NOT be committed.
+- Before pushing dependency changes, `pnpm install --frozen-lockfile` MUST succeed.
+
 ## Knowledge and Curriculum Boundaries
 
 - EduFlow MUST maintain one shared Knowledge Graph composed of `KnowledgeNode`, `KnowledgeEdge`, and user-owned `UserKnowledgeState`.
