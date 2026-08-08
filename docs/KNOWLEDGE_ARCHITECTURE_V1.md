@@ -8,7 +8,7 @@ Knowledge Architecture v1 gives EduFlow one durable semantic model for public, i
 Knowledge Layer                   Curriculum Layer
 ├── KnowledgeNode                ├── Course / Chapter / Lesson
 ├── KnowledgeEdge                ├── CurriculumCoverage / Sequence
-└── UserKnowledgeState           └── Material / Practice / PracticeCoverage
+└── UserKnowledgeState           └── Material / CourseAssignment / AssignmentCoverage
 ```
 
 Global Atlas, Personal Atlas, and Course Skill Tree are views over these shared identities, never separate stores of knowledge facts. Mapping, revisions, provenance, lifecycle, and promotion remain supporting governance models without becoming view-specific ontology layers.
@@ -70,7 +70,7 @@ Knowledge-to-knowledge facts use only:
 - `enables`: `A → B` means A enables implementation/application of B without being a cognitive prerequisite. Optional numeric strength is `0..1`.
 - `related`: a significant association without prerequisite/enabling semantics. It is structurally undirected by default and may have numeric strength `0..1`.
 
-`implementation-support`, `practice-support`, and `conceptual` are obsolete relation values. Lesson, practice, mapping, and promotion relationships are not KnowledgeRelations.
+`implementation-support`, `practice-support`, and `conceptual` are obsolete relation values. Lesson, Assignment, mapping, and promotion relationships are not KnowledgeRelations.
 
 ## 9. KnowledgeMapping
 
@@ -122,9 +122,9 @@ The User Graph is the owner-specific `scope=user, ownerId=userId` subgraph. A Us
 
 Course creation is strictly:
 
-`Upload → Parse → Atomic Knowledge Extraction → Relation Extraction → User Knowledge Graph → Curriculum Generation`.
+`Upload → Parse → Atomic Knowledge Extraction → Relation Extraction → User Knowledge Graph → Curriculum Generation → Chapter / Lesson → Assignment Generation → Assignment Coverage Validation → Course Ready`.
 
-It must not automatically retrieve Global/Tenant nodes or perform replacement, merge, mapping, or promotion. Course deletion removes curriculum/material/practice associations, not discovered User nodes, provenance, mastery, or evidence. **Course deletion != Knowledge deletion. Course != Knowledge Ontology.**
+It must not automatically retrieve Global/Tenant nodes or perform replacement, merge, mapping, or promotion. Course Ready requires Assignment coverage for every course KnowledgeNode. Course deletion removes curriculum/material/Assignment associations, not discovered User nodes, provenance, mastery, or evidence. **Course deletion != Knowledge deletion. Course != Knowledge Ontology.**
 
 ## 19. Curriculum
 
@@ -146,9 +146,17 @@ A Lesson is an ordered teaching unit inside a chapter. Lesson order is curriculu
 
 `CurriculumCoverage(courseId, lessonId, nodeId, role)` binds lessons to stable nodes. Roles are `introduce`, `reinforce`, `apply`, and `assess`. The model is many-to-many: a lesson covers many nodes, a node appears in multiple lessons, and multiple courses may reuse one node.
 
-## 23. PracticeCoverage
+## 23. Course Assignment Model
 
-`PracticeCoverage(practiceId, nodeId, role)` binds practice/assessment to knowledge with roles `practice`, `reinforce`, and `assess`. It is never encoded as a KnowledgeRelation.
+`CourseAssignment` is course-owned curriculum data describing an executable post-learning task. It contains a task description, requirements, expected output, acceptance criteria, estimated time, optional project contribution, and mode. `Assignment != KnowledgeNode` and `Assignment != KnowledgeRelation`; it never enters Global or Personal Atlas.
+
+`AssignmentCoverage(assignmentId, nodeId, role)` binds an Assignment to stable Global, Tenant, or User knowledge identity with roles `practice`, `apply`, and `assess`. It is N:M and never encoded as a KnowledgeRelation. One integrated Assignment can cover several atomic capabilities, and a KnowledgeNode can contribute to several Assignments.
+
+Assignment mode is `instruction` or `workflow`. Both modes have complete task definitions. Workflow mode additionally requires `workflowTemplateId`; the workflow canvas is an optional execution environment, not the Assignment itself.
+
+`UserAssignmentState(assignmentId, status, progress?)` is separate from Assignment definition and UserKnowledgeState. Assignment completion does not automatically set mastery, though it may produce KnowledgeEvidence in a future evidence pipeline.
+
+Every active course KnowledgeNode must have at least one AssignmentCoverage before Course Ready. Missing coverage is an invariant failure and cannot be replaced by generated UI fallback text. Assignment outputs may be composed into Chapter outcomes and the Course Integrated Project through `expectedOutput` and `projectContribution`; outputs and projects do not become KnowledgeNodes.
 
 ## 24. Similarity Analysis
 
@@ -174,7 +182,9 @@ Default rendering is a deterministic force graph with neutral undirected edge vi
 
 ## 29. Course Skill Tree
 
-Course Skill Tree answers “这门课准备怎样组织知识？” Full Skill Tree renders the active atomic nodes referenced by CurriculumCoverage and the real KnowledgeRelations among them, with N:M curriculum/practice contexts. Dependency rank uses prerequisite/enables; related is detail context rather than default structure.
+Course Skill Tree answers “这门课准备怎样组织知识？” Full Skill Tree renders the active atomic nodes referenced by CurriculumCoverage and the real KnowledgeRelations among them, with N:M curriculum/Assignment contexts. Dependency rank uses prerequisite/enables; related is detail context rather than default structure.
+
+The user-facing `技能树` and `实训树` are two presentations of this same course graph. Every atomic projection contains a Knowledge card plus one Assignment companion card; multiple AssignmentCoverages are summarized inside that single companion. Chapter Assignment summaries deduplicate by assignmentId through `Chapter → primary KnowledgeNodes → AssignmentCoverage → unique Assignments`. Switching presentation changes appearance and content only, never topology, ELK layout, coordinates, or viewport.
 
 Chapter Overview is the chapter aggregation of that same atomic DAG, not a second graph. Each node has one projection-only primary chapter: earliest `introduce`, otherwise earliest coverage. Cross-chapter prerequisite/enables facts are grouped into one ordered chapter pair with support counts, checked for cycles, and transitively reduced. CurriculumSequence can constrain ranking or minimally connect an otherwise isolated chapter, but never becomes a KnowledgeRelation.
 
@@ -186,15 +196,17 @@ Structural adjacency may treat all relation types as undirected for layout/commu
 2. Every node has type, mastery criteria, scope, provenance, and current revision.
 3. Tenant/User nodes have owners; Global nodes do not require one.
 4. A relation connects existing nodes and uses relation-specific strength.
-5. Curriculum/Practice coverage and Mapping are not KnowledgeRelations.
+5. Curriculum/Assignment coverage and Mapping are not KnowledgeRelations.
 6. Course deletion cannot delete KnowledgeNodes, mastery, evidence, or historical provenance.
 7. Mapping never mutates nodes or copies mastery.
 8. Global Atlas filters `scope=global`; Personal/Course views do not assume all nodes are Global.
 9. Community, Domain, Chapter, and Course identities are distinct; Knowledge Cluster is absent from the v1 core model.
 10. No layout-only node or edge may enter the ontology.
 11. Personal visible nodes equal active Core plus all direct one-hop Explore nodes.
-12. Curriculum and Practice projections preserve all N:M coverage records.
+12. Curriculum and Assignment projections preserve all N:M coverage records.
 13. Chapter dependency pairs are unique and derived only from primary membership.
+14. Every active course KnowledgeNode has at least one valid AssignmentCoverage.
+15. Workflow Assignments have a workflowTemplateId; instruction Assignments do not require one.
 
 ## 31. Explicit non-goals / forbidden shortcuts
 
@@ -214,8 +226,8 @@ ELK is the production owner of course macro layer/order, local atomic coordinate
 
 ## 33. Rendering Stability
 
-Rendering distinguishes structural state from presentation state. Structural state includes the actual node/edge set, curriculum composition, Chapter expansion state, and course graph revisions; it may trigger ELK or force-layout computation. Selection, hover, search, drawer visibility, labels, relation highlighting, and knowledge/practice visual mode are presentation state and must not alter coordinates or reheat the force simulation.
+Rendering distinguishes structural state from presentation state. Structural state includes the actual node/edge set, curriculum composition, Chapter expansion state, and course graph revisions; it may trigger ELK or force-layout computation. Selection, hover, search, drawer visibility, labels, relation highlighting, and knowledge/Assignment visual mode are presentation state and must not alter coordinates or reheat the force simulation.
 
-Course rendering computes one Chapter Macro Layout from the Chapter dependency DAG and caches one Local Atomic Layout per Chapter from internal prerequisite/enables facts. Overview, Focused, and Full compose those same results at different expansion levels. Expanded groups may push neighboring groups outward to avoid overlap, but layer order, branch order, and Chapter topology remain stable. Cross-Chapter atomic relations are routed over the composed positions and never determine Chapter placement. Practice companions are presentation layers inside the corresponding atomic knowledge card, not graph nodes.
+Course rendering computes one Chapter Macro Layout from the Chapter dependency DAG and caches one Local Atomic Layout per Chapter from internal prerequisite/enables facts. Overview, Focused, and Full compose those same results at different expansion levels. Expanded groups may push neighboring groups outward to avoid overlap, but layer order, branch order, and Chapter topology remain stable. Cross-Chapter atomic relations are routed over the composed positions and never determine Chapter placement. Assignment companions are presentation layers inside the corresponding atomic knowledge card, not graph nodes. ELK sizes each atomic child with the full Knowledge-card-plus-companion footprint, which stays identical in 技能树 and 实训树 modes.
 
 Global and Personal Atlas use stable structural graphData until the underlying visible knowledge set or factual edges change. Atlas Focus Mode derives the selected node and its direct factual neighbors, changes camera, material opacity, edge emphasis, and label priority, and leaves force coordinates untouched. Clearing focus restores default appearance without reheating the simulation or resetting the camera.

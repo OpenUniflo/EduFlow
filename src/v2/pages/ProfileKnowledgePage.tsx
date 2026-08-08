@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
-import { curriculumCoverages, curriculumLessons, practiceCoverages, practices } from "../data";
+import { assignmentCoverages, courseAssignments, curriculumCoverages, curriculumLessons, userAssignmentStates } from "../data";
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneHandle } from "../knowledge/components/KnowledgeAtlasScene";
 import { buildPersonalAtlasProjection } from "../knowledge/projections/atlasProjections";
 import { useLearningProgress } from "../progress";
@@ -26,7 +26,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   const progress = useLearningProgress();
   const sceneRef = useRef<KnowledgeAtlasSceneHandle>(null);
   const toastTimerRef = useRef<number | null>(null);
-  const graph = useMemo(() => buildPersonalKnowledgeGraph(demoPersonalKnowledgeGraph, demoUserKnowledge, practices, curriculumCoverages, curriculumLessons, practiceCoverages, progress), [progress]);
+  const graph = useMemo(() => buildPersonalKnowledgeGraph(demoPersonalKnowledgeGraph, demoUserKnowledge, courseAssignments, curriculumCoverages, curriculumLessons, assignmentCoverages, userAssignmentStates, progress), [progress]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchMatchId, setSearchMatchId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -89,9 +89,9 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
     else navigate("/courses");
   }
 
-  function openPractice(node: PersonalKnowledgeNode) {
-    const context = node.practiceContexts[0];
-    navigate(context ? `/workflows/${context.templateId}` : "/workflows");
+  function openAssignment(node: PersonalKnowledgeNode) {
+    const context = node.assignmentContexts[0];
+    navigate(context?.workflowTemplateId ? `/workflows/${context.workflowTemplateId}` : "/courses/agentic-ai");
   }
 
   const incidentEdges = selected ? graph.edges.filter((edge) => edge.source === selected.id || edge.target === selected.id) : [];
@@ -104,7 +104,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
         <div className="personal-identity"><span className="personal-avatar">{initials(session.name)}</span><span><strong>{session.name}</strong><small>{session.email}</small></span><button aria-label="打开个人设置" onClick={() => showToast("个人资料设置将在后续版本开放")}>•••</button></div>
         <div className="personal-summary-divider" />
         <div className="personal-summary-heading"><span><strong>我的知识空间</strong><small>Personal Knowledge Graph</small></span><i><Network size={15} /></i></div>
-        <div className="personal-summary-stats"><span><strong>{graph.summary.mastered}</strong><small>已掌握</small></span><span><strong>{graph.summary.learning}</strong><small>学习中</small></span><span><strong>{graph.summary.explore}</strong><small>可探索</small></span><span><strong>{graph.summary.verifiedPractices}</strong><small>实训验证</small></span></div>
+        <div className="personal-summary-stats"><span><strong>{graph.summary.mastered}</strong><small>已掌握</small></span><span><strong>{graph.summary.learning}</strong><small>学习中</small></span><span><strong>{graph.summary.explore}</strong><small>可探索</small></span><span><strong>{graph.summary.completedAssignments}</strong><small>实训验证</small></span></div>
         <div className="personal-summary-divider" />
         <div className="personal-summary-kicker">知识结构</div>
         <div className="personal-structure-row"><span>直接可探索</span><strong>{graph.summary.explore} 个</strong></div>
@@ -125,7 +125,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
           <section><h3>学习与实践证据</h3>{selected.evidence.length ? <div className="personal-drawer-list">{selected.evidence.map((item, index) => <span key={`${item}-${index}`}><small>证据 {String(index + 1).padStart(2, "0")}</small><strong>{item}</strong></span>)}</div> : <div className="personal-empty-analysis"><CircleDot size={18} /><strong>尚无学习证据</strong><p>节点出现在图中不会自动视为已掌握。</p></div>}</section>
           <section><h3>直接知识关系</h3><div className="personal-relation-tags">{incidentEdges.map((edge) => { const other = nodeById.get(edge.source === selected.id ? edge.target : edge.source); return other ? <button key={edge.id} onClick={() => locateNode(other)}><small>{relationLabels[edge.relation]}</small>{other.title}<ArrowRight size={12} /></button> : null; })}</div></section>
           {selected.status === "explore" ? <div className="personal-explore-note"><CircleDot size={18} /><span><strong>一跳可探索知识</strong><p>它与至少一个核心节点直接相关，但尚未进入你的掌握或学习状态。</p></span></div> : null}
-          <div className="personal-drawer-actions"><button className="primary" onClick={() => openCourse(selected)}>查看课程上下文<BookOpen size={14} /></button><button onClick={() => openPractice(selected)}>进入实训<Workflow size={14} /></button></div>
+          <div className="personal-drawer-actions"><button className="primary" onClick={() => openCourse(selected)}>查看课程上下文<BookOpen size={14} /></button><button onClick={() => openAssignment(selected)}>查看实训<Workflow size={14} /></button></div>
         </> : null}
       </aside>
 

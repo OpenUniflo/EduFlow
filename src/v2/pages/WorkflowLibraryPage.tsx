@@ -1,7 +1,7 @@
 import { ArrowRight, CheckCircle2, Grid2X2, List, Plus, Sparkles, Trash2 } from "lucide-react";
 import type { MockSession, Template, WorkflowViewMode } from "../../app/model";
 import { WorkflowPreview } from "../../components/app/workflows/WorkflowPages";
-import { practices } from "../data";
+import { courseAssignments } from "../data";
 import { useLearningProgress } from "../progress";
 import { GlobalNav } from "../components/GlobalNav";
 
@@ -27,25 +27,26 @@ export function WorkflowLibraryPage({
   onDeleteWorkflow: (templateId: string) => void;
 }) {
   const progress = useLearningProgress();
-  const lessonIds = new Set(practices.map((item) => item.templateId));
+  const workflowAssignments = courseAssignments.filter((item) => item.mode === "workflow" && item.workflowTemplateId);
+  const lessonIds = new Set(workflowAssignments.map((item) => item.workflowTemplateId!));
   const lessonWorkflows = workflows.filter((item) => lessonIds.has(item.id));
   const otherWorkflows = workflows.filter((item) => !lessonIds.has(item.id));
 
   function workflowCard(template: Template) {
-    const practice = practices.find((item) => item.templateId === template.id);
-    const complete = practice ? progress.completedPracticeIds.includes(practice.id) : false;
+    const assignment = workflowAssignments.find((item) => item.workflowTemplateId === template.id);
+    const complete = assignment ? progress.completedAssignmentIds.includes(assignment.id) : false;
     return (
       <article key={template.id} className={`atlas-workflow-card glass-v2 ${activeTemplateId === template.id ? "active" : ""}`}>
         <button className="atlas-workflow-open" onClick={() => onOpenWorkflow(template.id)}>
           <WorkflowPreview template={template} />
           <div className="atlas-workflow-copy">
             <div className="atlas-workflow-card-head">
-              <span>{practice ? `第四课 · ${practice.paradigm}` : "通用模板"}</span>
+              <span>{assignment ? `课程实训 · ${assignment.title}` : "通用模板"}</span>
               {complete ? <small><CheckCircle2 size={13} />已完成</small> : null}
             </div>
             <h3>{template.name}</h3>
             <p>{template.description}</p>
-            <div><span>{template.nodes.filter((item) => item.kind !== "system").length} 节点</span><span>{template.edges.length} 条边</span>{practice ? <span>{practice.estimatedMinutes} 分钟</span> : null}</div>
+            <div><span>{template.nodes.filter((item) => item.kind !== "system").length} 节点</span><span>{template.edges.length} 条边</span>{assignment?.estimatedMinutes ? <span>{assignment.estimatedMinutes} 分钟</span> : null}</div>
           </div>
           <ArrowRight size={18} />
         </button>
@@ -81,7 +82,7 @@ export function WorkflowLibraryPage({
         <section className="atlas-workflow-section">
           <div className="atlas-section-row">
             <div><span className="atlas-kicker">LESSON 04 LAB</span><h2>推理范式比较实训</h2></div>
-            <span>{progress.completedPracticeIds.length}/5 个模板已完成</span>
+            <span>{progress.completedAssignmentIds.length}/{workflowAssignments.length} 个课程工作流已完成</span>
           </div>
           <div className={`atlas-workflow-library ${viewMode}`}>{lessonWorkflows.map(workflowCard)}</div>
         </section>
@@ -102,4 +103,3 @@ export function WorkflowLibraryPage({
     </main>
   );
 }
-

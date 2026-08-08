@@ -16,22 +16,26 @@ export type CourseGraphHandle = {
 type Props = {
   view: CourseGraphView;
   focusedChapterId: string | null;
-  mode: "knowledge" | "practice";
+  mode: "knowledge" | "assignment";
   selectedId: string | null;
   searchMatchId: string | null;
   onChapterClick: (chapter: CourseChapterProjection) => void;
   onChapterDoubleClick: (chapter: CourseChapterProjection) => void;
   onKnowledgeClick: (node: CourseSkillTreeNode) => void;
+  onAssignmentClick: (node: CourseSkillTreeNode) => void;
 };
 
 function ChapterNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
   const chapter = data.chapter!;
   const progress = chapter.progress;
+  const assignment = chapter.assignmentSummary;
+  const assignmentStatus = `${assignment.completedCount} 项完成 · ${assignment.inProgressCount} 项进行中`;
   return (
-    <div className={`course-flow-chapter ${data.expanded ? "expanded" : "collapsed"} ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": chapter.color } as React.CSSProperties} onDoubleClick={(event) => { event.stopPropagation(); data.onChapterDoubleClick?.(chapter); }}>
+    <div className={`course-flow-chapter ${data.expanded ? "expanded" : "collapsed"} mode-${data.mode} ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": chapter.color } as React.CSSProperties} onDoubleClick={(event) => { event.stopPropagation(); data.onChapterDoubleClick?.(chapter); }}>
       <Handle type="target" id="in" position={Position.Left} />
-      <div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")}</small><strong>{chapter.title}</strong><em>{chapter.lessonIds.length} 课 · {progress >= 100 ? "已完成" : progress ? `学习中 ${progress}%` : "可学习"}</em></span></div>
-      {!data.expanded ? <><p>{chapter.description}</p><b>双击原位展开</b></> : <div className="course-flow-chapter-caption">{chapter.title} · 原子知识与实训伴生层</div>}
+      <div className="course-flow-chapter-presentation knowledge-presentation"><div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")}</small><strong>{chapter.title}</strong><em>{chapter.lessonIds.length} 课 · {progress >= 100 ? "已完成" : progress ? `学习中 ${progress}%` : "可学习"}</em></span></div>{!data.expanded ? <p>{chapter.description}</p> : <div className="course-flow-chapter-caption">{chapter.title} · 原子知识与实训伴生层</div>}</div>
+      <div className="course-flow-chapter-presentation assignment-presentation"><div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")} · 实训</small><strong>{chapter.title} · 实训</strong><em>{assignment.assignmentCount} 项实训 · 完成度 {assignment.progress}%</em></span></div>{!data.expanded ? <p>{assignmentStatus}<br />篇章成果：{assignment.outcome}</p> : <div className="course-flow-chapter-caption">{assignmentStatus} · 篇章成果：{assignment.outcome}</div>}</div>
+      {!data.expanded ? <b>双击原位展开</b> : null}
       <Handle type="source" id="out" position={Position.Right} />
     </div>
   );
@@ -40,22 +44,24 @@ function ChapterNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
 function KnowledgeNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
   const node = data.knowledge!;
   const status = { completed: "已完成", learning: "学习中", available: "可学习", locked: "未解锁" }[node.status];
-  const practiceStatus = node.status === "completed" ? "已验证" : node.status === "learning" ? "进行中" : node.status === "locked" ? "待解锁" : "可开始";
-  const hasPractice = node.practiceContexts.length > 0;
+  const assignmentStatus = node.assignmentStateSummary.completedCount ? "已完成" : node.assignmentStateSummary.inProgressCount ? "进行中" : node.status === "locked" ? "待解锁" : "可开始";
+  const singleAssignment = node.assignmentContexts.length === 1 ? node.assignmentContexts[0].assignment : null;
+  const assignmentTitle = singleAssignment?.title ?? `${node.assignmentCount} 项课后任务`;
+  const assignmentMeta = singleAssignment?.estimatedMinutes ? `预计 ${singleAssignment.estimatedMinutes} 分钟` : `${node.assignmentStateSummary.inProgressCount} 项进行中`;
   return (
-    <div className={`course-flow-knowledge status-${node.status} mode-${data.mode} ${hasPractice ? "has-practice" : ""} ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": node.color } as React.CSSProperties}>
+    <div className={`course-flow-knowledge status-${node.status} mode-${data.mode} has-assignment ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": node.color } as React.CSSProperties}>
       <Handle type="target" id="in" position={Position.Left} />
-      {hasPractice ? <div className="course-flow-card course-flow-practice-card">
+      <button className="course-flow-card course-flow-assignment-card" onClick={(event) => { event.stopPropagation(); data.onAssignmentClick?.(node); }} aria-label={`查看实训：${assignmentTitle}`}>
         <span className="course-flow-knowledge-icon">◇</span>
-        <strong>{node.practiceTitle}</strong>
-        <small>{node.practiceContexts.length} 项实训 · {practiceStatus}</small>
-        <em>PracticeCoverage 伴生层</em>
-      </div> : null}
+        <strong>{assignmentTitle}</strong>
+        <small>{node.assignmentCount} 项实训 · {assignmentStatus}</small>
+        <em>{assignmentMeta}</em>
+      </button>
       <div className="course-flow-card course-flow-knowledge-card">
         <span className="course-flow-knowledge-icon">◆</span>
         <strong>{node.title}</strong>
         <small>第 {node.lesson} 课 · {status}</small>
-        <em>{hasPractice ? `${node.practiceContexts.length} 项实训伴生` : "课程知识节点"}</em>
+        <em>{node.assignmentCount} 项实训伴生</em>
       </div>
       <Handle type="source" id="out" position={Position.Right} />
     </div>
@@ -103,8 +109,8 @@ const CourseGraphInner = forwardRef<CourseGraphHandle, Props>(function CourseGra
   }, [instance, projection, props.view, structureKey]);
 
   const flow = useMemo(
-    () => layout ? toReactFlow(layout, props.mode, props.selectedId, props.searchMatchId, props.onChapterDoubleClick) : { nodes: [], edges: [] },
-    [layout, props.mode, props.onChapterDoubleClick, props.searchMatchId, props.selectedId]
+    () => layout ? toReactFlow(layout, props.mode, props.selectedId, props.searchMatchId, props.onChapterDoubleClick, props.onAssignmentClick) : { nodes: [], edges: [] },
+    [layout, props.mode, props.onAssignmentClick, props.onChapterDoubleClick, props.searchMatchId, props.selectedId]
   );
 
   useImperativeHandle(ref, () => ({

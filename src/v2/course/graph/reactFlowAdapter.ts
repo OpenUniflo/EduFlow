@@ -3,20 +3,22 @@ import { courseSkillTreeEdges } from "../../data";
 import type { CourseLayout, CourseLayoutEdge, CourseLayoutNode } from "./elkCourseLayout";
 
 export type CourseFlowNodeData = CourseLayoutNode & {
-  mode: "knowledge" | "practice";
+  mode: "knowledge" | "assignment";
   selected: boolean;
   searchMatch: boolean;
   onChapterDoubleClick?: (chapter: NonNullable<CourseLayoutNode["chapter"]>) => void;
+  onAssignmentClick?: (knowledge: NonNullable<CourseLayoutNode["knowledge"]>) => void;
 } & Record<string, unknown>;
 
 export type CourseFlowEdgeData = CourseLayoutEdge & { highlighted: boolean } & Record<string, unknown>;
 
 export function toReactFlow(
   layout: CourseLayout,
-  mode: "knowledge" | "practice",
+  mode: "knowledge" | "assignment",
   selectedId: string | null,
   searchMatchId: string | null,
-  onChapterDoubleClick?: CourseFlowNodeData["onChapterDoubleClick"]
+  onChapterDoubleClick?: CourseFlowNodeData["onChapterDoubleClick"],
+  onAssignmentClick?: CourseFlowNodeData["onAssignmentClick"]
 ) {
   const nodes: Array<Node<CourseFlowNodeData>> = layout.nodes.map((node) => ({
     id: node.id,
@@ -35,7 +37,8 @@ export function toReactFlow(
       mode,
       selected: selectedId === node.id,
       searchMatch: searchMatchId === node.id,
-      onChapterDoubleClick: node.kind === "chapter" ? onChapterDoubleClick : undefined
+      onChapterDoubleClick: node.kind === "chapter" ? onChapterDoubleClick : undefined,
+      onAssignmentClick: node.kind === "knowledge" ? onAssignmentClick : undefined
     },
     style: { width: node.width, height: node.height }
   }));

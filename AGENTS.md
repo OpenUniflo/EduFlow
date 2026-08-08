@@ -4,7 +4,7 @@
 
 - EduFlow MUST maintain one shared Knowledge Graph composed of `KnowledgeNode`, `KnowledgeEdge`, and user-owned `UserKnowledgeState`.
 - Global Atlas, Personal Atlas, and Course Skill Tree are views over that shared graph. They MUST NOT maintain separate knowledge facts.
-- Curriculum data is separate: Course, Chapter, Lesson, CurriculumCoverage, CurriculumSequence, Material, Practice, and PracticeCoverage may reference stable node IDs but MUST NOT duplicate KnowledgeEdge facts.
+- Curriculum data is separate: Course, Chapter, Lesson, CurriculumCoverage, CurriculumSequence, Material, CourseAssignment, and AssignmentCoverage may reference stable node IDs but MUST NOT duplicate KnowledgeEdge facts.
 
 ## KnowledgeNode Is Atomic
 
@@ -16,7 +16,7 @@
 ## Relations and Metadata
 
 - Knowledge-to-knowledge facts use only `prerequisite`, `enables`, or `related` KnowledgeEdges.
-- CurriculumCoverage, PracticeCoverage, KnowledgeMapping, and Promotion MUST remain separate from KnowledgeEdge.
+- CurriculumCoverage, AssignmentCoverage, KnowledgeMapping, and Promotion MUST remain separate from KnowledgeEdge.
 - `domainId` is metadata for color, filtering, search, statistics, and details. It MUST NOT determine coordinates or grouping.
 - `clusterId` and persistent Knowledge Cluster structures MUST NOT be added to the v1 core model.
 - Fake nodes or edges MUST NOT be created for layout, composition, islands, bridges, chapters, or demos.
@@ -36,7 +36,21 @@
 - Chapter Overview is a derived aggregation of the atomic course graph by each node's primary chapter. It is not a second knowledge graph.
 - Primary chapter is the earliest `introduce` coverage, falling back to the earliest coverage.
 - Chapter edges aggregate prerequisite/enables counts per ordered chapter pair and undergo transitive reduction. CurriculumSequence may constrain or minimally connect the projection but MUST NOT become a KnowledgeEdge.
-- CurriculumCoverage and PracticeCoverage remain N:M. Lesson or chapter fields MUST NOT be written into KnowledgeNode.
+- CurriculumCoverage and AssignmentCoverage remain N:M. Lesson or chapter fields MUST NOT be written into KnowledgeNode.
+
+## Course Assignment Invariants
+
+- Every course KnowledgeNode MUST have at least one AssignmentCoverage.
+- Assignment is curriculum data and MUST NOT be represented as a KnowledgeNode or KnowledgeRelation.
+- The user-facing UI term remains "实训树"; the domain model uses Assignment.
+- Assignments are not limited to workflow-canvas tasks. Workflow canvas is an optional execution environment selected by `Assignment.mode`.
+- AssignmentCoverage is N:M. One Assignment may cover multiple KnowledgeNodes, and one KnowledgeNode may be covered by multiple Assignments.
+- Knowledge and Assignment companion cards occupy one stable graph footprint.
+- Switching 技能树 / 实训树 is presentation-only and MUST NOT trigger ELK, fitView, coordinate changes, or viewport reset.
+- Missing AssignmentCoverage is a course-data invariant failure and MUST NOT be silently replaced with generated fallback UI text.
+- Assignment progress is distinct from Knowledge mastery.
+- Assignment outputs may contribute to larger chapter/course outcomes without becoming KnowledgeNodes.
+- Assignment completion may produce KnowledgeEvidence in a future evidence pipeline, but completion MUST NOT automatically set mastery.
 
 ## Layout and Validation
 
@@ -49,7 +63,7 @@
 - Renderer-specific graph objects are projections only and MUST NOT become domain data.
 - Custom layout/routing code MUST NOT duplicate functionality owned by ELK or the Force Graph engine.
 - Layout stability is a product invariant.
-- Selection, hover, search, drawer state, and knowledge/practice presentation mode MUST NOT alter graph layout.
+- Selection, hover, search, drawer state, and knowledge/assignment presentation mode MUST NOT alter graph layout.
 - Only structural graph changes may trigger ELK or force-layout recomputation.
 - Course Overview, Focused, and Full views MUST share the same Chapter macro topology.
 - Personal and Global Atlas selection MUST operate as camera/highlight presentation over a stable knowledge layout.

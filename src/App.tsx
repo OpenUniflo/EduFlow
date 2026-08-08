@@ -80,8 +80,8 @@ import { LessonPage } from "./v2/pages/LessonPage";
 import { WorkflowLibraryPage } from "./v2/pages/WorkflowLibraryPage";
 import { ProfileKnowledgePage } from "./v2/pages/ProfileKnowledgePage";
 import { GlobalNav } from "./v2/components/GlobalNav";
-import { practices } from "./v2/data";
-import { markPracticeComplete } from "./v2/progress";
+import { courseAssignments } from "./v2/data";
+import { markAssignmentComplete } from "./v2/progress";
 
 function stableStateValue(value: unknown) {
   if (value === undefined) return "__undefined__";
@@ -281,7 +281,7 @@ export default function App() {
             [activeTemplate.id]: [record, ...existing].slice(0, 20)
           };
         });
-        markPracticeComplete(activeTemplate.id);
+        markAssignmentComplete(activeTemplate.id);
         activeRunSessionRef.current = null;
       }
       setIsRunning(false);
@@ -1211,7 +1211,7 @@ export default function App() {
         onToggle={() => setBottomOpen((value) => !value)}
         onTab={setActiveTab}
       />
-      {practices.some((item) => item.templateId === activeTemplate.id) && activeRunHistory.length ? (
+      {courseAssignments.some((item) => item.workflowTemplateId === activeTemplate.id) && activeRunHistory.length ? (
         <aside className="atlas-canvas-acceptance glass-v2">
           <div><strong>验收通过</strong><span>结构 92 · 行为 88 · 结果 90 · 轨迹 94</span></div>
           <div><span>模型调用 {Math.max(2, Math.round(activeTemplate.nodes.length / 2))}</span><span>工具调用 {activeTemplate.nodes.filter((item) => item.kind === "tool").length}</span><span>总分 91</span></div>

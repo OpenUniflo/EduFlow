@@ -1,5 +1,4 @@
-import { BarChart3, BookOpen, CheckCircle2, GitBranch, ListChecks, Trophy } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { BarChart3, BookOpen, CheckCircle2, GitBranch, ListChecks, Trophy, type LucideIcon } from "lucide-react";
 import type { StudentProfile } from "../../types/profile";
 
 const stats: Array<{ key: keyof Pick<StudentProfile, "completedCourses" | "completedChapters" | "completedTasks" | "builtWorkflows" | "successfulRuns" | "averageScore">; label: string; note: string; icon: LucideIcon }> = [

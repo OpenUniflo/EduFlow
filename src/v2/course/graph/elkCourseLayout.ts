@@ -4,8 +4,14 @@ import { courseChapterEdges, courseChapters, courseSkillTreeEdges, courseSkillTr
 import type { CourseSkillTreeEdge } from "../../types";
 import type { CourseGraphProjection, CourseProjectionEdge, CourseProjectionNode } from "./courseGraphProjection";
 
-export const COURSE_ATOMIC_WIDTH = 194;
-export const COURSE_ATOMIC_HEIGHT = 108;
+export const KNOWLEDGE_CARD_WIDTH = 194;
+export const KNOWLEDGE_CARD_HEIGHT = 108;
+export const COMPANION_OFFSET_X = 12;
+export const COMPANION_OFFSET_Y = 12;
+export const ATOMIC_FOOTPRINT_WIDTH = KNOWLEDGE_CARD_WIDTH + COMPANION_OFFSET_X;
+export const ATOMIC_FOOTPRINT_HEIGHT = KNOWLEDGE_CARD_HEIGHT + COMPANION_OFFSET_Y;
+export const COURSE_ATOMIC_WIDTH = ATOMIC_FOOTPRINT_WIDTH;
+export const COURSE_ATOMIC_HEIGHT = ATOMIC_FOOTPRINT_HEIGHT;
 export const COURSE_CHAPTER_WIDTH = 232;
 export const COURSE_CHAPTER_HEIGHT = 126;
 

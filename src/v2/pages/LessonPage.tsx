@@ -2,13 +2,13 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Clock3, GitBranch, Maximize2, Minus, Network, PanelLeftClose, PanelRightClose, Pin, Plus, Target, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
-import { practices } from "../data";
+import { courseAssignments } from "../data";
 import {
   acceptanceItems,
   discussionQuestions,
   homeworkItems,
   lessonFourMaterial,
-  lessonFourPractices,
+  lessonFourAssignments,
   teacherChecklist
 } from "../lessonData";
 import { saveRecentMaterialPage, useLearningProgress } from "../progress";
@@ -22,20 +22,20 @@ type LessonKnowledge = {
   type: string;
   time: string;
   slide: number;
-  practiceId: string;
+  assignmentId: string;
   related: string[];
   extras: Array<{ title: string; meta: string }>;
 };
 
 const lessonKnowledge: Record<string, LessonKnowledge> = {
-  concepts: { id: "concepts", title: "决策范式与任务完成", description: "从任务状态、外部证据、行动过程和约束满足理解 Agent 的完成条件。", color: "#78a7ee", type: "基础概念", time: "预计 12 分钟", slide: 1, practiceId: "lesson-04-direct", related: ["direct", "react", "planning"], extras: [{ title: "范式坐标判断", meta: "概念 · 8 分钟" }] },
-  direct: { id: "direct", title: "Direct 与 Reactive", description: "Direct 适合信息完整的一次生成；Reactive 根据当前状态立即行动，但缺少长期计划。", color: "#697ee6", type: "基础范式", time: "预计 14 分钟", slide: 6, practiceId: "lesson-04-direct", related: ["concepts", "react", "selection"], extras: [{ title: "Direct 基线实验", meta: "模板实验 · 5 分钟" }] },
-  react: { id: "react", title: "ReAct 推理—行动循环", description: "让推理、工具行动和环境观察形成闭环，并以停止条件约束执行。", color: "#70c4a5", type: "核心范式", time: "预计 22 分钟", slide: 9, practiceId: "lesson-04-react", related: ["direct", "planning", "replanning"], extras: [{ title: "来源验证轨迹", meta: "轨迹分析 · 10 分钟" }, { title: "无效循环诊断", meta: "调试 · 8 分钟" }] },
-  planning: { id: "planning", title: "Plan-and-Execute", description: "Planner 生成可检查计划，Executor 按依赖、产物和完成条件逐项执行。", color: "#9a8ee6", type: "规划范式", time: "预计 18 分钟", slide: 15, practiceId: "lesson-04-plan", related: ["react", "replanning", "selection"], extras: [{ title: "计划质量检查", meta: "结构化计划 · 12 分钟" }] },
-  replanning: { id: "replanning", title: "增量 Replanning", description: "保留已经完成的结果，只修改受失败、新证据或目标变化影响的剩余步骤。", color: "#eca86c", type: "恢复范式", time: "预计 15 分钟", slide: 19, practiceId: "lesson-04-replan", related: ["planning", "react", "reflection"], extras: [{ title: "失败触发器实验", meta: "异常恢复 · 10 分钟" }] },
-  reflection: { id: "reflection", title: "Reflection 与 Evaluator–Optimizer", description: "把评价结果转化为可执行改进，并以明确 Rubric 控制迭代质量与预算。", color: "#ec92aa", type: "评价范式", time: "预计 20 分钟", slide: 22, practiceId: "lesson-04-evaluator", related: ["replanning", "selection", "tot"], extras: [{ title: "Evaluator–Optimizer", meta: "模板实验 · 8 分钟" }, { title: "Rubric 偏差检查", meta: "分析 · 10 分钟" }] },
-  tot: { id: "tot", title: "Tree of Thoughts", description: "生成、评价和剪枝多个候选中间状态，以搜索换取复杂问题上的决策质量。", color: "#77b7c8", type: "搜索式推理", time: "预计 14 分钟", slide: 27, practiceId: "lesson-04-plan", related: ["planning", "reflection", "selection"], extras: [{ title: "搜索预算估算", meta: "分析 · 8 分钟" }] },
-  selection: { id: "selection", title: "范式选择与组合", description: "从信息缺口、任务长度、环境变化和可评价性出发选择最小可行结构。", color: "#697ee6", type: "综合判断", time: "预计 12 分钟", slide: 30, practiceId: "lesson-04-evaluator", related: ["direct", "react", "planning", "replanning", "reflection"], extras: [{ title: "同一任务范式比较", meta: "综合实验 · 35 分钟" }] }
+  concepts: { id: "concepts", title: "决策范式与任务完成", description: "从任务状态、外部证据、行动过程和约束满足理解 Agent 的完成条件。", color: "#78a7ee", type: "基础概念", time: "预计 12 分钟", slide: 1, assignmentId: "lesson-04-direct", related: ["direct", "react", "planning"], extras: [{ title: "范式坐标判断", meta: "概念 · 8 分钟" }] },
+  direct: { id: "direct", title: "Direct 与 Reactive", description: "Direct 适合信息完整的一次生成；Reactive 根据当前状态立即行动，但缺少长期计划。", color: "#697ee6", type: "基础范式", time: "预计 14 分钟", slide: 6, assignmentId: "lesson-04-direct", related: ["concepts", "react", "selection"], extras: [{ title: "Direct 基线实验", meta: "模板实验 · 5 分钟" }] },
+  react: { id: "react", title: "ReAct 推理—行动循环", description: "让推理、工具行动和环境观察形成闭环，并以停止条件约束执行。", color: "#70c4a5", type: "核心范式", time: "预计 22 分钟", slide: 9, assignmentId: "lesson-04-react", related: ["direct", "planning", "replanning"], extras: [{ title: "来源验证轨迹", meta: "轨迹分析 · 10 分钟" }, { title: "无效循环诊断", meta: "调试 · 8 分钟" }] },
+  planning: { id: "planning", title: "Plan-and-Execute", description: "Planner 生成可检查计划，Executor 按依赖、产物和完成条件逐项执行。", color: "#9a8ee6", type: "规划范式", time: "预计 18 分钟", slide: 15, assignmentId: "lesson-04-plan", related: ["react", "replanning", "selection"], extras: [{ title: "计划质量检查", meta: "结构化计划 · 12 分钟" }] },
+  replanning: { id: "replanning", title: "增量 Replanning", description: "保留已经完成的结果，只修改受失败、新证据或目标变化影响的剩余步骤。", color: "#eca86c", type: "恢复范式", time: "预计 15 分钟", slide: 19, assignmentId: "lesson-04-replan", related: ["planning", "react", "reflection"], extras: [{ title: "失败触发器实验", meta: "异常恢复 · 10 分钟" }] },
+  reflection: { id: "reflection", title: "Reflection 与 Evaluator–Optimizer", description: "把评价结果转化为可执行改进，并以明确 Rubric 控制迭代质量与预算。", color: "#ec92aa", type: "评价范式", time: "预计 20 分钟", slide: 22, assignmentId: "lesson-04-evaluator", related: ["replanning", "selection", "tot"], extras: [{ title: "Evaluator–Optimizer", meta: "模板实验 · 8 分钟" }, { title: "Rubric 偏差检查", meta: "分析 · 10 分钟" }] },
+  tot: { id: "tot", title: "Tree of Thoughts", description: "生成、评价和剪枝多个候选中间状态，以搜索换取复杂问题上的决策质量。", color: "#77b7c8", type: "搜索式推理", time: "预计 14 分钟", slide: 27, assignmentId: "lesson-04-plan", related: ["planning", "reflection", "selection"], extras: [{ title: "搜索预算估算", meta: "分析 · 8 分钟" }] },
+  selection: { id: "selection", title: "范式选择与组合", description: "从信息缺口、任务长度、环境变化和可评价性出发选择最小可行结构。", color: "#697ee6", type: "综合判断", time: "预计 12 分钟", slide: 30, assignmentId: "lesson-04-evaluator", related: ["direct", "react", "planning", "replanning", "reflection"], extras: [{ title: "同一任务范式比较", meta: "综合实验 · 35 分钟" }] }
 };
 
 function knowledgeIdsForPage(page: number) {
@@ -62,13 +62,13 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
   const [zoom, setZoom] = useState(1);
   const [scrollPercent, setScrollPercent] = useState(0);
   const [locationToast, setLocationToast] = useState("");
-  const [workflowPracticeId, setWorkflowPracticeId] = useState<string | null>(null);
+  const [workflowAssignmentId, setWorkflowAssignmentId] = useState<string | null>(null);
   const scrollTimerRef = useRef<number | null>(null);
   const activeKnowledge = lessonKnowledge[activeKnowledgeId] ?? lessonKnowledge.concepts;
-  const practice = practices.find((item) => item.id === activeKnowledge.practiceId);
-  const workflowPractice = practices.find((item) => item.id === workflowPracticeId);
+  const assignment = courseAssignments.find((item) => item.id === activeKnowledge.assignmentId);
+  const workflowAssignment = courseAssignments.find((item) => item.id === workflowAssignmentId);
   const pinned = Boolean(pinnedKnowledgeId);
-  const completed = progress.completedPracticeIds.length;
+  const completed = progress.completedAssignmentIds.length;
 
   useEffect(() => {
     const root = scrollRef.current;
@@ -104,11 +104,11 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && workflowPracticeId) setWorkflowPracticeId(null);
+      if (event.key === "Escape" && workflowAssignmentId) setWorkflowAssignmentId(null);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [workflowPracticeId]);
+  }, [workflowAssignmentId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -194,7 +194,7 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
       <div className="atlas-lesson-scroll" ref={scrollRef} style={{ "--lesson-scale": zoom } as CSSProperties}>
         <div className="atlas-lesson-main">
           {lessonFourMaterial.pages.map((page) => (
-            <article className={`atlas-lesson-slide atlas-slide-${page.visual ?? (page.table ? "comparison" : page.code ? "trace" : page.practiceId ? "practice" : "overview")} ${activePage === page.number ? "current" : ""}`} key={page.id} data-page-number={page.number} data-knowledge={knowledgeIdsForPage(page.number)[0]}>
+            <article className={`atlas-lesson-slide atlas-slide-${page.visual ?? (page.table ? "comparison" : page.code ? "trace" : page.assignmentId ? "practice" : "overview")} ${activePage === page.number ? "current" : ""}`} key={page.id} data-page-number={page.number} data-knowledge={knowledgeIdsForPage(page.number)[0]}>
               <div className="atlas-slide-label">{String(page.number).padStart(2, "0")} · {page.section}</div>
               <h2>{page.title}</h2>
               <p className="atlas-slide-lead">{page.lead}</p>
@@ -213,9 +213,9 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
                 </div>
               ) : null}
               <div className="atlas-slide-tags">{page.knowledge.map((item) => <span key={item}>{item}</span>)}</div>
-              {page.practiceId ? (
-                <button className="atlas-inline-practice" onClick={() => setWorkflowPracticeId(page.practiceId ?? null)}>
-                  <Network size={16} /><span><strong>{practices.find((item) => item.id === page.practiceId)?.title}</strong><small>预览预置 LangGraph 模板</small></span><ArrowRight size={16} />
+              {page.assignmentId ? (
+                <button className="atlas-inline-practice" onClick={() => setWorkflowAssignmentId(page.assignmentId ?? null)}>
+                  <Network size={16} /><span><strong>{courseAssignments.find((item) => item.id === page.assignmentId)?.title}</strong><small>{courseAssignments.find((item) => item.id === page.assignmentId)?.mode === "workflow" ? "预览工作流实训" : "查看实训说明"}</small></span><ArrowRight size={16} />
                 </button>
               ) : null}
               <div className="atlas-knowledge-rail" aria-label="本页关联知识点">
@@ -233,13 +233,13 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
             </article>
           ))}
 
-          <section className="atlas-lesson-supplement" id="lesson-practices">
+          <section className="atlas-lesson-supplement" id="lesson-assignments">
             <div className="atlas-kicker">PRACTICE LAB</div>
             <h2>九、模板实训</h2>
             <p>同一任务分别交给五种模板执行。学生不从空白画布搭建，只修改输入、参数和少量配置，比较每种范式的行为。</p>
             <div className="atlas-practice-grid">
-              {lessonFourPractices.map((item) => {
-                const complete = progress.completedPracticeIds.includes(item.id);
+              {lessonFourAssignments.map((item) => {
+                const complete = progress.completedAssignmentIds.includes(item.id);
                 return (
                   <article className="atlas-practice-card glass-v2" key={item.id}>
                     <div className={`atlas-practice-status ${complete ? "complete" : ""}`}>{complete ? <CheckCircle2 size={15} /> : <Network size={15} />}{complete ? "已完成" : "待运行"}</div>
@@ -247,7 +247,7 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
                     <pre>{item.structure}</pre>
                     <ul>{item.actions.map((action) => <li key={action}>{action}</li>)}</ul>
                     <p>{item.observation}</p>
-                    <button className={complete ? "atlas-secondary" : "atlas-primary"} onClick={() => setWorkflowPracticeId(item.id)}>预览模板 <ArrowRight size={15} /></button>
+                    <button className={complete ? "atlas-secondary" : "atlas-primary"} onClick={() => setWorkflowAssignmentId(item.id)}>预览模板 <ArrowRight size={15} /></button>
                   </article>
                 );
               })}
@@ -329,7 +329,7 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
             <p>所有模板使用相同模型、资料、工具、最终任务和验收标准，避免把性能差异误判为范式差异。</p>
             <div>
               <button className="atlas-secondary" onClick={() => navigate("/courses/agentic-ai")}><ArrowLeft size={15} />返回技能树</button>
-              <button className="atlas-primary" onClick={() => setWorkflowPracticeId("lesson-04-react")}>进入 ReAct 实训 <ArrowRight size={15} /></button>
+              <button className="atlas-primary" onClick={() => setWorkflowAssignmentId("lesson-04-react")}>进入 ReAct 实训 <ArrowRight size={15} /></button>
             </div>
           </section>
         </div>
@@ -364,38 +364,38 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
         <section>
           <h3>当前实训</h3>
           <div className="atlas-context-card atlas-context-practice">
-            <div className="atlas-practice-card-head"><span>WORKFLOW PRACTICE</span><b>{progress.completedPracticeIds.includes(activeKnowledge.practiceId) ? "已完成" : "可开始"}</b></div>
-            <strong>{practice?.title ?? "概念学习与范式比较"}</strong>
-            <p>{practice?.description ?? "本页用于建立后续实训所需的概念和判断标准。"}</p>
-            <div className="atlas-practice-meta"><span><Clock3 size={12} />{practice?.estimatedMinutes ?? 8} 分钟</span><span><GitBranch size={12} />5–8 个节点</span></div>
+            <div className="atlas-practice-card-head"><span>WORKFLOW PRACTICE</span><b>{progress.completedAssignmentIds.includes(activeKnowledge.assignmentId) ? "已完成" : "可开始"}</b></div>
+            <strong>{assignment?.title ?? "概念学习与范式比较"}</strong>
+            <p>{assignment?.description ?? "本页用于建立后续实训所需的概念和判断标准。"}</p>
+            <div className="atlas-practice-meta"><span><Clock3 size={12} />{assignment?.estimatedMinutes ?? 8} 分钟</span><span><GitBranch size={12} />{assignment?.mode === "workflow" ? "工作流画布" : "说明型任务"}</span></div>
             <div className="atlas-prereq-row"><span>前置完成度</span><b>{activeKnowledgeId === "concepts" ? "3 / 3" : "2 / 3"}</b></div>
             <div className="atlas-prereq-track"><i style={{ width: activeKnowledgeId === "concepts" ? "100%" : "66%" }} /></div>
           </div>
         </section>
         <section>
           <h3>相关实训</h3>
-          <div className="atlas-related-practices">{activeKnowledge.extras.map((item) => <button key={item.title}><Network size={14} /><span><strong>{item.title}</strong><small>{item.meta}</small></span><em>查看</em></button>)}</div>
+          <div className="atlas-related-assignments">{activeKnowledge.extras.map((item) => <button key={item.title}><Network size={14} /><span><strong>{item.title}</strong><small>{item.meta}</small></span><em>查看</em></button>)}</div>
         </section>
-        <button className="atlas-primary" onClick={() => setWorkflowPracticeId(activeKnowledge.practiceId)}><Network size={15} />进入对应工作流</button>
+        <button className="atlas-primary" onClick={() => setWorkflowAssignmentId(activeKnowledge.assignmentId)}><Network size={15} />{assignment?.mode === "workflow" ? "进入对应工作流" : "查看实训说明"}</button>
         <button className="atlas-secondary" onClick={() => goToPage(activeKnowledge.slide)}><Target size={15} />在课件中定位</button>
         </>}
       </aside>
       </section>
       {locationToast ? <div className="atlas-location-toast">{locationToast}</div> : null}
-      {workflowPracticeId ? (
-        <div className="atlas-workflow-modal" onMouseDown={(event) => { if (event.target === event.currentTarget) setWorkflowPracticeId(null); }}>
+      {workflowAssignmentId ? (
+        <div className="atlas-workflow-modal" onMouseDown={(event) => { if (event.target === event.currentTarget) setWorkflowAssignmentId(null); }}>
           <div className="atlas-workflow-modal-card glass-v2" role="dialog" aria-modal="true" aria-labelledby="workflow-preview-title">
-            <button className="atlas-modal-close" onClick={() => setWorkflowPracticeId(null)} aria-label="关闭工作流预览"><X size={18} /></button>
-            <div className="atlas-kicker">WORKFLOW TEMPLATE</div>
-            <h2 id="workflow-preview-title">{workflowPractice?.title}</h2>
-            <p>{workflowPractice?.description}</p>
+            <button className="atlas-modal-close" onClick={() => setWorkflowAssignmentId(null)} aria-label="关闭工作流预览"><X size={18} /></button>
+            <div className="atlas-kicker">{workflowAssignment?.mode === "workflow" ? "WORKFLOW ASSIGNMENT" : "COURSE ASSIGNMENT"}</div>
+            <h2 id="workflow-preview-title">{workflowAssignment?.title}</h2>
+            <p>{workflowAssignment?.description}</p>
             <div className="atlas-modal-workflow-preview">
-              <span>输入任务</span><i /><span>{workflowPractice?.paradigm}</span><i /><span>高校政策资料</span><i /><span>验收输出</span>
+              <span>输入任务</span><i /><span>{workflowAssignment?.mode === "workflow" ? "工作流画布" : "独立完成"}</span><i /><span>课程资料</span><i /><span>{workflowAssignment?.expectedOutput}</span>
             </div>
-            <div className="atlas-modal-facts"><span>{workflowPractice?.estimatedMinutes} 分钟</span><span>统一资料与工具</span><span>保留第 {activePage} 页进度</span></div>
+            <div className="atlas-modal-facts"><span>{workflowAssignment?.estimatedMinutes} 分钟</span><span>统一资料与工具</span><span>保留第 {activePage} 页进度</span></div>
             <div className="atlas-modal-actions">
-              <button className="atlas-secondary" onClick={() => setWorkflowPracticeId(null)}>取消</button>
-              <button className="atlas-primary" onClick={() => { saveRecentMaterialPage(activePage); navigate(`/workflows/${workflowPracticeId}`); }}>打开工作流 <ArrowRight size={15} /></button>
+              <button className="atlas-secondary" onClick={() => setWorkflowAssignmentId(null)}>取消</button>
+              {workflowAssignment?.mode === "workflow" && workflowAssignment.workflowTemplateId ? <button className="atlas-primary" onClick={() => { saveRecentMaterialPage(activePage); navigate(`/workflows/${workflowAssignment.workflowTemplateId}`); }}>打开工作流 <ArrowRight size={15} /></button> : null}
             </div>
           </div>
         </div>

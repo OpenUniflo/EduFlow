@@ -1,7 +1,7 @@
-import type { CurriculumCoverage, CurriculumLesson, LearningProgress, Practice, PracticeCoverage } from "../types";
+import type { AssignmentCoverage, CourseAssignment, CurriculumCoverage, CurriculumLesson, LearningProgress, UserAssignmentState } from "../types";
 import { calculateCrossDomainConnections, calculateKnowledgeConnectivity } from "../knowledge/graphAlgorithms";
 import type { KnowledgeGraph } from "../knowledge/types";
-import type { CurriculumContext, PersonalKnowledgeGraph, PersonalKnowledgeNode, PracticeContext, UserKnowledgeRecord } from "./types";
+import type { CurriculumContext, PersonalAssignmentContext, PersonalKnowledgeGraph, PersonalKnowledgeNode, UserKnowledgeRecord } from "./types";
 
 const MATERIAL_BY_LESSON: Record<string, string[]> = { L04: ["lesson-04"] };
 
@@ -24,19 +24,21 @@ export function getDirectExploreNodeIds(graph: KnowledgeGraph, coreIds: Set<stri
 export function buildPersonalKnowledgeGraph(
   graph: KnowledgeGraph,
   userKnowledge: UserKnowledgeRecord[],
-  practices: Practice[],
+  assignments: CourseAssignment[],
   curriculum: CurriculumCoverage[],
   lessons: CurriculumLesson[],
-  practiceCoverage: PracticeCoverage[],
+  assignmentCoverage: AssignmentCoverage[],
+  assignmentStates: UserAssignmentState[],
   progress: LearningProgress
 ): PersonalKnowledgeGraph {
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
   const domainById = new Map(graph.domains.map((domain) => [domain.id, domain]));
   const lessonById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
-  const practiceById = new Map(practices.map((practice) => [practice.id, practice]));
+  const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
+  const assignmentStateById = new Map(assignmentStates.map((state) => [state.assignmentId, state]));
   const recordById = new Map(userKnowledge.map((record) => [record.nodeId, record]));
   const curriculumByNode = groupBy(curriculum, (coverage) => coverage.nodeId);
-  const practiceByNode = groupBy(practiceCoverage, (coverage) => coverage.nodeId);
+  const assignmentByNode = groupBy(assignmentCoverage, (coverage) => coverage.nodeId);
 
   userKnowledge.forEach((record) => {
     if (!nodeById.has(record.nodeId)) throw new Error(`Unknown user knowledge node: ${record.nodeId}`);
@@ -69,18 +71,18 @@ export function buildPersonalKnowledgeGraph(
         materialIds: MATERIAL_BY_LESSON[coverage.lessonId] ?? []
       }];
     }).sort((left, right) => left.lessonOrder - right.lessonOrder || left.coverageId.localeCompare(right.coverageId));
-    const practiceContexts: PracticeContext[] = (practiceByNode.get(id) ?? []).flatMap((coverage) => {
-      const practice = practiceById.get(coverage.practiceId);
-      if (!practice) return [];
+    const assignmentContexts: PersonalAssignmentContext[] = (assignmentByNode.get(id) ?? []).flatMap((coverage) => {
+      const assignment = assignmentById.get(coverage.assignmentId);
+      if (!assignment) return [];
       return [{
         coverageId: coverage.id,
-        practiceId: practice.id,
-        title: practice.title,
+        assignmentId: assignment.id,
+        title: assignment.title,
         role: coverage.role,
-        templateId: practice.templateId,
-        completed: progress.completedPracticeIds.includes(practice.id)
+        workflowTemplateId: assignment.workflowTemplateId,
+        status: progress.completedAssignmentIds.includes(assignment.id) ? "completed" : assignmentStateById.get(assignment.id)?.status ?? "not-started"
       }];
-    }).sort((left, right) => left.practiceId.localeCompare(right.practiceId) || left.coverageId.localeCompare(right.coverageId));
+    }).sort((left, right) => left.assignmentId.localeCompare(right.assignmentId) || left.coverageId.localeCompare(right.coverageId));
     return [{
       id,
       title: source.title,
@@ -93,10 +95,10 @@ export function buildPersonalKnowledgeGraph(
       progress: record?.mastery ?? 0,
       isCore: coreIds.has(id),
       curriculumContexts,
-      practiceContexts,
+      assignmentContexts,
       evidence: [
         ...(record?.evidence?.map((evidence) => evidence.label) ?? []),
-        ...practiceContexts.filter((context) => context.completed).map((context) => `已完成实训 · ${context.title}`)
+        ...assignmentContexts.filter((context) => context.status === "completed").map((context) => `已完成实训 · ${context.title}`)
       ]
     }];
   });
@@ -117,7 +119,7 @@ export function buildPersonalKnowledgeGraph(
       mastered: nodes.filter((node) => node.status === "mastered").length,
       learning: nodes.filter((node) => node.status === "learning").length,
       explore: nodes.filter((node) => node.status === "explore").length,
-      verifiedPractices: new Set(nodes.flatMap((node) => node.practiceContexts.filter((context) => context.completed).map((context) => context.practiceId))).size,
+      completedAssignments: new Set(nodes.flatMap((node) => node.assignmentContexts.filter((context) => context.status === "completed").map((context) => context.assignmentId))).size,
       crossDomainConnections: calculateCrossDomainConnections(graph, coreIds, effectiveEdges),
       connectivity: calculateKnowledgeConnectivity(coreIds, effectiveEdges),
       currentLearningId

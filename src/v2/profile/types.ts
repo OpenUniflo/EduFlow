@@ -1,4 +1,4 @@
-import type { CurriculumCoverageRole, PracticeCoverageRole } from "../types";
+import type { AssignmentCoverageRole, CurriculumCoverageRole, UserAssignmentStatus } from "../types";
 import type { KnowledgeEdge, KnowledgeEvidence, KnowledgeScope, MasteryOrigin } from "../knowledge/types";
 
 export type UserKnowledgeStatus = "mastered" | "learning";
@@ -26,13 +26,13 @@ export type CurriculumContext = {
   materialIds: string[];
 };
 
-export type PracticeContext = {
+export type PersonalAssignmentContext = {
   coverageId: string;
-  practiceId: string;
+  assignmentId: string;
   title: string;
-  role: PracticeCoverageRole;
-  templateId: string;
-  completed: boolean;
+  role: AssignmentCoverageRole;
+  workflowTemplateId?: string;
+  status: UserAssignmentStatus;
 };
 
 export type PersonalKnowledgeNode = {
@@ -47,7 +47,7 @@ export type PersonalKnowledgeNode = {
   progress: number;
   isCore: boolean;
   curriculumContexts: CurriculumContext[];
-  practiceContexts: PracticeContext[];
+  assignmentContexts: PersonalAssignmentContext[];
   evidence: string[];
 };
 
@@ -59,7 +59,7 @@ export type PersonalKnowledgeSummary = {
   mastered: number;
   learning: number;
   explore: number;
-  verifiedPractices: number;
+  completedAssignments: number;
   crossDomainConnections: number;
   connectivity: number;
   currentLearningId: string | null;

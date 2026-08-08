@@ -4688,6 +4688,34 @@ body {
   gap: 10px;
 }
 
+.course-flow-chapter-presentation {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.course-flow-chapter-presentation.assignment-presentation {
+  opacity: 0;
+  transform: translateY(3px);
+  pointer-events: none;
+}
+
+.course-flow-chapter.mode-assignment .knowledge-presentation {
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+}
+
+.course-flow-chapter.mode-assignment .assignment-presentation {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.course-flow-chapter.collapsed .course-flow-chapter-presentation {
+  padding: 16px 17px 13px;
+}
+
 .course-flow-chapter-head > i {
   width: 10px;
   height: 10px;
@@ -4727,7 +4755,7 @@ body {
   font-weight: 650;
 }
 
-.course-flow-chapter.collapsed > p {
+.course-flow-chapter.collapsed .course-flow-chapter-presentation > p {
   display: -webkit-box;
   margin: 10px 0 0;
   overflow: hidden;
@@ -4752,6 +4780,10 @@ body {
   left: 23px;
 }
 
+.course-flow-chapter.expanded .course-flow-chapter-presentation {
+  inset: 0;
+}
+
 .course-flow-chapter-caption {
   position: absolute;
   top: 58px;
@@ -4767,44 +4799,47 @@ body {
 .course-flow-card {
   position: absolute;
   top: 0;
-  right: 8px;
-  bottom: 8px;
   left: 0;
+  width: 194px;
+  height: 108px;
   padding: 14px 14px 11px 43px;
   border: 1.5px solid #93a3bd;
   border-radius: 17px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 10px 24px rgba(72, 92, 130, 0.1);
-  transition: inset 0.22s ease, opacity 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+  text-align: left;
+  transition: transform 0.22s ease, opacity 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
 }
 
 .course-flow-knowledge-card {
   z-index: 2;
 }
 
-.course-flow-practice-card {
-  inset: 8px 0 0 8px;
+.course-flow-assignment-card {
+  transform: translate(12px, 12px);
   z-index: 1;
   border-color: color-mix(in srgb, var(--node-color) 46%, #aeb9ca);
+  border-style: dashed;
   background: color-mix(in srgb, var(--node-color) 8%, rgba(255, 255, 255, 0.96));
   opacity: 0.64;
+  cursor: pointer;
 }
 
-.course-flow-knowledge.mode-practice .course-flow-knowledge-card {
-  inset: 8px 0 0 8px;
+.course-flow-knowledge.mode-assignment .course-flow-knowledge-card {
+  transform: translate(12px, 12px);
   z-index: 1;
   opacity: 0.56;
 }
 
-.course-flow-knowledge.mode-practice .course-flow-practice-card {
-  inset: 0 8px 8px 0;
+.course-flow-knowledge.mode-assignment .course-flow-assignment-card {
+  transform: none;
   z-index: 2;
   opacity: 1;
+  border-style: solid;
 }
 
-.course-flow-knowledge.selected:not(.has-practice) .course-flow-knowledge-card,
 .course-flow-knowledge.selected.mode-knowledge .course-flow-knowledge-card,
-.course-flow-knowledge.selected.mode-practice .course-flow-practice-card {
+.course-flow-knowledge.selected.mode-assignment .course-flow-assignment-card {
   border: 2.5px solid #5b7cfa;
 }
 
@@ -5443,12 +5478,14 @@ body {
   background: linear-gradient(90deg, var(--atlas-brand), #70c4a5);
 }
 
-.atlas-related-practices {
+.atlas-related-practices,
+.atlas-related-assignments {
   display: grid;
   gap: 7px;
 }
 
-.atlas-related-practices button {
+.atlas-related-practices button,
+.atlas-related-assignments button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -5460,19 +5497,23 @@ body {
   text-align: left;
 }
 
-.atlas-related-practices button span {
+.atlas-related-practices button span,
+.atlas-related-assignments button span {
   display: grid;
   flex: 1;
   gap: 2px;
 }
 
-.atlas-related-practices button strong {
+.atlas-related-practices button strong,
+.atlas-related-assignments button strong {
   color: var(--atlas-ink);
   font-size: 10px;
 }
 
 .atlas-related-practices button small,
-.atlas-related-practices button em {
+.atlas-related-practices button em,
+.atlas-related-assignments button small,
+.atlas-related-assignments button em {
   font-size: 8px;
   font-style: normal;
 }
@@ -5816,6 +5857,87 @@ body {
   color: #3f4d63;
   background: #f7f9fd;
   font-size: 13px;
+}
+
+.atlas-assignment-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: #4b586d;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.atlas-assignment-criteria {
+  display: grid;
+  gap: 8px;
+}
+
+.atlas-assignment-criteria span {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 11px;
+  border: 1px solid #e7f1ec;
+  border-radius: 12px;
+  color: #405649;
+  background: #f4fbf7;
+  font-size: 12px;
+}
+
+.atlas-assignment-criteria svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #3c9a68;
+}
+
+.atlas-assignment-switcher {
+  display: grid;
+  gap: 8px;
+}
+
+.atlas-assignment-switcher button {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding: 10px 11px;
+  border: 1px solid #e7ecf5;
+  border-radius: 12px;
+  color: #3f4d63;
+  background: #f7f9fd;
+  text-align: left;
+}
+
+.atlas-assignment-switcher button:hover,
+.atlas-assignment-switcher button.active {
+  border-color: rgba(91, 124, 250, 0.35);
+  background: #f0f4ff;
+}
+
+.atlas-assignment-switcher button > span {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 8px;
+  color: #526bd2;
+  background: #e8edff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.atlas-assignment-switcher strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-assignment-switcher small {
+  color: #8290a4;
+  font-size: 9px;
 }
 
 .atlas-diamond {

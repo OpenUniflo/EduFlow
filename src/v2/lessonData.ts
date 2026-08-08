@@ -81,7 +81,7 @@ export const lessonFourMaterial: Material = {
       bullets: ["单次生成", "没有外部行动", "没有环境观察", "没有显式循环", "适合改写、摘要、分类与提取"],
       code: "输入 → 模型 → 输出",
       knowledge: ["Direct", "最简单可行结构"],
-      practiceId: "lesson-04-direct"
+      assignmentId: "lesson-04-direct"
     },
     {
       id: "page-07",
@@ -119,7 +119,7 @@ export const lessonFourMaterial: Material = {
       lead: "每一步决策都可以使用最新观察，需要明确停止条件与最大循环次数。",
       code: "目标 → 判断当前需要什么 → 选择行动 → 环境执行 → 获得观察 → 更新判断 → 继续或结束\n\nReason → Act → Observe → Reason → …",
       knowledge: ["ReAct Loop", "条件边", "停止条件"],
-      practiceId: "lesson-04-react"
+      assignmentId: "lesson-04-react"
     },
     {
       id: "page-11",
@@ -185,7 +185,7 @@ export const lessonFourMaterial: Material = {
       code: "用户目标 → Planner → 结构化计划 → Executor → 逐项执行 → 完成检查 → 最终输出",
       bullets: ["Planner：步骤、依赖、产物、完成条件", "Executor：工具、执行、结果、状态", "二者可以使用不同模型和成本策略"],
       knowledge: ["Planner", "Executor", "结构化计划"],
-      practiceId: "lesson-04-plan"
+      assignmentId: "lesson-04-plan"
     },
     {
       id: "page-17",
@@ -232,7 +232,7 @@ export const lessonFourMaterial: Material = {
       lead: "正确的 Replanning 应保留已完成结果，只修改尚未完成、受新信息影响的步骤。",
       code: "原计划：A✓ → B✓ → C失败 → 比较 → 写作\n新计划：保留 A/B → 为 C 增加替代来源 → 更新比较与写作约束",
       knowledge: ["增量重规划", "保留进度", "剩余计划"],
-      practiceId: "lesson-04-replan"
+      assignmentId: "lesson-04-replan"
     },
     {
       id: "page-21",
@@ -287,7 +287,7 @@ export const lessonFourMaterial: Material = {
       lead: "评价器根据明确 Rubric 输出通过或修订建议，优化器据此修改结果。",
       code: "Generator → Evaluator → Pass / Revise → Optimizer → 再评价",
       knowledge: ["Evaluator", "Optimizer", "Rubric"],
-      practiceId: "lesson-04-evaluator",
+      assignmentId: "lesson-04-evaluator",
       table: {
         headers: ["维度", "通过标准"],
         rows: [
@@ -400,7 +400,7 @@ export const lessonFourMaterial: Material = {
   ]
 };
 
-export const lessonFourPractices = [
+export const lessonFourAssignments = [
   {
     id: "lesson-04-direct",
     title: "模板一：Direct",

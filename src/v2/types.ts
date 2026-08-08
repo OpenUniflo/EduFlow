@@ -50,12 +50,34 @@ export type CurriculumCoverage = {
   role: CurriculumCoverageRole;
 };
 
-export type PracticeCoverageRole = "practice" | "reinforce" | "assess";
-export type PracticeCoverage = {
+export type AssignmentMode = "instruction" | "workflow";
+export type AssignmentCoverageRole = "practice" | "apply" | "assess";
+export type AssignmentCoverage = {
   id: string;
-  practiceId: string;
+  assignmentId: string;
   nodeId: string;
-  role: PracticeCoverageRole;
+  role: AssignmentCoverageRole;
+};
+
+export type CourseAssignment = {
+  id: string;
+  courseId: string;
+  title: string;
+  description: string;
+  requirements: string[];
+  expectedOutput: string;
+  acceptanceCriteria: string[];
+  mode: AssignmentMode;
+  workflowTemplateId?: string;
+  estimatedMinutes?: number;
+  projectContribution?: string;
+};
+
+export type UserAssignmentStatus = "not-started" | "in-progress" | "completed";
+export type UserAssignmentState = {
+  assignmentId: string;
+  status: UserAssignmentStatus;
+  progress?: number;
 };
 
 export type CurriculumSequence = {
@@ -70,9 +92,16 @@ export type CourseCurriculumContext = CurriculumCoverage & {
   chapterId: string;
 };
 
-export type CoursePracticeContext = PracticeCoverage & {
-  title: string;
-  templateId: string;
+export type AssignmentContext = AssignmentCoverage & {
+  assignment: CourseAssignment;
+  state?: UserAssignmentState;
+};
+
+export type AssignmentStateSummary = {
+  completedCount: number;
+  inProgressCount: number;
+  notStartedCount: number;
+  progress: number;
 };
 
 /** Presentation-only projection derived from KnowledgeNode + curriculum data. */
@@ -84,20 +113,42 @@ export type CourseSkillTreeNode = {
   scope: KnowledgeScope;
   primaryCoverage: CourseCurriculumContext;
   curriculumContexts: CourseCurriculumContext[];
-  practiceContexts: CoursePracticeContext[];
+  assignmentContexts: AssignmentContext[];
+  assignmentCount: number;
+  assignmentStateSummary: AssignmentStateSummary;
   lessonId: string;
   lesson: number;
   chapterId: string;
   coverageRoles: CurriculumCoverageRole[];
   materialIds: string[];
-  practiceIds: string[];
-  practiceTitle: string;
+  assignmentIds: string[];
   status: LearningStatus;
   color: string;
 };
 
 /** Presentation chapter identity. Renderer geometry is added only by the course graph adapter. */
-export type CourseChapterProjection = CurriculumChapter;
+export type ChapterAssignmentSummary = {
+  chapterId: string;
+  assignmentIds: string[];
+  assignmentCount: number;
+  completedCount: number;
+  inProgressCount: number;
+  progress: number;
+  outcome?: string;
+};
+
+export type CourseAssignmentSummary = {
+  courseId: string;
+  assignmentIds: string[];
+  assignmentCount: number;
+  completedCount: number;
+  inProgressCount: number;
+  progress: number;
+};
+
+export type CourseChapterProjection = CurriculumChapter & {
+  assignmentSummary: ChapterAssignmentSummary;
+};
 export type CourseSkillTreeEdge = KnowledgeEdge;
 export type CourseChapterEdge = {
   id: string;
@@ -108,16 +159,6 @@ export type CourseChapterEdge = {
   prerequisiteCount: number;
   enablesCount: number;
   supportCount: number;
-};
-
-export type Practice = {
-  id: string;
-  title: string;
-  paradigm: string;
-  description: string;
-  templateId: string;
-  acceptanceSpecId: string;
-  estimatedMinutes: number;
 };
 
 export type MaterialPage = {
@@ -132,7 +173,7 @@ export type MaterialPage = {
   knowledgeIds?: string[];
   primaryKnowledgeId?: string;
   visual?: "overview" | "flow" | "comparison" | "trace" | "decision" | "practice";
-  practiceId?: string;
+  assignmentId?: string;
   table?: { headers: string[]; rows: string[][] };
 };
 
@@ -153,8 +194,8 @@ export type AcceptanceSpec = {
 };
 
 export type LearningProgress = {
-  version: 2;
-  completedPracticeIds: string[];
+  version: 3;
+  completedAssignmentIds: string[];
   recentMaterialPage: number;
   updatedAt: string;
 };
