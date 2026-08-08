@@ -5,7 +5,9 @@ import { applyAutomaticAssignment, decideDomainAssignment, DEFAULT_DOMAIN_DISCOV
 import { demoDomainDiscoveryService } from "./knowledge/domain/domainDiscovery";
 import { initialKnowledgeDomains } from "./knowledge/domain/domainData";
 import { getDomainGovernanceSnapshot } from "./knowledge/domain/domainStore";
-import { validateDomainAssignments } from "./knowledge/domain/domainValidation";
+import { getDomainMembers, validateDomainAssignments } from "./knowledge/domain/domainValidation";
+import { moveNodesToDomain } from "./knowledge/domain/domainAssignment";
+import { atlasStructureKey, freezeAtlasNodePositions, resetAtlasCamera } from "./knowledge/atlasCamera";
 import type { DomainAssignmentCandidate } from "./knowledge/domain/domainTypes";
 
 function candidate(score: number): DomainAssignmentCandidate {
@@ -58,5 +60,38 @@ describe("Knowledge Domain invariants", () => {
     const proposals = demoDomainDiscoveryService.discover(knowledgeNodes, initialKnowledgeDomains);
     expect(proposals[0]).toMatchObject({ status: "pending", scope: "global" });
     expect(initialKnowledgeDomains.some((domain) => domain.id === proposals[0].id)).toBe(false);
+  });
+
+  it("treats nodes without DomainAssignment as manageable Unclassified members", () => {
+    const snapshot = getDomainGovernanceSnapshot();
+    const members = getDomainMembers(knowledgeNodes, snapshot.assignments, "");
+    expect(members.map((node) => node.id)).toContain("BR01");
+    expect(members.length).toBe(knowledgeNodes.filter((node) => node.status === "active" && !snapshot.assignments.some((assignment) => assignment.nodeId === node.id)).length);
+  });
+
+  it("moves Unclassified nodes with admin pinned precedence", () => {
+    const snapshot = getDomainGovernanceSnapshot();
+    const moved = moveNodesToDomain(snapshot.assignments, ["BR01"], "python-engineering", "now");
+    const assignment = moved.find((item) => item.nodeId === "BR01");
+    expect(assignment).toMatchObject({ domainId: "python-engineering", source: "admin", pinned: true });
+    expect(applyAutomaticAssignment(assignment, { kind: "auto-assign", candidate: candidate(0.99) })).toBe(assignment);
+  });
+
+  it("keeps Atlas structure identity stable for color, status, and selection presentation", () => {
+    const snapshot = getDomainGovernanceSnapshot();
+    const projection = buildGlobalAtlasProjection(snapshot);
+    const before = atlasStructureKey(projection.nodes, projection.edges, "global");
+    const presented = projection.nodes.map((node, index) => ({ ...node, color: index ? node.color : "#667EDB", status: index ? node.status : "learning" as const }));
+    expect(atlasStructureKey(presented, projection.edges, "global")).toBe(before);
+  });
+
+  it("freezes engine positions without a camera action and resets through one transition", () => {
+    const nodes = [{ id: "a", x: 1, y: 2, z: 3 }];
+    freezeAtlasNodePositions(nodes);
+    expect(nodes[0]).toMatchObject({ fx: 1, fy: 2, fz: 3 });
+    const calls: unknown[][] = [];
+    resetAtlasCamera("global", (...args) => calls.push(args));
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual([{ x: 0, y: 0, z: 620 }, { x: 0, y: 0, z: 0 }, 500]);
   });
 });

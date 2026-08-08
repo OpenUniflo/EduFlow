@@ -1,4 +1,13 @@
 import type { DomainAssignment, KnowledgeDomain } from "./domainTypes";
+import type { KnowledgeNode } from "../types";
+
+export function getDomainMembers(nodes: KnowledgeNode[], assignments: DomainAssignment[], selectedDomainId: string, query = "") {
+  const assignmentByNode = new Map(assignments.map((assignment) => [assignment.nodeId, assignment]));
+  const needle = query.trim().toLowerCase();
+  return nodes.filter((node) => node.status === "active")
+    .filter((node) => selectedDomainId ? assignmentByNode.get(node.id)?.domainId === selectedDomainId : !assignmentByNode.has(node.id))
+    .filter((node) => !needle || `${node.title} ${node.description}`.toLowerCase().includes(needle));
+}
 
 export function validateDomainAssignments(assignments: DomainAssignment[], domains: KnowledgeDomain[], nodeIds: string[]) {
   const domainIds = new Set(domains.map((domain) => domain.id));

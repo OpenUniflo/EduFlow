@@ -105,3 +105,28 @@
 - 技能树 / 实训树 switching is presentation-only.
 - Chapter and Atomic nodes MUST use a consistent Knowledge / Assignment companion visual language.
 - Mode switching MUST NOT trigger ELK, fitView, coordinate changes, edge changes, or viewport reset.
+
+## Course Selection & Drawer Invariants
+
+- Course selection MUST be anchor-based. A selected anchor is a stable location in the course graph: a Chapter or an atomic KnowledgeNode.
+- 技能树 / 实训树 mode determines the active Knowledge / Assignment detail facet. Switching mode MUST preserve the selected anchor and synchronize an open Drawer instead of closing it or leaving stale content.
+- Chapter Assignment detail is an aggregate presentation derived from Assignments covered by the Chapter; it MUST NOT create a `ChapterAssignment` ontology or domain entity.
+- If a KnowledgeNode has multiple Assignments, the Assignment facet MUST first expose an Assignment Group and MUST NOT silently open the first Assignment.
+- Search, prerequisite navigation, and focus actions MUST preserve the current Course mode and facet.
+- Only the foreground Knowledge / Assignment companion layer may receive pointer events.
+
+## Atlas Camera Invariants
+
+- Force lifecycle and camera lifecycle MUST be independent.
+- `onEngineStop` MAY freeze structural node positions but MUST NOT automatically alter camera position or zoom.
+- Background force simulation completion MUST NOT cause a delayed visible camera transition.
+- User camera actions have priority over background graph lifecycle. Reset MUST execute one deterministic camera transition.
+- Explicit Fit, Search Focus, and Selection Focus may change the camera because they are user-driven actions.
+- Domain changes, status changes, drawer state, and presentation state MUST NOT alter the camera.
+
+## Domain Unclassified Invariants
+
+- Unclassified is a first-class valid governance state. A node with no `DomainAssignment` is Unclassified.
+- Domain Management MUST allow administrators to inspect, select, and move Unclassified nodes.
+- Moving a node manually to a Domain creates an admin, pinned `DomainAssignment`.
+- Domain assignment and Domain color changes MUST NOT alter KnowledgeEdges, graph layout, or camera state.

@@ -10,6 +10,7 @@ import {
 import { buildCourseGraphProjection } from "./course/graph/courseGraphProjection";
 import { ATOMIC_FOOTPRINT_HEIGHT, ATOMIC_FOOTPRINT_WIDTH, COMPANION_OFFSET_X, COMPANION_OFFSET_Y, KNOWLEDGE_CARD_HEIGHT, KNOWLEDGE_CARD_WIDTH, layoutCourseGraph } from "./course/graph/elkCourseLayout";
 import { toReactFlow } from "./course/graph/reactFlowAdapter";
+import { assignmentProjectionForNode, buildChapterAssignmentProjection, courseDrawerProjectionKind, detailFacetForMode, flowIdForAnchor, type SelectedAnchor } from "./course/courseSelection";
 
 describe("Course Assignment invariants", () => {
   it("covers every Course KnowledgeNode", () => {
@@ -85,5 +86,43 @@ describe("Course Assignment layout footprint", () => {
     const assignmentFlow = toReactFlow(layout, "assignment", null, null);
     expect(assignmentFlow.nodes.map(({ id, position, width, height, parentId }) => ({ id, position, width, height, parentId }))).toEqual(knowledgeFlow.nodes.map(({ id, position, width, height, parentId }) => ({ id, position, width, height, parentId })));
     expect(assignmentFlow.edges.map((edge) => [edge.id, edge.source, edge.target])).toEqual(knowledgeFlow.edges.map((edge) => [edge.id, edge.source, edge.target]));
+  });
+});
+
+describe("Course anchor and Drawer facet", () => {
+  const multiNode = courseSkillTreeNodes.find((node) => node.assignmentCount > 1)!;
+  const singleNode = courseSkillTreeNodes.find((node) => node.assignmentCount === 1)!;
+
+  it("preserves a Knowledge anchor while mode drives the facet", () => {
+    const anchor: SelectedAnchor = { kind: "knowledge", id: multiNode.id };
+    expect(courseDrawerProjectionKind(anchor, "knowledge", multiNode)).toBe("atomic-knowledge");
+    expect(courseDrawerProjectionKind(anchor, "assignment", multiNode)).toBe("assignment-group");
+    expect(flowIdForAnchor(anchor)).toBe(`knowledge:${multiNode.id}`);
+    expect(detailFacetForMode("assignment")).toBe("assignment");
+  });
+
+  it("projects the same Chapter anchor through Knowledge and Assignment facets", () => {
+    const anchor: SelectedAnchor = { kind: "chapter", id: courseChapters[0].id };
+    expect(courseDrawerProjectionKind(anchor, "knowledge")).toBe("chapter-knowledge");
+    expect(courseDrawerProjectionKind(anchor, "assignment")).toBe("chapter-assignment");
+    expect(flowIdForAnchor(anchor)).toBe(`chapter:${anchor.id}`);
+    const aggregate = buildChapterAssignmentProjection(courseChapters[0], courseSkillTreeNodes);
+    expect(aggregate.assignments).toHaveLength(courseChapters[0].assignmentSummary.assignmentCount);
+    expect(new Set(aggregate.assignments.map((item) => item.assignment.id)).size).toBe(aggregate.assignments.length);
+  });
+
+  it("opens an Assignment Group before detail for multiple Assignments", () => {
+    expect(assignmentProjectionForNode(multiNode, null)).toMatchObject({ kind: "group" });
+    expect(assignmentProjectionForNode(multiNode, multiNode.assignmentContexts[0].assignmentId)).toMatchObject({ kind: "detail", canReturnToGroup: true });
+  });
+
+  it("opens direct detail for exactly one Assignment", () => {
+    expect(assignmentProjectionForNode(singleNode, null)).toMatchObject({ kind: "detail", canReturnToGroup: false });
+  });
+
+  it("keeps Assignment facet authoritative for a search-selected anchor", () => {
+    const searchAnchor: SelectedAnchor = { kind: "knowledge", id: singleNode.id };
+    expect(detailFacetForMode("assignment")).toBe("assignment");
+    expect(courseDrawerProjectionKind(searchAnchor, "assignment", singleNode)).toBe("assignment-detail");
   });
 });

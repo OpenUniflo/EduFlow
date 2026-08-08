@@ -17,6 +17,7 @@ import {
   type Texture
 } from "three";
 import type { AtlasSceneEdge, AtlasSceneNode } from "../projections/atlasProjections";
+import { atlasStructureKey, canonicalAtlasCamera, freezeAtlasNodePositions, resetAtlasCamera } from "../atlasCamera";
 
 type RenderNode = NodeObject<AtlasSceneNode> & AtlasSceneNode;
 type RenderEdge = LinkObject<AtlasSceneNode, AtlasSceneEdge> & AtlasSceneEdge;
@@ -135,7 +136,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const hoverResumeTimerRef = useRef<number | null>(null);
   const manualResumeTimerRef = useRef<number | null>(null);
   const disposeTimerRef = useRef<number | null>(null);
-  const initialFitRef = useRef(false);
+  const initialCameraInitializedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const visualByIdRef = useRef(new Map<string, NodeVisual>());
   const presentationRef = useRef({ focusTargetId: null as string | null, hoveredId: null as string | null, focusIds: null as Set<string> | null });
@@ -187,7 +188,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     };
   }, []);
 
-  const structureKey = useMemo(() => `${variant}|${nodes.map((node) => node.id).sort().join(",")}|${edges.map((edge) => `${edge.source}:${edge.relation}:${edge.target}`).sort().join(",")}`, [edges, nodes, variant]);
+  const structureKey = useMemo(() => atlasStructureKey(nodes, edges, variant), [edges, nodes, variant]);
   // Presentation-only fields intentionally do not participate in structural graph identity.
   const renderNodes = useMemo<RenderNode[]>(() => nodes.map((node) => ({ ...node })), [structureKey]);
   const renderEdges = useMemo<RenderEdge[]>(() => edges.map((edge) => ({ ...edge })), [structureKey]);
@@ -243,11 +244,16 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     if (graphBootedRef.current) return;
     graphBootedRef.current = true;
     instance.pauseAnimation();
+    if (!initialCameraInitializedRef.current) {
+      const camera = canonicalAtlasCamera(variant);
+      instance.cameraPosition(camera.position, camera.lookAt, 0);
+      initialCameraInitializedRef.current = true;
+    }
     graphResumeTimerRef.current = window.setTimeout(() => {
       instance.resumeAnimation();
       graphResumeTimerRef.current = null;
     }, 60);
-  }, []);
+  }, [variant]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -294,7 +300,6 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   useEffect(() => {
     const graph = graphRef.current;
     if (!graph) return;
-    initialFitRef.current = false;
     const charge = graph.d3Force("charge");
     if (charge && "strength" in charge) (charge as unknown as { strength: (value: number) => unknown }).strength(variant === "global" ? -54 : -82);
     const link = graph.d3Force("link");
@@ -481,8 +486,9 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     fit: () => graphRef.current?.zoomToFit(480, variant === "personal" ? 110 : 70),
     focus: (nodeId: string) => { focusNode(nodeId); },
     reset: () => {
-      graphRef.current?.cameraPosition({ x: 0, y: 0, z: variant === "personal" ? 520 : 620 }, { x: 0, y: 0, z: 0 }, 500);
-      window.setTimeout(() => graphRef.current?.zoomToFit(450, variant === "personal" ? 110 : 70), 520);
+      const graph = graphRef.current;
+      if (!graph) return;
+      resetAtlasCamera(variant, (position, lookAt, duration) => graph.cameraPosition(position, lookAt, duration));
     },
     zoomBy: (multiplier: number) => {
       const graph = graphRef.current;
@@ -531,10 +537,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
         warmupTicks={80}
         cooldownTicks={variant === "global" ? 180 : 140}
         onEngineStop={() => {
-          renderNodes.forEach((node) => { node.fx = node.x; node.fy = node.y; node.fz = node.z; });
-          if (initialFitRef.current) return;
-          initialFitRef.current = true;
-          graphRef.current?.zoomToFit(600, variant === "personal" ? 110 : 70);
+          freezeAtlasNodePositions(renderNodes);
         }}
         onNodeHover={(node) => {
           if (hoverResumeTimerRef.current) window.clearTimeout(hoverResumeTimerRef.current);

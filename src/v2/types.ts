@@ -133,6 +133,7 @@ export type ChapterAssignmentSummary = {
   assignmentCount: number;
   completedCount: number;
   inProgressCount: number;
+  notStartedCount: number;
   progress: number;
   outcome?: string;
 };

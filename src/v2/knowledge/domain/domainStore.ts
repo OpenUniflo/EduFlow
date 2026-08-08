@@ -5,6 +5,7 @@ import { initialKnowledgeDomains } from "./domainData";
 import { demoDomainDiscoveryService } from "./domainDiscovery";
 import type { DomainAdminCapability, DomainAssignment, DomainAssignmentCandidate, DomainProposal, KnowledgeDomain, KnowledgeDomainScope } from "./domainTypes";
 import { applyAutomaticAssignment, decideDomainAssignment, scoreNodeAgainstDomains } from "./domainScoring";
+import { moveNodesToDomain } from "./domainAssignment";
 
 export type DomainGovernanceState = {
   domains: KnowledgeDomain[];
@@ -64,9 +65,15 @@ export function resolveNodeDomain(nodeId: string, snapshot = state) {
 export function assignNodeDomain(nodeId: string, domainId: string | null, capability: DomainAdminCapability = "global-domain-admin") {
   const domain = domainId ? state.domains.find((item) => item.id === domainId) : undefined;
   if (domain) assertCapability(domain.scope, capability);
-  const assignments = state.assignments.filter((item) => item.nodeId !== nodeId);
-  if (domain) assignments.push({ nodeId, domainId: domain.id, source: "admin", pinned: true, assignedBy: "global-admin-demo", assignedAt: new Date().toISOString() });
+  const assignments = domain ? moveNodesToDomain(state.assignments, [nodeId], domain.id) : state.assignments.filter((item) => item.nodeId !== nodeId);
   publish({ ...state, assignments });
+}
+
+export function assignNodesToDomain(nodeIds: string[], domainId: string, capability: DomainAdminCapability = "global-domain-admin") {
+  const domain = state.domains.find((item) => item.id === domainId);
+  if (!domain) throw new Error(`Unknown Domain ${domainId}`);
+  assertCapability(domain.scope, capability);
+  publish({ ...state, assignments: moveNodesToDomain(state.assignments, nodeIds, domain.id) });
 }
 
 export function updateDomain(domainId: string, changes: Partial<Pick<KnowledgeDomain, "name" | "description" | "canonicalColor" | "status">>, capability: DomainAdminCapability = "global-domain-admin") {

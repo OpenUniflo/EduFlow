@@ -98,3 +98,21 @@ Assignment completion may later produce KnowledgeEvidence for the covered nodes.
 ## 16. Non-goals
 
 V1 does not implement submissions, teacher grading, automatic scoring, an Artifact Graph, Assignment DAG editor, project assembly runtime, full learner history, tenant sharing, a global Assignment library, or backend LLM generation.
+
+## 17. Course Assignment Drawer Projection
+
+Course selection uses a stable `SelectedAnchor`: either `{ kind: "chapter", id }` or `{ kind: "knowledge", id }`. `CourseDetailFacet` is `knowledge | assignment` and is authoritative from the current Course mode.
+
+The Drawer projects the selected Anchor through the active facet:
+
+- Chapter + Knowledge: Chapter introduction, lesson coverage, Knowledge progress, primary atomic KnowledgeNodes, materials, and a light Assignment cross-reference.
+- Chapter + Assignment: a deduplicated aggregate of `Chapter → KnowledgeNodes → AssignmentCoverage → unique AssignmentIds`, including completion counts, outcome, Assignment list, and project contributions.
+- Atomic + Knowledge: atomic Knowledge definition, curriculum coverage, prerequisites, materials, and a light Assignment cross-reference.
+- Atomic + Assignment with one Assignment: direct Assignment Detail.
+- Atomic + Assignment with multiple Assignments: Assignment Group first, then an internal Assignment Detail.
+
+Assignment Group is a UI projection, not a business entity. Chapter Assignment View is an aggregate projection, not a `ChapterAssignment` entity. Entering or leaving an Assignment Detail never changes the graph Anchor.
+
+## 18. Course Mode and Drawer Synchronization
+
+Course mode is authoritative for the Knowledge / Assignment facet. When mode changes, the selected Anchor stays, an open Drawer stays open, its facet switches, and graph geometry and viewport stay unchanged. Search and prerequisite navigation set only an Anchor; the active facet remains the current mode. Only the foreground companion layer accepts pointer input.

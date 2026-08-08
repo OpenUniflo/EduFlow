@@ -50,3 +50,15 @@ Global auto rotation pauses immediately while a node is hovered, selected, or se
 ## Hit Target
 
 Visual dot radius and raycast target are separate. An invisible sphere approximately twice the dot radius improves clicking without enlarging the visual mark.
+
+## Camera Lifecycle
+
+Structural layout lifecycle is not Camera lifecycle. Force boot, cooling, engine stop, and coordinate freezing control world positions only. Engine stop does not fit, zoom, reset, focus, or otherwise change the Camera.
+
+Explicit Fit, Reset, Search Focus, Selection Focus, and current-learning focus may move the Camera because they express user intent. Domain edits, learning-state presentation, Drawer state, hover, and background engine completion do not.
+
+Reset performs exactly one deterministic transition. It does not chain a canonical Camera move with a delayed `zoomToFit`.
+
+## Initial Camera Policy
+
+Initial Camera setup may occur once during scene initialization, but it must complete without a delayed visible jump after the scene has become interactive. Any later Camera movement requires explicit user intent or an explicit search/selection focus action.

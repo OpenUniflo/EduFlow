@@ -4785,6 +4785,7 @@ body {
   z-index: 2;
   opacity: 1;
   transform: none;
+  pointer-events: auto;
 }
 
 .course-flow-chapter.collapsed .assignment-presentation {
@@ -4816,6 +4817,10 @@ body {
   opacity: 0;
   transform: translateY(4px);
   pointer-events: none;
+}
+
+.course-flow-chapter.expanded .knowledge-presentation {
+  pointer-events: auto;
 }
 
 .course-flow-chapter.expanded.mode-assignment .knowledge-presentation {
@@ -4934,6 +4939,7 @@ body {
 
 .course-flow-knowledge-card {
   z-index: 2;
+  pointer-events: auto;
 }
 
 .course-flow-assignment-card {
@@ -4944,12 +4950,14 @@ body {
   background: color-mix(in srgb, var(--node-color) 8%, rgba(255, 255, 255, 0.96));
   opacity: 0.64;
   cursor: pointer;
+  pointer-events: none;
 }
 
 .course-flow-knowledge.mode-assignment .course-flow-knowledge-card {
   transform: translate(12px, 12px);
   z-index: 1;
   opacity: 0.56;
+  pointer-events: none;
 }
 
 .course-flow-knowledge.mode-assignment .course-flow-assignment-card {
@@ -4957,6 +4965,66 @@ body {
   z-index: 2;
   opacity: 1;
   border-style: solid;
+  pointer-events: auto;
+}
+
+.atlas-assignment-back {
+  display: flex;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9px;
+  color: #5269c6;
+  background: #edf0ff;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.atlas-assignment-group .atlas-assignment-switcher {
+  margin-top: 16px;
+}
+
+.atlas-assignment-switcher .atlas-assignment-row {
+  display: grid;
+  padding: 11px 10px;
+  align-items: center;
+  grid-template-columns: 28px 1fr auto;
+  gap: 8px;
+  border-radius: 10px;
+  background: #f4f6fa;
+}
+
+.atlas-assignment-switcher .atlas-assignment-row span {
+  color: #6c7fd2;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.atlas-assignment-switcher .atlas-assignment-row strong { font-size: 10px; }
+.atlas-assignment-switcher .atlas-assignment-row small { color: #8290a4; font-size: 9px; }
+
+.atlas-chapter-assignment-stats {
+  display: grid;
+  margin-bottom: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.atlas-chapter-assignment-stats span {
+  padding: 9px 5px;
+  border-radius: 9px;
+  color: #7a879a;
+  background: #f2f5f9;
+  font-size: 8px;
+  text-align: center;
+}
+
+.atlas-chapter-assignment-stats strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #263650;
+  font-size: 15px;
 }
 
 .course-flow-knowledge.selected.mode-knowledge .course-flow-knowledge-card,

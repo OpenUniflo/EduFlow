@@ -18,7 +18,7 @@ Formal Domain scope is `global | tenant`. Global Admin governs Global Domains. T
 
 `DomainAssignment` connects one node to one primary Domain and records `source`, optional confidence, pin state, actor, and time. Each KnowledgeNode has zero or one primary Domain in v1. `source: admin` requires `pinned: true`; automatic services must preserve pinned assignments. Secondary Domains are a non-goal.
 
-No assignment is the valid Unclassified state. Unclassified uses presentation fallback `#A7B0BF`; it is not a synthetic Domain or KnowledgeNode.
+No assignment is the valid Unclassified state: `domainAssignment == null → Unclassified`. Unclassified uses presentation fallback `#A7B0BF`; it is not a synthetic Domain or KnowledgeNode. It is a manageable collection in Domain Management: administrators can inspect, select, multi-select, and move its members to a formal Domain.
 
 ## DomainAssignmentCandidate
 
@@ -42,6 +42,8 @@ Discovery outputs `DomainProposal` with suggested identity, members, confidence,
 
 Moving a node in Domain Management or the Atlas quick editor writes `source: admin` and `pinned: true`. Subsequent automation cannot overwrite it.
 
+An Admin Move from Unclassified to a Domain creates the same admin, pinned assignment and immediately updates Unclassified and Domain counts. Candidate recomputation and Domain proposals cannot replace this result.
+
 `/admin/domains` contains Domain Management and Automatic Suggestions tabs. Management supports search/filter, membership inspection, multi-select move, rename, description/color editing, archive, and creation. Suggestions support accepting or redirecting node candidates and reviewing Domain proposals.
 
 ## Color Governance
@@ -53,6 +55,8 @@ Moving a node in Domain Management or the Atlas quick editor writes `source: adm
 Atlas hue resolves through `DomainAssignment → KnowledgeDomain.canonicalColor`. Global Admin can change a selected node's Domain from its drawer; name and color governance remain on the management page.
 
 Domain changes may change color, filters, statistics, search, and classification. They must not reconstruct structural graph data, reheat Force, reset the camera, alter coordinates, or mutate KnowledgeEdges.
+
+The current semantic scorer is a deterministic tokenization + Jaccard scaffold. The current discovery service is a review-flow scaffold, not real automatic Domain discovery. P1 replaces them with embedding kNN, a KnowledgeEdge-weighted similarity graph, and Leiden or an equivalent community algorithm; proposals still require governance confirmation.
 
 ## Future Merge/Split and Non-goals
 

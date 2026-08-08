@@ -4,7 +4,8 @@ import type { MockSession } from "../../../app/model";
 import { GlobalNav } from "../../components/GlobalNav";
 import { knowledgeNodes } from "../../knowledge/graph";
 import { DOMAIN_COLOR_PALETTE, UNCLASSIFIED_DOMAIN_COLOR } from "../../knowledge/domain/domainColors";
-import { acceptCandidate, assignNodeDomain, createDomain, ignoreCandidate, reviewProposal, updateDomain, useDomainGovernance } from "../../knowledge/domain/domainStore";
+import { acceptCandidate, assignNodeDomain, assignNodesToDomain, createDomain, ignoreCandidate, reviewProposal, updateDomain, useDomainGovernance } from "../../knowledge/domain/domainStore";
+import { getDomainMembers } from "../../knowledge/domain/domainValidation";
 
 export function DomainManagementPage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
   const governance = useDomainGovernance();
@@ -19,7 +20,7 @@ export function DomainManagementPage({ session, onLogout }: { session: MockSessi
   const selectedDomain = governance.domains.find((item) => item.id === selectedDomainId);
   const assignmentByNode = useMemo(() => new Map(governance.assignments.map((item) => [item.nodeId, item])), [governance.assignments]);
   const counts = useMemo(() => new Map(governance.domains.map((domain) => [domain.id, governance.assignments.filter((item) => item.domainId === domain.id).length])), [governance]);
-  const members = useMemo(() => knowledgeNodes.filter((node) => node.status === "active" && assignmentByNode.get(node.id)?.domainId === selectedDomainId && (!query || `${node.title} ${node.description}`.toLowerCase().includes(query.toLowerCase()))), [assignmentByNode, query, selectedDomainId]);
+  const members = useMemo(() => getDomainMembers(knowledgeNodes, governance.assignments, selectedDomainId, query), [governance.assignments, query, selectedDomainId]);
   const unclassifiedCount = knowledgeNodes.filter((node) => node.status === "active" && !assignmentByNode.has(node.id)).length;
   const candidateGroups = useMemo(() => [...new Set(governance.candidates.map((item) => item.nodeId))].map((nodeId) => ({ node: knowledgeNodes.find((node) => node.id === nodeId), candidates: governance.candidates.filter((item) => item.nodeId === nodeId).sort((a, b) => b.score - a.score) })).filter((group) => group.node), [governance.candidates]);
 
@@ -27,7 +28,7 @@ export function DomainManagementPage({ session, onLogout }: { session: MockSessi
 
   function moveSelected() {
     if (!moveTarget || !selectedNodeIds.length) return;
-    selectedNodeIds.forEach((nodeId) => assignNodeDomain(nodeId, moveTarget));
+    assignNodesToDomain(selectedNodeIds, moveTarget);
     notify(`已移动 ${selectedNodeIds.length} 个节点，并固定为管理员归属`);
     setSelectedNodeIds([]);
   }
