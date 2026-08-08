@@ -1,17 +1,19 @@
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
-import { ArrowRight, FileText, Minus, Pause, Play, Plus, RefreshCcw, Send, Upload, X } from "lucide-react";
+import { ArrowRight, FileText, Minus, Pause, Play, Plus, RefreshCcw, Send, Settings2, Upload, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneHandle } from "../knowledge/components/KnowledgeAtlasScene";
 import { buildGlobalAtlasProjection } from "../knowledge/projections/atlasProjections";
+import { assignNodeDomain, resolveNodeDomain, useDomainGovernance } from "../knowledge/domain/domainStore";
 
-const atlas = buildGlobalAtlasProjection();
 const generationStages = ["读取课件", "识别章节", "提取知识节点", "分析前置依赖", "生成实训目标", "完成课程"];
 
 export function AtlasHome({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
   const navigate = useNavigate();
   const sceneRef = useRef<KnowledgeAtlasSceneHandle>(null);
+  const governance = useDomainGovernance();
+  const atlas = useMemo(() => buildGlobalAtlasProjection(governance), [governance]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
@@ -29,7 +31,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
         .filter((edge) => edge.target === node.id && edge.relation === "prerequisite")
         .map((edge) => atlas.nodes.find((item) => item.id === edge.source)?.title ?? edge.source)
     };
-  }, [selectedId]);
+  }, [atlas, selectedId]);
 
   function chooseFiles(event: ChangeEvent<HTMLInputElement>) {
     const next = Array.from(event.target.files ?? []);
@@ -107,6 +109,14 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
           <div className="atlas-metric-grid"><div><strong>1</strong><span>知识点</span></div><div><strong>{selected.courseId ? 1 : "—"}</strong><span>课程</span></div><div><strong>{selected.related.length}</strong><span>关联主题</span></div></div>
           <div className="atlas-tag-list">{(selected.knowledge?.tags ?? [selected.domainTitle]).map((tag) => <span key={tag}>{tag}</span>)}</div>
           <section className="atlas-node-dependencies"><h3>前置依赖</h3><div>{selected.prerequisites.length ? selected.prerequisites.map((dependency) => <span key={dependency}><ArrowRight size={12} />{dependency}</span>) : <span>暂无严格前置依赖</span>}</div></section>
+          <section className="atlas-domain-quick-edit">
+            <div><h3>知识领域</h3><button onClick={() => navigate("/admin/domains")}><Settings2 size={13} />领域管理</button></div>
+            <select aria-label="修改知识领域" value={resolveNodeDomain(selected.id, governance).domain?.id ?? ""} onChange={(event) => assignNodeDomain(selected.id, event.target.value || null)}>
+              <option value="">未分类</option>
+              {governance.domains.filter((domain) => domain.status === "active" && domain.scope === "global").map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}
+            </select>
+            <small>管理员修改会写入 pinned 归属；颜色立即同步，节点位置保持不变。</small>
+          </section>
           <div className="atlas-panel-actions">
             <button className="atlas-primary" disabled={!selected.courseId} onClick={() => selected.courseId && navigate(`/courses/${selected.courseId}`)}>查看对应课程 <ArrowRight size={16} /></button>
             <button className="atlas-secondary" onClick={() => { setPrompt(`围绕“${selected.title}”创建一门课程，设计清晰的前置依赖与实训。`); setSelectedId(null); }}>基于此主题创建</button>

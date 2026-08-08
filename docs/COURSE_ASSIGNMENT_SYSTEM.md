@@ -58,6 +58,8 @@ The two views are stable presentations of one course graph. Each atomic React Fl
 
 Switching views changes z-index, transform, opacity, content, and border only. It does not change IDs, topology, ELK inputs, coordinates, pan, zoom, or viewport. The full footprint, including companion offset, is used by ELK in every mode.
 
+Chapter summaries and Atomic Knowledge/Assignment cards use the same companion-layer language. Collapsed Chapters exchange foreground/background companion cards; expanded headers use a restrained slide and crossfade while Atomic cards keep the stronger layer exchange. The graph footprint, coordinates, edges, zoom, and pan remain unchanged.
+
 ## 10. Chapter aggregation
 
 Chapter Assignment summary follows `Chapter -> primary KnowledgeNodes -> AssignmentCoverage -> unique assignmentId`. Assignment IDs are deduplicated before count and state aggregation, so one Assignment covering five nodes in a Chapter counts once. Chapter knowledge and Assignment presentations share the same macro position and edges.

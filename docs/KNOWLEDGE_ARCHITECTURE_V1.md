@@ -162,6 +162,18 @@ Every active course KnowledgeNode must have at least one AssignmentCoverage befo
 
 `Analyze Similar Knowledge` is an explicit, user-triggered service boundary. Candidate generation may combine embeddings, title, description, and relation-context similarity. Candidates are suggestions only; the user chooses Mapping, Merge, or Keep Independent. Course ingestion never invokes this service automatically.
 
+## 24A. Knowledge Domain
+
+`KnowledgeDomain` is first-class governance metadata, not graph geometry. It has Global or Tenant scope, a governed name and description, one canonical color, lifecycle status, and audit metadata. Domain is not a KnowledgeNode, Chapter, Community, Cluster, Island, or force-layout container.
+
+Formal membership is represented by `DomainAssignment`, not by copying color into `KnowledgeNode`. A node has zero or one primary Domain in v1; no assignment is the valid Unclassified state. Admin assignments are pinned and take precedence over automatic results. Global Admin governs Global Domains and Tenant Admin governs Tenant Domains; users cannot create formal Domains in v1.
+
+Domain classification never creates, deletes, or modifies `prerequisite`, `enables`, or `related` KnowledgeEdges. Domain changes may affect hue, filters, search, statistics, and classification only. They cannot change coordinates, topology, force state, or camera state.
+
+Existing-Domain assignment combines semantic evidence from `title`, `description`, and `masteryCriteria` with structural evidence from factual direct relations and common neighbors. Configurable thresholds produce automatic assignment, a pending candidate, or Unclassified. Admin-confirmed pinned members are preferred anchors.
+
+Full-graph discovery produces `DomainProposal` records for administrator review; clustering never creates an authoritative Domain directly. See `KNOWLEDGE_DOMAIN_SYSTEM.md`.
+
 ## 25. Community
 
 Community detection is an optional graph-analysis technique for future advanced analysis. It is not required to construct Personal Atlas, does not determine visible-node selection or layout, and is not a persistent product entity. If used later, it must operate on real relations, may span domains, and must never be implemented as `groupBy(domainId|chapter)`.

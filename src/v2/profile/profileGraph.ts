@@ -2,6 +2,7 @@ import type { AssignmentCoverage, CourseAssignment, CurriculumCoverage, Curricul
 import { calculateCrossDomainConnections, calculateKnowledgeConnectivity } from "../knowledge/graphAlgorithms";
 import type { KnowledgeGraph } from "../knowledge/types";
 import type { CurriculumContext, PersonalAssignmentContext, PersonalKnowledgeGraph, PersonalKnowledgeNode, UserKnowledgeRecord } from "./types";
+import { getDomainGovernanceSnapshot } from "../knowledge/domain/domainStore";
 
 const MATERIAL_BY_LESSON: Record<string, string[]> = { L04: ["lesson-04"] };
 
@@ -32,7 +33,6 @@ export function buildPersonalKnowledgeGraph(
   progress: LearningProgress
 ): PersonalKnowledgeGraph {
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
-  const domainById = new Map(graph.domains.map((domain) => [domain.id, domain]));
   const lessonById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
   const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
   const assignmentStateById = new Map(assignmentStates.map((state) => [state.assignmentId, state]));
@@ -89,8 +89,7 @@ export function buildPersonalKnowledgeGraph(
       description: source.description,
       scope: source.scope,
       domainId: source.domainId,
-      domainTitle: domainById.get(source.domainId ?? "")?.title ?? (source.scope === "user" ? "个人知识" : source.domainId),
-      domainColor: domainById.get(source.domainId ?? "")?.color ?? (source.scope === "user" ? "#f2a65a" : "#78a7ee"),
+      domainTitle: source.domainId,
       status: record?.status ?? "explore",
       progress: record?.mastery ?? 0,
       isCore: coreIds.has(id),
@@ -120,7 +119,7 @@ export function buildPersonalKnowledgeGraph(
       learning: nodes.filter((node) => node.status === "learning").length,
       explore: nodes.filter((node) => node.status === "explore").length,
       completedAssignments: new Set(nodes.flatMap((node) => node.assignmentContexts.filter((context) => context.status === "completed").map((context) => context.assignmentId))).size,
-      crossDomainConnections: calculateCrossDomainConnections(graph, coreIds, effectiveEdges),
+      crossDomainConnections: calculateCrossDomainConnections(graph, coreIds, effectiveEdges, getDomainGovernanceSnapshot().assignments),
       connectivity: calculateKnowledgeConnectivity(coreIds, effectiveEdges),
       currentLearningId
     }

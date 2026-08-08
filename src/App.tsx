@@ -82,6 +82,7 @@ import { ProfileKnowledgePage } from "./v2/pages/ProfileKnowledgePage";
 import { GlobalNav } from "./v2/components/GlobalNav";
 import { courseAssignments } from "./v2/data";
 import { markAssignmentComplete } from "./v2/progress";
+import { DomainManagementPage } from "./v2/admin/domains/DomainManagementPage";
 
 function stableStateValue(value: unknown) {
   if (value === undefined) return "__undefined__";
@@ -1111,6 +1112,7 @@ export default function App() {
   );
 
   const profilePage = session ? <ProfileKnowledgePage session={session} onLogout={logout} /> : null;
+  const domainManagementPage = session ? <DomainManagementPage session={session} onLogout={logout} /> : null;
 
   const canvasPage = routeTemplate ? (
     <main className="app-shell atlas-canvas-shell">
@@ -1263,6 +1265,7 @@ export default function App() {
               <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={<Navigate to="/courses/agentic-ai" replace />} />
               <RouterRoute path="/tasks/*" element={<Navigate to="/" replace />} />
               <RouterRoute path="/profile" element={protectedElement(profilePage)} />
+              <RouterRoute path="/admin/domains" element={protectedElement(domainManagementPage)} />
               <RouterRoute path="/profile/*" element={<Navigate to="/profile" replace />} />
               <RouterRoute path="/settings/*" element={<Navigate to="/" replace />} />
               <RouterRoute path="/notifications/*" element={<Navigate to="/" replace />} />

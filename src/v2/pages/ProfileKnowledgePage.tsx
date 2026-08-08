@@ -6,6 +6,7 @@ import { GlobalNav } from "../components/GlobalNav";
 import { assignmentCoverages, courseAssignments, curriculumCoverages, curriculumLessons, userAssignmentStates } from "../data";
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneHandle } from "../knowledge/components/KnowledgeAtlasScene";
 import { buildPersonalAtlasProjection } from "../knowledge/projections/atlasProjections";
+import { resolveNodeDomain, useDomainGovernance } from "../knowledge/domain/domainStore";
 import { useLearningProgress } from "../progress";
 import { demoPersonalKnowledgeGraph, demoUserKnowledge } from "../profile/demoUserKnowledge";
 import { buildPersonalKnowledgeGraph } from "../profile/profileGraph";
@@ -24,6 +25,7 @@ function initials(name: string) {
 export function ProfileKnowledgePage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
   const navigate = useNavigate();
   const progress = useLearningProgress();
+  const governance = useDomainGovernance();
   const sceneRef = useRef<KnowledgeAtlasSceneHandle>(null);
   const toastTimerRef = useRef<number | null>(null);
   const graph = useMemo(() => buildPersonalKnowledgeGraph(demoPersonalKnowledgeGraph, demoUserKnowledge, courseAssignments, curriculumCoverages, curriculumLessons, assignmentCoverages, userAssignmentStates, progress), [progress]);
@@ -31,8 +33,9 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   const [searchMatchId, setSearchMatchId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
-  const atlas = useMemo(() => buildPersonalAtlasProjection(graph), [graph]);
+  const atlas = useMemo(() => buildPersonalAtlasProjection(graph, governance), [governance, graph]);
   const selected = selectedId ? graph.nodes.find((node) => node.id === selectedId) ?? null : null;
+  const selectedDomain = selected ? resolveNodeDomain(selected.id, governance).domain : undefined;
   const drawerOpen = Boolean(selected);
   const nodeById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph.nodes]);
 
@@ -119,7 +122,7 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
 
       <aside className={`personal-drawer glass-v2 ${drawerOpen ? "open" : ""}`}>
         {selected ? <>
-          <div className="personal-drawer-head"><span><small>{selected.domainTitle ?? "个人知识"} · {selected.scope}</small><h2>{selected.title}</h2><p>{selected.description}</p><i className={`status-${selected.status}`}>{statusLabels[selected.status]}{selected.status === "learning" ? ` · ${selected.progress}%` : ""}</i></span><button onClick={() => { setSelectedId(null); setSearchMatchId(null); }} aria-label="关闭节点详情"><X size={17} /></button></div>
+          <div className="personal-drawer-head"><span><small>{selectedDomain?.name ?? "未分类"} · {selected.scope}</small><h2>{selected.title}</h2><p>{selected.description}</p><i className={`status-${selected.status}`}>{statusLabels[selected.status]}{selected.status === "learning" ? ` · ${selected.progress}%` : ""}</i></span><button onClick={() => { setSelectedId(null); setSearchMatchId(null); }} aria-label="关闭节点详情"><X size={17} /></button></div>
           <section><h3>当前掌握</h3><div className="personal-progress-card"><span><small>个人知识状态</small><strong>{selected.progress ? `${selected.progress}%` : statusLabels[selected.status]}</strong></span><i><b style={{ width: `${selected.progress || 8}%` }} /></i></div></section>
           <section><h3>课程上下文</h3>{selected.curriculumContexts.length ? <div className="personal-drawer-list">{selected.curriculumContexts.map((context) => <span key={context.coverageId}><small>第 {context.lessonOrder} 课 · {context.role}</small><strong>{context.lessonId}</strong></span>)}</div> : <div className="personal-empty-analysis"><CircleDot size={18} /><strong>暂无课程引用</strong><p>知识节点可独立于课程存在。</p></div>}</section>
           <section><h3>学习与实践证据</h3>{selected.evidence.length ? <div className="personal-drawer-list">{selected.evidence.map((item, index) => <span key={`${item}-${index}`}><small>证据 {String(index + 1).padStart(2, "0")}</small><strong>{item}</strong></span>)}</div> : <div className="personal-empty-analysis"><CircleDot size={18} /><strong>尚无学习证据</strong><p>节点出现在图中不会自动视为已掌握。</p></div>}</section>

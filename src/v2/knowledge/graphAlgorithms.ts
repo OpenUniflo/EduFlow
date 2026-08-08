@@ -1,4 +1,5 @@
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeGraphLayout } from "./types";
+import type { DomainAssignment } from "./domain/domainTypes";
 
 export function buildStructuralAdjacency(nodeIds: Iterable<string>, edges: KnowledgeEdge[]) {
   const adjacency = new Map<string, Set<string>>();
@@ -62,12 +63,12 @@ export function calculateKnowledgeConnectivity(coreNodeIds: Iterable<string>, ef
   return Math.round((connected.size / core.size) * 100);
 }
 
-export function calculateCrossDomainConnections(graph: KnowledgeGraph, coreNodeIds: Iterable<string>, effectiveEdges: KnowledgeEdge[]) {
+export function calculateCrossDomainConnections(graph: KnowledgeGraph, coreNodeIds: Iterable<string>, effectiveEdges: KnowledgeEdge[], domainAssignments?: DomainAssignment[]) {
   const core = new Set(coreNodeIds);
-  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+  const domainByNode = domainAssignments ? new Map(domainAssignments.map((assignment) => [assignment.nodeId, assignment.domainId])) : new Map(graph.nodes.map((node) => [node.id, node.domainId]));
   return effectiveEdges.filter((edge) => {
     if (!core.has(edge.source) || !core.has(edge.target)) return false;
-    return nodeById.get(edge.source)?.domainId !== nodeById.get(edge.target)?.domainId;
+    return domainByNode.get(edge.source) !== domainByNode.get(edge.target);
   }).length;
 }
 

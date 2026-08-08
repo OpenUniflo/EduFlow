@@ -35,6 +35,31 @@
 - Community detection is an optional analysis technique, not a required product entity or visible region. Default Personal Atlas MUST NOT render community/island hulls, titles, quotas, or potential bridges.
 - Personal edges use a neutral undirected visual by default while preserving their factual relation and direction in data and details.
 
+## Atlas Stability
+
+- Knowledge Atlas is a stable spatial world.
+- Hover, selection, search, learning state, Domain changes, filters, and drawer state MUST NOT trigger graph relayout.
+- Auto rotation MUST pause while a node is hovered or selected. Manual camera interaction MUST receive a grace period before rotation may resume.
+- Visual node size and interaction hit target MUST be decoupled.
+- Force positions MUST freeze after stabilization and remain frozen until the structural node/edge set changes.
+
+## Atlas Visual Encoding
+
+- Domain hue represents semantic Domain; node size represents graph importance; a marker or ring represents user learning state; opacity represents focus/explore visibility; halo and scale represent interaction; position is driven by KnowledgeEdges.
+- Domain color MUST NOT be replaced by mastery or learning colors.
+- Atlas nodes use a dot-first visual, KnowledgeEdges use neutral thread colors by default, and ordinary labels use sparse map-label styling.
+
+## Domain Invariants
+
+- `KnowledgeDomain` is a governed semantic classification entity and MUST NOT be represented as a `KnowledgeNode`.
+- `KnowledgeDomain` MUST NOT directly constrain graph geometry. Changing Domain membership MUST NOT trigger graph relayout.
+- Every `KnowledgeNode` has at most one primary Domain in v1. Unclassified is a valid state.
+- Domain assignment uses semantic and structural evidence. Automatic discovery creates proposals, not authoritative Domains.
+- An admin `DomainAssignment` is pinned and MUST NOT be overwritten automatically.
+- Changing Domain membership MUST NOT create, delete, or modify `KnowledgeEdge` facts.
+- Domain color belongs to `KnowledgeDomain.canonicalColor` and MUST NOT be copied into `KnowledgeNode`.
+- Global Domains are governed by Global Admin; Tenant Domains are governed by Tenant Admin. Users do not create formal Domains in v1.
+
 ## Course Views
 
 - Full Skill Tree renders CurriculumCoverage-referenced active KnowledgeNodes and their shared KnowledgeEdges.
@@ -74,3 +99,9 @@
 - Course Overview, Focused, and Full views MUST share the same Chapter macro topology.
 - Personal and Global Atlas selection MUST operate as camera/highlight presentation over a stable knowledge layout.
 - Changes MUST pass TypeScript compilation and production build. Relevant pages MUST be checked for runtime errors.
+
+## Course Presentation Stability
+
+- 技能树 / 实训树 switching is presentation-only.
+- Chapter and Atomic nodes MUST use a consistent Knowledge / Assignment companion visual language.
+- Mode switching MUST NOT trigger ELK, fitView, coordinate changes, edge changes, or viewport reset.

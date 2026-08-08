@@ -42,7 +42,6 @@ export type PersonalKnowledgeNode = {
   scope: KnowledgeScope;
   domainId?: string;
   domainTitle?: string;
-  domainColor?: string;
   status: PersonalKnowledgeStatus;
   progress: number;
   isCore: boolean;

@@ -45,6 +45,7 @@ type LabelState = { id: string; title: string; x: number; y: number; priority: n
 type NodeVisual = {
   group: Group;
   sphere: Mesh<SphereGeometry, MeshStandardMaterial>;
+  hitTarget: Mesh<SphereGeometry, MeshBasicMaterial>;
   glow: Sprite;
   ring?: Mesh<RingGeometry, MeshBasicMaterial>;
   materials: Material[];
@@ -101,8 +102,8 @@ function makeGlowTexture(color: string) {
   const context = canvas.getContext("2d");
   if (context) {
     const gradient = context.createRadialGradient(32, 32, 2, 32, 32, 30);
-    gradient.addColorStop(0, alphaColor("#ffffff", 0.9));
-    gradient.addColorStop(0.22, alphaColor(color, 0.7));
+    gradient.addColorStop(0, alphaColor(color, 0.62));
+    gradient.addColorStop(0.28, alphaColor(color, 0.34));
     gradient.addColorStop(1, alphaColor(color, 0));
     context.fillStyle = gradient;
     context.fillRect(0, 0, 64, 64);
@@ -111,9 +112,9 @@ function makeGlowTexture(color: string) {
 }
 
 function baseRadius(node: AtlasSceneNode, variant: "global" | "personal") {
-  if (node.status === "explore") return 3.6;
-  if (node.status === "learning") return 6.2;
-  return variant === "global" ? 5.2 : 5.4;
+  const importanceRadius = 3.4 + Math.max(0, Math.min(1, node.visualImportance)) * 3.6;
+  if (node.status === "explore") return Math.max(3.2, importanceRadius * 0.76);
+  return variant === "global" ? importanceRadius : 3.6 + Math.max(0, Math.min(1, node.visualImportance)) * 2.6;
 }
 
 export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, KnowledgeAtlasSceneProps>(function KnowledgeAtlasScene({
@@ -131,6 +132,8 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const graphRef = useRef<ForceGraphMethods<AtlasSceneNode, AtlasSceneEdge> | undefined>(undefined);
   const graphBootedRef = useRef(false);
   const graphResumeTimerRef = useRef<number | null>(null);
+  const hoverResumeTimerRef = useRef<number | null>(null);
+  const manualResumeTimerRef = useRef<number | null>(null);
   const disposeTimerRef = useRef<number | null>(null);
   const initialFitRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -138,6 +141,8 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const presentationRef = useRef({ focusTargetId: null as string | null, hoveredId: null as string | null, focusIds: null as Set<string> | null });
   const [size, setSize] = useState({ width: 1, height: 1 });
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [hoverPaused, setHoverPaused] = useState(false);
+  const [manualInteraction, setManualInteraction] = useState(false);
   const [labels, setLabels] = useState<LabelState[]>([]);
 
   const resources = useMemo(() => {
@@ -182,10 +187,13 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     };
   }, []);
 
-  const renderNodes = useMemo<RenderNode[]>(() => nodes.map((node) => ({ ...node })), [nodes]);
-  const renderEdges = useMemo<RenderEdge[]>(() => edges.map((edge) => ({ ...edge })), [edges]);
+  const structureKey = useMemo(() => `${variant}|${nodes.map((node) => node.id).sort().join(",")}|${edges.map((edge) => `${edge.source}:${edge.relation}:${edge.target}`).sort().join(",")}`, [edges, nodes, variant]);
+  // Presentation-only fields intentionally do not participate in structural graph identity.
+  const renderNodes = useMemo<RenderNode[]>(() => nodes.map((node) => ({ ...node })), [structureKey]);
+  const renderEdges = useMemo<RenderEdge[]>(() => edges.map((edge) => ({ ...edge })), [structureKey]);
   const graphData = useMemo(() => ({ nodes: renderNodes, links: renderEdges }), [renderEdges, renderNodes]);
-  const nodeById = useMemo(() => new Map(renderNodes.map((node) => [node.id, node])), [renderNodes]);
+  const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+  const renderNodeById = useMemo(() => new Map(renderNodes.map((node) => [node.id, node])), [renderNodes]);
   const focusTargetId = selectedId ?? searchMatchId ?? null;
   const focusIds = useMemo(() => {
     if (!focusTargetId) return null;
@@ -212,12 +220,17 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     const defaultOpacity = node.status === "explore" ? 0.38 : 0.82;
     const opacity = selected || hovered ? 1 : neighbor ? 0.9 : unrelated ? (node.status === "explore" ? 0.07 : 0.1) : defaultOpacity;
     visual.sphere.scale.setScalar(selected ? 1.3 : hovered ? 1.12 : 1);
+    visual.sphere.material.color.set(node.color);
+    visual.sphere.material.emissive.set(node.color);
     visual.sphere.material.opacity = opacity;
-    visual.sphere.material.emissiveIntensity = selected ? 1.35 : neighbor || hovered ? 0.72 : unrelated ? 0.08 : 0.55;
+    visual.sphere.material.emissiveIntensity = selected ? 0.72 : neighbor || hovered ? 0.38 : unrelated ? 0.04 : 0.18;
     const glowMaterial = visual.glow.material as SpriteMaterial;
-    glowMaterial.opacity = selected ? 0.7 : hovered ? 0.58 : neighbor ? 0.34 : unrelated ? 0.015 : node.status === "explore" ? 0.1 : 0.24;
+    glowMaterial.color.set(node.color);
+    glowMaterial.map = resources.glow(node.color);
+    glowMaterial.needsUpdate = true;
+    glowMaterial.opacity = selected ? 0.46 : hovered ? 0.3 : neighbor ? 0.14 : unrelated ? 0.008 : node.status === "explore" ? 0.04 : 0.1;
     if (visual.ring) visual.ring.material.opacity = unrelated ? 0.06 : selected ? 1 : neighbor ? 0.9 : 0.82;
-  }, []);
+  }, [resources]);
 
   const assignGraphRef = useCallback((instance: ForceGraphMethods<AtlasSceneNode, AtlasSceneEdge> | null | undefined) => {
     graphRef.current = instance ?? undefined;
@@ -252,11 +265,31 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   useEffect(() => {
     const controls = graphRef.current?.controls() as { autoRotate?: boolean; autoRotateSpeed?: number; enableDamping?: boolean; dampingFactor?: number } | undefined;
     if (!controls) return;
-    controls.autoRotate = autoRotate && !focusTargetId;
+    controls.autoRotate = variant === "global" && autoRotate && !focusTargetId && !hoveredId && !hoverPaused && !manualInteraction;
     controls.autoRotateSpeed = 0.16;
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-  }, [autoRotate, focusTargetId]);
+  }, [autoRotate, focusTargetId, hoverPaused, hoveredId, manualInteraction, variant]);
+
+  useEffect(() => {
+    const controls = graphRef.current?.controls() as { addEventListener?: (type: string, listener: () => void) => void; removeEventListener?: (type: string, listener: () => void) => void } | undefined;
+    if (!controls?.addEventListener) return;
+    const start = () => {
+      if (manualResumeTimerRef.current) window.clearTimeout(manualResumeTimerRef.current);
+      setManualInteraction(true);
+    };
+    const end = () => {
+      if (manualResumeTimerRef.current) window.clearTimeout(manualResumeTimerRef.current);
+      manualResumeTimerRef.current = window.setTimeout(() => setManualInteraction(false), 1400);
+    };
+    controls.addEventListener("start", start);
+    controls.addEventListener("end", end);
+    return () => {
+      controls.removeEventListener?.("start", start);
+      controls.removeEventListener?.("end", end);
+      if (manualResumeTimerRef.current) window.clearTimeout(manualResumeTimerRef.current);
+    };
+  }, [size.width]);
 
   useEffect(() => {
     const graph = graphRef.current;
@@ -266,8 +299,9 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     if (charge && "strength" in charge) (charge as unknown as { strength: (value: number) => unknown }).strength(variant === "global" ? -54 : -82);
     const link = graph.d3Force("link");
     if (link && "distance" in link) (link as unknown as { distance: (value: number) => unknown }).distance(variant === "global" ? 46 : 64);
+    renderNodes.forEach((node) => { node.fx = undefined; node.fy = undefined; node.fz = undefined; });
     graph.d3ReheatSimulation();
-  }, [graphData, variant]);
+  }, [graphData, renderNodes, structureKey, variant]);
 
   useEffect(() => {
     const visibleIds = new Set(renderNodes.map((node) => node.id));
@@ -293,6 +327,8 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       // cancel the teardown while a real unmount still releases GPU assets.
       disposeTimerRef.current = window.setTimeout(() => {
         if (graphResumeTimerRef.current) window.clearTimeout(graphResumeTimerRef.current);
+        if (hoverResumeTimerRef.current) window.clearTimeout(hoverResumeTimerRef.current);
+        if (manualResumeTimerRef.current) window.clearTimeout(manualResumeTimerRef.current);
         visualByIdRef.current.forEach(disposeVisual);
         visualByIdRef.current.clear();
         resources.dispose();
@@ -303,7 +339,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
 
   const focusNode = useCallback((nodeId: string) => {
     const graph = graphRef.current;
-    const node = nodeById.get(nodeId);
+    const node = renderNodeById.get(nodeId);
     if (!graph || !node || !Number.isFinite(node.x) || !Number.isFinite(node.y) || !Number.isFinite(node.z)) return false;
     const target = { x: node.x ?? 0, y: node.y ?? 0, z: node.z ?? 0 };
     const camera = graph.camera();
@@ -313,14 +349,18 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       vector = { x: 0.24, y: 0.14, z: 1 };
       length = Math.hypot(vector.x, vector.y, vector.z);
     }
-    const distance = variant === "personal" ? 190 : 155;
+    const neighborhoodRadius = focusIds ? Math.max(0, ...[...focusIds].map((id) => {
+      const neighbor = renderNodeById.get(id);
+      return neighbor && Number.isFinite(neighbor.x) ? Math.hypot((neighbor.x ?? 0) - target.x, (neighbor.y ?? 0) - target.y, (neighbor.z ?? 0) - target.z) : 0;
+    })) : 0;
+    const distance = Math.max(variant === "personal" ? 190 : 165, neighborhoodRadius * 2.1);
     graph.cameraPosition({
       x: target.x + vector.x / length * distance,
       y: target.y + vector.y / length * distance,
       z: target.z + vector.z / length * distance
     }, target, 620);
     return true;
-  }, [nodeById, variant]);
+  }, [focusIds, renderNodeById, variant]);
 
   useEffect(() => {
     if (!focusTargetId) return;
@@ -344,7 +384,10 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     const medium = cameraDistance > (variant === "global" ? 480 : 420);
     const candidates = renderNodes
       .filter((node) => Number.isFinite(node.x) && Number.isFinite(node.y) && Number.isFinite(node.z))
-      .map((node) => ({ node, priority: labelPriority(node, focusTargetId, hoveredId, focusIds, searchMatchId, currentLearningId) }))
+      .map((renderNode) => {
+        const node = nodeById.get(renderNode.id) ?? renderNode;
+        return { node: { ...node, x: renderNode.x, y: renderNode.y, z: renderNode.z } as RenderNode, priority: labelPriority(node, focusTargetId, hoveredId, focusIds, searchMatchId, currentLearningId) };
+      })
       .filter(({ node, priority }) => {
         if (priority >= 80) return true;
         if (focusTargetId) return false;
@@ -390,7 +433,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     const sphereMaterial = new MeshStandardMaterial({
       color: item.color,
       emissive: item.color,
-      emissiveIntensity: 0.55,
+      emissiveIntensity: 0.18,
       roughness: 0.28,
       metalness: 0.08,
       transparent: true,
@@ -398,18 +441,22 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     });
     const sphere = new Mesh(resources.sphere(radius), sphereMaterial);
     group.add(sphere);
+    const hitMaterial = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+    const hitTarget = new Mesh(resources.sphere(radius * 2), hitMaterial);
+    hitTarget.renderOrder = -1;
+    group.add(hitTarget);
     const glowMaterial = new SpriteMaterial({
       map: resources.glow(item.color),
       color: item.color,
       transparent: true,
-      opacity: item.status === "explore" ? 0.1 : 0.24,
+      opacity: item.status === "explore" ? 0.04 : 0.1,
       depthWrite: false,
       blending: AdditiveBlending
     });
     const glow = new Sprite(glowMaterial);
-    glow.scale.set(radius * 5.8, radius * 5.8, 1);
+    glow.scale.set(radius * 2.8, radius * 2.8, 1);
     group.add(glow);
-    const materials: Material[] = [sphereMaterial, glowMaterial];
+    const materials: Material[] = [sphereMaterial, hitMaterial, glowMaterial];
     let ring: NodeVisual["ring"];
     if (item.status === "mastered" || item.status === "learning") {
       const ringMaterial = new MeshBasicMaterial({
@@ -424,7 +471,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       group.add(ring);
       materials.push(ringMaterial);
     }
-    const visual = { group, sphere, glow, ring, materials };
+    const visual = { group, sphere, hitTarget, glow, ring, materials };
     visualByIdRef.current.set(item.id, visual);
     applyNodeAppearance(item, visual);
     return group;
@@ -463,15 +510,18 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
           const source = endpointId(edge.source);
           const target = endpointId(edge.target);
           const incident = Boolean(focusTargetId && (focusTargetId === source || focusTargetId === target));
-          if (incident) return alphaColor(nodeById.get(focusTargetId ?? "")?.color ?? "#697ee6", 0.72);
+          const hoverIncident = Boolean(hoveredId && (hoveredId === source || hoveredId === target));
+          if (incident) return alphaColor(nodeById.get(focusTargetId ?? "")?.color ?? "#8392A8", 0.84);
+          if (hoverIncident) return alphaColor(nodeById.get(hoveredId ?? "")?.color ?? "#8392A8", 0.48);
           if (focusTargetId) return "rgba(92,112,145,0.018)";
-          return variant === "global" ? "rgba(104,126,160,0.075)" : "rgba(92,112,145,0.09)";
+          return variant === "global" ? "rgba(131,146,168,0.18)" : "rgba(131,146,168,0.17)";
         }}
         linkWidth={(edge) => {
           const source = endpointId(edge.source);
           const target = endpointId(edge.target);
           if (focusTargetId && (focusTargetId === source || focusTargetId === target)) return 1.45;
-          return focusTargetId ? 0.08 : 0.24;
+          if (hoveredId && (hoveredId === source || hoveredId === target)) return 0.82;
+          return focusTargetId ? 0.08 : 0.48;
         }}
         linkOpacity={1}
         linkDirectionalArrowLength={0}
@@ -481,16 +531,26 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
         warmupTicks={80}
         cooldownTicks={variant === "global" ? 180 : 140}
         onEngineStop={() => {
+          renderNodes.forEach((node) => { node.fx = node.x; node.fy = node.y; node.fz = node.z; });
           if (initialFitRef.current) return;
           initialFitRef.current = true;
           graphRef.current?.zoomToFit(600, variant === "personal" ? 110 : 70);
         }}
-        onNodeHover={(node) => setHoveredId(node?.id ? String(node.id) : null)}
+        onNodeHover={(node) => {
+          if (hoverResumeTimerRef.current) window.clearTimeout(hoverResumeTimerRef.current);
+          if (node?.id) {
+            setHoverPaused(true);
+            setHoveredId(String(node.id));
+            return;
+          }
+          setHoveredId(null);
+          hoverResumeTimerRef.current = window.setTimeout(() => setHoverPaused(false), 250);
+        }}
         onNodeClick={(node) => onNodeClick?.(node as RenderNode)}
         onBackgroundClick={onBackgroundClick}
       />
       <div className="knowledge-atlas-label-layer" aria-hidden="true">
-        {labels.map((label) => <span key={label.id} className={label.forced ? "forced" : ""} style={{ transform: `translate(${label.x}px, ${label.y}px) translate(-50%, 0)` }}>{label.title}</span>)}
+        {labels.map((label) => <span key={label.id} className={label.id === focusTargetId ? "selected" : ""} style={{ transform: `translate(${label.x}px, ${label.y}px) translate(-50%, 0)` }}>{label.title}</span>)}
       </div>
     </div>
   );

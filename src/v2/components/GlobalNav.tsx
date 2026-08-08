@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BookOpen, ChevronDown, LogOut, Network, Workflow } from "lucide-react";
+import { BookOpen, ChevronDown, LogOut, Network, ShieldCheck, Workflow } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 
@@ -8,7 +8,7 @@ export function GlobalNav({
   session,
   onLogout
 }: {
-  active: "atlas" | "courses" | "workflows" | "profile";
+  active: "atlas" | "courses" | "workflows" | "profile" | "admin";
   session?: MockSession | null;
   onLogout?: () => void;
 }) {
@@ -44,6 +44,13 @@ export function GlobalNav({
       label: "工作流画布",
       description: "搭建、运行并验收实训任务",
       icon: Workflow
+    },
+    {
+      id: "admin",
+      to: "/admin/domains",
+      label: "知识领域管理",
+      description: "治理领域、成员与自动建议",
+      icon: ShieldCheck
     }
   ] as const;
 

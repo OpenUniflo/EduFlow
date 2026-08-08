@@ -6,18 +6,11 @@ import type {
   KnowledgeNodeRevision,
   KnowledgeNodeType
 } from "./types";
+import { initialKnowledgeDomains } from "./domain/domainData";
 
 const DEMO_TIME = "2026-08-01T00:00:00.000Z";
 
-export const knowledgeDomains: KnowledgeDomain[] = [
-  { id: "agentic-ai", title: "Agentic AI", description: "规划、工具、记忆、运行时、评测与治理组成的智能体系统知识。", color: "#78a7ee" },
-  { id: "python-engineering", title: "Python Engineering", description: "从 Python 运行模型到异步、后端架构与生产部署的工程能力。", color: "#70c4a5" },
-  { id: "machine-learning", title: "机器学习", description: "从统计学习到深度学习的数据驱动建模方法。", color: "#9a8ee6" },
-  { id: "education-ai", title: "教育 AI", description: "知识图谱、生成式 AI、学习分析与教学设计的交叉领域。", color: "#77b7c8" },
-  { id: "language-learning", title: "语言学习", description: "语法、表达、阅读、写作与跨文化交流。", color: "#ec92aa" },
-  { id: "business-analysis", title: "商业分析", description: "连接数据、商业问题与决策的分析能力。", color: "#eca86c" },
-  { id: "life-sciences", title: "生命科学", description: "生命结构、遗传、进化、生态与复杂生物系统。", color: "#82bfa5" }
-];
+export const knowledgeDomains: KnowledgeDomain[] = initialKnowledgeDomains;
 
 function criteria(title: string, type: KnowledgeNodeType) {
   const action = type === "procedural" ? "独立完成" : type === "representational" ? "正确解释并使用" : type === "meta" ? "判断适用条件并运用" : "清楚解释";

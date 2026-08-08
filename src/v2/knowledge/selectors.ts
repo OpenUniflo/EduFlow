@@ -1,5 +1,6 @@
 import { globalKnowledgeGraph } from "./graph";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "./types";
+import { getDomainGovernanceSnapshot } from "./domain/domainStore";
 
 const nodeById = new Map(globalKnowledgeGraph.nodes.map((node) => [node.id, node]));
 const domainById = new Map(globalKnowledgeGraph.domains.map((domain) => [domain.id, domain]));
@@ -19,7 +20,8 @@ export function getKnowledgeDomain(id: string) {
 }
 
 export function getNodesByDomain(domainId: string) {
-  return globalKnowledgeGraph.nodes.filter((node) => node.domainId === domainId);
+  const nodeIds = new Set(getDomainGovernanceSnapshot().assignments.filter((item) => item.domainId === domainId).map((item) => item.nodeId));
+  return globalKnowledgeGraph.nodes.filter((node) => nodeIds.has(node.id));
 }
 
 export function getKnowledgeNeighbors(id: string, graph: KnowledgeGraph = globalKnowledgeGraph): KnowledgeNode[] {
