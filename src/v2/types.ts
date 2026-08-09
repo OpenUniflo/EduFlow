@@ -243,10 +243,17 @@ export type MaterialSegmentContent = {
 export type MaterialSegment = {
   id: string;
   order: number;
+  page?: number;
   title?: string;
   section?: string;
-  content: MaterialSegmentContent;
+  content?: MaterialSegmentContent;
   assignmentIds?: string[];
+};
+
+export type MaterialSource = {
+  kind: "pdf";
+  url: string;
+  pageCount: number;
 };
 
 export type Material = {
@@ -255,7 +262,8 @@ export type Material = {
   lessonId: string;
   title: string;
   description?: string;
-  type: "slides" | "document" | "article";
+  type: "pdf" | "document" | "article";
+  source?: MaterialSource;
   duration?: string;
   segments: MaterialSegment[];
 };

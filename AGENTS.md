@@ -176,6 +176,28 @@
 - Reading completion MUST be derived from actually viewed/completed Segment identities and MUST NOT be inferred from the current Segment's numeric position.
 - MaterialKnowledgeCoverage is authoritative for Segment-to-Knowledge relationships. Generic readers MUST NOT contain course-specific page mappings.
 
+## Original Material Invariants
+
+- Original course material is authoritative presentation content. For PDF Material, the center reader MUST render the original PDF pages instead of reconstructing them from HTML cards.
+- Knowledge, Assignment, Domain, and progress metadata remain external to the source PDF. Changing mappings MUST NOT require rewriting the PDF file.
+- The source PDF is curriculum content and MUST NOT become a KnowledgeNode or determine Knowledge identity.
+
+## PDF Material Invariants
+
+- For PDF Material, one PDF page equals one MaterialSegment. `MaterialSegment.page` maps deterministically to a source page in the complete range `1..pageCount`.
+- PDF source metadata, Segment count, unique page numbers, and MaterialKnowledgeCoverage references MUST be validated before rendering.
+- PDF.js worker assets MUST be bundled by Vite with production-stable URLs. An iframe or browser-native PDF toolbar is not the primary reader.
+- Document and Article renderers MUST coexist with the PDF renderer.
+
+## Reader State Invariants
+
+- `activeSegmentId` is the single live reading-position state for PDF page, Outline, Knowledge context, Assignment context, URL, and persisted recent position.
+- Initial alignment runs only for a new Material or genuine external Segment navigation. Normal scrolling and reader-originated URL replacement MUST NOT restart it.
+- Programmatic navigation and observer navigation MUST be explicitly distinguished. Observer changes are ignored until the requested page is stably visible.
+- Reader URL updates preserve unrelated query parameters and use history replacement.
+- Pinning Knowledge detail survives page changes until the user explicitly unpins it.
+- Programmatic jumps MUST NOT mark intermediate PDF pages as viewed.
+
 ## Knowledge Progress Invariants
 
 - Knowledge mastery and Assignment completion are separate states and separate projections.

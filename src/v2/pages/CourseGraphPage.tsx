@@ -50,7 +50,10 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
   const drawerOpen = Boolean(selectedAnchor || materialsOpen);
   const drawerMaterials = useMemo(() => {
     if (!runtime) return [];
-    if (selectedNode) return runtime.materials.filter((material) => selectedNode.materialIds.includes(material.id));
+    if (selectedNode) return selectedNode.materialContexts.flatMap((context) => {
+      const material = runtime.materials.find((item) => item.id === context.materialId);
+      return material ? [material] : [];
+    });
     if (selectedChapter) return runtime.materials.filter((material) => selectedChapter.lessonIds.includes(material.lessonId));
     return runtime.materials;
   }, [runtime, selectedChapter, selectedNode]);

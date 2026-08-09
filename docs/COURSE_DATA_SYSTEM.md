@@ -69,3 +69,7 @@ Chapter `knowledgeProgress` is derived from visible UserKnowledgeState mastery, 
 ## 17. Chapter Deep Links
 
 `/courses/:courseId/chapters/:chapterId` validates ownership and opens the existing Course Graph in focused mode at that Chapter. An unknown Chapter renders a safe Not Found state rather than silently returning to Overview.
+
+## 18. PDF Course Material
+
+Course data may reference a stable static PDF through MaterialSource. It owns Material metadata, Page/Segment addresses, and MaterialKnowledgeCoverage; it does not recreate or own the PDF's visual layout. Adding another PDF course requires a source file/URL, Material metadata, one Segment per page, and coverage records, without changes to the generic Reader UI.

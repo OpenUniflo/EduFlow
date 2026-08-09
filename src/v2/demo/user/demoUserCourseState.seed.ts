@@ -15,7 +15,7 @@ export function demoUserCourseStateSeed(userId: string, courseId: string): UserC
       courseId,
       assignmentStates: record(agenticAssignmentStates),
       materialStates: {
-        "lesson-04": { materialId: "lesson-04", recentSegmentId: "page-12", progress: 34, viewedSegmentIds: Array.from({ length: 11 }, (_, index) => `page-${String(index + 1).padStart(2, "0")}`), updatedAt: DEMO_TIME }
+        "lesson-04": { materialId: "lesson-04", recentSegmentId: "page-12", progress: 34, viewedSegmentIds: Array.from({ length: 11 }, (_, index) => `page-${index + 1}`), updatedAt: DEMO_TIME }
       },
       recentLessonId: "L04",
       updatedAt: DEMO_TIME
@@ -32,8 +32,9 @@ export function demoUserCourseStateSeed(userId: string, courseId: string): UserC
       courseId,
       assignmentStates: record(states),
       materialStates: {
-        "python-core-handbook": { materialId: "python-core-handbook", recentSegmentId: "core-module", progress: 50, viewedSegmentIds: ["core-control", "core-scope"], updatedAt: "2026-08-08T08:00:00.000Z" },
-        "python-async-service-guide": { materialId: "python-async-service-guide", recentSegmentId: "async-event-loop", progress: 25, viewedSegmentIds: ["async-event-loop"], updatedAt: "2026-08-07T08:00:00.000Z" }
+        "python-core-handbook": { materialId: "python-core-handbook", recentSegmentId: "page-4", progress: 38, viewedSegmentIds: ["page-1", "page-3", "page-4"], updatedAt: "2026-08-08T08:00:00.000Z" },
+        "python-quality-testing": { materialId: "python-quality-testing", recentSegmentId: "page-4", progress: 20, viewedSegmentIds: ["page-1", "page-4"], updatedAt: "2026-08-08T10:00:00.000Z" },
+        "python-async-service-guide": { materialId: "python-async-service-guide", recentSegmentId: "page-2", progress: 10, viewedSegmentIds: ["page-2"], updatedAt: "2026-08-07T08:00:00.000Z" }
       },
       recentLessonId: "PY-L03",
       updatedAt: "2026-08-08T08:00:00.000Z"

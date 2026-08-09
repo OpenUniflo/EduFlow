@@ -1,7 +1,7 @@
 import { assertDirectedAcyclic, transitiveReduction } from "../../knowledge/graphAlgorithms";
 import type { KnowledgeGraph } from "../../knowledge/types";
 import type { KnowledgeAccessContext, KnowledgeRepository } from "../../knowledge/repository/KnowledgeRepository";
-import { resolveKnowledgeMaterialEntry } from "../../material/materialNavigation";
+import { resolveKnowledgeMaterialEntries, resolveKnowledgeMaterialEntry } from "../../material/materialNavigation";
 import type { UserKnowledgeRecord } from "../../profile/types";
 import type {
   AssignmentCoverage, Course, CourseAssignment, CourseAssignmentSummary, CourseChapterEdge, CourseChapterProjection,
@@ -88,6 +88,20 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
     if (material.courseId !== runtime.course.id) errors.push(`Material ${material.id} belongs to another Course`);
     if (!lessonIds.has(material.lessonId)) errors.push(`Material ${material.id} references unknown Lesson`);
     if (new Set(material.segments.map((segment) => segment.id)).size !== material.segments.length) errors.push(`Material ${material.id} Segment ids must be unique`);
+    if (material.type === "pdf") {
+      if (!material.source || material.source.kind !== "pdf") errors.push(`PDF Material ${material.id} requires a PDF source`);
+      else {
+        if (!material.source.url.trim()) errors.push(`PDF Material ${material.id} source URL is empty`);
+        if (!Number.isInteger(material.source.pageCount) || material.source.pageCount <= 0) errors.push(`PDF Material ${material.id} has invalid pageCount`);
+        if (material.segments.length !== material.source.pageCount) errors.push(`PDF Material ${material.id} pageCount does not match Segments`);
+        const pages = material.segments.map((segment) => segment.page);
+        if (pages.some((page) => !Number.isInteger(page) || (page ?? 0) < 1 || (page ?? 0) > material.source!.pageCount)) errors.push(`PDF Material ${material.id} has an invalid Segment page`);
+        if (new Set(pages).size !== pages.length) errors.push(`PDF Material ${material.id} Segment pages must be unique`);
+        for (let page = 1; page <= material.source.pageCount; page += 1) {
+          if (!pages.includes(page)) errors.push(`PDF Material ${material.id} is missing page ${page}`);
+        }
+      }
+    }
   });
   runtime.materialKnowledgeCoverages.forEach((coverage) => {
     if (!materialIds.has(coverage.materialId)) errors.push(`MaterialKnowledgeCoverage ${coverage.id} references unknown Material`);
@@ -150,6 +164,7 @@ export function buildCourseGraphData(runtime: CourseRuntimeData, userState: User
       return { ...coverage, assignment, state: assignmentStateById.get(assignment.id) };
     });
     const assignmentStateSummary = summarizeAssignmentIds(assignmentContexts.map((context) => context.assignmentId), assignmentStateById);
+    const materialEntryOrder = new Map(resolveKnowledgeMaterialEntries(runtime, nodeId).map((entry, index) => [entry.materialId, index]));
     const materialContexts = Array.from(groupBy(materialCoverageByNode.get(nodeId) ?? [], (coverage) => coverage.materialId)).flatMap(([materialId, coverages]) => {
       const material = materialById.get(materialId);
       const entry = resolveKnowledgeMaterialEntry(runtime, nodeId, materialId);
@@ -160,7 +175,7 @@ export function buildCourseGraphData(runtime: CourseRuntimeData, userState: User
         primarySegmentId: entry.segmentId, primarySegmentTitle: entry.segmentTitle,
         primarySegmentOrder: entry.segmentOrder, primaryRole: entry.role
       }] : [];
-    });
+    }).sort((left, right) => (materialEntryOrder.get(left.materialId) ?? Number.MAX_SAFE_INTEGER) - (materialEntryOrder.get(right.materialId) ?? Number.MAX_SAFE_INTEGER));
     const knowledgeState = userKnowledgeById.get(nodeId);
     return {
       id: knowledge.id, knowledge, title: knowledge.title, description: knowledge.description, scope: knowledge.scope,

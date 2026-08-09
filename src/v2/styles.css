@@ -964,6 +964,28 @@
 }
 
 .material-reader-current .atlas-lesson-pages { width: 100%; transform-origin: top center; }
+.material-reader-current .atlas-pdf-scroll { overflow-x: auto; padding: 30px 36px 88px; }
+.material-reader-current .atlas-pdf-pages { display: flex; min-width: 100%; flex-direction: column; align-items: center; gap: 28px; }
+.material-reader-current .atlas-pdf-page {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  scroll-margin-block: 30px;
+  border: 1px solid rgba(116, 137, 171, 0.2);
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 12px 30px rgba(71, 91, 126, 0.12);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.material-reader-current .atlas-pdf-page.current { border-color: rgba(105, 126, 230, 0.52); box-shadow: 0 18px 40px rgba(71, 91, 126, 0.18), 0 0 0 2px rgba(105, 126, 230, 0.1); }
+.material-reader-current .atlas-pdf-page canvas { display: block; max-width: none; }
+.material-reader-current .atlas-pdf-page-loading { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 9px; color: var(--atlas-muted); background: rgba(247, 249, 252, 0.92); font-size: 10px; }
+.material-reader-current .atlas-pdf-state { display: grid; min-height: 360px; place-content: center; justify-items: center; gap: 9px; color: var(--atlas-muted); text-align: center; }
+.material-reader-current .atlas-pdf-state h2 { margin: 6px 0 0; color: var(--atlas-ink); font-size: 19px; }
+.material-reader-current .atlas-pdf-state p { max-width: 360px; margin: 0 0 8px; font-size: 10px; line-height: 1.6; }
+.material-reader-current .atlas-pdf-error > svg { color: #d46b74; }
+.atlas-spin { animation: atlas-spin 0.9s linear infinite; }
+@keyframes atlas-spin { to { transform: rotate(360deg); } }
 .material-reader-current .atlas-lesson-slide {
   width: min(calc(820px * var(--lesson-zoom)), calc(100% - 24px));
   min-height: 460px;
@@ -998,6 +1020,8 @@
 .material-reader-current .atlas-active-knowledge h2 { margin: 11px 0 5px; font-size: 18px; }
 .material-reader-current .atlas-active-knowledge p,
 .material-reader-current .atlas-material-empty { color: var(--atlas-muted); font-size: 9px; line-height: 1.65; }
+.material-reader-current .atlas-knowledge-pin { display: inline-flex; float: right; gap: 5px; align-items: center; padding: 6px 8px; border-radius: 8px; color: var(--atlas-muted); background: rgba(105, 126, 230, 0.07); font-size: 8px; font-weight: 800; }
+.material-reader-current .atlas-knowledge-pin.active { color: var(--atlas-brand); background: rgba(105, 126, 230, 0.14); }
 
 .material-reader-current .atlas-lesson-controls {
   position: fixed;

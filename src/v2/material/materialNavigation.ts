@@ -11,6 +11,7 @@ const ROLE_PRIORITY: Record<MaterialKnowledgeCoverageRole, number> = {
 export type KnowledgeMaterialEntry = {
   materialId: string;
   materialTitle: string;
+  lessonId: string;
   segmentId: string;
   segmentTitle?: string;
   segmentOrder: number;
@@ -42,6 +43,7 @@ export function resolveKnowledgeMaterialEntry(runtime: CourseRuntimeData, nodeId
   return coverage && segment ? {
     materialId,
     materialTitle: material.title,
+    lessonId: material.lessonId,
     segmentId: segment.id,
     segmentTitle: segment.title,
     segmentOrder: segment.order,
@@ -50,9 +52,17 @@ export function resolveKnowledgeMaterialEntry(runtime: CourseRuntimeData, nodeId
 }
 
 export function resolveKnowledgeMaterialEntries(runtime: CourseRuntimeData, nodeId: string) {
+  const lessonOrderById = new Map(runtime.lessons.map((lesson) => [lesson.id, lesson.order]));
+  const nodeCoverages = runtime.curriculumCoverages.filter((coverage) => coverage.nodeId === nodeId);
+  const introduced = nodeCoverages.filter((coverage) => coverage.role === "introduce");
+  const primaryLessonId = [...(introduced.length ? introduced : nodeCoverages)].sort((left, right) => (lessonOrderById.get(left.lessonId) ?? Number.MAX_SAFE_INTEGER) - (lessonOrderById.get(right.lessonId) ?? Number.MAX_SAFE_INTEGER) || left.id.localeCompare(right.id))[0]?.lessonId;
   const materialIds = Array.from(new Set(runtime.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === nodeId).map((coverage) => coverage.materialId)));
   return materialIds.flatMap((materialId) => {
     const entry = resolveKnowledgeMaterialEntry(runtime, nodeId, materialId);
     return entry ? [entry] : [];
-  }).sort((left, right) => left.materialTitle.localeCompare(right.materialTitle) || left.segmentOrder - right.segmentOrder);
+  }).sort((left, right) => Number(right.lessonId === primaryLessonId) - Number(left.lessonId === primaryLessonId)
+    || ROLE_PRIORITY[left.role] - ROLE_PRIORITY[right.role]
+    || (lessonOrderById.get(left.lessonId) ?? Number.MAX_SAFE_INTEGER) - (lessonOrderById.get(right.lessonId) ?? Number.MAX_SAFE_INTEGER)
+    || left.materialTitle.localeCompare(right.materialTitle)
+    || left.segmentOrder - right.segmentOrder);
 }

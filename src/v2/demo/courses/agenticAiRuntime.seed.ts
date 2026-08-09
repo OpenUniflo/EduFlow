@@ -26,22 +26,22 @@ export const agenticAiMaterial: Material = {
   lessonId: "L04",
   title: lessonFourMaterial.title,
   description: lessonFourMaterial.subtitle,
-  type: "slides",
+  type: "pdf",
+  source: { kind: "pdf", url: "/materials/agentic-ai/lesson-04.pdf", pageCount: lessonFourMaterial.pageCount },
   duration: lessonFourMaterial.duration,
   segments: lessonFourMaterial.pages.map((page) => ({
-    id: page.id,
+    id: `page-${page.number}`,
     order: page.number,
+    page: page.number,
     title: page.title,
-    section: page.section,
-    assignmentIds: page.assignmentId ? [page.assignmentId] : [],
-    content: { lead: page.lead, bullets: page.bullets, code: page.code, table: page.table, visual: page.visual }
+    section: page.section
   }))
 };
 
 const materialGroups: Array<{ segmentIds: string[]; nodeIds: string[]; role: MaterialKnowledgeCoverage["role"] }> = [
-  { segmentIds: "page-01 page-02 page-03 page-04 page-05".split(" "), nodeIds: ["P05"], role: "introduce" },
-  { segmentIds: "page-06 page-07 page-08".split(" "), nodeIds: ["R01", "R10"], role: "example" },
-  { segmentIds: "page-09 page-10 page-11 page-12 page-13 page-14".split(" "), nodeIds: ["R10", "R11"], role: "explain" },
+  { segmentIds: "page-1 page-2 page-3 page-4 page-5".split(" "), nodeIds: ["P05"], role: "introduce" },
+  { segmentIds: "page-6 page-7 page-8".split(" "), nodeIds: ["R01", "R10"], role: "example" },
+  { segmentIds: "page-9 page-10 page-11 page-12 page-13 page-14".split(" "), nodeIds: ["R10", "R11"], role: "explain" },
   { segmentIds: "page-15 page-16 page-17 page-18".split(" "), nodeIds: ["R03", "R04", "R11"], role: "explain" },
   { segmentIds: "page-19 page-20 page-21".split(" "), nodeIds: ["R11", "R06", "R03"], role: "practice-reference" },
   { segmentIds: "page-22 page-23 page-24 page-25 page-26".split(" "), nodeIds: ["R07", "R08", "R09", "R11"], role: "explain" },

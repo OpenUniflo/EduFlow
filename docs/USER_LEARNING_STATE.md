@@ -64,3 +64,9 @@ These records are related but not interchangeable. Assignment completion may lat
 ## 15. Material Reading Updates
 
 `updateMaterialReadingState` atomically records recent Segment, viewed Segment IDs, derived reading progress, and the Material's Lesson as `recentLessonId`. Intersection-driven writes are debounced so UI response is immediate without writing local storage on every observer callback.
+
+## 16. PDF Reading State
+
+For PDF Material, `recentSegmentId` identifies the current PDF page/Segment only. `viewedSegmentIds` is the unique set of pages that actually became active at the reading anchor. Completion progress is `viewed / total`, not the numeric page position.
+
+A direct jump from page 1 to page 20 records the pages genuinely made active; it does not mark pages 2 through 19. Persistence remains debounced and is routed through LearningProgressRepository. PDF page position, Material completion, Assignment completion, and Knowledge mastery remain four independent concepts.

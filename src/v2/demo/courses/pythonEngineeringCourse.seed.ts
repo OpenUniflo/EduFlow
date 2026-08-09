@@ -76,36 +76,56 @@ const pythonAssignmentSeeds: AssignmentSeed[] = [
 export const pythonEngineeringAssignments: CourseAssignment[] = pythonAssignmentSeeds.map(({ nodeIds: _nodeIds, ...item }) => item);
 export const pythonEngineeringAssignmentCoverages: AssignmentCoverage[] = pythonAssignmentSeeds.flatMap((item) => item.nodeIds.map((nodeId, index) => ({ id: `assignment-coverage-${item.id}-${index + 1}`, assignmentId: item.id, nodeId, role: "assess" })));
 
+const pdfSegments = (titles: string[], sections: string[]) => titles.map((title, index) => ({ id: `page-${index + 1}`, order: index + 1, page: index + 1, title, section: sections[index] ?? sections[sections.length - 1] ?? "Lesson", content: {} }));
+
 export const pythonEngineeringMaterials: Material[] = [
   {
-    id: "python-core-handbook", courseId: pythonEngineeringCourse.id, lessonId: "PY-L02", title: "Python 函数与模块工程手册", description: "从控制流到可测试模块。", type: "document", duration: "45 分钟",
-    segments: [
-      { id: "core-control", order: 1, title: "控制流与函数边界", section: "Core", content: { lead: "把分支与循环收束到可测试函数。", bullets: ["纯函数", "输入输出契约", "边界条件"] } },
-      { id: "core-scope", order: 2, title: "作用域与引用", section: "Core", content: { lead: "识别局部状态、闭包与对象引用。", code: "def make_counter():\n    count = 0\n    ..." } },
-      { id: "core-module", order: 3, title: "模块与项目结构", section: "Engineering", content: { lead: "把函数组织进稳定模块和包。", bullets: ["公开接口", "配置边界", "测试目录"] } },
-      { id: "core-errors", order: 4, title: "异常契约", section: "Engineering", content: { lead: "让失败成为可观察、可测试的接口行为。" } }
-    ]
+    id: "python-core-handbook", courseId: pythonEngineeringCourse.id, lessonId: "PY-L02", title: "Python 函数与模块工程", description: "从控制流、函数、作用域到可维护模块。", type: "pdf", duration: "45 分钟",
+    source: { kind: "pdf", url: "/materials/python-engineering/lesson-02.pdf", pageCount: 8 },
+    segments: pdfSegments(["函数与模块工程", "控制流的可测试边界", "函数输入输出契约", "作用域、闭包与引用", "模块公开接口", "项目结构与依赖方向", "重构为可测试模块", "异常契约作为模块边界"], ["Overview", "Functions", "Functions", "Scope", "Modules", "Engineering", "Practice", "Bridge"])
   },
   {
-    id: "python-async-service-guide", courseId: pythonEngineeringCourse.id, lessonId: "PY-L07", title: "异步 Python 服务实战", description: "构建具有超时、取消、重试和观测能力的服务。", type: "slides", duration: "60 分钟",
+    id: "python-quality-testing", courseId: pythonEngineeringCourse.id, lessonId: "PY-L04", title: "异常、类型与自动化测试", description: "用 Exception、Type Hint、pytest 与 Unit Test 建立质量防线。", type: "pdf", duration: "55 分钟",
+    source: { kind: "pdf", url: "/materials/python-engineering/lesson-04.pdf", pageCount: 10 },
+    segments: pdfSegments(["异常、类型与自动化测试", "失败是接口的一部分", "异常层级与边界", "Exception 设计实战", "Type Hint 与静态反馈", "pytest 测试结构", "Unit Test 与依赖隔离", "参数化与失败路径", "从异常契约到测试契约", "质量防线综合练习"], ["Overview", "Exception", "Exception", "Exception", "Typing", "pytest", "Unit Test", "Testing", "Integration", "Practice"])
+  },
+  {
+    id: "python-async-service-guide", courseId: pythonEngineeringCourse.id, lessonId: "PY-L07", title: "异步 Python 服务实战", description: "构建具有超时、取消、重试和观测能力的服务。", type: "pdf", duration: "60 分钟",
+    source: { kind: "pdf", url: "/materials/python-engineering/lesson-07.pdf", pageCount: 10 },
+    segments: pdfSegments(["异步 Python 服务实战", "Event Loop 与协程", "async/await 执行模型", "并发任务与背压", "超时边界", "取消与资源清理", "异常传播", "有界重试与 Backoff", "日志、指标与 Trace", "可靠异步服务练习"], ["Overview", "Async", "Async", "Concurrency", "Reliability", "Reliability", "Exception", "Recovery", "Production", "Practice"])
+  },
+  {
+    id: "python-core-notes", courseId: pythonEngineeringCourse.id, lessonId: "PY-L02", title: "Python 模块边界速查", description: "非 PDF 辅助资料，用于验证 Article renderer。", type: "article", duration: "10 分钟",
     segments: [
-      { id: "async-event-loop", order: 1, title: "Event Loop 与 async/await", section: "Async", content: { lead: "事件循环调度协程与 I/O。", bullets: ["coroutine", "await", "task"] } },
-      { id: "async-bounds", order: 2, title: "超时与取消", section: "Reliability", content: { lead: "为每个外部操作设置生命周期边界。" } },
-      { id: "async-recovery", order: 3, title: "异常与有界重试", section: "Reliability", content: { lead: "只重试可恢复故障，并保留失败原因。" } },
-      { id: "async-observe", order: 4, title: "日志、指标与 Trace", section: "Production", content: { lead: "关联一次请求的完整执行路径。" } }
+      { id: "notes-contract", order: 1, title: "函数契约速查", section: "Reference", content: { lead: "用输入、输出与失败三部分描述函数边界。", bullets: ["明确输入类型", "控制副作用", "记录失败语义"] } },
+      { id: "notes-layout", order: 2, title: "模块布局速查", section: "Reference", content: { lead: "让公开接口与内部实现保持清晰分层。", bullets: ["包入口", "内部模块", "测试目录"] } }
     ]
   }
 ];
 
 const materialCoverageSeed: Array<[string, string, string[], MaterialKnowledgeCoverage["role"]]> = [
-  ["python-core-handbook", "core-control", ["PY05", "PY06"], "explain"],
-  ["python-core-handbook", "core-scope", ["PY02", "PY06", "PY07"], "example"],
-  ["python-core-handbook", "core-module", ["PY06", "PY08", "PY34"], "explain"],
-  ["python-core-handbook", "core-errors", ["PY09"], "practice-reference"],
-  ["python-async-service-guide", "async-event-loop", ["PY56", "PY57", "PY58"], "introduce"],
-  ["python-async-service-guide", "async-bounds", ["PY100", "PY63"], "explain"],
-  ["python-async-service-guide", "async-recovery", ["PY09", "PY62"], "practice-reference"],
-  ["python-async-service-guide", "async-observe", ["PY89", "PY90", "PY91"], "example"]
+  ["python-core-handbook", "page-2", ["PY05"], "introduce"],
+  ["python-core-handbook", "page-3", ["PY06"], "introduce"],
+  ["python-core-handbook", "page-4", ["PY07"], "introduce"],
+  ["python-core-handbook", "page-5", ["PY08", "PY34"], "example"],
+  ["python-core-handbook", "page-8", ["PY09"], "example"],
+  ["python-quality-testing", "page-1", ["PY09"], "introduce"],
+  ["python-quality-testing", "page-5", ["PY27"], "introduce"],
+  ["python-quality-testing", "page-6", ["PY37"], "introduce"],
+  ["python-quality-testing", "page-7", ["PY85"], "introduce"],
+  ["python-quality-testing", "page-4", ["PY09"], "explain"],
+  ["python-quality-testing", "page-8", ["PY37", "PY85"], "practice-reference"],
+  ["python-quality-testing", "page-9", ["PY09", "PY27"], "explain"],
+  ["python-quality-testing", "page-10", ["PY09", "PY27", "PY37", "PY85"], "practice-reference"],
+  ["python-async-service-guide", "page-2", ["PY56", "PY57"], "introduce"],
+  ["python-async-service-guide", "page-3", ["PY58"], "introduce"],
+  ["python-async-service-guide", "page-4", ["PY100"], "explain"],
+  ["python-async-service-guide", "page-5", ["PY63"], "explain"],
+  ["python-async-service-guide", "page-7", ["PY09"], "practice-reference"],
+  ["python-async-service-guide", "page-8", ["PY62"], "introduce"],
+  ["python-async-service-guide", "page-9", ["PY89", "PY90", "PY91"], "example"],
+  ["python-core-notes", "notes-contract", ["PY06"], "example"],
+  ["python-core-notes", "notes-layout", ["PY08"], "example"]
 ];
 export const pythonEngineeringMaterialKnowledgeCoverages: MaterialKnowledgeCoverage[] = materialCoverageSeed.flatMap(([materialId, segmentId, nodeIds, role]) => nodeIds.map((nodeId) => ({ id: `material-coverage-${materialId}-${segmentId}-${nodeId}`, materialId, segmentId, nodeId, role })));
 
@@ -123,5 +143,5 @@ export const pythonEngineeringRuntime: CourseRuntimeData = {
   assignmentCoverages: pythonEngineeringAssignmentCoverages,
   materials: pythonEngineeringMaterials,
   materialKnowledgeCoverages: pythonEngineeringMaterialKnowledgeCoverages,
-  revision: "python-engineering-v1"
+  revision: "python-engineering-v2-pdf"
 };

@@ -267,3 +267,7 @@ Course, Assignment, and Material definitions contain no user completion. Mutable
 Course, Assignment, and Material mappings may reference any KnowledgeNode visible to the actor across Global, Tenant, and User scopes. KnowledgeRepository provides scoped lookup over KnowledgeGraph data; it does not replace KnowledgeGraph or create new ontology facts.
 
 Global Atlas still projects only active Global nodes. Personal Atlas may project visible Global, Tenant, and User nodes selected by the active user's UserKnowledgeState plus factual direct Explore relations. Course and Material validation use the same scoped repository context.
+
+## 39. Source PDF Boundary
+
+Source PDF files remain outside the Knowledge Ontology. Knowledge is connected to addressable source pages through `Material -> MaterialSegment -> MaterialKnowledgeCoverage -> KnowledgeNode`. PDF page identifiers do not become KnowledgeNode identities, and PDF visual content is not duplicated into KnowledgeNode definitions.

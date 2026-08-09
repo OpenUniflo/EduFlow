@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { DemoCourseRepository } from "./course/repository/DemoCourseRepository";
 import { buildCourseGraphData, validateCourseRuntime, type CourseRuntimeData } from "./course/runtime/courseRuntime";
 import { buildCourseGraphProjection } from "./course/graph/courseGraphProjection";
@@ -10,7 +12,8 @@ import { LocalStorageLearningProgressRepository, learningProgressStorageKey } fr
 import { buildGlobalAtlasProjection } from "./knowledge/projections/atlasProjections";
 import { applicationServices } from "./services/applicationServices";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "./knowledge/repository/KnowledgeRepository";
-import { resolveInitialMaterialSegment, resolveKnowledgeMaterialEntry, buildMaterialDeepLink } from "./material/materialNavigation";
+import { resolveInitialMaterialSegment, resolveKnowledgeMaterialEntries, resolveKnowledgeMaterialEntry, buildMaterialDeepLink } from "./material/materialNavigation";
+import { classifySegmentQueryChange, selectPageAtReadingAnchor } from "./material/reader/materialReaderState";
 import { getDomainGovernanceSnapshot } from "./knowledge/domain/domainStore";
 import { createWorkflowRunRecord, type Template } from "../app/model";
 import { InMemoryKnowledgeRepository } from "./knowledge/repository/InMemoryKnowledgeRepository";
@@ -64,12 +67,12 @@ describe("Course Repository and runtime invariants", () => {
 
 describe("Material and progress generalization", () => {
   it("supports Segment → multiple KnowledgeNodes and KnowledgeNode → multiple Segments/Materials", () => {
-    const segmentNodes = python.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === "python-core-handbook" && coverage.segmentId === "core-control").map((coverage) => coverage.nodeId);
+    const segmentNodes = python.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === "python-core-handbook" && coverage.segmentId === "page-5").map((coverage) => coverage.nodeId);
     expect(new Set(segmentNodes).size).toBeGreaterThan(1);
     const py06 = python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === "PY06");
     expect(new Set(py06.map((coverage) => coverage.segmentId)).size).toBeGreaterThan(1);
     const py09 = python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === "PY09");
-    expect(new Set(py09.map((coverage) => coverage.materialId)).size).toBe(2);
+    expect(new Set(py09.map((coverage) => coverage.materialId)).size).toBe(3);
   });
 
   it("resolves Materials only inside their owning Course", () => {
@@ -81,8 +84,47 @@ describe("Material and progress generalization", () => {
     const entry = resolveKnowledgeMaterialEntry(agentic, "R01", "lesson-04");
     expect(entry).toMatchObject({ segmentId: "page-12", role: "introduce" });
     expect(buildMaterialDeepLink({ courseId: agentic.course.id, materialId: "lesson-04", segmentId: entry!.segmentId })).toBe("/courses/agentic-ai/materials/lesson-04?segment=page-12");
-    expect(resolveInitialMaterialSegment({ segmentIds: ["page-01", "page-12", "page-28"], requestedSegmentId: "page-12", recentSegmentId: "page-28" })).toBe("page-12");
-    expect(resolveInitialMaterialSegment({ segmentIds: ["page-01", "page-12"], requestedSegmentId: "missing", recentSegmentId: "page-12" })).toBe("page-12");
+    expect(resolveInitialMaterialSegment({ segmentIds: ["page-1", "page-12", "page-28"], requestedSegmentId: "page-12", recentSegmentId: "page-28" })).toBe("page-12");
+    expect(resolveInitialMaterialSegment({ segmentIds: ["page-1", "page-12"], requestedSegmentId: "missing", recentSegmentId: "page-12" })).toBe("page-12");
+  });
+
+  it("commits valid PDF fixtures whose page count matches Material Segments", () => {
+    for (const runtime of [agentic, python]) {
+      for (const material of runtime.materials.filter((item) => item.type === "pdf")) {
+        expect(material.source?.kind).toBe("pdf");
+        expect(material.segments).toHaveLength(material.source!.pageCount);
+        expect(material.segments.map((segment) => segment.page)).toEqual(Array.from({ length: material.source!.pageCount }, (_, index) => index + 1));
+        const file = join(process.cwd(), "public", material.source!.url.replace(/^\//, ""));
+        const bytes = readFileSync(file).toString("latin1");
+        expect((bytes.match(/\/Type\s*\/Page\b/g) ?? []).length).toBe(material.source!.pageCount);
+      }
+    }
+  });
+
+  it("rejects malformed PDF source metadata before rendering", () => {
+    const invalid: CourseRuntimeData = { ...python, materials: python.materials.map((material) => material.id === "python-quality-testing" ? { ...material, source: { kind: "pdf", url: material.source!.url, pageCount: 11 } } : material) };
+    expect(() => validateCourseRuntime(invalid, knowledgeRepository, access)).toThrow(/pageCount does not match Segments/);
+  });
+
+  it("prioritizes Exception's formal Lesson 04 PDF over reinforcement materials", () => {
+    const entries = resolveKnowledgeMaterialEntries(python, "PY09");
+    expect(entries[0]).toMatchObject({ materialId: "python-quality-testing", lessonId: "PY-L04", segmentId: "page-1", role: "introduce" });
+    expect(new Set(entries.map((entry) => entry.materialId))).toEqual(new Set(["python-core-handbook", "python-quality-testing", "python-async-service-guide"]));
+  });
+
+  it("keeps Reader URL replacement out of external navigation and selects the reading anchor", () => {
+    expect(classifySegmentQueryChange("page-10", "page-11", "page-11")).toBe("reader");
+    expect(classifySegmentQueryChange("page-10", "page-10", null)).toBe("unchanged");
+    expect(classifySegmentQueryChange("page-20", "page-8", null)).toBe("external");
+    expect(selectPageAtReadingAnchor([
+      { page: 10, segmentId: "page-10", top: -500, bottom: 180, intersectionRatio: 0.2 },
+      { page: 11, segmentId: "page-11", top: 200, bottom: 760, intersectionRatio: 0.8 },
+      { page: 12, segmentId: "page-12", top: 780, bottom: 1340, intersectionRatio: 0.1 }
+    ], 100, 700)?.segmentId).toBe("page-11");
+  });
+
+  it("retains a non-PDF renderer fixture", () => {
+    expect(python.materials.some((material) => material.type === "article" && material.segments.some((segment) => Boolean(segment.content)))).toBe(true);
   });
 
   it("isolates progress by user, Course, Material, and explicit Assignment identity", () => {
