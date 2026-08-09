@@ -3,7 +3,9 @@ import type { CourseRuntimeData } from "../course/runtime/courseRuntime";
 import { calculateCrossDomainConnections, calculateKnowledgeConnectivity } from "../knowledge/graphAlgorithms";
 import type { KnowledgeGraph } from "../knowledge/types";
 import type { CurriculumContext, PersonalAssignmentContext, PersonalKnowledgeGraph, PersonalKnowledgeNode, UserKnowledgeRecord } from "./types";
-import { getDomainGovernanceSnapshot, resolveNodeDomain } from "../knowledge/domain/domainStore";
+import { resolveNodeDomain } from "../knowledge/domain/domainStore";
+import type { DomainGovernanceState } from "../knowledge/domain/DomainGovernanceRepository";
+import { resolveKnowledgeMaterialEntries } from "../material/materialNavigation";
 
 function groupBy<T>(items: T[], key: (item: T) => string) {
   const grouped = new Map<string, T[]>();
@@ -25,7 +27,8 @@ export function buildPersonalKnowledgeGraph(
   graph: KnowledgeGraph,
   userKnowledge: UserKnowledgeRecord[],
   runtimes: CourseRuntimeData[],
-  userCourseStates: UserCourseState[]
+  userCourseStates: UserCourseState[],
+  governance: DomainGovernanceState
 ): PersonalKnowledgeGraph {
   const assignments = runtimes.flatMap((runtime) => runtime.assignments);
   const curriculum = runtimes.flatMap((runtime) => runtime.curriculumCoverages);
@@ -44,8 +47,6 @@ export function buildPersonalKnowledgeGraph(
   const recordById = new Map(userKnowledge.map((record) => [record.nodeId, record]));
   const curriculumByNode = groupBy(curriculum, (coverage) => coverage.nodeId);
   const assignmentByNode = groupBy(assignmentCoverage, (coverage) => coverage.nodeId);
-  const governance = getDomainGovernanceSnapshot();
-
   userKnowledge.forEach((record) => {
     if (!nodeById.has(record.nodeId)) throw new Error(`Unknown user knowledge node: ${record.nodeId}`);
   });
@@ -74,7 +75,8 @@ export function buildPersonalKnowledgeGraph(
         lessonOrder: lesson.order,
         chapterId: lesson.chapterId,
         role: coverage.role,
-        materialIds: materialIdsByCourseNode.get(`${coverage.courseId}:${id}`) ?? []
+        materialIds: materialIdsByCourseNode.get(`${coverage.courseId}:${id}`) ?? [],
+        materialEntries: resolveKnowledgeMaterialEntries(runtimes.find((runtime) => runtime.course.id === coverage.courseId)!, id)
       }];
     }).sort((left, right) => left.lessonOrder - right.lessonOrder || left.coverageId.localeCompare(right.coverageId));
     const assignmentContexts: PersonalAssignmentContext[] = (assignmentByNode.get(id) ?? []).flatMap((coverage) => {

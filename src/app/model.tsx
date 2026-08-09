@@ -76,6 +76,9 @@ export type WorkflowRunNodeRecord = {
 export type WorkflowRunRecord = {
   id: string;
   workflowId: string;
+  workflowTemplateId: string;
+  courseId?: string;
+  assignmentId?: string;
   workflowName: string;
   createdAt: string;
   status: "success";
@@ -2300,7 +2303,7 @@ export function createRuntimeStateSnapshot(template: Template, stateValues: Reco
   return state;
 }
 
-export function createWorkflowRunRecord(template: Template, stateValues: Record<string, unknown>, runNumber: number): WorkflowRunRecord {
+export function createWorkflowRunRecord(template: Template, stateValues: Record<string, unknown>, runNumber: number, assignmentContext?: { courseId: string; assignmentId: string }): WorkflowRunRecord {
   const nodeSteps = template.runOrder.reduce<WorkflowRunNodeRecord[]>((records, itemId, index) => {
     const nodeItem = template.nodes.find((item) => item.id === itemId);
     if (!nodeItem) return records;
@@ -2326,6 +2329,9 @@ export function createWorkflowRunRecord(template: Template, stateValues: Record<
   return {
     id: `${template.id}-${Date.now()}-${runNumber}`,
     workflowId: template.id,
+    workflowTemplateId: template.id,
+    courseId: assignmentContext?.courseId,
+    assignmentId: assignmentContext?.assignmentId,
     workflowName: template.name,
     createdAt: new Date().toISOString(),
     status: "success",

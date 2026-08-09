@@ -6,5 +6,3 @@ export class DemoCourseCreationService implements CourseCreationService {
     return { courseId: "agentic-ai" };
   }
 }
-
-export const courseCreationService: CourseCreationService = new DemoCourseCreationService();

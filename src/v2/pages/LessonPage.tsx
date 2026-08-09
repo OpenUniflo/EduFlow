@@ -1,56 +1,118 @@
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, FileText, Network, Pin, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
-import { courseRepository } from "../course/repository/DemoCourseRepository";
+import { useDomainGovernance } from "../knowledge/domain/domainStore";
+import { userKnowledgeAccess } from "../knowledge/repository/KnowledgeRepository";
 import { buildMaterialSegmentProjection, getCourseMaterial } from "../material/materialProjection";
-import { updateMaterialState, useUserCourseState, workflowLaunchUrl } from "../progress/progressService";
+import { resolveInitialMaterialSegment } from "../material/materialNavigation";
+import { updateMaterialReadingState, useUserCourseState, workflowLaunchUrl } from "../progress/progressService";
+import { applicationServices } from "../services/applicationServices";
+
+const PERSIST_DELAY_MS = 350;
 
 export function LessonPage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
   const navigate = useNavigate();
   const { courseId = "", materialId = "" } = useParams();
-  const runtime = courseRepository.getCourse(courseId);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const governance = useDomainGovernance();
+  const runtime = applicationServices.courseRepository.getCourse(courseId);
   const material = runtime ? getCourseMaterial(runtime, materialId) : null;
   const userState = useUserCourseState(session.email, courseId);
   const savedState = userState.materialStates[materialId];
-  const initialSegmentId = material?.segments.some((segment) => segment.id === savedState?.recentSegmentId) ? savedState?.recentSegmentId : material?.segments[0]?.id;
-  const [activeSegmentId, setActiveSegmentId] = useState(initialSegmentId ?? "");
+  const requestedSegmentId = searchParams.get("segment");
+  const segmentIds = useMemo(() => material?.segments.map((segment) => segment.id) ?? [], [material]);
+  const resolvedSegmentId = resolveInitialMaterialSegment({ segmentIds, requestedSegmentId, recentSegmentId: savedState?.recentSegmentId });
+  const [activeSegmentId, setActiveSegmentId] = useState(resolvedSegmentId);
   const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const persistTimerRef = useRef<number | null>(null);
+  const viewedSegmentIdsRef = useRef(new Set<string>());
+  const hasAlignedInitialSegmentRef = useRef(false);
 
-  useEffect(() => {
-    if (material && !material.segments.some((segment) => segment.id === activeSegmentId)) setActiveSegmentId(material.segments[0]?.id ?? "");
-  }, [activeSegmentId, material]);
-
-  const projection = useMemo(() => runtime && material ? buildMaterialSegmentProjection(runtime, material, activeSegmentId, userState) : null, [activeSegmentId, material, runtime, userState]);
+  const access = useMemo(() => userKnowledgeAccess(session.email), [session.email]);
+  const projection = useMemo(() => runtime && material ? buildMaterialSegmentProjection(runtime, material, activeSegmentId, userState, applicationServices.knowledgeRepository, access, governance) : null, [access, activeSegmentId, governance, material, runtime, userState]);
   const activeKnowledge = pinnedNodeId ? projection?.knowledgeContexts.find((context) => context.nodeId === pinnedNodeId) ?? projection?.knowledgeContexts[0] : projection?.knowledgeContexts[0];
   const activeAssignment = projection?.assignmentContexts.find((context) => context.assignmentId === activeAssignmentId) ?? null;
   const activeIndex = material?.segments.findIndex((segment) => segment.id === activeSegmentId) ?? -1;
   const lesson = runtime?.lessons.find((item) => item.id === material?.lessonId);
 
-  function selectSegment(segmentId: string, scroll = true) {
-    if (!material) return;
+  useEffect(() => {
+    viewedSegmentIdsRef.current = new Set(savedState?.viewedSegmentIds ?? savedState?.completedSegmentIds ?? []);
+    hasAlignedInitialSegmentRef.current = false;
+  }, [materialId, savedState?.completedSegmentIds, savedState?.viewedSegmentIds]);
+
+  useEffect(() => {
+    if (!material || !resolvedSegmentId) return;
+    if (hasAlignedInitialSegmentRef.current && resolvedSegmentId === activeSegmentId) return;
+    setActiveSegmentId(resolvedSegmentId);
+    setPinnedNodeId(null);
+    window.requestAnimationFrame(() => {
+      scrollRef.current?.querySelector<HTMLElement>(`[data-segment-id="${CSS.escape(resolvedSegmentId)}"]`)?.scrollIntoView({ behavior: "auto", block: "center" });
+      hasAlignedInitialSegmentRef.current = true;
+    });
+  }, [activeSegmentId, material, resolvedSegmentId]);
+
+  useEffect(() => {
+    if (!material || !activeSegmentId || requestedSegmentId === activeSegmentId) return;
+    setSearchParams({ segment: activeSegmentId }, { replace: true });
+  }, [activeSegmentId, material, requestedSegmentId, setSearchParams]);
+
+  useEffect(() => {
+    if (!material || !activeSegmentId) return;
+    viewedSegmentIdsRef.current.add(activeSegmentId);
+    if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = window.setTimeout(() => {
+      const viewedSegmentIds = material.segments.map((segment) => segment.id).filter((id) => viewedSegmentIdsRef.current.has(id));
+      updateMaterialReadingState(session.email, courseId, material.lessonId, material.id, {
+        recentSegmentId: activeSegmentId,
+        viewedSegmentIds,
+        progress: Math.round((viewedSegmentIds.length / Math.max(1, material.segments.length)) * 100)
+      });
+    }, PERSIST_DELAY_MS);
+    return () => { if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current); };
+  }, [activeSegmentId, courseId, material, session.email]);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root || !material || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting);
+      if (!visible.length) return;
+      const rootCenter = root.getBoundingClientRect().top + root.clientHeight / 2;
+      const nearest = visible.sort((left, right) => Math.abs(left.boundingClientRect.top + left.boundingClientRect.height / 2 - rootCenter) - Math.abs(right.boundingClientRect.top + right.boundingClientRect.height / 2 - rootCenter))[0];
+      const segmentId = (nearest.target as HTMLElement).dataset.segmentId;
+      if (segmentId) {
+        setActiveSegmentId(segmentId);
+        setPinnedNodeId(null);
+      }
+    }, { root, threshold: [0.2, 0.4, 0.6, 0.8] });
+    root.querySelectorAll<HTMLElement>("[data-segment-id]").forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [material]);
+
+  useEffect(() => {
+    if (activeAssignmentId && !projection?.assignmentContexts.some((context) => context.assignmentId === activeAssignmentId)) setActiveAssignmentId(null);
+  }, [activeAssignmentId, projection]);
+
+  function selectSegment(segmentId: string, behavior: ScrollBehavior = "smooth") {
+    if (!material?.segments.some((segment) => segment.id === segmentId)) return;
     setActiveSegmentId(segmentId);
     setPinnedNodeId(null);
-    const index = material.segments.findIndex((segment) => segment.id === segmentId);
-    updateMaterialState(session.email, courseId, material.id, {
-      recentSegmentId: segmentId,
-      progress: Math.round(((index + 1) / Math.max(1, material.segments.length)) * 100)
-    });
-    if (scroll) scrollRef.current?.querySelector(`[data-segment-id="${segmentId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    scrollRef.current?.querySelector<HTMLElement>(`[data-segment-id="${CSS.escape(segmentId)}"]`)?.scrollIntoView({ behavior, block: "center" });
   }
 
   if (!runtime || !material) {
-    return <main className="atlas-lesson-page"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>课件不存在</h1><p>该课件不存在，或不属于课程 “{courseId}”。</p><button className="atlas-primary" onClick={() => navigate(runtime ? `/courses/${runtime.course.id}` : "/courses")}>返回课程</button></section></main>;
+    return <main className="atlas-lesson-page material-reader-current"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>课件不存在</h1><p>该课件不存在，或不属于课程 “{courseId}”。</p><button className="atlas-primary" onClick={() => navigate(runtime ? `/courses/${runtime.course.id}` : "/courses")}>返回课程</button></section></main>;
   }
 
   return (
-    <main className={`atlas-lesson-page ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`}>
+    <main className={`atlas-lesson-page material-reader-current ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`}>
       <GlobalNav active="courses" session={session} onLogout={onLogout} />
       <header className="atlas-lesson-header glass-v2">
         <button className="atlas-lesson-back" onClick={() => navigate(`/courses/${runtime.course.id}`)} aria-label="返回课程技能树"><ArrowLeft size={16} /></button>
@@ -60,20 +122,18 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
 
       <aside className="atlas-lesson-outline glass-v2">
         <button className="atlas-lesson-collapse" onClick={() => setLeftCollapsed((value) => !value)} aria-label="折叠课件目录">{leftCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}</button>
-        {!leftCollapsed ? <><div className="atlas-outline-head"><FileText size={16} /><span><strong>课件目录</strong><small>{material.segments.length} Segments</small></span></div><div className="atlas-outline-list">{material.segments.map((segment) => <button key={segment.id} className={segment.id === activeSegmentId ? "active" : ""} onClick={() => selectSegment(segment.id)}><span>{String(segment.order).padStart(2, "0")}</span><div><strong>{segment.title}</strong><small>{segment.section}</small></div></button>)}</div></> : null}
+        {!leftCollapsed ? <><div className="atlas-outline-head"><FileText size={16} /><span><strong>课件目录</strong><small>{material.segments.length} Segments</small></span></div><div className="atlas-outline-list">{material.segments.map((segment) => <button key={segment.id} className={segment.id === activeSegmentId ? "active" : ""} aria-current={segment.id === activeSegmentId ? "true" : undefined} onClick={() => selectSegment(segment.id)}><span>{String(segment.order).padStart(2, "0")}</span><div><strong>{segment.title}</strong><small>{segment.section}</small></div></button>)}</div></> : null}
       </aside>
 
       <section className="atlas-lesson-scroll" ref={scrollRef}>
         <div className="atlas-lesson-pages" style={{ "--lesson-zoom": zoom } as React.CSSProperties}>
-          {material.segments.map((segment) => <article className={`atlas-lesson-slide atlas-slide-${segment.content.visual ?? (segment.content.table ? "comparison" : segment.content.code ? "trace" : "overview")} ${segment.id === activeSegmentId ? "current" : ""}`} key={segment.id} data-segment-id={segment.id} onClick={() => selectSegment(segment.id, false)}>
-            <div className="atlas-slide-number">{String(segment.order).padStart(2, "0")}</div>
-            <span className="atlas-kicker">{segment.section ?? runtime.course.title}</span>
-            <h2>{segment.title}</h2>
+          {material.segments.map((segment) => <article className={`atlas-lesson-slide atlas-slide-${segment.content.visual ?? (segment.content.table ? "comparison" : segment.content.code ? "trace" : "overview")} ${segment.id === activeSegmentId ? "current" : ""}`} key={segment.id} data-segment-id={segment.id} onClick={() => setActiveSegmentId(segment.id)}>
+            <div className="atlas-slide-number">{String(segment.order).padStart(2, "0")}</div><span className="atlas-kicker">{segment.section ?? runtime.course.title}</span><h2>{segment.title}</h2>
             {segment.content.lead ? <p className="atlas-slide-lead">{segment.content.lead}</p> : null}
             {segment.content.paragraphs?.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
             {segment.content.bullets?.length ? <ul>{segment.content.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul> : null}
             {segment.content.code ? <pre><code>{segment.content.code}</code></pre> : null}
-            {segment.content.table ? <table><thead><tr>{segment.content.table.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{segment.content.table.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => <td key={`${rowIndex}-${index}`}>{cell}</td>)}</tr>)}</tbody></table> : null}
+            {segment.content.table ? <div className="atlas-table-wrap"><table><thead><tr>{segment.content.table.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{segment.content.table.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => <td key={`${rowIndex}-${index}`}>{cell}</td>)}</tr>)}</tbody></table></div> : null}
           </article>)}
         </div>
       </section>
@@ -81,9 +141,9 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
       <aside className="atlas-lesson-knowledge glass-v2">
         <button className="atlas-lesson-collapse" onClick={() => setRightCollapsed((value) => !value)} aria-label="折叠知识上下文">{rightCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}</button>
         {!rightCollapsed ? <><div className="atlas-outline-head"><Network size={16} /><span><strong>Knowledge Context</strong><small>MaterialKnowledgeCoverage</small></span></div>
-          {projection?.knowledgeContexts.length ? <div className="atlas-knowledge-context-list">{projection.knowledgeContexts.map((context) => <button className={activeKnowledge?.nodeId === context.nodeId ? "active" : ""} key={context.nodeId} onClick={() => setPinnedNodeId(context.nodeId)}><span style={{ background: "#6f8fea" }} /><div><strong>{context.title}</strong><small>{context.roles.join(" · ")}</small></div></button>)}</div> : <p>当前内容段暂无 Knowledge 映射。</p>}
+          {projection?.knowledgeContexts.length ? <div className="atlas-knowledge-context-list">{projection.knowledgeContexts.map((context) => <button className={activeKnowledge?.nodeId === context.nodeId ? "active" : ""} key={context.nodeId} onClick={() => setPinnedNodeId(context.nodeId)}><span style={{ background: context.color }} /><div><strong>{context.title}</strong><small>{context.roles.join(" · ")}</small></div></button>)}</div> : <p className="atlas-material-empty">当前内容段暂无 Knowledge 映射。</p>}
           {activeKnowledge ? <section className="atlas-active-knowledge"><div className="atlas-pill"><Pin size={12} />{pinnedNodeId ? "已固定" : "随内容联动"}</div><h2>{activeKnowledge.title}</h2><p>{activeKnowledge.description}</p></section> : null}
-          {projection?.assignmentContexts.length ? <section className="atlas-drawer-section"><h3>关联实训</h3><div className="atlas-assignment-switcher">{projection.assignmentContexts.map((context) => <button key={context.assignmentId} onClick={() => setActiveAssignmentId(context.assignmentId)}><strong>{context.assignment.title}</strong><small>{context.state?.status ?? "not-started"}</small><ArrowRight size={13} /></button>)}</div></section> : null}
+          {projection?.assignmentContexts.length ? <section className="atlas-drawer-section"><h3>关联实训</h3><div className="atlas-assignment-switcher">{projection.assignmentContexts.map((context) => <button key={context.assignmentId} onClick={() => setActiveAssignmentId(context.assignmentId)}><strong>{context.assignment.title}</strong><small>{context.state?.status ?? "not-started"}</small><ArrowRight size={13} /></button>)}</div></section> : <p className="atlas-material-empty">当前内容段暂无关联实训。</p>}
         </> : null}
       </aside>
 

@@ -2,9 +2,10 @@ import { ArrowRight, CheckCircle2, Grid2X2, List, Plus, Sparkles, Trash2 } from 
 import type { MockSession, Template, WorkflowViewMode } from "../../app/model";
 import { WorkflowPreview } from "../../components/app/workflows/WorkflowPages";
 import { useEffect, useState } from "react";
-import { courseRepository } from "../course/repository/DemoCourseRepository";
-import { learningProgressRepository } from "../progress/LocalStorageLearningProgressRepository";
 import { GlobalNav } from "../components/GlobalNav";
+import { applicationServices } from "../services/applicationServices";
+
+const { courseRepository, learningProgressRepository } = applicationServices;
 
 export function WorkflowLibraryPage({
   session,

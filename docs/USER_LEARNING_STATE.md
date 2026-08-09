@@ -51,3 +51,16 @@ Local storage is a demo adapter. A server repository can replace it while preser
 ## 13. Non-goals
 
 This version does not implement submissions, grading, cross-device synchronization, audit history, teacher overrides, automatic mastery assignment, or a complete evidence pipeline.
+
+## 14. State Boundaries
+
+- `UserKnowledgeState` / `UserKnowledgeRecord`: mastery, learning status, evidence, and lineage for a KnowledgeNode.
+- `UserAssignmentState`: execution and completion for one stable CourseAssignment ID.
+- `UserMaterialState`: recent Segment and observed reading coverage for one Material.
+- `UserCourseState`: course-local Assignment/Material maps, recent Lesson, timestamps, and aggregate projection inputs.
+
+These records are related but not interchangeable. Assignment completion may later produce KnowledgeEvidence; it never directly overwrites mastery. Material reading likewise does not imply mastery or Assignment completion.
+
+## 15. Material Reading Updates
+
+`updateMaterialReadingState` atomically records recent Segment, viewed Segment IDs, derived reading progress, and the Material's Lesson as `recentLessonId`. Intersection-driven writes are debounced so UI response is immediate without writing local storage on every observer callback.

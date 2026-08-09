@@ -1,49 +1,39 @@
-import { globalKnowledgeGraph } from "./graph";
-import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "./types";
-import { getDomainGovernanceSnapshot } from "./domain/domainStore";
+import type { DomainAssignment } from "./domain/domainTypes";
+import type { KnowledgeGraph } from "./types";
 
-const nodeById = new Map(globalKnowledgeGraph.nodes.map((node) => [node.id, node]));
-const domainById = new Map(globalKnowledgeGraph.domains.map((domain) => [domain.id, domain]));
-const edgesByNode = new Map<string, KnowledgeEdge[]>();
-
-globalKnowledgeGraph.edges.forEach((edge) => {
-  edgesByNode.set(edge.source, [...(edgesByNode.get(edge.source) ?? []), edge]);
-  edgesByNode.set(edge.target, [...(edgesByNode.get(edge.target) ?? []), edge]);
-});
-
-export function getKnowledgeNode(id: string) {
-  return nodeById.get(id);
+export function getKnowledgeNode(id: string, graph: KnowledgeGraph) {
+  return graph.nodes.find((node) => node.id === id);
 }
 
-export function getKnowledgeDomain(id: string) {
-  return domainById.get(id);
+export function getKnowledgeDomain(id: string, graph: KnowledgeGraph) {
+  return graph.domains.find((domain) => domain.id === id);
 }
 
-export function getNodesByDomain(domainId: string) {
-  const nodeIds = new Set(getDomainGovernanceSnapshot().assignments.filter((item) => item.domainId === domainId).map((item) => item.nodeId));
-  return globalKnowledgeGraph.nodes.filter((node) => nodeIds.has(node.id));
+export function getNodesByDomain(domainId: string, graph: KnowledgeGraph, assignments: DomainAssignment[]) {
+  const nodeIds = new Set(assignments.filter((item) => item.domainId === domainId).map((item) => item.nodeId));
+  return graph.nodes.filter((node) => nodeIds.has(node.id));
 }
 
-export function getKnowledgeNeighbors(id: string, graph: KnowledgeGraph = globalKnowledgeGraph): KnowledgeNode[] {
-  const graphNodeById = graph === globalKnowledgeGraph ? nodeById : new Map(graph.nodes.map((node) => [node.id, node]));
-  const graphEdges = graph === globalKnowledgeGraph ? (edgesByNode.get(id) ?? []) : graph.edges.filter((edge) => edge.source === id || edge.target === id);
-  return graphEdges.flatMap((edge) => {
-    const neighbor = graphNodeById.get(edge.source === id ? edge.target : edge.source);
+export function getKnowledgeNeighbors(id: string, graph: KnowledgeGraph) {
+  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+  return graph.edges.flatMap((edge) => {
+    if (edge.source !== id && edge.target !== id) return [];
+    const neighbor = nodeById.get(edge.source === id ? edge.target : edge.source);
     return neighbor ? [neighbor] : [];
   });
 }
 
-export function getEdgesForNodes(nodeIds: Iterable<string>, graph: KnowledgeGraph = globalKnowledgeGraph) {
+export function getEdgesForNodes(nodeIds: Iterable<string>, graph: KnowledgeGraph) {
   const allowed = new Set(nodeIds);
   return graph.edges.filter((edge) => allowed.has(edge.source) && allowed.has(edge.target));
 }
 
-export function getEdgesTouchingNodes(nodeIds: Iterable<string>, graph: KnowledgeGraph = globalKnowledgeGraph) {
+export function getEdgesTouchingNodes(nodeIds: Iterable<string>, graph: KnowledgeGraph) {
   const allowed = new Set(nodeIds);
   return graph.edges.filter((edge) => allowed.has(edge.source) || allowed.has(edge.target));
 }
 
-export function getOneHopNeighbors(nodeIds: Iterable<string>, graph: KnowledgeGraph = globalKnowledgeGraph) {
+export function getOneHopNeighbors(nodeIds: Iterable<string>, graph: KnowledgeGraph) {
   const core = new Set(nodeIds);
   const neighbors = new Set<string>();
   graph.edges.forEach((edge) => {

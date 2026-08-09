@@ -165,3 +165,40 @@
 - Archiving a Domain requires explicit governance authority, MUST be rejected while active members remain, and archived Domains MUST reject new assignments.
 - Domain mutations require an explicit actor/capability. Generic stores MUST NOT manufacture default administrator authority.
 - Pinned admin assignments have precedence over automatic scoring, candidate recomputation, and proposals.
+
+## Material Reader Invariants
+
+- The current Material Reader DOM and layout CSS MUST have one scoped authority. Archived reader selectors MUST be removed or isolated so build output never depends on HMR or stylesheet injection order.
+- Material navigation MUST support explicit `?segment=` deep links. An explicit valid URL Segment takes precedence over saved reading position, which takes precedence over the first Segment.
+- KnowledgeNode-to-Material navigation MUST resolve a deterministic primary Segment by `introduce > explain > example > practice-reference > earliest segment order`.
+- Scrolling, active Segment, outline selection, Knowledge context, Assignment context, URL, and recent reading position MUST represent the same MaterialSegment.
+- Segment-to-URL synchronization MUST use history replacement, not one history entry per viewed Segment.
+- Reading completion MUST be derived from actually viewed/completed Segment identities and MUST NOT be inferred from the current Segment's numeric position.
+- MaterialKnowledgeCoverage is authoritative for Segment-to-Knowledge relationships. Generic readers MUST NOT contain course-specific page mappings.
+
+## Knowledge Progress Invariants
+
+- Knowledge mastery and Assignment completion are separate states and separate projections.
+- Knowledge presentation MUST use UserKnowledgeState evidence; it MUST NOT display Assignment completion as Knowledge mastery.
+- UserMaterialState reading position and reading coverage are separate concepts.
+- Opening or reading a Material MUST update its Lesson as the user's recent Lesson through LearningProgressRepository, never through direct local-storage writes.
+
+## Knowledge Source Invariants
+
+- Generic Course and Material code MUST NOT assume all KnowledgeNodes belong to the Global graph.
+- Visible Global, Tenant, and User KnowledgeNodes may be referenced by curriculum, Assignment, and Material mappings.
+- Global Atlas remains Global-only. Personal Atlas may include visible Global, Tenant, and User nodes according to the active user's state.
+- Knowledge lookup MUST use KnowledgeRepository or an explicitly supplied KnowledgeGraph context. KnowledgeRepository is access infrastructure, not a new ontology layer.
+- Personal Knowledge data MUST be loaded by active user identity; a shared all-session fixture is not a runtime source.
+
+## Workflow Run Invariants
+
+- WorkflowTemplate is reusable. A Workflow run launched from a Course Assignment MUST preserve `courseId`, `assignmentId`, and `workflowTemplateId`.
+- Two Assignments sharing one WorkflowTemplate MUST remain distinguishable in Run History and completion updates.
+- Evaluation output is runtime/evidence data, not CourseAssignment or WorkflowTemplate definition data.
+
+## Domain Scope Permission Invariants
+
+- Removing a DomainAssignment requires explicit permission for the current Domain's scope.
+- DomainProposal acceptance and rejection require the capability matching `proposal.scope`.
+- No Domain mutation may succeed merely because the actor holds an unrelated administrator capability.

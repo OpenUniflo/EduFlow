@@ -57,3 +57,15 @@ The current repository is in-memory demo infrastructure. Its interface is design
 ## 14. Non-goals
 
 This version does not implement a production course-generation backend, authoring studio, server synchronization, grading, submission history, or artifact dependency engine.
+
+## 15. Scoped Knowledge Resolution
+
+Course runtime mappings may reference any Global, Tenant, or User KnowledgeNode visible to the active actor. Runtime validation resolves CurriculumCoverage, AssignmentCoverage, and MaterialKnowledgeCoverage through KnowledgeRepository with a KnowledgeAccessContext; `globalKnowledgeGraph` is not the universal Course source.
+
+## 16. Independent Progress Projections
+
+Chapter `knowledgeProgress` is derived from visible UserKnowledgeState mastery, with missing evidence contributing no fabricated mastery. `assignmentSummary.progress` is derived independently from UserAssignmentState. Knowledge and Assignment presentation modes select the corresponding projection.
+
+## 17. Chapter Deep Links
+
+`/courses/:courseId/chapters/:chapterId` validates ownership and opens the existing Course Graph in focused mode at that Chapter. An unknown Chapter renders a safe Not Found state rather than silently returning to Overview.

@@ -2,7 +2,7 @@ import { globalKnowledgeGraph } from "../knowledge/graph";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeRevision } from "../knowledge/types";
 import type { UserKnowledgeRecord, UserKnowledgeStatus } from "./types";
 
-const demoUserNode: KnowledgeNode = {
+export const demoUserNode: KnowledgeNode = {
   id: "U-DEMO-01",
   title: "Agent 报告中的引用核验",
   description: "依据课程资料逐条核验 Agent 报告中的来源覆盖、可追溯性和引用准确性。",
@@ -13,7 +13,7 @@ const demoUserNode: KnowledgeNode = {
     "能给出保留证据谱系的修订结果"
   ],
   scope: "user",
-  ownerId: "demo-user",
+  ownerId: "student@knowledge-atlas.local",
   domainId: "agentic-ai",
   provenance: [{ sourceType: "course", sourceId: "agentic-ai", discoveredAt: "2026-07-12T08:00:00.000Z" }],
   currentRevisionId: "U-DEMO-01-r1",
@@ -22,7 +22,7 @@ const demoUserNode: KnowledgeNode = {
   updatedAt: "2026-07-12T08:00:00.000Z"
 };
 
-const demoUserRevision: KnowledgeNodeRevision = {
+export const demoUserRevision: KnowledgeNodeRevision = {
   id: demoUserNode.currentRevisionId,
   nodeId: demoUserNode.id,
   version: 1,
@@ -35,7 +35,7 @@ const demoUserRevision: KnowledgeNodeRevision = {
   changeReason: "Extracted from the user's course material"
 };
 
-const demoUserRelation: KnowledgeEdge = {
+export const demoUserRelation: KnowledgeEdge = {
   id: "user-edge-citation-verification",
   source: "K16",
   target: demoUserNode.id,

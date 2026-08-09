@@ -1,5 +1,6 @@
 import type { AssignmentCoverageRole, CurriculumCoverageRole, UserAssignmentStatus } from "../types";
 import type { KnowledgeEdge, KnowledgeEvidence, KnowledgeScope, MasteryOrigin } from "../knowledge/types";
+import type { KnowledgeMaterialEntry } from "../material/materialNavigation";
 
 export type UserKnowledgeStatus = "mastered" | "learning";
 export type PersonalKnowledgeStatus = UserKnowledgeStatus | "explore";
@@ -24,6 +25,7 @@ export type CurriculumContext = {
   chapterId: string;
   role: CurriculumCoverageRole;
   materialIds: string[];
+  materialEntries: KnowledgeMaterialEntry[];
 };
 
 export type PersonalAssignmentContext = {

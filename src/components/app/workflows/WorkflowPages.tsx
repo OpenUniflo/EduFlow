@@ -2165,7 +2165,7 @@ export function StateHistory({
             <button className="history-toggle" onClick={() => onOpenRunHistory(run)} aria-label={`查看第 ${runHistory.length - index} 次运行详情`}>
               <div>
                 <strong>{runHistory.length - index}. {run.workflowName}</strong>
-                <span>{formatRunTime(run.createdAt)} · {run.nodeCount} 个节点 · {run.status === "success" ? "运行成功" : run.status}</span>
+                <span>{formatRunTime(run.createdAt)} · {run.nodeCount} 个节点 · {run.status === "success" ? "运行成功" : run.status}{run.assignmentId ? ` · ${run.courseId}/${run.assignmentId}` : " · 独立运行"}</span>
               </div>
               <ChevronRight size={15} />
             </button>
@@ -2227,7 +2227,7 @@ export function RunHistoryDetail({ run, onClose }: { run: WorkflowRunRecord; onC
       <div className="history-floating-head">
         <div>
           <h3>{run.workflowName}</h3>
-          <p>{formatRunTime(run.createdAt)} · {run.nodeCount} 个节点 · 运行成功</p>
+          <p>{formatRunTime(run.createdAt)} · {run.nodeCount} 个节点 · 运行成功{run.assignmentId ? ` · Assignment ${run.courseId}/${run.assignmentId}` : " · 独立运行"}</p>
         </div>
         <button className="icon-button" onClick={onClose} aria-label="关闭历史详情">
           <X size={16} />

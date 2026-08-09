@@ -128,3 +128,9 @@ Course, chapter, and node summaries are projections over unique Assignment IDs. 
 ## 20. Material Integration
 
 Assignments associated with a Material segment are derived through `MaterialKnowledgeCoverage -> KnowledgeNode -> AssignmentCoverage`. The material viewer does not contain course-specific Assignment lookup tables.
+
+## 21. Workflow Run Identity
+
+WorkflowTemplate is reusable execution infrastructure. A run launched from an Assignment records `workflowTemplateId`, `courseId`, and `assignmentId`; an independently opened workflow may omit course context. Run History can therefore filter two Assignments that share one template without reverse lookup.
+
+Assignment completion continues to update explicit UserAssignmentState by Assignment ID. Evaluation results, when present, are runtime/evidence records and remain separate from CourseAssignment definitions and WorkflowTemplate definitions. Current fixed acceptance scores are explicitly a Demo Evaluation adapter.

@@ -3,11 +3,12 @@ import { ArrowRight, FileText, Minus, Pause, Play, Plus, RefreshCcw, Send, Setti
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
-import { courseCreationService } from "../demo/services/DemoCourseCreationService";
+import { applicationServices } from "../services/applicationServices";
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneHandle } from "../knowledge/components/KnowledgeAtlasScene";
 import { buildGlobalAtlasProjection } from "../knowledge/projections/atlasProjections";
 import { assignNodeDomain, resolveNodeDomain, useDomainGovernance } from "../knowledge/domain/domainStore";
 import { canManageKnowledgeDomains } from "../session/capabilities";
+import { globalKnowledgeAccess } from "../knowledge/repository/KnowledgeRepository";
 
 const generationStages = ["读取课件", "识别章节", "提取知识节点", "分析前置依赖", "生成实训目标", "完成课程"];
 
@@ -17,7 +18,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
   const governance = useDomainGovernance();
   const canManageDomains = canManageKnowledgeDomains(session);
   const domainActor = useMemo(() => ({ id: session.email, capabilities: session.capabilities }), [session.capabilities, session.email]);
-  const atlas = useMemo(() => buildGlobalAtlasProjection(governance), [governance]);
+  const atlas = useMemo(() => buildGlobalAtlasProjection(applicationServices.knowledgeRepository.getVisibleGraph(globalKnowledgeAccess), governance, applicationServices.courseRepository.listCourseRuntimes()), [governance]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
@@ -52,7 +53,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
     setGenerating(true);
     setGenerationIndex(0);
     generationStages.forEach((_, index) => window.setTimeout(() => setGenerationIndex(index), index * 430));
-    const result = await courseCreationService.createCourse({ files, prompt });
+    const result = await applicationServices.courseCreationService.createCourse({ files, prompt });
     window.setTimeout(() => navigate(`/courses/${result.courseId}?created=1`), generationStages.length * 430 + 280);
   }
 

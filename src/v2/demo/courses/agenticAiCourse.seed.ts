@@ -240,6 +240,8 @@ export const courseSkillTreeNodes: CourseSkillTreeNode[] = Array.from(courseNode
     materialContexts: [],
     assignmentIds: assignmentStateSummary.assignmentIds,
     status,
+    knowledgeProgress: status === "completed" ? 100 : status === "learning" ? 55 : 0,
+    hasKnowledgeEvidence: status === "completed" || status === "learning",
     color: chapter.color
   };
 });
@@ -309,7 +311,7 @@ export const courseChapterEdges: CourseChapterEdge[] = transitiveReduction(curri
 export const courseChapters: CourseChapterProjection[] = curriculumChapters.map((chapter) => {
   const chapterNodeIds = new Set(curriculumCoverages.filter((coverage) => chapter.lessonIds.includes(coverage.lessonId)).map((coverage) => coverage.nodeId));
   const summary = summarizeAssignmentIds(assignmentCoverages.filter((coverage) => chapterNodeIds.has(coverage.nodeId)).map((coverage) => coverage.assignmentId));
-  return { ...chapter, assignmentSummary: { chapterId: chapter.id, ...summary, outcome: chapter.outcome } };
+  return { ...chapter, knowledgeProgress: chapter.progress, knowledgeEvidenceCount: chapterNodeIds.size, assignmentSummary: { chapterId: chapter.id, ...summary, outcome: chapter.outcome } };
 });
 
 const courseAssignmentAggregate = summarizeAssignmentIds(courseAssignments.map((assignment) => assignment.id));

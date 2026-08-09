@@ -1,11 +1,9 @@
-import { courseRepository } from "../../course/repository/DemoCourseRepository";
 import type { CourseRuntimeData } from "../../course/runtime/courseRuntime";
 import type { CurriculumCoverage } from "../../types";
 import type { PersonalKnowledgeGraph, PersonalKnowledgeNode } from "../../profile/types";
-import { globalKnowledgeGraph } from "../graph";
 import { UNCLASSIFIED_DOMAIN_COLOR } from "../domain/domainColors";
-import { getDomainGovernanceSnapshot, resolveNodeDomain, type DomainGovernanceState } from "../domain/domainStore";
-import type { KnowledgeEdge, KnowledgeNode } from "../types";
+import { resolveNodeDomain, type DomainGovernanceState } from "../domain/domainStore";
+import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "../types";
 
 export type AtlasNodeStatus = "global" | "mastered" | "learning" | "explore";
 
@@ -39,8 +37,6 @@ export type AtlasSceneProjection = {
   edges: AtlasSceneEdge[];
 };
 
-const FEATURED_GLOBAL_IDS = new Set(["PY01", "PY06", "PY18", "PY46", "PY57", "PY58", "PY62", "PY49", "PY50", "PY76", "T11", "RT01"]);
-
 function importanceByNodeId(nodeIds: Set<string>, edges: AtlasSceneEdge[]) {
   const scores = new Map(Array.from(nodeIds, (id) => [id, 0]));
   edges.forEach((edge) => {
@@ -64,13 +60,13 @@ function courseContextsByNode(runtimes: CourseRuntimeData[]) {
   return contexts;
 }
 
-export function buildGlobalAtlasProjection(governance: DomainGovernanceState = getDomainGovernanceSnapshot(), runtimes = courseRepository.listCourseRuntimes()): AtlasSceneProjection {
-  const activeIds = new Set(globalKnowledgeGraph.nodes.filter((node) => node.scope === "global" && node.status === "active").map((node) => node.id));
+export function buildGlobalAtlasProjection(graph: KnowledgeGraph, governance: DomainGovernanceState, runtimes: CourseRuntimeData[]): AtlasSceneProjection {
+  const activeIds = new Set(graph.nodes.filter((node) => node.scope === "global" && node.status === "active").map((node) => node.id));
   const contextsByNode = courseContextsByNode(runtimes);
-  const edges = globalKnowledgeGraph.edges.filter((edge) => activeIds.has(edge.source) && activeIds.has(edge.target)).map((edge) => ({ ...edge }));
+  const edges = graph.edges.filter((edge) => activeIds.has(edge.source) && activeIds.has(edge.target)).map((edge) => ({ ...edge }));
   const importance = importanceByNodeId(activeIds, edges);
   return {
-    nodes: globalKnowledgeGraph.nodes
+    nodes: graph.nodes
       .filter((node) => activeIds.has(node.id))
       .sort((left, right) => left.id.localeCompare(right.id))
       .map((node) => {
@@ -85,7 +81,7 @@ export function buildGlobalAtlasProjection(governance: DomainGovernanceState = g
           status: "global" as const,
           isCore: true,
           progress: 0,
-          featured: FEATURED_GLOBAL_IDS.has(node.id),
+          featured: node.metadata?.featured === true || (importance.get(node.id) ?? 0) >= 0.72,
           visualImportance: importance.get(node.id) ?? 0,
           knowledge: node,
           courseContexts: contextsByNode.get(node.id) ?? []
@@ -95,7 +91,7 @@ export function buildGlobalAtlasProjection(governance: DomainGovernanceState = g
   };
 }
 
-export function buildPersonalAtlasProjection(graph: PersonalKnowledgeGraph, governance: DomainGovernanceState = getDomainGovernanceSnapshot(), runtimes = courseRepository.listCourseRuntimes()): AtlasSceneProjection {
+export function buildPersonalAtlasProjection(graph: PersonalKnowledgeGraph, governance: DomainGovernanceState, runtimes: CourseRuntimeData[]): AtlasSceneProjection {
   const nodeIds = new Set(graph.nodes.map((node) => node.id));
   const importance = importanceByNodeId(nodeIds, graph.edges);
   const titleByCourse = new Map(runtimes.map((runtime) => [runtime.course.id, runtime.course.title]));

@@ -135,6 +135,10 @@ export type MaterialContext = {
   lessonId: string;
   segmentIds: string[];
   roles: MaterialKnowledgeCoverageRole[];
+  primarySegmentId: string;
+  primarySegmentTitle?: string;
+  primarySegmentOrder: number;
+  primaryRole: MaterialKnowledgeCoverageRole;
 };
 
 /** Presentation-only projection derived from KnowledgeNode + curriculum data. */
@@ -157,6 +161,8 @@ export type CourseSkillTreeNode = {
   materialContexts: MaterialContext[];
   assignmentIds: string[];
   status: LearningStatus;
+  knowledgeProgress: number;
+  hasKnowledgeEvidence: boolean;
   color: string;
 };
 
@@ -182,6 +188,8 @@ export type CourseAssignmentSummary = {
 };
 
 export type CourseChapterProjection = CurriculumChapter & {
+  knowledgeProgress: number;
+  knowledgeEvidenceCount: number;
   assignmentSummary: ChapterAssignmentSummary;
 };
 export type CourseSkillTreeEdge = KnowledgeEdge;
@@ -277,6 +285,7 @@ export type LearningProgress = {
 export type UserMaterialState = {
   materialId: string;
   recentSegmentId?: string;
+  viewedSegmentIds?: string[];
   progress?: number;
   completedSegmentIds?: string[];
   updatedAt: string;

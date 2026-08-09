@@ -5,12 +5,12 @@ import type { DomainActor, DomainAssignmentCandidate, DomainProposal, KnowledgeD
 import { applyAutomaticAssignment, decideDomainAssignment, scoreNodeAgainstDomains } from "./domainScoring";
 import { moveNodesToDomain } from "./domainAssignment";
 import type { DomainGovernanceState } from "./DomainGovernanceRepository";
-import { LocalStorageDomainGovernanceRepository } from "./LocalStorageDomainGovernanceRepository";
 import { assertDomainAcceptsAssignment, assertDomainCanArchive } from "./domainValidation";
+import { applicationServices } from "../../services/applicationServices";
 
 export type { DomainGovernanceState } from "./DomainGovernanceRepository";
 
-const repository = new LocalStorageDomainGovernanceRepository();
+const repository = applicationServices.domainGovernanceRepository;
 const listeners = new Set<() => void>();
 let state = repository.load();
 
@@ -20,7 +20,7 @@ function publish(next: Omit<DomainGovernanceState, "revision">) {
   listeners.forEach((listener) => listener());
 }
 
-function assertCapability(scope: KnowledgeDomainScope, actor: DomainActor) {
+export function assertDomainScopeCapability(scope: KnowledgeDomainScope, actor: DomainActor) {
   const required = scope === "global" ? "global-domain-admin" : "tenant-domain-admin";
   if (!actor.capabilities.includes(required)) throw new Error(`${scope} Domain mutation requires ${required}`);
 }
@@ -28,7 +28,7 @@ function assertCapability(scope: KnowledgeDomainScope, actor: DomainActor) {
 function requireActiveDomain(domainId: string, actor: DomainActor) {
   const domain = state.domains.find((item) => item.id === domainId);
   if (!domain) throw new Error(`Unknown Domain ${domainId}`);
-  assertCapability(domain.scope, actor);
+  assertDomainScopeCapability(domain.scope, actor);
   assertDomainAcceptsAssignment(domain);
   return domain;
 }
@@ -43,7 +43,14 @@ export function resolveNodeDomain(nodeId: string, snapshot = state) {
 }
 
 export function assignNodeDomain(input: { actor: DomainActor; nodeId: string; domainId: string | null }) {
+  const currentAssignment = state.assignments.find((item) => item.nodeId === input.nodeId);
+  const currentDomain = state.domains.find((item) => item.id === currentAssignment?.domainId);
   const domain = input.domainId ? requireActiveDomain(input.domainId, input.actor) : undefined;
+  if (!input.domainId) {
+    if (!currentAssignment) return;
+    if (!currentDomain) throw new Error(`Unknown current Domain ${currentAssignment.domainId}`);
+    assertDomainScopeCapability(currentDomain.scope, input.actor);
+  }
   const assignments = domain ? moveNodesToDomain(state.assignments, [input.nodeId], domain.id, input.actor) : state.assignments.filter((item) => item.nodeId !== input.nodeId);
   publish({ ...state, assignments });
 }
@@ -56,7 +63,7 @@ export function assignNodesToDomain(input: { actor: DomainActor; nodeIds: string
 export function updateDomain(input: { actor: DomainActor; domainId: string; changes: Partial<Pick<KnowledgeDomain, "name" | "description" | "canonicalColor" | "status">> }) {
   const current = state.domains.find((item) => item.id === input.domainId);
   if (!current) throw new Error(`Unknown Domain ${input.domainId}`);
-  assertCapability(current.scope, input.actor);
+  assertDomainScopeCapability(current.scope, input.actor);
   if (input.changes.status === "archived") {
     assertDomainCanArchive(current.id, state.assignments);
   }
@@ -66,7 +73,7 @@ export function updateDomain(input: { actor: DomainActor; domainId: string; chan
 }
 
 export function createDomain(input: { actor: DomainActor; name: string; description?: string; scope: KnowledgeDomainScope; canonicalColor?: string }) {
-  assertCapability(input.scope, input.actor);
+  assertDomainScopeCapability(input.scope, input.actor);
   const canonicalColor = input.canonicalColor || chooseMostDistinctUnusedColor(state.domains.map((item) => item.canonicalColor));
   if (!isValidDomainColor(canonicalColor)) throw new Error("Domain color must be a six-digit HEX value");
   const idBase = input.name.toLowerCase().trim().replace(/[^a-z0-9\p{Script=Han}]+/gu, "-").replace(/^-|-$/g, "") || "domain";
@@ -85,7 +92,11 @@ export function acceptCandidate(input: { actor: DomainActor; candidate: DomainAs
 }
 
 export function ignoreCandidate(input: { actor: DomainActor; nodeId: string }) {
-  if (!input.actor.capabilities.length) throw new Error("Domain governance requires an admin capability");
+  const scopes = new Set(state.candidates.filter((item) => item.nodeId === input.nodeId).flatMap((candidate) => {
+    const domain = state.domains.find((item) => item.id === candidate.domainId);
+    return domain ? [domain.scope] : [];
+  }));
+  scopes.forEach((scope) => assertDomainScopeCapability(scope, input.actor));
   publish({ ...state, candidates: state.candidates.filter((item) => item.nodeId !== input.nodeId) });
 }
 
@@ -103,7 +114,9 @@ export function evaluateAutomaticDomainAssignment(nodeId: string) {
 }
 
 export function reviewProposal(input: { actor: DomainActor; proposalId: string; status: DomainProposal["status"] }) {
-  if (!input.actor.capabilities.length) throw new Error("Domain governance requires an admin capability");
+  const proposal = state.proposals.find((item) => item.id === input.proposalId);
+  if (!proposal) throw new Error(`Unknown DomainProposal ${input.proposalId}`);
+  assertDomainScopeCapability(proposal.scope, input.actor);
   publish({ ...state, proposals: state.proposals.map((item) => item.id === input.proposalId ? { ...item, status: input.status } : item) });
 }
 

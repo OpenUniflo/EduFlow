@@ -3,9 +3,11 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
-import { courseRepository } from "../course/repository/DemoCourseRepository";
 import { buildCourseGraphData, buildCourseSummary } from "../course/runtime/courseRuntime";
-import { learningProgressRepository } from "../progress/LocalStorageLearningProgressRepository";
+import { applicationServices } from "../services/applicationServices";
+import { userKnowledgeAccess } from "../knowledge/repository/KnowledgeRepository";
+
+const { courseRepository, learningProgressRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
 export function CourseCenterPage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
   const navigate = useNavigate();
@@ -14,7 +16,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
   const courses = useMemo(() => courseRepository.listCourseRuntimes().map((runtime) => {
     const state = learningProgressRepository.getCourseState(session.email, runtime.course.id);
-    const graphData = buildCourseGraphData(runtime, state);
+    const graphData = buildCourseGraphData(runtime, state, knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.email)), userKnowledgeRepository.getUserKnowledge(session.email));
     return { runtime, state, graphData, summary: buildCourseSummary(runtime, state, graphData) };
   }), [progressRevision, session.email]);
   const needle = query.trim().toLowerCase();

@@ -80,10 +80,12 @@ import { LessonPage } from "./v2/pages/LessonPage";
 import { WorkflowLibraryPage } from "./v2/pages/WorkflowLibraryPage";
 import { ProfileKnowledgePage } from "./v2/pages/ProfileKnowledgePage";
 import { GlobalNav } from "./v2/components/GlobalNav";
-import { courseRepository } from "./v2/course/repository/DemoCourseRepository";
+import { applicationServices } from "./v2/services/applicationServices";
 import { completeAssignment, workflowLaunchContextFromLocation } from "./v2/progress/progressService";
 import { DomainManagementPage } from "./v2/admin/domains/DomainManagementPage";
 import { canManageKnowledgeDomains } from "./v2/session/capabilities";
+
+const courseRepository = applicationServices.courseRepository;
 
 function stableStateValue(value: unknown) {
   if (value === undefined) return "__undefined__";
@@ -275,8 +277,9 @@ export default function App() {
         setRunHistory((history) => {
           const existing = history[activeTemplate.id] ?? [];
           if (existing.some((item) => item.id === runSessionId)) return history;
+          const launchContext = workflowLaunchContextFromLocation(activeTemplate.id, location.search);
           const record = {
-            ...createWorkflowRunRecord(activeTemplate, activeStateValues, existing.length + 1),
+            ...createWorkflowRunRecord(activeTemplate, activeStateValues, existing.length + 1, launchContext ?? undefined),
             id: runSessionId
           };
           return {
@@ -1218,7 +1221,7 @@ export default function App() {
       />
       {allCourseAssignments.some((item) => item.workflowTemplateId === activeTemplate.id) && activeRunHistory.length ? (
         <aside className="atlas-canvas-acceptance glass-v2">
-          <div><strong>验收通过</strong><span>结构 92 · 行为 88 · 结果 90 · 轨迹 94</span></div>
+          <div><strong>Demo Evaluation · 验收通过</strong><span>结构 92 · 行为 88 · 结果 90 · 轨迹 94</span></div>
           <div><span>模型调用 {Math.max(2, Math.round(activeTemplate.nodes.length / 2))}</span><span>工具调用 {activeTemplate.nodes.filter((item) => item.kind === "tool").length}</span><span>总分 91</span></div>
         </aside>
       ) : null}

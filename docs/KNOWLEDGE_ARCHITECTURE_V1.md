@@ -261,3 +261,9 @@ Course, Assignment, and Material definitions contain no user completion. Mutable
 ## 37. Domain Runtime Authority
 
 `DomainAssignment` is the only authoritative runtime membership source. Any `KnowledgeNode.domainId` remaining in a demo seed is deprecated migration input and must not drive color, filtering, governance, layout, or statistics. Domain definitions and assignments are persisted independently from the Knowledge Graph structure.
+
+## 38. Scoped Knowledge Access
+
+Course, Assignment, and Material mappings may reference any KnowledgeNode visible to the actor across Global, Tenant, and User scopes. KnowledgeRepository provides scoped lookup over KnowledgeGraph data; it does not replace KnowledgeGraph or create new ontology facts.
+
+Global Atlas still projects only active Global nodes. Personal Atlas may project visible Global, Tenant, and User nodes selected by the active user's UserKnowledgeState plus factual direct Explore relations. Course and Material validation use the same scoped repository context.

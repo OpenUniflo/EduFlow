@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DemoCourseRepository } from "./course/repository/DemoCourseRepository";
-import { buildCourseGraphData, validateCourseRuntime } from "./course/runtime/courseRuntime";
+import { buildCourseGraphData, validateCourseRuntime, type CourseRuntimeData } from "./course/runtime/courseRuntime";
 import { buildCourseGraphProjection } from "./course/graph/courseGraphProjection";
 import { ATOMIC_FOOTPRINT_HEIGHT, ATOMIC_FOOTPRINT_WIDTH, COMPANION_OFFSET_X, COMPANION_OFFSET_Y, KNOWLEDGE_CARD_HEIGHT, KNOWLEDGE_CARD_WIDTH, getCourseLayoutCacheKey, layoutCourseGraph } from "./course/graph/elkCourseLayout";
 import { toReactFlow } from "./course/graph/reactFlowAdapter";
@@ -8,20 +8,32 @@ import { assignmentProjectionForNode, buildChapterAssignmentProjection, courseDr
 import { demoUserCourseStateSeed } from "./demo/user/demoUserCourseState.seed";
 import { LocalStorageLearningProgressRepository, learningProgressStorageKey } from "./progress/LocalStorageLearningProgressRepository";
 import { buildGlobalAtlasProjection } from "./knowledge/projections/atlasProjections";
+import { applicationServices } from "./services/applicationServices";
+import { globalKnowledgeAccess, userKnowledgeAccess } from "./knowledge/repository/KnowledgeRepository";
+import { resolveInitialMaterialSegment, resolveKnowledgeMaterialEntry, buildMaterialDeepLink } from "./material/materialNavigation";
+import { getDomainGovernanceSnapshot } from "./knowledge/domain/domainStore";
+import { createWorkflowRunRecord, type Template } from "../app/model";
+import { InMemoryKnowledgeRepository } from "./knowledge/repository/InMemoryKnowledgeRepository";
+import type { KnowledgeGraph, KnowledgeNode } from "./knowledge/types";
+import { buildPersonalKnowledgeGraph } from "./profile/profileGraph";
 
-const repository = new DemoCourseRepository();
+const knowledgeRepository = applicationServices.knowledgeRepository;
+const repository = new DemoCourseRepository(knowledgeRepository);
+const access = userKnowledgeAccess("student@knowledge-atlas.local");
+const visibleGraph = knowledgeRepository.getVisibleGraph(access);
+const userKnowledge = applicationServices.userKnowledgeRepository.getUserKnowledge("student@knowledge-atlas.local");
 const agentic = repository.getCourse("agentic-ai")!;
 const python = repository.getCourse("python-engineering")!;
-const agenticGraph = buildCourseGraphData(agentic, demoUserCourseStateSeed("student", agentic.course.id));
-const pythonGraph = buildCourseGraphData(python, demoUserCourseStateSeed("student", python.course.id));
+const agenticGraph = buildCourseGraphData(agentic, demoUserCourseStateSeed("student", agentic.course.id), visibleGraph, userKnowledge);
+const pythonGraph = buildCourseGraphData(python, demoUserCourseStateSeed("student", python.course.id), visibleGraph, userKnowledge);
 
 describe("Course Repository and runtime invariants", () => {
   it("registers two isolated Courses and rejects unknown routes", () => {
     expect(repository.listCourses().map((course) => course.id)).toEqual(["agentic-ai", "python-engineering"]);
     expect(repository.getCourse("agentic-ai")).not.toBe(repository.getCourse("python-engineering"));
     expect(repository.getCourse("not-exist")).toBeNull();
-    expect(validateCourseRuntime(agentic)).toBe(true);
-    expect(validateCourseRuntime(python)).toBe(true);
+    expect(validateCourseRuntime(agentic, knowledgeRepository, access)).toBe(true);
+    expect(validateCourseRuntime(python, knowledgeRepository, access)).toBe(true);
   });
 
   it("keeps Course graph data isolated", () => {
@@ -65,6 +77,14 @@ describe("Material and progress generalization", () => {
     expect(agentic.materials.some((material) => material.id === "python-core-handbook")).toBe(false);
   });
 
+  it("resolves deterministic deep links and gives explicit URL Segment precedence", () => {
+    const entry = resolveKnowledgeMaterialEntry(agentic, "R01", "lesson-04");
+    expect(entry).toMatchObject({ segmentId: "page-12", role: "introduce" });
+    expect(buildMaterialDeepLink({ courseId: agentic.course.id, materialId: "lesson-04", segmentId: entry!.segmentId })).toBe("/courses/agentic-ai/materials/lesson-04?segment=page-12");
+    expect(resolveInitialMaterialSegment({ segmentIds: ["page-01", "page-12", "page-28"], requestedSegmentId: "page-12", recentSegmentId: "page-28" })).toBe("page-12");
+    expect(resolveInitialMaterialSegment({ segmentIds: ["page-01", "page-12"], requestedSegmentId: "missing", recentSegmentId: "page-12" })).toBe("page-12");
+  });
+
   it("isolates progress by user, Course, Material, and explicit Assignment identity", () => {
     expect(learningProgressStorageKey("user-a", "agentic-ai")).not.toBe(learningProgressStorageKey("user-a", "python-engineering"));
     expect(learningProgressStorageKey("user-a", "agentic-ai")).not.toBe(learningProgressStorageKey("user-b", "agentic-ai"));
@@ -80,9 +100,67 @@ describe("Material and progress generalization", () => {
     expect(progress.getCourseState("other-user", python.course.id).assignmentStates[target.id]?.status).not.toBe("completed");
   });
 
+  it("separates reading position from viewed completion and updates recent Lesson", () => {
+    const progress = new LocalStorageLearningProgressRepository();
+    progress.updateMaterialReadingState("reader", agentic.course.id, "L04", "lesson-04", { recentSegmentId: "page-32", viewedSegmentIds: ["page-32"], progress: 3 });
+    const state = progress.getCourseState("reader", agentic.course.id);
+    expect(state.recentLessonId).toBe("L04");
+    expect(state.materialStates["lesson-04"]).toMatchObject({ recentSegmentId: "page-32", progress: 3 });
+  });
+
+  it("keeps Knowledge mastery independent from Assignment completion", () => {
+    const node = agenticGraph.knowledgeNodes.find((item) => item.id === "R01")!;
+    expect(node.knowledgeProgress).toBe(58);
+    expect(node.assignmentStateSummary.progress).not.toBe(node.knowledgeProgress);
+  });
+
   it("projects N:M Atlas Course contexts", () => {
-    const atlas = buildGlobalAtlasProjection(undefined, repository.listCourseRuntimes());
+    const atlas = buildGlobalAtlasProjection(knowledgeRepository.getVisibleGraph(globalKnowledgeAccess), getDomainGovernanceSnapshot(), repository.listCourseRuntimes());
     expect(atlas.nodes.find((node) => node.id === "T11")?.courseContexts.map((context) => context.courseId).sort()).toEqual(["agentic-ai", "python-engineering"]);
+  });
+
+  it("resolves visible Global/Tenant/User Knowledge while Global Atlas stays Global-only", () => {
+    const node = (id: string, scope: KnowledgeNode["scope"], ownerId?: string): KnowledgeNode => ({ id, title: id, description: id, type: "conceptual", masteryCriteria: [id], scope, ownerId, provenance: [{ sourceType: "manual", sourceId: id }], currentRevisionId: `${id}-r1`, status: "active" });
+    const scopedGraph: KnowledgeGraph = { domains: [], revisions: [], edges: [], nodes: [node("G", "global"), node("T", "tenant", "tenant-1"), node("U", "user", "user-1")] };
+    const scopedRepository = new InMemoryKnowledgeRepository(scopedGraph);
+    const scopedAccess = userKnowledgeAccess("user-1", "tenant-1");
+    expect(scopedRepository.getVisibleGraph(scopedAccess).nodes.map((item) => item.id)).toEqual(["G", "T", "U"]);
+    expect(buildGlobalAtlasProjection(scopedRepository.getVisibleGraph(scopedAccess), { domains: [], assignments: [], candidates: [], proposals: [], revision: 0 }, []).nodes.map((item) => item.id)).toEqual(["G"]);
+
+    const runtime: CourseRuntimeData = {
+      course: { id: "scoped-course", title: "Scoped", description: "Scoped", accentColor: "#000000" },
+      curriculum: { id: "scoped-curriculum", courseId: "scoped-course", generationMode: "auto-fixed-count", requestedChapterCount: 1 },
+      chapters: [{ id: "C", courseId: "scoped-course", title: "C", description: "C", lessonIds: ["L"], order: 1, color: "#000000", progress: 0, outcome: "O" }],
+      lessons: [{ id: "L", courseId: "scoped-course", chapterId: "C", title: "L", order: 1 }],
+      curriculumCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `cc-${nodeId}`, courseId: "scoped-course", lessonId: "L", nodeId, role: "introduce" as const })),
+      curriculumSequences: [],
+      assignments: [{ id: "A", courseId: "scoped-course", title: "A", description: "A", requirements: ["A"], expectedOutput: "A", acceptanceCriteria: ["A"], mode: "instruction" }],
+      assignmentCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `ac-${nodeId}`, assignmentId: "A", nodeId, role: "practice" as const })),
+      materials: [{ id: "M", courseId: "scoped-course", lessonId: "L", title: "M", type: "article", segments: [{ id: "S", order: 1, title: "S", content: {} }] }],
+      materialKnowledgeCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `mc-${nodeId}`, materialId: "M", segmentId: "S", nodeId, role: "introduce" as const })),
+      revision: "v1"
+    };
+    expect(validateCourseRuntime(runtime, scopedRepository, scopedAccess)).toBe(true);
+    expect(buildCourseGraphData(runtime, demoUserCourseStateSeed("user-1", "scoped-course"), scopedRepository.getVisibleGraph(scopedAccess)).knowledgeNodes).toHaveLength(3);
+  });
+
+  it("keeps shared WorkflowTemplate run identity assignment-aware", () => {
+    const template: Template = { id: "same-template", name: "Shared", description: "Shared", nodes: [], edges: [], runOrder: [], result: "ok", code: "" };
+    const runA = createWorkflowRunRecord(template, {}, 1, { courseId: "course-a", assignmentId: "assignment-a" });
+    const runB = createWorkflowRunRecord(template, {}, 2, { courseId: "course-b", assignmentId: "assignment-b" });
+    expect(runA.workflowTemplateId).toBe(runB.workflowTemplateId);
+    expect(runA.assignmentId).not.toBe(runB.assignmentId);
+  });
+
+  it("projects different Personal Atlas state for different users", () => {
+    const governance = getDomainGovernanceSnapshot();
+    const userA = "student@knowledge-atlas.local";
+    const userB = "second@knowledge-atlas.local";
+    const statesFor = (userId: string) => repository.listCourseRuntimes().map((runtime) => demoUserCourseStateSeed(userId, runtime.course.id));
+    const graphA = buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(userA)), applicationServices.userKnowledgeRepository.getUserKnowledge(userA), repository.listCourseRuntimes(), statesFor(userA), governance);
+    const graphB = buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(userB)), applicationServices.userKnowledgeRepository.getUserKnowledge(userB), repository.listCourseRuntimes(), statesFor(userB), governance);
+    expect(graphA.nodes.map((node) => node.id)).not.toEqual(graphB.nodes.map((node) => node.id));
+    expect(graphA.summary).not.toEqual(graphB.summary);
   });
 });
 

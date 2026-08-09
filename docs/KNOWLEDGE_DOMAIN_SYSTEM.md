@@ -77,3 +77,9 @@ Every manual create, edit, move, archive, or restore operation receives an expli
 ## Multi-course Independence
 
 Domain membership belongs to the shared KnowledgeNode, not to any course that covers it. Adding a course context, Assignment, Material, or user progress does not change Domain membership. Domain definition and membership edits alter classification presentation only; they never alter KnowledgeEdges, structural graph keys, coordinates, or camera state.
+
+## Scope-based Mutation Permission
+
+Unassigning a node checks the scope of its current Domain and requires the matching global or tenant capability. DomainProposal acceptance and rejection check `proposal.scope`; possessing an unrelated admin capability is insufficient. Creation, move, archive, restore, candidate review, and proposal review all continue to require an explicit actor.
+
+The same canonical Domain color is reused by Global Atlas, Personal Atlas, and Material Knowledge Context. Domain edits do not alter MaterialKnowledgeCoverage or Course topology.

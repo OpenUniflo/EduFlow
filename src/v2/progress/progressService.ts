@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 import type { UserAssignmentState, UserCourseState, UserMaterialState, WorkflowLaunchContext } from "../types";
-import { learningProgressRepository } from "./LocalStorageLearningProgressRepository";
+import { applicationServices } from "../services/applicationServices";
+
+const learningProgressRepository = applicationServices.learningProgressRepository;
 
 export function getUserCourseState(userId: string, courseId: string) {
   return learningProgressRepository.getCourseState(userId, courseId);
@@ -24,6 +26,10 @@ export function completeAssignment(context: Pick<WorkflowLaunchContext, "courseI
 
 export function updateMaterialState(userId: string, courseId: string, materialId: string, state: Partial<UserMaterialState>) {
   learningProgressRepository.updateMaterialState(userId, courseId, materialId, state);
+}
+
+export function updateMaterialReadingState(userId: string, courseId: string, lessonId: string, materialId: string, state: Partial<UserMaterialState>) {
+  learningProgressRepository.updateMaterialReadingState(userId, courseId, lessonId, materialId, state);
 }
 
 export function workflowLaunchUrl(context: WorkflowLaunchContext) {

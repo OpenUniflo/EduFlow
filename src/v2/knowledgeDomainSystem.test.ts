@@ -4,12 +4,17 @@ import { buildGlobalAtlasProjection } from "./knowledge/projections/atlasProject
 import { applyAutomaticAssignment, decideDomainAssignment, DEFAULT_DOMAIN_DISCOVERY_CONFIG, scoreNodeAgainstDomains } from "./knowledge/domain/domainScoring";
 import { demoDomainDiscoveryService } from "./knowledge/domain/domainDiscovery";
 import { initialKnowledgeDomains } from "./knowledge/domain/domainData";
-import { getDomainGovernanceSnapshot } from "./knowledge/domain/domainStore";
+import { assignNodeDomain, assertDomainScopeCapability, getDomainGovernanceSnapshot } from "./knowledge/domain/domainStore";
 import { assertDomainAcceptsAssignment, assertDomainCanArchive, getDomainMembers, validateDomainAssignments } from "./knowledge/domain/domainValidation";
 import { moveNodesToDomain } from "./knowledge/domain/domainAssignment";
 import { atlasStructureKey, freezeAtlasNodePositions, resetAtlasCamera } from "./knowledge/atlasCamera";
 import type { DomainAssignmentCandidate } from "./knowledge/domain/domainTypes";
 import { canManageKnowledgeDomains } from "./session/capabilities";
+import { applicationServices } from "./services/applicationServices";
+import { globalKnowledgeAccess } from "./knowledge/repository/KnowledgeRepository";
+
+const atlasGraph = applicationServices.knowledgeRepository.getVisibleGraph(globalKnowledgeAccess);
+const runtimes = applicationServices.courseRepository.listCourseRuntimes();
 
 function candidate(score: number): DomainAssignmentCandidate {
   return { nodeId: "new-node", domainId: "agentic-ai", score, semanticScore: score, structuralScore: score, algorithmVersion: "test", generatedAt: "2026-08-08T00:00:00.000Z" };
@@ -45,13 +50,13 @@ describe("Knowledge Domain invariants", () => {
 
   it("Domain changes preserve topology and structural projection identity", () => {
     const snapshot = getDomainGovernanceSnapshot();
-    const before = buildGlobalAtlasProjection(snapshot);
+    const before = buildGlobalAtlasProjection(atlasGraph, snapshot, runtimes);
     const changed = {
       ...snapshot,
       assignments: [...snapshot.assignments.filter((item) => item.nodeId !== "PY46"), { nodeId: "PY46", domainId: "agentic-ai", source: "admin" as const, pinned: true, assignedAt: "now" }],
       revision: snapshot.revision + 1
     };
-    const after = buildGlobalAtlasProjection(changed);
+    const after = buildGlobalAtlasProjection(atlasGraph, changed, runtimes);
     const signature = (projection: typeof before) => ({ ids: projection.nodes.map((node) => node.id).sort(), edges: projection.edges.map((edge) => `${edge.source}:${edge.relation}:${edge.target}`).sort() });
     expect(signature(after)).toEqual(signature(before));
     expect(after.nodes.find((node) => node.id === "PY46")?.color).toBe(initialKnowledgeDomains.find((domain) => domain.id === "agentic-ai")?.canonicalColor);
@@ -87,7 +92,7 @@ describe("Knowledge Domain invariants", () => {
 
   it("keeps Atlas structure identity stable for color, status, and selection presentation", () => {
     const snapshot = getDomainGovernanceSnapshot();
-    const projection = buildGlobalAtlasProjection(snapshot);
+    const projection = buildGlobalAtlasProjection(atlasGraph, snapshot, runtimes);
     const before = atlasStructureKey(projection.nodes, projection.edges, "global");
     const presented = projection.nodes.map((node, index) => ({ ...node, color: index ? node.color : "#667EDB", status: index ? node.status : "learning" as const }));
     expect(atlasStructureKey(presented, projection.edges, "global")).toBe(before);
@@ -106,5 +111,12 @@ describe("Knowledge Domain invariants", () => {
   it("exposes Domain governance only through runtime capabilities", () => {
     expect(canManageKnowledgeDomains({ capabilities: [] })).toBe(false);
     expect(canManageKnowledgeDomains({ capabilities: ["global-domain-admin"] })).toBe(true);
+  });
+
+  it("requires scope-appropriate permission for unassign and proposal review", () => {
+    expect(() => assignNodeDomain({ actor: { id: "user", capabilities: [] }, nodeId: "R03", domainId: null })).toThrow(/global-domain-admin/);
+    expect(() => assertDomainScopeCapability("global", { id: "tenant", capabilities: ["tenant-domain-admin"] })).toThrow(/global-domain-admin/);
+    expect(() => assertDomainScopeCapability("global", { id: "global", capabilities: ["global-domain-admin"] })).not.toThrow();
+    expect(() => assertDomainScopeCapability("tenant", { id: "tenant", capabilities: ["tenant-domain-admin"] })).not.toThrow();
   });
 });

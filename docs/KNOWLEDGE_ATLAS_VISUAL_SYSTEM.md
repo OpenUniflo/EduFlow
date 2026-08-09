@@ -66,3 +66,5 @@ Initial Camera setup may occur once during scene initialization, but it must com
 ## Multi-course Context
 
 A visible KnowledgeNode may participate in zero, one, or several courses. Atlas details expose these as `courseContexts[]` and require an explicit course choice when more than one navigation target exists. Course context changes labels and navigation only; it does not change node coordinates, force lifecycle, or camera state.
+
+Material Knowledge Context uses the same `KnowledgeDomain.canonicalColor` hue as Global and Personal Atlas, including the shared Unclassified fallback.
