@@ -2,6 +2,7 @@ import { BaseEdge, getSmoothStepPath, Handle, Position, ReactFlow, ReactFlowProv
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import "@xyflow/react/dist/style.css";
 import type { CourseChapterProjection, CourseSkillTreeNode } from "../../types";
+import type { CourseGraphData } from "../runtime/courseRuntime";
 import { buildCourseGraphProjection, type CourseGraphView } from "./courseGraphProjection";
 import { layoutCourseGraph } from "./elkCourseLayout";
 import { toReactFlow, type CourseFlowEdgeData, type CourseFlowNodeData } from "./reactFlowAdapter";
@@ -14,6 +15,7 @@ export type CourseGraphHandle = {
 };
 
 type Props = {
+  graphData: CourseGraphData;
   view: CourseGraphView;
   focusedChapterId: string | null;
   mode: "knowledge" | "assignment";
@@ -93,24 +95,24 @@ const CourseGraphInner = forwardRef<CourseGraphHandle, Props>(function CourseGra
   const chapterClickTimer = useRef<number | null>(null);
   const layoutRequestRef = useRef(0);
   const fittedStructureRef = useRef<string | null>(null);
-  const projection = useMemo(() => buildCourseGraphProjection(props.view, props.focusedChapterId), [props.focusedChapterId, props.view]);
+  const projection = useMemo(() => buildCourseGraphProjection(props.graphData, props.view, props.focusedChapterId), [props.focusedChapterId, props.graphData, props.view]);
   const [layout, setLayout] = useState<Awaited<ReturnType<typeof layoutCourseGraph>> | null>(null);
-  const structureKey = `${props.view}:${props.focusedChapterId ?? "all-collapsed"}`;
+  const structureKey = `${props.graphData.courseId}:${props.graphData.revision}:${props.view}:${props.focusedChapterId ?? "all-collapsed"}`;
 
   useEffect(() => {
     const request = ++layoutRequestRef.current;
-    layoutCourseGraph(projection).then((layout) => {
+    layoutCourseGraph(props.graphData, projection).then((layout) => {
       if (request !== layoutRequestRef.current) return;
       setLayout(layout);
       if (fittedStructureRef.current === structureKey) return;
       fittedStructureRef.current = structureKey;
       window.requestAnimationFrame(() => instance.fitView({ padding: 0.14, duration: 520, maxZoom: props.view === "full" ? 0.76 : 1.05 }));
     });
-  }, [instance, projection, props.view, structureKey]);
+  }, [instance, projection, props.graphData, props.view, structureKey]);
 
   const flow = useMemo(
-    () => layout ? toReactFlow(layout, props.mode, props.selectedId, props.searchMatchId, props.onChapterDoubleClick, props.onAssignmentClick) : { nodes: [], edges: [] },
-    [layout, props.mode, props.onAssignmentClick, props.onChapterDoubleClick, props.searchMatchId, props.selectedId]
+    () => layout ? toReactFlow(layout, props.graphData.knowledgeEdges, props.mode, props.selectedId, props.searchMatchId, props.onChapterDoubleClick, props.onAssignmentClick) : { nodes: [], edges: [] },
+    [layout, props.graphData.knowledgeEdges, props.mode, props.onAssignmentClick, props.onChapterDoubleClick, props.searchMatchId, props.selectedId]
   );
 
   useImperativeHandle(ref, () => ({

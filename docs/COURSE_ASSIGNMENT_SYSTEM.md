@@ -116,3 +116,15 @@ Assignment Group is a UI projection, not a business entity. Chapter Assignment V
 ## 18. Course Mode and Drawer Synchronization
 
 Course mode is authoritative for the Knowledge / Assignment facet. When mode changes, the selected Anchor stays, an open Drawer stays open, its facet switches, and graph geometry and viewport stay unchanged. Search and prerequisite navigation set only an Anchor; the active facet remains the current mode. Only the foreground companion layer accepts pointer input.
+
+## 19. Multi-course Identity and Progress
+
+Every Assignment is owned by its `courseId`, while user state is stored separately under the `userId + courseId` scope and keyed by stable `assignmentId`. Completion code must receive the explicit Assignment identity. It must not infer the target from list order, the selected KnowledgeNode, or a workflow template because one template may execute several Assignments.
+
+Workflow launch context carries `courseId`, `assignmentId`, and `workflowTemplateId`. The canvas validates that relationship before updating state. Launching a template without an Assignment context may run the canvas but must not mark an arbitrary Assignment complete.
+
+Course, chapter, and node summaries are projections over unique Assignment IDs. Progress from another user or course is never included.
+
+## 20. Material Integration
+
+Assignments associated with a Material segment are derived through `MaterialKnowledgeCoverage -> KnowledgeNode -> AssignmentCoverage`. The material viewer does not contain course-specific Assignment lookup tables.

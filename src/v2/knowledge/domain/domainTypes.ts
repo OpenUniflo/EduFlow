@@ -55,3 +55,8 @@ export type DomainDiscoveryConfig = {
 };
 
 export type DomainAdminCapability = "global-domain-admin" | "tenant-domain-admin";
+
+export type DomainActor = {
+  id: string;
+  capabilities: DomainAdminCapability[];
+};

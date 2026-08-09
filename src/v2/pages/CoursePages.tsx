@@ -1,34 +1,55 @@
 import { ArrowRight, Layers3, Plus, Search } from "lucide-react";
-import { type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
-import { courseAssignmentSummary, courseChapters, courseSkillTreeNodes } from "../data";
-import { useLearningProgress } from "../progress";
+import { courseRepository } from "../course/repository/DemoCourseRepository";
+import { buildCourseGraphData, buildCourseSummary } from "../course/runtime/courseRuntime";
+import { learningProgressRepository } from "../progress/LocalStorageLearningProgressRepository";
 
 export function CourseCenterPage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
   const navigate = useNavigate();
-  const progress = useLearningProgress();
-  const completed = Math.max(courseAssignmentSummary.completedCount, progress.completedAssignmentIds.length);
-  const assignmentPercent = Math.round((completed / courseAssignmentSummary.assignmentCount) * 100);
+  const [query, setQuery] = useState("");
+  const [progressRevision, setProgressRevision] = useState(0);
+  useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
+  const courses = useMemo(() => courseRepository.listCourseRuntimes().map((runtime) => {
+    const state = learningProgressRepository.getCourseState(session.email, runtime.course.id);
+    const graphData = buildCourseGraphData(runtime, state);
+    return { runtime, state, graphData, summary: buildCourseSummary(runtime, state, graphData) };
+  }), [progressRevision, session.email]);
+  const needle = query.trim().toLowerCase();
+  const visible = courses.filter(({ runtime, graphData }) => !needle || [
+    runtime.course.title,
+    runtime.course.subtitle ?? "",
+    runtime.course.description,
+    ...runtime.chapters.map((chapter) => chapter.title),
+    ...graphData.knowledgeNodes.map((node) => node.title)
+  ].some((value) => value.toLowerCase().includes(needle)));
+  const recent = [...courses].sort((left, right) => (right.summary.updatedAt ?? "").localeCompare(left.summary.updatedAt ?? ""))[0];
+  const learningCount = courses.filter((item) => item.summary.status === "learning").length;
+
+  function miniMap(chapters: typeof courses[number]["graphData"]["chapters"], compact = false) {
+    return <div className={`atlas-mini-map-scene ${compact ? "compact" : ""}`}>{chapters.slice(0, compact ? 6 : chapters.length).map((stage, index) => <i key={stage.id} style={{ "--i": index, "--color": stage.color } as CSSProperties} />)}</div>;
+  }
+
   return (
     <main className="atlas-page-shell atlas-course-center">
       <GlobalNav active="courses" session={session} onLogout={onLogout} />
       <div className="atlas-course-floating-title glass-v2">课程中心</div>
       <div className="atlas-content-wrap">
-        <section className="atlas-course-title atlas-course-title-row"><div><h1>课程中心</h1><p>从一门课程进入完整的知识、课件与实训体系。</p></div><span className="atlas-pill">1 门课程 · 1 门学习中</span></section>
-        <div className="atlas-course-actions"><label className="atlas-course-search glass-v2"><Search size={17} /><input placeholder="搜索课程、篇章或知识点…" aria-label="搜索课程" /></label><button className="atlas-secondary"><Layers3 size={16} /> 全部课程</button></div>
-        <section className="atlas-course-section">
+        <section className="atlas-course-title atlas-course-title-row"><div><h1>课程中心</h1><p>从课程进入完整的知识、课件与实训体系。</p></div><span className="atlas-pill">{courses.length} 门课程 · {learningCount} 门学习中</span></section>
+        <div className="atlas-course-actions"><label className="atlas-course-search glass-v2"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索课程、篇章或知识点…" aria-label="搜索课程" /></label><button className="atlas-secondary" onClick={() => setQuery("")}><Layers3 size={16} /> 全部课程</button></div>
+        {recent ? <section className="atlas-course-section">
           <div className="atlas-section-row"><div><span className="atlas-kicker">RECENT</span><h2>最近学习</h2></div></div>
-          <article className="atlas-featured-course glass-v2" onClick={() => navigate("/courses/agentic-ai")}>
-            <div className="atlas-featured-copy"><div className="atlas-kicker">最近学习</div><h2>Agentic AI：从问题建模到受治理智能体</h2><p>继续学习“架构与推理范式”篇章。第四课将通过五套统一任务模板比较 Direct、ReAct、规划、重规划与评价优化。</p><div className="atlas-course-meta"><span>当前：第四课 · 推理、规划与反思</span><span>15 课</span><span>{courseAssignmentSummary.assignmentCount} 项课程实训</span></div><div className="atlas-progress-row"><div className="atlas-progress-track"><i style={{ width: `${Math.max(36, assignmentPercent)}%` }} /></div><strong>{Math.max(36, assignmentPercent)}%</strong></div><button className="atlas-primary" onClick={(event) => { event.stopPropagation(); navigate("/courses/agentic-ai"); }}>继续学习 <ArrowRight size={16} /></button></div>
-            <div className="atlas-recent-mini-map" aria-label="课程技能树缩略图"><div className="atlas-mini-map-scene">{courseChapters.map((stage, index) => <i key={stage.id} style={{ "--i": index, "--color": stage.color } as CSSProperties} />)}</div><span>{courseChapters.length} 个篇章 · {courseSkillTreeNodes.length} 个原子知识点</span></div>
+          <article className="atlas-featured-course glass-v2" onClick={() => navigate(`/courses/${recent.runtime.course.id}`)}>
+            <div className="atlas-featured-copy"><div className="atlas-kicker">最近学习</div><h2>{recent.runtime.course.subtitle ?? recent.runtime.course.title}</h2><p>{recent.runtime.course.description}</p><div className="atlas-course-meta"><span>当前：{recent.runtime.lessons.find((lesson) => lesson.id === recent.summary.recentLessonId)?.title ?? "尚未开始"}</span><span>{recent.summary.lessonCount} 课</span><span>{recent.summary.assignmentCount} 项课程实训</span></div><div className="atlas-progress-row"><div className="atlas-progress-track"><i style={{ width: `${recent.summary.progress}%` }} /></div><strong>{recent.summary.progress}%</strong></div><button className="atlas-primary" onClick={(event) => { event.stopPropagation(); navigate(`/courses/${recent.runtime.course.id}`); }}>继续学习 <ArrowRight size={16} /></button></div>
+            <div className="atlas-recent-mini-map" aria-label="课程技能树缩略图">{miniMap(recent.graphData.chapters)}<span>{recent.summary.chapterCount} 个篇章 · {recent.summary.knowledgeNodeCount} 个原子知识点</span></div>
           </article>
-        </section>
+        </section> : null}
         <section className="atlas-course-section">
-          <div className="atlas-section-row"><h2>所有课程</h2><span>1 门课程</span></div>
+          <div className="atlas-section-row"><h2>所有课程</h2><span>{visible.length} 门课程</span></div>
           <div className="atlas-course-grid">
-            <article className="atlas-course-card glass-v2" onClick={() => navigate("/courses/agentic-ai")}><div className="atlas-card-accent" /><div className="atlas-course-preview" aria-hidden="true"><div className="atlas-mini-map-scene compact">{courseChapters.slice(0, 6).map((stage, index) => <i key={stage.id} style={{ "--i": index, "--color": stage.color } as CSSProperties} />)}</div></div><div className="atlas-pill">学习中 · Agentic AI</div><h3>智能体系统设计与实践</h3><p>从概念、问题建模和推理范式出发，逐步构建可运行、可评测、可治理的 Agent 系统。</p><div className="atlas-course-meta"><span>15 课</span><span>{courseSkillTreeNodes.length} 原子节点</span><span>{courseAssignmentSummary.assignmentCount} 实训</span></div><div className="atlas-progress-row"><div className="atlas-progress-track"><i style={{ width: `${Math.max(36, assignmentPercent)}%` }} /></div><strong>{Math.max(36, assignmentPercent)}%</strong></div></article>
+            {visible.map(({ runtime, graphData, summary }) => <article className="atlas-course-card glass-v2" key={runtime.course.id} onClick={() => navigate(`/courses/${runtime.course.id}`)}><div className="atlas-card-accent" style={{ background: runtime.course.accentColor }} /><div className="atlas-course-preview" aria-hidden="true">{miniMap(graphData.chapters, true)}</div><div className="atlas-pill">{summary.status === "completed" ? "已完成" : summary.status === "learning" ? "学习中" : "未开始"} · {runtime.course.title}</div><h3>{runtime.course.subtitle ?? runtime.course.title}</h3><p>{runtime.course.description}</p><div className="atlas-course-meta"><span>{summary.lessonCount} 课</span><span>{summary.knowledgeNodeCount} 原子节点</span><span>{summary.assignmentCount} 实训</span></div><div className="atlas-progress-row"><div className="atlas-progress-track"><i style={{ width: `${summary.progress}%` }} /></div><strong>{summary.progress}%</strong></div></article>)}
             <button className="atlas-course-card atlas-new-course glass-v2" onClick={() => navigate("/")}><span><Plus size={22} /></span><strong>从课件创建课程</strong><p>回到知识星图，上传材料并描述课程目标。</p></button>
           </div>
         </section>

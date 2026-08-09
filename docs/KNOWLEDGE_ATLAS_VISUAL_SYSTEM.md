@@ -62,3 +62,7 @@ Reset performs exactly one deterministic transition. It does not chain a canonic
 ## Initial Camera Policy
 
 Initial Camera setup may occur once during scene initialization, but it must complete without a delayed visible jump after the scene has become interactive. Any later Camera movement requires explicit user intent or an explicit search/selection focus action.
+
+## Multi-course Context
+
+A visible KnowledgeNode may participate in zero, one, or several courses. Atlas details expose these as `courseContexts[]` and require an explicit course choice when more than one navigation target exists. Course context changes labels and navigation only; it does not change node coordinates, force lifecycle, or camera state.

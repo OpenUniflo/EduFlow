@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BookOpen, ChevronDown, LogOut, Network, ShieldCheck, Workflow } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
+import { canManageKnowledgeDomains } from "../session/capabilities";
 
 export function GlobalNav({
   active,
@@ -52,7 +53,7 @@ export function GlobalNav({
       description: "治理领域、成员与自动建议",
       icon: ShieldCheck
     }
-  ] as const;
+  ].filter((item) => item.id !== "admin" || canManageKnowledgeDomains(session));
 
   return (
     <nav className="atlas-global-nav" aria-label="全局导航">

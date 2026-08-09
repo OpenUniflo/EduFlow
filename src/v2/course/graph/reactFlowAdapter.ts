@@ -1,5 +1,5 @@
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
-import { courseSkillTreeEdges } from "../../data";
+import type { CourseSkillTreeEdge } from "../../types";
 import type { CourseLayout, CourseLayoutEdge, CourseLayoutNode } from "./elkCourseLayout";
 
 export type CourseFlowNodeData = CourseLayoutNode & {
@@ -14,6 +14,7 @@ export type CourseFlowEdgeData = CourseLayoutEdge & { highlighted: boolean } & R
 
 export function toReactFlow(
   layout: CourseLayout,
+  knowledgeEdges: CourseSkillTreeEdge[],
   mode: "knowledge" | "assignment",
   selectedId: string | null,
   searchMatchId: string | null,
@@ -44,7 +45,7 @@ export function toReactFlow(
   }));
 
   const visibleIds = new Set(nodes.map((node) => node.id));
-  const relatedOverlays: CourseLayoutEdge[] = selectedId?.startsWith("knowledge:") ? courseSkillTreeEdges
+  const relatedOverlays: CourseLayoutEdge[] = selectedId?.startsWith("knowledge:") ? knowledgeEdges
     .filter((edge) => edge.relation === "related")
     .filter((edge) => {
       const source = `knowledge:${edge.source}`;

@@ -1,8 +1,9 @@
 import { ArrowRight, CheckCircle2, Grid2X2, List, Plus, Sparkles, Trash2 } from "lucide-react";
 import type { MockSession, Template, WorkflowViewMode } from "../../app/model";
 import { WorkflowPreview } from "../../components/app/workflows/WorkflowPages";
-import { courseAssignments } from "../data";
-import { useLearningProgress } from "../progress";
+import { useEffect, useState } from "react";
+import { courseRepository } from "../course/repository/DemoCourseRepository";
+import { learningProgressRepository } from "../progress/LocalStorageLearningProgressRepository";
 import { GlobalNav } from "../components/GlobalNav";
 
 export function WorkflowLibraryPage({
@@ -26,22 +27,25 @@ export function WorkflowLibraryPage({
   onCreateWorkflow: () => void;
   onDeleteWorkflow: (templateId: string) => void;
 }) {
-  const progress = useLearningProgress();
-  const workflowAssignments = courseAssignments.filter((item) => item.mode === "workflow" && item.workflowTemplateId);
+  const [, setProgressRevision] = useState(0);
+  useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
+  const runtimes = courseRepository.listCourseRuntimes();
+  const workflowAssignments = runtimes.flatMap((runtime) => runtime.assignments.filter((item) => item.mode === "workflow" && item.workflowTemplateId));
   const lessonIds = new Set(workflowAssignments.map((item) => item.workflowTemplateId!));
   const lessonWorkflows = workflows.filter((item) => lessonIds.has(item.id));
   const otherWorkflows = workflows.filter((item) => !lessonIds.has(item.id));
 
   function workflowCard(template: Template) {
-    const assignment = workflowAssignments.find((item) => item.workflowTemplateId === template.id);
-    const complete = assignment ? progress.completedAssignmentIds.includes(assignment.id) : false;
+    const assignments = workflowAssignments.filter((item) => item.workflowTemplateId === template.id);
+    const assignment = assignments[0];
+    const complete = assignments.length > 0 && assignments.every((item) => learningProgressRepository.getCourseState(session.email, item.courseId).assignmentStates[item.id]?.status === "completed");
     return (
       <article key={template.id} className={`atlas-workflow-card glass-v2 ${activeTemplateId === template.id ? "active" : ""}`}>
         <button className="atlas-workflow-open" onClick={() => onOpenWorkflow(template.id)}>
           <WorkflowPreview template={template} />
           <div className="atlas-workflow-copy">
             <div className="atlas-workflow-card-head">
-              <span>{assignment ? `课程实训 · ${assignment.title}` : "通用模板"}</span>
+              <span>{assignments.length > 1 ? `${assignments.length} 项课程实训共用模板` : assignment ? `课程实训 · ${assignment.title}` : "通用模板"}</span>
               {complete ? <small><CheckCircle2 size={13} />已完成</small> : null}
             </div>
             <h3>{template.name}</h3>
@@ -81,8 +85,8 @@ export function WorkflowLibraryPage({
 
         <section className="atlas-workflow-section">
           <div className="atlas-section-row">
-            <div><span className="atlas-kicker">LESSON 04 LAB</span><h2>推理范式比较实训</h2></div>
-            <span>{progress.completedAssignmentIds.length}/{workflowAssignments.length} 个课程工作流已完成</span>
+            <div><span className="atlas-kicker">COURSE LABS</span><h2>课程工作流实训</h2></div>
+            <span>{workflowAssignments.filter((item) => learningProgressRepository.getCourseState(session.email, item.courseId).assignmentStates[item.id]?.status === "completed").length}/{workflowAssignments.length} 个课程实训已完成</span>
           </div>
           <div className={`atlas-workflow-library ${viewMode}`}>{lessonWorkflows.map(workflowCard)}</div>
         </section>

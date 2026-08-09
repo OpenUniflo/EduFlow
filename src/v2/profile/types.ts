@@ -28,6 +28,7 @@ export type CurriculumContext = {
 
 export type PersonalAssignmentContext = {
   coverageId: string;
+  courseId: string;
   assignmentId: string;
   title: string;
   role: AssignmentCoverageRole;

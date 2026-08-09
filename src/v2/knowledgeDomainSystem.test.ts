@@ -5,10 +5,11 @@ import { applyAutomaticAssignment, decideDomainAssignment, DEFAULT_DOMAIN_DISCOV
 import { demoDomainDiscoveryService } from "./knowledge/domain/domainDiscovery";
 import { initialKnowledgeDomains } from "./knowledge/domain/domainData";
 import { getDomainGovernanceSnapshot } from "./knowledge/domain/domainStore";
-import { getDomainMembers, validateDomainAssignments } from "./knowledge/domain/domainValidation";
+import { assertDomainAcceptsAssignment, assertDomainCanArchive, getDomainMembers, validateDomainAssignments } from "./knowledge/domain/domainValidation";
 import { moveNodesToDomain } from "./knowledge/domain/domainAssignment";
 import { atlasStructureKey, freezeAtlasNodePositions, resetAtlasCamera } from "./knowledge/atlasCamera";
 import type { DomainAssignmentCandidate } from "./knowledge/domain/domainTypes";
+import { canManageKnowledgeDomains } from "./session/capabilities";
 
 function candidate(score: number): DomainAssignmentCandidate {
   return { nodeId: "new-node", domainId: "agentic-ai", score, semanticScore: score, structuralScore: score, algorithmVersion: "test", generatedAt: "2026-08-08T00:00:00.000Z" };
@@ -71,10 +72,17 @@ describe("Knowledge Domain invariants", () => {
 
   it("moves Unclassified nodes with admin pinned precedence", () => {
     const snapshot = getDomainGovernanceSnapshot();
-    const moved = moveNodesToDomain(snapshot.assignments, ["BR01"], "python-engineering", "now");
+    const moved = moveNodesToDomain(snapshot.assignments, ["BR01"], "python-engineering", { id: "admin", capabilities: ["global-domain-admin"] }, "now");
     const assignment = moved.find((item) => item.nodeId === "BR01");
     expect(assignment).toMatchObject({ domainId: "python-engineering", source: "admin", pinned: true });
     expect(applyAutomaticAssignment(assignment, { kind: "auto-assign", candidate: candidate(0.99) })).toBe(assignment);
+  });
+
+  it("rejects archive while members exist and rejects assignments to archived Domains", () => {
+    const snapshot = getDomainGovernanceSnapshot();
+    expect(() => assertDomainCanArchive("agentic-ai", snapshot.assignments)).toThrow(/仍包含/);
+    expect(() => assertDomainCanArchive("empty-domain", snapshot.assignments)).not.toThrow();
+    expect(() => assertDomainAcceptsAssignment({ ...snapshot.domains[0], status: "archived" })).toThrow(/cannot accept assignments/);
   });
 
   it("keeps Atlas structure identity stable for color, status, and selection presentation", () => {
@@ -93,5 +101,10 @@ describe("Knowledge Domain invariants", () => {
     resetAtlasCamera("global", (...args) => calls.push(args));
     expect(calls).toHaveLength(1);
     expect(calls[0]).toEqual([{ x: 0, y: 0, z: 620 }, { x: 0, y: 0, z: 0 }, 500]);
+  });
+
+  it("exposes Domain governance only through runtime capabilities", () => {
+    expect(canManageKnowledgeDomains({ capabilities: [] })).toBe(false);
+    expect(canManageKnowledgeDomains({ capabilities: ["global-domain-admin"] })).toBe(true);
   });
 });

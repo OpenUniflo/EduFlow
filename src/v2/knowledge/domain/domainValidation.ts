@@ -23,3 +23,12 @@ export function validateDomainAssignments(assignments: DomainAssignment[], domai
   });
   return errors;
 }
+
+export function assertDomainCanArchive(domainId: string, assignments: DomainAssignment[]) {
+  const memberCount = assignments.filter((assignment) => assignment.domainId === domainId).length;
+  if (memberCount) throw new Error(`该领域仍包含 ${memberCount} 个知识节点。请先迁移成员后再归档。`);
+}
+
+export function assertDomainAcceptsAssignment(domain: KnowledgeDomain) {
+  if (domain.status !== "active") throw new Error(`Archived Domain ${domain.id} cannot accept assignments`);
+}

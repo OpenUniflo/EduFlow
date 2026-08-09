@@ -1,10 +1,9 @@
-import type { AssignmentCoverage, CourseAssignment, CurriculumCoverage, CurriculumLesson, LearningProgress, UserAssignmentState } from "../types";
+import type { UserCourseState } from "../types";
+import type { CourseRuntimeData } from "../course/runtime/courseRuntime";
 import { calculateCrossDomainConnections, calculateKnowledgeConnectivity } from "../knowledge/graphAlgorithms";
 import type { KnowledgeGraph } from "../knowledge/types";
 import type { CurriculumContext, PersonalAssignmentContext, PersonalKnowledgeGraph, PersonalKnowledgeNode, UserKnowledgeRecord } from "./types";
-import { getDomainGovernanceSnapshot } from "../knowledge/domain/domainStore";
-
-const MATERIAL_BY_LESSON: Record<string, string[]> = { L04: ["lesson-04"] };
+import { getDomainGovernanceSnapshot, resolveNodeDomain } from "../knowledge/domain/domainStore";
 
 function groupBy<T>(items: T[], key: (item: T) => string) {
   const grouped = new Map<string, T[]>();
@@ -25,20 +24,27 @@ export function getDirectExploreNodeIds(graph: KnowledgeGraph, coreIds: Set<stri
 export function buildPersonalKnowledgeGraph(
   graph: KnowledgeGraph,
   userKnowledge: UserKnowledgeRecord[],
-  assignments: CourseAssignment[],
-  curriculum: CurriculumCoverage[],
-  lessons: CurriculumLesson[],
-  assignmentCoverage: AssignmentCoverage[],
-  assignmentStates: UserAssignmentState[],
-  progress: LearningProgress
+  runtimes: CourseRuntimeData[],
+  userCourseStates: UserCourseState[]
 ): PersonalKnowledgeGraph {
+  const assignments = runtimes.flatMap((runtime) => runtime.assignments);
+  const curriculum = runtimes.flatMap((runtime) => runtime.curriculumCoverages);
+  const lessons = runtimes.flatMap((runtime) => runtime.lessons);
+  const assignmentCoverage = runtimes.flatMap((runtime) => runtime.assignmentCoverages);
+  const assignmentStateByCourse = new Map(userCourseStates.map((state) => [state.courseId, state.assignmentStates]));
+  const courseByAssignment = new Map(assignments.map((assignment) => [assignment.id, assignment.courseId]));
+  const materialIdsByCourseNode = new Map<string, string[]>();
+  runtimes.forEach((runtime) => runtime.materialKnowledgeCoverages.forEach((coverage) => {
+    const key = `${runtime.course.id}:${coverage.nodeId}`;
+    materialIdsByCourseNode.set(key, Array.from(new Set([...(materialIdsByCourseNode.get(key) ?? []), coverage.materialId])));
+  }));
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
   const lessonById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
   const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
-  const assignmentStateById = new Map(assignmentStates.map((state) => [state.assignmentId, state]));
   const recordById = new Map(userKnowledge.map((record) => [record.nodeId, record]));
   const curriculumByNode = groupBy(curriculum, (coverage) => coverage.nodeId);
   const assignmentByNode = groupBy(assignmentCoverage, (coverage) => coverage.nodeId);
+  const governance = getDomainGovernanceSnapshot();
 
   userKnowledge.forEach((record) => {
     if (!nodeById.has(record.nodeId)) throw new Error(`Unknown user knowledge node: ${record.nodeId}`);
@@ -68,7 +74,7 @@ export function buildPersonalKnowledgeGraph(
         lessonOrder: lesson.order,
         chapterId: lesson.chapterId,
         role: coverage.role,
-        materialIds: MATERIAL_BY_LESSON[coverage.lessonId] ?? []
+        materialIds: materialIdsByCourseNode.get(`${coverage.courseId}:${id}`) ?? []
       }];
     }).sort((left, right) => left.lessonOrder - right.lessonOrder || left.coverageId.localeCompare(right.coverageId));
     const assignmentContexts: PersonalAssignmentContext[] = (assignmentByNode.get(id) ?? []).flatMap((coverage) => {
@@ -76,20 +82,22 @@ export function buildPersonalKnowledgeGraph(
       if (!assignment) return [];
       return [{
         coverageId: coverage.id,
+        courseId: assignment.courseId,
         assignmentId: assignment.id,
         title: assignment.title,
         role: coverage.role,
         workflowTemplateId: assignment.workflowTemplateId,
-        status: progress.completedAssignmentIds.includes(assignment.id) ? "completed" : assignmentStateById.get(assignment.id)?.status ?? "not-started"
+        status: assignmentStateByCourse.get(courseByAssignment.get(assignment.id) ?? "")?.[assignment.id]?.status ?? "not-started"
       }];
     }).sort((left, right) => left.assignmentId.localeCompare(right.assignmentId) || left.coverageId.localeCompare(right.coverageId));
+    const domain = resolveNodeDomain(id, governance).domain;
     return [{
       id,
       title: source.title,
       description: source.description,
       scope: source.scope,
-      domainId: source.domainId,
-      domainTitle: source.domainId,
+      domainId: domain?.id,
+      domainTitle: domain?.name,
       status: record?.status ?? "explore",
       progress: record?.mastery ?? 0,
       isCore: coreIds.has(id),
@@ -119,7 +127,7 @@ export function buildPersonalKnowledgeGraph(
       learning: nodes.filter((node) => node.status === "learning").length,
       explore: nodes.filter((node) => node.status === "explore").length,
       completedAssignments: new Set(nodes.flatMap((node) => node.assignmentContexts.filter((context) => context.status === "completed").map((context) => context.assignmentId))).size,
-      crossDomainConnections: calculateCrossDomainConnections(graph, coreIds, effectiveEdges, getDomainGovernanceSnapshot().assignments),
+      crossDomainConnections: calculateCrossDomainConnections(graph, coreIds, effectiveEdges, governance.assignments),
       connectivity: calculateKnowledgeConnectivity(coreIds, effectiveEdges),
       currentLearningId
     }

@@ -221,10 +221,12 @@ export type RenameNodeResult = {
   message?: string;
   name?: string;
 };
+export type UserCapability = "global-domain-admin" | "tenant-domain-admin";
 export type MockSession = {
   name: string;
   email: string;
   role: "student";
+  capabilities: UserCapability[];
   createdAt: string;
 };
 export type WorkflowStatusKind = "ready" | "warning" | "blocked";
@@ -2515,7 +2517,8 @@ export function readMockSession(): MockSession | null {
     const raw = window.localStorage.getItem(sessionStorageKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as MockSession;
-    return parsed?.email ? parsed : null;
+    if (!parsed?.email) return null;
+    return { ...parsed, capabilities: parsed.capabilities ?? (parsed.email.endsWith("@knowledge-atlas.local") ? ["global-domain-admin"] : []) };
   } catch {
     return null;
   }

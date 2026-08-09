@@ -243,3 +243,21 @@ Rendering distinguishes structural state from presentation state. Structural sta
 Course rendering computes one Chapter Macro Layout from the Chapter dependency DAG and caches one Local Atomic Layout per Chapter from internal prerequisite/enables facts. Overview, Focused, and Full compose those same results at different expansion levels. Expanded groups may push neighboring groups outward to avoid overlap, but layer order, branch order, and Chapter topology remain stable. Cross-Chapter atomic relations are routed over the composed positions and never determine Chapter placement. Assignment companions are presentation layers inside the corresponding atomic knowledge card, not graph nodes. ELK sizes each atomic child with the full Knowledge-card-plus-companion footprint, which stays identical in 技能树 and 实训树 modes.
 
 Global and Personal Atlas use stable structural graphData until the underlying visible knowledge set or factual edges change. Atlas Focus Mode derives the selected node and its direct factual neighbors, changes camera, material opacity, edge emphasis, and label priority, and leaves force coordinates untouched. Clearing focus restores default appearance without reheating the simulation or resetting the camera.
+
+## 34. Multi-course Runtime Boundary
+
+Course definitions are loaded as `CourseRuntimeData` through `CourseRepository`. A runtime references shared KnowledgeNode IDs through curriculum, assignment, and material coverage; it does not create course-local ontology facts. Generic pages and graph services receive the runtime selected by route `courseId` and never fall back to a particular demo course.
+
+The same KnowledgeNode may be covered by several courses. Atlas exposes this as `courseContexts[]`, preserving the N:M relationship rather than choosing a single owning course.
+
+## 35. Material Knowledge Mapping
+
+`Material` and `MaterialSegment` are curriculum content. `MaterialKnowledgeCoverage` maps addressable segments to shared KnowledgeNodes N:M. It is neither a KnowledgeEdge nor a replacement for CurriculumCoverage. Course- and page-specific lookup switches are not part of the architecture.
+
+## 36. User Learning State Separation
+
+Course, Assignment, and Material definitions contain no user completion. Mutable state is scoped by `userId + courseId`, then stable `assignmentId` or `materialId`. Knowledge mastery remains a separate `UserKnowledgeState` concern and may later consume course evidence without being mechanically inferred from completion.
+
+## 37. Domain Runtime Authority
+
+`DomainAssignment` is the only authoritative runtime membership source. Any `KnowledgeNode.domainId` remaining in a demo seed is deprecated migration input and must not drive color, filtering, governance, layout, or statistics. Domain definitions and assignments are persisted independently from the Knowledge Graph structure.

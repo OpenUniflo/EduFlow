@@ -61,3 +61,19 @@ The current semantic scorer is a deterministic tokenization + Jaccard scaffold. 
 ## Future Merge/Split and Non-goals
 
 Future Domain merge/split requires audit and review while preserving node and edge identity. Secondary Domains, Domain layout anchors, community regions, cluster hulls, automatic production Domains, scheduled discovery, and a full ML training pipeline are outside v1.
+
+## Persistence and Runtime Authority
+
+`DomainGovernanceRepository` persists Domain definitions, assignments, candidates, and proposals. Explicit demo data initializes an empty repository; it is not recomputed from `KnowledgeNode.domainId`. All Atlas and management projections resolve membership from `DomainAssignment`, making it the single runtime authority.
+
+## Lifecycle and Archive Rules
+
+An active Domain may accept membership. An archived Domain is retained for history but rejects new assignments and automatic classification. Archiving is rejected while the Domain still has active members; an administrator must move or unclassify them first. Unclassified remains the absence of a DomainAssignment.
+
+## Mutation Authority
+
+Every manual create, edit, move, archive, or restore operation receives an explicit actor with the appropriate global or tenant governance capability. Stores do not synthesize a default administrator. Manual moves produce `source=admin` and `pinned=true`, and automated assignment never overwrites that result.
+
+## Multi-course Independence
+
+Domain membership belongs to the shared KnowledgeNode, not to any course that covers it. Adding a course context, Assignment, Material, or user progress does not change Domain membership. Domain definition and membership edits alter classification presentation only; they never alter KnowledgeEdges, structural graph keys, coordinates, or camera state.

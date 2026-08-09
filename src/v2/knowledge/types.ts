@@ -26,7 +26,10 @@ export type KnowledgeNode = {
   masteryCriteria: string[];
   scope: KnowledgeScope;
   ownerId?: string;
-  /** Legacy migration hint only. Formal membership is DomainAssignment. */
+  /**
+   * @deprecated Demo-seed migration hint only. Formal and authoritative
+   * membership is resolved exclusively through DomainAssignment.
+   */
   domainId?: string;
   provenance: KnowledgeProvenance[];
   currentRevisionId: string;

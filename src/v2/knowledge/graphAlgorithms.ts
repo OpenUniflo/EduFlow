@@ -63,9 +63,9 @@ export function calculateKnowledgeConnectivity(coreNodeIds: Iterable<string>, ef
   return Math.round((connected.size / core.size) * 100);
 }
 
-export function calculateCrossDomainConnections(graph: KnowledgeGraph, coreNodeIds: Iterable<string>, effectiveEdges: KnowledgeEdge[], domainAssignments?: DomainAssignment[]) {
+export function calculateCrossDomainConnections(_graph: KnowledgeGraph, coreNodeIds: Iterable<string>, effectiveEdges: KnowledgeEdge[], domainAssignments: DomainAssignment[] = []) {
   const core = new Set(coreNodeIds);
-  const domainByNode = domainAssignments ? new Map(domainAssignments.map((assignment) => [assignment.nodeId, assignment.domainId])) : new Map(graph.nodes.map((node) => [node.id, node.domainId]));
+  const domainByNode = new Map(domainAssignments.map((assignment) => [assignment.nodeId, assignment.domainId]));
   return effectiveEdges.filter((edge) => {
     if (!core.has(edge.source) || !core.has(edge.target)) return false;
     return domainByNode.get(edge.source) !== domainByNode.get(edge.target);

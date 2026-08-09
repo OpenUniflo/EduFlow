@@ -3,11 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
-import { assignmentCoverages, courseAssignments, curriculumCoverages, curriculumLessons, userAssignmentStates } from "../data";
+import { courseRepository } from "../course/repository/DemoCourseRepository";
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneHandle } from "../knowledge/components/KnowledgeAtlasScene";
 import { buildPersonalAtlasProjection } from "../knowledge/projections/atlasProjections";
 import { resolveNodeDomain, useDomainGovernance } from "../knowledge/domain/domainStore";
-import { useLearningProgress } from "../progress";
+import { learningProgressRepository } from "../progress/LocalStorageLearningProgressRepository";
+import { workflowLaunchUrl } from "../progress/progressService";
 import { demoPersonalKnowledgeGraph, demoUserKnowledge } from "../profile/demoUserKnowledge";
 import { buildPersonalKnowledgeGraph } from "../profile/profileGraph";
 import type { PersonalKnowledgeNode } from "../profile/types";
@@ -24,15 +25,20 @@ function initials(name: string) {
 
 export function ProfileKnowledgePage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
   const navigate = useNavigate();
-  const progress = useLearningProgress();
   const governance = useDomainGovernance();
   const sceneRef = useRef<KnowledgeAtlasSceneHandle>(null);
   const toastTimerRef = useRef<number | null>(null);
-  const graph = useMemo(() => buildPersonalKnowledgeGraph(demoPersonalKnowledgeGraph, demoUserKnowledge, courseAssignments, curriculumCoverages, curriculumLessons, assignmentCoverages, userAssignmentStates, progress), [progress]);
+  const [progressRevision, setProgressRevision] = useState(0);
+  useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
+  const runtimes = useMemo(() => courseRepository.listCourseRuntimes(), []);
+  const userCourseStates = useMemo(() => runtimes.map((runtime) => learningProgressRepository.getCourseState(session.email, runtime.course.id)), [progressRevision, runtimes, session.email]);
+  const graph = useMemo(() => buildPersonalKnowledgeGraph(demoPersonalKnowledgeGraph, demoUserKnowledge, runtimes, userCourseStates), [runtimes, userCourseStates]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchMatchId, setSearchMatchId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
+  const [courseChooserOpen, setCourseChooserOpen] = useState(false);
+  const [assignmentChooserOpen, setAssignmentChooserOpen] = useState(false);
   const atlas = useMemo(() => buildPersonalAtlasProjection(graph, governance), [governance, graph]);
   const selected = selectedId ? graph.nodes.find((node) => node.id === selectedId) ?? null : null;
   const selectedDomain = selected ? resolveNodeDomain(selected.id, governance).domain : undefined;
@@ -86,15 +92,22 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   }
 
   function openCourse(node: PersonalKnowledgeNode) {
-    const context = node.curriculumContexts[0];
-    if (context?.materialIds[0]) navigate(`/courses/${context.courseId}/materials/${context.materialIds[0]}`);
-    else if (context) navigate(`/courses/${context.courseId}`);
-    else navigate("/courses");
+    const options: Array<{ courseId: string; materialId: string | null }> = [];
+    node.curriculumContexts.forEach((context) => {
+      if (context.materialIds.length) context.materialIds.forEach((materialId) => options.push({ courseId: context.courseId, materialId }));
+      else options.push({ courseId: context.courseId, materialId: null });
+    });
+    if (!options.length) return;
+    if (options.length > 1) return setCourseChooserOpen(true);
+    const option = options[0];
+    navigate(option.materialId ? `/courses/${option.courseId}/materials/${option.materialId}` : `/courses/${option.courseId}`);
   }
 
   function openAssignment(node: PersonalKnowledgeNode) {
+    if (!node.assignmentContexts.length) return;
+    if (node.assignmentContexts.length > 1) return setAssignmentChooserOpen(true);
     const context = node.assignmentContexts[0];
-    navigate(context?.workflowTemplateId ? `/workflows/${context.workflowTemplateId}` : "/courses/agentic-ai");
+    navigate(context.workflowTemplateId ? workflowLaunchUrl({ courseId: context.courseId, assignmentId: context.assignmentId, workflowTemplateId: context.workflowTemplateId }) : `/courses/${context.courseId}`);
   }
 
   const incidentEdges = selected ? graph.edges.filter((edge) => edge.source === selected.id || edge.target === selected.id) : [];
@@ -128,7 +141,9 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
           <section><h3>学习与实践证据</h3>{selected.evidence.length ? <div className="personal-drawer-list">{selected.evidence.map((item, index) => <span key={`${item}-${index}`}><small>证据 {String(index + 1).padStart(2, "0")}</small><strong>{item}</strong></span>)}</div> : <div className="personal-empty-analysis"><CircleDot size={18} /><strong>尚无学习证据</strong><p>节点出现在图中不会自动视为已掌握。</p></div>}</section>
           <section><h3>直接知识关系</h3><div className="personal-relation-tags">{incidentEdges.map((edge) => { const other = nodeById.get(edge.source === selected.id ? edge.target : edge.source); return other ? <button key={edge.id} onClick={() => locateNode(other)}><small>{relationLabels[edge.relation]}</small>{other.title}<ArrowRight size={12} /></button> : null; })}</div></section>
           {selected.status === "explore" ? <div className="personal-explore-note"><CircleDot size={18} /><span><strong>一跳可探索知识</strong><p>它与至少一个核心节点直接相关，但尚未进入你的掌握或学习状态。</p></span></div> : null}
-          <div className="personal-drawer-actions"><button className="primary" onClick={() => openCourse(selected)}>查看课程上下文<BookOpen size={14} /></button><button onClick={() => openAssignment(selected)}>查看实训<Workflow size={14} /></button></div>
+          {courseChooserOpen ? <section><h3>选择课程上下文</h3><div className="personal-drawer-list">{selected.curriculumContexts.flatMap((context) => context.materialIds.length ? context.materialIds.map((materialId) => <button key={`${context.coverageId}:${materialId}`} onClick={() => navigate(`/courses/${context.courseId}/materials/${materialId}`)}><small>{context.courseId} · {context.role}</small><strong>{materialId}</strong></button>) : [<button key={context.coverageId} onClick={() => navigate(`/courses/${context.courseId}`)}><small>{context.role}</small><strong>{context.courseId}</strong></button>])}</div></section> : null}
+          {assignmentChooserOpen ? <section><h3>选择关联实训</h3><div className="personal-drawer-list">{selected.assignmentContexts.map((context) => <button key={context.coverageId} onClick={() => navigate(context.workflowTemplateId ? workflowLaunchUrl({ courseId: context.courseId, assignmentId: context.assignmentId, workflowTemplateId: context.workflowTemplateId }) : `/courses/${context.courseId}`)}><small>{context.courseId} · {context.status}</small><strong>{context.title}</strong></button>)}</div></section> : null}
+          <div className="personal-drawer-actions">{selected.curriculumContexts.length ? <button className="primary" onClick={() => openCourse(selected)}>查看课程上下文<BookOpen size={14} /></button> : null}{selected.assignmentContexts.length ? <button onClick={() => openAssignment(selected)}>查看实训<Workflow size={14} /></button> : null}</div>
         </> : null}
       </aside>
 

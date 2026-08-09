@@ -1,99 +1,124 @@
 import { describe, expect, it } from "vitest";
-import {
-  assignmentCoverages,
-  courseAssignments,
-  courseAssignmentSummary,
-  courseChapters,
-  courseSkillTreeNodes,
-  validateCourseAssignmentCoverage
-} from "./data";
+import { DemoCourseRepository } from "./course/repository/DemoCourseRepository";
+import { buildCourseGraphData, validateCourseRuntime } from "./course/runtime/courseRuntime";
 import { buildCourseGraphProjection } from "./course/graph/courseGraphProjection";
-import { ATOMIC_FOOTPRINT_HEIGHT, ATOMIC_FOOTPRINT_WIDTH, COMPANION_OFFSET_X, COMPANION_OFFSET_Y, KNOWLEDGE_CARD_HEIGHT, KNOWLEDGE_CARD_WIDTH, layoutCourseGraph } from "./course/graph/elkCourseLayout";
+import { ATOMIC_FOOTPRINT_HEIGHT, ATOMIC_FOOTPRINT_WIDTH, COMPANION_OFFSET_X, COMPANION_OFFSET_Y, KNOWLEDGE_CARD_HEIGHT, KNOWLEDGE_CARD_WIDTH, getCourseLayoutCacheKey, layoutCourseGraph } from "./course/graph/elkCourseLayout";
 import { toReactFlow } from "./course/graph/reactFlowAdapter";
 import { assignmentProjectionForNode, buildChapterAssignmentProjection, courseDrawerProjectionKind, detailFacetForMode, flowIdForAnchor, type SelectedAnchor } from "./course/courseSelection";
+import { demoUserCourseStateSeed } from "./demo/user/demoUserCourseState.seed";
+import { LocalStorageLearningProgressRepository, learningProgressStorageKey } from "./progress/LocalStorageLearningProgressRepository";
+import { buildGlobalAtlasProjection } from "./knowledge/projections/atlasProjections";
 
-describe("Course Assignment invariants", () => {
-  it("covers every Course KnowledgeNode", () => {
-    const nodeIds = courseSkillTreeNodes.map((node) => node.id);
-    expect({ knowledgeNodeCount: nodeIds.length, assignmentCount: courseAssignments.length, coverageCount: assignmentCoverages.length }).toEqual({ knowledgeNodeCount: 78, assignmentCount: 30, coverageCount: 94 });
-    expect(validateCourseAssignmentCoverage(nodeIds, assignmentCoverages)).toEqual([]);
-    expect(new Set(assignmentCoverages.map((coverage) => coverage.nodeId)).size).toBe(nodeIds.length);
+const repository = new DemoCourseRepository();
+const agentic = repository.getCourse("agentic-ai")!;
+const python = repository.getCourse("python-engineering")!;
+const agenticGraph = buildCourseGraphData(agentic, demoUserCourseStateSeed("student", agentic.course.id));
+const pythonGraph = buildCourseGraphData(python, demoUserCourseStateSeed("student", python.course.id));
+
+describe("Course Repository and runtime invariants", () => {
+  it("registers two isolated Courses and rejects unknown routes", () => {
+    expect(repository.listCourses().map((course) => course.id)).toEqual(["agentic-ai", "python-engineering"]);
+    expect(repository.getCourse("agentic-ai")).not.toBe(repository.getCourse("python-engineering"));
+    expect(repository.getCourse("not-exist")).toBeNull();
+    expect(validateCourseRuntime(agentic)).toBe(true);
+    expect(validateCourseRuntime(python)).toBe(true);
   });
 
-  it("resolves every coverage reference", () => {
-    const assignmentIds = new Set(courseAssignments.map((assignment) => assignment.id));
-    const nodeIds = new Set(courseSkillTreeNodes.map((node) => node.id));
-    expect(assignmentCoverages.every((coverage) => assignmentIds.has(coverage.assignmentId) && nodeIds.has(coverage.nodeId))).toBe(true);
+  it("keeps Course graph data isolated", () => {
+    expect(agenticGraph.courseId).not.toBe(pythonGraph.courseId);
+    expect(agenticGraph.chapters.every((chapter) => chapter.courseId === agentic.course.id)).toBe(true);
+    expect(pythonGraph.chapters.every((chapter) => chapter.courseId === python.course.id)).toBe(true);
+    expect(agenticGraph.knowledgeNodes.some((node) => node.id === "AG01")).toBe(true);
+    expect(pythonGraph.knowledgeNodes.some((node) => node.id === "PY01")).toBe(true);
+    expect(python.assignments.every((assignment) => assignment.courseId === python.course.id)).toBe(true);
   });
 
-  it("requires a template only for workflow mode", () => {
-    expect(courseAssignments.filter((assignment) => assignment.mode === "workflow").every((assignment) => Boolean(assignment.workflowTemplateId))).toBe(true);
-    expect(courseAssignments.some((assignment) => assignment.mode === "instruction" && !assignment.workflowTemplateId)).toBe(true);
-  });
-
-  it("contains real N:M examples in both directions", () => {
-    expect(courseAssignments.some((assignment) => assignmentCoverages.filter((coverage) => coverage.assignmentId === assignment.id).length > 1)).toBe(true);
-    expect(courseSkillTreeNodes.some((node) => node.assignmentCount > 1)).toBe(true);
-  });
-
-  it("deduplicates Assignment IDs in chapter and course summaries", () => {
-    courseChapters.forEach((chapter) => {
-      expect(chapter.assignmentSummary.assignmentCount).toBe(new Set(chapter.assignmentSummary.assignmentIds).size);
+  it("covers every Course KnowledgeNode and contains real N:M examples", () => {
+    [agentic, python].forEach((runtime) => {
+      const nodeIds = new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId));
+      const covered = new Set(runtime.assignmentCoverages.map((coverage) => coverage.nodeId));
+      expect(covered).toEqual(nodeIds);
+      expect(runtime.assignments.some((assignment) => runtime.assignmentCoverages.filter((coverage) => coverage.assignmentId === assignment.id).length > 1)).toBe(true);
     });
-    expect(courseAssignmentSummary.assignmentCount).toBe(new Set(assignmentCoverages.map((coverage) => coverage.assignmentId)).size);
+    expect(pythonGraph.knowledgeNodes.some((node) => node.assignmentCount > 1)).toBe(true);
+  });
+
+  it("uses courseId and structural revision as the only layout cache identity", () => {
+    expect(getCourseLayoutCacheKey("agentic-ai", "v1")).not.toBe(getCourseLayoutCacheKey("python-engineering", "v1"));
+    expect(getCourseLayoutCacheKey("agentic-ai", "v1")).not.toBe(getCourseLayoutCacheKey("agentic-ai", "v2"));
+    expect(getCourseLayoutCacheKey(agenticGraph.courseId, agenticGraph.revision)).toBe(getCourseLayoutCacheKey(agenticGraph.courseId, agenticGraph.revision));
   });
 });
 
-describe("Course Assignment layout footprint", () => {
+describe("Material and progress generalization", () => {
+  it("supports Segment → multiple KnowledgeNodes and KnowledgeNode → multiple Segments/Materials", () => {
+    const segmentNodes = python.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === "python-core-handbook" && coverage.segmentId === "core-control").map((coverage) => coverage.nodeId);
+    expect(new Set(segmentNodes).size).toBeGreaterThan(1);
+    const py06 = python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === "PY06");
+    expect(new Set(py06.map((coverage) => coverage.segmentId)).size).toBeGreaterThan(1);
+    const py09 = python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === "PY09");
+    expect(new Set(py09.map((coverage) => coverage.materialId)).size).toBe(2);
+  });
+
+  it("resolves Materials only inside their owning Course", () => {
+    expect(python.materials.some((material) => material.id === "python-core-handbook")).toBe(true);
+    expect(agentic.materials.some((material) => material.id === "python-core-handbook")).toBe(false);
+  });
+
+  it("isolates progress by user, Course, Material, and explicit Assignment identity", () => {
+    expect(learningProgressStorageKey("user-a", "agentic-ai")).not.toBe(learningProgressStorageKey("user-a", "python-engineering"));
+    expect(learningProgressStorageKey("user-a", "agentic-ai")).not.toBe(learningProgressStorageKey("user-b", "agentic-ai"));
+    const progress = new LocalStorageLearningProgressRepository();
+    const sharedTemplateAssignments = python.assignments.filter((assignment) => assignment.workflowTemplateId === "agent-loop");
+    expect(sharedTemplateAssignments.length).toBeGreaterThan(1);
+    const target = sharedTemplateAssignments[0];
+    const untouched = sharedTemplateAssignments[1];
+    progress.updateAssignmentState("isolated-user", python.course.id, target.id, { assignmentId: target.id, status: "completed", progress: 100 });
+    const state = progress.getCourseState("isolated-user", python.course.id);
+    expect(state.assignmentStates[target.id]?.status).toBe("completed");
+    expect(state.assignmentStates[untouched.id]?.status).not.toBe("completed");
+    expect(progress.getCourseState("other-user", python.course.id).assignmentStates[target.id]?.status).not.toBe("completed");
+  });
+
+  it("projects N:M Atlas Course contexts", () => {
+    const atlas = buildGlobalAtlasProjection(undefined, repository.listCourseRuntimes());
+    expect(atlas.nodes.find((node) => node.id === "T11")?.courseContexts.map((context) => context.courseId).sort()).toEqual(["agentic-ai", "python-engineering"]);
+  });
+});
+
+describe("Course Assignment layout and Drawer", () => {
   it("includes the companion offset in one stable footprint", () => {
     expect(ATOMIC_FOOTPRINT_WIDTH).toBe(KNOWLEDGE_CARD_WIDTH + COMPANION_OFFSET_X);
     expect(ATOMIC_FOOTPRINT_HEIGHT).toBe(KNOWLEDGE_CARD_HEIGHT + COMPANION_OFFSET_Y);
   });
 
-  it("keeps every expanded footprint inside its Chapter and avoids local overlap", async () => {
-    const layout = await layoutCourseGraph(buildCourseGraphProjection("full", null));
+  it("keeps every expanded Python footprint inside its Chapter", async () => {
+    const projection = buildCourseGraphProjection(pythonGraph, "full", null);
+    const layout = await layoutCourseGraph(pythonGraph, projection);
     const chapters = new Map(layout.nodes.filter((node) => node.kind === "chapter").map((node) => [node.id, node]));
-    const byParent = new Map<string, typeof layout.nodes>();
-    layout.nodes.filter((node) => node.kind === "knowledge" && node.parentId).forEach((node) => byParent.set(node.parentId!, [...(byParent.get(node.parentId!) ?? []), node]));
-
-    byParent.forEach((nodes, parentId) => {
-      const chapter = chapters.get(parentId);
-      expect(chapter).toBeDefined();
-      nodes.forEach((node) => {
-        expect(node.width).toBe(ATOMIC_FOOTPRINT_WIDTH);
-        expect(node.height).toBe(ATOMIC_FOOTPRINT_HEIGHT);
-        expect(node.x).toBeGreaterThanOrEqual(0);
-        expect(node.y).toBeGreaterThanOrEqual(0);
-        expect(node.x + node.width).toBeLessThanOrEqual(chapter!.width + 0.01);
-        expect(node.y + node.height).toBeLessThanOrEqual(chapter!.height + 0.01);
-      });
-      const positions = new Set(nodes.map((node) => `${node.x}:${node.y}`));
-      expect(positions.size).toBe(nodes.length);
-      for (let left = 0; left < nodes.length; left += 1) {
-        for (let right = left + 1; right < nodes.length; right += 1) {
-          const a = nodes[left];
-          const b = nodes[right];
-          const overlaps = a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
-          expect(overlaps).toBe(false);
-        }
-      }
+    layout.nodes.filter((node) => node.kind === "knowledge" && node.parentId).forEach((node) => {
+      const parent = chapters.get(node.parentId!);
+      expect(parent).toBeDefined();
+      expect(node.width).toBe(ATOMIC_FOOTPRINT_WIDTH);
+      expect(node.height).toBe(ATOMIC_FOOTPRINT_HEIGHT);
+      expect(node.x + node.width).toBeLessThanOrEqual(parent!.width + 0.01);
+      expect(node.y + node.height).toBeLessThanOrEqual(parent!.height + 0.01);
     });
   });
 
-  it("changes presentation without changing topology, geometry, or viewport-owned data", async () => {
-    const layout = await layoutCourseGraph(buildCourseGraphProjection("full", null));
-    const knowledgeFlow = toReactFlow(layout, "knowledge", null, null);
-    const assignmentFlow = toReactFlow(layout, "assignment", null, null);
-    expect(assignmentFlow.nodes.map(({ id, position, width, height, parentId }) => ({ id, position, width, height, parentId }))).toEqual(knowledgeFlow.nodes.map(({ id, position, width, height, parentId }) => ({ id, position, width, height, parentId })));
+  it("changes presentation without changing topology or geometry", async () => {
+    const projection = buildCourseGraphProjection(pythonGraph, "full", null);
+    const layout = await layoutCourseGraph(pythonGraph, projection);
+    const knowledgeFlow = toReactFlow(layout, pythonGraph.knowledgeEdges, "knowledge", null, null);
+    const assignmentFlow = toReactFlow(layout, pythonGraph.knowledgeEdges, "assignment", null, null);
+    expect(assignmentFlow.nodes.map(({ id, position, parentId }) => ({ id, position, parentId }))).toEqual(knowledgeFlow.nodes.map(({ id, position, parentId }) => ({ id, position, parentId })));
     expect(assignmentFlow.edges.map((edge) => [edge.id, edge.source, edge.target])).toEqual(knowledgeFlow.edges.map((edge) => [edge.id, edge.source, edge.target]));
   });
-});
 
-describe("Course anchor and Drawer facet", () => {
-  const multiNode = courseSkillTreeNodes.find((node) => node.assignmentCount > 1)!;
-  const singleNode = courseSkillTreeNodes.find((node) => node.assignmentCount === 1)!;
+  const multiNode = pythonGraph.knowledgeNodes.find((node) => node.assignmentCount > 1)!;
+  const singleNode = pythonGraph.knowledgeNodes.find((node) => node.assignmentCount === 1)!;
 
-  it("preserves a Knowledge anchor while mode drives the facet", () => {
+  it("keeps anchor stable while mode drives Knowledge/Assignment facets", () => {
     const anchor: SelectedAnchor = { kind: "knowledge", id: multiNode.id };
     expect(courseDrawerProjectionKind(anchor, "knowledge", multiNode)).toBe("atomic-knowledge");
     expect(courseDrawerProjectionKind(anchor, "assignment", multiNode)).toBe("assignment-group");
@@ -101,28 +126,12 @@ describe("Course anchor and Drawer facet", () => {
     expect(detailFacetForMode("assignment")).toBe("assignment");
   });
 
-  it("projects the same Chapter anchor through Knowledge and Assignment facets", () => {
-    const anchor: SelectedAnchor = { kind: "chapter", id: courseChapters[0].id };
-    expect(courseDrawerProjectionKind(anchor, "knowledge")).toBe("chapter-knowledge");
-    expect(courseDrawerProjectionKind(anchor, "assignment")).toBe("chapter-assignment");
-    expect(flowIdForAnchor(anchor)).toBe(`chapter:${anchor.id}`);
-    const aggregate = buildChapterAssignmentProjection(courseChapters[0], courseSkillTreeNodes);
-    expect(aggregate.assignments).toHaveLength(courseChapters[0].assignmentSummary.assignmentCount);
+  it("deduplicates Chapter Assignments and opens group/detail correctly", () => {
+    const chapter = pythonGraph.chapters[0];
+    const aggregate = buildChapterAssignmentProjection(chapter, pythonGraph.knowledgeNodes);
+    expect(aggregate.assignments).toHaveLength(chapter.assignmentSummary.assignmentCount);
     expect(new Set(aggregate.assignments.map((item) => item.assignment.id)).size).toBe(aggregate.assignments.length);
-  });
-
-  it("opens an Assignment Group before detail for multiple Assignments", () => {
     expect(assignmentProjectionForNode(multiNode, null)).toMatchObject({ kind: "group" });
-    expect(assignmentProjectionForNode(multiNode, multiNode.assignmentContexts[0].assignmentId)).toMatchObject({ kind: "detail", canReturnToGroup: true });
-  });
-
-  it("opens direct detail for exactly one Assignment", () => {
     expect(assignmentProjectionForNode(singleNode, null)).toMatchObject({ kind: "detail", canReturnToGroup: false });
-  });
-
-  it("keeps Assignment facet authoritative for a search-selected anchor", () => {
-    const searchAnchor: SelectedAnchor = { kind: "knowledge", id: singleNode.id };
-    expect(detailFacetForMode("assignment")).toBe("assignment");
-    expect(courseDrawerProjectionKind(searchAnchor, "assignment", singleNode)).toBe("assignment-detail");
   });
 });

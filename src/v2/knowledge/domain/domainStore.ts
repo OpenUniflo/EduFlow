@@ -1,60 +1,40 @@
 import { useSyncExternalStore } from "react";
 import { knowledgeEdges, knowledgeNodes } from "../graph";
 import { chooseMostDistinctUnusedColor, isValidDomainColor } from "./domainColors";
-import { initialKnowledgeDomains } from "./domainData";
-import { demoDomainDiscoveryService } from "./domainDiscovery";
-import type { DomainAdminCapability, DomainAssignment, DomainAssignmentCandidate, DomainProposal, KnowledgeDomain, KnowledgeDomainScope } from "./domainTypes";
+import type { DomainActor, DomainAssignmentCandidate, DomainProposal, KnowledgeDomain, KnowledgeDomainScope } from "./domainTypes";
 import { applyAutomaticAssignment, decideDomainAssignment, scoreNodeAgainstDomains } from "./domainScoring";
 import { moveNodesToDomain } from "./domainAssignment";
+import type { DomainGovernanceState } from "./DomainGovernanceRepository";
+import { LocalStorageDomainGovernanceRepository } from "./LocalStorageDomainGovernanceRepository";
+import { assertDomainAcceptsAssignment, assertDomainCanArchive } from "./domainValidation";
 
-export type DomainGovernanceState = {
-  domains: KnowledgeDomain[];
-  assignments: DomainAssignment[];
-  candidates: DomainAssignmentCandidate[];
-  proposals: DomainProposal[];
-  revision: number;
-};
+export type { DomainGovernanceState } from "./DomainGovernanceRepository";
 
-const DEMO_TIME = "2026-08-08T00:00:00.000Z";
+const repository = new LocalStorageDomainGovernanceRepository();
 const listeners = new Set<() => void>();
-
-function initialAssignments(): DomainAssignment[] {
-  return knowledgeNodes.filter((node) => node.status === "active" && node.domainId && node.id !== "BR01").map((node) => ({
-    nodeId: node.id,
-    domainId: node.domainId!,
-    source: node.id === "R03" || node.id === "PY01" ? "admin" : "auto",
-    confidence: node.id === "R03" || node.id === "PY01" ? undefined : 0.92,
-    pinned: node.id === "R03" || node.id === "PY01",
-    assignedBy: node.id === "R03" || node.id === "PY01" ? "global-admin-demo" : undefined,
-    assignedAt: DEMO_TIME
-  }));
-}
-
-const initialCandidates: DomainAssignmentCandidate[] = [
-  { nodeId: "BR01", domainId: "agentic-ai", score: 0.89, semanticScore: 0.82, structuralScore: 0.995, algorithmVersion: "domain-affinity-v1", generatedAt: DEMO_TIME },
-  { nodeId: "BR01", domainId: "python-engineering", score: 0.34, semanticScore: 0.31, structuralScore: 0.385, algorithmVersion: "domain-affinity-v1", generatedAt: DEMO_TIME }
-];
-
-let state: DomainGovernanceState = {
-  domains: initialKnowledgeDomains.map((item) => ({ ...item })),
-  assignments: initialAssignments(),
-  candidates: initialCandidates,
-  proposals: demoDomainDiscoveryService.discover(knowledgeNodes, initialKnowledgeDomains),
-  revision: 0
-};
+let state = repository.load();
 
 function publish(next: Omit<DomainGovernanceState, "revision">) {
   state = { ...next, revision: state.revision + 1 };
+  repository.save(state);
   listeners.forEach((listener) => listener());
 }
 
-function assertCapability(scope: KnowledgeDomainScope, capability: DomainAdminCapability) {
-  if (scope === "global" && capability !== "global-domain-admin") throw new Error("Global Domain mutation requires Global Admin");
-  if (scope === "tenant" && capability !== "tenant-domain-admin") throw new Error("Tenant Domain mutation requires Tenant Admin");
+function assertCapability(scope: KnowledgeDomainScope, actor: DomainActor) {
+  const required = scope === "global" ? "global-domain-admin" : "tenant-domain-admin";
+  if (!actor.capabilities.includes(required)) throw new Error(`${scope} Domain mutation requires ${required}`);
+}
+
+function requireActiveDomain(domainId: string, actor: DomainActor) {
+  const domain = state.domains.find((item) => item.id === domainId);
+  if (!domain) throw new Error(`Unknown Domain ${domainId}`);
+  assertCapability(domain.scope, actor);
+  assertDomainAcceptsAssignment(domain);
+  return domain;
 }
 
 export function getDomainGovernanceSnapshot() { return state; }
-export function subscribeDomainGovernance(listener: () => void) { listeners.add(listener); return () => listeners.delete(listener); }
+export function subscribeDomainGovernance(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export function useDomainGovernance() { return useSyncExternalStore(subscribeDomainGovernance, getDomainGovernanceSnapshot, getDomainGovernanceSnapshot); }
 
 export function resolveNodeDomain(nodeId: string, snapshot = state) {
@@ -62,31 +42,31 @@ export function resolveNodeDomain(nodeId: string, snapshot = state) {
   return { assignment, domain: snapshot.domains.find((item) => item.id === assignment?.domainId) };
 }
 
-export function assignNodeDomain(nodeId: string, domainId: string | null, capability: DomainAdminCapability = "global-domain-admin") {
-  const domain = domainId ? state.domains.find((item) => item.id === domainId) : undefined;
-  if (domain) assertCapability(domain.scope, capability);
-  const assignments = domain ? moveNodesToDomain(state.assignments, [nodeId], domain.id) : state.assignments.filter((item) => item.nodeId !== nodeId);
+export function assignNodeDomain(input: { actor: DomainActor; nodeId: string; domainId: string | null }) {
+  const domain = input.domainId ? requireActiveDomain(input.domainId, input.actor) : undefined;
+  const assignments = domain ? moveNodesToDomain(state.assignments, [input.nodeId], domain.id, input.actor) : state.assignments.filter((item) => item.nodeId !== input.nodeId);
   publish({ ...state, assignments });
 }
 
-export function assignNodesToDomain(nodeIds: string[], domainId: string, capability: DomainAdminCapability = "global-domain-admin") {
-  const domain = state.domains.find((item) => item.id === domainId);
-  if (!domain) throw new Error(`Unknown Domain ${domainId}`);
-  assertCapability(domain.scope, capability);
-  publish({ ...state, assignments: moveNodesToDomain(state.assignments, nodeIds, domain.id) });
+export function assignNodesToDomain(input: { actor: DomainActor; nodeIds: string[]; domainId: string }) {
+  const domain = requireActiveDomain(input.domainId, input.actor);
+  publish({ ...state, assignments: moveNodesToDomain(state.assignments, input.nodeIds, domain.id, input.actor) });
 }
 
-export function updateDomain(domainId: string, changes: Partial<Pick<KnowledgeDomain, "name" | "description" | "canonicalColor" | "status">>, capability: DomainAdminCapability = "global-domain-admin") {
-  const current = state.domains.find((item) => item.id === domainId);
-  if (!current) throw new Error(`Unknown Domain ${domainId}`);
-  assertCapability(current.scope, capability);
-  if (changes.canonicalColor && !isValidDomainColor(changes.canonicalColor)) throw new Error("Domain color must be a six-digit HEX value");
-  const domains = state.domains.map((item) => item.id === domainId ? { ...item, ...changes, updatedBy: "global-admin-demo", updatedAt: new Date().toISOString() } : item);
+export function updateDomain(input: { actor: DomainActor; domainId: string; changes: Partial<Pick<KnowledgeDomain, "name" | "description" | "canonicalColor" | "status">> }) {
+  const current = state.domains.find((item) => item.id === input.domainId);
+  if (!current) throw new Error(`Unknown Domain ${input.domainId}`);
+  assertCapability(current.scope, input.actor);
+  if (input.changes.status === "archived") {
+    assertDomainCanArchive(current.id, state.assignments);
+  }
+  if (input.changes.canonicalColor && !isValidDomainColor(input.changes.canonicalColor)) throw new Error("Domain color must be a six-digit HEX value");
+  const domains = state.domains.map((item) => item.id === input.domainId ? { ...item, ...input.changes, updatedBy: input.actor.id, updatedAt: new Date().toISOString() } : item);
   publish({ ...state, domains });
 }
 
-export function createDomain(input: Pick<KnowledgeDomain, "name" | "description" | "scope"> & { canonicalColor?: string }, capability: DomainAdminCapability = "global-domain-admin") {
-  assertCapability(input.scope, capability);
+export function createDomain(input: { actor: DomainActor; name: string; description?: string; scope: KnowledgeDomainScope; canonicalColor?: string }) {
+  assertCapability(input.scope, input.actor);
   const canonicalColor = input.canonicalColor || chooseMostDistinctUnusedColor(state.domains.map((item) => item.canonicalColor));
   if (!isValidDomainColor(canonicalColor)) throw new Error("Domain color must be a six-digit HEX value");
   const idBase = input.name.toLowerCase().trim().replace(/[^a-z0-9\p{Script=Han}]+/gu, "-").replace(/^-|-$/g, "") || "domain";
@@ -94,18 +74,19 @@ export function createDomain(input: Pick<KnowledgeDomain, "name" | "description"
   let suffix = 2;
   while (state.domains.some((item) => item.id === id)) id = `${idBase}-${suffix++}`;
   const now = new Date().toISOString();
-  const domain: KnowledgeDomain = { id, ...input, canonicalColor, status: "active", createdBy: "global-admin-demo", createdAt: now, updatedBy: "global-admin-demo", updatedAt: now };
+  const domain: KnowledgeDomain = { id, name: input.name, description: input.description, scope: input.scope, canonicalColor, status: "active", createdBy: input.actor.id, createdAt: now, updatedBy: input.actor.id, updatedAt: now };
   publish({ ...state, domains: [...state.domains, domain] });
   return domain;
 }
 
-export function acceptCandidate(candidate: DomainAssignmentCandidate, domainId = candidate.domainId) {
-  assignNodeDomain(candidate.nodeId, domainId);
-  publish({ ...state, candidates: state.candidates.filter((item) => item.nodeId !== candidate.nodeId) });
+export function acceptCandidate(input: { actor: DomainActor; candidate: DomainAssignmentCandidate; domainId?: string }) {
+  assignNodeDomain({ actor: input.actor, nodeId: input.candidate.nodeId, domainId: input.domainId ?? input.candidate.domainId });
+  publish({ ...state, candidates: state.candidates.filter((item) => item.nodeId !== input.candidate.nodeId) });
 }
 
-export function ignoreCandidate(nodeId: string) {
-  publish({ ...state, candidates: state.candidates.filter((item) => item.nodeId !== nodeId) });
+export function ignoreCandidate(input: { actor: DomainActor; nodeId: string }) {
+  if (!input.actor.capabilities.length) throw new Error("Domain governance requires an admin capability");
+  publish({ ...state, candidates: state.candidates.filter((item) => item.nodeId !== input.nodeId) });
 }
 
 export function evaluateAutomaticDomainAssignment(nodeId: string) {
@@ -113,19 +94,17 @@ export function evaluateAutomaticDomainAssignment(nodeId: string) {
   if (!node) throw new Error(`Unknown KnowledgeNode ${nodeId}`);
   const current = state.assignments.find((item) => item.nodeId === nodeId);
   if (current?.pinned) return { kind: "pinned" as const, assignment: current };
-  const candidates = scoreNodeAgainstDomains(node, state.domains, knowledgeNodes, knowledgeEdges, state.assignments);
+  const candidates = scoreNodeAgainstDomains(node, state.domains.filter((domain) => domain.status === "active"), knowledgeNodes, knowledgeEdges, state.assignments);
   const decision = decideDomainAssignment(candidates);
   const automatic = applyAutomaticAssignment(current, decision);
   const assignments = automatic ? [...state.assignments.filter((item) => item.nodeId !== nodeId), automatic] : state.assignments;
-  const pending = decision.kind === "suggestion" ? candidates : [];
-  publish({ ...state, assignments, candidates: [...state.candidates.filter((item) => item.nodeId !== nodeId), ...pending] });
+  publish({ ...state, assignments, candidates: [...state.candidates.filter((item) => item.nodeId !== nodeId), ...(decision.kind === "suggestion" ? candidates : [])] });
   return decision;
 }
 
-export function reviewProposal(proposalId: string, status: "accepted" | "rejected") {
-  publish({ ...state, proposals: state.proposals.map((item) => item.id === proposalId ? { ...item, status } : item) });
+export function reviewProposal(input: { actor: DomainActor; proposalId: string; status: DomainProposal["status"] }) {
+  if (!input.actor.capabilities.length) throw new Error("Domain governance requires an admin capability");
+  publish({ ...state, proposals: state.proposals.map((item) => item.id === input.proposalId ? { ...item, status: input.status } : item) });
 }
 
-export function topologySignature() {
-  return knowledgeEdges.map((edge) => `${edge.source}:${edge.relation}:${edge.target}`).sort().join("|");
-}
+export function topologySignature() { return knowledgeEdges.map((edge) => `${edge.source}:${edge.relation}:${edge.target}`).sort().join("|"); }

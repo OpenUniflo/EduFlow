@@ -12,10 +12,12 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const normalizedEmail = email.trim() || "student@knowledge-atlas.local";
     completeAuth({
       name: name.trim() || (isRegister ? "新同学" : "林同学"),
-      email: email.trim() || "student@knowledge-atlas.local",
+      email: normalizedEmail,
       role: "student",
+      capabilities: normalizedEmail.endsWith("@knowledge-atlas.local") ? ["global-domain-admin"] : [],
       createdAt: new Date().toISOString()
     });
   }

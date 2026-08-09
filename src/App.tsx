@@ -80,9 +80,10 @@ import { LessonPage } from "./v2/pages/LessonPage";
 import { WorkflowLibraryPage } from "./v2/pages/WorkflowLibraryPage";
 import { ProfileKnowledgePage } from "./v2/pages/ProfileKnowledgePage";
 import { GlobalNav } from "./v2/components/GlobalNav";
-import { courseAssignments } from "./v2/data";
-import { markAssignmentComplete } from "./v2/progress";
+import { courseRepository } from "./v2/course/repository/DemoCourseRepository";
+import { completeAssignment, workflowLaunchContextFromLocation } from "./v2/progress/progressService";
 import { DomainManagementPage } from "./v2/admin/domains/DomainManagementPage";
+import { canManageKnowledgeDomains } from "./v2/session/capabilities";
 
 function stableStateValue(value: unknown) {
   if (value === undefined) return "__undefined__";
@@ -198,6 +199,7 @@ export default function App() {
     return Array.from(fields).filter((field) => stableStateValue(previousState[field]) !== stableStateValue(visibleStateValues[field]));
   }, [activeStateValues, activeTemplate, runIndex, visibleStateValues]);
   const activeRunHistory = runHistory[activeTemplate.id] ?? [];
+  const allCourseAssignments = useMemo(() => courseRepository.listCourseRuntimes().flatMap((runtime) => runtime.assignments), []);
   const selectedRunHistory = activeRunHistory.find((item) => item.id === selectedRunHistoryId) ?? null;
   const configNode = configTarget?.type === "node" ? activeTemplate.nodes.find((item) => item.id === configTarget.id) : undefined;
   const configEdge = configTarget?.type === "edge" ? activeTemplate.edges.find((item) => item.id === configTarget.id) : undefined;
@@ -282,7 +284,8 @@ export default function App() {
             [activeTemplate.id]: [record, ...existing].slice(0, 20)
           };
         });
-        markAssignmentComplete(activeTemplate.id);
+        const launchContext = workflowLaunchContextFromLocation(activeTemplate.id, location.search);
+        if (launchContext && session) completeAssignment({ userId: session.email, courseId: launchContext.courseId, assignmentId: launchContext.assignmentId });
         activeRunSessionRef.current = null;
       }
       setIsRunning(false);
@@ -294,7 +297,7 @@ export default function App() {
     }, 760);
 
     return () => window.clearTimeout(timer);
-  }, [activeStateValues, activeTemplate, isRunning, runIndex]);
+  }, [activeStateValues, activeTemplate, isRunning, location.search, runIndex, session]);
 
   useEffect(() => {
     if (!draggingPaletteNode) return;
@@ -1213,7 +1216,7 @@ export default function App() {
         onToggle={() => setBottomOpen((value) => !value)}
         onTab={setActiveTab}
       />
-      {courseAssignments.some((item) => item.workflowTemplateId === activeTemplate.id) && activeRunHistory.length ? (
+      {allCourseAssignments.some((item) => item.workflowTemplateId === activeTemplate.id) && activeRunHistory.length ? (
         <aside className="atlas-canvas-acceptance glass-v2">
           <div><strong>验收通过</strong><span>结构 92 · 行为 88 · 结果 90 · 轨迹 94</span></div>
           <div><span>模型调用 {Math.max(2, Math.round(activeTemplate.nodes.length / 2))}</span><span>工具调用 {activeTemplate.nodes.filter((item) => item.kind === "tool").length}</span><span>总分 91</span></div>
@@ -1262,10 +1265,10 @@ export default function App() {
               <RouterRoute path="/courses" element={protectedElement(coursesPage)} />
               <RouterRoute path="/courses/:courseId" element={protectedElement(courseDetailPage)} />
               <RouterRoute path="/courses/:courseId/materials/:materialId" element={protectedElement(lessonPage)} />
-              <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={<Navigate to="/courses/agentic-ai" replace />} />
+              <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={protectedElement(courseDetailPage)} />
               <RouterRoute path="/tasks/*" element={<Navigate to="/" replace />} />
               <RouterRoute path="/profile" element={protectedElement(profilePage)} />
-              <RouterRoute path="/admin/domains" element={protectedElement(domainManagementPage)} />
+              <RouterRoute path="/admin/domains" element={canManageKnowledgeDomains(session) ? protectedElement(domainManagementPage) : <Navigate to="/" replace />} />
               <RouterRoute path="/profile/*" element={<Navigate to="/profile" replace />} />
               <RouterRoute path="/settings/*" element={<Navigate to="/" replace />} />
               <RouterRoute path="/notifications/*" element={<Navigate to="/" replace />} />

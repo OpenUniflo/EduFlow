@@ -23,7 +23,7 @@
 
 - Knowledge-to-knowledge facts use only `prerequisite`, `enables`, or `related` KnowledgeEdges.
 - CurriculumCoverage, AssignmentCoverage, KnowledgeMapping, and Promotion MUST remain separate from KnowledgeEdge.
-- `domainId` is metadata for color, filtering, search, statistics, and details. It MUST NOT determine coordinates or grouping.
+- `DomainAssignment` is the only authoritative Domain-membership source. A legacy seed `KnowledgeNode.domainId` is never runtime authority. Domain membership MUST NOT determine coordinates or grouping.
 - `clusterId` and persistent Knowledge Cluster structures MUST NOT be added to the v1 core model.
 - Fake nodes or edges MUST NOT be created for layout, composition, islands, bridges, chapters, or demos.
 
@@ -130,3 +130,38 @@
 - Domain Management MUST allow administrators to inspect, select, and move Unclassified nodes.
 - Moving a node manually to a Domain creates an admin, pinned `DomainAssignment`.
 - Domain assignment and Domain color changes MUST NOT alter KnowledgeEdges, graph layout, or camera state.
+
+## Data-driven Frontend Invariants
+
+- Generic pages and services MUST resolve course data by route `courseId`; an unknown course or cross-course material reference MUST render Not Found and MUST NOT fall back to a demo course.
+- Course Center cards, search results, metrics, recent learning, Atlas course links, material navigation, and workflow launch context MUST be derived from repositories and runtime data.
+- Agentic AI and Python Engineering identifiers, titles, counts, lesson rules, or workflow mappings may exist only in explicit demo seeds/adapters, never in generic UI algorithms.
+- Adding a valid course seed to the demo repository MUST be sufficient for it to appear in Course Center and work through the shared routes and projections.
+
+## Repository and Projection Invariants
+
+- `CourseRepository` is the read boundary for `CourseRuntimeData`; pages MUST NOT import a specific course seed.
+- Course graph projection, ELK layout, and React Flow adaptation MUST be pure functions of explicit runtime/projection inputs.
+- ELK caches MUST be keyed by course identity plus structural revision. Presentation state MUST NOT participate in that cache key.
+- CurriculumCoverage, AssignmentCoverage, MaterialKnowledgeCoverage, and Atlas course contexts remain N:M projections over shared stable KnowledgeNode IDs.
+
+## Material Invariants
+
+- `Material` belongs to a Course and Lesson and is composed of addressable `MaterialSegment` records.
+- `MaterialKnowledgeCoverage` is the authoritative N:M mapping between material segments and KnowledgeNodes. Page-number switches and course-specific material lookup tables are forbidden in generic viewers.
+- Material routes MUST validate both material existence and course ownership.
+- Zero, one, and multiple matching materials MUST be represented honestly; generic UI MUST NOT silently open an unrelated fixed material.
+
+## User Learning State Invariants
+
+- User progress is mutable user state and MUST NOT be stored in course definitions, material definitions, or graph projections.
+- `UserCourseState` is scoped by both `userId` and `courseId`; material state is additionally keyed by `materialId`, and assignment state by stable `assignmentId`.
+- Assignment completion MUST update the explicit launched `assignmentId`; workflow template identity alone is insufficient because templates may be shared.
+- Knowledge mastery remains separate from course progress, material reading progress, and assignment completion.
+
+## Domain Lifecycle and Authority
+
+- Domain definitions and assignments are loaded and persisted through a governance repository; demo seeds are initialization data only.
+- Archiving a Domain requires explicit governance authority, MUST be rejected while active members remain, and archived Domains MUST reject new assignments.
+- Domain mutations require an explicit actor/capability. Generic stores MUST NOT manufacture default administrator authority.
+- Pinned admin assignments have precedence over automatic scoring, candidate recomputation, and proposals.

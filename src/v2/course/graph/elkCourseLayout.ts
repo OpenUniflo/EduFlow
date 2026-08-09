@@ -1,7 +1,7 @@
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { ElkExtendedEdge, ElkNode, ElkPoint } from "elkjs/lib/elk-api";
-import { courseChapterEdges, courseChapters, courseSkillTreeEdges, courseSkillTreeNodes } from "../../data";
 import type { CourseSkillTreeEdge } from "../../types";
+import type { CourseGraphData } from "../runtime/courseRuntime";
 import type { CourseGraphProjection, CourseProjectionEdge, CourseProjectionNode } from "./courseGraphProjection";
 
 export const KNOWLEDGE_CARD_WIDTH = 194;
@@ -67,7 +67,11 @@ type CourseLayoutBasis = {
 };
 
 const elk = new ELK();
-let basisPromise: Promise<CourseLayoutBasis> | null = null;
+const basisPromises = new Map<string, Promise<CourseLayoutBasis>>();
+
+export function getCourseLayoutCacheKey(courseId: string, revision: string) {
+  return `${courseId}:${revision}`;
+}
 
 const layeredOptions = {
   "org.eclipse.elk.algorithm": "layered",
@@ -114,8 +118,8 @@ function knowledgeProjectionEdge(edge: CourseSkillTreeEdge): CourseProjectionEdg
   };
 }
 
-async function buildMacroLayout() {
-  const macroEdges: CourseProjectionEdge[] = courseChapterEdges.map((edge) => ({
+async function buildMacroLayout(graphData: CourseGraphData) {
+  const macroEdges: CourseProjectionEdge[] = graphData.chapterEdges.map((edge) => ({
     id: edge.id,
     source: `chapter:${edge.source}`,
     target: `chapter:${edge.target}`,
@@ -127,7 +131,7 @@ async function buildMacroLayout() {
   }));
   const graph: ElkNode = {
     id: "course-macro",
-    children: courseChapters
+    children: graphData.chapters
       .slice()
       .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
       .map((chapter) => ({ id: `chapter:${chapter.id}`, width: COURSE_CHAPTER_WIDTH, height: COURSE_CHAPTER_HEIGHT })),
@@ -159,12 +163,12 @@ async function buildMacroLayout() {
   };
 }
 
-async function buildChapterLocalLayout(chapterId: string): Promise<ChapterLocalLayout> {
-  const nodes = courseSkillTreeNodes
+export async function buildChapterLocalLayout(graphData: CourseGraphData, chapterId: string): Promise<ChapterLocalLayout> {
+  const nodes = graphData.knowledgeNodes
     .filter((node) => node.chapterId === chapterId)
     .sort((left, right) => left.lesson - right.lesson || left.id.localeCompare(right.id));
   const nodeIds = new Set(nodes.map((node) => node.id));
-  const edges = courseSkillTreeEdges
+  const edges = graphData.knowledgeEdges
     .filter((edge) => edge.relation !== "related" && nodeIds.has(edge.source) && nodeIds.has(edge.target))
     .map(knowledgeProjectionEdge);
   const graph: ElkNode = {
@@ -194,10 +198,10 @@ async function buildChapterLocalLayout(chapterId: string): Promise<ChapterLocalL
   };
 }
 
-async function buildCourseLayoutBasis(): Promise<CourseLayoutBasis> {
+async function buildCourseLayoutBasis(graphData: CourseGraphData): Promise<CourseLayoutBasis> {
   const [macroResult, localResults] = await Promise.all([
-    buildMacroLayout(),
-    Promise.all(courseChapters.map((chapter) => buildChapterLocalLayout(chapter.id)))
+    buildMacroLayout(graphData),
+    Promise.all(graphData.chapters.map((chapter) => buildChapterLocalLayout(graphData, chapter.id)))
   ]);
   return {
     ...macroResult,
@@ -205,9 +209,16 @@ async function buildCourseLayoutBasis(): Promise<CourseLayoutBasis> {
   };
 }
 
-export function getCourseLayoutBasis() {
-  basisPromise ??= buildCourseLayoutBasis();
-  return basisPromise;
+export function getCourseLayoutBasis(graphData: CourseGraphData) {
+  const key = getCourseLayoutCacheKey(graphData.courseId, graphData.revision);
+  const current = basisPromises.get(key) ?? buildCourseLayoutBasis(graphData);
+  basisPromises.set(key, current);
+  return current;
+}
+
+export function clearCourseLayoutCache(courseId?: string) {
+  if (!courseId) return basisPromises.clear();
+  Array.from(basisPromises.keys()).filter((key) => key.startsWith(`${courseId}:`)).forEach((key) => basisPromises.delete(key));
 }
 
 function composeChapterPositions(basis: CourseLayoutBasis, expandedIds: Set<string>) {
@@ -259,8 +270,8 @@ function composeChapterPositions(basis: CourseLayoutBasis, expandedIds: Set<stri
   return positions;
 }
 
-export async function layoutCourseGraph(projection: CourseGraphProjection): Promise<CourseLayout> {
-  const basis = await getCourseLayoutBasis();
+export async function layoutCourseGraph(graphData: CourseGraphData, projection: CourseGraphProjection): Promise<CourseLayout> {
+  const basis = await getCourseLayoutBasis(graphData);
   const expandedIds = new Set(projection.nodes.filter((node) => node.kind === "chapter" && node.expanded).map((node) => node.chapter!.id));
   const chapterPositions = composeChapterPositions(basis, expandedIds);
   const projectionById = new Map(projection.nodes.map((node) => [node.id, node]));

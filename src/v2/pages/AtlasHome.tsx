@@ -3,9 +3,11 @@ import { ArrowRight, FileText, Minus, Pause, Play, Plus, RefreshCcw, Send, Setti
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
+import { courseCreationService } from "../demo/services/DemoCourseCreationService";
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneHandle } from "../knowledge/components/KnowledgeAtlasScene";
 import { buildGlobalAtlasProjection } from "../knowledge/projections/atlasProjections";
 import { assignNodeDomain, resolveNodeDomain, useDomainGovernance } from "../knowledge/domain/domainStore";
+import { canManageKnowledgeDomains } from "../session/capabilities";
 
 const generationStages = ["读取课件", "识别章节", "提取知识节点", "分析前置依赖", "生成实训目标", "完成课程"];
 
@@ -13,6 +15,8 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
   const navigate = useNavigate();
   const sceneRef = useRef<KnowledgeAtlasSceneHandle>(null);
   const governance = useDomainGovernance();
+  const canManageDomains = canManageKnowledgeDomains(session);
+  const domainActor = useMemo(() => ({ id: session.email, capabilities: session.capabilities }), [session.capabilities, session.email]);
   const atlas = useMemo(() => buildGlobalAtlasProjection(governance), [governance]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
@@ -39,16 +43,17 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
     event.target.value = "";
   }
 
-  function createCourse() {
+  async function createCourse() {
     if (!prompt.trim() && files.length === 0) {
-      setPrompt("根据 Agentic AI 课程知识节点表创建 15 课时课程，并为第四课绑定五类范式实训。");
+      setPrompt("请上传课件或描述课程主题、目标学习者与期望成果。");
       return;
     }
     if (generating) return;
     setGenerating(true);
     setGenerationIndex(0);
     generationStages.forEach((_, index) => window.setTimeout(() => setGenerationIndex(index), index * 430));
-    window.setTimeout(() => navigate("/courses/agentic-ai?created=1"), generationStages.length * 430 + 280);
+    const result = await courseCreationService.createCourse({ files, prompt });
+    window.setTimeout(() => navigate(`/courses/${result.courseId}?created=1`), generationStages.length * 430 + 280);
   }
 
   return (
@@ -106,19 +111,20 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
           <button className="atlas-panel-close" onClick={() => setSelectedId(null)} aria-label="关闭简介"><X size={17} /></button>
           <div className="atlas-pill"><i style={{ background: selected.color }} />{selected.domainTitle}</div>
           <h2>{selected.title}</h2><p>{selected.description}</p>
-          <div className="atlas-metric-grid"><div><strong>1</strong><span>知识点</span></div><div><strong>{selected.courseId ? 1 : "—"}</strong><span>课程</span></div><div><strong>{selected.related.length}</strong><span>关联主题</span></div></div>
+          <div className="atlas-metric-grid"><div><strong>1</strong><span>知识点</span></div><div><strong>{selected.courseContexts.length || "—"}</strong><span>课程</span></div><div><strong>{selected.related.length}</strong><span>关联主题</span></div></div>
           <div className="atlas-tag-list">{(selected.knowledge?.tags ?? [selected.domainTitle]).map((tag) => <span key={tag}>{tag}</span>)}</div>
           <section className="atlas-node-dependencies"><h3>前置依赖</h3><div>{selected.prerequisites.length ? selected.prerequisites.map((dependency) => <span key={dependency}><ArrowRight size={12} />{dependency}</span>) : <span>暂无严格前置依赖</span>}</div></section>
-          <section className="atlas-domain-quick-edit">
+          {canManageDomains ? <section className="atlas-domain-quick-edit">
             <div><h3>知识领域</h3><button onClick={() => navigate("/admin/domains")}><Settings2 size={13} />领域管理</button></div>
-            <select aria-label="修改知识领域" value={resolveNodeDomain(selected.id, governance).domain?.id ?? ""} onChange={(event) => assignNodeDomain(selected.id, event.target.value || null)}>
+            <select aria-label="修改知识领域" value={resolveNodeDomain(selected.id, governance).domain?.id ?? ""} onChange={(event) => assignNodeDomain({ actor: domainActor, nodeId: selected.id, domainId: event.target.value || null })}>
               <option value="">未分类</option>
               {governance.domains.filter((domain) => domain.status === "active" && domain.scope === "global").map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}
             </select>
             <small>管理员修改会写入 pinned 归属；颜色立即同步，节点位置保持不变。</small>
-          </section>
+          </section> : null}
+          {selected.courseContexts.length > 1 ? <section className="atlas-node-dependencies"><h3>关联课程 {selected.courseContexts.length}</h3><div>{selected.courseContexts.map((context) => <button key={context.courseId} onClick={() => navigate(`/courses/${context.courseId}`)}><ArrowRight size={12} />{context.courseTitle}</button>)}</div></section> : null}
           <div className="atlas-panel-actions">
-            <button className="atlas-primary" disabled={!selected.courseId} onClick={() => selected.courseId && navigate(`/courses/${selected.courseId}`)}>查看对应课程 <ArrowRight size={16} /></button>
+            <button className="atlas-primary" disabled={!selected.courseContexts.length} onClick={() => selected.courseContexts.length === 1 && navigate(`/courses/${selected.courseContexts[0].courseId}`)}>{selected.courseContexts.length > 1 ? "请选择关联课程" : "查看对应课程"} <ArrowRight size={16} /></button>
             <button className="atlas-secondary" onClick={() => { setPrompt(`围绕“${selected.title}”创建一门课程，设计清晰的前置依赖与实训。`); setSelectedId(null); }}>基于此主题创建</button>
           </div>
         </aside>
