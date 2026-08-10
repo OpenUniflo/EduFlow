@@ -243,10 +243,20 @@
 - Demo repositories, user fixtures, concrete courses, Domains, and static graphs depend inward on Core interfaces and types. The application composition root may wire Demo adapters into Core boundaries.
 - Static demo Knowledge graphs are fixtures only; production repositories MUST NOT import or treat them as runtime authority.
 
-## Demo / Core Boundary
+## Core / Demo Boundary
 
-- Concrete demo Knowledge data MUST live under `src/v2/demo`. Core Knowledge packages contain reusable models, repositories, validation, algorithms, governance, and projections only.
-- Agentic AI and Python Engineering node lists, edge fixtures, global demo graphs, demo user identities, and concrete course fixtures MUST NOT be owned by Core packages.
+- Core packages define reusable contracts, repositories, validation, algorithms, projections, and governance.
+- Concrete Demo fixtures and Demo-specific fixture parsing/building utilities MUST live under `src/v2/demo`.
+- Demo may depend on Core. Core MUST NOT depend on Demo.
+
+## Architectural Enforcement
+
+- Core/Demo separation MUST be enforced by dependency direction, not by blacklists of concrete course names, node IDs, user identities, or fixture filenames.
+
+## Knowledge Graph Validation
+
+- `validateKnowledgeGraph` validates generic `KnowledgeGraph` invariants across all supported Knowledge scopes.
+- Global-only graph requirements MUST use `validateGlobalKnowledgeGraph` or an equivalently explicit Global validator.
 
 ## Course-Scoped Identity
 

@@ -316,3 +316,9 @@ Local persistence uses a versioned envelope. Load validates scope identity and n
 Core Knowledge, Course, Material, Progress, and Profile modules define reusable models, validators, repositories, and projections. They never import `src/v2/demo`. Concrete Course repositories, personal Knowledge fixtures, Domain seeds, and static Knowledge graphs live on the Demo side and depend inward on Core contracts; only the composition root wires them together.
 
 The current static Knowledge graph is owned by `src/v2/demo/knowledge` as a prototype fixture, not a production runtime source. Backend repositories must supply scoped graph data through `KnowledgeRepository` without importing fixture singletons.
+
+## 45. KnowledgeGraph Validation Scope
+
+`KnowledgeGraph` may contain Global, Tenant, and User KnowledgeNodes according to the caller's repository access context. `validateKnowledgeGraph` therefore validates scope-agnostic graph invariants and must not imply that every node is Global.
+
+Global-only graph requirements use the explicitly named `validateGlobalKnowledgeGraph`. The Demo Global graph invokes that validator after its fixture is assembled; generic repositories, Personal projections, and Domain services do not inherit a Global-only assumption.

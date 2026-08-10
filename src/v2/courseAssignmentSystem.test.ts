@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { DemoCourseRepository } from "./demo/courses/DemoCourseRepository";
@@ -48,6 +48,15 @@ function memoryStorage() {
     removeItem: (key: string) => { values.delete(key); },
     setItem: (key: string, value: string) => { values.set(key, value); }
   } satisfies Storage;
+}
+
+function importedSpecifiers(source: string) {
+  const patterns = [
+    /\bfrom\s+["']([^"']+)["']/g,
+    /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
+    /^\s*import\s+["']([^"']+)["']/gm
+  ];
+  return patterns.flatMap((pattern) => Array.from(source.matchAll(pattern), (match) => match[1]));
 }
 
 describe("Course Repository and runtime invariants", () => {
@@ -399,32 +408,17 @@ describe("Material and progress generalization", () => {
     expect(source).not.toContain("demoUserCourseStateSeed");
   });
 
-  it("keeps Core knowledge/course/material/progress/profile directories free of Demo imports", () => {
+  it("enforces the Core to Demo dependency boundary structurally", () => {
     const roots = ["knowledge", "course", "material", "progress", "profile"];
+    const allowedDemoImporters = new Set(["src/v2/services/applicationServices.ts"]);
     const files = roots.flatMap((root) => {
       const output = execFileSync("rg", ["--files", `src/v2/${root}`], { cwd: process.cwd(), encoding: "utf8" });
       return output.trim().split("\n").filter((file) => /\.(ts|tsx)$/.test(file));
-    });
-    const source = files.map((file) => readFileSync(join(process.cwd(), file), "utf8")).join("\n");
-    expect(source).not.toMatch(/from ["'][^"']*demo\//);
-    expect(readFileSync(join(process.cwd(), "src/v2/course/repository/CourseRepository.ts"), "utf8")).not.toContain("DemoCourseRepository");
-  });
-
-  it("owns concrete Knowledge fixtures only in the Demo layer", () => {
-    ["agenticAiNodes.ts", "pythonEngineeringNodes.ts", "agenticAiEdges.ts", "pythonEngineeringEdges.ts", "sharedEdges.ts"].forEach((file) => {
-      expect(existsSync(join(process.cwd(), "src/v2/knowledge/seeds", file))).toBe(false);
-    });
-    expect(existsSync(join(process.cwd(), "src/v2/demo/knowledge/demoGlobalKnowledgeGraph.fixture.ts"))).toBe(true);
-
-    const genericFiles = ["knowledge", "course", "material", "progress", "profile"].flatMap((root) => {
-      const output = execFileSync("rg", ["--files", `src/v2/${root}`], { cwd: process.cwd(), encoding: "utf8" });
-      return output.trim().split("\n").filter((file) => /\.(ts|tsx)$/.test(file));
-    });
-    const genericSource = [
-      ...genericFiles.map((file) => readFileSync(join(process.cwd(), file), "utf8")),
-      readFileSync(join(process.cwd(), "src/v2/pages/AtlasHome.tsx"), "utf8")
-    ].join("\n");
-    expect(genericSource).not.toMatch(/Agentic AI|Python Engineering|student@knowledge-atlas\.local|U-DEMO-01/);
+    }).filter((file) => !allowedDemoImporters.has(file));
+    const violations = files.flatMap((file) => importedSpecifiers(readFileSync(join(process.cwd(), file), "utf8"))
+      .filter((specifier) => specifier.split("/").includes("demo"))
+      .map((specifier) => `${file} -> ${specifier}`));
+    expect(violations).toEqual([]);
   });
 
   it("uses the dedicated Assignment modal class without changing Workflow Library cards", () => {

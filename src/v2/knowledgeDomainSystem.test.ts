@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildKnowledgeEdges, createKnowledgeEdgeId, type EdgeSeed } from "./knowledge/graph";
+import { validateGlobalKnowledgeGraph, validateKnowledgeGraph } from "./knowledge/graph";
+import { buildKnowledgeEdges, createKnowledgeEdgeId, type EdgeSeed } from "./demo/knowledge/demoKnowledgeEdgeFactory.fixture";
 import {
   demoGlobalKnowledgeGraph as globalKnowledgeGraph,
   demoKnowledgeEdges as knowledgeEdges,
@@ -45,6 +46,41 @@ describe("Knowledge Domain invariants", () => {
 
   it("validates canonical relation endpoints, active status, uniqueness, strength, and reasons", () => {
     expect(validateKnowledgeRelations(atlasGraph)).toEqual([]);
+  });
+
+  it("keeps generic KnowledgeGraph validation scope-agnostic", () => {
+    const node = (id: string, scope: KnowledgeNode["scope"], ownerId?: string): KnowledgeNode => ({
+      id,
+      title: id,
+      description: id,
+      type: "conceptual",
+      masteryCriteria: [`Explain ${id}`],
+      scope,
+      ownerId,
+      provenance: [{ sourceType: "manual", sourceId: id }],
+      currentRevisionId: `${id}-r1`,
+      status: "active"
+    });
+    const nodes = [node("GLOBAL", "global"), node("USER", "user", "user-1")];
+    const graph: KnowledgeGraph = {
+      nodes,
+      revisions: nodes.map((item) => ({
+        id: item.currentRevisionId,
+        nodeId: item.id,
+        version: 1,
+        title: item.title,
+        description: item.description,
+        type: item.type,
+        masteryCriteria: item.masteryCriteria,
+        createdAt: "2026-08-11T00:00:00.000Z"
+      })),
+      edges: [{ id: "shared", source: "GLOBAL", target: "USER", relation: "related", strength: 1, reason: "The nodes share a concept." }]
+    };
+
+    expect(() => validateKnowledgeGraph(graph)).not.toThrow();
+    expect(() => validateGlobalKnowledgeGraph(graph)).toThrow(/Global graph contains non-global node: USER/);
+    expect(() => validateGlobalKnowledgeGraph({ nodes: [nodes[0]], revisions: [graph.revisions[0]], edges: [] })).not.toThrow();
+    expect(() => validateGlobalKnowledgeGraph(globalKnowledgeGraph)).not.toThrow();
   });
 
   it("aligns KnowledgeEdge compile-time requirements with runtime invariants", () => {
@@ -128,13 +164,21 @@ describe("Knowledge Domain invariants", () => {
     expect(getDomainMembers(knowledgeNodes, demoDomainAssignments, "").map((node) => node.id)).toContain("BR01");
   });
 
-  it("derives stable KnowledgeEdge IDs independently of seed order", () => {
+  it("builds stable KnowledgeEdges from Demo EdgeSeed fixtures", () => {
     const seeds: EdgeSeed[] = [
       ["B", "A", "related", 0.7, "B relates to A."],
       ["A", "C", "enables", 0.8, "A enables C."]
     ];
     const forward = buildKnowledgeEdges([...seeds]);
     const reversed = buildKnowledgeEdges([...seeds].reverse());
+    expect(forward[0]).toEqual({
+      id: "knowledge-related-a-b",
+      source: "B",
+      target: "A",
+      relation: "related",
+      strength: 0.7,
+      reason: "B relates to A."
+    });
     expect(forward.map((edge) => edge.id).sort()).toEqual(reversed.map((edge) => edge.id).sort());
     expect(createKnowledgeEdgeId("B", "A", "related")).toBe(createKnowledgeEdgeId("A", "B", "related"));
     expect(new Set(knowledgeEdges.map((edge) => edge.id)).size).toBe(knowledgeEdges.length);
@@ -182,14 +226,11 @@ describe("Knowledge Domain invariants", () => {
     expect(demoKnowledgeDomains.some((domain) => domain.id === proposals[0].id)).toBe(false);
   });
 
-  it("keeps Core Domain modules free of static Demo graph and concrete Demo identities", () => {
+  it("keeps Core Domain modules free of Demo and static graph dependencies", () => {
     const domainDir = join(process.cwd(), "src/v2/knowledge/domain");
     const coreSource = readdirSync(domainDir).filter((file) => file.endsWith(".ts")).map((file) => readFileSync(join(domainDir, file), "utf8")).join("\n");
     expect(coreSource).not.toMatch(/from ["'][^"']*demo\//);
     expect(coreSource).not.toMatch(/from ["']\.\.\/graph["']/);
-    expect(coreSource).not.toMatch(/agenticAiNodes|pythonEngineeringNodes|Agentic AI|Python Engineering|RT01|PY01|BR01|Agent Runtime & Reliability/);
-    const interfaceSource = readFileSync(join(domainDir, "DomainDiscoveryService.ts"), "utf8");
-    expect(interfaceSource).not.toMatch(/RT\d+|PY\d+|demo/i);
   });
 
   it("keeps V1 Domain types, permissions, and UI Global-only", () => {

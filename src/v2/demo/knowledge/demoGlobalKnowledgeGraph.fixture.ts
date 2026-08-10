@@ -1,4 +1,4 @@
-import { buildKnowledgeEdges, validateKnowledgeGraph } from "../../knowledge/graph";
+import { validateGlobalKnowledgeGraph } from "../../knowledge/graph";
 import type { KnowledgeGraph, KnowledgeNode, KnowledgeNodeRevision } from "../../knowledge/types";
 import { agenticAiEdgeSeeds } from "./agenticAiEdges.fixture";
 import { agenticAiNodes } from "./agenticAiNodes.fixture";
@@ -6,6 +6,7 @@ import { DEMO_TIME } from "./demoKnowledgeNodeFactory.fixture";
 import { pythonEngineeringEdgeSeeds } from "./pythonEngineeringEdges.fixture";
 import { pythonEngineeringNodes } from "./pythonEngineeringNodes.fixture";
 import { sharedEdgeSeeds } from "./sharedKnowledgeEdges.fixture";
+import { buildKnowledgeEdges } from "./demoKnowledgeEdgeFactory.fixture";
 
 export const demoKnowledgeNodes: KnowledgeNode[] = [...agenticAiNodes, ...pythonEngineeringNodes];
 
@@ -34,4 +35,4 @@ export const demoGlobalKnowledgeGraph: KnowledgeGraph = {
   edges: demoKnowledgeEdges
 };
 
-validateKnowledgeGraph(demoGlobalKnowledgeGraph);
+validateGlobalKnowledgeGraph(demoGlobalKnowledgeGraph);

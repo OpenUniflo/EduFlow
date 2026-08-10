@@ -1,4 +1,4 @@
-import type { EdgeSeed } from "../../knowledge/graph";
+import type { EdgeSeed } from "./demoKnowledgeEdgeFactory.fixture";
 
 /**
  * These manually reviewed relations form the current demo canonical graph and

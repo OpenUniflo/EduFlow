@@ -1,4 +1,4 @@
-import type { EdgeSeed } from "../../knowledge/graph";
+import type { EdgeSeed } from "./demoKnowledgeEdgeFactory.fixture";
 
 /** Ordinary factual relations that cross current demo Domain assignments. */
 export const sharedEdgeSeeds: EdgeSeed[] = [

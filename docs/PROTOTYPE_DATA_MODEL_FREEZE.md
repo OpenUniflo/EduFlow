@@ -41,6 +41,15 @@ Core packages do not import Demo fixtures or repositories. Demo depends on Core 
 
 This cleanup does not reopen the frozen V1 domain model.
 
+## Final Core / Demo Boundary
+
+- Generic `KnowledgeGraph` validation is scope-agnostic.
+- Global-only validation is explicit.
+- Demo `EdgeSeed` parsing and edge building live in the Demo layer.
+- Core/Demo separation is enforced structurally through dependency direction rather than business-string blacklists.
+
+This change does not reopen the frozen V1 data model.
+
 ## Deferred Beyond Freeze
 
 Real Knowledge, Domain, Course Creation, Workflow, Evaluation, Auth, and asynchronous query backends remain future adapter/application work. WorkflowTemplate referential integrity waits for a WorkflowRepository, and Assignment completion still uses the current Demo run-end behavior until the Evaluation pipeline exists.
