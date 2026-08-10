@@ -129,6 +129,8 @@ Course, chapter, and node summaries are projections over unique Assignment IDs. 
 
 Assignments associated with a Material segment are derived through `MaterialKnowledgeCoverage -> KnowledgeNode -> AssignmentCoverage`. The material viewer does not contain course-specific Assignment lookup tables.
 
+A Segment may expose a page-level Assignment projection aggregated across every KnowledgeNode it covers. The Assignment list adjacent to a selected or pinned Knowledge Detail is a different, Knowledge-specific projection: it filters `AssignmentCoverage` by that effective KnowledgeNode ID and deduplicates by Assignment identity. It MUST NOT show unrelated Assignments contributed by other KnowledgeNodes on the same Segment.
+
 ## 21. Workflow Run Identity
 
 WorkflowTemplate is reusable execution infrastructure. A run launched from an Assignment records `workflowTemplateId`, `courseId`, and `assignmentId`; an independently opened workflow may omit course context. Run History can therefore filter two Assignments that share one template without reverse lookup.

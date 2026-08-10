@@ -198,6 +198,26 @@
 - Pinning Knowledge detail survives page changes until the user explicitly unpins it.
 - Programmatic jumps MUST NOT mark intermediate PDF pages as viewed.
 
+## Material Header Layout Invariants
+
+- Material Reader MUST reserve layout space for GlobalNav. GlobalNav and Material Header MUST NOT overlap or resolve overlap through z-index competition.
+- Material Header, Outline, PDF viewport, Knowledge panel, and bottom controls SHOULD share Material layout tokens instead of independent magic offsets.
+- Responsive GlobalNav reserve MUST contract when the global brand copy is hidden.
+
+## Material Knowledge Context Invariants
+
+- Current Page Knowledge, Selected Knowledge, and Pinned Knowledge are distinct presentation concepts. Selecting a KnowledgeNode MUST NOT automatically pin it.
+- Pinning is an explicit action and stores only the stable KnowledgeNode ID, never a copied Knowledge object, description, Domain color, or Assignment snapshot.
+- Effective Knowledge resolves as pinned Knowledge, then selected Knowledge, then the deterministic current-page primary Knowledge.
+- While pinned, Knowledge Detail and Knowledge-specific Assignment Context stay attached to the pinned Knowledge; Current Page Knowledge coverage continues following the active MaterialSegment.
+- Unpinning immediately restores current-page-linked selection. Material identity changes clear the presentation-only Pin state.
+
+## Material Assignment Context Invariants
+
+- Page-level Assignment Context and Knowledge-specific Assignment Context are separate projections.
+- Knowledge Detail MUST show Assignments covered by its effective KnowledgeNode and MUST NOT include unrelated Assignments from other KnowledgeNodes on the same MaterialSegment.
+- Knowledge selection and Pin state are downstream of `activeSegmentId`; they MUST NOT restart PDF initialization or change PDF scroll, URL ownership, activeSegmentId, or zoom.
+
 ## Knowledge Progress Invariants
 
 - Knowledge mastery and Assignment completion are separate states and separate projections.

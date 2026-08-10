@@ -95,3 +95,13 @@ Course runtime validation rejects PDF Material without a non-empty PDF source, p
 ## 21. Demo PDF Fixtures
 
 `scripts/generate-demo-pdfs.py` uses repository-owned teaching content to produce committed static fixtures under `public/materials/`. Generation is an explicit development task (`pnpm generate:demo-pdfs`), not a browser or Vercel runtime operation. Current fixtures are Agentic AI Lesson 04 and Python Engineering Lessons 02, 04, and 07. Their source page counts are validated against Material Segments.
+
+## 22. Material Knowledge Context State
+
+The Reader separates three presentation states. Current Page Knowledge is the deterministic `MaterialKnowledgeCoverage` projection for `activeSegmentId`. Selected Knowledge is the current detail choice within that page. Pinned Knowledge is an explicit, ID-only override that survives page changes.
+
+The effective detail identity is `pinnedKnowledgeId ?? selectedKnowledgeId ?? currentPagePrimaryKnowledgeId`. In Auto Mode, changing the active Segment resets selection to the first deterministic Knowledge context for that Segment. Clicking another current-page item changes selection without pinning. In Pinned Mode, the current-page list continues changing while Knowledge Detail and its Knowledge-specific Assignment list remain attached to the pinned node. Unpin immediately selects the current-page primary node. A Material change clears the Pin and initializes selection from the new Material position.
+
+Page Assignment Context is the unique Assignment projection for all KnowledgeNodes covered by a Segment, plus any explicit Segment references. Knowledge-specific Assignment Context filters `AssignmentCoverage` by one KnowledgeNode ID. The adjacent list under Knowledge Detail always uses the latter, so a multi-Knowledge page cannot leak unrelated Assignments into the selected detail.
+
+Selection and Pin are session-only Reader UI state. They do not persist in UserMaterialState and do not control PDF page, Outline, URL, zoom, or navigation initialization.

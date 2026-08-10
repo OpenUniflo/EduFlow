@@ -66,3 +66,15 @@ Files are committed static assets. Neither the browser nor deployment runtime ge
 ## 15. Production Considerations
 
 Course runtime validation checks source metadata before rendering. Static public URLs provide same-origin PDF and worker loading. Future uploaded sources may add authenticated URLs, Range optimization, lazy rendering, text layers, and large-document virtualization without changing the state machine.
+
+## 16. UI State Integration
+
+`activeSegmentId` remains the upstream reading position. It projects Current Page Knowledge, whose deterministic first item becomes the Auto Mode selection. `selectedKnowledgeId` changes when a user chooses another item on that page. `pinnedKnowledgeId` is an explicit stable ID override. Knowledge Detail and Knowledge-specific Assignments resolve from the effective ID: pinned, then selected, then current-page primary.
+
+Pin does not freeze the PDF, Outline, URL, or Current Page Knowledge list. It freezes only Knowledge Detail and its precisely scoped Assignment Context. Unpin resumes the current active page immediately. Knowledge UI state is downstream of `activeSegmentId` and never creates, settles, or restarts a Material navigation request.
+
+## 17. Layout Contract
+
+The Reader defines shared geometry tokens for shell margin, panel gap, left and right panel widths, Header height, content top, and the GlobalNav reserved footprint. The Header background may extend behind the fixed navigation layer, but its interactive content begins after the reserved footprint. When GlobalNav hides its brand copy, the responsive reserve contracts through the same token.
+
+Outline, PDF viewport, Knowledge Context, and bottom controls derive their geometry from the shared Material tokens. Layout avoids overlap by reserved space, never by placing the Material Header above GlobalNav with z-index.

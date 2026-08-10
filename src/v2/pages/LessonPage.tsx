@@ -1,14 +1,15 @@
 import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { MockSession } from "../../app/model";
 import { GlobalNav } from "../components/GlobalNav";
 import type { CourseRuntimeData } from "../course/runtime/courseRuntime";
 import { useDomainGovernance } from "../knowledge/domain/domainStore";
 import { userKnowledgeAccess } from "../knowledge/repository/KnowledgeRepository";
-import { buildMaterialSegmentProjection, getCourseMaterial } from "../material/materialProjection";
+import { buildKnowledgeAssignmentContexts, buildMaterialKnowledgeContext, buildMaterialSegmentProjection, getCourseMaterial } from "../material/materialProjection";
 import { MaterialControls } from "../material/reader/MaterialControls";
-import { MaterialKnowledgeContext, type MaterialKnowledgeItem } from "../material/reader/MaterialKnowledgeContext";
+import { MaterialKnowledgeContext } from "../material/reader/MaterialKnowledgeContext";
+import { createMaterialKnowledgeContextState, reduceMaterialKnowledgeContextState, resolveEffectiveKnowledgeId } from "../material/reader/materialKnowledgeContextState";
 import { MaterialOutline } from "../material/reader/MaterialOutline";
 import { MaterialRenderer } from "../material/reader/MaterialRenderer";
 import { useMaterialReaderState } from "../material/reader/useMaterialReaderState";
@@ -30,7 +31,6 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   const [searchParams, setSearchParams] = useSearchParams();
   const governance = useDomainGovernance();
   const requestedSegmentId = searchParams.get("segment");
-  const [pinnedKnowledge, setPinnedKnowledge] = useState<MaterialKnowledgeItem | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -47,14 +47,26 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   const reader = useMaterialReaderState({ material, requestedSegmentId, recentSegmentId: savedState?.recentSegmentId, onReplaceSegment: replaceSegmentQuery });
   const access = useMemo(() => userKnowledgeAccess(session.email), [session.email]);
   const projection = useMemo(() => buildMaterialSegmentProjection(runtime, material, reader.activeSegmentId, userState, applicationServices.knowledgeRepository, access, governance), [access, governance, material, reader.activeSegmentId, runtime, userState]);
-  const activeAssignment = projection?.assignmentContexts.find((context) => context.assignmentId === activeAssignmentId) ?? null;
+  const currentPagePrimaryKnowledgeId = projection?.knowledgeContexts[0]?.nodeId ?? null;
+  const [knowledgeContextState, dispatchKnowledgeContext] = useReducer(reduceMaterialKnowledgeContextState, currentPagePrimaryKnowledgeId, createMaterialKnowledgeContextState);
+  const effectiveKnowledgeId = resolveEffectiveKnowledgeId(knowledgeContextState, currentPagePrimaryKnowledgeId);
+  const effectiveKnowledge = useMemo(() => {
+    if (!effectiveKnowledgeId) return null;
+    const roles = projection?.knowledgeContexts.find((context) => context.nodeId === effectiveKnowledgeId)?.roles ?? [];
+    return buildMaterialKnowledgeContext(effectiveKnowledgeId, roles, applicationServices.knowledgeRepository, access, governance);
+  }, [access, effectiveKnowledgeId, governance, projection]);
+  const knowledgeAssignmentContexts = useMemo(() => buildKnowledgeAssignmentContexts(runtime, effectiveKnowledgeId, userState), [effectiveKnowledgeId, runtime, userState]);
+  const activeAssignment = knowledgeAssignmentContexts.find((context) => context.assignmentId === activeAssignmentId) ?? null;
   const activeIndex = material.segments.findIndex((segment) => segment.id === reader.activeSegmentId);
   const lesson = runtime.lessons.find((item) => item.id === material.lessonId);
 
   useEffect(() => {
     viewedSegmentIdsRef.current = new Set(savedState?.viewedSegmentIds ?? savedState?.completedSegmentIds ?? []);
-    setPinnedKnowledge(null);
   }, [material.id]);
+
+  useEffect(() => {
+    dispatchKnowledgeContext({ type: "page-change", currentPagePrimaryKnowledgeId });
+  }, [currentPagePrimaryKnowledgeId, reader.activeSegmentId]);
 
   useEffect(() => {
     if (!reader.activeSegmentId) return;
@@ -72,8 +84,8 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   }, [material, reader.activeSegmentId, runtime.course.id, session.email]);
 
   useEffect(() => {
-    if (activeAssignmentId && !projection?.assignmentContexts.some((context) => context.assignmentId === activeAssignmentId)) setActiveAssignmentId(null);
-  }, [activeAssignmentId, projection]);
+    if (activeAssignmentId && !knowledgeAssignmentContexts.some((context) => context.assignmentId === activeAssignmentId)) setActiveAssignmentId(null);
+  }, [activeAssignmentId, knowledgeAssignmentContexts]);
 
   const previous = material.segments[activeIndex - 1];
   const next = material.segments[activeIndex + 1];
@@ -88,7 +100,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
 
     <MaterialOutline material={material} activeSegmentId={reader.activeSegmentId} collapsed={leftCollapsed} onToggle={() => setLeftCollapsed((value) => !value)} onSelect={(segmentId) => reader.navigateToSegment(segmentId, "outline", "smooth")} />
     <MaterialRenderer material={material} activeSegmentId={reader.activeSegmentId} zoom={zoom} navigationRequest={reader.navigationRequest} onVisibleSegmentChange={reader.observeSegment} onNavigationSettled={reader.settleNavigation} />
-    <MaterialKnowledgeContext projection={projection} pinnedKnowledge={pinnedKnowledge} collapsed={rightCollapsed} onToggle={() => setRightCollapsed((value) => !value)} onPin={setPinnedKnowledge} onAssignment={setActiveAssignmentId} />
+    <MaterialKnowledgeContext projection={projection} selectedKnowledgeId={knowledgeContextState.selectedKnowledgeId} pinnedKnowledgeId={knowledgeContextState.pinnedKnowledgeId} effectiveKnowledge={effectiveKnowledge} knowledgeAssignmentContexts={knowledgeAssignmentContexts} collapsed={rightCollapsed} onToggle={() => setRightCollapsed((value) => !value)} onSelect={(nodeId) => dispatchKnowledgeContext({ type: "select", nodeId })} onTogglePin={() => dispatchKnowledgeContext(knowledgeContextState.pinnedKnowledgeId ? { type: "unpin", currentPagePrimaryKnowledgeId } : { type: "pin" })} onAssignment={setActiveAssignmentId} />
     <MaterialControls current={activeIndex + 1} total={material.segments.length} zoom={zoom} onZoom={setZoom} onFit={() => setZoom(1)} onPrevious={() => previous && reader.navigateToSegment(previous.id, "previous", "smooth")} onNext={() => next && reader.navigateToSegment(next.id, "next", "smooth")} />
 
     {activeAssignment ? <div className="atlas-workflow-modal" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveAssignmentId(null); }}><article className="atlas-workflow-card glass-v2"><button className="atlas-modal-close" onClick={() => setActiveAssignmentId(null)} aria-label="关闭实训详情"><X size={18} /></button><span className="atlas-kicker">COURSE ASSIGNMENT</span><h2>{activeAssignment.assignment.title}</h2><p>{activeAssignment.assignment.description}</p><section><h3>任务要求</h3>{activeAssignment.assignment.requirements.map((requirement) => <div key={requirement}><Check size={13} />{requirement}</div>)}</section><section><h3>预期成果</h3><p>{activeAssignment.assignment.expectedOutput}</p></section><div className="atlas-modal-actions"><button className="atlas-secondary" onClick={() => setActiveAssignmentId(null)}>关闭</button>{activeAssignment.assignment.mode === "workflow" && activeAssignment.assignment.workflowTemplateId ? <button className="atlas-primary" onClick={() => navigate(workflowLaunchUrl({ courseId: runtime.course.id, assignmentId: activeAssignment.assignment.id, workflowTemplateId: activeAssignment.assignment.workflowTemplateId! }))}>进入工作流 <ArrowRight size={15} /></button> : null}</div></article></div> : null}

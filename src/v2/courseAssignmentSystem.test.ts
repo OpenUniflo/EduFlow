@@ -14,11 +14,14 @@ import { applicationServices } from "./services/applicationServices";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "./knowledge/repository/KnowledgeRepository";
 import { resolveInitialMaterialSegment, resolveKnowledgeMaterialEntries, resolveKnowledgeMaterialEntry, buildMaterialDeepLink } from "./material/materialNavigation";
 import { classifySegmentQueryChange, selectPageAtReadingAnchor } from "./material/reader/materialReaderState";
+import { createMaterialKnowledgeContextState, reduceMaterialKnowledgeContextState, resolveEffectiveKnowledgeId } from "./material/reader/materialKnowledgeContextState";
+import { buildKnowledgeAssignmentContexts, buildMaterialKnowledgeContext, buildMaterialSegmentProjection } from "./material/materialProjection";
 import { getDomainGovernanceSnapshot } from "./knowledge/domain/domainStore";
 import { createWorkflowRunRecord, type Template } from "../app/model";
 import { InMemoryKnowledgeRepository } from "./knowledge/repository/InMemoryKnowledgeRepository";
 import type { KnowledgeGraph, KnowledgeNode } from "./knowledge/types";
 import { buildPersonalKnowledgeGraph } from "./profile/profileGraph";
+import type { AssignmentCoverage, CourseAssignment } from "./types";
 
 const knowledgeRepository = applicationServices.knowledgeRepository;
 const repository = new DemoCourseRepository(knowledgeRepository);
@@ -125,6 +128,56 @@ describe("Material and progress generalization", () => {
 
   it("retains a non-PDF renderer fixture", () => {
     expect(python.materials.some((material) => material.type === "article" && material.segments.some((segment) => Boolean(segment.content)))).toBe(true);
+  });
+
+  it("separates Auto selection from explicit ID-only Pin state", () => {
+    let state = createMaterialKnowledgeContextState("PY09");
+    state = reduceMaterialKnowledgeContextState(state, { type: "select", nodeId: "PY27" });
+    expect(state).toEqual({ selectedKnowledgeId: "PY27", pinnedKnowledgeId: null });
+    state = reduceMaterialKnowledgeContextState(state, { type: "page-change", currentPagePrimaryKnowledgeId: "PY37" });
+    expect(state).toEqual({ selectedKnowledgeId: "PY37", pinnedKnowledgeId: null });
+    state = reduceMaterialKnowledgeContextState(state, { type: "pin" });
+    state = reduceMaterialKnowledgeContextState(state, { type: "page-change", currentPagePrimaryKnowledgeId: "PY85" });
+    expect(resolveEffectiveKnowledgeId(state, "PY85")).toBe("PY37");
+    expect(state.pinnedKnowledgeId).toBe("PY37");
+    state = reduceMaterialKnowledgeContextState(state, { type: "unpin", currentPagePrimaryKnowledgeId: "PY85" });
+    expect(state).toEqual({ selectedKnowledgeId: "PY85", pinnedKnowledgeId: null });
+    expect(reduceMaterialKnowledgeContextState({ selectedKnowledgeId: "PY85", pinnedKnowledgeId: "PY85" }, { type: "material-change", currentPagePrimaryKnowledgeId: "PY06" })).toEqual({ selectedKnowledgeId: "PY06", pinnedKnowledgeId: null });
+  });
+
+  it("keeps page Assignments separate from Knowledge-specific Assignments on a multi-Knowledge Segment", () => {
+    const extraAssignments: CourseAssignment[] = ["PY09", "PY27", "PY37"].map((nodeId) => ({ id: `specific-${nodeId}`, courseId: python.course.id, title: `Specific ${nodeId}`, description: nodeId, requirements: [nodeId], expectedOutput: nodeId, acceptanceCriteria: [nodeId], mode: "instruction" }));
+    const extraCoverages: AssignmentCoverage[] = extraAssignments.map((assignment, index) => ({ id: `specific-coverage-${index}`, assignmentId: assignment.id, nodeId: assignment.id.replace("specific-", ""), role: "assess" }));
+    const runtime = { ...python, assignments: [...python.assignments, ...extraAssignments], assignmentCoverages: [...python.assignmentCoverages, ...extraCoverages] };
+    const userState = demoUserCourseStateSeed("student", python.course.id);
+    const material = runtime.materials.find((item) => item.id === "python-quality-testing")!;
+    const projection = buildMaterialSegmentProjection(runtime, material, "page-10", userState, knowledgeRepository, access, getDomainGovernanceSnapshot())!;
+    const exceptionAssignments = buildKnowledgeAssignmentContexts(runtime, "PY09", userState);
+    const typeHintAssignments = buildKnowledgeAssignmentContexts(runtime, "PY27", userState);
+    expect(projection.knowledgeContexts).toHaveLength(4);
+    expect(projection.pageAssignmentContexts.map((context) => context.assignmentId)).toEqual(expect.arrayContaining(["specific-PY09", "specific-PY27", "specific-PY37"]));
+    expect(exceptionAssignments.map((context) => context.assignmentId)).toContain("specific-PY09");
+    expect(exceptionAssignments.map((context) => context.assignmentId)).not.toContain("specific-PY27");
+    expect(typeHintAssignments.map((context) => context.assignmentId)).toContain("specific-PY27");
+  });
+
+  it("resolves pinned Knowledge metadata and Domain color from current repositories instead of snapshots", () => {
+    const governance = getDomainGovernanceSnapshot();
+    const before = buildMaterialKnowledgeContext("PY09", [], knowledgeRepository, access, governance)!;
+    const changed = { ...governance, domains: governance.domains.map((domain) => domain.id === "python-engineering" ? { ...domain, canonicalColor: "#123456" } : domain) };
+    const after = buildMaterialKnowledgeContext("PY09", [], knowledgeRepository, access, changed)!;
+    expect(before.nodeId).toBe(after.nodeId);
+    expect(after.color).toBe("#123456");
+    expect(after).not.toBe(before);
+  });
+
+  it("reserves the Material Header through responsive layout tokens instead of nav magic offsets", () => {
+    const styles = readFileSync(join(process.cwd(), "src/v2/styles.css"), "utf8");
+    expect(styles).toContain("--material-global-nav-reserve");
+    expect(styles).toContain("--material-global-nav-reserve: 116px");
+    expect(styles).toContain("--material-global-nav-reserve: 104px");
+    expect(styles).toContain("padding: 8px 16px 8px calc(var(--material-global-nav-reserve) - var(--material-shell-margin))");
+    expect(styles).not.toMatch(/material-reader-current \.atlas-lesson-header[^}]*left:\s*(?:92|72)px/s);
   });
 
   it("isolates progress by user, Course, Material, and explicit Assignment identity", () => {

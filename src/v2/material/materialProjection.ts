@@ -7,12 +7,37 @@ import { UNCLASSIFIED_DOMAIN_COLOR } from "../knowledge/domain/domainColors";
 
 export type MaterialSegmentProjection = {
   segment: MaterialSegment;
-  knowledgeContexts: Array<{ nodeId: string; title: string; description: string; roles: MaterialKnowledgeCoverage["role"][]; color: string }>;
-  assignmentContexts: AssignmentContext[];
+  knowledgeContexts: MaterialKnowledgeContext[];
+  pageAssignmentContexts: AssignmentContext[];
+};
+
+export type MaterialKnowledgeContext = {
+  nodeId: string;
+  title: string;
+  description: string;
+  roles: MaterialKnowledgeCoverage["role"][];
+  color: string;
 };
 
 export function getCourseMaterial(runtime: CourseRuntimeData, materialId: string) {
   return runtime.materials.find((material) => material.id === materialId) ?? null;
+}
+
+export function buildMaterialKnowledgeContext(nodeId: string, roles: MaterialKnowledgeCoverage["role"][], knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext, governance: DomainGovernanceState): MaterialKnowledgeContext | null {
+  const node = knowledgeRepository.getNode(nodeId, access);
+  if (!node) return null;
+  const domain = resolveNodeDomain(nodeId, governance).domain;
+  return { nodeId, title: node.title, description: node.description, roles: Array.from(new Set(roles)), color: domain?.canonicalColor ?? UNCLASSIFIED_DOMAIN_COLOR };
+}
+
+export function buildKnowledgeAssignmentContexts(runtime: CourseRuntimeData, nodeId: string | null, userState: UserCourseState): AssignmentContext[] {
+  if (!nodeId) return [];
+  const coverages = runtime.assignmentCoverages.filter((coverage) => coverage.nodeId === nodeId);
+  const coverageByAssignmentId = new Map(coverages.map((coverage) => [coverage.assignmentId, coverage]));
+  return runtime.assignments.flatMap((assignment) => {
+    const coverage = coverageByAssignmentId.get(assignment.id);
+    return coverage ? [{ ...coverage, assignment, state: userState.assignmentStates[assignment.id] }] : [];
+  });
 }
 
 export function buildMaterialSegmentProjection(runtime: CourseRuntimeData, material: Material, segmentId: string, userState: UserCourseState, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext, governance: DomainGovernanceState): MaterialSegmentProjection | null {
@@ -21,19 +46,17 @@ export function buildMaterialSegmentProjection(runtime: CourseRuntimeData, mater
   const coverages = runtime.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === material.id && coverage.segmentId === segment.id);
   const coverageByNode = new Map<string, MaterialKnowledgeCoverage[]>();
   coverages.forEach((coverage) => coverageByNode.set(coverage.nodeId, [...(coverageByNode.get(coverage.nodeId) ?? []), coverage]));
-  const knowledgeById = new Map(knowledgeRepository.getNodes([...coverageByNode.keys()], access).map((node) => [node.id, node]));
   const knowledgeContexts = Array.from(coverageByNode).flatMap(([nodeId, items]) => {
-    const node = knowledgeById.get(nodeId);
-    const domain = resolveNodeDomain(nodeId, governance).domain;
-    return node ? [{ nodeId, title: node.title, description: node.description, roles: Array.from(new Set(items.map((item) => item.role))), color: domain?.canonicalColor ?? UNCLASSIFIED_DOMAIN_COLOR }] : [];
+    const context = buildMaterialKnowledgeContext(nodeId, items.map((item) => item.role), knowledgeRepository, access, governance);
+    return context ? [context] : [];
   });
   const assignmentIds = new Set([
     ...(segment.assignmentIds ?? []),
     ...runtime.assignmentCoverages.filter((coverage) => coverageByNode.has(coverage.nodeId)).map((coverage) => coverage.assignmentId)
   ]);
-  const assignmentContexts = runtime.assignments.filter((assignment) => assignmentIds.has(assignment.id)).map((assignment) => {
+  const pageAssignmentContexts = runtime.assignments.filter((assignment) => assignmentIds.has(assignment.id)).map((assignment) => {
     const coverage = runtime.assignmentCoverages.find((item) => item.assignmentId === assignment.id && coverageByNode.has(item.nodeId));
     return { id: coverage?.id ?? `material-assignment-${material.id}-${segment.id}-${assignment.id}`, assignmentId: assignment.id, nodeId: coverage?.nodeId ?? knowledgeContexts[0]?.nodeId ?? "", role: coverage?.role ?? "practice", assignment, state: userState.assignmentStates[assignment.id] };
   });
-  return { segment, knowledgeContexts, assignmentContexts };
+  return { segment, knowledgeContexts, pageAssignmentContexts };
 }
