@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildKnowledgeEdges, createKnowledgeEdgeId, globalKnowledgeGraph, knowledgeEdges, knowledgeNodes } from "./knowledge/graph";
+import { buildKnowledgeEdges, createKnowledgeEdgeId, type EdgeSeed } from "./knowledge/graph";
+import {
+  demoGlobalKnowledgeGraph as globalKnowledgeGraph,
+  demoKnowledgeEdges as knowledgeEdges,
+  demoKnowledgeNodes as knowledgeNodes
+} from "./demo/knowledge/demoGlobalKnowledgeGraph.fixture";
 import { buildGlobalAtlasProjection } from "./knowledge/projections/atlasProjections";
 import { applyAutomaticAssignment, decideDomainAssignment, DEFAULT_DOMAIN_DISCOVERY_CONFIG, scoreNodeAgainstDomains } from "./knowledge/domain/domainScoring";
 import { demoDomainDiscoveryService } from "./demo/domains/DemoDomainDiscoveryService";
@@ -20,7 +25,6 @@ import { demoPersonalKnowledgeGraph } from "./demo/user/demoPersonalKnowledgeGra
 import { DOMAIN_GOVERNANCE_SCHEMA_VERSION, migrateDomainGovernanceStateToGlobalV1, reconcileDomainGovernanceState } from "./knowledge/domain/LocalStorageDomainGovernanceRepository";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import type { EdgeSeed } from "./knowledge/seeds";
 import { DomainGovernanceService } from "./knowledge/domain/DomainGovernanceService";
 import { InMemoryKnowledgeRepository } from "./knowledge/repository/InMemoryKnowledgeRepository";
 import type { DomainGovernanceRepository, DomainGovernanceState } from "./knowledge/domain/DomainGovernanceRepository";

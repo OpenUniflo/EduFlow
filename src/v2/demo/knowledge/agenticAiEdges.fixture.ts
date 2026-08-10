@@ -1,4 +1,4 @@
-import type { EdgeSeed } from "./types";
+import type { EdgeSeed } from "../../knowledge/graph";
 
 /**
  * These manually reviewed relations form the current demo canonical graph and

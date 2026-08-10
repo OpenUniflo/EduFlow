@@ -184,7 +184,7 @@ Generic Domain application logic composes `KnowledgeRepository + DomainGovernanc
 
 ### Demo Data Boundary
 
-Agentic AI, Python Engineering, their membership lists, and deterministic proposal identities are demo data under explicit fixtures/adapters. Demo fixtures are not ontology rules or production repositories. Moving a KnowledgeNode between fixture files has no effect on membership without a DomainAssignment change.
+Agentic AI, Python Engineering, their concrete node and edge lists, demo graph assembly, membership lists, and deterministic proposal identities are demo data under `src/v2/demo/knowledge` and other explicit Demo fixtures/adapters. The Core `src/v2/knowledge` package contains no concrete ontology fixture. Demo fixtures are not ontology rules or production repositories. Moving a KnowledgeNode between fixture files has no effect on membership without a DomainAssignment change.
 
 ## 25. Community
 
@@ -315,4 +315,4 @@ Local persistence uses a versioned envelope. Load validates scope identity and n
 
 Core Knowledge, Course, Material, Progress, and Profile modules define reusable models, validators, repositories, and projections. They never import `src/v2/demo`. Concrete Course repositories, personal Knowledge fixtures, Domain seeds, and static Knowledge graphs live on the Demo side and depend inward on Core contracts; only the composition root wires them together.
 
-The current static Knowledge graph is a prototype fixture, not a production runtime source. Backend repositories must supply scoped graph data through `KnowledgeRepository` without importing fixture singletons.
+The current static Knowledge graph is owned by `src/v2/demo/knowledge` as a prototype fixture, not a production runtime source. Backend repositories must supply scoped graph data through `KnowledgeRepository` without importing fixture singletons.

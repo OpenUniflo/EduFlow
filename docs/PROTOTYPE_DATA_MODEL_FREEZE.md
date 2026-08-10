@@ -31,6 +31,16 @@ Chapter, Lesson, Coverage, Material, Segment, and Assignment order are explicit 
 
 Core packages do not import Demo fixtures or repositories. Demo depends on Core and is injected at the composition root. Knowledge visibility and Domain mutations receive explicit `KnowledgeAccessContext`; progress is finite `0..100`; runtime relations are validated before projection.
 
+## Final Boundary Cleanup
+
+1. Concrete Knowledge fixtures are owned by `src/v2/demo/knowledge`.
+2. Core packages no longer own Demo Knowledge data.
+3. Cross-course projections treat Course-owned IDs as scoped by `(courseId, entityId)`.
+4. Generic `AtlasHome` contains no concrete Demo course identity.
+5. Backend work begins from the existing Repository boundaries after this cleanup.
+
+This cleanup does not reopen the frozen V1 domain model.
+
 ## Deferred Beyond Freeze
 
 Real Knowledge, Domain, Course Creation, Workflow, Evaluation, Auth, and asynchronous query backends remain future adapter/application work. WorkflowTemplate referential integrity waits for a WorkflowRepository, and Assignment completion still uses the current Demo run-end behavior until the Evaluation pipeline exists.

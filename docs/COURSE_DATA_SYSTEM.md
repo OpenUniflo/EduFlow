@@ -60,6 +60,10 @@ Course-specific text and fixtures live under `src/v2/demo`. Generic pages, proje
 
 The current repository is in-memory demo infrastructure. Its interface is designed so an API-backed repository can replace it without changing routes, projections, or page behavior.
 
+## 14. Entity Identity Scope
+
+`KnowledgeNode` identity may be reused by multiple Courses. Course-owned entity IDs are stable within a Course and MUST NOT be assumed globally unique across Course boundaries. Cross-course projections use `(courseId, entityId)` identity or runtime-local lookup; this does not add composite ID fields to persisted entities.
+
 ## 14. Non-goals
 
 This version does not implement a production course-generation backend, authoring studio, server synchronization, grading, submission history, or artifact dependency engine.

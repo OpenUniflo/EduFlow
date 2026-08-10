@@ -1,5 +1,5 @@
-import type { KnowledgeNode } from "../types";
-import { legacyPythonNode as legacyPython, pythonNode as p, splitPythonNode as splitPython } from "./nodeFactory";
+import type { KnowledgeNode } from "../../knowledge/types";
+import { legacyPythonNode as legacyPython, pythonNode as p, splitPythonNode as splitPython } from "./demoKnowledgeNodeFactory.fixture";
 
 export const pythonEngineeringNodes: KnowledgeNode[] = [
   p("PY01", "Python Runtime", "理解 Python 程序的运行环境与执行模型。"),

@@ -1,4 +1,4 @@
-import { globalKnowledgeGraph } from "../../knowledge/graph";
+import { demoGlobalKnowledgeGraph } from "../knowledge/demoGlobalKnowledgeGraph.fixture";
 import { assertDirectedAcyclic, transitiveReduction } from "../../knowledge/graphAlgorithms";
 import type {
   CourseChapterEdge,
@@ -145,11 +145,11 @@ export const userAssignmentStates: UserAssignmentState[] = courseAssignments.map
   progress: index < 5 ? 100 : index < 9 ? [70, 45, 30, 20][index - 5] : 0
 }));
 
-const nodeById = new Map(globalKnowledgeGraph.nodes.map((node) => [node.id, node]));
+const nodeById = new Map(demoGlobalKnowledgeGraph.nodes.map((node) => [node.id, node]));
 const lessonById = new Map(curriculumLessons.map((lesson) => [lesson.id, lesson]));
 const chapterById = new Map(curriculumChapters.map((chapter) => [chapter.id, chapter]));
 const courseNodeIds = new Set(curriculumCoverages.map((coverage) => coverage.nodeId).filter((id) => nodeById.get(id)?.status === "active"));
-export const courseSkillTreeEdges: CourseSkillTreeEdge[] = globalKnowledgeGraph.edges
+export const courseSkillTreeEdges: CourseSkillTreeEdge[] = demoGlobalKnowledgeGraph.edges
   .filter((edge) => courseNodeIds.has(edge.source) && courseNodeIds.has(edge.target))
   .map((edge) => ({ ...edge }));
 

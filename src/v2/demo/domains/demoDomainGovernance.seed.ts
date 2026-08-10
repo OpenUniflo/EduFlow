@@ -2,7 +2,7 @@ import { demoDomainDiscoveryService } from "./DemoDomainDiscoveryService";
 import type { DomainAssignmentCandidate } from "../../knowledge/domain/domainTypes";
 import type { DomainGovernanceState } from "../../knowledge/domain/DomainGovernanceRepository";
 import { validateDomainGovernance } from "../../knowledge/domain/domainValidation";
-import { knowledgeNodes } from "../../knowledge/graph";
+import { demoKnowledgeNodes } from "../knowledge/demoGlobalKnowledgeGraph.fixture";
 import { demoPersonalKnowledgeGraph } from "../user/demoPersonalKnowledgeGraph.fixture";
 import { demoDomainAssignments, DEMO_DOMAIN_ASSIGNMENT_TIME } from "./demoDomainAssignments.fixture";
 import { demoKnowledgeDomains } from "./demoDomains.fixture";
@@ -18,7 +18,7 @@ export function demoDomainGovernanceSeed(): DomainGovernanceState {
     domains,
     assignments: demoDomainAssignments.map((assignment) => ({ ...assignment })),
     candidates,
-    proposals: demoDomainDiscoveryService.discover(knowledgeNodes, domains),
+    proposals: demoDomainDiscoveryService.discover(demoKnowledgeNodes, domains),
     revision: 0
   };
   const errors = validateDomainGovernance(demoPersonalKnowledgeGraph, state);

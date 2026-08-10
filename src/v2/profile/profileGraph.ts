@@ -8,10 +8,12 @@ import type { DomainGovernanceState } from "../knowledge/domain/DomainGovernance
 import { resolveKnowledgeMaterialEntries } from "../material/materialNavigation";
 import { CURRICULUM_ROLE_PRIORITY } from "../course/curriculum/curriculumOrdering";
 
-function groupBy<T>(items: T[], key: (item: T) => string) {
-  const grouped = new Map<string, T[]>();
-  items.forEach((item) => grouped.set(key(item), [...(grouped.get(key(item)) ?? []), item]));
-  return grouped;
+function appendToGroup<T>(grouped: Map<string, T[]>, key: string, item: T) {
+  grouped.set(key, [...(grouped.get(key) ?? []), item]);
+}
+
+export function courseScopedId(courseId: string, entityId: string) {
+  return `${courseId}:${entityId}`;
 }
 
 export function getDirectExploreNodeIds(graph: KnowledgeGraph, coreIds: Set<string>) {
@@ -31,23 +33,53 @@ export function buildPersonalKnowledgeGraph(
   userCourseStates: UserCourseState[],
   governance: DomainGovernanceState
 ): PersonalKnowledgeGraph {
-  const assignments = runtimes.flatMap((runtime) => runtime.assignments);
-  const curriculum = runtimes.flatMap((runtime) => runtime.curriculumCoverages);
-  const lessons = runtimes.flatMap((runtime) => runtime.lessons);
-  const assignmentCoverage = runtimes.flatMap((runtime) => runtime.assignmentCoverages);
   const assignmentStateByCourse = new Map(userCourseStates.map((state) => [state.courseId, state.assignmentStates]));
-  const courseByAssignment = new Map(assignments.map((assignment) => [assignment.id, assignment.courseId]));
-  const materialIdsByCourseNode = new Map<string, string[]>();
-  runtimes.forEach((runtime) => runtime.materialKnowledgeCoverages.forEach((coverage) => {
-    const key = `${runtime.course.id}:${coverage.nodeId}`;
-    materialIdsByCourseNode.set(key, Array.from(new Set([...(materialIdsByCourseNode.get(key) ?? []), coverage.materialId])));
-  }));
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
-  const lessonById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
-  const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
   const recordById = new Map(userKnowledge.map((record) => [record.nodeId, record]));
-  const curriculumByNode = groupBy(curriculum, (coverage) => coverage.nodeId);
-  const assignmentByNode = groupBy(assignmentCoverage, (coverage) => coverage.nodeId);
+  const curriculumByNode = new Map<string, CurriculumContext[]>();
+  const assignmentByNode = new Map<string, PersonalAssignmentContext[]>();
+
+  runtimes.forEach((runtime) => {
+    const courseId = runtime.course.id;
+    const lessonById = new Map(runtime.lessons.map((lesson) => [lesson.id, lesson]));
+    const assignmentById = new Map(runtime.assignments.map((assignment) => [assignment.id, assignment]));
+    const materialIdsByNode = new Map<string, string[]>();
+    runtime.materialKnowledgeCoverages.forEach((coverage) => {
+      materialIdsByNode.set(coverage.nodeId, Array.from(new Set([...(materialIdsByNode.get(coverage.nodeId) ?? []), coverage.materialId])));
+    });
+
+    runtime.curriculumCoverages.forEach((coverage) => {
+      const lesson = lessonById.get(coverage.lessonId);
+      if (!lesson) return;
+      appendToGroup(curriculumByNode, coverage.nodeId, {
+        coverageId: coverage.id,
+        courseId,
+        lessonId: coverage.lessonId,
+        lessonOrder: lesson.order,
+        coverageOrder: coverage.order,
+        chapterId: lesson.chapterId,
+        role: coverage.role,
+        materialIds: materialIdsByNode.get(coverage.nodeId) ?? [],
+        materialEntries: resolveKnowledgeMaterialEntries(runtime, coverage.nodeId)
+      });
+    });
+
+    runtime.assignmentCoverages.forEach((coverage) => {
+      const assignment = assignmentById.get(coverage.assignmentId);
+      if (!assignment) return;
+      appendToGroup(assignmentByNode, coverage.nodeId, {
+        coverageId: coverage.id,
+        courseId,
+        assignmentId: assignment.id,
+        assignmentOrder: assignment.order,
+        title: assignment.title,
+        role: coverage.role,
+        workflowTemplateId: assignment.workflowTemplateId,
+        status: assignmentStateByCourse.get(courseId)?.[assignment.id]?.status ?? "not-started"
+      });
+    });
+  });
+
   userKnowledge.forEach((record) => {
     if (!nodeById.has(record.nodeId)) throw new Error(`Unknown user knowledge node: ${record.nodeId}`);
   });
@@ -66,38 +98,15 @@ export function buildPersonalKnowledgeGraph(
     const source = nodeById.get(id);
     if (!source || source.status !== "active") return [];
     const record = recordById.get(id);
-    const curriculumContexts: CurriculumContext[] = (curriculumByNode.get(id) ?? []).flatMap((coverage) => {
-      const lesson = lessonById.get(coverage.lessonId);
-      if (!lesson) return [];
-      return [{
-        coverageId: coverage.id,
-        courseId: coverage.courseId,
-        lessonId: coverage.lessonId,
-        lessonOrder: lesson.order,
-        coverageOrder: coverage.order,
-        chapterId: lesson.chapterId,
-        role: coverage.role,
-        materialIds: materialIdsByCourseNode.get(`${coverage.courseId}:${id}`) ?? [],
-        materialEntries: resolveKnowledgeMaterialEntries(runtimes.find((runtime) => runtime.course.id === coverage.courseId)!, id)
-      }];
-    }).sort((left, right) => left.lessonOrder - right.lessonOrder
+    const curriculumContexts = [...(curriculumByNode.get(id) ?? [])].sort((left, right) => left.lessonOrder - right.lessonOrder
       || left.coverageOrder - right.coverageOrder
       || CURRICULUM_ROLE_PRIORITY[left.role] - CURRICULUM_ROLE_PRIORITY[right.role]
+      || left.courseId.localeCompare(right.courseId)
       || left.coverageId.localeCompare(right.coverageId));
-    const assignmentContexts: PersonalAssignmentContext[] = (assignmentByNode.get(id) ?? []).flatMap((coverage) => {
-      const assignment = assignmentById.get(coverage.assignmentId);
-      if (!assignment) return [];
-      return [{
-        coverageId: coverage.id,
-        courseId: assignment.courseId,
-        assignmentId: assignment.id,
-        assignmentOrder: assignment.order,
-        title: assignment.title,
-        role: coverage.role,
-        workflowTemplateId: assignment.workflowTemplateId,
-        status: assignmentStateByCourse.get(courseByAssignment.get(assignment.id) ?? "")?.[assignment.id]?.status ?? "not-started"
-      }];
-    }).sort((left, right) => left.assignmentOrder - right.assignmentOrder || left.assignmentId.localeCompare(right.assignmentId) || left.coverageId.localeCompare(right.coverageId));
+    const assignmentContexts = [...(assignmentByNode.get(id) ?? [])].sort((left, right) => left.assignmentOrder - right.assignmentOrder
+      || left.courseId.localeCompare(right.courseId)
+      || left.assignmentId.localeCompare(right.assignmentId)
+      || left.coverageId.localeCompare(right.coverageId));
     const domain = resolveNodeDomain(id, governance).domain;
     return [{
       id,
@@ -134,7 +143,9 @@ export function buildPersonalKnowledgeGraph(
       mastered: nodes.filter((node) => node.status === "mastered").length,
       learning: nodes.filter((node) => node.status === "learning").length,
       explore: nodes.filter((node) => node.status === "explore").length,
-      completedAssignments: new Set(nodes.flatMap((node) => node.assignmentContexts.filter((context) => context.status === "completed").map((context) => context.assignmentId))).size,
+      completedAssignments: new Set(nodes.flatMap((node) => node.assignmentContexts
+        .filter((context) => context.status === "completed")
+        .map((context) => courseScopedId(context.courseId, context.assignmentId)))).size,
       crossDomainConnections: calculateCrossDomainConnections(graph, coreIds, effectiveEdges, governance.assignments),
       connectivity: calculateKnowledgeConnectivity(coreIds, effectiveEdges),
       currentLearningId

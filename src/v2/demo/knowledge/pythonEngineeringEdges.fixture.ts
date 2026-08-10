@@ -1,4 +1,4 @@
-import type { EdgeSeed } from "./types";
+import type { EdgeSeed } from "../../knowledge/graph";
 
 /** Manually reviewed canonical relations for the Python Engineering demo Domain. */
 export const pythonEngineeringEdgeSeeds: EdgeSeed[] = [

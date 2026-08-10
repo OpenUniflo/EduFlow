@@ -1,5 +1,5 @@
-import type { KnowledgeNode } from "../types";
-import { agenticNode as a, legacyAgenticNode as legacy } from "./nodeFactory";
+import type { KnowledgeNode } from "../../knowledge/types";
+import { agenticNode as a, legacyAgenticNode as legacy } from "./demoKnowledgeNodeFactory.fixture";
 
 export const agenticAiNodes: KnowledgeNode[] = [
   legacy("H01", "Agentic AI 全景", ["AG01", "H02", "H03"]),

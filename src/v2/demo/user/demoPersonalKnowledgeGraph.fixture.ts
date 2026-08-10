@@ -1,4 +1,4 @@
-import { globalKnowledgeGraph } from "../../knowledge/graph";
+import { demoGlobalKnowledgeGraph } from "../knowledge/demoGlobalKnowledgeGraph.fixture";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeRevision } from "../../knowledge/types";
 import type { UserKnowledgeRecord, UserKnowledgeStatus } from "../../profile/types";
 
@@ -44,10 +44,10 @@ export const demoUserRelation: KnowledgeEdge = {
 };
 
 export const demoPersonalKnowledgeGraph: KnowledgeGraph = {
-  ...globalKnowledgeGraph,
-  nodes: [...globalKnowledgeGraph.nodes, demoUserNode],
-  revisions: [...globalKnowledgeGraph.revisions, demoUserRevision],
-  edges: [...globalKnowledgeGraph.edges, demoUserRelation]
+  ...demoGlobalKnowledgeGraph,
+  nodes: [...demoGlobalKnowledgeGraph.nodes, demoUserNode],
+  revisions: [...demoGlobalKnowledgeGraph.revisions, demoUserRevision],
+  edges: [...demoGlobalKnowledgeGraph.edges, demoUserRelation]
 };
 
 function courseEvidence(nodeId: string, lesson: number, alsoSupportsNodeIds?: string[]) {

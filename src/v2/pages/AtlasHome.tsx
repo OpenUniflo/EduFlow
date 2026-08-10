@@ -96,7 +96,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
             <button className="atlas-send" type="button" aria-label="生成课程" onClick={createCourse}>{generating ? <span className="atlas-spinner" /> : <Send size={18} />}</button>
           </div>
           <div className="atlas-quick-actions">
-            {["根据课件生成技能树", "创建 15 课时 Agentic AI 课程", "补充前置依赖、评测和最终项目"].map((label) => <button key={label} onClick={() => setPrompt(label)}>{label}</button>)}
+            {["根据课件生成技能树", "根据主题生成一门 15 课时完整课程", "补充前置依赖、评测和最终项目"].map((label) => <button key={label} onClick={() => setPrompt(label)}>{label}</button>)}
           </div>
           {generating ? (
             <div className="atlas-generation glass-v2" aria-live="polite">

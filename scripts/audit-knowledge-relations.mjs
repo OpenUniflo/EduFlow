@@ -3,23 +3,23 @@ import { createServer } from "vite";
 const server = await createServer({ appType: "custom", server: { middlewareMode: true }, logLevel: "error" });
 
 try {
-  const [{ globalKnowledgeGraph }, { demoDomainGovernanceSeed }, { auditDomainRelations, validateKnowledgeRelations }] = await Promise.all([
-    server.ssrLoadModule("/src/v2/knowledge/graph.ts"),
+  const [{ demoGlobalKnowledgeGraph }, { demoDomainGovernanceSeed }, { auditDomainRelations, validateKnowledgeRelations }] = await Promise.all([
+    server.ssrLoadModule("/src/v2/demo/knowledge/demoGlobalKnowledgeGraph.fixture.ts"),
     server.ssrLoadModule("/src/v2/demo/domains/demoDomainGovernance.seed.ts"),
     server.ssrLoadModule("/src/v2/knowledge/relationAudit.ts")
   ]);
   const governance = demoDomainGovernanceSeed();
-  const titleById = new Map(globalKnowledgeGraph.nodes.map((node) => [node.id, node.title]));
+  const titleById = new Map(demoGlobalKnowledgeGraph.nodes.map((node) => [node.id, node.title]));
   const formatNodes = (ids) => ids.length ? ids.map((id) => `- ${id} ${titleById.get(id) ?? "Unknown"}`).join("\n") : "- None";
 
-  const activeNodeIds = new Set(globalKnowledgeGraph.nodes.filter((node) => node.status === "active").map((node) => node.id));
+  const activeNodeIds = new Set(demoGlobalKnowledgeGraph.nodes.filter((node) => node.status === "active").map((node) => node.id));
   const assignedDomainIds = new Set(governance.assignments.filter((assignment) => activeNodeIds.has(assignment.nodeId)).map((assignment) => assignment.domainId));
   const auditableDomains = governance.domains
     .filter((domain) => domain.status === "active" && assignedDomainIds.has(domain.id))
     .sort((left, right) => left.id.localeCompare(right.id));
 
   for (const domain of auditableDomains) {
-    const audit = auditDomainRelations(globalKnowledgeGraph, governance.assignments, domain.id);
+    const audit = auditDomainRelations(demoGlobalKnowledgeGraph, governance.assignments, domain.id);
     const label = domain.name;
     console.log(`${label}\n${"-".repeat(label.length)}`);
     console.log(`Active nodes: ${audit.activeNodeCount}`);
@@ -30,7 +30,7 @@ try {
     console.log(`Low-degree:\n${formatNodes(audit.lowDegreeNodeIds)}\n`);
   }
 
-  const issues = validateKnowledgeRelations(globalKnowledgeGraph);
+  const issues = validateKnowledgeRelations(demoGlobalKnowledgeGraph);
   console.log(`Relation validation: ${issues.length ? "FAILED" : "passed"}`);
   if (issues.length) {
     console.error(issues.map((issue) => `- ${issue}`).join("\n"));

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { DemoCourseRepository } from "./demo/courses/DemoCourseRepository";
@@ -410,6 +410,23 @@ describe("Material and progress generalization", () => {
     expect(readFileSync(join(process.cwd(), "src/v2/course/repository/CourseRepository.ts"), "utf8")).not.toContain("DemoCourseRepository");
   });
 
+  it("owns concrete Knowledge fixtures only in the Demo layer", () => {
+    ["agenticAiNodes.ts", "pythonEngineeringNodes.ts", "agenticAiEdges.ts", "pythonEngineeringEdges.ts", "sharedEdges.ts"].forEach((file) => {
+      expect(existsSync(join(process.cwd(), "src/v2/knowledge/seeds", file))).toBe(false);
+    });
+    expect(existsSync(join(process.cwd(), "src/v2/demo/knowledge/demoGlobalKnowledgeGraph.fixture.ts"))).toBe(true);
+
+    const genericFiles = ["knowledge", "course", "material", "progress", "profile"].flatMap((root) => {
+      const output = execFileSync("rg", ["--files", `src/v2/${root}`], { cwd: process.cwd(), encoding: "utf8" });
+      return output.trim().split("\n").filter((file) => /\.(ts|tsx)$/.test(file));
+    });
+    const genericSource = [
+      ...genericFiles.map((file) => readFileSync(join(process.cwd(), file), "utf8")),
+      readFileSync(join(process.cwd(), "src/v2/pages/AtlasHome.tsx"), "utf8")
+    ].join("\n");
+    expect(genericSource).not.toMatch(/Agentic AI|Python Engineering|student@knowledge-atlas\.local|U-DEMO-01/);
+  });
+
   it("uses the dedicated Assignment modal class without changing Workflow Library cards", () => {
     const lessonPage = readFileSync(join(process.cwd(), "src/v2/pages/LessonPage.tsx"), "utf8");
     const workflowLibrary = readFileSync(join(process.cwd(), "src/v2/pages/WorkflowLibraryPage.tsx"), "utf8");
@@ -472,6 +489,65 @@ describe("Material and progress generalization", () => {
     const graphB = buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(userB)), applicationServices.userKnowledgeRepository.getUserKnowledge(userB), repository.listCourseRuntimes(), statesFor(userB), governance);
     expect(graphA.nodes.map((node) => node.id)).not.toEqual(graphB.nodes.map((node) => node.id));
     expect(graphA.summary).not.toEqual(graphB.summary);
+  });
+
+  it("preserves course-scoped Lesson, Assignment, and Coverage identities in Personal Atlas", () => {
+    const node: KnowledgeNode = {
+      id: "shared-node",
+      title: "Shared Node",
+      description: "Shared Node",
+      type: "conceptual",
+      masteryCriteria: ["Explain the node"],
+      scope: "global",
+      provenance: [{ sourceType: "manual", sourceId: "test" }],
+      currentRevisionId: "shared-node-r1",
+      status: "active"
+    };
+    const graph: KnowledgeGraph = { nodes: [node], revisions: [], edges: [] };
+    const runtime = (courseId: string, title: string): CourseRuntimeData => ({
+      course: { id: courseId, title, description: title },
+      curriculum: { id: "curriculum-01", courseId, generationMode: "manual" },
+      chapters: [{ id: "chapter-01", courseId, title: `${title} Chapter`, description: title, order: 0, color: "#000000", outcome: title }],
+      lessons: [{ id: "lesson-01", courseId, chapterId: "chapter-01", title: `${title} Lesson`, order: 0 }],
+      curriculumCoverages: [{ id: "coverage-01", courseId, lessonId: "lesson-01", nodeId: node.id, role: "introduce", order: 0 }],
+      curriculumSequences: [],
+      assignments: [{ id: "assignment-01", courseId, order: 0, title: `${title} Assignment`, description: title, requirements: [title], expectedOutput: title, acceptanceCriteria: [title], mode: "instruction" }],
+      assignmentCoverages: [{ id: "assignment-coverage-01", assignmentId: "assignment-01", nodeId: node.id, role: "practice" }],
+      materials: [],
+      materialKnowledgeCoverages: [],
+      revision: "v1"
+    });
+    const runtimeA = runtime("course-a", "Course A");
+    const runtimeB = runtime("course-b", "Course B");
+    const state = (courseId: string, completed: boolean): UserCourseState => ({
+      userId: "user-1",
+      courseId,
+      assignmentStates: {
+        "assignment-01": { assignmentId: "assignment-01", status: completed ? "completed" : "not-started", progress: completed ? 100 : 0 }
+      },
+      materialStates: {},
+      updatedAt: "2026-08-10T00:00:00.000Z"
+    });
+    const states = [state("course-a", true), state("course-b", false)];
+    const userRecord = [{ nodeId: node.id, status: "mastered" as const, mastery: 100 }];
+    const governance = { domains: [], assignments: [], candidates: [], proposals: [], revision: 0 };
+
+    const projected = buildPersonalKnowledgeGraph(graph, userRecord, [runtimeA, runtimeB], states, governance);
+    const reversed = buildPersonalKnowledgeGraph(graph, userRecord, [runtimeB, runtimeA], states, governance);
+    const projectedNode = projected.nodes[0];
+
+    expect(projectedNode.curriculumContexts.map((context) => [context.courseId, context.lessonId, context.coverageId])).toEqual([
+      ["course-a", "lesson-01", "coverage-01"],
+      ["course-b", "lesson-01", "coverage-01"]
+    ]);
+    expect(projectedNode.assignmentContexts.map((context) => [context.courseId, context.assignmentId, context.title, context.status])).toEqual([
+      ["course-a", "assignment-01", "Course A Assignment", "completed"],
+      ["course-b", "assignment-01", "Course B Assignment", "not-started"]
+    ]);
+    expect(projected.summary.completedAssignments).toBe(1);
+    expect(reversed.nodes[0].curriculumContexts).toEqual(projectedNode.curriculumContexts);
+    expect(reversed.nodes[0].assignmentContexts).toEqual(projectedNode.assignmentContexts);
+    expect(reversed.summary).toEqual(projected.summary);
   });
 });
 

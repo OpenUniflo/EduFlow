@@ -243,6 +243,21 @@
 - Demo repositories, user fixtures, concrete courses, Domains, and static graphs depend inward on Core interfaces and types. The application composition root may wire Demo adapters into Core boundaries.
 - Static demo Knowledge graphs are fixtures only; production repositories MUST NOT import or treat them as runtime authority.
 
+## Demo / Core Boundary
+
+- Concrete demo Knowledge data MUST live under `src/v2/demo`. Core Knowledge packages contain reusable models, repositories, validation, algorithms, governance, and projections only.
+- Agentic AI and Python Engineering node lists, edge fixtures, global demo graphs, demo user identities, and concrete course fixtures MUST NOT be owned by Core packages.
+
+## Course-Scoped Identity
+
+- `Course.id`, `KnowledgeNode.id`, and governed `KnowledgeDomain.id` are global identities within their respective repositories.
+- Course-owned `CurriculumChapter`, `CurriculumLesson`, `CurriculumCoverage`, `CurriculumSequence`, `Material`, `MaterialSegment`, `CourseAssignment`, `AssignmentCoverage`, and `MaterialKnowledgeCoverage` IDs MUST NOT be assumed globally unique across Courses.
+- Cross-course projections MUST scope Course-owned identity by `courseId` or resolve entities inside each `CourseRuntimeData`.
+
+## UI Demo Boundary
+
+- Generic product pages MUST NOT contain concrete Demo course identities such as Agentic AI or Python Engineering unless that content is explicitly injected by a Demo configuration or adapter.
+
 ## Material Invariants
 
 - `Material` belongs to a Course and Lesson and is composed of addressable `MaterialSegment` records.

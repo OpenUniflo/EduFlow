@@ -1,31 +1,12 @@
 import type {
   KnowledgeEdge,
-  KnowledgeGraph,
-  KnowledgeNode,
-  KnowledgeNodeRevision
+  KnowledgeGraph
 } from "./types";
 import { validateKnowledgeRelations } from "./relationAudit";
-import { agenticAiEdgeSeeds, pythonEngineeringEdgeSeeds, sharedEdgeSeeds, type EdgeSeed } from "./seeds";
-import { agenticAiNodes } from "./seeds/agenticAiNodes";
-import { DEMO_TIME } from "./seeds/nodeFactory";
-import { pythonEngineeringNodes } from "./seeds/pythonEngineeringNodes";
 
-export const knowledgeNodes: KnowledgeNode[] = [...agenticAiNodes, ...pythonEngineeringNodes];
-
-export const knowledgeNodeRevisions: KnowledgeNodeRevision[] = knowledgeNodes.map((node) => ({
-  id: node.currentRevisionId,
-  nodeId: node.id,
-  version: 1,
-  title: node.title,
-  description: node.description,
-  type: node.type,
-  masteryCriteria: node.masteryCriteria,
-  createdBy: "global-admin-demo",
-  createdAt: node.createdAt ?? DEMO_TIME,
-  changeReason: "Knowledge Architecture v1 atomic ontology"
-}));
-
-const edgeSeeds = [...agenticAiEdgeSeeds, ...pythonEngineeringEdgeSeeds, ...sharedEdgeSeeds];
+export type EdgeSeed =
+  | [string, string, "prerequisite", "hard" | "soft", string]
+  | [string, string, "enables" | "related", number, string];
 
 function edgeIdPart(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -47,8 +28,6 @@ export function buildKnowledgeEdges(seeds: EdgeSeed[]): KnowledgeEdge[] {
   });
 }
 
-export const knowledgeEdges = buildKnowledgeEdges(edgeSeeds);
-
 function assertUnique(label: string, ids: string[]) {
   const seen = new Set<string>();
   ids.forEach((id) => {
@@ -57,7 +36,7 @@ function assertUnique(label: string, ids: string[]) {
   });
 }
 
-function validateGraph(graph: KnowledgeGraph) {
+export function validateKnowledgeGraph(graph: KnowledgeGraph) {
   assertUnique("node", graph.nodes.map((item) => item.id));
   assertUnique("revision", graph.revisions.map((item) => item.id));
   assertUnique("edge", graph.edges.map((item) => item.id));
@@ -77,11 +56,3 @@ function validateGraph(graph: KnowledgeGraph) {
   const relationIssues = validateKnowledgeRelations(graph);
   if (relationIssues.length) throw new Error(relationIssues.join("\n"));
 }
-
-export const globalKnowledgeGraph: KnowledgeGraph = {
-  nodes: knowledgeNodes,
-  revisions: knowledgeNodeRevisions,
-  edges: knowledgeEdges
-};
-
-validateGraph(globalKnowledgeGraph);

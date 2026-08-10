@@ -1,4 +1,4 @@
-import type { KnowledgeNode, KnowledgeNodeType } from "../types";
+import type { KnowledgeNode, KnowledgeNodeType } from "../../knowledge/types";
 
 export const DEMO_TIME = "2026-08-01T00:00:00.000Z";
 
