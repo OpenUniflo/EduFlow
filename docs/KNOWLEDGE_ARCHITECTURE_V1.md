@@ -271,3 +271,15 @@ Global Atlas still projects only active Global nodes. Personal Atlas may project
 ## 39. Source PDF Boundary
 
 Source PDF files remain outside the Knowledge Ontology. Knowledge is connected to addressable source pages through `Material -> MaterialSegment -> MaterialKnowledgeCoverage -> KnowledgeNode`. PDF page identifiers do not become KnowledgeNode identities, and PDF visual content is not duplicated into KnowledgeNode definitions.
+
+## 40. Atomic Relation Reconstruction
+
+The canonical construction flow is `Source Content -> Atomic Knowledge Extraction -> Relation Reconstruction -> KnowledgeGraph`. Atomizing a composite node does not finish the migration: every active successor must be reviewed against both its sibling atoms and relevant atoms in other modules of the same semantic knowledge system. Relations previously implied by the composite title must be recreated only when they remain direct, factual `prerequisite`, `enables`, or `related` relations between active atomic nodes.
+
+Superseded composite nodes preserve identity and lineage but never act as topology bridges. Reconstruction preserves stable atomic IDs, revisions, provenance, and split/merge lineage.
+
+## 41. Relation Quality Audit
+
+Static canonical data is reviewed with undirected connected-component metrics, isolated-node review, degree-one review, and cross-module completeness review. Direction is ignored only for the connectivity metric; the stored relation retains its factual direction and strength.
+
+These metrics are review signals, not business validity thresholds. A mature Domain that unexpectedly fragments into many components should prompt a semantic completeness review before any layout response. Global cross-domain connectivity is not a Knowledge Graph quality requirement, and disconnected Domains may be correct.

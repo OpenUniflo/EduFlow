@@ -40,6 +40,13 @@ export function buildKnowledgeAssignmentContexts(runtime: CourseRuntimeData, nod
   });
 }
 
+export function buildMaterialKnowledgeRoles(runtime: CourseRuntimeData, materialId: string, nodeId: string | null): MaterialKnowledgeCoverage["role"][] {
+  if (!nodeId) return [];
+  return Array.from(new Set(runtime.materialKnowledgeCoverages
+    .filter((coverage) => coverage.materialId === materialId && coverage.nodeId === nodeId)
+    .map((coverage) => coverage.role)));
+}
+
 export function buildMaterialSegmentProjection(runtime: CourseRuntimeData, material: Material, segmentId: string, userState: UserCourseState, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext, governance: DomainGovernanceState): MaterialSegmentProjection | null {
   const segment = material.segments.find((item) => item.id === segmentId);
   if (!segment) return null;

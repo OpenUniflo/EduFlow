@@ -820,7 +820,9 @@
   --material-right: 320px;
   --material-shell-margin: 20px;
   --material-panel-gap: 16px;
-  --material-global-nav-reserve: 278px;
+  --material-global-nav-width: 242px;
+  --material-global-nav-gap: 16px;
+  --material-header-left: calc(var(--material-shell-margin) + var(--material-global-nav-width) + var(--material-global-nav-gap));
   --material-header-top: 16px;
   --material-header-height: 60px;
   --material-content-top: calc(var(--material-header-top) + var(--material-header-height) + var(--material-panel-gap));
@@ -841,13 +843,13 @@
   z-index: 42;
   top: var(--material-header-top);
   right: var(--material-shell-margin);
-  left: var(--material-shell-margin);
+  left: var(--material-header-left);
   display: grid;
   height: var(--material-header-height);
   grid-template-columns: 36px minmax(160px, 0.65fr) minmax(240px, 1fr);
   gap: 12px;
   align-items: center;
-  padding: 8px 16px 8px calc(var(--material-global-nav-reserve) - var(--material-shell-margin));
+  padding: 8px 16px;
   border-radius: 18px;
 }
 
@@ -1029,6 +1031,8 @@
 .material-reader-current .atlas-knowledge-mode.pinned > span { color: var(--atlas-brand); }
 .material-reader-current .atlas-active-knowledge { margin-top: 8px; padding: 13px; border-radius: 14px; background: rgba(255, 255, 255, 0.62); }
 .material-reader-current .atlas-active-knowledge h2 { margin: 0 0 5px; font-size: 18px; }
+.material-reader-current .atlas-active-knowledge-roles { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 7px; }
+.material-reader-current .atlas-active-knowledge-roles span { padding: 3px 6px; border-radius: 999px; color: var(--atlas-brand); background: rgba(105, 126, 230, 0.09); font-size: 7px; font-weight: 800; }
 .material-reader-current .atlas-active-knowledge p,
 .material-reader-current .atlas-material-empty { color: var(--atlas-muted); font-size: 9px; line-height: 1.65; }
 .material-reader-current .atlas-knowledge-pin { display: inline-flex; flex: 0 0 auto; gap: 5px; align-items: center; padding: 6px 8px; border-radius: 8px; color: var(--atlas-muted); background: rgba(105, 126, 230, 0.07); font-size: 8px; font-weight: 800; }
@@ -1061,11 +1065,11 @@
 }
 
 @media (max-width: 820px) {
-  .atlas-lesson-page.material-reader-current { --material-global-nav-reserve: 116px; }
+  .atlas-lesson-page.material-reader-current { --material-global-nav-width: 80px; }
 }
 
 @media (max-width: 760px) {
-  .atlas-lesson-page.material-reader-current { --material-shell-margin: 12px; --material-panel-gap: 10px; --material-left: 0px; --material-right: 0px; overflow-y: auto; }
+  .atlas-lesson-page.material-reader-current { --material-shell-margin: 12px; --material-panel-gap: 10px; --material-global-nav-gap: 12px; --material-left: 0px; --material-right: 0px; overflow-y: auto; }
   .material-reader-current .atlas-lesson-header { grid-template-columns: 32px minmax(0, 1fr); }
   .material-reader-current .atlas-lesson-breadcrumb { display: none; }
   .material-reader-current .atlas-lesson-outline,
@@ -1073,10 +1077,6 @@
   .material-reader-current .atlas-lesson-scroll { right: var(--material-shell-margin); left: var(--material-shell-margin); padding: 18px 8px 82px; }
   .material-reader-current .atlas-lesson-slide { width: calc(100% - 4px); min-height: 360px; padding: 32px 24px; }
   .material-reader-current .atlas-lesson-controls { left: 50%; }
-}
-
-@media (max-width: 560px) {
-  .atlas-lesson-page.material-reader-current { --material-global-nav-reserve: 104px; }
 }
 
 body {

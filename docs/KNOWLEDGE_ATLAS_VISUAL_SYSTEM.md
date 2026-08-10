@@ -68,3 +68,9 @@ Initial Camera setup may occur once during scene initialization, but it must com
 A visible KnowledgeNode may participate in zero, one, or several courses. Atlas details expose these as `courseContexts[]` and require an explicit course choice when more than one navigation target exists. Course context changes labels and navigation only; it does not change node coordinates, force lifecycle, or camera state.
 
 Material Knowledge Context uses the same `KnowledgeDomain.canonicalColor` hue as Global and Personal Atlas, including the shared Unclassified fallback.
+
+## Topology Responsibility
+
+Atlas renders the active KnowledgeNode and factual KnowledgeEdge topology supplied by its projection. It does not repair missing semantic relations, add same-domain links, infer course or layout edges, or force disconnected components together.
+
+KnowledgeDomain controls governed semantic classification and canonical hue; it does not constrain geometry or imply connectivity. Different Domains may legitimately appear as separate islands. Before adding layout compensation for surprising fragmentation inside one coherent, mature Domain, relation completeness should be audited first. Personal Atlas may likewise contain disconnected islands when the user's core and one-hop Explore facts do not connect them.

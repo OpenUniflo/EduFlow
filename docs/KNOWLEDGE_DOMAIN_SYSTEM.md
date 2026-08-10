@@ -56,6 +56,8 @@ Atlas hue resolves through `DomainAssignment → KnowledgeDomain.canonicalColor`
 
 Domain changes may change color, filters, statistics, search, and classification. They must not reconstruct structural graph data, reheat Force, reset the camera, alter coordinates, or mutate KnowledgeEdges.
 
+Domain membership does not imply a direct KnowledgeEdge or require members to be mutually connected. No same-domain link is synthesized for Atlas layout or connectivity.
+
 The current semantic scorer is a deterministic tokenization + Jaccard scaffold. The current discovery service is a review-flow scaffold, not real automatic Domain discovery. P1 replaces them with embedding kNN, a KnowledgeEdge-weighted similarity graph, and Leiden or an equivalent community algorithm; proposals still require governance confirmation.
 
 ## Future Merge/Split and Non-goals

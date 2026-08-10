@@ -27,6 +27,14 @@
 - `clusterId` and persistent Knowledge Cluster structures MUST NOT be added to the v1 core model.
 - Fake nodes or edges MUST NOT be created for layout, composition, islands, bridges, chapters, or demos.
 
+## Knowledge Relation Invariants
+
+- Knowledge Atlas topology MUST be derived from real KnowledgeEdge facts. KnowledgeDomain membership and same-domain visual attraction MUST NOT create or imply synthetic KnowledgeEdges.
+- Cross-domain connectivity is not a quality requirement. The absence of a cross-domain KnowledgeEdge may be meaningful and MUST NOT be repaired for presentation.
+- Atomic Knowledge extraction MUST be followed by relation reconstruction covering within-module facts, cross-module facts inside the same semantic knowledge system, and relations lost when composite nodes were atomized.
+- Unexpected fragmentation in a mature Domain SHOULD trigger relation completeness review before layout compensation.
+- Relation quality review SHOULD inspect connected components, isolated nodes, low-degree nodes, and missing cross-module facts. These are audit signals, never reasons to manufacture edges.
+
 ## Atlas Views
 
 - Global Atlas renders active Global-scope nodes and factual edges only.
@@ -34,6 +42,7 @@
 - Personal Atlas uses deterministic relation-driven force layout. It MUST NOT use domain, cluster, chapter, community, or island anchors.
 - Community detection is an optional analysis technique, not a required product entity or visible region. Default Personal Atlas MUST NOT render community/island hulls, titles, quotas, or potential bridges.
 - Personal edges use a neutral undirected visual by default while preserving their factual relation and direction in data and details.
+- Personal Atlas MAY contain disconnected knowledge islands. Explore–Explore edges MUST NOT be revealed solely to preserve visual connectivity.
 
 ## Atlas Stability
 
@@ -203,6 +212,7 @@
 - Material Reader MUST reserve layout space for GlobalNav. GlobalNav and Material Header MUST NOT overlap or resolve overlap through z-index competition.
 - Material Header, Outline, PDF viewport, Knowledge panel, and bottom controls SHOULD share Material layout tokens instead of independent magic offsets.
 - Responsive GlobalNav reserve MUST contract when the global brand copy is hidden.
+- GlobalNav and Material Header MUST be visually independent floating panels; their backgrounds, borders, shadows, and panel surfaces MUST NOT overlap.
 
 ## Material Knowledge Context Invariants
 
@@ -211,6 +221,8 @@
 - Effective Knowledge resolves as pinned Knowledge, then selected Knowledge, then the deterministic current-page primary Knowledge.
 - While pinned, Knowledge Detail and Knowledge-specific Assignment Context stay attached to the pinned Knowledge; Current Page Knowledge coverage continues following the active MaterialSegment.
 - Unpinning immediately restores current-page-linked selection. Material identity changes clear the presentation-only Pin state.
+- Pinned Knowledge Context MUST remain stable while the PDF reading position changes. Pinned mode hides the primary Current Page Coverage region so page changes cannot displace or visually compete with pinned detail.
+- Pinning MUST NOT control PDF navigation. Unpinning MUST restore context from the current active MaterialSegment without changing the PDF position.
 
 ## Material Assignment Context Invariants
 

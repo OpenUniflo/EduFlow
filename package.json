@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",
+    "audit:knowledge": "node scripts/audit-knowledge-relations.mjs",
     "generate:demo-pdfs": "uv run --with reportlab scripts/generate-demo-pdfs.py",
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0"

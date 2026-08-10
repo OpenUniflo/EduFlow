@@ -15,7 +15,7 @@ import { globalKnowledgeAccess, userKnowledgeAccess } from "./knowledge/reposito
 import { resolveInitialMaterialSegment, resolveKnowledgeMaterialEntries, resolveKnowledgeMaterialEntry, buildMaterialDeepLink } from "./material/materialNavigation";
 import { classifySegmentQueryChange, selectPageAtReadingAnchor } from "./material/reader/materialReaderState";
 import { createMaterialKnowledgeContextState, reduceMaterialKnowledgeContextState, resolveEffectiveKnowledgeId } from "./material/reader/materialKnowledgeContextState";
-import { buildKnowledgeAssignmentContexts, buildMaterialKnowledgeContext, buildMaterialSegmentProjection } from "./material/materialProjection";
+import { buildKnowledgeAssignmentContexts, buildMaterialKnowledgeContext, buildMaterialKnowledgeRoles, buildMaterialSegmentProjection } from "./material/materialProjection";
 import { getDomainGovernanceSnapshot } from "./knowledge/domain/domainStore";
 import { createWorkflowRunRecord, type Template } from "../app/model";
 import { InMemoryKnowledgeRepository } from "./knowledge/repository/InMemoryKnowledgeRepository";
@@ -169,15 +169,17 @@ describe("Material and progress generalization", () => {
     expect(before.nodeId).toBe(after.nodeId);
     expect(after.color).toBe("#123456");
     expect(after).not.toBe(before);
+    expect(buildMaterialKnowledgeRoles(python, "python-quality-testing", "PY09")).toEqual(expect.arrayContaining(["introduce", "explain"]));
   });
 
-  it("reserves the Material Header through responsive layout tokens instead of nav magic offsets", () => {
+  it("gives the Material Header a real responsive boundary after the GlobalNav panel", () => {
     const styles = readFileSync(join(process.cwd(), "src/v2/styles.css"), "utf8");
-    expect(styles).toContain("--material-global-nav-reserve");
-    expect(styles).toContain("--material-global-nav-reserve: 116px");
-    expect(styles).toContain("--material-global-nav-reserve: 104px");
-    expect(styles).toContain("padding: 8px 16px 8px calc(var(--material-global-nav-reserve) - var(--material-shell-margin))");
-    expect(styles).not.toMatch(/material-reader-current \.atlas-lesson-header[^}]*left:\s*(?:92|72)px/s);
+    expect(styles).toContain("--material-global-nav-width: 242px");
+    expect(styles).toContain("--material-header-left: calc(var(--material-shell-margin) + var(--material-global-nav-width) + var(--material-global-nav-gap))");
+    expect(styles).toContain("--material-global-nav-width: 80px");
+    expect(styles).toMatch(/material-reader-current \.atlas-lesson-header[^}]*left:\s*var\(--material-header-left\)/s);
+    expect(styles).toMatch(/material-reader-current \.atlas-lesson-header[^}]*padding:\s*8px 16px/s);
+    expect(styles).not.toContain("--material-global-nav-reserve");
   });
 
   it("isolates progress by user, Course, Material, and explicit Assignment identity", () => {

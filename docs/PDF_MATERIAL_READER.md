@@ -71,10 +71,18 @@ Course runtime validation checks source metadata before rendering. Static public
 
 `activeSegmentId` remains the upstream reading position. It projects Current Page Knowledge, whose deterministic first item becomes the Auto Mode selection. `selectedKnowledgeId` changes when a user chooses another item on that page. `pinnedKnowledgeId` is an explicit stable ID override. Knowledge Detail and Knowledge-specific Assignments resolve from the effective ID: pinned, then selected, then current-page primary.
 
-Pin does not freeze the PDF, Outline, URL, or Current Page Knowledge list. It freezes only Knowledge Detail and its precisely scoped Assignment Context. Unpin resumes the current active page immediately. Knowledge UI state is downstream of `activeSegmentId` and never creates, settles, or restarts a Material navigation request.
+Pin does not freeze the PDF, Outline, URL, or active Segment. It freezes the full displayed Knowledge Context, including its indicator, title, roles, description, and precisely scoped Assignment Context. The primary Current Page Coverage list is hidden while pinned so ongoing page projections cannot compete with pinned content. Unpin resolves the current active page immediately without moving the PDF. Knowledge UI state is downstream of `activeSegmentId` and never creates, settles, or restarts a Material navigation request.
 
 ## 17. Layout Contract
 
-The Reader defines shared geometry tokens for shell margin, panel gap, left and right panel widths, Header height, content top, and the GlobalNav reserved footprint. The Header background may extend behind the fixed navigation layer, but its interactive content begins after the reserved footprint. When GlobalNav hides its brand copy, the responsive reserve contracts through the same token.
+The Reader defines shared geometry tokens for shell margin, panel gap, left and right panel widths, Header height, content top, responsive GlobalNav width, and the Header's real left boundary. GlobalNav and Header are separate floating panels: Header background, border, and shadow start after GlobalNav plus the shared gap and never extend behind it. When GlobalNav hides its brand copy, the width token contracts and the Header boundary follows automatically.
 
 Outline, PDF viewport, Knowledge Context, and bottom controls derive their geometry from the shared Material tokens. Layout avoids overlap by reserved space, never by placing the Material Header above GlobalNav with z-index.
+
+## 18. Pinned Knowledge Context
+
+PDF reading position continues to update `activeSegmentId`, page visibility, Outline, URL replacement, and progress while a Knowledge Context is pinned. The pinned context resolves fresh metadata from the stable `pinnedKnowledgeId`; no Knowledge object snapshot is stored. Explicit unpin restores the deterministic primary Knowledge for the current Segment.
+
+## 19. Floating Panel Layout
+
+GlobalNav, Material Header, Outline, PDF viewport, Knowledge Context, and controls are independent panel surfaces. Responsive layout changes shared tokens rather than distributing guessed offsets across selectors.

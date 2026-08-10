@@ -6,7 +6,7 @@ import { GlobalNav } from "../components/GlobalNav";
 import type { CourseRuntimeData } from "../course/runtime/courseRuntime";
 import { useDomainGovernance } from "../knowledge/domain/domainStore";
 import { userKnowledgeAccess } from "../knowledge/repository/KnowledgeRepository";
-import { buildKnowledgeAssignmentContexts, buildMaterialKnowledgeContext, buildMaterialSegmentProjection, getCourseMaterial } from "../material/materialProjection";
+import { buildKnowledgeAssignmentContexts, buildMaterialKnowledgeContext, buildMaterialKnowledgeRoles, buildMaterialSegmentProjection, getCourseMaterial } from "../material/materialProjection";
 import { MaterialControls } from "../material/reader/MaterialControls";
 import { MaterialKnowledgeContext } from "../material/reader/MaterialKnowledgeContext";
 import { createMaterialKnowledgeContextState, reduceMaterialKnowledgeContextState, resolveEffectiveKnowledgeId } from "../material/reader/materialKnowledgeContextState";
@@ -52,9 +52,11 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   const effectiveKnowledgeId = resolveEffectiveKnowledgeId(knowledgeContextState, currentPagePrimaryKnowledgeId);
   const effectiveKnowledge = useMemo(() => {
     if (!effectiveKnowledgeId) return null;
-    const roles = projection?.knowledgeContexts.find((context) => context.nodeId === effectiveKnowledgeId)?.roles ?? [];
+    const roles = knowledgeContextState.pinnedKnowledgeId
+      ? buildMaterialKnowledgeRoles(runtime, material.id, effectiveKnowledgeId)
+      : projection?.knowledgeContexts.find((context) => context.nodeId === effectiveKnowledgeId)?.roles ?? [];
     return buildMaterialKnowledgeContext(effectiveKnowledgeId, roles, applicationServices.knowledgeRepository, access, governance);
-  }, [access, effectiveKnowledgeId, governance, projection]);
+  }, [access, effectiveKnowledgeId, governance, knowledgeContextState.pinnedKnowledgeId, material.id, projection, runtime]);
   const knowledgeAssignmentContexts = useMemo(() => buildKnowledgeAssignmentContexts(runtime, effectiveKnowledgeId, userState), [effectiveKnowledgeId, runtime, userState]);
   const activeAssignment = knowledgeAssignmentContexts.find((context) => context.assignmentId === activeAssignmentId) ?? null;
   const activeIndex = material.segments.findIndex((segment) => segment.id === reader.activeSegmentId);

@@ -100,8 +100,14 @@ Course runtime validation rejects PDF Material without a non-empty PDF source, p
 
 The Reader separates three presentation states. Current Page Knowledge is the deterministic `MaterialKnowledgeCoverage` projection for `activeSegmentId`. Selected Knowledge is the current detail choice within that page. Pinned Knowledge is an explicit, ID-only override that survives page changes.
 
-The effective detail identity is `pinnedKnowledgeId ?? selectedKnowledgeId ?? currentPagePrimaryKnowledgeId`. In Auto Mode, changing the active Segment resets selection to the first deterministic Knowledge context for that Segment. Clicking another current-page item changes selection without pinning. In Pinned Mode, the current-page list continues changing while Knowledge Detail and its Knowledge-specific Assignment list remain attached to the pinned node. Unpin immediately selects the current-page primary node. A Material change clears the Pin and initializes selection from the new Material position.
+The effective detail identity is `pinnedKnowledgeId ?? selectedKnowledgeId ?? currentPagePrimaryKnowledgeId`. In Auto Mode, changing the active Segment resets selection to the first deterministic Knowledge context for that Segment. Clicking another current-page item changes selection without pinning. In Pinned Mode, the primary Current Page Coverage region is hidden and the complete Knowledge Context—indicator, title, roles, description, and Knowledge-specific Assignment list—remains attached to the pinned node. Unpin immediately selects the current-page primary node. A Material change clears the Pin and initializes selection from the new Material position.
 
 Page Assignment Context is the unique Assignment projection for all KnowledgeNodes covered by a Segment, plus any explicit Segment references. Knowledge-specific Assignment Context filters `AssignmentCoverage` by one KnowledgeNode ID. The adjacent list under Knowledge Detail always uses the latter, so a multi-Knowledge page cannot leak unrelated Assignments into the selected detail.
 
 Selection and Pin are session-only Reader UI state. They do not persist in UserMaterialState and do not control PDF page, Outline, URL, zoom, or navigation initialization.
+
+## 23. Floating Panel Contract
+
+GlobalNav, Material Header, Outline, PDF Reader, Knowledge Context, and Material Controls are independent floating panels. Their backgrounds, borders, shadows, and visible surfaces do not overlap to form a larger container.
+
+Material Header starts at a real `--material-header-left` boundary derived from the shared shell margin, responsive GlobalNav width, and panel gap. Its normal internal padding never acts as navigation reserve. When GlobalNav hides brand copy, a responsive token override contracts the same geometry without duplicated pixel offsets.

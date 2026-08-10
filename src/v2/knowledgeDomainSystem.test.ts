@@ -12,6 +12,8 @@ import type { DomainAssignmentCandidate } from "./knowledge/domain/domainTypes";
 import { canManageKnowledgeDomains } from "./session/capabilities";
 import { applicationServices } from "./services/applicationServices";
 import { globalKnowledgeAccess } from "./knowledge/repository/KnowledgeRepository";
+import { auditDomainRelations, validateKnowledgeRelations } from "./knowledge/relationAudit";
+import type { KnowledgeGraph, KnowledgeNode } from "./knowledge/types";
 
 const atlasGraph = applicationServices.knowledgeRepository.getVisibleGraph(globalKnowledgeAccess);
 const runtimes = applicationServices.courseRepository.listCourseRuntimes();
@@ -21,6 +23,67 @@ function candidate(score: number): DomainAssignmentCandidate {
 }
 
 describe("Knowledge Domain invariants", () => {
+  it("validates canonical relation endpoints, active status, uniqueness, strength, and reasons", () => {
+    expect(validateKnowledgeRelations(atlasGraph)).toEqual([]);
+  });
+
+  it("reports malformed relation records as data-quality failures", () => {
+    const node = (id: string, status: KnowledgeNode["status"] = "active"): KnowledgeNode => ({ id, title: id, description: id, type: "conceptual", masteryCriteria: [id], scope: "global", provenance: [{ sourceType: "manual", sourceId: id }], currentRevisionId: `${id}-r1`, status });
+    const malformed = {
+      domains: [],
+      revisions: [],
+      nodes: [node("A"), node("B"), node("S", "superseded")],
+      edges: [
+        { id: "unknown", source: "A", target: "X", relation: "enables", strength: 0.8, reason: "Unknown target." },
+        { id: "inactive", source: "A", target: "S", relation: "related", strength: 0.7, reason: "Inactive target." },
+        { id: "self", source: "A", target: "A", relation: "related", strength: 0.5, reason: "Self." },
+        { id: "duplicate-a", source: "A", target: "B", relation: "related", strength: 0.6, reason: "Duplicate." },
+        { id: "duplicate-b", source: "B", target: "A", relation: "related", strength: 0.6, reason: "Reverse duplicate." },
+        { id: "bad-strength", source: "A", target: "B", relation: "enables", strength: 2, reason: "Invalid strength." },
+        { id: "missing-reason", source: "B", target: "A", relation: "enables", strength: 0.7 },
+        { id: "cycle-a", source: "A", target: "B", relation: "prerequisite", strength: "hard", reason: "A before B." },
+        { id: "cycle-b", source: "B", target: "A", relation: "prerequisite", strength: "soft", reason: "B before A." }
+      ]
+    } as KnowledgeGraph;
+    const issues = validateKnowledgeRelations(malformed);
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.stringContaining("Unknown KnowledgeEdge endpoint"),
+      expect.stringContaining("inactive"),
+      expect.stringContaining("Self KnowledgeEdge"),
+      expect.stringContaining("Duplicate KnowledgeEdge relation"),
+      expect.stringContaining("Invalid associative strength"),
+      expect.stringContaining("has no reason"),
+      expect.stringContaining("Conflicting prerequisite directions"),
+      expect.stringContaining("contains a cycle")
+    ]));
+  });
+
+  it("audits Domain-internal undirected components without using cross-Domain edges", () => {
+    const node = (id: string): KnowledgeNode => ({ id, title: `Node ${id}`, description: id, type: "conceptual", masteryCriteria: [id], scope: "global", provenance: [{ sourceType: "manual", sourceId: id }], currentRevisionId: `${id}-r1`, status: "active" });
+    const graph: KnowledgeGraph = {
+      domains: [],
+      nodes: ["A", "B", "C", "D", "X"].map(node),
+      revisions: [],
+      edges: [
+        { id: "e1", source: "A", target: "B", relation: "prerequisite", strength: "hard", reason: "A grounds B." },
+        { id: "e2", source: "B", target: "C", relation: "enables", strength: 0.8, reason: "B enables C." },
+        { id: "e3", source: "D", target: "X", relation: "related", strength: 0.7, reason: "Cross-domain fact." }
+      ]
+    };
+    const assignments = ["A", "B", "C", "D"].map((nodeId) => ({ nodeId, domainId: "domain-a", source: "auto" as const, confidence: 0.9, pinned: false, assignedAt: "now" }));
+    assignments.push({ nodeId: "X", domainId: "domain-b", source: "auto", confidence: 0.9, pinned: false, assignedAt: "now" });
+    expect(auditDomainRelations(graph, assignments, "domain-a")).toEqual({
+      domainId: "domain-a",
+      activeNodeCount: 4,
+      edgeCount: 2,
+      componentCount: 2,
+      largestComponentSize: 3,
+      largestComponentRatio: 0.75,
+      isolatedNodeIds: ["D"],
+      lowDegreeNodeIds: ["A", "C"]
+    });
+  });
+
   it("keeps exactly zero or one valid primary Domain and pins admin assignments", () => {
     const snapshot = getDomainGovernanceSnapshot();
     expect(validateDomainAssignments(snapshot.assignments, snapshot.domains, knowledgeNodes.map((node) => node.id))).toEqual([]);
