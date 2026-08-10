@@ -6,7 +6,9 @@ The course data system makes every course a runtime data package rather than a p
 
 ## 2. Core Boundary
 
-`CourseRepository` exposes `listCourses()`, `getCourse(courseId)`, and summary lookup. It returns `CourseRuntimeData`, which contains the course definition, chapters, lessons, curriculum coverage, assignments, assignment coverage, materials, and material coverage.
+`CourseRepository` exposes `listCourseRuntimes()` and `getCourse(courseId)` only. It returns `CourseRuntimeData`, which contains the course definition, chapters, lessons, curriculum coverage, assignments, assignment coverage, materials, and material coverage.
+
+The repository does not know a user identity and therefore does not return fixed `CourseSummary` status or progress. Application projection combines CourseRuntimeData, LearningProgress, and UserKnowledge through `buildCourseSummary()`.
 
 Pages and generic services depend on this interface. They do not import individual course seeds.
 
@@ -40,7 +42,9 @@ Course cards, metrics, search, progress, and recent activity are computed from r
 
 ## 10. Validation
 
-Runtime validation verifies unique IDs, valid chapter/lesson/course references, complete AssignmentCoverage, valid coverage endpoints, workflow template requirements, and course-owned material mappings before a course is considered ready.
+Runtime validation verifies unique IDs for Chapter, Lesson, CurriculumCoverage, CurriculumSequence, Assignment, AssignmentCoverage, Material, and MaterialKnowledgeCoverage. Every Chapter, Lesson, Coverage, Sequence, Assignment, and Material with course ownership must belong to the runtime Course.
+
+Referential validation requires every `lesson.chapterId`, Coverage Lesson/Knowledge endpoint, Sequence source/target, AssignmentCoverage endpoint, Material Lesson/Segment, and MaterialKnowledgeCoverage endpoint to resolve. Sequences cannot self-reference or duplicate the same ordered Lesson pair. Exact duplicate AssignmentCoverage and MaterialKnowledgeCoverage facts are rejected. Every course KnowledgeNode must still have AssignmentCoverage, and workflow Assignments must still declare `workflowTemplateId`.
 
 ## 11. Multi-course Fixture
 
@@ -73,3 +77,21 @@ Chapter `knowledgeProgress` is derived from visible UserKnowledgeState mastery, 
 ## 18. PDF Course Material
 
 Course data may reference a stable static PDF through MaterialSource. It owns Material metadata, Page/Segment addresses, and MaterialKnowledgeCoverage; it does not recreate or own the PDF's visual layout. Adding another PDF course requires a source file/URL, Material metadata, one Segment per page, and coverage records, without changes to the generic Reader UI.
+
+## 19. CurriculumChapter
+
+`CurriculumChapter` is static curriculum definition only. It contains neither user `progress` nor a duplicated `lessonIds` list. Chapter knowledge progress and Assignment summaries exist only in user-scoped projections.
+
+## 20. CurriculumLesson Ownership
+
+`CurriculumLesson.chapterId` is the sole authoritative Chapter membership relation. Chapter Lesson lists and counts are derived by filtering runtime Lessons; a Chapter does not store a second copy of membership.
+
+## 21. CurriculumCoverage Ordering
+
+Every CurriculumCoverage has an integer `order >= 0`, representing deterministic instruction/display order inside its Lesson. Primary coverage selects `introduce` first, then earliest `lesson.order`, then `coverage.order`, with stable IDs used only for exact ties.
+
+Course Knowledge ordering is `lesson.order -> coverage.order -> role -> nodeId`, with Coverage ID only as a final deterministic tie-break. KnowledgeNode never receives course-specific Lesson, Chapter, or curriculum-order fields, and changing an ID to a UUID does not change business order.
+
+## 22. User State
+
+Course, Chapter, Assignment, and reading progress are not Course definition data. They belong to `UserCourseState`, `UserAssignmentState`, `UserMaterialState`, `UserKnowledgeState`, or projections derived from those records.

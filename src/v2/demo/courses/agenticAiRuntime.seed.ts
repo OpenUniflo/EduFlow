@@ -71,5 +71,5 @@ export const agenticAiRuntime: CourseRuntimeData = {
   assignmentCoverages,
   materials: [agenticAiMaterial],
   materialKnowledgeCoverages: agenticAiMaterialKnowledgeCoverages,
-  revision: "agentic-ai-v2"
+  revision: "agentic-ai-v3-curriculum-order"
 };

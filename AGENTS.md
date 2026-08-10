@@ -163,9 +163,46 @@
 ## Repository and Projection Invariants
 
 - `CourseRepository` is the read boundary for `CourseRuntimeData`; pages MUST NOT import a specific course seed.
+- `CourseRepository` exposes Course definitions only through `listCourseRuntimes()` and `getCourse(courseId)`; it MUST NOT return fixed user status or progress summaries.
 - Course graph projection, ELK layout, and React Flow adaptation MUST be pure functions of explicit runtime/projection inputs.
 - ELK caches MUST be keyed by course identity plus structural revision. Presentation state MUST NOT participate in that cache key.
 - CurriculumCoverage, AssignmentCoverage, MaterialKnowledgeCoverage, and Atlas course contexts remain N:M projections over shared stable KnowledgeNode IDs.
+
+## Course Definition Purity
+
+- Course and Curriculum definitions MUST NOT contain mutable user progress.
+- `CurriculumChapter` MUST NOT contain `progress`; Chapter progress is derived only in user-scoped Course projections or summaries.
+- User progress belongs to `UserCourseState`, `UserKnowledgeState`, and derived Course projections/summaries.
+
+## Chapter / Lesson Ownership
+
+- `CurriculumLesson.chapterId` is the sole authoritative Chapter-membership relation.
+- `CurriculumChapter` MUST NOT duplicate Lesson membership through `lessonIds`.
+- Chapter Lesson lists and counts MUST be derived from the runtime Lessons.
+
+## Curriculum Ordering
+
+- Instructional order MUST be explicit curriculum data.
+- `CurriculumCoverage.order` is the deterministic Knowledge coverage order inside one Lesson; it is not KnowledgeNode, Domain, or graph-topology order.
+- Entity IDs, ID prefixes, UUID lexical order, Coverage ID order, and fixture-array order MUST NOT define curriculum presentation order. IDs MAY be used only as a final deterministic tie-break.
+
+## Course Repository Boundary
+
+- `CourseRepository` exposes `CourseRuntimeData` definitions only.
+- User-specific status and progress MUST be derived from Course runtime, LearningProgress, and UserKnowledge inputs by application/projection logic.
+- Repositories MUST NOT manufacture fixed `not-started` or `0%` summaries without user identity and state.
+
+## Learning Progress Boundary
+
+- Core LearningProgress repositories MUST NOT import Demo state fixtures.
+- Demo initial state MUST be injected through a `UserCourseStateFactory` at the application composition root.
+- Persisted learning progress MUST use a versioned schema envelope, validate nested state identity, and migrate supported legacy records before use.
+
+## Domain Visibility
+
+- Global Domain governance does not imply Global-only Knowledge visibility.
+- Generic automatic Domain assignment and topology inspection MUST operate on an explicitly supplied `KnowledgeAccessContext` or `KnowledgeGraph`.
+- Domain services and adapters MUST NOT silently replace caller visibility with `globalKnowledgeAccess`.
 
 ## Material Invariants
 
@@ -176,7 +213,7 @@
 
 ## User Learning State Invariants
 
-- User progress is mutable user state and MUST NOT be stored in course definitions, material definitions, or graph projections.
+- User progress is mutable user state and MUST NOT be persisted in course, curriculum, material, or structural graph definitions; user-scoped presentation projections MAY derive it from explicit user-state inputs.
 - `UserCourseState` is scoped by both `userId` and `courseId`; material state is additionally keyed by `materialId`, and assignment state by stable `assignmentId`.
 - Assignment completion MUST update the explicit launched `assignmentId`; workflow template identity alone is insufficient because templates may be shared.
 - Knowledge mastery remains separate from course progress, material reading progress, and assignment completion.

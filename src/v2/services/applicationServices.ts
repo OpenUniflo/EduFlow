@@ -13,6 +13,7 @@ import { demoPersonalKnowledgeGraph } from "../profile/demoUserKnowledge";
 import type { UserKnowledgeRepository } from "../profile/UserKnowledgeRepository";
 import type { LearningProgressRepository } from "../progress/LearningProgressRepository";
 import { LocalStorageLearningProgressRepository } from "../progress/LocalStorageLearningProgressRepository";
+import { demoUserCourseStateSeed } from "../demo/user/demoUserCourseState.seed";
 
 export type ApplicationServices = {
   courseRepository: CourseRepository;
@@ -32,7 +33,7 @@ export const applicationServices: ApplicationServices = {
   courseRepository: new DemoCourseRepository(knowledgeRepository),
   knowledgeRepository,
   userKnowledgeRepository: new DemoUserKnowledgeRepository(),
-  learningProgressRepository: new LocalStorageLearningProgressRepository(),
+  learningProgressRepository: new LocalStorageLearningProgressRepository(demoUserCourseStateSeed),
   domainGovernanceRepository,
   domainGovernanceService,
   courseCreationService: new DemoCourseCreationService()

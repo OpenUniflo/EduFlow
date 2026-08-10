@@ -22,7 +22,9 @@ Learning state is mutable, user-owned data layered over immutable curriculum def
 
 ## 6. Repository
 
-`LearningProgressRepository` loads, saves, and subscribes to states by user and course. The demo implementation persists each scope under a versioned local-storage key and uses explicit demo fixtures only for initialization.
+`LearningProgressRepository` loads, saves, and subscribes to states by user and course. The LocalStorage adapter receives a `UserCourseStateFactory`; it does not import Demo fixtures. The application composition root injects the Demo factory, while production may inject an empty factory or replace the repository.
+
+Persisted data uses `{ schemaVersion, state }`. Loading validates user/course identity, Assignment and Material maps, key-to-record identity, and timestamps. Legacy raw `UserCourseState` is migrated into the current envelope; invalid data falls back to the injected initial-state factory without treating an unchecked cast as valid state.
 
 ## 7. Isolation
 

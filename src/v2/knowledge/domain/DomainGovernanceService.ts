@@ -1,4 +1,4 @@
-import { globalKnowledgeAccess, type KnowledgeRepository } from "../repository/KnowledgeRepository";
+import type { KnowledgeAccessContext, KnowledgeRepository } from "../repository/KnowledgeRepository";
 import { chooseMostDistinctUnusedColor, isValidDomainColor } from "./domainColors";
 import { moveNodesToDomain } from "./domainAssignment";
 import { applyAutomaticAssignment, decideDomainAssignment, scoreNodeAgainstDomains } from "./domainScoring";
@@ -12,6 +12,7 @@ export type UpdateDomainInput = { actor: DomainActor; domainId: string; changes:
 export type CreateDomainInput = { actor: DomainActor; name: string; description?: string; canonicalColor?: string };
 export type AcceptCandidateInput = { actor: DomainActor; candidate: DomainAssignmentCandidate; domainId?: string };
 export type ReviewProposalInput = { actor: DomainActor; proposalId: string; status: DomainProposal["status"] };
+export type EvaluateAutomaticDomainAssignmentInput = { nodeId: string; access: KnowledgeAccessContext };
 
 export function assertGlobalDomainAdmin(actor: DomainActor) {
   if (!actor.capabilities.includes("global-domain-admin")) throw new Error("Domain mutation requires global-domain-admin");
@@ -104,17 +105,17 @@ export class DomainGovernanceService {
     this.publish({ ...this.state, candidates: this.state.candidates.filter((item) => item.nodeId !== input.nodeId) });
   }
 
-  evaluateAutomaticDomainAssignment(nodeId: string) {
-    const graph = this.knowledgeRepository.getVisibleGraph(globalKnowledgeAccess);
-    const node = graph.nodes.find((item) => item.id === nodeId);
-    if (!node) throw new Error(`Unknown KnowledgeNode ${nodeId}`);
-    const current = this.state.assignments.find((item) => item.nodeId === nodeId);
+  evaluateAutomaticDomainAssignment(input: EvaluateAutomaticDomainAssignmentInput) {
+    const graph = this.knowledgeRepository.getVisibleGraph(input.access);
+    const node = graph.nodes.find((item) => item.id === input.nodeId);
+    if (!node) throw new Error(`Unknown KnowledgeNode ${input.nodeId}`);
+    const current = this.state.assignments.find((item) => item.nodeId === input.nodeId);
     if (current?.pinned) return { kind: "pinned" as const, assignment: current };
     const candidates = scoreNodeAgainstDomains(node, this.state.domains.filter((domain) => domain.status === "active"), graph.nodes, graph.edges, this.state.assignments);
     const decision = decideDomainAssignment(candidates);
     const automatic = applyAutomaticAssignment(current, decision);
-    const assignments = automatic ? [...this.state.assignments.filter((item) => item.nodeId !== nodeId), automatic] : this.state.assignments;
-    this.publish({ ...this.state, assignments, candidates: [...this.state.candidates.filter((item) => item.nodeId !== nodeId), ...(decision.kind === "suggestion" ? candidates : [])] });
+    const assignments = automatic ? [...this.state.assignments.filter((item) => item.nodeId !== input.nodeId), automatic] : this.state.assignments;
+    this.publish({ ...this.state, assignments, candidates: [...this.state.candidates.filter((item) => item.nodeId !== input.nodeId), ...(decision.kind === "suggestion" ? candidates : [])] });
     return decision;
   }
 
@@ -124,8 +125,8 @@ export class DomainGovernanceService {
     this.publish({ ...this.state, proposals: this.state.proposals.map((item) => item.id === input.proposalId ? { ...item, status: input.status } : item) });
   }
 
-  topologySignature() {
-    return this.knowledgeRepository.getVisibleGraph(globalKnowledgeAccess).edges
+  topologySignature(access: KnowledgeAccessContext) {
+    return this.knowledgeRepository.getVisibleGraph(access).edges
       .map((edge) => `${edge.source}:${edge.relation}:${edge.target}`)
       .sort()
       .join("|");

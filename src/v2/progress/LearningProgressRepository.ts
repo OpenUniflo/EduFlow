@@ -1,5 +1,7 @@
 import type { UserAssignmentState, UserCourseState, UserMaterialState } from "../types";
 
+export type UserCourseStateFactory = (userId: string, courseId: string) => UserCourseState;
+
 export interface LearningProgressRepository {
   getCourseState(userId: string, courseId: string): UserCourseState;
   updateAssignmentState(userId: string, courseId: string, assignmentId: string, state: UserAssignmentState): void;

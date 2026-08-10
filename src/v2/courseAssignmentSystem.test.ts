@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DemoCourseRepository } from "./course/repository/DemoCourseRepository";
@@ -8,7 +8,7 @@ import { ATOMIC_FOOTPRINT_HEIGHT, ATOMIC_FOOTPRINT_WIDTH, COMPANION_OFFSET_X, CO
 import { toReactFlow } from "./course/graph/reactFlowAdapter";
 import { assignmentProjectionForNode, buildChapterAssignmentProjection, courseDrawerProjectionKind, detailFacetForMode, flowIdForAnchor, type SelectedAnchor } from "./course/courseSelection";
 import { demoUserCourseStateSeed } from "./demo/user/demoUserCourseState.seed";
-import { LocalStorageLearningProgressRepository, learningProgressStorageKey } from "./progress/LocalStorageLearningProgressRepository";
+import { LEARNING_PROGRESS_SCHEMA_VERSION, LocalStorageLearningProgressRepository, learningProgressStorageKey } from "./progress/LocalStorageLearningProgressRepository";
 import { buildGlobalAtlasProjection } from "./knowledge/projections/atlasProjections";
 import { applicationServices } from "./services/applicationServices";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "./knowledge/repository/KnowledgeRepository";
@@ -21,7 +21,7 @@ import { createWorkflowRunRecord, type Template } from "../app/model";
 import { InMemoryKnowledgeRepository } from "./knowledge/repository/InMemoryKnowledgeRepository";
 import type { KnowledgeGraph, KnowledgeNode } from "./knowledge/types";
 import { buildPersonalKnowledgeGraph } from "./profile/profileGraph";
-import type { AssignmentCoverage, CourseAssignment } from "./types";
+import type { AssignmentCoverage, CourseAssignment, UserCourseState } from "./types";
 
 const knowledgeRepository = applicationServices.knowledgeRepository;
 const repository = new DemoCourseRepository(knowledgeRepository);
@@ -33,9 +33,23 @@ const python = repository.getCourse("python-engineering")!;
 const agenticGraph = buildCourseGraphData(agentic, demoUserCourseStateSeed("student", agentic.course.id), visibleGraph, userKnowledge);
 const pythonGraph = buildCourseGraphData(python, demoUserCourseStateSeed("student", python.course.id), visibleGraph, userKnowledge);
 
+afterEach(() => vi.unstubAllGlobals());
+
+function memoryStorage() {
+  const values = new Map<string, string>();
+  return {
+    get length() { return values.size; },
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => Array.from(values.keys())[index] ?? null,
+    removeItem: (key: string) => { values.delete(key); },
+    setItem: (key: string, value: string) => { values.set(key, value); }
+  } satisfies Storage;
+}
+
 describe("Course Repository and runtime invariants", () => {
   it("registers two isolated Courses and rejects unknown routes", () => {
-    expect(repository.listCourses().map((course) => course.id)).toEqual(["agentic-ai", "python-engineering"]);
+    expect(repository.listCourseRuntimes().map((runtime) => runtime.course.id)).toEqual(["agentic-ai", "python-engineering"]);
     expect(repository.getCourse("agentic-ai")).not.toBe(repository.getCourse("python-engineering"));
     expect(repository.getCourse("not-exist")).toBeNull();
     expect(validateCourseRuntime(agentic, knowledgeRepository, access)).toBe(true);
@@ -65,6 +79,51 @@ describe("Course Repository and runtime invariants", () => {
     expect(getCourseLayoutCacheKey("agentic-ai", "v1")).not.toBe(getCourseLayoutCacheKey("python-engineering", "v1"));
     expect(getCourseLayoutCacheKey("agentic-ai", "v1")).not.toBe(getCourseLayoutCacheKey("agentic-ai", "v2"));
     expect(getCourseLayoutCacheKey(agenticGraph.courseId, agenticGraph.revision)).toBe(getCourseLayoutCacheKey(agenticGraph.courseId, agenticGraph.revision));
+  });
+
+  it.each([
+    ["CurriculumCoverage", (runtime: CourseRuntimeData) => ({ ...runtime, curriculumCoverages: [...runtime.curriculumCoverages, { ...runtime.curriculumCoverages[0] }] })],
+    ["CurriculumSequence", (runtime: CourseRuntimeData) => ({ ...runtime, curriculumSequences: [...runtime.curriculumSequences, { ...runtime.curriculumSequences[0] }] })],
+    ["AssignmentCoverage", (runtime: CourseRuntimeData) => ({ ...runtime, assignmentCoverages: [...runtime.assignmentCoverages, { ...runtime.assignmentCoverages[0] }] })],
+    ["MaterialKnowledgeCoverage", (runtime: CourseRuntimeData) => ({ ...runtime, materialKnowledgeCoverages: [...runtime.materialKnowledgeCoverages, { ...runtime.materialKnowledgeCoverages[0] }] })]
+  ])("rejects duplicate %s ids", (label, mutate) => {
+    expect(() => validateCourseRuntime(mutate(python), knowledgeRepository, access)).toThrow(`${label} ids must be unique`);
+  });
+
+  it("rejects cross-Course sequence/coverage ownership and unknown Chapter membership", () => {
+    expect(() => validateCourseRuntime({ ...python, curriculumSequences: python.curriculumSequences.map((sequence, index) => index ? sequence : { ...sequence, courseId: "another-course" }) }, knowledgeRepository, access)).toThrow(/CurriculumSequence .* belongs to another Course/);
+    expect(() => validateCourseRuntime({ ...python, lessons: python.lessons.map((lesson, index) => index ? lesson : { ...lesson, chapterId: "unknown" }) }, knowledgeRepository, access)).toThrow(/references unknown Chapter/);
+    expect(() => validateCourseRuntime({ ...python, curriculumCoverages: python.curriculumCoverages.map((coverage, index) => index ? coverage : { ...coverage, courseId: "another-course" }) }, knowledgeRepository, access)).toThrow(/Coverage .* belongs to another Course/);
+  });
+
+  it("rejects self/duplicate CurriculumSequence relations", () => {
+    const sequence = python.curriculumSequences[0];
+    expect(() => validateCourseRuntime({ ...python, curriculumSequences: [{ ...sequence, targetLessonId: sequence.sourceLessonId }] }, knowledgeRepository, access)).toThrow(/cannot reference the same Lesson twice/);
+    expect(() => validateCourseRuntime({ ...python, curriculumSequences: [...python.curriculumSequences, { ...sequence, id: "parallel-sequence" }] }, knowledgeRepository, access)).toThrow(/Duplicate CurriculumSequence relation/);
+  });
+
+  it("rejects invalid CurriculumCoverage order", () => {
+    const invalidOrder = (order: number) => ({ ...python, curriculumCoverages: python.curriculumCoverages.map((coverage, index) => index ? coverage : { ...coverage, order }) });
+    expect(() => validateCourseRuntime(invalidOrder(-1), knowledgeRepository, access)).toThrow(/invalid Lesson order/);
+    expect(() => validateCourseRuntime(invalidOrder(0.5), knowledgeRepository, access)).toThrow(/invalid Lesson order/);
+    const missing = { ...python, curriculumCoverages: python.curriculumCoverages.map((coverage, index) => index ? coverage : { ...coverage, order: undefined as never }) };
+    expect(() => validateCourseRuntime(missing, knowledgeRepository, access)).toThrow(/invalid Lesson order/);
+  });
+
+  it("rejects duplicate Assignment and Material coverage facts", () => {
+    const assignment = python.assignmentCoverages[0];
+    expect(() => validateCourseRuntime({ ...python, assignmentCoverages: [...python.assignmentCoverages, { ...assignment, id: "duplicate-assignment-relation" }] }, knowledgeRepository, access)).toThrow(/Duplicate AssignmentCoverage relation/);
+    const material = python.materialKnowledgeCoverages[0];
+    expect(() => validateCourseRuntime({ ...python, materialKnowledgeCoverages: [...python.materialKnowledgeCoverages, { ...material, id: "duplicate-material-relation" }] }, knowledgeRepository, access)).toThrow(/Duplicate MaterialKnowledgeCoverage relation/);
+  });
+
+  it("keeps CurriculumChapter pure and CourseRepository definition-only", () => {
+    const types = readFileSync(join(process.cwd(), "src/v2/types.ts"), "utf8");
+    const chapterType = types.match(/export type CurriculumChapter = \{([\s\S]*?)\n\};/)?.[1] ?? "";
+    expect(chapterType).not.toMatch(/\bprogress\b|\blessonIds\b/);
+    expect(repository).not.toHaveProperty("listCourses");
+    expect(agentic.chapters.every((chapter) => !("progress" in chapter) && !("lessonIds" in chapter))).toBe(true);
+    expect(python.chapters.every((chapter) => !("progress" in chapter) && !("lessonIds" in chapter))).toBe(true);
   });
 });
 
@@ -199,7 +258,7 @@ describe("Material and progress generalization", () => {
   it("isolates progress by user, Course, Material, and explicit Assignment identity", () => {
     expect(learningProgressStorageKey("user-a", "agentic-ai")).not.toBe(learningProgressStorageKey("user-a", "python-engineering"));
     expect(learningProgressStorageKey("user-a", "agentic-ai")).not.toBe(learningProgressStorageKey("user-b", "agentic-ai"));
-    const progress = new LocalStorageLearningProgressRepository();
+    const progress = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed);
     const sharedTemplateAssignments = python.assignments.filter((assignment) => assignment.workflowTemplateId === "agent-loop");
     expect(sharedTemplateAssignments.length).toBeGreaterThan(1);
     const target = sharedTemplateAssignments[0];
@@ -212,11 +271,63 @@ describe("Material and progress generalization", () => {
   });
 
   it("separates reading position from viewed completion and updates recent Lesson", () => {
-    const progress = new LocalStorageLearningProgressRepository();
+    const progress = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed);
     progress.updateMaterialReadingState("reader", agentic.course.id, "L04", "lesson-04", { recentSegmentId: "page-32", viewedSegmentIds: ["page-32"], progress: 3 });
     const state = progress.getCourseState("reader", agentic.course.id);
     expect(state.recentLessonId).toBe("L04");
     expect(state.materialStates["lesson-04"]).toMatchObject({ recentSegmentId: "page-32", progress: 3 });
+  });
+
+  it("migrates legacy learning progress to the current envelope without clearing valid edits", () => {
+    const localStorage = memoryStorage();
+    vi.stubGlobal("window", { localStorage });
+    const state = demoUserCourseStateSeed("legacy-user", python.course.id);
+    const edited: UserCourseState = { ...state, assignmentStates: { ...state.assignmentStates, "admin-edit": { assignmentId: "admin-edit", status: "completed", progress: 100 } } };
+    const key = learningProgressStorageKey(edited.userId, edited.courseId);
+    localStorage.setItem(key, JSON.stringify(edited));
+    const loaded = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed).getCourseState(edited.userId, edited.courseId);
+    expect(loaded.assignmentStates["admin-edit"]).toMatchObject({ status: "completed", progress: 100 });
+    expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({ schemaVersion: LEARNING_PROGRESS_SCHEMA_VERSION, state: { userId: edited.userId, courseId: edited.courseId } });
+  });
+
+  it("loads the current learning-progress envelope", () => {
+    const localStorage = memoryStorage();
+    vi.stubGlobal("window", { localStorage });
+    const state = demoUserCourseStateSeed("current-user", agentic.course.id);
+    localStorage.setItem(learningProgressStorageKey(state.userId, state.courseId), JSON.stringify({ schemaVersion: LEARNING_PROGRESS_SCHEMA_VERSION, state }));
+    expect(new LocalStorageLearningProgressRepository(demoUserCourseStateSeed).getCourseState(state.userId, state.courseId)).toEqual(state);
+  });
+
+  it("falls back to the injected initial state for invalid persisted progress", () => {
+    const localStorage = memoryStorage();
+    vi.stubGlobal("window", { localStorage });
+    const key = learningProgressStorageKey("invalid-user", agentic.course.id);
+    localStorage.setItem(key, JSON.stringify({ schemaVersion: LEARNING_PROGRESS_SCHEMA_VERSION, state: { userId: "invalid-user" } }));
+    expect(new LocalStorageLearningProgressRepository(demoUserCourseStateSeed).getCourseState("invalid-user", agentic.course.id)).toEqual(demoUserCourseStateSeed("invalid-user", agentic.course.id));
+  });
+
+  it("roundtrips saved learning progress through the versioned envelope", () => {
+    const localStorage = memoryStorage();
+    vi.stubGlobal("window", { localStorage });
+    const first = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed);
+    first.updateAssignmentState("roundtrip-user", python.course.id, "py-runtime-model", { assignmentId: "py-runtime-model", status: "completed", progress: 100 });
+    const second = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed);
+    expect(second.getCourseState("roundtrip-user", python.course.id).assignmentStates["py-runtime-model"]).toMatchObject({ status: "completed", progress: 100 });
+  });
+
+  it("keeps Core LearningProgress persistence free of Demo fixture imports", () => {
+    const source = readFileSync(join(process.cwd(), "src/v2/progress/LocalStorageLearningProgressRepository.ts"), "utf8");
+    expect(source).not.toMatch(/demo\//);
+    expect(source).not.toContain("demoUserCourseStateSeed");
+  });
+
+  it("uses the dedicated Assignment modal class without changing Workflow Library cards", () => {
+    const lessonPage = readFileSync(join(process.cwd(), "src/v2/pages/LessonPage.tsx"), "utf8");
+    const workflowLibrary = readFileSync(join(process.cwd(), "src/v2/pages/WorkflowLibraryPage.tsx"), "utf8");
+    expect(lessonPage).toContain('className="atlas-workflow-modal"');
+    expect(lessonPage).toContain('className="atlas-workflow-modal-card glass-v2"');
+    expect(lessonPage).not.toContain('className="atlas-workflow-card glass-v2"');
+    expect(workflowLibrary).toContain("atlas-workflow-card glass-v2");
   });
 
   it("keeps Knowledge mastery independent from Assignment completion", () => {
@@ -241,9 +352,9 @@ describe("Material and progress generalization", () => {
     const runtime: CourseRuntimeData = {
       course: { id: "scoped-course", title: "Scoped", description: "Scoped", accentColor: "#000000" },
       curriculum: { id: "scoped-curriculum", courseId: "scoped-course", generationMode: "auto-fixed-count", requestedChapterCount: 1 },
-      chapters: [{ id: "C", courseId: "scoped-course", title: "C", description: "C", lessonIds: ["L"], order: 1, color: "#000000", progress: 0, outcome: "O" }],
+      chapters: [{ id: "C", courseId: "scoped-course", title: "C", description: "C", order: 1, color: "#000000", outcome: "O" }],
       lessons: [{ id: "L", courseId: "scoped-course", chapterId: "C", title: "L", order: 1 }],
-      curriculumCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `cc-${nodeId}`, courseId: "scoped-course", lessonId: "L", nodeId, role: "introduce" as const })),
+      curriculumCoverages: ["G", "T", "U"].map((nodeId, order) => ({ id: `cc-${nodeId}`, courseId: "scoped-course", lessonId: "L", nodeId, role: "introduce" as const, order })),
       curriculumSequences: [],
       assignments: [{ id: "A", courseId: "scoped-course", title: "A", description: "A", requirements: ["A"], expectedOutput: "A", acceptanceCriteria: ["A"], mode: "instruction" }],
       assignmentCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `ac-${nodeId}`, assignmentId: "A", nodeId, role: "practice" as const })),
@@ -281,16 +392,29 @@ describe("Course Assignment layout and Drawer", () => {
     expect(ATOMIC_FOOTPRINT_HEIGHT).toBe(KNOWLEDGE_CARD_HEIGHT + COMPANION_OFFSET_Y);
   });
 
-  it("orders same-Lesson Knowledge from curriculum projection data instead of ID characters", () => {
+  it("orders same-Lesson Knowledge by CurriculumCoverage.order instead of KnowledgeNode or Coverage IDs", () => {
     const base = pythonGraph.knowledgeNodes[0];
     const variants = [
-      { ...base, id: "R01", primaryCoverage: { ...base.primaryCoverage, id: "coverage-03" } },
-      { ...base, id: "uuid-like-id", primaryCoverage: { ...base.primaryCoverage, id: "coverage-01" } },
-      { ...base, id: "Z999", primaryCoverage: { ...base.primaryCoverage, id: "coverage-02" } }
+      { ...base, id: "ZZZ", primaryCoverage: { ...base.primaryCoverage, id: "coverage-uuid-z", order: 0 } },
+      { ...base, id: "AAA", primaryCoverage: { ...base.primaryCoverage, id: "coverage-uuid-a", order: 1 } }
     ];
     const projection = buildCourseGraphProjection({ ...pythonGraph, knowledgeNodes: variants, knowledgeEdges: [], chapterEdges: [] }, "full", null);
     const orderedIds = projection.nodes.filter((node) => node.kind === "knowledge").sort((left, right) => left.order - right.order).map((node) => node.knowledge!.id);
-    expect(orderedIds).toEqual(["uuid-like-id", "Z999", "R01"]);
+    expect(orderedIds).toEqual(["ZZZ", "AAA"]);
+  });
+
+  it("selects introduce coverage first, then Lesson order, coverage order, and stable ID", () => {
+    const target = "PY06";
+    const baseCoverages = python.curriculumCoverages.filter((coverage) => coverage.nodeId === target);
+    expect(baseCoverages.some((coverage) => coverage.role === "reinforce" && python.lessons.find((lesson) => lesson.id === coverage.lessonId)!.order > 1)).toBe(true);
+    const extra = [
+      { ...baseCoverages[0], id: "coverage-earlier-reinforce", lessonId: "PY-L01", order: 0, role: "reinforce" as const },
+      { ...baseCoverages[0], id: "coverage-z", order: 0, role: "introduce" as const },
+      { ...baseCoverages[0], id: "coverage-a", order: 0, role: "introduce" as const }
+    ];
+    const runtime = { ...python, curriculumCoverages: [...python.curriculumCoverages, ...extra] };
+    const graph = buildCourseGraphData(runtime, demoUserCourseStateSeed("student", python.course.id), visibleGraph, userKnowledge);
+    expect(graph.knowledgeNodes.find((node) => node.id === target)?.primaryCoverage.id).toBe("coverage-a");
   });
 
   it("keeps every expanded Python footprint inside its Chapter", async () => {

@@ -41,10 +41,8 @@ export type CurriculumChapter = {
   courseId: string;
   title: string;
   description: string;
-  lessonIds: string[];
   order: number;
   color: string;
-  progress: number;
   outcome: string;
 };
 
@@ -73,6 +71,8 @@ export type CurriculumCoverage = {
   lessonId: string;
   nodeId: string;
   role: CurriculumCoverageRole;
+  /** Deterministic instructional/display order inside this Lesson. */
+  order: number;
 };
 
 export type AssignmentMode = "instruction" | "workflow";
@@ -188,6 +188,7 @@ export type CourseAssignmentSummary = {
 };
 
 export type CourseChapterProjection = CurriculumChapter & {
+  lessonCount: number;
   knowledgeProgress: number;
   knowledgeEvidenceCount: number;
   assignmentSummary: ChapterAssignmentSummary;

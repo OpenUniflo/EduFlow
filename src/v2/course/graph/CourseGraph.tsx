@@ -29,13 +29,13 @@ type Props = {
 
 function ChapterNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
   const chapter = data.chapter!;
-  const progress = chapter.progress;
+  const progress = chapter.knowledgeProgress;
   const assignment = chapter.assignmentSummary;
   const assignmentStatus = `${assignment.completedCount} 项完成 · ${assignment.inProgressCount} 项进行中`;
   return (
     <div className={`course-flow-chapter ${data.expanded ? "expanded" : "collapsed"} mode-${data.mode} ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": chapter.color } as React.CSSProperties} onDoubleClick={(event) => { event.stopPropagation(); data.onChapterDoubleClick?.(chapter); }}>
       <Handle type="target" id="in" position={Position.Left} />
-      <div className="course-flow-chapter-presentation knowledge-presentation"><div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")}</small><strong>{chapter.title}</strong><em>{chapter.lessonIds.length} 课 · {progress >= 100 ? "已完成" : progress ? `学习中 ${progress}%` : "可学习"}</em></span></div>{!data.expanded ? <p>{chapter.description}</p> : <div className="course-flow-chapter-caption">{chapter.title} · 原子知识与实训伴生层</div>}</div>
+      <div className="course-flow-chapter-presentation knowledge-presentation"><div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")}</small><strong>{chapter.title}</strong><em>{chapter.lessonCount} 课 · {progress >= 100 ? "已完成" : progress ? `学习中 ${progress}%` : "可学习"}</em></span></div>{!data.expanded ? <p>{chapter.description}</p> : <div className="course-flow-chapter-caption">{chapter.title} · 原子知识与实训伴生层</div>}</div>
       <div className="course-flow-chapter-presentation assignment-presentation"><div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")} · 实训</small><strong>{chapter.title} · 实训</strong><em>{assignment.assignmentCount} 项实训 · 完成度 {assignment.progress}%</em></span></div>{!data.expanded ? <p>{assignmentStatus}<br />篇章成果：{assignment.outcome}</p> : <div className="course-flow-chapter-caption">{assignmentStatus} · 篇章成果：{assignment.outcome}</div>}</div>
       {!data.expanded ? <b>双击原位展开</b> : null}
       <Handle type="source" id="out" position={Position.Right} />

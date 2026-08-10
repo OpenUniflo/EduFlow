@@ -178,7 +178,7 @@ Full-graph discovery produces `DomainProposal` records for administrator review;
 
 ### Domain Application Boundary
 
-Generic Domain application logic composes `KnowledgeRepository + DomainGovernanceRepository` through `DomainGovernanceService`. It reads the Global visible graph through the repository and never imports static graph or demo fixture singletons. The React store is only a subscription adapter over that service.
+Generic Domain application logic composes `KnowledgeRepository + DomainGovernanceRepository` through `DomainGovernanceService`. It reads the graph visible to an explicit `KnowledgeAccessContext` and never imports static graph or demo fixture singletons. The React store is only a subscription adapter over that service and does not inject Global visibility.
 
 ### Demo Data Boundary
 
@@ -298,3 +298,13 @@ Superseded composite nodes preserve identity and lineage but never act as topolo
 Static canonical data is reviewed with undirected connected-component metrics, isolated-node review, degree-one review, and cross-module completeness review. Direction is ignored only for the connectivity metric; the stored relation retains its factual direction and strength.
 
 These metrics are review signals, not business validity thresholds. A mature Domain that unexpectedly fragments into many components should prompt a semantic completeness review before any layout response. Global cross-domain connectivity is not a Knowledge Graph quality requirement, and disconnected Domains may be correct.
+
+## 42. Repository Visibility Boundary
+
+Knowledge visibility is determined by the caller's `KnowledgeAccessContext`. Generic services must pass that context through to `KnowledgeRepository` and must not silently replace it with Global access. Global-only Domain governance describes who governs the Domain definition; it does not restrict assignable Knowledge to Global-scope nodes.
+
+## 43. LearningProgress Core / Demo Boundary
+
+Core LearningProgress repository interfaces and persistence adapters know only `UserCourseState` and an injected `UserCourseStateFactory`. Demo fixtures flow inward from the application composition root; Core must never import a Demo initial state.
+
+Local persistence uses a versioned envelope. Load validates scope identity and nested Assignment/Material record keys, migrates supported legacy raw `UserCourseState`, and falls back to the injected factory only when stored data is absent or invalid. A production backend or empty-state factory can replace Demo initialization without changing Core persistence semantics.

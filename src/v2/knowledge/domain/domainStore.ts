@@ -6,9 +6,11 @@ import type {
   AssignNodeDomainInput,
   AssignNodesToDomainInput,
   CreateDomainInput,
+  EvaluateAutomaticDomainAssignmentInput,
   ReviewProposalInput,
   UpdateDomainInput
 } from "./DomainGovernanceService";
+import type { KnowledgeAccessContext } from "../repository/KnowledgeRepository";
 
 export { assertGlobalDomainAdmin } from "./DomainGovernanceService";
 export type { DomainGovernanceState } from "./DomainGovernanceRepository";
@@ -25,6 +27,6 @@ export function updateDomain(input: UpdateDomainInput) { return service.updateDo
 export function createDomain(input: CreateDomainInput) { return service.createDomain(input); }
 export function acceptCandidate(input: AcceptCandidateInput) { return service.acceptCandidate(input); }
 export function ignoreCandidate(input: { actor: AssignNodeDomainInput["actor"]; nodeId: string }) { return service.ignoreCandidate(input); }
-export function evaluateAutomaticDomainAssignment(nodeId: string) { return service.evaluateAutomaticDomainAssignment(nodeId); }
+export function evaluateAutomaticDomainAssignment(input: EvaluateAutomaticDomainAssignmentInput) { return service.evaluateAutomaticDomainAssignment(input); }
 export function reviewProposal(input: ReviewProposalInput) { return service.reviewProposal(input); }
-export function topologySignature() { return service.topologySignature(); }
+export function topologySignature(access: KnowledgeAccessContext) { return service.topologySignature(access); }

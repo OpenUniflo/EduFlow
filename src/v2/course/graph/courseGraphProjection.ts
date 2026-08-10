@@ -43,9 +43,10 @@ const CURRICULUM_ROLE_ORDER: Record<CourseSkillTreeNode["primaryCoverage"]["role
 
 export function compareCourseKnowledgeOrder(left: CourseSkillTreeNode, right: CourseSkillTreeNode) {
   return left.primaryCoverage.lessonOrder - right.primaryCoverage.lessonOrder
+    || left.primaryCoverage.order - right.primaryCoverage.order
     || CURRICULUM_ROLE_ORDER[left.primaryCoverage.role] - CURRICULUM_ROLE_ORDER[right.primaryCoverage.role]
-    || left.primaryCoverage.id.localeCompare(right.primaryCoverage.id)
-    || left.id.localeCompare(right.id);
+    || left.id.localeCompare(right.id)
+    || left.primaryCoverage.id.localeCompare(right.primaryCoverage.id);
 }
 
 export function buildCourseGraphProjection(graphData: CourseGraphData, view: CourseGraphView, focusedChapterId: string | null): CourseGraphProjection {

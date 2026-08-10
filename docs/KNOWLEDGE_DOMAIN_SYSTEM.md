@@ -26,7 +26,13 @@ KnowledgeRepository + DomainGovernanceRepository
        React domainStore adapter / UI
 ```
 
-Generic Domain logic obtains the active Global graph from `KnowledgeRepository`. It does not import `knowledgeNodes`, `knowledgeEdges`, `globalKnowledgeGraph`, or any demo fixture singleton.
+Generic Domain logic obtains the caller-visible graph from `KnowledgeRepository` using an explicit `KnowledgeAccessContext`. It does not import `knowledgeNodes`, `knowledgeEdges`, `globalKnowledgeGraph`, or any demo fixture singleton.
+
+## Knowledge Visibility During Assignment
+
+KnowledgeDomain is Global-only in V1, but a Global Domain may classify any KnowledgeNode visible to the governing operation, including Global, Tenant, or User scope nodes. Domain scope and Knowledge visibility are separate concerns.
+
+Automatic Domain classification and topology signatures must use an explicit `KnowledgeAccessContext` (or an explicitly supplied `KnowledgeGraph`). They must not hardcode `globalKnowledgeAccess` inside the service or its adapter. Node lookup, semantic/structural scoring, candidate generation, and assignment decisions all operate on that caller-visible graph; a node outside it is unknown to that operation.
 
 ## Explicit Membership
 

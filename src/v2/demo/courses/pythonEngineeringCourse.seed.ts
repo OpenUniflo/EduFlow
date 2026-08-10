@@ -20,12 +20,12 @@ export const pythonEngineeringCourse: Course = {
   accentColor: "#53B89A"
 };
 
-const chapter = (id: string, title: string, description: string, lessonIds: string[], order: number, color: string, outcome: string): CurriculumChapter => ({ id, courseId: pythonEngineeringCourse.id, title, description, lessonIds, order, color, progress: 0, outcome });
+const chapter = (id: string, title: string, description: string, order: number, color: string, outcome: string): CurriculumChapter => ({ id, courseId: pythonEngineeringCourse.id, title, description, order, color, outcome });
 export const pythonEngineeringChapters: CurriculumChapter[] = [
-  chapter("py-foundations", "运行时与语言基础", "理解对象、表达式、控制流、函数与作用域。", ["PY-L01", "PY-L02"], 1, "#53B89A", "可测试的函数模块"),
-  chapter("py-modules", "模块化与质量", "用模块、类型与测试组织可靠项目。", ["PY-L03", "PY-L04"], 2, "#6F8FEA", "类型化 Python 包"),
-  chapter("py-services", "HTTP 与 API 服务", "调用外部 API，并构建经过校验的异步服务。", ["PY-L05", "PY-L06"], 3, "#42AFC4", "可运行 API 服务"),
-  chapter("py-production", "异步与生产化", "处理并发、超时、重试、可观测性与部署。", ["PY-L07", "PY-L08"], 4, "#9A7EDC", "可靠异步服务" )
+  chapter("py-foundations", "运行时与语言基础", "理解对象、表达式、控制流、函数与作用域。", 1, "#53B89A", "可测试的函数模块"),
+  chapter("py-modules", "模块化与质量", "用模块、类型与测试组织可靠项目。", 2, "#6F8FEA", "类型化 Python 包"),
+  chapter("py-services", "HTTP 与 API 服务", "调用外部 API，并构建经过校验的异步服务。", 3, "#42AFC4", "可运行 API 服务"),
+  chapter("py-production", "异步与生产化", "处理并发、超时、重试、可观测性与部署。", 4, "#9A7EDC", "可靠异步服务" )
 ];
 
 const lesson = (id: string, chapterId: string, title: string, order: number): CurriculumLesson => ({ id, courseId: pythonEngineeringCourse.id, chapterId, title, order });
@@ -52,7 +52,12 @@ const coverageSeed: Array<[string, CurriculumCoverage["role"], string[]]> = [
   ["PY-L07", "introduce", ["PY56", "PY57", "PY58", "PY100", "PY63", "PY62"]],
   ["PY-L08", "introduce", ["PY89", "PY90", "PY91", "PY95"]]
 ];
-export const pythonEngineeringCoverages: CurriculumCoverage[] = coverageSeed.flatMap(([lessonId, role, nodeIds]) => nodeIds.map((nodeId, index) => ({ id: `coverage-${lessonId}-${role}-${index + 1}`, courseId: pythonEngineeringCourse.id, lessonId, nodeId, role })));
+const nextPythonCoverageOrderByLesson = new Map<string, number>();
+export const pythonEngineeringCoverages: CurriculumCoverage[] = coverageSeed.flatMap(([lessonId, role, nodeIds]) => nodeIds.map((nodeId, index) => {
+  const order = nextPythonCoverageOrderByLesson.get(lessonId) ?? 0;
+  nextPythonCoverageOrderByLesson.set(lessonId, order + 1);
+  return { id: `coverage-${lessonId}-${role}-${index + 1}`, courseId: pythonEngineeringCourse.id, lessonId, nodeId, role, order };
+}));
 
 type AssignmentSeed = CourseAssignment & { nodeIds: string[] };
 const assignment = (id: string, title: string, description: string, nodeIds: string[], mode: CourseAssignment["mode"], workflowTemplateId?: string, projectContribution?: string): AssignmentSeed => ({
@@ -143,5 +148,5 @@ export const pythonEngineeringRuntime: CourseRuntimeData = {
   assignmentCoverages: pythonEngineeringAssignmentCoverages,
   materials: pythonEngineeringMaterials,
   materialKnowledgeCoverages: pythonEngineeringMaterialKnowledgeCoverages,
-  revision: "python-engineering-v2-pdf"
+  revision: "python-engineering-v3-curriculum-order"
 };

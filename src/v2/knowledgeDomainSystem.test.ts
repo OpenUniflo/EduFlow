@@ -13,7 +13,7 @@ import { atlasStructureKey, freezeAtlasNodePositions, resetAtlasCamera } from ".
 import type { DomainAssignmentCandidate } from "./knowledge/domain/domainTypes";
 import { canManageKnowledgeDomains } from "./session/capabilities";
 import { applicationServices } from "./services/applicationServices";
-import { globalKnowledgeAccess } from "./knowledge/repository/KnowledgeRepository";
+import { globalKnowledgeAccess, userKnowledgeAccess } from "./knowledge/repository/KnowledgeRepository";
 import { auditDomainRelations, validateKnowledgeRelations } from "./knowledge/relationAudit";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "./knowledge/types";
 import { demoPersonalKnowledgeGraph } from "./profile/demoUserKnowledge";
@@ -211,8 +211,31 @@ describe("Knowledge Domain invariants", () => {
       const repository: DomainGovernanceRepository = { load: () => stored, save: (next) => { stored = next; } };
       return new DomainGovernanceService(new InMemoryKnowledgeRepository(graphFor(left, right)), repository);
     };
-    expect(serviceFor("A1", "A2").evaluateAutomaticDomainAssignment("A1")).toMatchObject({ kind: "auto-assign", candidate: { nodeId: "A1" } });
-    expect(serviceFor("B1", "B2").evaluateAutomaticDomainAssignment("B1")).toMatchObject({ kind: "auto-assign", candidate: { nodeId: "B1" } });
+    expect(serviceFor("A1", "A2").evaluateAutomaticDomainAssignment({ nodeId: "A1", access: globalKnowledgeAccess })).toMatchObject({ kind: "auto-assign", candidate: { nodeId: "A1" } });
+    expect(serviceFor("B1", "B2").evaluateAutomaticDomainAssignment({ nodeId: "B1", access: globalKnowledgeAccess })).toMatchObject({ kind: "auto-assign", candidate: { nodeId: "B1" } });
+  });
+
+  it("classifies Global and user-owned Knowledge according to explicit visibility", () => {
+    const node = (id: string, scope: KnowledgeNode["scope"], ownerId?: string): KnowledgeNode => ({ id, title: "Shared semantics", description: "Shared semantics", type: "conceptual", masteryCriteria: ["Explain shared semantics"], scope, ownerId, provenance: [{ sourceType: "manual", sourceId: id }], currentRevisionId: `${id}-r1`, status: "active" });
+    const graph: KnowledgeGraph = {
+      nodes: [node("GLOBAL", "global"), node("USER", "user", "user-1")],
+      revisions: [],
+      edges: [{ id: "shared", source: "GLOBAL", target: "USER", relation: "related", strength: 1, reason: "Shared semantics connect the nodes." }]
+    };
+    const initial: DomainGovernanceState = {
+      domains: [{ id: "domain", name: "Domain", canonicalColor: "#123456", status: "active", createdBy: "test", createdAt: "now", updatedBy: "test", updatedAt: "now" }],
+      assignments: [{ nodeId: "GLOBAL", domainId: "domain", source: "admin", pinned: true, assignedBy: "test", assignedAt: "now" }],
+      candidates: [], proposals: [], revision: 0
+    };
+    const createService = () => {
+      let stored = initial;
+      return new DomainGovernanceService(new InMemoryKnowledgeRepository(graph), { load: () => stored, save: (next) => { stored = next; } });
+    };
+    expect(createService().evaluateAutomaticDomainAssignment({ nodeId: "GLOBAL", access: globalKnowledgeAccess })).toMatchObject({ kind: "pinned" });
+    expect(createService().evaluateAutomaticDomainAssignment({ nodeId: "USER", access: userKnowledgeAccess("user-1") })).toMatchObject({ kind: "auto-assign", candidate: { nodeId: "USER" } });
+    expect(() => createService().evaluateAutomaticDomainAssignment({ nodeId: "USER", access: globalKnowledgeAccess })).toThrow(/Unknown KnowledgeNode USER/);
+    expect(createService().topologySignature(globalKnowledgeAccess)).toBe("");
+    expect(createService().topologySignature(userKnowledgeAccess("user-1"))).toBe("GLOBAL:related:USER");
   });
 
   it("audits membership only from DomainAssignment and discovers auditable Domains dynamically", () => {

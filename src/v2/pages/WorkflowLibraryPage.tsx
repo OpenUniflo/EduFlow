@@ -32,9 +32,9 @@ export function WorkflowLibraryPage({
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
   const runtimes = courseRepository.listCourseRuntimes();
   const workflowAssignments = runtimes.flatMap((runtime) => runtime.assignments.filter((item) => item.mode === "workflow" && item.workflowTemplateId));
-  const lessonIds = new Set(workflowAssignments.map((item) => item.workflowTemplateId!));
-  const lessonWorkflows = workflows.filter((item) => lessonIds.has(item.id));
-  const otherWorkflows = workflows.filter((item) => !lessonIds.has(item.id));
+  const courseTemplateIds = new Set(workflowAssignments.map((item) => item.workflowTemplateId!));
+  const lessonWorkflows = workflows.filter((item) => courseTemplateIds.has(item.id));
+  const otherWorkflows = workflows.filter((item) => !courseTemplateIds.has(item.id));
 
   function workflowCard(template: Template) {
     const assignments = workflowAssignments.filter((item) => item.workflowTemplateId === template.id);

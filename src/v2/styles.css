@@ -3505,6 +3505,7 @@ body {
   grid-template-columns: 1fr;
 }
 
+/* Workflow Library card */
 .atlas-workflow-card {
   position: relative;
   overflow: hidden;
@@ -6001,6 +6002,7 @@ body {
   backdrop-filter: blur(8px);
 }
 
+/* Course Assignment modal content */
 .atlas-workflow-modal-card {
   position: relative;
   width: min(560px, 100%);
@@ -6027,6 +6029,29 @@ body {
 }
 
 .atlas-workflow-modal-card > p {
+  margin: 0;
+  color: var(--atlas-muted);
+  line-height: 1.6;
+}
+
+.atlas-workflow-modal-card section {
+  margin-top: 20px;
+}
+
+.atlas-workflow-modal-card section h3 {
+  margin: 0 0 10px;
+}
+
+.atlas-workflow-modal-card section > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--atlas-muted);
+}
+
+.atlas-workflow-modal-card section p {
+  margin: 0;
   color: var(--atlas-muted);
   line-height: 1.6;
 }
