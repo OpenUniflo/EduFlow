@@ -1,7 +1,9 @@
-import { demoDomainDiscoveryService } from "../../knowledge/domain/domainDiscovery";
+import { demoDomainDiscoveryService } from "./DemoDomainDiscoveryService";
 import type { DomainAssignmentCandidate } from "../../knowledge/domain/domainTypes";
 import type { DomainGovernanceState } from "../../knowledge/domain/DomainGovernanceRepository";
+import { validateDomainGovernance } from "../../knowledge/domain/domainValidation";
 import { knowledgeNodes } from "../../knowledge/graph";
+import { demoPersonalKnowledgeGraph } from "../../profile/demoUserKnowledge";
 import { demoDomainAssignments, DEMO_DOMAIN_ASSIGNMENT_TIME } from "./demoDomainAssignments.fixture";
 import { demoKnowledgeDomains } from "./demoDomains.fixture";
 
@@ -12,11 +14,14 @@ const candidates: DomainAssignmentCandidate[] = [
 
 export function demoDomainGovernanceSeed(): DomainGovernanceState {
   const domains = demoKnowledgeDomains.map((domain) => ({ ...domain }));
-  return {
+  const state: DomainGovernanceState = {
     domains,
     assignments: demoDomainAssignments.map((assignment) => ({ ...assignment })),
     candidates,
     proposals: demoDomainDiscoveryService.discover(knowledgeNodes, domains),
     revision: 0
   };
+  const errors = validateDomainGovernance(demoPersonalKnowledgeGraph, state);
+  if (errors.length) throw new Error(`Invalid demo Domain governance fixture:\n${errors.join("\n")}`);
+  return state;
 }

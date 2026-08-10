@@ -8,7 +8,7 @@ The Knowledge Relation System defines factual topology between atomic KnowledgeN
 
 A KnowledgeEdge connects two active atomic KnowledgeNodes with exactly one relation: `prerequisite`, `enables`, or `related`. Curriculum coverage, Assignment coverage, Material coverage, mappings, promotions, Domain membership, and layout metadata are separate models.
 
-Every canonical demo relation carries a concise `reason` that explains the direct semantic fact. Reasons support review; they are not display copy or generated ontology.
+Every KnowledgeEdge carries a required, non-empty `reason` that explains the direct semantic fact. Reasons support review; they are not display copy or generated ontology.
 
 ## prerequisite
 
@@ -29,7 +29,9 @@ Prerequisite direction is source to target. Conflicting reverse prerequisites ar
 
 ## Strength
 
-Prerequisite strength is `hard | soft`. Enables and related strength is numeric in `0..1`: roughly `0.9+` for a very direct relationship, `0.75..0.9` for a clear important relationship, and `0.55..0.75` for a useful secondary relationship. Relations too weak to add practical graph value are omitted.
+Prerequisite strength is required as `hard | soft`. Enables and related strength is required as a finite number in `0..1`: roughly `0.9+` for a very direct relationship, `0.75..0.9` for a clear important relationship, and `0.55..0.75` for a useful secondary relationship. Relations too weak to add practical graph value are omitted.
+
+TypeScript definitions and runtime validation enforce the same contract. Runtime checks remain necessary because future backend records are not compile-time trusted.
 
 ## Directionality and Duplicate Rules
 

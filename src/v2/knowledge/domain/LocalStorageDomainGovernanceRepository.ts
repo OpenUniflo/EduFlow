@@ -3,8 +3,8 @@ import type { KnowledgeGraph } from "../types";
 import { validateDomainGovernance } from "./domainValidation";
 
 export const DOMAIN_GOVERNANCE_STORAGE_KEY = "eduflow:v2:domain-governance";
-export const DOMAIN_GOVERNANCE_SCHEMA_VERSION = 1;
-export const DOMAIN_GOVERNANCE_SEED_VERSION = "2026-08-10-domain-decoupling-v1";
+export const DOMAIN_GOVERNANCE_SCHEMA_VERSION = 2;
+export const DOMAIN_GOVERNANCE_SEED_VERSION = "2026-08-10-global-domain-v2";
 
 type PersistedDomainGovernanceEnvelope = {
   schemaVersion: number;
@@ -20,7 +20,30 @@ function isGovernanceState(value: unknown): value is DomainGovernanceState {
   return Array.isArray(state.domains) && Array.isArray(state.assignments) && Array.isArray(state.candidates) && Array.isArray(state.proposals) && typeof state.revision === "number";
 }
 
+type LegacyScopedRecord = { scope?: unknown };
+
+export function migrateDomainGovernanceStateToGlobalV1(state: DomainGovernanceState): DomainGovernanceState {
+  const domains = state.domains.flatMap((domain) => {
+    const legacy = domain as typeof domain & LegacyScopedRecord;
+    if (legacy.scope === "tenant") return [];
+    const { scope: _scope, ...globalDomain } = legacy;
+    return [globalDomain];
+  });
+  const domainIds = new Set(domains.map((domain) => domain.id));
+  const assignments = state.assignments.filter((assignment) => domainIds.has(assignment.domainId));
+  const candidates = state.candidates.filter((candidate) => domainIds.has(candidate.domainId));
+  const proposals = state.proposals.flatMap((proposal) => {
+    const legacy = proposal as typeof proposal & LegacyScopedRecord;
+    if (legacy.scope === "tenant") return [];
+    const { scope: _scope, ...globalProposal } = legacy;
+    return [globalProposal];
+  });
+  return { domains, assignments, candidates, proposals, revision: state.revision };
+}
+
 export function reconcileDomainGovernanceState(saved: DomainGovernanceState, seed: DomainGovernanceState, seededDomainIds: string[], seededAssignmentNodeIds: string[], graph: KnowledgeGraph) {
+  saved = migrateDomainGovernanceStateToGlobalV1(saved);
+  seed = migrateDomainGovernanceStateToGlobalV1(seed);
   const knownSeedDomains = new Set(seededDomainIds);
   const domains = saved.domains.map((domain) => ({ ...domain }));
   seed.domains.forEach((domain) => {
@@ -58,11 +81,13 @@ export class LocalStorageDomainGovernanceRepository implements DomainGovernanceR
         if (raw) {
           const parsed = JSON.parse(raw) as Partial<PersistedDomainGovernanceEnvelope> | DomainGovernanceState;
           let state: DomainGovernanceState | null = null;
-          if ("state" in parsed && parsed.schemaVersion === DOMAIN_GOVERNANCE_SCHEMA_VERSION && isGovernanceState(parsed.state)) {
-            state = reconcileDomainGovernanceState(parsed.state, seed, parsed.seededDomainIds ?? [], parsed.seededAssignmentNodeIds ?? [], this.graph);
+          if ("state" in parsed && (parsed.schemaVersion === 1 || parsed.schemaVersion === DOMAIN_GOVERNANCE_SCHEMA_VERSION) && isGovernanceState(parsed.state)) {
+            // Schema v1 allowed scoped Domains. Global records are stripped of scope; Tenant records and their references are discarded rather than promoted.
+            state = reconcileDomainGovernanceState(migrateDomainGovernanceStateToGlobalV1(parsed.state), seed, parsed.seededDomainIds ?? [], parsed.seededAssignmentNodeIds ?? [], this.graph);
           } else if (isGovernanceState(parsed)) {
-            // Legacy raw-state migration. Existing records are preserved; newly introduced seed records are reconciled once.
-            state = reconcileDomainGovernanceState(parsed, seed, parsed.domains.map((domain) => domain.id), parsed.assignments.map((assignment) => assignment.nodeId), this.graph);
+            // Legacy raw-state migration follows the same Global-only rule and preserves valid administrator changes.
+            const migrated = migrateDomainGovernanceStateToGlobalV1(parsed);
+            state = reconcileDomainGovernanceState(migrated, seed, migrated.domains.map((domain) => domain.id), migrated.assignments.map((assignment) => assignment.nodeId), this.graph);
           }
           if (state && !validateDomainGovernance(this.graph, state).length) {
             this.save(state);

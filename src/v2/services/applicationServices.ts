@@ -4,6 +4,7 @@ import { DemoCourseRepository } from "../course/repository/DemoCourseRepository"
 import { DemoCourseCreationService } from "../demo/services/DemoCourseCreationService";
 import { DemoUserKnowledgeRepository } from "../demo/user/DemoUserKnowledgeRepository";
 import { LocalStorageDomainGovernanceRepository } from "../knowledge/domain/LocalStorageDomainGovernanceRepository";
+import { DomainGovernanceService } from "../knowledge/domain/DomainGovernanceService";
 import { demoDomainGovernanceSeed } from "../demo/domains/demoDomainGovernance.seed";
 import type { DomainGovernanceRepository } from "../knowledge/domain/DomainGovernanceRepository";
 import { InMemoryKnowledgeRepository } from "../knowledge/repository/InMemoryKnowledgeRepository";
@@ -19,16 +20,20 @@ export type ApplicationServices = {
   userKnowledgeRepository: UserKnowledgeRepository;
   learningProgressRepository: LearningProgressRepository;
   domainGovernanceRepository: DomainGovernanceRepository;
+  domainGovernanceService: DomainGovernanceService;
   courseCreationService: CourseCreationService;
 };
 
 const knowledgeRepository = new InMemoryKnowledgeRepository(demoPersonalKnowledgeGraph);
+const domainGovernanceRepository = new LocalStorageDomainGovernanceRepository(demoPersonalKnowledgeGraph, demoDomainGovernanceSeed);
+const domainGovernanceService = new DomainGovernanceService(knowledgeRepository, domainGovernanceRepository);
 
 export const applicationServices: ApplicationServices = {
   courseRepository: new DemoCourseRepository(knowledgeRepository),
   knowledgeRepository,
   userKnowledgeRepository: new DemoUserKnowledgeRepository(),
   learningProgressRepository: new LocalStorageLearningProgressRepository(),
-  domainGovernanceRepository: new LocalStorageDomainGovernanceRepository(demoPersonalKnowledgeGraph, demoDomainGovernanceSeed),
+  domainGovernanceRepository,
+  domainGovernanceService,
   courseCreationService: new DemoCourseCreationService()
 };

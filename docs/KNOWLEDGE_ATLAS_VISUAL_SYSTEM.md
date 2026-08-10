@@ -35,6 +35,8 @@ Priority is selected, hovered, search result, current learning, high visual impo
 
 Atlas color resolves from `KnowledgeDomain.canonicalColor` through the primary `DomainAssignment`. Unclassified uses `#A7B0BF`. Learning status is a ring/marker, not a hue replacement.
 
+V1 KnowledgeDomains are Global-only. Atlas styling receives Domain data through the governance projection join; it exposes no Tenant Domain branch.
+
 `KnowledgeGraph` does not carry Domains. Atlas projection explicitly joins its visible graph with `DomainGovernanceState`; this produces presentation fields only. Missing assignment remains Unclassified, with no fallback to node tags, provenance, courses, or fixture location.
 
 `visualImportance` is projection-only and derived from weighted degree. `prerequisite` and `enables` carry more weight than `related`; normalized importance maps Global dots from approximately 3.4 to 7.0 units.

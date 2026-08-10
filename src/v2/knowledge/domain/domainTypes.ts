@@ -1,8 +1,5 @@
-export type KnowledgeDomainScope = "global" | "tenant";
-
 export type KnowledgeDomain = {
   id: string;
-  scope: KnowledgeDomainScope;
   name: string;
   description?: string;
   canonicalColor: string;
@@ -35,7 +32,6 @@ export type DomainAssignmentCandidate = {
 
 export type DomainProposal = {
   id: string;
-  scope: KnowledgeDomainScope;
   suggestedName: string;
   suggestedDescription?: string;
   suggestedColor: string;
@@ -54,7 +50,7 @@ export type DomainDiscoveryConfig = {
   algorithmVersion: string;
 };
 
-export type DomainAdminCapability = "global-domain-admin" | "tenant-domain-admin";
+export type DomainAdminCapability = "global-domain-admin";
 
 export type DomainActor = {
   id: string;

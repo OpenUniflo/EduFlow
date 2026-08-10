@@ -34,6 +34,20 @@ export type CourseGraphProjection = {
   edges: CourseProjectionEdge[];
 };
 
+const CURRICULUM_ROLE_ORDER: Record<CourseSkillTreeNode["primaryCoverage"]["role"], number> = {
+  introduce: 0,
+  reinforce: 1,
+  apply: 2,
+  assess: 3
+};
+
+export function compareCourseKnowledgeOrder(left: CourseSkillTreeNode, right: CourseSkillTreeNode) {
+  return left.primaryCoverage.lessonOrder - right.primaryCoverage.lessonOrder
+    || CURRICULUM_ROLE_ORDER[left.primaryCoverage.role] - CURRICULUM_ROLE_ORDER[right.primaryCoverage.role]
+    || left.primaryCoverage.id.localeCompare(right.primaryCoverage.id)
+    || left.id.localeCompare(right.id);
+}
+
 export function buildCourseGraphProjection(graphData: CourseGraphData, view: CourseGraphView, focusedChapterId: string | null): CourseGraphProjection {
   const expandedIds = new Set(view === "full" ? graphData.chapters.map((chapter) => chapter.id) : view === "focused" && focusedChapterId ? [focusedChapterId] : []);
   const nodes: CourseProjectionNode[] = graphData.chapters.map((chapter) => ({
@@ -43,14 +57,14 @@ export function buildCourseGraphProjection(graphData: CourseGraphData, view: Cou
     chapter,
     order: chapter.order
   }));
-  graphData.knowledgeNodes.forEach((knowledge) => {
+  [...graphData.knowledgeNodes].sort(compareCourseKnowledgeOrder).forEach((knowledge, projectionOrder) => {
     if (!expandedIds.has(knowledge.chapterId)) return;
     nodes.push({
       id: `knowledge:${knowledge.id}`,
       kind: "knowledge",
       parentId: `chapter:${knowledge.chapterId}`,
       knowledge,
-      order: knowledge.lesson * 100 + knowledge.id.charCodeAt(0)
+      order: projectionOrder
     });
   });
 

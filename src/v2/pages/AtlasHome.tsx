@@ -119,7 +119,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
             <div><h3>知识领域</h3><button onClick={() => navigate("/admin/domains")}><Settings2 size={13} />领域管理</button></div>
             <select aria-label="修改知识领域" value={resolveNodeDomain(selected.id, governance).domain?.id ?? ""} onChange={(event) => assignNodeDomain({ actor: domainActor, nodeId: selected.id, domainId: event.target.value || null })}>
               <option value="">未分类</option>
-              {governance.domains.filter((domain) => domain.status === "active" && domain.scope === "global").map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}
+              {governance.domains.filter((domain) => domain.status === "active").map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}
             </select>
             <small>管理员修改会写入 pinned 归属；颜色立即同步，节点位置保持不变。</small>
           </section> : null}

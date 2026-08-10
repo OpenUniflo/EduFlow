@@ -5,7 +5,6 @@ export const DEMO_DOMAIN_TIME = "2026-08-01T00:00:00.000Z";
 function domain(id: string, name: string, description: string, canonicalColor: string): KnowledgeDomain {
   return {
     id,
-    scope: "global",
     name,
     description,
     canonicalColor,

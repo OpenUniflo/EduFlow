@@ -64,13 +64,23 @@
 ## Domain Invariants
 
 - `KnowledgeDomain` is a governed semantic classification entity and MUST NOT be represented as a `KnowledgeNode`.
+- V1 supports Global KnowledgeDomain governance only. Tenant Domain governance is deferred.
+- Core V1 models, stores, services, permissions, persistence, and UI MUST NOT expose partial Tenant Domain behavior.
+- A future Tenant Domain implementation MUST add tenant ownership, tenant-scoped authority, repository isolation, assignment isolation, and persistence isolation as one coherent feature.
 - `KnowledgeDomain` MUST NOT directly constrain graph geometry. Changing Domain membership MUST NOT trigger graph relayout.
 - Every `KnowledgeNode` has at most one primary Domain in v1. Unclassified is a valid state.
 - Domain assignment uses semantic and structural evidence. Automatic discovery creates proposals, not authoritative Domains.
 - An admin `DomainAssignment` is pinned and MUST NOT be overwritten automatically.
 - Changing Domain membership MUST NOT create, delete, or modify `KnowledgeEdge` facts.
 - Domain color belongs to `KnowledgeDomain.canonicalColor` and MUST NOT be copied into `KnowledgeNode`.
-- Global Domains are governed by Global Admin; Tenant Domains are governed by Tenant Admin. Users do not create formal Domains in v1.
+- Formal Domains are governed only by Global Admin in v1. Users do not create formal Domains.
+
+## Core / Demo Domain Boundary
+
+- Core Domain services MUST NOT import demo KnowledgeNode or KnowledgeEdge fixtures, concrete demo Domain definitions, concrete demo DomainAssignments, or demo Domain proposals.
+- Concrete demo identities MUST live under explicit demo fixtures/adapters.
+- Domain membership MUST be represented explicitly by `DomainAssignment` and MUST NOT be inferred from fixture file location, module name, course provenance, tags, node naming, or node ID prefix.
+- Generic Domain application logic MUST consume Knowledge data through `KnowledgeRepository` or explicit `KnowledgeGraph` input. Generic Domain code MUST NOT read static demo graph singletons.
 
 ## Course Views
 
@@ -259,6 +269,5 @@
 
 ## Domain Scope Permission Invariants
 
-- Removing a DomainAssignment requires explicit permission for the current Domain's scope.
-- DomainProposal acceptance and rejection require the capability matching `proposal.scope`.
-- No Domain mutation may succeed merely because the actor holds an unrelated administrator capability.
+- Every manual Domain mutation, including unassignment and proposal review, requires `global-domain-admin` in v1.
+- `tenant-domain-admin`, Domain scope branching, and proposal scope branching MUST NOT exist in the V1 runtime.

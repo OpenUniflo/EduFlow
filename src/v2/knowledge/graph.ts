@@ -37,9 +37,14 @@ export function createKnowledgeEdgeId(source: string, target: string, relation: 
 }
 
 export function buildKnowledgeEdges(seeds: EdgeSeed[]): KnowledgeEdge[] {
-  return seeds.map(([source, target, relation, strength, reason]) => relation === "prerequisite"
-    ? { id: createKnowledgeEdgeId(source, target, relation), source, target, relation, strength: strength as "hard" | "soft", reason }
-    : { id: createKnowledgeEdgeId(source, target, relation), source, target, relation, strength: strength as number, reason });
+  return seeds.map((seed) => {
+    if (seed[2] === "prerequisite") {
+      const [source, target, relation, strength, reason] = seed;
+      return { id: createKnowledgeEdgeId(source, target, relation), source, target, relation, strength, reason };
+    }
+    const [source, target, relation, strength, reason] = seed;
+    return { id: createKnowledgeEdgeId(source, target, relation), source, target, relation, strength, reason };
+  });
 }
 
 export const knowledgeEdges = buildKnowledgeEdges(edgeSeeds);
@@ -67,7 +72,7 @@ function validateGraph(graph: KnowledgeGraph) {
   graph.edges.forEach((edge) => {
     if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) throw new Error(`Invalid edge endpoints: ${edge.source} -> ${edge.target}`);
     if (nodeById.get(edge.source)?.status !== "active" || nodeById.get(edge.target)?.status !== "active") throw new Error(`KnowledgeEdge references inactive node: ${edge.source} -> ${edge.target}`);
-    if (edge.relation !== "prerequisite" && edge.strength !== undefined && (edge.strength < 0 || edge.strength > 1)) throw new Error(`Invalid relation strength: ${edge.id}`);
+    if (edge.relation !== "prerequisite" && (edge.strength < 0 || edge.strength > 1)) throw new Error(`Invalid relation strength: ${edge.id}`);
   });
   const relationIssues = validateKnowledgeRelations(graph);
   if (relationIssues.length) throw new Error(relationIssues.join("\n"));

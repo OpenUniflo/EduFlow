@@ -56,7 +56,7 @@ type KnowledgeRelationBase = {
   id: string;
   source: string;
   target: string;
-  reason?: string;
+  reason: string;
 };
 
 export type PrerequisiteKnowledgeRelation = KnowledgeRelationBase & {
@@ -66,7 +66,7 @@ export type PrerequisiteKnowledgeRelation = KnowledgeRelationBase & {
 
 export type AssociativeKnowledgeRelation = KnowledgeRelationBase & {
   relation: "enables" | "related";
-  strength?: number;
+  strength: number;
 };
 
 export type KnowledgeEdge = PrerequisiteKnowledgeRelation | AssociativeKnowledgeRelation;

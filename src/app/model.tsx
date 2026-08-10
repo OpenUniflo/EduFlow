@@ -224,7 +224,7 @@ export type RenameNodeResult = {
   message?: string;
   name?: string;
 };
-export type UserCapability = "global-domain-admin" | "tenant-domain-admin";
+export type UserCapability = "global-domain-admin";
 export type MockSession = {
   name: string;
   email: string;

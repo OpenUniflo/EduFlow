@@ -164,17 +164,25 @@ Every active course KnowledgeNode must have at least one AssignmentCoverage befo
 
 ## 24A. Knowledge Domain
 
-`KnowledgeDomain` is first-class governance metadata, not graph geometry. It has Global or Tenant scope, a governed name and description, one canonical color, lifecycle status, and audit metadata. Domain is not a KnowledgeNode, Chapter, Community, Cluster, Island, or force-layout container.
+`KnowledgeDomain` is Global-only first-class governance metadata in v1, not graph geometry. It has a governed name and description, one canonical color, lifecycle status, and audit metadata; it has no scope field. Tenant Domain governance is a future extension. Domain is not a KnowledgeNode, Chapter, Community, Cluster, Island, or force-layout container.
 
 The schema boundary is strict: `KnowledgeNode` has no `domainId`, and `KnowledgeGraph` contains only nodes, revisions, and factual edges. Domain definitions and memberships are loaded through `DomainGovernanceRepository`. Views resolve Domain presentation by explicitly joining graph identity with governance state; tags, provenance, fixture location, and curriculum context are never membership fallbacks.
 
-Formal membership is represented by `DomainAssignment`, not by copying color into `KnowledgeNode`. A node has zero or one primary Domain in v1; no assignment is the valid Unclassified state. Admin assignments are pinned and take precedence over automatic results. Global Admin governs Global Domains and Tenant Admin governs Tenant Domains; users cannot create formal Domains in v1.
+Formal membership is represented only by explicit `DomainAssignment`, not by copying color into `KnowledgeNode` or inferring fixture location. A node has zero or one primary Domain in v1; no assignment is the valid Unclassified state. Admin assignments are pinned and take precedence over automatic results. Global Admin is the only formal Domain authority in v1.
 
 Domain classification never creates, deletes, or modifies `prerequisite`, `enables`, or `related` KnowledgeEdges. Domain changes may affect hue, filters, search, statistics, and classification only. They cannot change coordinates, topology, force state, or camera state.
 
 Existing-Domain assignment combines semantic evidence from `title`, `description`, and `masteryCriteria` with structural evidence from factual direct relations and common neighbors. Configurable thresholds produce automatic assignment, a pending candidate, or Unclassified. Admin-confirmed pinned members are preferred anchors.
 
 Full-graph discovery produces `DomainProposal` records for administrator review; clustering never creates an authoritative Domain directly. See `KNOWLEDGE_DOMAIN_SYSTEM.md`.
+
+### Domain Application Boundary
+
+Generic Domain application logic composes `KnowledgeRepository + DomainGovernanceRepository` through `DomainGovernanceService`. It reads the Global visible graph through the repository and never imports static graph or demo fixture singletons. The React store is only a subscription adapter over that service.
+
+### Demo Data Boundary
+
+Agentic AI, Python Engineering, their membership lists, and deterministic proposal identities are demo data under explicit fixtures/adapters. Demo fixtures are not ontology rules or production repositories. Moving a KnowledgeNode between fixture files has no effect on membership without a DomainAssignment change.
 
 ## 25. Community
 
@@ -267,7 +275,7 @@ Course, Assignment, and Material definitions contain no user completion. Mutable
 
 ## 37. Domain Runtime Authority
 
-`DomainAssignment` is the only authoritative runtime membership source. `KnowledgeNode` has no Domain-membership field, and Domain definitions and assignments are persisted independently from the Knowledge Graph structure.
+`DomainAssignment` is the only authoritative runtime membership source. `KnowledgeNode` has no Domain-membership field, and Domain definitions and assignments are persisted independently from the Knowledge Graph structure. V1 Domain governance is Global-only; Tenant Domain ownership, permissions, repository isolation, and persistence are deferred as one coherent extension.
 
 ## 38. Scoped Knowledge Access
 

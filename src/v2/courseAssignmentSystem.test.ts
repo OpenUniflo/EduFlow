@@ -281,6 +281,18 @@ describe("Course Assignment layout and Drawer", () => {
     expect(ATOMIC_FOOTPRINT_HEIGHT).toBe(KNOWLEDGE_CARD_HEIGHT + COMPANION_OFFSET_Y);
   });
 
+  it("orders same-Lesson Knowledge from curriculum projection data instead of ID characters", () => {
+    const base = pythonGraph.knowledgeNodes[0];
+    const variants = [
+      { ...base, id: "R01", primaryCoverage: { ...base.primaryCoverage, id: "coverage-03" } },
+      { ...base, id: "uuid-like-id", primaryCoverage: { ...base.primaryCoverage, id: "coverage-01" } },
+      { ...base, id: "Z999", primaryCoverage: { ...base.primaryCoverage, id: "coverage-02" } }
+    ];
+    const projection = buildCourseGraphProjection({ ...pythonGraph, knowledgeNodes: variants, knowledgeEdges: [], chapterEdges: [] }, "full", null);
+    const orderedIds = projection.nodes.filter((node) => node.kind === "knowledge").sort((left, right) => left.order - right.order).map((node) => node.knowledge!.id);
+    expect(orderedIds).toEqual(["uuid-like-id", "Z999", "R01"]);
+  });
+
   it("keeps every expanded Python footprint inside its Chapter", async () => {
     const projection = buildCourseGraphProjection(pythonGraph, "full", null);
     const layout = await layoutCourseGraph(pythonGraph, projection);
