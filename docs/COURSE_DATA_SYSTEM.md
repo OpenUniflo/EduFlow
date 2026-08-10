@@ -44,7 +44,9 @@ Course cards, metrics, search, progress, and recent activity are computed from r
 
 Runtime validation verifies unique IDs for Chapter, Lesson, CurriculumCoverage, CurriculumSequence, Assignment, AssignmentCoverage, Material, and MaterialKnowledgeCoverage. Every Chapter, Lesson, Coverage, Sequence, Assignment, and Material with course ownership must belong to the runtime Course.
 
-Referential validation requires every `lesson.chapterId`, Coverage Lesson/Knowledge endpoint, Sequence source/target, AssignmentCoverage endpoint, Material Lesson/Segment, and MaterialKnowledgeCoverage endpoint to resolve. Sequences cannot self-reference or duplicate the same ordered Lesson pair. Exact duplicate AssignmentCoverage and MaterialKnowledgeCoverage facts are rejected. Every course KnowledgeNode must still have AssignmentCoverage, and workflow Assignments must still declare `workflowTemplateId`.
+Referential validation requires every `lesson.chapterId`, Coverage Lesson/Knowledge endpoint, Sequence source/target, AssignmentCoverage endpoint, Material Lesson/Segment, and MaterialKnowledgeCoverage endpoint to resolve. Sequences cannot self-reference or duplicate the same ordered Lesson pair. AssignmentCoverage is unique by `(assignmentId, nodeId)` regardless of role; exact duplicate MaterialKnowledgeCoverage facts are rejected. Every course KnowledgeNode must still have AssignmentCoverage, and workflow Assignments must still declare `workflowTemplateId`.
+
+Ordering validation requires non-negative integer order values. Chapter, Lesson, and CourseAssignment order are unique course-wide; CurriculumCoverage order is unique within a Lesson; Material order is unique within a Lesson; and MaterialSegment order is unique within a Material. PDF page remains the authoritative complete `1..pageCount` ordering.
 
 ## 11. Multi-course Fixture
 
@@ -95,3 +97,14 @@ Course Knowledge ordering is `lesson.order -> coverage.order -> role -> nodeId`,
 ## 22. User State
 
 Course, Chapter, Assignment, and reading progress are not Course definition data. They belong to `UserCourseState`, `UserAssignmentState`, `UserMaterialState`, `UserKnowledgeState`, or projections derived from those records.
+
+## 23. Canonical Ordering Hierarchy
+
+- Course curriculum: `chapter.order -> lesson.order -> coverage.order`.
+- Primary Knowledge coverage: introduce first, then `lesson.order -> coverage.order -> coverage.id` final tie.
+- Course Knowledge presentation: `lesson.order -> coverage.order -> role -> nodeId -> coverageId`.
+- Materials: `lesson.order -> material.order -> material.id` final tie.
+- Non-PDF Segments: `segment.order -> segment.id`; PDF Segments: `page -> segment.id`.
+- Assignments: `assignment.order -> assignment.id`.
+
+Changing IDs to UUIDs or shuffling repository arrays does not change business presentation order.

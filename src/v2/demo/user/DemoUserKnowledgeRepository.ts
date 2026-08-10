@@ -1,4 +1,4 @@
-import { demoUserKnowledge } from "../../profile/demoUserKnowledge";
+import { demoUserKnowledge } from "./demoPersonalKnowledgeGraph.fixture";
 import type { UserKnowledgeRepository } from "../../profile/UserKnowledgeRepository";
 
 const SECONDARY_USER_RECORDS = demoUserKnowledge

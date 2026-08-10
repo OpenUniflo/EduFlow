@@ -2,6 +2,7 @@ import type { Material } from "../../types";
 import { DocumentMaterialViewer } from "./DocumentMaterialViewer";
 import { PdfMaterialViewer } from "./PdfMaterialViewer";
 import type { MaterialNavigationRequest } from "./materialReaderState";
+import { sortMaterialSegments } from "../materialOrdering";
 
 export function MaterialRenderer({ material, activeSegmentId, zoom, navigationRequest, onVisibleSegmentChange, onNavigationSettled }: {
   material: Material;
@@ -12,9 +13,10 @@ export function MaterialRenderer({ material, activeSegmentId, zoom, navigationRe
   onNavigationSettled(token: number): void;
 }) {
   if (material.type === "pdf" && material.source?.kind === "pdf") {
-    const segmentByPage = new Map(material.segments.map((segment) => [segment.page ?? segment.order, segment.id]));
-    const activeSegment = material.segments.find((segment) => segment.id === activeSegmentId);
-    return <PdfMaterialViewer sourceUrl={material.source.url} sourcePageCount={material.source.pageCount} segments={material.segments} activePage={activeSegment?.page ?? activeSegment?.order ?? 1} zoom={zoom} navigationRequest={navigationRequest} onVisiblePageChange={(page) => {
+    const segments = sortMaterialSegments(material);
+    const segmentByPage = new Map(segments.map((segment) => [segment.page ?? segment.order, segment.id]));
+    const activeSegment = segments.find((segment) => segment.id === activeSegmentId);
+    return <PdfMaterialViewer sourceUrl={material.source.url} sourcePageCount={material.source.pageCount} segments={segments} activePage={activeSegment?.page ?? activeSegment?.order ?? 1} zoom={zoom} navigationRequest={navigationRequest} onVisiblePageChange={(page) => {
       const segmentId = segmentByPage.get(page);
       if (segmentId) onVisibleSegmentChange(segmentId);
     }} onNavigationSettled={onNavigationSettled} />;

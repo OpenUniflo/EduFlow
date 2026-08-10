@@ -4,6 +4,7 @@ import { WorkflowPreview } from "../../components/app/workflows/WorkflowPages";
 import { useEffect, useState } from "react";
 import { GlobalNav } from "../components/GlobalNav";
 import { applicationServices } from "../services/applicationServices";
+import { sortAssignments } from "../material/materialOrdering";
 
 const { courseRepository, learningProgressRepository } = applicationServices;
 
@@ -31,7 +32,7 @@ export function WorkflowLibraryPage({
   const [, setProgressRevision] = useState(0);
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
   const runtimes = courseRepository.listCourseRuntimes();
-  const workflowAssignments = runtimes.flatMap((runtime) => runtime.assignments.filter((item) => item.mode === "workflow" && item.workflowTemplateId));
+  const workflowAssignments = runtimes.flatMap((runtime) => sortAssignments(runtime.assignments).filter((item) => item.mode === "workflow" && item.workflowTemplateId));
   const courseTemplateIds = new Set(workflowAssignments.map((item) => item.workflowTemplateId!));
   const lessonWorkflows = workflows.filter((item) => courseTemplateIds.has(item.id));
   const otherWorkflows = workflows.filter((item) => !courseTemplateIds.has(item.id));

@@ -16,6 +16,7 @@ import { useMaterialReaderState } from "../material/reader/useMaterialReaderStat
 import { updateMaterialReadingState, useUserCourseState, workflowLaunchUrl } from "../progress/progressService";
 import { applicationServices } from "../services/applicationServices";
 import type { Material, UserCourseState, UserMaterialState } from "../types";
+import { sortMaterialSegments } from "../material/materialOrdering";
 
 const PERSIST_DELAY_MS = 350;
 
@@ -59,7 +60,8 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   }, [access, effectiveKnowledgeId, governance, knowledgeContextState.pinnedKnowledgeId, material.id, projection, runtime]);
   const knowledgeAssignmentContexts = useMemo(() => buildKnowledgeAssignmentContexts(runtime, effectiveKnowledgeId, userState), [effectiveKnowledgeId, runtime, userState]);
   const activeAssignment = knowledgeAssignmentContexts.find((context) => context.assignmentId === activeAssignmentId) ?? null;
-  const activeIndex = material.segments.findIndex((segment) => segment.id === reader.activeSegmentId);
+  const orderedSegments = useMemo(() => sortMaterialSegments(material), [material]);
+  const activeIndex = orderedSegments.findIndex((segment) => segment.id === reader.activeSegmentId);
   const lesson = runtime.lessons.find((item) => item.id === material.lessonId);
 
   useEffect(() => {
@@ -75,7 +77,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
     viewedSegmentIdsRef.current.add(reader.activeSegmentId);
     if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
     persistTimerRef.current = window.setTimeout(() => {
-      const viewedSegmentIds = material.segments.map((segment) => segment.id).filter((id) => viewedSegmentIdsRef.current.has(id));
+      const viewedSegmentIds = orderedSegments.map((segment) => segment.id).filter((id) => viewedSegmentIdsRef.current.has(id));
       updateMaterialReadingState(session.email, runtime.course.id, material.lessonId, material.id, {
         recentSegmentId: reader.activeSegmentId,
         viewedSegmentIds,
@@ -83,14 +85,14 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
       });
     }, PERSIST_DELAY_MS);
     return () => { if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current); };
-  }, [material, reader.activeSegmentId, runtime.course.id, session.email]);
+  }, [material, orderedSegments, reader.activeSegmentId, runtime.course.id, session.email]);
 
   useEffect(() => {
     if (activeAssignmentId && !knowledgeAssignmentContexts.some((context) => context.assignmentId === activeAssignmentId)) setActiveAssignmentId(null);
   }, [activeAssignmentId, knowledgeAssignmentContexts]);
 
-  const previous = material.segments[activeIndex - 1];
-  const next = material.segments[activeIndex + 1];
+  const previous = orderedSegments[activeIndex - 1];
+  const next = orderedSegments[activeIndex + 1];
 
   return <main className={`atlas-lesson-page material-reader-current ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`}>
     <GlobalNav active="courses" session={session} onLogout={onLogout} />

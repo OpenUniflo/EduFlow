@@ -6,11 +6,11 @@ The Material system represents reusable course-owned learning content without en
 
 ## 2. Material
 
-A `Material` has a stable ID, `courseId`, `lessonId`, title, kind, and ordered segment IDs. It is curriculum data, not a KnowledgeNode.
+A `Material` has a stable ID, `courseId`, `lessonId`, explicit Lesson-local `order`, title, kind, and addressable Segments. It is curriculum data, not a KnowledgeNode.
 
 ## 3. MaterialSegment
 
-`MaterialSegment` is the addressable reading unit. It owns ordered, renderer-neutral content blocks such as headings, paragraphs, lists, callouts, and code.
+`MaterialSegment` is the addressable reading unit. Non-PDF content uses its explicit Material-local `order`; PDF content uses the source `page` as authoritative order. It owns renderer-neutral content blocks such as headings, paragraphs, lists, callouts, and code and contains no Assignment IDs.
 
 ## 4. MaterialKnowledgeCoverage
 
@@ -18,7 +18,7 @@ Coverage maps `materialId + segmentId` to a stable `nodeId` with a role. It is t
 
 ## 5. Assignment Context
 
-The viewer derives related Assignments by following the segment's KnowledgeNodes through AssignmentCoverage. It does not infer Assignments from page numbers or titles.
+The viewer derives related Assignments only through `MaterialSegment -> MaterialKnowledgeCoverage -> KnowledgeNode -> AssignmentCoverage -> CourseAssignment`. It does not infer Assignments from page numbers or titles and does not synthesize fallback relations.
 
 ## 6. Generic Projection
 
@@ -58,7 +58,7 @@ After initialization, outline clicks and previous/next actions may scroll smooth
 
 ## 14. Knowledge Material Entry Resolution
 
-A KnowledgeNode may map to several Segments in one Material and to several Materials. Each Material gets one deterministic entry using `introduce > explain > example > practice-reference > earliest segment.order`. Zero entries render an explicit empty state, one opens directly, and several produce a chooser showing Material, Segment order/title, and role.
+A KnowledgeNode may map to several Segments in one Material and to several Materials. Each Material gets one deterministic entry using `introduce > explain > example > practice-reference`, then authoritative Segment order (`order` for non-PDF, `page` for PDF), then stable ID. Multiple Materials order by primary Lesson, `lesson.order`, `material.order`, then ID only as the final tie. Zero entries render an explicit empty state, one opens directly, and several produce a chooser showing Material, Segment order/title, and role.
 
 ## 15. Reading Position and Completion
 
@@ -102,7 +102,7 @@ The Reader separates three presentation states. Current Page Knowledge is the de
 
 The effective detail identity is `pinnedKnowledgeId ?? selectedKnowledgeId ?? currentPagePrimaryKnowledgeId`. In Auto Mode, changing the active Segment resets selection to the first deterministic Knowledge context for that Segment. Clicking another current-page item changes selection without pinning. In Pinned Mode, the primary Current Page Coverage region is hidden and the complete Knowledge Context—indicator, title, roles, description, and Knowledge-specific Assignment list—remains attached to the pinned node. Unpin immediately selects the current-page primary node. A Material change clears the Pin and initializes selection from the new Material position.
 
-Page Assignment Context is the unique Assignment projection for all KnowledgeNodes covered by a Segment, plus any explicit Segment references. Knowledge-specific Assignment Context filters `AssignmentCoverage` by one KnowledgeNode ID. The adjacent list under Knowledge Detail always uses the latter, so a multi-Knowledge page cannot leak unrelated Assignments into the selected detail.
+Page Assignment Context is the unique Assignment projection for all KnowledgeNodes covered by a Segment through formal coverage records. Knowledge-specific Assignment Context filters `AssignmentCoverage` by one KnowledgeNode ID. The adjacent list under Knowledge Detail always uses the latter, so a multi-Knowledge page cannot leak unrelated Assignments into the selected detail.
 
 Selection and Pin are session-only Reader UI state. They do not persist in UserMaterialState and do not control PDF page, Outline, URL, zoom, or navigation initialization.
 

@@ -54,16 +54,6 @@ export type CurriculumLesson = {
   order: number;
 };
 
-export type CurriculumOutcome = {
-  id: string;
-  courseId: string;
-  title: string;
-  description: string;
-  kind: "learning-outcome" | "project";
-  lessonId?: string;
-  legacySourceNodeId?: string;
-};
-
 export type CurriculumCoverageRole = "introduce" | "reinforce" | "apply" | "assess";
 export type CurriculumCoverage = {
   id: string;
@@ -87,6 +77,8 @@ export type AssignmentCoverage = {
 export type CourseAssignment = {
   id: string;
   courseId: string;
+  /** Stable course-wide instructional/display order. */
+  order: number;
   title: string;
   description: string;
   requirements: string[];
@@ -205,33 +197,6 @@ export type CourseChapterEdge = {
   supportCount: number;
 };
 
-/** Legacy Agentic AI seed shape. It is normalized at the demo-seed boundary. */
-export type LegacyMaterialPage = {
-  id: string;
-  number: number;
-  section: string;
-  title: string;
-  lead: string;
-  bullets?: string[];
-  code?: string;
-  knowledge: string[];
-  knowledgeIds?: string[];
-  primaryKnowledgeId?: string;
-  visual?: "overview" | "flow" | "comparison" | "trace" | "decision" | "practice";
-  assignmentId?: string;
-  table?: { headers: string[]; rows: string[][] };
-};
-
-export type LegacyMaterialSeed = {
-  id: string;
-  courseId: string;
-  title: string;
-  subtitle: string;
-  duration: string;
-  pageCount: number;
-  pages: LegacyMaterialPage[];
-};
-
 export type MaterialSegmentContent = {
   lead?: string;
   paragraphs?: string[];
@@ -248,7 +213,6 @@ export type MaterialSegment = {
   title?: string;
   section?: string;
   content?: MaterialSegmentContent;
-  assignmentIds?: string[];
 };
 
 export type MaterialSource = {
@@ -261,6 +225,8 @@ export type Material = {
   id: string;
   courseId: string;
   lessonId: string;
+  /** Stable instructional/display order inside the owning Lesson. */
+  order: number;
   title: string;
   description?: string;
   type: "pdf" | "document" | "article";
@@ -276,19 +242,6 @@ export type MaterialKnowledgeCoverage = {
   segmentId: string;
   nodeId: string;
   role: MaterialKnowledgeCoverageRole;
-};
-
-export type AcceptanceSpec = {
-  id: string;
-  title: string;
-  checks: Array<{ id: string; label: string; weight: number }>;
-};
-
-export type LearningProgress = {
-  version: 3;
-  completedAssignmentIds: string[];
-  recentMaterialPage: number;
-  updatedAt: string;
 };
 
 export type UserMaterialState = {

@@ -6,11 +6,11 @@ import type { DomainActor, DomainAssignmentCandidate, DomainProposal, KnowledgeD
 import type { DomainGovernanceRepository, DomainGovernanceState } from "./DomainGovernanceRepository";
 import { assertDomainAcceptsAssignment, assertDomainCanArchive } from "./domainValidation";
 
-export type AssignNodeDomainInput = { actor: DomainActor; nodeId: string; domainId: string | null };
-export type AssignNodesToDomainInput = { actor: DomainActor; nodeIds: string[]; domainId: string };
+export type AssignNodeDomainInput = { actor: DomainActor; access: KnowledgeAccessContext; nodeId: string; domainId: string | null };
+export type AssignNodesToDomainInput = { actor: DomainActor; access: KnowledgeAccessContext; nodeIds: string[]; domainId: string };
 export type UpdateDomainInput = { actor: DomainActor; domainId: string; changes: Partial<Pick<KnowledgeDomain, "name" | "description" | "canonicalColor" | "status">> };
 export type CreateDomainInput = { actor: DomainActor; name: string; description?: string; canonicalColor?: string };
-export type AcceptCandidateInput = { actor: DomainActor; candidate: DomainAssignmentCandidate; domainId?: string };
+export type AcceptCandidateInput = { actor: DomainActor; access: KnowledgeAccessContext; candidate: DomainAssignmentCandidate; domainId?: string };
 export type ReviewProposalInput = { actor: DomainActor; proposalId: string; status: DomainProposal["status"] };
 export type EvaluateAutomaticDomainAssignmentInput = { nodeId: string; access: KnowledgeAccessContext };
 
@@ -47,6 +47,18 @@ export class DomainGovernanceService {
     return domain;
   }
 
+  validateAssignmentTargets(nodeIds: string[], access: KnowledgeAccessContext) {
+    const uniqueNodeIds = Array.from(new Set(nodeIds));
+    const nodes = this.knowledgeRepository.getNodes(uniqueNodeIds, access);
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    uniqueNodeIds.forEach((nodeId) => {
+      const node = nodeById.get(nodeId);
+      if (!node) throw new Error(`Unknown or invisible KnowledgeNode ${nodeId}`);
+      if (node.status !== "active") throw new Error(`KnowledgeNode ${nodeId} is not active`);
+    });
+    return uniqueNodeIds;
+  }
+
   resolveNodeDomain(nodeId: string, snapshot = this.state) {
     const assignment = snapshot.assignments.find((item) => item.nodeId === nodeId);
     return { assignment, domain: snapshot.domains.find((item) => item.id === assignment?.domainId) };
@@ -54,6 +66,7 @@ export class DomainGovernanceService {
 
   assignNodeDomain(input: AssignNodeDomainInput) {
     assertGlobalDomainAdmin(input.actor);
+    this.validateAssignmentTargets([input.nodeId], input.access);
     const currentAssignment = this.state.assignments.find((item) => item.nodeId === input.nodeId);
     const domain = input.domainId ? this.requireActiveDomain(input.domainId, input.actor) : undefined;
     if (!domain && !currentAssignment) return;
@@ -65,7 +78,8 @@ export class DomainGovernanceService {
 
   assignNodesToDomain(input: AssignNodesToDomainInput) {
     const domain = this.requireActiveDomain(input.domainId, input.actor);
-    this.publish({ ...this.state, assignments: moveNodesToDomain(this.state.assignments, input.nodeIds, domain.id, input.actor) });
+    const nodeIds = this.validateAssignmentTargets(input.nodeIds, input.access);
+    this.publish({ ...this.state, assignments: moveNodesToDomain(this.state.assignments, nodeIds, domain.id, input.actor) });
   }
 
   updateDomain(input: UpdateDomainInput) {
@@ -96,6 +110,7 @@ export class DomainGovernanceService {
 
   acceptCandidate(input: AcceptCandidateInput) {
     const domain = this.requireActiveDomain(input.domainId ?? input.candidate.domainId, input.actor);
+    this.validateAssignmentTargets([input.candidate.nodeId], input.access);
     const assignments = moveNodesToDomain(this.state.assignments, [input.candidate.nodeId], domain.id, input.actor);
     this.publish({ ...this.state, assignments, candidates: this.state.candidates.filter((item) => item.nodeId !== input.candidate.nodeId) });
   }

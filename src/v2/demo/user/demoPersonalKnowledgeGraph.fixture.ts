@@ -1,6 +1,6 @@
-import { globalKnowledgeGraph } from "../knowledge/graph";
-import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeRevision } from "../knowledge/types";
-import type { UserKnowledgeRecord, UserKnowledgeStatus } from "./types";
+import { globalKnowledgeGraph } from "../../knowledge/graph";
+import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeNodeRevision } from "../../knowledge/types";
+import type { UserKnowledgeRecord, UserKnowledgeStatus } from "../../profile/types";
 
 export const demoUserNode: KnowledgeNode = {
   id: "U-DEMO-01",

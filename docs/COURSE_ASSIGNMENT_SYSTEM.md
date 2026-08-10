@@ -12,11 +12,13 @@ Assignment is curriculum data. `Assignment != KnowledgeNode`, `Assignment != Kno
 
 ## 3. CourseAssignment schema
 
-`CourseAssignment` owns stable course-local identity, `courseId`, title, description, requirements, expected output, acceptance criteria, mode, optional workflow template, estimated time, and optional project contribution. It is a definition and does not contain user completion state.
+`CourseAssignment` owns stable course-local identity, `courseId`, explicit course-wide `order`, title, description, requirements, expected output, acceptance criteria, mode, optional workflow template, estimated time, and optional project contribution. It is a definition and does not contain user completion state.
 
 ## 4. AssignmentCoverage
 
 `AssignmentCoverage(assignmentId, nodeId, role)` connects curriculum work to stable knowledge identity. Roles are `practice`, `apply`, and `assess`. Coverage is N:M: one Assignment may integrate several KnowledgeNodes, and one KnowledgeNode may participate in several Assignments. Coverage is curriculum context, never a KnowledgeEdge.
+
+V1 allows at most one coverage for a given `(assignmentId, nodeId)` pair. `role` is one attribute on that relation; changing role does not create a second valid relationship. Projection code must surface duplicate-pair data errors instead of silently overwriting them in a map.
 
 ## 5. UserAssignmentState
 
@@ -128,6 +130,8 @@ Course, chapter, and node summaries are projections over unique Assignment IDs. 
 ## 20. Material Integration
 
 Assignments associated with a Material segment are derived through `MaterialKnowledgeCoverage -> KnowledgeNode -> AssignmentCoverage`. The material viewer does not contain course-specific Assignment lookup tables.
+
+`MaterialSegment` has no Assignment ID field, and the viewer never synthesizes fallback AssignmentCoverage. A future product need for a direct Material-to-Assignment fact must introduce a separately identified relation entity rather than another embedded ID list.
 
 A Segment may expose a page-level Assignment projection aggregated across every KnowledgeNode it covers. The Assignment list adjacent to a selected or pinned Knowledge Detail is a different, Knowledge-specific projection: it filters `AssignmentCoverage` by that effective KnowledgeNode ID and deduplicates by Assignment identity. It MUST NOT show unrelated Assignments contributed by other KnowledgeNodes on the same Segment.
 

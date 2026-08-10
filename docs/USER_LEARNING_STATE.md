@@ -26,6 +26,8 @@ Learning state is mutable, user-owned data layered over immutable curriculum def
 
 Persisted data uses `{ schemaVersion, state }`. Loading validates user/course identity, Assignment and Material maps, key-to-record identity, and timestamps. Legacy raw `UserCourseState` is migrated into the current envelope; invalid data falls back to the injected initial-state factory without treating an unchecked cast as valid state.
 
+Assignment and Material `progress`, when present, must be a finite number in the inclusive range `0..100`. NaN, Infinity, negative values, and values above 100 are rejected both during persistence validation and before a mutation can be saved.
+
 ## 7. Isolation
 
 Updating one user's course, Assignment, or material state cannot change another user or another course. Course Center and course pages always request the active user's scoped state.

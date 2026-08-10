@@ -21,6 +21,10 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
+function isValidProgress(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
 export function isValidUserCourseState(value: unknown, expectedUserId?: string, expectedCourseId?: string): value is UserCourseState {
   if (!isRecord(value)
     || typeof value.userId !== "string"
@@ -35,14 +39,14 @@ export function isValidUserCourseState(value: unknown, expectedUserId?: string, 
   const assignmentsValid = Object.entries(value.assignmentStates).every(([key, state]) => isRecord(state)
     && state.assignmentId === key
     && ["not-started", "in-progress", "completed"].includes(String(state.status))
-    && (state.progress === undefined || typeof state.progress === "number"));
+    && (state.progress === undefined || isValidProgress(state.progress)));
   const materialsValid = Object.entries(value.materialStates).every(([key, state]) => isRecord(state)
     && state.materialId === key
     && typeof state.updatedAt === "string"
     && (state.recentSegmentId === undefined || typeof state.recentSegmentId === "string")
     && (state.viewedSegmentIds === undefined || isStringArray(state.viewedSegmentIds))
     && (state.completedSegmentIds === undefined || isStringArray(state.completedSegmentIds))
-    && (state.progress === undefined || typeof state.progress === "number"));
+    && (state.progress === undefined || isValidProgress(state.progress)));
   return assignmentsValid && materialsValid;
 }
 
@@ -96,6 +100,8 @@ export class LocalStorageLearningProgressRepository implements LearningProgressR
   }
 
   private save(state: UserCourseState) {
+    const { userId, courseId } = state;
+    if (!isValidUserCourseState(state, userId, courseId)) throw new Error(`Learning progress is invalid for ${userId}/${courseId}`);
     this.cache.set(learningProgressStorageKey(state.userId, state.courseId), state);
     if (typeof window !== "undefined") window.localStorage.setItem(learningProgressStorageKey(state.userId, state.courseId), JSON.stringify(envelope(state)));
     this.listeners.forEach((listener) => listener());

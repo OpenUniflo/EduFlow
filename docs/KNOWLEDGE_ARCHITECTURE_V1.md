@@ -152,6 +152,8 @@ A Lesson is an ordered teaching unit inside a chapter. Lesson order is curriculu
 
 `AssignmentCoverage(assignmentId, nodeId, role)` binds an Assignment to stable Global, Tenant, or User knowledge identity with roles `practice`, `apply`, and `assess`. It is N:M and never encoded as a KnowledgeRelation. One integrated Assignment can cover several atomic capabilities, and a KnowledgeNode can contribute to several Assignments.
 
+V1 cardinality allows at most one AssignmentCoverage per `(assignmentId, nodeId)` pair. Role is one attribute of that relation, not part of its uniqueness. CourseAssignment also carries an explicit course-wide display order; repository or ID order has no business meaning.
+
 Assignment mode is `instruction` or `workflow`. Both modes have complete task definitions. Workflow mode additionally requires `workflowTemplateId`; the workflow canvas is an optional execution environment, not the Assignment itself.
 
 `UserAssignmentState(assignmentId, status, progress?)` is separate from Assignment definition and UserKnowledgeState. Assignment completion does not automatically set mastery, though it may produce KnowledgeEvidence in a future evidence pipeline.
@@ -231,7 +233,7 @@ Structural adjacency may treat all relation types as undirected for layout/commu
 15. Workflow Assignments have a workflowTemplateId; instruction Assignments do not require one.
 16. KnowledgeEdge IDs are stable semantic identities and never depend on seed-array order or position.
 17. Concrete Domain seed data belongs to demo fixtures, never the core knowledge/domain package.
-18. Material Knowledge contexts sort by coverage-role priority and stable node ID, independent of source record order.
+18. Material Knowledge contexts sort by coverage-role priority, authoritative Segment order, and stable identity only as a final tie, independent of source record order.
 
 ## 31. Explicit non-goals / forbidden shortcuts
 
@@ -308,3 +310,9 @@ Knowledge visibility is determined by the caller's `KnowledgeAccessContext`. Gen
 Core LearningProgress repository interfaces and persistence adapters know only `UserCourseState` and an injected `UserCourseStateFactory`. Demo fixtures flow inward from the application composition root; Core must never import a Demo initial state.
 
 Local persistence uses a versioned envelope. Load validates scope identity and nested Assignment/Material record keys, migrates supported legacy raw `UserCourseState`, and falls back to the injected factory only when stored data is absent or invalid. A production backend or empty-state factory can replace Demo initialization without changing Core persistence semantics.
+
+## 44. Core / Demo Dependency Direction
+
+Core Knowledge, Course, Material, Progress, and Profile modules define reusable models, validators, repositories, and projections. They never import `src/v2/demo`. Concrete Course repositories, personal Knowledge fixtures, Domain seeds, and static Knowledge graphs live on the Demo side and depend inward on Core contracts; only the composition root wires them together.
+
+The current static Knowledge graph is a prototype fixture, not a production runtime source. Backend repositories must supply scoped graph data through `KnowledgeRepository` without importing fixture singletons.

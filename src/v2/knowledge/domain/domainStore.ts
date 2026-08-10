@@ -21,6 +21,7 @@ export function getDomainGovernanceSnapshot() { return service.getSnapshot(); }
 export function subscribeDomainGovernance(listener: () => void) { return service.subscribe(listener); }
 export function useDomainGovernance() { return useSyncExternalStore(service.subscribe, service.getSnapshot, service.getSnapshot); }
 export function resolveNodeDomain(nodeId: string, snapshot?: DomainGovernanceState) { return service.resolveNodeDomain(nodeId, snapshot); }
+export function validateDomainAssignmentTargets(nodeIds: string[], access: KnowledgeAccessContext) { return service.validateAssignmentTargets(nodeIds, access); }
 export function assignNodeDomain(input: AssignNodeDomainInput) { return service.assignNodeDomain(input); }
 export function assignNodesToDomain(input: AssignNodesToDomainInput) { return service.assignNodesToDomain(input); }
 export function updateDomain(input: UpdateDomainInput) { return service.updateDomain(input); }

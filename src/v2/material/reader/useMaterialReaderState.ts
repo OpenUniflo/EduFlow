@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Material } from "../../types";
 import { resolveInitialMaterialSegment } from "../materialNavigation";
 import { classifySegmentQueryChange, shouldHandleExternalSegment, type MaterialNavigationReason, type MaterialNavigationRequest } from "./materialReaderState";
+import { sortMaterialSegments } from "../materialOrdering";
 
 export function useMaterialReaderState({ material, requestedSegmentId, recentSegmentId, onReplaceSegment }: {
   material: Material;
@@ -9,8 +10,9 @@ export function useMaterialReaderState({ material, requestedSegmentId, recentSeg
   recentSegmentId?: string;
   onReplaceSegment(segmentId: string): void;
 }) {
-  const segmentIds = useMemo(() => material.segments.map((segment) => segment.id), [material]);
-  const segmentById = useMemo(() => new Map(material.segments.map((segment) => [segment.id, segment])), [material]);
+  const orderedSegments = useMemo(() => sortMaterialSegments(material), [material]);
+  const segmentIds = useMemo(() => orderedSegments.map((segment) => segment.id), [orderedSegments]);
+  const segmentById = useMemo(() => new Map(orderedSegments.map((segment) => [segment.id, segment])), [orderedSegments]);
   const validSegmentIds = useMemo(() => new Set(segmentIds), [segmentIds]);
   const initialSegmentId = resolveInitialMaterialSegment({ segmentIds, requestedSegmentId, recentSegmentId });
   const [activeSegmentId, setActiveSegmentId] = useState(initialSegmentId);

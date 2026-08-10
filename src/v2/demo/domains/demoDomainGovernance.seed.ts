@@ -3,7 +3,7 @@ import type { DomainAssignmentCandidate } from "../../knowledge/domain/domainTyp
 import type { DomainGovernanceState } from "../../knowledge/domain/DomainGovernanceRepository";
 import { validateDomainGovernance } from "../../knowledge/domain/domainValidation";
 import { knowledgeNodes } from "../../knowledge/graph";
-import { demoPersonalKnowledgeGraph } from "../../profile/demoUserKnowledge";
+import { demoPersonalKnowledgeGraph } from "../user/demoPersonalKnowledgeGraph.fixture";
 import { demoDomainAssignments, DEMO_DOMAIN_ASSIGNMENT_TIME } from "./demoDomainAssignments.fixture";
 import { demoKnowledgeDomains } from "./demoDomains.fixture";
 

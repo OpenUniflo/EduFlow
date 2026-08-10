@@ -204,6 +204,45 @@
 - Generic automatic Domain assignment and topology inspection MUST operate on an explicitly supplied `KnowledgeAccessContext` or `KnowledgeGraph`.
 - Domain services and adapters MUST NOT silently replace caller visibility with `globalKnowledgeAccess`.
 
+## Prototype Data Model Freeze
+
+- The prototype model frozen on 2026-08-10 is the backend contract baseline. Backend adapters MUST preserve these identities, ownership relations, ordering fields, and validation rules.
+- IDs provide stable identity only. They MUST NOT encode business order, fixture position, or relationship meaning.
+
+## Material / Assignment Relation
+
+- `MaterialSegment` MUST NOT contain Assignment IDs.
+- Material Assignment context follows only `MaterialSegment -> MaterialKnowledgeCoverage -> KnowledgeNode -> AssignmentCoverage -> CourseAssignment`.
+- Generic projection MUST NOT synthesize fallback AssignmentCoverage records. A future direct Material/Assignment relation requires its own explicit relation entity.
+
+## AssignmentCoverage Cardinality
+
+- V1 permits at most one `AssignmentCoverage` for each `(assignmentId, nodeId)` pair. `role` is the single attribute of that relation and MUST NOT be used to make duplicate pairs distinct.
+- Projections MAY deduplicate the same Assignment reached through different KnowledgeNodes, but MUST NOT hide duplicate Assignment–Knowledge relations.
+
+## Explicit Ordering
+
+- `CurriculumChapter.order` and `CurriculumLesson.order` are unique course-wide; `CurriculumCoverage.order` is unique within a Lesson.
+- `Material.order` is unique within a Lesson. Non-PDF content uses `MaterialSegment.order`; PDF content uses the complete unique `page` sequence. `CourseAssignment.order` is unique course-wide.
+- Canonical helpers own curriculum, material coverage, segment, material, and Assignment sorting. Fixture-array order and IDs MUST NOT substitute for these fields.
+
+## Shared Selection Rules
+
+- Primary CurriculumCoverage is `introduce` first, then `lesson.order`, `coverage.order`, and stable ID only for a final tie.
+- Course Knowledge order is `lesson.order -> coverage.order -> role -> nodeId -> coverageId`.
+- Material coverage role priority is `introduce -> explain -> example -> practice-reference`, followed by the authoritative Segment order and stable identity tie-breaks.
+
+## Domain Mutation Integrity
+
+- Manual assignment, batch assignment, candidate acceptance, and proposal membership writes MUST receive explicit `KnowledgeAccessContext`.
+- Before mutation, every target KnowledgeNode MUST exist, be visible to that context, and be active. Candidate and proposal acceptance MUST revalidate rather than trust stored suggestions.
+
+## Core / Demo Dependency Rule
+
+- Code under Core `knowledge`, `course`, `material`, `progress`, and `profile` MUST NOT import `src/v2/demo`.
+- Demo repositories, user fixtures, concrete courses, Domains, and static graphs depend inward on Core interfaces and types. The application composition root may wire Demo adapters into Core boundaries.
+- Static demo Knowledge graphs are fixtures only; production repositories MUST NOT import or treat them as runtime authority.
+
 ## Material Invariants
 
 - `Material` belongs to a Course and Lesson and is composed of addressable `MaterialSegment` records.
@@ -231,7 +270,7 @@
 
 - The current Material Reader DOM and layout CSS MUST have one scoped authority. Archived reader selectors MUST be removed or isolated so build output never depends on HMR or stylesheet injection order.
 - Material navigation MUST support explicit `?segment=` deep links. An explicit valid URL Segment takes precedence over saved reading position, which takes precedence over the first Segment.
-- KnowledgeNode-to-Material navigation MUST resolve a deterministic primary Segment by `introduce > explain > example > practice-reference > earliest segment order`.
+- KnowledgeNode-to-Material navigation MUST resolve a deterministic primary Segment by `introduce > explain > example > practice-reference > authoritative segment order` (`order` for non-PDF, `page` for PDF), then stable ID only as a final tie.
 - Scrolling, active Segment, outline selection, Knowledge context, Assignment context, URL, and recent reading position MUST represent the same MaterialSegment.
 - Segment-to-URL synchronization MUST use history replacement, not one history entry per viewed Segment.
 - Reading completion MUST be derived from actually viewed/completed Segment identities and MUST NOT be inferred from the current Segment's numeric position.

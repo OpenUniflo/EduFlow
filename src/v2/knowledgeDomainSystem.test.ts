@@ -16,7 +16,7 @@ import { applicationServices } from "./services/applicationServices";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "./knowledge/repository/KnowledgeRepository";
 import { auditDomainRelations, validateKnowledgeRelations } from "./knowledge/relationAudit";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "./knowledge/types";
-import { demoPersonalKnowledgeGraph } from "./profile/demoUserKnowledge";
+import { demoPersonalKnowledgeGraph } from "./demo/user/demoPersonalKnowledgeGraph.fixture";
 import { DOMAIN_GOVERNANCE_SCHEMA_VERSION, migrateDomainGovernanceStateToGlobalV1, reconcileDomainGovernanceState } from "./knowledge/domain/LocalStorageDomainGovernanceRepository";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -238,6 +238,23 @@ describe("Knowledge Domain invariants", () => {
     expect(createService().topologySignature(userKnowledgeAccess("user-1"))).toBe("GLOBAL:related:USER");
   });
 
+  it("revalidates manual and candidate Domain mutations against explicit visibility", () => {
+    const node = (id: string, scope: KnowledgeNode["scope"], ownerId?: string, status: KnowledgeNode["status"] = "active"): KnowledgeNode => ({ id, title: id, description: id, type: "conceptual", masteryCriteria: [id], scope, ownerId, provenance: [{ sourceType: "manual", sourceId: id }], currentRevisionId: `${id}-r1`, status });
+    const graph: KnowledgeGraph = { nodes: [node("GLOBAL", "global"), node("USER", "user", "user-1"), node("ARCHIVED", "global", undefined, "deprecated")], revisions: [], edges: [] };
+    let stored: DomainGovernanceState = {
+      domains: [{ id: "domain", name: "Domain", canonicalColor: "#123456", status: "active", createdBy: "test", createdAt: "now", updatedBy: "test", updatedAt: "now" }],
+      assignments: [], candidates: [], proposals: [], revision: 0
+    };
+    const service = new DomainGovernanceService(new InMemoryKnowledgeRepository(graph), { load: () => stored, save: (next) => { stored = next; } });
+    const actor = { id: "admin", capabilities: ["global-domain-admin" as const] };
+    expect(() => service.assignNodeDomain({ actor, access: globalKnowledgeAccess, nodeId: "UNKNOWN", domainId: "domain" })).toThrow(/Unknown or invisible/);
+    expect(() => service.assignNodeDomain({ actor, access: globalKnowledgeAccess, nodeId: "USER", domainId: "domain" })).toThrow(/Unknown or invisible/);
+    expect(() => service.assignNodeDomain({ actor, access: globalKnowledgeAccess, nodeId: "ARCHIVED", domainId: "domain" })).toThrow(/not active/);
+    service.assignNodeDomain({ actor, access: userKnowledgeAccess("user-1"), nodeId: "USER", domainId: "domain" });
+    expect(stored.assignments).toContainEqual(expect.objectContaining({ nodeId: "USER", domainId: "domain", pinned: true }));
+    expect(() => service.acceptCandidate({ actor, access: globalKnowledgeAccess, candidate: { ...candidate(0.9), nodeId: "UNKNOWN", domainId: "domain" } })).toThrow(/Unknown or invisible/);
+  });
+
   it("audits membership only from DomainAssignment and discovers auditable Domains dynamically", () => {
     expect(auditDomainRelations(globalKnowledgeGraph, [], "agentic-ai").activeNodeCount).toBe(0);
     const script = readFileSync(join(process.cwd(), "scripts/audit-knowledge-relations.mjs"), "utf8");
@@ -332,7 +349,7 @@ describe("Knowledge Domain invariants", () => {
   });
 
   it("requires one Global Domain authority for every manual mutation", () => {
-    expect(() => assignNodeDomain({ actor: { id: "user", capabilities: [] }, nodeId: "R03", domainId: null })).toThrow(/global-domain-admin/);
+    expect(() => assignNodeDomain({ actor: { id: "user", capabilities: [] }, access: globalKnowledgeAccess, nodeId: "R03", domainId: null })).toThrow(/global-domain-admin/);
     expect(() => assertGlobalDomainAdmin({ id: "user", capabilities: [] })).toThrow(/global-domain-admin/);
     expect(() => assertGlobalDomainAdmin({ id: "global", capabilities: ["global-domain-admin"] })).not.toThrow();
   });

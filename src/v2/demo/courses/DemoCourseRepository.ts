@@ -1,7 +1,7 @@
-import { agenticAiRuntime } from "../../demo/courses/agenticAiRuntime.seed";
-import { pythonEngineeringRuntime } from "../../demo/courses/pythonEngineeringCourse.seed";
-import { validateCourseRuntime, type CourseRuntimeData } from "../runtime/courseRuntime";
-import type { CourseRepository } from "./CourseRepository";
+import { agenticAiRuntime } from "./agenticAiRuntime.seed";
+import { pythonEngineeringRuntime } from "./pythonEngineeringCourse.seed";
+import { validateCourseRuntime, type CourseRuntimeData } from "../../course/runtime/courseRuntime";
+import type { CourseRepository } from "../../course/repository/CourseRepository";
 import { globalKnowledgeAccess, type KnowledgeAccessContext, type KnowledgeRepository } from "../../knowledge/repository/KnowledgeRepository";
 
 export class DemoCourseRepository implements CourseRepository {

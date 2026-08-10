@@ -34,10 +34,11 @@ export function courseDrawerProjectionKind(anchor: SelectedAnchor, mode: "knowle
 }
 
 export function assignmentProjectionForNode(node: CourseSkillTreeNode, activeAssignmentId: string | null): AssignmentDrawerProjection {
-  if (node.assignmentContexts.length > 1 && !activeAssignmentId) return { kind: "group", contexts: node.assignmentContexts };
-  const context = node.assignmentContexts.find((item) => item.assignmentId === activeAssignmentId) ?? (node.assignmentContexts.length === 1 ? node.assignmentContexts[0] : undefined);
-  if (!context) return { kind: "group", contexts: node.assignmentContexts };
-  return { kind: "detail", context, canReturnToGroup: node.assignmentContexts.length > 1 };
+  const contexts = [...node.assignmentContexts].sort((left, right) => left.assignment.order - right.assignment.order || left.assignment.id.localeCompare(right.assignment.id));
+  if (contexts.length > 1 && !activeAssignmentId) return { kind: "group", contexts };
+  const context = contexts.find((item) => item.assignmentId === activeAssignmentId) ?? (contexts.length === 1 ? contexts[0] : undefined);
+  if (!context) return { kind: "group", contexts };
+  return { kind: "detail", context, canReturnToGroup: contexts.length > 1 };
 }
 
 export function buildChapterAssignmentProjection(chapter: CourseChapterProjection, nodes: CourseSkillTreeNode[]): ChapterAssignmentProjection {
@@ -48,7 +49,7 @@ export function buildChapterAssignmentProjection(chapter: CourseChapterProjectio
   const assignments = chapter.assignmentSummary.assignmentIds.flatMap((assignmentId) => {
     const context = contextByAssignmentId.get(assignmentId);
     return context ? [{ assignment: context.assignment, context }] : [];
-  });
+  }).sort((left, right) => left.assignment.order - right.assignment.order || left.assignment.id.localeCompare(right.assignment.id));
   return {
     chapter,
     assignments,

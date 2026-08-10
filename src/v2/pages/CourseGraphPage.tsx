@@ -12,6 +12,7 @@ import type { AssignmentContext, CourseAssignment, CourseChapterProjection, Cour
 import { applicationServices } from "../services/applicationServices";
 import { userKnowledgeAccess } from "../knowledge/repository/KnowledgeRepository";
 import { buildMaterialDeepLink } from "../material/materialNavigation";
+import { sortMaterials } from "../material/materialOrdering";
 
 const { courseRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
@@ -26,6 +27,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
   const navigate = useNavigate();
   const { courseId = "", chapterId: routeChapterId } = useParams();
   const runtime = courseRepository.getCourse(courseId);
+  const orderedMaterials = useMemo(() => runtime ? sortMaterials(runtime.materials, runtime.lessons) : [], [runtime]);
   const userCourseState = useUserCourseState(session.email, courseId);
   const graphData = useMemo(() => runtime ? buildCourseGraphData(runtime, userCourseState, knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.email)), userKnowledgeRepository.getUserKnowledge(session.email)) : null, [runtime, session.email, userCourseState]);
   const courseChapters = graphData?.chapters ?? [];
@@ -60,10 +62,10 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
     });
     if (selectedChapter) {
       const lessonIds = new Set(lessonsForChapter(runtime, selectedChapter.id).map((lesson) => lesson.id));
-      return runtime.materials.filter((material) => lessonIds.has(material.lessonId));
+      return orderedMaterials.filter((material) => lessonIds.has(material.lessonId));
     }
-    return runtime.materials;
-  }, [runtime, selectedChapter, selectedNode]);
+    return orderedMaterials;
+  }, [orderedMaterials, runtime, selectedChapter, selectedNode]);
   const routeChapter = routeChapterId ? courseChapters.find((chapter) => chapter.id === routeChapterId) : null;
   const invalidChapter = Boolean(runtime && routeChapterId && !routeChapter);
 
@@ -228,7 +230,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
         <div className="atlas-drawer-actions"><button className="atlas-secondary" onClick={() => selectedFlowId && graphRef.current?.focus(selectedFlowId)}><Target size={15} />定位节点</button>{selectedChapter ? <button className="atlas-primary" onClick={() => focusChapter(selectedChapter)}>原位展开篇章</button> : selectedNode && detailFacet === "knowledge" && drawerMaterials.length === 1 ? <button className="atlas-primary" onClick={() => navigate(materialLink(drawerMaterials[0].id))}><FileText size={15} />查看课件详情</button> : selectedNode && detailFacet === "knowledge" && drawerMaterials.length > 1 ? <button className="atlas-primary" onClick={() => setDrawerTab("materials")}><FileText size={15} />选择关联课件</button> : assignmentProjection?.kind === "detail" && assignmentProjection.context.assignment.mode === "workflow" && assignmentProjection.context.assignment.workflowTemplateId ? <button className="atlas-primary" onClick={() => navigate(workflowLaunchUrl({ courseId: runtime.course.id, assignmentId: assignmentProjection.context.assignment.id, workflowTemplateId: assignmentProjection.context.assignment.workflowTemplateId! }))}><Settings2 size={15} />进入工作流画布</button> : null}</div>
       </aside> : null}
 
-      {materialsOpen ? <aside className="atlas-detail-drawer atlas-materials-drawer open"><button className="atlas-panel-close" onClick={() => setMaterialsOpen(false)} aria-label="关闭课件列表"><X size={17} /></button><div className="atlas-drawer-head"><span>课程资料</span><h2>全部关联课件</h2><div><i className="atlas-pill">{runtime.materials.length} 份课件</i><i className="atlas-pill">课程级</i></div></div><div className="atlas-drawer-body"><p>课件、Knowledge 与 Assignment 通过覆盖数据动态关联。</p>{runtime.materials.map((material) => <button className="atlas-material-card" key={material.id} onClick={() => navigate(materialLink(material.id, null))}><div><span>{material.type.toUpperCase()} · {material.segments.length} 个内容段</span><strong>{material.title}</strong><p>{material.description}</p></div><div className="atlas-course-meta"><span>{material.duration ?? "自定进度"}</span></div></button>)}</div>{runtime.materials.length ? <div className="atlas-drawer-actions"><button className="atlas-primary" onClick={() => { const recent = Object.values(userCourseState.materialStates).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.materialId; const material = runtime.materials.find((item) => item.id === recent) ?? runtime.materials[0]; navigate(materialLink(material.id, null)); }}>打开最近课件 <ArrowRight size={15} /></button></div> : null}</aside> : null}
+      {materialsOpen ? <aside className="atlas-detail-drawer atlas-materials-drawer open"><button className="atlas-panel-close" onClick={() => setMaterialsOpen(false)} aria-label="关闭课件列表"><X size={17} /></button><div className="atlas-drawer-head"><span>课程资料</span><h2>全部关联课件</h2><div><i className="atlas-pill">{orderedMaterials.length} 份课件</i><i className="atlas-pill">课程级</i></div></div><div className="atlas-drawer-body"><p>课件、Knowledge 与 Assignment 通过覆盖数据动态关联。</p>{orderedMaterials.map((material) => <button className="atlas-material-card" key={material.id} onClick={() => navigate(materialLink(material.id, null))}><div><span>{material.type.toUpperCase()} · {material.segments.length} 个内容段</span><strong>{material.title}</strong><p>{material.description}</p></div><div className="atlas-course-meta"><span>{material.duration ?? "自定进度"}</span></div></button>)}</div>{orderedMaterials.length ? <div className="atlas-drawer-actions"><button className="atlas-primary" onClick={() => { const recent = Object.values(userCourseState.materialStates).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.materialId; const material = orderedMaterials.find((item) => item.id === recent) ?? orderedMaterials[0]; navigate(materialLink(material.id, null)); }}>打开最近课件 <ArrowRight size={15} /></button></div> : null}</aside> : null}
       {toast ? <div className="atlas-toast"><Sparkles size={16} />{view === "focused" ? "篇章已在宏观位置展开，其他篇章保持折叠" : "课程图已更新"}</div> : null}
     </main>
   );

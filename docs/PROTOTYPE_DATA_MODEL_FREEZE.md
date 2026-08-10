@@ -1,0 +1,36 @@
+# Prototype Data Model Freeze
+
+**Status:** FROZEN
+**Freeze date:** 2026-08-10
+
+This document is the compact backend handoff index. Detailed invariants remain in the linked system documents and `AGENTS.md`.
+
+## Frozen Models
+
+- Shared Knowledge: `KnowledgeNode`, `KnowledgeEdge`, revisions, evidence, and scoped `UserKnowledgeState`.
+- Domain governance: Global-only `KnowledgeDomain`, `DomainAssignment`, candidates, proposals, and explicit visibility/authority inputs.
+- Course definition: `Course`, `CourseCurriculum`, `CurriculumChapter`, `CurriculumLesson`, `CurriculumCoverage`, and `CurriculumSequence`.
+- Assignment definition: `CourseAssignment`, unique-pair `AssignmentCoverage`, and separate `UserAssignmentState`.
+- Material definition: `Material`, `MaterialSegment`, `MaterialKnowledgeCoverage`, and separate `UserMaterialState`.
+- User Course persistence: `UserCourseState` in a versioned envelope.
+
+## Single Sources of Truth
+
+- Chapter membership: `CurriculumLesson.chapterId` only.
+- Lesson Knowledge order: `CurriculumCoverage.order` only.
+- Material Assignment context: `MaterialSegment -> MaterialKnowledgeCoverage -> KnowledgeNode -> AssignmentCoverage -> CourseAssignment` only.
+- Domain membership: `DomainAssignment` only.
+- Knowledge relations: factual `KnowledgeEdge` records only.
+- User progress: user-scoped state and derived projections only, never Course/Chapter/Material definitions.
+
+## Ordering Contract
+
+Chapter, Lesson, Coverage, Material, Segment, and Assignment order are explicit validated data. PDF uses its complete unique page sequence. Canonical shared comparators drive all projections; IDs are identity and final deterministic tie-breaks only. Shuffling repository arrays or replacing IDs with UUIDs cannot change business order.
+
+## Boundary Contract
+
+Core packages do not import Demo fixtures or repositories. Demo depends on Core and is injected at the composition root. Knowledge visibility and Domain mutations receive explicit `KnowledgeAccessContext`; progress is finite `0..100`; runtime relations are validated before projection.
+
+## Deferred Beyond Freeze
+
+Real Knowledge, Domain, Course Creation, Workflow, Evaluation, Auth, and asynchronous query backends remain future adapter/application work. WorkflowTemplate referential integrity waits for a WorkflowRepository, and Assignment completion still uses the current Demo run-end behavior until the Evaluation pipeline exists.

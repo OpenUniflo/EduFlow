@@ -1,7 +1,6 @@
 import { globalKnowledgeGraph } from "../../knowledge/graph";
 import { assertDirectedAcyclic, transitiveReduction } from "../../knowledge/graphAlgorithms";
 import type {
-  AcceptanceSpec,
   CourseChapterEdge,
   CourseChapterProjection,
   CourseCurriculum,
@@ -10,7 +9,6 @@ import type {
   CurriculumChapter,
   CurriculumCoverage,
   CurriculumLesson,
-  CurriculumOutcome,
   CurriculumSequence,
   AssignmentCoverage,
   AssignmentCoverageRole,
@@ -18,6 +16,7 @@ import type {
   CourseAssignmentSummary,
   UserAssignmentState
 } from "../../types";
+import { compareCourseCurriculumContexts, compareCourseKnowledgeOrder, selectPrimaryCurriculumCoverage } from "../../course/curriculum/curriculumOrdering";
 
 export const COURSE_ID = "agentic-ai";
 export const MATERIAL_ID = "lesson-04";
@@ -54,18 +53,6 @@ export const curriculumLessons: CurriculumLesson[] = lessonSeed.map(([chapterId,
   return { id, courseId: COURSE_ID, chapterId, title, order: index + 1 };
 });
 
-export const curriculumOutcomes: CurriculumOutcome[] = [
-  {
-    id: "outcome-agentic-ai-capstone",
-    courseId: COURSE_ID,
-    title: "Agentic AI 综合系统与答辩",
-    description: "综合系统实现、架构决策、评测、安全报告与答辩，是课程成果而非知识节点。",
-    kind: "project",
-    lessonId: "L15",
-    legacySourceNodeId: "F06"
-  }
-];
-
 const coverageSeed: Array<[lessonId: string, role: CurriculumCoverage["role"], nodeIds: string[]]> = [
   ["L01", "introduce", ["AG01", "H02", "H03"]],
   ["L02", "introduce", ["P01", "P02", "P03", "P05"]],
@@ -99,10 +86,10 @@ export const curriculumSequences: CurriculumSequence[] = curriculumLessons.slice
   targetLessonId: lesson.id
 }));
 
-type AssignmentSeed = CourseAssignment & { coverage: Array<{ nodeId: string; role: AssignmentCoverageRole }> };
+type AssignmentSeed = Omit<CourseAssignment, "order"> & { coverage: Array<{ nodeId: string; role: AssignmentCoverageRole }> };
 
 const assignmentSeed = (
-  assignment: Omit<CourseAssignment, "courseId">,
+  assignment: Omit<CourseAssignment, "courseId" | "order">,
   nodeIds: string[],
   role: AssignmentCoverageRole = "apply",
   extraCoverage: Array<{ nodeId: string; role: AssignmentCoverageRole }> = []
@@ -143,7 +130,7 @@ const assignmentSeeds: AssignmentSeed[] = [
   assignmentSeed({ id: "agentic-ai-capstone", title: "交付 Agentic AI 综合系统", description: "组合课程各阶段产物，交付一个具备规划、工具、知识、记忆、评测与安全边界的可运行系统。", requirements: ["集成 Agent Core 与 Planning Module", "接入 Tool、Knowledge 与 Memory Layer", "运行基准评测并提交报告", "演示审批、安全与恢复路径"], expectedOutput: "agentic-ai-capstone/ + architecture-decision-record.md", acceptanceCriteria: ["端到端主路径可运行", "关键输出满足验收标准", "失败、安全和审计路径可演示", "架构决定与课程能力对应"], mode: "workflow", workflowTemplateId: "agentic-ai-capstone", estimatedMinutes: 180, projectContribution: "课程综合项目最终交付。" }, ["P05", "R06", "I05", "T15", "K14", "RT15", "WF05", "MA12", "E13", "S01", "S08"], "assess")
 ];
 
-export const courseAssignments: CourseAssignment[] = assignmentSeeds.map(({ coverage: _coverage, ...assignment }) => assignment);
+export const courseAssignments: CourseAssignment[] = assignmentSeeds.map(({ coverage: _coverage, ...assignment }, order) => ({ ...assignment, order }));
 
 export const assignmentCoverages: AssignmentCoverage[] = assignmentSeeds.flatMap((seed) => seed.coverage.map((coverage, index) => ({
   id: `assignment-coverage-${seed.id}-${String(index + 1).padStart(2, "0")}`,
@@ -158,17 +145,6 @@ export const userAssignmentStates: UserAssignmentState[] = courseAssignments.map
   progress: index < 5 ? 100 : index < 9 ? [70, 45, 30, 20][index - 5] : 0
 }));
 
-export const acceptanceSpec: AcceptanceSpec = {
-  id: "lesson-04-comparison",
-  title: "同一任务下的推理范式比较",
-  checks: [
-    { id: "structure", label: "结构完整", weight: 25 },
-    { id: "behavior", label: "行为符合范式", weight: 25 },
-    { id: "result", label: "结果满足约束", weight: 30 },
-    { id: "trace", label: "轨迹可审计", weight: 20 }
-  ]
-};
-
 const nodeById = new Map(globalKnowledgeGraph.nodes.map((node) => [node.id, node]));
 const lessonById = new Map(curriculumLessons.map((lesson) => [lesson.id, lesson]));
 const chapterById = new Map(curriculumChapters.map((chapter) => [chapter.id, chapter]));
@@ -177,16 +153,8 @@ export const courseSkillTreeEdges: CourseSkillTreeEdge[] = globalKnowledgeGraph.
   .filter((edge) => courseNodeIds.has(edge.source) && courseNodeIds.has(edge.target))
   .map((edge) => ({ ...edge }));
 
-function compareCoverageOrder(left: CurriculumCoverage, right: CurriculumCoverage) {
-  return (lessonById.get(left.lessonId)?.order ?? Number.MAX_SAFE_INTEGER) - (lessonById.get(right.lessonId)?.order ?? Number.MAX_SAFE_INTEGER)
-    || left.order - right.order
-    || left.id.localeCompare(right.id);
-}
-
 function primaryCoverageFor(nodeId: string) {
-  const coverages = curriculumCoverages.filter((coverage) => coverage.nodeId === nodeId);
-  const introduced = coverages.filter((coverage) => coverage.role === "introduce");
-  return [...(introduced.length ? introduced : coverages)].sort(compareCoverageOrder)[0];
+  return selectPrimaryCurriculumCoverage(curriculumCoverages.filter((coverage) => coverage.nodeId === nodeId), curriculumLessons);
 }
 
 const primaryCoverageByNode = new Map(Array.from(courseNodeIds, (nodeId) => [nodeId, primaryCoverageFor(nodeId)]));
@@ -201,7 +169,7 @@ export function validateCourseAssignmentCoverage(courseKnowledgeNodeIds: string[
 }
 
 function summarizeAssignmentIds(assignmentIds: string[]) {
-  const uniqueIds = Array.from(new Set(assignmentIds));
+  const uniqueIds = Array.from(new Set(assignmentIds)).sort((left, right) => (assignmentById.get(left)?.order ?? Number.MAX_SAFE_INTEGER) - (assignmentById.get(right)?.order ?? Number.MAX_SAFE_INTEGER) || left.localeCompare(right));
   const states = uniqueIds.map((id) => assignmentStateById.get(id));
   const completedCount = states.filter((state) => state?.status === "completed").length;
   const inProgressCount = states.filter((state) => state?.status === "in-progress").length;
@@ -219,12 +187,12 @@ export const courseSkillTreeNodes: CourseSkillTreeNode[] = Array.from(courseNode
     const contextLesson = lessonById.get(coverage.lessonId);
     if (!contextLesson) throw new Error(`Unknown lesson for coverage: ${coverage.id}`);
     return { ...coverage, lessonOrder: contextLesson.order, chapterId: contextLesson.chapterId };
-  }).sort((left, right) => left.lessonOrder - right.lessonOrder || left.order - right.order || left.id.localeCompare(right.id));
+  }).sort(compareCourseCurriculumContexts);
   const assignmentContexts = assignmentCoverages.filter((coverage) => coverage.nodeId === nodeId).map((coverage) => {
     const assignment = assignmentById.get(coverage.assignmentId);
     if (!assignment) throw new Error(`Unknown assignment for coverage: ${coverage.id}`);
     return { ...coverage, assignment, state: assignmentStateById.get(assignment.id) };
-  });
+  }).sort((left, right) => left.assignment.order - right.assignment.order || left.assignment.id.localeCompare(right.assignment.id));
   if (!assignmentContexts.length) throw new Error(`Course Assignment invariant failed for KnowledgeNode ${nodeId}`);
   const assignmentStateSummary = summarizeAssignmentIds(assignmentContexts.map((context) => context.assignmentId));
   const status = lesson.order <= 3 ? "completed" : lesson.order === 4 ? "learning" : lesson.order <= 7 ? "available" : "locked";
@@ -251,10 +219,7 @@ export const courseSkillTreeNodes: CourseSkillTreeNode[] = Array.from(courseNode
     hasKnowledgeEvidence: status === "completed" || status === "learning",
     color: chapter.color
   };
-}).sort((left, right) => left.primaryCoverage.lessonOrder - right.primaryCoverage.lessonOrder
-  || left.primaryCoverage.order - right.primaryCoverage.order
-  || left.id.localeCompare(right.id)
-  || left.primaryCoverage.id.localeCompare(right.primaryCoverage.id));
+}).sort(compareCourseKnowledgeOrder);
 
 if (courseSkillTreeNodes.reduce((sum, node) => sum + node.curriculumContexts.length, 0) !== curriculumCoverages.filter((coverage) => courseNodeIds.has(coverage.nodeId)).length) {
   throw new Error("Course curriculum N:M projection lost coverage records");

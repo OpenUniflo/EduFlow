@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Material } from "../../types";
 import { selectPageAtReadingAnchor, type MaterialNavigationRequest, type VisiblePageCandidate } from "./materialReaderState";
+import { sortMaterialSegments } from "../materialOrdering";
 
 export function DocumentMaterialViewer({ material, activeSegmentId, zoom, navigationRequest, onVisibleSegmentChange, onNavigationSettled }: {
   material: Material;
@@ -43,7 +44,7 @@ export function DocumentMaterialViewer({ material, activeSegmentId, zoom, naviga
 
   return <section className="atlas-lesson-scroll" ref={rootRef}>
     <div className="atlas-lesson-pages" style={{ "--lesson-zoom": zoom } as React.CSSProperties}>
-      {material.segments.map((segment) => {
+      {sortMaterialSegments(material).map((segment) => {
         const content = segment.content ?? {};
         return <article className={`atlas-lesson-slide atlas-slide-${content.visual ?? (content.table ? "comparison" : content.code ? "trace" : "overview")} ${segment.id === activeSegmentId ? "current" : ""}`} key={segment.id} data-segment-id={segment.id} data-page-number={segment.page ?? segment.order}>
           <div className="atlas-slide-number">{String(segment.page ?? segment.order).padStart(2, "0")}</div><span className="atlas-kicker">{segment.section ?? material.title}</span><h2>{segment.title}</h2>

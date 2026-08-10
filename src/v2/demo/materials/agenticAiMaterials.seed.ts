@@ -1,5 +1,29 @@
-import type { LegacyMaterialSeed } from "../../types";
 import { COURSE_ID, MATERIAL_ID } from "../courses/agenticAiCourse.seed";
+
+type LegacyMaterialPage = {
+  id: string;
+  number: number;
+  section: string;
+  title: string;
+  lead: string;
+  bullets?: string[];
+  code?: string;
+  knowledge: string[];
+  knowledgeIds?: string[];
+  primaryKnowledgeId?: string;
+  visual?: "overview" | "flow" | "comparison" | "trace" | "decision" | "practice";
+  table?: { headers: string[]; rows: string[][] };
+};
+
+type LegacyMaterialSeed = {
+  id: string;
+  courseId: string;
+  title: string;
+  subtitle: string;
+  duration: string;
+  pageCount: number;
+  pages: LegacyMaterialPage[];
+};
 
 export const lessonFourMaterial: LegacyMaterialSeed = {
   id: MATERIAL_ID,
@@ -80,8 +104,7 @@ export const lessonFourMaterial: LegacyMaterialSeed = {
       lead: "当输入已经包含完成任务所需的全部信息，并且输出可以一次生成时，Direct 往往是正确选择。",
       bullets: ["单次生成", "没有外部行动", "没有环境观察", "没有显式循环", "适合改写、摘要、分类与提取"],
       code: "输入 → 模型 → 输出",
-      knowledge: ["Direct", "最简单可行结构"],
-      assignmentId: "lesson-04-direct"
+      knowledge: ["Direct", "最简单可行结构"]
     },
     {
       id: "page-07",
@@ -118,8 +141,7 @@ export const lessonFourMaterial: LegacyMaterialSeed = {
       title: "ReAct 的基本结构",
       lead: "每一步决策都可以使用最新观察，需要明确停止条件与最大循环次数。",
       code: "目标 → 判断当前需要什么 → 选择行动 → 环境执行 → 获得观察 → 更新判断 → 继续或结束\n\nReason → Act → Observe → Reason → …",
-      knowledge: ["ReAct Loop", "条件边", "停止条件"],
-      assignmentId: "lesson-04-react"
+      knowledge: ["ReAct Loop", "条件边", "停止条件"]
     },
     {
       id: "page-11",
@@ -184,8 +206,7 @@ export const lessonFourMaterial: LegacyMaterialSeed = {
       lead: "Planner 负责分解目标与定义步骤，Executor 读取当前步骤、选择工具、执行操作并更新状态。",
       code: "用户目标 → Planner → 结构化计划 → Executor → 逐项执行 → 完成检查 → 最终输出",
       bullets: ["Planner：步骤、依赖、产物、完成条件", "Executor：工具、执行、结果、状态", "二者可以使用不同模型和成本策略"],
-      knowledge: ["Planner", "Executor", "结构化计划"],
-      assignmentId: "lesson-04-plan"
+      knowledge: ["Planner", "Executor", "结构化计划"]
     },
     {
       id: "page-17",
@@ -231,8 +252,7 @@ export const lessonFourMaterial: LegacyMaterialSeed = {
       title: "Replanning 不是重新从头生成",
       lead: "正确的 Replanning 应保留已完成结果，只修改尚未完成、受新信息影响的步骤。",
       code: "原计划：A✓ → B✓ → C失败 → 比较 → 写作\n新计划：保留 A/B → 为 C 增加替代来源 → 更新比较与写作约束",
-      knowledge: ["增量重规划", "保留进度", "剩余计划"],
-      assignmentId: "lesson-04-replan"
+      knowledge: ["增量重规划", "保留进度", "剩余计划"]
     },
     {
       id: "page-21",
@@ -287,7 +307,6 @@ export const lessonFourMaterial: LegacyMaterialSeed = {
       lead: "评价器根据明确 Rubric 输出通过或修订建议，优化器据此修改结果。",
       code: "Generator → Evaluator → Pass / Revise → Optimizer → 再评价",
       knowledge: ["Evaluator", "Optimizer", "Rubric"],
-      assignmentId: "lesson-04-evaluator",
       table: {
         headers: ["维度", "通过标准"],
         rows: [

@@ -1,14 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DemoCourseRepository } from "./course/repository/DemoCourseRepository";
+import { execFileSync } from "node:child_process";
+import { DemoCourseRepository } from "./demo/courses/DemoCourseRepository";
 import { buildCourseGraphData, validateCourseRuntime, type CourseRuntimeData } from "./course/runtime/courseRuntime";
 import { buildCourseGraphProjection } from "./course/graph/courseGraphProjection";
 import { ATOMIC_FOOTPRINT_HEIGHT, ATOMIC_FOOTPRINT_WIDTH, COMPANION_OFFSET_X, COMPANION_OFFSET_Y, KNOWLEDGE_CARD_HEIGHT, KNOWLEDGE_CARD_WIDTH, getCourseLayoutCacheKey, layoutCourseGraph } from "./course/graph/elkCourseLayout";
 import { toReactFlow } from "./course/graph/reactFlowAdapter";
 import { assignmentProjectionForNode, buildChapterAssignmentProjection, courseDrawerProjectionKind, detailFacetForMode, flowIdForAnchor, type SelectedAnchor } from "./course/courseSelection";
 import { demoUserCourseStateSeed } from "./demo/user/demoUserCourseState.seed";
-import { LEARNING_PROGRESS_SCHEMA_VERSION, LocalStorageLearningProgressRepository, learningProgressStorageKey } from "./progress/LocalStorageLearningProgressRepository";
+import { LEARNING_PROGRESS_SCHEMA_VERSION, LocalStorageLearningProgressRepository, isValidUserCourseState, learningProgressStorageKey } from "./progress/LocalStorageLearningProgressRepository";
 import { buildGlobalAtlasProjection } from "./knowledge/projections/atlasProjections";
 import { applicationServices } from "./services/applicationServices";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "./knowledge/repository/KnowledgeRepository";
@@ -22,6 +23,8 @@ import { InMemoryKnowledgeRepository } from "./knowledge/repository/InMemoryKnow
 import type { KnowledgeGraph, KnowledgeNode } from "./knowledge/types";
 import { buildPersonalKnowledgeGraph } from "./profile/profileGraph";
 import type { AssignmentCoverage, CourseAssignment, UserCourseState } from "./types";
+import { selectPrimaryCurriculumCoverage } from "./course/curriculum/curriculumOrdering";
+import { sortAssignments, sortMaterials, sortMaterialSegments } from "./material/materialOrdering";
 
 const knowledgeRepository = applicationServices.knowledgeRepository;
 const repository = new DemoCourseRepository(knowledgeRepository);
@@ -117,6 +120,35 @@ describe("Course Repository and runtime invariants", () => {
     expect(() => validateCourseRuntime({ ...python, materialKnowledgeCoverages: [...python.materialKnowledgeCoverages, { ...material, id: "duplicate-material-relation" }] }, knowledgeRepository, access)).toThrow(/Duplicate MaterialKnowledgeCoverage relation/);
   });
 
+  it("treats AssignmentCoverage role as one attribute of a unique Assignment–Knowledge relation", () => {
+    const coverage = python.assignmentCoverages[0];
+    const duplicate = { ...coverage, id: "same-pair-different-role", role: coverage.role === "apply" ? "assess" as const : "apply" as const };
+    expect(() => validateCourseRuntime({ ...python, assignmentCoverages: [...python.assignmentCoverages, duplicate] }, knowledgeRepository, access)).toThrow(/Duplicate AssignmentCoverage relation/);
+  });
+
+  it.each([
+    ["Chapter", (runtime: CourseRuntimeData) => ({ ...runtime, chapters: runtime.chapters.map((item, index) => index ? item : { ...item, order: -1 }) })],
+    ["Lesson", (runtime: CourseRuntimeData) => ({ ...runtime, lessons: runtime.lessons.map((item, index) => index ? item : { ...item, order: 0.5 }) })],
+    ["Material", (runtime: CourseRuntimeData) => ({ ...runtime, materials: runtime.materials.map((item, index) => index ? item : { ...item, order: -1 }) })],
+    ["MaterialSegment", (runtime: CourseRuntimeData) => ({
+      ...runtime,
+      materials: runtime.materials.map((item, index) => index ? item : {
+        ...item,
+        segments: item.segments.map((segment, segmentIndex) => segmentIndex ? segment : { ...segment, order: Number.NaN })
+      })
+    })],
+    ["Assignment", (runtime: CourseRuntimeData) => ({ ...runtime, assignments: runtime.assignments.map((item, index) => index ? item : { ...item, order: -1 }) })]
+  ])("rejects invalid explicit %s order", (label, mutate) => {
+    expect(() => validateCourseRuntime(mutate(python), knowledgeRepository, access)).toThrow(new RegExp(`${label} .*invalid order`));
+  });
+
+  it("rejects duplicate order inside each ordering scope", () => {
+    expect(() => validateCourseRuntime({ ...python, lessons: python.lessons.map((item, index) => index === 1 ? { ...item, order: python.lessons[0].order } : item) }, knowledgeRepository, access)).toThrow(/Lesson orders must be unique/);
+    expect(() => validateCourseRuntime({ ...python, assignments: python.assignments.map((item, index) => index === 1 ? { ...item, order: python.assignments[0].order } : item) }, knowledgeRepository, access)).toThrow(/Assignment orders must be unique/);
+    const material = python.materials[0];
+    expect(() => validateCourseRuntime({ ...python, materials: python.materials.map((item) => item.id === material.id ? { ...item, segments: item.segments.map((segment, index) => index === 1 ? { ...segment, order: item.segments[0].order } : segment) } : item) }, knowledgeRepository, access)).toThrow(/MaterialSegment .* orders must be unique/);
+  });
+
   it("keeps CurriculumChapter pure and CourseRepository definition-only", () => {
     const types = readFileSync(join(process.cwd(), "src/v2/types.ts"), "utf8");
     const chapterType = types.match(/export type CurriculumChapter = \{([\s\S]*?)\n\};/)?.[1] ?? "";
@@ -128,6 +160,42 @@ describe("Course Repository and runtime invariants", () => {
 });
 
 describe("Material and progress generalization", () => {
+  it("uses only the formal Material → Knowledge → Assignment relation chain", () => {
+    const types = readFileSync(join(process.cwd(), "src/v2/types.ts"), "utf8");
+    const segmentType = types.match(/export type MaterialSegment = \{([\s\S]*?)\n\};/)?.[1] ?? "";
+    const projection = readFileSync(join(process.cwd(), "src/v2/material/materialProjection.ts"), "utf8");
+    expect(segmentType).not.toContain("assignmentIds");
+    expect(projection).not.toContain("material-assignment-");
+    expect(projection).not.toMatch(/segment\.assignmentIds/);
+    const material = python.materials.find((item) => item.id === "python-quality-testing")!;
+    const result = buildMaterialSegmentProjection(python, material, "page-10", demoUserCourseStateSeed("student", python.course.id), knowledgeRepository, access, getDomainGovernanceSnapshot())!;
+    expect(result.pageAssignmentContexts.every((context) => python.assignmentCoverages.some((coverage) => coverage.id === context.id))).toBe(true);
+  });
+
+  it("derives Material, Segment, and Assignment order independently of fixture array order", () => {
+    expect(sortMaterials([...python.materials].reverse(), python.lessons).map((item) => item.id)).toEqual(sortMaterials(python.materials, python.lessons).map((item) => item.id));
+    const article = python.materials.find((item) => item.type === "article")!;
+    expect(sortMaterialSegments({ ...article, segments: [...article.segments].reverse() }).map((item) => item.id)).toEqual(sortMaterialSegments(article).map((item) => item.id));
+    expect(sortAssignments([...python.assignments].reverse()).map((item) => item.id)).toEqual(sortAssignments(python.assignments).map((item) => item.id));
+  });
+
+  it("keeps graph, Material navigation, and Profile curriculum selection stable after shuffled inputs", () => {
+    const shuffled: CourseRuntimeData = {
+      ...python,
+      materials: [...python.materials].reverse().map((material) => ({ ...material, segments: [...material.segments].reverse() })),
+      assignments: [...python.assignments].reverse(),
+      curriculumCoverages: [...python.curriculumCoverages].reverse(),
+      assignmentCoverages: [...python.assignmentCoverages].reverse(),
+      materialKnowledgeCoverages: [...python.materialKnowledgeCoverages].reverse()
+    };
+    const state = demoUserCourseStateSeed("student", python.course.id);
+    const graphOrder = (runtime: CourseRuntimeData) => buildCourseGraphData(runtime, state, visibleGraph, userKnowledge).knowledgeNodes.map((node) => [node.id, node.primaryCoverage.id, node.assignmentIds, node.materialIds]);
+    expect(graphOrder(shuffled)).toEqual(graphOrder(python));
+    expect(resolveKnowledgeMaterialEntries(shuffled, "PY09")).toEqual(resolveKnowledgeMaterialEntries(python, "PY09"));
+    const profileOrder = (runtime: CourseRuntimeData) => buildPersonalKnowledgeGraph(visibleGraph, userKnowledge, [runtime], [state], getDomainGovernanceSnapshot()).nodes.find((node) => node.id === "PY06")?.curriculumContexts.map((context) => context.coverageId);
+    expect(profileOrder(shuffled)).toEqual(profileOrder(python));
+    expect(selectPrimaryCurriculumCoverage(shuffled.curriculumCoverages.filter((coverage) => coverage.nodeId === "PY06"), shuffled.lessons)?.id).toBe(pythonGraph.knowledgeNodes.find((node) => node.id === "PY06")?.primaryCoverage.id);
+  });
   it("supports Segment → multiple KnowledgeNodes and KnowledgeNode → multiple Segments/Materials", () => {
     const segmentNodes = python.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === "python-core-handbook" && coverage.segmentId === "page-5").map((coverage) => coverage.nodeId);
     expect(new Set(segmentNodes).size).toBeGreaterThan(1);
@@ -205,7 +273,7 @@ describe("Material and progress generalization", () => {
   });
 
   it("keeps page Assignments separate from Knowledge-specific Assignments on a multi-Knowledge Segment", () => {
-    const extraAssignments: CourseAssignment[] = ["PY09", "PY27", "PY37"].map((nodeId) => ({ id: `specific-${nodeId}`, courseId: python.course.id, title: `Specific ${nodeId}`, description: nodeId, requirements: [nodeId], expectedOutput: nodeId, acceptanceCriteria: [nodeId], mode: "instruction" }));
+    const extraAssignments: CourseAssignment[] = ["PY09", "PY27", "PY37"].map((nodeId, index) => ({ id: `specific-${nodeId}`, courseId: python.course.id, order: python.assignments.length + index, title: `Specific ${nodeId}`, description: nodeId, requirements: [nodeId], expectedOutput: nodeId, acceptanceCriteria: [nodeId], mode: "instruction" }));
     const extraCoverages: AssignmentCoverage[] = extraAssignments.map((assignment, index) => ({ id: `specific-coverage-${index}`, assignmentId: assignment.id, nodeId: assignment.id.replace("specific-", ""), role: "assess" }));
     const runtime = { ...python, assignments: [...python.assignments, ...extraAssignments], assignmentCoverages: [...python.assignmentCoverages, ...extraCoverages] };
     const userState = demoUserCourseStateSeed("student", python.course.id);
@@ -315,10 +383,31 @@ describe("Material and progress generalization", () => {
     expect(second.getCourseState("roundtrip-user", python.course.id).assignmentStates["py-runtime-model"]).toMatchObject({ status: "completed", progress: 100 });
   });
 
+  it("accepts only finite learning progress in the inclusive 0–100 range", () => {
+    const valid = demoUserCourseStateSeed("range-user", python.course.id);
+    expect(isValidUserCourseState({ ...valid, assignmentStates: { boundary: { assignmentId: "boundary", status: "in-progress", progress: 0 } } })).toBe(true);
+    expect(isValidUserCourseState({ ...valid, materialStates: { boundary: { materialId: "boundary", updatedAt: valid.updatedAt, progress: 100 } } })).toBe(true);
+    for (const invalid of [-1, 101, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(isValidUserCourseState({ ...valid, assignmentStates: { invalid: { assignmentId: "invalid", status: "in-progress", progress: invalid } } })).toBe(false);
+      expect(() => new LocalStorageLearningProgressRepository(demoUserCourseStateSeed).updateMaterialState("range-user", python.course.id, "invalid", { progress: invalid })).toThrow(/Learning progress is invalid/);
+    }
+  });
+
   it("keeps Core LearningProgress persistence free of Demo fixture imports", () => {
     const source = readFileSync(join(process.cwd(), "src/v2/progress/LocalStorageLearningProgressRepository.ts"), "utf8");
     expect(source).not.toMatch(/demo\//);
     expect(source).not.toContain("demoUserCourseStateSeed");
+  });
+
+  it("keeps Core knowledge/course/material/progress/profile directories free of Demo imports", () => {
+    const roots = ["knowledge", "course", "material", "progress", "profile"];
+    const files = roots.flatMap((root) => {
+      const output = execFileSync("rg", ["--files", `src/v2/${root}`], { cwd: process.cwd(), encoding: "utf8" });
+      return output.trim().split("\n").filter((file) => /\.(ts|tsx)$/.test(file));
+    });
+    const source = files.map((file) => readFileSync(join(process.cwd(), file), "utf8")).join("\n");
+    expect(source).not.toMatch(/from ["'][^"']*demo\//);
+    expect(readFileSync(join(process.cwd(), "src/v2/course/repository/CourseRepository.ts"), "utf8")).not.toContain("DemoCourseRepository");
   });
 
   it("uses the dedicated Assignment modal class without changing Workflow Library cards", () => {
@@ -356,9 +445,9 @@ describe("Material and progress generalization", () => {
       lessons: [{ id: "L", courseId: "scoped-course", chapterId: "C", title: "L", order: 1 }],
       curriculumCoverages: ["G", "T", "U"].map((nodeId, order) => ({ id: `cc-${nodeId}`, courseId: "scoped-course", lessonId: "L", nodeId, role: "introduce" as const, order })),
       curriculumSequences: [],
-      assignments: [{ id: "A", courseId: "scoped-course", title: "A", description: "A", requirements: ["A"], expectedOutput: "A", acceptanceCriteria: ["A"], mode: "instruction" }],
+      assignments: [{ id: "A", courseId: "scoped-course", order: 0, title: "A", description: "A", requirements: ["A"], expectedOutput: "A", acceptanceCriteria: ["A"], mode: "instruction" }],
       assignmentCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `ac-${nodeId}`, assignmentId: "A", nodeId, role: "practice" as const })),
-      materials: [{ id: "M", courseId: "scoped-course", lessonId: "L", title: "M", type: "article", segments: [{ id: "S", order: 1, title: "S", content: {} }] }],
+      materials: [{ id: "M", courseId: "scoped-course", lessonId: "L", order: 0, title: "M", type: "article", segments: [{ id: "S", order: 1, title: "S", content: {} }] }],
       materialKnowledgeCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `mc-${nodeId}`, materialId: "M", segmentId: "S", nodeId, role: "introduce" as const })),
       revision: "v1"
     };

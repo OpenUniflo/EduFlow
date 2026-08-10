@@ -1,6 +1,6 @@
 import type { CourseCreationService } from "../course/creation/CourseCreationService";
 import type { CourseRepository } from "../course/repository/CourseRepository";
-import { DemoCourseRepository } from "../course/repository/DemoCourseRepository";
+import { DemoCourseRepository } from "../demo/courses/DemoCourseRepository";
 import { DemoCourseCreationService } from "../demo/services/DemoCourseCreationService";
 import { DemoUserKnowledgeRepository } from "../demo/user/DemoUserKnowledgeRepository";
 import { LocalStorageDomainGovernanceRepository } from "../knowledge/domain/LocalStorageDomainGovernanceRepository";
@@ -9,7 +9,7 @@ import { demoDomainGovernanceSeed } from "../demo/domains/demoDomainGovernance.s
 import type { DomainGovernanceRepository } from "../knowledge/domain/DomainGovernanceRepository";
 import { InMemoryKnowledgeRepository } from "../knowledge/repository/InMemoryKnowledgeRepository";
 import type { KnowledgeRepository } from "../knowledge/repository/KnowledgeRepository";
-import { demoPersonalKnowledgeGraph } from "../profile/demoUserKnowledge";
+import { demoPersonalKnowledgeGraph } from "../demo/user/demoPersonalKnowledgeGraph.fixture";
 import type { UserKnowledgeRepository } from "../profile/UserKnowledgeRepository";
 import type { LearningProgressRepository } from "../progress/LearningProgressRepository";
 import { LocalStorageLearningProgressRepository } from "../progress/LocalStorageLearningProgressRepository";

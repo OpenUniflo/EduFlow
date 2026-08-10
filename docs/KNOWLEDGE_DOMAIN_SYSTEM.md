@@ -72,6 +72,8 @@ Demo data is initialization data, not ontology behavior or a production reposito
 
 Every create, update, move, unassign, candidate decision, proposal review, and archive operation requires `global-domain-admin`. An active Domain accepts assignments. An archived Domain is retained for history and rejects assignments; archiving is rejected while members remain.
 
+Manual node assignment, batch movement, candidate acceptance, and proposal membership application also receive an explicit `KnowledgeAccessContext`. Immediately before writing, the service resolves every target through `KnowledgeRepository` and rejects unknown, invisible, deprecated, or superseded nodes. Stored candidates and proposals are recommendations, not trusted referential authority, so acceptance always revalidates their node IDs.
+
 Renaming or recoloring a Domain does not rewrite KnowledgeNodes. Assignment changes do not alter KnowledgeEdges, curriculum, MaterialKnowledgeCoverage, force state, ELK layout, or camera state.
 
 ## Persistence and Migration

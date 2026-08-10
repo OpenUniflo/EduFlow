@@ -24,6 +24,7 @@ export const agenticAiMaterial: Material = {
   id: lessonFourMaterial.id,
   courseId: lessonFourMaterial.courseId,
   lessonId: "L04",
+  order: 0,
   title: lessonFourMaterial.title,
   description: lessonFourMaterial.subtitle,
   type: "pdf",
@@ -71,5 +72,5 @@ export const agenticAiRuntime: CourseRuntimeData = {
   assignmentCoverages,
   materials: [agenticAiMaterial],
   materialKnowledgeCoverages: agenticAiMaterialKnowledgeCoverages,
-  revision: "agentic-ai-v3-curriculum-order"
+  revision: "agentic-ai-v4-final-model-freeze"
 };

@@ -22,6 +22,7 @@ export type CurriculumContext = {
   courseId: string;
   lessonId: string;
   lessonOrder: number;
+  coverageOrder: number;
   chapterId: string;
   role: CurriculumCoverageRole;
   materialIds: string[];
@@ -32,6 +33,7 @@ export type PersonalAssignmentContext = {
   coverageId: string;
   courseId: string;
   assignmentId: string;
+  assignmentOrder: number;
   title: string;
   role: AssignmentCoverageRole;
   workflowTemplateId?: string;

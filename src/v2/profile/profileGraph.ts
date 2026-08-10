@@ -6,6 +6,7 @@ import type { CurriculumContext, PersonalAssignmentContext, PersonalKnowledgeGra
 import { resolveNodeDomain } from "../knowledge/domain/domainStore";
 import type { DomainGovernanceState } from "../knowledge/domain/DomainGovernanceRepository";
 import { resolveKnowledgeMaterialEntries } from "../material/materialNavigation";
+import { CURRICULUM_ROLE_PRIORITY } from "../course/curriculum/curriculumOrdering";
 
 function groupBy<T>(items: T[], key: (item: T) => string) {
   const grouped = new Map<string, T[]>();
@@ -73,12 +74,16 @@ export function buildPersonalKnowledgeGraph(
         courseId: coverage.courseId,
         lessonId: coverage.lessonId,
         lessonOrder: lesson.order,
+        coverageOrder: coverage.order,
         chapterId: lesson.chapterId,
         role: coverage.role,
         materialIds: materialIdsByCourseNode.get(`${coverage.courseId}:${id}`) ?? [],
         materialEntries: resolveKnowledgeMaterialEntries(runtimes.find((runtime) => runtime.course.id === coverage.courseId)!, id)
       }];
-    }).sort((left, right) => left.lessonOrder - right.lessonOrder || left.coverageId.localeCompare(right.coverageId));
+    }).sort((left, right) => left.lessonOrder - right.lessonOrder
+      || left.coverageOrder - right.coverageOrder
+      || CURRICULUM_ROLE_PRIORITY[left.role] - CURRICULUM_ROLE_PRIORITY[right.role]
+      || left.coverageId.localeCompare(right.coverageId));
     const assignmentContexts: PersonalAssignmentContext[] = (assignmentByNode.get(id) ?? []).flatMap((coverage) => {
       const assignment = assignmentById.get(coverage.assignmentId);
       if (!assignment) return [];
@@ -86,12 +91,13 @@ export function buildPersonalKnowledgeGraph(
         coverageId: coverage.id,
         courseId: assignment.courseId,
         assignmentId: assignment.id,
+        assignmentOrder: assignment.order,
         title: assignment.title,
         role: coverage.role,
         workflowTemplateId: assignment.workflowTemplateId,
         status: assignmentStateByCourse.get(courseByAssignment.get(assignment.id) ?? "")?.[assignment.id]?.status ?? "not-started"
       }];
-    }).sort((left, right) => left.assignmentId.localeCompare(right.assignmentId) || left.coverageId.localeCompare(right.coverageId));
+    }).sort((left, right) => left.assignmentOrder - right.assignmentOrder || left.assignmentId.localeCompare(right.assignmentId) || left.coverageId.localeCompare(right.coverageId));
     const domain = resolveNodeDomain(id, governance).domain;
     return [{
       id,

@@ -117,7 +117,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
           <section className="atlas-node-dependencies"><h3>前置依赖</h3><div>{selected.prerequisites.length ? selected.prerequisites.map((dependency) => <span key={dependency}><ArrowRight size={12} />{dependency}</span>) : <span>暂无严格前置依赖</span>}</div></section>
           {canManageDomains ? <section className="atlas-domain-quick-edit">
             <div><h3>知识领域</h3><button onClick={() => navigate("/admin/domains")}><Settings2 size={13} />领域管理</button></div>
-            <select aria-label="修改知识领域" value={resolveNodeDomain(selected.id, governance).domain?.id ?? ""} onChange={(event) => assignNodeDomain({ actor: domainActor, nodeId: selected.id, domainId: event.target.value || null })}>
+            <select aria-label="修改知识领域" value={resolveNodeDomain(selected.id, governance).domain?.id ?? ""} onChange={(event) => assignNodeDomain({ actor: domainActor, access: globalKnowledgeAccess, nodeId: selected.id, domainId: event.target.value || null })}>
               <option value="">未分类</option>
               {governance.domains.filter((domain) => domain.status === "active").map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}
             </select>
