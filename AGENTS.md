@@ -258,6 +258,21 @@
 - `validateKnowledgeGraph` validates generic `KnowledgeGraph` invariants across all supported Knowledge scopes.
 - Global-only graph requirements MUST use `validateGlobalKnowledgeGraph` or an equivalently explicit Global validator.
 
+## Pure Core Dependency Boundary
+
+- Pure Core models, algorithms, validators, and projections MUST operate from explicit inputs and MUST NOT import the application composition root or React/application singleton stores.
+- `applicationServices` is a composition root, not a Core dependency. UI/application adapters may bind Core contracts to application services.
+
+## Compatibility Export Rule
+
+- Generic compatibility barrels MUST NOT re-export concrete Demo fixtures.
+- Concrete Demo compatibility exports, if temporarily required, MUST live under `src/v2/demo` and be explicitly named as Demo compatibility code.
+
+## Domain Resolution
+
+- Pure Domain resolution from `DomainGovernanceState` MUST live in a Core pure helper.
+- React/application stores MAY delegate to this helper but MUST NOT be required by pure projections.
+
 ## Course-Scoped Identity
 
 - `Course.id`, `KnowledgeNode.id`, and governed `KnowledgeDomain.id` are global identities within their respective repositories.

@@ -3,7 +3,7 @@ import type { CourseRuntimeData } from "../course/runtime/courseRuntime";
 import { calculateCrossDomainConnections, calculateKnowledgeConnectivity } from "../knowledge/graphAlgorithms";
 import type { KnowledgeGraph } from "../knowledge/types";
 import type { CurriculumContext, PersonalAssignmentContext, PersonalKnowledgeGraph, PersonalKnowledgeNode, UserKnowledgeRecord } from "./types";
-import { resolveNodeDomain } from "../knowledge/domain/domainStore";
+import { resolveNodeDomain } from "../knowledge/domain/domainResolution";
 import type { DomainGovernanceState } from "../knowledge/domain/DomainGovernanceRepository";
 import { resolveKnowledgeMaterialEntries } from "../material/materialNavigation";
 import { CURRICULUM_ROLE_PRIORITY } from "../course/curriculum/curriculumOrdering";

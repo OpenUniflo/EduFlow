@@ -28,6 +28,13 @@ KnowledgeRepository + DomainGovernanceRepository
 
 Generic Domain logic obtains the caller-visible graph from `KnowledgeRepository` using an explicit `KnowledgeAccessContext`. It does not import `knowledgeNodes`, `knowledgeEdges`, `globalKnowledgeGraph`, or any demo fixture singleton.
 
+## Domain Resolution Layers
+
+- Domain Resolution is a pure Core lookup over an explicit `DomainGovernanceState`.
+- `DomainGovernanceService` owns governance mutation and application-service behavior and delegates lookup to the pure resolution helper.
+- `domainStore` is the React/application adapter for subscriptions and UI mutations; pure projections do not import it.
+- Concrete Domain initialization and fixtures belong to the Demo layer.
+
 ## Knowledge Visibility During Assignment
 
 KnowledgeDomain is Global-only in V1, but a Global Domain may classify any KnowledgeNode visible to the governing operation, including Global, Tenant, or User scope nodes. Domain scope and Knowledge visibility are separate concerns.

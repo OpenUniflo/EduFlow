@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { DemoCourseRepository } from "./demo/courses/DemoCourseRepository";
@@ -57,6 +57,11 @@ function importedSpecifiers(source: string) {
     /^\s*import\s+["']([^"']+)["']/gm
   ];
   return patterns.flatMap((pattern) => Array.from(source.matchAll(pattern), (match) => match[1]));
+}
+
+function typescriptFilesUnder(root: string) {
+  const output = execFileSync("rg", ["--files", root], { cwd: process.cwd(), encoding: "utf8" });
+  return output.trim().split("\n").filter((file) => /\.(ts|tsx)$/.test(file));
 }
 
 describe("Course Repository and runtime invariants", () => {
@@ -410,15 +415,48 @@ describe("Material and progress generalization", () => {
 
   it("enforces the Core to Demo dependency boundary structurally", () => {
     const roots = ["knowledge", "course", "material", "progress", "profile"];
-    const allowedDemoImporters = new Set(["src/v2/services/applicationServices.ts"]);
-    const files = roots.flatMap((root) => {
-      const output = execFileSync("rg", ["--files", `src/v2/${root}`], { cwd: process.cwd(), encoding: "utf8" });
-      return output.trim().split("\n").filter((file) => /\.(ts|tsx)$/.test(file));
-    }).filter((file) => !allowedDemoImporters.has(file));
+    const applicationAdapters = new Set([
+      "src/v2/knowledge/domain/domainStore.ts",
+      "src/v2/progress/progressService.ts"
+    ]);
+    const files = roots.flatMap((root) => typescriptFilesUnder(`src/v2/${root}`))
+      .filter((file) => !applicationAdapters.has(file));
     const violations = files.flatMap((file) => importedSpecifiers(readFileSync(join(process.cwd(), file), "utf8"))
       .filter((specifier) => specifier.split("/").includes("demo"))
       .map((specifier) => `${file} -> ${specifier}`));
     expect(violations).toEqual([]);
+  });
+
+  it("keeps Pure Core independent from Demo, composition, React stores, and UI layers", () => {
+    const pureCoreFiles = Array.from(new Set([
+      ...typescriptFilesUnder("src/v2/knowledge/projections"),
+      ...typescriptFilesUnder("src/v2/knowledge/domain").filter((file) => !file.endsWith("/domainStore.ts") && !file.endsWith("/LocalStorageDomainGovernanceRepository.ts")),
+      ...typescriptFilesUnder("src/v2/knowledge").filter((file) => /\/graph[^/]*\.ts$/.test(file)),
+      ...typescriptFilesUnder("src/v2/course/runtime"),
+      ...typescriptFilesUnder("src/v2/course/graph").filter((file) => file.endsWith(".ts") && !file.endsWith("/reactFlowAdapter.ts")),
+      ...typescriptFilesUnder("src/v2/course/curriculum"),
+      "src/v2/material/materialProjection.ts",
+      "src/v2/material/materialNavigation.ts",
+      "src/v2/profile/profileGraph.ts"
+    ]));
+    const forbidden = (specifier: string) => {
+      const normalized = specifier.replace(/\.(?:ts|tsx|js|jsx)$/, "");
+      const segments = normalized.split("/");
+      return segments.includes("demo")
+        || normalized.endsWith("/services/applicationServices")
+        || normalized.endsWith("/domain/domainStore")
+        || normalized === "react"
+        || segments.some((segment) => segment === "pages" || segment === "admin" || segment === "components");
+    };
+    const violations = pureCoreFiles.flatMap((file) => importedSpecifiers(readFileSync(join(process.cwd(), file), "utf8"))
+      .filter(forbidden)
+      .map((specifier) => `${file} -> ${specifier}`));
+    expect(violations).toEqual([]);
+  });
+
+  it("removes generic compatibility entry points for concrete Demo data", () => {
+    expect(existsSync(join(process.cwd(), "src/v2/data.ts"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "src/v2/lessonData.ts"))).toBe(false);
   });
 
   it("uses the dedicated Assignment modal class without changing Workflow Library cards", () => {

@@ -4,6 +4,7 @@ import { moveNodesToDomain } from "./domainAssignment";
 import { applyAutomaticAssignment, decideDomainAssignment, scoreNodeAgainstDomains } from "./domainScoring";
 import type { DomainActor, DomainAssignmentCandidate, DomainProposal, KnowledgeDomain } from "./domainTypes";
 import type { DomainGovernanceRepository, DomainGovernanceState } from "./DomainGovernanceRepository";
+import { resolveNodeDomain as resolveNodeDomainFromState } from "./domainResolution";
 import { assertDomainAcceptsAssignment, assertDomainCanArchive } from "./domainValidation";
 
 export type AssignNodeDomainInput = { actor: DomainActor; access: KnowledgeAccessContext; nodeId: string; domainId: string | null };
@@ -60,8 +61,7 @@ export class DomainGovernanceService {
   }
 
   resolveNodeDomain(nodeId: string, snapshot = this.state) {
-    const assignment = snapshot.assignments.find((item) => item.nodeId === nodeId);
-    return { assignment, domain: snapshot.domains.find((item) => item.id === assignment?.domainId) };
+    return resolveNodeDomainFromState(nodeId, snapshot);
   }
 
   assignNodeDomain(input: AssignNodeDomainInput) {

@@ -322,3 +322,9 @@ The current static Knowledge graph is owned by `src/v2/demo/knowledge` as a prot
 `KnowledgeGraph` may contain Global, Tenant, and User KnowledgeNodes according to the caller's repository access context. `validateKnowledgeGraph` therefore validates scope-agnostic graph invariants and must not imply that every node is Global.
 
 Global-only graph requirements use the explicitly named `validateGlobalKnowledgeGraph`. The Demo Global graph invokes that validator after its fixture is assembled; generic repositories, Personal projections, and Domain services do not inherit a Global-only assumption.
+
+## 46. Pure Projection Inputs
+
+Pure projections consume explicit `KnowledgeGraph`, `CourseRuntimeData`, `DomainGovernanceState`, and user-state inputs. They must not retrieve hidden state from `applicationServices`, React hooks, or application singleton stores.
+
+`resolveNodeDomain(nodeId, governanceState)` is a pure Core governance lookup. Atlas, Material, and Personal projections import that helper directly; `domainStore` remains an application/UI adapter over the composed governance service.

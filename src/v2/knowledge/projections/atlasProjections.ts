@@ -2,7 +2,8 @@ import type { CourseRuntimeData } from "../../course/runtime/courseRuntime";
 import type { CurriculumCoverage } from "../../types";
 import type { PersonalKnowledgeGraph, PersonalKnowledgeNode } from "../../profile/types";
 import { UNCLASSIFIED_DOMAIN_COLOR } from "../domain/domainColors";
-import { resolveNodeDomain, type DomainGovernanceState } from "../domain/domainStore";
+import type { DomainGovernanceState } from "../domain/DomainGovernanceRepository";
+import { resolveNodeDomain } from "../domain/domainResolution";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "../types";
 
 export type AtlasNodeStatus = "global" | "mastered" | "learning" | "explore";

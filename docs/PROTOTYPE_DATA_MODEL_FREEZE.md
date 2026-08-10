@@ -50,6 +50,16 @@ This cleanup does not reopen the frozen V1 domain model.
 
 This change does not reopen the frozen V1 data model.
 
+## Dependency Closure
+
+- Generic Demo compatibility barrels have been removed.
+- Pure Core projections no longer depend directly or indirectly on `applicationServices`.
+- Domain resolution is a pure Core operation over explicit `DomainGovernanceState`.
+- `domainStore` is an application/UI adapter.
+- Core/Demo separation includes transitive dependency direction, not only direct `/demo/` imports.
+
+This cleanup does not reopen any frozen V1 model.
+
 ## Deferred Beyond Freeze
 
 Real Knowledge, Domain, Course Creation, Workflow, Evaluation, Auth, and asynchronous query backends remain future adapter/application work. WorkflowTemplate referential integrity waits for a WorkflowRepository, and Assignment completion still uses the current Demo run-end behavior until the Evaluation pipeline exists.

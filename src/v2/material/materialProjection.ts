@@ -2,7 +2,7 @@ import type { AssignmentContext, Material, MaterialKnowledgeCoverage, MaterialSe
 import type { CourseRuntimeData } from "../course/runtime/courseRuntime";
 import type { KnowledgeRepository, KnowledgeAccessContext } from "../knowledge/repository/KnowledgeRepository";
 import type { DomainGovernanceState } from "../knowledge/domain/DomainGovernanceRepository";
-import { resolveNodeDomain } from "../knowledge/domain/domainStore";
+import { resolveNodeDomain } from "../knowledge/domain/domainResolution";
 import { UNCLASSIFIED_DOMAIN_COLOR } from "../knowledge/domain/domainColors";
 import { MATERIAL_COVERAGE_ROLE_PRIORITY, sortMaterialCoverageRoles } from "./materialCoverageOrdering";
 import { sortAssignments } from "./materialOrdering";
