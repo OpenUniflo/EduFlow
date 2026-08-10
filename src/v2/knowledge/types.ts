@@ -1,6 +1,3 @@
-import type { KnowledgeDomain } from "./domain/domainTypes";
-export type { KnowledgeDomain } from "./domain/domainTypes";
-
 export type KnowledgeNodeType =
   | "conceptual"
   | "procedural"
@@ -26,11 +23,6 @@ export type KnowledgeNode = {
   masteryCriteria: string[];
   scope: KnowledgeScope;
   ownerId?: string;
-  /**
-   * @deprecated Demo-seed migration hint only. Formal and authoritative
-   * membership is resolved exclusively through DomainAssignment.
-   */
-  domainId?: string;
   provenance: KnowledgeProvenance[];
   currentRevisionId: string;
   status: KnowledgeNodeStatus;
@@ -80,7 +72,6 @@ export type AssociativeKnowledgeRelation = KnowledgeRelationBase & {
 export type KnowledgeEdge = PrerequisiteKnowledgeRelation | AssociativeKnowledgeRelation;
 
 export type KnowledgeGraph = {
-  domains: KnowledgeDomain[];
   nodes: KnowledgeNode[];
   revisions: KnowledgeNodeRevision[];
   edges: KnowledgeEdge[];

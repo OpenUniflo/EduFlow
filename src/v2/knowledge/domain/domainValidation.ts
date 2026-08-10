@@ -1,5 +1,7 @@
 import type { DomainAssignment, KnowledgeDomain } from "./domainTypes";
-import type { KnowledgeNode } from "../types";
+import type { KnowledgeGraph, KnowledgeNode } from "../types";
+import type { DomainGovernanceState } from "./DomainGovernanceRepository";
+import { isValidDomainColor } from "./domainColors";
 
 export function getDomainMembers(nodes: KnowledgeNode[], assignments: DomainAssignment[], selectedDomainId: string, query = "") {
   const assignmentByNode = new Map(assignments.map((assignment) => [assignment.nodeId, assignment]));
@@ -20,6 +22,36 @@ export function validateDomainAssignments(assignments: DomainAssignment[], domai
     if (!validNodeIds.has(assignment.nodeId)) errors.push(`Unknown DomainAssignment node ${assignment.nodeId}`);
     if (!domainIds.has(assignment.domainId)) errors.push(`Unknown Domain ${assignment.domainId}`);
     if (assignment.source === "admin" && !assignment.pinned) errors.push(`Admin assignment must be pinned: ${assignment.nodeId}`);
+  });
+  return errors;
+}
+
+export function validateDomainGovernance(graph: KnowledgeGraph, governance: DomainGovernanceState) {
+  const errors: string[] = [];
+  const activeNodeIds = new Set(graph.nodes.filter((node) => node.status === "active").map((node) => node.id));
+  const domainIds = new Set<string>();
+  const domainById = new Map<string, KnowledgeDomain>();
+  governance.domains.forEach((domain) => {
+    if (domainIds.has(domain.id)) errors.push(`Duplicate Domain ${domain.id}`);
+    domainIds.add(domain.id);
+    domainById.set(domain.id, domain);
+    if (!isValidDomainColor(domain.canonicalColor)) errors.push(`Invalid Domain color ${domain.id}`);
+  });
+  errors.push(...validateDomainAssignments(governance.assignments, governance.domains, [...activeNodeIds]));
+  governance.assignments.forEach((assignment) => {
+    if (domainById.get(assignment.domainId)?.status === "archived") errors.push(`Archived Domain ${assignment.domainId} has active assignment ${assignment.nodeId}`);
+  });
+  governance.candidates.forEach((candidate) => {
+    if (!activeNodeIds.has(candidate.nodeId)) errors.push(`Unknown DomainAssignmentCandidate node ${candidate.nodeId}`);
+    if (domainById.get(candidate.domainId)?.status !== "active") errors.push(`Candidate references inactive Domain ${candidate.domainId}`);
+  });
+  const proposalIds = new Set<string>();
+  governance.proposals.forEach((proposal) => {
+    if (proposalIds.has(proposal.id)) errors.push(`Duplicate DomainProposal ${proposal.id}`);
+    proposalIds.add(proposal.id);
+    proposal.suggestedNodeIds.forEach((nodeId) => {
+      if (!activeNodeIds.has(nodeId)) errors.push(`DomainProposal ${proposal.id} references unknown node ${nodeId}`);
+    });
   });
   return errors;
 }

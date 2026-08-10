@@ -14,7 +14,7 @@ function criteria(title: string, type: KnowledgeNodeType) {
 function globalNode(
   id: string,
   title: string,
-  domainId: "agentic-ai" | "python-engineering",
+  provenanceSourceId: string,
   description: string,
   type: KnowledgeNodeType,
   masteryCriteria = criteria(title, type),
@@ -27,8 +27,7 @@ function globalNode(
     type,
     masteryCriteria,
     scope: "global",
-    domainId,
-    provenance: [{ sourceType: "global-catalog", sourceId: `${domainId}-v1`, discoveredAt: DEMO_TIME }],
+    provenance: [{ sourceType: "global-catalog", sourceId: provenanceSourceId, discoveredAt: DEMO_TIME }],
     currentRevisionId: `${id}-r1`,
     status: "active",
     createdAt: DEMO_TIME,
@@ -38,10 +37,10 @@ function globalNode(
 }
 
 export const agenticNode = (id: string, title: string, description: string, type: KnowledgeNodeType, mastery?: string[], tags?: string[]) =>
-  globalNode(id, title, "agentic-ai", description, type, mastery, tags);
+  globalNode(id, title, "agentic-ai-knowledge-v1", description, type, mastery, tags);
 
 export const pythonNode = (id: string, title: string, description: string, type: KnowledgeNodeType = "conceptual") =>
-  globalNode(id, title, "python-engineering", description, type);
+  globalNode(id, title, "python-engineering-knowledge-v1", description, type);
 
 export const splitPythonNode = (id: string, title: string, description: string, splitFrom: string, type: KnowledgeNodeType = "conceptual") => ({
   ...pythonNode(id, title, description, type),

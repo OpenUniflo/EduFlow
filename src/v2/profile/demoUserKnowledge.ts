@@ -14,7 +14,6 @@ export const demoUserNode: KnowledgeNode = {
   ],
   scope: "user",
   ownerId: "student@knowledge-atlas.local",
-  domainId: "agentic-ai",
   provenance: [{ sourceType: "course", sourceId: "agentic-ai", discoveredAt: "2026-07-12T08:00:00.000Z" }],
   currentRevisionId: "U-DEMO-01-r1",
   status: "active",

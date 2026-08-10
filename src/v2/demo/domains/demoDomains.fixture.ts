@@ -1,12 +1,24 @@
-import type { KnowledgeDomain } from "./domainTypes";
+import type { KnowledgeDomain } from "../../knowledge/domain/domainTypes";
 
-const DEMO_TIME = "2026-08-01T00:00:00.000Z";
+export const DEMO_DOMAIN_TIME = "2026-08-01T00:00:00.000Z";
 
 function domain(id: string, name: string, description: string, canonicalColor: string): KnowledgeDomain {
-  return { id, scope: "global", name, description, canonicalColor, status: "active", createdBy: "global-admin-demo", createdAt: DEMO_TIME, updatedBy: "global-admin-demo", updatedAt: DEMO_TIME };
+  return {
+    id,
+    scope: "global",
+    name,
+    description,
+    canonicalColor,
+    status: "active",
+    createdBy: "global-admin-demo",
+    createdAt: DEMO_DOMAIN_TIME,
+    updatedBy: "global-admin-demo",
+    updatedAt: DEMO_DOMAIN_TIME
+  };
 }
 
-export const initialKnowledgeDomains: KnowledgeDomain[] = [
+/** Demo initialization data. Production Domain definitions come from governance storage. */
+export const demoKnowledgeDomains: KnowledgeDomain[] = [
   domain("agentic-ai", "Agentic AI", "规划、工具、记忆、运行时、评测与治理组成的智能体系统知识。", "#6F8FEA"),
   domain("python-engineering", "Python Engineering", "从 Python 运行模型到异步、后端架构与生产部署的工程能力。", "#53B89A"),
   domain("machine-learning", "Machine Learning", "从统计学习到深度学习的数据驱动建模方法。", "#9A7EDC"),

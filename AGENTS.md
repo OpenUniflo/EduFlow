@@ -23,7 +23,8 @@
 
 - Knowledge-to-knowledge facts use only `prerequisite`, `enables`, or `related` KnowledgeEdges.
 - CurriculumCoverage, AssignmentCoverage, KnowledgeMapping, and Promotion MUST remain separate from KnowledgeEdge.
-- `DomainAssignment` is the only authoritative Domain-membership source. A legacy seed `KnowledgeNode.domainId` is never runtime authority. Domain membership MUST NOT determine coordinates or grouping.
+- `KnowledgeNode` MUST NOT contain `domainId`; `KnowledgeGraph` MUST NOT contain Domain definitions or assignments.
+- `DomainAssignment` is the only authoritative Domain-membership source. Domain membership MUST NOT be inferred from tags, provenance, fixture location, or course context and MUST NOT determine coordinates or grouping.
 - `clusterId` and persistent Knowledge Cluster structures MUST NOT be added to the v1 core model.
 - Fake nodes or edges MUST NOT be created for layout, composition, islands, bridges, chapters, or demos.
 
@@ -34,6 +35,8 @@
 - Atomic Knowledge extraction MUST be followed by relation reconstruction covering within-module facts, cross-module facts inside the same semantic knowledge system, and relations lost when composite nodes were atomized.
 - Unexpected fragmentation in a mature Domain SHOULD trigger relation completeness review before layout compensation.
 - Relation quality review SHOULD inspect connected components, isolated nodes, low-degree nodes, and missing cross-module facts. These are audit signals, never reasons to manufacture edges.
+- KnowledgeEdge IDs MUST be deterministic from stable relation semantics and MUST NOT depend on seed-array index or ordering. `related` IDs MUST normalize the unordered endpoint pair.
+- Domain relation audits MUST enumerate active governed Domains with assigned active nodes; generic audit code MUST NOT hardcode demo Domain identities.
 
 ## Atlas Views
 
@@ -174,6 +177,8 @@
 - Archiving a Domain requires explicit governance authority, MUST be rejected while active members remain, and archived Domains MUST reject new assignments.
 - Domain mutations require an explicit actor/capability. Generic stores MUST NOT manufacture default administrator authority.
 - Pinned admin assignments have precedence over automatic scoring, candidate recomputation, and proposals.
+- Concrete Domain definitions and seed assignments MUST live in demo adapters/fixtures, never in the core Domain package.
+- Persisted Domain governance state MUST use a versioned schema/seed envelope and reconcile seed upgrades while preserving valid administrator changes and explicit unassignment.
 
 ## Material Reader Invariants
 
@@ -221,6 +226,7 @@
 - Effective Knowledge resolves as pinned Knowledge, then selected Knowledge, then the deterministic current-page primary Knowledge.
 - While pinned, Knowledge Detail and Knowledge-specific Assignment Context stay attached to the pinned Knowledge; Current Page Knowledge coverage continues following the active MaterialSegment.
 - Unpinning immediately restores current-page-linked selection. Material identity changes clear the presentation-only Pin state.
+- Current-page Knowledge contexts MUST be ordered deterministically by `introduce > explain > example > practice-reference`, then stable `nodeId`, independent of MaterialKnowledgeCoverage input order.
 - Pinned Knowledge Context MUST remain stable while the PDF reading position changes. Pinned mode hides the primary Current Page Coverage region so page changes cannot displace or visually compete with pinned detail.
 - Pinning MUST NOT control PDF navigation. Unpinning MUST restore context from the current active MaterialSegment without changing the PDF position.
 

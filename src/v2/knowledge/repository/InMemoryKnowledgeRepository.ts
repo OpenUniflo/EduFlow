@@ -25,7 +25,6 @@ export class InMemoryKnowledgeRepository implements KnowledgeRepository {
     const nodes = this.graph.nodes.filter((node) => isVisible(node, context));
     const nodeIds = new Set(nodes.map((node) => node.id));
     return {
-      domains: this.graph.domains,
       nodes,
       revisions: this.graph.revisions.filter((revision) => nodeIds.has(revision.nodeId)),
       edges: this.graph.edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))

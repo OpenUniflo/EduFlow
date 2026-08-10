@@ -161,6 +161,20 @@ describe("Material and progress generalization", () => {
     expect(typeHintAssignments.map((context) => context.assignmentId)).toContain("specific-PY27");
   });
 
+  it("orders Material Knowledge contexts by role priority and stable node ID regardless of coverage input order", () => {
+    const material = python.materials.find((item) => item.id === "python-quality-testing")!;
+    const pageCoverages = python.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === material.id && coverage.segmentId === "page-10");
+    const roles = ["practice-reference", "example", "introduce", "explain"] as const;
+    const prioritized = pageCoverages.map((coverage, index) => ({ ...coverage, role: roles[index] }));
+    const otherCoverages = python.materialKnowledgeCoverages.filter((coverage) => !pageCoverages.includes(coverage));
+    const runtime = { ...python, materialKnowledgeCoverages: [...otherCoverages, ...prioritized] };
+    const reordered = { ...runtime, materialKnowledgeCoverages: [...runtime.materialKnowledgeCoverages].reverse() };
+    const userState = demoUserCourseStateSeed("student", python.course.id);
+    const project = (input: typeof runtime) => buildMaterialSegmentProjection(input, material, "page-10", userState, knowledgeRepository, access, getDomainGovernanceSnapshot())!.knowledgeContexts.map((context) => ({ nodeId: context.nodeId, roles: context.roles }));
+    expect(project(reordered)).toEqual(project(runtime));
+    expect(project(runtime).map((context) => context.roles[0])).toEqual(["introduce", "explain", "example", "practice-reference"]);
+  });
+
   it("resolves pinned Knowledge metadata and Domain color from current repositories instead of snapshots", () => {
     const governance = getDomainGovernanceSnapshot();
     const before = buildMaterialKnowledgeContext("PY09", [], knowledgeRepository, access, governance)!;
@@ -218,7 +232,7 @@ describe("Material and progress generalization", () => {
 
   it("resolves visible Global/Tenant/User Knowledge while Global Atlas stays Global-only", () => {
     const node = (id: string, scope: KnowledgeNode["scope"], ownerId?: string): KnowledgeNode => ({ id, title: id, description: id, type: "conceptual", masteryCriteria: [id], scope, ownerId, provenance: [{ sourceType: "manual", sourceId: id }], currentRevisionId: `${id}-r1`, status: "active" });
-    const scopedGraph: KnowledgeGraph = { domains: [], revisions: [], edges: [], nodes: [node("G", "global"), node("T", "tenant", "tenant-1"), node("U", "user", "user-1")] };
+    const scopedGraph: KnowledgeGraph = { revisions: [], edges: [], nodes: [node("G", "global"), node("T", "tenant", "tenant-1"), node("U", "user", "user-1")] };
     const scopedRepository = new InMemoryKnowledgeRepository(scopedGraph);
     const scopedAccess = userKnowledgeAccess("user-1", "tenant-1");
     expect(scopedRepository.getVisibleGraph(scopedAccess).nodes.map((item) => item.id)).toEqual(["G", "T", "U"]);

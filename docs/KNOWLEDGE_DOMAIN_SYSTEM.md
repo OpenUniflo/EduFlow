@@ -1,87 +1,77 @@
 # Knowledge Domain System
 
-## Purpose and Definition
+## Purpose
 
-Knowledge Domain provides governed semantic classification for the shared Knowledge Graph. A `KnowledgeDomain` is a stable field inferred from node semantics and KnowledgeEdge structure, then confirmed through administration. It supports color, filtering, search, statistics, and governance without changing knowledge facts or spatial layout.
+Knowledge Domain is governed semantic classification around the shared Knowledge Graph. It supports canonical hue, filtering, search, statistics, and administration without becoming a knowledge fact or changing graph geometry.
 
-Domain is not a Community, Cluster, Island, Chapter, course grouping, or force-layout region. Analysis may discover a candidate group, but that result remains a proposal. No Domain creates fake nodes, fake edges, anchors, hulls, or forces.
+Domain is not a KnowledgeNode, Community, Cluster, Island, Chapter, Course group, force anchor, or layout region. Discovery produces proposals only. Domain logic never creates fake nodes, fake edges, hulls, centers, or forces.
 
-## Domain Scope and Permissions
+## Hard Model Boundary
 
-Formal Domain scope is `global | tenant`. Global Admin governs Global Domains. Tenant Admin governs Tenant Domains. Users may assign a visible Domain to their nodes or remain Unclassified, but cannot create formal Domains in v1. The prototype uses a demo admin capability while preserving scope checks in domain services.
+`KnowledgeNode` contains no `domainId`, copied Domain color, or other authoritative membership field. `KnowledgeGraph` contains only `nodes`, `revisions`, and factual `edges`; it contains no Domain definitions or assignments.
 
-## KnowledgeDomain Schema
+Domain definitions, assignments, candidates, and proposals live behind `DomainGovernanceRepository`. `DomainAssignment` is the only membership truth. Tags, provenance, node fixture location, course context, and relation neighborhoods may be evidence for suggestions, but none is a membership fallback.
 
-`KnowledgeDomain` stores `id`, `scope`, `name`, optional `description`, `canonicalColor`, `status`, and create/update audit fields. `canonicalColor` is the only authoritative Domain color.
+Atlas, Material, Profile, and admin projections explicitly join a visible `KnowledgeGraph` with a `DomainGovernanceState`. This join may change presentation metadata such as hue and labels. It must not change node/edge identity, force input, coordinates, ELK input, or camera state.
 
-## DomainAssignment and Primary Domain Rule
+## KnowledgeDomain
 
-`DomainAssignment` connects one node to one primary Domain and records `source`, optional confidence, pin state, actor, and time. Each KnowledgeNode has zero or one primary Domain in v1. `source: admin` requires `pinned: true`; automatic services must preserve pinned assignments. Secondary Domains are a non-goal.
+`KnowledgeDomain` stores `id`, `scope`, `name`, optional `description`, `canonicalColor`, lifecycle `status`, and create/update audit fields. Scope is `global | tenant`. `canonicalColor` is the only authoritative Domain color.
 
-No assignment is the valid Unclassified state: `domainAssignment == null → Unclassified`. Unclassified uses presentation fallback `#A7B0BF`; it is not a synthetic Domain or KnowledgeNode. It is a manageable collection in Domain Management: administrators can inspect, select, multi-select, and move its members to a formal Domain.
+Global Admin governs Global Domains. Tenant Admin governs Tenant Domains. Every mutation receives an explicit actor with the matching capability; stores never synthesize administrator authority. Users do not create formal Domains in v1.
 
-## DomainAssignmentCandidate
+## DomainAssignment and Unclassified
 
-A candidate records per-node Domain affinity: combined score, semantic score, structural score, algorithm version, and generation time. Candidates are evidence, not formal membership.
+`DomainAssignment(nodeId, domainId, source, confidence?, pinned, assignedBy?, assignedAt)` connects one node to at most one primary Domain. `source: admin` requires `pinned: true`; automatic services must preserve pinned assignments.
 
-## Existing Domain Auto Assignment
+No assignment is the first-class Unclassified state. Unclassified is not a synthetic Domain or KnowledgeNode and uses presentation fallback `#A7B0BF`. Administrators can inspect, select, and move Unclassified nodes. A manual move writes an admin-pinned assignment. Removing an assignment requires authority for the current Domain scope.
 
-The service scores non-pinned new or unclassified nodes against existing Domains. The configurable default is `0.60 × semantic + 0.40 × structural`.
+The governance validator rejects duplicate Domains, duplicate primary assignments, orphan assignments, assignments to inactive nodes, assignments to archived Domains, invalid colors, invalid candidate references, invalid proposal node references, and unpinned admin assignments.
 
-Semantic input uses only `title`, `description`, and `masteryCriteria`. Course, Chapter, Lesson, Assignment, and curriculum organization are excluded. Structural evidence uses direct `prerequisite`, `enables`, and `related` neighbors plus common-neighbor evidence. It never mutates KnowledgeEdges.
+## Candidates and Discovery
 
-Default thresholds are: score at least `0.85` creates an automatic assignment; `0.60–0.85` creates a pending suggestion; lower scores remain Unclassified. Admin-confirmed pinned assignments are preferred Domain anchors and always have higher authority.
+Existing-Domain scoring combines configurable semantic and structural evidence. Semantic evidence uses title, description, and mastery criteria. Structural evidence uses factual `prerequisite`, `enables`, and `related` neighbors and common neighbors. It never mutates KnowledgeEdges.
 
-## Domain Discovery and DomainProposal
+Default scoring is `0.60 × semantic + 0.40 × structural`. A score at least `0.85` may create an automatic assignment; `0.60–0.85` creates a review candidate; lower scores remain Unclassified. Admin-pinned assignments always win.
 
-Discovery builds a weighted similarity graph from semantic neighbor evidence and factual KnowledgeEdges. Its algorithm is replaceable; a future Leiden implementation may replace the deterministic v1 scaffold.
+Full-graph discovery creates `DomainProposal` records. A proposal becomes a formal Domain only after authorized review. Proposal acceptance/rejection requires the capability matching `proposal.scope`.
 
-Discovery outputs `DomainProposal` with suggested identity, members, confidence, lifecycle status, algorithm version, and timestamp. A clustering result becomes a Domain only after an administrator accepts and creates it.
+## Lifecycle
 
-## Admin Override and Governance UI
+An active Domain accepts assignments. An archived Domain is retained for history and rejects new assignments or automatic classification. Archiving is rejected while active members remain; members must first be moved or unclassified.
 
-Moving a node in Domain Management or the Atlas quick editor writes `source: admin` and `pinned: true`. Subsequent automation cannot overwrite it.
+Renaming a Domain or changing its canonical color does not rewrite KnowledgeNodes. Changing assignment does not create, delete, or alter KnowledgeEdges, MaterialKnowledgeCoverage, curriculum data, layout, or camera state.
 
-An Admin Move from Unclassified to a Domain creates the same admin, pinned assignment and immediately updates Unclassified and Domain counts. Candidate recomputation and Domain proposals cannot replace this result.
+## Persistence and Seed Reconciliation
 
-`/admin/domains` contains Domain Management and Automatic Suggestions tabs. Management supports search/filter, membership inspection, multi-select move, rename, description/color editing, archive, and creation. Suggestions support accepting or redirecting node candidates and reviewing Domain proposals.
+Local prototype persistence uses a versioned envelope:
 
-## Color Governance
+```ts
+{
+  schemaVersion,
+  seedVersion,
+  seededDomainIds,
+  seededAssignmentNodeIds,
+  state
+}
+```
 
-`DOMAIN_COLOR_PALETTE` contains calibrated choices. New Domains receive the most visually distinct unused palette color. Administrators may enter a valid HEX value. KnowledgeNode never owns Domain color.
+`state` contains Domains, assignments, candidates, proposals, and revision. Legacy raw-state storage is detected and migrated. On seed upgrades, new valid fixture records are added while valid administrator rename/color/move/pin changes are preserved. The recorded seeded ID sets preserve an explicit later unassignment instead of silently restoring it. Orphaned or archived references are discarded; invalid persistence falls back to a validated seed.
 
-## Atlas Integration and Layout Independence
+Legacy raw state did not record seed tombstones, so a one-time migration cannot distinguish a previously removed seed assignment from a seed record that is newly introduced. After the first envelope write, explicit unassignment is preserved across later seed updates.
 
-Atlas hue resolves through `DomainAssignment → KnowledgeDomain.canonicalColor`. Global Admin can change a selected node's Domain from its drawer; name and color governance remain on the management page.
+## Demo Fixtures
 
-Domain changes may change color, filters, statistics, search, and classification. They must not reconstruct structural graph data, reheat Force, reset the camera, alter coordinates, or mutate KnowledgeEdges.
+Concrete demo Domain definitions and assignments live only under `src/v2/demo/domains`. The core `knowledge/domain` package defines schemas, validation, scoring, repository boundaries, and mutation rules; it does not hardcode Agentic AI, Python Engineering, or other product fixtures.
 
-Domain membership does not imply a direct KnowledgeEdge or require members to be mutually connected. No same-domain link is synthesized for Atlas layout or connectivity.
+Demo assignments are generated from active node fixtures rather than duplicated hand-maintained node-ID lists. The deliberately Unclassified bridge node is excluded for candidate review. The demo user node `U-DEMO-01` receives Agentic AI presentation through a demo `DomainAssignment`, not through `KnowledgeNode` metadata.
 
-The current semantic scorer is a deterministic tokenization + Jaccard scaffold. The current discovery service is a review-flow scaffold, not real automatic Domain discovery. P1 replaces them with embedding kNN, a KnowledgeEdge-weighted similarity graph, and Leiden or an equivalent community algorithm; proposals still require governance confirmation.
+## Admin UI
 
-## Future Merge/Split and Non-goals
+`/admin/domains` supports governed membership inspection, Unclassified management, multi-select move, rename, description/color editing, archive, candidates, and proposals. Atlas quick assignment calls the same governance mutations.
 
-Future Domain merge/split requires audit and review while preserving node and edge identity. Secondary Domains, Domain layout anchors, community regions, cluster hulls, automatic production Domains, scheduled discovery, and a full ML training pipeline are outside v1.
+The same resolved canonical hue is reused by Global Atlas, Personal Atlas, and Material Knowledge Context. A Domain edit must never reheat Force, rebuild topology, reset camera, or reposition Material content.
 
-## Persistence and Runtime Authority
+## Non-goals
 
-`DomainGovernanceRepository` persists Domain definitions, assignments, candidates, and proposals. Explicit demo data initializes an empty repository; it is not recomputed from `KnowledgeNode.domainId`. All Atlas and management projections resolve membership from `DomainAssignment`, making it the single runtime authority.
-
-## Lifecycle and Archive Rules
-
-An active Domain may accept membership. An archived Domain is retained for history but rejects new assignments and automatic classification. Archiving is rejected while the Domain still has active members; an administrator must move or unclassify them first. Unclassified remains the absence of a DomainAssignment.
-
-## Mutation Authority
-
-Every manual create, edit, move, archive, or restore operation receives an explicit actor with the appropriate global or tenant governance capability. Stores do not synthesize a default administrator. Manual moves produce `source=admin` and `pinned=true`, and automated assignment never overwrites that result.
-
-## Multi-course Independence
-
-Domain membership belongs to the shared KnowledgeNode, not to any course that covers it. Adding a course context, Assignment, Material, or user progress does not change Domain membership. Domain definition and membership edits alter classification presentation only; they never alter KnowledgeEdges, structural graph keys, coordinates, or camera state.
-
-## Scope-based Mutation Permission
-
-Unassigning a node checks the scope of its current Domain and requires the matching global or tenant capability. DomainProposal acceptance and rejection check `proposal.scope`; possessing an unrelated admin capability is insufficient. Creation, move, archive, restore, candidate review, and proposal review all continue to require an explicit actor.
-
-The same canonical Domain color is reused by Global Atlas, Personal Atlas, and Material Knowledge Context. Domain edits do not alter MaterialKnowledgeCoverage or Course topology.
+Secondary Domains, Domain geometry anchors, community regions, cluster hulls, scheduled production discovery, automatic authoritative Domains, merge/split workflows, and a full ML pipeline are outside v1.

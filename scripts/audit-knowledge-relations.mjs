@@ -12,8 +12,15 @@ try {
   const titleById = new Map(globalKnowledgeGraph.nodes.map((node) => [node.id, node.title]));
   const formatNodes = (ids) => ids.length ? ids.map((id) => `- ${id} ${titleById.get(id) ?? "Unknown"}`).join("\n") : "- None";
 
-  for (const [domainId, label] of [["agentic-ai", "Agentic AI"], ["python-engineering", "Python Engineering"]]) {
-    const audit = auditDomainRelations(globalKnowledgeGraph, governance.assignments, domainId);
+  const activeNodeIds = new Set(globalKnowledgeGraph.nodes.filter((node) => node.status === "active").map((node) => node.id));
+  const assignedDomainIds = new Set(governance.assignments.filter((assignment) => activeNodeIds.has(assignment.nodeId)).map((assignment) => assignment.domainId));
+  const auditableDomains = governance.domains
+    .filter((domain) => domain.status === "active" && assignedDomainIds.has(domain.id))
+    .sort((left, right) => left.id.localeCompare(right.id));
+
+  for (const domain of auditableDomains) {
+    const audit = auditDomainRelations(globalKnowledgeGraph, governance.assignments, domain.id);
+    const label = domain.name;
     console.log(`${label}\n${"-".repeat(label.length)}`);
     console.log(`Active nodes: ${audit.activeNodeCount}`);
     console.log(`Internal edges: ${audit.edgeCount}`);

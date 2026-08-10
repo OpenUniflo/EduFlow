@@ -3,7 +3,6 @@ import { type Connection } from "@xyflow/react";
 import { Navigate, Route as RouterRoute, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { NavigationProvider } from "./contexts/NavigationContext";
-import { TaskProvider } from "./contexts/TaskContext";
 import { WorkflowProvider } from "./contexts/WorkflowContext";
 import {
   type BottomTab,
@@ -14,14 +13,12 @@ import {
   type FlowEdge,
   type FlowNode,
   type MockSession,
-  type MockTask,
   type PersistedAppState,
   type PersistedRunHistory,
   type PersistedStateValues,
   type RenameNodeResult,
   type Selection,
   type StateTab,
-  type TaskTestStatus,
   type Template,
   type WorkflowViewMode,
   addBranch,
@@ -43,9 +40,6 @@ import {
   isControlNode,
   isEdgeSideHandle,
   mergeBuiltinWorkflows,
-  mergeStoredTasks,
-  mockCourses,
-  mockTasks,
   readMockSession,
   readStoredMockSettings,
   readStoredAppState,
@@ -57,20 +51,13 @@ import {
 import {
   AuthPage,
   Canvas,
-  ChapterLearningPage,
   CodeModal,
   ConfigPopover,
-  CourseDetailPage,
-  CourseShell,
-  CoursesPage,
-  HomePage,
   Inspector,
   NotFoundPage,
   PlaceholderShell,
   RunHistoryDetail,
   RunPanel,
-  TaskDetailPage,
-  TasksPage,
   Topbar
 } from "./components/app";
 import { AtlasHome } from "./v2/pages/AtlasHome";
@@ -111,13 +98,7 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const workflowMatch = useMatch("/workflows/:workflowId");
-  const courseDetailMatch = useMatch("/courses/:courseId");
-  const chapterMatch = useMatch("/courses/:courseId/chapters/:chapterId");
-  const taskDetailMatch = useMatch("/tasks/:taskId");
   const routeWorkflowId = workflowMatch?.params.workflowId;
-  const routeCourseId = chapterMatch?.params.courseId ?? courseDetailMatch?.params.courseId;
-  const routeChapterId = chapterMatch?.params.chapterId;
-  const routeTaskId = taskDetailMatch?.params.taskId;
 
   const [initialState] = useState(() => {
     const stored = readStoredAppState();
@@ -132,11 +113,7 @@ export default function App() {
 
     return {
       workflows,
-      tasks: stored.tasks?.length ? mergeStoredTasks(stored.tasks) : mockTasks,
       activeTemplateId: activeTemplate.id,
-      activeCourseId: mockCourses.some((item) => item.id === routeCourseId) ? routeCourseId : mockCourses[0].id,
-      activeChapterId: routeChapterId,
-      activeTaskId: mockTasks.some((item) => item.id === routeTaskId) ? routeTaskId : mockTasks[0].id,
       workflowDescription,
       schemaSaved: stored.schemaSaved ?? false,
       nodePositions: stored.nodePositions ?? {},
@@ -147,11 +124,7 @@ export default function App() {
   });
   const [session, setSession] = useState<MockSession | null>(() => readMockSession());
   const [workflows, setWorkflows] = useState<Template[]>(initialState.workflows);
-  const [tasks, setTasks] = useState<MockTask[]>(initialState.tasks);
   const [activeTemplateId, setActiveTemplateId] = useState(initialState.activeTemplateId);
-  const [activeCourseId, setActiveCourseId] = useState(initialState.activeCourseId);
-  const [activeChapterId, setActiveChapterId] = useState<string | undefined>(initialState.activeChapterId);
-  const [activeTaskId, setActiveTaskId] = useState(initialState.activeTaskId);
   const [workflowDescription, setWorkflowDescription] = useState(initialState.workflowDescription);
   const [selection, setSelection] = useState<Selection>({ type: "state" });
   const [configTarget, setConfigTarget] = useState<ConfigTarget | null>(null);
@@ -163,7 +136,6 @@ export default function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [layoutPulse, setLayoutPulse] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [homeSidebarCollapsed, setHomeSidebarCollapsed] = useState(false);
   const [workflowViewMode, setWorkflowViewMode] = useState<WorkflowViewMode>("gallery");
   const [draggingPaletteNode, setDraggingPaletteNode] = useState<CreateNodePayload | null>(null);
   const [codeModalOpen, setCodeModalOpen] = useState(false);
@@ -180,14 +152,6 @@ export default function App() {
     [activeTemplateId, routeWorkflowId, workflows]
   );
   const routeTemplate = routeWorkflowId ? workflows.find((item) => item.id === routeWorkflowId) : undefined;
-  const routeCourse = routeCourseId ? mockCourses.find((item) => item.id === routeCourseId) : undefined;
-  const activeCourse = routeCourse ?? mockCourses.find((item) => item.id === activeCourseId) ?? mockCourses[0];
-  const activeChapter = routeChapterId
-    ? activeCourse.chapters.find((item) => item.id === routeChapterId)
-    : activeCourse.chapters.find((item) => item.id === activeChapterId) ?? activeCourse.chapters.find((item) => item.status === "learning") ?? activeCourse.chapters[0];
-  const routeTask = routeTaskId ? tasks.find((item) => item.id === routeTaskId) : undefined;
-  const activeTask = routeTask ?? tasks.find((item) => item.id === activeTaskId) ?? tasks[0] ?? mockTasks[0];
-
   const activeRunItem = runIndex >= 0 ? activeTemplate.runOrder[runIndex] ?? "" : "";
   const activeStateValues = useMemo(() => ({ ...getDefaultStateValues(), ...(stateValues[activeTemplate.id] ?? {}) }), [activeTemplate.id, stateValues]);
   const visibleStateValues = useMemo(() => {
@@ -223,24 +187,10 @@ export default function App() {
   }, [activeTemplateId, routeWorkflowId, workflows]);
 
   useEffect(() => {
-    if (routeCourseId && mockCourses.some((item) => item.id === routeCourseId)) {
-      setActiveCourseId(routeCourseId);
-    }
-    setActiveChapterId(routeChapterId);
-  }, [routeChapterId, routeCourseId]);
-
-  useEffect(() => {
-    if (routeTaskId && tasks.some((item) => item.id === routeTaskId)) {
-      setActiveTaskId(routeTaskId);
-    }
-  }, [routeTaskId, tasks]);
-
-  useEffect(() => {
     window.localStorage.setItem(
       storageKey,
       JSON.stringify({
         workflows,
-        tasks,
         activeTemplateId: activeTemplate.id,
         workflowDescription,
         schemaSaved,
@@ -249,7 +199,7 @@ export default function App() {
         runHistory
       } satisfies PersistedAppState)
     );
-  }, [activeTemplate.id, nodePositions, runHistory, schemaSaved, stateValues, tasks, workflowDescription, workflows]);
+  }, [activeTemplate.id, nodePositions, runHistory, schemaSaved, stateValues, workflowDescription, workflows]);
 
   useEffect(() => {
     const safeEnvironments = environments.length ? environments : initialState.settings.environments;
@@ -333,81 +283,11 @@ export default function App() {
   }
 
   function openCourses() {
-    setActiveChapterId(undefined);
     navigate("/courses");
   }
 
-  function openCourse(courseId: string) {
-    setActiveCourseId(courseId);
-    setActiveChapterId(undefined);
-    navigate(`/courses/${courseId}`);
-  }
-
-  function openChapter(courseId: string, chapterId: string) {
-    setActiveCourseId(courseId);
-    setActiveChapterId(chapterId);
-    navigate(`/courses/${courseId}/chapters/${chapterId}`);
-  }
-
-  function openTasks(taskId?: string) {
-    if (taskId) setActiveTaskId(taskId);
-    setActiveChapterId(undefined);
-    navigate("/tasks");
-  }
-
-  function openTask(taskId: string) {
-    const task = tasks.find((item) => item.id === taskId) ?? mockTasks[0];
-    setActiveTaskId(task.id);
-    navigate(`/tasks/${task.id}`);
-  }
-
   function openProfile() {
-    setActiveChapterId(undefined);
     navigate("/profile");
-  }
-
-  function updateTask(taskId: string, updater: (task: MockTask) => MockTask) {
-    setTasks((items) => items.map((item) => (item.id === taskId ? updater(item) : item)));
-  }
-
-  function toggleTaskChecklist(taskId: string, checklistId: string) {
-    updateTask(taskId, (task) => {
-      const checklist = task.checklist.map((item) => (item.id === checklistId ? { ...item, checked: !item.checked } : item));
-      const nextStatus = task.status === "not_started" ? "in_progress" : task.status;
-      return { ...task, checklist, status: nextStatus };
-    });
-  }
-
-  function runTaskChecks(taskId: string) {
-    updateTask(taskId, (task) => {
-      const failedIndex = task.id === "task-trace-analysis" ? 2 : -1;
-      const testCases = task.testCases.map((item, index) => ({
-        ...item,
-        status: index === failedIndex ? "failed" as TaskTestStatus : "passed" as TaskTestStatus
-      }));
-      const hasFailed = testCases.some((item) => item.status === "failed");
-      return {
-        ...task,
-        testCases,
-        status: hasFailed ? "in_progress" : task.status === "graded" || task.status === "submitted" ? task.status : "ready_to_submit",
-        checklist: task.checklist.map((item) => ({ ...item, checked: true }))
-      };
-    });
-  }
-
-  function submitTask(taskId: string) {
-    updateTask(taskId, (task) => ({
-      ...task,
-      status: "submitted",
-      submittedAt: new Date().toISOString().slice(0, 10),
-      checklist: task.checklist.map((item) => ({ ...item, checked: true })),
-      testCases: task.testCases.map((item) => ({ ...item, status: item.status === "failed" ? "failed" : "passed" }))
-    }));
-  }
-
-  function openTaskWorkflow(task: MockTask) {
-    const workflowId = task.submittedWorkflowId && workflows.some((item) => item.id === task.submittedWorkflowId) ? task.submittedWorkflowId : task.workflowTemplateId;
-    openWorkflow(workflowId);
   }
 
   function createWorkflow() {
@@ -944,7 +824,6 @@ export default function App() {
   }
 
   function returnHome() {
-    setActiveChapterId(undefined);
     setIsRunning(false);
     activeRunSessionRef.current = null;
     setSelectedRunHistoryId(null);
@@ -1041,14 +920,9 @@ export default function App() {
     return session ? element : <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  const layoutProps = {
-    collapsed: homeSidebarCollapsed,
-    onCollapsed: setHomeSidebarCollapsed
-  };
-
   const navigationContextValue = {
     onGoCourses: openCourses,
-    onGoTasks: () => openTasks(),
+    onGoTasks: () => navigate("/"),
     onGoWorkflows: returnHome,
     onGoProfile: openProfile,
     onGoSettings: () => navigate("/settings"),
@@ -1078,44 +952,6 @@ export default function App() {
   const courseDetailPage = session ? <CourseGraphPage session={session} onLogout={logout} /> : null;
 
   const lessonPage = session ? <LessonPage session={session} onLogout={logout} /> : null;
-
-  const chapterPage = routeCourse && activeChapter ? (
-    <main className="app-shell">
-      <div className="workspace-glow" aria-hidden="true" />
-      <CourseShell {...layoutProps} activeSection="courses">
-        <ChapterLearningPage course={routeCourse} chapter={activeChapter} onBack={() => openCourse(routeCourse.id)} onOpenWorkflow={openWorkflow} />
-      </CourseShell>
-    </main>
-  ) : (
-    <NotFoundPage onHome={returnHome} />
-  );
-
-  const tasksPage = (
-    <main className="app-shell">
-      <div className="workspace-glow" aria-hidden="true" />
-      <CourseShell {...layoutProps} activeSection="tasks">
-        <TasksPage tasks={tasks} activeTaskId={activeTask.id} onOpenTask={openTask} onSelectTask={setActiveTaskId} />
-      </CourseShell>
-    </main>
-  );
-
-  const taskDetailPage = routeTask ? (
-    <main className="app-shell">
-      <div className="workspace-glow" aria-hidden="true" />
-      <CourseShell {...layoutProps} activeSection="tasks">
-        <TaskDetailPage
-          task={routeTask}
-          onBack={() => openTasks(routeTask.id)}
-          onOpenWorkflow={() => openTaskWorkflow(routeTask)}
-          onToggleChecklist={toggleTaskChecklist}
-          onRunChecks={runTaskChecks}
-          onSubmitTask={submitTask}
-        />
-      </CourseShell>
-    </main>
-  ) : (
-    <NotFoundPage onHome={returnHome} />
-  );
 
   const profilePage = session ? <ProfileKnowledgePage session={session} onLogout={logout} /> : null;
   const domainManagementPage = session ? <DomainManagementPage session={session} onLogout={logout} /> : null;
@@ -1245,21 +1081,11 @@ export default function App() {
     createWorkflow,
     deleteWorkflow
   };
-  const taskContextValue = {
-    tasks,
-    activeTask,
-    openTask,
-    toggleTaskChecklist,
-    runTaskChecks,
-    submitTask
-  };
-
   return (
     <AuthProvider value={authContextValue}>
       <NavigationProvider value={navigationContextValue}>
         <WorkflowProvider value={workflowContextValue}>
-          <TaskProvider value={taskContextValue}>
-            <Routes>
+          <Routes>
               <RouterRoute path="/login" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
               <RouterRoute path="/register" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
               <RouterRoute path="/" element={protectedElement(atlasHome)} />
@@ -1277,8 +1103,7 @@ export default function App() {
               <RouterRoute path="/notifications/*" element={<Navigate to="/" replace />} />
               <RouterRoute path="/messages/*" element={<Navigate to="/" replace />} />
               <RouterRoute path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </TaskProvider>
+          </Routes>
         </WorkflowProvider>
       </NavigationProvider>
     </AuthProvider>

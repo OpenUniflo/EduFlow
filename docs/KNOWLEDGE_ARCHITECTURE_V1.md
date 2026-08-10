@@ -166,6 +166,8 @@ Every active course KnowledgeNode must have at least one AssignmentCoverage befo
 
 `KnowledgeDomain` is first-class governance metadata, not graph geometry. It has Global or Tenant scope, a governed name and description, one canonical color, lifecycle status, and audit metadata. Domain is not a KnowledgeNode, Chapter, Community, Cluster, Island, or force-layout container.
 
+The schema boundary is strict: `KnowledgeNode` has no `domainId`, and `KnowledgeGraph` contains only nodes, revisions, and factual edges. Domain definitions and memberships are loaded through `DomainGovernanceRepository`. Views resolve Domain presentation by explicitly joining graph identity with governance state; tags, provenance, fixture location, and curriculum context are never membership fallbacks.
+
 Formal membership is represented by `DomainAssignment`, not by copying color into `KnowledgeNode`. A node has zero or one primary Domain in v1; no assignment is the valid Unclassified state. Admin assignments are pinned and take precedence over automatic results. Global Admin governs Global Domains and Tenant Admin governs Tenant Domains; users cannot create formal Domains in v1.
 
 Domain classification never creates, deletes, or modifies `prerequisite`, `enables`, or `related` KnowledgeEdges. Domain changes may affect hue, filters, search, statistics, and classification only. They cannot change coordinates, topology, force state, or camera state.
@@ -219,6 +221,9 @@ Structural adjacency may treat all relation types as undirected for layout/commu
 13. Chapter dependency pairs are unique and derived only from primary membership.
 14. Every active course KnowledgeNode has at least one valid AssignmentCoverage.
 15. Workflow Assignments have a workflowTemplateId; instruction Assignments do not require one.
+16. KnowledgeEdge IDs are stable semantic identities and never depend on seed-array order or position.
+17. Concrete Domain seed data belongs to demo fixtures, never the core knowledge/domain package.
+18. Material Knowledge contexts sort by coverage-role priority and stable node ID, independent of source record order.
 
 ## 31. Explicit non-goals / forbidden shortcuts
 
@@ -231,6 +236,8 @@ The Python ontology retains some broad nodes for a later bounded cleanup; v1 spl
 Rendering consumes the shared `KnowledgeNode + KnowledgeEdge` graph through view projections. Renderer-specific nodes, links, ports, bend points, coordinates, chapter groups, and interaction state are presentation data only and are never written back to the Knowledge Schema.
 
 Global Atlas and Personal Atlas use the same `KnowledgeAtlasScene` based on `react-force-graph-3d`. Global projects active Global-scope nodes and their factual edges. Personal projects mastered/learning Core nodes, direct one-hop Explore nodes, and the default Core↔Core / Core↔Explore visible edges. The shared scene owns force geometry, camera interaction, node and edge materials, selection, focus, label priority, zoom-dependent label density, and screen-space label collision. Domain and personal status affect appearance but do not create layout centers or graph entities.
+
+Atlas projection receives `KnowledgeGraph` and `DomainGovernanceState` as separate inputs. DomainAssignment-to-Domain resolution adds hue and classification labels only after structural graph selection; a governance-only revision cannot change the structural node/edge key.
 
 Course Skill Tree projects the same atomic knowledge identities through CurriculumCoverage and Chapter/Lesson context, then uses ELK layered hierarchical layout and React Flow rendering. Chapter Overview keeps the dependency DAG derived from aggregated prerequisite/enables facts and visually distinguishes minimal CurriculumSequence fallback edges. Focused mode expands one Chapter at its macro position while other Chapters remain collapsed; Full mode expands every Chapter while preserving the shared chapter-level topology. Chapter containers are compound presentation groups, never KnowledgeNodes.
 
@@ -260,7 +267,7 @@ Course, Assignment, and Material definitions contain no user completion. Mutable
 
 ## 37. Domain Runtime Authority
 
-`DomainAssignment` is the only authoritative runtime membership source. Any `KnowledgeNode.domainId` remaining in a demo seed is deprecated migration input and must not drive color, filtering, governance, layout, or statistics. Domain definitions and assignments are persisted independently from the Knowledge Graph structure.
+`DomainAssignment` is the only authoritative runtime membership source. `KnowledgeNode` has no Domain-membership field, and Domain definitions and assignments are persisted independently from the Knowledge Graph structure.
 
 ## 38. Scoped Knowledge Access
 

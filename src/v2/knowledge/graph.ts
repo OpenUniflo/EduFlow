@@ -1,18 +1,14 @@
 import type {
-  KnowledgeDomain,
   KnowledgeEdge,
   KnowledgeGraph,
   KnowledgeNode,
   KnowledgeNodeRevision
 } from "./types";
-import { initialKnowledgeDomains } from "./domain/domainData";
 import { validateKnowledgeRelations } from "./relationAudit";
-import { agenticAiEdgeSeeds, pythonEngineeringEdgeSeeds, sharedEdgeSeeds } from "./seeds";
+import { agenticAiEdgeSeeds, pythonEngineeringEdgeSeeds, sharedEdgeSeeds, type EdgeSeed } from "./seeds";
 import { agenticAiNodes } from "./seeds/agenticAiNodes";
 import { DEMO_TIME } from "./seeds/nodeFactory";
 import { pythonEngineeringNodes } from "./seeds/pythonEngineeringNodes";
-
-export const knowledgeDomains: KnowledgeDomain[] = initialKnowledgeDomains;
 
 export const knowledgeNodes: KnowledgeNode[] = [...agenticAiNodes, ...pythonEngineeringNodes];
 
@@ -31,9 +27,22 @@ export const knowledgeNodeRevisions: KnowledgeNodeRevision[] = knowledgeNodes.ma
 
 const edgeSeeds = [...agenticAiEdgeSeeds, ...pythonEngineeringEdgeSeeds, ...sharedEdgeSeeds];
 
-export const knowledgeEdges: KnowledgeEdge[] = edgeSeeds.map(([source, target, relation, strength, reason], index) => relation === "prerequisite"
-  ? { id: `knowledge-edge-${String(index + 1).padStart(3, "0")}`, source, target, relation, strength: strength as "hard" | "soft", reason }
-  : { id: `knowledge-edge-${String(index + 1).padStart(3, "0")}`, source, target, relation, strength: strength as number, reason });
+function edgeIdPart(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+export function createKnowledgeEdgeId(source: string, target: string, relation: KnowledgeEdge["relation"]) {
+  const endpoints = relation === "related" ? [source, target].sort((left, right) => left.localeCompare(right)) : [source, target];
+  return `knowledge-${relation}-${edgeIdPart(endpoints[0])}-${edgeIdPart(endpoints[1])}`;
+}
+
+export function buildKnowledgeEdges(seeds: EdgeSeed[]): KnowledgeEdge[] {
+  return seeds.map(([source, target, relation, strength, reason]) => relation === "prerequisite"
+    ? { id: createKnowledgeEdgeId(source, target, relation), source, target, relation, strength: strength as "hard" | "soft", reason }
+    : { id: createKnowledgeEdgeId(source, target, relation), source, target, relation, strength: strength as number, reason });
+}
+
+export const knowledgeEdges = buildKnowledgeEdges(edgeSeeds);
 
 function assertUnique(label: string, ids: string[]) {
   const seen = new Set<string>();
@@ -44,18 +53,15 @@ function assertUnique(label: string, ids: string[]) {
 }
 
 function validateGraph(graph: KnowledgeGraph) {
-  assertUnique("domain", graph.domains.map((item) => item.id));
   assertUnique("node", graph.nodes.map((item) => item.id));
   assertUnique("revision", graph.revisions.map((item) => item.id));
   assertUnique("edge", graph.edges.map((item) => item.id));
-  const domainIds = new Set(graph.domains.map((item) => item.id));
   const nodeIds = new Set(graph.nodes.map((item) => item.id));
   const nodeById = new Map(graph.nodes.map((item) => [item.id, item]));
   const revisionById = new Map(graph.revisions.map((item) => [item.id, item]));
   graph.nodes.forEach((node) => {
     if (node.scope !== "global") throw new Error(`Global graph contains non-global node: ${node.id}`);
     if (!node.masteryCriteria.length) throw new Error(`Knowledge node has no mastery criteria: ${node.id}`);
-    if (node.domainId && !domainIds.has(node.domainId)) throw new Error(`Unknown domain for node ${node.id}: ${node.domainId}`);
     if (revisionById.get(node.currentRevisionId)?.nodeId !== node.id) throw new Error(`Invalid current revision for node ${node.id}`);
   });
   graph.edges.forEach((edge) => {
@@ -68,7 +74,6 @@ function validateGraph(graph: KnowledgeGraph) {
 }
 
 export const globalKnowledgeGraph: KnowledgeGraph = {
-  domains: knowledgeDomains,
   nodes: knowledgeNodes,
   revisions: knowledgeNodeRevisions,
   edges: knowledgeEdges

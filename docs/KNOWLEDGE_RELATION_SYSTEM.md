@@ -35,6 +35,10 @@ Prerequisite strength is `hard | soft`. Enables and related strength is numeric 
 
 Prerequisite and enables records are directional. Related records are symmetric even though storage uses one source and target. The same directed pair and relation may occur only once; reverse related duplicates, self edges, unknown endpoints, inactive endpoints, invalid strength, and missing reasons are validation failures.
 
+## Stable Edge Identity
+
+Canonical KnowledgeEdge IDs are deterministic from relation semantics, never from array index. Directed IDs preserve `source → target`; `related` IDs normalize the two endpoints into a sorted unordered pair. Reordering, splitting, or combining seed arrays therefore does not rename unchanged facts. Duplicate generated IDs are a validation failure.
+
 ## Atomic Relation Reconstruction
 
 The canonical workflow is:
@@ -54,6 +58,8 @@ Mature semantic Domains are reviewed for unexpected fragmentation. The review in
 ## Connected Component Audit
 
 Connectivity is computed over active nodes and internal factual edges, treating all three relation types as undirected for this metric only. The report includes active node count, internal edge count, component count, largest component size and ratio, isolated nodes, and degree-one nodes. Cross-domain edges do not affect a Domain's internal score.
+
+The audit command enumerates every active governed Domain that has at least one assigned active graph node. Domain names and IDs are not hardcoded in generic audit logic. Membership is selected only from DomainAssignment; node tags, provenance, course coverage, and historical node fields are ignored.
 
 ## Isolated and Low-degree Audits
 

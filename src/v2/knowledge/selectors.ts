@@ -5,10 +5,6 @@ export function getKnowledgeNode(id: string, graph: KnowledgeGraph) {
   return graph.nodes.find((node) => node.id === id);
 }
 
-export function getKnowledgeDomain(id: string, graph: KnowledgeGraph) {
-  return graph.domains.find((domain) => domain.id === id);
-}
-
 export function getNodesByDomain(domainId: string, graph: KnowledgeGraph, assignments: DomainAssignment[]) {
   const nodeIds = new Set(assignments.filter((item) => item.domainId === domainId).map((item) => item.nodeId));
   return graph.nodes.filter((node) => nodeIds.has(node.id));
