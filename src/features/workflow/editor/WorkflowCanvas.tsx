@@ -761,13 +761,13 @@ export function WorkflowAssistant({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    commitDraft({ generate: false });
+    commitDraft({ generate: !targetNode });
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== "Enter" || event.shiftKey) return;
     event.preventDefault();
-    commitDraft({ generate: false });
+    commitDraft({ generate: !targetNode });
   }
 
   function handleBlur(event: ReactFocusEvent<HTMLElement>) {

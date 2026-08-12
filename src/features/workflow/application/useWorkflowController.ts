@@ -7,6 +7,7 @@ import { addEdge, addNode, deleteControlBranch as removeControlBranch, deleteCus
 import type { PersistedRunHistory, PersistedStateValues, WorkflowPersistence } from "../repository/WorkflowPersistence";
 import type { EnvironmentConfig, WorkflowRunRecord, WorkflowRuntime } from "../runtime/types";
 import type { WorkflowCodeExporter } from "../editor/WorkflowCodeExporter";
+import { canExecuteWorkflow, nextWorkflowStepIndex, resolveGeneratedWorkflow, WorkflowRunLifecycle } from "./WorkflowRunLifecycle";
 
 export type WorkflowApplicationDependencies = {
   builtinWorkflows: WorkflowDefinition[];
@@ -59,7 +60,7 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
   const [activeEnvironmentId, setActiveEnvironmentId] = useState(initialState.settings.activeEnvironmentId);
   const [runIndex, setRunIndex] = useState(-1);
   const [isRunning, setIsRunning] = useState(false);
-  const activeRunSessionRef = useRef<string | null>(null);
+  const runLifecycleRef = useRef(new WorkflowRunLifecycle());
 
   const activeTemplate = useMemo(
     () => (routeWorkflowId ? workflows.find((item) => item.id === routeWorkflowId) : undefined)
@@ -87,7 +88,7 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
     setWorkflowDescription(next.description);
     setRunIndex(-1);
     setIsRunning(false);
-    activeRunSessionRef.current = null;
+    runLifecycleRef.current.stop();
     setNodePositions({});
   }, [activeTemplateId, routeWorkflowId, workflows]);
 
@@ -105,21 +106,16 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
   useEffect(() => {
     if (!isRunning) return;
     if (runIndex >= activeTemplate.runOrder.length - 1) {
-      const sessionId = activeRunSessionRef.current;
-      if (sessionId) {
-        const existing = runHistory[activeTemplate.id] ?? [];
-        if (!existing.some((item) => item.id === sessionId)) {
-          const completedRecord = finalizeRunRecord({ ...runtime.createRunRecord(activeTemplate, activeStateValues, existing.length + 1), id: sessionId });
-          setRunHistory((history) => ({ ...history, [activeTemplate.id]: [completedRecord, ...(history[activeTemplate.id] ?? [])].slice(0, 20) }));
-          onRunCompleted(completedRecord);
-        }
-        activeRunSessionRef.current = null;
+      const existing = runHistory[activeTemplate.id] ?? [];
+      const completed = runLifecycleRef.current.complete(runtime.createRunRecord(activeTemplate, activeStateValues, existing.length + 1), existing, onRunCompleted);
+      if (completed) {
+        setRunHistory((history) => ({ ...history, [activeTemplate.id]: completed.history }));
       }
       setIsRunning(false);
       return;
     }
     return runtime.scheduleNextStep(() => setRunIndex((value) => value + 1));
-  }, [activeStateValues, activeTemplate, finalizeRunRecord, isRunning, onRunCompleted, runHistory, runIndex, runtime]);
+  }, [activeStateValues, activeTemplate, isRunning, onRunCompleted, runHistory, runIndex, runtime]);
 
   function updateActiveDefinition(update: (definition: WorkflowDefinition) => WorkflowDefinition) {
     setWorkflows((items) => replaceWorkflow(items, update(items.find((item) => item.id === activeTemplate.id) ?? activeTemplate)));
@@ -131,7 +127,7 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
     setWorkflowDescription(next.description);
     setRunIndex(-1);
     setIsRunning(false);
-    activeRunSessionRef.current = null;
+    runLifecycleRef.current.stop();
     setNodePositions({});
   }
 
@@ -143,7 +139,7 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
     setSchemaSaved(false);
     setRunIndex(-1);
     setIsRunning(false);
-    activeRunSessionRef.current = null;
+    runLifecycleRef.current.stop();
     setNodePositions({});
     return next.id;
   }
@@ -233,15 +229,16 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
   }
 
   function generateWorkflowFromDescription(description = workflowDescription) {
-    const nextDescription = description.trim() || workflowDescription;
-    setWorkflowDescription(nextDescription);
-    const templateId = dependencies.inferTemplateId(nextDescription);
+    const generated = resolveGeneratedWorkflow(description, workflowDescription, dependencies.inferTemplateId);
+    setWorkflowDescription(generated.description);
+    const templateId = generated.templateId;
     setActiveTemplateId(templateId);
     setRunIndex(-1);
     setIsRunning(false);
-    activeRunSessionRef.current = null;
+    runLifecycleRef.current.stop();
     setNodePositions({});
     setSchemaSaved(true);
+    return templateId;
   }
 
   function updateStateField(fieldName: string, value: unknown) {
@@ -250,22 +247,22 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
   }
 
   function runFlow() {
-    if (!schemaSaved) return false;
+    if (!canExecuteWorkflow(schemaSaved)) return false;
     setRunIndex(0);
     setIsRunning(true);
-    activeRunSessionRef.current = `${activeTemplate.id}-${Date.now()}`;
+    runLifecycleRef.current.start(activeTemplate.id, finalizeRunRecord);
     return true;
   }
 
   function stepFlow() {
-    if (!schemaSaved) return false;
+    if (!canExecuteWorkflow(schemaSaved)) return false;
     setIsRunning(false);
-    activeRunSessionRef.current = null;
-    setRunIndex((value) => value + 1 >= activeTemplate.runOrder.length ? 0 : value + 1);
+    runLifecycleRef.current.stop();
+    setRunIndex((value) => nextWorkflowStepIndex(value, activeTemplate.runOrder.length));
     return true;
   }
 
-  function stopRun() { setIsRunning(false); activeRunSessionRef.current = null; }
+  function stopRun() { setIsRunning(false); runLifecycleRef.current.stop(); }
 
   return {
     workflows, activeTemplate, activeTemplateId, routeTemplate, workflowDescription, schemaSaved, nodePositions, codeExporter: dependencies.codeExporter,

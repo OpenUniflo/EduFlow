@@ -49,3 +49,9 @@ Course and Material actions build the existing URL with `courseId`, `assignmentI
 4. its `workflowTemplateId` equals the opened Workflow.
 
 The application integration attaches that validated identity to the Runtime's base record before Run History persistence. Only a completed Run with that metadata updates the explicit Assignment. An independent Run updates no Assignment. Two Assignments that share one template remain distinct because completion never performs reverse lookup by template. Knowledge mastery is not changed by this integration.
+
+Assignment identity is frozen when a Run starts. Later URL query or React callback changes cannot replace that launch identity; stop, Workflow switch, creation, and description generation clear the old Run session. Generate from Description returns the selected Demo Template identity to the page, and the App routing layer synchronizes the URL while dropping any no-longer-valid Assignment query.
+
+## 6. Open product decisions
+
+The current v2 prototype keeps one `nodePositions` map and one `schemaSaved` flag, allows editing while the Demo Run is active, and keeps the App-level controller mounted when leaving the Editor. Whether these should become per-Workflow state, enforce edit locking, or stop/background a Run is not specified. This refactor does not change those semantics or introduce Workflow version snapshots.

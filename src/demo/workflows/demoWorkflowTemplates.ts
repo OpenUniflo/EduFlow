@@ -16,7 +16,7 @@ export const demoWorkflowSchemaFields: Field[] = [
   { name: "iteration", type: "number", defaultValue: "0", note: "Agent 循环次数" }
 ];
 
-export const demoWorkflowTemplates: WorkflowDefinition[] = [
+const baseDemoWorkflowTemplates: WorkflowDefinition[] = [
   {
     id: "support-ticket-showcase",
     name: "客服工单处理闭环",
@@ -510,4 +510,29 @@ graph.add_edge("replanner", "executor")`
 )
 graph.add_edge("optimizer", "evaluator")`
   }
+];
+
+function workflowVariant(sourceId: string, id: string, name: string): WorkflowDefinition {
+  const source = baseDemoWorkflowTemplates.find((template) => template.id === sourceId)!;
+  return {
+    ...source,
+    id,
+    name,
+    nodes: source.nodes.map((item) => ({ ...item, control: item.control ? { branches: [...item.control.branches] } : undefined })),
+    edges: source.edges.map((item) => ({ ...item })),
+    runOrder: [...source.runOrder]
+  };
+}
+
+export const demoWorkflowTemplates: WorkflowDefinition[] = [
+  ...baseDemoWorkflowTemplates,
+  workflowVariant("minimal", "agent-core", "最小 Agent Core"),
+  workflowVariant("agent", "tool-calling-layer", "Tool Calling Layer"),
+  workflowVariant("sequence", "cited-rag", "带引用的 RAG Pipeline"),
+  workflowVariant("agent", "agent-loop", "有界 Agent Loop"),
+  workflowVariant("branch", "runtime-recovery", "Runtime Recovery & Audit"),
+  workflowVariant("sequence", "orchestrator-worker", "Orchestrator–Worker"),
+  workflowVariant("showcase", "agentic-workflow", "受治理 Agentic Workflow"),
+  workflowVariant("showcase", "multi-agent-workflow", "Supervisor 多智能体协作"),
+  workflowVariant("showcase", "agentic-ai-capstone", "Agentic AI 综合系统")
 ];

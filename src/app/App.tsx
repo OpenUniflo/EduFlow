@@ -114,6 +114,7 @@ export default function App() {
       controller={workflow}
       navigation={<div className="atlas-canvas-nav"><GlobalNav active="workflows" session={session} onLogout={logout} /></div>}
       onBack={() => navigate("/workflows")}
+      onWorkflowGenerated={(templateId) => navigate(`/workflows/${templateId}`)}
       showAcceptance={allCourseAssignments.some((item) => item.workflowTemplateId === workflow.activeTemplate.id)}
     />
   ) : <NotFoundPage onHome={() => navigate("/")} />;

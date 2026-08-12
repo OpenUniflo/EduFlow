@@ -11,11 +11,13 @@ export function WorkflowEditorPage({
   controller,
   navigation,
   onBack,
+  onWorkflowGenerated,
   showAcceptance
 }: {
   controller: WorkflowController;
   navigation: ReactNode;
   onBack: () => void;
+  onWorkflowGenerated: (templateId: string) => void;
   showAcceptance: boolean;
 }) {
   const [selection, setSelection] = useState<Selection>({ type: "state" });
@@ -80,7 +82,7 @@ export function WorkflowEditorPage({
         onOpenConfig={setConfigTarget}
         onCloseConfig={() => setConfigTarget(null)}
         onWorkflowDescription={controller.setWorkflowDescription}
-        onGenerateWorkflow={(description) => { controller.generateWorkflowFromDescription(description); setSelection({ type: "workflow" }); setConfigTarget(null); setSelectedRunHistoryId(null); setBottomOpen(false); triggerLayout(); }}
+        onGenerateWorkflow={(description) => { const templateId = controller.generateWorkflowFromDescription(description); onWorkflowGenerated(templateId); setSelection({ type: "workflow" }); setConfigTarget(null); setSelectedRunHistoryId(null); setBottomOpen(false); triggerLayout(); }}
         onCreateNode={(payload) => { const node = controller.createCanvasNode(payload); setDraggingPaletteNode(null); setSelection({ type: "node", id: node.id }); setConfigTarget(null); }}
         onCreateEdge={(connection) => { const edge = controller.createCanvasEdge(connection); if (edge) setSelection({ type: "edge", id: edge.id }); setConfigTarget(null); }}
         onReconnectEdge={(edgeId, connection) => { controller.reconnectCanvasEdge(edgeId, connection); setSelection({ type: "edge", id: edgeId }); }}

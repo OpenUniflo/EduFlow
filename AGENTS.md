@@ -406,3 +406,5 @@
 - Any compatibility writer sharing the v2 workflow-settings key MUST preserve Environment, active Environment, and unknown current payload fields when updating legacy preferences.
 - Concrete Workflow templates, description-to-template selection, Demo runtime behavior, Demo Environment defaults, and template-specific code exports live under `src/demo/workflows` and depend inward on Workflow contracts.
 - Course integration belongs to the application integration layer. Assignment completion requires a validated explicit `courseId`, `assignmentId`, and `workflowTemplateId`; independent runs MUST NOT complete an Assignment, and template identity MUST NOT be used to infer one.
+- Assignment metadata is frozen at Workflow Run launch. Completion MUST use that launch snapshot rather than the current route or callback context.
+- Generate from Description may select a Demo Template in the Workflow application layer, but the App/page routing layer owns synchronizing `/workflows/:workflowId` and removing stale Assignment query context.
