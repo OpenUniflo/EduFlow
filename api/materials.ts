@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createServerSupabase, createUserSupabase, requireCapability } from "./_lib/supabase";
-import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http";
-import { dataOrThrow } from "./_lib/query";
+import { createServerSupabase, createUserSupabase, requireCapability } from "./_lib/supabase.js";
+import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
+import { dataOrThrow } from "./_lib/query.js";
 
 const MIME_TYPES = new Map([
   ["application/pdf", "pdf"],

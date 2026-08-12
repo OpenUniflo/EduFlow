@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createServerSupabase } from "./_lib/supabase";
-import { handleApi, json, methodNotAllowed } from "./_lib/http";
+import { createServerSupabase } from "./_lib/supabase.js";
+import { handleApi, json, methodNotAllowed } from "./_lib/http.js";
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   if (request.method !== "GET") return methodNotAllowed(response, ["GET"]);

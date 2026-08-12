@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createUserSupabase, ensureProfile } from "./_lib/supabase";
-import { handleApi, json, methodNotAllowed } from "./_lib/http";
-import { dataOrThrow } from "./_lib/query";
+import { createUserSupabase, ensureProfile } from "./_lib/supabase.js";
+import { handleApi, json, methodNotAllowed } from "./_lib/http.js";
+import { dataOrThrow } from "./_lib/query.js";
 
 type KnowledgeNodeRow = {
   id: string; title: string; description: string; node_type: string; mastery_criteria: string[]; scope: string;

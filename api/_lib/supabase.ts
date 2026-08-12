@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import type { VercelRequest } from "@vercel/node";
-import { ApiError, bearerToken } from "./http";
-import { readServerEnvironment } from "./env";
+import { ApiError, bearerToken } from "./http.js";
+import { readServerEnvironment } from "./env.js";
 
 const options = { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } } as const;
 
