@@ -17,7 +17,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
   const sceneRef = useRef<KnowledgeAtlasSceneHandle>(null);
   const governance = useDomainGovernance();
   const canManageDomains = canManageKnowledgeDomains(session);
-  const domainActor = useMemo(() => ({ id: session.email, capabilities: session.capabilities }), [session.capabilities, session.email]);
+  const domainActor = useMemo(() => ({ id: session.userId, capabilities: session.capabilities }), [session.capabilities, session.userId]);
   const atlas = useMemo(() => buildGlobalAtlasProjection(applicationServices.knowledgeRepository.getVisibleGraph(globalKnowledgeAccess), governance, applicationServices.courseRepository.listCourseRuntimes()), [governance]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
@@ -53,8 +53,13 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
     setGenerating(true);
     setGenerationIndex(0);
     generationStages.forEach((_, index) => window.setTimeout(() => setGenerationIndex(index), index * 430));
-    const result = await applicationServices.courseCreationService.createCourse({ files, prompt });
-    window.setTimeout(() => navigate(`/courses/${result.courseId}?created=1`), generationStages.length * 430 + 280);
+    try {
+      const result = await applicationServices.courseCreationService.createCourse({ files, prompt });
+      window.setTimeout(() => navigate(`/courses/${result.courseId}?created=1`), generationStages.length * 430 + 280);
+    } catch (error) {
+      setGenerating(false);
+      setPrompt(error instanceof Error ? error.message : "课程创建失败，请稍后重试。");
+    }
   }
 
   return (

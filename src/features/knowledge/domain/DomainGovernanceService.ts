@@ -29,6 +29,11 @@ export class DomainGovernanceService {
 
   getSnapshot = () => this.state;
 
+  reloadFromRepository() {
+    this.state = this.governanceRepository.load();
+    this.listeners.forEach((listener) => listener());
+  }
+
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
     return () => { this.listeners.delete(listener); };

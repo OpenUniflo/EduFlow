@@ -402,9 +402,23 @@
 - Workflow Editor UI and editor-only state live under `src/features/workflow/editor` and `src/features/workflow/pages`. App MUST NOT own node, edge, branch, selection, canvas-position, Schema, Environment, Run, or Run History behavior.
 - Workflow execution uses the `WorkflowRuntime` contract. The current timed simulation is a Demo adapter under `src/demo/workflows`; the Runtime contract MUST NOT reference Course or Assignment types.
 - Workflow Runtime creates Course-independent base Run records. Validated `courseId` and `assignmentId` are optional application/persistence metadata attached before Run History persistence and MUST NOT become Runtime inputs.
-- Workflow persistence uses the `WorkflowPersistence` contract and the LocalStorage adapter. The v2 workflow-state and workflow-settings keys and payload fields are compatibility contracts.
+- Workflow persistence uses the `WorkflowPersistence` contract. Application runtime uses the API adapter; the LocalStorage adapter and v2 keys remain compatibility/test contracts.
 - Any compatibility writer sharing the v2 workflow-settings key MUST preserve Environment, active Environment, and unknown current payload fields when updating legacy preferences.
 - Concrete Workflow templates, description-to-template selection, Demo runtime behavior, Demo Environment defaults, and template-specific code exports live under `src/demo/workflows` and depend inward on Workflow contracts.
 - Course integration belongs to the application integration layer. Assignment completion requires a validated explicit `courseId`, `assignmentId`, and `workflowTemplateId`; independent runs MUST NOT complete an Assignment, and template identity MUST NOT be used to infer one.
 - Assignment metadata is frozen at Workflow Run launch. Completion MUST use that launch snapshot rather than the current route or callback context.
 - Generate from Description may select a Demo Template in the Workflow application layer, but the App/page routing layer owns synchronizing `/workflows/:workflowId` and removing stale Assignment query context.
+
+## Backend and Data Runtime
+
+- Committed files under `supabase/migrations` are the authoritative business-schema history. Hosted schema changes MUST use those same locally verified migrations and MUST NOT be recreated manually in Dashboard.
+- Local destructive database commands MUST explicitly target Local Supabase. Hosted Supabase MUST NOT be reset by the normal development workflow.
+- Browser code may use only the Supabase URL and publishable key. `SUPABASE_SECRET_KEY` MUST remain server-only, MUST NOT use a `VITE_` prefix, and MUST NOT enter client source, build output, logs, health responses, or error responses.
+- Feature Core, Domain logic, and repository contracts MUST NOT import Supabase SDK or environment variables. React Features MUST NOT perform direct Supabase table access; `src/app` selects concrete API repositories and may bind Supabase Auth at the application boundary.
+- Production and Preview Knowledge, Domain, Course, Material, Learning Progress, and Workflow persistence MUST flow through Repository contracts to `/api` and Supabase. Concrete Demo data is seed/test input, never production runtime authority.
+- Shared catalog data uses authenticated read and no browser write. User-owned rows MUST enforce `auth.uid()` ownership through RLS even when trusted server clients also exist.
+- `auth.users.id` is the stable user ownership identity. Profiles MUST NOT copy passwords or auth tokens, and email MUST NOT be used as row ownership identity.
+- `course-materials` remains private. Browser uploads MUST use a short-lived authorized direct-to-Storage mechanism; large binaries MUST NOT be proxied through Vercel Functions. Trusted metadata writes MUST validate the Course, Lesson, object, type, and PDF Segment completeness.
+- Normalized database tables are the persistence source. `CourseRuntimeData` MUST be reconstructed by API mapping and MUST NOT be persisted as one JSONB blob. JSONB is reserved for genuinely document-shaped or structural values.
+- Assignment completion remains separate from Knowledge mastery in database writes. Workflow Runs preserve explicit launch-time `courseId`, `assignmentId`, and `workflowTemplateId`; independent Runs MUST NOT infer Course provenance.
+- `DemoWorkflowRuntime` remains the execution adapter until a future runtime round. Backend persistence MUST NOT introduce Course or Assignment dependencies into the Workflow Runtime contract.

@@ -33,8 +33,8 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   const [progressRevision, setProgressRevision] = useState(0);
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
   const runtimes = useMemo(() => courseRepository.listCourseRuntimes(), []);
-  const userCourseStates = useMemo(() => runtimes.map((runtime) => learningProgressRepository.getCourseState(session.email, runtime.course.id)), [progressRevision, runtimes, session.email]);
-  const graph = useMemo(() => buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.email)), userKnowledgeRepository.getUserKnowledge(session.email), runtimes, userCourseStates, governance), [governance, runtimes, session.email, userCourseStates]);
+  const userCourseStates = useMemo(() => runtimes.map((runtime) => learningProgressRepository.getCourseState(session.userId, runtime.course.id)), [progressRevision, runtimes, session.userId]);
+  const graph = useMemo(() => buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), userKnowledgeRepository.getUserKnowledge(session.userId), runtimes, userCourseStates, governance), [governance, runtimes, session.userId, userCourseStates]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchMatchId, setSearchMatchId] = useState<string | null>(null);
   const [query, setQuery] = useState("");

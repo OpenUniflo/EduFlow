@@ -2,7 +2,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config({
   ignores: ["dist/**"],
-  files: ["src/**/*.{ts,tsx}"],
+  files: ["{src,api,scripts}/**/*.{ts,tsx}"],
   languageOptions: {
     parser: tseslint.parser,
     parserOptions: { ecmaVersion: "latest", sourceType: "module", ecmaFeatures: { jsx: true } }

@@ -15,6 +15,7 @@ export type WorkflowApplicationDependencies = {
   runtime: WorkflowRuntime;
   codeExporter: WorkflowCodeExporter;
   inferTemplateId(description: string): string;
+  hydrationKey?: number;
 };
 
 export type UseWorkflowControllerOptions = {
@@ -61,6 +62,7 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
   const [runIndex, setRunIndex] = useState(-1);
   const [isRunning, setIsRunning] = useState(false);
   const runLifecycleRef = useRef(new WorkflowRunLifecycle());
+  const skipPersistenceEffectsRef = useRef(0);
 
   const activeTemplate = useMemo(
     () => (routeWorkflowId ? workflows.find((item) => item.id === routeWorkflowId) : undefined)
@@ -81,6 +83,25 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
   const activeRunHistory = runHistory[activeTemplate.id] ?? [];
 
   useEffect(() => {
+    if (!dependencies.hydrationKey) return;
+    const stored = persistence.readState();
+    const nextSettings = persistence.readSettings();
+    const nextWorkflows = stored.workflows?.length ? stored.workflows : builtinWorkflows;
+    const nextActiveTemplateId = routeWorkflowId ?? stored.activeTemplateId ?? nextWorkflows[0]?.id;
+    const nextActiveTemplate = nextWorkflows.find((item) => item.id === nextActiveTemplateId) ?? nextWorkflows[0] ?? builtinWorkflows[0];
+    skipPersistenceEffectsRef.current = 2;
+    setWorkflows(nextWorkflows);
+    setActiveTemplateId(nextActiveTemplate.id);
+    setWorkflowDescription(stored.workflowDescription ?? nextActiveTemplate.description);
+    setSchemaSaved(stored.schemaSaved ?? false);
+    setNodePositions(stored.nodePositions ?? {});
+    setStateValues(stored.stateValues ?? {});
+    setRunHistory(stored.runHistory ?? {});
+    setEnvironments(nextSettings.environments);
+    setActiveEnvironmentId(nextSettings.activeEnvironmentId);
+  }, [builtinWorkflows, dependencies.hydrationKey, persistence, routeWorkflowId]);
+
+  useEffect(() => {
     if (!routeWorkflowId) return;
     const next = workflows.find((item) => item.id === routeWorkflowId);
     if (!next || next.id === activeTemplateId) return;
@@ -93,10 +114,12 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
   }, [activeTemplateId, routeWorkflowId, workflows]);
 
   useEffect(() => {
+    if (skipPersistenceEffectsRef.current > 0) { skipPersistenceEffectsRef.current -= 1; return; }
     persistence.writeState({ workflows, activeTemplateId: activeTemplate.id, workflowDescription, schemaSaved, nodePositions, stateValues, runHistory });
   }, [activeTemplate.id, nodePositions, persistence, runHistory, schemaSaved, stateValues, workflowDescription, workflows]);
 
   useEffect(() => {
+    if (skipPersistenceEffectsRef.current > 0) { skipPersistenceEffectsRef.current -= 1; return; }
     const safeEnvironments = environments.length ? environments : initialState.settings.environments;
     const safeActiveId = safeEnvironments.some((item) => item.id === activeEnvironmentId) ? activeEnvironmentId : safeEnvironments[0].id;
     persistence.writeSettings({ ...initialState.settings, environments: safeEnvironments, activeEnvironmentId: safeActiveId });

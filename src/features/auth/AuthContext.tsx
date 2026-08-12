@@ -3,7 +3,8 @@ import type { MockSession } from "./types";
 
 type AuthContextValue = {
   session: MockSession | null;
-  completeAuth: (session: MockSession) => void;
+  signIn: (input: { email: string; password: string }) => Promise<void>;
+  signUp: (input: { name: string; email: string; password: string }) => Promise<{ confirmationRequired: boolean }>;
   logout: () => void;
 };
 

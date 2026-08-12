@@ -15,15 +15,24 @@
     "preinstall": "node scripts/enforce-pnpm.mjs",
     "dev": "vite --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src",
+    "lint": "eslint src api scripts",
     "test": "vitest run",
     "audit:knowledge": "node scripts/audit-knowledge-relations.mjs",
+    "audit:client-secrets": "node scripts/audit-client-secrets.mjs",
+    "verify:backend:local": "node --env-file=.env.local --import tsx scripts/verify-local-backend.ts",
     "generate:demo-pdfs": "uv run --with reportlab scripts/generate-demo-pdfs.py",
     "build": "tsc && vite build",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:status": "supabase status",
+    "db:reset": "supabase db reset --local && supabase seed buckets",
+    "db:seed:generate": "tsx scripts/generate-supabase-seed.ts",
+    "db:seed:storage": "tsx --env-file=.env.local scripts/seed-storage.ts",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
     "3d-force-graph": "1.79.1",
+    "@supabase/supabase-js": "2.112.3",
     "@vitejs/plugin-react": "^5.1.0",
     "@xyflow/react": "^12.10.2",
     "elkjs": "^0.12.0",
@@ -42,8 +51,12 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.185.4",
+    "@vercel/node": "5.9.9",
     "eslint": "^10.8.0",
+    "supabase": "2.113.0",
+    "tsx": "4.23.12",
     "typescript-eslint": "^8.66.0",
+    "vercel": "58.9.4",
     "vitest": "^4.1.10"
   }
 }

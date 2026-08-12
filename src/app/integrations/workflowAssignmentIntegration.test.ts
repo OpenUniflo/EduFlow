@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { applicationServices } from "@/app/services/applicationServices";
+import { createDemoApplicationServices } from "@/demo/services/createDemoApplicationServices";
 import type { LearningProgressRepository } from "@/features/learning/progress/LearningProgressRepository";
 import type { WorkflowRunRecord } from "@/features/workflow/runtime/types";
 import { attachWorkflowAssignmentMetadata, completeWorkflowAssignmentRun, resolveWorkflowAssignmentContext } from "./workflowAssignmentIntegration";
+
+const applicationServices = createDemoApplicationServices();
 
 function record(context?: { courseId: string; assignmentId: string }): WorkflowRunRecord {
   const base: WorkflowRunRecord = { id: "run", workflowId: "agent-loop", workflowTemplateId: "agent-loop", workflowName: "Run", createdAt: "now", status: "success", nodeCount: 0, outputSummary: "ok", finalState: {}, nodes: [] };

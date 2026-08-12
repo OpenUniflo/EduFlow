@@ -12,13 +12,13 @@ import { demoDomainDiscoveryService } from "@/demo/domains/DemoDomainDiscoverySe
 import { demoKnowledgeDomains } from "@/demo/domains/demoDomains.fixture";
 import { demoDomainAssignments } from "@/demo/domains/demoDomainAssignments.fixture";
 import { demoDomainGovernanceSeed } from "@/demo/domains/demoDomainGovernance.seed";
-import { assignNodeDomain, assertGlobalDomainAdmin, getDomainGovernanceSnapshot } from "@/features/knowledge/domain/domainStore";
+import { assignNodeDomain, assertGlobalDomainAdmin } from "@/features/knowledge/domain/domainStore";
 import { assertDomainAcceptsAssignment, assertDomainCanArchive, getDomainMembers, validateDomainGovernance } from "@/features/knowledge/domain/domainValidation";
 import { moveNodesToDomain } from "@/features/knowledge/domain/domainAssignment";
 import { atlasStructureKey, freezeAtlasNodePositions, resetAtlasCamera } from "@/features/knowledge/atlasCamera";
 import type { DomainAssignmentCandidate } from "@/features/knowledge/domain/domainTypes";
 import { canManageKnowledgeDomains } from "@/features/auth/capabilities";
-import { applicationServices } from "@/app/services/applicationServices";
+import { createDemoApplicationServices } from "@/demo/services/createDemoApplicationServices";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { auditDomainRelations, validateKnowledgeRelations } from "@/features/knowledge/relationAudit";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "@/features/knowledge/types";
@@ -30,6 +30,8 @@ import { DomainGovernanceService } from "@/features/knowledge/domain/DomainGover
 import { InMemoryKnowledgeRepository } from "@/features/knowledge/repository/InMemoryKnowledgeRepository";
 import type { DomainGovernanceRepository, DomainGovernanceState } from "@/features/knowledge/domain/DomainGovernanceRepository";
 
+const applicationServices = createDemoApplicationServices();
+const getDomainGovernanceSnapshot = applicationServices.domainGovernanceService.getSnapshot;
 const atlasGraph = applicationServices.knowledgeRepository.getVisibleGraph(globalKnowledgeAccess);
 const runtimes = applicationServices.courseRepository.listCourseRuntimes();
 

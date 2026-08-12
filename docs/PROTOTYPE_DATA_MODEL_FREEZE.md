@@ -60,6 +60,8 @@ This change does not reopen the frozen V1 data model.
 
 This cleanup does not reopen any frozen V1 model.
 
-## Deferred Beyond Freeze
+## Backend realization
 
-Real Knowledge, Domain, Course Creation, Workflow, Evaluation, Auth, and asynchronous query backends remain future adapter/application work. WorkflowTemplate referential integrity waits for a WorkflowRepository, and Assignment completion still uses the current Demo run-end behavior until the Evaluation pipeline exists.
+The frozen model is now realized through normalized Supabase migrations and API repositories for Knowledge, Domain governance, Courses, Materials, Auth, Learning Progress, Workflow definitions, and Run History. WorkflowTemplate foreign keys are enforced. Assignment completion persists the explicit Assignment ID and remains separate from Knowledge mastery.
+
+AI Course creation, document parsing, Knowledge extraction/resolution, real Workflow execution, Evaluation, Evidence, and mastery inference remain deferred. `DemoWorkflowRuntime` continues to provide the current timed execution behavior behind the unchanged Runtime contract.

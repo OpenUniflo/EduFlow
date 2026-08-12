@@ -46,7 +46,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   }, [searchParams, setSearchParams]);
 
   const reader = useMaterialReaderState({ material, requestedSegmentId, recentSegmentId: savedState?.recentSegmentId, onReplaceSegment: replaceSegmentQuery });
-  const access = useMemo(() => userKnowledgeAccess(session.email), [session.email]);
+  const access = useMemo(() => userKnowledgeAccess(session.userId), [session.userId]);
   const projection = useMemo(() => buildMaterialSegmentProjection(runtime, material, reader.activeSegmentId, userState, applicationServices.knowledgeRepository, access, governance), [access, governance, material, reader.activeSegmentId, runtime, userState]);
   const currentPagePrimaryKnowledgeId = projection?.knowledgeContexts[0]?.nodeId ?? null;
   const [knowledgeContextState, dispatchKnowledgeContext] = useReducer(reduceMaterialKnowledgeContextState, currentPagePrimaryKnowledgeId, createMaterialKnowledgeContextState);
@@ -78,14 +78,14 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
     if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
     persistTimerRef.current = window.setTimeout(() => {
       const viewedSegmentIds = orderedSegments.map((segment) => segment.id).filter((id) => viewedSegmentIdsRef.current.has(id));
-      updateMaterialReadingState(session.email, runtime.course.id, material.lessonId, material.id, {
+      updateMaterialReadingState(session.userId, runtime.course.id, material.lessonId, material.id, {
         recentSegmentId: reader.activeSegmentId,
         viewedSegmentIds,
         progress: Math.round((viewedSegmentIds.length / Math.max(1, material.segments.length)) * 100)
       });
     }, PERSIST_DELAY_MS);
     return () => { if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current); };
-  }, [material, orderedSegments, reader.activeSegmentId, runtime.course.id, session.email]);
+  }, [material, orderedSegments, reader.activeSegmentId, runtime.course.id, session.userId]);
 
   useEffect(() => {
     if (activeAssignmentId && !knowledgeAssignmentContexts.some((context) => context.assignmentId === activeAssignmentId)) setActiveAssignmentId(null);
@@ -116,11 +116,11 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
   const { courseId = "", materialId = "" } = useParams();
   const runtime = applicationServices.courseRepository.getCourse(courseId);
   const material = runtime ? getCourseMaterial(runtime, materialId) : null;
-  const userState = useUserCourseState(session.email, courseId);
+  const userState = useUserCourseState(session.userId, courseId);
 
   if (!runtime || !material) {
     return <main className="atlas-lesson-page material-reader-current"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>课件不存在</h1><p>该课件不存在，或不属于课程 “{courseId}”。</p><button className="atlas-primary" onClick={() => navigate(runtime ? `/courses/${runtime.course.id}` : "/courses")}>返回课程</button></section></main>;
   }
 
-  return <MaterialReaderShell key={`${session.email}:${runtime.course.id}:${material.id}`} runtime={runtime} material={material} userState={userState} savedState={userState.materialStates[material.id]} session={session} onLogout={onLogout} />;
+  return <MaterialReaderShell key={`${session.userId}:${runtime.course.id}:${material.id}`} runtime={runtime} material={material} userState={userState} savedState={userState.materialStates[material.id]} session={session} onLogout={onLogout} />;
 }

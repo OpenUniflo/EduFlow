@@ -11,8 +11,8 @@ import { applicationServices } from "@/app/services/applicationServices";
 const UNCLASSIFIED_MOVE_TARGET = "__unclassified__";
 
 export function DomainManagementPage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
-  const actor = useMemo(() => ({ id: session.email, capabilities: session.capabilities }), [session.capabilities, session.email]);
-  const access = useMemo(() => userKnowledgeAccess(session.email), [session.email]);
+  const actor = useMemo(() => ({ id: session.userId, capabilities: session.capabilities }), [session.capabilities, session.userId]);
+  const access = useMemo(() => userKnowledgeAccess(session.userId), [session.userId]);
   const visibleNodes = useMemo(() => applicationServices.knowledgeRepository.getVisibleGraph(access).nodes, [access]);
   const governance = useDomainGovernance();
   const [tab, setTab] = useState<"management" | "suggestions">("management");

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applicationServices } from "@/app/services/applicationServices";
+import { createDemoApplicationServices } from "@/demo/services/createDemoApplicationServices";
 import { isControlNode } from "@/features/workflow/domain/graphOperations";
 import { demoWorkflowTemplates } from "./demoWorkflowTemplates";
+
+const applicationServices = createDemoApplicationServices();
 
 describe("Demo Workflow integrity", () => {
   it("resolves every Demo Course Workflow Assignment to an existing Template", () => {

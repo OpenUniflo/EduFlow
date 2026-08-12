@@ -15,10 +15,10 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
   const [progressRevision, setProgressRevision] = useState(0);
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
   const courses = useMemo(() => courseRepository.listCourseRuntimes().map((runtime) => {
-    const state = learningProgressRepository.getCourseState(session.email, runtime.course.id);
-    const graphData = buildCourseGraphData(runtime, state, knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.email)), userKnowledgeRepository.getUserKnowledge(session.email));
+    const state = learningProgressRepository.getCourseState(session.userId, runtime.course.id);
+    const graphData = buildCourseGraphData(runtime, state, knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), userKnowledgeRepository.getUserKnowledge(session.userId));
     return { runtime, state, graphData, summary: buildCourseSummary(runtime, state, graphData) };
-  }), [progressRevision, session.email]);
+  }), [progressRevision, session.userId]);
   const needle = query.trim().toLowerCase();
   const visible = courses.filter(({ runtime, graphData }) => !needle || [
     runtime.course.title,

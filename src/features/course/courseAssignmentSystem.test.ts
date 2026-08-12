@@ -11,13 +11,12 @@ import { assignmentProjectionForNode, buildChapterAssignmentProjection, courseDr
 import { demoUserCourseStateSeed } from "@/demo/users/demoUserCourseState.seed";
 import { LEARNING_PROGRESS_SCHEMA_VERSION, LocalStorageLearningProgressRepository, isValidUserCourseState, learningProgressStorageKey } from "@/features/learning/progress/LocalStorageLearningProgressRepository";
 import { buildGlobalAtlasProjection } from "@/features/knowledge/projections/atlasProjections";
-import { applicationServices } from "@/app/services/applicationServices";
+import { createDemoApplicationServices } from "@/demo/services/createDemoApplicationServices";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { resolveInitialMaterialSegment, resolveKnowledgeMaterialEntries, resolveKnowledgeMaterialEntry, buildMaterialDeepLink } from "@/features/material/materialNavigation";
 import { classifySegmentQueryChange, selectPageAtReadingAnchor } from "@/features/material/reader/materialReaderState";
 import { createMaterialKnowledgeContextState, reduceMaterialKnowledgeContextState, resolveEffectiveKnowledgeId } from "@/features/material/reader/materialKnowledgeContextState";
 import { buildKnowledgeAssignmentContexts, buildMaterialKnowledgeContext, buildMaterialKnowledgeRoles, buildMaterialSegmentProjection } from "@/features/material/materialProjection";
-import { getDomainGovernanceSnapshot } from "@/features/knowledge/domain/domainStore";
 import type { Template } from "@/features/workflow/domain/types";
 import { DemoWorkflowRuntime } from "@/demo/workflows/DemoWorkflowRuntime";
 import { InMemoryKnowledgeRepository } from "@/features/knowledge/repository/InMemoryKnowledgeRepository";
@@ -27,6 +26,8 @@ import type { AssignmentCoverage, CourseAssignment, UserCourseState } from "@/fe
 import { selectPrimaryCurriculumCoverage } from "@/features/course/curriculum/curriculumOrdering";
 import { sortAssignments, sortMaterials, sortMaterialSegments } from "@/features/material/materialOrdering";
 
+const applicationServices = createDemoApplicationServices();
+const getDomainGovernanceSnapshot = applicationServices.domainGovernanceService.getSnapshot;
 const knowledgeRepository = applicationServices.knowledgeRepository;
 const repository = new DemoCourseRepository(knowledgeRepository);
 const access = userKnowledgeAccess("student@knowledge-atlas.local");

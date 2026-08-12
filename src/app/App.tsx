@@ -1,14 +1,13 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Navigate, Route as RouterRoute, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import { AuthProvider } from "@/features/auth/AuthContext";
 import type { MockSession } from "@/features/auth/types";
-import { clearMockSession, readMockSession, writeMockSession } from "@/features/auth/session";
 import { canManageKnowledgeDomains } from "@/features/auth/capabilities";
 import { AuthPage } from "@/features/auth/pages/AuthPage";
 import { NavigationProvider } from "@/app/providers/NavigationContext";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import { NotFoundPage } from "@/app/pages/PlaceholderPages";
-import { applicationServices } from "@/app/services/applicationServices";
+import { applicationServices, hydrateApplicationServices } from "@/app/services/applicationServices";
 import { attachWorkflowAssignmentMetadata, resolveWorkflowAssignmentContext, completeWorkflowAssignmentRun } from "@/app/integrations/workflowAssignmentIntegration";
 import { AtlasHome } from "@/features/knowledge/pages/AtlasHome";
 import { CourseCenterPage } from "@/features/course/pages/CoursePages";
@@ -19,12 +18,13 @@ import { DomainManagementPage } from "@/features/admin/domains/DomainManagementP
 import { WorkflowLibraryPage } from "@/features/workflow/pages/WorkflowLibraryPage";
 import { WorkflowEditorPage } from "@/features/workflow/pages/WorkflowEditorPage";
 import { useWorkflowController } from "@/features/workflow/application/useWorkflowController";
-import { LocalStorageWorkflowPersistence } from "@/features/workflow/repository/LocalStorageWorkflowPersistence";
+import { ApiWorkflowPersistence } from "@/features/workflow/repository/ApiWorkflowPersistence";
 import { demoWorkflowTemplates } from "@/demo/workflows/demoWorkflowTemplates";
 import { demoWorkflowSettings } from "@/demo/workflows/demoWorkflowSettings";
 import { DemoWorkflowRuntime } from "@/demo/workflows/DemoWorkflowRuntime";
 import { inferDemoWorkflowTemplateId } from "@/demo/workflows/descriptionWorkflowGenerator";
 import { DemoWorkflowCodeExporter } from "@/demo/workflows/demoWorkflowCode";
+import { supabaseClient } from "@/shared/api/supabaseClient";
 
 function getAuthRedirect(state: unknown) {
   if (!state || typeof state !== "object" || !("from" in state)) return "/";
@@ -39,8 +39,11 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const routeWorkflowId = useMatch("/workflows/:workflowId")?.params.workflowId;
-  const [session, setSession] = useState<MockSession | null>(() => readMockSession());
-  const [workflowPersistence] = useState(() => new LocalStorageWorkflowPersistence(window.localStorage, demoWorkflowTemplates, demoWorkflowSettings));
+  const [session, setSession] = useState<MockSession | null>(null);
+  const [ready, setReady] = useState(false);
+  const [startupError, setStartupError] = useState("");
+  const [workflowVersion, setWorkflowVersion] = useState(0);
+  const [workflowPersistence] = useState(() => new ApiWorkflowPersistence(demoWorkflowSettings));
   const [workflowRuntime] = useState(() => new DemoWorkflowRuntime());
   const [workflowCodeExporter] = useState(() => new DemoWorkflowCodeExporter());
   const workflowDependencies = useMemo(() => ({
@@ -48,8 +51,35 @@ export default function App() {
     persistence: workflowPersistence,
     runtime: workflowRuntime,
     codeExporter: workflowCodeExporter,
-    inferTemplateId: inferDemoWorkflowTemplateId
-  }), [workflowCodeExporter, workflowPersistence, workflowRuntime]);
+    inferTemplateId: inferDemoWorkflowTemplateId,
+    hydrationKey: workflowVersion
+  }), [workflowCodeExporter, workflowPersistence, workflowRuntime, workflowVersion]);
+
+  useEffect(() => {
+    let active = true;
+    async function restore() {
+      const { data } = await supabaseClient.auth.getSession();
+      const authSession = data.session;
+      if (!active) return;
+      if (!authSession) { setReady(true); return; }
+      try {
+        const [profile] = await Promise.all([hydrateApplicationServices(authSession.user.id), workflowPersistence.hydrate()]);
+        if (!active) return;
+        const name = profile.displayName || authSession.user.email?.split("@")[0] || "学习者";
+        setSession({ userId: authSession.user.id, name, email: authSession.user.email ?? "", role: "student", capabilities: profile.capabilities, createdAt: authSession.user.created_at });
+        setWorkflowVersion((version) => version + 1);
+      } catch (error) {
+        setStartupError(error instanceof Error ? error.message : "数据加载失败");
+      } finally {
+        setReady(true);
+      }
+    }
+    void restore();
+    const { data } = supabaseClient.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT" && active) setSession(null);
+    });
+    return () => { active = false; data.subscription.unsubscribe(); };
+  }, [workflowPersistence]);
   const assignmentContext = useMemo(
     () => routeWorkflowId ? resolveWorkflowAssignmentContext(applicationServices.courseRepository, routeWorkflowId, location.search) : null,
     [location.search, routeWorkflowId]
@@ -59,7 +89,7 @@ export default function App() {
     [assignmentContext]
   );
   const onRunCompleted = useCallback((record: Parameters<typeof completeWorkflowAssignmentRun>[2]) => {
-    if (session) completeWorkflowAssignmentRun(applicationServices.learningProgressRepository, session.email, record);
+    if (session) completeWorkflowAssignmentRun(applicationServices.learningProgressRepository, session.userId, record);
   }, [session]);
   const workflow = useWorkflowController(workflowDependencies, {
     routeWorkflowId,
@@ -80,17 +110,33 @@ export default function App() {
     workflow.deleteWorkflow(templateId);
   }
 
-  function logout() {
+  async function logout() {
     workflow.stopRun();
-    clearMockSession();
+    await Promise.all([
+      workflowPersistence.flush(),
+      (applicationServices.learningProgressRepository as { flush?: () => Promise<unknown> }).flush?.()
+    ]);
+    await supabaseClient.auth.signOut();
     setSession(null);
     navigate("/login", { replace: true });
   }
 
-  function completeAuth(nextSession: MockSession) {
-    writeMockSession(nextSession);
-    setSession(nextSession);
+  async function signIn(input: { email: string; password: string }) {
+    const { data, error } = await supabaseClient.auth.signInWithPassword(input);
+    if (error || !data.session) throw new Error(error?.message ?? "登录失败");
+    const [profile] = await Promise.all([hydrateApplicationServices(data.user.id), workflowPersistence.hydrate()]);
+    const name = profile.displayName || data.user.email?.split("@")[0] || "学习者";
+    setSession({ userId: data.user.id, name, email: data.user.email ?? "", role: "student", capabilities: profile.capabilities, createdAt: data.user.created_at });
+    setWorkflowVersion((version) => version + 1);
     navigate(getAuthRedirect(location.state), { replace: true });
+  }
+
+  async function signUp(input: { name: string; email: string; password: string }) {
+    const { data, error } = await supabaseClient.auth.signUp({ email: input.email, password: input.password, options: { data: { display_name: input.name } } });
+    if (error) throw new Error(error.message);
+    if (!data.session) return { confirmationRequired: true };
+    await signIn({ email: input.email, password: input.password });
+    return { confirmationRequired: false };
   }
 
   function protectedElement(element: ReactNode) {
@@ -119,14 +165,17 @@ export default function App() {
     />
   ) : <NotFoundPage onHome={() => navigate("/")} />;
 
+  if (!ready) return <main className="atlas-auth-page"><section className="atlas-auth-panel glass-v2"><h2>正在连接 EduFlow…</h2></section></main>;
+  if (startupError) return <main className="atlas-auth-page"><section className="atlas-auth-panel glass-v2"><h2>数据连接失败</h2><p>{startupError}</p></section></main>;
+
   return (
-    <AuthProvider value={{ session, completeAuth, logout }}>
+    <AuthProvider value={{ session, signIn, signUp, logout }}>
       <NavigationProvider value={navigationContextValue}>
         <Routes>
           <RouterRoute path="/login" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
           <RouterRoute path="/register" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
           <RouterRoute path="/" element={protectedElement(session ? <AtlasHome session={session} onLogout={logout} /> : null)} />
-          <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="workflows" session={session} onLogout={logout} />} userId={session.email} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />
+          <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="workflows" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />
           <RouterRoute path="/workflows/:workflowId" element={protectedElement(editor)} />
           <RouterRoute path="/courses" element={protectedElement(session ? <CourseCenterPage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/courses/:courseId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} /> : null)} />

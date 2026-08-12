@@ -28,8 +28,8 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
   const { courseId = "", chapterId: routeChapterId } = useParams();
   const runtime = courseRepository.getCourse(courseId);
   const orderedMaterials = useMemo(() => runtime ? sortMaterials(runtime.materials, runtime.lessons) : [], [runtime]);
-  const userCourseState = useUserCourseState(session.email, courseId);
-  const graphData = useMemo(() => runtime ? buildCourseGraphData(runtime, userCourseState, knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.email)), userKnowledgeRepository.getUserKnowledge(session.email)) : null, [runtime, session.email, userCourseState]);
+  const userCourseState = useUserCourseState(session.userId, courseId);
+  const graphData = useMemo(() => runtime ? buildCourseGraphData(runtime, userCourseState, knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), userKnowledgeRepository.getUserKnowledge(session.userId)) : null, [runtime, session.userId, userCourseState]);
   const courseChapters = graphData?.chapters ?? [];
   const courseSkillTreeNodes = graphData?.knowledgeNodes ?? [];
   const courseSkillTreeEdges = graphData?.knowledgeEdges ?? [];

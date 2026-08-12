@@ -5,21 +5,30 @@ import { useAuth } from "@/features/auth/AuthContext";
 
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const navigate = useNavigate();
-  const { completeAuth } = useAuth();
-  const [name, setName] = useState("林同学");
-  const [email, setEmail] = useState("student@knowledge-atlas.local");
+  const { signIn, signUp } = useAuth();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const isRegister = mode === "register";
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedEmail = email.trim() || "student@knowledge-atlas.local";
-    completeAuth({
-      name: name.trim() || (isRegister ? "新同学" : "林同学"),
-      email: normalizedEmail,
-      role: "student",
-      capabilities: normalizedEmail.endsWith("@knowledge-atlas.local") ? ["global-domain-admin"] : [],
-      createdAt: new Date().toISOString()
-    });
+    setError("");
+    setSubmitting(true);
+    try {
+      if (isRegister) {
+        const result = await signUp({ name: name.trim() || "新同学", email: email.trim(), password });
+        if (result.confirmationRequired) setError("注册成功，请先在邮箱中确认账号后再登录。");
+      } else {
+        await signIn({ email: email.trim(), password });
+      }
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "认证失败，请重试。");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -43,13 +52,15 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
       </section>
 
       <section className="atlas-auth-panel glass-v2">
-        <div className="atlas-pill"><Sparkles size={13} />本地演示账号</div>
+        <div className="atlas-pill"><Sparkles size={13} />Supabase 安全账号</div>
         <h2>{isRegister ? "创建学习账号" : "欢迎回来"}</h2>
-        <p>{isRegister ? "创建一个本地会话，开始探索 Agentic AI 课程。" : "登录后进入知识星图首页，继续你的课程与实训。"}</p>
+        <p>{isRegister ? "创建安全账号，开始探索知识、课程与实训。" : "登录后进入知识星图首页，继续你的课程与实训。"}</p>
         <form onSubmit={submit}>
-          <label><span>姓名</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" /></label>
+          {isRegister ? <label><span>姓名</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" /></label> : null}
           <label><span>邮箱</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" /></label>
-          <button className="atlas-primary" type="submit">{isRegister ? "注册并进入" : "登录并进入"}<ArrowRight size={16} /></button>
+          <label><span>密码</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={isRegister ? "new-password" : "current-password"} minLength={6} required /></label>
+          {error ? <p role="alert">{error}</p> : null}
+          <button className="atlas-primary" type="submit" disabled={submitting}>{submitting ? "请稍候…" : isRegister ? "注册并进入" : "登录并进入"}<ArrowRight size={16} /></button>
         </form>
         <button className="atlas-auth-switch" onClick={() => navigate(isRegister ? "/login" : "/register")}>
           {isRegister ? "已有账号，去登录" : "没有账号，创建一个"}

@@ -22,7 +22,7 @@ Learning state is mutable, user-owned data layered over immutable curriculum def
 
 ## 6. Repository
 
-`LearningProgressRepository` loads, saves, and subscribes to states by user and course. The LocalStorage adapter receives a `UserCourseStateFactory`; it does not import Demo fixtures. The application composition root injects the Demo factory, while production may inject an empty factory or replace the repository.
+`LearningProgressRepository` loads, saves, and subscribes to states by user and course. Application composition uses `ApiLearningProgressRepository`, backed by `/api/progress` and owner-scoped PostgreSQL rows. The LocalStorage adapter receives a `UserCourseStateFactory` and remains only for Demo/test compatibility; it does not import Demo fixtures.
 
 Persisted data uses `{ schemaVersion, state }`. Loading validates user/course identity, Assignment and Material maps, key-to-record identity, and timestamps. Legacy raw `UserCourseState` is migrated into the current envelope; invalid data falls back to the injected initial-state factory without treating an unchecked cast as valid state.
 
@@ -50,11 +50,11 @@ Recent courses are ordered from user-course activity timestamps. The UI does not
 
 ## 12. Persistence Evolution
 
-Local storage is a demo adapter. A server repository can replace it while preserving the same scoped identity and update semantics.
+Local storage is a compatibility adapter. The server repository is the application source of truth and preserves the same scoped identity and update semantics. Existing LocalStorage payloads are not automatically imported into a Supabase account.
 
 ## 13. Non-goals
 
-This version does not implement submissions, grading, cross-device synchronization, audit history, teacher overrides, automatic mastery assignment, or a complete evidence pipeline.
+This version does not implement submissions, grading, audit history, teacher overrides, automatic mastery assignment, or a complete evidence pipeline. Authenticated progress itself is synchronized through the backend.
 
 ## 14. State Boundaries
 

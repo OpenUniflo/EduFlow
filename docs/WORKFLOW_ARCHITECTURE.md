@@ -8,7 +8,7 @@ Workflow is split by current responsibility rather than by future runtime plans:
 - `src/features/workflow/editor`: editor-only types, pure CRUD operations, Canvas, Topbar, Inspector, Config Popover, code presentation, and node UI.
 - `src/features/workflow/application`: the React controller that coordinates definitions, editor persistence, runtime progress, Environment selection, State, and Run History.
 - `src/features/workflow/runtime`: runtime and run-record contracts plus Run Panel presentation.
-- `src/features/workflow/repository`: persistence contract and the LocalStorage adapter.
+- `src/features/workflow/repository`: persistence contract, API adapter, and LocalStorage compatibility adapter.
 - `src/features/workflow/pages`: Library and Editor page composition with page-local presentation state.
 - `src/demo/workflows`: concrete templates, description selection, Environment defaults, code-export fixture, and the timed Demo runtime.
 - `src/app/integrations`: validated Workflow Run to Learning Progress integration.
@@ -21,13 +21,16 @@ Workflow is split by current responsibility rather than by future runtime plans:
 
 The Runtime contract receives only Workflow definition and runtime state. It does not import, receive, or resolve Course Assignments.
 
-## 3. Persistence compatibility
+## 3. Persistence
 
-The LocalStorage adapter preserves the existing contracts:
+The application composition uses `ApiWorkflowPersistence`. Authenticated user Workflow definitions, editor state, settings, and Run History are persisted through `/api/workflows` into owner-scoped PostgreSQL rows. Built-in template definitions are shared seed data; custom definitions and Runs are user owned. Each assignment-launched Run persists its launch-time `courseId`, `assignmentId`, and `workflowTemplateId`. Independent Runs omit Course provenance.
+
+The LocalStorage adapter remains for Demo/test compatibility and preserves the historical contracts:
 
 - `knowledge-atlas.workflow-state.v2`: workflows, active template, description, Schema saved state, node positions, state values, and Run History.
 - `knowledge-atlas.workflow-settings.v2`: existing mock settings plus Environments and active Environment.
-- `knowledge-atlas.mock-session.v2`: Mock Auth session, owned by `src/features/auth/session.ts`.
+
+Mock session persistence is no longer an application runtime contract; Supabase Auth owns the session.
 
 Stored custom workflows remain authoritative. Missing built-in Demo templates are merged in, and the existing showcase display-name migration is retained. Invalid JSON falls back to built-in definitions or default settings without changing the key or schema.
 
