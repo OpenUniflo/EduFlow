@@ -1,7 +1,7 @@
 import { ArrowRight, Layers3, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import type { MockSession } from "@/features/workflow/model";
+import type { MockSession } from "@/features/auth/types";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import { buildCourseGraphData, buildCourseSummary } from "@/features/course/runtime/courseRuntime";
 import { applicationServices } from "@/app/services/applicationServices";

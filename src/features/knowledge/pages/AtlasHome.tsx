@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ArrowRight, FileText, Minus, Pause, Play, Plus, RefreshCcw, Send, Settings2, Upload, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import type { MockSession } from "@/features/workflow/model";
+import type { MockSession } from "@/features/auth/types";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices } from "@/app/services/applicationServices";
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneHandle } from "@/features/knowledge/components/KnowledgeAtlasScene";

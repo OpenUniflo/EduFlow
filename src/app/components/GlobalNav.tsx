@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { BookOpen, ChevronDown, LogOut, Network, ShieldCheck, Workflow } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
-import type { MockSession } from "@/features/workflow/model";
+import type { MockSession } from "@/features/auth/types";
 import { canManageKnowledgeDomains } from "@/features/auth/capabilities";
 
 export function GlobalNav({

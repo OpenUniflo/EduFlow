@@ -1,34 +1,34 @@
 import { ArrowRight, CheckCircle2, Grid2X2, List, Plus, Sparkles, Trash2 } from "lucide-react";
-import type { MockSession, Template, WorkflowViewMode } from "@/features/workflow/model";
-import { WorkflowPreview } from "@/features/workflow/components/WorkflowPages";
-import { useEffect, useState } from "react";
-import { GlobalNav } from "@/app/components/GlobalNav";
-import { applicationServices } from "@/app/services/applicationServices";
+import type { Template } from "@/features/workflow/domain/types";
+import type { WorkflowViewMode } from "@/features/workflow/editor/types";
+import { WorkflowPreview } from "@/features/workflow/editor/WorkflowPreview";
+import { useEffect, useState, type ReactNode } from "react";
 import { sortAssignments } from "@/features/material/materialOrdering";
-
-const { courseRepository, learningProgressRepository } = applicationServices;
+import type { CourseRepository } from "@/features/course/repository/CourseRepository";
+import type { LearningProgressRepository } from "@/features/learning/progress/LearningProgressRepository";
 
 export function WorkflowLibraryPage({
-  session,
-  onLogout,
-  viewMode,
+  navigation,
+  userId,
+  courseRepository,
+  learningProgressRepository,
   workflows,
   activeTemplateId,
-  onViewMode,
   onOpenWorkflow,
   onCreateWorkflow,
   onDeleteWorkflow
 }: {
-  session: MockSession;
-  onLogout: () => void;
-  viewMode: WorkflowViewMode;
+  navigation: ReactNode;
+  userId: string;
+  courseRepository: CourseRepository;
+  learningProgressRepository: LearningProgressRepository;
   workflows: Template[];
   activeTemplateId: string;
-  onViewMode: (value: WorkflowViewMode) => void;
   onOpenWorkflow: (templateId: string) => void;
   onCreateWorkflow: () => void;
   onDeleteWorkflow: (templateId: string) => void;
 }) {
+  const [viewMode, setViewMode] = useState<WorkflowViewMode>("gallery");
   const [, setProgressRevision] = useState(0);
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
   const runtimes = courseRepository.listCourseRuntimes();
@@ -40,7 +40,7 @@ export function WorkflowLibraryPage({
   function workflowCard(template: Template) {
     const assignments = workflowAssignments.filter((item) => item.workflowTemplateId === template.id);
     const assignment = assignments[0];
-    const complete = assignments.length > 0 && assignments.every((item) => learningProgressRepository.getCourseState(session.email, item.courseId).assignmentStates[item.id]?.status === "completed");
+    const complete = assignments.length > 0 && assignments.every((item) => learningProgressRepository.getCourseState(userId, item.courseId).assignmentStates[item.id]?.status === "completed");
     return (
       <article key={template.id} className={`atlas-workflow-card glass-v2 ${activeTemplateId === template.id ? "active" : ""}`}>
         <button className="atlas-workflow-open" onClick={() => onOpenWorkflow(template.id)}>
@@ -65,7 +65,7 @@ export function WorkflowLibraryPage({
 
   return (
     <main className="atlas-page-shell atlas-workflows-page">
-      <GlobalNav active="workflows" session={session} onLogout={onLogout} />
+      {navigation}
       <header className="atlas-workspace-head">
         <div className="atlas-breadcrumb glass-v2"><strong>工作流画布</strong></div>
       </header>
@@ -79,8 +79,8 @@ export function WorkflowLibraryPage({
           <div className="atlas-workflow-actions">
             <button className="atlas-primary" onClick={onCreateWorkflow}><Plus size={16} />创建空白画布</button>
             <div className="atlas-view-switch glass-v2">
-              <button className={viewMode === "gallery" ? "active" : ""} onClick={() => onViewMode("gallery")}><Grid2X2 size={15} />画廊</button>
-              <button className={viewMode === "list" ? "active" : ""} onClick={() => onViewMode("list")}><List size={15} />列表</button>
+              <button className={viewMode === "gallery" ? "active" : ""} onClick={() => setViewMode("gallery")}><Grid2X2 size={15} />画廊</button>
+              <button className={viewMode === "list" ? "active" : ""} onClick={() => setViewMode("list")}><List size={15} />列表</button>
             </div>
           </div>
         </section>
@@ -88,7 +88,7 @@ export function WorkflowLibraryPage({
         <section className="atlas-workflow-section">
           <div className="atlas-section-row">
             <div><span className="atlas-kicker">COURSE LABS</span><h2>课程工作流实训</h2></div>
-            <span>{workflowAssignments.filter((item) => learningProgressRepository.getCourseState(session.email, item.courseId).assignmentStates[item.id]?.status === "completed").length}/{workflowAssignments.length} 个课程实训已完成</span>
+            <span>{workflowAssignments.filter((item) => learningProgressRepository.getCourseState(userId, item.courseId).assignmentStates[item.id]?.status === "completed").length}/{workflowAssignments.length} 个课程实训已完成</span>
           </div>
           <div className={`atlas-workflow-library ${viewMode}`}>{lessonWorkflows.map(workflowCard)}</div>
         </section>

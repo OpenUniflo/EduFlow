@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import type { MockSession } from "@/features/workflow/model";
+import type { MockSession } from "./types";
 
 type AuthContextValue = {
   session: MockSession | null;

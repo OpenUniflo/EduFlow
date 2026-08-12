@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Archive, Check, ChevronRight, CirclePlus, Palette, Search, Sparkles, X } from "lucide-react";
-import type { MockSession } from "@/features/workflow/model";
+import type { MockSession } from "@/features/auth/types";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import { DOMAIN_COLOR_PALETTE, UNCLASSIFIED_DOMAIN_COLOR } from "@/features/knowledge/domain/domainColors";
 import { acceptCandidate, assignNodeDomain, assignNodesToDomain, createDomain, ignoreCandidate, reviewProposal, updateDomain, useDomainGovernance, validateDomainAssignmentTargets } from "@/features/knowledge/domain/domainStore";

@@ -18,7 +18,8 @@ import { classifySegmentQueryChange, selectPageAtReadingAnchor } from "@/feature
 import { createMaterialKnowledgeContextState, reduceMaterialKnowledgeContextState, resolveEffectiveKnowledgeId } from "@/features/material/reader/materialKnowledgeContextState";
 import { buildKnowledgeAssignmentContexts, buildMaterialKnowledgeContext, buildMaterialKnowledgeRoles, buildMaterialSegmentProjection } from "@/features/material/materialProjection";
 import { getDomainGovernanceSnapshot } from "@/features/knowledge/domain/domainStore";
-import { createWorkflowRunRecord, type Template } from "@/features/workflow/model";
+import type { Template } from "@/features/workflow/domain/types";
+import { DemoWorkflowRuntime } from "@/demo/workflows/DemoWorkflowRuntime";
 import { InMemoryKnowledgeRepository } from "@/features/knowledge/repository/InMemoryKnowledgeRepository";
 import type { KnowledgeGraph, KnowledgeNode } from "@/features/knowledge/types";
 import { buildPersonalKnowledgeGraph } from "@/features/profile/profileGraph";
@@ -520,8 +521,9 @@ describe("Material and progress generalization", () => {
 
   it("keeps shared WorkflowTemplate run identity assignment-aware", () => {
     const template: Template = { id: "same-template", name: "Shared", description: "Shared", nodes: [], edges: [], runOrder: [], result: "ok", code: "" };
-    const runA = createWorkflowRunRecord(template, {}, 1, { courseId: "course-a", assignmentId: "assignment-a" });
-    const runB = createWorkflowRunRecord(template, {}, 2, { courseId: "course-b", assignmentId: "assignment-b" });
+    const demoRuntime = new DemoWorkflowRuntime();
+    const runA = demoRuntime.createRunRecord(template, {}, 1, { courseId: "course-a", assignmentId: "assignment-a", workflowTemplateId: "same-template" });
+    const runB = demoRuntime.createRunRecord(template, {}, 2, { courseId: "course-b", assignmentId: "assignment-b", workflowTemplateId: "same-template" });
     expect(runA.workflowTemplateId).toBe(runB.workflowTemplateId);
     expect(runA.assignmentId).not.toBe(runB.assignmentId);
   });

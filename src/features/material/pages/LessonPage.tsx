@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { MockSession } from "@/features/workflow/model";
+import type { MockSession } from "@/features/auth/types";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import { useDomainGovernance } from "@/features/knowledge/domain/domainStore";
