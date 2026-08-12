@@ -3,6 +3,26 @@ import { apiRequest } from "@/shared/api/apiClient";
 
 type WorkflowPayload = { state: PersistedWorkflowState; settings: PersistedWorkflowSettings | null; builtinWorkflowIds: string[] };
 
+export function normalizeWorkflowSettings(
+  current: PersistedWorkflowSettings,
+  persisted: Partial<PersistedWorkflowSettings> | null | undefined
+): PersistedWorkflowSettings {
+  const environments = Array.isArray(persisted?.environments) && persisted.environments.length
+    ? persisted.environments
+    : current.environments;
+  const activeEnvironmentId = environments.some((environment) => environment.id === persisted?.activeEnvironmentId)
+    ? persisted!.activeEnvironmentId!
+    : environments.some((environment) => environment.id === current.activeEnvironmentId)
+      ? current.activeEnvironmentId
+      : environments[0].id;
+  return {
+    ...current,
+    ...persisted,
+    environments: structuredClone(environments),
+    activeEnvironmentId
+  };
+}
+
 export class ApiWorkflowPersistence implements WorkflowPersistence {
   private state: PersistedWorkflowState = {};
   private settings: PersistedWorkflowSettings;
@@ -17,7 +37,7 @@ export class ApiWorkflowPersistence implements WorkflowPersistence {
   async hydrate() {
     const payload = await apiRequest<WorkflowPayload>("/api/workflows");
     this.state = structuredClone(payload.state);
-    this.settings = structuredClone(payload.settings ?? this.settings);
+    this.settings = normalizeWorkflowSettings(this.settings, payload.settings);
     this.builtinWorkflowIds = [...payload.builtinWorkflowIds];
     this.hydrated = true;
   }
