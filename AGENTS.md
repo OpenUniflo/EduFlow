@@ -6,6 +6,14 @@
 - `package-lock.json`, `yarn.lock`, and other competing lockfiles MUST NOT be committed.
 - Before pushing dependency changes, `pnpm install --frozen-lockfile` MUST succeed.
 
+## Frontend Project Structure
+
+- `src/app` owns application assembly, providers, and the `ApplicationServices` composition root.
+- `src/features` owns product feature code. Production Feature code MUST NOT import `src/demo`; pure Feature Core MUST NOT import `src/app` or the `applicationServices` singleton.
+- `src/demo` owns concrete Demo fixtures, seeds, and adapters and may depend inward on Feature contracts and types. `src/app` performs the final wiring.
+- `src/shared` owns only cross-Feature utilities, components, types, and styles and MUST NOT depend on `src/features`, `src/demo`, or `src/app`.
+- Cross-top-level imports SHOULD use the single `@/* -> src/*` alias. Short relative imports within one Feature may remain relative.
+
 ## Knowledge and Curriculum Boundaries
 
 - EduFlow MUST maintain one shared Knowledge Graph composed of `KnowledgeNode`, `KnowledgeEdge`, and user-owned `UserKnowledgeState`.
@@ -239,14 +247,14 @@
 
 ## Core / Demo Dependency Rule
 
-- Code under Core `knowledge`, `course`, `material`, `progress`, and `profile` MUST NOT import `src/v2/demo`.
+- Code under Core `src/features/knowledge`, `src/features/course`, `src/features/material`, `src/features/learning/progress`, and `src/features/profile` MUST NOT import `src/demo`.
 - Demo repositories, user fixtures, concrete courses, Domains, and static graphs depend inward on Core interfaces and types. The application composition root may wire Demo adapters into Core boundaries.
 - Static demo Knowledge graphs are fixtures only; production repositories MUST NOT import or treat them as runtime authority.
 
 ## Core / Demo Boundary
 
 - Core packages define reusable contracts, repositories, validation, algorithms, projections, and governance.
-- Concrete Demo fixtures and Demo-specific fixture parsing/building utilities MUST live under `src/v2/demo`.
+- Concrete Demo fixtures and Demo-specific fixture parsing/building utilities MUST live under `src/demo`.
 - Demo may depend on Core. Core MUST NOT depend on Demo.
 
 ## Architectural Enforcement
@@ -266,7 +274,7 @@
 ## Compatibility Export Rule
 
 - Generic compatibility barrels MUST NOT re-export concrete Demo fixtures.
-- Concrete Demo compatibility exports, if temporarily required, MUST live under `src/v2/demo` and be explicitly named as Demo compatibility code.
+- Concrete Demo compatibility exports, if temporarily required, MUST live under `src/demo` and be explicitly named as Demo compatibility code.
 
 ## Domain Resolution
 

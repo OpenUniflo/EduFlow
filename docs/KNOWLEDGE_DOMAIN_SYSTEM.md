@@ -65,7 +65,7 @@ The scorer is generic and operates only on nodes, edges, Domains, and assignment
 
 ## Discovery Boundary
 
-Core defines only the `DomainDiscoveryService` interface. It knows no concrete proposal IDs, node IDs, or Domain names. The deterministic prototype discovery implementation lives under `src/v2/demo/domains` and may contain demo-specific identities.
+Core defines only the `DomainDiscoveryService` interface. It knows no concrete proposal IDs, node IDs, or Domain names. The deterministic prototype discovery implementation lives under `src/demo/domains` and may contain demo-specific identities.
 
 Discovery creates reviewable `DomainProposal` data. A proposal has no scope in V1; authorized acceptance always creates a Global KnowledgeDomain. Discovery never writes an authoritative Domain or KnowledgeEdge by itself.
 

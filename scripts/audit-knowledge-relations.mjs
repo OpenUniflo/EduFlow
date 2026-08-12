@@ -1,12 +1,17 @@
 import { createServer } from "vite";
 
-const server = await createServer({ appType: "custom", server: { middlewareMode: true }, logLevel: "error" });
+const server = await createServer({
+  appType: "custom",
+  optimizeDeps: { noDiscovery: true },
+  server: { middlewareMode: true },
+  logLevel: "error"
+});
 
 try {
   const [{ demoGlobalKnowledgeGraph }, { demoDomainGovernanceSeed }, { auditDomainRelations, validateKnowledgeRelations }] = await Promise.all([
-    server.ssrLoadModule("/src/v2/demo/knowledge/demoGlobalKnowledgeGraph.fixture.ts"),
-    server.ssrLoadModule("/src/v2/demo/domains/demoDomainGovernance.seed.ts"),
-    server.ssrLoadModule("/src/v2/knowledge/relationAudit.ts")
+    server.ssrLoadModule("/src/demo/knowledge/demoGlobalKnowledgeGraph.fixture.ts"),
+    server.ssrLoadModule("/src/demo/domains/demoDomainGovernance.seed.ts"),
+    server.ssrLoadModule("/src/features/knowledge/relationAudit.ts")
   ]);
   const governance = demoDomainGovernanceSeed();
   const titleById = new Map(demoGlobalKnowledgeGraph.nodes.map((node) => [node.id, node.title]));

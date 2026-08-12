@@ -33,7 +33,7 @@ Core packages do not import Demo fixtures or repositories. Demo depends on Core 
 
 ## Final Boundary Cleanup
 
-1. Concrete Knowledge fixtures are owned by `src/v2/demo/knowledge`.
+1. Concrete Knowledge fixtures are owned by `src/demo/knowledge`.
 2. Core packages no longer own Demo Knowledge data.
 3. Cross-course projections treat Course-owned IDs as scoped by `(courseId, entityId)`.
 4. Generic `AtlasHome` contains no concrete Demo course identity.

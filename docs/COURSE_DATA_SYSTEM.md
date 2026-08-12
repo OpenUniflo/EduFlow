@@ -54,7 +54,7 @@ Python Engineering is the second full fixture. It exercises dynamic Course Cente
 
 ## 12. Seed Boundaries
 
-Course-specific text and fixtures live under `src/v2/demo`. Generic pages, projections, repositories, layout, progress, and material services must not encode Agentic AI or Python Engineering IDs or counts.
+Course-specific text and fixtures live under `src/demo`. Generic pages, projections, repositories, layout, progress, and material services must not encode Agentic AI or Python Engineering IDs or counts.
 
 ## 13. Persistence Evolution
 

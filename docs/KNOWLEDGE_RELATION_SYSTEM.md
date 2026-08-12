@@ -73,7 +73,7 @@ Agentic AI and Python Engineering demo relations are manually reviewed static ca
 
 ## Demo Seed Governance
 
-Domain-specific node and edge fixtures are organized under `src/v2/demo/knowledge`. Ordinary genuine relations that span current Domain assignments live in a shared Demo fixture; they have no special cross-domain business status. Demo relation tuple types, stable fixture ID construction, and tuple-to-edge parsing are owned by the Demo edge factory in that directory. The resulting `KnowledgeEdge` model and generic relation validation remain Core responsibilities. These fixtures are prototype/reference data, not a production repository. `pnpm audit:knowledge` prints the current quality report and performs relation validation.
+Domain-specific node and edge fixtures are organized under `src/demo/knowledge`. Ordinary genuine relations that span current Domain assignments live in a shared Demo fixture; they have no special cross-domain business status. Demo relation tuple types, stable fixture ID construction, and tuple-to-edge parsing are owned by the Demo edge factory in that directory. The resulting `KnowledgeEdge` model and generic relation validation remain Core responsibilities. These fixtures are prototype/reference data, not a production repository. `pnpm audit:knowledge` prints the current quality report and performs relation validation.
 
 ## Future Relation Candidate Generation
 
