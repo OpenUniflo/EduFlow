@@ -1,6 +1,6 @@
 import type { FlowNode, WorkflowDefinition } from "@/features/workflow/domain/types";
 import { isControlOutletEdge } from "@/features/workflow/domain/graphOperations";
-import type { WorkflowAssignmentContext, WorkflowRunNodeRecord, WorkflowRunRecord, WorkflowRuntime } from "@/features/workflow/runtime/types";
+import type { WorkflowRunNodeRecord, WorkflowRunRecord, WorkflowRuntime } from "@/features/workflow/runtime/types";
 import { demoWorkflowSchemaFields } from "./demoWorkflowTemplates";
 
 function parseFormValue(value: string) {
@@ -102,7 +102,7 @@ export class DemoWorkflowRuntime implements WorkflowRuntime {
     return state;
   }
 
-  createRunRecord(definition: WorkflowDefinition, stateValues: Record<string, unknown>, runNumber: number, assignmentContext?: WorkflowAssignmentContext): WorkflowRunRecord {
+  createRunRecord(definition: WorkflowDefinition, stateValues: Record<string, unknown>, runNumber: number): WorkflowRunRecord {
     const nodes = definition.runOrder.reduce<WorkflowRunNodeRecord[]>((records, itemId, index) => {
       const node = definition.nodes.find((item) => item.id === itemId);
       if (!node) return records;
@@ -116,8 +116,6 @@ export class DemoWorkflowRuntime implements WorkflowRuntime {
       id: `${definition.id}-${Date.now()}-${runNumber}`,
       workflowId: definition.id,
       workflowTemplateId: definition.id,
-      courseId: assignmentContext?.courseId,
-      assignmentId: assignmentContext?.assignmentId,
       workflowName: definition.name,
       createdAt: new Date().toISOString(),
       status: "success",

@@ -7,6 +7,9 @@ export type LegacySettings = {
   [key: string]: unknown;
 };
 
+type LegacyPreferenceSettings = Pick<LegacySettings, "dailyReminder" | "compactMode" | "emailDigest">;
+type LegacySettingsStorage = Pick<Storage, "getItem" | "setItem">;
+
 const defaults: LegacySettings = { dailyReminder: true, compactMode: false, emailDigest: true };
 
 export function readLegacySettings(): LegacySettings {
@@ -18,6 +21,19 @@ export function readLegacySettings(): LegacySettings {
   }
 }
 
-export function writeLegacySettings(settings: LegacySettings) {
-  window.localStorage.setItem(settingsStorageKey, JSON.stringify(settings));
+export function writeLegacySettings(settings: LegacyPreferenceSettings, storage: LegacySettingsStorage = window.localStorage) {
+  let existing: Record<string, unknown> = {};
+  try {
+    const raw = storage.getItem(settingsStorageKey);
+    const parsed = raw ? JSON.parse(raw) as unknown : null;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) existing = parsed as Record<string, unknown>;
+  } catch {
+    // Invalid legacy JSON is replaced with a valid payload containing the requested preferences.
+  }
+  storage.setItem(settingsStorageKey, JSON.stringify({
+    ...existing,
+    dailyReminder: settings.dailyReminder,
+    compactMode: settings.compactMode,
+    emailDigest: settings.emailDigest
+  }));
 }

@@ -1,6 +1,12 @@
 import type { CourseRepository } from "@/features/course/repository/CourseRepository";
 import type { LearningProgressRepository } from "@/features/learning/progress/LearningProgressRepository";
-import type { WorkflowAssignmentContext, WorkflowRunRecord } from "@/features/workflow/runtime/types";
+import type { WorkflowRunRecord } from "@/features/workflow/runtime/types";
+
+export type WorkflowAssignmentContext = {
+  courseId: string;
+  assignmentId: string;
+  workflowTemplateId: string;
+};
 
 export function resolveWorkflowAssignmentContext(
   courseRepository: CourseRepository,
@@ -15,6 +21,14 @@ export function resolveWorkflowAssignmentContext(
   const assignment = runtime?.assignments.find((item) => item.id === assignmentId);
   if (!assignment || assignment.mode !== "workflow" || assignment.workflowTemplateId !== workflowTemplateId) return null;
   return { courseId, assignmentId, workflowTemplateId };
+}
+
+export function attachWorkflowAssignmentMetadata(
+  record: WorkflowRunRecord,
+  context: WorkflowAssignmentContext | null
+): WorkflowRunRecord {
+  if (!context || context.workflowTemplateId !== record.workflowTemplateId) return record;
+  return { ...record, courseId: context.courseId, assignmentId: context.assignmentId };
 }
 
 export function completeWorkflowAssignmentRun(

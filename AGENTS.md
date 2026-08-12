@@ -401,6 +401,8 @@
 - Pure Workflow Domain types, factories, and graph operations live under `src/features/workflow/domain` and MUST NOT depend on React, browser storage, Demo fixtures, `src/app`, or the `applicationServices` singleton.
 - Workflow Editor UI and editor-only state live under `src/features/workflow/editor` and `src/features/workflow/pages`. App MUST NOT own node, edge, branch, selection, canvas-position, Schema, Environment, Run, or Run History behavior.
 - Workflow execution uses the `WorkflowRuntime` contract. The current timed simulation is a Demo adapter under `src/demo/workflows`; the Runtime contract MUST NOT reference Course or Assignment types.
+- Workflow Runtime creates Course-independent base Run records. Validated `courseId` and `assignmentId` are optional application/persistence metadata attached before Run History persistence and MUST NOT become Runtime inputs.
 - Workflow persistence uses the `WorkflowPersistence` contract and the LocalStorage adapter. The v2 workflow-state and workflow-settings keys and payload fields are compatibility contracts.
+- Any compatibility writer sharing the v2 workflow-settings key MUST preserve Environment, active Environment, and unknown current payload fields when updating legacy preferences.
 - Concrete Workflow templates, description-to-template selection, Demo runtime behavior, Demo Environment defaults, and template-specific code exports live under `src/demo/workflows` and depend inward on Workflow contracts.
 - Course integration belongs to the application integration layer. Assignment completion requires a validated explicit `courseId`, `assignmentId`, and `workflowTemplateId`; independent runs MUST NOT complete an Assignment, and template identity MUST NOT be used to infer one.

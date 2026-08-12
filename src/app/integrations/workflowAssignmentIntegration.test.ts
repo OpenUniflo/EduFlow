@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { applicationServices } from "@/app/services/applicationServices";
 import type { LearningProgressRepository } from "@/features/learning/progress/LearningProgressRepository";
 import type { WorkflowRunRecord } from "@/features/workflow/runtime/types";
-import { completeWorkflowAssignmentRun, resolveWorkflowAssignmentContext } from "./workflowAssignmentIntegration";
+import { attachWorkflowAssignmentMetadata, completeWorkflowAssignmentRun, resolveWorkflowAssignmentContext } from "./workflowAssignmentIntegration";
 
 function record(context?: { courseId: string; assignmentId: string }): WorkflowRunRecord {
-  return { id: "run", workflowId: "agent-loop", workflowTemplateId: "agent-loop", courseId: context?.courseId, assignmentId: context?.assignmentId, workflowName: "Run", createdAt: "now", status: "success", nodeCount: 0, outputSummary: "ok", finalState: {}, nodes: [] };
+  const base: WorkflowRunRecord = { id: "run", workflowId: "agent-loop", workflowTemplateId: "agent-loop", workflowName: "Run", createdAt: "now", status: "success", nodeCount: 0, outputSummary: "ok", finalState: {}, nodes: [] };
+  return context ? { ...base, ...context } : base;
 }
 
 describe("Workflow Assignment application integration", () => {
@@ -14,8 +15,11 @@ describe("Workflow Assignment application integration", () => {
     const runtime = repository.getCourse("python-engineering")!;
     const shared = runtime.assignments.filter((item) => item.workflowTemplateId === "agent-loop");
     expect(shared.length).toBeGreaterThan(1);
-    const valid = resolveWorkflowAssignmentContext(repository, "agent-loop", `?courseId=${runtime.course.id}&assignmentId=${shared[0].id}`);
-    expect(valid).toEqual({ courseId: runtime.course.id, assignmentId: shared[0].id, workflowTemplateId: "agent-loop" });
+    const validA = resolveWorkflowAssignmentContext(repository, "agent-loop", `?courseId=${runtime.course.id}&assignmentId=${shared[0].id}`);
+    const validB = resolveWorkflowAssignmentContext(repository, "agent-loop", `?courseId=${runtime.course.id}&assignmentId=${shared[1].id}`);
+    expect(validA).toEqual({ courseId: runtime.course.id, assignmentId: shared[0].id, workflowTemplateId: "agent-loop" });
+    expect(validB).toEqual({ courseId: runtime.course.id, assignmentId: shared[1].id, workflowTemplateId: "agent-loop" });
+    expect(validA?.assignmentId).not.toBe(validB?.assignmentId);
     expect(resolveWorkflowAssignmentContext(repository, "minimal", `?courseId=${runtime.course.id}&assignmentId=${shared[0].id}`)).toBeNull();
     expect(resolveWorkflowAssignmentContext(repository, "agent-loop", `?courseId=${runtime.course.id}&assignmentId=missing`)).toBeNull();
     expect(resolveWorkflowAssignmentContext(repository, "agent-loop", "")).toBeNull();
@@ -23,11 +27,24 @@ describe("Workflow Assignment application integration", () => {
 
   it("independent runs complete nothing and shared templates complete exactly the launched Assignment", () => {
     const updates = vi.fn();
-    const repository = { updateAssignmentState: updates } as unknown as LearningProgressRepository;
+    const masteryUpdates = vi.fn();
+    const repository = { updateAssignmentState: updates, updateKnowledgeMastery: masteryUpdates } as unknown as LearningProgressRepository;
     expect(completeWorkflowAssignmentRun(repository, "user", record())).toBe(false);
     expect(updates).not.toHaveBeenCalled();
     completeWorkflowAssignmentRun(repository, "user", record({ courseId: "course", assignmentId: "assignment-a" }));
     expect(updates).toHaveBeenCalledOnce();
     expect(updates).toHaveBeenCalledWith("user", "course", "assignment-a", { assignmentId: "assignment-a", status: "completed", progress: 100 });
+    expect(masteryUpdates).not.toHaveBeenCalled();
+  });
+
+  it("attaches only validated matching Application metadata to Run History", () => {
+    const base = record();
+    const contextA = { courseId: "course", assignmentId: "assignment-a", workflowTemplateId: "agent-loop" };
+    const contextB = { courseId: "course", assignmentId: "assignment-b", workflowTemplateId: "agent-loop" };
+    expect(attachWorkflowAssignmentMetadata(base, null)).toBe(base);
+    expect(attachWorkflowAssignmentMetadata(base, { ...contextA, workflowTemplateId: "minimal" })).toBe(base);
+    expect(attachWorkflowAssignmentMetadata(base, null)).not.toHaveProperty("assignmentId");
+    expect(attachWorkflowAssignmentMetadata(base, contextA)).toMatchObject({ workflowTemplateId: "agent-loop", courseId: "course", assignmentId: "assignment-a" });
+    expect(attachWorkflowAssignmentMetadata(base, contextB)).toMatchObject({ workflowTemplateId: "agent-loop", courseId: "course", assignmentId: "assignment-b" });
   });
 });

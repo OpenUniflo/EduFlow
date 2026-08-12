@@ -519,13 +519,14 @@ describe("Material and progress generalization", () => {
     expect(buildCourseGraphData(runtime, demoUserCourseStateSeed("user-1", "scoped-course"), scopedRepository.getVisibleGraph(scopedAccess)).knowledgeNodes).toHaveLength(3);
   });
 
-  it("keeps shared WorkflowTemplate run identity assignment-aware", () => {
+  it("keeps shared WorkflowTemplate runtime records Course-independent", () => {
     const template: Template = { id: "same-template", name: "Shared", description: "Shared", nodes: [], edges: [], runOrder: [], result: "ok", code: "" };
     const demoRuntime = new DemoWorkflowRuntime();
-    const runA = demoRuntime.createRunRecord(template, {}, 1, { courseId: "course-a", assignmentId: "assignment-a", workflowTemplateId: "same-template" });
-    const runB = demoRuntime.createRunRecord(template, {}, 2, { courseId: "course-b", assignmentId: "assignment-b", workflowTemplateId: "same-template" });
+    const runA = demoRuntime.createRunRecord(template, {}, 1);
+    const runB = demoRuntime.createRunRecord(template, {}, 2);
     expect(runA.workflowTemplateId).toBe(runB.workflowTemplateId);
-    expect(runA.assignmentId).not.toBe(runB.assignmentId);
+    expect(runA).not.toHaveProperty("assignmentId");
+    expect(runB).not.toHaveProperty("courseId");
   });
 
   it("projects different Personal Atlas state for different users", () => {

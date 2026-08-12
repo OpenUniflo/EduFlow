@@ -22,12 +22,6 @@ export type WorkflowRunRecord = {
   nodes: WorkflowRunNodeRecord[];
 };
 
-export type WorkflowAssignmentContext = {
-  courseId: string;
-  assignmentId: string;
-  workflowTemplateId: string;
-};
-
 export type WorkflowRuntime = {
   readonly stepDelayMs: number;
   createInitialState(): Record<string, unknown>;
@@ -35,8 +29,7 @@ export type WorkflowRuntime = {
   createRunRecord(
     definition: WorkflowDefinition,
     stateValues: Record<string, unknown>,
-    runNumber: number,
-    assignmentContext?: WorkflowAssignmentContext
+    runNumber: number
   ): WorkflowRunRecord;
   scheduleNextStep(advance: () => void): () => void;
 };

@@ -9,7 +9,7 @@ import { NavigationProvider } from "@/app/providers/NavigationContext";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import { NotFoundPage } from "@/app/pages/PlaceholderPages";
 import { applicationServices } from "@/app/services/applicationServices";
-import { resolveWorkflowAssignmentContext, completeWorkflowAssignmentRun } from "@/app/integrations/workflowAssignmentIntegration";
+import { attachWorkflowAssignmentMetadata, resolveWorkflowAssignmentContext, completeWorkflowAssignmentRun } from "@/app/integrations/workflowAssignmentIntegration";
 import { AtlasHome } from "@/features/knowledge/pages/AtlasHome";
 import { CourseCenterPage } from "@/features/course/pages/CoursePages";
 import { CourseGraphPage } from "@/features/course/pages/CourseGraphPage";
@@ -54,13 +54,17 @@ export default function App() {
     () => routeWorkflowId ? resolveWorkflowAssignmentContext(applicationServices.courseRepository, routeWorkflowId, location.search) : null,
     [location.search, routeWorkflowId]
   );
-  const onAssignmentRunCompleted = useCallback((record: Parameters<typeof completeWorkflowAssignmentRun>[2]) => {
+  const finalizeRunRecord = useCallback(
+    (record: Parameters<typeof attachWorkflowAssignmentMetadata>[0]) => attachWorkflowAssignmentMetadata(record, assignmentContext),
+    [assignmentContext]
+  );
+  const onRunCompleted = useCallback((record: Parameters<typeof completeWorkflowAssignmentRun>[2]) => {
     if (session) completeWorkflowAssignmentRun(applicationServices.learningProgressRepository, session.email, record);
   }, [session]);
   const workflow = useWorkflowController(workflowDependencies, {
     routeWorkflowId,
-    assignmentContext,
-    onAssignmentRunCompleted
+    finalizeRunRecord,
+    onRunCompleted
   });
 
   function openWorkflow(templateId: string) {

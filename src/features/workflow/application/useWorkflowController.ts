@@ -5,7 +5,7 @@ import { createBlankWorkflow, createPaletteNode, getEdgeDefaults, getUniqueWorkf
 import type { CreateNodePayload, EdgeSide, FlowEdge, FlowNode, NodePositionMap, RenameNodeResult, WorkflowDefinition } from "../domain/types";
 import { addEdge, addNode, deleteControlBranch as removeControlBranch, deleteCustomWorkflow, deleteEdge, deleteNode, reconnectEdge, renameNode, renameWorkflow, replaceWorkflow, updateControlBranch as changeControlBranch, updateEdge, updateNode } from "../editor/workflowEditorOperations";
 import type { PersistedRunHistory, PersistedStateValues, WorkflowPersistence } from "../repository/WorkflowPersistence";
-import type { EnvironmentConfig, WorkflowAssignmentContext, WorkflowRunRecord, WorkflowRuntime } from "../runtime/types";
+import type { EnvironmentConfig, WorkflowRunRecord, WorkflowRuntime } from "../runtime/types";
 import type { WorkflowCodeExporter } from "../editor/WorkflowCodeExporter";
 
 export type WorkflowApplicationDependencies = {
@@ -18,8 +18,8 @@ export type WorkflowApplicationDependencies = {
 
 export type UseWorkflowControllerOptions = {
   routeWorkflowId?: string;
-  assignmentContext: WorkflowAssignmentContext | null;
-  onAssignmentRunCompleted(record: WorkflowRunRecord): void;
+  finalizeRunRecord(record: WorkflowRunRecord): WorkflowRunRecord;
+  onRunCompleted(record: WorkflowRunRecord): void;
 };
 
 function stableStateValue(value: unknown) {
@@ -30,7 +30,7 @@ function stableStateValue(value: unknown) {
 
 export function useWorkflowController(dependencies: WorkflowApplicationDependencies, options: UseWorkflowControllerOptions) {
   const { builtinWorkflows, persistence, runtime } = dependencies;
-  const { assignmentContext, onAssignmentRunCompleted, routeWorkflowId } = options;
+  const { finalizeRunRecord, onRunCompleted, routeWorkflowId } = options;
   const [initialState] = useState(() => {
     const stored = persistence.readState();
     const settings = persistence.readSettings();
@@ -109,10 +109,9 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
       if (sessionId) {
         const existing = runHistory[activeTemplate.id] ?? [];
         if (!existing.some((item) => item.id === sessionId)) {
-          const context = assignmentContext?.workflowTemplateId === activeTemplate.id ? assignmentContext : undefined;
-          const completedRecord = { ...runtime.createRunRecord(activeTemplate, activeStateValues, existing.length + 1, context), id: sessionId };
+          const completedRecord = finalizeRunRecord({ ...runtime.createRunRecord(activeTemplate, activeStateValues, existing.length + 1), id: sessionId });
           setRunHistory((history) => ({ ...history, [activeTemplate.id]: [completedRecord, ...(history[activeTemplate.id] ?? [])].slice(0, 20) }));
-          if (completedRecord.assignmentId) onAssignmentRunCompleted(completedRecord);
+          onRunCompleted(completedRecord);
         }
         activeRunSessionRef.current = null;
       }
@@ -120,7 +119,7 @@ export function useWorkflowController(dependencies: WorkflowApplicationDependenc
       return;
     }
     return runtime.scheduleNextStep(() => setRunIndex((value) => value + 1));
-  }, [activeStateValues, activeTemplate, assignmentContext, isRunning, onAssignmentRunCompleted, runHistory, runIndex, runtime]);
+  }, [activeStateValues, activeTemplate, finalizeRunRecord, isRunning, onRunCompleted, runHistory, runIndex, runtime]);
 
   function updateActiveDefinition(update: (definition: WorkflowDefinition) => WorkflowDefinition) {
     setWorkflows((items) => replaceWorkflow(items, update(items.find((item) => item.id === activeTemplate.id) ?? activeTemplate)));

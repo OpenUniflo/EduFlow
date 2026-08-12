@@ -17,9 +17,9 @@ Workflow is split by current responsibility rather than by future runtime plans:
 
 ## 2. Definition and run identity
 
-`WorkflowDefinition` (with the compatibility type name `Template`) describes nodes, edges, run order, result presentation, and code presentation. `WorkflowRunRecord` describes one completed execution. A Run records its own `workflowTemplateId` and may additionally record explicit `courseId` and `assignmentId`.
+`WorkflowDefinition` (with the compatibility type name `Template`) describes nodes, edges, run order, result presentation, and code presentation. `WorkflowRunRecord` describes one completed execution. The Runtime creates a base record with its `workflowTemplateId`; the application integration may attach a validated explicit `courseId` and `assignmentId` before Run History persistence. Those optional fields are application/persistence metadata retained for v2 compatibility, not Runtime inputs.
 
-The Runtime contract receives only Workflow definition and runtime state. It does not import or resolve Course Assignments.
+The Runtime contract receives only Workflow definition and runtime state. It does not import, receive, or resolve Course Assignments.
 
 ## 3. Persistence compatibility
 
@@ -30,6 +30,8 @@ The LocalStorage adapter preserves the existing contracts:
 - `knowledge-atlas.mock-session.v2`: Mock Auth session, owned by `src/features/auth/session.ts`.
 
 Stored custom workflows remain authoritative. Missing built-in Demo templates are merged in, and the existing showcase display-name migration is retained. Invalid JSON falls back to built-in definitions or default settings without changing the key or schema.
+
+The unreachable legacy Settings compatibility UI still has a small writer for the same settings key. It merges only `dailyReminder`, `compactMode`, and `emailDigest` into the existing JSON object, preserving Environment fields and other current payload fields instead of replacing the object.
 
 ## 4. Demo runtime behavior
 
@@ -46,4 +48,4 @@ Course and Material actions build the existing URL with `courseId`, `assignmentI
 3. its mode is `workflow`;
 4. its `workflowTemplateId` equals the opened Workflow.
 
-Only a completed Run with that validated context updates the explicit Assignment. An independent Run updates no Assignment. Two Assignments that share one template remain distinct because completion never performs reverse lookup by template. Knowledge mastery is not changed by this integration.
+The application integration attaches that validated identity to the Runtime's base record before Run History persistence. Only a completed Run with that metadata updates the explicit Assignment. An independent Run updates no Assignment. Two Assignments that share one template remain distinct because completion never performs reverse lookup by template. Knowledge mastery is not changed by this integration.
