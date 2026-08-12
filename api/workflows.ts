@@ -6,6 +6,16 @@ import { dataOrThrow } from "./_lib/query.js";
 type Row = Record<string, unknown>;
 type Definition = { id: string; name: string; description: string } & Record<string, unknown>;
 type Run = { id: string; workflowId: string; workflowTemplateId: string; courseId?: string; assignmentId?: string; workflowName: string; createdAt: string; status: string; nodeCount: number; outputSummary: string; finalState: Record<string, unknown>; nodes: unknown[] };
+const MAX_RUN_HISTORY = 20;
+
+function newestRuns(workflowId: string, runs: Run[]) {
+  if (runs.some((run) => run.workflowId !== workflowId)) {
+    throw new ApiError(400, "invalid_workflow_run", "Workflow run history key must match workflowId");
+  }
+  return [...runs]
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id))
+    .slice(0, MAX_RUN_HISTORY);
+}
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   const { client, user } = await createUserSupabase(request);
@@ -67,7 +77,11 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       node_positions: body.state.nodePositions ?? {}, state_values: body.state.stateValues ?? {}, settings: body.settings ?? {}, updated_at: new Date().toISOString()
     });
     dataOrThrow(stateResult.data, stateResult.error, "Workflow state update");
-    const runs = Object.values(body.state.runHistory ?? {}).flat();
+    const runHistory = Object.entries(body.state.runHistory ?? {}).map(([workflowId, runs]) => ({
+      workflowId,
+      runs: newestRuns(workflowId, runs)
+    }));
+    const runs = runHistory.flatMap((entry) => entry.runs);
     if (runs.length) {
       const result = await client.from("workflow_runs").upsert(runs.map((run) => ({
         owner_user_id: user.id, id: run.id, workflow_id: run.workflowId, workflow_template_id: run.workflowTemplateId,
@@ -76,6 +90,19 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
         final_state: run.finalState, nodes: run.nodes
       })));
       dataOrThrow(result.data, result.error, "WorkflowRun update");
+    }
+    for (const { workflowId } of runHistory) {
+      const existing = await client.from("workflow_runs").select("id")
+        .eq("owner_user_id", user.id).eq("workflow_id", workflowId)
+        .order("created_at", { ascending: false }).order("id", { ascending: false });
+      const obsoleteIds = dataOrThrow(existing.data as Array<{ id: string }> | null, existing.error, "WorkflowRun prune query")
+        .slice(MAX_RUN_HISTORY)
+        .map((row) => row.id);
+      if (obsoleteIds.length) {
+        const result = await client.from("workflow_runs").delete()
+          .eq("owner_user_id", user.id).eq("workflow_id", workflowId).in("id", obsoleteIds);
+        dataOrThrow(result.data, result.error, "WorkflowRun prune");
+      }
     }
     json(response, 200, { ok: true });
     return;

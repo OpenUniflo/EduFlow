@@ -32,6 +32,9 @@
   },
   "dependencies": {
     "3d-force-graph": "1.79.1",
+    "@supabase/auth-js": "2.112.3",
+    "@supabase/postgrest-js": "2.112.3",
+    "@supabase/storage-js": "2.112.3",
     "@supabase/supabase-js": "2.112.3",
     "@vitejs/plugin-react": "^5.1.0",
     "@xyflow/react": "^12.10.2",

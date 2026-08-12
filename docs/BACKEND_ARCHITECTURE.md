@@ -35,6 +35,8 @@ Preview uses the existing Vercel `edu-flow` project and Hosted Supabase `Knowled
 Vercel Preview -> Vercel Functions -> Hosted Supabase
 ```
 
+`vercel.json` pins Functions to Vercel `sin1`, matching the Hosted Supabase `ap-southeast-1` region so API/database traffic does not cross continents.
+
 Hosted schema changes use the same committed files under `supabase/migrations`. Reviewed migrations may be applied to Hosted only after `pnpm db:reset` and local verification succeed. Hosted Supabase must never be reset as part of ordinary development.
 
 ## Environment boundary
@@ -62,6 +64,8 @@ There is no client-prefixed secret key. `pnpm audit:client-secrets` checks sourc
 - `PUT /api/domains`: persists Global Domain governance after capability and active-node validation.
 
 The API is intentionally a small mapping layer rather than a second Domain model or a backend framework.
+
+Progress and Workflow API adapters serialize browser writes. A rejected request is retained for the next `flush()` call while the internal queue recovers, so later writes still execute in order. Workflow Run History is bounded to the newest 20 rows per user and Workflow; `PUT /api/workflows` enforces the same cap as the application layer and deletes older persisted rows.
 
 ## Relational model
 

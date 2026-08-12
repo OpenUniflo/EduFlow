@@ -1,5 +1,6 @@
 import type { PersistedWorkflowSettings, PersistedWorkflowState, WorkflowPersistence } from "./WorkflowPersistence";
 import { apiRequest } from "@/shared/api/apiClient";
+import { RecoverableWriteQueue } from "@/shared/api/RecoverableWriteQueue";
 
 type WorkflowPayload = { state: PersistedWorkflowState; settings: PersistedWorkflowSettings | null; builtinWorkflowIds: string[] };
 
@@ -27,7 +28,7 @@ export class ApiWorkflowPersistence implements WorkflowPersistence {
   private state: PersistedWorkflowState = {};
   private settings: PersistedWorkflowSettings;
   private builtinWorkflowIds: string[] = [];
-  private pending: Promise<unknown> = Promise.resolve();
+  private readonly writes = new RecoverableWriteQueue();
   private hydrated = false;
 
   constructor(defaultSettings: PersistedWorkflowSettings) {
@@ -61,12 +62,12 @@ export class ApiWorkflowPersistence implements WorkflowPersistence {
   }
 
   flush() {
-    return this.pending;
+    return this.writes.flush();
   }
 
   private queueWrite() {
     if (!this.hydrated) return;
     const body = JSON.stringify({ state: this.state, settings: this.settings, builtinWorkflowIds: this.builtinWorkflowIds });
-    this.pending = this.pending.then(() => apiRequest("/api/workflows", { method: "PUT", body }));
+    this.writes.enqueue(() => apiRequest("/api/workflows", { method: "PUT", body }));
   }
 }

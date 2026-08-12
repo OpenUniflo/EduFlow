@@ -1,13 +1,14 @@
 import type { UserAssignmentState, UserCourseState, UserMaterialState } from "@/features/course/types";
 import type { LearningProgressRepository } from "./LearningProgressRepository";
 import { apiRequest } from "@/shared/api/apiClient";
+import { RecoverableWriteQueue } from "@/shared/api/RecoverableWriteQueue";
 
 const now = () => new Date().toISOString();
 
 export class ApiLearningProgressRepository implements LearningProgressRepository {
   private readonly states = new Map<string, UserCourseState>();
   private readonly listeners = new Set<() => void>();
-  private pending: Promise<unknown> = Promise.resolve();
+  private readonly writes = new RecoverableWriteQueue();
 
   hydrate(userId: string, courseIds: string[], states: UserCourseState[]) {
     this.states.clear();
@@ -48,12 +49,12 @@ export class ApiLearningProgressRepository implements LearningProgressRepository
   }
 
   flush() {
-    return this.pending;
+    return this.writes.flush();
   }
 
   private persist(state: UserCourseState) {
     this.states.set(state.courseId, structuredClone(state));
-    this.pending = this.pending.then(() => apiRequest("/api/progress", { method: "PUT", body: JSON.stringify(state) }));
+    this.writes.enqueue(() => apiRequest("/api/progress", { method: "PUT", body: JSON.stringify(state) }));
     this.emit();
   }
 
