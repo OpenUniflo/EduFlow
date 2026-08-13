@@ -6,7 +6,16 @@ import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  for (const name of ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY"]) {
+  for (const name of [
+    "SUPABASE_URL",
+    "SUPABASE_SECRET_KEY",
+    "VITE_SUPABASE_PUBLISHABLE_KEY",
+    "EMBEDDING_PROVIDER",
+    "EMBEDDING_BASE_URL",
+    "EMBEDDING_API_KEY",
+    "EMBEDDING_MODEL",
+    "EMBEDDING_DIMENSIONS"
+  ]) {
     if (env[name]) process.env[name] = env[name];
   }
   return {

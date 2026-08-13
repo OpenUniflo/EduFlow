@@ -54,7 +54,23 @@ Server Functions additionally require:
 - `SUPABASE_URL`
 - `SUPABASE_SECRET_KEY`
 
-There is no client-prefixed secret key. `pnpm audit:client-secrets` checks source and build output for server-secret leakage. Health and error responses never return credentials.
+The server-only embedding boundary additionally requires:
+
+- `EMBEDDING_PROVIDER=dmxapi`
+- `EMBEDDING_BASE_URL=https://www.dmxapi.cn/v1`
+- `EMBEDDING_API_KEY`
+- `EMBEDDING_MODEL=text-embedding-3-small`
+- `EMBEDDING_DIMENSIONS=1024`
+
+`api/_lib/env.ts` validates these values when the embedding boundary is used; unrelated API routes do not require an embedding credential. The provider identity is DMXAPI, the wire protocol is the OpenAI-compatible Embeddings API, and the underlying model is `text-embedding-3-small`. There is no client-prefixed embedding key, and `VITE_EMBEDDING_API_KEY` is forbidden. `pnpm audit:client-secrets` checks client source and build output for server-secret leakage. Health and error responses never return credentials.
+
+## Phase 4 embedding preflight
+
+The Phase 4 preflight uses a minimal server-side `EmbeddingService` implemented by `OpenAICompatibleEmbeddingService` with native `fetch`. It calls the configured DMXAPI base URL with an OpenAI-compatible request for `text-embedding-3-small`, explicitly sends `dimensions: 1024`, and rejects malformed, non-finite, empty, or wrong-sized results. DMXAPI's published example omits `dimensions` and shows the model's default 1536-dimensional output, so 1024-dimensional compatibility is established by the live verification rather than inferred from protocol compatibility. The preflight verified on 2026-08-13 that DMXAPI returned exactly 1024 finite values when the request explicitly supplied `dimensions: 1024`.
+
+The committed Supabase migration enables `vector` in the `extensions` schema. `pnpm verify:embedding` performs the opt-in live DMXAPI smoke test. Only if that returns exactly 1024 dimensions does `pnpm verify:embedding:local` continue to generate real vectors, store them in a session-local `extensions.vector(1024)` table, verify PostgreSQL dimension enforcement, and run cosine similarity ranking. The temporary table is destroyed with the database session. The same preflight run stored all five real sample vectors and ranked Function Calling, Tool Calling, and 工具调用 above Database Index for the query Agent Function Calling.
+
+No permanent Knowledge embedding table is introduced by this preflight. The existing Phase 4 architecture does not yet freeze revision binding, version coexistence, or replacement semantics for that table; making those decisions here would prematurely change the Knowledge persistence contract.
 
 ## API surface
 

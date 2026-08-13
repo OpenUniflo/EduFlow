@@ -9,10 +9,22 @@ function filesUnder(directory) {
 }
 
 if (!existsSync("dist")) throw new Error("dist is missing; run pnpm build first");
-const secret = process.env.SUPABASE_SECRET_KEY;
+const secretNames = [
+  "SUPABASE_SECRET_KEY",
+  "EMBEDDING_API_KEY",
+  "VITE_EMBEDDING_API_KEY",
+  "OPENAI_API_KEY",
+  "VITE_OPENAI_API_KEY"
+];
+const secretValues = [process.env.SUPABASE_SECRET_KEY, process.env.EMBEDDING_API_KEY, process.env.OPENAI_API_KEY]
+  .filter((value) => value && value.length >= 12);
 const violations = filesUnder("dist").filter((file) => {
   const source = readFileSync(file, "utf8");
-  return source.includes("SUPABASE_SECRET_KEY") || Boolean(secret && secret.length >= 12 && source.includes(secret));
+  return secretNames.some((name) => source.includes(name)) || secretValues.some((secret) => source.includes(secret));
 });
+violations.push(...filesUnder("src").filter((file) => {
+  const source = readFileSync(file, "utf8");
+  return source.includes("EMBEDDING_API_KEY") || source.includes("OPENAI_API_KEY");
+}));
 if (violations.length) throw new Error(`Client secret boundary failed in ${violations.join(", ")}`);
 console.log("Client secret boundary: passed");
