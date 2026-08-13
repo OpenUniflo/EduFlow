@@ -1,0 +1,285 @@
+{
+  "datasetVersion": "knowledge-gold-v0.1",
+  "relations": [
+    {
+      "from": "K01",
+      "to": "K02",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "先掌握最小工程组成，再区分 Agent 内外边界更自然。"
+    },
+    {
+      "from": "K02",
+      "to": "K03",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "观察/动作接口建立在 Agent 与 Environment 边界之上。"
+    },
+    {
+      "from": "K01",
+      "to": "K04",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "工具是最小 Agent 组成之一。"
+    },
+    {
+      "from": "K04",
+      "to": "K05",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "理解工具概念后才能理解结构化工具调用循环。"
+    },
+    {
+      "from": "K01",
+      "to": "K06",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "LLM 决策角色属于最小 Agent 组成。"
+    },
+    {
+      "from": "K01",
+      "to": "K07",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "上下文是最小 Agent 组成之一。"
+    },
+    {
+      "from": "K03",
+      "to": "K07",
+      "type": "enables",
+      "weight": 0.8,
+      "rationale": "观察通道解释了环境信息如何进入模型上下文。"
+    },
+    {
+      "from": "K05",
+      "to": "K08",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "ReAct 的行动与观察依赖工具调用及结果回传。"
+    },
+    {
+      "from": "K06",
+      "to": "K08",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "ReAct 中的思考和下一步动作选择由模型决策完成。"
+    },
+    {
+      "from": "K07",
+      "to": "K08",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "ReAct 每轮决策依赖累积上下文。"
+    },
+    {
+      "from": "K08",
+      "to": "K09",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "轨迹是 ReAct 多轮交互积累出的结构化历史。"
+    },
+    {
+      "from": "K05",
+      "to": "K10",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "模型即 Agent 的讨论依赖对工具调用决策与执行边界的理解。"
+    },
+    {
+      "from": "K06",
+      "to": "K10",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "模型即 Agent 强调模型原生决策能力。"
+    },
+    {
+      "from": "K10",
+      "to": "K11",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "学习机制用于解释 Agent 行为如何从临场适应到参数内化。"
+    },
+    {
+      "from": "K01",
+      "to": "K12",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "Harness 是对最小 Agent 工程组成在生产可靠性层面的扩展。"
+    },
+    {
+      "from": "K08",
+      "to": "K12",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "Harness 围绕模型循环提供运行与治理保障。"
+    },
+    {
+      "from": "K12",
+      "to": "K13",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "约束是 Harness 的核心治理职责之一。"
+    },
+    {
+      "from": "K12",
+      "to": "K14",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "验证是 Harness 的核心治理职责之一。"
+    },
+    {
+      "from": "K12",
+      "to": "K15",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "纠正是 Harness 的核心治理职责之一。"
+    },
+    {
+      "from": "K12",
+      "to": "K16",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "理解 Harness 后才能定位其在工程范式演进中的层级。"
+    },
+    {
+      "from": "K04",
+      "to": "K17",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "ACI 设计建立在工具作为 Agent 接口的认识上。"
+    },
+    {
+      "from": "K12",
+      "to": "K17",
+      "type": "enables",
+      "weight": 0.7,
+      "rationale": "Harness 工程通过工具接口设计把模型能力转化为可靠行动。"
+    },
+    {
+      "from": "K06",
+      "to": "K18",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "模型选型需要先理解模型在 Agent 中承担的职责。"
+    },
+    {
+      "from": "K01",
+      "to": "K19",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "工作流是组织 Agent/LLM 与工具的一种编排模式。"
+    },
+    {
+      "from": "K08",
+      "to": "K20",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "自主 Agent 本质上以持续工具循环和环境反馈推进任务。"
+    },
+    {
+      "from": "K19",
+      "to": "K21",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "混合编排需要先理解确定性工作流。"
+    },
+    {
+      "from": "K20",
+      "to": "K21",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "混合编排需要先理解自主 Agent。"
+    },
+    {
+      "from": "K20",
+      "to": "K22",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "停止条件是自主 Agent 安全运行的基本要求。"
+    },
+    {
+      "from": "K12",
+      "to": "K23",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "护栏是 Harness 约束、验证与纠正层面的核心实现。"
+    },
+    {
+      "from": "K13",
+      "to": "K23",
+      "type": "enables",
+      "weight": 0.8,
+      "rationale": "约束机制是构建护栏防线的重要基础。"
+    },
+    {
+      "from": "K14",
+      "to": "K23",
+      "type": "enables",
+      "weight": 0.8,
+      "rationale": "验证机制支撑输入、执行和输出检查。"
+    },
+    {
+      "from": "K15",
+      "to": "K23",
+      "type": "enables",
+      "weight": 0.7,
+      "rationale": "纠正机制使护栏发现风险后能够闭环处理。"
+    },
+    {
+      "from": "K23",
+      "to": "K24",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "输入侧护栏属于分层护栏体系。"
+    },
+    {
+      "from": "K23",
+      "to": "K25",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "执行侧护栏属于分层护栏体系。"
+    },
+    {
+      "from": "K23",
+      "to": "K26",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "输出侧护栏属于分层护栏体系。"
+    },
+    {
+      "from": "K23",
+      "to": "K27",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "人工干预在本章中作为重要保护措施展开。"
+    },
+    {
+      "from": "K13",
+      "to": "K27",
+      "type": "enables",
+      "weight": 0.7,
+      "rationale": "高风险边界和失败阈值可触发人工接管。"
+    },
+    {
+      "from": "K19",
+      "to": "K20",
+      "type": "related",
+      "weight": 1.0,
+      "rationale": "二者是本章并列对比的两种主要编排模式。"
+    },
+    {
+      "from": "K12",
+      "to": "K28",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "这些原则用于指导生产级 Harness/Agent 工程。"
+    },
+    {
+      "from": "K17",
+      "to": "K28",
+      "type": "related",
+      "weight": 0.9,
+      "rationale": "良好 ACI 是本章核心 Agent 工程原则之一。"
+    }
+  ]
+}

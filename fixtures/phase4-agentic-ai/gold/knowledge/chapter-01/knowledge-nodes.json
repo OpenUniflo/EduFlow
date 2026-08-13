@@ -1,0 +1,766 @@
+{
+  "datasetVersion": "knowledge-gold-v0.1",
+  "matchPolicy": "semantic_with_aliases",
+  "nodes": [
+    {
+      "id": "K01",
+      "canonicalTitle": "现代 AI Agent 的最小工程组成",
+      "aliases": [
+        "Agent = LLM + 上下文 + 工具",
+        "LLM + Context + Tools"
+      ],
+      "type": "conceptual",
+      "description": "理解现代 Agent 在工程边界内由决策模型、上下文与工具接口协同构成。",
+      "masteryCriteria": [
+        "能说明 LLM、上下文、工具在 Agent 中分别承担什么职责",
+        "能解释该工程公式不包含 Environment 本身"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1",
+          "printedPages": [
+            7,
+            8
+          ],
+          "pdfPages": [
+            15,
+            16
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K02",
+      "canonicalTitle": "Agent 与 Environment 的系统边界",
+      "aliases": [
+        "Agent–Environment 边界",
+        "智能体与环境的闭环边界"
+      ],
+      "type": "conceptual",
+      "description": "区分 Agent 内部运行与治理层和外部环境状态，理解二者通过观察与行动形成闭环。",
+      "masteryCriteria": [
+        "能将文件系统、数据库、网页、用户等正确区分为 Environment 或 Agent 内部组件",
+        "能说明 Agent 通过观察和行动接口与 Environment 交互"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1 / 图 1-1",
+          "printedPages": [
+            7,
+            9
+          ],
+          "pdfPages": [
+            15,
+            17
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K03",
+      "canonicalTitle": "观察空间与动作接口",
+      "aliases": [
+        "Observation Space 与 Action Interface",
+        "观察通道与动作接口"
+      ],
+      "type": "conceptual",
+      "description": "理解模型可见的信息和可执行的行动由观察通道与动作接口限定，并共同定义 Agent 与世界的交互边界。",
+      "masteryCriteria": [
+        "能解释为什么未进入观察通道的信息对模型等同于不可见",
+        "能解释为什么未暴露为动作接口的操作无法被 Agent 实际执行"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1.1",
+          "printedPages": [
+            8,
+            9
+          ],
+          "pdfPages": [
+            16,
+            17
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K04",
+      "canonicalTitle": "Agent 工具及五类工具",
+      "aliases": [
+        "工具：Agent 的手脚",
+        "Agent Tools",
+        "感知/执行/协作/事件触发/用户沟通工具"
+      ],
+      "type": "conceptual",
+      "description": "理解工具是 Agent 与外部世界交互的广义接口，并能区分感知、执行、协作、事件触发和用户沟通五类。",
+      "masteryCriteria": [
+        "能把典型工具按五类正确分类",
+        "能区分工具接口与工具背后的 Environment 对象"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1.2",
+          "printedPages": [
+            10,
+            10
+          ],
+          "pdfPages": [
+            18,
+            18
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K05",
+      "canonicalTitle": "工具调用循环",
+      "aliases": [
+        "Tool Calling",
+        "Function Calling",
+        "结构化工具调用"
+      ],
+      "type": "procedural",
+      "description": "理解并能描述工具定义、模型选择与参数生成、工具执行、结果回注上下文的完整闭环。",
+      "masteryCriteria": [
+        "能按顺序说明工具调用的四个步骤",
+        "能区分模型的调用决策与框架/环境的真实工具执行"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1.2",
+          "printedPages": [
+            10,
+            11
+          ],
+          "pdfPages": [
+            18,
+            19
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K06",
+      "canonicalTitle": "LLM 作为 Agent 的决策核心",
+      "aliases": [
+        "LLM：Agent 的大脑",
+        "Model decision core"
+      ],
+      "type": "conceptual",
+      "description": "理解 LLM 在 Agent 中负责意图理解、思考规划、动作选择和动态决策，而不是承担外部工具执行。",
+      "masteryCriteria": [
+        "能说明 LLM 在一次 Agent 决策中的核心职责",
+        "能区分模型决策能力与 Harness/Environment 的执行职责"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1.3",
+          "printedPages": [
+            11,
+            11
+          ],
+          "pdfPages": [
+            19,
+            19
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K07",
+      "canonicalTitle": "Agent 上下文的组成",
+      "aliases": [
+        "上下文：Agent 的眼睛",
+        "Context composition",
+        "上下文五个组成部分"
+      ],
+      "type": "representational",
+      "description": "理解系统提示词、工具定义、用户消息、模型回复和工具结果如何共同构成模型每轮可见的信息。",
+      "masteryCriteria": [
+        "能列出并解释五类上下文组成",
+        "能区分静态前缀与随交互增长的动态消息历史"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1.4",
+          "printedPages": [
+            13,
+            14
+          ],
+          "pdfPages": [
+            21,
+            22
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K08",
+      "canonicalTitle": "ReAct 循环",
+      "aliases": [
+        "Reasoning + Acting",
+        "思考—行动—观察循环"
+      ],
+      "type": "conceptual",
+      "description": "理解 Agent 如何通过思考、行动和观察的循环持续推进任务并根据环境反馈调整下一步。",
+      "masteryCriteria": [
+        "能画出或描述 ReAct 的基本循环",
+        "能解释工具结果为什么必须进入后续决策上下文"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1.5",
+          "printedPages": [
+            14,
+            16
+          ],
+          "pdfPages": [
+            22,
+            24
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K09",
+      "canonicalTitle": "Agent 轨迹",
+      "aliases": [
+        "Trajectory",
+        "结构化执行轨迹"
+      ],
+      "type": "representational",
+      "description": "理解任务执行中用户消息、模型回复、工具调用和工具结果如何累积为可解释、可调试的结构化轨迹。",
+      "masteryCriteria": [
+        "能指出轨迹中应保存的关键消息类型",
+        "能说明轨迹与模型每轮完整上下文之间的关系"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1.5",
+          "printedPages": [
+            14,
+            16
+          ],
+          "pdfPages": [
+            22,
+            24
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K10",
+      "canonicalTitle": "模型即 Agent",
+      "aliases": [
+        "Model as Agent",
+        "原生 Agent 能力"
+      ],
+      "type": "conceptual",
+      "description": "理解模型可通过训练内化工具调用等决策策略，但工具本身和执行循环仍由外部 Harness/API 基础设施提供。",
+      "masteryCriteria": [
+        "能区分被模型内化的决策策略与模型外部的工具执行机制",
+        "能解释为什么模型更强并不意味着 Harness 消失"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1.3.1 / 实验 1-2 / 实验 1-3",
+          "printedPages": [
+            11,
+            18
+          ],
+          "pdfPages": [
+            19,
+            26
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K11",
+      "canonicalTitle": "Agent 行为更新的三个层次",
+      "aliases": [
+        "Agent 学习机制",
+        "上下文适应/外部制品更新/参数更新"
+      ],
+      "type": "conceptual",
+      "description": "理解 Agent 行为可通过任务内上下文适应、跨任务外部制品更新和训练周期参数更新三种时间尺度发生改变。",
+      "masteryCriteria": [
+        "能比较三种更新路径的载体、持续时间和成本",
+        "能为具体能力改进选择合理的更新路径"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.1.3.2",
+          "printedPages": [
+            12,
+            13
+          ],
+          "pdfPages": [
+            20,
+            21
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K12",
+      "canonicalTitle": "Harness 工程",
+      "aliases": [
+        "Harness Engineering",
+        "模型运行与治理层"
+      ],
+      "type": "conceptual",
+      "description": "理解 Harness 是 Agent 边界内、模型之外的运行与治理层，负责上下文、工具以及约束、验证、纠正。",
+      "masteryCriteria": [
+        "能准确说明 Harness 与 Model、Environment 的边界",
+        "能说明 Harness 如何把可工作的 Agent 推向可靠的生产系统"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2",
+          "printedPages": [
+            18,
+            20
+          ],
+          "pdfPages": [
+            26,
+            28
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K13",
+      "canonicalTitle": "Harness 约束机制",
+      "aliases": [
+        "Constrain",
+        "行为边界约束"
+      ],
+      "type": "procedural",
+      "description": "理解通过权限、规则和故障安全默认值限制 Agent 可执行行为的工程机制。",
+      "masteryCriteria": [
+        "能为一个高风险工具设计最小必要权限边界",
+        "能解释默认关闭、显式开放的故障安全原则"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2 / 1.2.2",
+          "printedPages": [
+            18,
+            21
+          ],
+          "pdfPages": [
+            26,
+            29
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K14",
+      "canonicalTitle": "Harness 验证机制",
+      "aliases": [
+        "Verify",
+        "结果验证"
+      ],
+      "type": "procedural",
+      "description": "理解如何用结构化证据检查 Agent 操作或结果是否满足预期，而不是只相信模型自由文本。",
+      "masteryCriteria": [
+        "能说明为什么验证应优先依赖可检查的结构化证据",
+        "能为一个工具调用设计至少一个确定性验证条件"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2 / 1.2.2",
+          "printedPages": [
+            18,
+            21
+          ],
+          "pdfPages": [
+            26,
+            29
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K15",
+      "canonicalTitle": "Harness 纠正与恢复机制",
+      "aliases": [
+        "Correct",
+        "错误纠正",
+        "错误恢复"
+      ],
+      "type": "procedural",
+      "description": "理解 Agent 失败后通过重试、回退、熔断或人工接管恢复，而不是直接暴露不稳定中间态。",
+      "masteryCriteria": [
+        "能为连续失败场景选择重试、回退、熔断或人工接管策略",
+        "能解释为什么纠正机制是闭合执行循环的一部分"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2 / 1.2.2",
+          "printedPages": [
+            18,
+            21
+          ],
+          "pdfPages": [
+            26,
+            29
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K16",
+      "canonicalTitle": "Agent 工程范式的层级演进",
+      "aliases": [
+        "Prompt Engineering → Context Engineering → Harness Engineering → Loop Engineering → Graph Engineering"
+      ],
+      "type": "meta",
+      "description": "理解 Agent 工程关注范围从提示词扩展到上下文、运行治理、持续循环和显式执行图的层级演进。",
+      "masteryCriteria": [
+        "能比较各工程范式主要解决的问题",
+        "能判断一个实际问题应落在哪一层解决而不是盲目增加框架复杂度"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.1",
+          "printedPages": [
+            20,
+            20
+          ],
+          "pdfPages": [
+            28,
+            28
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K17",
+      "canonicalTitle": "Agent-Computer Interface 设计",
+      "aliases": [
+        "ACI",
+        "面向 Agent 的工具接口设计",
+        "Agent-Computer Interface"
+      ],
+      "type": "procedural",
+      "description": "理解工具命名、参数和边界应从 Agent 可理解、可正确使用的角度设计，并通过接口设计减少误用。",
+      "masteryCriteria": [
+        "能识别一个工具接口中容易诱发模型错误的设计",
+        "能改写工具名称/参数/约束使接口更易被 Agent 正确使用"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.3",
+          "printedPages": [
+            21,
+            21
+          ],
+          "pdfPages": [
+            29,
+            29
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K18",
+      "canonicalTitle": "Agent 模型选型",
+      "aliases": [
+        "Agent model selection",
+        "如何选择模型"
+      ],
+      "type": "meta",
+      "description": "理解 Agent 模型选型需要结合真实任务评估能力、策略边界、思考能力、成本、速度和多模态需求。",
+      "masteryCriteria": [
+        "能为给定 Agent 场景列出模型选型维度并说明优先级",
+        "能解释为什么不能只依据排行榜选择模型"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.4",
+          "printedPages": [
+            21,
+            22
+          ],
+          "pdfPages": [
+            29,
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K19",
+      "canonicalTitle": "确定性工作流编排",
+      "aliases": [
+        "Workflow",
+        "工作流模式"
+      ],
+      "type": "conceptual",
+      "description": "理解工作流通过开发者预定义执行路径组织 LLM 和工具，适合步骤明确、控制和安全要求高的任务。",
+      "masteryCriteria": [
+        "能解释工作流执行路径为何是确定性的",
+        "能判断固定流程何时优于自主 Agent"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.5.1",
+          "printedPages": [
+            22,
+            23
+          ],
+          "pdfPages": [
+            30,
+            31
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K20",
+      "canonicalTitle": "自主 Agent 编排",
+      "aliases": [
+        "Autonomous Agent",
+        "动态自主决策"
+      ],
+      "type": "conceptual",
+      "description": "理解自主 Agent 根据环境反馈动态决定下一步，适合开放式、难以预先确定步骤数量的任务。",
+      "masteryCriteria": [
+        "能解释自主 Agent 与确定性工作流在控制路径上的根本区别",
+        "能识别适合自主 Agent 的开放式任务"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.5.2",
+          "printedPages": [
+            23,
+            23
+          ],
+          "pdfPages": [
+            31,
+            31
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K21",
+      "canonicalTitle": "工作流与自主 Agent 的混合编排",
+      "aliases": [
+        "Hybrid orchestration",
+        "工作流 + 自主 Agent"
+      ],
+      "type": "meta",
+      "description": "理解生产系统可以将关键确定性流程与需要灵活决策的自主区域组合，以平衡可靠性和灵活性。",
+      "masteryCriteria": [
+        "能为一个业务流程划分确定性步骤和自主决策步骤",
+        "能解释混合架构在安全性、成本和灵活性上的权衡"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.5.3",
+          "printedPages": [
+            23,
+            24
+          ],
+          "pdfPages": [
+            31,
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K22",
+      "canonicalTitle": "自主 Agent 的停止条件",
+      "aliases": [
+        "Agent termination conditions",
+        "最大迭代/错误阈值/任务完成退出"
+      ],
+      "type": "procedural",
+      "description": "理解自主 Agent 必须设置任务完成、无工具调用、错误超限、最大轮次等明确停止条件以避免失控。",
+      "masteryCriteria": [
+        "能为自主循环设计至少三类停止条件",
+        "能解释缺少停止条件可能导致的死循环或过度执行风险"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.5.2 / 图 1-6",
+          "printedPages": [
+            23,
+            23
+          ],
+          "pdfPages": [
+            31,
+            31
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K23",
+      "canonicalTitle": "分层护栏",
+      "aliases": [
+        "Guardrails",
+        "护栏与安全性",
+        "分层防御"
+      ],
+      "type": "conceptual",
+      "description": "理解单个护栏不足以覆盖 Agent 风险，需要把多个专门护栏组合成输入、执行和输出等分层防线。",
+      "masteryCriteria": [
+        "能解释为什么 Agent 安全应采用分层防御",
+        "能区分危险请求漏放与合法请求误拒绝两类评估风险"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.6",
+          "printedPages": [
+            25,
+            25
+          ],
+          "pdfPages": [
+            33,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K24",
+      "canonicalTitle": "输入侧护栏",
+      "aliases": [
+        "Input guardrails"
+      ],
+      "type": "procedural",
+      "description": "理解在请求进入 Agent 前通过相关性、安全分类、内容审核和规则过滤降低输入风险。",
+      "masteryCriteria": [
+        "能为给定输入风险选择适当的输入侧检查",
+        "能区分越狱与提示注入的基本差异"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.6.1",
+          "printedPages": [
+            25,
+            25
+          ],
+          "pdfPages": [
+            33,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K25",
+      "canonicalTitle": "执行侧护栏",
+      "aliases": [
+        "Execution guardrails",
+        "工具风险评级"
+      ],
+      "type": "procedural",
+      "description": "理解在工具调用时依据可逆性、权限和影响评估风险，并对高风险操作增加审查或人工确认。",
+      "masteryCriteria": [
+        "能为工具操作设计低/中/高风险分类或等价策略",
+        "能说明哪些参数或副作用会使工具调用升级为高风险"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.6.1",
+          "printedPages": [
+            25,
+            25
+          ],
+          "pdfPages": [
+            33,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K26",
+      "canonicalTitle": "输出侧护栏",
+      "aliases": [
+        "Output guardrails"
+      ],
+      "type": "procedural",
+      "description": "理解在响应返回用户前检查个人信息和输出内容，以减少敏感信息泄露和不符合约束的结果。",
+      "masteryCriteria": [
+        "能为输出设计至少一种敏感信息检查和一种内容验证",
+        "能解释输出检查与输入检查的职责差异"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.6.1",
+          "printedPages": [
+            25,
+            25
+          ],
+          "pdfPages": [
+            33,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K27",
+      "canonicalTitle": "Human-in-the-Loop 人工干预",
+      "aliases": [
+        "HITL",
+        "Human in the loop",
+        "人工接管"
+      ],
+      "type": "procedural",
+      "description": "理解当 Agent 超过失败阈值或执行高风险操作时，将控制权升级给人工以提升可靠性和安全性。",
+      "masteryCriteria": [
+        "能识别需要人工干预的失败阈值和高风险触发条件",
+        "能设计 Agent 到人工的最小可用移交机制"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.6.2",
+          "printedPages": [
+            25,
+            26
+          ],
+          "pdfPages": [
+            33,
+            34
+          ]
+        }
+      ]
+    },
+    {
+      "id": "K28",
+      "canonicalTitle": "简单、透明与可用接口的 Agent 设计原则",
+      "aliases": [
+        "保持简单/保持透明/设计好工具接口",
+        "Agent 核心工程原则"
+      ],
+      "type": "meta",
+      "description": "理解构建 Agent 应优先保持方案简单、执行透明，并通过良好的 Agent 接口设计降低调试和误用成本。",
+      "masteryCriteria": [
+        "能在一个过度复杂的 Agent 方案中识别可删除的抽象",
+        "能说明透明轨迹和清晰接口如何提升调试与信任"
+      ],
+      "sourceRefs": [
+        {
+          "section": "1.2.3",
+          "printedPages": [
+            21,
+            21
+          ],
+          "pdfPages": [
+            29,
+            29
+          ]
+        }
+      ]
+    }
+  ]
+}

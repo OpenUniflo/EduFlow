@@ -1,0 +1,58 @@
+{
+  "datasetVersion": "knowledge-gold-v0.1",
+  "negativeNodeCases": [
+    {
+      "text": "第 1 章 AI Agent 入门",
+      "reason": "Chapter/curriculum container, not an atomic KnowledgeNode."
+    },
+    {
+      "text": "1.3 本章小结",
+      "reason": "Document summary section, not independently teachable ontology identity."
+    },
+    {
+      "text": "思考题",
+      "reason": "Assessment/question container, not KnowledgeNode."
+    },
+    {
+      "text": "图 1-1 Agent 与 Environment 的闭环交互",
+      "reason": "Figure/artifact illustrating knowledge, not KnowledgeNode identity."
+    },
+    {
+      "text": "图 1-2 Agent 能力更新的三个层次",
+      "reason": "Figure/artifact; the underlying conceptual model is represented by K11."
+    },
+    {
+      "text": "图 1-6 自主 Agent 的执行循环",
+      "reason": "Figure/artifact; underlying concepts are K20/K22."
+    },
+    {
+      "text": "Manus",
+      "reason": "Product example in this chapter; do not promote solely because it is named."
+    },
+    {
+      "text": "OpenClaw",
+      "reason": "Product example in this chapter; do not promote solely because it is named."
+    },
+    {
+      "text": "Kimi K3",
+      "reason": "Experiment/model example; not a required course KnowledgeNode for this Gold slice."
+    },
+    {
+      "text": "GPT-5.6",
+      "reason": "Experiment/model example; not a required course KnowledgeNode for this Gold slice."
+    },
+    {
+      "text": "Claude Code",
+      "reason": "Industrial example used to explain Harness, not required ontology identity in this slice."
+    },
+    {
+      "text": "n8n",
+      "reason": "Framework example used to illustrate hybrid orchestration, not required ontology identity in this slice."
+    },
+    {
+      "text": "1.2.7 本书作为 Harness 工程的实践指南",
+      "reason": "Book-navigation/summary section, not an atomic knowledge unit."
+    }
+  ],
+  "note": "These are hard negative examples for this scoped Chapter 1 baseline. A product/framework name may become a valid KnowledgeNode in a different course or source if it independently satisfies the atomic Knowledge definition."
+}

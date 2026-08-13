@@ -1,0 +1,64 @@
+{
+  "datasetVersion": "knowledge-gold-v0.1",
+  "status": "reference_not_exact_oracle",
+  "purpose": "Provide one human-reviewed reasonable organization and hard ordering/coverage constraints without asserting that only one curriculum is valid.",
+  "referenceChapters": [
+    {
+      "id": "C1",
+      "title": "Agent 核心组成与交互机制",
+      "knowledge": [
+        "K01",
+        "K02",
+        "K03",
+        "K04",
+        "K05",
+        "K06",
+        "K07",
+        "K08",
+        "K09"
+      ]
+    },
+    {
+      "id": "C2",
+      "title": "模型能力与 Harness 工程",
+      "knowledge": [
+        "K10",
+        "K11",
+        "K12",
+        "K13",
+        "K14",
+        "K15",
+        "K16",
+        "K17",
+        "K18",
+        "K28"
+      ]
+    },
+    {
+      "id": "C3",
+      "title": "编排、安全与生产可靠性",
+      "knowledge": [
+        "K19",
+        "K20",
+        "K21",
+        "K22",
+        "K23",
+        "K24",
+        "K25",
+        "K26",
+        "K27"
+      ]
+    }
+  ],
+  "hardConstraints": {
+    "allRequiredKnowledgeCovered": true,
+    "chapterAndLessonAreNotKnowledgeNodes": true,
+    "lessonOrderMustNotCreateOntologyEdges": true,
+    "respectHardPrerequisiteOrder": true
+  },
+  "softConstraints": [
+    "Exact chapter count and exact titles are not hard Gold for auto curriculum generation.",
+    "A different grouping is acceptable if all required Knowledge is covered and hard prerequisite order is respected.",
+    "Source section order may inform curriculum but must not be treated as automatic prerequisite evidence."
+  ]
+}

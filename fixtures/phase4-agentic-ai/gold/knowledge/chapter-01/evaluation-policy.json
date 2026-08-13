@@ -1,0 +1,46 @@
+{
+  "datasetVersion": "knowledge-gold-v0.1",
+  "nodeMatching": {
+    "mode": "semantic_with_aliases",
+    "exactIdMatchRequired": false,
+    "exactTitleMatchRequired": false,
+    "requirements": [
+      "Predicted node must represent the same independently teachable/assessable unit.",
+      "Aliases and harmless wording differences are accepted.",
+      "Over-broad nodes that collapse multiple Gold nodes should be reported as under-splitting.",
+      "Overly fine fragments without independent teaching/mastery value should be reported as over-splitting."
+    ]
+  },
+  "relationMatching": {
+    "directionMattersFor": [
+      "prerequisite",
+      "enables"
+    ],
+    "directionIgnoredFor": [
+      "related"
+    ],
+    "prerequisiteStrength": "Evaluate hard/soft separately when prediction exposes strength; do not fail an otherwise correct edge solely because strength is unavailable in the first implementation.",
+    "cyclePolicy": "Any prerequisite cycle is an invariant failure."
+  },
+  "curriculumMatching": {
+    "exactChapterTitleRequired": false,
+    "exactChapterCountRequired": false,
+    "required": [
+      "all expected Knowledge covered",
+      "hard prerequisite order respected",
+      "no curriculum container emitted as KnowledgeNode",
+      "curriculum order not silently persisted as KnowledgeRelation"
+    ]
+  },
+  "metrics": [
+    "expected node recall",
+    "spurious node rate",
+    "negative-case violation count",
+    "duplicate rate after normalization",
+    "relation precision/recall by type",
+    "prerequisite invalid-edge/cycle count",
+    "provenance completeness",
+    "curriculum Knowledge coverage"
+  ],
+  "aggregateScore": "Do not create a single aggregate score in Gold v0.1."
+}
