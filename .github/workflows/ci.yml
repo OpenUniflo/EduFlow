@@ -58,3 +58,27 @@ jobs:
 
       - name: Audit client secrets
         run: pnpm audit:client-secrets
+
+  parser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.26"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: services/parser/uv.lock
+
+      - name: Sync parser environment
+        working-directory: services/parser
+        run: uv sync --locked
+
+      - name: Test real parser fixtures
+        working-directory: services/parser
+        run: uv run pytest -q
