@@ -1,0 +1,37 @@
+{
+  "version": "parsing-gold-v0",
+  "positiveCases": [
+    {
+      "id": "parse-full-book-pdf",
+      "file": "corpus/AI-Agents-in-Depth-zh-CN-v1.4.pdf",
+      "runByDefaultInCi": false,
+      "purpose": "Full-book stress and canonical Phase 4 corpus."
+    },
+    {
+      "id": "parse-small-pdf",
+      "file": "fixtures/representative-agent-course.pdf",
+      "runByDefaultInCi": true,
+      "purpose": "Fast PDF compatibility fixture."
+    },
+    {
+      "id": "parse-small-pptx",
+      "file": "fixtures/representative-agent-course.pptx",
+      "runByDefaultInCi": true,
+      "purpose": "Fast PPTX compatibility fixture."
+    },
+    {
+      "id": "parse-small-docx",
+      "file": "fixtures/representative-agent-course.docx",
+      "runByDefaultInCi": true,
+      "purpose": "Fast DOCX compatibility fixture."
+    }
+  ],
+  "negativeCases": [
+    {
+      "id": "invalid-pdf-extension",
+      "file": "invalid/not-a-real-pdf.pdf",
+      "expectedLifecycle": "pending -> running -> failed",
+      "expectedBehavior": "Do not persist partial CourseMaterial. Keep diagnostic failure state and original uploaded file reference."
+    }
+  ]
+}

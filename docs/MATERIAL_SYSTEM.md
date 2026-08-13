@@ -44,9 +44,13 @@ One segment may cover several nodes, and one KnowledgeNode may be covered by seg
 
 Every coverage record must reference an existing material, one of that material's segments, and an active KnowledgeNode included by the course curriculum.
 
-## 12. Non-goals
+## 12. Structured Parsing Contract
 
-This version does not provide file upload storage, PDF parsing, rich authoring, annotations, highlights, collaborative comments, or content version synchronization.
+Uploaded PDF, PPTX, and DOCX sources may have a versioned structured parse attached to the existing `Material`. The vendor-neutral `CourseMaterial` document contains ordered Sections, ContentBlocks, structure-first Chunks, and honest SourceLocations. PDF locations use source pages, PPTX locations use slides, and DOCX locations use section paths plus stable raw-block identity and ordinal; DOCX page numbers are not manufactured.
+
+The source binary remains in private `course-materials` Storage. Raw Docling JSON and normalized `CourseMaterial` JSON remain separate immutable artifacts in private `material-parser-artifacts` Storage, so adapter changes can renormalize saved raw output without rerunning Docling. The worker persists raw JSON immediately after Docling conversion and before normalization. PostgreSQL stores only the material-owned parsing lifecycle, versions, checksums, artifact paths, and bounded diagnostics. One job row per Material moves through `pending -> running -> completed | failed`; retry reuses that row and increments its attempt. Retry clears the prior attempt's artifact pointers. A failed attempt may reference its reusable raw artifact but never a normalized artifact; a completed attempt is visible only after both current-attempt artifacts have been written. Operational job rows and parser artifacts are service-role-only.
+
+Rich authoring, annotations, highlights, collaborative comments, content version synchronization, Knowledge extraction, and semantic chunking remain non-goals.
 
 ## 13. Reader Lifecycle and Deep Links
 

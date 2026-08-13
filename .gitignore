@@ -4,3 +4,5 @@ dist/
 .env.local
 .env.*.local
 .vercel/
+
+/fixtures/phase4-agentic-ai/corpus/*.pdf
