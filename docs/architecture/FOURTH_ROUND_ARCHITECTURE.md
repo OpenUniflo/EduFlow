@@ -54,6 +54,12 @@ Phase 4 should extend these contracts instead of bypassing them with vendor-spec
 
 Supabase remains the authoritative product data platform. External technologies are adapters, not domain authorities.
 
+### Implemented preflight foundation
+
+Before Phase 4.1, the repository has an opt-in embedding preflight: server-only DMXAPI configuration, a minimal native-fetch `EmbeddingService` using the OpenAI-compatible Embeddings protocol with `text-embedding-3-small`, an explicit request for 1024 dimensions, and a migration-managed pgvector extension in Supabase. Provider identity, protocol compatibility, and model identity remain separate configuration facts. Live verification on 2026-08-13 confirmed that DMXAPI honored `dimensions: 1024`; the local path stored those real vectors in a session-local `extensions.vector(1024)` table and produced the expected semantic ordering without committing an unresolved permanent Knowledge embedding schema.
+
+This preflight does not implement parsing, extraction, alignment decisions, Knowledge mutation, indexing, or model routing.
+
 ## 4. Phase 4.1 — Material parsing and structuring
 
 ### Default
