@@ -53,8 +53,8 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Audit client secrets
-        run: pnpm audit:client-secrets
-
       - name: Build
         run: pnpm build
+
+      - name: Audit client secrets
+        run: pnpm audit:client-secrets
