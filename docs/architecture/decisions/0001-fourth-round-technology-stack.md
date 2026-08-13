@@ -25,7 +25,7 @@ Use the following default stack for Phase 4:
 | Course prerequisite DAG | EduFlow-owned logic |
 | Knowledge/Material/Practice mapping | EduFlow-owned logic |
 | Workflow canonical model | EduFlow-owned `WorkflowDefinition` |
-| Workflow execution | LangGraph behind runtime/compiler adapter |
+| Workflow execution | LangGraph TypeScript behind runtime/compiler adapter |
 | Deterministic practice validation | EduFlow Rule Validator |
 | Semantic practice evaluation | DeepEval behind evaluator adapter |
 | Authoritative Run / Step / Acceptance data | Supabase PostgreSQL |
@@ -54,7 +54,7 @@ Recommended contracts include:
 
 ### Cost / constraints
 
-- A Python execution environment is required for the initial parser worker and likely the LangGraph runtime if the Python implementation is selected.
+- A Python execution environment is required for the initial parser worker; the Workflow runtime remains in TypeScript and uses LangGraph behind EduFlow's runtime/compiler boundary.
 - Adapter contracts and mapping tests are required to prevent vendor models leaking into domain code.
 - LLM pipeline quality must be measured per stage rather than assumed from end output.
 
