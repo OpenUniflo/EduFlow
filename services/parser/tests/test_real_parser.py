@@ -37,7 +37,13 @@ def find_block(material: dict[str, object], text: str) -> dict[str, object]:
 def test_real_pdf_structure_and_page_provenance(parsed: dict[str, tuple[dict[str, object], dict[str, object]]]) -> None:
     raw, material = parsed["pdf"]
     assert sorted(map(int, raw["pages"])) == [1, 2, 3]  # type: ignore[arg-type]
-    assert {block["kind"] for block in material["blocks"]} >= {"heading", "paragraph", "table", "code", "picture"}  # type: ignore[index,union-attr]
+    assert {block["kind"] for block in material["blocks"]} >= {"heading", "paragraph", "table", "picture"}  # type: ignore[index,union-attr]
+    code_block = find_block(material, "def react_loop(task)")
+    # Docling 2.119 labels this visual block as code on macOS and paragraph on Ubuntu CPU.
+    # Content, provenance, and chunk membership are the stable CourseMaterial contract.
+    assert code_block["kind"] in {"code", "paragraph"}
+    assert code_block["source"]["page"] == 2
+    assert any(code_block["id"] in chunk["blockIds"] for chunk in material["chunks"])  # type: ignore[index,union-attr]
     case = gold_case("small-pdf-table")
     assert find_block(material, str(case["expectedTextContains"]))["source"]["page"] == case["source"]["pdfPage"]  # type: ignore[index]
     assert all(block["source"]["page"] in {1, 2, 3} for block in material["blocks"])  # type: ignore[index,union-attr]
