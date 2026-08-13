@@ -20,16 +20,23 @@ def _write_json(path: Path, value: object) -> None:
     temporary.replace(path)
 
 
+def convert_source(source: Path) -> dict[str, object]:
+    return DocumentConverter().convert(source).document.export_to_dict()
+
+
+def normalize_artifact(raw: dict[str, object], material_id: str) -> dict[str, object]:
+    return adapt_docling_artifact(raw, material_id).to_dict()
+
+
 def parse(source: Path, raw_output: Path, normalized_output: Path, material_id: str) -> None:
-    raw = DocumentConverter().convert(source).document.export_to_dict()
+    raw = convert_source(source)
     _write_json(raw_output, raw)
-    normalized = adapt_docling_artifact(raw, material_id)
-    _write_json(normalized_output, normalized.to_dict())
+    _write_json(normalized_output, normalize_artifact(raw, material_id))
 
 
 def normalize(raw_input: Path, normalized_output: Path, material_id: str) -> None:
     raw = json.loads(raw_input.read_text(encoding="utf-8"))
-    _write_json(normalized_output, adapt_docling_artifact(raw, material_id).to_dict())
+    _write_json(normalized_output, normalize_artifact(raw, material_id))
 
 
 def main() -> None:

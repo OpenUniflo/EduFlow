@@ -2,6 +2,51 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createServerSupabase, createUserSupabase, requireCapability } from "./_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
 import { dataOrThrow } from "./_lib/query.js";
+import type { MaterialParsingJob } from "../src/features/material/parsing/types.js";
+
+type MaterialParsingJobRow = {
+  id: string;
+  course_id: string;
+  material_id: string;
+  status: MaterialParsingJob["status"];
+  attempt: number;
+  parser_version: string;
+  adapter_version: string;
+  raw_artifact_path: string | null;
+  normalized_artifact_path: string | null;
+  error_code: string | null;
+  error_message: string | null;
+};
+
+export function toMaterialParsingJob(row: MaterialParsingJobRow): MaterialParsingJob {
+  return {
+    id: row.id,
+    courseId: row.course_id,
+    materialId: row.material_id,
+    status: row.status,
+    attempt: row.attempt,
+    parserVersion: row.parser_version,
+    adapterVersion: row.adapter_version,
+    ...(row.raw_artifact_path ? { rawArtifactPath: row.raw_artifact_path } : {}),
+    ...(row.normalized_artifact_path ? { normalizedArtifactPath: row.normalized_artifact_path } : {}),
+    ...(row.error_code ? { errorCode: row.error_code } : {}),
+    ...(row.error_message ? { errorMessage: row.error_message } : {})
+  };
+}
+
+export function parsingJobRetryPatch(now: string) {
+  return {
+    status: "pending" as const,
+    source_sha256: null,
+    raw_artifact_path: null,
+    normalized_artifact_path: null,
+    error_code: null,
+    error_message: null,
+    started_at: null,
+    completed_at: null,
+    updated_at: now
+  };
+}
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   const { user } = await createUserSupabase(request);
@@ -13,7 +58,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const result = await server.from("material_parsing_jobs").select("*").eq("id", jobId).maybeSingle();
     if (result.error) throw new Error(`Material parsing job query failed: ${result.error.message}`);
     if (!result.data) throw new ApiError(404, "parsing_job_not_found", "Material parsing job not found");
-    json(response, 200, { job: result.data });
+    json(response, 200, { job: toMaterialParsingJob(result.data as MaterialParsingJobRow) });
     return;
   }
   if (request.method === "POST") {
@@ -21,12 +66,13 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (current.error || !current.data) throw new ApiError(404, "parsing_job_not_found", "Material parsing job not found");
     if (!["failed", "completed"].includes(current.data.status)) throw new ApiError(409, "parsing_job_not_retryable", "Only failed or completed parsing jobs can be queued again");
     const result = await server.from("material_parsing_jobs")
-      .update({ status: "pending", error_code: null, error_message: null, completed_at: null, updated_at: new Date().toISOString() })
+      .update(parsingJobRetryPatch(new Date().toISOString()))
       .eq("id", jobId)
       .eq("status", current.data.status)
-      .select("id, status, attempt")
+      .select("*")
       .single();
-    json(response, 200, { job: dataOrThrow(result.data, result.error, "Material parsing job retry") });
+    const row = dataOrThrow(result.data, result.error, "Material parsing job retry");
+    json(response, 200, { job: toMaterialParsingJob(row as MaterialParsingJobRow) });
     return;
   }
   return methodNotAllowed(response, ["GET", "POST"]);

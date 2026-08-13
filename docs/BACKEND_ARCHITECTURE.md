@@ -128,7 +128,7 @@ If hosted Email Confirmation or Password Reset is enabled later, Supabase Dashbo
 
 PDF, PPTX, and DOCX are accepted by the storage/metadata boundary. The current reader renders original PDF pages and existing Article/Document content. PPTX/DOCX conversion or native binary rendering is not implemented.
 
-Phase 4.1 parsing runs outside the 30-second Vercel Function boundary as a single-job Python 3.12/uv worker. The API creates and retries material-owned job records; a service-role-only RPC atomically claims an attempt and marks it completed or failed. The worker downloads the existing private source, runs Docling, uploads separate raw and normalized JSON artifacts, and then completes the job. This is an invocation boundary, not a scheduler: production worker hosting remains replaceable and no queue, polling framework, Docling Serve, or distributed job platform is introduced.
+Phase 4.1 parsing runs outside the 30-second Vercel Function boundary as a single-job Python 3.12/uv worker. The API creates and retries material-owned job records; service-role-only RPCs atomically claim an attempt and mark it completed or failed. Operational job rows and the private parser artifact bucket have no authenticated-client access. The worker downloads the existing private source, runs Docling, persists raw JSON before normalization, uploads normalized JSON only after the adapter succeeds, and then completes the job. This is an invocation boundary, not a scheduler: production worker hosting remains replaceable and no queue, polling framework, Docling Serve, or distributed job platform is introduced.
 
 ## Demo and seed boundary
 

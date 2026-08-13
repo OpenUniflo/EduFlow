@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from .cli import parse
+from .cli import convert_source, normalize_artifact
 
 
 class WorkerError(RuntimeError):
@@ -62,11 +62,16 @@ def _safe_message(error: Exception) -> str:
     return message[:1000] or type(error).__name__
 
 
+def _json_bytes(value: object) -> bytes:
+    return json.dumps(value, ensure_ascii=False, indent=2).encode("utf-8")
+
+
 def run_job(job_id: str, boundary: SupabaseBoundary) -> None:
     claimed = boundary.json_request("/rest/v1/rpc/claim_material_parsing_job", {"target_id": job_id})
     if not isinstance(claimed, dict):
         raise WorkerError("Claim RPC returned an invalid job")
     attempt = int(claimed["attempt"])
+    raw_artifact: str | None = None
     try:
         source = boundary.download_source(str(claimed["source_storage_path"]))
         source_hash = hashlib.sha256(source).hexdigest()
@@ -74,24 +79,25 @@ def run_job(job_id: str, boundary: SupabaseBoundary) -> None:
         with tempfile.TemporaryDirectory(prefix="eduflow-parser-") as directory:
             root = Path(directory)
             source_path = root / f"source{suffix}"
-            raw_path = root / "raw.json"
-            normalized_path = root / "normalized.json"
             source_path.write_bytes(source)
             # Docling may log temporary local paths before raising. The worker emits only its sanitized result.
             with contextlib.redirect_stderr(io.StringIO()):
-                parse(source_path, raw_path, normalized_path, str(claimed["material_id"]))
+                raw = convert_source(source_path)
             artifact_root = f"jobs/{job_id}/attempt-{attempt}"
-            raw_artifact = f"{artifact_root}/raw.json"
+            raw_artifact_candidate = f"{artifact_root}/raw.json"
             normalized_artifact = f"{artifact_root}/normalized.json"
-            boundary.upload_artifact(raw_artifact, raw_path.read_bytes())
-            boundary.upload_artifact(normalized_artifact, normalized_path.read_bytes())
+            boundary.upload_artifact(raw_artifact_candidate, _json_bytes(raw))
+            raw_artifact = raw_artifact_candidate
+            normalized = normalize_artifact(raw, str(claimed["material_id"]))
+            boundary.upload_artifact(normalized_artifact, _json_bytes(normalized))
         boundary.json_request("/rest/v1/rpc/complete_material_parsing_job", {
             "target_id": job_id, "expected_attempt": attempt, "parsed_source_sha256": source_hash,
             "raw_path": raw_artifact, "normalized_path": normalized_artifact,
         })
     except Exception as error:
         boundary.json_request("/rest/v1/rpc/fail_material_parsing_job", {
-            "target_id": job_id, "expected_attempt": attempt, "failure_code": "material_parse_failed", "failure_message": _safe_message(error),
+            "target_id": job_id, "expected_attempt": attempt, "raw_path": raw_artifact,
+            "failure_code": "material_parse_failed", "failure_message": _safe_message(error),
         })
         raise
 

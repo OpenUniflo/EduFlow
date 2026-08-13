@@ -21,13 +21,16 @@ create table public.material_parsing_jobs (
   check (source_sha256 is null or source_sha256 ~ '^[0-9a-f]{64}$'),
   check ((status = 'completed' and raw_artifact_path is not null and normalized_artifact_path is not null and error_code is null and error_message is null)
     or status <> 'completed'),
-  check ((status = 'failed' and error_code is not null and error_message is not null) or status <> 'failed')
+  check ((status = 'failed' and error_code is not null and error_message is not null) or status <> 'failed'),
+  check (raw_artifact_path is null or status in ('completed', 'failed')),
+  check (normalized_artifact_path is null or status = 'completed'),
+  check (raw_artifact_path is null or raw_artifact_path = 'jobs/' || id::text || '/attempt-' || attempt || '/raw.json'),
+  check (normalized_artifact_path is null or normalized_artifact_path = 'jobs/' || id::text || '/attempt-' || attempt || '/normalized.json')
 );
 
 create index material_parsing_jobs_status_idx on public.material_parsing_jobs(status, updated_at);
 alter table public.material_parsing_jobs enable row level security;
-create policy material_parsing_jobs_authenticated_read on public.material_parsing_jobs for select to authenticated using (true);
-grant select on public.material_parsing_jobs to authenticated;
+revoke all on table public.material_parsing_jobs from anon, authenticated;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('material-parser-artifacts', 'material-parser-artifacts', false, 104857600, array['application/json'])
@@ -43,6 +46,7 @@ declare claimed public.material_parsing_jobs;
 begin
   update public.material_parsing_jobs
   set status = 'running', attempt = attempt + 1, started_at = now(), completed_at = null,
+      source_sha256 = null, raw_artifact_path = null, normalized_artifact_path = null,
       error_code = null, error_message = null, updated_at = now()
   where id = target_id and status = 'pending'
   returning * into claimed;
@@ -64,11 +68,14 @@ begin
 end;
 $$;
 
-create or replace function public.fail_material_parsing_job(target_id uuid, expected_attempt integer, failure_code text, failure_message text)
+create or replace function public.fail_material_parsing_job(
+  target_id uuid, expected_attempt integer, raw_path text, failure_code text, failure_message text
+)
 returns void language plpgsql security definer set search_path = public as $$
 begin
   update public.material_parsing_jobs
-  set status = 'failed', error_code = left(failure_code, 80), error_message = left(failure_message, 1000),
+  set status = 'failed', raw_artifact_path = raw_path, normalized_artifact_path = null,
+      error_code = left(failure_code, 80), error_message = left(failure_message, 1000),
       completed_at = now(), updated_at = now()
   where id = target_id and status = 'running' and attempt = expected_attempt;
   if not found then raise exception 'material_parse_job_not_running'; end if;
@@ -77,7 +84,7 @@ $$;
 
 revoke all on function public.claim_material_parsing_job(uuid) from public, anon, authenticated;
 revoke all on function public.complete_material_parsing_job(uuid, integer, text, text, text) from public, anon, authenticated;
-revoke all on function public.fail_material_parsing_job(uuid, integer, text, text) from public, anon, authenticated;
+revoke all on function public.fail_material_parsing_job(uuid, integer, text, text, text) from public, anon, authenticated;
 grant execute on function public.claim_material_parsing_job(uuid) to service_role;
 grant execute on function public.complete_material_parsing_job(uuid, integer, text, text, text) to service_role;
-grant execute on function public.fail_material_parsing_job(uuid, integer, text, text) to service_role;
+grant execute on function public.fail_material_parsing_job(uuid, integer, text, text, text) to service_role;
