@@ -101,7 +101,12 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       })));
       dataOrThrow(segmentResult.data, segmentResult.error, "MaterialSegment insert");
     }
-    json(response, 201, { material: { id: body.materialId, courseId: body.courseId, lessonId: body.lessonId, storagePath: body.path, type: materialType } });
+    const parsingJob = await server.from("material_parsing_jobs").insert({
+      course_id: body.courseId, material_id: body.materialId, source_storage_path: body.path,
+      status: "pending", parser_version: "docling-2.119.0", adapter_version: "course-material-v1"
+    }).select("id, status").single();
+    const job = dataOrThrow(parsingJob.data, parsingJob.error, "Material parsing job insert");
+    json(response, 201, { material: { id: body.materialId, courseId: body.courseId, lessonId: body.lessonId, storagePath: body.path, type: materialType }, parsingJob: job });
     return;
   }
   return methodNotAllowed(response, ["POST", "PUT"]);
