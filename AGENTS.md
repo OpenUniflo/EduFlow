@@ -413,6 +413,7 @@
 
 - Committed files under `supabase/migrations` are the authoritative business-schema history. Hosted schema changes MUST use those same locally verified migrations and MUST NOT be recreated manually in Dashboard.
 - Local destructive database commands MUST explicitly target Local Supabase. Hosted Supabase MUST NOT be reset by the normal development workflow.
+- Local acceptance users MUST never be seeded into Hosted Supabase. Any bootstrap command that creates or updates them MUST reject non-Local Supabase URLs before reading privileged credentials or mutating Auth or database state.
 - Browser code may use only the Supabase URL and publishable key. `SUPABASE_SECRET_KEY` MUST remain server-only, MUST NOT use a `VITE_` prefix, and MUST NOT enter client source, build output, logs, health responses, or error responses.
 - Feature Core, Domain logic, and repository contracts MUST NOT import Supabase SDK or environment variables. React Features MUST NOT perform direct Supabase table access; `src/app` selects concrete API repositories and may bind Supabase Auth at the application boundary.
 - Production and Preview Knowledge, Domain, Course, Material, Learning Progress, and Workflow persistence MUST flow through Repository contracts to `/api` and Supabase. Concrete Demo data is seed/test input, never production runtime authority.

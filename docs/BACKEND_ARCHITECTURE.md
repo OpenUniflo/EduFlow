@@ -21,11 +21,14 @@ Local development uses Local Supabase only:
 ```text
 pnpm db:start
 pnpm db:reset
+pnpm auth:bootstrap-local
 pnpm dev
 Browser -> Vite local API middleware -> Local Supabase
 ```
 
 `pnpm dev` is the local equivalent of Vercel Functions and serves both the Vite application and `/api/*`. `pnpm verify:backend:local` creates disposable local Auth users, verifies API and RLS behavior, and removes its test data.
+
+`pnpm auth:bootstrap-local` independently creates or corrects the fixed `local-admin@eduflow.local` and `local-student@eduflow.local` acceptance identities through the Auth Admin API. It also restores their profiles, verifies password login and the existing API authorization paths, and gives Local Admin a small Personal Atlas state using active Agentic AI and Python Engineering KnowledgeNodes. Passwords remain only in ignored `.env.local`; `.env.example` contains placeholders. The command accepts only `http://127.0.0.1:54321` or `http://localhost:54321` and fails before privileged configuration is used when the target is not Local Supabase.
 
 `.env.local` contains the URL, publishable key, and secret key emitted by `supabase start`; it is ignored by Git. `.env.example` contains placeholders only. Local destructive commands always use `--local`. Remote reset is not part of this workflow.
 

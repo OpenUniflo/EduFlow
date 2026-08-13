@@ -9,6 +9,7 @@ import progressHandler from "../api/progress";
 import workflowsHandler from "../api/workflows";
 import materialsHandler from "../api/materials";
 import domainsHandler from "../api/domains";
+import { assertLocalSupabaseUrl } from "./local-supabase";
 
 type Handler = (request: VercelRequest, response: VercelResponse) => Promise<void> | void;
 type Invocation = { status: number; body: any; headers: Record<string, string | string[]> };
@@ -51,8 +52,7 @@ function workflowRun(workflowId: string, id: string, createdAt: string, provenan
   };
 }
 
-const supabaseUrl = required("SUPABASE_URL");
-assert.match(supabaseUrl, /^http:\/\/(127\.0\.0\.1|localhost):54321\/?$/, "This verifier refuses to run against a hosted Supabase project");
+const supabaseUrl = assertLocalSupabaseUrl(required("SUPABASE_URL"));
 const secretKey = required("SUPABASE_SECRET_KEY");
 const publishableKey = required("VITE_SUPABASE_PUBLISHABLE_KEY");
 const server = createClient(supabaseUrl, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
