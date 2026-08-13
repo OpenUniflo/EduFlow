@@ -1,0 +1,60 @@
+{
+  "version": "parsing-gold-v0",
+  "note": "Use PDF page numbers for PDFs, slide numbers for PPTX, and section/block order for DOCX unless the parser provides reliable page positions.",
+  "cases": [
+    {
+      "id": "book-title",
+      "file": "corpus/AI-Agents-in-Depth-zh-CN-v1.4.pdf",
+      "expectedTextContains": "深入理解 AI Agent",
+      "source": {
+        "type": "pdf",
+        "pdfPage": 1
+      }
+    },
+    {
+      "id": "book-chapter-1",
+      "file": "corpus/AI-Agents-in-Depth-zh-CN-v1.4.pdf",
+      "expectedTextContains": "第 1 章 AI Agent 入门",
+      "source": {
+        "type": "pdf",
+        "pdfPage": 15
+      }
+    },
+    {
+      "id": "book-react",
+      "file": "corpus/AI-Agents-in-Depth-zh-CN-v1.4.pdf",
+      "expectedTextContains": "1.1.5 ReAct 循环",
+      "source": {
+        "type": "pdf",
+        "pdfPage": 22
+      }
+    },
+    {
+      "id": "small-pdf-table",
+      "file": "fixtures/representative-agent-course.pdf",
+      "expectedTextContains": "工具调用流程",
+      "source": {
+        "type": "pdf",
+        "pdfPage": 2
+      }
+    },
+    {
+      "id": "small-pptx-slide-3",
+      "file": "fixtures/representative-agent-course.pptx",
+      "expectedTextContains": "2. ReAct 循环",
+      "source": {
+        "type": "pptx",
+        "slide": 3
+      }
+    },
+    {
+      "id": "small-docx-section",
+      "file": "fixtures/representative-agent-course.docx",
+      "expectedTextContains": "DOCX 通常没有稳定的源页码语义",
+      "source": {
+        "type": "docx",
+        "heading": "4. DOCX 页面语义说明"
+      }
+    }
+  ]
+}
