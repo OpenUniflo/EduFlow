@@ -1,0 +1,201 @@
+# Phase 4 — Core Business Loop Architecture
+
+## 1. Goal
+
+Phase 4 turns the engineering and data foundations from Phases 1–3 into EduFlow's first real end-to-end teaching loop:
+
+```text
+Upload course material
+  -> parse and structure
+  -> AI knowledge modeling and course generation
+  -> knowledge/material/practice mapping
+  -> student learning
+  -> real Workflow execution
+  -> automatic acceptance
+```
+
+The success boundary is a vertical product slice, not a count of implemented features.
+
+## 2. Existing boundaries to preserve
+
+Phase 4 builds on the current repository architecture:
+
+- `docs/BACKEND_ARCHITECTURE.md`: browser -> Repository contract -> `/api` -> Supabase PostgreSQL/Auth/Storage; feature/domain code does not import Supabase directly.
+- `docs/WORKFLOW_ARCHITECTURE.md`: Workflow domain/editor/application/runtime/repository boundaries are already separated; the current Demo runtime is explicitly replaceable.
+- `docs/MATERIAL_SYSTEM.md`: `MaterialSegment` is the addressable reading unit and `MaterialKnowledgeCoverage` is the N:M content-to-Knowledge mapping.
+- `docs/KNOWLEDGE_ARCHITECTURE_V1.md`: Knowledge is a stable domain model rather than a course-page artifact.
+
+Phase 4 should extend these contracts instead of bypassing them with vendor-specific models.
+
+## 3. Default architecture
+
+```text
+                               EduFlow
+                                  |
+             +--------------------+--------------------+
+             |                    |                    |
+             v                    v                    v
+      Material pipeline     Knowledge pipeline    Practice runtime
+             |                    |                    |
+          Docling          Structured LLM         EduFlow-owned
+        Python worker          outputs         WorkflowDefinition
+             |                    |                    |
+             v                    v                    v
+       CourseMaterial        align / DAG           LangGraph
+             |                    |                    |
+             +----------+---------+---------+----------+
+                        |                   |
+                        v                   v
+                    Supabase            Acceptance
+             PostgreSQL/Auth/Storage   rules + DeepEval
+                        |
+                     pgvector
+```
+
+Supabase remains the authoritative product data platform. External technologies are adapters, not domain authorities.
+
+## 4. Phase 4.1 — Material parsing and structuring
+
+### Default
+
+Use Docling through a lightweight Python parser worker.
+
+```text
+Supabase Storage
+  -> Parse Job
+  -> Python Parser Worker
+  -> DoclingDocument
+  -> Docling adapter
+  -> EduFlow CourseMaterial
+```
+
+### EduFlow-owned model
+
+`CourseMaterial` should expose stable product concepts such as:
+
+- Document
+- Section
+- Page / Slide
+- ContentBlock
+- Chunk
+- SourceLocation
+
+Do not expose `DoclingDocument` directly throughout the application.
+
+Keep the original parsed Docling artifact so CourseMaterial normalization can be re-run without reparsing the source binary.
+
+### Success
+
+Real PDF/PPTX/DOCX input produces persistent, traceable structured material with source locations suitable for downstream AI processing.
+
+## 5. Phase 4.2 — AI knowledge modeling and course generation
+
+Use an explicit pipeline rather than one unconstrained Agent:
+
+```text
+CourseMaterial
+  -> candidate extraction
+  -> normalization
+  -> deduplication
+  -> global Knowledge alignment
+  -> prerequisite inference
+  -> DAG validation
+  -> chapter organization
+  -> Course Skill Tree
+```
+
+Each stage has structured input/output, can be retried independently, records model/version metadata, and can be evaluated separately.
+
+### Candidate extraction
+
+Default to structured LLM output behind a `KnowledgeCandidateExtractor` contract.
+
+Docling Graph may be evaluated as an alternative extractor adapter. It must not directly define the Course Skill DAG.
+
+### Knowledge alignment
+
+Use Supabase PostgreSQL + pgvector:
+
+```text
+candidate Knowledge
+  -> embedding
+  -> pgvector Top-K retrieval
+  -> rule filtering / LLM judge
+  -> matched | ambiguous | new
+```
+
+The vector store narrows candidates; it does not decide ontology identity on its own.
+
+### Prerequisite semantics
+
+A generic content relation is not a teaching prerequisite. `prerequisite_of` remains an EduFlow-owned teaching decision with validation for self-edges, cycles, duplicates, invalid references, and unsupported relations.
+
+## 6. Phase 4.3 — Knowledge / Material / Practice mapping
+
+This remains EduFlow domain logic.
+
+Core relationships:
+
+```text
+Knowledge <-> MaterialSegment
+Knowledge <-> Practice
+Practice -> Practice
+Practice -> ChapterOutcome
+ChapterOutcome -> FinalProject
+```
+
+`MaterialKnowledgeCoverage` remains the formal N:M material mapping rather than inferring Knowledge from titles or page numbers.
+
+Not every Knowledge node must map to a Workflow. Practice types may include analysis, quiz, template experiment, workflow, and project tasks.
+
+## 7. Phase 4.4 — Real Workflow runtime
+
+Keep `WorkflowDefinition` owned by EduFlow and compile/adapt it to LangGraph:
+
+```text
+React Flow editor
+  -> EduFlow WorkflowDefinition
+  -> LangGraphCompiler / WorkflowRuntime adapter
+  -> LangGraph execution
+  -> EduFlow Run / Step persistence
+```
+
+Do not persist LangGraph-specific JSON as the canonical product model.
+
+Phase 4 runtime scope is intentionally limited to teaching requirements: graph validation, LLM/tool nodes, state passing, routing/conditions, basic retry/error handling, pause/resume where required, and durable Run/Step records.
+
+Do not build a general LangGraph replacement.
+
+## 8. Phase 4.5 — Automatic acceptance
+
+Use two layers:
+
+```text
+AcceptanceSpec
+  -> deterministic Rule Validator
+  -> semantic evaluator when needed
+  -> AcceptanceResult
+```
+
+Deterministic checks have priority for graph structure, required nodes, schemas, actual tool calls, run status, limits, and expected machine-verifiable outputs.
+
+DeepEval may back a semantic evaluator adapter for open-ended task completion, quality, tool-choice, argument-quality, or plan-quality checks.
+
+Authoritative `PracticeAttempt`, evidence, and `AcceptanceResult` remain in EduFlow PostgreSQL.
+
+## 9. Phase 4.6 — End-to-end closeout
+
+Using real Agentic AI material, without manually editing database rows or depending on production DemoRepository/fixtures, the system must:
+
+1. upload source material;
+2. parse it into structured CourseMaterial;
+3. generate/alignment Knowledge and a valid Course Skill DAG;
+4. establish formal Material and Practice mappings;
+5. let a learner navigate from Knowledge to real material and practice;
+6. execute the Workflow through a backend runtime;
+7. persist Run/Step evidence;
+8. return persistent pass/fail/review acceptance feedback.
+
+## 10. Phase 5 boundary
+
+Phase 4 records raw learning, runtime, and acceptance evidence. It does not yet turn that evidence into the full Mastery model, Personal Knowledge Atlas, connection analysis, recommendation, adaptive learning paths, class analytics, or a full teacher analytics dashboard.
