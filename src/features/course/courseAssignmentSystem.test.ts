@@ -512,6 +512,7 @@ describe("Material and progress generalization", () => {
       curriculumSequences: [],
       assignments: [{ id: "A", courseId: "scoped-course", order: 0, title: "A", description: "A", requirements: ["A"], expectedOutput: "A", acceptanceCriteria: ["A"], mode: "instruction" }],
       assignmentCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `ac-${nodeId}`, assignmentId: "A", nodeId, role: "practice" as const })),
+      assignmentDependencies: [], chapterOutcomes: [], assignmentOutcomeCompositions: [], finalProjects: [], finalProjectOutcomeCompositions: [],
       materials: [{ id: "M", courseId: "scoped-course", lessonId: "L", order: 0, title: "M", type: "article", segments: [{ id: "S", order: 1, title: "S", content: {} }] }],
       materialKnowledgeCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `mc-${nodeId}`, materialId: "M", segmentId: "S", nodeId, role: "introduce" as const })),
       revision: "v1"
@@ -563,6 +564,7 @@ describe("Material and progress generalization", () => {
       curriculumSequences: [],
       assignments: [{ id: "assignment-01", courseId, order: 0, title: `${title} Assignment`, description: title, requirements: [title], expectedOutput: title, acceptanceCriteria: [title], mode: "instruction" }],
       assignmentCoverages: [{ id: "assignment-coverage-01", assignmentId: "assignment-01", nodeId: node.id, role: "practice" }],
+      assignmentDependencies: [], chapterOutcomes: [], assignmentOutcomeCompositions: [], finalProjects: [], finalProjectOutcomeCompositions: [],
       materials: [],
       materialKnowledgeCoverages: [],
       revision: "v1"

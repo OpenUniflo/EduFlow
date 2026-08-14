@@ -91,6 +91,7 @@ No permanent Knowledge embedding table is introduced by this preflight. The exis
 - `POST|PUT /api/materials`: authorizes direct-to-Storage upload and commits trusted Material metadata.
 - `PUT /api/domains`: persists Global Domain governance after capability and active-node validation.
 - `POST /api/knowledge-generation`: generates and atomically persists User Knowledge and Curriculum from a completed Phase 4.1 parsing job.
+- `POST /api/course-mapping`: consumes an owning completed Phase 4.2 Course, resolves provenance coverage, generates stable-ID-bound Assignments and direct dependencies, and atomically persists Phase 4.3 composition data.
 
 The API is intentionally a small mapping layer rather than a second Domain model or a backend framework.
 
@@ -106,6 +107,7 @@ The database normalizes:
 - Knowledge nodes, revisions, factual edges, Domains, assignments, candidates, and proposals;
 - Courses, curricula, Chapters, Lessons, Coverage, and Sequence;
 - Assignments and AssignmentCoverage;
+- direct Assignment dependencies, ChapterOutcomes, FinalProjects, and their explicit composition relations;
 - Materials, Segments, and MaterialKnowledgeCoverage;
 - user Knowledge, Course, Assignment, and Material state;
 - Workflow templates, user Workflow definitions/state, and Workflow Runs.

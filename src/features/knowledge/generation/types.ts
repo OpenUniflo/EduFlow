@@ -48,7 +48,7 @@ export type GeneratedCurriculum = {
   chapters: GeneratedCurriculumChapter[];
 };
 
-export type GenerationStage = "extraction" | "deduplication" | "coverage" | "admission" | "relations" | "curriculum";
+export type GenerationStage = "extraction" | "deduplication" | "coverage" | "admission" | "relations" | "curriculum" | "assignments" | "assignment-dependencies";
 
 export type CandidateAdmissionDecision = {
   candidateId: string;

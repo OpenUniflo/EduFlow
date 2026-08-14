@@ -4,9 +4,9 @@ import type { KnowledgeAccessContext, KnowledgeRepository } from "../../knowledg
 import { resolveKnowledgeMaterialEntries, resolveKnowledgeMaterialEntry } from "../../material/materialNavigation";
 import type { UserKnowledgeRecord } from "../../profile/types";
 import type {
-  AssignmentCoverage, Course, CourseAssignment, CourseAssignmentSummary, CourseChapterEdge, CourseChapterProjection,
+  AssignmentCoverage, AssignmentDependency, AssignmentOutcomeComposition, ChapterOutcome, Course, CourseAssignment, CourseAssignmentSummary, CourseChapterEdge, CourseChapterProjection,
   CourseCurriculum, CourseSkillTreeEdge, CourseSkillTreeNode, CourseSummary, CurriculumChapter, CurriculumCoverage,
-  CurriculumLesson, CurriculumSequence, Material, MaterialKnowledgeCoverage, UserAssignmentState, UserCourseState
+  CurriculumLesson, CurriculumSequence, FinalProject, FinalProjectOutcomeComposition, Material, MaterialKnowledgeCoverage, UserAssignmentState, UserCourseState
 } from "@/features/course/types";
 import { defaultCourseUnlockPolicy, type CourseUnlockPolicy } from "./courseUnlockPolicy";
 import { compareCourseCurriculumContexts, compareCourseKnowledgeOrder, selectPrimaryCurriculumCoverage } from "../curriculum/curriculumOrdering";
@@ -22,6 +22,11 @@ export type CourseRuntimeData = {
   curriculumSequences: CurriculumSequence[];
   assignments: CourseAssignment[];
   assignmentCoverages: AssignmentCoverage[];
+  assignmentDependencies: AssignmentDependency[];
+  chapterOutcomes: ChapterOutcome[];
+  assignmentOutcomeCompositions: AssignmentOutcomeComposition[];
+  finalProjects: FinalProject[];
+  finalProjectOutcomeCompositions: FinalProjectOutcomeComposition[];
   materials: Material[];
   materialKnowledgeCoverages: MaterialKnowledgeCoverage[];
   revision: string;
@@ -58,6 +63,8 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
   const lessonIds = new Set(runtime.lessons.map((lesson) => lesson.id));
   const courseNodeIds = new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId));
   const assignmentIds = new Set(runtime.assignments.map((assignment) => assignment.id));
+  const outcomeIds = new Set(runtime.chapterOutcomes.map((outcome) => outcome.id));
+  const finalProjectIds = new Set(runtime.finalProjects.map((project) => project.id));
   const materialIds = new Set(runtime.materials.map((material) => material.id));
   const curriculumCoverageIds = new Set(runtime.curriculumCoverages.map((coverage) => coverage.id));
   const curriculumSequenceIds = new Set(runtime.curriculumSequences.map((sequence) => sequence.id));
@@ -110,6 +117,37 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
     if (assignment.mode === "workflow" && !assignment.workflowTemplateId) errors.push(`Workflow Assignment ${assignment.id} has no template`);
   });
   validateUniqueOrders(errors, runtime.assignments, (assignment) => assignment.order, "Assignment");
+  const dependencyPairs = new Set<string>();
+  runtime.assignmentDependencies.forEach((dependency) => {
+    if (dependency.courseId !== runtime.course.id) errors.push(`AssignmentDependency ${dependency.id} belongs to another Course`);
+    if (!assignmentIds.has(dependency.sourceAssignmentId) || !assignmentIds.has(dependency.targetAssignmentId)) errors.push(`AssignmentDependency ${dependency.id} has a dangling Assignment reference`);
+    if (dependency.sourceAssignmentId === dependency.targetAssignmentId) errors.push(`AssignmentDependency ${dependency.id} cannot be a self-edge`);
+    const pair = `${dependency.sourceAssignmentId}:${dependency.targetAssignmentId}`;
+    if (dependencyPairs.has(pair)) errors.push(`Duplicate AssignmentDependency relation ${pair}`);
+    dependencyPairs.add(pair);
+  });
+  if (runtime.assignmentDependencies.length) assertDirectedAcyclic(assignmentIds, runtime.assignmentDependencies.map((dependency) => ({ source: dependency.sourceAssignmentId, target: dependency.targetAssignmentId })));
+  const chapterOutcomeChapters = new Set<string>();
+  runtime.chapterOutcomes.forEach((outcome) => {
+    if (outcome.courseId !== runtime.course.id || !chapterIds.has(outcome.chapterId)) errors.push(`ChapterOutcome ${outcome.id} has invalid Course or Chapter ownership`);
+    if (chapterOutcomeChapters.has(outcome.chapterId)) errors.push(`Chapter ${outcome.chapterId} has multiple ChapterOutcomes`);
+    chapterOutcomeChapters.add(outcome.chapterId);
+  });
+  const assignmentOutcomePairs = new Set<string>();
+  runtime.assignmentOutcomeCompositions.forEach((composition) => {
+    if (!assignmentIds.has(composition.assignmentId) || !outcomeIds.has(composition.outcomeId)) errors.push(`AssignmentOutcomeComposition ${composition.id} has a dangling reference`);
+    const pair = `${composition.assignmentId}:${composition.outcomeId}`;
+    if (assignmentOutcomePairs.has(pair)) errors.push(`Duplicate AssignmentOutcomeComposition relation ${pair}`);
+    assignmentOutcomePairs.add(pair);
+  });
+  runtime.finalProjects.forEach((project) => { if (project.courseId !== runtime.course.id) errors.push(`FinalProject ${project.id} belongs to another Course`); });
+  const finalCompositionPairs = new Set<string>();
+  runtime.finalProjectOutcomeCompositions.forEach((composition) => {
+    if (!finalProjectIds.has(composition.finalProjectId) || !outcomeIds.has(composition.outcomeId)) errors.push(`FinalProjectOutcomeComposition ${composition.id} has a dangling reference`);
+    const pair = `${composition.finalProjectId}:${composition.outcomeId}`;
+    if (finalCompositionPairs.has(pair)) errors.push(`Duplicate FinalProjectOutcomeComposition relation ${pair}`);
+    finalCompositionPairs.add(pair);
+  });
   const assignmentRelations = new Set<string>();
   runtime.assignmentCoverages.forEach((coverage) => {
     if (!assignmentIds.has(coverage.assignmentId)) errors.push(`AssignmentCoverage ${coverage.id} references unknown Assignment`);

@@ -91,6 +91,42 @@ export type CourseAssignment = {
   projectContribution?: string;
 };
 
+/** Direct teaching/execution prerequisite between course-owned Assignments. */
+export type AssignmentDependency = {
+  id: string;
+  courseId: string;
+  sourceAssignmentId: string;
+  targetAssignmentId: string;
+  strength: "hard" | "soft";
+};
+
+/** Stable course-owned outcome identity; CurriculumChapter.outcome remains its display summary. */
+export type ChapterOutcome = {
+  id: string;
+  courseId: string;
+  chapterId: string;
+  title: string;
+};
+
+export type AssignmentOutcomeComposition = {
+  id: string;
+  assignmentId: string;
+  outcomeId: string;
+};
+
+export type FinalProject = {
+  id: string;
+  courseId: string;
+  title: string;
+  description: string;
+};
+
+export type FinalProjectOutcomeComposition = {
+  id: string;
+  finalProjectId: string;
+  outcomeId: string;
+};
+
 export type UserAssignmentStatus = "not-started" | "in-progress" | "completed";
 export type UserAssignmentState = {
   assignmentId: string;

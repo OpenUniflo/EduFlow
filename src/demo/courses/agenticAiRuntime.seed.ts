@@ -70,6 +70,11 @@ export const agenticAiRuntime: CourseRuntimeData = {
   curriculumSequences,
   assignments: courseAssignments,
   assignmentCoverages,
+  assignmentDependencies: [],
+  chapterOutcomes: [],
+  assignmentOutcomeCompositions: [],
+  finalProjects: [],
+  finalProjectOutcomeCompositions: [],
   materials: [agenticAiMaterial],
   materialKnowledgeCoverages: agenticAiMaterialKnowledgeCoverages,
   revision: "agentic-ai-v4-final-model-freeze"

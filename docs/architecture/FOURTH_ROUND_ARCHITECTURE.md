@@ -160,6 +160,12 @@ ChapterOutcome -> FinalProject
 
 Not every Knowledge node must map to a Workflow. Practice types may include analysis, quiz, template experiment, workflow, and project tasks.
 
+Phase 4.3 Gold uses `Practice` as human evaluation terminology. The production domain continues to use the existing `CourseAssignment` and N:M `AssignmentCoverage`; Gold objective and deliverable semantics map to Assignment description and expected output rather than defining a parallel Practice schema. `instruction` remains the representation for non-canvas tasks, while `workflow` is used only with an existing valid Workflow template.
+
+Direct Assignment prerequisites are persisted as course-owned `AssignmentDependency` records and validated as a DAG independently from Knowledge topology. Stable `ChapterOutcome` and `FinalProject` identities plus explicit composition relations represent `Assignment -> ChapterOutcome -> FinalProject`; chapter outcome and project-contribution strings remain display content rather than relationship keys.
+
+Material coverage is resolved deterministically from persisted Phase 4.2 material provenance. PDF source pages resolve to the matching one-page MaterialSegments; exact non-PDF section locations may resolve to explicitly addressed Segments. Ambiguous or missing addresses fail for review and are never replaced with whole-document embedding search or order-based guesses. Provenance alone yields the conservative `explain` role because it does not prove first introduction.
+
 ## 7. Phase 4.4 — Real Workflow runtime
 
 Keep `WorkflowDefinition` owned by EduFlow and compile/adapt it to LangGraph:

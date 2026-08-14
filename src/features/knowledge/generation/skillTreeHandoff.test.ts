@@ -15,7 +15,7 @@ const runtime: CourseRuntimeData = {
   chapters: [{ id: "chapter", courseId: "generated-course", title: "Chapter", description: "Chapter", order: 0, color: "#6f85ff", outcome: "Outcome" }],
   lessons: [{ id: "lesson", courseId: "generated-course", chapterId: "chapter", title: "Lesson", order: 0 }],
   curriculumCoverages: ["a", "b"].map((nodeId, order) => ({ id: `coverage-${nodeId}`, courseId: "generated-course", lessonId: "lesson", nodeId, role: "introduce", order })),
-  curriculumSequences: [], assignments: [], assignmentCoverages: [], materials: [], materialKnowledgeCoverages: [], revision: "run-1"
+  curriculumSequences: [], assignments: [], assignmentCoverages: [], assignmentDependencies: [], chapterOutcomes: [], assignmentOutcomeCompositions: [], finalProjects: [], finalProjectOutcomeCompositions: [], materials: [], materialKnowledgeCoverages: [], revision: "run-1"
 };
 const repository = new InMemoryKnowledgeRepository(graph);
 const access = userKnowledgeAccess("user-1");

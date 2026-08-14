@@ -44,6 +44,8 @@ One segment may cover several nodes, and one KnowledgeNode may be covered by seg
 
 Every coverage record must reference an existing material, one of that material's segments, and an active KnowledgeNode included by the course curriculum.
 
+Phase 4.3 derives generated-course coverage from persisted Phase 4.2 `KnowledgeProvenance.sourceLocations`. PDF pages resolve exactly to page Segments. Non-PDF locations resolve only when an explicit unique Segment section address exists; unresolved or ambiguous locations are review failures rather than order-based guesses. Because provenance proves source support but not first introduction, generated coverage uses the conservative `explain` role unless a future explicit teaching-role source is added.
+
 ## 12. Structured Parsing Contract
 
 Uploaded PDF, PPTX, and DOCX sources may have a versioned structured parse attached to the existing `Material`. The vendor-neutral `CourseMaterial` document contains ordered Sections, ContentBlocks, structure-first Chunks, and honest SourceLocations. PDF locations use source pages, PPTX locations use slides, and DOCX locations use section paths plus stable raw-block identity and ordinal; DOCX page numbers are not manufactured.
