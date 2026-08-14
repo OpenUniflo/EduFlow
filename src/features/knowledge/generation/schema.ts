@@ -28,6 +28,22 @@ function strings(value: unknown, label: string, allowEmpty = false): string[] {
   return result;
 }
 
+function boundedMasteryCriteria(value: unknown, label: string, onWarning?: (warning: string) => void): string[] {
+  const parsed = strings(value, label);
+  const seen = new Set<string>();
+  const normalized = parsed.flatMap((criterion) => {
+    const value = criterion.normalize("NFKC").replace(/[\s\u00a0]+/g, " ").trim();
+    const key = value.toLocaleLowerCase("zh-CN");
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [value];
+  });
+  if (normalized.length !== parsed.length || normalized.length > 2) {
+    onWarning?.(`${label} normalized from ${parsed.length} valid items to ${Math.min(2, normalized.length)} by deterministic deduplication and the 2-item representation cap`);
+  }
+  return normalized.slice(0, 2);
+}
+
 export type ExtractedCandidateDto = {
   id: string;
   canonicalTitle: string;
@@ -38,7 +54,7 @@ export type ExtractedCandidateDto = {
   sourceChunkIds: string[];
 };
 
-export function parseExtractionOutput(value: unknown, maxCandidates = 40): ExtractedCandidateDto[] {
+export function parseExtractionOutput(value: unknown, maxCandidates = 40, onWarning?: (warning: string) => void): ExtractedCandidateDto[] {
   const root = object(value, "extraction output");
   const ids = new Set<string>();
   const candidates = array(root.candidates, "candidates");
@@ -51,9 +67,8 @@ export function parseExtractionOutput(value: unknown, maxCandidates = 40): Extra
     const type = string(candidate.type, `candidates[${index}].type`) as KnowledgeNodeType;
     if (!NODE_TYPES.has(type)) throw new Error(`Unsupported KnowledgeNode type: ${type}`);
     const aliases = strings(candidate.aliases ?? [], `candidates[${index}].aliases`, true);
-    const masteryCriteria = strings(candidate.masteryCriteria, `candidates[${index}].masteryCriteria`);
+    const masteryCriteria = boundedMasteryCriteria(candidate.masteryCriteria, `candidates[${index}].masteryCriteria`, onWarning);
     if (aliases.length > 6) throw new Error(`candidates[${index}].aliases exceeds 6 items`);
-    if (masteryCriteria.length > 2) throw new Error(`candidates[${index}].masteryCriteria exceeds 2 items`);
     return {
       id,
       canonicalTitle: string(candidate.canonicalTitle, `candidates[${index}].canonicalTitle`),
@@ -87,7 +102,12 @@ export function parseEquivalenceOutput(value: unknown, requestedPairIds: Set<str
 
 export type CoverageDecisionDto = { sectionId: string; status: "covered" | "missing"; missingCandidates: ExtractedCandidateDto[] };
 
-export function parseCoverageOutput(value: unknown, requestedSectionIds: Set<string>, knownChunkIds: Set<string>): CoverageDecisionDto[] {
+export function parseCoverageOutput(
+  value: unknown,
+  requestedSectionIds: Set<string>,
+  knownChunkIds: Set<string>,
+  onWarning?: (warning: string) => void
+): CoverageDecisionDto[] {
   const root = object(value, "coverage output");
   const seen = new Set<string>();
   const sections = array(root.sections, "sections").map((item, index) => {
@@ -98,7 +118,7 @@ export function parseCoverageOutput(value: unknown, requestedSectionIds: Set<str
     seen.add(sectionId);
     const status = string(decision.status, `sections[${index}].status`);
     if (status !== "covered" && status !== "missing") throw new Error(`Invalid coverage status: ${status}`);
-    const missingCandidates = parseExtractionOutput({ candidates: decision.missingCandidates ?? [] }, 8);
+    const missingCandidates = parseExtractionOutput({ candidates: decision.missingCandidates ?? [] }, 8, onWarning);
     if (status === "covered" && missingCandidates.length) throw new Error(`Covered section must not return missing candidates: ${sectionId}`);
     if (status === "missing" && !missingCandidates.length) throw new Error(`Missing section must return at least one candidate: ${sectionId}`);
     missingCandidates.forEach((candidate) => candidate.sourceChunkIds.forEach((id) => {

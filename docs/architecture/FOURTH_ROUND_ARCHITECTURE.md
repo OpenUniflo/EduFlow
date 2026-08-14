@@ -116,6 +116,8 @@ CourseMaterial
 
 Each stage has structured input/output, can be retried independently, records model/version metadata, and can be evaluated separately.
 
+The Phase 4.2 structured-output boundary distinguishes semantic corruption from a bounded representation mismatch. Missing, empty, or wrongly typed required fields still fail validation and use the existing bounded retry. A model response containing more than two otherwise valid mastery criteria is deterministically trimmed, deduplicated, capped to the compact generated-candidate representation, and recorded as a validation warning; this repair does not change candidate identity, type, or provenance.
+
 Candidate admission is a local ontology quality gate over already extracted and recovered candidates, limited source evidence, and nearby ingestion-local candidates. It does not regenerate a Chapter or the whole ontology. `SUBSUMED_BY` is a granularity decision, not semantic duplicate identity and not a new KnowledgeRelation; only admitted candidates enter the final Knowledge set.
 
 ### Candidate extraction
@@ -135,6 +137,10 @@ Embedding-based similarity is used inside one course-ingestion run only to retri
 A generic content relation is not a teaching prerequisite. `prerequisite_of` remains an EduFlow-owned teaching decision with validation for self-edges, cycles, duplicates, invalid references, and unsupported relations.
 
 For the Phase 4.2 MVP, relation classification is precision-first: insufficient, proximity-only, order-only, part/whole, or similarity-only evidence produces `NONE`. Omission is preferable to an unsupported learning edge; higher relation recall remains a post-MVP quality optimization.
+
+The v1 domain continues to support `prerequisite`, `enables`, and `related`. Phase 4.2 automatic generation is deliberately narrower: it publishes supported prerequisite facts only, rejects a prerequisite when the classifier rationale explicitly relies on document order, and suppresses generated `enables`/`related` facts. Live MVP evidence showed that those associative types dominated graph density and were not reliable enough to publish. This is a generator policy, not an ontology change; manually governed and future higher-confidence pipelines may still use every v1 relation type.
+
+Phase 4.2 MVP acceptance prioritizes a stable complete generation, graph invariants, traceability, curriculum/Skill Tree handoff, and a readable precision-first teaching path. One canonical live run plus one independent same-configuration sanity repeat is the merge gate. Gold node/relation metrics, relation recall, and cost remain reported diagnostics rather than fixed MVP thresholds. Formal three-or-more-run statistical stability remains post-MVP model-quality work.
 
 ## 6. Phase 4.3 — Knowledge / Material / Practice mapping
 

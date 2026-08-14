@@ -55,6 +55,14 @@ function candidateRelationId(type: string, source: string, target: string) {
   return `candidate-edge:${type}:${endpoints[0]}:${endpoints[1]}`;
 }
 
+function recordValidationWarnings(executions: ModelExecutionMetadata[], warnings: string[]) {
+  if (!warnings.length) return;
+  const index = executions.length - 1;
+  const execution = executions[index];
+  if (!execution) return;
+  executions[index] = { ...execution, validationWarnings: [...(execution.validationWarnings ?? []), ...warnings] };
+}
+
 async function boundedStructuredGeneration<T>(
   client: StructuredGenerationClient,
   request: Parameters<StructuredGenerationClient["generateJson"]>[0],
@@ -90,10 +98,12 @@ export async function extractAtomicKnowledge(input: KnowledgeGenerationInput, cl
         stage: "extraction", promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION,
         schemaVersion: EXTRACTION_SCHEMA_VERSION, ...prompt, maxTokens: 8_000, temperature: 0.1
       }, executions, (value) => {
-        const output = parseExtractionOutput(value, 8);
+        const warnings: string[] = [];
+        const output = parseExtractionOutput(value, 8, (warning) => warnings.push(warning));
         output.forEach((candidate) => candidate.sourceChunkIds.forEach((id) => {
           if (!chunkById.has(id)) throw new Error(`Unknown extraction source chunk reference: ${id}`);
         }));
+        recordValidationWarnings(executions, warnings);
         return output;
       }, () => { retryCount += 1; });
     } catch (error) {
@@ -164,7 +174,12 @@ async function auditCoverage(input: KnowledgeGenerationInput, candidates: Knowle
     const prompt = coverageAuditPrompt(batch);
     const decisions = await boundedStructuredGeneration(client, { stage: "coverage", promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION,
       schemaVersion: COVERAGE_SCHEMA_VERSION, ...prompt, maxTokens: 5_000, temperature: 0 }, executions,
-    (value) => parseCoverageOutput(value, new Set(batch.map(({ unit }) => unit.id)), new Set(chunkById.keys())), () => { retryCounter.count += 1; });
+    (value) => {
+      const warnings: string[] = [];
+      const output = parseCoverageOutput(value, new Set(batch.map(({ unit }) => unit.id)), new Set(chunkById.keys()), (warning) => warnings.push(warning));
+      recordValidationWarnings(executions, warnings);
+      return output;
+    }, () => { retryCounter.count += 1; });
     decisions.forEach((decision) => {
       if (decision.status === "missing") gaps += 1;
       decision.missingCandidates.forEach((candidate) => additions.push({
@@ -264,8 +279,27 @@ export async function classifyRelations(candidates: KnowledgeCandidate[], chunks
             : { ...common, relation, strength: result.strength as number });
         });
   }
-  validateCandidateGraph(candidates, relations);
-  return { relations, executions, batchCount: batches.length };
+  const publishedRelations = applyMvpRelationPolicy(relations);
+  validateCandidateGraph(candidates, publishedRelations);
+  return {
+    relations: publishedRelations,
+    classifiedRelationCount: relations.length,
+    suppressedDocumentOrderPrerequisiteCount: relations.filter(isDocumentOrderOnlyPrerequisite).length,
+    suppressedEnablesCount: relations.filter((relation) => relation.relation === "enables").length,
+    suppressedRelatedCount: relations.filter((relation) => relation.relation === "related").length,
+    executions,
+    batchCount: batches.length
+  };
+}
+
+function isDocumentOrderOnlyPrerequisite(relation: CandidateKnowledgeRelation) {
+  if (relation.relation !== "prerequisite") return false;
+  return /\b(?:introduc(?:e[sd]?|ing)|present(?:ed|ing)?|discuss(?:ed|ing)?|appear(?:s|ed|ing)?)\b.{0,120}\b(?:before|after|following)\b|\bfollowing\s+the\s+introduction\b|\bsource\s+order\b|\bdocument\s+order\b|(?:先介绍|随后讨论|文档顺序|材料顺序)/iu.test(relation.reason);
+}
+
+/** Phase 4.2 automatic generation publishes only its reliable teaching-path relation. */
+export function applyMvpRelationPolicy(relations: CandidateKnowledgeRelation[]) {
+  return relations.filter((relation) => relation.relation === "prerequisite" && !isDocumentOrderOnlyPrerequisite(relation));
 }
 
 export async function generateCurriculum(candidates: KnowledgeCandidate[], relations: CandidateKnowledgeRelation[], input: KnowledgeGenerationInput, client: StructuredGenerationClient) {
@@ -392,6 +426,10 @@ export async function runKnowledgeGenerationPipeline(input: KnowledgeGenerationI
       retrievedRelationPairCount: relationCandidatePairs.length,
       relationRetrievalReductionRatio: allRelationPairCount ? 1 - relationCandidatePairs.length / allRelationPairCount : 0,
       relationBatchCount: relationExtraction.batchCount,
+      classifiedRelationCount: relationExtraction.classifiedRelationCount,
+      suppressedDocumentOrderPrerequisiteCount: relationExtraction.suppressedDocumentOrderPrerequisiteCount,
+      suppressedEnablesCount: relationExtraction.suppressedEnablesCount,
+      suppressedRelatedCount: relationExtraction.suppressedRelatedCount,
       structuredRetryCount: extraction.retryCount + retryCounter.count + Math.max(0, curriculumGeneration.executions.length - 1)
     }
   };

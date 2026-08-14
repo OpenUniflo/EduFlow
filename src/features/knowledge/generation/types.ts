@@ -91,6 +91,10 @@ export type GenerationDiagnostics = {
   retrievedRelationPairCount: number;
   relationRetrievalReductionRatio: number;
   relationBatchCount: number;
+  classifiedRelationCount: number;
+  suppressedDocumentOrderPrerequisiteCount: number;
+  suppressedEnablesCount: number;
+  suppressedRelatedCount: number;
   structuredRetryCount: number;
 };
 

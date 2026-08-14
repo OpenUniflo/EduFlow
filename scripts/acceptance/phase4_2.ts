@@ -174,6 +174,7 @@ try {
       completionTokens: result.executions.reduce((sum, execution) => sum + (execution.completionTokens ?? 0), 0),
       relationBatches: result.diagnostics.relationBatchCount,
       validationRetryCount: result.diagnostics.structuredRetryCount },
+    validationWarnings: result.executions.flatMap((execution) => (execution.validationWarnings ?? []).map((warning) => ({ stage: execution.stage, requestId: execution.requestId, warning }))),
     skillTree, evaluation };
   writeFileSync(join(OUTPUT, runIndex ? `run-${runIndex}.json` : "summary.json"), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));

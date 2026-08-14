@@ -242,7 +242,7 @@ Deferred. The current generic LLM remains a confirmed model-quality bottleneck: 
 One chapter Gold dataset is an architecture regression oracle, not sufficiently large or representative training data. Training now would overfit one course and introduce an unsupported model lifecycle.
 
 ### Current solution
-Structured LLM classification of retrieved unordered pairs into NONE, prerequisite hard/soft, enables, or related, followed by deterministic graph validation.
+Structured LLM classification of retrieved unordered pairs into NONE, prerequisite hard/soft, enables, or related, followed by a conservative Phase 4.2 publishing policy and deterministic graph validation. The MVP automatic generator publishes prerequisite only; the domain model still supports all three relation types.
 
 ### Revisit triggers
 Evaluate a trained classifier after enough human-reviewed, domain-diverse pair labels exist for NONE, prerequisite, enables, and related. It may classify high-confidence pairs and reserve the LLM for low-confidence cases.
@@ -252,13 +252,13 @@ Evaluate a trained classifier after enough human-reviewed, domain-diverse pair l
 ## Production multi-LLM voting / ensemble
 
 ### Current status
-Deferred. Three-run generation is evaluation-only.
+Deferred. Multi-run generation is evaluation-only; the Phase 4.2 MVP gate uses one canonical live run plus one independent same-configuration sanity repeat and never votes or selects the better output.
 
 ### Why not now
 Voting multiplies latency and cost and can conceal excessive generation freedom without fixing retrieval, classification contracts, or validation. Phase 4.2 needs one bounded production pipeline per ingestion.
 
 ### Current solution
-One production generation run; acceptance executes three independent runs, retains all results, and reports stability without selecting or merging them.
+One production generation run. Acceptance retains and reports every run without selecting or merging them. The existing three-run stability tool remains available for formal post-MVP evaluation.
 
 ### Revisit triggers
 Evaluate voting only when measured errors are concentrated in a small set of low-confidence, high-cost pairs and the avoided error cost justifies added latency and model spend.
@@ -275,3 +275,42 @@ The reviewed Chapter 1 baseline is sufficient for Phase 4.2 regression and MVP u
 
 ### Revisit triggers
 Expand reviewed Gold across courses and domains before training an EduFlow-specific classifier or claiming generalized admission/relation quality.
+
+---
+
+## Formal multi-run model stability
+
+### Current status
+Post-MVP. The repository retains the three-run stability tool, but three-or-more-run statistical stability is not a Phase 4.2 MVP merge blocker.
+
+### Current solution
+MVP acceptance requires two independent complete generations with the same configuration and reports both results. Provider/network failures may be rerun after infrastructure repair; semantically weak completed outputs remain real results.
+
+### Revisit triggers
+Run three or more repetitions across multiple reviewed courses when model-quality decisions need variance estimates rather than a usability sanity check.
+
+---
+
+## Knowledge-generation cost optimization
+
+### Current status
+Post-MVP. Current live generation remains expensive enough for internal acceptance and demos but is not suitable evidence of optimized production economics.
+
+### Current solution
+Keep bounded batches, run-local embedding retrieval, and execution token diagnostics. Do not add a provider hierarchy, voting, or caching platform solely to close Phase 4.2.
+
+### Revisit triggers
+Prioritize cost/latency work when real usage volume is known; evaluate retrieval reranking, safe caching, and provider routing from measured traces.
+
+---
+
+## Relation recall and associative-relation enrichment
+
+### Current status
+Post-MVP. Missing edges are acceptable for the precision-first Course Skill Tree; automatic `enables` and `related` publication is suppressed while live precision is unreliable.
+
+### Current solution
+Publish conservative prerequisite facts only, allow disconnected nodes/islands, and continue reporting per-type relation diagnostics without forcing connectivity or quotas.
+
+### Revisit triggers
+Re-enable or enrich relation types only after broader reviewed data demonstrates useful precision, with the trained classifier and Cross-Encoder options above reconsidered as evidence warrants.

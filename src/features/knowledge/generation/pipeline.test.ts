@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CourseMaterial, SourceLocation } from "@/features/material/parsing/types";
 import { deduplicateWithinIngestion, normalizeKnowledgeSurface } from "./normalization";
 import { parseAdmissionOutput, parseCoverageOutput, parseEquivalenceOutput, parseExtractionOutput, parsePairClassificationOutput, parseRelationOutput } from "./schema";
-import { admitCandidates, extractAtomicKnowledge, runKnowledgeGenerationPipeline } from "./pipeline";
+import { admitCandidates, classifyRelations, extractAtomicKnowledge, runKnowledgeGenerationPipeline } from "./pipeline";
 import { candidateAdmissionPrompt, coverageAuditPrompt, equivalencePrompt, pairClassificationPrompt } from "./prompts";
 import { RunLocalEmbeddingCache } from "./retrieval";
 import type { CandidatePair, EmbeddingService, KnowledgeCandidate, StructuredGenerationClient, StructuredGenerationRequest } from "./types";
@@ -37,6 +37,21 @@ describe("knowledge generation schemas", () => {
     expect(() => parseExtractionOutput({ candidates: [{ id: "a", canonicalTitle: "工具调用", description: "闭环", type: "procedural", aliases: [], masteryCriteria: ["能说明步骤"], sourceChunkIds: [] }] })).toThrow(/sourceChunkIds/);
     const tooMany = Array.from({ length: 41 }, (_, index) => ({ id: `a-${index}`, canonicalTitle: `知识 ${index}`, description: "描述", type: "conceptual", aliases: [], masteryCriteria: ["能解释"], sourceChunkIds: ["chunk-1"] }));
     expect(() => parseExtractionOutput({ candidates: tooMany })).toThrow(/40-candidate schema limit/);
+  });
+
+  it("diagnostically normalizes only valid extra mastery criteria while preserving candidate identity and rejecting malformed criteria", () => {
+    const warnings: string[] = [];
+    const parsed = parseExtractionOutput({ candidates: [{
+      id: "stable-id", canonicalTitle: "工具调用", description: "闭环", type: "procedural", aliases: ["Function Calling"],
+      masteryCriteria: [" 能解释闭环 ", "能实现闭环", "能解释闭环", "能调试闭环"], sourceChunkIds: ["chunk-1"]
+    }] }, 40, (warning) => warnings.push(warning));
+    expect(parsed[0]).toMatchObject({ id: "stable-id", canonicalTitle: "工具调用", type: "procedural", sourceChunkIds: ["chunk-1"] });
+    expect(parsed[0].masteryCriteria).toEqual(["能解释闭环", "能实现闭环"]);
+    expect(warnings).toEqual([expect.stringContaining("normalized from 4 valid items to 2")]);
+    const base = { id: "a", canonicalTitle: "A", description: "A", type: "conceptual", aliases: [], sourceChunkIds: ["chunk-1"] };
+    expect(() => parseExtractionOutput({ candidates: [{ ...base, masteryCriteria: 42 }] })).toThrow(/must be an array/);
+    expect(() => parseExtractionOutput({ candidates: [{ ...base, masteryCriteria: [] }] })).toThrow(/must not be empty/);
+    expect(() => parseExtractionOutput({ candidates: [{ ...base }] })).toThrow(/masteryCriteria/);
   });
 
   it("requires exactly one scoped equivalence result for every known pair", () => {
@@ -250,7 +265,7 @@ describe("deterministic mocked pipeline", () => {
       if (request.stage === "coverage") {
         coverageCalls += 1;
         const sectionId = request.user.match(/\"sectionId\":\"([^\"]+)\"/)?.[1];
-        return { value: { sections: [{ sectionId, status: "missing", missingCandidates: [{ id: "b", canonicalTitle: "B", description: "B desc", type: "procedural", aliases: [], masteryCriteria: ["Execute B"], sourceChunkIds: ["chunk-1"] }] }] }, metadata };
+        return { value: { sections: [{ sectionId, status: "missing", missingCandidates: [{ id: "b", canonicalTitle: "B", description: "B desc", type: "procedural", aliases: [], masteryCriteria: ["Explain B", "Execute B", "Debug B"], sourceChunkIds: ["chunk-1"] }] }] }, metadata };
       }
       if (request.stage === "admission") return { value: admissionOutput(request), metadata };
       if (request.stage === "relations") return { value: { pairs: Array.from(request.user.matchAll(/\"pairId\":\"([^\"]+)\"/g), (match) => ({ pairId: match[1], label: "none", strength: null, reason: "none", evidenceChunkIds: [] })) }, metadata };
@@ -261,6 +276,10 @@ describe("deterministic mocked pipeline", () => {
     const result = await runKnowledgeGenerationPipeline({ courseId: "course", ownerId: "user", material: longMaterial }, client, embedder);
     expect(coverageCalls).toBe(1);
     expect(result.candidates.map((item) => item.canonicalTitle)).toEqual(["A", "B"]);
+    expect(result.candidates[1]).toMatchObject({ canonicalTitle: "B", type: "procedural" });
+    expect(result.candidates[1].masteryCriteria).toEqual(["Explain B", "Execute B"]);
+    expect(result.candidates[1].sourceRefs).toHaveLength(1);
+    expect(result.executions.find((execution) => execution.stage === "coverage")?.validationWarnings).toEqual([expect.stringContaining("2-item representation cap")]);
     expect(result.diagnostics.coverageGapCount).toBe(1);
   });
 
@@ -325,7 +344,31 @@ describe("deterministic mocked pipeline", () => {
     expect(coverageAuditPrompt([]).system.toLowerCase()).toContain("json");
   });
 
-  it("deduplicates identical related facts deterministically before graph validation", async () => {
+  it("publishes valid prerequisites while suppressing unsupported, topical-only, and weak associative relations", async () => {
+    const candidates = ["a", "b", "c", "d", "e"].map((id) => candidate(id, id.toUpperCase()));
+    const pairs: CandidatePair[] = [
+      { id: "valid-prerequisite", leftCandidateId: "a", rightCandidateId: "b", signals: ["shared-provenance"] },
+      { id: "unsupported-prerequisite", leftCandidateId: "a", rightCandidateId: "c", signals: ["embedding-neighbor"] },
+      { id: "topical-related", leftCandidateId: "a", rightCandidateId: "d", signals: ["shared-provenance"] },
+      { id: "weak-enables", leftCandidateId: "a", rightCandidateId: "e", signals: ["shared-provenance"] }
+    ];
+    const client: StructuredGenerationClient = { async generateJson(request) {
+      const output = new Map([
+        ["valid-prerequisite", { label: "a_prerequisite_b", strength: "hard", reason: "explicit dependency", evidenceChunkIds: ["chunk-1"] }],
+        ["unsupported-prerequisite", { label: "a_prerequisite_b", strength: "soft", reason: "The source introduces A before discussing C.", evidenceChunkIds: ["chunk-1"] }],
+        ["topical-related", { label: "related", strength: 0.8, reason: "same topic", evidenceChunkIds: ["chunk-1"] }],
+        ["weak-enables", { label: "a_enables_b", strength: 0.4, reason: "weak support", evidenceChunkIds: ["chunk-1"] }]
+      ]);
+      const requested = Array.from(request.user.matchAll(/"pairId":"([^"]+)"/g), (match) => match[1]);
+      return { value: { pairs: requested.map((pairId) => ({ pairId, ...output.get(pairId) })) }, metadata: { stage: request.stage, provider: "fake", model: "fake", promptVersion: request.promptVersion, schemaVersion: request.schemaVersion, requestId: "relations", generatedAt: "2026-08-14T00:00:00.000Z" } };
+    } };
+    const result = await classifyRelations(candidates, material.chunks, pairs, client);
+    expect(result.relations).toHaveLength(1);
+    expect(result.relations[0]).toMatchObject({ sourceCandidateId: "a", targetCandidateId: "b", relation: "prerequisite", strength: "hard" });
+    expect(result).toMatchObject({ classifiedRelationCount: 4, suppressedDocumentOrderPrerequisiteCount: 1, suppressedEnablesCount: 1, suppressedRelatedCount: 1 });
+  });
+
+  it("does not publish related facts from the conservative MVP automatic generator", async () => {
     const client: StructuredGenerationClient = { async generateJson(request) {
       const metadata = { stage: request.stage, provider: "fake", model: "fake", promptVersion: request.promptVersion, schemaVersion: request.schemaVersion, requestId: request.stage, generatedAt: "2026-08-14T00:00:00.000Z" };
       if (request.stage === "extraction") return { value: { candidates: [
@@ -338,7 +381,7 @@ describe("deterministic mocked pipeline", () => {
     } };
     const twoCandidateMaterial = { ...material };
     const result = await runKnowledgeGenerationPipeline({ courseId: "course", ownerId: "user", material: twoCandidateMaterial }, client, embedder);
-    expect(result.relations).toHaveLength(1);
-    expect(result.relations[0]).toMatchObject({ sourceCandidateId: "candidate-001", targetCandidateId: "candidate-002", relation: "related", reason: "same fact" });
+    expect(result.relations).toHaveLength(0);
+    expect(result.diagnostics).toMatchObject({ classifiedRelationCount: 1, suppressedRelatedCount: 1 });
   });
 });
