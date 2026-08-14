@@ -1,6 +1,6 @@
 {
-  "datasetVersion": "mapping-gold-candidate-v0.1",
-  "reviewStatus": "pending_human_review",
+  "datasetVersion": "mapping-gold-v0.1",
+  "reviewStatus": "reviewed",
   "policies": {
     "knowledgeMaterial": {
       "requiredKeys": [
