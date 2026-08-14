@@ -1,66 +1,18 @@
 {
-  "datasetVersion": "mapping-gold-candidate-v0.1",
-  "reviewStatus": "pending_human_review",
+  "datasetVersion": "mapping-gold-v0.1",
+  "reviewStatus": "reviewed",
   "links": [
-    {
-      "knowledgeNodeId": "K02",
-      "practiceId": "PR01",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K03",
-      "practiceId": "PR02",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K05",
-      "practiceId": "PR03",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K07",
-      "practiceId": "PR04",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K05",
-      "practiceId": "PR05",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K07",
-      "practiceId": "PR05",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K08",
-      "practiceId": "PR05",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K19",
-      "practiceId": "PR06",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K20",
-      "practiceId": "PR06",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K21",
-      "practiceId": "PR06",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K25",
-      "practiceId": "PR07",
-      "role": "required"
-    },
-    {
-      "knowledgeNodeId": "K27",
-      "practiceId": "PR07",
-      "role": "required"
-    }
+    {"knowledgeNodeId":"K02","practiceId":"PR01","role":"required"},
+    {"knowledgeNodeId":"K03","practiceId":"PR02","role":"required"},
+    {"knowledgeNodeId":"K05","practiceId":"PR03","role":"required"},
+    {"knowledgeNodeId":"K07","practiceId":"PR04","role":"required"},
+    {"knowledgeNodeId":"K05","practiceId":"PR05","role":"required"},
+    {"knowledgeNodeId":"K07","practiceId":"PR05","role":"required"},
+    {"knowledgeNodeId":"K08","practiceId":"PR05","role":"required"},
+    {"knowledgeNodeId":"K19","practiceId":"PR06","role":"required"},
+    {"knowledgeNodeId":"K20","practiceId":"PR06","role":"required"},
+    {"knowledgeNodeId":"K21","practiceId":"PR06","role":"required"},
+    {"knowledgeNodeId":"K25","practiceId":"PR07","role":"required"},
+    {"knowledgeNodeId":"K27","practiceId":"PR07","role":"required"}
   ]
 }
