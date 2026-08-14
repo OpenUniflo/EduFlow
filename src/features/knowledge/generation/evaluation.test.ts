@@ -41,4 +41,20 @@ describe("Phase 4.2 Gold evaluator", () => {
     expect(evaluation.metrics.spuriousNodeRate).toBeGreaterThan(0);
     expect(evaluation.metrics.negativeCaseViolationCount).toBe(1);
   });
+
+  it("matches document-artifact prefixes conservatively without substring matching", () => {
+    const result = perfectResult();
+    result.candidates.push(
+      { ...result.candidates[0], id: "figure-title", canonicalTitle: "自主 Agent 的执行循环", aliases: [], sourceRefs: [source] },
+      { ...result.candidates[0], id: "partial", canonicalTitle: "自主 Agent", aliases: [], sourceRefs: [source] }
+    );
+    result.curriculum.chapters[0].lessons[0].coverages.push(
+      { candidateId: "figure-title", role: "introduce" },
+      { candidateId: "partial", role: "introduce" }
+    );
+    const evaluation = evaluateKnowledgeGeneration(result, { ...gold, negativeCases: [{ text: "图 1-6 自主 Agent 的执行循环" }] });
+    expect(evaluation.mismatches.negativeViolations).toEqual([
+      expect.objectContaining({ candidateId: "figure-title" })
+    ]);
+  });
 });

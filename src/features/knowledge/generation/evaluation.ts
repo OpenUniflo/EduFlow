@@ -47,6 +47,14 @@ function surfaceScore(predicted: string[], gold: string[]) {
   return best;
 }
 
+function normalizeNegativeCaseSurface(value: string) {
+  const withoutDocumentPrefix = value.normalize("NFKC").trim().replace(
+    /^(?:(?:图|表)\s*\d+(?:\s*[-–—.．]\s*\d+)+|(?:figure|table)\s+\d+(?:\s*[-–—.]\s*\d+)+)\s*[:：\-–—]?\s*/iu,
+    ""
+  );
+  return normalizeKnowledgeSurface(withoutDocumentPrefix);
+}
+
 function ratio(numerator: number, denominator: number) {
   return denominator ? numerator / denominator : 0;
 }
@@ -109,8 +117,8 @@ export function evaluateKnowledgeGeneration(result: KnowledgeGenerationResult, g
     cycleCount = 1;
   }
   const negativeViolations = gold.negativeCases.flatMap((negative) => result.candidates.filter((candidate) => {
-    const negativeSurface = normalizeKnowledgeSurface(negative.text);
-    return [candidate.canonicalTitle, ...candidate.aliases].some((surface) => normalizeKnowledgeSurface(surface) === negativeSurface);
+    const negativeSurface = normalizeNegativeCaseSurface(negative.text);
+    return [candidate.canonicalTitle, ...candidate.aliases].some((surface) => normalizeNegativeCaseSurface(surface) === negativeSurface);
   }).map((candidate) => ({ text: negative.text, candidateId: candidate.id, candidateTitle: candidate.canonicalTitle })));
   const facts = result.candidates.length + result.relations.length;
   const factsWithProvenance = result.candidates.filter((candidate) => candidate.sourceRefs.length > 0).length + result.relations.filter((relation) => relation.sourceRefs.length > 0).length;

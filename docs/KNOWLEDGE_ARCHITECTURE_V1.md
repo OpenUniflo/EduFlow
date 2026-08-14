@@ -70,6 +70,8 @@ Knowledge-to-knowledge facts use only:
 - `enables`: `A → B` means A enables implementation/application of B without being a cognitive prerequisite. Optional numeric strength is `0..1`.
 - `related`: a significant association without prerequisite/enabling semantics. It is structurally undirected by default and may have numeric strength `0..1`.
 
+The Knowledge ontology DAG invariant applies only to the `prerequisite` subgraph. `enables` remains directional but is not automatically a prerequisite; Course Skill Tree and Chapter projections may separately enforce acyclic ordering over their combined prerequisite/enables dependency projection.
+
 `implementation-support`, `practice-support`, and `conceptual` are obsolete relation values. Lesson, Assignment, mapping, and promotion relationships are not KnowledgeRelations.
 
 ## 9. KnowledgeMapping

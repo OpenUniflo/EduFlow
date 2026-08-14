@@ -36,9 +36,6 @@ export function validateCandidateGraph(candidates: KnowledgeCandidate[], relatio
     if (!relation.sourceRefs.length) throw new Error(`Knowledge relation has no provenance: ${relation.id}`);
   });
   validateKnowledgeGraph(graph);
-  assertDirectedAcyclic(candidates.map((candidate) => candidate.id), relations
-    .filter((relation) => relation.relation !== "related")
-    .map((relation) => ({ source: relation.sourceCandidateId, target: relation.targetCandidateId })));
   return true;
 }
 

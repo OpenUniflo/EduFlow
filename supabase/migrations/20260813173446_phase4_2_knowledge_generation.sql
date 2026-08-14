@@ -111,7 +111,11 @@ begin
       case when item->>'relation' <> 'prerequisite' then (item->>'strength')::numeric else null end,
       item->'provenance', 'active'
     ) on conflict (source_node_id, target_node_id, relation) do update
-      set reason = excluded.reason, provenance = excluded.provenance, lifecycle_status = 'active';
+      set reason = excluded.reason,
+          prerequisite_strength = excluded.prerequisite_strength,
+          associative_strength = excluded.associative_strength,
+          provenance = excluded.provenance,
+          lifecycle_status = 'active';
   end loop;
 
   for item in select value from jsonb_array_elements(payload->'chapters') loop

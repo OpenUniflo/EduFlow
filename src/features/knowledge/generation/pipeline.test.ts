@@ -3,6 +3,7 @@ import type { CourseMaterial, SourceLocation } from "@/features/material/parsing
 import { deduplicateWithinIngestion, normalizeKnowledgeSurface } from "./normalization";
 import { parseExtractionOutput, parseRelationOutput } from "./schema";
 import { runKnowledgeGenerationPipeline } from "./pipeline";
+import { relationPrompt } from "./prompts";
 import type { KnowledgeCandidate, StructuredGenerationClient, StructuredGenerationRequest } from "./types";
 import { validateCandidateGraph, validateGeneratedCurriculum } from "./validation";
 
@@ -28,11 +29,16 @@ describe("knowledge generation schemas", () => {
     expect(() => parseExtractionOutput({ candidates: [{ id: "a", canonicalTitle: "工具调用", description: "闭环", type: "course", aliases: [], masteryCriteria: ["能说明步骤"], sourceChunkIds: ["chunk-1"] }] })).toThrow(/Unsupported KnowledgeNode type/);
     expect(() => parseExtractionOutput({ candidates: [{ id: "a", canonicalTitle: "工具调用", description: "闭环", type: "procedural", aliases: [], sourceChunkIds: ["chunk-1"] }] })).toThrow(/masteryCriteria/);
     expect(() => parseExtractionOutput({ candidates: [{ id: "a", canonicalTitle: "工具调用", description: "闭环", type: "procedural", aliases: [], masteryCriteria: ["能说明步骤"], sourceChunkIds: [] }] })).toThrow(/sourceChunkIds/);
+    const tooMany = Array.from({ length: 41 }, (_, index) => ({ id: `a-${index}`, canonicalTitle: `知识 ${index}`, description: "描述", type: "conceptual", aliases: [], masteryCriteria: ["能解释"], sourceChunkIds: ["chunk-1"] }));
+    expect(() => parseExtractionOutput({ candidates: tooMany })).toThrow(/40-candidate schema limit/);
   });
 
-  it("rejects unknown relation references and invalid strengths", () => {
+  it("rejects unknown/self relation references, invalid enums, and relation-specific strengths", () => {
     expect(() => parseRelationOutput({ relations: [{ sourceCandidateId: "a", targetCandidateId: "missing", type: "related", strength: 0.5, reason: "x", evidenceChunkIds: ["chunk-1"] }] }, new Set(["a"]), new Set(["chunk-1"]))).toThrow(/Unknown candidate reference/);
+    expect(() => parseRelationOutput({ relations: [{ sourceCandidateId: "a", targetCandidateId: "a", type: "related", strength: 0.5, reason: "x", evidenceChunkIds: ["chunk-1"] }] }, new Set(["a"]), new Set(["chunk-1"]))).toThrow(/Self relation/);
+    expect(() => parseRelationOutput({ relations: [{ sourceCandidateId: "a", targetCandidateId: "b", type: "supports", strength: 0.5, reason: "x", evidenceChunkIds: ["chunk-1"] }] }, new Set(["a", "b"]), new Set(["chunk-1"]))).toThrow(/Unsupported relation type/);
     expect(() => parseRelationOutput({ relations: [{ sourceCandidateId: "a", targetCandidateId: "b", type: "prerequisite", strength: 0.5, reason: "x", evidenceChunkIds: ["chunk-1"] }] }, new Set(["a", "b"]), new Set(["chunk-1"]))).toThrow(/Invalid prerequisite strength/);
+    expect(() => parseRelationOutput({ relations: [{ sourceCandidateId: "a", targetCandidateId: "b", type: "enables", strength: "hard", reason: "x", evidenceChunkIds: ["chunk-1"] }] }, new Set(["a", "b"]), new Set(["chunk-1"]))).toThrow(/Invalid associative strength/);
   });
 });
 
@@ -73,11 +79,18 @@ describe("graph and curriculum validation", () => {
     expect(() => validateGeneratedCurriculum(candidates, [relation], { ...valid, chapters: [{ ...valid.chapters[0], lessons: [{ ...valid.chapters[0].lessons[0], coverages: [...valid.chapters[0].lessons[0].coverages].reverse() }] }] })).toThrow(/hard prerequisite/);
   });
 
-  it("rejects directed Knowledge and aggregated Chapter cycles before persistence", () => {
+  it("checks only prerequisite cycles at the Knowledge ontology layer", () => {
     const aToB = { id: "ab", sourceCandidateId: "a", targetCandidateId: "b", relation: "enables" as const, strength: 0.8, reason: "a enables b", sourceRefs: [source("raw-1")] };
     const bToA = { ...aToB, id: "ba", sourceCandidateId: "b", targetCandidateId: "a" };
-    expect(() => validateCandidateGraph(candidates, [aToB, bToA])).toThrow(/cycle/i);
+    expect(validateCandidateGraph(candidates, [aToB, bToA])).toBe(true);
 
+    const prerequisite = { ...aToB, id: "prerequisite-ab", relation: "prerequisite" as const, strength: "hard" as const };
+    expect(validateCandidateGraph(candidates, [prerequisite, bToA])).toBe(true);
+    expect(() => validateCandidateGraph(candidates, [prerequisite, { ...prerequisite, id: "prerequisite-ba", sourceCandidateId: "b", targetCandidateId: "a" }])).toThrow(/cycle|Conflicting prerequisite/i);
+  });
+
+  it("keeps prerequisite/enables cycle checks at the aggregated Chapter projection layer", () => {
+    const aToB = { id: "ab", sourceCandidateId: "a", targetCandidateId: "b", relation: "enables" as const, strength: 0.8, reason: "a enables b", sourceRefs: [source("raw-1")] };
     const third = candidate("c", "应用");
     const curriculum = { chapters: [
       { id: "c1", title: "一", description: "desc", outcome: "outcome", lessons: [{ id: "l1", title: "一", coverages: [{ candidateId: "a", role: "introduce" as const }, { candidateId: "c", role: "introduce" as const }] }] },
@@ -125,6 +138,33 @@ describe("deterministic mocked pipeline", () => {
     const result = await runKnowledgeGenerationPipeline({ courseId: "course", ownerId: "user", material }, client);
     expect(relationAttempts).toBe(2);
     expect(result.executions.filter((execution) => execution.stage === "relations")).toHaveLength(2);
+  });
+
+  it("does not derive a Knowledge minimum from source character count", async () => {
+    const result = await runKnowledgeGenerationPipeline({
+      courseId: "course", ownerId: "user",
+      material: { ...material, chunks: [{ ...material.chunks[0], text: "工具调用形成闭环。".repeat(1_500) }] }
+    }, new FakeClient());
+    expect(result.candidates).toHaveLength(1);
+  });
+
+  it("rejects extraction when semantic admission retains zero Knowledge", async () => {
+    const client: StructuredGenerationClient = { async generateJson(request) {
+      const value = request.schemaVersion === "knowledge-candidate-admission-v1" ? { acceptedCandidateIds: [] } : { candidates: [] };
+      return { value, metadata: { stage: request.stage, provider: "fake", model: "fake", promptVersion: request.promptVersion, schemaVersion: request.schemaVersion, requestId: request.stage, generatedAt: "2026-08-14T00:00:00.000Z" } };
+    } };
+    await expect(runKnowledgeGenerationPipeline({ courseId: "course", ownerId: "user", material }, client)).rejects.toThrow(/at least one semantically valid KnowledgeNode/);
+  });
+
+  it("prompts relation classification by semantics without type quotas or connectivity goals", () => {
+    const prompt = relationPrompt([candidate("a", "A"), candidate("b", "B")], material.chunks).system;
+    expect(prompt).toContain("semantic decision procedure");
+    expect(prompt).toContain("Only if prerequisite does not apply");
+    expect(prompt).toContain("related as a fallback");
+    expect(prompt).toContain("document order");
+    expect(prompt).toContain("Graph connectivity and relation-type distribution are not goals");
+    expect(prompt).not.toContain("Use related rarely");
+    expect(prompt).not.toContain("Most useful skill-tree relations are prerequisite relations");
   });
 
   it("deduplicates identical related facts deterministically before graph validation", async () => {

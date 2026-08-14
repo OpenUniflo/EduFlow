@@ -15,6 +15,7 @@ const CANDIDATE_ADMISSION_SCHEMA_VERSION = "knowledge-candidate-admission-v1";
 const RELATION_SCHEMA_VERSION = "knowledge-relations-v1";
 const CURRICULUM_SCHEMA_VERSION = "generated-curriculum-v1";
 const EXTRACTION_BATCH_CHARACTERS = 5_000;
+const MAX_GENERATED_CANDIDATES = 40;
 
 function uniqueSources(values: SourceLocation[]) {
   const byKey = new Map(values.map((source) => [[source.sourceMaterialId, source.rawBlockId, source.ordinal].join(":"), source]));
@@ -72,12 +73,7 @@ export async function extractAtomicKnowledge(input: KnowledgeGenerationInput, cl
       });
     });
   }
-  const evidenceCharacters = input.material.chunks.reduce((sum, chunk) => sum + chunk.text.length, 0);
-  const target = Math.min(36, Math.max(12, Math.round(evidenceCharacters / 1_050)));
-  const expectedRange = evidenceCharacters < 10_000
-    ? { min: 1, max: 40 }
-    : { min: Math.max(16, target - 10), max: Math.min(40, target + 4) };
-  const prompt = consolidationPrompt(candidates, input.material.chunks, expectedRange);
+  const prompt = consolidationPrompt(candidates, input.material.chunks, MAX_GENERATED_CANDIDATES);
   const request = {
     stage: "extraction", promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION,
     schemaVersion: CONSOLIDATION_SCHEMA_VERSION, ...prompt, maxTokens: 8_000, temperature: 0.1
@@ -88,8 +84,7 @@ export async function extractAtomicKnowledge(input: KnowledgeGenerationInput, cl
     const generation = await client.generateJson(correction ? { ...request, system: `${request.system}\nYour previous consolidation failed validation: ${correction}. Re-read the full evidence and return a complete corrected object.` } : request);
     executions.push(generation.metadata);
     try {
-      const parsed = parseExtractionOutput(generation.value, 40);
-      if (parsed.length < expectedRange.min || parsed.length > expectedRange.max) throw new Error(`Expected ${expectedRange.min}-${expectedRange.max} consolidated candidates, received ${parsed.length}`);
+      const parsed = parseExtractionOutput(generation.value, MAX_GENERATED_CANDIDATES);
       const consolidated = parsed.map((candidate) => {
         candidate.sourceChunkIds.forEach((id) => { if (!chunkById.has(id)) throw new Error(`Unknown consolidated source chunk reference: ${id}`); });
         return {
@@ -113,8 +108,7 @@ export async function extractAtomicKnowledge(input: KnowledgeGenerationInput, cl
         };
       });
       const audited = deduplicateWithinIngestion([...consolidated, ...additions, ...candidates]).candidates;
-      const admissionRange = evidenceCharacters < 10_000 ? { min: 1, max: 40 } : { min: Math.max(20, target - 4), max: Math.min(36, target + 4) };
-      const admissionPrompt = candidateAdmissionPrompt(audited, admissionRange);
+      const admissionPrompt = candidateAdmissionPrompt(audited, MAX_GENERATED_CANDIDATES);
       const admission = await client.generateJson({
         stage: "extraction", promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION,
         schemaVersion: CANDIDATE_ADMISSION_SCHEMA_VERSION, ...admissionPrompt, maxTokens: 2_000, temperature: 0
@@ -129,7 +123,8 @@ export async function extractAtomicKnowledge(input: KnowledgeGenerationInput, cl
       const auditedById = new Map(audited.map((candidate) => [candidate.id, candidate]));
       admittedIds.forEach((id) => { if (!auditedById.has(id)) throw new Error(`Candidate admission references unknown ID: ${id}`); });
       const admitted = admittedIds.map((id) => auditedById.get(id) as KnowledgeCandidate);
-      if (admitted.length < admissionRange.min || admitted.length > admissionRange.max) throw new Error(`Candidate admission must retain ${admissionRange.min}-${admissionRange.max} candidates, received ${admitted.length}`);
+      if (!admitted.length) throw new Error("Candidate admission must retain at least one semantically valid KnowledgeNode");
+      if (admitted.length > MAX_GENERATED_CANDIDATES) throw new Error(`Candidate admission exceeds the ${MAX_GENERATED_CANDIDATES}-candidate safety limit`);
       return { candidates: admitted, executions };
     } catch (error) {
       correction = error instanceof Error ? error.message : "consolidation validation violation";
