@@ -20,7 +20,8 @@ function perfectResult(): KnowledgeGenerationResult {
     reason: relation.rationale, sourceRefs: [source]
   })) as KnowledgeGenerationResult["relations"];
   return { courseId: "course", ownerId: "user", sourceMaterialId: "material", candidates, duplicateCount: 0, relations,
-    curriculum: { chapters: [{ id: "c", title: "Chapter", description: "desc", outcome: "outcome", lessons: [{ id: "l", title: "Lesson", coverages: candidates.map((candidate) => ({ candidateId: candidate.id, role: "introduce" })) }] }] }, executions: [] };
+    curriculum: { chapters: [{ id: "c", title: "Chapter", description: "desc", outcome: "outcome", lessons: [{ id: "l", title: "Lesson", coverages: candidates.map((candidate) => ({ candidateId: candidate.id, role: "introduce" })) }] }] }, executions: [], relationCandidatePairs: [],
+    diagnostics: { embeddingRequestCount: 0, semanticDedupCandidatePairCount: 0, coverageAuditedSectionCount: 0, coverageGapCount: 0, allRelationPairCount: 0, retrievedRelationPairCount: 0, relationRetrievalReductionRatio: 0, relationBatchCount: 0, structuredRetryCount: 0 } };
 }
 
 describe("Phase 4.2 Gold evaluator", () => {
@@ -56,5 +57,16 @@ describe("Phase 4.2 Gold evaluator", () => {
     expect(evaluation.mismatches.negativeViolations).toEqual([
       expect.objectContaining({ candidateId: "figure-title" })
     ]);
+  });
+
+  it("separates relation retrieval misses from retrieved classification errors", () => {
+    const result = perfectResult();
+    const first = relationsJson.relations[0];
+    result.relations = [];
+    result.relationCandidatePairs = [{ id: "p", leftCandidateId: first.from, rightCandidateId: first.to, signals: ["embedding-neighbor"] }];
+    const evaluation = evaluateKnowledgeGeneration(result, gold);
+    expect(evaluation.retrievalDiagnostics.overall.retrieved).toBeGreaterThan(0);
+    expect(evaluation.retrievalDiagnostics.overall.retrievedButMisclassified).toBeGreaterThan(0);
+    expect(evaluation.retrievalDiagnostics.overall.retrievalMisses).toBeGreaterThan(0);
   });
 });

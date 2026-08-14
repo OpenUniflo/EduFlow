@@ -65,6 +65,79 @@ export function parseExtractionOutput(value: unknown, maxCandidates = 40): Extra
   });
 }
 
+export type EquivalenceDecisionDto = { pairId: string; decision: "same" | "distinct"; reason: string };
+
+export function parseEquivalenceOutput(value: unknown, requestedPairIds: Set<string>): EquivalenceDecisionDto[] {
+  const root = object(value, "equivalence output");
+  const seen = new Set<string>();
+  const pairs = array(root.pairs, "pairs").map((item, index) => {
+    const decision = object(item, `pairs[${index}]`);
+    const pairId = string(decision.pairId, `pairs[${index}].pairId`);
+    if (!requestedPairIds.has(pairId)) throw new Error(`Unknown equivalence pair: ${pairId}`);
+    if (seen.has(pairId)) throw new Error(`Duplicate equivalence pair result: ${pairId}`);
+    seen.add(pairId);
+    const classification = string(decision.decision, `pairs[${index}].decision`);
+    if (classification !== "same" && classification !== "distinct") throw new Error(`Invalid equivalence decision: ${classification}`);
+    return { pairId, decision: classification, reason: string(decision.reason, `pairs[${index}].reason`) } as EquivalenceDecisionDto;
+  });
+  requestedPairIds.forEach((id) => { if (!seen.has(id)) throw new Error(`Missing equivalence pair result: ${id}`); });
+  return pairs;
+}
+
+export type CoverageDecisionDto = { sectionId: string; status: "covered" | "missing"; missingCandidates: ExtractedCandidateDto[] };
+
+export function parseCoverageOutput(value: unknown, requestedSectionIds: Set<string>, knownChunkIds: Set<string>): CoverageDecisionDto[] {
+  const root = object(value, "coverage output");
+  const seen = new Set<string>();
+  const sections = array(root.sections, "sections").map((item, index) => {
+    const decision = object(item, `sections[${index}]`);
+    const sectionId = string(decision.sectionId, `sections[${index}].sectionId`);
+    if (!requestedSectionIds.has(sectionId)) throw new Error(`Unknown coverage section: ${sectionId}`);
+    if (seen.has(sectionId)) throw new Error(`Duplicate coverage section result: ${sectionId}`);
+    seen.add(sectionId);
+    const status = string(decision.status, `sections[${index}].status`);
+    if (status !== "covered" && status !== "missing") throw new Error(`Invalid coverage status: ${status}`);
+    const missingCandidates = parseExtractionOutput({ candidates: decision.missingCandidates ?? [] }, 8);
+    if (status === "covered" && missingCandidates.length) throw new Error(`Covered section must not return missing candidates: ${sectionId}`);
+    if (status === "missing" && !missingCandidates.length) throw new Error(`Missing section must return at least one candidate: ${sectionId}`);
+    missingCandidates.forEach((candidate) => candidate.sourceChunkIds.forEach((id) => {
+      if (!knownChunkIds.has(id)) throw new Error(`Unknown coverage source chunk reference: ${id}`);
+    }));
+    return { sectionId, status, missingCandidates } as CoverageDecisionDto;
+  });
+  requestedSectionIds.forEach((id) => { if (!seen.has(id)) throw new Error(`Missing coverage section result: ${id}`); });
+  return sections;
+}
+
+export type PairClassificationLabel = "none" | "related" | "a_prerequisite_b" | "b_prerequisite_a" | "a_enables_b" | "b_enables_a";
+export type PairClassificationDto = { pairId: string; label: PairClassificationLabel; strength: "hard" | "soft" | number | null; reason: string; evidenceChunkIds: string[] };
+
+export function parsePairClassificationOutput(value: unknown, requestedPairIds: Set<string>, knownChunkIds: Set<string>): PairClassificationDto[] {
+  const root = object(value, "pair classification output");
+  const seen = new Set<string>();
+  const validLabels = new Set<PairClassificationLabel>(["none", "related", "a_prerequisite_b", "b_prerequisite_a", "a_enables_b", "b_enables_a"]);
+  const pairs = array(root.pairs, "pairs").map((item, index) => {
+    const result = object(item, `pairs[${index}]`);
+    const pairId = string(result.pairId, `pairs[${index}].pairId`);
+    if (!requestedPairIds.has(pairId)) throw new Error(`Unknown relation candidate pair: ${pairId}`);
+    if (seen.has(pairId)) throw new Error(`Duplicate relation candidate pair result: ${pairId}`);
+    seen.add(pairId);
+    const label = string(result.label, `pairs[${index}].label`) as PairClassificationLabel;
+    if (!validLabels.has(label)) throw new Error(`Invalid relation pair label: ${label}`);
+    const strength = result.strength ?? null;
+    if (label.includes("prerequisite")) {
+      if (strength !== "hard" && strength !== "soft") throw new Error(`Invalid prerequisite strength for pair: ${pairId}`);
+    } else if (label === "related" || label.includes("enables")) {
+      if (typeof strength !== "number" || !Number.isFinite(strength) || strength < 0 || strength > 1) throw new Error(`Invalid associative strength for pair: ${pairId}`);
+    } else if (strength !== null) throw new Error(`NONE pair strength must be null: ${pairId}`);
+    const evidenceChunkIds = strings(result.evidenceChunkIds ?? [], `pairs[${index}].evidenceChunkIds`, label === "none");
+    evidenceChunkIds.forEach((id) => { if (!knownChunkIds.has(id)) throw new Error(`Unknown relation evidence chunk reference: ${id}`); });
+    return { pairId, label, strength: strength as PairClassificationDto["strength"], reason: string(result.reason, `pairs[${index}].reason`), evidenceChunkIds };
+  });
+  requestedPairIds.forEach((id) => { if (!seen.has(id)) throw new Error(`Missing relation candidate pair result: ${id}`); });
+  return pairs;
+}
+
 export type ExtractedRelationDto = {
   sourceCandidateId: string;
   targetCandidateId: string;

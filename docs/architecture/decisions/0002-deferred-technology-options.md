@@ -214,3 +214,51 @@ Add/evaluate Langfuse once real runtime debugging and model operations produce r
 - runtime debugging is consuming significant engineering time.
 
 Langfuse remains observability/evaluation infrastructure, not the source of truth for EduFlow Run or Acceptance records.
+
+---
+
+## Cross-Encoder relation reranker
+
+### Current status
+Deferred.
+
+### Why not now
+Phase 4.2 has only tens of candidates. In-memory embedding top-K plus provenance union already bounds the pair set, and a Cross-Encoder would add another model, dependency, latency, and deployment surface before candidate precision has been measured as a cost problem.
+
+### Current solution
+Embedding retrieval feeds bounded batched LLM pair classification. Embedding similarity never creates a relation.
+
+### Revisit triggers
+Evaluate `embedding retrieval -> Cross-Encoder rerank -> classifier` when measured retrieval precision is low enough that unrelated pairs materially dominate classifier tokens, latency, or cost while relation-pair recall remains high.
+
+---
+
+## EduFlow-trained relation classifier
+
+### Current status
+Deferred.
+
+### Why not now
+One chapter Gold dataset is an architecture regression oracle, not sufficiently large or representative training data. Training now would overfit one course and introduce an unsupported model lifecycle.
+
+### Current solution
+Structured LLM classification of retrieved unordered pairs into NONE, prerequisite hard/soft, enables, or related, followed by deterministic graph validation.
+
+### Revisit triggers
+Evaluate a trained classifier after enough human-reviewed, domain-diverse pair labels exist for NONE, prerequisite, enables, and related. It may classify high-confidence pairs and reserve the LLM for low-confidence cases.
+
+---
+
+## Production multi-LLM voting / ensemble
+
+### Current status
+Deferred. Three-run generation is evaluation-only.
+
+### Why not now
+Voting multiplies latency and cost and can conceal excessive generation freedom without fixing retrieval, classification contracts, or validation. Phase 4.2 needs one bounded production pipeline per ingestion.
+
+### Current solution
+One production generation run; acceptance executes three independent runs, retains all results, and reports stability without selecting or merging them.
+
+### Revisit triggers
+Evaluate voting only when measured errors are concentrated in a small set of low-confidence, high-cost pairs and the avoided error cost justifies added latency and model spend.

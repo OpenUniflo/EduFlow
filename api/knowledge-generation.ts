@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createJsonGenerationClient } from "./_lib/llm.js";
-import { readLlmEnvironment } from "./_lib/env.js";
+import { readEmbeddingEnvironment, readLlmEnvironment } from "./_lib/env.js";
+import { createEmbeddingService } from "./_lib/embedding.js";
 import { createServerSupabase, createUserSupabase, requireCapability } from "./_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
 import { SupabaseKnowledgeGenerationRepository } from "./_lib/knowledgeGenerationRepository.js";
@@ -22,11 +23,15 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const prepared = await repository.prepare({
     parsingJobId: body.parsingJobId, ownerId: user.id, provider: env.llmProvider, model: env.llmModel,
     promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION,
-    schemaVersions: ["knowledge-candidates-v1", "knowledge-candidates-consolidated-v1", "knowledge-candidates-atomicity-audit-v1", "knowledge-candidate-admission-v1", "knowledge-relations-v1", "generated-curriculum-v1"]
+    schemaVersions: ["knowledge-candidates-v1", "knowledge-equivalence-v1", "knowledge-coverage-v1", "knowledge-pair-classification-v1", "generated-curriculum-v1"]
   });
   try {
     const material = selectCourseMaterialScope(prepared.material, body.scope);
-    const result = await runKnowledgeGenerationPipeline({ courseId: prepared.courseId, ownerId: user.id, material }, createJsonGenerationClient(env));
+    const result = await runKnowledgeGenerationPipeline(
+      { courseId: prepared.courseId, ownerId: user.id, material },
+      createJsonGenerationClient(env),
+      createEmbeddingService(readEmbeddingEnvironment())
+    );
     await repository.persist(prepared.runId, result);
     json(response, 201, {
       run: { id: prepared.runId, status: "completed", provider: env.llmProvider, model: env.llmModel, promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION },

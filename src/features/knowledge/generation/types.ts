@@ -48,7 +48,31 @@ export type GeneratedCurriculum = {
   chapters: GeneratedCurriculumChapter[];
 };
 
-export type GenerationStage = "extraction" | "relations" | "curriculum";
+export type GenerationStage = "extraction" | "deduplication" | "coverage" | "relations" | "curriculum";
+
+export interface EmbeddingService {
+  embed(text: string): Promise<number[]>;
+}
+
+export type CandidatePair = {
+  id: string;
+  leftCandidateId: string;
+  rightCandidateId: string;
+  similarity?: number;
+  signals: Array<"embedding-neighbor" | "shared-provenance">;
+};
+
+export type GenerationDiagnostics = {
+  embeddingRequestCount: number;
+  semanticDedupCandidatePairCount: number;
+  coverageAuditedSectionCount: number;
+  coverageGapCount: number;
+  allRelationPairCount: number;
+  retrievedRelationPairCount: number;
+  relationRetrievalReductionRatio: number;
+  relationBatchCount: number;
+  structuredRetryCount: number;
+};
 
 export type ModelExecutionMetadata = {
   stage: GenerationStage;
@@ -99,6 +123,8 @@ export type KnowledgeGenerationResult = {
   relations: CandidateKnowledgeRelation[];
   curriculum: GeneratedCurriculum;
   executions: ModelExecutionMetadata[];
+  relationCandidatePairs: CandidatePair[];
+  diagnostics: GenerationDiagnostics;
 };
 
 export type CourseMaterialScope = {

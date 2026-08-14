@@ -10,6 +10,7 @@ import { createJsonGenerationClient } from "../../api/_lib/llm";
 import { readEmbeddingEnvironment, readLlmEnvironment } from "../../api/_lib/env";
 import { createEmbeddingService } from "../../api/_lib/embedding";
 import { runKnowledgeGenerationPipeline } from "../../src/features/knowledge/generation/pipeline";
+import { cosineSimilarity } from "../../src/features/knowledge/generation/retrieval";
 import { selectCourseMaterialScope } from "../../src/features/knowledge/generation/materialScope";
 import { KNOWLEDGE_GENERATION_PROMPT_VERSION } from "../../src/features/knowledge/generation/prompts";
 import { evaluateKnowledgeGeneration, type KnowledgeGold } from "../../src/features/knowledge/generation/evaluation";
@@ -26,7 +27,7 @@ import type { KnowledgeGraph } from "../../src/features/knowledge/types";
 const REPO = join(import.meta.dirname, "../..");
 const OUTPUT = join(REPO, "phase4.2-acceptance");
 const CORPUS = join(REPO, "fixtures/phase4-agentic-ai/corpus/AI-Agents-in-Depth-zh-CN-v1.4.pdf");
-const SCHEMA_VERSIONS = ["knowledge-candidates-v1", "knowledge-candidates-consolidated-v1", "knowledge-candidates-atomicity-audit-v1", "knowledge-candidate-admission-v1", "knowledge-relations-v1", "generated-curriculum-v1"];
+const SCHEMA_VERSIONS = ["knowledge-candidates-v1", "knowledge-equivalence-v1", "knowledge-coverage-v1", "knowledge-pair-classification-v1", "generated-curriculum-v1"];
 
 function required(name: string) {
   const value = process.env[name];
@@ -66,6 +67,7 @@ const server = createClient(supabaseUrl, required("SUPABASE_SECRET_KEY"), { auth
 const env = readLlmEnvironment();
 const existingJobId = argument("--job-id");
 const existingOwnerId = argument("--owner-id");
+const runIndex = argument("--run-index");
 const keep = process.argv.includes("--keep");
 const created = { userId: "", courseId: "", materialId: "", jobId: "", storagePath: "", password: "", email: "" };
 
@@ -121,7 +123,7 @@ try {
   const scoped = selectCourseMaterialScope(prepared.material, { pdfPages: { start: 15, end: 35 } });
   let result;
   try {
-    result = await runKnowledgeGenerationPipeline({ courseId: prepared.courseId, ownerId: created.userId, material: scoped }, createJsonGenerationClient(env));
+    result = await runKnowledgeGenerationPipeline({ courseId: prepared.courseId, ownerId: created.userId, material: scoped }, createJsonGenerationClient(env), createEmbeddingService(readEmbeddingEnvironment()));
     await repository.persist(prepared.runId, result);
   } catch (error) {
     await repository.fail(prepared.runId, error);
@@ -140,12 +142,7 @@ try {
     Promise.all(goldTexts.map((text) => embedder.embed(text))),
     Promise.all(predictedTexts.map((text) => embedder.embed(text)))
   ]);
-  const cosine = (left: number[], right: number[]) => {
-    let dot = 0; let leftNorm = 0; let rightNorm = 0;
-    left.forEach((value, index) => { dot += value * right[index]; leftNorm += value * value; rightNorm += right[index] * right[index]; });
-    return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
-  };
-  const semanticScores = new Map(gold.nodes.flatMap((node, goldIndex) => result.candidates.map((candidate, candidateIndex) => [`${node.id}:${candidate.id}`, cosine(goldEmbeddings[goldIndex], predictedEmbeddings[candidateIndex])] as const)));
+  const semanticScores = new Map(gold.nodes.flatMap((node, goldIndex) => result.candidates.map((candidate, candidateIndex) => [`${node.id}:${candidate.id}`, cosineSimilarity(goldEmbeddings[goldIndex], predictedEmbeddings[candidateIndex])] as const)));
   const evaluation = evaluateKnowledgeGeneration(result, gold, { scores: semanticScores, provider: embeddingEnv.embeddingProvider, model: embeddingEnv.embeddingModel });
 
   let skillTree = { nodeCount: 0, edgeCount: 0, chapterCount: 0 };
@@ -161,11 +158,18 @@ try {
     assert(skillTree.nodeCount === result.candidates.length, "Formal Course Skill Tree lost generated Knowledge nodes");
   }
   mkdirSync(OUTPUT, { recursive: true });
-  const report = { runId: prepared.runId, provider: env.llmProvider, model: env.llmModel, promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION,
+  const report = { runId: prepared.runId, ownerId: created.userId, provider: env.llmProvider, model: env.llmModel, promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION,
+    embedding: { provider: embeddingEnv.embeddingProvider, model: embeddingEnv.embeddingModel, dimensions: embeddingEnv.embeddingDimensions },
     source: { parsingJobId: created.jobId, materialId: created.materialId, pdfPages: [15, 35], courseMaterialChunks: scoped.chunks.length },
     generated: { candidateCount: result.candidates.length, duplicateCount: result.duplicateCount, relationCount: result.relations.length, chapterCount: result.curriculum.chapters.length },
+    diagnostics: result.diagnostics,
+    calls: { llmRequestCount: result.executions.length, embeddingRequestCount: result.diagnostics.embeddingRequestCount,
+      promptTokens: result.executions.reduce((sum, execution) => sum + (execution.promptTokens ?? 0), 0),
+      completionTokens: result.executions.reduce((sum, execution) => sum + (execution.completionTokens ?? 0), 0),
+      relationBatches: result.diagnostics.relationBatchCount,
+      validationRetryCount: result.diagnostics.structuredRetryCount },
     skillTree, evaluation };
-  writeFileSync(join(OUTPUT, "summary.json"), `${JSON.stringify(report, null, 2)}\n`);
+  writeFileSync(join(OUTPUT, runIndex ? `run-${runIndex}.json` : "summary.json"), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   if (keep) console.log(`Kept Local acceptance data: job=${created.jobId} owner=${created.userId}`);
 } finally {

@@ -100,12 +100,15 @@ Use an explicit pipeline rather than one unconstrained Agent:
 
 ```text
 CourseMaterial
-  -> candidate extraction
-  -> normalization
-  -> ingestion-local deduplication
+  -> section-aware high-recall candidate extraction
+  -> deterministic normalization and exact deduplication
+  -> ingestion-local embedding duplicate retrieval
+  -> scoped equivalence classification
+  -> embedding-assisted section coverage audit and one-pass recovery
+  -> embedding/provenance relation-pair retrieval
+  -> bounded pair classification (prerequisite / enables / related / none)
+  -> deterministic graph validation
   -> User Knowledge creation with provenance
-  -> prerequisite inference
-  -> DAG validation
   -> chapter organization
   -> Course Skill Tree
 ```
@@ -122,7 +125,7 @@ Docling Graph may be evaluated as an alternative extractor adapter. It must not 
 
 Knowledge Architecture v1 supersedes the earlier automatic Global alignment proposal for ingestion. Phase 4.2 creates source-traceable User Knowledge owned by the authenticated actor. It does not retrieve, map, merge, promote, replace, or align against Global or Tenant Knowledge.
 
-Embedding-based similarity remains available only to isolated evaluation tooling here. A future explicit user-triggered “Analyze Similar Knowledge” operation may propose mappings, but it is not part of course ingestion and cannot mutate ontology identity automatically.
+Embedding-based similarity is used inside one course-ingestion run only to retrieve candidate duplicate pairs, nearby Knowledge for section coverage review, and plausible relation pairs. Vectors stay in run memory; cosine similarity never merges Knowledge or creates a KnowledgeEdge. Scoped LLM judgments decide candidate equivalence and classify each retrieved unordered pair, while deterministic validators remain authoritative. This path never searches or aligns Global/Tenant Knowledge and adds no persistent pgvector candidate schema. Gold embeddings remain isolated evaluator inputs.
 
 ### Prerequisite semantics
 

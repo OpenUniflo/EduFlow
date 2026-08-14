@@ -91,6 +91,7 @@ export function evaluateKnowledgeGeneration(result: KnowledgeGenerationResult, g
       : { goldId: node.id, goldTitle: node.canonicalTitle, score: 0, signal: "unmatched" };
   });
   const predictedToGold = new Map(Array.from(matches.values(), (match) => [match.predicted.id, match.gold.id]));
+  const goldToPredicted = new Map(Array.from(matches.values(), (match) => [match.gold.id, match.predicted.id]));
   const relationMetrics = Object.fromEntries((["prerequisite", "enables", "related"] as const).map((type) => {
     const key = (source: string, target: string) => type === "related" ? [source, target].sort().join(":") : `${source}:${target}`;
     const expected = new Set(gold.relations.filter((relation) => relation.type === type).map((relation) => key(relation.from, relation.to)));
@@ -125,6 +126,27 @@ export function evaluateKnowledgeGeneration(result: KnowledgeGenerationResult, g
   const coveredCandidateIds = new Set(result.curriculum.chapters.flatMap((chapter) => chapter.lessons.flatMap((lesson) => lesson.coverages.map((coverage) => coverage.candidateId))));
   const normalizedCandidateSurfaces = result.candidates.map((candidate) => normalizeKnowledgeSurface(candidate.canonicalTitle));
   const duplicateCandidateCount = normalizedCandidateSurfaces.length - new Set(normalizedCandidateSurfaces).size;
+  const retrievedPairKeys = new Set(result.relationCandidatePairs.map((pair) => [pair.leftCandidateId, pair.rightCandidateId].sort().join(":")));
+  const predictedRelationKeys = new Set(result.relations.map((relation) => {
+    const endpoints = relation.relation === "related" ? [relation.sourceCandidateId, relation.targetCandidateId].sort() : [relation.sourceCandidateId, relation.targetCandidateId];
+    return `${relation.relation}:${endpoints.join(":")}`;
+  }));
+  const retrievalByType = Object.fromEntries((["prerequisite", "enables", "related"] as const).map((type) => {
+    const evaluable = gold.relations.filter((relation) => relation.type === type).flatMap((relation) => {
+      const source = goldToPredicted.get(relation.from); const target = goldToPredicted.get(relation.to);
+      return source && target ? [{ relation, source, target }] : [];
+    });
+    const retrieved = evaluable.filter(({ source, target }) => retrievedPairKeys.has([source, target].sort().join(":")));
+    const correctlyClassified = retrieved.filter(({ relation, source, target }) => {
+      const endpoints = relation.type === "related" ? [source, target].sort() : [source, target];
+      return predictedRelationKeys.has(`${relation.type}:${endpoints.join(":")}`);
+    });
+    return [type, { evaluable: evaluable.length, retrieved: retrieved.length, recall: ratio(retrieved.length, evaluable.length),
+      retrievalMisses: evaluable.length - retrieved.length, retrievedButMisclassified: retrieved.length - correctlyClassified.length }];
+  }));
+  const retrievalTotals = Object.values(retrievalByType) as Array<{ evaluable: number; retrieved: number; retrievalMisses: number; retrievedButMisclassified: number }>;
+  const overallEvaluable = retrievalTotals.reduce((sum, metric) => sum + metric.evaluable, 0);
+  const overallRetrieved = retrievalTotals.reduce((sum, metric) => sum + metric.retrieved, 0);
   return {
     matching: { mode: "semantic_with_aliases", deterministicThreshold: threshold, ...(semantic ? { semanticEvaluator: { provider: semantic.provider, model: semantic.model, cosineThreshold: 0.7 } } : {}), decisions: matchDecisions },
     metrics: {
@@ -137,6 +159,12 @@ export function evaluateKnowledgeGeneration(result: KnowledgeGenerationResult, g
       prerequisiteCycleCount: cycleCount,
       provenanceCompleteness: ratio(factsWithProvenance, facts),
       curriculumKnowledgeCoverage: ratio(Array.from(candidateIds).filter((id) => coveredCandidateIds.has(id)).length, candidateIds.size)
+    },
+    retrievalDiagnostics: {
+      byRelationType: retrievalByType,
+      overall: { evaluable: overallEvaluable, retrieved: overallRetrieved, recall: ratio(overallRetrieved, overallEvaluable),
+        retrievalMisses: retrievalTotals.reduce((sum, metric) => sum + metric.retrievalMisses, 0),
+        retrievedButMisclassified: retrievalTotals.reduce((sum, metric) => sum + metric.retrievedButMisclassified, 0) }
     },
     mismatches: {
       missingGoldNodes: matchDecisions.filter((decision) => !decision.predictedId),

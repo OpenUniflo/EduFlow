@@ -330,3 +330,9 @@ Global-only graph requirements use the explicitly named `validateGlobalKnowledge
 Pure projections consume explicit `KnowledgeGraph`, `CourseRuntimeData`, `DomainGovernanceState`, and user-state inputs. They must not retrieve hidden state from `applicationServices`, React hooks, or application singleton stores.
 
 `resolveNodeDomain(nodeId, governanceState)` is a pure Core governance lookup. Atlas, Material, and Personal projections import that helper directly; `domainStore` remains an application/UI adapter over the composed governance service.
+
+## 47. Ingestion-local Retrieval Boundary
+
+Course ingestion may embed source sections and generated User Knowledge candidates inside one generation run to retrieve suspicious duplicate pairs, coverage-review neighbors, and plausible relation pairs. Those vectors are ephemeral retrieval aids: cosine similarity is neither Knowledge identity authority nor KnowledgeRelation authority. Duplicate merge requires scoped equivalence judgment, relation creation requires bounded pair classification, and the graph validator remains final authority.
+
+This mechanism does not search, map, merge, promote, replace, or align against Global or Tenant Knowledge, does not persist candidate vectors, and does not alter Knowledge Architecture scope or ownership rules. Gold data and Gold embeddings exist only in evaluation and never enter production retrieval.
