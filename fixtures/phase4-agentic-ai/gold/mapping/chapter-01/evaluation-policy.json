@@ -1,0 +1,29 @@
+{
+  "datasetVersion": "mapping-gold-candidate-v0.1",
+  "reviewStatus": "pending_human_review",
+  "policies": {
+    "knowledgeMaterial": {
+      "requiredKeys": [
+        "knowledgeNodeId",
+        "relationType",
+        "sourceRefs"
+      ],
+      "matching": "knowledgeNodeId exact; source section/page should overlap the reviewed provenance; do not rediscover pages with embeddings when provenance already exists."
+    },
+    "knowledgePractice": {
+      "matching": "Compare required knowledge-node sets per practice. Practice wording may vary semantically; IDs in this Gold are oracle IDs, not production IDs."
+    },
+    "practiceDependencies": {
+      "matching": "Evaluate directed prerequisite edges. Extra transitive edges should be flagged as redundant rather than counted as new semantic prerequisites."
+    },
+    "outcomes": {
+      "matching": "Evaluate whether required practices are attached to the expected outcome. OUT03/OUT04 are intentionally partial because this is a representative sample."
+    }
+  },
+  "successCriteria": {
+    "knowledgeMaterialLinkRecall": "10/10 sampled KnowledgeNodes preserve reviewed source provenance",
+    "practiceCoverage": "10/10 sampled KnowledgeNodes map to at least one appropriate Practice",
+    "dependencyValidity": "Practice graph is acyclic and contains all reviewed direct prerequisite edges",
+    "outcomeCoverage": "All 7 sampled Practices map to an expected ChapterOutcome"
+  }
+}

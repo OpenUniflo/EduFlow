@@ -1,0 +1,177 @@
+{
+  "datasetVersion": "mapping-gold-candidate-v0.1",
+  "reviewStatus": "pending_human_review",
+  "sourceKnowledgeGold": "fixtures/phase4-agentic-ai/gold/knowledge/chapter-01/knowledge-nodes.json",
+  "links": [
+    {
+      "knowledgeNodeId": "K02",
+      "relationType": "teaches",
+      "sourceRefs": [
+        {
+          "section": "1.1 / 图 1-1",
+          "printedPages": [
+            7,
+            9
+          ],
+          "pdfPages": [
+            15,
+            17
+          ]
+        }
+      ]
+    },
+    {
+      "knowledgeNodeId": "K03",
+      "relationType": "teaches",
+      "sourceRefs": [
+        {
+          "section": "1.1.1",
+          "printedPages": [
+            8,
+            9
+          ],
+          "pdfPages": [
+            16,
+            17
+          ]
+        }
+      ]
+    },
+    {
+      "knowledgeNodeId": "K05",
+      "relationType": "teaches",
+      "sourceRefs": [
+        {
+          "section": "1.1.2",
+          "printedPages": [
+            10,
+            11
+          ],
+          "pdfPages": [
+            18,
+            19
+          ]
+        }
+      ]
+    },
+    {
+      "knowledgeNodeId": "K07",
+      "relationType": "teaches",
+      "sourceRefs": [
+        {
+          "section": "1.1.4",
+          "printedPages": [
+            13,
+            14
+          ],
+          "pdfPages": [
+            21,
+            22
+          ]
+        }
+      ]
+    },
+    {
+      "knowledgeNodeId": "K08",
+      "relationType": "teaches",
+      "sourceRefs": [
+        {
+          "section": "1.1.5",
+          "printedPages": [
+            14,
+            16
+          ],
+          "pdfPages": [
+            22,
+            24
+          ]
+        }
+      ]
+    },
+    {
+      "knowledgeNodeId": "K19",
+      "relationType": "teaches",
+      "sourceRefs": [
+        {
+          "section": "1.2.5.1",
+          "printedPages": [
+            22,
+            23
+          ],
+          "pdfPages": [
+            30,
+            31
+          ]
+        }
+      ]
+    },
+    {
+      "knowledgeNodeId": "K20",
+      "relationType": "teaches",
+      "sourceRefs": [
+        {
+          "section": "1.2.5.2",
+          "printedPages": [
+            23,
+            23
+          ],
+          "pdfPages": [
+            31,
+            31
+          ]
+        }
+      ]
+    },
+    {
+      "knowledgeNodeId": "K21",
+      "relationType": "teaches",
+      "sourceRefs": [
+        {
+          "section": "1.2.5.3",
+          "printedPages": [
+            23,
+            24
+          ],
+          "pdfPages": [
+            31,
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "knowledgeNodeId": "K25",
+      "relationType": "teaches",
+      "sourceRefs": [
+        {
+          "section": "1.2.6.1",
+          "printedPages": [
+            25,
+            25
+          ],
+          "pdfPages": [
+            33,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "knowledgeNodeId": "K27",
+      "relationType": "teaches",
+      "sourceRefs": [
+        {
+          "section": "1.2.6.2",
+          "printedPages": [
+            25,
+            26
+          ],
+          "pdfPages": [
+            33,
+            34
+          ]
+        }
+      ]
+    }
+  ]
+}

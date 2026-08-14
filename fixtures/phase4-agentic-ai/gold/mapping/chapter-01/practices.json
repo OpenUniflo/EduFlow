@@ -1,0 +1,86 @@
+{
+  "datasetVersion": "mapping-gold-candidate-v0.1",
+  "reviewStatus": "pending_human_review",
+  "practices": [
+    {
+      "id": "PR01",
+      "title": "划分 Agent 与 Environment 系统边界",
+      "curriculumRefs": [
+        "P01"
+      ],
+      "practiceType": "analysis",
+      "runtimeType": "non_workflow",
+      "objective": "为一个具体任务划分 Agent 内部组件与外部 Environment，说明二者如何交互。",
+      "deliverable": "一份 Agent/Environment 边界标注图或结构化说明。"
+    },
+    {
+      "id": "PR02",
+      "title": "定义观察通道与动作接口",
+      "curriculumRefs": [
+        "P04"
+      ],
+      "practiceType": "analysis",
+      "runtimeType": "non_workflow",
+      "objective": "为目标任务列出 Agent 能观察的信息、允许执行的动作及关键限制。",
+      "deliverable": "观察通道、动作接口与限制条件清单。"
+    },
+    {
+      "id": "PR03",
+      "title": "接入单一工具并完成一次 Tool Calling 闭环",
+      "curriculumRefs": [
+        "T01"
+      ],
+      "practiceType": "build",
+      "runtimeType": "workflow",
+      "objective": "让 Agent 正确选择并调用一个外部工具，并把工具结果回注后续模型上下文。",
+      "deliverable": "可运行的 Agent→Tool 流程及至少一次成功工具调用记录。"
+    },
+    {
+      "id": "PR04",
+      "title": "设计 Agent 上下文来源清单",
+      "curriculumRefs": [
+        "I04"
+      ],
+      "practiceType": "design",
+      "runtimeType": "workflow_config",
+      "objective": "明确系统指令、用户输入、历史、知识、记忆与工具结果如何组成 Agent 上下文。",
+      "deliverable": "上下文来源清单及 Context Builder 配置草案。"
+    },
+    {
+      "id": "PR05",
+      "title": "使用 ReAct 模板完成资料查找任务并解释循环",
+      "curriculumRefs": [
+        "R02"
+      ],
+      "practiceType": "template_experiment",
+      "runtimeType": "workflow_template",
+      "objective": "通过现成 ReAct 模板观察 Reason–Act–Observe 循环如何依赖工具调用、上下文与环境反馈推进任务。",
+      "deliverable": "一次成功运行记录，以及对 Reason/Act/Observe 关键步骤的说明。"
+    },
+    {
+      "id": "PR06",
+      "title": "比较确定性 Workflow、自主 Agent 与混合编排",
+      "curriculumRefs": [
+        "W01",
+        "W05"
+      ],
+      "practiceType": "comparison",
+      "runtimeType": "workflow_template",
+      "objective": "针对同一任务比较固定流程、自主决策与混合架构的控制路径、灵活性与风险。",
+      "deliverable": "三种编排方式的对比记录及架构选择说明。"
+    },
+    {
+      "id": "PR07",
+      "title": "为高风险工具增加执行侧护栏和人工审批",
+      "curriculumRefs": [
+        "T05",
+        "W05",
+        "S04"
+      ],
+      "practiceType": "build",
+      "runtimeType": "workflow",
+      "objective": "识别高风险工具操作，并在执行前加入权限/风险检查和 Human Approval。",
+      "deliverable": "带执行侧护栏与 Human Approval 的工作流，以及明确的触发条件。"
+    }
+  ]
+}

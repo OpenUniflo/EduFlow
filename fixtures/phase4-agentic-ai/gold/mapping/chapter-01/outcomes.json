@@ -1,0 +1,52 @@
+{
+  "datasetVersion": "mapping-gold-candidate-v0.1",
+  "reviewStatus": "pending_human_review",
+  "chapterOutcomes": [
+    {
+      "id": "OUT01",
+      "title": "Agent 问题与架构认知成果",
+      "practiceIds": [
+        "PR01",
+        "PR02"
+      ],
+      "scopeNote": "对应课程前期的问题建模/架构认知类成果。"
+    },
+    {
+      "id": "OUT02",
+      "title": "架构选择报告",
+      "practiceIds": [
+        "PR05",
+        "PR06"
+      ],
+      "scopeNote": "对应第4—5课模板实验与架构比较成果。"
+    },
+    {
+      "id": "OUT03",
+      "title": "受控单 Agent MVP",
+      "practiceIds": [
+        "PR03",
+        "PR04"
+      ],
+      "scopeNote": "本 Gold 仅覆盖该成果的一部分；完整课程还包括 Instruction、RAG、State/Memory、Runtime 等实训。"
+    },
+    {
+      "id": "OUT04",
+      "title": "可评测、可部署、受治理的 Agent 系统",
+      "practiceIds": [
+        "PR07"
+      ],
+      "scopeNote": "本 Gold 仅覆盖治理成果的一部分；完整课程还包括评测、审计、部署等实训。"
+    }
+  ],
+  "finalProject": {
+    "id": "FP01",
+    "title": "Agentic AI 综合项目",
+    "chapterOutcomeIds": [
+      "OUT01",
+      "OUT02",
+      "OUT03",
+      "OUT04"
+    ],
+    "scopeNote": "这是 10 个代表性知识节点的抽样 Gold，不代表最终项目的完整组成。"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "datasetVersion": "mapping-gold-candidate-v0.1",
+  "reviewStatus": "pending_human_review",
+  "dependencies": [
+    {
+      "from": "PR01",
+      "to": "PR02",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "先确定 Agent–Environment 边界，再定义哪些信息可观察、哪些动作可执行。"
+    },
+    {
+      "from": "PR03",
+      "to": "PR05",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "ReAct 的 Act/Observe 循环需要先理解并完成工具调用闭环。"
+    },
+    {
+      "from": "PR04",
+      "to": "PR05",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "ReAct 下一轮决策依赖工具结果和消息历史进入上下文。"
+    },
+    {
+      "from": "PR05",
+      "to": "PR06",
+      "type": "prerequisite",
+      "strength": "soft",
+      "rationale": "先观察自主循环，再比较固定 Workflow、自主 Agent 与混合编排更容易形成架构判断。"
+    },
+    {
+      "from": "PR03",
+      "to": "PR07",
+      "type": "prerequisite",
+      "strength": "hard",
+      "rationale": "执行侧护栏和人工审批建立在真实工具调用链路之上。"
+    }
+  ]
+}
