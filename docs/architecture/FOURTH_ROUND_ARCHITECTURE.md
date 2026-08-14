@@ -100,17 +100,25 @@ Use an explicit pipeline rather than one unconstrained Agent:
 
 ```text
 CourseMaterial
-  -> candidate extraction
-  -> normalization
-  -> deduplication
-  -> global Knowledge alignment
-  -> prerequisite inference
-  -> DAG validation
+  -> section-aware high-recall candidate extraction
+  -> deterministic normalization and exact deduplication
+  -> ingestion-local embedding duplicate retrieval
+  -> scoped equivalence classification
+  -> embedding-assisted section coverage audit and one-pass recovery
+  -> bounded local candidate admission (KEEP / DROP / SUBSUMED_BY)
+  -> embedding/provenance relation-pair retrieval
+  -> bounded pair classification (prerequisite / enables / related / none)
+  -> deterministic graph validation
+  -> User Knowledge creation with provenance
   -> chapter organization
   -> Course Skill Tree
 ```
 
 Each stage has structured input/output, can be retried independently, records model/version metadata, and can be evaluated separately.
+
+The Phase 4.2 structured-output boundary distinguishes semantic corruption from a bounded representation mismatch. Missing, empty, or wrongly typed required fields still fail validation and use the existing bounded retry. A model response containing more than two otherwise valid mastery criteria is deterministically trimmed, deduplicated, capped to the compact generated-candidate representation, and recorded as a validation warning; this repair does not change candidate identity, type, or provenance.
+
+Candidate admission is a local ontology quality gate over already extracted and recovered candidates, limited source evidence, and nearby ingestion-local candidates. It does not regenerate a Chapter or the whole ontology. `SUBSUMED_BY` is a granularity decision, not semantic duplicate identity and not a new KnowledgeRelation; only admitted candidates enter the final Knowledge set.
 
 ### Candidate extraction
 
@@ -118,23 +126,21 @@ Default to structured LLM output behind a `KnowledgeCandidateExtractor` contract
 
 Docling Graph may be evaluated as an alternative extractor adapter. It must not directly define the Course Skill DAG.
 
-### Knowledge alignment
+### Knowledge ingestion boundary
 
-Use Supabase PostgreSQL + pgvector:
+Knowledge Architecture v1 supersedes the earlier automatic Global alignment proposal for ingestion. Phase 4.2 creates source-traceable User Knowledge owned by the authenticated actor. It does not retrieve, map, merge, promote, replace, or align against Global or Tenant Knowledge.
 
-```text
-candidate Knowledge
-  -> embedding
-  -> pgvector Top-K retrieval
-  -> rule filtering / LLM judge
-  -> matched | ambiguous | new
-```
-
-The vector store narrows candidates; it does not decide ontology identity on its own.
+Embedding-based similarity is used inside one course-ingestion run only to retrieve candidate duplicate pairs, nearby Knowledge for section coverage review, and plausible relation pairs. Vectors stay in run memory; cosine similarity never merges Knowledge or creates a KnowledgeEdge. Scoped LLM judgments decide candidate equivalence and classify each retrieved unordered pair, while deterministic validators remain authoritative. This path never searches or aligns Global/Tenant Knowledge and adds no persistent pgvector candidate schema. Gold embeddings remain isolated evaluator inputs.
 
 ### Prerequisite semantics
 
 A generic content relation is not a teaching prerequisite. `prerequisite_of` remains an EduFlow-owned teaching decision with validation for self-edges, cycles, duplicates, invalid references, and unsupported relations.
+
+For the Phase 4.2 MVP, relation classification is precision-first: insufficient, proximity-only, order-only, part/whole, or similarity-only evidence produces `NONE`. Omission is preferable to an unsupported learning edge; higher relation recall remains a post-MVP quality optimization.
+
+The v1 domain continues to support `prerequisite`, `enables`, and `related`. Phase 4.2 automatic generation is deliberately narrower: it publishes supported prerequisite facts only, rejects a prerequisite when the classifier rationale explicitly relies on document order, and suppresses generated `enables`/`related` facts. Live MVP evidence showed that those associative types dominated graph density and were not reliable enough to publish. This is a generator policy, not an ontology change; manually governed and future higher-confidence pipelines may still use every v1 relation type.
+
+Phase 4.2 MVP acceptance prioritizes a stable complete generation, graph invariants, traceability, curriculum/Skill Tree handoff, and a readable precision-first teaching path. One canonical live run plus one independent same-configuration sanity repeat is the merge gate. Gold node/relation metrics, relation recall, and cost remain reported diagnostics rather than fixed MVP thresholds. Formal three-or-more-run statistical stability remains post-MVP model-quality work.
 
 ## 6. Phase 4.3 — Knowledge / Material / Practice mapping
 
@@ -195,7 +201,7 @@ Using real Agentic AI material, without manually editing database rows or depend
 
 1. upload source material;
 2. parse it into structured CourseMaterial;
-3. generate/alignment Knowledge and a valid Course Skill DAG;
+3. generate User Knowledge and a valid Course Skill DAG;
 4. establish formal Material and Practice mappings;
 5. let a learner navigate from Knowledge to real material and practice;
 6. execute the Workflow through a backend runtime;

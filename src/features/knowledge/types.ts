@@ -13,6 +13,16 @@ export type KnowledgeProvenance = {
   sourceId: string;
   sourceRevision?: string;
   discoveredAt?: string;
+  courseId?: string;
+  materialId?: string;
+  generationRunId?: string;
+  sourceLocations?: Array<{
+    rawBlockId: string;
+    ordinal: number;
+    sectionPath: string[];
+    page?: number;
+    slide?: number;
+  }>;
 };
 
 export type KnowledgeNode = {
@@ -57,6 +67,7 @@ type KnowledgeRelationBase = {
   source: string;
   target: string;
   reason: string;
+  provenance?: KnowledgeProvenance[];
 };
 
 export type PrerequisiteKnowledgeRelation = KnowledgeRelationBase & {

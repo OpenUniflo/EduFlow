@@ -9,6 +9,7 @@ export type Course = {
   subtitle?: string;
   description: string;
   accentColor?: string;
+  generationStatus?: "draft" | "parsed" | "curriculum-generated" | "ready";
 };
 
 export type CourseSummary = {

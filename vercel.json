@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["sin1"],
   "functions": {
+    "api/knowledge-generation.ts": {
+      "maxDuration": 300
+    },
     "api/**/*.ts": {
       "maxDuration": 30
     }

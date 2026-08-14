@@ -29,3 +29,15 @@ uv run python ../../scripts/acceptance/phase4_1.py package
 ```
 
 Use `--output-dir /absolute/path` before `full-book` or `package` to write to a different directory.
+
+## Phase 4.2
+
+`pnpm acceptance:phase4.2:live` is the opt-in network acceptance. It uploads and parses the canonical PDF through the formal Phase 4.1 worker, scopes the resulting `CourseMaterial` to PDF pages 15–35, calls the configured DeepSeek model, persists the validated graph and Curriculum, reloads them through the real APIs, and hands them to the existing Course Skill Tree projection. It evaluates against the read-only Chapter 1 Gold package and writes `phase4.2-acceptance/summary.json`; the ignored report contains metrics and match decisions, never raw model responses or secrets.
+
+For prompt iteration without reparsing the full book, reuse the IDs printed by a kept local run:
+
+```bash
+pnpm acceptance:phase4.2:live -- --job-id <completed-job-uuid> --owner-id <local-user-uuid> --keep
+```
+
+This command is guarded to Local Supabase. `pnpm verify:knowledge-generation:local` independently verifies atomic persistence, reload, idempotent rerun, and rollback without a live model call.

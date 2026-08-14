@@ -70,6 +70,8 @@ Knowledge-to-knowledge facts use only:
 - `enables`: `A → B` means A enables implementation/application of B without being a cognitive prerequisite. Optional numeric strength is `0..1`.
 - `related`: a significant association without prerequisite/enabling semantics. It is structurally undirected by default and may have numeric strength `0..1`.
 
+The Knowledge ontology DAG invariant applies only to the `prerequisite` subgraph. `enables` remains directional but is not automatically a prerequisite; Course Skill Tree and Chapter projections may separately enforce acyclic ordering over their combined prerequisite/enables dependency projection.
+
 `implementation-support`, `practice-support`, and `conceptual` are obsolete relation values. Lesson, Assignment, mapping, and promotion relationships are not KnowledgeRelations.
 
 ## 9. KnowledgeMapping
@@ -328,3 +330,9 @@ Global-only graph requirements use the explicitly named `validateGlobalKnowledge
 Pure projections consume explicit `KnowledgeGraph`, `CourseRuntimeData`, `DomainGovernanceState`, and user-state inputs. They must not retrieve hidden state from `applicationServices`, React hooks, or application singleton stores.
 
 `resolveNodeDomain(nodeId, governanceState)` is a pure Core governance lookup. Atlas, Material, and Personal projections import that helper directly; `domainStore` remains an application/UI adapter over the composed governance service.
+
+## 47. Ingestion-local Retrieval Boundary
+
+Course ingestion may embed source sections and generated User Knowledge candidates inside one generation run to retrieve suspicious duplicate pairs, coverage-review neighbors, candidate-admission neighbors, and plausible relation pairs. Those vectors are ephemeral retrieval aids: cosine similarity is neither Knowledge identity authority nor KnowledgeRelation authority. Duplicate merge requires scoped equivalence judgment; a bounded local admission gate decides whether recovered candidates warrant independent Knowledge identity without regenerating the ontology; relation creation requires bounded precision-first pair classification; and the graph validator remains final authority.
+
+This mechanism does not search, map, merge, promote, replace, or align against Global or Tenant Knowledge, does not persist candidate vectors, and does not alter Knowledge Architecture scope or ownership rules. Gold data and Gold embeddings exist only in evaluation and never enter production retrieval.
