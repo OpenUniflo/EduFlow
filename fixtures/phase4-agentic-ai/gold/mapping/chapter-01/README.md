@@ -1,6 +1,6 @@
-# Phase 4.3 Mapping Gold Candidate — Chapter 1
+# Phase 4.3 Mapping Gold — Chapter 1
 
-This package is a **human-review candidate** for EduFlow Phase 4.3.
+This package is the **human-reviewed Mapping Gold baseline** for EduFlow Phase 4.3.
 It is derived from:
 
 1. the existing human-reviewed Phase 4.2 Knowledge Gold for Chapter 1; and
@@ -41,13 +41,13 @@ The sample covers:
 The repository's existing Knowledge Gold policy states that model-produced artifacts do not become Gold
 until reviewed and deliberately promoted.
 
-Therefore this package uses:
+This package has been manually reviewed and promoted to:
 
-`reviewStatus = pending_human_review`
+`datasetVersion = mapping-gold-v0.1`
 
-After human confirmation, rename the dataset version from
-`mapping-gold-candidate-v0.1` to `mapping-gold-v0.1`
-and place the directory at:
+`reviewStatus = reviewed`
+
+Repository location:
 
 `fixtures/phase4-agentic-ai/gold/mapping/chapter-01/`
 
