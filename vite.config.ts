@@ -14,7 +14,11 @@ export default defineConfig(({ mode }) => {
     "EMBEDDING_BASE_URL",
     "EMBEDDING_API_KEY",
     "EMBEDDING_MODEL",
-    "EMBEDDING_DIMENSIONS"
+    "EMBEDDING_DIMENSIONS",
+    "LLM_PROVIDER",
+    "LLM_BASE_URL",
+    "LLM_API_KEY",
+    "LLM_MODEL"
   ]) {
     if (env[name]) process.env[name] = env[name];
   }

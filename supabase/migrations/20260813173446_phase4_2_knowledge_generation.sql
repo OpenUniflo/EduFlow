@@ -1,0 +1,162 @@
+alter table public.knowledge_edges
+  add column provenance jsonb not null default '[]'::jsonb check (jsonb_typeof(provenance) = 'array');
+alter table public.knowledge_edges
+  add column lifecycle_status text not null default 'active' check (lifecycle_status in ('active', 'deprecated'));
+
+alter table public.courses
+  add column generation_status text not null default 'ready'
+  check (generation_status in ('draft', 'parsed', 'curriculum-generated', 'ready'));
+
+create table public.knowledge_generation_runs (
+  id uuid primary key default gen_random_uuid(),
+  course_id text not null,
+  material_id text not null,
+  owner_user_id uuid not null references auth.users(id),
+  status text not null default 'running' check (status in ('running', 'completed', 'failed')),
+  provider text not null,
+  model text not null,
+  prompt_version text not null,
+  schema_versions jsonb not null check (jsonb_typeof(schema_versions) = 'array'),
+  executions jsonb not null default '[]'::jsonb check (jsonb_typeof(executions) = 'array'),
+  candidate_count integer check (candidate_count >= 0),
+  duplicate_count integer check (duplicate_count >= 0),
+  relation_count integer check (relation_count >= 0),
+  chapter_count integer check (chapter_count >= 0),
+  error_code text,
+  error_message text,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz,
+  foreign key (course_id, material_id) references public.materials(course_id, id),
+  check ((status = 'failed' and error_code is not null and error_message is not null)
+    or (status = 'completed' and completed_at is not null and error_code is null and error_message is null)
+    or status = 'running')
+);
+
+create index knowledge_generation_runs_course_idx on public.knowledge_generation_runs(course_id, created_at desc);
+create index knowledge_generation_runs_owner_idx on public.knowledge_generation_runs(owner_user_id, created_at desc);
+alter table public.knowledge_generation_runs enable row level security;
+revoke all on table public.knowledge_generation_runs from anon, authenticated;
+grant all privileges on table public.knowledge_generation_runs to service_role;
+
+create or replace function public.persist_knowledge_generation(target_run_id uuid, payload jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  generation_run public.knowledge_generation_runs;
+  source_material public.materials;
+  old_lesson_ids text[];
+  old_chapter_ids text[];
+  first_lesson_id text;
+  item jsonb;
+begin
+  select * into generation_run
+  from public.knowledge_generation_runs
+  where id = target_run_id and status = 'running'
+  for update;
+  if generation_run.id is null then raise exception 'knowledge_generation_run_not_running'; end if;
+
+  select * into source_material
+  from public.materials
+  where course_id = generation_run.course_id and id = generation_run.material_id;
+  if source_material.id is null then raise exception 'knowledge_generation_material_missing'; end if;
+  if (select count(*) from public.materials where course_id = generation_run.course_id) <> 1 then
+    raise exception 'knowledge_generation_requires_single_material_draft';
+  end if;
+  if exists (select 1 from public.course_assignments where course_id = generation_run.course_id) then
+    raise exception 'knowledge_generation_rejects_courses_with_assignments';
+  end if;
+
+  select array_agg(id), array_agg(distinct chapter_id) into old_lesson_ids, old_chapter_ids
+  from public.curriculum_lessons where course_id = generation_run.course_id;
+
+  delete from public.curriculum_sequences where course_id = generation_run.course_id;
+  delete from public.curriculum_coverages where course_id = generation_run.course_id;
+  update public.curriculum_lessons set display_order = display_order + 100000 where course_id = generation_run.course_id;
+  update public.curriculum_chapters set display_order = display_order + 100000 where course_id = generation_run.course_id;
+
+  -- A rerun replaces the generated relation projection for this source. Stable
+  -- KnowledgeNode identities remain, but stale generated edges must not leak
+  -- into the new Course graph through reused endpoints.
+  update public.knowledge_edges edge set lifecycle_status = 'deprecated'
+  where edge.provenance @> jsonb_build_array(jsonb_build_object(
+    'courseId', generation_run.course_id,
+    'materialId', generation_run.material_id
+  ));
+
+  for item in select value from jsonb_array_elements(payload->'nodes') loop
+    insert into public.knowledge_nodes (
+      id, title, description, node_type, mastery_criteria, scope, owner_id, provenance,
+      current_revision_id, status, metadata, created_at, updated_at
+    ) values (
+      item->>'id', item->>'title', item->>'description', item->>'type', item->'masteryCriteria', 'user',
+      generation_run.owner_user_id::text, item->'provenance', item->>'revisionId', 'active', item->'metadata', now(), now()
+    ) on conflict (id) do nothing;
+    insert into public.knowledge_node_revisions (
+      id, node_id, version, title, description, node_type, mastery_criteria, created_by, created_at, change_reason
+    ) values (
+      item->>'revisionId', item->>'id', 1, item->>'title', item->>'description', item->>'type',
+      item->'masteryCriteria', generation_run.owner_user_id::text, now(), 'phase4.2-course-ingestion'
+    ) on conflict (id) do nothing;
+  end loop;
+
+  for item in select value from jsonb_array_elements(payload->'relations') loop
+    insert into public.knowledge_edges (
+      id, source_node_id, target_node_id, relation, reason, prerequisite_strength, associative_strength, provenance, lifecycle_status
+    ) values (
+      item->>'id', item->>'source', item->>'target', item->>'relation', item->>'reason',
+      case when item->>'relation' = 'prerequisite' then item->>'strength' else null end,
+      case when item->>'relation' <> 'prerequisite' then (item->>'strength')::numeric else null end,
+      item->'provenance', 'active'
+    ) on conflict (source_node_id, target_node_id, relation) do update
+      set reason = excluded.reason, provenance = excluded.provenance, lifecycle_status = 'active';
+  end loop;
+
+  for item in select value from jsonb_array_elements(payload->'chapters') loop
+    insert into public.curriculum_chapters (course_id, id, title, description, display_order, color, outcome)
+    values (generation_run.course_id, item->>'id', item->>'title', item->>'description', (item->>'order')::integer, item->>'color', item->>'outcome')
+    on conflict (course_id, id) do update set title = excluded.title, description = excluded.description,
+      display_order = excluded.display_order, color = excluded.color, outcome = excluded.outcome;
+  end loop;
+  for item in select value from jsonb_array_elements(payload->'lessons') loop
+    insert into public.curriculum_lessons (course_id, id, chapter_id, title, display_order)
+    values (generation_run.course_id, item->>'id', item->>'chapterId', item->>'title', (item->>'order')::integer)
+    on conflict (course_id, id) do update set chapter_id = excluded.chapter_id, title = excluded.title, display_order = excluded.display_order;
+  end loop;
+  select value->>'id' into first_lesson_id from jsonb_array_elements(payload->'lessons') order by (value->>'order')::integer limit 1;
+  if first_lesson_id is null then raise exception 'knowledge_generation_has_no_lessons'; end if;
+  update public.materials set lesson_id = first_lesson_id, updated_at = now()
+  where course_id = generation_run.course_id and id = generation_run.material_id;
+  delete from public.curriculum_lessons
+  where course_id = generation_run.course_id and id = any(coalesce(old_lesson_ids, '{}'))
+    and id not in (select value->>'id' from jsonb_array_elements(payload->'lessons'));
+  delete from public.curriculum_chapters
+  where course_id = generation_run.course_id and id = any(coalesce(old_chapter_ids, '{}'))
+    and id not in (select value->>'id' from jsonb_array_elements(payload->'chapters'));
+
+  for item in select value from jsonb_array_elements(payload->'coverages') loop
+    insert into public.curriculum_coverages (course_id, id, lesson_id, node_id, role, display_order)
+    values (
+      generation_run.course_id, item->>'id', item->>'lessonId', item->>'nodeId', item->>'role', (item->>'order')::integer
+    );
+  end loop;
+
+  update public.course_curricula
+  set generation_mode = 'auto', requested_chapter_count = null, source_structure_id = generation_run.material_id
+  where course_id = generation_run.course_id;
+  update public.courses
+  set generation_status = 'curriculum-generated', revision = target_run_id::text, updated_at = now()
+  where id = generation_run.course_id;
+  update public.knowledge_generation_runs
+  set status = 'completed', executions = payload->'executions',
+      candidate_count = jsonb_array_length(payload->'nodes'), duplicate_count = (payload->>'duplicateCount')::integer,
+      relation_count = jsonb_array_length(payload->'relations'), chapter_count = jsonb_array_length(payload->'chapters'),
+      completed_at = now()
+  where id = target_run_id;
+end;
+$$;
+
+revoke all on function public.persist_knowledge_generation(uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.persist_knowledge_generation(uuid, jsonb) to service_role;

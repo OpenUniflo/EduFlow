@@ -8,6 +8,7 @@ import progressHandler from "../api/progress";
 import workflowsHandler from "../api/workflows";
 import materialsHandler from "../api/materials";
 import domainsHandler from "../api/domains";
+import knowledgeGenerationHandler from "../api/knowledge-generation";
 
 const handlers = new Map([
   ["/api/health", healthHandler],
@@ -16,7 +17,8 @@ const handlers = new Map([
   ["/api/progress", progressHandler],
   ["/api/workflows", workflowsHandler],
   ["/api/materials", materialsHandler],
-  ["/api/domains", domainsHandler]
+  ["/api/domains", domainsHandler],
+  ["/api/knowledge-generation", knowledgeGenerationHandler]
 ]);
 
 async function readBody(request: IncomingMessage) {

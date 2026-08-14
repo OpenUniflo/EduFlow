@@ -10,7 +10,7 @@ type KnowledgeNodeRow = {
   created_at: string; updated_at: string; tags: string[] | null; metadata: Record<string, unknown> | null;
 };
 type RevisionRow = { id: string; node_id: string; version: number; title: string; description: string; node_type: string; mastery_criteria: string[]; created_by: string | null; created_at: string; previous_revision_id: string | null; change_reason: string | null };
-type EdgeRow = { id: string; source_node_id: string; target_node_id: string; relation: string; reason: string; prerequisite_strength: string | null; associative_strength: number | null };
+type EdgeRow = { id: string; source_node_id: string; target_node_id: string; relation: string; reason: string; prerequisite_strength: string | null; associative_strength: number | null; provenance: unknown[] };
 type DomainRow = { id: string; name: string; description: string | null; canonical_color: string; status: string; created_by: string; created_at: string; updated_by: string; updated_at: string };
 type AssignmentRow = { node_id: string; domain_id: string; source: string; confidence: number | null; pinned: boolean; assigned_by: string | null; assigned_at: string };
 type CandidateRow = { node_id: string; domain_id: string; score: number; semantic_score: number; structural_score: number; algorithm_version: string; generated_at: string };
@@ -23,7 +23,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const [nodesResult, revisionsResult, edgesResult, domainsResult, assignmentsResult, candidatesResult, proposalsResult, metadataResult, profileResult] = await Promise.all([
     client.from("knowledge_nodes").select("*").order("id"),
     client.from("knowledge_node_revisions").select("*").order("node_id").order("version"),
-    client.from("knowledge_edges").select("*").order("id"),
+    client.from("knowledge_edges").select("*").eq("lifecycle_status", "active").order("id"),
     client.from("knowledge_domains").select("*").order("id"),
     client.from("domain_assignments").select("*").order("node_id"),
     client.from("domain_assignment_candidates").select("*").order("node_id"),
@@ -45,7 +45,8 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   }));
   const edges = dataOrThrow(edgesResult.data as EdgeRow[] | null, edgesResult.error, "KnowledgeEdge query").map((row) => ({
     id: row.id, source: row.source_node_id, target: row.target_node_id, relation: row.relation, reason: row.reason,
-    strength: row.relation === "prerequisite" ? row.prerequisite_strength : row.associative_strength
+    strength: row.relation === "prerequisite" ? row.prerequisite_strength : row.associative_strength,
+    provenance: row.provenance
   }));
   const domains = dataOrThrow(domainsResult.data as DomainRow[] | null, domainsResult.error, "KnowledgeDomain query").map((row) => ({
     id: row.id, name: row.name, description: row.description ?? undefined, canonicalColor: row.canonical_color, status: row.status,

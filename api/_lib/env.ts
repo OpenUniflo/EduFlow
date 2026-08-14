@@ -12,6 +12,13 @@ export type EmbeddingEnvironment = {
   embeddingDimensions: number;
 };
 
+export type LlmEnvironment = {
+  llmProvider: "deepseek";
+  llmBaseUrl: string;
+  llmApiKey: string;
+  llmModel: string;
+};
+
 const EMBEDDING_PROVIDER = "dmxapi";
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1024;
@@ -39,19 +46,19 @@ function embeddingDimensions(value: string | undefined): number {
   return parsed;
 }
 
-function embeddingBaseUrl(value: string | undefined): string {
-  const configured = required("EMBEDDING_BASE_URL", value).trim();
+function serverBaseUrl(name: string, value: string | undefined): string {
+  const configured = required(name, value).trim();
   let parsed: URL;
   try {
     parsed = new URL(configured);
   } catch {
-    throw new Error("EMBEDDING_BASE_URL must be a valid HTTP or HTTPS URL");
+    throw new Error(`${name} must be a valid HTTP or HTTPS URL`);
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("EMBEDDING_BASE_URL must be a valid HTTP or HTTPS URL");
+    throw new Error(`${name} must be a valid HTTP or HTTPS URL`);
   }
   if (parsed.search || parsed.hash) {
-    throw new Error("EMBEDDING_BASE_URL must not contain a query string or fragment");
+    throw new Error(`${name} must not contain a query string or fragment`);
   }
   return parsed.toString().replace(/\/+$/, "");
 }
@@ -67,9 +74,18 @@ export function readServerEnvironment(env: NodeJS.ProcessEnv = process.env): Ser
 export function readEmbeddingEnvironment(env: NodeJS.ProcessEnv = process.env): EmbeddingEnvironment {
   return {
     embeddingProvider: exact("EMBEDDING_PROVIDER", env.EMBEDDING_PROVIDER, EMBEDDING_PROVIDER),
-    embeddingBaseUrl: embeddingBaseUrl(env.EMBEDDING_BASE_URL),
+    embeddingBaseUrl: serverBaseUrl("EMBEDDING_BASE_URL", env.EMBEDDING_BASE_URL),
     embeddingApiKey: required("EMBEDDING_API_KEY", env.EMBEDDING_API_KEY),
     embeddingModel: exact("EMBEDDING_MODEL", env.EMBEDDING_MODEL, EMBEDDING_MODEL),
     embeddingDimensions: embeddingDimensions(env.EMBEDDING_DIMENSIONS)
+  };
+}
+
+export function readLlmEnvironment(env: NodeJS.ProcessEnv = process.env): LlmEnvironment {
+  return {
+    llmProvider: exact("LLM_PROVIDER", env.LLM_PROVIDER, "deepseek"),
+    llmBaseUrl: serverBaseUrl("LLM_BASE_URL", env.LLM_BASE_URL),
+    llmApiKey: required("LLM_API_KEY", env.LLM_API_KEY),
+    llmModel: required("LLM_MODEL", env.LLM_MODEL)
   };
 }

@@ -62,6 +62,15 @@ The server-only embedding boundary additionally requires:
 - `EMBEDDING_MODEL=text-embedding-3-small`
 - `EMBEDDING_DIMENSIONS=1024`
 
+The server-only Phase 4.2 generation boundary additionally requires:
+
+- `LLM_PROVIDER=deepseek`
+- `LLM_BASE_URL=https://api.deepseek.com`
+- `LLM_API_KEY`
+- `LLM_MODEL`
+
+The browser never receives these values. `/api/knowledge-generation` authorizes an authenticated Global Admin, consumes a completed private `CourseMaterial` artifact, runs bounded structured generation and domain validation, and commits Knowledge, relation provenance, Curriculum, and run status in one database transaction. Completed Phase 4.2 courses use the intermediate `curriculum-generated` status; Assignment generation remains a later phase.
+
 `api/_lib/env.ts` validates these values when the embedding boundary is used; unrelated API routes do not require an embedding credential. The provider identity is DMXAPI, the wire protocol is the OpenAI-compatible Embeddings API, and the underlying model is `text-embedding-3-small`. There is no client-prefixed embedding key, and `VITE_EMBEDDING_API_KEY` is forbidden. `pnpm audit:client-secrets` checks client source and build output for server-secret leakage. Health and error responses never return credentials.
 
 ## Phase 4 embedding preflight
@@ -81,6 +90,7 @@ No permanent Knowledge embedding table is introduced by this preflight. The exis
 - `GET|PUT /api/workflows`: reads templates and persists current-user Workflow definitions, editor state, and Run History.
 - `POST|PUT /api/materials`: authorizes direct-to-Storage upload and commits trusted Material metadata.
 - `PUT /api/domains`: persists Global Domain governance after capability and active-node validation.
+- `POST /api/knowledge-generation`: generates and atomically persists User Knowledge and Curriculum from a completed Phase 4.1 parsing job.
 
 The API is intentionally a small mapping layer rather than a second Domain model or a backend framework.
 

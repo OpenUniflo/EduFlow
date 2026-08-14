@@ -120,7 +120,9 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
     assignmentRelations.add(relation);
   });
   const covered = new Set(runtime.assignmentCoverages.map((coverage) => coverage.nodeId));
-  courseNodeIds.forEach((nodeId) => { if (!covered.has(nodeId)) errors.push(`KnowledgeNode ${nodeId} has no AssignmentCoverage`); });
+  if (runtime.course.generationStatus !== "curriculum-generated") {
+    courseNodeIds.forEach((nodeId) => { if (!covered.has(nodeId)) errors.push(`KnowledgeNode ${nodeId} has no AssignmentCoverage`); });
+  }
   runtime.materials.forEach((material) => {
     if (material.courseId !== runtime.course.id) errors.push(`Material ${material.id} belongs to another Course`);
     if (!lessonIds.has(material.lessonId)) errors.push(`Material ${material.id} references unknown Lesson`);

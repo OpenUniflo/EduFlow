@@ -38,4 +38,4 @@ The generated PDF/PPTX/DOCX fixtures are deliberately small but representative. 
 
 ## Gold scope
 
-The `gold/parsing` JSON files are Parsing Gold v0. They only assert document structure, ordering, and source location/provenance expectations. They are not Knowledge Gold. Knowledge nodes, aliases, prerequisites, and practice mappings should be created after Phase 4.1 stabilizes the `CourseMaterial` contract.
+The `gold/parsing` JSON files are Parsing Gold v0 and assert document structure, ordering, and source location/provenance expectations. The separate, human-reviewed `gold/knowledge/chapter-01` package is the Phase 4.2 Knowledge Gold v0.1 oracle for PDF pages 15–35. Production generation never imports it; only the isolated acceptance evaluator reads it.

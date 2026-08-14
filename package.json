@@ -23,6 +23,8 @@
     "verify:backend:local": "node --env-file=.env.local --import tsx scripts/verify-local-backend.ts",
     "verify:embedding": "node --env-file=.env.local --import tsx scripts/verify-embedding.ts",
     "verify:embedding:local": "node --env-file=.env.local --import tsx scripts/verify-embedding-pgvector.ts",
+    "verify:knowledge-generation:local": "node --env-file=.env.local --import tsx scripts/verify-knowledge-generation-persistence.ts",
+    "acceptance:phase4.2:live": "node --env-file=.env.local --import tsx scripts/acceptance/phase4_2.ts",
     "generate:demo-pdfs": "uv run --with reportlab scripts/generate-demo-pdfs.py",
     "build": "tsc && vite build",
     "db:start": "supabase start",

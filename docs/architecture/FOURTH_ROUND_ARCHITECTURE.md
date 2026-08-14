@@ -102,8 +102,8 @@ Use an explicit pipeline rather than one unconstrained Agent:
 CourseMaterial
   -> candidate extraction
   -> normalization
-  -> deduplication
-  -> global Knowledge alignment
+  -> ingestion-local deduplication
+  -> User Knowledge creation with provenance
   -> prerequisite inference
   -> DAG validation
   -> chapter organization
@@ -118,19 +118,11 @@ Default to structured LLM output behind a `KnowledgeCandidateExtractor` contract
 
 Docling Graph may be evaluated as an alternative extractor adapter. It must not directly define the Course Skill DAG.
 
-### Knowledge alignment
+### Knowledge ingestion boundary
 
-Use Supabase PostgreSQL + pgvector:
+Knowledge Architecture v1 supersedes the earlier automatic Global alignment proposal for ingestion. Phase 4.2 creates source-traceable User Knowledge owned by the authenticated actor. It does not retrieve, map, merge, promote, replace, or align against Global or Tenant Knowledge.
 
-```text
-candidate Knowledge
-  -> embedding
-  -> pgvector Top-K retrieval
-  -> rule filtering / LLM judge
-  -> matched | ambiguous | new
-```
-
-The vector store narrows candidates; it does not decide ontology identity on its own.
+Embedding-based similarity remains available only to isolated evaluation tooling here. A future explicit user-triggered “Analyze Similar Knowledge” operation may propose mappings, but it is not part of course ingestion and cannot mutate ontology identity automatically.
 
 ### Prerequisite semantics
 
@@ -195,7 +187,7 @@ Using real Agentic AI material, without manually editing database rows or depend
 
 1. upload source material;
 2. parse it into structured CourseMaterial;
-3. generate/alignment Knowledge and a valid Course Skill DAG;
+3. generate User Knowledge and a valid Course Skill DAG;
 4. establish formal Material and Practice mappings;
 5. let a learner navigate from Knowledge to real material and practice;
 6. execute the Workflow through a backend runtime;
