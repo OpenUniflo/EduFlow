@@ -12,7 +12,7 @@ export type PreparedCourseMapping = {
 };
 
 export interface CourseMappingRepository {
-  prepare(input: { courseId: string; ownerId: string; provider: string; model: string; promptVersion: string; schemaVersions: string[] }): Promise<PreparedCourseMapping>;
+  prepare(input: { courseId: string; ownerId: string; targetOutcome?: string; provider: string; model: string; promptVersion: string; schemaVersions: string[] }): Promise<PreparedCourseMapping>;
   persist(runId: string, plan: CourseMappingPlan): Promise<void>;
   fail(runId: string, error: unknown): Promise<void>;
 }

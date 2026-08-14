@@ -8,6 +8,8 @@ export type Course = {
   title: string;
   subtitle?: string;
   description: string;
+  /** Persisted user-authored outcome that constrains Assignment planning. */
+  targetOutcome?: string;
   accentColor?: string;
   generationStatus?: "draft" | "parsed" | "curriculum-generated" | "ready";
 };

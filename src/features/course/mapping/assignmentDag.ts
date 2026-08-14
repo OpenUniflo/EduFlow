@@ -1,5 +1,6 @@
 import { assertDirectedAcyclic } from "@/features/knowledge/graphAlgorithms";
 import type { GeneratedAssignmentCandidate, GeneratedAssignmentDependency } from "./types";
+import type { KnowledgeEdge } from "@/features/knowledge/types";
 
 export type AssignmentDagReport = {
   selfEdges: GeneratedAssignmentDependency[];
@@ -62,4 +63,26 @@ export function reduceAssignmentDependencies(assignments: readonly GeneratedAssi
   const reduced = dependencies.filter((edge) => !redundant.has(edge));
   assertValidAssignmentDAG(assignments, reduced);
   return { dependencies: reduced, removedRedundantEdges: report.redundantTransitiveEdges };
+}
+
+export function retrieveDependencyCandidates(target: GeneratedAssignmentCandidate, assignments: readonly GeneratedAssignmentCandidate[], knowledgeEdges: readonly KnowledgeEdge[], limit = 12) {
+  const targetIndex = assignments.indexOf(target);
+  if (targetIndex <= 0) return [];
+  const reverse = new Map<string, string[]>();
+  knowledgeEdges.filter((edge) => edge.relation === "prerequisite").forEach((edge) => reverse.set(edge.target, [...(reverse.get(edge.target) ?? []), edge.source]));
+  const distance = new Map<string, number>();
+  const queue = target.knowledgeNodeIds.map((id) => ({ id, depth: 0 }));
+  while (queue.length) {
+    const current = queue.shift() as { id: string; depth: number };
+    for (const ancestor of reverse.get(current.id) ?? []) {
+      const nextDepth = current.depth + 1;
+      if ((distance.get(ancestor) ?? Number.MAX_SAFE_INTEGER) <= nextDepth) continue;
+      distance.set(ancestor, nextDepth);
+      queue.push({ id: ancestor, depth: nextDepth });
+    }
+  }
+  return assignments.slice(0, targetIndex).map((assignment, index) => {
+    const ancestorDistance = Math.min(...assignment.knowledgeNodeIds.map((id) => distance.get(id) ?? Number.MAX_SAFE_INTEGER));
+    return { assignment, index, ancestorDistance };
+  }).filter((item) => Number.isFinite(item.ancestorDistance)).sort((left, right) => left.ancestorDistance - right.ancestorDistance || right.index - left.index || left.assignment.semanticKey.localeCompare(right.assignment.semanticKey)).slice(0, limit).map((item) => item.assignment);
 }

@@ -49,7 +49,9 @@ export function buildCourseMappingPlan(runtime: CourseRuntimeData, generation: C
     const outcomeId = outcomeByChapter.get(chapterId)?.id as string;
     return { id: deterministicMappingId("aoc", runtime.course.id, assignmentId, outcomeId), assignmentId, outcomeId };
   }));
-  const finalProject: FinalProject = { id: deterministicMappingId("fp", runtime.course.id), courseId: runtime.course.id, title: `${runtime.course.title} 综合项目`, description: `整合课程各 Chapter Outcome：${chapterOutcomes.map((outcome) => outcome.title).join("；")}` };
+  const targetOutcome = runtime.course.targetOutcome?.trim();
+  if (!targetOutcome) throw new Error("FinalProject composition requires Course.targetOutcome");
+  const finalProject: FinalProject = { id: deterministicMappingId("fp", runtime.course.id), courseId: runtime.course.id, title: `${runtime.course.title} 最终项目`, description: `最终目标：${targetOutcome}。通过以下阶段成果完成：${chapterOutcomes.map((outcome) => outcome.title).join("；")}` };
   const finalProjectOutcomeCompositions = chapterOutcomes.map((outcome): FinalProjectOutcomeComposition => ({ id: deterministicMappingId("fpoc", runtime.course.id, finalProject.id, outcome.id), finalProjectId: finalProject.id, outcomeId: outcome.id }));
   return { assignments, assignmentCoverages, assignmentDependencies, chapterOutcomes, assignmentOutcomeCompositions, finalProjects: [finalProject], finalProjectOutcomeCompositions, materialKnowledgeCoverages: generation.materialCoverage.coverages, executions: generation.executions };
 }

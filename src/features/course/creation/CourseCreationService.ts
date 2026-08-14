@@ -1,3 +1,6 @@
+import type { CourseIntent } from "./courseIntent";
+
 export interface CourseCreationService {
-  createCourse(input: { files: File[]; prompt: string }): Promise<{ courseId: string }>;
+  analyzeIntent(input: { files: File[]; prompt: string }): Promise<CourseIntent>;
+  createCourse(input: { files: File[]; prompt: string; targetOutcome: string }): Promise<{ courseId: string }>;
 }

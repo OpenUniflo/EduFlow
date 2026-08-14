@@ -1,5 +1,5 @@
-import type { GeneratedAssignmentCandidate, GeneratedAssignmentDependency } from "./types";
-import { normalizeMappingSemanticKey } from "./deterministicId";
+import type { GeneratedAssignmentCandidate, GeneratedAssignmentDependency, ImplementationStep } from "./types";
+import { deterministicMappingId, normalizeMappingSemanticKey } from "./deterministicId";
 
 type JsonObject = Record<string, unknown>;
 const object = (value: unknown, label: string) => {
@@ -61,7 +61,30 @@ export function parseGeneratedDependencies(value: unknown, assignmentKeys: Reado
   });
 }
 
-export type AssignmentGenerationGroup = { groupKey: string; identityKey: string; knowledgeNodeIds: string[] };
+export type AssignmentGenerationGroup = { groupKey: string; identityKey: string; title: string; objective: string; knowledgeNodeIds: string[] };
+
+export function parseImplementationSteps(value: unknown, courseId: string, allowedNodeIds: ReadonlySet<string>, requireFullCoverage = true): ImplementationStep[] {
+  const root = object(value, "Implementation Step generation");
+  if (!Array.isArray(root.steps) || !root.steps.length) throw new Error("steps must be a non-empty array");
+  const transientKeys = new Set<string>();
+  const identityKeys = new Set<string>();
+  const steps = root.steps.map((value, index) => {
+    const item = object(value, `steps[${index}]`);
+    const stepKey = normalizeMappingSemanticKey(text(item.stepKey, `steps[${index}].stepKey`));
+    if (!stepKey || transientKeys.has(stepKey)) throw new Error(`steps[${index}].stepKey must be unique`);
+    transientKeys.add(stepKey);
+    const knowledgeNodeIds = strings(item.knowledgeNodeIds, `steps[${index}].knowledgeNodeIds`).sort();
+    if (knowledgeNodeIds.some((id) => !allowedNodeIds.has(id))) throw new Error(`steps[${index}] references Knowledge outside the Course input`);
+    const semanticKey = deterministicMappingId("step", courseId, ...knowledgeNodeIds);
+    if (identityKeys.has(semanticKey)) throw new Error(`steps[${index}] duplicates an existing Knowledge grouping`);
+    identityKeys.add(semanticKey);
+    return { semanticKey, title: text(item.title, `steps[${index}].title`), objective: text(item.objective, `steps[${index}].objective`), knowledgeNodeIds };
+  });
+  const covered = new Set(steps.flatMap((step) => step.knowledgeNodeIds));
+  const missing = Array.from(allowedNodeIds).filter((id) => !covered.has(id));
+  if (requireFullCoverage && missing.length) throw new Error(`Implementation Steps leave Knowledge without coverage: ${missing.join(", ")}`);
+  return steps;
+}
 
 export function parseGeneratedAssignmentGroups(value: unknown, groups: readonly AssignmentGenerationGroup[], allowedWorkflowTemplateIds: ReadonlySet<string>): GeneratedAssignmentCandidate[] {
   const root = object(value, "Assignment group generation");

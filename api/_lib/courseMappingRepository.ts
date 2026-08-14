@@ -17,7 +17,7 @@ const safeFailure = (error: unknown) => (error instanceof Error ? error.message 
 export class SupabaseCourseMappingRepository implements CourseMappingRepository {
   constructor(private readonly server: SupabaseClient) {}
 
-  async prepare(input: { courseId: string; ownerId: string; provider: string; model: string; promptVersion: string; schemaVersions: string[] }): Promise<PreparedCourseMapping> {
+  async prepare(input: { courseId: string; ownerId: string; targetOutcome?: string; provider: string; model: string; promptVersion: string; schemaVersions: string[] }): Promise<PreparedCourseMapping> {
     const [courseResult, curriculumResult, chapterResult, lessonResult, coverageResult, sequenceResult, materialResult, segmentResult, generationResult, templateResult] = await Promise.all([
       this.server.from("courses").select("*").eq("id", input.courseId).maybeSingle(),
       this.server.from("course_curricula").select("*").eq("course_id", input.courseId).maybeSingle(),
@@ -33,6 +33,12 @@ export class SupabaseCourseMappingRepository implements CourseMappingRepository 
     if (courseResult.error || !courseResult.data || !["curriculum-generated", "ready"].includes(courseResult.data.generation_status)) throw new Error("Course mapping requires a generated Course");
     if (generationResult.error || !generationResult.data || generationResult.data.owner_user_id !== input.ownerId) throw new Error("Course mapping requires the owning Phase 4.2 generation result");
     if (curriculumResult.error || !curriculumResult.data) throw new Error("Course mapping requires a Course curriculum");
+    const targetOutcome = input.targetOutcome?.trim() || optionalText(courseResult.data, "target_outcome")?.trim();
+    if (!targetOutcome) throw new Error("Course mapping requires a persisted targetOutcome");
+    if (input.targetOutcome?.trim() && input.targetOutcome.trim() !== optionalText(courseResult.data, "target_outcome")?.trim()) {
+      const outcomeUpdate = await this.server.from("courses").update({ target_outcome: targetOutcome }).eq("id", input.courseId);
+      if (outcomeUpdate.error) throw new Error(`Course target outcome persistence failed: ${outcomeUpdate.error.code}`);
+    }
     const chapters = rows(chapterResult, "Chapter query");
     const lessons = rows(lessonResult, "Lesson query");
     const coverages = rows(coverageResult, "CurriculumCoverage query");
@@ -50,7 +56,7 @@ export class SupabaseCourseMappingRepository implements CourseMappingRepository 
     const knowledgeEdges = rows(edgeResult, "KnowledgeEdge query").filter((row) => nodeSet.has(text(row, "target_node_id"))).map((row) => ({ id: text(row, "id"), source: text(row, "source_node_id"), target: text(row, "target_node_id"), relation: text(row, "relation"), reason: text(row, "reason"), strength: text(row, "relation") === "prerequisite" ? text(row, "prerequisite_strength") : number(row, "associative_strength"), provenance: row.provenance }) as KnowledgeEdge);
     const courseId = input.courseId;
     const runtime: CourseRuntimeData = {
-      course: { id: courseId, title: text(courseResult.data, "title"), description: text(courseResult.data, "description"), generationStatus: text(courseResult.data, "generation_status") as CourseRuntimeData["course"]["generationStatus"] },
+      course: { id: courseId, title: text(courseResult.data, "title"), description: text(courseResult.data, "description"), targetOutcome, generationStatus: text(courseResult.data, "generation_status") as CourseRuntimeData["course"]["generationStatus"] },
       curriculum: { id: text(curriculumResult.data, "id"), courseId, generationMode: text(curriculumResult.data, "generation_mode") as CourseRuntimeData["curriculum"]["generationMode"] },
       chapters: chapters.map((row) => ({ id: text(row, "id"), courseId, title: text(row, "title"), description: text(row, "description"), order: number(row, "display_order"), color: text(row, "color"), outcome: text(row, "outcome") })),
       lessons: lessons.map((row) => ({ id: text(row, "id"), courseId, chapterId: text(row, "chapter_id"), title: text(row, "title"), order: number(row, "display_order") })),

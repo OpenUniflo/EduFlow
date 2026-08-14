@@ -9,6 +9,7 @@ import { buildGlobalAtlasProjection } from "@/features/knowledge/projections/atl
 import { assignNodeDomain, resolveNodeDomain, useDomainGovernance } from "@/features/knowledge/domain/domainStore";
 import { canManageKnowledgeDomains } from "@/features/auth/capabilities";
 import { globalKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
+import type { CourseIntent } from "@/features/course/creation/courseIntent";
 
 const generationStages = ["读取课件", "识别章节", "提取知识节点", "分析前置依赖", "生成实训目标", "完成课程"];
 
@@ -25,6 +26,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
   const [prompt, setPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generationIndex, setGenerationIndex] = useState(0);
+  const [clarification, setClarification] = useState<Extract<CourseIntent, { status: "needs_clarification" }> | null>(null);
   const selected = useMemo(() => {
     const node = atlas.nodes.find((item) => item.id === selectedId);
     if (!node) return null;
@@ -44,17 +46,24 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
     event.target.value = "";
   }
 
-  async function createCourse() {
-    if (!prompt.trim() && files.length === 0) {
+  async function createCourse(answer = prompt) {
+    if (!answer.trim() && files.length === 0) {
       setPrompt("请上传课件或描述课程主题、目标学习者与期望成果。");
       return;
     }
     if (generating) return;
+    setClarification(null);
     setGenerating(true);
-    setGenerationIndex(0);
-    generationStages.forEach((_, index) => window.setTimeout(() => setGenerationIndex(index), index * 430));
     try {
-      const result = await applicationServices.courseCreationService.createCourse({ files, prompt });
+      const intent = await applicationServices.courseCreationService.analyzeIntent({ files, prompt: answer });
+      if (intent.status === "needs_clarification") {
+        setClarification(intent);
+        setGenerating(false);
+        return;
+      }
+      setGenerationIndex(0);
+      generationStages.forEach((_, index) => window.setTimeout(() => setGenerationIndex(index), index * 430));
+      const result = await applicationServices.courseCreationService.createCourse({ files, prompt: answer, targetOutcome: intent.targetOutcome });
       window.setTimeout(() => navigate(`/courses/${result.courseId}?created=1`), generationStages.length * 430 + 280);
     } catch (error) {
       setGenerating(false);
@@ -98,11 +107,12 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
           <div className="atlas-composer glass-v2">
             <label className="atlas-upload" title="上传课件"><Upload size={19} /><input hidden multiple type="file" accept=".pdf,.ppt,.pptx,.doc,.docx" onChange={chooseFiles} /></label>
             <textarea aria-label="课程创建要求" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="上传课件，或描述你想创建的课程…" />
-            <button className="atlas-send" type="button" aria-label="生成课程" onClick={createCourse}>{generating ? <span className="atlas-spinner" /> : <Send size={18} />}</button>
+            <button className="atlas-send" type="button" aria-label="生成课程" onClick={() => void createCourse()}>{generating ? <span className="atlas-spinner" /> : <Send size={18} />}</button>
           </div>
           <div className="atlas-quick-actions">
             {["根据课件生成技能树", "根据主题生成一门 15 课时完整课程", "补充前置依赖、评测和最终项目"].map((label) => <button key={label} onClick={() => setPrompt(label)}>{label}</button>)}
           </div>
+          {clarification ? <div className="atlas-generation glass-v2" aria-live="polite"><strong>{clarification.clarificationQuestion}</strong><div className="atlas-quick-actions">{clarification.recommendedOptions.map((option) => <button key={option} onClick={() => { setPrompt(option); void createCourse(option); }}>{option}</button>)}</div></div> : null}
           {generating ? (
             <div className="atlas-generation glass-v2" aria-live="polite">
               <div className="atlas-generation-track"><i style={{ width: `${((generationIndex + 1) / generationStages.length) * 100}%` }} /></div>

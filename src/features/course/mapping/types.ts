@@ -26,11 +26,19 @@ export type GeneratedAssignmentDependency = {
 
 export type AvailableWorkflowTemplate = { id: string; title: string; description?: string };
 
+export type ImplementationStep = {
+  semanticKey: string;
+  title: string;
+  objective: string;
+  knowledgeNodeIds: string[];
+};
+
 export type CourseMappingInput = {
   runtime: CourseRuntimeData;
   knowledgeNodes: KnowledgeNode[];
   knowledgeEdges: KnowledgeEdge[];
   workflowTemplates: AvailableWorkflowTemplate[];
+  targetOutcome: string;
 };
 
 export type ResolvedMaterialCoverage = {
@@ -40,6 +48,7 @@ export type ResolvedMaterialCoverage = {
 
 export type CourseMappingGeneration = {
   materialCoverage: ResolvedMaterialCoverage;
+  steps: ImplementationStep[];
   assignments: GeneratedAssignmentCandidate[];
   dependencies: GeneratedAssignmentDependency[];
   executions: ModelExecutionMetadata[];
