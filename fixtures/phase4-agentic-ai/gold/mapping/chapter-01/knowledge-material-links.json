@@ -1,6 +1,6 @@
 {
-  "datasetVersion": "mapping-gold-candidate-v0.1",
-  "reviewStatus": "pending_human_review",
+  "datasetVersion": "mapping-gold-v0.1",
+  "reviewStatus": "reviewed",
   "sourceKnowledgeGold": "fixtures/phase4-agentic-ai/gold/knowledge/chapter-01/knowledge-nodes.json",
   "links": [
     {
@@ -9,14 +9,8 @@
       "sourceRefs": [
         {
           "section": "1.1 / 图 1-1",
-          "printedPages": [
-            7,
-            9
-          ],
-          "pdfPages": [
-            15,
-            17
-          ]
+          "printedPages": [7, 9],
+          "pdfPages": [15, 17]
         }
       ]
     },
@@ -26,14 +20,8 @@
       "sourceRefs": [
         {
           "section": "1.1.1",
-          "printedPages": [
-            8,
-            9
-          ],
-          "pdfPages": [
-            16,
-            17
-          ]
+          "printedPages": [8, 9],
+          "pdfPages": [16, 17]
         }
       ]
     },
@@ -43,14 +31,8 @@
       "sourceRefs": [
         {
           "section": "1.1.2",
-          "printedPages": [
-            10,
-            11
-          ],
-          "pdfPages": [
-            18,
-            19
-          ]
+          "printedPages": [10, 11],
+          "pdfPages": [18, 19]
         }
       ]
     },
@@ -60,14 +42,8 @@
       "sourceRefs": [
         {
           "section": "1.1.4",
-          "printedPages": [
-            13,
-            14
-          ],
-          "pdfPages": [
-            21,
-            22
-          ]
+          "printedPages": [13, 14],
+          "pdfPages": [21, 22]
         }
       ]
     },
@@ -77,14 +53,8 @@
       "sourceRefs": [
         {
           "section": "1.1.5",
-          "printedPages": [
-            14,
-            16
-          ],
-          "pdfPages": [
-            22,
-            24
-          ]
+          "printedPages": [14, 16],
+          "pdfPages": [22, 24]
         }
       ]
     },
@@ -94,14 +64,8 @@
       "sourceRefs": [
         {
           "section": "1.2.5.1",
-          "printedPages": [
-            22,
-            23
-          ],
-          "pdfPages": [
-            30,
-            31
-          ]
+          "printedPages": [22, 23],
+          "pdfPages": [30, 31]
         }
       ]
     },
@@ -111,14 +75,8 @@
       "sourceRefs": [
         {
           "section": "1.2.5.2",
-          "printedPages": [
-            23,
-            23
-          ],
-          "pdfPages": [
-            31,
-            31
-          ]
+          "printedPages": [23, 23],
+          "pdfPages": [31, 31]
         }
       ]
     },
@@ -128,14 +86,8 @@
       "sourceRefs": [
         {
           "section": "1.2.5.3",
-          "printedPages": [
-            23,
-            24
-          ],
-          "pdfPages": [
-            31,
-            32
-          ]
+          "printedPages": [23, 24],
+          "pdfPages": [31, 32]
         }
       ]
     },
@@ -145,14 +97,8 @@
       "sourceRefs": [
         {
           "section": "1.2.6.1",
-          "printedPages": [
-            25,
-            25
-          ],
-          "pdfPages": [
-            33,
-            33
-          ]
+          "printedPages": [25, 25],
+          "pdfPages": [33, 33]
         }
       ]
     },
@@ -162,14 +108,8 @@
       "sourceRefs": [
         {
           "section": "1.2.6.2",
-          "printedPages": [
-            25,
-            26
-          ],
-          "pdfPages": [
-            33,
-            34
-          ]
+          "printedPages": [25, 26],
+          "pdfPages": [33, 34]
         }
       ]
     }
