@@ -48,7 +48,18 @@ export type GeneratedCurriculum = {
   chapters: GeneratedCurriculumChapter[];
 };
 
-export type GenerationStage = "extraction" | "deduplication" | "coverage" | "relations" | "curriculum";
+export type GenerationStage = "extraction" | "deduplication" | "coverage" | "admission" | "relations" | "curriculum";
+
+export type CandidateAdmissionDecision = {
+  candidateId: string;
+  decision: "keep" | "drop" | "subsumed";
+  subsumedByCandidateId?: string;
+  reason: string;
+};
+
+export type CandidateAdmissionReview = CandidateAdmissionDecision & {
+  candidate: KnowledgeCandidate;
+};
 
 export interface EmbeddingService {
   embed(text: string): Promise<number[]>;
@@ -64,6 +75,15 @@ export type CandidatePair = {
 
 export type GenerationDiagnostics = {
   embeddingRequestCount: number;
+  extractedCandidateCount: number;
+  afterExactDedupCount: number;
+  afterSemanticDedupCount: number;
+  coverageRecoveredCount: number;
+  admissionReviewedCount: number;
+  admissionKeptCount: number;
+  admissionDroppedCount: number;
+  admissionSubsumedCount: number;
+  finalCandidateCount: number;
   semanticDedupCandidatePairCount: number;
   coverageAuditedSectionCount: number;
   coverageGapCount: number;
@@ -123,6 +143,7 @@ export type KnowledgeGenerationResult = {
   relations: CandidateKnowledgeRelation[];
   curriculum: GeneratedCurriculum;
   executions: ModelExecutionMetadata[];
+  admissionReviews: CandidateAdmissionReview[];
   relationCandidatePairs: CandidatePair[];
   diagnostics: GenerationDiagnostics;
 };

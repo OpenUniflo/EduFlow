@@ -220,7 +220,7 @@ Langfuse remains observability/evaluation infrastructure, not the source of trut
 ## Cross-Encoder relation reranker
 
 ### Current status
-Deferred.
+Deferred. Trigger status: **ACTIVE** after the Phase 4.2 admission experiment; one live run still retrieved 243 of 820 theoretical pairs, used 51 relation batches, and did not materially reduce the approximately one-million-token run cost.
 
 ### Why not now
 Phase 4.2 has only tens of candidates. In-memory embedding top-K plus provenance union already bounds the pair set, and a Cross-Encoder would add another model, dependency, latency, and deployment surface before candidate precision has been measured as a cost problem.
@@ -236,7 +236,7 @@ Evaluate `embedding retrieval -> Cross-Encoder rerank -> classifier` when measur
 ## EduFlow-trained relation classifier
 
 ### Current status
-Deferred.
+Deferred. The current generic LLM remains a confirmed model-quality bottleneck: retrieved pairs still produced low-precision `enables` and `related` classifications in live acceptance. One reviewed Chapter remains insufficient training data.
 
 ### Why not now
 One chapter Gold dataset is an architecture regression oracle, not sufficiently large or representative training data. Training now would overfit one course and introduce an unsupported model lifecycle.
@@ -262,3 +262,16 @@ One production generation run; acceptance executes three independent runs, retai
 
 ### Revisit triggers
 Evaluate voting only when measured errors are concentrated in a small set of low-confidence, high-cost pairs and the avoided error cost justifies added latency and model spend.
+
+---
+
+## Broader multi-course Knowledge Gold
+
+### Current status
+Deferred.
+
+### Why not now
+The reviewed Chapter 1 baseline is sufficient for Phase 4.2 regression and MVP usability diagnosis, but not for generalized multi-domain quality claims or classifier training.
+
+### Revisit triggers
+Expand reviewed Gold across courses and domains before training an EduFlow-specific classifier or claiming generalized admission/relation quality.

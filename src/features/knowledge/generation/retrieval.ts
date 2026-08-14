@@ -6,6 +6,7 @@ export const SEMANTIC_DUPLICATE_RETRIEVAL_THRESHOLD = 0.72;
 export const SEMANTIC_DUPLICATE_NEIGHBORS = 3;
 export const RELATION_NEIGHBORS = 8;
 export const COVERAGE_NEIGHBORS = 3;
+export const ADMISSION_NEIGHBORS = 3;
 
 export class RunLocalEmbeddingCache {
   private readonly cache = new Map<string, Promise<number[]>>();
@@ -109,6 +110,14 @@ export async function retrieveRelationCandidatePairs(candidates: KnowledgeCandid
   return Array.from(byId.values()).sort((a, b) => a.id.localeCompare(b.id));
 }
 
+export async function nearestCandidatesForAdmission(candidates: KnowledgeCandidate[], cache: RunLocalEmbeddingCache) {
+  if (candidates.length < 2) return new Map<string, Array<{ candidate: KnowledgeCandidate; similarity: number }>>();
+  const vectors = await candidateVectors(candidates, cache);
+  return new Map(candidates.map((candidate, left) => [candidate.id, candidates.flatMap((other, right) => left === right ? [] : [{ candidate: other, similarity: cosineSimilarity(vectors[left], vectors[right]) }])
+    .sort((a, b) => b.similarity - a.similarity || a.candidate.id.localeCompare(b.candidate.id))
+    .slice(0, Math.min(ADMISSION_NEIGHBORS, candidates.length - 1))]));
+}
+
 export type CoverageUnit = { id: string; sectionPath: string[]; chunks: StructuredMaterialChunk[]; text: string };
 
 export function buildCoverageUnits(material: CourseMaterial): CoverageUnit[] {
@@ -140,4 +149,12 @@ export function evidenceChunksForPair(pairValue: CandidatePair, candidates: Know
     `block:${source.sourceMaterialId}:${source.rawBlockId}`, `section:${source.sourceMaterialId}:${source.sectionPath.join("\u001f")}`
   ]) ?? []));
   return chunks.filter((chunk) => chunk.sources.some((source) => evidenceKeys.has(`block:${source.sourceMaterialId}:${source.rawBlockId}`) || evidenceKeys.has(`section:${source.sourceMaterialId}:${source.sectionPath.join("\u001f")}`))).slice(0, 8);
+}
+
+export function evidenceChunksForCandidate(candidate: KnowledgeCandidate, chunks: StructuredMaterialChunk[]) {
+  const evidenceKeys = new Set(candidate.sourceRefs.flatMap((source) => [
+    `block:${source.sourceMaterialId}:${source.rawBlockId}`, `section:${source.sourceMaterialId}:${source.sectionPath.join("\u001f")}`
+  ]));
+  return chunks.filter((chunk) => chunk.sources.some((source) => evidenceKeys.has(`block:${source.sourceMaterialId}:${source.rawBlockId}`)
+    || evidenceKeys.has(`section:${source.sourceMaterialId}:${source.sectionPath.join("\u001f")}`))).slice(0, 4);
 }

@@ -20,8 +20,9 @@ function perfectResult(): KnowledgeGenerationResult {
     reason: relation.rationale, sourceRefs: [source]
   })) as KnowledgeGenerationResult["relations"];
   return { courseId: "course", ownerId: "user", sourceMaterialId: "material", candidates, duplicateCount: 0, relations,
+    admissionReviews: candidates.map((candidate) => ({ candidateId: candidate.id, candidate, decision: "keep", reason: "valid" })),
     curriculum: { chapters: [{ id: "c", title: "Chapter", description: "desc", outcome: "outcome", lessons: [{ id: "l", title: "Lesson", coverages: candidates.map((candidate) => ({ candidateId: candidate.id, role: "introduce" })) }] }] }, executions: [], relationCandidatePairs: [],
-    diagnostics: { embeddingRequestCount: 0, semanticDedupCandidatePairCount: 0, coverageAuditedSectionCount: 0, coverageGapCount: 0, allRelationPairCount: 0, retrievedRelationPairCount: 0, relationRetrievalReductionRatio: 0, relationBatchCount: 0, structuredRetryCount: 0 } };
+    diagnostics: { embeddingRequestCount: 0, extractedCandidateCount: candidates.length, afterExactDedupCount: candidates.length, afterSemanticDedupCount: candidates.length, coverageRecoveredCount: 0, admissionReviewedCount: candidates.length, admissionKeptCount: candidates.length, admissionDroppedCount: 0, admissionSubsumedCount: 0, finalCandidateCount: candidates.length, semanticDedupCandidatePairCount: 0, coverageAuditedSectionCount: 0, coverageGapCount: 0, allRelationPairCount: 0, retrievedRelationPairCount: 0, relationRetrievalReductionRatio: 0, relationBatchCount: 0, structuredRetryCount: 0 } };
 }
 
 describe("Phase 4.2 Gold evaluator", () => {

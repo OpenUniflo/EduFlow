@@ -1,13 +1,13 @@
 import type { SourceLocation, StructuredMaterialChunk } from "@/features/material/parsing/types";
 import { deduplicateWithinIngestion } from "./normalization";
-import { coverageAuditPrompt, curriculumPrompt, equivalencePrompt, extractionPrompt, KNOWLEDGE_GENERATION_PROMPT_VERSION, pairClassificationPrompt } from "./prompts";
-import { parseCoverageOutput, parseCurriculumOutput, parseEquivalenceOutput, parseExtractionOutput, parsePairClassificationOutput } from "./schema";
+import { candidateAdmissionPrompt, coverageAuditPrompt, curriculumPrompt, equivalencePrompt, extractionPrompt, KNOWLEDGE_GENERATION_PROMPT_VERSION, pairClassificationPrompt } from "./prompts";
+import { parseAdmissionOutput, parseCoverageOutput, parseCurriculumOutput, parseEquivalenceOutput, parseExtractionOutput, parsePairClassificationOutput } from "./schema";
 import {
-  buildCoverageUnits, evidenceChunksForPair, nearestCandidatesForCoverage, retrieveRelationCandidatePairs,
+  buildCoverageUnits, evidenceChunksForCandidate, evidenceChunksForPair, nearestCandidatesForAdmission, nearestCandidatesForCoverage, retrieveRelationCandidatePairs,
   retrieveSemanticDuplicatePairs, RunLocalEmbeddingCache
 } from "./retrieval";
 import type {
-  CandidateKnowledgeRelation, CandidatePair, EmbeddingService, GeneratedCurriculum, KnowledgeCandidate,
+  CandidateAdmissionReview, CandidateKnowledgeRelation, CandidatePair, EmbeddingService, GeneratedCurriculum, KnowledgeCandidate,
   KnowledgeGenerationInput, KnowledgeGenerationResult, ModelExecutionMetadata, StructuredGenerationClient
 } from "./types";
 import { validateCandidateGraph, validateGeneratedCurriculum } from "./validation";
@@ -15,6 +15,7 @@ import { validateCandidateGraph, validateGeneratedCurriculum } from "./validatio
 const EXTRACTION_SCHEMA_VERSION = "knowledge-candidates-v1";
 const EQUIVALENCE_SCHEMA_VERSION = "knowledge-equivalence-v1";
 const COVERAGE_SCHEMA_VERSION = "knowledge-coverage-v1";
+export const ADMISSION_SCHEMA_VERSION = "knowledge-admission-v1";
 const RELATION_SCHEMA_VERSION = "knowledge-pair-classification-v1";
 const CURRICULUM_SCHEMA_VERSION = "generated-curriculum-v1";
 const EXTRACTION_BATCH_CHARACTERS = 5_000;
@@ -24,6 +25,8 @@ export const MAX_EQUIVALENCE_PAIRS_PER_BATCH = 20;
 export const MAX_RELATION_PAIRS_PER_BATCH = 8;
 export const MAX_RELATION_BATCH_CHARACTERS = 20_000;
 const MAX_COVERAGE_SECTIONS_PER_BATCH = 2;
+export const MAX_ADMISSION_CANDIDATES_PER_BATCH = 12;
+export const MAX_ADMISSION_BATCH_CHARACTERS = 28_000;
 
 function uniqueSources(values: SourceLocation[]) {
   const byKey = new Map(values.map((source) => [[source.sourceMaterialId, source.rawBlockId, source.ordinal].join(":"), source]));
@@ -175,6 +178,53 @@ async function auditCoverage(input: KnowledgeGenerationInput, candidates: Knowle
   return { additions, auditedSectionCount: units.length, gapCount: gaps, executions };
 }
 
+function admissionBatches(items: Array<{ candidate: KnowledgeCandidate; evidence: StructuredMaterialChunk[]; nearest: Array<{ candidate: KnowledgeCandidate; similarity: number }> }>) {
+  const result: typeof items[] = [];
+  let current: typeof items = [];
+  let characters = 0;
+  items.forEach((item) => {
+    const itemCharacters = candidateAdmissionPrompt([item]).user.length;
+    if (current.length && (current.length >= MAX_ADMISSION_CANDIDATES_PER_BATCH || characters + itemCharacters > MAX_ADMISSION_BATCH_CHARACTERS)) {
+      result.push(current);
+      current = [];
+      characters = 0;
+    }
+    current.push(item);
+    characters += itemCharacters;
+  });
+  if (current.length) result.push(current);
+  return result;
+}
+
+export async function admitCandidates(candidates: KnowledgeCandidate[], chunks: StructuredMaterialChunk[], client: StructuredGenerationClient, cache: RunLocalEmbeddingCache, retryCounter: { count: number } = { count: 0 }) {
+  const knownCandidateIds = new Set(candidates.map((candidate) => candidate.id));
+  if (knownCandidateIds.size !== candidates.length) throw new Error("Candidate admission requires unique candidate IDs");
+  const nearestByCandidate = await nearestCandidatesForAdmission(candidates, cache);
+  const items = candidates.map((candidate) => ({
+    candidate,
+    evidence: evidenceChunksForCandidate(candidate, chunks),
+    nearest: nearestByCandidate.get(candidate.id) ?? []
+  }));
+  const executions: ModelExecutionMetadata[] = [];
+  const decisions = [] as Awaited<ReturnType<typeof parseAdmissionOutput>>;
+  for (const batch of admissionBatches(items)) {
+    const prompt = candidateAdmissionPrompt(batch);
+    const requestedCandidateIds = new Set(batch.map(({ candidate }) => candidate.id));
+    decisions.push(...await boundedStructuredGeneration(client, {
+      stage: "admission", promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION,
+      schemaVersion: ADMISSION_SCHEMA_VERSION, ...prompt, maxTokens: 5_000, temperature: 0
+    }, executions, (value) => parseAdmissionOutput(value, requestedCandidateIds, knownCandidateIds), () => { retryCounter.count += 1; }));
+  }
+  const decisionById = new Map(decisions.map((decision) => [decision.candidateId, decision]));
+  const reviews: CandidateAdmissionReview[] = candidates.map((candidate) => {
+    const decision = decisionById.get(candidate.id);
+    if (!decision) throw new Error(`Missing admission candidate result: ${candidate.id}`);
+    return { ...decision, candidate };
+  });
+  const admitted = candidates.filter((candidate) => decisionById.get(candidate.id)?.decision === "keep");
+  return { candidates: admitted, reviews, executions, batchCount: admissionBatches(items).length };
+}
+
 function relationPairBatches(pairs: CandidatePair[], evidence: Map<string, StructuredMaterialChunk[]>) {
   const result: CandidatePair[][] = []; let current: CandidatePair[] = []; let characters = 0;
   pairs.forEach((pair) => {
@@ -299,8 +349,15 @@ export async function runKnowledgeGenerationPipeline(input: KnowledgeGenerationI
   const recoveredSemantic = coverage.additions.length
     ? await semanticDeduplicate(recoveredExact.candidates, input.material.chunks, client, embeddingCache, retryCounter)
     : { candidates: recoveredExact.candidates, candidatePairCount: 0, executions: [] as ModelExecutionMetadata[] };
-  if (recoveredSemantic.candidates.length > MAX_GENERATED_CANDIDATES) throw new Error(`Final Knowledge set exceeds the ${MAX_GENERATED_CANDIDATES}-candidate safety limit`);
-  const candidates = recoveredSemantic.candidates.map((candidate, index) => ({ ...candidate, id: `candidate-${String(index + 1).padStart(3, "0")}` }));
+  const duplicateCount = extraction.candidates.length + coverage.additions.length - recoveredSemantic.candidates.length;
+  if (recoveredSemantic.candidates.length > MAX_GENERATED_CANDIDATES) throw new Error(`Candidate set exceeds the ${MAX_GENERATED_CANDIDATES}-candidate safety limit before admission`);
+  const admission = await admitCandidates(recoveredSemantic.candidates, input.material.chunks, client, embeddingCache, retryCounter);
+  const admittedExact = deduplicateWithinIngestion(admission.candidates);
+  admittedExact.candidates.forEach((candidate) => {
+    if (!candidate.id.trim()) throw new Error("Candidate admission produced an invalid candidate ID");
+    if (!candidate.sourceRefs.length) throw new Error(`Candidate admission produced Knowledge without provenance: ${candidate.id}`);
+  });
+  const candidates = admittedExact.candidates.map((candidate, index) => ({ ...candidate, id: `candidate-${String(index + 1).padStart(3, "0")}` }));
   if (!candidates.length) throw new Error("Knowledge extraction produced no valid candidates");
   const relationCandidatePairs = await retrieveRelationCandidatePairs(candidates, embeddingCache);
   const relationExtraction = await classifyRelations(candidates, input.material.chunks, relationCandidatePairs, client, retryCounter);
@@ -311,13 +368,23 @@ export async function runKnowledgeGenerationPipeline(input: KnowledgeGenerationI
     ownerId: input.ownerId,
     sourceMaterialId: input.material.sourceMaterialId,
     candidates,
-    duplicateCount: extraction.candidates.length + coverage.additions.length - candidates.length,
+    duplicateCount,
     relations: relationExtraction.relations,
     curriculum: curriculumGeneration.curriculum,
-    executions: [...extraction.executions, ...semantic.executions, ...coverage.executions, ...recoveredSemantic.executions, ...relationExtraction.executions, ...curriculumGeneration.executions],
+    executions: [...extraction.executions, ...semantic.executions, ...coverage.executions, ...recoveredSemantic.executions, ...admission.executions, ...relationExtraction.executions, ...curriculumGeneration.executions],
+    admissionReviews: admission.reviews,
     relationCandidatePairs,
     diagnostics: {
       embeddingRequestCount: embeddingCache.requestCount,
+      extractedCandidateCount: extraction.candidates.length,
+      afterExactDedupCount: exact.candidates.length,
+      afterSemanticDedupCount: semantic.candidates.length,
+      coverageRecoveredCount: coverage.additions.length,
+      admissionReviewedCount: admission.reviews.length,
+      admissionKeptCount: admission.reviews.filter((review) => review.decision === "keep").length,
+      admissionDroppedCount: admission.reviews.filter((review) => review.decision === "drop").length,
+      admissionSubsumedCount: admission.reviews.filter((review) => review.decision === "subsumed").length,
+      finalCandidateCount: candidates.length,
       semanticDedupCandidatePairCount: semantic.candidatePairCount + recoveredSemantic.candidatePairCount,
       coverageAuditedSectionCount: coverage.auditedSectionCount,
       coverageGapCount: coverage.gapCount,

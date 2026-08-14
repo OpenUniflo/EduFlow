@@ -27,7 +27,7 @@ import type { KnowledgeGraph } from "../../src/features/knowledge/types";
 const REPO = join(import.meta.dirname, "../..");
 const OUTPUT = join(REPO, "phase4.2-acceptance");
 const CORPUS = join(REPO, "fixtures/phase4-agentic-ai/corpus/AI-Agents-in-Depth-zh-CN-v1.4.pdf");
-const SCHEMA_VERSIONS = ["knowledge-candidates-v1", "knowledge-equivalence-v1", "knowledge-coverage-v1", "knowledge-pair-classification-v1", "generated-curriculum-v1"];
+const SCHEMA_VERSIONS = ["knowledge-candidates-v1", "knowledge-equivalence-v1", "knowledge-coverage-v1", "knowledge-admission-v1", "knowledge-pair-classification-v1", "generated-curriculum-v1"];
 
 function required(name: string) {
   const value = process.env[name];
@@ -162,7 +162,13 @@ try {
     embedding: { provider: embeddingEnv.embeddingProvider, model: embeddingEnv.embeddingModel, dimensions: embeddingEnv.embeddingDimensions },
     source: { parsingJobId: created.jobId, materialId: created.materialId, pdfPages: [15, 35], courseMaterialChunks: scoped.chunks.length },
     generated: { candidateCount: result.candidates.length, duplicateCount: result.duplicateCount, relationCount: result.relations.length, chapterCount: result.curriculum.chapters.length },
+    generatedCandidates: result.candidates.map(({ id, canonicalTitle, description, type, aliases, masteryCriteria }) => ({ id, canonicalTitle, description, type, aliases, masteryCriteria })),
+    generatedRelations: result.relations.map(({ id, sourceCandidateId, targetCandidateId, relation, strength, reason }) => ({ id, sourceCandidateId, targetCandidateId, relation, strength, reason })),
     diagnostics: result.diagnostics,
+    admission: result.admissionReviews.map((review) => ({
+      candidateId: review.candidateId, title: review.candidate.canonicalTitle, decision: review.decision,
+      ...(review.subsumedByCandidateId ? { subsumedByCandidateId: review.subsumedByCandidateId } : {}), reason: review.reason
+    })),
     calls: { llmRequestCount: result.executions.length, embeddingRequestCount: result.diagnostics.embeddingRequestCount,
       promptTokens: result.executions.reduce((sum, execution) => sum + (execution.promptTokens ?? 0), 0),
       completionTokens: result.executions.reduce((sum, execution) => sum + (execution.completionTokens ?? 0), 0),

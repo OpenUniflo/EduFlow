@@ -23,7 +23,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const prepared = await repository.prepare({
     parsingJobId: body.parsingJobId, ownerId: user.id, provider: env.llmProvider, model: env.llmModel,
     promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION,
-    schemaVersions: ["knowledge-candidates-v1", "knowledge-equivalence-v1", "knowledge-coverage-v1", "knowledge-pair-classification-v1", "generated-curriculum-v1"]
+    schemaVersions: ["knowledge-candidates-v1", "knowledge-equivalence-v1", "knowledge-coverage-v1", "knowledge-admission-v1", "knowledge-pair-classification-v1", "generated-curriculum-v1"]
   });
   try {
     const material = selectCourseMaterialScope(prepared.material, body.scope);

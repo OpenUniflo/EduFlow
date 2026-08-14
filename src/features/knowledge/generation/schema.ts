@@ -1,5 +1,6 @@
 import type { CurriculumCoverageRole } from "@/features/course/types";
 import type { KnowledgeNodeType } from "../types";
+import type { CandidateAdmissionDecision } from "./types";
 
 type JsonObject = Record<string, unknown>;
 
@@ -107,6 +108,44 @@ export function parseCoverageOutput(value: unknown, requestedSectionIds: Set<str
   });
   requestedSectionIds.forEach((id) => { if (!seen.has(id)) throw new Error(`Missing coverage section result: ${id}`); });
   return sections;
+}
+
+export function parseAdmissionOutput(
+  value: unknown,
+  requestedCandidateIds: Set<string>,
+  knownCandidateIds: Set<string>
+): CandidateAdmissionDecision[] {
+  const root = object(value, "admission output");
+  const seen = new Set<string>();
+  const decisions = array(root.decisions, "decisions").map((item, index) => {
+    const result = object(item, `decisions[${index}]`);
+    const candidateId = string(result.candidateId, `decisions[${index}].candidateId`);
+    if (!requestedCandidateIds.has(candidateId)) throw new Error(`Unknown admission candidate: ${candidateId}`);
+    if (seen.has(candidateId)) throw new Error(`Duplicate admission candidate result: ${candidateId}`);
+    seen.add(candidateId);
+    const decision = string(result.decision, `decisions[${index}].decision`);
+    if (decision !== "keep" && decision !== "drop" && decision !== "subsumed") {
+      throw new Error(`Invalid admission decision: ${decision}`);
+    }
+    const rawTarget = result.subsumedByCandidateId;
+    const subsumedByCandidateId = rawTarget === null || rawTarget === undefined ? undefined : string(rawTarget, `decisions[${index}].subsumedByCandidateId`);
+    if (decision === "subsumed") {
+      if (!subsumedByCandidateId || !knownCandidateIds.has(subsumedByCandidateId)) {
+        throw new Error(`Unknown subsumption target for candidate: ${candidateId}`);
+      }
+      if (subsumedByCandidateId === candidateId) throw new Error(`Candidate cannot subsume itself: ${candidateId}`);
+    } else if (subsumedByCandidateId) {
+      throw new Error(`${decision.toUpperCase()} admission decision must not have a subsumption target: ${candidateId}`);
+    }
+    return {
+      candidateId,
+      decision,
+      ...(subsumedByCandidateId ? { subsumedByCandidateId } : {}),
+      reason: string(result.reason, `decisions[${index}].reason`)
+    } as CandidateAdmissionDecision;
+  });
+  requestedCandidateIds.forEach((id) => { if (!seen.has(id)) throw new Error(`Missing admission candidate result: ${id}`); });
+  return decisions;
 }
 
 export type PairClassificationLabel = "none" | "related" | "a_prerequisite_b" | "b_prerequisite_a" | "a_enables_b" | "b_enables_a";

@@ -19,6 +19,7 @@ type Report = {
   source: { parsingJobId: string };
   generated: { candidateCount: number; relationCount: number };
   evaluation: { metrics: { expectedNodeRecall: number; spuriousNodeRate: number } };
+  calls: { llmRequestCount: number; promptTokens: number };
 };
 
 function stats(values: number[], includeRange = false) {
@@ -44,7 +45,9 @@ const summary = {
   nodeCount: stats(reports.map((report) => report.generated.candidateCount), true),
   edgeCount: stats(reports.map((report) => report.generated.relationCount), true),
   nodeRecall: stats(reports.map((report) => report.evaluation.metrics.expectedNodeRecall)),
-  spuriousRate: stats(reports.map((report) => report.evaluation.metrics.spuriousNodeRate))
+  spuriousRate: stats(reports.map((report) => report.evaluation.metrics.spuriousNodeRate)),
+  llmRequestCount: stats(reports.map((report) => report.calls.llmRequestCount)),
+  promptTokens: stats(reports.map((report) => report.calls.promptTokens))
 };
 writeFileSync(join(OUTPUT, "stability-summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
 console.log(JSON.stringify(summary, null, 2));

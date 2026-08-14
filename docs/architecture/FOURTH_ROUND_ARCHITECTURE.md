@@ -105,6 +105,7 @@ CourseMaterial
   -> ingestion-local embedding duplicate retrieval
   -> scoped equivalence classification
   -> embedding-assisted section coverage audit and one-pass recovery
+  -> bounded local candidate admission (KEEP / DROP / SUBSUMED_BY)
   -> embedding/provenance relation-pair retrieval
   -> bounded pair classification (prerequisite / enables / related / none)
   -> deterministic graph validation
@@ -114,6 +115,8 @@ CourseMaterial
 ```
 
 Each stage has structured input/output, can be retried independently, records model/version metadata, and can be evaluated separately.
+
+Candidate admission is a local ontology quality gate over already extracted and recovered candidates, limited source evidence, and nearby ingestion-local candidates. It does not regenerate a Chapter or the whole ontology. `SUBSUMED_BY` is a granularity decision, not semantic duplicate identity and not a new KnowledgeRelation; only admitted candidates enter the final Knowledge set.
 
 ### Candidate extraction
 
@@ -130,6 +133,8 @@ Embedding-based similarity is used inside one course-ingestion run only to retri
 ### Prerequisite semantics
 
 A generic content relation is not a teaching prerequisite. `prerequisite_of` remains an EduFlow-owned teaching decision with validation for self-edges, cycles, duplicates, invalid references, and unsupported relations.
+
+For the Phase 4.2 MVP, relation classification is precision-first: insufficient, proximity-only, order-only, part/whole, or similarity-only evidence produces `NONE`. Omission is preferable to an unsupported learning edge; higher relation recall remains a post-MVP quality optimization.
 
 ## 6. Phase 4.3 — Knowledge / Material / Practice mapping
 
