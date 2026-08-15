@@ -27,7 +27,7 @@
 | 6 Multi-Agent Workflow | Multi-Agent Research System |
 | Final | AI 科研调研与立项助手 |
 
-固定统计：**6 篇章 / 31 Knowledge / 31 知识点实训 / 6 篇章实训 / 1 Final Project**。
+固定统计：**6 CurriculumChapters / 6 CurriculumLessons / 31 Knowledge / 31 知识点实训 / 6 篇章实训 / 37 Assignments total / 6 ChapterOutcomes / 1 FinalProject**。
 
 ## 3. Demo Golden Path
 

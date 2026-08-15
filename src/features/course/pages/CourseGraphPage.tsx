@@ -50,6 +50,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
   const [drawerTab, setDrawerTab] = useState<"detail" | "materials">("detail");
   const [legendCollapsed, setLegendCollapsed] = useState(false);
   const [toast, setToast] = useState(() => new URLSearchParams(window.location.search).has("created"));
+  const [designActionNotice, setDesignActionNotice] = useState<string | null>(null);
   const selectedChapter = selectedAnchor?.kind === "chapter" ? courseChapters.find((item) => item.id === selectedAnchor.id) ?? null : null;
   const selectedNode = selectedAnchor?.kind === "knowledge" ? courseSkillTreeNodes.find((item) => item.id === selectedAnchor.id) ?? null : null;
   const selectedFlowId = flowIdForAnchor(selectedAnchor);
@@ -83,6 +84,12 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
     const timer = window.setTimeout(() => setToast(false), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!designActionNotice) return;
+    const timer = window.setTimeout(() => setDesignActionNotice(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [designActionNotice]);
 
   useEffect(() => {
     function escape(event: KeyboardEvent) {
@@ -157,7 +164,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
       {experience === "design" ? <>
         <section className="atlas-drawer-section"><h3>Assignment Mapping</h3><div className="atlas-drawer-info-card"><Settings2 size={15} /><span>{assignment.experience?.type ?? assignment.mode} renderer · {context.role} coverage</span></div></section>
         <section className="atlas-drawer-section"><h3>AssignmentDependency</h3>{incomingDependencies.length ? <div className="atlas-requirement-list">{incomingDependencies.map((item) => <div className="atlas-requirement" key={item.id}><span className="atlas-requirement-icon ready">→</span><span>{item.title}</span></div>)}</div> : <p>无直接前置 Assignment。</p>}</section>
-        <section className="atlas-drawer-section"><h3>AI 教学建议</h3><p>{assignment.experience?.type === "trace" ? "建议让学生先定位错误步骤，再解释恢复和终止顺序。" : "当前实训覆盖、预期输出和验收标准完整，可继续优化任务措辞。"}</p><button className="atlas-secondary">AI 优化任务说明</button></section>
+        <section className="atlas-drawer-section"><h3>AI 教学建议</h3><p>{assignment.experience?.type === "trace" ? "建议让学生先定位错误步骤，再解释恢复和终止顺序。" : "当前实训覆盖、预期输出和验收标准完整，可继续优化任务措辞。"}</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：强化验收标准中对可复核输出的要求。")}>AI 优化任务说明</button></section>
       </> : null}
       <section className="atlas-drawer-section"><h3>任务说明</h3><p>{assignment.description}</p></section>
       {assignment.inheritedOutputs?.length ? <section className="atlas-drawer-section"><h3>已加载前置实训成果</h3><div className="atlas-assignment-criteria">{assignment.inheritedOutputs.map((item) => <span key={item}><Check size={14} />{item}</span>)}</div>{assignment.dependencyRationale ? <p>{assignment.dependencyRationale}</p> : null}</section> : null}
@@ -190,7 +197,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
       <section className="atlas-drawer-section"><h3>Coverage Completeness</h3><div className="atlas-drawer-progress-meta"><span>{nodes.length} Knowledge · {chapter.assignmentSummary.assignmentCount} Assignments · {runtime!.materials.filter((material) => lessonIds.has(material.lessonId)).length} Materials</span><strong>完整</strong></div><div className="atlas-drawer-progress"><i style={{width:"100%"}} /></div></section>
       <section className="atlas-drawer-section"><h3>Stage Outcome</h3><p>{chapter.outcome}</p></section>
       <section className="atlas-drawer-section"><h3>CurriculumCoverage</h3><div className="atlas-tag-list">{nodes.map((node) => <span key={node.id}>{node.id} · {node.curriculumContexts[0]?.role}</span>)}</div></section>
-      <section className="atlas-drawer-section"><h3>AI 教学建议</h3><p>覆盖与阶段成果一致。建议在综合实训中明确本篇章成果如何被后续篇章继承。</p><button className="atlas-secondary">优化篇章教学设计</button></section>
+      <section className="atlas-drawer-section"><h3>AI 教学建议</h3><p>覆盖与阶段成果一致。建议在综合实训中明确本篇章成果如何被后续篇章继承。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：在篇章目标中明确阶段成果的后续复用接口。")}>优化篇章教学设计</button></section>
     </>;
     return <>
       <section className="atlas-drawer-section"><h3>篇章简介</h3><p>{chapter.description}</p></section>
@@ -209,7 +216,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
       <section className="atlas-drawer-section"><h3>Chapter Assignment Design</h3><div className="atlas-chapter-assignment-stats"><span><strong>{summary.assignmentCount}</strong>Assignments</span><span><strong>{projection.projectContributions.length}</strong>成果映射</span></div></section>
       <section className="atlas-drawer-section"><h3>覆盖与依赖</h3><p>{projection.assignments.length} 个 Assignment 覆盖本篇章 Knowledge；直接依赖由稳定 Assignment ID 定义。</p><div className="atlas-assignment-switcher">{projection.assignments.map(({assignment}) => <div className="atlas-assignment-row" key={assignment.id}><strong>{assignment.title}</strong><small>{assignment.experience?.type ?? assignment.mode}</small></div>)}</div></section>
       <section className="atlas-drawer-section"><h3>Stage Outcome</h3><p>{summary.outcome}</p></section>
-      <section className="atlas-drawer-section"><h3>Issues / AI Suggestion</h3><p>当前覆盖完整。建议复核 inherited outputs 是否足以支持下一篇章，无需创建展示用依赖。</p><button className="atlas-secondary">AI 优化篇章实训</button></section>
+      <section className="atlas-drawer-section"><h3>Issues / AI Suggestion</h3><p>当前覆盖完整。建议复核 inherited outputs 是否足以支持下一篇章，无需创建展示用依赖。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：补充 inherited outputs 的验收边界和复用说明。")}>AI 优化篇章实训</button></section>
     </>;
     return <>
       <section className="atlas-drawer-section"><h3>{chapter.title} · 实训</h3><div className="atlas-chapter-assignment-stats"><span><strong>{summary.assignmentCount}</strong>项实训</span><span><strong>{summary.completedCount}</strong>已完成</span><span><strong>{summary.inProgressCount}</strong>进行中</span><span><strong>{summary.notStartedCount}</strong>未开始</span></div><div className="atlas-drawer-progress-meta"><span>完成度</span><strong>{summary.progress}%</strong></div><div className="atlas-drawer-progress"><i style={{ width: `${summary.progress}%` }} /></div></section>
@@ -226,7 +233,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
       <section className="atlas-drawer-section"><h3>前置 / 后继</h3><p>{courseSkillTreeEdges.filter((edge) => edge.target === node.id).length} 前置 · {courseSkillTreeEdges.filter((edge) => edge.source === node.id).length} 后继</p></section>
       <section className="atlas-drawer-section"><h3>MaterialCoverage / AssignmentCoverage</h3><p>{node.materialContexts.length} Material 映射 · {node.assignmentContexts.length} Assignment 映射</p></section>
       <section className="atlas-drawer-section"><h3>Mapping 状态</h3><div className="atlas-drawer-info-card"><Check size={15} /><span>课程、课件与实训覆盖完整</span></div></section>
-      <section className="atlas-drawer-section"><h3>AI 教学建议</h3><p>保持该 Knowledge 的原子目标，并在实训验收标准中要求可复核证据。</p><button className="atlas-secondary">编辑映射</button></section>
+      <section className="atlas-drawer-section"><h3>AI 教学建议</h3><p>保持该 Knowledge 的原子目标，并在实训验收标准中要求可复核证据。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · 映射编辑将在正式课程编辑器中持久化；当前 Demo 仅展示 mapping inspection。")}>编辑映射</button></section>
     </>;
     return <>
       <section className="atlas-drawer-section"><h3>简介</h3><p>{node.description}</p></section>
@@ -265,6 +272,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
 
       {materialsOpen ? <aside className="atlas-detail-drawer atlas-materials-drawer open"><button className="atlas-panel-close" onClick={() => setMaterialsOpen(false)} aria-label="关闭课件列表"><X size={17} /></button><div className="atlas-drawer-head"><span>课程资料</span><h2>全部关联课件</h2><div><i className="atlas-pill">{orderedMaterials.length} 份课件</i><i className="atlas-pill">课程级</i></div></div><div className="atlas-drawer-body"><p>课件、Knowledge 与 Assignment 通过覆盖数据动态关联。</p>{orderedMaterials.map((material) => <button className="atlas-material-card" key={material.id} onClick={() => navigate(materialLink(material.id, null))}><div><span>{material.type.toUpperCase()} · {material.segments.length} 个内容段</span><strong>{material.title}</strong><p>{material.description}</p></div><div className="atlas-course-meta"><span>{material.duration ?? "自定进度"}</span></div></button>)}</div>{orderedMaterials.length ? <div className="atlas-drawer-actions"><button className="atlas-primary" onClick={() => { const recent = Object.values(userCourseState.materialStates).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.materialId; const material = orderedMaterials.find((item) => item.id === recent) ?? orderedMaterials[0]; navigate(materialLink(material.id, null)); }}>打开最近课件 <ArrowRight size={15} /></button></div> : null}</aside> : null}
       {toast ? <div className="atlas-toast"><Sparkles size={16} />{view === "focused" ? "篇章已在宏观位置展开，其他篇章保持折叠" : "课程图已更新"}</div> : null}
+      {designActionNotice ? <div className="atlas-toast" role="status"><Sparkles size={16} />{designActionNotice}</div> : null}
     </main>
   );
 }

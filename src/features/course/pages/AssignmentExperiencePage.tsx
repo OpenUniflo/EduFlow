@@ -5,6 +5,7 @@ import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
 import type { AssignmentExperience } from "@/features/course/types";
+import { evaluateTraceSelection } from "@/features/course/assignmentExperience";
 import { workflowLaunchUrl } from "@/features/learning/progress/progressService";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 
@@ -21,7 +22,11 @@ function CodeExperience({ experience, onSubmit }: { experience: AssignmentExperi
 
 function TraceExperience({ experience, onSubmit }: { experience: AssignmentExperience; onSubmit: () => void }) {
   const [selected, setSelected] = useState("");
-  return <section className="assignment-experience-body"><h2>Trace Debug</h2><p>{experience.prompt}</p><div className="assignment-trace">{experience.traceSteps?.map((step, index) => <button key={step.id} className={selected === step.id ? "selected" : ""} onClick={() => setSelected(step.id)}><span>{String(index + 1).padStart(2,"0")}</span><code>{step.label}</code></button>)}</div><button className="atlas-primary" disabled={!selected} onClick={onSubmit}>提交故障判断</button></section>;
+  const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
+  function checkSelection() {
+    setFeedback(evaluateTraceSelection(experience, selected) ? "correct" : "incorrect");
+  }
+  return <section className="assignment-experience-body"><h2>Trace Debug</h2><p>{experience.prompt}</p><div className="assignment-trace">{experience.traceSteps?.map((step, index) => <button key={step.id} className={selected === step.id ? "selected" : ""} onClick={() => {setSelected(step.id);setFeedback(null);}}><span>{String(index + 1).padStart(2,"0")}</span><code>{step.label}</code></button>)}</div>{feedback ? <div className={`assignment-trace-feedback ${feedback}`} role="status"><strong>{feedback === "correct" ? "✓ 定位正确" : "✕ 这里不是根因"}</strong><span>{feedback === "correct" ? "该步骤已越过允许的运行边界，应进入恢复或终止策略，而不是继续等待。" : "继续检查出现异常、超时或错误状态的步骤。"}</span></div> : null}{feedback === "correct" ? <button className="atlas-primary" onClick={onSubmit}>完成本次实训</button> : <button className="atlas-primary" disabled={!selected} onClick={checkSelection}>提交故障判断</button>}</section>;
 }
 
 export function AssignmentExperiencePage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
