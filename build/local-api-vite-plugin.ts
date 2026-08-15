@@ -9,6 +9,7 @@ import workflowsHandler from "../api/workflows";
 import materialsHandler from "../api/materials";
 import domainsHandler from "../api/domains";
 import knowledgeGenerationHandler from "../api/knowledge-generation";
+import courseIntentHandler from "../api/course-intent";
 
 const handlers = new Map([
   ["/api/health", healthHandler],
@@ -18,7 +19,8 @@ const handlers = new Map([
   ["/api/workflows", workflowsHandler],
   ["/api/materials", materialsHandler],
   ["/api/domains", domainsHandler],
-  ["/api/knowledge-generation", knowledgeGenerationHandler]
+  ["/api/knowledge-generation", knowledgeGenerationHandler],
+  ["/api/course-intent", courseIntentHandler]
 ]);
 
 async function readBody(request: IncomingMessage) {

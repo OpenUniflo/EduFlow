@@ -112,6 +112,11 @@
 - Assignment progress is distinct from Knowledge mastery.
 - Assignment outputs may contribute to larger chapter/course outcomes without becoming KnowledgeNodes.
 - Assignment completion may produce KnowledgeEvidence in a future evidence pipeline, but completion MUST NOT automatically set mastery.
+- Phase 4.3 Mapping Gold uses Practice as evaluation terminology; production continues to use CourseAssignment and AssignmentCoverage and MUST NOT introduce a parallel Practice domain for the same teaching task.
+- AssignmentDependency is a course-owned direct teaching/execution prerequisite between Assignments. It MUST use stable Assignment IDs, remain acyclic, and MUST NOT be mechanically copied from KnowledgeEdge.
+- ChapterOutcome and FinalProject composition MUST use stable course-owned identities and explicit Assignment-to-Outcome and Outcome-to-FinalProject relations; titles and projectContribution text are presentation content, not relationship identity.
+- Goal-constrained Assignment planning MUST combine the persisted Course target outcome with existing Course Knowledge and its factual DAG; planning Steps MUST reference only real active Course Knowledge IDs and MUST NOT invent Knowledge.
+- Every planning Step contains at least one Knowledge ID, all Course Knowledge remains covered by AssignmentCoverage, and one MVP planning Step produces exactly one CourseAssignment. An integrated Assignment MAY cover multiple KnowledgeNodes.
 
 ## Layout and Validation
 

@@ -9,6 +9,7 @@ Upload course material
   -> parse and structure
   -> AI knowledge modeling and course generation
   -> knowledge/material/practice mapping
+  -> authoring chat / human review
   -> student learning
   -> real Workflow execution
   -> automatic acceptance
@@ -160,6 +161,27 @@ ChapterOutcome -> FinalProject
 
 Not every Knowledge node must map to a Workflow. Practice types may include analysis, quiz, template experiment, workflow, and project tasks.
 
+Phase 4.3 Gold uses `Practice` as human evaluation terminology. The production domain continues to use the existing `CourseAssignment` and N:M `AssignmentCoverage`; Gold objective and deliverable semantics map to Assignment description and expected output rather than defining a parallel Practice schema. `instruction` remains the representation for non-canvas tasks, while `workflow` is used only with an existing valid Workflow template.
+
+Course planning is goal-constrained rather than one-Assignment-per-Knowledge:
+
+```text
+Conversation / Material -> persisted Course target outcome
+Course target outcome + existing Course Knowledge DAG
+  -> validated Implementation Steps over real Knowledge IDs
+  -> exactly one CourseAssignment per Step (MVP)
+  -> AssignmentCoverage -> Assignment DAG
+  -> ChapterOutcome -> FinalProject
+```
+
+The goal determines direction while existing atomic Knowledge determines the allowed decomposition. The planner may group several KnowledgeNodes into one coherent implementation milestone, but it cannot invent Knowledge, omit Course Knowledge coverage, or create a catch-all task solely to reduce task count. Assignment identity derives from Course identity plus the stable grouped Knowledge set, not model response order or presentation text. Knowledge prerequisite ancestors expand bounded dependency candidates; the model still decides direct teaching/execution prerequisites, followed by DAG validation and transitive reduction.
+
+Future course-authoring orchestration may use LangGraph pause/resume and checkpoints for `Generate Knowledge -> Human Review -> Generate Assignments -> Human Review -> Finalize`. That authoring state machine is separate from learner-facing `WorkflowDefinition` execution and is not implemented in Phase 4.3.
+
+Direct Assignment prerequisites are persisted as course-owned `AssignmentDependency` records and validated as a DAG independently from Knowledge topology. Stable `ChapterOutcome` and `FinalProject` identities plus explicit composition relations represent `Assignment -> ChapterOutcome -> FinalProject`; chapter outcome and project-contribution strings remain display content rather than relationship keys.
+
+Material coverage is resolved deterministically from persisted Phase 4.2 material provenance. PDF source pages resolve to the matching one-page MaterialSegments; exact non-PDF section locations may resolve to explicitly addressed Segments. Ambiguous or missing addresses fail for review and are never replaced with whole-document embedding search or order-based guesses. Provenance alone yields the conservative `explain` role because it does not prove first introduction.
+
 ## 7. Phase 4.4 — Real Workflow runtime
 
 Keep `WorkflowDefinition` owned by EduFlow and compile/adapt it to LangGraph:
@@ -195,19 +217,38 @@ DeepEval may back a semantic evaluator adapter for open-ended task completion, q
 
 Authoritative `PracticeAttempt`, evidence, and `AcceptanceResult` remain in EduFlow PostgreSQL.
 
-## 9. Phase 4.6 — End-to-end closeout
+## 9. Phase 4.6 — Authoring Chat & Human Review
+
+Phase 4.6 turns the current single-turn CourseIntent surface into a persistent course-authoring conversation and review flow. It should support the smallest product contract needed for:
+
+- persistent Conversation / Message history;
+- multi-turn context across course creation and clarification;
+- uploaded material/file context;
+- persisted CourseIntent / target outcome context;
+- `Generate Knowledge -> Human Review/Edit -> Resume`;
+- `Generate Assignments -> Human Review/Edit -> Resume`;
+- final course confirmation/finalization;
+- reopening an interrupted authoring session without rebuilding context manually.
+
+The implementation should preserve human-approved Knowledge and Assignment state as EduFlow-owned domain data. LangGraph pause/resume/checkpoints may be used to orchestrate authoring HITL once the concrete workflow requires them, but the authoring state machine remains separate from learner-facing `WorkflowDefinition` execution.
+
+Phase 4.6 is not a general-purpose chat platform. The MVP is complete when the existing homepage conversation can carry one course-creation session through clarification, generated Knowledge review, generated Assignment review, and finalization with persistent state.
+
+## 10. Phase 4.7 — End-to-end closeout
 
 Using real Agentic AI material, without manually editing database rows or depending on production DemoRepository/fixtures, the system must:
 
-1. upload source material;
-2. parse it into structured CourseMaterial;
+1. start from the homepage course-authoring conversation and upload/source context;
+2. parse source material into structured CourseMaterial;
 3. generate User Knowledge and a valid Course Skill DAG;
-4. establish formal Material and Practice mappings;
-5. let a learner navigate from Knowledge to real material and practice;
-6. execute the Workflow through a backend runtime;
-7. persist Run/Step evidence;
-8. return persistent pass/fail/review acceptance feedback.
+4. let the author review/edit the Knowledge result and continue;
+5. establish formal Material and Assignment mappings and let the author review/edit Assignments;
+6. finalize the course and let a learner navigate from Knowledge to real material and practice;
+7. execute the Workflow through a backend runtime;
+8. persist Run/Step evidence;
+9. return persistent pass/fail/review acceptance feedback;
+10. rerun the complete real flow without manual database fixes or DemoRepository fallbacks.
 
-## 10. Phase 5 boundary
+## 11. Phase 5 boundary
 
-Phase 4 records raw learning, runtime, and acceptance evidence. It does not yet turn that evidence into the full Mastery model, Personal Knowledge Atlas, connection analysis, recommendation, adaptive learning paths, class analytics, or a full teacher analytics dashboard.
+Phase 4 records raw learning, runtime, acceptance, and course-authoring evidence. It does not yet turn that evidence into the full Mastery model, Personal Knowledge Atlas, connection analysis, recommendation, adaptive learning paths, class analytics, or a full teacher analytics dashboard.

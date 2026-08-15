@@ -91,6 +91,8 @@ No permanent Knowledge embedding table is introduced by this preflight. The exis
 - `POST|PUT /api/materials`: authorizes direct-to-Storage upload and commits trusted Material metadata.
 - `PUT /api/domains`: persists Global Domain governance after capability and active-node validation.
 - `POST /api/knowledge-generation`: generates and atomically persists User Knowledge and Curriculum from a completed Phase 4.1 parsing job.
+- `POST /api/course-intent`: analyzes the existing course-creation conversation for an explicit learner target outcome or returns one contextual clarification question with 3–5 options.
+- `POST /api/course-mapping`: consumes an owning completed Phase 4.2 Course plus its persisted target outcome, resolves provenance coverage, plans goal-constrained Knowledge groups, generates one stable-ID-bound Assignment per Step and direct dependencies, and atomically persists Phase 4.3 composition data.
 
 The API is intentionally a small mapping layer rather than a second Domain model or a backend framework.
 
@@ -106,6 +108,7 @@ The database normalizes:
 - Knowledge nodes, revisions, factual edges, Domains, assignments, candidates, and proposals;
 - Courses, curricula, Chapters, Lessons, Coverage, and Sequence;
 - Assignments and AssignmentCoverage;
+- direct Assignment dependencies, ChapterOutcomes, FinalProjects, and their explicit composition relations;
 - Materials, Segments, and MaterialKnowledgeCoverage;
 - user Knowledge, Course, Assignment, and Material state;
 - Workflow templates, user Workflow definitions/state, and Workflow Runs.
@@ -150,4 +153,4 @@ No automatic migration of old LocalStorage sessions, progress, or Workflow paylo
 
 ## Deliberate non-goals
 
-This backend does not run Docling inside Vercel Functions, automatically schedule parser workers, create a Course with AI, extract or resolve Knowledge, run LangGraph/tools, evaluate evidence, infer mastery, stream execution, or provide tenant governance. Course creation reports that the capability belongs to the next round rather than manufacturing Demo data.
+This backend does not run Docling inside Vercel Functions, automatically schedule parser workers, create a Course with AI, run LangGraph/tools, evaluate evidence, infer mastery, stream execution, or provide tenant governance. CourseIntent analysis now supports the existing conversation surface, but the production `CourseCreationService` still reports that full AI Course creation is unavailable rather than manufacturing Demo data. Future authoring pause/review/resume orchestration is distinct from learner Workflow execution.

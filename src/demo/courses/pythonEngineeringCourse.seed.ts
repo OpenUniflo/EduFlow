@@ -146,6 +146,11 @@ export const pythonEngineeringRuntime: CourseRuntimeData = {
   curriculumSequences: pythonEngineeringSequences,
   assignments: pythonEngineeringAssignments,
   assignmentCoverages: pythonEngineeringAssignmentCoverages,
+  assignmentDependencies: [],
+  chapterOutcomes: [],
+  assignmentOutcomeCompositions: [],
+  finalProjects: [],
+  finalProjectOutcomeCompositions: [],
   materials: pythonEngineeringMaterials,
   materialKnowledgeCoverages: pythonEngineeringMaterialKnowledgeCoverages,
   revision: "python-engineering-v4-final-model-freeze"
