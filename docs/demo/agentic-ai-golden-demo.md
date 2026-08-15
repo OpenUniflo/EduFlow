@@ -1,0 +1,124 @@
+# EduFlow Agentic AI Golden Demo — 实施规格
+
+## 1. 演示目标
+
+用一本真实 Agent 教材作为输入，演示 EduFlow 如何把静态教材重构成：
+
+1. 有知识依赖的课程技能树；
+2. 每个知识节点都有实训的实践树；
+3. 前置实训成果持续复用的工程学习路径；
+4. 具备互动表达和 AI 辅助修改能力的 Lesson；
+5. 能汇合往期成果的复杂 Workflow；
+6. 可通过固定 AI 验收回写能力反馈的闭环。
+
+原始教材负责提供事实、术语和技术主题；Golden Demo 的 6 篇章、实训和综合项目属于 EduFlow 教学设计。
+
+## 2. 固定课程
+
+**Agentic AI 工程实践：从单 Agent 到多智能体研究系统**
+
+| 篇章 | 阶段成果 |
+|---|---|
+| 1 Agent 基础与任务建模 | 最小任务 Agent |
+| 2 Context 与结构化交互 | 上下文增强 Agent |
+| 3 Tools、RAG 与 Memory | 知识工具 Agent |
+| 4 Runtime 与可靠性 | 可恢复 Agent |
+| 5 Evaluation、Guardrail 与可信执行 | 可信 Agent |
+| 6 Multi-Agent Workflow | Multi-Agent Research System |
+| Final | AI 科研调研与立项助手 |
+
+固定统计：**6 篇章 / 31 Knowledge / 31 知识点实训 / 6 篇章实训 / 1 Final Project**。
+
+## 3. Demo Golden Path
+
+`教师/管理员 → 上传指定 PDF → 仿真建课 → 固定课程草稿 → 技能树 → 课程设计模式 → 第 6 篇章 → AI Native Lesson → AI 修改 Lesson → 学习模式 → 知识点实训 → 前置成果加载 → 篇章 Workflow → AI 验收 → 能力反馈`
+
+## 4. 角色与导航
+
+- 学生：学习
+- 教师：学习 + 教学管理
+- 管理员：学习 + 教学管理 + 系统管理
+
+菜单分组：
+- 学习：知识星图首页 / 课程中心 / 工作流画布 / 个人知识
+- 教学管理：课程管理
+- 系统管理：知识领域管理
+
+教师/管理员进入同一个课程技能树时显示 `学习模式 ↔ 课程设计模式`；学生不显示切换按钮。不要再做独立“学生视角预览”。
+
+## 5. 建课仿真
+
+指定 PDF 命中 Golden Scenario 后，不走现场不可控的全量生成；播放固定但真实的 UI state machine：
+
+`解析教材 → 提取知识 → 分析依赖 → 重构教学路径 → 设计实训 → 生成互动课件`
+
+随后加载固定课程 Scenario。
+
+**假的是 AI 智能过程，真的必须是产品交互：** 文件上传、页面跳转、权限、模式切换、Drawer、Lesson、Workflow、提交和 UI 状态变化都应是真实产品能力。
+
+## 6. 实训规则
+
+- 每个 KnowledgeNode 至少一个 CourseAssignment。
+- 每篇章一个篇章实训。
+- 后续知识点实训通过显式 AssignmentDependency 继承前置成果。
+- 篇章实训显式汇合本篇章及必要往期成果。
+- FinalProject 汇合多个 ChapterOutcome。
+- 不创建“组合实训”新 Domain。
+- Workflow Canvas 只是 Assignment 执行载体之一。
+
+Demo 需要至少展示：
+- 开放回答；
+- 代码/文件提交；
+- Trace Debug；
+- Workflow Canvas。
+
+## 7. 第 6 篇章重点
+
+前五篇章在 Demo user state 中已完成。第 6 篇章进入时明确显示已继承：
+
+- Task Specification
+- Context Pack
+- Knowledge & Tool Agent
+- Runtime + Retry + Checkpoint
+- Evaluator + Guardrail + Approval
+
+完整制作两节 AI Native Lesson：
+
+- **并行执行与结果汇合**
+- **故障、验证与终止**
+
+第 6 篇章最终 Workflow 使用 Planner、三类 Research Worker、Evidence Merge、Verifier、Experiment Designer、Critic、Human Approval 和 Final Proposal。
+
+## 8. 固定 AI 脚本
+
+Lesson 设计模式至少支持：
+
+- 解释得简单一点；
+- 增加案例；
+- 增加 Worker 超时案例；
+- 检查课件与实训是否一致。
+
+输入框可以开放，但命中关键词后映射预设 mutation；未命中走固定 fallback。不要现场生成不可应用的任意 DOM 变更。
+
+## 9. 固定验收
+
+篇章综合实训固定演示 **86/100，需要修改**。
+
+核心缺陷：
+
+`Candidate → 直接 Cancel` 是错误的。
+
+正确链路：
+
+`Candidate → Verifier → Verified Success → Atomic Settle → Cancel Remaining Workers`
+
+反馈映射到 `WF03 / E13 / RT14`，但 Assignment completion 不得自动等同 Knowledge mastery。
+
+## 10. 实现约束
+
+- Golden Scenario 代码应位于 `src/demo`，Core Feature 不得 import Demo。
+- Generic UI 不得判断具体 `agentic-ai-engineering-demo`、文件名或节点 ID。
+- Scenario Resolver 负责触发与注入；页面只读取正常 contract。
+- 原始 PDF 不提交仓库。
+- 不把 Demo AI 脚本、固定分数、课程名写入通用组件。
+- 现有 Core `AssignmentMode = instruction | workflow` 暂不因准备工作强行修改；多载体 UI 在正式实现时再以最小改动设计 presentation/execution metadata。
