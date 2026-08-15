@@ -31,7 +31,9 @@
 
 ## 3. Demo Golden Path
 
-`教师/管理员 → 上传指定 PDF → 仿真建课 → 固定课程草稿 → 技能树 → 课程设计模式 → 第 6 篇章 → AI Native Lesson → AI 修改 Lesson → 学习模式 → 知识点实训 → 前置成果加载 → 篇章 Workflow → AI 验收 → 能力反馈`
+`学生/教师/管理员 → 上传指定 PDF → 仿真建课 → 固定课程草稿 → 技能树 → 第 6 篇章 → AI Native Lesson → 知识点实训 → 前置成果加载 → 篇章 Workflow → AI 验收 → 能力反馈`
+
+教师和管理员还可在同一技能树、同一 selected anchor 与 viewport 上进入课程设计模式，用 AI 修改 Lesson；Student 共享建课和学习能力，但没有课程管理或课程设计权限。
 
 ## 4. 角色与导航
 
@@ -66,11 +68,13 @@
 - 不创建“组合实训”新 Domain。
 - Workflow Canvas 只是 Assignment 执行载体之一。
 
-Demo 需要至少展示：
+通用 `AssignmentExperience` 是 CourseAssignment 的可选执行/展示元数据，不是第二套课程本体。当前实现展示：
 - 开放回答；
 - 代码/文件提交；
 - Trace Debug；
 - Workflow Canvas。
+
+四种体验共用独立 Assignment 页面和任务 Shell；Shell 展示关联 Knowledge、前置实训、继承成果、要求、预期输出与验收标准。Code/File 的文件选择与提交状态仅保存在 Prototype session；Workflow 跳转保留显式 Course/Assignment launch context。
 
 ## 7. 第 6 篇章重点
 
@@ -98,11 +102,11 @@ Lesson 设计模式至少支持：
 - 增加 Worker 超时案例；
 - 检查课件与实训是否一致。
 
-输入框可以开放，但命中关键词后映射预设 mutation；未命中走固定 fallback。不要现场生成不可应用的任意 DOM 变更。
+输入框开放，但命中关键词后映射预设 mutation；未命中走固定 fallback。修改经过 Preview → Apply，并支持撤销最近一次修改。切换 learn/design 保留 session draft，刷新后恢复 seed。
 
 ## 9. 固定验收
 
-篇章综合实训固定演示 **86/100，需要修改**。
+篇章综合实训在运行完成后分阶段演示分析过程，再显示固定 **86/100，需要修改**。
 
 核心缺陷：
 
@@ -121,4 +125,21 @@ Lesson 设计模式至少支持：
 - Scenario Resolver 负责触发与注入；页面只读取正常 contract。
 - 原始 PDF 不提交仓库。
 - 不把 Demo AI 脚本、固定分数、课程名写入通用组件。
-- 现有 Core `AssignmentMode = instruction | workflow` 暂不因准备工作强行修改；多载体 UI 在正式实现时再以最小改动设计 presentation/execution metadata。
+- Core `AssignmentMode = instruction | workflow` 保持不变；`AssignmentExperience = answer | code | trace | workflow` 只描述执行/展示体验。
+- Generic Lesson 仅消费 `LessonAssistantProvider`，Generic Workflow Editor 仅消费可选 `WorkflowAssessmentResult`；固定 Demo 内容由 `src/demo/scenarios/agenticAiBook` 提供并在 App 组合根注入。
+
+## 11. 本地验收身份与数据
+
+`pnpm auth:bootstrap-local` 可重复创建并验证：
+
+- `local-student@eduflow.local` → student
+- `local-teacher@eduflow.local` → teacher
+- `local-admin@eduflow.local` → admin + global-domain-admin
+
+Teacher 未单独配置密码时使用 local-only Admin acceptance password 作为明确 fallback。Golden `UserCourseState` 由 Demo fixture 注入/seed：篇章 1–5 的阶段 Assignment 已完成，篇章 6 进行中；Knowledge mastery 仍只读取独立 `UserKnowledgeState`。
+
+## 12. 真实与仿真边界
+
+真实：教材文件选择、SHA/文件名路由、角色权限、导航、Course/Skill Tree、learn/design 状态、Lesson mutation、Assignment UI、Workflow launch context、运行状态、提交与反馈交互。
+
+仿真：PDF 的 AI 分析推理、课程生成推理、Lesson AI 文案生成、Workflow AI 验收推理和固定结果。

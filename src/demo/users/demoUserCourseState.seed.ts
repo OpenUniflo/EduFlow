@@ -1,6 +1,7 @@
 import { userAssignmentStates as agenticAssignmentStates } from "../courses/agenticAiCourse.seed";
 import { pythonEngineeringAssignments } from "../courses/pythonEngineeringCourse.seed";
 import type { UserAssignmentState, UserCourseState } from "@/features/course/types";
+import { goldenAgenticAiRuntime, GOLDEN_COURSE_ID } from "@/demo/scenarios/agenticAiBook/goldenCourse.seed";
 
 const DEMO_TIME = "2026-08-09T08:00:00.000Z";
 
@@ -9,6 +10,22 @@ function record(states: UserAssignmentState[]) {
 }
 
 export function demoUserCourseStateSeed(userId: string, courseId: string): UserCourseState {
+  if (courseId === GOLDEN_COURSE_ID) {
+    const chapterByLesson = new Map(goldenAgenticAiRuntime.lessons.map((lesson) => [lesson.id, lesson.chapterId]));
+    const chapterOrderByNode = new Map(goldenAgenticAiRuntime.curriculumCoverages.map((coverage) => {
+      const chapterId = chapterByLesson.get(coverage.lessonId);
+      return [coverage.nodeId, goldenAgenticAiRuntime.chapters.find((chapter) => chapter.id === chapterId)?.order ?? 6];
+    }));
+    const states = goldenAgenticAiRuntime.assignments.map<UserAssignmentState>((assignment) => {
+      const coveredNode = goldenAgenticAiRuntime.assignmentCoverages.find((coverage) => coverage.assignmentId === assignment.id)?.nodeId;
+      const chapterOrder = coveredNode ? chapterOrderByNode.get(coveredNode) ?? 6 : Number(assignment.id.replace("golden-chapter-assignment-", ""));
+      if (chapterOrder <= 5) return { assignmentId: assignment.id, status: "completed", progress: 100 };
+      if (["golden-knowledge-assignment-MA02", "golden-knowledge-assignment-MA12"].includes(assignment.id)) return { assignmentId: assignment.id, status: "completed", progress: 100 };
+      if (["golden-knowledge-assignment-MA04", "golden-chapter-assignment-6"].includes(assignment.id)) return { assignmentId: assignment.id, status: "in-progress", progress: assignment.id.endsWith("6") ? 68 : 45 };
+      return { assignmentId: assignment.id, status: "not-started", progress: 0 };
+    });
+    return { userId, courseId, assignmentStates: record(states), materialStates: {}, recentLessonId: goldenAgenticAiRuntime.lessons[5].id, updatedAt: DEMO_TIME };
+  }
   if (courseId === "agentic-ai") {
     return {
       userId,

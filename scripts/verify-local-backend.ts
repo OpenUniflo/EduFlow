@@ -91,7 +91,12 @@ try {
 
   const courses = await invoke(coursesHandler, "GET", adminUser.token);
   assertStatus(courses, 200, "course read");
-  assert.deepEqual(courses.body.courses.map((item: any) => item.course.id).sort(), ["agentic-ai", "python-engineering"]);
+  assert.deepEqual(courses.body.courses.map((item: any) => item.course.id).sort(), ["agentic-ai", "agentic-ai-golden", "python-engineering"]);
+  const golden = courses.body.courses.find((item: any) => item.course.id === "agentic-ai-golden");
+  assert.ok(golden, "Golden Course must be available through the API");
+  assert.equal(golden.chapters.length, 6);
+  assert.equal(golden.assignments.length, 37);
+  assert.deepEqual(new Set(golden.assignments.map((item: any) => item.experience?.type)), new Set(["answer", "code", "trace", "workflow"]));
   assertStatus(await invoke(coursesHandler, "GET", adminUser.token, undefined, { id: "missing-course" }), 404, "unknown course denial");
   const signedPdf = courses.body.courses.flatMap((item: any) => item.materials).find((item: any) => item.source?.kind === "pdf")?.source?.url;
   assert.ok(signedPdf);

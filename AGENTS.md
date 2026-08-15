@@ -396,6 +396,13 @@
 - Two Assignments sharing one WorkflowTemplate MUST remain distinguishable in Run History and completion updates.
 - Evaluation output is runtime/evidence data, not CourseAssignment or WorkflowTemplate definition data.
 
+## Assignment Experience and Demo Provider Boundaries
+
+- `AssignmentExperience` is optional execution/presentation metadata on CourseAssignment; it MUST NOT create a parallel Practice ontology or change Assignment ownership and coverage semantics.
+- Generic Assignment UI may select an answer, code/file, trace, or workflow renderer only from explicit Assignment metadata and MUST NOT branch on Demo Course or Assignment identities.
+- Generic Lesson and Workflow UI consume provider/result contracts. Concrete Demo lesson scripts and fixed assessment content MUST live under `src/demo` and be injected by the application composition root.
+- Workflow assessment resolution MUST use the complete explicit `(courseId, assignmentId, workflowTemplateId)` launch context; template identity alone MUST NOT select Course-specific feedback.
+
 ## Domain Scope Permission Invariants
 
 - Every manual Domain mutation, including unassignment and proposal review, requires `global-domain-admin` in v1.

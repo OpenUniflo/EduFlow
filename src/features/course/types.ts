@@ -69,6 +69,15 @@ export type CurriculumCoverage = {
 };
 
 export type AssignmentMode = "instruction" | "workflow";
+export type AssignmentExperienceType = "answer" | "code" | "trace" | "workflow";
+export type AssignmentExperience = {
+  type: AssignmentExperienceType;
+  prompt?: string;
+  starterCode?: string;
+  acceptedFileTypes?: string[];
+  traceSteps?: Array<{ id: string; label: string; status?: "ok" | "warning" | "error" }>;
+  faultyStepId?: string;
+};
 export type AssignmentCoverageRole = "practice" | "apply" | "assess";
 export type AssignmentCoverage = {
   id: string;
@@ -91,6 +100,10 @@ export type CourseAssignment = {
   workflowTemplateId?: string;
   estimatedMinutes?: number;
   projectContribution?: string;
+  /** Generic execution/presentation metadata; concrete teaching content is supplied by Course fixtures. */
+  experience?: AssignmentExperience;
+  inheritedOutputs?: string[];
+  dependencyRationale?: string;
 };
 
 /** Direct teaching/execution prerequisite between course-owned Assignments. */

@@ -1,7 +1,7 @@
 import type { CourseCreationScenario, CourseCreationScenarioResolver } from "@/features/course/creation/demoScenario";
 import { GOLDEN_COURSE_ID } from "./goldenCourse.seed";
 
-const normalizedGoldenNames = new Set(["ai-agents-in-depth-zh-cn.pdf", "ai agents in depth zh cn.pdf"]);
+const normalizedGoldenNames = new Set(["ai-agents-in-depth-zh-cn.pdf", "ai-agents-in-depth-zh-cn(2).pdf", "ai agents in depth zh cn.pdf"]);
 const goldenSha256 = "0b47ef3f02396b694bea58be02706ce60ff1e7e3dae293475abe111d69cb2f3b";
 const normalize = (name: string) => name.normalize("NFKC").toLowerCase().replace(/[_–—]+/g, "-").replace(/\s+/g, " ").trim();
 

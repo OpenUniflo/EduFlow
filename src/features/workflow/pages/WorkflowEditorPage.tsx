@@ -6,19 +6,20 @@ import { CodeModal, Topbar } from "../editor/Topbar";
 import { ConfigPopover } from "../editor/ConfigPopover";
 import { Inspector, RunHistoryDetail } from "../editor/Inspector";
 import { RunPanel } from "../runtime/RunPanel";
+import type { WorkflowAssessmentResult } from "../workflowAssessment";
 
 export function WorkflowEditorPage({
   controller,
   navigation,
   onBack,
   onWorkflowGenerated,
-  showAcceptance
+  assessment
 }: {
   controller: WorkflowController;
   navigation: ReactNode;
   onBack: () => void;
   onWorkflowGenerated: (templateId: string) => void;
-  showAcceptance: boolean;
+  assessment?: WorkflowAssessmentResult | null;
 }) {
   const [selection, setSelection] = useState<Selection>({ type: "state" });
   const [configTarget, setConfigTarget] = useState<ConfigTarget | null>(null);
@@ -30,6 +31,7 @@ export function WorkflowEditorPage({
   const [draggingPaletteNode, setDraggingPaletteNode] = useState<Parameters<typeof Canvas>[0]["draggingPaletteNode"]>(null);
   const [codeModalOpen, setCodeModalOpen] = useState(false);
   const [selectedRunHistoryId, setSelectedRunHistoryId] = useState<string | null>(null);
+  const [assessmentStage, setAssessmentStage] = useState(-1);
   const { activeTemplate } = controller;
   const selectedRunHistory = controller.activeRunHistory.find((item) => item.id === selectedRunHistoryId) ?? null;
   const configNode = configTarget?.type === "node" ? activeTemplate.nodes.find((item) => item.id === configTarget.id) : undefined;
@@ -41,6 +43,13 @@ export function WorkflowEditorPage({
     window.addEventListener("mouseup", clear);
     return () => window.removeEventListener("mouseup", clear);
   }, [draggingPaletteNode]);
+
+  useEffect(() => {
+    if (!assessment || !controller.activeRunHistory.length) { setAssessmentStage(-1); return; }
+    setAssessmentStage(0);
+    const timers = assessment.stages.map((_, index) => window.setTimeout(() => setAssessmentStage(index + 1), 380 * (index + 1)));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [assessment, controller.activeRunHistory.length]);
 
   function runWithSavedSchema(action: () => boolean) {
     if (action()) {
@@ -148,11 +157,9 @@ export function WorkflowEditorPage({
       <CodeModal open={codeModalOpen} template={activeTemplate} codeExporter={controller.codeExporter} onClose={() => setCodeModalOpen(false)} />
       <RunPanel open={bottomOpen} activeTab={activeTab} template={activeTemplate} runIndex={controller.runIndex} onToggle={() => setBottomOpen((value) => !value)} onTab={setActiveTab} />
       {activeTemplate.inheritedAssets?.length ? <aside className="workflow-inherited-assets glass-v2"><strong>已继承往期成果</strong><div>{activeTemplate.inheritedAssets.map((item) => <span key={item}>✓ {item}</span>)}</div>{activeTemplate.reliabilityNotes?.map((item) => <small key={item}>{item}</small>)}</aside> : null}
-      {showAcceptance && controller.activeRunHistory.length ? (
+      {assessment && controller.activeRunHistory.length && assessmentStage >= 0 ? (
         <aside className="atlas-canvas-acceptance glass-v2">
-          <div><strong>AI 验收 · 86 / 100 · 需要修改</strong><span>✓ Agent Team　✓ Context Isolation　✓ Parallel Execution　✓ Message Protocol</span></div>
-          <div><span>⚠ Result Verification</span><span>⚠ Failure Recovery / Termination</span><span>建议巩固：WF03 · E13 · RT14</span></div>
-          <p>Candidate 不能直接 Cancel Others。应先经过 Verifier → Verified Success → Atomic Settle，再取消剩余 Worker。该反馈不会自动把 Knowledge 标为 mastered。</p>
+          {assessmentStage < assessment.stages.length ? <div className="workflow-assessment-progress"><strong>AI 正在验收</strong>{assessment.stages.map((stage,index)=><span key={stage} className={index <= assessmentStage ? "active" : ""}>{index < assessmentStage ? "✓" : "•"} {stage}</span>)}</div> : <><div><strong>AI 验收 · {assessment.score} / 100 · {assessment.statusLabel}</strong><span>{assessment.passed.map((item)=>`✓ ${item}`).join("　")}</span></div><div>{assessment.improvements.map((item)=><span key={item}>⚠ {item}</span>)}<span>建议巩固：{assessment.reinforcementNodeIds.join(" · ")}</span></div><p>{assessment.feedback}</p><button className="atlas-secondary" onClick={()=>setAssessmentStage(-1)}>返回 Workflow 修改</button></>}
         </aside>
       ) : null}
     </main>

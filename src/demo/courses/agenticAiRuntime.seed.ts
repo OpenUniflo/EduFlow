@@ -14,9 +14,9 @@ import {
 
 export const agenticAiCourse: Course = {
   id: COURSE_ID,
-  title: "Agentic AI 工程实践：从单 Agent 到多智能体研究系统",
-  subtitle: "从单 Agent 到多智能体研究系统",
-  description: "以同一个研究 Agent 系统为主线，逐步形成任务建模、Context、Tools、Runtime、可信执行与 Multi-Agent Workflow 能力。",
+  title: "智能体系统设计与实践",
+  subtitle: "Agentic AI：从问题建模到受治理智能体",
+  description: "从问题建模出发，逐步形成可设计、可运行、可治理的智能体系统能力。",
   accentColor: "#697ee6"
 };
 

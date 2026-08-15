@@ -81,19 +81,25 @@ for (const template of demoWorkflowTemplates) {
 
 function seedCourse(runtime: CourseRuntimeData) {
   const { course, curriculum } = runtime;
-  lines.push(insert("courses", ["id", "title", "subtitle", "description", "accent_color", "revision"], [course.id, course.title, course.subtitle, course.description, course.accentColor, runtime.revision]));
+  lines.push(insert("courses", ["id", "title", "subtitle", "description", "target_outcome", "accent_color", "generation_status", "revision"], [course.id, course.title, course.subtitle, course.description, course.targetOutcome, course.accentColor, course.generationStatus ?? "ready", runtime.revision]));
   lines.push(insert("course_curricula", ["course_id", "id", "generation_mode", "requested_chapter_count", "source_structure_id"], [curriculum.courseId, curriculum.id, curriculum.generationMode, curriculum.requestedChapterCount, curriculum.sourceStructureId]));
   runtime.chapters.forEach((chapter) => lines.push(insert("curriculum_chapters", ["course_id", "id", "title", "description", "display_order", "color", "outcome"], [chapter.courseId, chapter.id, chapter.title, chapter.description, chapter.order, chapter.color, chapter.outcome])));
   runtime.lessons.forEach((lesson) => lines.push(insert("curriculum_lessons", ["course_id", "id", "chapter_id", "title", "display_order"], [lesson.courseId, lesson.id, lesson.chapterId, lesson.title, lesson.order])));
   runtime.curriculumCoverages.forEach((coverage) => lines.push(insert("curriculum_coverages", ["course_id", "id", "lesson_id", "node_id", "role", "display_order"], [coverage.courseId, coverage.id, coverage.lessonId, coverage.nodeId, coverage.role, coverage.order])));
   runtime.curriculumSequences.forEach((sequence) => lines.push(insert("curriculum_sequences", ["course_id", "id", "source_lesson_id", "target_lesson_id"], [sequence.courseId, sequence.id, sequence.sourceLessonId, sequence.targetLessonId])));
   runtime.assignments.forEach((assignment) => lines.push(insert("course_assignments", [
-    "course_id", "id", "display_order", "title", "description", "requirements", "expected_output", "acceptance_criteria", "mode", "workflow_template_id", "estimated_minutes", "project_contribution"
+    "course_id", "id", "display_order", "title", "description", "requirements", "expected_output", "acceptance_criteria", "mode", "workflow_template_id", "estimated_minutes", "project_contribution", "experience", "inherited_outputs", "dependency_rationale"
   ], [
     assignment.courseId, assignment.id, assignment.order, assignment.title, assignment.description, assignment.requirements,
-    assignment.expectedOutput, assignment.acceptanceCriteria, assignment.mode, assignment.workflowTemplateId, assignment.estimatedMinutes, assignment.projectContribution
+    assignment.expectedOutput, assignment.acceptanceCriteria, assignment.mode, assignment.workflowTemplateId, assignment.estimatedMinutes, assignment.projectContribution,
+    assignment.experience, assignment.inheritedOutputs ?? [], assignment.dependencyRationale
   ])));
   runtime.assignmentCoverages.forEach((coverage) => lines.push(insert("assignment_coverages", ["course_id", "id", "assignment_id", "node_id", "role"], [runtime.course.id, coverage.id, coverage.assignmentId, coverage.nodeId, coverage.role])));
+  runtime.assignmentDependencies.forEach((dependency) => lines.push(insert("assignment_dependencies", ["course_id", "id", "source_assignment_id", "target_assignment_id", "strength"], [dependency.courseId, dependency.id, dependency.sourceAssignmentId, dependency.targetAssignmentId, dependency.strength])));
+  runtime.chapterOutcomes.forEach((outcome) => lines.push(insert("chapter_outcomes", ["course_id", "id", "chapter_id", "title"], [outcome.courseId, outcome.id, outcome.chapterId, outcome.title])));
+  runtime.assignmentOutcomeCompositions.forEach((composition) => lines.push(insert("assignment_outcome_compositions", ["course_id", "id", "assignment_id", "outcome_id"], [runtime.course.id, composition.id, composition.assignmentId, composition.outcomeId])));
+  runtime.finalProjects.forEach((project) => lines.push(insert("final_projects", ["course_id", "id", "title", "description"], [project.courseId, project.id, project.title, project.description])));
+  runtime.finalProjectOutcomeCompositions.forEach((composition) => lines.push(insert("final_project_outcome_compositions", ["course_id", "id", "final_project_id", "outcome_id"], [runtime.course.id, composition.id, composition.finalProjectId, composition.outcomeId])));
   runtime.materials.forEach((material) => {
     const storagePath = material.source?.url.startsWith("/materials/") ? `shared/${material.source.url.slice("/materials/".length)}` : undefined;
     lines.push(insert("materials", ["course_id", "id", "lesson_id", "display_order", "title", "description", "material_type", "storage_path", "page_count", "duration"], [

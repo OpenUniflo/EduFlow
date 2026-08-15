@@ -25,31 +25,13 @@ export function GlobalNav({
   }, []);
 
   const learningItems = [
+    { id: "atlas", to: "/", label: "知识星图首页", description: "探索全局知识体系并创建课程", icon: Network },
+    { id: "courses", to: "/courses", label: "课程中心", description: "课程入口、技能树与课件阅读", icon: BookOpen },
+    { id: "workflows", to: "/workflows", label: "工作流画布", description: "搭建、运行并验收实训任务", icon: Workflow },
     { id: "profile", to: "/profile", label: "个人知识", description: "查看学习状态与能力反馈", icon: GraduationCap },
   ];
   const teachingItems = [{ id: "course-management", to: "/course-management", label: "课程管理", description: "创建、发布与维护课程资产", icon: BookOpen }].filter(() => canManageCourses(session));
   const systemItems = [{
-      id: "atlas",
-      to: "/",
-      label: "知识星图首页",
-      description: "探索全局知识体系并创建课程",
-      icon: Network
-    },
-    {
-      id: "courses",
-      to: "/courses",
-      label: "课程中心",
-      description: "课程入口、技能树与课件阅读",
-      icon: BookOpen
-    },
-    {
-      id: "workflows",
-      to: "/workflows",
-      label: "工作流画布",
-      description: "搭建、运行并验收实训任务",
-      icon: Workflow
-    },
-    {
       id: "admin",
       to: "/admin/domains",
       label: "知识领域管理",

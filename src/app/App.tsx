@@ -14,6 +14,7 @@ import { CourseCenterPage } from "@/features/course/pages/CoursePages";
 import { CourseManagementPage } from "@/features/course/pages/CourseManagementPage";
 import { CourseCreationWorkspacePage } from "@/features/course/pages/CourseCreationWorkspacePage";
 import { CourseGraphPage } from "@/features/course/pages/CourseGraphPage";
+import { AssignmentExperiencePage } from "@/features/course/pages/AssignmentExperiencePage";
 import { LessonPage } from "@/features/material/pages/LessonPage";
 import { ProfileKnowledgePage } from "@/features/profile/pages/ProfileKnowledgePage";
 import { DomainManagementPage } from "@/features/admin/domains/DomainManagementPage";
@@ -28,6 +29,8 @@ import { inferDemoWorkflowTemplateId } from "@/demo/workflows/descriptionWorkflo
 import { DemoWorkflowCodeExporter } from "@/demo/workflows/demoWorkflowCode";
 import { supabaseClient } from "@/shared/api/supabaseClient";
 import { demoCourseCreationScenarioResolver } from "@/demo/scenarios/agenticAiBook/scenario";
+import { demoLessonAssistantProvider } from "@/demo/scenarios/agenticAiBook/lessonAssistantScripts";
+import { demoWorkflowAssessmentProvider } from "@/demo/scenarios/agenticAiBook/workflowAssessment";
 
 function getAuthRedirect(state: unknown) {
   if (!state || typeof state !== "object" || !("from" in state)) return "/";
@@ -167,7 +170,7 @@ export default function App() {
     onGoMessages: () => navigate("/messages"),
     onLogout: logout
   };
-  const allCourseAssignments = useMemo(() => applicationServices.courseRepository.listCourseRuntimes().flatMap((runtime) => runtime.assignments), []);
+  const workflowAssessment = useMemo(() => demoWorkflowAssessmentProvider.resolve(assignmentContext), [assignmentContext]);
   const editor = workflow.routeTemplate && session ? (
     <WorkflowEditorPage
       key={workflow.routeTemplate.id}
@@ -175,7 +178,7 @@ export default function App() {
       navigation={<div className="atlas-canvas-nav"><GlobalNav active="workflows" session={session} onLogout={logout} /></div>}
       onBack={() => navigate("/workflows")}
       onWorkflowGenerated={(templateId) => navigate(`/workflows/${templateId}`)}
-      showAcceptance={allCourseAssignments.some((item) => item.workflowTemplateId === workflow.activeTemplate.id)}
+      assessment={workflowAssessment}
     />
   ) : <NotFoundPage onHome={() => navigate("/")} />;
 
@@ -192,10 +195,11 @@ export default function App() {
           <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="workflows" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />
           <RouterRoute path="/workflows/:workflowId" element={protectedElement(editor)} />
           <RouterRoute path="/courses" element={protectedElement(session ? <CourseCenterPage session={session} onLogout={logout} /> : null)} />
-          <RouterRoute path="/courses/create" element={canManageCourses(session) ? protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} /> : null) : <Navigate to="/courses" replace />} />
+          <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} /> : null)} />
           <RouterRoute path="/course-management" element={canManageCourses(session) ? protectedElement(session ? <CourseManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/courses" replace />} />
           <RouterRoute path="/courses/:courseId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} /> : null)} />
-          <RouterRoute path="/courses/:courseId/materials/:materialId" element={protectedElement(session ? <LessonPage session={session} onLogout={logout} /> : null)} />
+          <RouterRoute path="/courses/:courseId/assignments/:assignmentId" element={protectedElement(session ? <AssignmentExperiencePage session={session} onLogout={logout} /> : null)} />
+          <RouterRoute path="/courses/:courseId/materials/:materialId" element={protectedElement(session ? <LessonPage session={session} onLogout={logout} lessonAssistantProvider={demoLessonAssistantProvider} /> : null)} />
           <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/tasks/*" element={<Navigate to="/" replace />} />
           <RouterRoute path="/profile" element={protectedElement(session ? <ProfileKnowledgePage session={session} onLogout={logout} /> : null)} />

@@ -13,20 +13,22 @@ import { createMaterialKnowledgeContextState, reduceMaterialKnowledgeContextStat
 import { MaterialOutline } from "@/features/material/reader/MaterialOutline";
 import { MaterialRenderer } from "@/features/material/reader/MaterialRenderer";
 import { useMaterialReaderState } from "@/features/material/reader/useMaterialReaderState";
-import { updateMaterialReadingState, useUserCourseState, workflowLaunchUrl } from "@/features/learning/progress/progressService";
+import { updateMaterialReadingState, useUserCourseState } from "@/features/learning/progress/progressService";
 import { applicationServices } from "@/app/services/applicationServices";
 import type { Material, UserCourseState, UserMaterialState } from "@/features/course/types";
 import { sortMaterialSegments } from "@/features/material/materialOrdering";
 import { canDesignCourse } from "@/features/auth/capabilities";
+import type { LessonAssistantProvider, LessonAssistantResult } from "@/features/material/lessonAssistant";
 
 const PERSIST_DELAY_MS = 350;
 
-function MaterialReaderShell({ runtime, material, userState, savedState, session, onLogout }: {
+function MaterialReaderShell({ runtime, material, userState, savedState, session, lessonAssistantProvider, onLogout }: {
   runtime: CourseRuntimeData;
   material: Material;
   userState: UserCourseState;
   savedState?: UserMaterialState;
   session: MockSession;
+  lessonAssistantProvider?: LessonAssistantProvider;
   onLogout(): void;
 }) {
   const navigate = useNavigate();
@@ -41,6 +43,8 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   const [draftSegments, setDraftSegments] = useState(material.segments);
   const [undoSegments, setUndoSegments] = useState(material.segments);
   const [assistantNote, setAssistantNote] = useState("选择动作后，中央课件会发生真实变化。");
+  const [assistantInput, setAssistantInput] = useState("");
+  const [assistantPreview, setAssistantPreview] = useState<LessonAssistantResult | null>(null);
   const renderedMaterial = useMemo(() => ({ ...material, segments: draftSegments }), [draftSegments, material]);
   const persistTimerRef = useRef<number | null>(null);
   const viewedSegmentIdsRef = useRef(new Set(savedState?.viewedSegmentIds ?? savedState?.completedSegmentIds ?? []));
@@ -99,11 +103,12 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
 
   const previous = orderedSegments[activeIndex - 1];
   const next = orderedSegments[activeIndex + 1];
-  function applyAssistant(kind: "simple" | "example" | "timeout" | "alignment") {
+  function applyAssistantPreview() {
+    if (!assistantPreview?.mutation) return;
     setUndoSegments(draftSegments);
-    const copy = kind === "simple" ? ["一句话理解", "并行像三位研究员同时查资料；Merge 像主编等待证据到齐。"] : kind === "example" ? ["案例：三路证据汇合", "Web、Paper 与 RAG 可以乱序完成，Merge 按来源身份收齐 3/3。"] : ["Worker 超时与 Partial Failure", "单个 Worker 超时后执行有界 Retry；耗尽后走 Fallback，并由 Verifier 决定是否足够结算。"];
-    setDraftSegments((items) => [...items, { id: `session-${kind}-${Date.now()}`, order: items.length + 1, title: copy[0], section: kind === "timeout" || kind === "alignment" ? "Warning / Failure Case" : "Example", content: { lead: copy[1], code: kind === "timeout" || kind === "alignment" ? "Candidate → Verifier → Verified Success → Atomic Settle → Cancel Remaining Workers" : undefined, visual: kind === "timeout" || kind === "alignment" ? "decision" : "overview" } }]);
-    setAssistantNote(kind === "alignment" ? "检测到实训要求 Partial Failure，但课件解释不足；已补充对齐内容。" : "修改已应用到当前 session 的 Lesson draft。切回学习模式仍然可见。" );
+    setDraftSegments((items) => [...items, { ...assistantPreview.mutation!.segment, id:`${assistantPreview.mutation!.segment.id}-${Date.now()}`, order:items.length+1 }]);
+    setAssistantNote("修改已应用到当前 session 的 Lesson draft。切回学习模式仍然可见。");
+    setAssistantPreview(null);
   }
 
   return <main className={`atlas-lesson-page material-reader-current ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`}>
@@ -119,13 +124,13 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
     <MaterialRenderer material={renderedMaterial} activeSegmentId={reader.activeSegmentId} zoom={zoom} navigationRequest={reader.navigationRequest} onVisibleSegmentChange={reader.observeSegment} onNavigationSettled={reader.settleNavigation} />
     <MaterialKnowledgeContext projection={projection} selectedKnowledgeId={knowledgeContextState.selectedKnowledgeId} pinnedKnowledgeId={knowledgeContextState.pinnedKnowledgeId} effectiveKnowledge={effectiveKnowledge} knowledgeAssignmentContexts={knowledgeAssignmentContexts} collapsed={rightCollapsed} onToggle={() => setRightCollapsed((value) => !value)} onSelect={(nodeId) => dispatchKnowledgeContext({ type: "select", nodeId })} onTogglePin={() => dispatchKnowledgeContext(knowledgeContextState.pinnedKnowledgeId ? { type: "unpin", currentPagePrimaryKnowledgeId } : { type: "pin" })} onAssignment={setActiveAssignmentId} />
     <MaterialControls current={activeIndex + 1} total={draftSegments.length} zoom={zoom} onZoom={setZoom} onFit={() => setZoom(1)} onPrevious={() => previous && reader.navigateToSegment(previous.id, "previous", "smooth")} onNext={() => next && reader.navigateToSegment(next.id, "next", "smooth")} />
-    {experience === "design" && material.type !== "pdf" ? <aside className="lesson-ai-assistant glass-v2"><strong>AI 课件助手</strong><p>{assistantNote}</p><button onClick={() => applyAssistant("simple")}>解释得简单一点</button><button onClick={() => applyAssistant("example")}>增加案例</button><button onClick={() => applyAssistant("timeout")}>增加 Worker 超时案例</button><button onClick={() => applyAssistant("alignment")}>检查课件与实训是否一致</button><button className="undo" onClick={() => { setDraftSegments(undoSegments); setAssistantNote("已撤销本次修改。"); }}>撤销本次修改</button><small>Prototype · 固定意图映射为可应用的 Lesson mutation</small></aside> : null}
+    {experience === "design" && lessonAssistantProvider && lessonAssistantProvider.listActions(material).length ? <aside className="lesson-ai-assistant glass-v2"><strong>AI 课件助手</strong><p>{assistantNote}</p>{lessonAssistantProvider.listActions(material).map((action)=><button key={action.id} onClick={() => {const result=lessonAssistantProvider.resolveAction(material,action.id);setAssistantPreview(result);setAssistantNote(result.message);}}>{action.label}</button>)}<div className="lesson-assistant-input"><input value={assistantInput} onChange={(event)=>setAssistantInput(event.target.value)} placeholder="描述你想怎样修改课件…" /><button onClick={()=>{const result=lessonAssistantProvider.resolveText(material,assistantInput);setAssistantPreview(result);setAssistantNote(result.message);}}>发送</button></div>{assistantPreview?.mutation ? <div className="lesson-assistant-preview"><strong>修改预览</strong><span>{assistantPreview.mutation.segment.title}</span><p>{assistantPreview.mutation.segment.content?.lead}</p><button onClick={applyAssistantPreview}>应用修改</button></div> : null}<button className="undo" onClick={() => { setDraftSegments(undoSegments); setAssistantNote("已撤销本次修改。"); setAssistantPreview(null); }}>撤销本次修改</button><small>Prototype · 固定意图映射为可预览、应用和撤销的 Lesson mutation</small></aside> : null}
 
-    {activeAssignment ? <div className="atlas-workflow-modal" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveAssignmentId(null); }}><article className="atlas-workflow-modal-card glass-v2"><button className="atlas-modal-close" onClick={() => setActiveAssignmentId(null)} aria-label="关闭实训详情"><X size={18} /></button><span className="atlas-kicker">COURSE ASSIGNMENT</span><h2>{activeAssignment.assignment.title}</h2><p>{activeAssignment.assignment.description}</p><section><h3>任务要求</h3>{activeAssignment.assignment.requirements.map((requirement) => <div key={requirement}><Check size={13} />{requirement}</div>)}</section><section><h3>预期成果</h3><p>{activeAssignment.assignment.expectedOutput}</p></section><div className="atlas-modal-actions"><button className="atlas-secondary" onClick={() => setActiveAssignmentId(null)}>关闭</button>{activeAssignment.assignment.mode === "workflow" && activeAssignment.assignment.workflowTemplateId ? <button className="atlas-primary" onClick={() => navigate(workflowLaunchUrl({ courseId: runtime.course.id, assignmentId: activeAssignment.assignment.id, workflowTemplateId: activeAssignment.assignment.workflowTemplateId! }))}>进入工作流 <ArrowRight size={15} /></button> : null}</div></article></div> : null}
+    {activeAssignment ? <div className="atlas-workflow-modal" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveAssignmentId(null); }}><article className="atlas-workflow-modal-card glass-v2"><button className="atlas-modal-close" onClick={() => setActiveAssignmentId(null)} aria-label="关闭实训详情"><X size={18} /></button><span className="atlas-kicker">COURSE ASSIGNMENT</span><h2>{activeAssignment.assignment.title}</h2><p>{activeAssignment.assignment.description}</p>{activeAssignment.assignment.inheritedOutputs?.length ? <section><h3>已继承成果</h3>{activeAssignment.assignment.inheritedOutputs.map((item)=><div key={item}><Check size={13}/>{item}</div>)}</section>:null}<section><h3>任务要求</h3>{activeAssignment.assignment.requirements.map((requirement) => <div key={requirement}><Check size={13} />{requirement}</div>)}</section><section><h3>预期成果</h3><p>{activeAssignment.assignment.expectedOutput}</p></section><div className="atlas-modal-actions"><button className="atlas-secondary" onClick={() => setActiveAssignmentId(null)}>关闭</button><button className="atlas-primary" onClick={() => navigate(`/courses/${runtime.course.id}/assignments/${activeAssignment.assignment.id}`)}>进入实训 <ArrowRight size={15} /></button></div></article></div> : null}
   </main>;
 }
 
-export function LessonPage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
+export function LessonPage({ session, onLogout, lessonAssistantProvider }: { session: MockSession; onLogout: () => void; lessonAssistantProvider?: LessonAssistantProvider }) {
   const navigate = useNavigate();
   const { courseId = "", materialId = "" } = useParams();
   const runtime = applicationServices.courseRepository.getCourse(courseId);
@@ -136,5 +141,5 @@ export function LessonPage({ session, onLogout }: { session: MockSession; onLogo
     return <main className="atlas-lesson-page material-reader-current"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>课件不存在</h1><p>该课件不存在，或不属于课程 “{courseId}”。</p><button className="atlas-primary" onClick={() => navigate(runtime ? `/courses/${runtime.course.id}` : "/courses")}>返回课程</button></section></main>;
   }
 
-  return <MaterialReaderShell key={`${session.userId}:${runtime.course.id}:${material.id}`} runtime={runtime} material={material} userState={userState} savedState={userState.materialStates[material.id]} session={session} onLogout={onLogout} />;
+  return <MaterialReaderShell key={`${session.userId}:${runtime.course.id}:${material.id}`} runtime={runtime} material={material} userState={userState} savedState={userState.materialStates[material.id]} session={session} lessonAssistantProvider={lessonAssistantProvider} onLogout={onLogout} />;
 }

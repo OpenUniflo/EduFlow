@@ -7,9 +7,11 @@ import knowledgeHandler from "../api/knowledge";
 import materialsHandler from "../api/materials";
 import progressHandler from "../api/progress";
 import { assertLocalSupabaseUrl } from "./local-supabase";
+import { demoUserCourseStateSeed } from "../src/demo/users/demoUserCourseState.seed";
 
 const ADMIN_EMAIL = "local-admin@eduflow.local";
 const STUDENT_EMAIL = "local-student@eduflow.local";
+const TEACHER_EMAIL = "local-teacher@eduflow.local";
 const PLACEHOLDER_PASSWORD = "replace-with-local-password";
 
 const ADMIN_KNOWLEDGE = [
@@ -159,6 +161,17 @@ async function verifyKnowledgePrerequisites(server: LocalServer) {
   }
 }
 
+async function seedGoldenProgress(server: LocalServer, userIds: string[]) {
+  const updatedAt = new Date().toISOString();
+  for (const userId of userIds) {
+    const state = demoUserCourseStateSeed(userId, "agentic-ai-golden");
+    const course = await server.from("user_course_states").upsert({ user_id: userId, course_id: state.courseId, recent_lesson_id: state.recentLessonId, updated_at: updatedAt });
+    assert.ifError(course.error);
+    const assignments = await server.from("user_assignment_states").upsert(Object.values(state.assignmentStates).map((assignment) => ({ user_id: userId, course_id: state.courseId, assignment_id: assignment.assignmentId, status: assignment.status, progress: assignment.progress, updated_at: updatedAt })));
+    assert.ifError(assignments.error);
+  }
+}
+
 export async function bootstrapLocalUsers() {
   const supabaseUrl = assertLocalSupabaseUrl(required("SUPABASE_URL"));
   const secretKey = required("SUPABASE_SECRET_KEY");
@@ -167,20 +180,29 @@ export async function bootstrapLocalUsers() {
   const adminPassword = acceptancePassword("LOCAL_ADMIN_PASSWORD");
   const studentEmail = acceptanceEmail("LOCAL_STUDENT_EMAIL", STUDENT_EMAIL);
   const studentPassword = acceptancePassword("LOCAL_STUDENT_PASSWORD");
+  const teacherEmail = (process.env.LOCAL_TEACHER_EMAIL ?? TEACHER_EMAIL).trim().toLowerCase();
+  if (teacherEmail !== TEACHER_EMAIL) throw new Error(`LOCAL_TEACHER_EMAIL must be ${TEACHER_EMAIL}`);
+  const teacherPassword = process.env.LOCAL_TEACHER_PASSWORD
+    ? acceptancePassword("LOCAL_TEACHER_PASSWORD")
+    : adminPassword;
   const server = createLocalServer(supabaseUrl, secretKey);
   const nodeIds = ADMIN_KNOWLEDGE.map((state) => state.nodeId);
   await verifyKnowledgePrerequisites(server);
 
   const admin = await ensureUser(server, adminEmail, adminPassword, "Local Admin");
   const student = await ensureUser(server, studentEmail, studentPassword, "Local Student");
+  const teacher = await ensureUser(server, teacherEmail, teacherPassword, "Local Teacher");
   assert.ok(admin.email_confirmed_at);
   assert.ok(student.email_confirmed_at);
+  assert.ok(teacher.email_confirmed_at);
 
   const profiles = await server.from("profiles").upsert([
     { id: admin.id, display_name: "Local Admin", role: "admin", capabilities: ["global-domain-admin"] },
-    { id: student.id, display_name: "Local Student", role: "student", capabilities: [] }
+    { id: student.id, display_name: "Local Student", role: "student", capabilities: [] },
+    { id: teacher.id, display_name: "Local Teacher", role: "teacher", capabilities: [] }
   ]);
   assert.ifError(profiles.error);
+  await seedGoldenProgress(server, [admin.id, student.id, teacher.id]);
 
   const knowledgeStates = await server.from("user_knowledge_states").upsert(ADMIN_KNOWLEDGE.map((state) => ({
     user_id: admin.id,
@@ -197,6 +219,7 @@ export async function bootstrapLocalUsers() {
 
   const adminToken = await signIn(supabaseUrl, publishableKey, adminEmail, adminPassword, admin.id);
   const studentToken = await signIn(supabaseUrl, publishableKey, studentEmail, studentPassword, student.id);
+  const teacherToken = await signIn(supabaseUrl, publishableKey, teacherEmail, teacherPassword, teacher.id);
   const knowledge = await invoke(knowledgeHandler, "GET", adminToken);
   assertStatus(knowledge, 200, "Local Admin Knowledge read");
   const governance = (knowledge.body as { governance?: unknown }).governance;
@@ -206,6 +229,7 @@ export async function bootstrapLocalUsers() {
   const adminProgressNodeIds = new Set((adminProgress.body as { userKnowledge: Array<{ nodeId: string }> }).userKnowledge.map((state) => state.nodeId));
   assert.ok(nodeIds.every((nodeId) => adminProgressNodeIds.has(nodeId)), "Local Admin Personal Atlas states must be available through the Progress API");
   assertStatus(await invoke(progressHandler, "GET", studentToken), 200, "Local Student progress read");
+  assertStatus(await invoke(progressHandler, "GET", teacherToken), 200, "Local Teacher progress read");
 
   assertStatus(await invoke(domainsHandler, "PUT", adminToken, governance), 200, "Local Admin Domain mutation");
   assertStatus(await invoke(domainsHandler, "PUT", studentToken, governance), 403, "Local Student Domain mutation denial");
@@ -219,18 +243,24 @@ export async function bootstrapLocalUsers() {
   assertStatus(await invoke(materialsHandler, "POST", adminToken, uploadRequest), 200, "Local Admin Material authorization");
   assertStatus(await invoke(materialsHandler, "POST", studentToken, uploadRequest), 403, "Local Student Material authorization denial");
 
-  const verifiedProfiles = await server.from("profiles").select("id, display_name, role, capabilities").in("id", [admin.id, student.id]);
+  const verifiedProfiles = await server.from("profiles").select("id, display_name, role, capabilities").in("id", [admin.id, student.id, teacher.id]);
   assert.ifError(verifiedProfiles.error);
   assert.deepEqual(verifiedProfiles.data?.find((profile) => profile.id === admin.id), {
     id: admin.id,
     display_name: "Local Admin",
-    role: "student",
+    role: "admin",
     capabilities: ["global-domain-admin"]
   });
   assert.deepEqual(verifiedProfiles.data?.find((profile) => profile.id === student.id), {
     id: student.id,
     display_name: "Local Student",
     role: "student",
+    capabilities: []
+  });
+  assert.deepEqual(verifiedProfiles.data?.find((profile) => profile.id === teacher.id), {
+    id: teacher.id,
+    display_name: "Local Teacher",
+    role: "teacher",
     capabilities: []
   });
   const verifiedStates = await server.from("user_knowledge_states").select("node_id").eq("user_id", admin.id).in("node_id", nodeIds);
@@ -240,9 +270,11 @@ export async function bootstrapLocalUsers() {
   const finalUsers = await listUsers(server);
   assert.equal(finalUsers.filter((user) => user.email?.toLowerCase() === adminEmail).length, 1);
   assert.equal(finalUsers.filter((user) => user.email?.toLowerCase() === studentEmail).length, 1);
+  assert.equal(finalUsers.filter((user) => user.email?.toLowerCase() === teacherEmail).length, 1);
 
   console.log(`Local admin ready: ${adminEmail}`);
   console.log(`Local student ready: ${studentEmail}`);
+  console.log(`Local teacher ready: ${teacherEmail}`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
