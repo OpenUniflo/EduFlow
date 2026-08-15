@@ -11,3 +11,7 @@ export function canManageCourses(session: Pick<MockSession, "role" | "capabiliti
 export function canDesignCourse(session: Pick<MockSession, "role" | "capabilities"> | null | undefined) {
   return Boolean(session && (session.role === "teacher" || session.role === "admin" || session.capabilities.includes("global-domain-admin")));
 }
+
+export function canUseCourseDesignFeatures(session: Pick<MockSession, "role" | "capabilities"> | null | undefined, experience: "learn" | "design") {
+  return experience === "design" && canDesignCourse(session);
+}

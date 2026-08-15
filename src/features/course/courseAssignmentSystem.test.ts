@@ -604,6 +604,17 @@ describe("Material and progress generalization", () => {
 });
 
 describe("Course Assignment layout and Drawer", () => {
+  it("aggregates multiple Segment coverages into one Material context", () => {
+    const node = pythonGraph.knowledgeNodes.find((candidate) => {
+      const coverageCounts = candidate.materialContexts.map((context) => python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === candidate.id && coverage.materialId === context.materialId).length);
+      return coverageCounts.some((count) => count > 1);
+    })!;
+    const context = node.materialContexts.find((candidate) => python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === node.id && coverage.materialId === candidate.materialId).length > 1)!;
+    const rawCoverages = python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === node.id && coverage.materialId === context.materialId);
+    expect(node.materialContexts.filter((candidate) => candidate.materialId === context.materialId)).toHaveLength(1);
+    expect(context.segmentIds).toEqual(Array.from(new Set(rawCoverages.map((coverage) => coverage.segmentId))));
+  });
+
   it("includes the companion offset in one stable footprint", () => {
     expect(ATOMIC_FOOTPRINT_WIDTH).toBe(KNOWLEDGE_CARD_WIDTH + COMPANION_OFFSET_X);
     expect(ATOMIC_FOOTPRINT_HEIGHT).toBe(KNOWLEDGE_CARD_HEIGHT + COMPANION_OFFSET_Y);

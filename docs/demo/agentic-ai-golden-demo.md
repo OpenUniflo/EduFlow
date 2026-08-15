@@ -35,6 +35,8 @@
 
 教师和管理员还可在同一技能树、同一 selected anchor 与 viewport 上进入课程设计模式，用 AI 修改 Lesson；Student 共享建课和学习能力，但没有课程管理或课程设计权限。
 
+课程设计模式还提供独立于 Drawer 的页面级 AI 课程助手：右下角悬浮入口支持 hover 预览和 click 固定对话，上下文随当前 Course / Chapter / Knowledge / Assignment 自动更新。该能力通过通用 Feature contract 由 App composition root 注入 Golden scripted provider，仅 Teacher/Admin 的课程设计模式可见；Lesson 设计页的 AI 课件助手仍是独立能力。
+
 ## 4. 角色与导航
 
 - 学生：学习

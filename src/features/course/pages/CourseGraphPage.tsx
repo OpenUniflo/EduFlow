@@ -5,6 +5,8 @@ import type { MockSession } from "@/features/auth/types";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import { assignmentProjectionForNode, buildChapterAssignmentProjection, detailFacetForMode, flowIdForAnchor, type SelectedAnchor } from "@/features/course/courseSelection";
 import { CourseGraph, type CourseGraphHandle } from "@/features/course/graph/CourseGraph";
+import { CourseDesignAssistant } from "@/features/course/components/CourseDesignAssistant";
+import { buildCourseDesignAssistantContext, type CourseDesignAssistantProvider } from "@/features/course/courseDesignAssistant";
 import type { CourseGraphView } from "@/features/course/graph/courseGraphProjection";
 import { buildCourseGraphData } from "@/features/course/runtime/courseRuntime";
 import { useUserCourseState } from "@/features/learning/progress/progressService";
@@ -13,7 +15,7 @@ import { applicationServices } from "@/app/services/applicationServices";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { buildMaterialDeepLink } from "@/features/material/materialNavigation";
 import { sortMaterials } from "@/features/material/materialOrdering";
-import { canDesignCourse } from "@/features/auth/capabilities";
+import { canDesignCourse, canUseCourseDesignFeatures } from "@/features/auth/capabilities";
 
 const { courseRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
@@ -24,7 +26,7 @@ function lessonsForChapter(runtime: NonNullable<ReturnType<typeof courseReposito
   return runtime.lessons.filter((lesson) => lesson.chapterId === chapterId).sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
 }
 
-export function CourseGraphPage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
+export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvider }: { session: MockSession; onLogout: () => void; courseDesignAssistantProvider?:CourseDesignAssistantProvider }) {
   const navigate = useNavigate();
   const { courseId = "", chapterId: routeChapterId } = useParams();
   const runtime = courseRepository.getCourse(courseId);
@@ -51,24 +53,26 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
   const [legendCollapsed, setLegendCollapsed] = useState(false);
   const [toast, setToast] = useState(() => new URLSearchParams(window.location.search).has("created"));
   const [designActionNotice, setDesignActionNotice] = useState<string | null>(null);
+  const designEnabled = canUseCourseDesignFeatures(session,experience);
   const selectedChapter = selectedAnchor?.kind === "chapter" ? courseChapters.find((item) => item.id === selectedAnchor.id) ?? null : null;
   const selectedNode = selectedAnchor?.kind === "knowledge" ? courseSkillTreeNodes.find((item) => item.id === selectedAnchor.id) ?? null : null;
   const selectedFlowId = flowIdForAnchor(selectedAnchor);
   const assignmentProjection = selectedNode && detailFacet === "assignment" ? assignmentProjectionForNode(selectedNode, activeAssignmentId) : null;
   const chapterAssignment = selectedChapter && detailFacet === "assignment" ? buildChapterAssignmentProjection(selectedChapter, courseSkillTreeNodes) : null;
   const drawerOpen = Boolean(selectedAnchor || materialsOpen);
-  const drawerMaterials = useMemo(() => {
+  const drawerMaterialItems = useMemo(() => {
     if (!runtime) return [];
     if (selectedNode) return selectedNode.materialContexts.flatMap((context) => {
       const material = runtime.materials.find((item) => item.id === context.materialId);
-      return material ? [material] : [];
+      return material ? [{material,context}] : [];
     });
     if (selectedChapter) {
       const lessonIds = new Set(lessonsForChapter(runtime, selectedChapter.id).map((lesson) => lesson.id));
-      return orderedMaterials.filter((material) => lessonIds.has(material.lessonId));
+      return orderedMaterials.filter((material) => lessonIds.has(material.lessonId)).map((material) => ({material,context:undefined}));
     }
-    return orderedMaterials;
+    return orderedMaterials.map((material) => ({material,context:undefined}));
   }, [orderedMaterials, runtime, selectedChapter, selectedNode]);
+  const assistantContext = useMemo(() => runtime && graphData ? buildCourseDesignAssistantContext(runtime,graphData,selectedAnchor,detailFacet,activeAssignmentId) : null,[activeAssignmentId,detailFacet,graphData,runtime,selectedAnchor]);
   const routeChapter = routeChapterId ? courseChapters.find((chapter) => chapter.id === routeChapterId) : null;
   const invalidChapter = Boolean(runtime && routeChapterId && !routeChapter);
 
@@ -184,6 +188,18 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
     return buildMaterialDeepLink({ courseId: runtime!.course.id, materialId, segmentId });
   }
 
+  function relatedMaterialsPanel() {
+    if (!drawerMaterialItems.length) return <div className="atlas-related-material-empty"><FileText size={22}/><strong>{designEnabled ? "暂未关联课件" : "暂未关联学习材料"}</strong>{designEnabled ? <span>可使用下方 Prototype 操作选择课程课件。</span> : null}</div>;
+    return <div className={`atlas-related-material-list ${designEnabled ? "design" : "learn"}`}>{drawerMaterialItems.map(({material,context}) => {
+      const mappings = selectedNode ? runtime!.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === selectedNode.id && coverage.materialId === material.id).map((coverage) => ({...coverage,segment:material.segments.find((segment) => segment.id === coverage.segmentId)})) : [];
+      return <article className="atlas-related-material-card" key={material.id}>
+        <FileText size={19}/><div className="atlas-related-material-copy"><strong>{material.title}</strong>{material.description ? <p>{material.description}</p> : null}<small>{material.duration ?? "自定进度"}</small>
+          {designEnabled ? <div className="atlas-related-material-mapping"><span>Material · {material.type}</span>{selectedNode ? <><span>关联段落 · {context?.segmentIds.length ?? mappings.length}</span>{mappings.map((mapping) => <code key={mapping.id}>{mapping.segment?.title ?? mapping.segmentId} · {mapping.role}</code>)}</> : <span>内容段落 · {material.segments.length}</span>}</div> : null}
+        </div><div className="atlas-related-material-actions"><button onClick={() => navigate(materialLink(material.id))}>查看 <ArrowRight size={13}/></button>{designEnabled && selectedNode ? <button onClick={() => setDesignActionNotice("Prototype · 映射编辑将在正式课程编辑器中持久化；当前 Demo 展示 Material / Segment / Role inspection。")}>编辑映射</button> : null}</div>
+      </article>;
+    })}</div>;
+  }
+
   function assignmentGroup(node: CourseSkillTreeNode) {
     return <><section className="atlas-drawer-section atlas-assignment-group"><h3>{node.title} · 实训</h3><div className="atlas-drawer-progress-meta"><span>{node.assignmentCount} 项实训</span><strong>{node.assignmentStateSummary.progress}%</strong></div><div className="atlas-drawer-progress"><i style={{ width: `${node.assignmentStateSummary.progress}%` }} /></div><div className="atlas-assignment-switcher">{node.assignmentContexts.map((context, index) => <button key={context.assignmentId} onClick={() => setActiveAssignmentId(context.assignmentId)}><span>{String(index + 1).padStart(2, "0")}</span><strong>{context.assignment.title}</strong><small>{assignmentStatusLabel[context.state?.status ?? "not-started"]}</small><ArrowRight size={13} /></button>)}</div></section></>;
   }
@@ -266,11 +282,12 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
         <button className="atlas-panel-close" onClick={() => { setSelectedAnchor(null); setActiveAssignmentId(null); }} aria-label="关闭详情"><X size={17} /></button>
         <div className="atlas-drawer-head"><span>{experience === "design" ? "课程设计模式 · " : "学习模式 · "}{selectedChapter ? `课程篇章 · ${detailFacet === "knowledge" ? "Knowledge Facet" : "Assignment Aggregate"}` : `原子知识位置 · ${detailFacet === "knowledge" ? "Knowledge Facet" : "Assignment Facet"}`}</span><h2>{drawerTitle}</h2><div><i className="atlas-pill">{selectedChapter ? `${selectedChapter.lessonCount} 课` : selectedNode ? `第 ${selectedNode.lesson} 课` : ""}</i><i className="atlas-pill success">{drawerStatus}</i></div></div>
         {detailFacet === "knowledge" ? <div className="atlas-drawer-tabs"><button className={drawerTab === "detail" ? "active" : ""} onClick={() => setDrawerTab("detail")}>节点详情</button><button className={drawerTab === "materials" ? "active" : ""} onClick={() => setDrawerTab("materials")}>关联课件</button></div> : null}
-        <div className="atlas-drawer-body">{detailFacet === "knowledge" && drawerTab === "materials" ? <div className="atlas-drawer-material-list">{drawerMaterials.length ? drawerMaterials.map((material) => { const context = selectedNode?.materialContexts.find((item) => item.materialId === material.id); return <button key={material.id} onClick={() => navigate(materialLink(material.id))}><FileText size={18} /><div><strong>{material.title}</strong><span>{context ? `第 ${context.primarySegmentOrder} 段 · ${context.primaryRole}` : `${material.type} · ${material.segments.length} 个内容段`}</span></div><ArrowRight size={14} /></button>; }) : <p>暂无关联课件。</p>}</div> : selectedChapter ? detailFacet === "knowledge" ? chapterKnowledgeFacet(selectedChapter) : chapterAssignmentFacet(selectedChapter) : selectedNode ? detailFacet === "knowledge" ? atomicKnowledgeFacet(selectedNode) : assignmentProjection?.kind === "group" ? assignmentGroup(selectedNode) : assignmentProjection?.kind === "detail" ? assignmentDetail(assignmentProjection.context.assignment, assignmentProjection.context, selectedNode, assignmentProjection.canReturnToGroup) : null : null}</div>
-        <div className="atlas-drawer-actions"><button className="atlas-secondary" onClick={() => selectedFlowId && graphRef.current?.focus(selectedFlowId)}><Target size={15} />定位节点</button>{selectedChapter ? <button className="atlas-primary" onClick={() => focusChapter(selectedChapter)}>原位展开篇章</button> : selectedNode && detailFacet === "knowledge" && drawerMaterials.length === 1 ? <button className="atlas-primary" onClick={() => navigate(materialLink(drawerMaterials[0].id))}><FileText size={15} />查看课件详情</button> : selectedNode && detailFacet === "knowledge" && drawerMaterials.length > 1 ? <button className="atlas-primary" onClick={() => setDrawerTab("materials")}><FileText size={15} />选择关联课件</button> : assignmentProjection?.kind === "detail" ? <button className="atlas-primary" onClick={() => navigate(`/courses/${runtime.course.id}/assignments/${assignmentProjection.context.assignment.id}`)}><Settings2 size={15} />{experience === "design" ? "预览实训" : "开始 / 继续实训"}</button> : null}</div>
+        <div className="atlas-drawer-body">{detailFacet === "knowledge" && drawerTab === "materials" ? relatedMaterialsPanel() : selectedChapter ? detailFacet === "knowledge" ? chapterKnowledgeFacet(selectedChapter) : chapterAssignmentFacet(selectedChapter) : selectedNode ? detailFacet === "knowledge" ? atomicKnowledgeFacet(selectedNode) : assignmentProjection?.kind === "group" ? assignmentGroup(selectedNode) : assignmentProjection?.kind === "detail" ? assignmentDetail(assignmentProjection.context.assignment, assignmentProjection.context, selectedNode, assignmentProjection.canReturnToGroup) : null : null}</div>
+        <div className="atlas-drawer-actions"><button className="atlas-secondary" onClick={() => selectedFlowId && graphRef.current?.focus(selectedFlowId)}><Target size={15} />定位节点</button>{detailFacet === "knowledge" && drawerTab === "materials" ? designEnabled && selectedNode ? <button className="atlas-primary" onClick={() => setDesignActionNotice("Prototype · 课件选择与持久化映射将在正式课程编辑器中完成。")}>＋ 选择关联课件</button> : null : selectedChapter ? <button className="atlas-primary" onClick={() => focusChapter(selectedChapter)}>原位展开篇章</button> : selectedNode && detailFacet === "knowledge" && drawerMaterialItems.length === 1 ? <button className="atlas-primary" onClick={() => navigate(materialLink(drawerMaterialItems[0].material.id))}><FileText size={15} />查看课件详情</button> : selectedNode && detailFacet === "knowledge" && drawerMaterialItems.length > 1 ? <button className="atlas-primary" onClick={() => setDrawerTab("materials")}><FileText size={15} />{designEnabled ? "选择关联课件" : "查看关联课件"}</button> : selectedNode && detailFacet === "knowledge" && !drawerMaterialItems.length && designEnabled ? <button className="atlas-primary" onClick={() => setDesignActionNotice("Prototype · 课件选择与持久化映射将在正式课程编辑器中完成。")}>＋ 选择关联课件</button> : assignmentProjection?.kind === "detail" ? <button className="atlas-primary" onClick={() => navigate(`/courses/${runtime.course.id}/assignments/${assignmentProjection.context.assignment.id}`)}><Settings2 size={15} />{experience === "design" ? "预览实训" : "开始 / 继续实训"}</button> : null}</div>
       </aside> : null}
 
       {materialsOpen ? <aside className="atlas-detail-drawer atlas-materials-drawer open"><button className="atlas-panel-close" onClick={() => setMaterialsOpen(false)} aria-label="关闭课件列表"><X size={17} /></button><div className="atlas-drawer-head"><span>课程资料</span><h2>全部关联课件</h2><div><i className="atlas-pill">{orderedMaterials.length} 份课件</i><i className="atlas-pill">课程级</i></div></div><div className="atlas-drawer-body"><p>课件、Knowledge 与 Assignment 通过覆盖数据动态关联。</p>{orderedMaterials.map((material) => <button className="atlas-material-card" key={material.id} onClick={() => navigate(materialLink(material.id, null))}><div><span>{material.type.toUpperCase()} · {material.segments.length} 个内容段</span><strong>{material.title}</strong><p>{material.description}</p></div><div className="atlas-course-meta"><span>{material.duration ?? "自定进度"}</span></div></button>)}</div>{orderedMaterials.length ? <div className="atlas-drawer-actions"><button className="atlas-primary" onClick={() => { const recent = Object.values(userCourseState.materialStates).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.materialId; const material = orderedMaterials.find((item) => item.id === recent) ?? orderedMaterials[0]; navigate(materialLink(material.id, null)); }}>打开最近课件 <ArrowRight size={15} /></button></div> : null}</aside> : null}
+      {designEnabled && assistantContext ? <CourseDesignAssistant context={assistantContext} provider={courseDesignAssistantProvider} drawerOpen={drawerOpen}/> : null}
       {toast ? <div className="atlas-toast"><Sparkles size={16} />{view === "focused" ? "篇章已在宏观位置展开，其他篇章保持折叠" : "课程图已更新"}</div> : null}
       {designActionNotice ? <div className="atlas-toast" role="status"><Sparkles size={16} />{designActionNotice}</div> : null}
     </main>
