@@ -42,6 +42,12 @@ Vercel Preview -> Vercel Functions -> Hosted Supabase
 
 Hosted schema changes use the same committed files under `supabase/migrations`. Reviewed migrations may be applied to Hosted only after `pnpm db:reset` and local verification succeed. Hosted Supabase must never be reset as part of ordinary development.
 
+Vercel deployment and Hosted Supabase migration deployment are separate operations. Before a Production deployment is considered complete:
+
+1. Compare committed migrations with Hosted using `supabase migration list --linked` and `supabase db push --linked --dry-run`.
+2. Review every pending migration for destructive operations, then apply the verified difference with `supabase db push --linked`; do not reset, reseed, or manually repair migration history.
+3. Re-run the migration comparison and perform an authenticated Production smoke test, including `/api/knowledge` and `/api/courses`, before accepting the deployment.
+
 ## Environment boundary
 
 The browser bundle may contain only:

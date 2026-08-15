@@ -34,6 +34,7 @@ Additional validation:
 - [ ] No schema change.
 - [ ] Schema changed through committed Supabase migration(s).
 - [ ] Local Supabase migration/reset path verified when applicable.
+- [ ] Hosted migration history/dry-run checked separately from Vercel Production deployment when applicable.
 - [ ] Existing RLS/ownership boundaries preserved.
 - [ ] No client secret exposure introduced.
 

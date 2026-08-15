@@ -69,7 +69,8 @@ export default function App() {
         setSession({ userId: authSession.user.id, name, email: authSession.user.email ?? "", role: "student", capabilities: profile.capabilities, createdAt: authSession.user.created_at });
         setWorkflowVersion((version) => version + 1);
       } catch (error) {
-        setStartupError(error instanceof Error ? error.message : "数据加载失败");
+        console.error("Post-login application initialization failed", error);
+        setStartupError("账号已登录，但应用数据加载失败，请稍后重试。");
       } finally {
         setReady(true);
       }
@@ -123,8 +124,18 @@ export default function App() {
 
   async function signIn(input: { email: string; password: string }) {
     const { data, error } = await supabaseClient.auth.signInWithPassword(input);
-    if (error || !data.session) throw new Error(error?.message ?? "登录失败");
-    const [profile] = await Promise.all([hydrateApplicationServices(data.user.id), workflowPersistence.hydrate()]);
+    if (error || !data.session) {
+      console.error("Authentication failed", error);
+      const invalidCredentials = error?.code === "invalid_credentials" || error?.message === "Invalid login credentials";
+      throw new Error(invalidCredentials ? "邮箱或密码错误" : "登录失败，请稍后重试。");
+    }
+    let profile: Awaited<ReturnType<typeof hydrateApplicationServices>>;
+    try {
+      [profile] = await Promise.all([hydrateApplicationServices(data.user.id), workflowPersistence.hydrate()]);
+    } catch (initializationError) {
+      console.error("Post-login application initialization failed", initializationError);
+      throw new Error("账号已登录，但应用数据加载失败，请稍后重试。");
+    }
     const name = profile.displayName || data.user.email?.split("@")[0] || "学习者";
     setSession({ userId: data.user.id, name, email: data.user.email ?? "", role: "student", capabilities: profile.capabilities, createdAt: data.user.created_at });
     setWorkflowVersion((version) => version + 1);
