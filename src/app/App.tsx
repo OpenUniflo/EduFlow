@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Navigate, Route as RouterRoute, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import { AuthProvider } from "@/features/auth/AuthContext";
 import type { MockSession } from "@/features/auth/types";
-import { canManageKnowledgeDomains } from "@/features/auth/capabilities";
+import { canManageCourses, canManageKnowledgeDomains } from "@/features/auth/capabilities";
 import { AuthPage } from "@/features/auth/pages/AuthPage";
 import { NavigationProvider } from "@/app/providers/NavigationContext";
 import { GlobalNav } from "@/app/components/GlobalNav";
@@ -11,6 +11,8 @@ import { applicationServices, hydrateApplicationServices } from "@/app/services/
 import { attachWorkflowAssignmentMetadata, resolveWorkflowAssignmentContext, completeWorkflowAssignmentRun } from "@/app/integrations/workflowAssignmentIntegration";
 import { AtlasHome } from "@/features/knowledge/pages/AtlasHome";
 import { CourseCenterPage } from "@/features/course/pages/CoursePages";
+import { CourseManagementPage } from "@/features/course/pages/CourseManagementPage";
+import { CourseCreationWorkspacePage } from "@/features/course/pages/CourseCreationWorkspacePage";
 import { CourseGraphPage } from "@/features/course/pages/CourseGraphPage";
 import { LessonPage } from "@/features/material/pages/LessonPage";
 import { ProfileKnowledgePage } from "@/features/profile/pages/ProfileKnowledgePage";
@@ -25,6 +27,7 @@ import { DemoWorkflowRuntime } from "@/demo/workflows/DemoWorkflowRuntime";
 import { inferDemoWorkflowTemplateId } from "@/demo/workflows/descriptionWorkflowGenerator";
 import { DemoWorkflowCodeExporter } from "@/demo/workflows/demoWorkflowCode";
 import { supabaseClient } from "@/shared/api/supabaseClient";
+import { demoCourseCreationScenarioResolver } from "@/demo/scenarios/agenticAiBook/scenario";
 
 function getAuthRedirect(state: unknown) {
   if (!state || typeof state !== "object" || !("from" in state)) return "/";
@@ -66,7 +69,7 @@ export default function App() {
         const [profile] = await Promise.all([hydrateApplicationServices(authSession.user.id), workflowPersistence.hydrate()]);
         if (!active) return;
         const name = profile.displayName || authSession.user.email?.split("@")[0] || "学习者";
-        setSession({ userId: authSession.user.id, name, email: authSession.user.email ?? "", role: "student", capabilities: profile.capabilities, createdAt: authSession.user.created_at });
+        setSession({ userId: authSession.user.id, name, email: authSession.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: authSession.user.created_at });
         setWorkflowVersion((version) => version + 1);
       } catch (error) {
         console.error("Post-login application initialization failed", error);
@@ -137,7 +140,7 @@ export default function App() {
       throw new Error("账号已登录，但应用数据加载失败，请稍后重试。");
     }
     const name = profile.displayName || data.user.email?.split("@")[0] || "学习者";
-    setSession({ userId: data.user.id, name, email: data.user.email ?? "", role: "student", capabilities: profile.capabilities, createdAt: data.user.created_at });
+    setSession({ userId: data.user.id, name, email: data.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: data.user.created_at });
     setWorkflowVersion((version) => version + 1);
     navigate(getAuthRedirect(location.state), { replace: true });
   }
@@ -189,6 +192,8 @@ export default function App() {
           <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="workflows" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />
           <RouterRoute path="/workflows/:workflowId" element={protectedElement(editor)} />
           <RouterRoute path="/courses" element={protectedElement(session ? <CourseCenterPage session={session} onLogout={logout} /> : null)} />
+          <RouterRoute path="/courses/create" element={canManageCourses(session) ? protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} /> : null) : <Navigate to="/courses" replace />} />
+          <RouterRoute path="/course-management" element={canManageCourses(session) ? protectedElement(session ? <CourseManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/courses" replace />} />
           <RouterRoute path="/courses/:courseId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/courses/:courseId/materials/:materialId" element={protectedElement(session ? <LessonPage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} /> : null)} />

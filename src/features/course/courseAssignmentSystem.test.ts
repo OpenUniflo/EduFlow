@@ -67,8 +67,8 @@ function typescriptFilesUnder(root: string) {
 }
 
 describe("Course Repository and runtime invariants", () => {
-  it("registers two isolated Courses and rejects unknown routes", () => {
-    expect(repository.listCourseRuntimes().map((runtime) => runtime.course.id)).toEqual(["agentic-ai", "python-engineering"]);
+  it("registers isolated Courses and rejects unknown routes", () => {
+    expect(repository.listCourseRuntimes().map((runtime) => runtime.course.id)).toEqual(["agentic-ai-golden", "agentic-ai", "python-engineering"]);
     expect(repository.getCourse("agentic-ai")).not.toBe(repository.getCourse("python-engineering"));
     expect(repository.getCourse("not-exist")).toBeNull();
     expect(validateCourseRuntime(agentic, knowledgeRepository, access)).toBe(true);
@@ -492,7 +492,7 @@ describe("Material and progress generalization", () => {
 
   it("projects N:M Atlas Course contexts", () => {
     const atlas = buildGlobalAtlasProjection(knowledgeRepository.getVisibleGraph(globalKnowledgeAccess), getDomainGovernanceSnapshot(), repository.listCourseRuntimes());
-    expect(atlas.nodes.find((node) => node.id === "T11")?.courseContexts.map((context) => context.courseId).sort()).toEqual(["agentic-ai", "python-engineering"]);
+    expect(atlas.nodes.find((node) => node.id === "T11")?.courseContexts.map((context) => context.courseId).sort()).toEqual(["agentic-ai", "agentic-ai-golden", "python-engineering"]);
   });
 
   it("resolves visible Global/Tenant/User Knowledge while Global Atlas stays Global-only", () => {

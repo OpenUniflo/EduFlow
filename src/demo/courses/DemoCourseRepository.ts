@@ -1,5 +1,6 @@
 import { agenticAiRuntime } from "./agenticAiRuntime.seed";
 import { pythonEngineeringRuntime } from "./pythonEngineeringCourse.seed";
+import { goldenAgenticAiRuntime } from "@/demo/scenarios/agenticAiBook/goldenCourse.seed";
 import { validateCourseRuntime, type CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import type { CourseRepository } from "@/features/course/repository/CourseRepository";
 import { globalKnowledgeAccess, type KnowledgeAccessContext, type KnowledgeRepository } from "@/features/knowledge/repository/KnowledgeRepository";
@@ -7,7 +8,7 @@ import { globalKnowledgeAccess, type KnowledgeAccessContext, type KnowledgeRepos
 export class DemoCourseRepository implements CourseRepository {
   private readonly runtimeById: Map<string, CourseRuntimeData>;
 
-  constructor(knowledgeRepository: KnowledgeRepository, runtimes: CourseRuntimeData[] = [agenticAiRuntime, pythonEngineeringRuntime], access: KnowledgeAccessContext = globalKnowledgeAccess) {
+  constructor(knowledgeRepository: KnowledgeRepository, runtimes: CourseRuntimeData[] = [goldenAgenticAiRuntime, agenticAiRuntime, pythonEngineeringRuntime], access: KnowledgeAccessContext = globalKnowledgeAccess) {
     runtimes.forEach((runtime) => validateCourseRuntime(runtime, knowledgeRepository, access));
     this.runtimeById = new Map(runtimes.map((runtime) => [runtime.course.id, runtime]));
   }

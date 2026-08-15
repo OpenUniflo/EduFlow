@@ -53,6 +53,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
     }
     if (generating) return;
     setClarification(null);
+    if (files.length) { navigate("/courses/create", { state: { files, prompt: answer } }); return; }
     setGenerating(true);
     try {
       const intent = await applicationServices.courseCreationService.analyzeIntent({ files, prompt: answer });

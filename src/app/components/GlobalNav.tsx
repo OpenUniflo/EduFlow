@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
-import { BookOpen, ChevronDown, LogOut, Network, ShieldCheck, Workflow } from "lucide-react";
+import { BookOpen, ChevronDown, GraduationCap, LogOut, Network, ShieldCheck, Workflow } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
-import { canManageKnowledgeDomains } from "@/features/auth/capabilities";
+import { canManageCourses, canManageKnowledgeDomains } from "@/features/auth/capabilities";
 
 export function GlobalNav({
   active,
   session,
   onLogout
 }: {
-  active: "atlas" | "courses" | "workflows" | "profile" | "admin";
+  active: "atlas" | "courses" | "workflows" | "profile" | "course-management" | "course-create" | "admin";
   session?: MockSession | null;
   onLogout?: () => void;
 }) {
@@ -24,8 +24,11 @@ export function GlobalNav({
     return () => window.removeEventListener("keydown", close);
   }, []);
 
-  const items = [
-    {
+  const learningItems = [
+    { id: "profile", to: "/profile", label: "个人知识", description: "查看学习状态与能力反馈", icon: GraduationCap },
+  ];
+  const teachingItems = [{ id: "course-management", to: "/course-management", label: "课程管理", description: "创建、发布与维护课程资产", icon: BookOpen }].filter(() => canManageCourses(session));
+  const systemItems = [{
       id: "atlas",
       to: "/",
       label: "知识星图首页",
@@ -52,8 +55,8 @@ export function GlobalNav({
       label: "知识领域管理",
       description: "治理领域、成员与自动建议",
       icon: ShieldCheck
-    }
-  ].filter((item) => item.id !== "admin" || canManageKnowledgeDomains(session));
+    }].filter(() => canManageKnowledgeDomains(session));
+  const groups = [{ label: "学习", items: learningItems }, { label: "教学管理", items: teachingItems }, { label: "系统管理", items: systemItems }].filter((group) => group.items.length);
 
   return (
     <nav className="atlas-global-nav" aria-label="全局导航">
@@ -82,8 +85,8 @@ export function GlobalNav({
         </div>
 
         <div className="atlas-nav-dropdown glass-v2">
-          <div className="atlas-nav-label">主要空间</div>
-          {items.map((item) => {
+          {groups.map((group) => <div className="atlas-nav-group" key={group.label}><div className="atlas-nav-label">{group.label}</div>
+          {group.items.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -100,7 +103,7 @@ export function GlobalNav({
                 {active === item.id ? <span className="atlas-current-tag">当前</span> : null}
               </NavLink>
             );
-          })}
+          })}</div>)}
           {session && onLogout ? (
             <>
               <div className="atlas-nav-divider" />

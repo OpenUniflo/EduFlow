@@ -13,6 +13,7 @@ import { applicationServices } from "@/app/services/applicationServices";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { buildMaterialDeepLink } from "@/features/material/materialNavigation";
 import { sortMaterials } from "@/features/material/materialOrdering";
+import { canDesignCourse } from "@/features/auth/capabilities";
 
 const { courseRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
@@ -37,6 +38,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
   const searchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<CourseGraphView>("overview");
   const [mode, setMode] = useState<"knowledge" | "assignment">("knowledge");
+  const [experience, setExperience] = useState<"learn" | "design">("learn");
   const detailFacet = detailFacetForMode(mode);
   const [selectedAnchor, setSelectedAnchor] = useState<SelectedAnchor | null>(null);
   const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
@@ -214,7 +216,7 @@ export function CourseGraphPage({ session, onLogout }: { session: MockSession; o
   return (
     <main className="atlas-graph-page">
       <GlobalNav active="courses" session={session} onLogout={onLogout} />
-      <header className="atlas-skill-course-island glass-v2"><button onClick={() => view === "overview" ? navigate("/courses") : changeView("overview")} aria-label="返回上一级"><ArrowLeft size={18} /></button><span className="atlas-skill-divider" /><div><span>{runtime.course.title.toUpperCase()}</span><strong>{view === "overview" ? "课程篇章总览" : view === "focused" ? "聚焦篇章" : `完整课程${mode === "knowledge" ? "技能树" : "实训树"}`}</strong>{view === "focused" ? <small>/ {courseChapters.find((item) => item.id === focusedChapterId)?.title}</small> : null}</div>{view !== "full" ? <button className="atlas-skill-focus" onClick={() => changeView("full")}>展开全部篇章 <ArrowRight size={12} /></button> : <button className="atlas-skill-focus" onClick={() => changeView("overview")}>折叠为篇章总览 <X size={12} /></button>}</header>
+      <header className="atlas-skill-course-island glass-v2"><button onClick={() => view === "overview" ? navigate("/courses") : changeView("overview")} aria-label="返回上一级"><ArrowLeft size={18} /></button><span className="atlas-skill-divider" /><div><span>{runtime.course.title.toUpperCase()}</span><strong>{view === "overview" ? "课程篇章总览" : view === "focused" ? "聚焦篇章" : `完整课程${mode === "knowledge" ? "技能树" : "实训树"}`}</strong>{view === "focused" ? <small>/ {courseChapters.find((item) => item.id === focusedChapterId)?.title}</small> : null}</div>{canDesignCourse(session) ? <div className="course-experience-toggle"><button className={experience === "learn" ? "active" : ""} onClick={() => setExperience("learn")}>学习模式</button><button className={experience === "design" ? "active" : ""} onClick={() => setExperience("design")}>课程设计</button></div> : null}{view !== "full" ? <button className="atlas-skill-focus" onClick={() => changeView("full")}>展开全部篇章 <ArrowRight size={12} /></button> : <button className="atlas-skill-focus" onClick={() => changeView("overview")}>折叠为篇章总览 <X size={12} /></button>}</header>
 
       <div className={`atlas-graph-stage ${drawerOpen ? "drawer-open" : ""}`}><CourseGraph ref={graphRef} graphData={graphData} view={view} focusedChapterId={focusedChapterId} mode={mode} selectedId={selectedFlowId} searchMatchId={searchMatch} onChapterClick={selectChapter} onChapterDoubleClick={focusChapter} onKnowledgeClick={selectKnowledge} onAssignmentClick={selectKnowledge} /></div>
       <div className={`atlas-graph-meta ${drawerOpen ? "drawer-open" : ""}`}><div className={`atlas-graph-search glass-v2 ${searchExpanded ? "expanded" : ""}`}><button onClick={() => { setSearchExpanded((value) => !value); window.setTimeout(() => searchRef.current?.focus(), 0); }} aria-label="搜索技能树"><Search size={20} /></button><input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") executeSearch(); }} placeholder="搜索篇章、知识点或实训…" /></div></div>

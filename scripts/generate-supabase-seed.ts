@@ -4,6 +4,7 @@ import { demoGlobalKnowledgeGraph } from "../src/demo/knowledge/demoGlobalKnowle
 import { demoKnowledgeDomains } from "../src/demo/domains/demoDomains.fixture";
 import { demoDomainAssignments } from "../src/demo/domains/demoDomainAssignments.fixture";
 import { agenticAiRuntime } from "../src/demo/courses/agenticAiRuntime.seed";
+import { goldenAgenticAiRuntime } from "../src/demo/scenarios/agenticAiBook/goldenCourse.seed";
 import { pythonEngineeringRuntime } from "../src/demo/courses/pythonEngineeringCourse.seed";
 import { demoWorkflowTemplates } from "../src/demo/workflows/demoWorkflowTemplates";
 import type { CourseRuntimeData } from "../src/features/course/runtime/courseRuntime";
@@ -107,7 +108,7 @@ function seedCourse(runtime: CourseRuntimeData) {
   ])));
 }
 
-[agenticAiRuntime, pythonEngineeringRuntime].forEach(seedCourse);
+[goldenAgenticAiRuntime, agenticAiRuntime, pythonEngineeringRuntime].forEach(seedCourse);
 lines.push("", "commit;", "");
 
 writeFileSync(resolve(process.cwd(), "supabase/seed.sql"), lines.join("\n"));

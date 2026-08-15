@@ -524,6 +524,30 @@ function workflowVariant(sourceId: string, id: string, name: string): WorkflowDe
   };
 }
 
+const multiAgentResearchWorkflow: WorkflowDefinition = {
+  id: "multi-agent-workflow", name: "Multi-Agent Research System", description: "继承 Planner、Web Researcher、Paper Researcher 与 Internal RAG；学生调整并行汇合、验证和可靠终止路径。",
+  inheritedAssets: ["Task Specification", "Context Pack", "Knowledge & Tool Agent", "Runtime + Retry + Checkpoint", "Evaluator + Guardrail + Approval"],
+  reliabilityNotes: ["Worker timeout → bounded Retry → Fallback", "Verifier rejects → return to Planner", "Verified Success → Atomic Settle → Cancel Remaining Workers"],
+  nodes: [
+    systemNode("start", "User Research Question", 20, 300),
+    node("planner", "Planner", "Agent Node", "agent", 190, 300, [], [], "拆分研究问题并分派独立任务。"),
+    node("web", "Web Researcher", "Agent Node", "agent", 430, 90, [], [], "并行检索 Web；超时后执行有界重试与 fallback。"),
+    node("paper", "Paper Researcher", "Agent Node", "agent", 430, 290, [], [], "并行检索论文数据库。"),
+    node("rag", "Internal RAG", "Agent Node", "agent", 430, 490, [], [], "并行查询内部知识库。"),
+    node("merge", "Evidence Merge", "State Transform", "transform", 690, 290, [], [], "等待并归并 3 个 Worker 的证据。"),
+    node("verifier", "Verifier", "Evaluator Node", "llm", 910, 290, [], [], "拒绝未验证 Candidate，失败则返回 Planner。"),
+    node("experiment", "Experiment Designer", "Agent Node", "agent", 1130, 170, [], [], "基于已验证证据设计实验。"),
+    node("critic", "Research Critic", "Evaluator Node", "llm", 1130, 410, [], [], "批判性检查研究方案。"),
+    node("approval", "Human Approval", "Human Approval Node", "function", 1370, 290, [], [], "人工批准高风险外发。"),
+    node("settle", "Atomic Settle", "Function Node", "function", 1570, 290, [], [], "仅在 Verified Success 后原子结算。"),
+    node("cancel", "Cancel Remaining Workers", "Function Node", "function", 1770, 290, [], [], "结算成功后取消剩余 Worker。"),
+    node("proposal", "Final Proposal", "Output Node", "output", 1980, 290, [], [], "输出最终立项建议。"),
+    systemNode("end", "END", 2190, 290)
+  ],
+  edges: [edge("g1","start","planner"),edge("g2","planner","web","parallel"),edge("g3","planner","paper","parallel"),edge("g4","planner","rag","parallel"),edge("g5","web","merge"),edge("g6","paper","merge"),edge("g7","rag","merge"),edge("g8","merge","verifier"),edge("g9","verifier","experiment","verified"),edge("g10","verifier","planner","reject / retry"),edge("g11","experiment","critic"),edge("g12","critic","approval"),edge("g13","approval","settle","approve"),edge("g14","settle","cancel"),edge("g15","cancel","proposal"),edge("g16","proposal","end")],
+  runOrder: ["start","g1","planner","g2","web","g3","paper","g4","rag","g5","g6","g7","merge","g8","verifier","g9","experiment","g11","critic","g12","approval","g13","settle","g14","cancel","g15","proposal","g16","end"], result: "Candidate → Verifier → Verified Success → Atomic Settle → Cancel Remaining Workers → Final Proposal", code: "Golden Demo: timeout / retry / fallback / verifier reject paths are visible on the canvas."
+};
+
 export const demoWorkflowTemplates: WorkflowDefinition[] = [
   ...baseDemoWorkflowTemplates,
   workflowVariant("minimal", "agent-core", "最小 Agent Core"),
@@ -533,6 +557,6 @@ export const demoWorkflowTemplates: WorkflowDefinition[] = [
   workflowVariant("branch", "runtime-recovery", "Runtime Recovery & Audit"),
   workflowVariant("sequence", "orchestrator-worker", "Orchestrator–Worker"),
   workflowVariant("showcase", "agentic-workflow", "受治理 Agentic Workflow"),
-  workflowVariant("showcase", "multi-agent-workflow", "Supervisor 多智能体协作"),
+  multiAgentResearchWorkflow,
   workflowVariant("showcase", "agentic-ai-capstone", "Agentic AI 综合系统")
 ];

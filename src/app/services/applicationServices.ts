@@ -14,6 +14,7 @@ import { ApiCourseRepository } from "@/features/course/repository/ApiCourseRepos
 import { apiRequest } from "@/shared/api/apiClient";
 import type { KnowledgeGraph } from "@/features/knowledge/types";
 import type { UserCourseState } from "@/features/course/types";
+import type { UserCapability, UserRole } from "@/features/auth/types";
 import type { UserKnowledgeRecord } from "@/features/profile/types";
 
 export type ApplicationServices = {
@@ -44,7 +45,7 @@ export const applicationServices: ApplicationServices = {
 };
 
 export async function hydrateApplicationServices(userId: string) {
-  const knowledge = await apiRequest<{ graph: KnowledgeGraph; governance: DomainGovernanceState; profile: { displayName: string; role: "student"; capabilities: Array<"global-domain-admin"> } }>("/api/knowledge");
+  const knowledge = await apiRequest<{ graph: KnowledgeGraph; governance: DomainGovernanceState; profile: { displayName: string; role: UserRole; capabilities: UserCapability[] } }>("/api/knowledge");
   knowledgeRepository.hydrate(knowledge.graph);
   domainGovernanceRepository.hydrate(knowledge.governance);
   domainGovernanceService.reloadFromRepository();

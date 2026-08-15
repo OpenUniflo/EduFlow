@@ -17,6 +17,7 @@ import { updateMaterialReadingState, useUserCourseState, workflowLaunchUrl } fro
 import { applicationServices } from "@/app/services/applicationServices";
 import type { Material, UserCourseState, UserMaterialState } from "@/features/course/types";
 import { sortMaterialSegments } from "@/features/material/materialOrdering";
+import { canDesignCourse } from "@/features/auth/capabilities";
 
 const PERSIST_DELAY_MS = 350;
 
@@ -36,6 +37,11 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
+  const [experience, setExperience] = useState<"learn" | "design">("learn");
+  const [draftSegments, setDraftSegments] = useState(material.segments);
+  const [undoSegments, setUndoSegments] = useState(material.segments);
+  const [assistantNote, setAssistantNote] = useState("选择动作后，中央课件会发生真实变化。");
+  const renderedMaterial = useMemo(() => ({ ...material, segments: draftSegments }), [draftSegments, material]);
   const persistTimerRef = useRef<number | null>(null);
   const viewedSegmentIdsRef = useRef(new Set(savedState?.viewedSegmentIds ?? savedState?.completedSegmentIds ?? []));
 
@@ -45,7 +51,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const reader = useMaterialReaderState({ material, requestedSegmentId, recentSegmentId: savedState?.recentSegmentId, onReplaceSegment: replaceSegmentQuery });
+  const reader = useMaterialReaderState({ material: renderedMaterial, requestedSegmentId, recentSegmentId: savedState?.recentSegmentId, onReplaceSegment: replaceSegmentQuery });
   const access = useMemo(() => userKnowledgeAccess(session.userId), [session.userId]);
   const projection = useMemo(() => buildMaterialSegmentProjection(runtime, material, reader.activeSegmentId, userState, applicationServices.knowledgeRepository, access, governance), [access, governance, material, reader.activeSegmentId, runtime, userState]);
   const currentPagePrimaryKnowledgeId = projection?.knowledgeContexts[0]?.nodeId ?? null;
@@ -60,7 +66,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   }, [access, effectiveKnowledgeId, governance, knowledgeContextState.pinnedKnowledgeId, material.id, projection, runtime]);
   const knowledgeAssignmentContexts = useMemo(() => buildKnowledgeAssignmentContexts(runtime, effectiveKnowledgeId, userState), [effectiveKnowledgeId, runtime, userState]);
   const activeAssignment = knowledgeAssignmentContexts.find((context) => context.assignmentId === activeAssignmentId) ?? null;
-  const orderedSegments = useMemo(() => sortMaterialSegments(material), [material]);
+  const orderedSegments = useMemo(() => sortMaterialSegments(renderedMaterial), [renderedMaterial]);
   const activeIndex = orderedSegments.findIndex((segment) => segment.id === reader.activeSegmentId);
   const lesson = runtime.lessons.find((item) => item.id === material.lessonId);
 
@@ -93,19 +99,27 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
 
   const previous = orderedSegments[activeIndex - 1];
   const next = orderedSegments[activeIndex + 1];
+  function applyAssistant(kind: "simple" | "example" | "timeout" | "alignment") {
+    setUndoSegments(draftSegments);
+    const copy = kind === "simple" ? ["一句话理解", "并行像三位研究员同时查资料；Merge 像主编等待证据到齐。"] : kind === "example" ? ["案例：三路证据汇合", "Web、Paper 与 RAG 可以乱序完成，Merge 按来源身份收齐 3/3。"] : ["Worker 超时与 Partial Failure", "单个 Worker 超时后执行有界 Retry；耗尽后走 Fallback，并由 Verifier 决定是否足够结算。"];
+    setDraftSegments((items) => [...items, { id: `session-${kind}-${Date.now()}`, order: items.length + 1, title: copy[0], section: kind === "timeout" || kind === "alignment" ? "Warning / Failure Case" : "Example", content: { lead: copy[1], code: kind === "timeout" || kind === "alignment" ? "Candidate → Verifier → Verified Success → Atomic Settle → Cancel Remaining Workers" : undefined, visual: kind === "timeout" || kind === "alignment" ? "decision" : "overview" } }]);
+    setAssistantNote(kind === "alignment" ? "检测到实训要求 Partial Failure，但课件解释不足；已补充对齐内容。" : "修改已应用到当前 session 的 Lesson draft。切回学习模式仍然可见。" );
+  }
 
   return <main className={`atlas-lesson-page material-reader-current ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`}>
     <GlobalNav active="courses" session={session} onLogout={onLogout} />
     <header className="atlas-lesson-header glass-v2">
       <button className="atlas-lesson-back" onClick={() => navigate(`/courses/${runtime.course.id}`)} aria-label="返回课程技能树"><ArrowLeft size={16} /></button>
       <div className="atlas-lesson-breadcrumb"><button onClick={() => navigate(`/courses/${runtime.course.id}`)}>{runtime.course.title}</button><span>/</span><span>{lesson?.title ?? material.title}</span></div>
-      <div className="atlas-lesson-title"><strong>{material.title}</strong><small>{material.type === "pdf" ? "Original PDF" : material.type} · {material.segments.length} 个内容段 · {material.duration ?? "自定进度"}</small></div>
+      <div className="atlas-lesson-title"><strong>{material.title}</strong><small>{material.type === "pdf" ? "Original PDF" : material.type} · {draftSegments.length} 个内容段 · {material.duration ?? "自定进度"}</small></div>
+      {canDesignCourse(session) ? <div className="course-experience-toggle"><button className={experience === "learn" ? "active" : ""} onClick={() => setExperience("learn")}>学习模式</button><button className={experience === "design" ? "active" : ""} onClick={() => setExperience("design")}>课程设计</button></div> : null}
     </header>
 
-    <MaterialOutline material={material} activeSegmentId={reader.activeSegmentId} collapsed={leftCollapsed} onToggle={() => setLeftCollapsed((value) => !value)} onSelect={(segmentId) => reader.navigateToSegment(segmentId, "outline", "smooth")} />
-    <MaterialRenderer material={material} activeSegmentId={reader.activeSegmentId} zoom={zoom} navigationRequest={reader.navigationRequest} onVisibleSegmentChange={reader.observeSegment} onNavigationSettled={reader.settleNavigation} />
+    <MaterialOutline material={renderedMaterial} activeSegmentId={reader.activeSegmentId} collapsed={leftCollapsed} onToggle={() => setLeftCollapsed((value) => !value)} onSelect={(segmentId) => reader.navigateToSegment(segmentId, "outline", "smooth")} />
+    <MaterialRenderer material={renderedMaterial} activeSegmentId={reader.activeSegmentId} zoom={zoom} navigationRequest={reader.navigationRequest} onVisibleSegmentChange={reader.observeSegment} onNavigationSettled={reader.settleNavigation} />
     <MaterialKnowledgeContext projection={projection} selectedKnowledgeId={knowledgeContextState.selectedKnowledgeId} pinnedKnowledgeId={knowledgeContextState.pinnedKnowledgeId} effectiveKnowledge={effectiveKnowledge} knowledgeAssignmentContexts={knowledgeAssignmentContexts} collapsed={rightCollapsed} onToggle={() => setRightCollapsed((value) => !value)} onSelect={(nodeId) => dispatchKnowledgeContext({ type: "select", nodeId })} onTogglePin={() => dispatchKnowledgeContext(knowledgeContextState.pinnedKnowledgeId ? { type: "unpin", currentPagePrimaryKnowledgeId } : { type: "pin" })} onAssignment={setActiveAssignmentId} />
-    <MaterialControls current={activeIndex + 1} total={material.segments.length} zoom={zoom} onZoom={setZoom} onFit={() => setZoom(1)} onPrevious={() => previous && reader.navigateToSegment(previous.id, "previous", "smooth")} onNext={() => next && reader.navigateToSegment(next.id, "next", "smooth")} />
+    <MaterialControls current={activeIndex + 1} total={draftSegments.length} zoom={zoom} onZoom={setZoom} onFit={() => setZoom(1)} onPrevious={() => previous && reader.navigateToSegment(previous.id, "previous", "smooth")} onNext={() => next && reader.navigateToSegment(next.id, "next", "smooth")} />
+    {experience === "design" && material.type !== "pdf" ? <aside className="lesson-ai-assistant glass-v2"><strong>AI 课件助手</strong><p>{assistantNote}</p><button onClick={() => applyAssistant("simple")}>解释得简单一点</button><button onClick={() => applyAssistant("example")}>增加案例</button><button onClick={() => applyAssistant("timeout")}>增加 Worker 超时案例</button><button onClick={() => applyAssistant("alignment")}>检查课件与实训是否一致</button><button className="undo" onClick={() => { setDraftSegments(undoSegments); setAssistantNote("已撤销本次修改。"); }}>撤销本次修改</button><small>Prototype · 固定意图映射为可应用的 Lesson mutation</small></aside> : null}
 
     {activeAssignment ? <div className="atlas-workflow-modal" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveAssignmentId(null); }}><article className="atlas-workflow-modal-card glass-v2"><button className="atlas-modal-close" onClick={() => setActiveAssignmentId(null)} aria-label="关闭实训详情"><X size={18} /></button><span className="atlas-kicker">COURSE ASSIGNMENT</span><h2>{activeAssignment.assignment.title}</h2><p>{activeAssignment.assignment.description}</p><section><h3>任务要求</h3>{activeAssignment.assignment.requirements.map((requirement) => <div key={requirement}><Check size={13} />{requirement}</div>)}</section><section><h3>预期成果</h3><p>{activeAssignment.assignment.expectedOutput}</p></section><div className="atlas-modal-actions"><button className="atlas-secondary" onClick={() => setActiveAssignmentId(null)}>关闭</button>{activeAssignment.assignment.mode === "workflow" && activeAssignment.assignment.workflowTemplateId ? <button className="atlas-primary" onClick={() => navigate(workflowLaunchUrl({ courseId: runtime.course.id, assignmentId: activeAssignment.assignment.id, workflowTemplateId: activeAssignment.assignment.workflowTemplateId! }))}>进入工作流 <ArrowRight size={15} /></button> : null}</div></article></div> : null}
   </main>;

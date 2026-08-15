@@ -38,6 +38,9 @@ export type WorkflowDefinition = {
   runOrder: string[];
   result: string;
   code: string;
+  /** Optional template-level starting assets shown by the generic editor. */
+  inheritedAssets?: string[];
+  reliabilityNotes?: string[];
 };
 
 // Compatibility name used by the current UI and persisted v2 payload.

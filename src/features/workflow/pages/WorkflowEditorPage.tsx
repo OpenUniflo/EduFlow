@@ -147,10 +147,12 @@ export function WorkflowEditorPage({
       />
       <CodeModal open={codeModalOpen} template={activeTemplate} codeExporter={controller.codeExporter} onClose={() => setCodeModalOpen(false)} />
       <RunPanel open={bottomOpen} activeTab={activeTab} template={activeTemplate} runIndex={controller.runIndex} onToggle={() => setBottomOpen((value) => !value)} onTab={setActiveTab} />
+      {activeTemplate.inheritedAssets?.length ? <aside className="workflow-inherited-assets glass-v2"><strong>已继承往期成果</strong><div>{activeTemplate.inheritedAssets.map((item) => <span key={item}>✓ {item}</span>)}</div>{activeTemplate.reliabilityNotes?.map((item) => <small key={item}>{item}</small>)}</aside> : null}
       {showAcceptance && controller.activeRunHistory.length ? (
         <aside className="atlas-canvas-acceptance glass-v2">
-          <div><strong>Demo Evaluation · 验收通过</strong><span>结构 92 · 行为 88 · 结果 90 · 轨迹 94</span></div>
-          <div><span>模型调用 {Math.max(2, Math.round(activeTemplate.nodes.length / 2))}</span><span>工具调用 {activeTemplate.nodes.filter((item) => item.kind === "tool").length}</span><span>总分 91</span></div>
+          <div><strong>AI 验收 · 86 / 100 · 需要修改</strong><span>✓ Agent Team　✓ Context Isolation　✓ Parallel Execution　✓ Message Protocol</span></div>
+          <div><span>⚠ Result Verification</span><span>⚠ Failure Recovery / Termination</span><span>建议巩固：WF03 · E13 · RT14</span></div>
+          <p>Candidate 不能直接 Cancel Others。应先经过 Verifier → Verified Success → Atomic Settle，再取消剩余 Worker。该反馈不会自动把 Knowledge 标为 mastered。</p>
         </aside>
       ) : null}
     </main>

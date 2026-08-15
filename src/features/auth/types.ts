@@ -1,10 +1,11 @@
+export type UserRole = "student" | "teacher" | "admin";
 export type UserCapability = "global-domain-admin";
 
 export type AuthSession = {
   userId: string;
   name: string;
   email: string;
-  role: "student";
+  role: UserRole;
   capabilities: UserCapability[];
   createdAt: string;
 };

@@ -177,7 +177,7 @@ export async function bootstrapLocalUsers() {
   assert.ok(student.email_confirmed_at);
 
   const profiles = await server.from("profiles").upsert([
-    { id: admin.id, display_name: "Local Admin", role: "student", capabilities: ["global-domain-admin"] },
+    { id: admin.id, display_name: "Local Admin", role: "admin", capabilities: ["global-domain-admin"] },
     { id: student.id, display_name: "Local Student", role: "student", capabilities: [] }
   ]);
   assert.ifError(profiles.error);
