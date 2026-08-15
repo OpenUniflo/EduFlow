@@ -9,6 +9,7 @@ Upload course material
   -> parse and structure
   -> AI knowledge modeling and course generation
   -> knowledge/material/practice mapping
+  -> authoring chat / human review
   -> student learning
   -> real Workflow execution
   -> automatic acceptance
@@ -216,19 +217,38 @@ DeepEval may back a semantic evaluator adapter for open-ended task completion, q
 
 Authoritative `PracticeAttempt`, evidence, and `AcceptanceResult` remain in EduFlow PostgreSQL.
 
-## 9. Phase 4.6 — End-to-end closeout
+## 9. Phase 4.6 — Authoring Chat & Human Review
+
+Phase 4.6 turns the current single-turn CourseIntent surface into a persistent course-authoring conversation and review flow. It should support the smallest product contract needed for:
+
+- persistent Conversation / Message history;
+- multi-turn context across course creation and clarification;
+- uploaded material/file context;
+- persisted CourseIntent / target outcome context;
+- `Generate Knowledge -> Human Review/Edit -> Resume`;
+- `Generate Assignments -> Human Review/Edit -> Resume`;
+- final course confirmation/finalization;
+- reopening an interrupted authoring session without rebuilding context manually.
+
+The implementation should preserve human-approved Knowledge and Assignment state as EduFlow-owned domain data. LangGraph pause/resume/checkpoints may be used to orchestrate authoring HITL once the concrete workflow requires them, but the authoring state machine remains separate from learner-facing `WorkflowDefinition` execution.
+
+Phase 4.6 is not a general-purpose chat platform. The MVP is complete when the existing homepage conversation can carry one course-creation session through clarification, generated Knowledge review, generated Assignment review, and finalization with persistent state.
+
+## 10. Phase 4.7 — End-to-end closeout
 
 Using real Agentic AI material, without manually editing database rows or depending on production DemoRepository/fixtures, the system must:
 
-1. upload source material;
-2. parse it into structured CourseMaterial;
+1. start from the homepage course-authoring conversation and upload/source context;
+2. parse source material into structured CourseMaterial;
 3. generate User Knowledge and a valid Course Skill DAG;
-4. establish formal Material and Practice mappings;
-5. let a learner navigate from Knowledge to real material and practice;
-6. execute the Workflow through a backend runtime;
-7. persist Run/Step evidence;
-8. return persistent pass/fail/review acceptance feedback.
+4. let the author review/edit the Knowledge result and continue;
+5. establish formal Material and Assignment mappings and let the author review/edit Assignments;
+6. finalize the course and let a learner navigate from Knowledge to real material and practice;
+7. execute the Workflow through a backend runtime;
+8. persist Run/Step evidence;
+9. return persistent pass/fail/review acceptance feedback;
+10. rerun the complete real flow without manual database fixes or DemoRepository fallbacks.
 
-## 10. Phase 5 boundary
+## 11. Phase 5 boundary
 
-Phase 4 records raw learning, runtime, and acceptance evidence. It does not yet turn that evidence into the full Mastery model, Personal Knowledge Atlas, connection analysis, recommendation, adaptive learning paths, class analytics, or a full teacher analytics dashboard.
+Phase 4 records raw learning, runtime, acceptance, and course-authoring evidence. It does not yet turn that evidence into the full Mastery model, Personal Knowledge Atlas, connection analysis, recommendation, adaptive learning paths, class analytics, or a full teacher analytics dashboard.
