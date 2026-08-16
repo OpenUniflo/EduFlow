@@ -33,9 +33,11 @@
 
 `学生/教师/管理员 → 上传指定 PDF → 仿真建课 → 固定课程草稿 → 技能树 → 第 6 篇章 → AI Native Lesson → 知识点实训 → 前置成果加载 → 篇章 Workflow → AI 验收 → 能力反馈`
 
-教师和管理员还可在同一技能树、同一 selected anchor 与 viewport 上进入课程设计模式，用 AI 修改 Lesson；Student 共享建课和学习能力，但没有课程管理或课程设计权限。
+教师和管理员还可在同一技能树、同一 selected anchor 与 viewport 上进入课程设计模式，用 AI 修改 Lesson；Student 只有已发布课程的学习能力，没有课程管理或课程设计权限。
 
-课程设计模式还提供独立于 Drawer 的页面级 AI 课程助手：右下角悬浮入口支持 hover 预览和 click 固定对话，上下文随当前 Course / Chapter / Knowledge / Assignment 自动更新。该能力通过通用 Feature contract 由 App composition root 注入 Golden scripted provider，仅 Teacher/Admin 的课程设计模式可见；Lesson 设计页的 AI 课件助手仍是独立能力。
+课程 publication lifecycle 是浏览器 presentation state，不写入 Core Course：`draft` 只出现在 Course Management，`published` 才进入 Course Center，`archived` 保留在 Course Management 并从 Course Center 隐藏。AI 建课完成时初始为 `draft`。
+
+课程设计模式还提供独立于 Drawer 的页面级 AI 课程助手：右下角悬浮入口支持 hover 预览和 click 固定对话，上下文随当前 Course / Chapter / Knowledge / Assignment 自动更新。Lesson 设计页的 AI 课件助手使用相同的悬浮交互语言，但继续保留独立 Provider。两者都仅在 Teacher/Admin 的课程设计模式显示。
 
 ## 4. 角色与导航
 
@@ -106,6 +108,8 @@ Lesson 设计模式至少支持：
 
 输入框开放，但命中关键词后映射预设 mutation；未命中走固定 fallback。修改经过 Preview → Apply，并支持撤销最近一次修改。切换 learn/design 保留 session draft，刷新后恢复 seed。
 
+Course Design 的 Material authoring 使用浏览器 `localStorage` overlay：在 Repository Material/Coverage 之上记录关联、取消关联和生成的 Article draft。生成采用固定 700ms 仿真并自动关联当前 Knowledge；生成 Material 可由正常 Lesson route 打开。该状态不修改 Repository seed、不写 Supabase，发布课程也不会把 authoring overlay 持久化到后端。
+
 ## 9. 固定验收
 
 篇章综合实训在运行完成后分阶段演示分析过程，再显示固定 **86/100，需要修改**。
@@ -145,3 +149,7 @@ Teacher 未单独配置密码时使用 local-only Admin acceptance password 作�
 真实：教材文件选择、SHA/文件名路由、角色权限、导航、Course/Skill Tree、learn/design 状态、Lesson mutation、Assignment UI、Workflow launch context、运行状态、提交与反馈交互。
 
 仿真：PDF 的 AI 分析推理、课程生成推理、Lesson AI 文案生成、Workflow AI 验收推理和固定结果。
+
+## 13. NEXT: Course Structure Authoring Prototype
+
+下一轮再处理 Chapter/Knowledge 的新建、删除、重命名、Chapter 归属拖动、Knowledge dependency 编辑、AI 拆分/合并/依赖建议与自定义 Graph layout；本轮 Material authoring overlay 不承担课程结构编辑职责。

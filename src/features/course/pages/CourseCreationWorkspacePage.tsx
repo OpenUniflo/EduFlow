@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import type { MockSession } from "@/features/auth/types";
 import type { CourseCreationScenario, CourseCreationScenarioResolver } from "@/features/course/creation/demoScenario";
+import { setCoursePresentationLifecycle } from "@/features/course/presentation/courseLifecycle";
 
 export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { session: MockSession; onLogout(): void; resolver: CourseCreationScenarioResolver }) {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
   const [done, setDone] = useState(false);
   const [fallback, setFallback] = useState(false);
   useEffect(() => { let alive = true; void resolver.resolve(files).then((result) => { if (!alive) return; if (!result) setFallback(true); else { setScenario(result); setStep(0); } }); return () => { alive = false; }; }, [files, resolver]);
-  useEffect(() => { if (!scenario || step < 0 || step >= scenario.stages.length) return; const timer = window.setTimeout(() => { if (step === scenario.stages.length - 1) { setDone(true); localStorage.setItem(`eduflow:course-created:${scenario.courseId}`, "draft"); } else setStep((value) => value + 1); }, 650); return () => window.clearTimeout(timer); }, [scenario, step]);
+  useEffect(() => { if (!scenario || step < 0 || step >= scenario.stages.length) return; const timer = window.setTimeout(() => { if (step === scenario.stages.length - 1) { setDone(true); setCoursePresentationLifecycle(scenario.courseId, "draft"); } else setStep((value) => value + 1); }, 650); return () => window.clearTimeout(timer); }, [scenario, step]);
   return <main className="atlas-page-shell golden-creation-page"><GlobalNav active="course-create" session={session} onLogout={onLogout} /><div className="golden-creation-shell">
     <header><span className="atlas-kicker">AI COURSE CREATION</span><h1>AI 建课工作台</h1><p>{scenario?.sourceLabel ?? (files[0]?.name || "等待教材")}</p></header>
     {(!files.length || fallback) ? <section className="golden-fallback glass-v2"><FileText /><h2>{files.length ? "该教材尚无稳定 Demo Scenario" : "上传教材开始创建课程"}</h2><p>当前 Prototype 不会假装对任意 PDF 生成高质量课程。指定 Golden 教材会进入稳定、可重放的教学重构流程。</p><label className="atlas-primary">选择 PDF<input hidden type="file" accept=".pdf" onChange={(event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (file) { setFallback(false); setFiles([file]); } }} /></label><button className="atlas-secondary" onClick={() => navigate("/courses")}>返回课程中心</button></section> : null}

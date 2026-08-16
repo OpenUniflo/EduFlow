@@ -2,12 +2,13 @@ import { Bot, Pin, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { CourseDesignAssistantContext, CourseDesignAssistantProvider, CourseDesignAssistantResponse } from "@/features/course/courseDesignAssistant";
 
-export function CourseDesignAssistant({ context, provider, drawerOpen }: { context:CourseDesignAssistantContext; provider?:CourseDesignAssistantProvider; drawerOpen:boolean }) {
+export function CourseDesignAssistant({ context, provider, drawerOpen, onAction }: { context:CourseDesignAssistantContext; provider?:CourseDesignAssistantProvider; drawerOpen:boolean; onAction?(actionId:string):CourseDesignAssistantResponse | null | Promise<CourseDesignAssistantResponse | null> }) {
   const actions = provider?.getActions(context) ?? [];
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [input, setInput] = useState("");
   const [response, setResponse] = useState<CourseDesignAssistantResponse | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const closeTimer = useRef<number | null>(null);
 
   useEffect(() => { setResponse(null); }, [context.key]);
@@ -22,10 +23,13 @@ export function CourseDesignAssistant({ context, provider, drawerOpen }: { conte
     if (pinned) return;
     closeTimer.current = window.setTimeout(() => setHovered(false), 220);
   }
-  function runAction(actionId:string) {
+  async function runAction(actionId:string) {
     setPinned(true);
     setHovered(true);
-    setResponse(provider!.resolveAction(context, actionId));
+    setPendingAction(actionId);
+    const handled = await onAction?.(actionId);
+    setResponse(handled ?? provider!.resolveAction(context, actionId));
+    setPendingAction(null);
   }
   function send() {
     if (!input.trim()) return;
@@ -36,7 +40,7 @@ export function CourseDesignAssistant({ context, provider, drawerOpen }: { conte
     {open ? <section className="course-design-assistant-panel glass-v2">
       <header><div><Bot size={18}/><span><strong>AI 课程助手</strong><small>{pinned ? "已固定对话" : "悬停预览 · 点击图标固定"}</small></span></div>{pinned ? <button onClick={() => {setPinned(false);setHovered(false);}} aria-label="关闭 AI 课程助手"><X size={16}/></button> : null}</header>
       <div className="course-design-assistant-context"><span>当前上下文</span><strong>{context.label}</strong><small>{context.kind === "course" ? "Course" : context.kind === "chapter" ? "Chapter" : context.kind === "knowledge" ? "Knowledge" : "Assignment"}</small></div>
-      <div className="course-design-assistant-actions">{actions.map((action) => <button key={action.id} onClick={() => runAction(action.id)}>{action.label}</button>)}</div>
+      <div className="course-design-assistant-actions">{actions.map((action) => <button key={action.id} disabled={Boolean(pendingAction)} onClick={() => void runAction(action.id)}>{pendingAction === action.id ? "处理中…" : action.label}</button>)}</div>
       {response ? <div className={`course-design-assistant-response ${response.fallback ? "fallback" : ""}`} role="status">{response.message}</div> : null}
       {pinned ? <div className="course-design-assistant-input"><input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {if(event.key === "Enter") send();}} placeholder="询问课程结构、依赖、课件或实训…"/><button onClick={send} aria-label="发送课程设计问题"><Send size={15}/></button></div> : null}
     </section> : null}

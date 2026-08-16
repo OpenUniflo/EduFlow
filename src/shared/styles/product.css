@@ -6516,3 +6516,38 @@ body {
 .course-design-assistant-response{margin-top:10px;padding:10px;border-radius:10px;color:#365a4b;background:#edf8f3;font-size:10px;line-height:1.55}.course-design-assistant-response.fallback{color:#6e627e;background:#f5f1f8}
 .course-design-assistant-input{display:flex;gap:6px;margin-top:10px}.course-design-assistant-input input{min-width:0;flex:1;padding:9px 10px;border:1px solid #dce1ec;border-radius:10px;outline:none;font:inherit;font-size:10px}.course-design-assistant-input input:focus{border-color:#7b8ae4}.course-design-assistant-input button{display:grid;width:34px;place-items:center;border:0;border-radius:10px;color:#fff;background:#6375df}
 @media(max-width:900px){.course-design-assistant.drawer-open{right:24px}.course-design-assistant-panel{width:min(300px,calc(100vw - 96px))}}
+
+/* Shared learn/design control and authoring overlays */
+.experience-mode-toggle{display:inline-flex;flex:0 0 auto;gap:3px;padding:3px;border:1px solid rgba(92,109,151,.12);border-radius:12px;background:rgba(235,239,248,.86);box-shadow:inset 0 1px 2px rgba(37,49,78,.04)}
+.experience-mode-toggle button{min-width:76px;padding:7px 11px;border:0;border-radius:9px;color:#7a8498;background:transparent;font-size:11px;font-weight:700;white-space:nowrap;transition:background .18s ease,color .18s ease,box-shadow .18s ease}
+.experience-mode-toggle button.active{color:#fff;background:#6375df;box-shadow:0 4px 12px rgba(80,96,198,.22)}
+
+.atlas-skill-course-island{right:24px;left:276px;display:grid;width:auto;max-width:none;grid-template-columns:minmax(0,1fr) auto minmax(170px,1fr);gap:18px;padding:7px 12px}
+.atlas-skill-course-island>.atlas-skill-header-left,.atlas-skill-course-island>.atlas-skill-header-center,.atlas-skill-course-island>.atlas-skill-header-actions{display:flex;min-width:0;align-items:center;gap:9px}
+.atlas-skill-course-island>.atlas-skill-header-center{justify-content:center}
+.atlas-skill-course-island>.atlas-skill-header-actions{justify-content:flex-end}
+.atlas-skill-header-left>button{display:grid;width:38px;height:38px;flex:0 0 38px;place-items:center;border:0;border-radius:12px;color:#66758a;background:transparent}
+.atlas-skill-header-left>button:hover{color:var(--atlas-brand);background:rgba(105,126,230,.1)}
+.atlas-skill-course-island .atlas-skill-title{display:grid;min-width:0;grid-template-columns:auto minmax(0,1fr);gap:2px 7px;align-items:baseline}
+.atlas-skill-course-island .atlas-skill-title>span{grid-column:1/-1;overflow:hidden;color:var(--atlas-muted);font-size:9px;letter-spacing:.06em;text-overflow:ellipsis;white-space:nowrap}
+.atlas-skill-course-island .atlas-skill-title>strong{font-size:13px;white-space:nowrap}
+.atlas-skill-course-island .atlas-skill-title>small{overflow:hidden;color:var(--atlas-muted);font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.atlas-skill-course-island .atlas-skill-focus{flex:0 0 auto;height:32px;min-height:32px;padding:0 10px;white-space:nowrap}
+
+.material-reader-current .atlas-lesson-header{grid-template-columns:minmax(210px,.85fr) minmax(260px,1fr) auto;gap:18px}
+.material-reader-current .atlas-lesson-header-left{display:flex;min-width:0;gap:10px;align-items:center}
+.material-reader-current .atlas-lesson-header-left .atlas-lesson-breadcrumb{flex:1}
+
+.atlas-material-draft-badge{padding:3px 7px;border-radius:999px;color:#9b6835;background:#fff1dc;font-size:9px;font-weight:800}
+.atlas-material-picker-backdrop{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:24px;background:rgba(29,37,58,.22);backdrop-filter:blur(4px)}
+.atlas-material-picker{display:flex;width:min(620px,calc(100vw - 48px));max-height:min(680px,calc(100vh - 48px));flex-direction:column;padding:20px;border-radius:22px}
+.atlas-material-picker>header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.atlas-material-picker>header h2{margin:4px 0;font-size:20px}.atlas-material-picker>header p{margin:0;color:#798397;font-size:12px}.atlas-material-picker>header>button{display:grid;width:32px;height:32px;place-items:center;border:0;border-radius:10px;color:#768196;background:#f0f2f7}
+.atlas-material-picker-list{display:grid;gap:8px;margin:18px 0;overflow:auto}.atlas-material-picker-list>button{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:11px;align-items:center;padding:12px;border:1px solid #e3e7f0;border-radius:13px;color:#5365ca;background:#fff;text-align:left}.atlas-material-picker-list>button>span{display:grid;min-width:0;gap:4px}.atlas-material-picker-list>button strong{overflow:hidden;color:#344054;text-overflow:ellipsis;white-space:nowrap}.atlas-material-picker-list>button small{color:#858fa2;font-size:10px}.atlas-material-picker-list>button i{font-size:10px;font-style:normal;font-weight:800}.atlas-material-picker-list>button:disabled{color:#97a0b1;background:#f5f6f9;cursor:default}.atlas-material-picker-list>button:disabled strong{color:#7e8798}
+.atlas-material-picker>footer{display:flex;gap:8px;justify-content:flex-end}.atlas-material-picker>footer button{display:inline-flex;gap:6px;align-items:center}
+
+.lesson-design-assistant{right:28px;bottom:28px}.lesson-design-assistant-panel{max-height:calc(100vh - 112px);overflow:auto}.lesson-assistant-note{margin:11px 0 0;color:#6e7588;font-size:11px;line-height:1.5}.lesson-assistant-preview{display:grid;gap:5px}.lesson-assistant-preview>button,.lesson-assistant-undo{padding:8px 10px;border:0;border-radius:9px;color:#5264c8;background:#eef1ff;font-size:10px}.lesson-assistant-undo{width:100%;margin-top:8px;color:#a6603e;background:rgba(238,158,115,.13)}.lesson-assistant-footnote{display:block;margin-top:8px;color:#929bad;font-size:9px}
+
+@media(max-width:1100px){.atlas-skill-course-island{left:92px}.material-reader-current .atlas-lesson-header{grid-template-columns:minmax(180px,.75fr) minmax(220px,1fr) auto}}
+@media(max-width:760px){.atlas-skill-course-island{grid-template-columns:minmax(0,1fr) auto}.atlas-skill-header-center{grid-column:2}.atlas-skill-header-actions{display:none!important}.material-reader-current .atlas-lesson-header{grid-template-columns:32px minmax(0,1fr) auto}.material-reader-current .atlas-lesson-header-left{display:contents}.material-reader-current .experience-mode-toggle button{min-width:0;padding:7px}.material-reader-current .experience-mode-toggle button:first-child{display:none}}
+.atlas-graph-meta{top:82px;right:24px}
+.atlas-graph-meta.drawer-open{right:calc(min(50vw,760px) + 24px)}

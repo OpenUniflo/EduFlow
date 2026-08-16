@@ -4,7 +4,7 @@ import { GOLDEN_COURSE_ID } from "./goldenCourse.seed";
 const actions:Record<CourseDesignAssistantContext["kind"],CourseDesignAssistantAction[]> = {
   course:[{id:"course-structure",label:"检查课程结构"},{id:"knowledge-dependencies",label:"检查知识依赖"},{id:"material-coverage",label:"检查课件覆盖"},{id:"assignment-coverage",label:"检查实训覆盖"}],
   chapter:[{id:"chapter-coverage",label:"检查篇章覆盖"},{id:"missing-knowledge",label:"检查遗漏知识"},{id:"chapter-assignment",label:"优化篇章实训"},{id:"difficulty-curve",label:"检查难度曲线"}],
-  knowledge:[{id:"knowledge-dependencies",label:"检查前置依赖"},{id:"material-coverage",label:"检查课件覆盖"},{id:"assignment-coverage",label:"检查实训覆盖"},{id:"knowledge-design",label:"优化当前知识点教学设计"}],
+  knowledge:[{id:"knowledge-dependencies",label:"检查前置依赖"},{id:"material-coverage",label:"检查课件覆盖"},{id:"link-material",label:"关联已有课件"},{id:"generate-material",label:"AI 生成课件"},{id:"assignment-coverage",label:"检查实训覆盖"},{id:"knowledge-design",label:"优化当前知识点教学设计"}],
   assignment:[{id:"assignment-copy",label:"优化任务说明"},{id:"inherited-outputs",label:"检查前置成果"},{id:"acceptance-criteria",label:"优化验收标准"},{id:"knowledge-mapping",label:"检查知识对应关系"}]
 };
 const fallback:CourseDesignAssistantResponse={fallback:true,message:"Prototype 当前支持课程结构、依赖、课件覆盖和实训设计等预设 AI 辅助能力。"};

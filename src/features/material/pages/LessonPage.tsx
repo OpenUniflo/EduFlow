@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Check, Pin, Send, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
@@ -19,6 +19,8 @@ import type { Material, UserCourseState, UserMaterialState } from "@/features/co
 import { sortMaterialSegments } from "@/features/material/materialOrdering";
 import { canDesignCourse } from "@/features/auth/capabilities";
 import type { LessonAssistantProvider, LessonAssistantResult } from "@/features/material/lessonAssistant";
+import { ExperienceModeToggle } from "@/shared/components/ExperienceModeToggle";
+import { applyCourseAuthoringDraft, readCourseAuthoringDraft, subscribeCourseAuthoringDraft } from "@/features/course/authoring/courseAuthoringDraft";
 
 const PERSIST_DELAY_MS = 350;
 
@@ -45,8 +47,11 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   const [assistantNote, setAssistantNote] = useState("选择动作后，中央课件会发生真实变化。");
   const [assistantInput, setAssistantInput] = useState("");
   const [assistantPreview, setAssistantPreview] = useState<LessonAssistantResult | null>(null);
+  const [assistantHovered, setAssistantHovered] = useState(false);
+  const [assistantPinned, setAssistantPinned] = useState(false);
   const renderedMaterial = useMemo(() => ({ ...material, segments: draftSegments }), [draftSegments, material]);
   const persistTimerRef = useRef<number | null>(null);
+  const assistantCloseTimerRef = useRef<number | null>(null);
   const viewedSegmentIdsRef = useRef(new Set(savedState?.viewedSegmentIds ?? savedState?.completedSegmentIds ?? []));
 
   const replaceSegmentQuery = useCallback((segmentId: string) => {
@@ -83,7 +88,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   }, [currentPagePrimaryKnowledgeId, reader.activeSegmentId]);
 
   useEffect(() => {
-    if (!reader.activeSegmentId) return;
+    if (!reader.activeSegmentId || material.id.startsWith("draft-material-")) return;
     viewedSegmentIdsRef.current.add(reader.activeSegmentId);
     if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
     persistTimerRef.current = window.setTimeout(() => {
@@ -101,6 +106,8 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
     if (activeAssignmentId && !knowledgeAssignmentContexts.some((context) => context.assignmentId === activeAssignmentId)) setActiveAssignmentId(null);
   }, [activeAssignmentId, knowledgeAssignmentContexts]);
 
+  useEffect(() => () => { if (assistantCloseTimerRef.current) window.clearTimeout(assistantCloseTimerRef.current); }, []);
+
   const previous = orderedSegments[activeIndex - 1];
   const next = orderedSegments[activeIndex + 1];
   function applyAssistantPreview() {
@@ -111,20 +118,30 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
     setAssistantPreview(null);
   }
 
+  function enterAssistant() {
+    if (assistantCloseTimerRef.current) window.clearTimeout(assistantCloseTimerRef.current);
+    setAssistantHovered(true);
+  }
+  function leaveAssistant() {
+    if (assistantPinned) return;
+    assistantCloseTimerRef.current = window.setTimeout(() => setAssistantHovered(false), 220);
+  }
+  const lessonAssistantActions = lessonAssistantProvider?.listActions(material) ?? [];
+  const assistantOpen = assistantHovered || assistantPinned;
+
   return <main className={`atlas-lesson-page material-reader-current ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`}>
     <GlobalNav active="courses" session={session} onLogout={onLogout} />
     <header className="atlas-lesson-header glass-v2">
-      <button className="atlas-lesson-back" onClick={() => navigate(`/courses/${runtime.course.id}`)} aria-label="返回课程技能树"><ArrowLeft size={16} /></button>
-      <div className="atlas-lesson-breadcrumb"><button onClick={() => navigate(`/courses/${runtime.course.id}`)}>{runtime.course.title}</button><span>/</span><span>{lesson?.title ?? material.title}</span></div>
+      <div className="atlas-lesson-header-left"><button className="atlas-lesson-back" onClick={() => navigate(`/courses/${runtime.course.id}`)} aria-label="返回课程技能树"><ArrowLeft size={16} /></button><div className="atlas-lesson-breadcrumb"><button onClick={() => navigate(`/courses/${runtime.course.id}`)}>{runtime.course.title}</button><span>/</span><span>{lesson?.title ?? material.title}</span></div></div>
       <div className="atlas-lesson-title"><strong>{material.title}</strong><small>{material.type === "pdf" ? "Original PDF" : material.type} · {draftSegments.length} 个内容段 · {material.duration ?? "自定进度"}</small></div>
-      {canDesignCourse(session) ? <div className="course-experience-toggle"><button className={experience === "learn" ? "active" : ""} onClick={() => setExperience("learn")}>学习模式</button><button className={experience === "design" ? "active" : ""} onClick={() => setExperience("design")}>课程设计</button></div> : null}
+      {canDesignCourse(session) ? <ExperienceModeToggle value={experience} onChange={setExperience} /> : null}
     </header>
 
     <MaterialOutline material={renderedMaterial} activeSegmentId={reader.activeSegmentId} collapsed={leftCollapsed} onToggle={() => setLeftCollapsed((value) => !value)} onSelect={(segmentId) => reader.navigateToSegment(segmentId, "outline", "smooth")} />
     <MaterialRenderer material={renderedMaterial} activeSegmentId={reader.activeSegmentId} zoom={zoom} navigationRequest={reader.navigationRequest} onVisibleSegmentChange={reader.observeSegment} onNavigationSettled={reader.settleNavigation} />
     <MaterialKnowledgeContext projection={projection} selectedKnowledgeId={knowledgeContextState.selectedKnowledgeId} pinnedKnowledgeId={knowledgeContextState.pinnedKnowledgeId} effectiveKnowledge={effectiveKnowledge} knowledgeAssignmentContexts={knowledgeAssignmentContexts} collapsed={rightCollapsed} onToggle={() => setRightCollapsed((value) => !value)} onSelect={(nodeId) => dispatchKnowledgeContext({ type: "select", nodeId })} onTogglePin={() => dispatchKnowledgeContext(knowledgeContextState.pinnedKnowledgeId ? { type: "unpin", currentPagePrimaryKnowledgeId } : { type: "pin" })} onAssignment={setActiveAssignmentId} />
     <MaterialControls current={activeIndex + 1} total={draftSegments.length} zoom={zoom} onZoom={setZoom} onFit={() => setZoom(1)} onPrevious={() => previous && reader.navigateToSegment(previous.id, "previous", "smooth")} onNext={() => next && reader.navigateToSegment(next.id, "next", "smooth")} />
-    {experience === "design" && lessonAssistantProvider && lessonAssistantProvider.listActions(material).length ? <aside className="lesson-ai-assistant glass-v2"><strong>AI 课件助手</strong><p>{assistantNote}</p>{lessonAssistantProvider.listActions(material).map((action)=><button key={action.id} onClick={() => {const result=lessonAssistantProvider.resolveAction(material,action.id);setAssistantPreview(result);setAssistantNote(result.message);}}>{action.label}</button>)}<div className="lesson-assistant-input"><input value={assistantInput} onChange={(event)=>setAssistantInput(event.target.value)} placeholder="描述你想怎样修改课件…" /><button onClick={()=>{const result=lessonAssistantProvider.resolveText(material,assistantInput);setAssistantPreview(result);setAssistantNote(result.message);}}>发送</button></div>{assistantPreview?.mutation ? <div className="lesson-assistant-preview"><strong>修改预览</strong><span>{assistantPreview.mutation.segment.title}</span><p>{assistantPreview.mutation.segment.content?.lead}</p><button onClick={applyAssistantPreview}>应用修改</button></div> : null}<button className="undo" onClick={() => { setDraftSegments(undoSegments); setAssistantNote("已撤销本次修改。"); setAssistantPreview(null); }}>撤销本次修改</button><small>Prototype · 固定意图映射为可预览、应用和撤销的 Lesson mutation</small></aside> : null}
+    {experience === "design" && lessonAssistantProvider && lessonAssistantActions.length ? <aside className={`lesson-design-assistant course-design-assistant ${assistantOpen ? "open" : ""} ${assistantPinned ? "pinned" : ""}`} onMouseEnter={enterAssistant} onMouseLeave={leaveAssistant} aria-label="AI 课件助手">{assistantOpen ? <section className="course-design-assistant-panel lesson-design-assistant-panel glass-v2"><header><div><Bot size={18}/><span><strong>AI 课件助手</strong><small>{assistantPinned ? "已固定对话" : "悬停预览 · 点击图标固定"}</small></span></div>{assistantPinned ? <button onClick={() => {setAssistantPinned(false);setAssistantHovered(false);}} aria-label="关闭 AI 课件助手"><X size={16}/></button> : null}</header><p className="lesson-assistant-note">{assistantNote}</p><div className="course-design-assistant-actions">{lessonAssistantActions.map((action)=><button key={action.id} onClick={() => {const result=lessonAssistantProvider.resolveAction(material,action.id);setAssistantPreview(result);setAssistantNote(result.message);setAssistantPinned(true);}}>{action.label}</button>)}</div>{assistantPreview?.mutation ? <div className="lesson-assistant-preview"><strong>修改预览</strong><span>{assistantPreview.mutation.segment.title}</span><p>{assistantPreview.mutation.segment.content?.lead}</p><button onClick={applyAssistantPreview}>应用修改</button></div> : null}{assistantPinned ? <><div className="course-design-assistant-input"><input value={assistantInput} onChange={(event)=>setAssistantInput(event.target.value)} onKeyDown={(event)=>{if(event.key === "Enter" && assistantInput.trim()){const result=lessonAssistantProvider.resolveText(material,assistantInput);setAssistantPreview(result);setAssistantNote(result.message);}}} placeholder="描述你想怎样修改课件…" /><button onClick={()=>{if(!assistantInput.trim())return;const result=lessonAssistantProvider.resolveText(material,assistantInput);setAssistantPreview(result);setAssistantNote(result.message);}} aria-label="发送课件修改要求"><Send size={15}/></button></div><button className="lesson-assistant-undo" onClick={() => { setDraftSegments(undoSegments); setAssistantNote("已撤销本次修改。"); setAssistantPreview(null); }}>撤销本次修改</button></> : null}<small className="lesson-assistant-footnote">Prototype · Preview / Apply / Undo</small></section> : null}<button className="course-design-assistant-trigger" onClick={() => {setAssistantPinned((value)=>!value);setAssistantHovered(true);}} aria-label="打开 AI 课件助手" aria-expanded={assistantOpen}><Bot size={22}/>{assistantPinned ? <Pin size={10}/> : null}</button></aside> : null}
 
     {activeAssignment ? <div className="atlas-workflow-modal" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveAssignmentId(null); }}><article className="atlas-workflow-modal-card glass-v2"><button className="atlas-modal-close" onClick={() => setActiveAssignmentId(null)} aria-label="关闭实训详情"><X size={18} /></button><span className="atlas-kicker">COURSE ASSIGNMENT</span><h2>{activeAssignment.assignment.title}</h2><p>{activeAssignment.assignment.description}</p>{activeAssignment.assignment.inheritedOutputs?.length ? <section><h3>已继承成果</h3>{activeAssignment.assignment.inheritedOutputs.map((item)=><div key={item}><Check size={13}/>{item}</div>)}</section>:null}<section><h3>任务要求</h3>{activeAssignment.assignment.requirements.map((requirement) => <div key={requirement}><Check size={13} />{requirement}</div>)}</section><section><h3>预期成果</h3><p>{activeAssignment.assignment.expectedOutput}</p></section><div className="atlas-modal-actions"><button className="atlas-secondary" onClick={() => setActiveAssignmentId(null)}>关闭</button><button className="atlas-primary" onClick={() => navigate(`/courses/${runtime.course.id}/assignments/${activeAssignment.assignment.id}`)}>进入实训 <ArrowRight size={15} /></button></div></article></div> : null}
   </main>;
@@ -133,7 +150,10 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
 export function LessonPage({ session, onLogout, lessonAssistantProvider }: { session: MockSession; onLogout: () => void; lessonAssistantProvider?: LessonAssistantProvider }) {
   const navigate = useNavigate();
   const { courseId = "", materialId = "" } = useParams();
-  const runtime = applicationServices.courseRepository.getCourse(courseId);
+  const baseRuntime = applicationServices.courseRepository.getCourse(courseId);
+  const [authoringRevision, setAuthoringRevision] = useState(0);
+  useEffect(() => subscribeCourseAuthoringDraft(() => setAuthoringRevision((value) => value + 1)), []);
+  const runtime = useMemo(() => baseRuntime ? applyCourseAuthoringDraft(baseRuntime, readCourseAuthoringDraft(courseId)) : undefined, [authoringRevision, baseRuntime, courseId]);
   const material = runtime ? getCourseMaterial(runtime, materialId) : null;
   const userState = useUserCourseState(session.userId, courseId);
 

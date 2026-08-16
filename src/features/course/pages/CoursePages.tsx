@@ -6,6 +6,7 @@ import { GlobalNav } from "@/app/components/GlobalNav";
 import { buildCourseGraphData, buildCourseSummary } from "@/features/course/runtime/courseRuntime";
 import { applicationServices } from "@/app/services/applicationServices";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
+import { publishedCourseRuntimes } from "@/features/course/presentation/courseLifecycle";
 
 const { courseRepository, learningProgressRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
@@ -14,7 +15,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
   const [query, setQuery] = useState("");
   const [progressRevision, setProgressRevision] = useState(0);
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
-  const courses = useMemo(() => courseRepository.listCourseRuntimes().map((runtime) => {
+  const courses = useMemo(() => publishedCourseRuntimes(courseRepository.listCourseRuntimes()).map((runtime) => {
     const state = learningProgressRepository.getCourseState(session.userId, runtime.course.id);
     const graphData = buildCourseGraphData(runtime, state, knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), userKnowledgeRepository.getUserKnowledge(session.userId));
     return { runtime, state, graphData, summary: buildCourseSummary(runtime, state, graphData) };
