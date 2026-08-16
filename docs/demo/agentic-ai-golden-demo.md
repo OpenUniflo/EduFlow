@@ -108,7 +108,9 @@ Lesson 设计模式至少支持：
 
 输入框开放，但命中关键词后映射预设 mutation；未命中走固定 fallback。修改经过 Preview → Apply，并支持撤销最近一次修改。切换 learn/design 保留 session draft，刷新后恢复 seed。
 
-Course Design 的 Material authoring 使用浏览器 `localStorage` overlay：在 Repository Material/Coverage 之上记录关联、取消关联和生成的 Article draft。生成采用固定 700ms 仿真并自动关联当前 Knowledge；生成 Material 可由正常 Lesson route 打开。该状态不修改 Repository seed、不写 Supabase，发布课程也不会把 authoring overlay 持久化到后端。
+Course Design 使用 course-scoped、schema-versioned 的浏览器 `localStorage` Draft Overlay。在 Repository Runtime/Graph 之上记录 Chapter 增删改序、课程 Knowledge 覆盖与移动、课程局部 Draft Candidate、Knowledge dependency、手动坐标、Material 关联/取消关联和生成的 Article draft。生成采用固定 700ms 仿真并自动关联当前 Knowledge；生成 Material 可由正常 Lesson route 打开。该状态不修改 Repository seed、Global Knowledge 或 Supabase。
+
+结构 AI 只返回通用 `CourseAuthoringProposal.operations`。UI 先展示 Preview，再把 Proposal 应用到临时 Overlay 并执行确定性引用、重复边和 DAG 校验；只有通过后才写入 Draft，且整次 Apply 可 Undo。Golden 的拆分、合并、依赖建议和篇章重构是 `src/demo` 中的 scripted Proposal，不是真实 LLM mutation。
 
 ## 9. 固定验收
 
@@ -150,6 +152,16 @@ Teacher 未单独配置密码时使用 local-only Admin acceptance password 作�
 
 仿真：PDF 的 AI 分析推理、课程生成推理、Lesson AI 文案生成、Workflow AI 验收推理和固定结果。
 
-## 13. NEXT: Course Structure Authoring Prototype
+## 13. Course Structure Authoring Prototype
 
-下一轮再处理 Chapter/Knowledge 的新建、删除、重命名、Chapter 归属拖动、Knowledge dependency 编辑、AI 拆分/合并/依赖建议与自定义 Graph layout；本轮 Material authoring overlay 不承担课程结构编辑职责。
+Teacher/Admin 的 Design Mode 在现有 React Flow + ELK 上提供：Chapter 新建、重命名、上移/下移与受控删除；已有 Global Knowledge 的课程覆盖、课程局部 Draft Candidate、从课程移除与 Chapter 下拉移动；节点手动坐标、显式“自动整理”；依赖连线、删除以及 self/duplicate/cycle 防护；snapshot Undo/Redo 和键盘快捷键。
+
+React Flow 的嵌套 Chapter group 不适合可靠的 drop-to-parent 命中，因此拖动只表达 `manualNodePosition`，Chapter 归属由 Drawer 下拉框明确修改。普通 Drawer、selection 和 mode state 不触发手动位置重置；只有教师确认“自动整理”才清除手动坐标并重新使用 ELK。
+
+发布前运行 Publication Check：broken reference、重复/self edge 与 cycle 是 fatal，会阻止 Publish；课件/Assignment 覆盖、Draft Candidate、ChapterOutcome 和 FinalProject 缺口是 warning，允许教师确认后发布。publication lifecycle 与 authoring snapshot 都是当前浏览器 presentation state；发布只切换 `draft → published`，Course Center 和 Student 在同一浏览器中读取已 Apply 的 Editable View，不写后端。
+
+## 14. Prototype 闭环与持久化边界
+
+最终演示闭环为：`AI create → draft → teacher structure authoring → AI Proposal / Preview / Validate / Apply → material authoring → publish check → publish → student learn → Assignment → Workflow → AI Evaluation`。
+
+结构 authoring、Material authoring、AI Proposal Apply 和 publication lifecycle 都仅保存在浏览器本地 overlay。它们不会创建 Global Knowledge、不会更改课程 seed、不会迁移 Supabase schema，也不代表正式版本历史或多人协作。Draft Candidate promote、正式审批、后端持久化、多人协作和真实 Course Authoring Agent 留待产品阶段。

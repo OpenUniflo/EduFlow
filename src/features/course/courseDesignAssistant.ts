@@ -1,5 +1,6 @@
 import { assignmentProjectionForNode, type CourseDetailFacet, type SelectedAnchor } from "@/features/course/courseSelection";
 import type { CourseGraphData, CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
+import type { CourseAuthoringProposal } from "@/features/course/authoring/courseAuthoringProposal";
 
 type CourseContextBase = {
   key: string;
@@ -11,12 +12,12 @@ type CourseContextBase = {
 export type CourseDesignAssistantContext = CourseContextBase & (
   | { kind:"course"; chapterCount:number; knowledgeCount:number; assignmentCount:number }
   | { kind:"chapter"; chapterId:string; knowledgeCount:number; assignmentCount:number; materialCoverageCount:number; stageOutcome?:string }
-  | { kind:"knowledge"; nodeId:string; chapterTitle:string; predecessors:string[]; successors:string[]; relatedMaterials:Array<{id:string;title:string}>; relatedAssignments:string[]; materialCoverageCount:number }
+  | { kind:"knowledge"; nodeId:string; chapterId?:string; chapterTitle:string; predecessorIds?:string[]; predecessors:string[]; successors:string[]; relatedMaterials:Array<{id:string;title:string}>; relatedAssignments:string[]; materialCoverageCount:number }
   | { kind:"assignment"; assignmentId:string; coveredKnowledge:string[]; dependencies:string[]; inheritedOutputs:string[]; acceptanceCriteria:string[]; experienceType:string }
 );
 
 export type CourseDesignAssistantAction = { id:string; label:string };
-export type CourseDesignAssistantResponse = { message:string; fallback?:boolean };
+export type CourseDesignAssistantResponse = { message:string; fallback?:boolean; proposal?:CourseAuthoringProposal };
 
 export interface CourseDesignAssistantProvider {
   getActions(context: CourseDesignAssistantContext): CourseDesignAssistantAction[];
@@ -93,7 +94,9 @@ export function buildCourseDesignAssistantContext(
     key:`knowledge:${node.id}`,
     label:node.title,
     nodeId:node.id,
+    chapterId:node.chapterId,
     chapterTitle,
+    predecessorIds:graphData.knowledgeEdges.filter((edge) => edge.target === node.id).map((edge) => edge.source),
     predecessors:graphData.knowledgeEdges.filter((edge) => edge.target === node.id).map((edge) => titleForNode(edge.source)),
     successors:graphData.knowledgeEdges.filter((edge) => edge.source === node.id).map((edge) => titleForNode(edge.target)),
     relatedMaterials:node.materialContexts.map((context) => ({id:context.materialId,title:context.materialTitle})),

@@ -7,6 +7,7 @@ import { buildCourseGraphData, buildCourseSummary } from "@/features/course/runt
 import { applicationServices } from "@/app/services/applicationServices";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { publishedCourseRuntimes } from "@/features/course/presentation/courseLifecycle";
+import { applyCourseAuthoringDraft, createEditableKnowledgeGraph, readCourseAuthoringDraft, subscribeCourseAuthoringDraft } from "@/features/course/authoring/courseAuthoringDraft";
 
 const { courseRepository, learningProgressRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
@@ -15,9 +16,13 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
   const [query, setQuery] = useState("");
   const [progressRevision, setProgressRevision] = useState(0);
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
-  const courses = useMemo(() => publishedCourseRuntimes(courseRepository.listCourseRuntimes()).map((runtime) => {
+  useEffect(() => subscribeCourseAuthoringDraft(() => setProgressRevision((value) => value + 1)), []);
+  const courses = useMemo(() => publishedCourseRuntimes(courseRepository.listCourseRuntimes()).map((baseRuntime) => {
+    const draft=readCourseAuthoringDraft(baseRuntime.course.id);
+    const runtime=applyCourseAuthoringDraft(baseRuntime,draft);
     const state = learningProgressRepository.getCourseState(session.userId, runtime.course.id);
-    const graphData = buildCourseGraphData(runtime, state, knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), userKnowledgeRepository.getUserKnowledge(session.userId));
+    const graph=createEditableKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)),draft);
+    const graphData = buildCourseGraphData(runtime, state, graph, userKnowledgeRepository.getUserKnowledge(session.userId));
     return { runtime, state, graphData, summary: buildCourseSummary(runtime, state, graphData) };
   }), [progressRevision, session.userId]);
   const needle = query.trim().toLowerCase();

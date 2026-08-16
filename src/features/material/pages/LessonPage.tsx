@@ -20,7 +20,7 @@ import { sortMaterialSegments } from "@/features/material/materialOrdering";
 import { canDesignCourse } from "@/features/auth/capabilities";
 import type { LessonAssistantProvider, LessonAssistantResult } from "@/features/material/lessonAssistant";
 import { ExperienceModeToggle } from "@/shared/components/ExperienceModeToggle";
-import { applyCourseAuthoringDraft, readCourseAuthoringDraft, subscribeCourseAuthoringDraft } from "@/features/course/authoring/courseAuthoringDraft";
+import { applyCourseAuthoringDraft, createEditableKnowledgeRepository, readCourseAuthoringDraft, subscribeCourseAuthoringDraft } from "@/features/course/authoring/courseAuthoringDraft";
 
 const PERSIST_DELAY_MS = 350;
 
@@ -62,7 +62,8 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
 
   const reader = useMaterialReaderState({ material: renderedMaterial, requestedSegmentId, recentSegmentId: savedState?.recentSegmentId, onReplaceSegment: replaceSegmentQuery });
   const access = useMemo(() => userKnowledgeAccess(session.userId), [session.userId]);
-  const projection = useMemo(() => buildMaterialSegmentProjection(runtime, material, reader.activeSegmentId, userState, applicationServices.knowledgeRepository, access, governance), [access, governance, material, reader.activeSegmentId, runtime, userState]);
+  const editableKnowledgeRepository=useMemo(()=>createEditableKnowledgeRepository(applicationServices.knowledgeRepository,readCourseAuthoringDraft(runtime.course.id)),[runtime.course.id,runtime.revision]);
+  const projection = useMemo(() => buildMaterialSegmentProjection(runtime, material, reader.activeSegmentId, userState, editableKnowledgeRepository, access, governance), [access, editableKnowledgeRepository, governance, material, reader.activeSegmentId, runtime, userState]);
   const currentPagePrimaryKnowledgeId = projection?.knowledgeContexts[0]?.nodeId ?? null;
   const [knowledgeContextState, dispatchKnowledgeContext] = useReducer(reduceMaterialKnowledgeContextState, currentPagePrimaryKnowledgeId, createMaterialKnowledgeContextState);
   const effectiveKnowledgeId = resolveEffectiveKnowledgeId(knowledgeContextState, currentPagePrimaryKnowledgeId);
@@ -71,8 +72,8 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
     const roles = knowledgeContextState.pinnedKnowledgeId
       ? buildMaterialKnowledgeRoles(runtime, material.id, effectiveKnowledgeId)
       : projection?.knowledgeContexts.find((context) => context.nodeId === effectiveKnowledgeId)?.roles ?? [];
-    return buildMaterialKnowledgeContext(effectiveKnowledgeId, roles, applicationServices.knowledgeRepository, access, governance);
-  }, [access, effectiveKnowledgeId, governance, knowledgeContextState.pinnedKnowledgeId, material.id, projection, runtime]);
+    return buildMaterialKnowledgeContext(effectiveKnowledgeId, roles, editableKnowledgeRepository, access, governance);
+  }, [access, editableKnowledgeRepository, effectiveKnowledgeId, governance, knowledgeContextState.pinnedKnowledgeId, material.id, projection, runtime]);
   const knowledgeAssignmentContexts = useMemo(() => buildKnowledgeAssignmentContexts(runtime, effectiveKnowledgeId, userState), [effectiveKnowledgeId, runtime, userState]);
   const activeAssignment = knowledgeAssignmentContexts.find((context) => context.assignmentId === activeAssignmentId) ?? null;
   const orderedSegments = useMemo(() => sortMaterialSegments(renderedMaterial), [renderedMaterial]);
@@ -129,7 +130,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   const lessonAssistantActions = lessonAssistantProvider?.listActions(material) ?? [];
   const assistantOpen = assistantHovered || assistantPinned;
 
-  return <main className={`atlas-lesson-page material-reader-current ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`}>
+  return <main className={`atlas-lesson-page material-reader-current ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`} data-experience={experience}>
     <GlobalNav active="courses" session={session} onLogout={onLogout} />
     <header className="atlas-lesson-header glass-v2">
       <div className="atlas-lesson-header-left"><button className="atlas-lesson-back" onClick={() => navigate(`/courses/${runtime.course.id}`)} aria-label="返回课程技能树"><ArrowLeft size={16} /></button><div className="atlas-lesson-breadcrumb"><button onClick={() => navigate(`/courses/${runtime.course.id}`)}>{runtime.course.title}</button><span>/</span><span>{lesson?.title ?? material.title}</span></div></div>

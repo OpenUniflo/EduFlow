@@ -1,5 +1,6 @@
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
 import type { CourseSkillTreeEdge } from "@/features/course/types";
+import type { ManualNodePosition } from "@/features/course/authoring/courseAuthoringDraft";
 import type { CourseLayout, CourseLayoutEdge, CourseLayoutNode } from "./elkCourseLayout";
 
 export type CourseFlowNodeData = CourseLayoutNode & {
@@ -8,6 +9,8 @@ export type CourseFlowNodeData = CourseLayoutNode & {
   searchMatch: boolean;
   onChapterDoubleClick?: (chapter: NonNullable<CourseLayoutNode["chapter"]>) => void;
   onAssignmentClick?: (knowledge: NonNullable<CourseLayoutNode["knowledge"]>) => void;
+  designEnabled: boolean;
+  draftCandidate: boolean;
 } & Record<string, unknown>;
 
 export type CourseFlowEdgeData = CourseLayoutEdge & { highlighted: boolean } & Record<string, unknown>;
@@ -19,7 +22,9 @@ export function toReactFlow(
   selectedId: string | null,
   searchMatchId: string | null,
   onChapterDoubleClick?: CourseFlowNodeData["onChapterDoubleClick"],
-  onAssignmentClick?: CourseFlowNodeData["onAssignmentClick"]
+  onAssignmentClick?: CourseFlowNodeData["onAssignmentClick"],
+  designEnabled = false,
+  manualPositions: Record<string, ManualNodePosition> = {}
 ) {
   const nodes: Array<Node<CourseFlowNodeData>> = layout.nodes.map((node) => ({
     id: node.id,
@@ -27,10 +32,10 @@ export function toReactFlow(
     parentId: node.parentId,
     extent: node.parentId ? "parent" : undefined,
     expandParent: false,
-    position: { x: node.x, y: node.y },
+    position: node.kind === "knowledge" && manualPositions[node.knowledge!.id] ? manualPositions[node.knowledge!.id] : { x: node.x, y: node.y },
     width: node.width,
     height: node.height,
-    draggable: false,
+    draggable: designEnabled && node.kind === "knowledge",
     selectable: true,
     zIndex: node.kind === "chapter" ? (node.expanded ? -1 : 1) : 2,
     data: {
@@ -38,6 +43,8 @@ export function toReactFlow(
       mode,
       selected: selectedId === node.id,
       searchMatch: searchMatchId === node.id,
+      designEnabled,
+      draftCandidate: Boolean(node.knowledge?.knowledge.metadata?.courseDraftCandidate),
       onChapterDoubleClick: node.kind === "chapter" ? onChapterDoubleClick : undefined,
       onAssignmentClick: node.kind === "knowledge" ? onAssignmentClick : undefined
     },
@@ -83,8 +90,8 @@ export function toReactFlow(
           height: 12,
           color: highlighted ? "#6078db" : edge.sourceKind === "curriculum-sequence" ? "#aeb9c7" : "#8493aa"
         },
-        selectable: false,
-        focusable: false,
+        selectable: designEnabled && edge.kind === "knowledge" && edge.relation !== "related",
+        focusable: designEnabled && edge.kind === "knowledge" && edge.relation !== "related",
         zIndex: edge.relation === "related" ? 3 : 0
       };
     });

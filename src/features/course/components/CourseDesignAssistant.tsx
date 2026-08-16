@@ -1,8 +1,9 @@
 import { Bot, Pin, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { CourseDesignAssistantContext, CourseDesignAssistantProvider, CourseDesignAssistantResponse } from "@/features/course/courseDesignAssistant";
+import { describeCourseAuthoringOperation } from "@/features/course/authoring/courseAuthoringProposal";
 
-export function CourseDesignAssistant({ context, provider, drawerOpen, onAction }: { context:CourseDesignAssistantContext; provider?:CourseDesignAssistantProvider; drawerOpen:boolean; onAction?(actionId:string):CourseDesignAssistantResponse | null | Promise<CourseDesignAssistantResponse | null> }) {
+export function CourseDesignAssistant({ context, provider, drawerOpen, onAction, onApplyProposal }: { context:CourseDesignAssistantContext; provider?:CourseDesignAssistantProvider; drawerOpen:boolean; onAction?(actionId:string):CourseDesignAssistantResponse | null | Promise<CourseDesignAssistantResponse | null>; onApplyProposal?(response:CourseDesignAssistantResponse):void }) {
   const actions = provider?.getActions(context) ?? [];
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -41,7 +42,7 @@ export function CourseDesignAssistant({ context, provider, drawerOpen, onAction 
       <header><div><Bot size={18}/><span><strong>AI 课程助手</strong><small>{pinned ? "已固定对话" : "悬停预览 · 点击图标固定"}</small></span></div>{pinned ? <button onClick={() => {setPinned(false);setHovered(false);}} aria-label="关闭 AI 课程助手"><X size={16}/></button> : null}</header>
       <div className="course-design-assistant-context"><span>当前上下文</span><strong>{context.label}</strong><small>{context.kind === "course" ? "Course" : context.kind === "chapter" ? "Chapter" : context.kind === "knowledge" ? "Knowledge" : "Assignment"}</small></div>
       <div className="course-design-assistant-actions">{actions.map((action) => <button key={action.id} disabled={Boolean(pendingAction)} onClick={() => void runAction(action.id)}>{pendingAction === action.id ? "处理中…" : action.label}</button>)}</div>
-      {response ? <div className={`course-design-assistant-response ${response.fallback ? "fallback" : ""}`} role="status">{response.message}</div> : null}
+      {response ? <div className={`course-design-assistant-response ${response.fallback ? "fallback" : ""}`} role="status"><span>{response.message}</span>{response.proposal ? <div className="course-design-proposal-preview"><strong>{response.proposal.title}</strong>{response.proposal.operations.map((operation,index)=><small key={`${operation.type}:${index}`}>{describeCourseAuthoringOperation(operation)}</small>)}<div><button onClick={()=>setResponse(null)}>取消</button><button onClick={()=>onApplyProposal?.(response)}>验证并应用</button></div></div> : null}</div> : null}
       {pinned ? <div className="course-design-assistant-input"><input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {if(event.key === "Enter") send();}} placeholder="询问课程结构、依赖、课件或实训…"/><button onClick={send} aria-label="发送课程设计问题"><Send size={15}/></button></div> : null}
     </section> : null}
     <button className="course-design-assistant-trigger" onClick={() => {setPinned((value) => !value);setHovered(true);}} aria-label="打开 AI 课程助手" aria-expanded={open}><Bot size={22}/>{pinned ? <Pin size={10}/> : null}</button>

@@ -403,6 +403,12 @@
 - Generic Lesson and Workflow UI consume provider/result contracts. Concrete Demo lesson scripts and fixed assessment content MUST live under `src/demo` and be injected by the application composition root.
 - Workflow assessment resolution MUST use the complete explicit `(courseId, assignmentId, workflowTemplateId)` launch context; template identity alone MUST NOT select Course-specific feedback.
 
+## Course Authoring Overlay Invariants
+
+- Prototype Course authoring MUST derive an Editable View from immutable Repository data plus a course-scoped Draft Overlay; it MUST NOT mutate repository fixtures or duplicate the complete `CourseRuntimeData`.
+- A course-local Draft Knowledge Candidate MUST remain inside the authoring overlay and MUST NOT silently create, replace, or delete a Global KnowledgeNode or appear in the Global Atlas.
+- AI structure authoring MUST emit a Proposal/Patch, show its operations for preview, and pass deterministic reference and DAG validation before Apply; providers MUST NOT directly mutate React Flow nodes, KnowledgeEdges, or Course runtime data.
+
 ## Domain Scope Permission Invariants
 
 - Every manual Domain mutation, including unassignment and proposal review, requires `global-domain-admin` in v1.

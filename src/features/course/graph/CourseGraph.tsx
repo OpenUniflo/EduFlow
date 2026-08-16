@@ -1,4 +1,4 @@
-import { BaseEdge, getSmoothStepPath, Handle, Position, ReactFlow, ReactFlowProvider, useReactFlow, type Edge, type EdgeProps, type Node, type NodeProps } from "@xyflow/react";
+import { BaseEdge, getSmoothStepPath, Handle, Position, ReactFlow, ReactFlowProvider, useReactFlow, type Connection, type Edge, type EdgeProps, type Node, type NodeProps } from "@xyflow/react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import "@xyflow/react/dist/style.css";
 import type { CourseChapterProjection, CourseSkillTreeNode } from "@/features/course/types";
@@ -6,6 +6,7 @@ import type { CourseGraphData } from "../runtime/courseRuntime";
 import { buildCourseGraphProjection, type CourseGraphView } from "./courseGraphProjection";
 import { layoutCourseGraph } from "./elkCourseLayout";
 import { toReactFlow, type CourseFlowEdgeData, type CourseFlowNodeData } from "./reactFlowAdapter";
+import type { ManualNodePosition } from "@/features/course/authoring/courseAuthoringDraft";
 
 export type CourseGraphHandle = {
   fit: () => void;
@@ -25,6 +26,11 @@ type Props = {
   onChapterDoubleClick: (chapter: CourseChapterProjection) => void;
   onKnowledgeClick: (node: CourseSkillTreeNode) => void;
   onAssignmentClick: (node: CourseSkillTreeNode) => void;
+  designEnabled?: boolean;
+  manualPositions?: Record<string, ManualNodePosition>;
+  onNodePositionChange?: (nodeId: string, position: ManualNodePosition) => void;
+  onDependencyCreate?: (sourceId: string, targetId: string) => void;
+  onDependencySelect?: (edgeId: string) => void;
 };
 
 function ChapterNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
@@ -52,7 +58,7 @@ function KnowledgeNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
   const assignmentMeta = singleAssignment?.estimatedMinutes ? `预计 ${singleAssignment.estimatedMinutes} 分钟` : `${node.assignmentStateSummary.inProgressCount} 项进行中`;
   return (
     <div className={`course-flow-knowledge status-${node.status} mode-${data.mode} has-assignment ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": node.color } as React.CSSProperties}>
-      <Handle type="target" id="in" position={Position.Left} />
+      <Handle type="target" id="in" position={Position.Left} isConnectable={data.designEnabled} />
       <button className="course-flow-card course-flow-assignment-card" onClick={(event) => { event.stopPropagation(); data.onAssignmentClick?.(node); }} aria-label={`查看实训：${assignmentTitle}`}>
         <span className="course-flow-knowledge-icon">◇</span>
         <strong>{assignmentTitle}</strong>
@@ -61,11 +67,11 @@ function KnowledgeNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
       </button>
       <div className="course-flow-card course-flow-knowledge-card">
         <span className="course-flow-knowledge-icon">◆</span>
-        <strong>{node.title}</strong>
+        <strong>{node.title}{data.draftCandidate ? <small className="course-flow-draft-badge">草稿</small> : null}</strong>
         <small>第 {node.lesson} 课 · {status}</small>
         <em>{node.assignmentCount} 项实训伴生</em>
       </div>
-      <Handle type="source" id="out" position={Position.Right} />
+      <Handle type="source" id="out" position={Position.Right} isConnectable={data.designEnabled} />
     </div>
   );
 }
@@ -111,8 +117,8 @@ const CourseGraphInner = forwardRef<CourseGraphHandle, Props>(function CourseGra
   }, [instance, projection, props.graphData, props.view, structureKey]);
 
   const flow = useMemo(
-    () => layout ? toReactFlow(layout, props.graphData.knowledgeEdges, props.mode, props.selectedId, props.searchMatchId, props.onChapterDoubleClick, props.onAssignmentClick) : { nodes: [], edges: [] },
-    [layout, props.graphData.knowledgeEdges, props.mode, props.onAssignmentClick, props.onChapterDoubleClick, props.searchMatchId, props.selectedId]
+    () => layout ? toReactFlow(layout, props.graphData.knowledgeEdges, props.mode, props.selectedId, props.searchMatchId, props.onChapterDoubleClick, props.onAssignmentClick, props.designEnabled, props.manualPositions) : { nodes: [], edges: [] },
+    [layout, props.designEnabled, props.graphData.knowledgeEdges, props.manualPositions, props.mode, props.onAssignmentClick, props.onChapterDoubleClick, props.searchMatchId, props.selectedId]
   );
 
   useImperativeHandle(ref, () => ({
@@ -132,12 +138,15 @@ const CourseGraphInner = forwardRef<CourseGraphHandle, Props>(function CourseGra
       edges={flow.edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
-      nodesDraggable={false}
-      nodesConnectable={false}
+      nodesDraggable={Boolean(props.designEnabled)}
+      nodesConnectable={Boolean(props.designEnabled)}
       elementsSelectable
       minZoom={0.16}
       maxZoom={1.8}
       proOptions={{ hideAttribution: true }}
+      onNodeDragStop={(_, node) => { if (props.designEnabled && node.data.kind === "knowledge") props.onNodePositionChange?.(node.data.knowledge!.id, node.position); }}
+      onConnect={(connection: Connection) => { if (!props.designEnabled || !connection.source || !connection.target) return; props.onDependencyCreate?.(connection.source.replace(/^knowledge:/, ""), connection.target.replace(/^knowledge:/, "")); }}
+      onEdgeClick={(_, edge) => { if (!props.designEnabled || !edge.selectable) return; props.onDependencySelect?.(edge.data?.sourceEdge?.id ?? edge.id); }}
       onNodeClick={(event, node) => {
         if (node.data.kind !== "chapter") return props.onKnowledgeClick(node.data.knowledge!);
         if (chapterClickTimer.current) window.clearTimeout(chapterClickTimer.current);
