@@ -37,6 +37,19 @@ describe("Course authoring draft overlay", () => {
   it("serializes safely and supports snapshot undo/redo",()=>{
     const storage=memoryStorage(); const initial=emptyCourseAuthoringDraft("course"); const changed=addDraftChapter(initial,{id:"chapter-b",courseId:"course",title:"B",description:"B",outcome:"B",color:"#456",order:1}); expect(writeCourseAuthoringDraft(changed,storage)).toBe(true); expect(readCourseAuthoringDraft("course",storage).addedChapters[0].id).toBe("chapter-b"); expect(undoCourseAuthoringDraft("course",storage)).toBe(true); expect(readCourseAuthoringDraft("course",storage).addedChapters).toHaveLength(0); expect(redoCourseAuthoringDraft("course",storage)).toBe(true); expect(readCourseAuthoringDraft("course",storage).addedChapters).toHaveLength(1);
   });
+  it("persists a cross-Chapter move as one undoable and redoable overlay snapshot",()=>{
+    const storage=memoryStorage(); let state=addDraftChapter(emptyCourseAuthoringDraft("course"),{id:"chapter-b",courseId:"course",title:"B",description:"B",outcome:"B",color:"#456",order:1}); writeCourseAuthoringDraft(state,storage);
+    state=setManualNodePosition(moveCourseKnowledge(state,"a","chapter-b"),"a",{x:40,y:120}); writeCourseAuthoringDraft(state,storage);
+    expect(readCourseAuthoringDraft("course",storage).knowledgeChapterOverrides.a).toBe("chapter-b"); expect(readCourseAuthoringDraft("course",storage).manualNodePositions.a).toEqual({x:40,y:120});
+    undoCourseAuthoringDraft("course",storage); expect(readCourseAuthoringDraft("course",storage).knowledgeChapterOverrides.a).toBeUndefined();
+    redoCourseAuthoringDraft("course",storage); expect(readCourseAuthoringDraft("course",storage).knowledgeChapterOverrides.a).toBe("chapter-b");
+  });
+  it("persists dependency add/delete with undo and redo",()=>{
+    const storage=memoryStorage(); const edge={id:"draft-edge:a:c",source:"a",target:"c",relation:"prerequisite",strength:"hard",reason:"test"} as const; let state=addDraftDependency(emptyCourseAuthoringDraft("course"),edge); writeCourseAuthoringDraft(state,storage); expect(readCourseAuthoringDraft("course",storage).addedDependencies).toHaveLength(1);
+    state=removeDraftDependency(state,edge.id); writeCourseAuthoringDraft(state,storage); expect(readCourseAuthoringDraft("course",storage).addedDependencies).toHaveLength(0);
+    undoCourseAuthoringDraft("course",storage); expect(readCourseAuthoringDraft("course",storage).addedDependencies).toHaveLength(1);
+    redoCourseAuthoringDraft("course",storage); expect(readCourseAuthoringDraft("course",storage).addedDependencies).toHaveLength(0);
+  });
   it("validates and applies AI proposals while rejecting a cyclic patch",()=>{
     const valid:CourseAuthoringProposal={id:"valid",title:"Add B",summary:"Add",operations:[{type:"addKnowledgeCandidate",candidate:{id:"draft-b",title:"B",description:"B",chapterId:"chapter-a"}}]}; const applied=validateCourseAuthoringProposal(runtime,graph,emptyCourseAuthoringDraft("course"),valid); expect(applied.valid).toBe(true); expect(applied.state.addedKnowledgeCandidates).toHaveLength(1);
     const courseState=addExistingKnowledge(addExistingKnowledge(emptyCourseAuthoringDraft("course"),"b","chapter-a"),"c","chapter-a"); const invalid:CourseAuthoringProposal={id:"invalid",title:"Cycle",summary:"Cycle",operations:[{type:"addDependency",edge:{id:"c-a",source:"c",target:"a",relation:"prerequisite",strength:"hard",reason:"cycle"}}]}; expect(validateCourseAuthoringProposal(runtime,graph,courseState,invalid).valid).toBe(false); expect(reduceCourseAuthoringProposal(emptyCourseAuthoringDraft("course"),valid).addedKnowledgeCandidates).toHaveLength(1);
@@ -44,5 +57,14 @@ describe("Course authoring draft overlay", () => {
   it("reports warnings as publishable and cycles as fatal",()=>{
     const warning=validateCourseAuthoring(runtime,graph,addKnowledgeCandidate(emptyCourseAuthoringDraft("course"),{id:"draft-b",title:"B",description:"B",chapterId:"chapter-a"})); expect(warning.fatal).toHaveLength(0); expect(warning.warnings.length).toBeGreaterThan(0);
     const state=addDraftDependency(addExistingKnowledge(addExistingKnowledge(emptyCourseAuthoringDraft("course"),"b","chapter-a"),"c","chapter-a"),{id:"c-a",source:"c",target:"a",relation:"prerequisite",strength:"hard",reason:"cycle"}); expect(validateCourseAuthoring(runtime,graph,state).fatal.some((issue)=>issue.code==="dependency-cycle")).toBe(true);
+  });
+  it("rejects a cross-Chapter move that would make the Chapter projection cyclic",()=>{
+    let state=addDraftChapter(emptyCourseAuthoringDraft("course"),{id:"chapter-b",courseId:"course",title:"B",description:"B",outcome:"B",color:"#456",order:1});
+    state=addExistingKnowledge(state,"b","chapter-a");
+    state=addExistingKnowledge(state,"c","chapter-b");
+    state=moveCourseKnowledge(state,"a","chapter-b");
+    const result=validateCourseAuthoring(runtime,graph,state);
+    expect(result.fatal.some((issue)=>issue.code==="chapter-dependency-cycle")).toBe(true);
+    expect(result.summary.dagValid).toBe(false);
   });
 });

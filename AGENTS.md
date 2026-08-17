@@ -408,6 +408,12 @@
 - Prototype Course authoring MUST derive an Editable View from immutable Repository data plus a course-scoped Draft Overlay; it MUST NOT mutate repository fixtures or duplicate the complete `CourseRuntimeData`.
 - A course-local Draft Knowledge Candidate MUST remain inside the authoring overlay and MUST NOT silently create, replace, or delete a Global KnowledgeNode or appear in the Global Atlas.
 - AI structure authoring MUST emit a Proposal/Patch, show its operations for preview, and pass deterministic reference and DAG validation before Apply; providers MUST NOT directly mutate React Flow nodes, KnowledgeEdges, or Course runtime data.
+- Course authoring selection and Drawer visibility are independent presentation state. Closing the Drawer MUST release its layout reservation without clearing the selected graph anchor or resetting the viewport.
+- A cross-Chapter Knowledge drop MUST commit Chapter ownership and Chapter-relative manual position in one Draft Overlay snapshot and MUST be rejected if the resulting Chapter projection is cyclic.
+
+## Administrator Base Capability
+
+- `role=admin` MUST receive administrator base UI capabilities without requiring the legacy `global-domain-admin` capability. The legacy capability remains a supported additive grant for compatible non-admin accounts.
 
 ## Domain Scope Permission Invariants
 

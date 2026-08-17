@@ -1,5 +1,6 @@
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import type { KnowledgeGraph } from "@/features/knowledge/types";
+import { selectPrimaryCurriculumCoverage } from "@/features/course/curriculum/curriculumOrdering";
 import { applyCourseAuthoringDraft, createEditableKnowledgeGraph, type CourseAuthoringDraftState } from "./courseAuthoringDraft";
 
 export type AuthoringValidationIssue = { code: string; message: string };
@@ -56,6 +57,26 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
   const dagValid = !findCycle(courseNodeIds, courseEdges);
   if (!dagValid) fatal.push({ code: "dependency-cycle", message: "Knowledge 依赖图存在循环。" });
 
+  const lessonById = new Map(editable.lessons.map((lesson) => [lesson.id, lesson]));
+  const primaryChapterByNode = new Map([...courseNodeIds].map((nodeId) => {
+    const coverage = selectPrimaryCurriculumCoverage(editable.curriculumCoverages.filter((item) => item.nodeId === nodeId), editable.lessons);
+    return [nodeId, coverage ? lessonById.get(coverage.lessonId)?.chapterId : undefined];
+  }));
+  const chapterPairs = new Map<string, { source: string; target: string }>();
+  courseEdges.filter((edge) => edge.relation !== "related").forEach((edge) => {
+    const source = primaryChapterByNode.get(edge.source);
+    const target = primaryChapterByNode.get(edge.target);
+    if (source && target && source !== target) chapterPairs.set(`${source}:${target}`, { source, target });
+  });
+  const incidentChapterIds = new Set([...chapterPairs.values()].flatMap((edge) => [edge.source, edge.target]));
+  editable.chapters.filter((chapter) => chapter.order > 1 && !incidentChapterIds.has(chapter.id)).forEach((chapter) => {
+    const sequence = [...editable.curriculumSequences].reverse().find((item) => lessonById.get(item.targetLessonId)?.chapterId === chapter.id && lessonById.get(item.sourceLessonId)?.chapterId !== chapter.id);
+    const source = sequence ? lessonById.get(sequence.sourceLessonId)?.chapterId : undefined;
+    if (source) chapterPairs.set(`${source}:${chapter.id}`, { source, target: chapter.id });
+  });
+  const chapterDagValid = !findCycle(new Set(chapterIds), [...chapterPairs.values()]);
+  if (!chapterDagValid) fatal.push({ code: "chapter-dependency-cycle", message: "该变更会让篇章聚合依赖形成循环，请选择其他篇章或调整 Knowledge 依赖。" });
+
   const materials = new Map(editable.materials.map((material) => [material.id, material]));
   editable.materialKnowledgeCoverages.forEach((coverage) => {
     const material = materials.get(coverage.materialId);
@@ -74,5 +95,5 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
   if (missingOutcomes.length) warnings.push({ code: "missing-chapter-outcome", message: `${missingOutcomes.length} 个篇章没有正式 ChapterOutcome。` });
   if (!editable.finalProjects.length) warnings.push({ code: "missing-final-project", message: "课程尚未配置 FinalProject。" });
 
-  return { fatal, warnings, summary: { chapterCount: editable.chapters.length, knowledgeCount: courseNodeIds.size, assignmentCoveredCount: assignmentCovered.size, materialCoveredCount: materialCovered.size, candidateCount: candidates.length, dagValid } };
+  return { fatal, warnings, summary: { chapterCount: editable.chapters.length, knowledgeCount: courseNodeIds.size, assignmentCoveredCount: assignmentCovered.size, materialCoveredCount: materialCovered.size, candidateCount: candidates.length, dagValid: dagValid && chapterDagValid } };
 }

@@ -7,6 +7,7 @@ import { buildCourseGraphProjection, type CourseGraphView } from "./courseGraphP
 import { layoutCourseGraph } from "./elkCourseLayout";
 import { toReactFlow, type CourseFlowEdgeData, type CourseFlowNodeData } from "./reactFlowAdapter";
 import type { ManualNodePosition } from "@/features/course/authoring/courseAuthoringDraft";
+import { findChapterDropTarget, toChapterRelativePosition, type CourseGraphRect } from "./courseGraphInteraction";
 
 export type CourseGraphHandle = {
   fit: () => void;
@@ -28,7 +29,7 @@ type Props = {
   onAssignmentClick: (node: CourseSkillTreeNode) => void;
   designEnabled?: boolean;
   manualPositions?: Record<string, ManualNodePosition>;
-  onNodePositionChange?: (nodeId: string, position: ManualNodePosition) => void;
+  onKnowledgeDrop?: (nodeId: string, chapterId: string, position: ManualNodePosition) => void;
   onDependencyCreate?: (sourceId: string, targetId: string) => void;
   onDependencySelect?: (edgeId: string) => void;
 };
@@ -39,7 +40,7 @@ function ChapterNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
   const assignment = chapter.assignmentSummary;
   const assignmentStatus = `${assignment.completedCount} 项完成 · ${assignment.inProgressCount} 项进行中`;
   return (
-    <div className={`course-flow-chapter ${data.expanded ? "expanded" : "collapsed"} mode-${data.mode} ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": chapter.color } as React.CSSProperties} onDoubleClick={(event) => { event.stopPropagation(); data.onChapterDoubleClick?.(chapter); }}>
+    <div className={`course-flow-chapter ${data.expanded ? "expanded" : "collapsed"} mode-${data.mode} ${data.selected || data.searchMatch ? "selected" : ""} ${data.dropTarget ? "drop-target" : ""}`} style={{ "--node-color": chapter.color } as React.CSSProperties} onDoubleClick={(event) => { event.stopPropagation(); data.onChapterDoubleClick?.(chapter); }}>
       <Handle type="target" id="in" position={Position.Left} />
       <div className="course-flow-chapter-presentation knowledge-presentation"><div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")}</small><strong>{chapter.title}</strong><em>{chapter.lessonCount} 课 · {assignment.progress >= 100 ? "✓ 阶段已完成" : assignment.progress ? "● 当前学习" : "可学习"}</em></span></div>{!data.expanded ? <p>{chapter.description}</p> : <div className="course-flow-chapter-caption">{chapter.title} · 原子知识与实训伴生层 · Knowledge mastery {progress}%</div>}</div>
       <div className="course-flow-chapter-presentation assignment-presentation"><div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")} · 实训</small><strong>{chapter.title} · 实训</strong><em>{assignment.assignmentCount} 项实训 · 完成度 {assignment.progress}%</em></span></div>{!data.expanded ? <p>{assignmentStatus}<br />篇章成果：{assignment.outcome}</p> : <div className="course-flow-chapter-caption">{assignmentStatus} · 篇章成果：{assignment.outcome}</div>}</div>
@@ -58,7 +59,7 @@ function KnowledgeNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
   const assignmentMeta = singleAssignment?.estimatedMinutes ? `预计 ${singleAssignment.estimatedMinutes} 分钟` : `${node.assignmentStateSummary.inProgressCount} 项进行中`;
   return (
     <div className={`course-flow-knowledge status-${node.status} mode-${data.mode} has-assignment ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": node.color } as React.CSSProperties}>
-      <Handle type="target" id="in" position={Position.Left} isConnectable={data.designEnabled} />
+      <Handle type="target" id="in" position={Position.Left} isConnectable={data.designEnabled} className="course-dependency-handle target" aria-label={`连接到 ${node.title}`} />
       <button className="course-flow-card course-flow-assignment-card" onClick={(event) => { event.stopPropagation(); data.onAssignmentClick?.(node); }} aria-label={`查看实训：${assignmentTitle}`}>
         <span className="course-flow-knowledge-icon">◇</span>
         <strong>{assignmentTitle}</strong>
@@ -71,7 +72,7 @@ function KnowledgeNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
         <small>第 {node.lesson} 课 · {status}</small>
         <em>{node.assignmentCount} 项实训伴生</em>
       </div>
-      <Handle type="source" id="out" position={Position.Right} isConnectable={data.designEnabled} />
+      <Handle type="source" id="out" position={Position.Right} isConnectable={data.designEnabled} className="course-dependency-handle source" aria-label={`从 ${node.title} 创建依赖`} />
     </div>
   );
 }
@@ -101,6 +102,7 @@ const CourseGraphInner = forwardRef<CourseGraphHandle, Props>(function CourseGra
   const chapterClickTimer = useRef<number | null>(null);
   const layoutRequestRef = useRef(0);
   const fittedStructureRef = useRef<string | null>(null);
+  const [dropTargetChapterId, setDropTargetChapterId] = useState<string | null>(null);
   const projection = useMemo(() => buildCourseGraphProjection(props.graphData, props.view, props.focusedChapterId), [props.focusedChapterId, props.graphData, props.view]);
   const [layout, setLayout] = useState<Awaited<ReturnType<typeof layoutCourseGraph>> | null>(null);
   const structureKey = `${props.graphData.courseId}:${props.graphData.revision}:${props.view}:${props.focusedChapterId ?? "all-collapsed"}`;
@@ -117,9 +119,18 @@ const CourseGraphInner = forwardRef<CourseGraphHandle, Props>(function CourseGra
   }, [instance, projection, props.graphData, props.view, structureKey]);
 
   const flow = useMemo(
-    () => layout ? toReactFlow(layout, props.graphData.knowledgeEdges, props.mode, props.selectedId, props.searchMatchId, props.onChapterDoubleClick, props.onAssignmentClick, props.designEnabled, props.manualPositions) : { nodes: [], edges: [] },
-    [layout, props.designEnabled, props.graphData.knowledgeEdges, props.manualPositions, props.mode, props.onAssignmentClick, props.onChapterDoubleClick, props.searchMatchId, props.selectedId]
+    () => layout ? toReactFlow(layout, props.graphData.knowledgeEdges, props.mode, props.selectedId, props.searchMatchId, props.onChapterDoubleClick, props.onAssignmentClick, props.designEnabled, props.manualPositions, dropTargetChapterId) : { nodes: [], edges: [] },
+    [dropTargetChapterId, layout, props.designEnabled, props.graphData.knowledgeEdges, props.manualPositions, props.mode, props.onAssignmentClick, props.onChapterDoubleClick, props.searchMatchId, props.selectedId]
   );
+
+  function graphRect(node: Node<CourseFlowNodeData>): CourseGraphRect {
+    const position = node.position;
+    return { id: node.id, x: position.x, y: position.y, width: node.measured?.width ?? node.width ?? 0, height: node.measured?.height ?? node.height ?? 0 };
+  }
+
+  function dropTargetFor(node: Node<CourseFlowNodeData>) {
+    return findChapterDropTarget(graphRect(node), instance.getNodes().filter((item) => item.data.kind === "chapter").map((item) => graphRect(item as Node<CourseFlowNodeData>)));
+  }
 
   useImperativeHandle(ref, () => ({
     fit: () => instance.fitView({ padding: 0.14, duration: 420, maxZoom: props.view === "full" ? 0.76 : 1.05 }),
@@ -144,8 +155,22 @@ const CourseGraphInner = forwardRef<CourseGraphHandle, Props>(function CourseGra
       minZoom={0.16}
       maxZoom={1.8}
       proOptions={{ hideAttribution: true }}
-      onNodeDragStop={(_, node) => { if (props.designEnabled && node.data.kind === "knowledge") props.onNodePositionChange?.(node.data.knowledge!.id, node.position); }}
+      onNodeDrag={(_, node) => { if (props.designEnabled && node.data.kind === "knowledge") setDropTargetChapterId(dropTargetFor(node)?.replace(/^chapter:/, "") ?? null); }}
+      onNodeDragStop={(_, node) => {
+        setDropTargetChapterId(null);
+        if (!props.designEnabled || node.data.kind !== "knowledge") return;
+        const sourceChapterId = node.data.knowledge!.chapterId;
+        const targetFlowId = dropTargetFor(node) ?? `chapter:${sourceChapterId}`;
+        const targetChapter = instance.getNode(targetFlowId) as Node<CourseFlowNodeData> | undefined;
+        if (!targetChapter) return;
+        props.onKnowledgeDrop?.(node.data.knowledge!.id, targetFlowId.replace(/^chapter:/, ""), toChapterRelativePosition(graphRect(node), graphRect(targetChapter)));
+      }}
       onConnect={(connection: Connection) => { if (!props.designEnabled || !connection.source || !connection.target) return; props.onDependencyCreate?.(connection.source.replace(/^knowledge:/, ""), connection.target.replace(/^knowledge:/, "")); }}
+      onConnectEnd={(_, connectionState) => {
+        if (!props.designEnabled || !connectionState.fromNode || !connectionState.toNode || connectionState.fromNode.id !== connectionState.toNode.id) return;
+        const nodeId = connectionState.fromNode.id.replace(/^knowledge:/, "");
+        props.onDependencyCreate?.(nodeId, nodeId);
+      }}
       onEdgeClick={(_, edge) => { if (!props.designEnabled || !edge.selectable) return; props.onDependencySelect?.(edge.data?.sourceEdge?.id ?? edge.id); }}
       onNodeClick={(event, node) => {
         if (node.data.kind !== "chapter") return props.onKnowledgeClick(node.data.knowledge!);

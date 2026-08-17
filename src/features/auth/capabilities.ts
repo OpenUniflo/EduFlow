@@ -1,7 +1,7 @@
 import type { MockSession } from "./types";
 
-export function canManageKnowledgeDomains(session: Pick<MockSession, "capabilities"> | null | undefined) {
-  return Boolean(session?.capabilities.includes("global-domain-admin"));
+export function canManageKnowledgeDomains(session: (Pick<MockSession, "capabilities"> & Partial<Pick<MockSession, "role">>) | null | undefined) {
+  return Boolean(session && (session.role === "admin" || session.capabilities.includes("global-domain-admin")));
 }
 
 export function canLearn(session: MockSession | null | undefined) { return Boolean(session); }

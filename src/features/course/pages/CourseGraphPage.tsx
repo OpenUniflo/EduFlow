@@ -21,6 +21,7 @@ import { addDraftChapter, addDraftDependency, addExistingKnowledge, addGenerated
 import { validateCourseAuthoring } from "@/features/course/authoring/courseAuthoringValidation";
 import { validateCourseAuthoringProposal } from "@/features/course/authoring/courseAuthoringProposal";
 import { setCoursePresentationLifecycle } from "@/features/course/presentation/courseLifecycle";
+import { shouldReserveCourseDrawer } from "@/features/course/graph/courseGraphInteraction";
 
 const { courseRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
@@ -40,9 +41,11 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   const baseKnowledgeGraph = useMemo(() => knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), [session.userId]);
   const editableKnowledgeGraph = useMemo(() => draftState ? createEditableKnowledgeGraph(baseKnowledgeGraph, draftState) : baseKnowledgeGraph, [baseKnowledgeGraph, draftState]);
   const runtime = useMemo(() => baseRuntime && draftState ? applyCourseAuthoringDraft(baseRuntime, draftState) : undefined, [baseRuntime, draftState]);
+  const validation = useMemo(() => baseRuntime && draftState ? validateCourseAuthoring(baseRuntime, baseKnowledgeGraph, draftState) : null, [baseKnowledgeGraph, baseRuntime, draftState]);
+  const graphRuntime = validation?.fatal.length ? baseRuntime : runtime;
   const orderedMaterials = useMemo(() => runtime ? sortMaterials(runtime.materials, runtime.lessons) : [], [runtime]);
   const userCourseState = useUserCourseState(session.userId, courseId);
-  const graphData = useMemo(() => runtime ? buildCourseGraphData(runtime, userCourseState, editableKnowledgeGraph, userKnowledgeRepository.getUserKnowledge(session.userId)) : null, [editableKnowledgeGraph, runtime, session.userId, userCourseState]);
+  const graphData = useMemo(() => graphRuntime ? buildCourseGraphData(graphRuntime, userCourseState, validation?.fatal.length ? baseKnowledgeGraph : editableKnowledgeGraph, userKnowledgeRepository.getUserKnowledge(session.userId)) : null, [baseKnowledgeGraph, editableKnowledgeGraph, graphRuntime, session.userId, userCourseState, validation?.fatal.length]);
   const courseChapters = graphData?.chapters ?? [];
   const courseSkillTreeNodes = graphData?.knowledgeNodes ?? [];
   const courseSkillTreeEdges = graphData?.knowledgeEdges ?? [];
@@ -76,9 +79,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   const selectedFlowId = flowIdForAnchor(selectedAnchor);
   const assignmentProjection = selectedNode && detailFacet === "assignment" ? assignmentProjectionForNode(selectedNode, activeAssignmentId) : null;
   const chapterAssignment = selectedChapter && detailFacet === "assignment" ? buildChapterAssignmentProjection(selectedChapter, courseSkillTreeNodes) : null;
-  const drawerOpen = Boolean((drawerVisible && selectedAnchor) || materialsOpen);
+  const drawerOpen = shouldReserveCourseDrawer({ drawerVisible, selectedAnchor, materialsOpen });
   const historyStatus = draftState ? getCourseAuthoringHistoryStatus(draftState.courseId) : { canUndo:false, canRedo:false };
-  const validation = useMemo(() => baseRuntime && draftState ? validateCourseAuthoring(baseRuntime, baseKnowledgeGraph, draftState) : null, [baseKnowledgeGraph, baseRuntime, draftState]);
   const availableKnowledge = useMemo(() => {
     const covered=new Set(courseSkillTreeNodes.map((node)=>node.id)); const needle=knowledgeQuery.trim().toLowerCase();
     return baseKnowledgeGraph.nodes.filter((node)=>!covered.has(node.id)&&(!needle||`${node.id} ${node.title} ${node.description}`.toLowerCase().includes(needle))).slice(0,24);
@@ -168,7 +170,13 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
 
   function updateAuthoringDraft(update: (state: ReturnType<typeof readCourseAuthoringDraft>) => ReturnType<typeof readCourseAuthoringDraft>) {
     if (!baseRuntime) return;
-    writeCourseAuthoringDraft(update(readCourseAuthoringDraft(baseRuntime.course.id)));
+    const next = update(readCourseAuthoringDraft(baseRuntime.course.id));
+    const nextValidation = validateCourseAuthoring(baseRuntime, baseKnowledgeGraph, next);
+    if (nextValidation.fatal.length) {
+      setDesignActionNotice(`无法应用变更：${nextValidation.fatal[0].message}`);
+      return false;
+    }
+    return writeCourseAuthoringDraft(next);
   }
 
   function createChapter() {
@@ -235,8 +243,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     const ids=courseSkillTreeNodes.map((node)=>node.id); const edges=courseSkillTreeEdges.map((edge)=>({source:edge.source,target:edge.target}));
     const result=validateDependencyAddition(ids,edges,sourceId,targetId);
     if(!result.valid){setDesignActionNotice(result.reason==="cycle"?"无法创建依赖：该操作会形成循环依赖。":result.reason==="self"?"无法创建依赖：不能连接自身。":result.reason==="duplicate"?"无法创建依赖：该关系已存在。":"无法创建依赖：节点不在当前课程。 ");return;}
-    updateAuthoringDraft((state)=>addDraftDependency(state,{id:`draft-edge:${sourceId}:${targetId}`,source:sourceId,target:targetId,relation:"prerequisite",strength:"hard",reason:"Teacher-authored Course dependency"}));
-    setDesignActionNotice("已创建课程草稿依赖。");
+    const committed = updateAuthoringDraft((state)=>addDraftDependency(state,{id:`draft-edge:${sourceId}:${targetId}`,source:sourceId,target:targetId,relation:"prerequisite",strength:"hard",reason:"Teacher-authored Course dependency"}));
+    if (committed) setDesignActionNotice("已创建课程草稿依赖。");
   }
 
   function deleteSelectedDependency() {
@@ -248,7 +256,7 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     if(!response.proposal||!baseRuntime||!draftState)return;
     const result=validateCourseAuthoringProposal(baseRuntime,baseKnowledgeGraph,draftState,response.proposal);
     if(!result.valid){setDesignActionNotice(`AI Proposal 未应用：${result.validation.fatal[0]?.message ?? "校验失败"}`);return;}
-    writeCourseAuthoringDraft(result.state); setDesignActionNotice("AI Proposal 已验证并应用，可使用 Undo 撤回。");
+    if (updateAuthoringDraft(() => result.state)) setDesignActionNotice("AI Proposal 已验证并应用，可使用 Undo 撤回。");
   }
 
   function publishCourse() {
@@ -434,8 +442,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
         <div className="atlas-skill-header-actions">{view !== "full" ? <button className="atlas-skill-focus" onClick={() => changeView("full")}>展开全部篇章 <ArrowRight size={12} /></button> : <button className="atlas-skill-focus" onClick={() => changeView("overview")}>折叠为篇章总览 <X size={12} /></button>}</div>
       </header>
 
-      {designEnabled ? <div className={`course-authoring-toolbar glass-v2 ${drawerOpen ? "drawer-open" : ""}`}><button onClick={createChapter}><Plus size={14}/>新建篇章</button><button onClick={()=>setKnowledgePickerOpen(true)}><Plus size={14}/>添加知识点</button><button onClick={createCandidate}><Sparkles size={14}/>草稿知识点</button><span/><button disabled={!historyStatus.canUndo} onClick={()=>undoCourseAuthoringDraft(courseId)} title="Cmd/Ctrl + Z"><Undo2 size={14}/>Undo</button><button disabled={!historyStatus.canRedo} onClick={()=>redoCourseAuthoringDraft(courseId)} title="Cmd/Ctrl + Shift + Z"><Redo2 size={14}/>Redo</button><button onClick={()=>{if(Object.keys(draftState?.manualNodePositions??{}).length&&!window.confirm("自动整理会覆盖手动布局，继续吗？"))return;updateAuthoringDraft(clearManualNodePositions);window.setTimeout(()=>graphRef.current?.fit(),80);}}><WandSparkles size={14}/>自动整理</button><button className="publish" onClick={()=>setPublishCheckOpen(true)}>发布检查</button></div>:null}
-      <div className={`atlas-graph-stage ${drawerOpen ? "drawer-open" : ""}`}><CourseGraph ref={graphRef} graphData={graphData} view={view} focusedChapterId={focusedChapterId} mode={mode} selectedId={selectedFlowId} searchMatchId={searchMatch} designEnabled={designEnabled} manualPositions={draftState?.manualNodePositions} onNodePositionChange={(nodeId,position)=>updateAuthoringDraft((state)=>setManualNodePosition(state,nodeId,position))} onDependencyCreate={createDependency} onDependencySelect={setSelectedDependencyId} onChapterClick={selectChapter} onChapterDoubleClick={focusChapter} onKnowledgeClick={selectKnowledge} onAssignmentClick={selectKnowledge} /></div>
+      {designEnabled ? <div className={`course-authoring-toolbar glass-v2 ${drawerOpen ? "drawer-open" : ""}`}><button onClick={createChapter} title="新建篇章"><Plus size={14}/>新建篇章</button><button onClick={()=>setKnowledgePickerOpen(true)} title="添加知识点"><Plus size={14}/>添加知识点</button><button onClick={createCandidate} title="草稿知识点"><Sparkles size={14}/>草稿知识点</button><span/><button disabled={!historyStatus.canUndo} onClick={()=>undoCourseAuthoringDraft(courseId)} title="Undo · Cmd/Ctrl + Z"><Undo2 size={14}/>Undo</button><button disabled={!historyStatus.canRedo} onClick={()=>redoCourseAuthoringDraft(courseId)} title="Redo · Cmd/Ctrl + Shift + Z"><Redo2 size={14}/>Redo</button><button onClick={()=>{if(Object.keys(draftState?.manualNodePositions??{}).length&&!window.confirm("自动整理会覆盖手动布局，继续吗？"))return;updateAuthoringDraft(clearManualNodePositions);window.setTimeout(()=>graphRef.current?.fit(),80);}} title="自动整理"><WandSparkles size={14}/>自动整理</button><button className="publish" onClick={()=>setPublishCheckOpen(true)}>发布检查</button></div>:null}
+      <div className={`atlas-graph-stage ${drawerOpen ? "drawer-open" : ""}`}><CourseGraph ref={graphRef} graphData={graphData} view={view} focusedChapterId={focusedChapterId} mode={mode} selectedId={selectedFlowId} searchMatchId={searchMatch} designEnabled={designEnabled} manualPositions={draftState?.manualNodePositions} onKnowledgeDrop={(nodeId,chapterId,position)=>updateAuthoringDraft((state)=>setManualNodePosition(moveCourseKnowledge(state,nodeId,chapterId),nodeId,position))} onDependencyCreate={createDependency} onDependencySelect={setSelectedDependencyId} onChapterClick={selectChapter} onChapterDoubleClick={focusChapter} onKnowledgeClick={selectKnowledge} onAssignmentClick={selectKnowledge} /></div>
       <div className={`atlas-graph-meta ${drawerOpen ? "drawer-open" : ""}`}><div className={`atlas-graph-search glass-v2 ${searchExpanded ? "expanded" : ""}`}><button onClick={() => { setSearchExpanded((value) => !value); window.setTimeout(() => searchRef.current?.focus(), 0); }} aria-label="搜索技能树"><Search size={20} /></button><input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") executeSearch(); }} placeholder="搜索篇章、知识点或实训…" /></div></div>
       <div className={`atlas-graph-toolbar glass-v2 ${drawerOpen ? "drawer-open" : ""}`}><button onClick={() => graphRef.current?.zoomIn()} data-tip="放大" aria-label="放大"><Plus size={17} /></button><button onClick={() => graphRef.current?.zoomOut()} data-tip="缩小" aria-label="缩小"><Minus size={17} /></button><button onClick={() => graphRef.current?.fit()} data-tip="适配全图" aria-label="适配全图"><Maximize2 size={17} /></button><span /><button className={mode === "assignment" ? "active" : ""} onClick={switchMode} data-tip="切换技能树 / 实训树" aria-label="切换技能树与实训树"><Layers3 size={17} /></button><button onClick={() => setMaterialsOpen(true)} data-tip="查看全部关联课件" aria-label="查看关联课件"><BookOpen size={17} /></button><button disabled={!selectedAnchor} onClick={() => selectedFlowId && graphRef.current?.focus(selectedFlowId)} data-tip="定位当前节点" aria-label="定位当前节点"><Crosshair size={17} /></button><button onClick={() => changeView("overview")} data-tip="返回篇章总览" aria-label="返回篇章总览"><Network size={17} /></button></div>
       <button className={`atlas-graph-legend glass-v2 ${legendCollapsed ? "collapsed" : ""}`} onClick={() => setLegendCollapsed((value) => !value)}><strong>学习状态 <span>{legendCollapsed ? "＋" : "－"}</span></strong><div><span><i className="done" /> 已完成</span><span><i className="learning" /> 学习中</span><span><i className="available" /> 可学习</span><span><i className="locked" /> 未解锁</span><span><i className="sequence" /> 教学顺序补充</span></div></button>

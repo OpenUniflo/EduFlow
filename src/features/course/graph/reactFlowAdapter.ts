@@ -11,6 +11,7 @@ export type CourseFlowNodeData = CourseLayoutNode & {
   onAssignmentClick?: (knowledge: NonNullable<CourseLayoutNode["knowledge"]>) => void;
   designEnabled: boolean;
   draftCandidate: boolean;
+  dropTarget: boolean;
 } & Record<string, unknown>;
 
 export type CourseFlowEdgeData = CourseLayoutEdge & { highlighted: boolean } & Record<string, unknown>;
@@ -24,32 +25,42 @@ export function toReactFlow(
   onChapterDoubleClick?: CourseFlowNodeData["onChapterDoubleClick"],
   onAssignmentClick?: CourseFlowNodeData["onAssignmentClick"],
   designEnabled = false,
-  manualPositions: Record<string, ManualNodePosition> = {}
+  manualPositions: Record<string, ManualNodePosition> = {},
+  dropTargetChapterId: string | null = null
 ) {
-  const nodes: Array<Node<CourseFlowNodeData>> = layout.nodes.map((node) => ({
-    id: node.id,
-    type: node.kind === "chapter" ? "chapter" : "knowledge",
-    parentId: node.parentId,
-    extent: node.parentId ? "parent" : undefined,
-    expandParent: false,
-    position: node.kind === "knowledge" && manualPositions[node.knowledge!.id] ? manualPositions[node.knowledge!.id] : { x: node.x, y: node.y },
-    width: node.width,
-    height: node.height,
-    draggable: designEnabled && node.kind === "knowledge",
-    selectable: true,
-    zIndex: node.kind === "chapter" ? (node.expanded ? -1 : 1) : 2,
-    data: {
-      ...node,
-      mode,
-      selected: selectedId === node.id,
-      searchMatch: searchMatchId === node.id,
-      designEnabled,
-      draftCandidate: Boolean(node.knowledge?.knowledge.metadata?.courseDraftCandidate),
-      onChapterDoubleClick: node.kind === "chapter" ? onChapterDoubleClick : undefined,
-      onAssignmentClick: node.kind === "knowledge" ? onAssignmentClick : undefined
-    },
-    style: { width: node.width, height: node.height }
-  }));
+  const chapterById = new Map(layout.nodes.filter((node) => node.kind === "chapter").map((node) => [node.id, node]));
+  const nodes: Array<Node<CourseFlowNodeData>> = layout.nodes.map((node) => {
+    const relativePosition = node.kind === "knowledge" && manualPositions[node.knowledge!.id] ? manualPositions[node.knowledge!.id] : { x: node.x, y: node.y };
+    const parent = node.parentId ? chapterById.get(node.parentId) : undefined;
+    const rootKnowledgePosition = designEnabled && node.kind === "knowledge" && parent
+      ? { x: parent.x + relativePosition.x, y: parent.y + relativePosition.y }
+      : relativePosition;
+    return {
+      id: node.id,
+      type: node.kind === "chapter" ? "chapter" : "knowledge",
+      parentId: designEnabled && node.kind === "knowledge" ? undefined : node.parentId,
+      extent: designEnabled && node.kind === "knowledge" ? undefined : node.parentId ? "parent" : undefined,
+      expandParent: false,
+      position: rootKnowledgePosition,
+      width: node.width,
+      height: node.height,
+      draggable: designEnabled && node.kind === "knowledge",
+      selectable: true,
+      zIndex: node.kind === "chapter" ? (node.expanded ? -1 : 1) : 2,
+      data: {
+        ...node,
+        mode,
+        selected: selectedId === node.id,
+        searchMatch: searchMatchId === node.id,
+        designEnabled,
+        draftCandidate: Boolean(node.knowledge?.knowledge.metadata?.courseDraftCandidate),
+        dropTarget: node.kind === "chapter" && node.chapter?.id === dropTargetChapterId,
+        onChapterDoubleClick: node.kind === "chapter" ? onChapterDoubleClick : undefined,
+        onAssignmentClick: node.kind === "knowledge" ? onAssignmentClick : undefined
+      },
+      style: { width: node.width, height: node.height }
+    };
+  });
 
   const visibleIds = new Set(nodes.map((node) => node.id));
   const relatedOverlays: CourseLayoutEdge[] = selectedId?.startsWith("knowledge:") ? knowledgeEdges

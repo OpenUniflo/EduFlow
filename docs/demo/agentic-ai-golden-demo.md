@@ -154,9 +154,9 @@ Teacher 未单独配置密码时使用 local-only Admin acceptance password 作�
 
 ## 13. Course Structure Authoring Prototype
 
-Teacher/Admin 的 Design Mode 在现有 React Flow + ELK 上提供：Chapter 新建、重命名、上移/下移与受控删除；已有 Global Knowledge 的课程覆盖、课程局部 Draft Candidate、从课程移除与 Chapter 下拉移动；节点手动坐标、显式“自动整理”；依赖连线、删除以及 self/duplicate/cycle 防护；snapshot Undo/Redo 和键盘快捷键。
+Teacher/Admin 的 Design Mode 在现有 React Flow + ELK 上提供：Chapter 新建、重命名、上移/下移与受控删除；已有 Global Knowledge 的课程覆盖、课程局部 Draft Candidate、从课程移除与跨 Chapter 鼠标拖放（Drawer 下拉仍为 fallback）；节点手动坐标、显式“自动整理”；Canvas dependency handles、依赖选择/删除以及 self/duplicate/cycle 防护；snapshot Undo/Redo 和键盘快捷键。
 
-React Flow 的嵌套 Chapter group 不适合可靠的 drop-to-parent 命中，因此拖动只表达 `manualNodePosition`，Chapter 归属由 Drawer 下拉框明确修改。普通 Drawer、selection 和 mode state 不触发手动位置重置；只有教师确认“自动整理”才清除手动坐标并重新使用 ELK。
+Design Mode 将 Knowledge 暂时投影为根节点，使 React Flow 能跨 Chapter 拖动；drop 时以节点中心命中目标 Chapter，并把位置转换回 Chapter-relative overlay 坐标。Chapter 归属与坐标作为同一个 Draft snapshot 提交，聚合后会形成 Chapter cycle 的移动会在提交前拒绝。普通 Drawer、selection 和 mode state 不触发手动位置重置；只有教师确认“自动整理”才清除手动坐标并重新使用 ELK。Drawer 关闭只释放布局宽度，不清除当前 selection，标题区始终从 Course Header 下方开始。
 
 发布前运行 Publication Check：broken reference、重复/self edge 与 cycle 是 fatal，会阻止 Publish；课件/Assignment 覆盖、Draft Candidate、ChapterOutcome 和 FinalProject 缺口是 warning，允许教师确认后发布。publication lifecycle 与 authoring snapshot 都是当前浏览器 presentation state；发布只切换 `draft → published`，Course Center 和 Student 在同一浏览器中读取已 Apply 的 Editable View，不写后端。
 
@@ -165,3 +165,5 @@ React Flow 的嵌套 Chapter group 不适合可靠的 drop-to-parent 命中，�
 最终演示闭环为：`AI create → draft → teacher structure authoring → AI Proposal / Preview / Validate / Apply → material authoring → publish check → publish → student learn → Assignment → Workflow → AI Evaluation`。
 
 结构 authoring、Material authoring、AI Proposal Apply 和 publication lifecycle 都仅保存在浏览器本地 overlay。它们不会创建 Global Knowledge、不会更改课程 seed、不会迁移 Supabase schema，也不代表正式版本历史或多人协作。Draft Candidate promote、正式审批、后端持久化、多人协作和真实 Course Authoring Agent 留待产品阶段。
+
+管理员基础能力由 `role=admin` 直接授予；`global-domain-admin` 继续作为兼容旧账号的附加 capability。最终本地真实浏览器验收覆盖 Admin/Teacher/Student、Drawer、跨 Chapter 拖放、手工依赖、四类 AI Proposal、Material/Lesson、Publish→Student、Workflow 及 1366/1440/1512 桌面尺寸。已知非阻断项：本地 Supabase 在 logout 后首次切换账号时，Workflow hydrate 偶发一次 `/api/workflows` 500，立即重试成功；若部署环境不复现则不扩展 Auth/Workflow 范围。
