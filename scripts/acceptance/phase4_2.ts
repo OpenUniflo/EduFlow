@@ -18,7 +18,7 @@ import nodesJson from "../../fixtures/phase4-agentic-ai/gold/knowledge/chapter-0
 import relationsJson from "../../fixtures/phase4-agentic-ai/gold/knowledge/chapter-01/knowledge-relations.json";
 import negativeJson from "../../fixtures/phase4-agentic-ai/gold/knowledge/chapter-01/negative-cases.json";
 import knowledgeHandler from "../../api/knowledge";
-import coursesHandler from "../../api/courses";
+import coursesHandler from "../../api/_handlers/courses";
 import { InMemoryKnowledgeRepository } from "../../src/features/knowledge/repository/InMemoryKnowledgeRepository";
 import { buildCourseGraphData, validateCourseRuntime, type CourseRuntimeData } from "../../src/features/course/runtime/courseRuntime";
 import { userKnowledgeAccess } from "../../src/features/knowledge/repository/KnowledgeRepository";

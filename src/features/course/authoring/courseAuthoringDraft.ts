@@ -1,5 +1,7 @@
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import type { CurriculumChapter, Material, MaterialKnowledgeCoverage } from "@/features/course/types";
+import type { CourseAssignment, AssignmentCoverage } from "@/features/course/types";
+import type { MicroLearningPath } from "@/features/learning/micro/microLearning";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "@/features/knowledge/types";
 import type { KnowledgeAccessContext, KnowledgeRepository } from "@/features/knowledge/repository/KnowledgeRepository";
 
@@ -25,6 +27,11 @@ export type CourseAuthoringDraftState = {
   addedDependencies: KnowledgeEdge[];
   removedDependencyIds: string[];
   manualNodePositions: Record<string, ManualNodePosition>;
+  /** Course-scoped Micro edits are draft-only until Publish. */
+  microPaths?: MicroLearningPath[];
+  /** Full course Assignment projection, retained only after an author edit. */
+  assignments?: CourseAssignment[];
+  assignmentCoverages?: AssignmentCoverage[];
 };
 type CourseAuthoringEnvelope = { schemaVersion: 2; present: CourseAuthoringDraftState; past: CourseAuthoringDraftState[]; future: CourseAuthoringDraftState[] };
 
@@ -34,7 +41,7 @@ const HISTORY_LIMIT = 50;
 const listeners = new Set<() => void>();
 
 export function emptyCourseAuthoringDraft(courseId: string): CourseAuthoringDraftState {
-  return { schemaVersion: 2, courseId, addedLinks: [], removedLinks: [], generatedMaterials: [], addedChapters: [], chapterUpdates: {}, removedChapterIds: [], chapterOrder: [], addedKnowledgeNodeIds: [], addedKnowledgeCandidates: [], removedKnowledgeNodeIds: [], knowledgeChapterOverrides: {}, addedDependencies: [], removedDependencyIds: [], manualNodePositions: {} };
+  return { schemaVersion: 2, courseId, addedLinks: [], removedLinks: [], generatedMaterials: [], addedChapters: [], chapterUpdates: {}, removedChapterIds: [], chapterOrder: [], addedKnowledgeNodeIds: [], addedKnowledgeCandidates: [], removedKnowledgeNodeIds: [], knowledgeChapterOverrides: {}, addedDependencies: [], removedDependencyIds: [], manualNodePositions: {}, microPaths: [] };
 }
 const sameLink = (left: MaterialLink, right: MaterialLink) => left.nodeId === right.nodeId && left.materialId === right.materialId;
 const unique = <T,>(items: T[]) => Array.from(new Set(items));
@@ -156,7 +163,14 @@ export function applyCourseAuthoringDraft(runtime: CourseRuntimeData, state: Cou
   const materialAdditions: MaterialKnowledgeCoverage[] = state.addedLinks.flatMap((link) => { if (removedNodes.has(link.nodeId) || removedMaterialLink(link.nodeId, link.materialId) || materialKnowledgeCoverages.some((coverage) => coverage.nodeId === link.nodeId && coverage.materialId === link.materialId)) return []; const segment = materials.find((item) => item.id === link.materialId)?.segments[0]; return segment ? [{ id: `authoring-material-coverage:${link.materialId}:${link.nodeId}`, materialId: link.materialId, segmentId: segment.id, nodeId: link.nodeId, role: "explain" as const }] : []; });
   const chapterOutcomes = runtime.chapterOutcomes.filter((outcome) => activeChapterIds.has(outcome.chapterId));
   const outcomeIds = new Set(chapterOutcomes.map((outcome) => outcome.id));
-  return { ...runtime, chapters, lessons, curriculumCoverages, curriculumSequences:runtime.curriculumSequences.filter((sequence)=>activeLessonIds.has(sequence.sourceLessonId)&&activeLessonIds.has(sequence.targetLessonId)), assignmentCoverages: runtime.assignmentCoverages.filter((coverage) => !removedNodes.has(coverage.nodeId)), chapterOutcomes, assignmentOutcomeCompositions:runtime.assignmentOutcomeCompositions.filter((composition)=>outcomeIds.has(composition.outcomeId)), finalProjectOutcomeCompositions:runtime.finalProjectOutcomeCompositions.filter((composition)=>outcomeIds.has(composition.outcomeId)), materials, materialKnowledgeCoverages: [...materialKnowledgeCoverages, ...materialAdditions], revision: `${runtime.revision}:authoring:${structuralRevision(state)}` };
+  return { ...runtime, chapters, lessons, curriculumCoverages, curriculumSequences:runtime.curriculumSequences.filter((sequence)=>activeLessonIds.has(sequence.sourceLessonId)&&activeLessonIds.has(sequence.targetLessonId)), assignments: state.assignments ?? runtime.assignments, assignmentCoverages: (state.assignmentCoverages ?? runtime.assignmentCoverages).filter((coverage) => !removedNodes.has(coverage.nodeId)), chapterOutcomes, assignmentOutcomeCompositions:runtime.assignmentOutcomeCompositions.filter((composition)=>outcomeIds.has(composition.outcomeId)), finalProjectOutcomeCompositions:runtime.finalProjectOutcomeCompositions.filter((composition)=>outcomeIds.has(composition.outcomeId)), materials, materialKnowledgeCoverages: [...materialKnowledgeCoverages, ...materialAdditions], revision: `${runtime.revision}:authoring:${structuralRevision(state)}` };
+}
+
+export function upsertDraftMicroPath(state: CourseAuthoringDraftState, path: MicroLearningPath) { return { ...state, microPaths: [...(state.microPaths ?? []).filter((item) => item.id !== path.id), path] }; }
+export function removeDraftMicroPath(state: CourseAuthoringDraftState, pathId: string) { return { ...state, microPaths: (state.microPaths ?? []).filter((item) => item.id !== pathId) }; }
+export function upsertDraftAssignment(state: CourseAuthoringDraftState, assignment: CourseAssignment, coverage: AssignmentCoverage) {
+  const assignments = state.assignments ?? []; const coverages = state.assignmentCoverages ?? [];
+  return { ...state, assignments: [...assignments.filter((item) => item.id !== assignment.id), assignment], assignmentCoverages: [...coverages.filter((item) => item.assignmentId !== assignment.id || item.nodeId !== coverage.nodeId), coverage] };
 }
 
 export function createEditableKnowledgeGraph(base: KnowledgeGraph, state: CourseAuthoringDraftState): KnowledgeGraph {

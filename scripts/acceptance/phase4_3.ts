@@ -19,7 +19,7 @@ import { validateCourseRuntime, buildCourseGraphData, type CourseRuntimeData } f
 import { resolveKnowledgeMaterialEntries } from "../../src/features/material/materialNavigation";
 import { buildKnowledgeAssignmentContexts, buildMaterialSegmentProjection } from "../../src/features/material/materialProjection";
 import knowledgeHandler from "../../api/knowledge";
-import coursesHandler from "../../api/courses";
+import coursesHandler from "../../api/_handlers/courses";
 import type { KnowledgeGraph } from "../../src/features/knowledge/types";
 import knowledgeNodesGold from "../../fixtures/phase4-agentic-ai/gold/knowledge/chapter-01/knowledge-nodes.json";
 import knowledgeMaterialGold from "../../fixtures/phase4-agentic-ai/gold/mapping/chapter-01/knowledge-material-links.json";

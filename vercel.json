@@ -10,6 +10,11 @@
     }
   },
   "rewrites": [
+    { "source": "/api/courses", "destination": "/api/course?resource=courses" },
+    { "source": "/api/course-authoring", "destination": "/api/course?resource=authoring" },
+    { "source": "/api/learning", "destination": "/api/learner?resource=learning" },
+    { "source": "/api/micro", "destination": "/api/learner?resource=micro" },
+    { "source": "/api/progress", "destination": "/api/learner?resource=progress" },
     {
       "source": "/api/:path*",
       "destination": "/api/:path*"

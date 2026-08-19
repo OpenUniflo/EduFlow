@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createUserSupabase } from "./_lib/supabase.js";
-import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
-import { dataOrThrow } from "./_lib/query.js";
+import { createUserSupabase } from "../_lib/supabase.js";
+import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
+import { dataOrThrow } from "../_lib/query.js";
 
 type Row = Record<string, unknown>;
 type Answer = string | string[] | undefined;

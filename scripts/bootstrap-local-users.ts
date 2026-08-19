@@ -5,7 +5,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import domainsHandler from "../api/domains";
 import knowledgeHandler from "../api/knowledge";
 import materialsHandler from "../api/materials";
-import progressHandler from "../api/progress";
+import progressHandler from "../api/_handlers/progress";
 import { assertLocalSupabaseUrl } from "./local-supabase";
 import { demoUserCourseStateSeed } from "../src/demo/users/demoUserCourseState.seed";
 
