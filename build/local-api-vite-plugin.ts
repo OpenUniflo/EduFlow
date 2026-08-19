@@ -3,8 +3,8 @@ import type { Plugin } from "vite";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import healthHandler from "../api/health";
 import knowledgeHandler from "../api/knowledge";
-import coursesHandler from "../api/courses";
-import progressHandler from "../api/progress";
+import courseHandler from "../api/course";
+import learnerHandler from "../api/learner";
 import workflowsHandler from "../api/workflows";
 import materialsHandler from "../api/materials";
 import domainsHandler from "../api/domains";
@@ -14,8 +14,11 @@ import courseIntentHandler from "../api/course-intent";
 const handlers = new Map([
   ["/api/health", healthHandler],
   ["/api/knowledge", knowledgeHandler],
-  ["/api/courses", coursesHandler],
-  ["/api/progress", progressHandler],
+  ["/api/courses", courseHandler],
+  ["/api/course-authoring", courseHandler],
+  ["/api/learning", learnerHandler],
+  ["/api/micro", learnerHandler],
+  ["/api/progress", learnerHandler],
   ["/api/workflows", workflowsHandler],
   ["/api/materials", materialsHandler],
   ["/api/domains", domainsHandler],
@@ -55,6 +58,9 @@ export function localApiPlugin(): Plugin {
         const handler = handlers.get(url.pathname);
         if (!handler) return next();
         const query = Object.fromEntries(url.searchParams.entries());
+        // Mirror Vercel's rewrite contract while retaining the public client URL.
+        const resource = ({ "/api/courses": "courses", "/api/course-authoring": "authoring", "/api/learning": "learning", "/api/micro": "micro", "/api/progress": "progress" } as Record<string, string>)[url.pathname];
+        if (resource) query.resource = resource;
         const vercelRequest = Object.assign(request, { body: await readBody(request), query }) as unknown as VercelRequest;
         await handler(vercelRequest, createResponse(response));
       });
