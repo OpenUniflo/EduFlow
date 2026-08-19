@@ -67,7 +67,7 @@ export function WorkflowLibraryPage({
     <main className="atlas-page-shell atlas-workflows-page">
       {navigation}
       <header className="atlas-workspace-head">
-        <div className="atlas-breadcrumb glass-v2"><strong>工作流画布</strong></div>
+        <div className="atlas-breadcrumb glass-v2"><strong>画布</strong></div>
       </header>
       <div className="atlas-content-wrap">
         <section className="atlas-workflow-hero">

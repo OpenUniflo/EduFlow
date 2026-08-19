@@ -1,4 +1,4 @@
-import { ArrowRight, Layers3, Plus, Search } from "lucide-react";
+import { ArrowRight, Layers3, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
@@ -63,7 +63,6 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
           <div className="atlas-section-row"><h2>所有课程</h2><span>{visible.length} 门课程</span></div>
           <div className="atlas-course-grid">
             {visible.map(({ runtime, graphData, summary }) => <article className="atlas-course-card glass-v2" key={runtime.course.id} onClick={() => navigate(`/courses/${runtime.course.id}`)}><div className="atlas-card-accent" style={{ background: runtime.course.accentColor }} /><div className="atlas-course-preview" aria-hidden="true">{miniMap(graphData.chapters, true)}</div><div className="atlas-pill">{summary.status === "completed" ? "已完成" : summary.status === "learning" ? "学习中" : "未开始"} · {runtime.course.title}</div><h3>{runtime.course.subtitle ?? runtime.course.title}</h3><p>{runtime.course.description}</p><div className="atlas-course-meta"><span>{summary.lessonCount} 课</span><span>{summary.knowledgeNodeCount} 原子节点</span><span>{summary.assignmentCount} 实训</span></div><div className="atlas-progress-row"><div className="atlas-progress-track"><i style={{ width: `${summary.progress}%` }} /></div><strong>{summary.progress}%</strong></div></article>)}
-            <button className="atlas-course-card atlas-new-course glass-v2" onClick={() => navigate("/")}><span><Plus size={22} /></span><strong>从课件创建课程</strong><p>回到知识星图，上传材料并描述课程目标。</p></button>
           </div>
         </section>
       </div>

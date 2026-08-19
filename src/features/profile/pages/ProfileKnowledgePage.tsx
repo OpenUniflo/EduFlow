@@ -12,6 +12,7 @@ import type { PersonalKnowledgeNode } from "@/features/profile/types";
 import { applicationServices } from "@/app/services/applicationServices";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { buildMaterialDeepLink } from "@/features/material/materialNavigation";
+import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
 
 const { courseRepository, learningProgressRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
@@ -25,7 +26,7 @@ function initials(name: string) {
   return words.length > 1 ? words.slice(0, 2).map((word) => word[0]).join("").toUpperCase() : clean.slice(0, 2).toUpperCase();
 }
 
-export function ProfileKnowledgePage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
+export function PersonalKnowledgeView({ session, onLogout, embedded = false }: { session: MockSession; onLogout: () => void; embedded?: boolean }) {
   const navigate = useNavigate();
   const governance = useDomainGovernance();
   const sceneRef = useRef<KnowledgeAtlasSceneHandle>(null);
@@ -121,12 +122,11 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
   const incidentEdges = selected ? graph.edges.filter((edge) => edge.source === selected.id || edge.target === selected.id) : [];
 
   return (
-    <main className={`personal-atlas-page ${drawerOpen ? "has-drawer" : ""}`}>
-      <GlobalNav active="profile" session={session} onLogout={onLogout} />
-      <header className="personal-page-title"><h1>我的知识空间</h1><p>Personal Knowledge Atlas</p></header>
+    <main className={`personal-atlas-page ${embedded ? "learning-personal-view" : ""} ${drawerOpen ? "has-drawer" : ""}`}>
+      {!embedded ? <GlobalNav active="learning" session={session} onLogout={onLogout} /> : null}
+      <header className="personal-page-title"><h1>我的知识</h1><p>Personal Knowledge Atlas</p></header>
       <aside className="personal-summary glass-v2">
-        <div className="personal-identity"><span className="personal-avatar">{initials(session.name)}</span><span><strong>{session.name}</strong><small>{session.email}</small></span><button aria-label="打开个人设置" onClick={() => showToast("个人资料设置将在后续版本开放")}>•••</button></div>
-        <div className="personal-summary-divider" />
+        {!embedded ? <><div className="personal-identity"><span className="personal-avatar">{initials(session.name)}</span><span><strong>{session.name}</strong><small>{session.email}</small></span><button aria-label="打开个人设置" onClick={() => showToast("个人资料设置将在后续版本开放")}>•••</button></div><div className="personal-summary-divider" /></> : null}
         <div className="personal-summary-heading"><span><strong>我的知识空间</strong><small>Personal Knowledge Graph</small></span><i><Network size={15} /></i></div>
         <div className="personal-summary-stats"><span><strong>{graph.summary.mastered}</strong><small>已掌握</small></span><span><strong>{graph.summary.learning}</strong><small>学习中</small></span><span><strong>{graph.summary.explore}</strong><small>可探索</small></span><span><strong>{graph.summary.completedAssignments}</strong><small>实训验证</small></span></div>
         <div className="personal-summary-divider" />
@@ -160,8 +160,12 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
         <button onClick={() => { sceneRef.current?.reset(); setSelectedId(null); setSearchMatchId(null); }} data-tip="重置视图" aria-label="重置视图"><RotateCcw size={17} /></button>
       </div>
       <div className="personal-legend glass-v2"><span><i className="dot mastered" />已掌握</span><span><i className="dot learning" />学习中</span><span><i className="dot explore" />可探索</span><span><i className="diamond" />实训验证</span></div>
-      <form className="personal-ai" onSubmit={(event) => { event.preventDefault(); askKnowledgeSpace(query); }} data-personal-interactive><div className="personal-ai-box glass-v2"><span><Sparkles size={15} /></span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索知识，或基于我的知识空间提问……" aria-label="搜索或向个人知识空间提问" /><button type="submit" aria-label="发送"><Send size={16} /></button></div><div className="personal-ai-suggestions"><button type="button" onClick={() => askKnowledgeSpace("我下一步应该学什么？")}>我下一步应该学什么？</button><button type="button" onClick={() => askKnowledgeSpace("显示直接关联的可探索知识")}>直接关联哪些知识？</button><button type="button" onClick={() => askKnowledgeSpace("我的知识结构如何？")}>我的知识结构如何？</button></div></form>
+      <EduFlowAssistant context={{workspace:"learning",experienceMode:"learn",userRole:session.role,capabilities:session.capabilities,knowledgeId:selectedId??undefined}} contextLabel={selected?.title??"我的知识"} drawerOpen={drawerOpen}><form className="personal-assistant-form" onSubmit={(event)=>{event.preventDefault();askKnowledgeSpace(query);}}><div className="course-design-assistant-input"><input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="搜索知识或询问下一步…"/><button aria-label="发送"><Send size={15}/></button></div><div className="course-design-assistant-actions"><button type="button" onClick={()=>askKnowledgeSpace("我下一步应该学什么？")}>下一步学什么？</button><button type="button" onClick={()=>askKnowledgeSpace("显示直接关联的可探索知识")}>直接关联知识</button></div><p className="assistant-plain-response"><Sparkles size={12}/>搜索只定位当前 Personal Atlas，不会改变图布局。</p></form></EduFlowAssistant>
       <div className={`personal-toast ${toast ? "show" : ""}`}>{toast}</div>
     </main>
   );
+}
+
+export function ProfileKnowledgePage(props: { session: MockSession; onLogout: () => void }) {
+  return <PersonalKnowledgeView {...props} />;
 }

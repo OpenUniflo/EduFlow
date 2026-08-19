@@ -9,14 +9,15 @@ import { GlobalNav } from "@/app/components/GlobalNav";
 import { NotFoundPage } from "@/app/pages/PlaceholderPages";
 import { applicationServices, hydrateApplicationServices } from "@/app/services/applicationServices";
 import { attachWorkflowAssignmentMetadata, resolveWorkflowAssignmentContext, completeWorkflowAssignmentRun } from "@/app/integrations/workflowAssignmentIntegration";
-import { AtlasHome } from "@/features/knowledge/pages/AtlasHome";
+import { ExplorePage } from "@/features/explore/pages/ExplorePage";
+import { LearningPage } from "@/features/learning/pages/LearningPage";
+import { MicroLearningExperience } from "@/features/learning/micro/MicroLearningExperience";
 import { CourseCenterPage } from "@/features/course/pages/CoursePages";
 import { CourseManagementPage } from "@/features/course/pages/CourseManagementPage";
 import { CourseCreationWorkspacePage } from "@/features/course/pages/CourseCreationWorkspacePage";
 import { CourseGraphPage } from "@/features/course/pages/CourseGraphPage";
 import { AssignmentExperiencePage } from "@/features/course/pages/AssignmentExperiencePage";
 import { LessonPage } from "@/features/material/pages/LessonPage";
-import { ProfileKnowledgePage } from "@/features/profile/pages/ProfileKnowledgePage";
 import { DomainManagementPage } from "@/features/admin/domains/DomainManagementPage";
 import { WorkflowLibraryPage } from "@/features/workflow/pages/WorkflowLibraryPage";
 import { WorkflowEditorPage } from "@/features/workflow/pages/WorkflowEditorPage";
@@ -32,6 +33,14 @@ import { demoCourseCreationScenarioResolver } from "@/demo/scenarios/agenticAiBo
 import { demoLessonAssistantProvider } from "@/demo/scenarios/agenticAiBook/lessonAssistantScripts";
 import { demoWorkflowAssessmentProvider } from "@/demo/scenarios/agenticAiBook/workflowAssessment";
 import { demoCourseDesignAssistantProvider } from "@/demo/scenarios/agenticAiBook/courseDesignAssistantScripts";
+import { demoLearningIntentResolver } from "@/demo/explore/demoLearningIntentResolver";
+import { demoMicroLearningProvider } from "@/demo/learning/demoMicroLearningProvider";
+import { resolveLegacyRoute } from "@/app/legacyRoutes";
+
+function LegacyRedirect() {
+  const location = useLocation();
+  return <Navigate to={resolveLegacyRoute(location.pathname,location.search)} replace />;
+}
 
 function getAuthRedirect(state: unknown) {
   if (!state || typeof state !== "object" || !("from" in state)) return "/";
@@ -176,7 +185,7 @@ export default function App() {
     <WorkflowEditorPage
       key={workflow.routeTemplate.id}
       controller={workflow}
-      navigation={<div className="atlas-canvas-nav"><GlobalNav active="workflows" session={session} onLogout={logout} /></div>}
+      navigation={<div className="atlas-canvas-nav"><GlobalNav active="canvas" session={session} onLogout={logout} /></div>}
       onBack={() => navigate("/workflows")}
       onWorkflowGenerated={(templateId) => navigate(`/workflows/${templateId}`)}
       assessment={workflowAssessment}
@@ -192,20 +201,26 @@ export default function App() {
         <Routes>
           <RouterRoute path="/login" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
           <RouterRoute path="/register" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
-          <RouterRoute path="/" element={protectedElement(session ? <AtlasHome session={session} onLogout={logout} /> : null)} />
-          <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="workflows" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />
+          <RouterRoute path="/" element={protectedElement(session ? <LearningPage session={session} onLogout={logout} microLearningProvider={demoMicroLearningProvider} /> : null)} />
+          <RouterRoute path="/explore" element={protectedElement(session ? <ExplorePage session={session} onLogout={logout} resolver={demoLearningIntentResolver} /> : null)} />
+          <RouterRoute path="/learn/micro/:knowledgeId" element={protectedElement(session ? <MicroLearningExperience session={session} onLogout={logout} provider={demoMicroLearningProvider} /> : null)} />
+          <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="canvas" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />
           <RouterRoute path="/workflows/:workflowId" element={protectedElement(editor)} />
           <RouterRoute path="/courses" element={protectedElement(session ? <CourseCenterPage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} /> : null)} />
-          <RouterRoute path="/course-management" element={canManageCourses(session) ? protectedElement(session ? <CourseManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/courses" replace />} />
+          <RouterRoute path="/teaching" element={canManageCourses(session) ? protectedElement(session ? <CourseManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/courses" replace />} />
+          <RouterRoute path="/teaching/create" element={canManageCourses(session) ? protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} /> : null) : <Navigate to="/courses" replace />} />
+          <RouterRoute path="/course-management" element={<LegacyRedirect />} />
           <RouterRoute path="/courses/:courseId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} /> : null)} />
           <RouterRoute path="/courses/:courseId/assignments/:assignmentId" element={protectedElement(session ? <AssignmentExperiencePage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/courses/:courseId/materials/:materialId" element={protectedElement(session ? <LessonPage session={session} onLogout={logout} lessonAssistantProvider={demoLessonAssistantProvider} /> : null)} />
           <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} /> : null)} />
           <RouterRoute path="/tasks/*" element={<Navigate to="/" replace />} />
-          <RouterRoute path="/profile" element={protectedElement(session ? <ProfileKnowledgePage session={session} onLogout={logout} /> : null)} />
-          <RouterRoute path="/admin/domains" element={canManageKnowledgeDomains(session) ? protectedElement(session ? <DomainManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/" replace />} />
-          <RouterRoute path="/profile/*" element={<Navigate to="/profile" replace />} />
+          <RouterRoute path="/system" element={canManageKnowledgeDomains(session) ? protectedElement(session ? <DomainManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/" replace />} />
+          <RouterRoute path="/system/domains" element={<Navigate to="/system" replace />} />
+          <RouterRoute path="/admin/domains" element={<LegacyRedirect />} />
+          <RouterRoute path="/profile" element={<LegacyRedirect />} />
+          <RouterRoute path="/profile/*" element={<LegacyRedirect />} />
           <RouterRoute path="/settings/*" element={<Navigate to="/" replace />} />
           <RouterRoute path="/notifications/*" element={<Navigate to="/" replace />} />
           <RouterRoute path="/messages/*" element={<Navigate to="/" replace />} />

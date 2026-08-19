@@ -17,12 +17,15 @@ Course materials
 
 The Global Knowledge Atlas, Course Skill Tree, and Personal Atlas are projections over one shared Knowledge Graph. Curriculum, materials, assignments, workflow execution, and mutable user learning state remain separate domain concerns.
 
+The signed-in product is organized around six capability-aware workspaces: **Learning**, **Explore**, **Courses**, **Canvas**, **Teaching**, and **System**. Learning owns Today, Personal Knowledge, activity history, deterministic Today Queue, and Golden Micro Learning. Explore keeps the Global Knowledge Atlas as its primary surface and resolves a learning goal through existing Knowledge and Courses before offering a personal path or material-creation fallback. A single user-visible **EduFlow Assistant** shell adapts to workspace, experience mode, selection, and role capabilities.
+
 ## Current Status
 
 - Round 1: frontend project structure refactor — complete.
 - Round 2: workflow module boundary refactor — complete.
 - Round 3: Supabase-backed data, Auth, and persistence layer — complete.
-- Next: Round 4 — Core Teaching Loop.
+- Round 4: Core Teaching Loop — implemented in the current prototype.
+- Current prototype: Learning / Explore / Unified Assistant product-structure validation.
 
 Round 4 scope and exit criteria are defined in [`docs/ROUND4_CORE_TEACHING_LOOP.md`](docs/ROUND4_CORE_TEACHING_LOOP.md).
 

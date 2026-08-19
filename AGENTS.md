@@ -382,6 +382,18 @@
 - UserMaterialState reading position and reading coverage are separate concepts.
 - Opening or reading a Material MUST update its Lesson as the user's recent Lesson through LearningProgressRepository, never through direct local-storage writes.
 
+## Learning Experience Ordering
+
+- Course instructional order is the learning-path backbone; factual prerequisite edges determine new-learning eligibility; explicit UserKnowledgeState determines Learn or Continue presentation.
+- Today Queue and Micro Learning entry order MUST use canonical curriculum ordering. IDs, fixture-array order, graph coordinates, Assignment completion, and Material progress MUST NOT determine Knowledge mastery or new-learning order.
+- Without reliable review-due data, the product MUST NOT present spaced-repetition due claims. Prototype Micro Learning completion is learning activity, not mastery evidence.
+
+## Unified EduFlow Assistant
+
+- The product has one user-visible EduFlow Assistant identity and shell language. Workspace, experience mode, active context, role, and capabilities determine available actions; Feature-specific providers may remain behind adapters.
+- Assistant mutation requires both Design Mode and the existing capability checks. Proposal preview, deterministic validation, Apply, and Undo MUST NOT be bypassed by the unified shell.
+- Learn and Explore Assistant actions may explain, recommend, focus, or start supported experiences, but MUST NOT expose curriculum, material, publication, or Domain mutation without the corresponding authority and validation path.
+
 ## Knowledge Source Invariants
 
 - Generic Course and Material code MUST NOT assume all KnowledgeNodes belong to the Global graph.

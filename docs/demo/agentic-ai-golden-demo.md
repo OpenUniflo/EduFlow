@@ -37,18 +37,15 @@
 
 课程 publication lifecycle 是浏览器 presentation state，不写入 Core Course：`draft` 只出现在 Course Management，`published` 才进入 Course Center，`archived` 保留在 Course Management 并从 Course Center 隐藏。AI 建课完成时初始为 `draft`。
 
-课程设计模式还提供独立于 Drawer 的页面级 AI 课程助手：右下角悬浮入口支持 hover 预览和 click 固定对话，上下文随当前 Course / Chapter / Knowledge / Assignment 自动更新。Lesson 设计页的 AI 课件助手使用相同的悬浮交互语言，但继续保留独立 Provider。两者都仅在 Teacher/Admin 的课程设计模式显示。
+课程设计和 Lesson 设计继续保留各自的底层 Provider、Proposal、Preview、Validation、Apply 与 Undo 能力，但用户可见入口统一为右下角 **EduFlow Assistant**。Assistant shell 根据 Course / Chapter / Knowledge / Material / Segment / Assignment 上下文和 Learn / Design mode 改变能力；设计 mutation 只在 Teacher/Admin 具备 capability 的 Design Mode 开放。
 
 ## 4. 角色与导航
 
-- 学生：学习
-- 教师：学习 + 教学管理
-- 管理员：学习 + 教学管理 + 系统管理
+- 学生：学习 / 探索 / 课程 / 画布
+- 教师：学习 / 探索 / 课程 / 画布 / 教学管理
+- 管理员：学习 / 探索 / 课程 / 画布 / 教学管理 / 系统管理
 
-菜单分组：
-- 学习：知识星图首页 / 课程中心 / 工作流画布 / 个人知识
-- 教学管理：课程管理
-- 系统管理：知识领域管理
+顶部悬浮 Tab 是全局导航主体。`/` 是 Learning Space（今天 / 我的知识 / 记录），`/explore` 的主体是 Global Knowledge Atlas，`/courses` 是 learner-facing Course Center，`/workflows` 保留为“画布”的 canonical URL，`/teaching` 收纳建课和 Design Mode，`/system` 当前只收纳真实的知识领域治理。`/profile`、`/course-management`、`/admin/domains` 保留兼容跳转。
 
 教师/管理员进入同一个课程技能树时显示 `学习模式 ↔ 课程设计模式`；学生不显示切换按钮。不要再做独立“学生视角预览”。
 
@@ -97,7 +94,7 @@
 
 第 6 篇章最终 Workflow 使用 Planner、三类 Research Worker、Evidence Merge、Verifier、Experiment Designer、Critic、Human Approval 和 Final Proposal。
 
-## 8. 固定 AI 脚本
+## 8. 固定 AI 脚本与统一 Assistant
 
 Lesson 设计模式至少支持：
 
@@ -107,6 +104,8 @@ Lesson 设计模式至少支持：
 - 检查课件与实训是否一致。
 
 输入框开放，但命中关键词后映射预设 mutation；未命中走固定 fallback。修改经过 Preview → Apply，并支持撤销最近一次修改。切换 learn/design 保留 session draft，刷新后恢复 seed。
+
+Explore 的 Learning Intent Resolver 和 Micro Learning 也使用 Feature contract + `src/demo` deterministic provider + App composition wiring。它们只引用现有稳定 Knowledge ID，不创建第二套 Knowledge/Course/Practice ontology。未知学习目标先明确提示覆盖不足，再把材料创建作为 fallback；任意材料的高质量建课仍不是通用能力。MicroLesson 完成记录为 Prototype 学习活动，不自动写 Knowledge mastery。
 
 Course Design 使用 course-scoped、schema-versioned 的浏览器 `localStorage` Draft Overlay。在 Repository Runtime/Graph 之上记录 Chapter 增删改序、课程 Knowledge 覆盖与移动、课程局部 Draft Candidate、Knowledge dependency、手动坐标、Material 关联/取消关联和生成的 Article draft。生成采用固定 700ms 仿真并自动关联当前 Knowledge；生成 Material 可由正常 Lesson route 打开。该状态不修改 Repository seed、Global Knowledge 或 Supabase。
 

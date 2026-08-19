@@ -1,121 +1,28 @@
+import { BookOpen, Compass, GraduationCap, LogOut, Network, ShieldCheck, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
-import { BookOpen, ChevronDown, GraduationCap, LogOut, Network, ShieldCheck, Workflow } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
 import { canManageCourses, canManageKnowledgeDomains } from "@/features/auth/capabilities";
 
-export function GlobalNav({
-  active,
-  session,
-  onLogout
-}: {
-  active: "atlas" | "courses" | "workflows" | "profile" | "course-management" | "course-create" | "admin";
-  session?: MockSession | null;
-  onLogout?: () => void;
-}) {
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+export type GlobalNavActive="learning"|"explore"|"courses"|"canvas"|"teaching"|"system";
+export type GlobalNavItem={id:GlobalNavActive;to:string;label:string};
 
-  useEffect(() => {
-    function close(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, []);
+export function getPrimaryNavigationItems(session?:MockSession|null):GlobalNavItem[]{
+  const items:GlobalNavItem[]=[{id:"learning",to:"/",label:"学习"},{id:"explore",to:"/explore",label:"探索"},{id:"courses",to:"/courses",label:"课程"},{id:"canvas",to:"/workflows",label:"画布"}];
+  if(canManageCourses(session))items.push({id:"teaching",to:"/teaching",label:"教学管理"});
+  if(canManageKnowledgeDomains(session))items.push({id:"system",to:"/system",label:"系统管理"});
+  return items;
+}
 
-  const learningItems = [
-    { id: "atlas", to: "/", label: "知识星图首页", description: "探索全局知识体系并创建课程", icon: Network },
-    { id: "courses", to: "/courses", label: "课程中心", description: "课程入口、技能树与课件阅读", icon: BookOpen },
-    { id: "workflows", to: "/workflows", label: "工作流画布", description: "搭建、运行并验收实训任务", icon: Workflow },
-    { id: "profile", to: "/profile", label: "个人知识", description: "查看学习状态与能力反馈", icon: GraduationCap },
-  ];
-  const teachingItems = [{ id: "course-management", to: "/course-management", label: "课程管理", description: "创建、发布与维护课程资产", icon: BookOpen }].filter(() => canManageCourses(session));
-  const systemItems = [{
-      id: "admin",
-      to: "/admin/domains",
-      label: "知识领域管理",
-      description: "治理领域、成员与自动建议",
-      icon: ShieldCheck
-    }].filter(() => canManageKnowledgeDomains(session));
-  const groups = [{ label: "学习", items: learningItems }, { label: "教学管理", items: teachingItems }, { label: "系统管理", items: systemItems }].filter((group) => group.items.length);
+const icons={learning:GraduationCap,explore:Compass,courses:BookOpen,canvas:Workflow,teaching:BookOpen,system:ShieldCheck};
+function initials(name:string){return name.trim().slice(0,2).toUpperCase()||"ED";}
 
-  return (
-    <nav className="atlas-global-nav" aria-label="全局导航">
-      <div
-        className={`atlas-brand-menu ${open ? "open" : ""}`}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-      >
-        <div className="atlas-brand-button glass-v2">
-          <button className="atlas-brand-home" onClick={() => navigate("/")} aria-label="返回知识星图首页">
-            <span className="atlas-brand-mark"><Network size={18} /></span>
-            <span className="atlas-brand-copy">
-              <strong>知序 Knowledge Atlas</strong>
-              <span>探索知识，生成课程</span>
-            </span>
-          </button>
-          <button
-            className="atlas-nav-toggle"
-            type="button"
-            aria-label="展开导航菜单"
-            aria-expanded={open}
-            onClick={() => setOpen(true)}
-          >
-            <ChevronDown size={16} />
-          </button>
-        </div>
-
-        <div className="atlas-nav-dropdown glass-v2">
-          {groups.map((group) => <div className="atlas-nav-group" key={group.label}><div className="atlas-nav-label">{group.label}</div>
-          {group.items.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.id}
-                className={`atlas-nav-item ${active === item.id ? "active" : ""}`}
-                to={item.to}
-                onClick={() => setOpen(false)}
-              >
-                <span className="atlas-nav-icon"><Icon size={17} /></span>
-                <span className="atlas-nav-copy">
-                  <strong>{item.label}</strong>
-                  <span>{item.description}</span>
-                </span>
-                {active === item.id ? <span className="atlas-current-tag">当前</span> : null}
-              </NavLink>
-            );
-          })}</div>)}
-          {session && onLogout ? (
-            <>
-              <div className="atlas-nav-divider" />
-              <div
-                className={`atlas-account-row ${active === "profile" ? "active" : ""}`}
-                role="link"
-                tabIndex={0}
-                onClick={() => { setOpen(false); navigate("/profile"); }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    setOpen(false);
-                    navigate("/profile");
-                  }
-                }}
-              >
-                <div>
-                  <strong>{session.name}</strong>
-                  <span>{session.email}</span>
-                </div>
-                {active === "profile" ? <span className="atlas-current-tag">当前</span> : null}
-                <button
-                  onClick={(event) => { event.stopPropagation(); onLogout(); }}
-                  aria-label="退出登录"
-                ><LogOut size={16} /></button>
-              </div>
-            </>
-          ) : null}
-        </div>
-      </div>
-    </nav>
-  );
+export function GlobalNav({active,session,onLogout}:{active:GlobalNavActive;session?:MockSession|null;onLogout?:()=>void}){
+  const navigate=useNavigate(); const [accountOpen,setAccountOpen]=useState(false);
+  useEffect(()=>{function close(event:KeyboardEvent){if(event.key==="Escape")setAccountOpen(false);}window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[]);
+  return <nav className="atlas-global-nav global-tab-nav" aria-label="全局导航">
+    <button className="global-nav-brand glass-v2" onClick={()=>navigate("/")} aria-label="返回学习空间"><span><Network size={18}/></span><strong>EduFlow</strong></button>
+    <div className="global-nav-tabs glass-v2">{getPrimaryNavigationItems(session).map((item)=>{const Icon=icons[item.id];return <NavLink key={item.id} to={item.to} className={active===item.id?"active":""}><Icon size={15}/><span>{item.label}</span></NavLink>;})}</div>
+    {session?<div className={`global-account ${accountOpen?"open":""}`}><button className="global-account-trigger glass-v2" onClick={()=>setAccountOpen((value)=>!value)} aria-expanded={accountOpen} aria-label="账户菜单"><span>{initials(session.name)}</span></button>{accountOpen?<div className="global-account-popover glass-v2"><strong>{session.name}</strong><small>{session.email}</small><button onClick={()=>{setAccountOpen(false);navigate("/?view=knowledge");}}><GraduationCap size={14}/>我的知识</button>{onLogout?<button onClick={onLogout}><LogOut size={14}/>退出登录</button>:null}</div>:null}</div>:null}
+  </nav>;
 }

@@ -39,7 +39,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
       <section className="atlas-auth-story">
         <div className="atlas-brand-lockup">
           <span className="atlas-brand-mark"><Network size={20} /></span>
-          <span><strong>知序 Knowledge Atlas</strong><small>探索知识，生成课程</small></span>
+          <span><strong>EduFlow</strong><small>连接学习、探索与实践</small></span>
         </div>
         <span className="atlas-kicker">KNOWLEDGE → COURSE → PRACTICE</span>
         <h1>让知识结构、课程学习与 Agent 实践自然连接</h1>
@@ -47,14 +47,14 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
         <div className="atlas-auth-features">
           <div><Network size={18} /><span><strong>知识星图</strong><small>发现完整知识体系</small></span></div>
           <div><BookOpen size={18} /><span><strong>课程中心</strong><small>组织学习与课件</small></span></div>
-          <div><Workflow size={18} /><span><strong>工作流画布</strong><small>实践并验证能力</small></span></div>
+          <div><Workflow size={18} /><span><strong>画布</strong><small>实践并验证能力</small></span></div>
         </div>
       </section>
 
       <section className="atlas-auth-panel glass-v2">
         <div className="atlas-pill"><Sparkles size={13} />Supabase 安全账号</div>
         <h2>{isRegister ? "创建学习账号" : "欢迎回来"}</h2>
-        <p>{isRegister ? "创建安全账号，开始探索知识、课程与实训。" : "登录后进入知识星图首页，继续你的课程与实训。"}</p>
+        <p>{isRegister ? "创建安全账号，开始探索知识、课程与实训。" : "登录后进入学习空间，继续你的课程与实训。"}</p>
         <form onSubmit={submit}>
           {isRegister ? <label><span>姓名</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" /></label> : null}
           <label><span>邮箱</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" /></label>
