@@ -16,7 +16,7 @@ export type CourseUnlockPolicy = (input: CourseUnlockPolicyInput) => LearningSta
 /** Conservative default: evidence controls learning; curriculum sequence controls availability. */
 export const defaultCourseUnlockPolicy: CourseUnlockPolicy = ({ lesson, lessons, sequences, userCourseState, userKnowledge }) => {
   if (userKnowledge?.status === "mastered") return "completed";
-  if (userKnowledge?.status === "learning") return "learning";
+  if (userKnowledge?.status === "learning" || userKnowledge?.status === "learned" || userKnowledge?.status === "practicing") return "learning";
   const firstOrder = Math.min(...lessons.map((item) => item.order));
   if (!userCourseState.recentLessonId) return lesson.order === firstOrder ? "available" : "locked";
   if (lesson.id === userCourseState.recentLessonId) return "available";

@@ -6,7 +6,7 @@ import type { DomainGovernanceState } from "../domain/DomainGovernanceRepository
 import { resolveNodeDomain } from "../domain/domainResolution";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "../types";
 
-export type AtlasNodeStatus = "global" | "mastered" | "learning" | "explore";
+export type AtlasNodeStatus = "global" | "mastered" | "practicing" | "learned" | "learning" | "explore";
 
 export type AtlasCourseContext = {
   courseId: string;

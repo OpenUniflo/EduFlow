@@ -1,6 +1,7 @@
 import type { KnowledgeEdge, KnowledgeNode, KnowledgeScope } from "@/features/knowledge/types";
 
 export type LearningStatus = "completed" | "learning" | "available" | "locked";
+export type CourseLifecycle = "draft" | "published" | "archived";
 export type CurriculumGenerationMode = "auto" | "auto-fixed-count" | "follow-source" | "manual";
 
 export type Course = {
@@ -12,6 +13,7 @@ export type Course = {
   targetOutcome?: string;
   accentColor?: string;
   generationStatus?: "draft" | "parsed" | "curriculum-generated" | "ready";
+  lifecycle?: CourseLifecycle;
 };
 
 export type CourseSummary = {
@@ -142,7 +144,8 @@ export type FinalProjectOutcomeComposition = {
   outcomeId: string;
 };
 
-export type UserAssignmentStatus = "not-started" | "in-progress" | "completed";
+/** Legacy values are read-only compatibility for pre-foundation local fixtures. */
+export type UserAssignmentStatus = "not_started" | "started" | "submitted" | "accepted" | "needs_revision" | "not-started" | "in-progress" | "completed";
 export type UserAssignmentState = {
   assignmentId: string;
   status: UserAssignmentStatus;

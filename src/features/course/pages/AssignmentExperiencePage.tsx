@@ -1,8 +1,8 @@
 import { ArrowLeft, ArrowRight, Check, Clock3, FileCode2, Network, Upload } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GlobalNav } from "@/app/components/GlobalNav";
-import { applicationServices } from "@/app/services/applicationServices";
+import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
 import type { AssignmentExperience } from "@/features/course/types";
 import { evaluateTraceSelection } from "@/features/course/assignmentExperience";
@@ -34,7 +34,7 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
   const { courseId = "", assignmentId = "" } = useParams();
   const runtime = applicationServices.courseRepository.getCourse(courseId);
   const assignment = runtime?.assignments.find((item) => item.id === assignmentId);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(false); const [accepted, setAccepted] = useState(false); const [busy, setBusy] = useState(false);
   const knowledgeById = useMemo(() => new Map(applicationServices.knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)).nodes.map((node) => [node.id, node])), [session.userId]);
   if (!runtime || !assignment) return <main className="assignment-page"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>实训不存在</h1><button className="atlas-primary" onClick={() => navigate(`/courses/${courseId}`)}>返回课程</button></section></main>;
   const experience = assignment.experience ?? { type: assignment.mode === "workflow" ? "workflow" : "answer", prompt: assignment.description };
@@ -44,9 +44,11 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
     const source = runtime.assignments.find((item) => item.id === dependency.sourceAssignmentId);
     return source ? [source] : [];
   });
-  function submit() {
-    applicationServices.learningProgressRepository.updateAssignmentState(session.userId, courseId, stableAssignmentId, { assignmentId: stableAssignmentId, status: "completed", progress: 100 });
-    setSubmitted(true);
+  useEffect(() => { if (runtime && assignment) void applicationServices.learnerStateService.startAssignment(courseId, stableAssignmentId).then(() => refreshLearnerState(session.userId)); }, [assignment, courseId, runtime, session.userId, stableAssignmentId]);
+  async function submit(deterministicAccepted = false) {
+    if (busy) return; setBusy(true);
+    try { const result = await applicationServices.learnerStateService.submitAssignment(courseId, stableAssignmentId, deterministicAccepted); setSubmitted(true); setAccepted(result.accepted); await refreshLearnerState(session.userId); }
+    finally { setBusy(false); }
   }
   return <main className="assignment-page">
     <GlobalNav active="courses" session={session} onLogout={onLogout} />
@@ -61,7 +63,7 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
         <section><h3>验收标准</h3>{assignment.acceptanceCriteria.map((item) => <span key={item}>✓ {item}</span>)}</section>
       </aside>
       <article className="assignment-experience-card glass-v2">
-        {submitted ? <div className="assignment-submitted"><Check size={34} /><h2>本次提交已记录</h2><p>Assignment 完成状态已更新；Knowledge mastery 仍只由独立证据决定。</p></div> : experience.type === "answer" ? <AnswerExperience prompt={experience.prompt} onSubmit={submit} /> : experience.type === "code" ? <CodeExperience experience={experience} onSubmit={submit} /> : experience.type === "trace" ? <TraceExperience experience={experience} onSubmit={submit} /> : <section className="assignment-experience-body"><h2>画布</h2><p>{experience.prompt}</p><div className="assignment-workflow-preview"><Network size={34} /><strong>继承型工作流已准备</strong><span>画布将从现有 Planner、Workers 与 Merge 结构开始。</span></div><button className="atlas-primary" onClick={() => navigate(workflowLaunchUrl({courseId,assignmentId:assignment.id,workflowTemplateId:assignment.workflowTemplateId!}))}>进入画布 <ArrowRight size={15} /></button></section>}
+        {submitted ? <div className="assignment-submitted"><Check size={34} /><h2>{accepted ? "本次实训已通过确定性验收" : "本次提交已记录"}</h2><p>{accepted ? "已写入有效实践证据；是否 mastered 仍由完整掌握策略决定。" : "状态为 submitted，等待教师或支持的确定性规则验收；提交不等于 mastery。"}</p></div> : experience.type === "answer" ? <AnswerExperience prompt={experience.prompt} onSubmit={() => void submit()} /> : experience.type === "code" ? <CodeExperience experience={experience} onSubmit={() => void submit()} /> : experience.type === "trace" ? <TraceExperience experience={experience} onSubmit={() => void submit(true)} /> : <section className="assignment-experience-body"><h2>画布</h2><p>{experience.prompt}</p><div className="assignment-workflow-preview"><Network size={34} /><strong>继承型工作流已准备</strong><span>画布将从现有 Planner、Workers 与 Merge 结构开始。</span></div><button className="atlas-primary" onClick={() => navigate(workflowLaunchUrl({courseId,assignmentId:assignment.id,workflowTemplateId:assignment.workflowTemplateId!}))}>进入画布 <ArrowRight size={15} /></button></section>}
       </article>
     </div>
   </main>;

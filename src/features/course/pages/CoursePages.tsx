@@ -6,8 +6,6 @@ import { GlobalNav } from "@/app/components/GlobalNav";
 import { buildCourseGraphData, buildCourseSummary } from "@/features/course/runtime/courseRuntime";
 import { applicationServices } from "@/app/services/applicationServices";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
-import { publishedCourseRuntimes } from "@/features/course/presentation/courseLifecycle";
-import { applyCourseAuthoringDraft, createEditableKnowledgeGraph, readCourseAuthoringDraft, subscribeCourseAuthoringDraft } from "@/features/course/authoring/courseAuthoringDraft";
 
 const { courseRepository, learningProgressRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
@@ -16,17 +14,15 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
   const [query, setQuery] = useState("");
   const [progressRevision, setProgressRevision] = useState(0);
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
-  useEffect(() => subscribeCourseAuthoringDraft(() => setProgressRevision((value) => value + 1)), []);
-  const courses = useMemo(() => publishedCourseRuntimes(courseRepository.listCourseRuntimes()).flatMap((baseRuntime) => {
+  useEffect(() => userKnowledgeRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
+  const courses = useMemo(() => courseRepository.listCourseRuntimes().filter((runtime) => runtime.course.lifecycle === "published").flatMap((runtime) => {
     try {
-      const draft=readCourseAuthoringDraft(baseRuntime.course.id);
-      const runtime=applyCourseAuthoringDraft(baseRuntime,draft);
       const state = learningProgressRepository.getCourseState(session.userId, runtime.course.id);
-      const graph=createEditableKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)),draft);
+      const graph=knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId));
       const graphData = buildCourseGraphData(runtime, state, graph, userKnowledgeRepository.getUserKnowledge(session.userId));
       return [{ runtime, state, graphData, summary: buildCourseSummary(runtime, state, graphData) }];
     } catch (error) {
-      console.error(`Course center projection failed for ${baseRuntime.course.id}`, error);
+      console.error(`Course center projection failed for ${runtime.course.id}`, error);
       return [];
     }
   }), [progressRevision, session.userId]);

@@ -2,11 +2,13 @@ export type MicroInteraction =
   | { type:"choice"; options:string[]; correctIndex:number }
   | { type:"ordering"; items:string[]; correctOrder:string[] }
   | { type:"trace"; steps:Array<{id:string;label:string}>; correctStepId:string }
-  | { type:"mini-workflow"; nodes:string[]; correctOrder:string[] };
+  | { type:"mini-workflow"; nodes:string[]; correctOrder:string[] }
+  | { type:"h5p"; contentRef:string; adapter?:string };
 
 export type MicroLearningAnswer = string|string[];
 
 export function isMicroInteractionCorrect(interaction:MicroInteraction, answer:MicroLearningAnswer) {
+  if(interaction.type==="h5p") return false;
   if(interaction.type==="choice")return answer===interaction.options[interaction.correctIndex];
   if(interaction.type==="ordering"||interaction.type==="mini-workflow")return Array.isArray(answer)&&answer.join("|")===interaction.correctOrder.join("|");
   return answer===interaction.correctStepId;
@@ -20,20 +22,55 @@ export type MicroStep = {
   interaction?:MicroInteraction;
   successFeedback?:string;
   retryFeedback?:string;
+  transition?: { nextStepId?:string; retryStepId?:string };
 };
 
-export type MicroLesson = {
+export type MicroUnit = {
   id:string;
-  knowledgeId:string;
+  pathId:string;
   title:string;
+  description?:string;
+  position:number;
   estimatedMinutes:number;
-  mode:"learn"|"review"|"apply"|"transfer";
+  required:boolean;
   steps:MicroStep[];
 };
+
+export type MicroLearningPath = {
+  id:string;
+  knowledgeId:string;
+  courseId?:string;
+  scope:"global"|"course";
+  title:string;
+  description?:string;
+  estimatedMinutes:number;
+  mode:"learn"|"review"|"apply"|"transfer";
+  required:boolean;
+  status:"draft"|"published"|"archived";
+  units:MicroUnit[];
+};
+
+/** Compatibility alias for non-persistent demo adapters; production uses paths. */
+export type MicroLesson = {
+  id:string; knowledgeId:string; title:string; estimatedMinutes:number; mode:"learn"|"review"|"apply"|"transfer"; steps:MicroStep[];
+};
+
+export type MicroUnitProgress = { unitId:string; pathId:string; status:"not_started"|"in_progress"|"completed"; currentStepId?:string; completedStepIds:string[]; startedAt?:string; completedAt?:string; updatedAt:string };
+export type MicroPathProgress = { pathId:string; status:"not_started"|"in_progress"|"completed"; currentUnitId?:string; currentStepId?:string; startedAt?:string; completedAt?:string; updatedAt:string };
 
 export interface MicroLearningProvider {
   getLesson(knowledgeId:string, context?:{courseId?:string; coverageRole?:string}):MicroLesson|null;
   listSupportedKnowledgeIds():string[];
+}
+
+export interface MicroLearningRepository extends MicroLearningProvider {
+  hydrate(userId:string):Promise<void>;
+  getPath(knowledgeId:string, context?:{courseId?:string; mode?:MicroLearningPath["mode"]}):MicroLearningPath|null;
+  getPathProgress(pathId:string):MicroPathProgress|undefined;
+  getUnitProgress(unitId:string):MicroUnitProgress|undefined;
+  start(pathId:string):Promise<void>;
+  completeStep(pathId:string, unitId:string, stepId:string, answer?:MicroLearningAnswer):Promise<{correct:boolean; completed:boolean}>;
+  subscribe(listener:()=>void):()=>void;
 }
 
 export function canCompleteMicroLesson(steps:readonly MicroStep[], completedStepIds:ReadonlySet<string>) {
@@ -59,20 +96,4 @@ function safeInternalPath(value:unknown) {
 export function resolveMicroLearningReturnTarget(state:unknown, courseId?:string) {
   const returnTo=state&&typeof state==="object"&&"returnTo" in state?(state as {returnTo?:unknown}).returnTo:undefined;
   return safeInternalPath(returnTo)??(courseId?`/courses/${encodeURIComponent(courseId)}`:"/");
-}
-
-export type MicroLearningActivity = { userId:string; knowledgeId:string; lessonId:string; courseId?:string; completedAt:string };
-const KEY="eduflow:micro-learning-activities:v1";
-
-export function readMicroLearningActivities(userId:string):MicroLearningActivity[] {
-  if(typeof window==="undefined")return [];
-  try { return (JSON.parse(window.localStorage.getItem(KEY)??"[]") as MicroLearningActivity[]).filter((item)=>item.userId===userId); } catch { return []; }
-}
-
-export function recordMicroLearningActivity(activity:MicroLearningActivity) {
-  if(typeof window==="undefined")return;
-  let all:MicroLearningActivity[]=[];
-  try { all=JSON.parse(window.localStorage.getItem(KEY)??"[]") as MicroLearningActivity[]; } catch { all=[]; }
-  window.localStorage.setItem(KEY,JSON.stringify([...all.filter((item)=>!(item.userId===activity.userId&&item.lessonId===activity.lessonId)),activity]));
-  window.dispatchEvent(new CustomEvent("eduflow:micro-learning-activity"));
 }

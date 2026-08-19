@@ -8,6 +8,7 @@ import { DomainGovernanceService } from "@/features/knowledge/domain/DomainGover
 import { LocalStorageDomainGovernanceRepository } from "@/features/knowledge/domain/LocalStorageDomainGovernanceRepository";
 import { InMemoryKnowledgeRepository } from "@/features/knowledge/repository/InMemoryKnowledgeRepository";
 import { LocalStorageLearningProgressRepository } from "@/features/learning/progress/LocalStorageLearningProgressRepository";
+import { demoMicroLearningProvider } from "@/demo/learning/demoMicroLearningProvider";
 import { DemoCourseCreationService } from "./DemoCourseCreationService";
 
 export function createDemoApplicationServices(): ApplicationServices {
@@ -18,6 +19,11 @@ export function createDemoApplicationServices(): ApplicationServices {
     knowledgeRepository,
     userKnowledgeRepository: new DemoUserKnowledgeRepository(),
     learningProgressRepository: new LocalStorageLearningProgressRepository(demoUserCourseStateSeed),
+    microLearningRepository: {
+      ...demoMicroLearningProvider,
+      async hydrate() {}, getPath() { return null; }, getPathProgress() { return undefined; }, getUnitProgress() { return undefined; }, async start() {}, async completeStep() { return { correct:false, completed:false }; }, subscribe() { return () => {}; }
+    },
+    learnerStateService: { startKnowledge: async () => ({ status:"learning" }), startAssignment: async () => ({ status:"started" }), submitAssignment: async () => ({ status:"submitted", accepted:false }) } as never,
     domainGovernanceRepository,
     domainGovernanceService: new DomainGovernanceService(knowledgeRepository, domainGovernanceRepository),
     courseCreationService: new DemoCourseCreationService()

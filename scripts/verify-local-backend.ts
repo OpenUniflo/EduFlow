@@ -6,6 +6,8 @@ import healthHandler from "../api/health";
 import knowledgeHandler from "../api/knowledge";
 import coursesHandler from "../api/courses";
 import progressHandler from "../api/progress";
+import microHandler from "../api/micro";
+import learningHandler from "../api/learning";
 import workflowsHandler from "../api/workflows";
 import materialsHandler from "../api/materials";
 import domainsHandler from "../api/domains";
@@ -104,11 +106,31 @@ try {
   assert.equal(pdfResponse.status, 200);
   assert.equal(new TextDecoder().decode((await pdfResponse.arrayBuffer()).slice(0, 5)), "%PDF-");
 
+  const micro = await invoke(microHandler, "GET", adminUser.token);
+  assertStatus(micro, 200, "database-backed Micro read");
+  const agentPath = micro.body.paths.find((item: any) => item.id === "golden-micro-AG01");
+  assert.ok(agentPath && agentPath.units.length === 2, "Golden Micro hierarchy must be read from the database");
+  assertStatus(await invoke(microHandler, "POST", adminUser.token, { action: "start", pathId: agentPath.id }), 200, "Micro start");
+  const firstUnit = agentPath.units[0]; const secondUnit = agentPath.units[1];
+  const first = await invoke(microHandler, "POST", adminUser.token, { action: "complete-step", pathId: agentPath.id, unitId: firstUnit.id, stepId: firstUnit.steps[0].id, answer: "先明确目标与可验证边界" });
+  assertStatus(first, 200, "Micro deterministic choice"); assert.equal(first.body.correct, true);
+  const second = await invoke(microHandler, "POST", adminUser.token, { action: "complete-step", pathId: agentPath.id, unitId: secondUnit.id, stepId: secondUnit.steps[0].id, answer: ["Candidate", "Verifier", "Atomic Settle", "Cancel Remaining"] });
+  assertStatus(second, 200, "Micro deterministic workflow order"); assert.equal(second.body.completed, true);
+  const startedKnowledge = await invoke(progressHandler, "GET", adminUser.token);
+  assertStatus(startedKnowledge, 200, "Learning state after Micro");
+  assert.equal(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.status, "learned");
+  assert.ok(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.evidence?.some((item: any) => item.type === "micro_path_completed"));
+
+  assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "start-knowledge", nodeId: "RT14" }), 200, "explicit Knowledge start");
+  assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "start-assignment", courseId: "agentic-ai-golden", assignmentId: "golden-knowledge-assignment-RT14" }), 200, "Assignment start");
+  const deterministicSubmit = await invoke(learningHandler, "POST", adminUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: "golden-knowledge-assignment-RT14", deterministicAccepted: true });
+  assertStatus(deterministicSubmit, 200, "deterministic Assignment acceptance"); assert.equal(deterministicSubmit.body.status, "accepted");
+
   const progressBody = {
     userId: ordinaryUser.user.id,
     courseId: "python-engineering",
     recentLessonId: "PY-L02",
-    assignmentStates: { "py-runtime-model": { assignmentId: "py-runtime-model", status: "completed", progress: 100 } },
+    assignmentStates: { "py-runtime-model": { assignmentId: "py-runtime-model", status: "submitted", progress: 75 } },
     materialStates: {}
   };
   assertStatus(await invoke(progressHandler, "PUT", adminUser.token, progressBody), 200, "progress write");
@@ -213,7 +235,7 @@ try {
   assertStatus(await invoke(domainsHandler, "PUT", ordinaryUser.token, knowledge.body.governance), 403, "non-admin Domain mutation denial");
   assertStatus(await invoke(domainsHandler, "PUT", adminUser.token, knowledge.body.governance), 200, "admin Domain mutation");
 
-  console.log("Local backend verification passed: Auth, Health, Knowledge, Courses, signed PDF, RLS, Progress, Workflows, upload, and authorization.");
+  console.log("Local backend verification passed: Auth, Health, Knowledge, Courses, Micro progress, learning state, evidence, signed PDF, RLS, Workflows, upload, and authorization.");
 } finally {
   if (uploadedMaterialId) await server.from("materials").delete().eq("course_id", "python-engineering").eq("id", uploadedMaterialId);
   if (uploadedPath) await server.storage.from("course-materials").remove([uploadedPath]);

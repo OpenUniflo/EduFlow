@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import type { MockSession } from "@/features/auth/types";
 import type { CourseCreationScenario, CourseCreationScenarioResolver } from "@/features/course/creation/demoScenario";
-import { setCoursePresentationLifecycle } from "@/features/course/presentation/courseLifecycle";
 
 export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { session: MockSession; onLogout(): void; resolver: CourseCreationScenarioResolver }) {
   const navigate = useNavigate();
@@ -16,7 +15,7 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
   const [done, setDone] = useState(false);
   const [fallback, setFallback] = useState(false);
   useEffect(() => { let alive = true; void resolver.resolve(files).then((result) => { if (!alive) return; if (!result) setFallback(true); else { setScenario(result); setStep(0); } }); return () => { alive = false; }; }, [files, resolver]);
-  useEffect(() => { if (!scenario || step < 0 || step >= scenario.stages.length) return; const timer = window.setTimeout(() => { if (step === scenario.stages.length - 1) { setDone(true); setCoursePresentationLifecycle(scenario.courseId, "draft"); } else setStep((value) => value + 1); }, 650); return () => window.clearTimeout(timer); }, [scenario, step]);
+  useEffect(() => { if (!scenario || step < 0 || step >= scenario.stages.length) return; const timer = window.setTimeout(() => { if (step === scenario.stages.length - 1) setDone(true); else setStep((value) => value + 1); }, 650); return () => window.clearTimeout(timer); }, [scenario, step]);
   const fromExplore = new URLSearchParams(location.search).get("source") === "explore";
   return <main className="atlas-page-shell golden-creation-page"><GlobalNav active={fromExplore ? "explore" : "teaching"} session={session} onLogout={onLogout} /><div className="golden-creation-shell">
     <header><span className="atlas-kicker">AI COURSE CREATION</span><h1>AI 建课工作台</h1><p>{scenario?.sourceLabel ?? (files[0]?.name || "等待教材")}</p></header>

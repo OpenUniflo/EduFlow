@@ -828,6 +828,35 @@ insert into public.assignment_coverages (course_id, id, assignment_id, node_id, 
 insert into public.assignment_coverages (course_id, id, assignment_id, node_id, role) values ('agentic-ai-golden', 'golden-chapter-ac-6-3', 'golden-chapter-assignment-6', 'MA04', 'assess');
 insert into public.assignment_coverages (course_id, id, assignment_id, node_id, role) values ('agentic-ai-golden', 'golden-chapter-ac-6-4', 'golden-chapter-assignment-6', 'WF03', 'assess');
 insert into public.assignment_coverages (course_id, id, assignment_id, node_id, role) values ('agentic-ai-golden', 'golden-chapter-ac-6-5', 'golden-chapter-assignment-6', 'W13', 'assess');
+
+-- Golden Micro is fixture data, but the runtime reaches it only through the
+-- same database repository as teacher-authored paths.
+insert into public.micro_learning_paths (id, knowledge_id, course_id, scope, title, description, mode, estimated_minutes, required, status)
+values
+  ('golden-micro-AG01', 'AG01', 'agentic-ai-golden', 'course', 'Agent · 快速学习', '从目标边界到可验证的 Agent 判断。', 'learn', 8, true, 'published'),
+  ('golden-micro-H02', 'H02', 'agentic-ai-golden', 'course', 'Workflow · 快速学习', '建立可靠 Workflow 的顺序与边界。', 'learn', 8, true, 'published'),
+  ('golden-micro-RT14', 'RT14', 'agentic-ai-golden', 'course', 'Failure Recovery · 快速学习', '识别恢复链路里的错误结算顺序。', 'learn', 8, true, 'published'),
+  ('golden-micro-E13', 'E13', 'agentic-ai-golden', 'course', 'Outcome Evaluation · 快速学习', '区分候选输出与可验收结果。', 'learn', 8, true, 'published');
+
+insert into public.micro_units (id, path_id, title, description, position, estimated_minutes, required) values
+  ('golden-micro-AG01-unit-1', 'golden-micro-AG01', '判断与验证', '先建立可验证的判断。', 0, 4, true),
+  ('golden-micro-AG01-unit-2', 'golden-micro-AG01', '可靠执行顺序', '把判断落实到执行顺序。', 1, 4, true),
+  ('golden-micro-H02-unit-1', 'golden-micro-H02', '判断与验证', '先建立可验证的判断。', 0, 4, true),
+  ('golden-micro-H02-unit-2', 'golden-micro-H02', '可靠执行顺序', '把判断落实到执行顺序。', 1, 4, true),
+  ('golden-micro-RT14-unit-1', 'golden-micro-RT14', '判断与验证', '先建立可验证的判断。', 0, 4, true),
+  ('golden-micro-RT14-unit-2', 'golden-micro-RT14', '可靠执行顺序', '把判断落实到执行顺序。', 1, 4, true),
+  ('golden-micro-E13-unit-1', 'golden-micro-E13', '判断与验证', '先建立可验证的判断。', 0, 4, true),
+  ('golden-micro-E13-unit-2', 'golden-micro-E13', '可靠执行顺序', '把判断落实到执行顺序。', 1, 4, true);
+
+insert into public.micro_steps (id, unit_id, position, kind, title, content, interaction, success_feedback, retry_feedback) values
+  ('golden-micro-AG01-s1', 'golden-micro-AG01-unit-1', 0, 'challenge', '先做判断', '一个系统正在使用 Agent。最先应该明确什么？', '{"type":"choice","options":["先明确目标与可验证边界","先增加更多 Agent","先隐藏失败路径"],"correctIndex":0}', '正确：先建立可验证边界，再决定结构复杂度。', '数量和界面不是第一约束，回到目标与验证。'),
+  ('golden-micro-AG01-s2', 'golden-micro-AG01-unit-2', 0, 'interaction', '重排可靠执行顺序', '按点击顺序组装最小可靠链路。', '{"type":"mini-workflow","nodes":["Candidate","Verifier","Atomic Settle","Cancel Remaining"],"correctOrder":["Candidate","Verifier","Atomic Settle","Cancel Remaining"]}', '顺序正确：验证发生在结算和取消之前。', '先验证，再结算，最后取消剩余执行。'),
+  ('golden-micro-H02-s1', 'golden-micro-H02-unit-1', 0, 'challenge', '选出工作流边界', '一个 Workflow 需要先固定什么？', '{"type":"choice","options":["输入、输出和失败边界","更多并行节点","隐藏状态"],"correctIndex":0}', '正确：可靠流程从清晰边界开始。', '回到输入、输出与失败处理。'),
+  ('golden-micro-H02-s2', 'golden-micro-H02-unit-2', 0, 'interaction', '排列运行步骤', '把可靠执行步骤按顺序排列。', '{"type":"ordering","items":["Verify output","Receive input","Persist result"],"correctOrder":["Receive input","Verify output","Persist result"]}', '正确：先接收，再验证，最后持久化。', '验证不能发生在输入之前。'),
+  ('golden-micro-RT14-s1', 'golden-micro-RT14-unit-1', 0, 'challenge', '定位恢复错误', '哪一步错误地在验证前结束了恢复链路？', '{"type":"trace","steps":[{"id":"candidate","label":"Candidate emitted"},{"id":"cancel","label":"Cancel remaining workers"},{"id":"verify","label":"Verifier skipped"}],"correctStepId":"cancel"}', '正确：在验证前取消会使恢复链路失去证据。', '检查哪一步导致验证无法发生。'),
+  ('golden-micro-RT14-s2', 'golden-micro-RT14-unit-2', 0, 'summary', '恢复原则', '恢复链路先保存可复核状态，再决定 retry、fallback 或终止。', null, null, null),
+  ('golden-micro-E13-s1', 'golden-micro-E13-unit-1', 0, 'challenge', '识别验收边界', 'Candidate 尚不能通过 Outcome Evaluation 的原因是什么？', '{"type":"choice","options":["尚未有独立验证","名称不够吸引人","节点位置不正确"],"correctIndex":0}', '正确：Candidate 不是验收结果，仍需要独立验证。', '把候选输出与可验收证据区分开。'),
+  ('golden-micro-E13-s2', 'golden-micro-E13-unit-2', 0, 'interaction', '排序评估链路', '按顺序排列评估链路。', '{"type":"mini-workflow","nodes":["Candidate","Verifier","Accepted evidence"],"correctOrder":["Candidate","Verifier","Accepted evidence"]}', '正确：证据只在验证后成立。', '验收证据不能跳过 Verifier。');
 insert into public.assignment_dependencies (course_id, id, source_assignment_id, target_assignment_id, strength) values ('agentic-ai-golden', 'golden-stage-dependency-1', 'golden-chapter-assignment-1', 'golden-chapter-assignment-2', 'hard');
 insert into public.assignment_dependencies (course_id, id, source_assignment_id, target_assignment_id, strength) values ('agentic-ai-golden', 'golden-stage-dependency-2', 'golden-chapter-assignment-2', 'golden-chapter-assignment-3', 'hard');
 insert into public.assignment_dependencies (course_id, id, source_assignment_id, target_assignment_id, strength) values ('agentic-ai-golden', 'golden-stage-dependency-3', 'golden-chapter-assignment-3', 'golden-chapter-assignment-4', 'hard');

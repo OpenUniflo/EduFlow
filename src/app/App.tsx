@@ -34,7 +34,6 @@ import { demoLessonAssistantProvider } from "@/demo/scenarios/agenticAiBook/less
 import { demoWorkflowAssessmentProvider } from "@/demo/scenarios/agenticAiBook/workflowAssessment";
 import { demoCourseDesignAssistantProvider } from "@/demo/scenarios/agenticAiBook/courseDesignAssistantScripts";
 import { demoLearningIntentResolver } from "@/demo/explore/demoLearningIntentResolver";
-import { demoMicroLearningProvider } from "@/demo/learning/demoMicroLearningProvider";
 import { resolveLegacyRoute } from "@/app/legacyRoutes";
 
 function LegacyRedirect() {
@@ -201,9 +200,9 @@ export default function App() {
         <Routes>
           <RouterRoute path="/login" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
           <RouterRoute path="/register" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
-          <RouterRoute path="/" element={protectedElement(session ? <LearningPage session={session} onLogout={logout} microLearningProvider={demoMicroLearningProvider} /> : null)} />
+          <RouterRoute path="/" element={protectedElement(session ? <LearningPage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/explore" element={protectedElement(session ? <ExplorePage session={session} onLogout={logout} resolver={demoLearningIntentResolver} /> : null)} />
-          <RouterRoute path="/learn/micro/:knowledgeId" element={protectedElement(session ? <MicroLearningExperience session={session} onLogout={logout} provider={demoMicroLearningProvider} /> : null)} />
+          <RouterRoute path="/learn/micro/:knowledgeId" element={protectedElement(session ? <MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} /> : null)} />
           <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="canvas" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />
           <RouterRoute path="/workflows/:workflowId" element={protectedElement(editor)} />
           <RouterRoute path="/courses" element={protectedElement(session ? <CourseCenterPage session={session} onLogout={logout} /> : null)} />
@@ -211,10 +210,10 @@ export default function App() {
           <RouterRoute path="/teaching" element={canManageCourses(session) ? protectedElement(session ? <CourseManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/courses" replace />} />
           <RouterRoute path="/teaching/create" element={canManageCourses(session) ? protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} /> : null) : <Navigate to="/courses" replace />} />
           <RouterRoute path="/course-management" element={<LegacyRedirect />} />
-          <RouterRoute path="/courses/:courseId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} microLearningProvider={demoMicroLearningProvider} /> : null)} />
+          <RouterRoute path="/courses/:courseId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} microLearningProvider={applicationServices.microLearningRepository} /> : null)} />
           <RouterRoute path="/courses/:courseId/assignments/:assignmentId" element={protectedElement(session ? <AssignmentExperiencePage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/courses/:courseId/materials/:materialId" element={protectedElement(session ? <LessonPage session={session} onLogout={logout} lessonAssistantProvider={demoLessonAssistantProvider} /> : null)} />
-          <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} microLearningProvider={demoMicroLearningProvider} /> : null)} />
+          <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} microLearningProvider={applicationServices.microLearningRepository} /> : null)} />
           <RouterRoute path="/tasks/*" element={<Navigate to="/" replace />} />
           <RouterRoute path="/system" element={canManageKnowledgeDomains(session) ? protectedElement(session ? <DomainManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/" replace />} />
           <RouterRoute path="/system/domains" element={<Navigate to="/system" replace />} />

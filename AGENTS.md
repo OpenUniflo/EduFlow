@@ -403,8 +403,17 @@
 ## Micro Learning Assessment Integrity
 
 - Assistant hints and explanations MUST NOT mutate MicroStep answers, grading feedback, Step completion, or Lesson completion, and Assistant actions MUST NOT bypass interaction validation.
-- MicroLesson completion activity MUST be recorded only after every required MicroStep has legitimately completed. Micro Learning completion remains separate from Knowledge mastery.
-- A Quick Learn CTA MUST be executable only when the active MicroLearningProvider resolves a MicroLesson for the Knowledge and Course context. Unsupported Micro deep links MUST render a visible fallback rather than a blank experience.
+- `MicroLearningPath -> MicroUnit -> MicroStep` is the canonical Micro Learning hierarchy. A legacy MicroLesson/provider may exist only as a demo/test adapter and is never runtime authority.
+- Required Unit completion and resume state MUST be persisted. A completed required Learn Path creates learning evidence and may reach `learned`; it MUST NOT itself claim `mastered`.
+- A Quick Learn CTA MUST be executable only for a published, repository-loaded MicroLearningPath in the Knowledge and Course context. Unsupported and unadapted H5P content MUST render a visible fallback rather than a blank experience.
+
+## Learner State, Evidence, and Assignment Lifecycle
+
+- Durable `UserKnowledgeState` values are `explore`, `learning`, `learned`, `practicing`, and `mastered`. State transitions are monotonic and belong to a centralized policy/application action, never an individual React component.
+- Assignment lifecycle is `not_started -> started -> submitted -> accepted` (with optional `needs_revision`). Submission is not acceptance and neither submission nor course completion is Knowledge mastery.
+- KnowledgeEvidence is user-owned, source-identified, and idempotent. Supported MVP evidence is completed Micro paths, accepted Assignments, and passed Workflows.
+- Mastery requires a completed required Learn Path plus every explicitly required Assignment accepted. A Knowledge without an explicit required Assignment remains `learned` after its required Learn Path.
+- Course progress and UserKnowledgeState are separate projections. PersonalLearningPlan is removed; systematic multi-Knowledge learning belongs to a Course, while MicroLearningPath is a within-Knowledge experience.
 
 ## Knowledge Source Invariants
 

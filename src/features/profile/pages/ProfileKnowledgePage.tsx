@@ -16,7 +16,7 @@ import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssista
 
 const { courseRepository, learningProgressRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
-const statusLabels = { mastered: "已掌握", learning: "学习中", explore: "可探索" } as const;
+const statusLabels = { mastered: "已掌握", practicing: "实训中", learned: "已学会", learning: "学习中", explore: "可探索" } as const;
 const relationLabels = { prerequisite: "前置依赖", enables: "能力支持", related: "知识相关" } as const;
 
 function initials(name: string) {
@@ -33,6 +33,7 @@ export function PersonalKnowledgeView({ session, onLogout, embedded = false }: {
   const toastTimerRef = useRef<number | null>(null);
   const [progressRevision, setProgressRevision] = useState(0);
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
+  useEffect(() => userKnowledgeRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
   const runtimes = useMemo(() => courseRepository.listCourseRuntimes(), []);
   const userCourseStates = useMemo(() => runtimes.map((runtime) => learningProgressRepository.getCourseState(session.userId, runtime.course.id)), [progressRevision, runtimes, session.userId]);
   const graph = useMemo(() => buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), userKnowledgeRepository.getUserKnowledge(session.userId), runtimes, userCourseStates, governance), [governance, runtimes, session.userId, userCourseStates]);

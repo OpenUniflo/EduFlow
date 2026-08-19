@@ -201,9 +201,9 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
 function summarizeAssignmentIds(assignmentIds: string[], assignmentStateById: Map<string, UserAssignmentState>, assignmentOrderById: ReadonlyMap<string, number>) {
   const uniqueIds = Array.from(new Set(assignmentIds)).sort((left, right) => (assignmentOrderById.get(left) ?? Number.MAX_SAFE_INTEGER) - (assignmentOrderById.get(right) ?? Number.MAX_SAFE_INTEGER) || left.localeCompare(right));
   const states = uniqueIds.map((id) => assignmentStateById.get(id));
-  const completedCount = states.filter((state) => state?.status === "completed").length;
-  const inProgressCount = states.filter((state) => state?.status === "in-progress").length;
-  const progress = uniqueIds.length ? Math.round(states.reduce((sum, state) => sum + (state?.progress ?? (state?.status === "completed" ? 100 : 0)), 0) / uniqueIds.length) : 0;
+  const completedCount = states.filter((state) => state?.status === "accepted" || state?.status === "completed").length;
+  const inProgressCount = states.filter((state) => state?.status === "started" || state?.status === "submitted" || state?.status === "needs_revision" || state?.status === "in-progress").length;
+  const progress = uniqueIds.length ? Math.round(states.reduce((sum, state) => sum + (state?.progress ?? ((state?.status === "accepted" || state?.status === "completed") ? 100 : 0)), 0) / uniqueIds.length) : 0;
   return { assignmentIds: uniqueIds, assignmentCount: uniqueIds.length, completedCount, inProgressCount, notStartedCount: uniqueIds.length - completedCount - inProgressCount, progress };
 }
 

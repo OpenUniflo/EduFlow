@@ -75,7 +75,7 @@ export function buildPersonalKnowledgeGraph(
         title: assignment.title,
         role: coverage.role,
         workflowTemplateId: assignment.workflowTemplateId,
-        status: assignmentStateByCourse.get(courseId)?.[assignment.id]?.status ?? "not-started"
+        status: assignmentStateByCourse.get(courseId)?.[assignment.id]?.status ?? "not_started"
       });
     });
   });
@@ -122,7 +122,7 @@ export function buildPersonalKnowledgeGraph(
       assignmentContexts,
       evidence: [
         ...(record?.evidence?.map((evidence) => evidence.label) ?? []),
-        ...assignmentContexts.filter((context) => context.status === "completed").map((context) => `已完成实训 · ${context.title}`)
+        ...assignmentContexts.filter((context) => context.status === "accepted" || context.status === "completed").map((context) => `已验收实训 · ${context.title}`)
       ]
     }];
   });
@@ -142,9 +142,11 @@ export function buildPersonalKnowledgeGraph(
     summary: {
       mastered: nodes.filter((node) => node.status === "mastered").length,
       learning: nodes.filter((node) => node.status === "learning").length,
+      learned: nodes.filter((node) => node.status === "learned").length,
+      practicing: nodes.filter((node) => node.status === "practicing").length,
       explore: nodes.filter((node) => node.status === "explore").length,
       completedAssignments: new Set(nodes.flatMap((node) => node.assignmentContexts
-        .filter((context) => context.status === "completed")
+        .filter((context) => context.status === "accepted" || context.status === "completed")
         .map((context) => courseScopedId(context.courseId, context.assignmentId)))).size,
       crossDomainConnections: calculateCrossDomainConnections(graph, coreIds, effectiveEdges, governance.assignments),
       connectivity: calculateKnowledgeConnectivity(coreIds, effectiveEdges),

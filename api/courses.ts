@@ -9,8 +9,19 @@ const optionalText = (row: Row, key: string) => row[key] == null ? undefined : S
 const number = (row: Row, key: string) => Number(row[key]);
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
-  if (request.method !== "GET") return methodNotAllowed(response, ["GET"]);
-  const { client } = await createUserSupabase(request);
+  const { client, user } = await createUserSupabase(request);
+  if (request.method === "PATCH") {
+    const body = request.body as { courseId?: string; lifecycle?: string };
+    if (!body.courseId || !["draft", "published", "archived"].includes(String(body.lifecycle))) throw new ApiError(400, "invalid_course_lifecycle", "courseId and a valid lifecycle are required");
+    const profile = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const profileRow = dataOrThrow(profile.data as Row | null, profile.error, "Course lifecycle role lookup");
+    if (!profileRow || !["teacher", "admin"].includes(text(profileRow, "role"))) throw new ApiError(403, "course_lifecycle_forbidden", "Only teachers may change course lifecycle");
+    const write = await client.from("courses").update({ lifecycle: body.lifecycle, updated_at: new Date().toISOString() }).eq("id", body.courseId).select("id,lifecycle").maybeSingle();
+    const row = dataOrThrow(write.data as Row | null, write.error, "Course lifecycle update");
+    if (!row) throw new ApiError(404, "course_not_found", "Course not found");
+    json(response, 200, { courseId: text(row, "id"), lifecycle: text(row, "lifecycle") }); return;
+  }
+  if (request.method !== "GET") return methodNotAllowed(response, ["GET", "PATCH"]);
   const courseId = typeof request.query.id === "string" ? request.query.id : undefined;
   const queries = await Promise.all([
     client.from("courses").select("*").order("id"),
@@ -41,7 +52,11 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     })];
   }));
 
-  const runtimes = courseRows.map((courseRow) => {
+  const profileResult = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  const profile = dataOrThrow(profileResult.data as Row | null, profileResult.error, "Course role lookup");
+  const canManage = profile && ["teacher", "admin"].includes(text(profile, "role"));
+  const readableCourseRows = canManage ? courseRows : courseRows.filter((row) => text(row, "lifecycle") === "published");
+  const runtimes = readableCourseRows.map((courseRow) => {
     const id = text(courseRow, "id");
     const curriculumRow = curriculumRows.find((row) => text(row, "course_id") === id);
     if (!curriculumRow) throw new Error(`Course ${id} has no curriculum`);
@@ -61,7 +76,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       };
     });
     return {
-      course: { id, title: text(courseRow, "title"), subtitle: optionalText(courseRow, "subtitle"), description: text(courseRow, "description"), targetOutcome: optionalText(courseRow, "target_outcome"), accentColor: optionalText(courseRow, "accent_color"), generationStatus: text(courseRow, "generation_status") },
+      course: { id, title: text(courseRow, "title"), subtitle: optionalText(courseRow, "subtitle"), description: text(courseRow, "description"), targetOutcome: optionalText(courseRow, "target_outcome"), accentColor: optionalText(courseRow, "accent_color"), generationStatus: text(courseRow, "generation_status"), lifecycle: text(courseRow, "lifecycle") },
       curriculum: { id: text(curriculumRow, "id"), courseId: id, generationMode: text(curriculumRow, "generation_mode"), requestedChapterCount: curriculumRow.requested_chapter_count == null ? undefined : number(curriculumRow, "requested_chapter_count"), sourceStructureId: optionalText(curriculumRow, "source_structure_id") },
       chapters: chapterRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, title: text(row, "title"), description: text(row, "description"), order: number(row, "display_order"), color: text(row, "color"), outcome: text(row, "outcome") })),
       lessons: lessonRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, chapterId: text(row, "chapter_id"), title: text(row, "title"), order: number(row, "display_order") })),

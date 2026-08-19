@@ -20,14 +20,14 @@ import { ExperienceModeToggle } from "@/shared/components/ExperienceModeToggle";
 import { addDraftChapter, addDraftDependency, addExistingKnowledge, addGeneratedMaterial, addKnowledgeCandidate, addMaterialLink, applyCourseAuthoringDraft, clearManualNodePositions, createEditableKnowledgeGraph, createGeneratedArticleDraft, getCourseAuthoringHistoryStatus, moveCourseKnowledge, readCourseAuthoringDraft, redoCourseAuthoringDraft, removeCourseKnowledge, removeDraftChapter, removeDraftDependency, removeMaterialLink, reorderDraftChapter, setManualNodePosition, subscribeCourseAuthoringDraft, undoCourseAuthoringDraft, updateDraftChapter, validateDependencyAddition, writeCourseAuthoringDraft } from "@/features/course/authoring/courseAuthoringDraft";
 import { validateCourseAuthoring } from "@/features/course/authoring/courseAuthoringValidation";
 import { validateCourseAuthoringProposal } from "@/features/course/authoring/courseAuthoringProposal";
-import { setCoursePresentationLifecycle } from "@/features/course/presentation/courseLifecycle";
+import { apiRequest } from "@/shared/api/apiClient";
 import { shouldReserveCourseDrawer } from "@/features/course/graph/courseGraphInteraction";
 import { createMicroLearningNavigation, type MicroLearningProvider } from "@/features/learning/micro/microLearning";
 
 const { courseRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
 const knowledgeStatusLabel = { completed: "已完成", learning: "学习中", available: "可学习", locked: "未解锁" } as const;
-const assignmentStatusLabel = { completed: "已完成", "in-progress": "进行中", "not-started": "未开始" } as const;
+const assignmentStatusLabel = { accepted: "已验收", submitted: "已提交", started: "进行中", needs_revision: "需修改", not_started: "未开始", completed: "已完成", "in-progress": "进行中", "not-started": "未开始" } as const;
 
 function lessonsForChapter(runtime: NonNullable<ReturnType<typeof courseRepository.getCourse>>, chapterId: string) {
   return runtime.lessons.filter((lesson) => lesson.chapterId === chapterId).sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
@@ -38,8 +38,9 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   const location = useLocation();
   const { courseId = "", chapterId: routeChapterId } = useParams();
   const baseRuntime = courseRepository.getCourse(courseId);
+  const authoringRoute = new URLSearchParams(window.location.search).get("experience") === "design" && canDesignCourse(session);
   const [authoringRevision, setAuthoringRevision] = useState(0);
-  const draftState = useMemo(() => baseRuntime ? readCourseAuthoringDraft(baseRuntime.course.id) : null, [authoringRevision, baseRuntime]);
+  const draftState = useMemo(() => baseRuntime && authoringRoute ? readCourseAuthoringDraft(baseRuntime.course.id) : null, [authoringRevision, authoringRoute, baseRuntime]);
   const baseKnowledgeGraph = useMemo(() => knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), [session.userId]);
   const editableKnowledgeGraph = useMemo(() => draftState ? createEditableKnowledgeGraph(baseKnowledgeGraph, draftState) : baseKnowledgeGraph, [baseKnowledgeGraph, draftState]);
   const runtime = useMemo(() => baseRuntime && draftState ? applyCourseAuthoringDraft(baseRuntime, draftState) : undefined, [baseRuntime, draftState]);
@@ -263,9 +264,10 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     if (updateAuthoringDraft(() => result.state)) setDesignActionNotice("AI Proposal 已验证并应用，可使用 Undo 撤回。");
   }
 
-  function publishCourse() {
+  async function publishCourse() {
     if(!runtime||!validation||validation.fatal.length)return;
-    setCoursePresentationLifecycle(runtime.course.id,"published"); setPublishCheckOpen(false); setDesignActionNotice("课程已发布，Course Center 将显示当前浏览器中的 Editable View。");
+    try { await apiRequest("/api/courses", { method:"PATCH", body:JSON.stringify({courseId:runtime.course.id,lifecycle:"published"}) }); setPublishCheckOpen(false); setDesignActionNotice("课程生命周期已持久化为已发布；学习者读取只会看到发布课程。"); }
+    catch { setDesignActionNotice("发布失败，请检查权限或网络后重试。"); }
   }
 
   function linkMaterialToSelected(materialId: string) {
