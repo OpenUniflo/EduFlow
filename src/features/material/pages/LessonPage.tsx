@@ -120,7 +120,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
 
   return <main className={`atlas-lesson-page material-reader-current ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`} data-experience={experience}>
     <GlobalNav active={designEnabled ? "teaching" : "courses"} session={session} onLogout={onLogout} />
-    <header className="atlas-lesson-header glass-v2">
+    <header className="atlas-lesson-header">
       <div className="atlas-lesson-header-left"><button className="atlas-lesson-back" onClick={() => navigate(`/courses/${runtime.course.id}`)} aria-label="返回课程技能树"><ArrowLeft size={16} /></button><div className="atlas-lesson-breadcrumb"><button onClick={() => navigate(`/courses/${runtime.course.id}`)}>{runtime.course.title}</button><span>/</span><span>{lesson?.title ?? material.title}</span></div></div>
       <div className="atlas-lesson-title"><strong>{material.title}</strong><small>{material.type === "pdf" ? "Original PDF" : material.type} · {draftSegments.length} 个内容段 · {material.duration ?? "自定进度"}</small></div>
       {canDesignCourse(session) ? <ExperienceModeToggle value={experience} onChange={setExperience} /> : null}

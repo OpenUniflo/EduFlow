@@ -441,7 +441,7 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   return (
     <main className="atlas-graph-page" data-experience={experience}>
       <GlobalNav active={experience === "design" ? "teaching" : "courses"} session={session} onLogout={onLogout} />
-      <header className="atlas-skill-course-island glass-v2">
+      <header className="atlas-skill-course-island">
         <div className="atlas-skill-header-left"><button onClick={() => view === "overview" ? navigate("/courses") : changeView("overview")} aria-label="返回上一级"><ArrowLeft size={18} /></button><span className="atlas-skill-divider" /><div className="atlas-skill-title"><span>{runtime.course.title}</span><strong>{view === "overview" ? "课程篇章总览" : view === "focused" ? "聚焦篇章" : `完整课程${mode === "knowledge" ? "技能树" : "实训树"}`}</strong>{view === "focused" ? <small>/ {courseChapters.find((item) => item.id === focusedChapterId)?.title}</small> : null}</div></div>
         <div className="atlas-skill-header-center">{canDesignCourse(session) ? <ExperienceModeToggle value={experience} onChange={setExperience} /> : null}</div>
         <div className="atlas-skill-header-actions">{view !== "full" ? <button className="atlas-skill-focus" onClick={() => changeView("full")}>展开全部篇章 <ArrowRight size={12} /></button> : <button className="atlas-skill-focus" onClick={() => changeView("overview")}>折叠为篇章总览 <X size={12} /></button>}</div>

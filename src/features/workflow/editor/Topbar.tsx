@@ -36,7 +36,6 @@ import {
   CircleDot,
   ClipboardList,
   Code2,
-  Download,
   Folder,
   FolderOpen,
   GitBranch,
@@ -50,7 +49,7 @@ import {
   Lock,
   MessageSquare,
   MousePointer2,
-  Network,
+  MoreHorizontal,
   Play,
   Plus,
   RefreshCcw,
@@ -108,7 +107,7 @@ export function Topbar({
   onSaveEnvironments: (environments: EnvironmentConfig[], activeEnvironmentId: string) => void;
 }) {
   const [draftName, setDraftName] = useState(workflowName);
-  const [exportOpen, setExportOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const activeEnvironment = environments.find((item) => item.id === activeEnvironmentId) ?? environments[0];
 
   useEffect(() => {
@@ -120,8 +119,8 @@ export function Topbar({
     onRenameWorkflow(nextName);
   }
 
-  function closeExportMenu() {
-    window.setTimeout(() => setExportOpen(false), 0);
+  function closeMoreMenu() {
+    window.setTimeout(() => setMoreOpen(false), 0);
   }
 
   function handleExportCode() {
@@ -132,7 +131,7 @@ export function Topbar({
       workflowName: template.name,
       files: codeExporter.getFiles(template)
     });
-    closeExportMenu();
+    closeMoreMenu();
   }
 
   function handleExportCanvas() {
@@ -141,7 +140,7 @@ export function Topbar({
       exportedAt: new Date().toISOString(),
       workflow: getCanvasExportTemplate(template, nodePositions)
     });
-    closeExportMenu();
+    closeMoreMenu();
   }
 
   function handleExportAll() {
@@ -151,20 +150,17 @@ export function Topbar({
       workflow: getCanvasExportTemplate(template, nodePositions),
       files: codeExporter.getFiles(template)
     });
-    closeExportMenu();
+    closeMoreMenu();
   }
 
   return (
-    <header className="topbar glass">
-      <div className="brand-block">
+    <header className="topbar workflow-context-bar">
+      <div className="brand-block workflow-context-title">
         <button className="back-button" onClick={onBack} aria-label="返回主页">
           <ArrowLeft size={18} />
         </button>
-        <div className="brand-mark">
-          <Network size={20} />
-        </div>
         <div>
-          <div className="eyebrow">知序 · WORKFLOW</div>
+          <div className="eyebrow">WORKFLOW</div>
           <input
             className="workflow-name-input"
             value={draftName}
@@ -187,18 +183,18 @@ export function Topbar({
       <WorkflowStatusPrompt template={template} schemaSaved={schemaSaved} activeEnvironment={activeEnvironment} />
 
       <nav className="toolbar-actions" aria-label="工作流操作">
-        <div className={`export-menu ${exportOpen ? "open" : ""}`} onBlur={(event) => {
+        <div className={`export-menu ${moreOpen ? "open" : ""}`} onBlur={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-            setExportOpen(false);
+            setMoreOpen(false);
           }
         }}>
-          <button className="tool-button" onClick={() => setExportOpen((value) => !value)} aria-expanded={exportOpen} aria-haspopup="menu">
-            <Download size={16} />
-            导出
-            <ChevronDown size={14} />
+          <button className="tool-button" onClick={() => setMoreOpen((value) => !value)} aria-expanded={moreOpen} aria-haspopup="menu" aria-label="更多工作流操作">
+            <MoreHorizontal size={18} />
           </button>
-          {exportOpen && (
+          {moreOpen && (
             <div className="export-menu-popover glass" role="menu">
+              <button role="menuitem" onClick={onStep}><StepForward size={15} />单步运行</button>
+              <button role="menuitem" onClick={onShowCode}><Code2 size={15} />查看代码</button>
               <button role="menuitem" onClick={handleExportCode}>
                 <Code2 size={15} />
                 导出代码
@@ -217,14 +213,6 @@ export function Topbar({
         <button className="tool-button primary" onClick={onRun}>
           {isRunning ? <Loader2 className="spin" size={17} /> : <Play size={17} />}
           运行
-        </button>
-        <button className="tool-button" onClick={onStep}>
-          <StepForward size={16} />
-          单步运行
-        </button>
-        <button className="tool-button" onClick={onShowCode}>
-          <Code2 size={16} />
-          查看代码
         </button>
         <EnvironmentMenu
           environments={environments}

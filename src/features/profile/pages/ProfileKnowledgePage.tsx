@@ -124,7 +124,7 @@ export function PersonalKnowledgeView({ session, onLogout, embedded = false }: {
   return (
     <main className={`personal-atlas-page ${embedded ? "learning-personal-view" : ""} ${drawerOpen ? "has-drawer" : ""}`}>
       {!embedded ? <GlobalNav active="learning" session={session} onLogout={onLogout} /> : null}
-      <header className="personal-page-title"><h1>我的知识</h1><p>Personal Knowledge Atlas</p></header>
+      {!embedded ? <header className="personal-page-title"><h1>我的知识</h1><p>Personal Knowledge Atlas</p></header> : null}
       <aside className="personal-summary glass-v2">
         {!embedded ? <><div className="personal-identity"><span className="personal-avatar">{initials(session.name)}</span><span><strong>{session.name}</strong><small>{session.email}</small></span><button aria-label="打开个人设置" onClick={() => showToast("个人资料设置将在后续版本开放")}>•••</button></div><div className="personal-summary-divider" /></> : null}
         <div className="personal-summary-heading"><span><strong>我的知识空间</strong><small>Personal Knowledge Graph</small></span><i><Network size={15} /></i></div>

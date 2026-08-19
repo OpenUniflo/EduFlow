@@ -1,5 +1,5 @@
 import { ArrowRight, Layers3, Search } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
 import { GlobalNav } from "@/app/components/GlobalNav";
@@ -41,8 +41,8 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
   const recent = [...courses].sort((left, right) => (right.summary.updatedAt ?? "").localeCompare(left.summary.updatedAt ?? ""))[0];
   const learningCount = courses.filter((item) => item.summary.status === "learning").length;
 
-  function miniMap(chapters: typeof courses[number]["graphData"]["chapters"], compact = false) {
-    return <div className={`atlas-mini-map-scene ${compact ? "compact" : ""}`}>{chapters.slice(0, compact ? 6 : chapters.length).map((stage, index) => <i key={stage.id} style={{ "--i": index, "--color": stage.color } as CSSProperties} />)}</div>;
+  function pathPreview(chapters: typeof courses[number]["runtime"]["chapters"]) {
+    return <div className="atlas-course-path-preview" aria-label="课程篇章路径">{[...chapters].sort((left,right)=>left.order-right.order).slice(0,4).map((chapter,index)=><span key={chapter.id}>{index? <i>→</i> : null}{chapter.title}</span>)}</div>;
   }
 
   return (
@@ -56,13 +56,13 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession; 
           <div className="atlas-section-row"><div><span className="atlas-kicker">RECENT</span><h2>最近学习</h2></div></div>
           <article className="atlas-featured-course glass-v2" onClick={() => navigate(`/courses/${recent.runtime.course.id}`)}>
             <div className="atlas-featured-copy"><div className="atlas-kicker">最近学习</div><h2>{recent.runtime.course.subtitle ?? recent.runtime.course.title}</h2><p>{recent.runtime.course.description}</p><div className="atlas-course-meta"><span>当前：{recent.runtime.lessons.find((lesson) => lesson.id === recent.summary.recentLessonId)?.title ?? "尚未开始"}</span><span>{recent.summary.lessonCount} 课</span><span>{recent.summary.assignmentCount} 项课程实训</span></div><div className="atlas-progress-row"><div className="atlas-progress-track"><i style={{ width: `${recent.summary.progress}%` }} /></div><strong>{recent.summary.progress}%</strong></div><button className="atlas-primary" onClick={(event) => { event.stopPropagation(); navigate(`/courses/${recent.runtime.course.id}`); }}>继续学习 <ArrowRight size={16} /></button></div>
-            <div className="atlas-recent-mini-map" aria-label="课程技能树缩略图">{miniMap(recent.graphData.chapters)}<span>{recent.summary.chapterCount} 个篇章 · {recent.summary.knowledgeNodeCount} 个原子知识点</span></div>
+            <div className="atlas-recent-course-path">{pathPreview(recent.runtime.chapters)}<span>{recent.summary.chapterCount} 个篇章 · {recent.summary.knowledgeNodeCount} 个原子知识点</span></div>
           </article>
         </section> : null}
         <section className="atlas-course-section">
           <div className="atlas-section-row"><h2>所有课程</h2><span>{visible.length} 门课程</span></div>
           <div className="atlas-course-grid">
-            {visible.map(({ runtime, graphData, summary }) => <article className="atlas-course-card glass-v2" key={runtime.course.id} onClick={() => navigate(`/courses/${runtime.course.id}`)}><div className="atlas-card-accent" style={{ background: runtime.course.accentColor }} /><div className="atlas-course-preview" aria-hidden="true">{miniMap(graphData.chapters, true)}</div><div className="atlas-pill">{summary.status === "completed" ? "已完成" : summary.status === "learning" ? "学习中" : "未开始"} · {runtime.course.title}</div><h3>{runtime.course.subtitle ?? runtime.course.title}</h3><p>{runtime.course.description}</p><div className="atlas-course-meta"><span>{summary.lessonCount} 课</span><span>{summary.knowledgeNodeCount} 原子节点</span><span>{summary.assignmentCount} 实训</span></div><div className="atlas-progress-row"><div className="atlas-progress-track"><i style={{ width: `${summary.progress}%` }} /></div><strong>{summary.progress}%</strong></div></article>)}
+            {visible.map(({ runtime, summary }) => <article className="atlas-course-card" key={runtime.course.id} onClick={() => navigate(`/courses/${runtime.course.id}`)}><div className="atlas-card-accent" style={{ background: runtime.course.accentColor }} /><div className="atlas-pill">{summary.status === "completed" ? "已完成" : summary.status === "learning" ? "学习中" : "未开始"} · {runtime.course.title}</div><h3>{runtime.course.subtitle ?? runtime.course.title}</h3><p>{runtime.course.description}</p>{pathPreview(runtime.chapters)}<div className="atlas-course-meta"><span>{summary.lessonCount} 课</span><span>{summary.knowledgeNodeCount} 原子节点</span><span>{summary.assignmentCount} 实训</span></div><div className="atlas-progress-row"><div className="atlas-progress-track"><i style={{ width: `${summary.progress}%` }} /></div><strong>{summary.progress}%</strong></div></article>)}
           </div>
         </section>
       </div>

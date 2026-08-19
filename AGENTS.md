@@ -394,6 +394,12 @@
 - Assistant mutation requires both Design Mode and the existing capability checks. Proposal preview, deterministic validation, Apply, and Undo MUST NOT be bypassed by the unified shell.
 - Learn and Explore Assistant actions may explain, recommend, focus, or start supported experiences, but MUST NOT expose curriculum, material, publication, or Domain mutation without the corresponding authority and validation path.
 
+## Product Chrome
+
+- GlobalNav is the single primary top-level chrome. A page title, contextual control, or workspace tool MUST NOT introduce a second full-width fixed header.
+- Content and management pages use headings in normal document flow; graph, canvas, and reader pages use only lightweight contextual overlays so their primary workspace remains dominant.
+- Micro Learning is interaction-first. Assistant help may be contextual, but product chrome and Assistant actions MUST NOT visually or behaviorally dominate the assessment.
+
 ## Micro Learning Assessment Integrity
 
 - Assistant hints and explanations MUST NOT mutate MicroStep answers, grading feedback, Step completion, or Lesson completion, and Assistant actions MUST NOT bypass interaction validation.
