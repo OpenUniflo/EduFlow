@@ -86,6 +86,8 @@ export type AssignmentCoverage = {
   assignmentId: string;
   nodeId: string;
   role: AssignmentCoverageRole;
+  /** Explicit mastery/publish requirement; it is not implied by presentation role. */
+  required?: boolean;
 };
 
 export type CourseAssignment = {

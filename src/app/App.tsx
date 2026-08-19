@@ -16,6 +16,7 @@ import { CourseCenterPage } from "@/features/course/pages/CoursePages";
 import { CourseManagementPage } from "@/features/course/pages/CourseManagementPage";
 import { CourseCreationWorkspacePage } from "@/features/course/pages/CourseCreationWorkspacePage";
 import { CourseGraphPage } from "@/features/course/pages/CourseGraphPage";
+import { ManualCourseCreationPage } from "@/features/course/pages/ManualCourseCreationPage";
 import { AssignmentExperiencePage } from "@/features/course/pages/AssignmentExperiencePage";
 import { LessonPage } from "@/features/material/pages/LessonPage";
 import { DomainManagementPage } from "@/features/admin/domains/DomainManagementPage";
@@ -208,7 +209,7 @@ export default function App() {
           <RouterRoute path="/courses" element={protectedElement(session ? <CourseCenterPage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} /> : null)} />
           <RouterRoute path="/teaching" element={canManageCourses(session) ? protectedElement(session ? <CourseManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/courses" replace />} />
-          <RouterRoute path="/teaching/create" element={canManageCourses(session) ? protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} /> : null) : <Navigate to="/courses" replace />} />
+          <RouterRoute path="/teaching/create" element={canManageCourses(session) ? protectedElement(session ? <ManualCourseCreationPage session={session} onLogout={logout} /> : null) : <Navigate to="/courses" replace />} />
           <RouterRoute path="/course-management" element={<LegacyRedirect />} />
           <RouterRoute path="/courses/:courseId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} microLearningProvider={applicationServices.microLearningRepository} /> : null)} />
           <RouterRoute path="/courses/:courseId/assignments/:assignmentId" element={protectedElement(session ? <AssignmentExperiencePage session={session} onLogout={logout} /> : null)} />

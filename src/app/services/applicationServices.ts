@@ -14,6 +14,8 @@ import { ApiMicroLearningRepository } from "@/features/learning/micro/ApiMicroLe
 import type { MicroLearningRepository } from "@/features/learning/micro/microLearning";
 import { ApiLearnerStateService } from "@/features/learning/state/ApiLearnerStateService";
 import { ApiCourseRepository } from "@/features/course/repository/ApiCourseRepository";
+import { ApiCourseAuthoringDraftRepository } from "@/features/course/authoring/ApiCourseAuthoringDraftRepository";
+import type { CourseAuthoringDraftRepository } from "@/features/course/authoring/CourseAuthoringDraftRepository";
 import { apiRequest } from "@/shared/api/apiClient";
 import type { KnowledgeGraph } from "@/features/knowledge/types";
 import type { UserCourseState } from "@/features/course/types";
@@ -30,6 +32,7 @@ export type ApplicationServices = {
   domainGovernanceRepository: DomainGovernanceRepository;
   domainGovernanceService: DomainGovernanceService;
   courseCreationService: CourseCreationService;
+  courseAuthoringDraftRepository: CourseAuthoringDraftRepository;
 };
 
 const knowledgeRepository = new ApiKnowledgeRepository();
@@ -38,6 +41,7 @@ const userKnowledgeRepository = new ApiUserKnowledgeRepository();
 const learningProgressRepository = new ApiLearningProgressRepository();
 const microLearningRepository = new ApiMicroLearningRepository();
 const learnerStateService = new ApiLearnerStateService();
+const courseAuthoringDraftRepository = new ApiCourseAuthoringDraftRepository();
 const domainGovernanceRepository = new ApiDomainGovernanceRepository();
 const domainGovernanceService = new DomainGovernanceService(knowledgeRepository, domainGovernanceRepository);
 
@@ -50,6 +54,7 @@ export const applicationServices: ApplicationServices = {
   learnerStateService,
   domainGovernanceRepository,
   domainGovernanceService,
+  courseAuthoringDraftRepository,
   courseCreationService: new BackendCourseCreationService()
 };
 

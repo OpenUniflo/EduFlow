@@ -5,6 +5,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import healthHandler from "../api/health";
 import knowledgeHandler from "../api/knowledge";
 import coursesHandler from "../api/courses";
+import courseAuthoringHandler from "../api/course-authoring";
 import progressHandler from "../api/progress";
 import microHandler from "../api/micro";
 import learningHandler from "../api/learning";
@@ -63,6 +64,7 @@ const password = `Local-${suffix}-Aa1!`;
 const emails = [`backend-a-${suffix}@eduflow.local`, `backend-b-${suffix}@eduflow.local`];
 const createdUserIds: string[] = [];
 let uploadedPath: string | undefined;
+let authoredCourseId: string | undefined;
 const uploadedMaterialId = `local-backend-${suffix}`;
 
 try {
@@ -105,6 +107,33 @@ try {
   const pdfResponse = await fetch(signedPdf);
   assert.equal(pdfResponse.status, 200);
   assert.equal(new TextDecoder().decode((await pdfResponse.arrayBuffer()).slice(0, 5)), "%PDF-");
+
+  // Authoring drafts are server-owned, isolated from learners, versioned, and
+  // only materialize canonical Course rows during Publish.
+  const teacherRole = await server.from("profiles").update({ role: "teacher" }).eq("id", adminUser.user.id);
+  assert.ifError(teacherRole.error);
+  const manualCourse = await invoke(coursesHandler, "POST", adminUser.token, { title: `Manual ${suffix}`, description: "Created without AI", targetOutcome: "Produce a verifiable manual-course outcome" });
+  assertStatus(manualCourse, 201, "manual course creation");
+  const manualCourseId = manualCourse.body.courseId; authoredCourseId = manualCourseId;
+  const teacherCourses = await invoke(coursesHandler, "GET", adminUser.token);
+  assertStatus(teacherCourses, 200, "teacher reads draft course");
+  const manualRuntime = teacherCourses.body.courses.find((item: any) => item.course.id === manualCourseId);
+  assert.ok(manualRuntime && manualRuntime.course.lifecycle === "draft");
+  assertStatus(await invoke(courseAuthoringHandler, "GET", ordinaryUser.token, undefined, { courseId: manualCourseId }), 403, "learner authoring draft denial");
+  const draftState = { schemaVersion: 2, courseId: manualCourseId, addedLinks: [], removedLinks: [], generatedMaterials: [], addedChapters: [], chapterUpdates: {}, removedChapterIds: [], chapterOrder: [], addedKnowledgeNodeIds: [], addedKnowledgeCandidates: [], removedKnowledgeNodeIds: [], knowledgeChapterOverrides: {}, addedDependencies: [], removedDependencyIds: [], manualNodePositions: {} };
+  const saveDraft = await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: draftState, previewRuntime: manualRuntime, expectedRevision: 0 }, { courseId: manualCourseId });
+  assertStatus(saveDraft, 200, "teacher authoring draft save"); assert.equal(saveDraft.body.revision, 1);
+  const reloadedDraft = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: manualCourseId });
+  assertStatus(reloadedDraft, 200, "teacher authoring draft reload"); assert.equal(reloadedDraft.body.draft.revision, 1);
+  assertStatus(await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: draftState, previewRuntime: manualRuntime, expectedRevision: 0 }, { courseId: manualCourseId }), 409, "authoring draft stale write denial");
+  const learnerBeforePublish = await invoke(coursesHandler, "GET", ordinaryUser.token);
+  assertStatus(learnerBeforePublish, 200, "learner course read before publish"); assert.ok(!learnerBeforePublish.body.courses.some((item: any) => item.course.id === manualCourseId));
+  const published = await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: 1 }, { courseId: manualCourseId });
+  assertStatus(published, 200, "authoring draft publish");
+  const noDraft = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: manualCourseId });
+  assertStatus(noDraft, 200, "published draft cleared"); assert.equal(noDraft.body.draft, null);
+  const learnerAfterPublish = await invoke(coursesHandler, "GET", ordinaryUser.token);
+  assertStatus(learnerAfterPublish, 200, "learner course read after publish"); assert.ok(learnerAfterPublish.body.courses.some((item: any) => item.course.id === manualCourseId));
 
   const micro = await invoke(microHandler, "GET", adminUser.token);
   assertStatus(micro, 200, "database-backed Micro read");
@@ -237,6 +266,7 @@ try {
 
   console.log("Local backend verification passed: Auth, Health, Knowledge, Courses, Micro progress, learning state, evidence, signed PDF, RLS, Workflows, upload, and authorization.");
 } finally {
+  if (authoredCourseId) await server.from("courses").delete().eq("id", authoredCourseId);
   if (uploadedMaterialId) await server.from("materials").delete().eq("course_id", "python-engineering").eq("id", uploadedMaterialId);
   if (uploadedPath) await server.storage.from("course-materials").remove([uploadedPath]);
   for (const userId of createdUserIds) await server.auth.admin.deleteUser(userId);

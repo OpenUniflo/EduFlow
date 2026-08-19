@@ -138,6 +138,13 @@
 ## Course Presentation Stability
 
 - 技能树 / 实训树 switching is presentation-only.
+
+## Course Authoring Drafts
+
+- Persisted Course authoring drafts are server-side, teacher/admin-only, and are never learner-visible.
+- Editing a published Course changes only its draft projection until validated Publish succeeds.
+- Preview is derived from the published base plus the current persisted authoring draft; browser localStorage is not authoring content authority.
+- Publish must materialize the validated draft transactionally into canonical Course data and clear the applied draft.
 - Chapter and Atomic nodes MUST use a consistent Knowledge / Assignment companion visual language.
 - Mode switching MUST NOT trigger ELK, fitView, coordinate changes, edge changes, or viewport reset.
 

@@ -20,12 +20,12 @@ import { sortMaterialSegments } from "@/features/material/materialOrdering";
 import { canDesignCourse } from "@/features/auth/capabilities";
 import type { LessonAssistantProvider, LessonAssistantResult } from "@/features/material/lessonAssistant";
 import { ExperienceModeToggle } from "@/shared/components/ExperienceModeToggle";
-import { applyCourseAuthoringDraft, createEditableKnowledgeRepository, readCourseAuthoringDraft, subscribeCourseAuthoringDraft } from "@/features/course/authoring/courseAuthoringDraft";
+import { applyCourseAuthoringDraft, createEditableKnowledgeRepository, type CourseAuthoringDraftState } from "@/features/course/authoring/courseAuthoringDraft";
 import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
 
 const PERSIST_DELAY_MS = 350;
 
-function MaterialReaderShell({ runtime, material, userState, savedState, session, lessonAssistantProvider, onLogout }: {
+function MaterialReaderShell({ runtime, material, userState, savedState, session, lessonAssistantProvider, onLogout, draftState }: {
   runtime: CourseRuntimeData;
   material: Material;
   userState: UserCourseState;
@@ -33,6 +33,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   session: MockSession;
   lessonAssistantProvider?: LessonAssistantProvider;
   onLogout(): void;
+  draftState?: CourseAuthoringDraftState | null;
 }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -60,7 +61,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
 
   const reader = useMaterialReaderState({ material: renderedMaterial, requestedSegmentId, recentSegmentId: savedState?.recentSegmentId, onReplaceSegment: replaceSegmentQuery });
   const access = useMemo(() => userKnowledgeAccess(session.userId), [session.userId]);
-  const editableKnowledgeRepository=useMemo(()=>createEditableKnowledgeRepository(applicationServices.knowledgeRepository,readCourseAuthoringDraft(runtime.course.id)),[runtime.course.id,runtime.revision]);
+  const editableKnowledgeRepository=useMemo(()=>draftState ? createEditableKnowledgeRepository(applicationServices.knowledgeRepository,draftState) : applicationServices.knowledgeRepository,[draftState]);
   const projection = useMemo(() => buildMaterialSegmentProjection(runtime, material, reader.activeSegmentId, userState, editableKnowledgeRepository, access, governance), [access, editableKnowledgeRepository, governance, material, reader.activeSegmentId, runtime, userState]);
   const currentPagePrimaryKnowledgeId = projection?.knowledgeContexts[0]?.nodeId ?? null;
   const [knowledgeContextState, dispatchKnowledgeContext] = useReducer(reduceMaterialKnowledgeContextState, currentPagePrimaryKnowledgeId, createMaterialKnowledgeContextState);
@@ -140,9 +141,10 @@ export function LessonPage({ session, onLogout, lessonAssistantProvider }: { ses
   const navigate = useNavigate();
   const { courseId = "", materialId = "" } = useParams();
   const baseRuntime = applicationServices.courseRepository.getCourse(courseId);
-  const [authoringRevision, setAuthoringRevision] = useState(0);
-  useEffect(() => subscribeCourseAuthoringDraft(() => setAuthoringRevision((value) => value + 1)), []);
-  const runtime = useMemo(() => baseRuntime ? applyCourseAuthoringDraft(baseRuntime, readCourseAuthoringDraft(courseId)) : undefined, [authoringRevision, baseRuntime, courseId]);
+  const design = new URLSearchParams(window.location.search).get("experience") === "design" && canDesignCourse(session);
+  const [draftState, setDraftState] = useState<CourseAuthoringDraftState | null>(null);
+  useEffect(() => { let active=true; if (!design || !baseRuntime) { setDraftState(null); return; } void applicationServices.courseAuthoringDraftRepository.getDraft(courseId).then((draft)=>{if(active)setDraftState(draft?.state??null);}).catch(()=>{if(active)setDraftState(null);}); return()=>{active=false;}; }, [baseRuntime, courseId, design]);
+  const runtime = useMemo(() => baseRuntime ? (draftState ? applyCourseAuthoringDraft(baseRuntime, draftState) : baseRuntime) : undefined, [baseRuntime, draftState]);
   const material = runtime ? getCourseMaterial(runtime, materialId) : null;
   const userState = useUserCourseState(session.userId, courseId);
 
@@ -150,5 +152,5 @@ export function LessonPage({ session, onLogout, lessonAssistantProvider }: { ses
     return <main className="atlas-lesson-page material-reader-current"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>课件不存在</h1><p>该课件不存在，或不属于课程 “{courseId}”。</p><button className="atlas-primary" onClick={() => navigate(runtime ? `/courses/${runtime.course.id}` : "/courses")}>返回课程</button></section></main>;
   }
 
-  return <MaterialReaderShell key={`${session.userId}:${runtime.course.id}:${material.id}`} runtime={runtime} material={material} userState={userState} savedState={userState.materialStates[material.id]} session={session} lessonAssistantProvider={lessonAssistantProvider} onLogout={onLogout} />;
+  return <MaterialReaderShell key={`${session.userId}:${runtime.course.id}:${material.id}`} runtime={runtime} material={material} userState={userState} savedState={userState.materialStates[material.id]} session={session} lessonAssistantProvider={lessonAssistantProvider} onLogout={onLogout} draftState={draftState} />;
 }
