@@ -55,7 +55,10 @@ describe("Workflow Assignment application integration", () => {
   it("loads authenticated built-in templates through the server client while keeping user state user-scoped", () => {
     const source = readFileSync(join(process.cwd(), "api/workflows.ts"), "utf8");
     expect(source).toContain('import { createServerSupabase, createUserSupabase } from "./_lib/supabase.js"');
-    expect(source).toContain('createServerSupabase().from("workflow_templates").select("definition").order("id")');
-    expect(source).toContain('client.from("user_workflow_definitions").select("definition").eq("owner_user_id", user.id)');
+    expect(source).toContain('const { user } = await createUserSupabase(request)');
+    expect(source).toContain('const server = createServerSupabase()');
+    expect(source).toContain('server.from("workflow_templates").select("definition").order("id")');
+    expect(source).toContain('server.from("user_workflow_definitions").select("definition").eq("owner_user_id", user.id)');
+    expect(source).toContain('server.from("workflow_runs").select("*").eq("owner_user_id", user.id)');
   });
 });
