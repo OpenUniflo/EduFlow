@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { demoMicroLearningProvider } from "@/demo/learning/demoMicroLearningProvider";
 import {
   canCompleteMicroLesson,
   createMicroLearningNavigation,
@@ -36,6 +37,22 @@ describe("Micro Learning navigation", () => {
     expect(resolveMicroLearningReturnTarget({ returnTo: "https://evil.example.com" }, "agentic-ai")).toBe("/courses/agentic-ai");
     expect(resolveMicroLearningReturnTarget({ returnTo: "//evil.example.com" })).toBe("/");
     expect(resolveMicroLearningReturnTarget({ returnTo: "/\\evil.example.com" })).toBe("/");
+  });
+
+  it("exposes executable Micro navigation only for Provider-supported knowledge", () => {
+    expect(demoMicroLearningProvider.getLesson("AG01", { courseId: "agentic-ai-golden" })).not.toBeNull();
+    expect(demoMicroLearningProvider.getLesson("CDS525-K056", { courseId: "cds525-deep-learning" })).toBeNull();
+
+    const coursePage = readFileSync(join(process.cwd(), "src/features/course/pages/CourseGraphPage.tsx"), "utf8");
+    expect(coursePage).toContain("selectedMicroLesson ? <button");
+    expect(coursePage).toContain("microLearningProvider?.getLesson(nodeId,{courseId:runtime.course.id})");
+  });
+
+  it("renders an honest unsupported deep-link fallback inside the Micro page", () => {
+    const source = readFileSync(join(process.cwd(), "src/features/learning/micro/MicroLearningExperience.tsx"), "utf8");
+    expect(source).toContain('className="micro-unsupported"');
+    expect(source).toContain("该知识暂不支持快速学习");
+    expect(source).toContain("返回来源");
   });
 });
 

@@ -1,8 +1,13 @@
 import type { PersistedWorkflowSettings, PersistedWorkflowState, WorkflowPersistence } from "./WorkflowPersistence";
-import { apiRequest } from "@/shared/api/apiClient";
+import { ApiRequestError, apiRequest } from "@/shared/api/apiClient";
 import { RecoverableWriteQueue } from "@/shared/api/RecoverableWriteQueue";
 
 type WorkflowPayload = { state: PersistedWorkflowState; settings: PersistedWorkflowSettings | null; builtinWorkflowIds: string[] };
+const WORKFLOW_HYDRATION_RETRY_DELAY_MS = 200;
+
+export function isTransientPostgrestClaimsError(error: unknown) {
+  return error instanceof ApiRequestError && error.code === "PGRST303";
+}
 
 export function normalizeWorkflowSettings(
   current: PersistedWorkflowSettings,
@@ -36,7 +41,14 @@ export class ApiWorkflowPersistence implements WorkflowPersistence {
   }
 
   async hydrate() {
-    const payload = await apiRequest<WorkflowPayload>("/api/workflows");
+    let payload: WorkflowPayload;
+    try {
+      payload = await apiRequest<WorkflowPayload>("/api/workflows");
+    } catch (error) {
+      if (!isTransientPostgrestClaimsError(error)) throw error;
+      await new Promise<void>((resolve) => setTimeout(resolve, WORKFLOW_HYDRATION_RETRY_DELAY_MS));
+      payload = await apiRequest<WorkflowPayload>("/api/workflows");
+    }
     this.state = structuredClone(payload.state);
     this.settings = normalizeWorkflowSettings(this.settings, payload.settings);
     this.builtinWorkflowIds = [...payload.builtinWorkflowIds];

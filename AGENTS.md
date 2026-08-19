@@ -404,6 +404,7 @@
 
 - Assistant hints and explanations MUST NOT mutate MicroStep answers, grading feedback, Step completion, or Lesson completion, and Assistant actions MUST NOT bypass interaction validation.
 - MicroLesson completion activity MUST be recorded only after every required MicroStep has legitimately completed. Micro Learning completion remains separate from Knowledge mastery.
+- A Quick Learn CTA MUST be executable only when the active MicroLearningProvider resolves a MicroLesson for the Knowledge and Course context. Unsupported Micro deep links MUST render a visible fallback rather than a blank experience.
 
 ## Knowledge Source Invariants
 
