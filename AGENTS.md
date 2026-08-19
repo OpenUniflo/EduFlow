@@ -394,6 +394,11 @@
 - Assistant mutation requires both Design Mode and the existing capability checks. Proposal preview, deterministic validation, Apply, and Undo MUST NOT be bypassed by the unified shell.
 - Learn and Explore Assistant actions may explain, recommend, focus, or start supported experiences, but MUST NOT expose curriculum, material, publication, or Domain mutation without the corresponding authority and validation path.
 
+## Micro Learning Assessment Integrity
+
+- Assistant hints and explanations MUST NOT mutate MicroStep answers, grading feedback, Step completion, or Lesson completion, and Assistant actions MUST NOT bypass interaction validation.
+- MicroLesson completion activity MUST be recorded only after every required MicroStep has legitimately completed. Micro Learning completion remains separate from Knowledge mastery.
+
 ## Knowledge Source Invariants
 
 - Generic Course and Material code MUST NOT assume all KnowledgeNodes belong to the Global graph.

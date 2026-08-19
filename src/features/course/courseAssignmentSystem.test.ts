@@ -84,6 +84,28 @@ describe("Course Repository and runtime invariants", () => {
     expect(python.assignments.every((assignment) => assignment.courseId === python.course.id)).toBe(true);
   });
 
+  it("keeps the Course page renderable when factual atomic relations form a Chapter-level cycle", () => {
+    const firstChapterNodes = agenticGraph.knowledgeNodes.filter((node) => node.chapterId === agentic.chapters[0].id);
+    const secondChapterNodes = agenticGraph.knowledgeNodes.filter((node) => node.chapterId === agentic.chapters[1].id);
+    expect(firstChapterNodes.length).toBeGreaterThanOrEqual(2);
+    expect(secondChapterNodes.length).toBeGreaterThanOrEqual(2);
+    const cyclicAtChapterLevel: KnowledgeGraph = {
+      nodes: visibleGraph.nodes,
+      revisions: visibleGraph.revisions,
+      edges: [
+        { id: "regression-forward", source: firstChapterNodes[0].id, target: secondChapterNodes[0].id, relation: "prerequisite", strength: "hard", reason: "Hosted graph forward relation" },
+        { id: "regression-backward", source: secondChapterNodes[1].id, target: firstChapterNodes[1].id, relation: "enables", strength: 0.8, reason: "Hosted graph backward relation" }
+      ]
+    };
+
+    const graphData = buildCourseGraphData(agentic, demoUserCourseStateSeed("student", agentic.course.id), cyclicAtChapterLevel, userKnowledge);
+    const orderByChapter = new Map(agentic.chapters.map((chapter) => [chapter.id, chapter.order]));
+    expect(graphData.knowledgeEdges.map((edge) => edge.id)).toEqual(["regression-forward", "regression-backward"]);
+    expect(graphData.chapterEdges.length).toBeGreaterThan(0);
+    expect(graphData.chapterEdges.every((edge) => orderByChapter.get(edge.source)! < orderByChapter.get(edge.target)!)).toBe(true);
+    expect(buildCourseGraphProjection(graphData, "overview", null).nodes.some((node) => node.kind === "chapter")).toBe(true);
+  });
+
   it("covers every Course KnowledgeNode and contains real N:M examples", () => {
     [agentic, python].forEach((runtime) => {
       const nodeIds = new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId));
