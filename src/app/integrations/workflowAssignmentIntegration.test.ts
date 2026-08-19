@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createDemoApplicationServices } from "@/demo/services/createDemoApplicationServices";
 import type { LearningProgressRepository } from "@/features/learning/progress/LearningProgressRepository";
@@ -50,15 +48,5 @@ describe("Workflow Assignment application integration", () => {
     expect(attachWorkflowAssignmentMetadata(base, null)).not.toHaveProperty("assignmentId");
     expect(attachWorkflowAssignmentMetadata(base, contextA)).toMatchObject({ workflowTemplateId: "agent-loop", courseId: "course", assignmentId: "assignment-a" });
     expect(attachWorkflowAssignmentMetadata(base, contextB)).toMatchObject({ workflowTemplateId: "agent-loop", courseId: "course", assignmentId: "assignment-b" });
-  });
-
-  it("loads authenticated built-in templates through the server client while keeping user state user-scoped", () => {
-    const source = readFileSync(join(process.cwd(), "api/workflows.ts"), "utf8");
-    expect(source).toContain('import { createServerSupabase, createUserSupabase } from "./_lib/supabase.js"');
-    expect(source).toContain('const { user } = await createUserSupabase(request)');
-    expect(source).toContain('const server = createServerSupabase()');
-    expect(source).toContain('server.from("workflow_templates").select("definition").order("id")');
-    expect(source).toContain('server.from("user_workflow_definitions").select("definition").eq("owner_user_id", user.id)');
-    expect(source).toContain('server.from("workflow_runs").select("*").eq("owner_user_id", user.id)');
   });
 });

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createServerSupabase, createUserSupabase } from "./_lib/supabase.js";
+import { createUserSupabase } from "./_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
 import { dataOrThrow } from "./_lib/query.js";
 
@@ -18,14 +18,13 @@ function newestRuns(workflowId: string, runs: Run[]) {
 }
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
-  const { user } = await createUserSupabase(request);
-  const server = createServerSupabase();
+  const { client, user } = await createUserSupabase(request);
   if (request.method === "GET") {
     const [templatesResult, definitionsResult, stateResult, runsResult] = await Promise.all([
-      server.from("workflow_templates").select("definition").order("id"),
-      server.from("user_workflow_definitions").select("definition").eq("owner_user_id", user.id).order("updated_at", { ascending: false }),
-      server.from("user_workflow_state").select("*").eq("owner_user_id", user.id).maybeSingle(),
-      server.from("workflow_runs").select("*").eq("owner_user_id", user.id).order("created_at", { ascending: false })
+      client.from("workflow_templates").select("definition").order("id"),
+      client.from("user_workflow_definitions").select("definition").eq("owner_user_id", user.id).order("updated_at", { ascending: false }),
+      client.from("user_workflow_state").select("*").eq("owner_user_id", user.id).maybeSingle(),
+      client.from("workflow_runs").select("*").eq("owner_user_id", user.id).order("created_at", { ascending: false })
     ]);
     const templates = dataOrThrow(templatesResult.data as Row[] | null, templatesResult.error, "WorkflowTemplate query").map((row) => row.definition as Definition);
     const definitions = dataOrThrow(definitionsResult.data as Row[] | null, definitionsResult.error, "WorkflowDefinition query").map((row) => row.definition as Definition);
@@ -57,22 +56,22 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (!body?.state || !Array.isArray(body.state.workflows)) throw new ApiError(400, "invalid_workflow_state", "Workflow state is required");
     const builtinIds = new Set(body.builtinWorkflowIds ?? []);
     const custom = body.state.workflows.filter((definition) => !builtinIds.has(definition.id));
-    const existing = await server.from("user_workflow_definitions").select("id").eq("owner_user_id", user.id);
+    const existing = await client.from("user_workflow_definitions").select("id").eq("owner_user_id", user.id);
     const existingRows = dataOrThrow(existing.data as Array<{ id: string }> | null, existing.error, "WorkflowDefinition identity query");
     const customIds = new Set(custom.map((definition) => definition.id));
     const removedIds = existingRows.map((row) => row.id).filter((id) => !customIds.has(id));
     if (removedIds.length) {
-      const result = await server.from("user_workflow_definitions").delete().eq("owner_user_id", user.id).in("id", removedIds);
+      const result = await client.from("user_workflow_definitions").delete().eq("owner_user_id", user.id).in("id", removedIds);
       dataOrThrow(result.data, result.error, "WorkflowDefinition delete");
     }
     if (custom.length) {
-      const result = await server.from("user_workflow_definitions").upsert(custom.map((definition) => ({
+      const result = await client.from("user_workflow_definitions").upsert(custom.map((definition) => ({
         owner_user_id: user.id, id: definition.id, name: definition.name, description: definition.description,
         definition, updated_at: new Date().toISOString()
       })));
       dataOrThrow(result.data, result.error, "WorkflowDefinition update");
     }
-    const stateResult = await server.from("user_workflow_state").upsert({
+    const stateResult = await client.from("user_workflow_state").upsert({
       owner_user_id: user.id, active_template_id: body.state.activeTemplateId ?? null,
       workflow_description: body.state.workflowDescription ?? null, schema_saved: body.state.schemaSaved ?? false,
       node_positions: body.state.nodePositions ?? {}, state_values: body.state.stateValues ?? {}, settings: body.settings ?? {}, updated_at: new Date().toISOString()
@@ -84,7 +83,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     }));
     const runs = runHistory.flatMap((entry) => entry.runs);
     if (runs.length) {
-      const result = await server.from("workflow_runs").upsert(runs.map((run) => ({
+      const result = await client.from("workflow_runs").upsert(runs.map((run) => ({
         owner_user_id: user.id, id: run.id, workflow_id: run.workflowId, workflow_template_id: run.workflowTemplateId,
         course_id: run.courseId ?? null, assignment_id: run.assignmentId ?? null, workflow_name: run.workflowName,
         created_at: run.createdAt, status: run.status, node_count: run.nodeCount, output_summary: run.outputSummary,
@@ -93,14 +92,14 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       dataOrThrow(result.data, result.error, "WorkflowRun update");
     }
     for (const { workflowId } of runHistory) {
-      const existing = await server.from("workflow_runs").select("id")
+      const existing = await client.from("workflow_runs").select("id")
         .eq("owner_user_id", user.id).eq("workflow_id", workflowId)
         .order("created_at", { ascending: false }).order("id", { ascending: false });
       const obsoleteIds = dataOrThrow(existing.data as Array<{ id: string }> | null, existing.error, "WorkflowRun prune query")
         .slice(MAX_RUN_HISTORY)
         .map((row) => row.id);
       if (obsoleteIds.length) {
-        const result = await server.from("workflow_runs").delete()
+        const result = await client.from("workflow_runs").delete()
           .eq("owner_user_id", user.id).eq("workflow_id", workflowId).in("id", obsoleteIds);
         dataOrThrow(result.data, result.error, "WorkflowRun prune");
       }
