@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createUserSupabase } from "./_lib/supabase.js";
+import { createServerSupabase, createUserSupabase } from "./_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
 import { dataOrThrow } from "./_lib/query.js";
 
@@ -21,7 +21,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const { client, user } = await createUserSupabase(request);
   if (request.method === "GET") {
     const [templatesResult, definitionsResult, stateResult, runsResult] = await Promise.all([
-      client.from("workflow_templates").select("definition").order("id"),
+      createServerSupabase().from("workflow_templates").select("definition").order("id"),
       client.from("user_workflow_definitions").select("definition").eq("owner_user_id", user.id).order("updated_at", { ascending: false }),
       client.from("user_workflow_state").select("*").eq("owner_user_id", user.id).maybeSingle(),
       client.from("workflow_runs").select("*").eq("owner_user_id", user.id).order("created_at", { ascending: false })
