@@ -18,7 +18,7 @@ import { buildMaterialDeepLink } from "@/features/material/materialNavigation";
 import { sortMaterials } from "@/features/material/materialOrdering";
 import { canDesignCourse, canUseCourseDesignFeatures } from "@/features/auth/capabilities";
 import { ExperienceModeToggle } from "@/shared/components/ExperienceModeToggle";
-import { addDraftChapter, addDraftDependency, addExistingKnowledge, addGeneratedMaterial, addKnowledgeCandidate, addMaterialLink, applyCourseAuthoringDraft, clearManualNodePositions, createEditableKnowledgeGraph, createGeneratedArticleDraft, emptyCourseAuthoringDraft, moveCourseKnowledge, removeCourseKnowledge, removeDraftChapter, removeDraftDependency, removeMaterialLink, reorderDraftChapter, setManualNodePosition, updateDraftChapter, validateDependencyAddition, type CourseAuthoringDraftState } from "@/features/course/authoring/courseAuthoringDraft";
+import { addDraftChapter, addDraftDependency, addExistingKnowledge, addGeneratedMaterial, addKnowledgeCandidate, addMaterialLink, applyCourseAuthoringDraft, clearManualNodePositions, createEditableKnowledgeGraph, createGeneratedArticleDraft, emptyCourseAuthoringDraft, moveCourseKnowledge, removeCourseKnowledge, removeDraftChapter, removeDraftDependency, removeMaterialLink, reorderDraftChapter, setManualNodePosition, updateDraftChapter, upsertDraftMicroPath, upsertDraftAssignment, validateDependencyAddition, type CourseAuthoringDraftState } from "@/features/course/authoring/courseAuthoringDraft";
 import { validateCourseAuthoring } from "@/features/course/authoring/courseAuthoringValidation";
 import { validateCourseAuthoringProposal } from "@/features/course/authoring/courseAuthoringProposal";
 import { shouldReserveCourseDrawer } from "@/features/course/graph/courseGraphInteraction";
@@ -277,6 +277,21 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     setSelectedAnchor({kind:"knowledge",id}); setDrawerVisible(true); setDesignActionNotice("已创建课程草稿知识点；未写入全局 Knowledge Atlas。");
   }
 
+  function createMicroForSelected() {
+    if (!selectedNode || !runtime) return;
+    const title=window.prompt("微学习路径标题", `${selectedNode.title} · 快速学习`); if(!title?.trim()) return;
+    const question=window.prompt("Choice 检查题", `哪一项最能说明你理解了 ${selectedNode.title}？`); if(!question?.trim()) return;
+    const id=`micro-${crypto.randomUUID()}`; const unitId=`${id}:unit:1`; const stepId=`${unitId}:step:1`;
+    updateAuthoringDraft((state)=>upsertDraftMicroPath(state,{id,knowledgeId:selectedNode.id,courseId:runtime.course.id,scope:"course",title:title.trim(),description:"教师手工创建的学习路径",mode:"learn",estimatedMinutes:8,required:true,status:"draft",units:[{id:unitId,pathId:id,title:"理解与检查",position:0,estimatedMinutes:8,required:true,steps:[{id:stepId,kind:"interaction",title:"理解检查",body:question.trim(),interaction:{type:"choice",options:["能解释目标、边界与证据","只记住标题"],correctIndex:0},successFeedback:"回答正确",retryFeedback:"请回到目标与边界。"}]}]}));
+    setDesignActionNotice("已添加草稿 Micro Path / Unit / Choice Step；发布前仅教师预览可见。");
+  }
+  function createAssignmentForSelected() {
+    if(!selectedNode||!runtime)return; const title=window.prompt("实训标题",`${selectedNode.title} · 实训`); if(!title?.trim())return;
+    const id=`assignment-${crypto.randomUUID()}`;
+    updateAuthoringDraft((state)=>upsertDraftAssignment({...state,assignments:state.assignments??runtime.assignments,assignmentCoverages:state.assignmentCoverages??runtime.assignmentCoverages},{id,courseId:runtime.course.id,order:runtime.assignments.length,title:title.trim(),description:"教师手工创建的可提交实训。",requirements:["提交可复核的成果"],expectedOutput:"一份可验证的成果",acceptanceCriteria:["满足目标与边界"],mode:"instruction",estimatedMinutes:20,experience:{type:"answer",prompt:"说明你的方案与证据。"}},{id:`${id}:coverage:${selectedNode.id}`,assignmentId:id,nodeId:selectedNode.id,role:"assess",required:true}));
+    setDesignActionNotice("已添加 required Assignment 草稿；提交仍不会自动验收。");
+  }
+
   function removeSelectedKnowledge() {
     if(!selectedNode||!runtime)return;
     const dependencyCount=courseSkillTreeEdges.filter((edge)=>edge.source===selectedNode.id||edge.target===selectedNode.id).length;
@@ -464,6 +479,7 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
       <section className="atlas-drawer-section"><h3>所属 Chapter / CurriculumCoverage</h3><label className="course-authoring-field"><span>移动到篇章</span><select value={node.chapterId} onChange={(event)=>updateAuthoringDraft((state)=>moveCourseKnowledge(state,node.id,event.target.value))}>{runtime!.chapters.map((chapter)=><option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}</select></label><div className="atlas-requirement-list">{node.curriculumContexts.map((context) => <div className="atlas-requirement" key={context.id}><span className="atlas-requirement-icon ready">{context.lessonOrder}</span><span>{courseChapters.find((chapter) => chapter.id === context.chapterId)?.title}<small>{context.role} · order {context.order}</small></span></div>)}</div></section>
       <section className="atlas-drawer-section"><h3>前置 / 后继</h3><p>{courseSkillTreeEdges.filter((edge) => edge.target === node.id).length} 前置 · {courseSkillTreeEdges.filter((edge) => edge.source === node.id).length} 后继</p></section>
       <section className="atlas-drawer-section"><h3>MaterialCoverage / AssignmentCoverage</h3><p>{node.materialContexts.length} Material 映射 · {node.assignmentContexts.length} Assignment 映射</p></section>
+      <section className="atlas-drawer-section"><h3>手工学习内容</h3><div className="course-authoring-inline-actions"><button onClick={createMicroForSelected}>＋ Micro Learning</button><button onClick={createAssignmentForSelected}>＋ Assignment</button></div><p>创建内容先保存为课程草稿，学习者在 Publish 前不会读取。</p></section>
       <section className="atlas-drawer-section"><h3>Mapping 状态</h3><div className="atlas-drawer-info-card"><Check size={15} /><span>课程、课件与实训覆盖完整</span></div></section>
       <section className="atlas-drawer-section"><h3>课程覆盖操作</h3><p>移除只影响本课程覆盖，不会删除 Global Knowledge。</p><button className="atlas-secondary danger" onClick={removeSelectedKnowledge}><Trash2 size={14}/>从课程移除</button></section>
     </>;

@@ -1,6 +1,5 @@
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
-import type { CurriculumChapter, Material, MaterialKnowledgeCoverage } from "@/features/course/types";
-import type { CourseAssignment, AssignmentCoverage } from "@/features/course/types";
+import type { CurriculumChapter, Material, MaterialKnowledgeCoverage, CourseAssignment, AssignmentCoverage } from "@/features/course/types";
 import type { MicroLearningPath } from "@/features/learning/micro/microLearning";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "@/features/knowledge/types";
 import type { KnowledgeAccessContext, KnowledgeRepository } from "@/features/knowledge/repository/KnowledgeRepository";
