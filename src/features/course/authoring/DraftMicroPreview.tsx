@@ -1,0 +1,13 @@
+import { useMemo, useState } from "react";
+import { isMicroInteractionCorrect, type MicroLearningPath } from "@/features/learning/micro/microLearning";
+
+export function DraftMicroPreview({ paths, knowledgeId }: { paths: MicroLearningPath[]; knowledgeId: string }) {
+  const path = paths.find((item) => item.knowledgeId === knowledgeId && item.mode === "learn");
+  const steps = useMemo(() => path?.units.slice().sort((left, right) => left.position - right.position).flatMap((unit) => unit.steps) ?? [], [path]);
+  const [index, setIndex] = useState(0); const [answer, setAnswer] = useState<string | string[]>(""); const [feedback, setFeedback] = useState<string | null>(null);
+  if (!path) return null;
+  const step = steps[index]; if (!step) return <section className="atlas-drawer-section"><h3>草稿 Micro Preview</h3><p>路径没有 Step，无法运行；发布检查会阻止该结构。</p></section>;
+  const check = () => { const correct = !step.interaction || isMicroInteractionCorrect(step.interaction, answer); setFeedback(correct ? step.successFeedback ?? "正确。" : step.retryFeedback ?? "请重试。"); if (correct) { setAnswer(""); if (index < steps.length - 1) setIndex(index + 1); } };
+  const interaction = step.interaction;
+  return <section className="atlas-drawer-section"><h3>草稿 Micro Preview</h3><p>{path.title} · {index + 1}/{steps.length}</p><strong>{step.title}</strong><p>{step.body}</p>{interaction?.type === "choice" ? <div className="course-authoring-inline-actions">{interaction.options.map((option) => <button key={option} className={answer === option ? "active" : ""} onClick={() => { setAnswer(option); setFeedback(null); }}>{option}</button>)}</div> : interaction?.type === "trace" ? <div className="course-authoring-inline-actions">{interaction.steps.map((item) => <button key={item.id} onClick={() => { setAnswer(item.id); setFeedback(null); }}>{item.label}</button>)}</div> : interaction?.type === "ordering" || interaction?.type === "mini-workflow" ? <div className="course-authoring-inline-actions">{(interaction.type === "ordering" ? interaction.items : interaction.nodes).map((item) => <button key={item} onClick={() => setAnswer((current) => Array.isArray(current) ? current.includes(item) ? current.filter((candidate) => candidate !== item) : [...current, item] : [item])}>{item}</button>)}</div> : interaction?.type === "h5p" ? <p>H5P 编辑器未启用；发布后需要已配置适配器。</p> : null}<div className="course-authoring-inline-actions"><button disabled={Boolean(interaction) && (!answer || (Array.isArray(answer) && !answer.length))} onClick={check}>{interaction ? "检查" : "继续"}</button>{index > 0 ? <button onClick={() => { setIndex(index - 1); setFeedback(null); }}>上一步</button> : null}</div>{feedback ? <p role="status">{feedback}</p> : null}</section>;
+}

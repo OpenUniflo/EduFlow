@@ -28,6 +28,8 @@ export type CourseAuthoringDraftState = {
   manualNodePositions: Record<string, ManualNodePosition>;
   /** Course-scoped Micro edits are draft-only until Publish. */
   microPaths?: MicroLearningPath[];
+  /** Marks that the complete course Micro projection intentionally replaces published paths. */
+  microPathsEdited?: boolean;
   /** Full course Assignment projection, retained only after an author edit. */
   assignments?: CourseAssignment[];
   assignmentCoverages?: AssignmentCoverage[];
@@ -40,7 +42,7 @@ const HISTORY_LIMIT = 50;
 const listeners = new Set<() => void>();
 
 export function emptyCourseAuthoringDraft(courseId: string): CourseAuthoringDraftState {
-  return { schemaVersion: 2, courseId, addedLinks: [], removedLinks: [], generatedMaterials: [], addedChapters: [], chapterUpdates: {}, removedChapterIds: [], chapterOrder: [], addedKnowledgeNodeIds: [], addedKnowledgeCandidates: [], removedKnowledgeNodeIds: [], knowledgeChapterOverrides: {}, addedDependencies: [], removedDependencyIds: [], manualNodePositions: {}, microPaths: [] };
+  return { schemaVersion: 2, courseId, addedLinks: [], removedLinks: [], generatedMaterials: [], addedChapters: [], chapterUpdates: {}, removedChapterIds: [], chapterOrder: [], addedKnowledgeNodeIds: [], addedKnowledgeCandidates: [], removedKnowledgeNodeIds: [], knowledgeChapterOverrides: {}, addedDependencies: [], removedDependencyIds: [], manualNodePositions: {} };
 }
 const sameLink = (left: MaterialLink, right: MaterialLink) => left.nodeId === right.nodeId && left.materialId === right.materialId;
 const unique = <T,>(items: T[]) => Array.from(new Set(items));
@@ -165,8 +167,8 @@ export function applyCourseAuthoringDraft(runtime: CourseRuntimeData, state: Cou
   return { ...runtime, chapters, lessons, curriculumCoverages, curriculumSequences:runtime.curriculumSequences.filter((sequence)=>activeLessonIds.has(sequence.sourceLessonId)&&activeLessonIds.has(sequence.targetLessonId)), assignments: state.assignments ?? runtime.assignments, assignmentCoverages: (state.assignmentCoverages ?? runtime.assignmentCoverages).filter((coverage) => !removedNodes.has(coverage.nodeId)), chapterOutcomes, assignmentOutcomeCompositions:runtime.assignmentOutcomeCompositions.filter((composition)=>outcomeIds.has(composition.outcomeId)), finalProjectOutcomeCompositions:runtime.finalProjectOutcomeCompositions.filter((composition)=>outcomeIds.has(composition.outcomeId)), materials, materialKnowledgeCoverages: [...materialKnowledgeCoverages, ...materialAdditions], revision: `${runtime.revision}:authoring:${structuralRevision(state)}` };
 }
 
-export function upsertDraftMicroPath(state: CourseAuthoringDraftState, path: MicroLearningPath) { return { ...state, microPaths: [...(state.microPaths ?? []).filter((item) => item.id !== path.id), path] }; }
-export function removeDraftMicroPath(state: CourseAuthoringDraftState, pathId: string) { return { ...state, microPaths: (state.microPaths ?? []).filter((item) => item.id !== pathId) }; }
+export function upsertDraftMicroPath(state: CourseAuthoringDraftState, path: MicroLearningPath) { return { ...state, microPaths: [...(state.microPaths ?? []).filter((item) => item.id !== path.id), path], microPathsEdited: true }; }
+export function removeDraftMicroPath(state: CourseAuthoringDraftState, pathId: string) { return { ...state, microPaths: (state.microPaths ?? []).filter((item) => item.id !== pathId), microPathsEdited: true }; }
 export function upsertDraftAssignment(state: CourseAuthoringDraftState, assignment: CourseAssignment, coverage: AssignmentCoverage) {
   const assignments = state.assignments ?? []; const coverages = state.assignmentCoverages ?? [];
   return { ...state, assignments: [...assignments.filter((item) => item.id !== assignment.id), assignment], assignmentCoverages: [...coverages.filter((item) => item.assignmentId !== assignment.id || item.nodeId !== coverage.nodeId), coverage] };
@@ -189,4 +191,13 @@ export function createGeneratedArticleDraft(input: { runtime: CourseRuntimeData;
     { id: `${id}-example`, order: 1, title: "工程示例", content: { lead: `通过一个最小工程案例拆解 ${input.nodeTitle}。`, paragraphs: ["先确认输入、输出与约束，再观察关键决策如何影响结果。", "示例保留可复核的中间产物，便于课堂讨论与后续实训。"], visual: "flow" } },
     { id: `${id}-practice`, order: 2, title: "检查与延伸", content: { lead: "使用以下问题检查理解，并为对应实训准备证据。", bullets: ["能否解释为什么采用该方案？", "失败时最先检查哪一项？", "产出如何被后续课程步骤复用？"], visual: "practice" } }
   ] };
+}
+
+/** Minimal manual Article authoring; AI generation is optional automation, never authority. */
+export function createManualArticleDraft(input: { runtime: CourseRuntimeData; nodeId: string; title: string; content: string; createId?: () => string }): Material {
+  const lessonId = input.runtime.curriculumCoverages.find((coverage) => coverage.nodeId === input.nodeId)?.lessonId;
+  if (!lessonId) throw new Error(`Cannot create Material for KnowledgeNode ${input.nodeId} without CurriculumCoverage`);
+  const id = `draft-material-${(input.createId ?? (() => crypto.randomUUID()))()}`;
+  const order = Math.max(-1, ...input.runtime.materials.filter((material) => material.lessonId === lessonId).map((material) => material.order)) + 1;
+  return { id, courseId: input.runtime.course.id, lessonId, order, title: input.title, description: `教师手工创建的 Article Material。`, type: "article", duration: "自定进度", segments: [{ id: `${id}-content`, order: 0, title: input.title, content: { lead: input.content, visual: "overview" } }] };
 }

@@ -143,7 +143,7 @@ export function LessonPage({ session, onLogout, lessonAssistantProvider }: { ses
   const baseRuntime = applicationServices.courseRepository.getCourse(courseId);
   const design = new URLSearchParams(window.location.search).get("experience") === "design" && canDesignCourse(session);
   const [draftState, setDraftState] = useState<CourseAuthoringDraftState | null>(null);
-  useEffect(() => { let active=true; if (!design || !baseRuntime) { setDraftState(null); return; } void applicationServices.courseAuthoringDraftRepository.getDraft(courseId).then((draft)=>{if(active)setDraftState(draft?.state??null);}).catch(()=>{if(active)setDraftState(null);}); return()=>{active=false;}; }, [baseRuntime, courseId, design]);
+  useEffect(() => { let active=true; if (!design || !baseRuntime) { setDraftState(null); return; } void applicationServices.courseAuthoringDraftRepository.getDraft(courseId).then((result)=>{if(active)setDraftState(result.draft?.state??null);}).catch(()=>{if(active)setDraftState(null);}); return()=>{active=false;}; }, [baseRuntime, courseId, design]);
   const runtime = useMemo(() => baseRuntime ? (draftState ? applyCourseAuthoringDraft(baseRuntime, draftState) : baseRuntime) : undefined, [baseRuntime, draftState]);
   const material = runtime ? getCourseMaterial(runtime, materialId) : null;
   const userState = useUserCourseState(session.userId, courseId);

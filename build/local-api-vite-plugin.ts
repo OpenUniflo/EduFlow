@@ -26,6 +26,11 @@ const handlers = new Map([
   ["/api/course-intent", courseIntentHandler]
 ]);
 
+/** Public client paths must match the resource injected by the Vercel rewrite. */
+export const consolidatedResourceForPath: Record<string, "courses" | "authoring" | "learning" | "micro" | "progress"> = {
+  "/api/courses": "courses", "/api/course-authoring": "authoring", "/api/learning": "learning", "/api/micro": "micro", "/api/progress": "progress"
+};
+
 async function readBody(request: IncomingMessage) {
   if (request.method === "GET" || request.method === "HEAD") return undefined;
   const chunks: Buffer[] = [];
@@ -59,7 +64,7 @@ export function localApiPlugin(): Plugin {
         if (!handler) return next();
         const query = Object.fromEntries(url.searchParams.entries());
         // Mirror Vercel's rewrite contract while retaining the public client URL.
-        const resource = ({ "/api/courses": "courses", "/api/course-authoring": "authoring", "/api/learning": "learning", "/api/micro": "micro", "/api/progress": "progress" } as Record<string, string>)[url.pathname];
+        const resource = consolidatedResourceForPath[url.pathname];
         if (resource) query.resource = resource;
         const vercelRequest = Object.assign(request, { body: await readBody(request), query }) as unknown as VercelRequest;
         await handler(vercelRequest, createResponse(response));

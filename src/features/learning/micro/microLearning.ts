@@ -16,7 +16,7 @@ export function isMicroInteractionCorrect(interaction:MicroInteraction, answer:M
 
 export type MicroStep = {
   id:string;
-  kind:"challenge"|"feedback"|"explanation"|"interaction"|"application"|"check";
+  kind:"challenge"|"feedback"|"explanation"|"interaction"|"application"|"check"|"summary";
   title:string;
   body:string;
   interaction?:MicroInteraction;

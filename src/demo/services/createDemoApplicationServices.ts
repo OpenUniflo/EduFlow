@@ -24,7 +24,7 @@ export function createDemoApplicationServices(): ApplicationServices {
       async hydrate() {}, getPath() { return null; }, getPathProgress() { return undefined; }, getUnitProgress() { return undefined; }, async start() {}, async completeStep() { return { correct:false, completed:false }; }, subscribe() { return () => {}; }
     },
     learnerStateService: { startKnowledge: async () => ({ status:"learning" }), startAssignment: async () => ({ status:"started" }), submitAssignment: async () => ({ status:"submitted", accepted:false }) } as never,
-    courseAuthoringDraftRepository: { getDraft: async () => null, saveDraft: async () => ({ revision: 1, updatedAt: new Date(0).toISOString() }), publish: async () => ({ revision: "demo" }) },
+    courseAuthoringDraftRepository: { getDraft: async () => ({ draft: null, baseMicroPaths: [] }), saveDraft: async () => ({ revision: 1, updatedAt: new Date(0).toISOString() }), publish: async () => ({ revision: "demo" }) },
     domainGovernanceRepository,
     domainGovernanceService: new DomainGovernanceService(knowledgeRepository, domainGovernanceRepository),
     courseCreationService: new DemoCourseCreationService()

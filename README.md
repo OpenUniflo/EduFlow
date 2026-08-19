@@ -11,13 +11,13 @@ Course materials
   -> Course Skill Tree / Assignment Tree
   -> Material Reader
   -> Workflow / practice execution
-  -> Evaluation
-  -> evidence and mastery (later stage)
+  -> deterministic/manual acceptance
+  -> evidence and policy-gated mastery
 ```
 
 The Global Knowledge Atlas, Course Skill Tree, and Personal Atlas are projections over one shared Knowledge Graph. Curriculum, materials, assignments, workflow execution, and mutable user learning state remain separate domain concerns.
 
-The signed-in product is organized around six capability-aware workspaces: **Learning**, **Explore**, **Courses**, **Canvas**, **Teaching**, and **System**. Learning owns Today, Personal Knowledge, activity history, deterministic Today Queue, and Golden Micro Learning. Explore keeps the Global Knowledge Atlas as its primary surface and resolves a learning goal through existing Knowledge and Courses before offering a personal path or material-creation fallback. A single user-visible **EduFlow Assistant** shell adapts to workspace, experience mode, selection, and role capabilities.
+The signed-in product is organized around six capability-aware workspaces: **Learning**, **Explore**, **Courses**, **Canvas**, **Teaching**, and **System**. Learning owns Today, Personal Knowledge, activity history, deterministic Today Queue, and database-backed Micro Learning. Explore keeps the Global Knowledge Atlas as its primary surface and resolves a learning goal through existing Knowledge and Courses; systematic multi-Knowledge learning belongs to a Course, not a personal-path product. A single user-visible **EduFlow Assistant** shell adapts to workspace, experience mode, selection, and role capabilities.
 
 ## Current Status
 

@@ -17,11 +17,18 @@ compare-and-swap and return a conflict instead of silently replacing a newer
 draft. Undo and redo are intentionally session-local.
 
 Publishing materializes draft Knowledge candidates before replacing the
-course-owned curriculum, Material, Assignment, outcome, and mapping rows. It
+course-owned curriculum, Material, Assignment, outcome, mapping, and explicitly
+edited course-scoped `MicroLearningPath -> MicroUnit -> MicroStep` rows. It
 updates `courses.lifecycle` to `published` and clears the applied draft in the
-same database transaction. Editing an already published course therefore never
-changes what learners read until Publish succeeds.
+same database transaction. A Micro projection is replaced only after a teacher
+has explicitly edited it; an ordinary course draft cannot delete existing Micro
+content. Learner `recent_lesson_id` and stale workflow-run references are made
+safe inside that transaction before Course-owned rows change, while learner
+Knowledge state and evidence remain independent.
 
 The manual Teaching entrypoint creates a `draft` course with a target outcome,
-one initial chapter, and one initial lesson. AI course creation remains a
-separate proposal/demo workflow rather than a prerequisite for authoring.
+one initial chapter, and one initial lesson. Design Mode provides manual
+Article Material creation/linking plus Path, Unit, native Step, Assignment, and
+AssignmentCoverage editing. The Micro preview runs the same interaction
+contract without publishing it. AI course creation remains a separate
+proposal/demo workflow rather than a prerequisite for authoring.

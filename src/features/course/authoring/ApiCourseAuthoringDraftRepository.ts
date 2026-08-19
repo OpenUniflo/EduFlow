@@ -1,10 +1,9 @@
 import { apiRequest } from "@/shared/api/apiClient";
-import type { CourseAuthoringDraftRepository, PersistedCourseAuthoringDraft } from "./CourseAuthoringDraftRepository";
+import type { CourseAuthoringDraftRead, CourseAuthoringDraftRepository, PersistedCourseAuthoringDraft } from "./CourseAuthoringDraftRepository";
 
 export class ApiCourseAuthoringDraftRepository implements CourseAuthoringDraftRepository {
   async getDraft(courseId: string) {
-    const result = await apiRequest<{ draft: PersistedCourseAuthoringDraft | null }>(`/api/course-authoring?courseId=${encodeURIComponent(courseId)}`);
-    return result.draft;
+    return apiRequest<CourseAuthoringDraftRead>(`/api/course-authoring?courseId=${encodeURIComponent(courseId)}`);
   }
   async saveDraft(courseId: string, input: Omit<PersistedCourseAuthoringDraft, "updatedAt"> & { expectedRevision: number }) {
     return apiRequest<{ revision: number; updatedAt: string }>(`/api/course-authoring?courseId=${encodeURIComponent(courseId)}`, { method: "PUT", body: JSON.stringify(input) });

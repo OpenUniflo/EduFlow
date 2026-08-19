@@ -5,6 +5,25 @@ import { dataOrThrow } from "../_lib/query.js";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
+const optionalText = (row: Row, key: string) => row[key] == null ? undefined : String(row[key]);
+
+async function readCourseMicroPaths(server: ReturnType<typeof createServerSupabase>, courseId: string) {
+  const [pathsResult, unitsResult, stepsResult] = await Promise.all([
+    server.from("micro_learning_paths").select("*").eq("course_id", courseId).order("id"),
+    server.from("micro_units").select("*").order("path_id").order("position"),
+    server.from("micro_steps").select("*").order("unit_id").order("position")
+  ]);
+  const paths = dataOrThrow(pathsResult.data as Row[] | null, pathsResult.error, "Authoring Micro paths read");
+  const units = dataOrThrow(unitsResult.data as Row[] | null, unitsResult.error, "Authoring Micro units read");
+  const steps = dataOrThrow(stepsResult.data as Row[] | null, stepsResult.error, "Authoring Micro steps read");
+  return paths.map((path) => ({
+    id: text(path, "id"), knowledgeId: text(path, "knowledge_id"), courseId: optionalText(path, "course_id"), scope: text(path, "scope"), title: text(path, "title"), description: optionalText(path, "description"), mode: text(path, "mode"), estimatedMinutes: Number(path.estimated_minutes), required: Boolean(path.required), status: text(path, "status"),
+    units: units.filter((unit) => text(unit, "path_id") === text(path, "id")).map((unit) => ({
+      id: text(unit, "id"), pathId: text(unit, "path_id"), title: text(unit, "title"), description: optionalText(unit, "description"), position: Number(unit.position), estimatedMinutes: Number(unit.estimated_minutes), required: Boolean(unit.required),
+      steps: steps.filter((step) => text(step, "unit_id") === text(unit, "id")).map((step) => ({ id: text(step, "id"), kind: text(step, "kind"), title: text(step, "title"), body: text(step, "content"), interaction: step.interaction ?? undefined, successFeedback: optionalText(step, "success_feedback"), retryFeedback: optionalText(step, "retry_feedback"), transition: step.transition ?? undefined }))
+    }))
+  }));
+}
 
 function rpcRows(result: { data: unknown; error: any }, operation: string) {
   if (result.error?.code === "40001") throw new ApiError(409, "authoring_draft_conflict", "The draft changed in another session. Reload before saving again.");
@@ -36,11 +55,14 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const { user, server } = await requireTeacher(request);
 
   if (request.method === "GET") {
-    const result = await server.from("course_authoring_drafts").select("payload,revision,updated_at").eq("course_id", courseId).maybeSingle();
+    const [result, baseMicroPaths] = await Promise.all([
+      server.from("course_authoring_drafts").select("payload,revision,updated_at").eq("course_id", courseId).maybeSingle(),
+      readCourseMicroPaths(server, courseId)
+    ]);
     const row = dataOrThrow(result.data as Row | null, result.error, "Authoring draft read");
-    if (!row) { json(response, 200, { draft: null }); return; }
+    if (!row) { json(response, 200, { draft: null, baseMicroPaths }); return; }
     const payload = row.payload as Record<string, unknown>;
-    json(response, 200, { draft: { state: payload.state, previewRuntime: payload.previewRuntime, revision: Number(row.revision), updatedAt: text(row, "updated_at") } });
+    json(response, 200, { draft: { state: payload.state, previewRuntime: payload.previewRuntime, revision: Number(row.revision), updatedAt: text(row, "updated_at") }, baseMicroPaths });
     return;
   }
 

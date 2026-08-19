@@ -105,9 +105,9 @@ Lesson 设计模式至少支持：
 
 输入框开放，但命中关键词后映射预设 mutation；未命中走固定 fallback。修改经过 Preview → Apply，并支持撤销最近一次修改。切换 learn/design 保留 session draft，刷新后恢复 seed。
 
-Explore 的 Learning Intent Resolver 和 Micro Learning 也使用 Feature contract + `src/demo` deterministic provider + App composition wiring。它们只引用现有稳定 Knowledge ID，不创建第二套 Knowledge/Course/Practice ontology。未知学习目标先明确提示覆盖不足，再把材料创建作为 fallback；任意材料的高质量建课仍不是通用能力。MicroLesson 完成记录为 Prototype 学习活动，不自动写 Knowledge mastery。
+Explore 的 Learning Intent Resolver 继续使用 Feature contract；生产 Micro Learning 则通过 Supabase/API 的 `MicroLearningPath -> MicroUnit -> MicroStep` 读取 Golden seed。Demo provider 只保留给测试兼容，不是 runtime authority。它们只引用现有稳定 Knowledge ID，不创建第二套 Knowledge/Course/Practice ontology。未知学习目标先明确提示覆盖不足，再把材料创建作为 fallback；任意材料的高质量建课仍不是通用能力。完成 Micro 会写入学习证据并最多达到 `learned`，不自动写 Knowledge mastery。
 
-Course Design 使用 course-scoped、schema-versioned 的浏览器 `localStorage` Draft Overlay。在 Repository Runtime/Graph 之上记录 Chapter 增删改序、课程 Knowledge 覆盖与移动、课程局部 Draft Candidate、Knowledge dependency、手动坐标、Material 关联/取消关联和生成的 Article draft。生成采用固定 700ms 仿真并自动关联当前 Knowledge；生成 Material 可由正常 Lesson route 打开。该状态不修改 Repository seed、Global Knowledge 或 Supabase。
+Course Design 使用 course-scoped、schema-versioned 的服务端 `course_authoring_drafts` Overlay。浏览器只保留 session undo/redo，不是 authoring authority。Overlay 记录 Chapter 增删改序、课程 Knowledge 覆盖与移动、课程局部 Draft Candidate、Knowledge dependency、Material 关联/取消关联、手工 Article、Micro hierarchy 和 Assignment mappings。该状态不修改 learner 可见的 published runtime、Global Knowledge 或 Supabase canonical Course rows，直到 transactional Publish 成功。
 
 结构 AI 只返回通用 `CourseAuthoringProposal.operations`。UI 先展示 Preview，再把 Proposal 应用到临时 Overlay 并执行确定性引用、重复边和 DAG 校验；只有通过后才写入 Draft，且整次 Apply 可 Undo。Golden 的拆分、合并、依赖建议和篇章重构是 `src/demo` 中的 scripted Proposal，不是真实 LLM mutation。
 
