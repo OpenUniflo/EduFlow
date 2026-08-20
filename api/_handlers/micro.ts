@@ -119,6 +119,11 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     }
     const courseId = optionalText(path, "course_id");
     if (courseId) await recomputeMastery(client, user.id, text(path, "knowledge_id"), courseId);
+    else {
+      const coverages = await client.from("assignment_coverages").select("course_id").eq("node_id", text(path, "knowledge_id")).eq("required", true);
+      const rows = dataOrThrow(coverages.data as Row[] | null, coverages.error, "Global Micro course contexts lookup");
+      for (const candidate of new Set(rows.map((row)=>text(row,"course_id")))) await recomputeMastery(client,user.id,text(path,"knowledge_id"),candidate);
+    }
   }
   json(response, 200, { correct: true, completed: pathCompleted, pathProgress: { pathId: body.pathId, status: pathCompleted ? "completed" : "in_progress", currentUnitId: currentUnitId ?? undefined, currentStepId: nextStepRow ? text(nextStepRow, "id") : undefined, startedAt: now, completedAt: pathCompleted ? now : undefined, updatedAt: now } });
 });

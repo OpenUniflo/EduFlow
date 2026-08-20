@@ -833,7 +833,7 @@ insert into public.assignment_coverages (course_id, id, assignment_id, node_id, 
 -- same database repository as teacher-authored paths.
 insert into public.micro_learning_paths (id, knowledge_id, course_id, scope, title, description, mode, estimated_minutes, required, status)
 values
-  ('golden-micro-AG01', 'AG01', 'agentic-ai-golden', 'course', 'Agent · 快速学习', '从目标边界到可验证的 Agent 判断。', 'learn', 8, true, 'published'),
+  ('golden-micro-AG01', 'AG01', null, 'global', 'Agent · 快速学习', '从目标边界到可验证的 Agent 判断。', 'learn', 8, true, 'published'),
   ('golden-micro-H02', 'H02', 'agentic-ai-golden', 'course', 'Workflow · 快速学习', '建立可靠 Workflow 的顺序与边界。', 'learn', 8, true, 'published'),
   ('golden-micro-RT14', 'RT14', 'agentic-ai-golden', 'course', 'Failure Recovery · 快速学习', '识别恢复链路里的错误结算顺序。', 'learn', 8, true, 'published'),
   ('golden-micro-E13', 'E13', 'agentic-ai-golden', 'course', 'Outcome Evaluation · 快速学习', '区分候选输出与可验收结果。', 'learn', 8, true, 'published');

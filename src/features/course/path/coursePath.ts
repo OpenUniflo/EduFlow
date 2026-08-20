@@ -4,7 +4,7 @@ import type { UserKnowledgeRecord } from "@/features/profile/types";
 
 export type CoursePathItem = {
   node: CourseSkillTreeNode;
-  state: "completed" | "current" | "available" | "blocked";
+  state: "completed" | "underway" | "available" | "blocked";
   blockedBy: string[];
 };
 
@@ -20,7 +20,7 @@ export function buildCoursePath(graph: CourseGraphData, userKnowledge: UserKnowl
   return [...graph.knowledgeNodes].sort((left, right) => left.primaryCoverage.lessonOrder - right.primaryCoverage.lessonOrder || left.primaryCoverage.order - right.primaryCoverage.order || left.id.localeCompare(right.id)).map((node) => {
     const status = statusByNode.get(node.id);
     if (complete(status)) return { node, state: "completed", blockedBy: [] };
-    if (underway(status)) return { node, state: "current", blockedBy: [] };
+    if (underway(status)) return { node, state: "underway", blockedBy: [] };
     const blockedBy = (prerequisites.get(node.id) ?? []).filter((id) => !complete(statusByNode.get(id))).map((id) => nodeById.get(id)?.title ?? id);
     return blockedBy.length ? { node, state: "blocked", blockedBy } : { node, state: "available", blockedBy: [] };
   });

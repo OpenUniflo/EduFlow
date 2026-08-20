@@ -430,6 +430,13 @@
 - Mastery requires a completed required Learn Path plus every explicitly required Assignment accepted. A Knowledge without an explicit required Assignment remains `learned` after its required Learn Path.
 - Course progress and UserKnowledgeState are separate projections. PersonalLearningPlan is removed; systematic multi-Knowledge learning belongs to a Course, while MicroLearningPath is a within-Knowledge experience.
 
+## Learner Entry and Today Invariants
+
+- Today is a quick-access projection of active `learning`, `learned`, and `practicing` Knowledge. It MUST NOT add Course candidates, imply curriculum or prerequisite order, or include `explore` or `mastered` Knowledge.
+- Carousel selection and Course navigation are presentation-only. Micro and Material entry first raise the Knowledge to at least `learning`; Assignment entry raises covered Knowledge to at least `practicing`; no weaker action may downgrade state.
+- A Course-specific required Learn Path takes precedence. A published Global required Learn Path is the fallback only when that Course has no matching required Learn Path; Course and Global paths MUST NOT become simultaneous mastery requirements.
+- Standalone Knowledge may use Global Micro but has no Global Material or Global Assignment in the MVP. Starting Knowledge does not require Micro, and Material completion does not infer `learned`; without a required Learn Path the learner may remain `learning` or advance through explicit practice.
+
 ## Knowledge Source Invariants
 
 - Generic Course and Material code MUST NOT assume all KnowledgeNodes belong to the Global graph.

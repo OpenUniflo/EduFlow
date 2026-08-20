@@ -6,6 +6,10 @@ type SupabaseClient = Awaited<ReturnType<typeof createUserSupabase>>["client"];
 const text = (row: Row, key: string) => String(row[key]);
 const weakKnowledgeStatus = (status: string) => ["explore", "learning", "learned", "practicing"].includes(status);
 
+export function preferCourseRequiredPaths<T>(coursePaths: T[], globalPaths: T[]) {
+  return coursePaths.length ? coursePaths : globalPaths;
+}
+
 export async function updateKnowledgeAtLeast(client: SupabaseClient, userId: string, nodeId: string, status: "learning" | "practicing" | "mastered") {
   const existingResult = await client.from("user_knowledge_states").select("status").eq("user_id", userId).eq("node_id", nodeId).maybeSingle();
   const existing = dataOrThrow(existingResult.data as Row | null, existingResult.error, "Knowledge state lookup");
@@ -16,13 +20,22 @@ export async function updateKnowledgeAtLeast(client: SupabaseClient, userId: str
   dataOrThrow(write.data, write.error, "Knowledge state update");
 }
 
+export async function resolveRequiredLearnPaths(client: SupabaseClient, nodeId: string, courseId?: string) {
+  if (courseId) {
+    const courseResult = await client.from("micro_learning_paths").select("id").eq("knowledge_id", nodeId).eq("course_id", courseId).eq("mode", "learn").eq("required", true).eq("status", "published");
+    const coursePaths = dataOrThrow(courseResult.data as Row[] | null, courseResult.error, "Course Micro paths lookup");
+    if (coursePaths.length) return coursePaths;
+  }
+  const globalResult = await client.from("micro_learning_paths").select("id").eq("knowledge_id", nodeId).is("course_id", null).eq("scope", "global").eq("mode", "learn").eq("required", true).eq("status", "published");
+  return preferCourseRequiredPaths([], dataOrThrow(globalResult.data as Row[] | null, globalResult.error, "Global Micro paths lookup"));
+}
+
 export async function recomputeMastery(client: SupabaseClient, userId: string, nodeId: string, courseId: string) {
-  const [pathsResult, pathProgressResult, coveragesResult] = await Promise.all([
-    client.from("micro_learning_paths").select("id").eq("knowledge_id", nodeId).eq("course_id", courseId).eq("mode", "learn").eq("required", true).eq("status", "published"),
+  const [paths, pathProgressResult, coveragesResult] = await Promise.all([
+    resolveRequiredLearnPaths(client, nodeId, courseId),
     client.from("user_micro_path_progress").select("path_id,status").eq("user_id", userId),
     client.from("assignment_coverages").select("course_id,assignment_id").eq("node_id", nodeId).eq("course_id", courseId).eq("required", true)
   ]);
-  const paths = dataOrThrow(pathsResult.data as Row[] | null, pathsResult.error, "Required Micro paths lookup");
   const pathProgress = dataOrThrow(pathProgressResult.data as Row[] | null, pathProgressResult.error, "Micro progress lookup");
   const requiredAssignments = dataOrThrow(coveragesResult.data as Row[] | null, coveragesResult.error, "Required assignment lookup");
   const completedPaths = new Set(pathProgress.filter((row) => text(row, "status") === "completed").map((row) => text(row, "path_id")));

@@ -17,7 +17,7 @@ describe("Micro Learning navigation", () => {
       state: { returnTo: "/" }
     });
     const learningPage = readFileSync(join(process.cwd(), "src/features/learning/pages/LearningPage.tsx"), "utf8");
-    expect(learningPage).toMatch(/createMicroLearningNavigation\(current\.knowledgeId,\{courseId:current\.courseId,returnTo:"\/"\}\)/);
+    expect(learningPage).toMatch(/createMicroLearningNavigation\(current\.knowledgeId,\{courseId:current\.resources\.primaryCourse\?\.courseId,returnTo:"\/"\}\)/);
   });
 
   it("carries the current Course route as the explicit return target", () => {

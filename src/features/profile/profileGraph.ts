@@ -133,7 +133,7 @@ export function buildPersonalKnowledgeGraph(
   }
 
   const currentLearningId = [...userKnowledge]
-    .filter((record) => record.status === "learning" && coreIds.has(record.nodeId))
+    .filter((record) => ["learning", "learned", "practicing"].includes(record.status) && coreIds.has(record.nodeId))
     .sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? ""))[0]?.nodeId ?? null;
 
   return {
