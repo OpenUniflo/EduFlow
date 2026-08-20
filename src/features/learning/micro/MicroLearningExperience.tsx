@@ -14,7 +14,7 @@ export function MicroLearningExperience({ session, onLogout, repository }: { ses
   useEffect(() => repository.subscribe(() => setRevision((value) => value + 1)), [repository]);
   const path = useMemo(() => repository.getPath(knowledgeId, { courseId, mode: "learn" }), [courseId, knowledgeId, repository, revision]);
   const progress = path ? repository.getPathProgress(path.id) : undefined;
-  useEffect(() => { if (path && progress?.status !== "completed" && progress?.status !== "in_progress") void repository.start(path.id); }, [path, progress?.status, repository]);
+  useEffect(() => { if (path && progress?.status !== "completed" && progress?.status !== "in_progress") void repository.start(path.id, courseId); }, [courseId, path, progress?.status, repository]);
   const unit = path?.units.find((item) => item.id === progress?.currentUnitId) ?? path?.units[0];
   const step = unit?.steps.find((item) => item.id === progress?.currentStepId) ?? unit?.steps[0];
   const unitProgress = unit ? repository.getUnitProgress(unit.id) : undefined;
@@ -41,7 +41,7 @@ export function MicroLearningExperience({ session, onLogout, repository }: { ses
   return <main className="micro-learning-page"><GlobalNav active="learning" session={session} onLogout={onLogout}/>
     <header className="micro-learning-header"><button onClick={() => navigate(returnTarget)}><ArrowLeft size={16}/>返回</button><span><small>MICRO LEARNING · {path.estimatedMinutes} 分钟</small><strong>{path.title}</strong></span><i>{progress?.status === "completed" ? total : currentIndex} / {total}</i></header>
     <section className="micro-learning-stage"><div className="micro-progress"><i style={{ width: `${((progress?.status === "completed" ? total : currentIndex - 1) / Math.max(total, 1)) * 100}%` }}/></div>
-      {progress?.status === "completed" ? <article className="micro-card micro-complete"><Check size={36}/><span className="atlas-kicker">PATH COMPLETED</span><h1>这条微学习路径已完成</h1><p>完成已持久化为学习证据；它只会达到 learned，不会自动声称 mastery。</p><div><button className="atlas-secondary" onClick={() => void repository.start(path.id)}><RotateCcw size={15}/>查看路径</button><button className="atlas-primary" onClick={() => navigate(returnTarget)}>返回来源<ArrowRight size={15}/></button></div></article> :
+      {progress?.status === "completed" ? <article className="micro-card micro-complete"><Check size={36}/><span className="atlas-kicker">PATH COMPLETED</span><h1>这条微学习路径已完成</h1><p>完成已持久化为学习证据；它只会达到 learned，不会自动声称 mastery。</p><div><span className="atlas-pill"><RotateCcw size={15}/>已完成 · 查看状态</span><button className="atlas-primary" onClick={() => navigate(returnTarget)}>返回来源<ArrowRight size={15}/></button></div></article> :
         <article className="micro-card"><span className="atlas-kicker">UNIT {unit.position + 1} · {step.kind.toUpperCase()}</span><h1>{step.title}</h1><p>{step.body}</p>{interaction?.type === "h5p" ? <div className="micro-feedback retry">此 H5P 内容需要已配置的运行适配器，当前无法在此设备上完成。</div> : interaction ? <Interaction step={step} answer={answer} completed={stepCompleted} onAnswer={(value) => { setAnswer(value); setGradingFeedback(null); }} onToggle={toggle}/> : null}
         {gradingFeedback ? <div className={`micro-feedback ${gradingFeedback}`}>{gradingFeedback === "success" ? (step.successFeedback ?? "判断正确，正在保存进度。") : (step.retryFeedback ?? "再检查一次因果或执行顺序。")}</div> : null}
         {whyOpen ? <div className="micro-inline-explanation"><strong>为什么？</strong><p>{step.successFeedback ?? "这一步关注可验证的判断与因果关系；先确认当前条件，再决定下一步。"}</p></div> : null}

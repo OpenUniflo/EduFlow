@@ -23,7 +23,7 @@ const access = userKnowledgeAccess("user-1");
 describe("real Course Skill Tree handoff before Phase 4.3 Assignments", () => {
   it("accepts an explicit curriculum-generated draft and projects the factual Knowledge graph without fake Assignments", () => {
     expect(validateCourseRuntime(runtime, repository, access)).toBe(true);
-    const projected = buildCourseGraphData(runtime, { userId: "user-1", courseId: runtime.course.id, assignmentStates: {}, materialStates: {}, updatedAt: "2026-08-14T00:00:00.000Z" }, graph);
+    const projected = buildCourseGraphData(runtime, { userId: "user-1", courseId: runtime.course.id, isActive: true, assignmentStates: {}, materialStates: {}, updatedAt: "2026-08-14T00:00:00.000Z" }, graph);
     expect(projected.knowledgeNodes.map((node) => node.id)).toEqual(["a", "b"]);
     expect(projected.knowledgeEdges).toEqual(graph.edges);
     expect(projected.knowledgeNodes.every((node) => node.assignmentContexts.length === 0 && node.assignmentCount === 0)).toBe(true);

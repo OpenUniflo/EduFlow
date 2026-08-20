@@ -32,8 +32,8 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
   getPathProgress(pathId: string) { return this.pathProgress.get(pathId); }
   getUnitProgress(unitId: string) { return this.unitProgress.get(unitId); }
 
-  async start(pathId: string) {
-    const result = await apiRequest<{ progress: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "start", pathId }) });
+  async start(pathId: string, contextCourseId?: string) {
+    const result = await apiRequest<{ progress: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "start", pathId, contextCourseId }) });
     this.pathProgress.set(pathId, result.progress);
     this.emit();
   }

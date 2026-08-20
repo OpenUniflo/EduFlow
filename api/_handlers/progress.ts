@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createUserSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 import { dataOrThrow } from "../_lib/query.js";
+import { activateCourse, requirePublishedCourse } from "../_lib/courseMembership.js";
 
 type Row = Record<string, unknown>;
 
@@ -35,16 +36,32 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
         viewedSegmentIds: row.viewed_segment_ids, completedSegmentIds: row.completed_segment_ids,
         progress: row.progress == null ? undefined : Number(row.progress), updatedAt: String(row.updated_at)
       }]));
-      return { userId: user.id, courseId, assignmentStates, materialStates, recentLessonId: course.recent_lesson_id ?? undefined, updatedAt: String(course.updated_at) };
+      return { userId: user.id, courseId, isActive: Boolean(course.is_active), assignmentStates, materialStates, recentLessonId: course.recent_lesson_id ?? undefined, updatedAt: String(course.updated_at) };
     });
     json(response, 200, { userKnowledge: knowledge, courseStates });
+    return;
+  }
+  if (request.method === "POST") {
+    const body = request.body as { action?: "activate-course" | "deactivate-course"; courseId?: string };
+    if (!body.courseId || !body.action) throw new ApiError(400, "invalid_membership_action", "courseId and action are required");
+    if (body.action === "activate-course") await activateCourse(client, user.id, body.courseId);
+    else if (body.action === "deactivate-course") {
+      await requirePublishedCourse(client, body.courseId);
+      const result = await client.from("user_course_states").update({ is_active: false, updated_at: new Date().toISOString() }).eq("user_id", user.id).eq("course_id", body.courseId);
+      dataOrThrow(result.data, result.error, "Course membership deactivation");
+    } else throw new ApiError(400, "invalid_membership_action", "Unsupported membership action");
+    const stateResult = await client.from("user_course_states").select("*").eq("user_id", user.id).eq("course_id", body.courseId).maybeSingle();
+    const row = dataOrThrow(stateResult.data as Row | null, stateResult.error, "Course membership readback");
+    if (!row) throw new ApiError(404, "course_membership_not_found", "Course membership does not exist");
+    json(response, 200, { state: { userId: user.id, courseId: body.courseId, isActive: Boolean(row.is_active), assignmentStates: {}, materialStates: {}, recentLessonId: row.recent_lesson_id ?? undefined, updatedAt: String(row.updated_at) } });
     return;
   }
   if (request.method === "PUT") {
     const state = request.body as { userId?: string; courseId?: string; assignmentStates?: Record<string, Row>; materialStates?: Record<string, Row>; recentLessonId?: string; updatedAt?: string };
     if (!state?.courseId || !state.assignmentStates || !state.materialStates) throw new ApiError(400, "invalid_progress", "A complete course progress state is required");
     const updatedAt = state.updatedAt ?? new Date().toISOString();
-    const courseResult = await client.from("user_course_states").upsert({ user_id: user.id, course_id: state.courseId, recent_lesson_id: state.recentLessonId ?? null, updated_at: updatedAt });
+    await requirePublishedCourse(client, state.courseId);
+    const courseResult = await client.from("user_course_states").upsert({ user_id: user.id, course_id: state.courseId, is_active: true, recent_lesson_id: state.recentLessonId ?? null, updated_at: updatedAt });
     dataOrThrow(courseResult.data, courseResult.error, "UserCourseState update");
     const assignmentRows = Object.values(state.assignmentStates).map((item) => ({
       user_id: user.id, course_id: state.courseId, assignment_id: String(item.assignmentId), status: String(item.status),
@@ -63,8 +80,8 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const result = await client.from("user_material_states").upsert(materialRows);
       dataOrThrow(result.data, result.error, "UserMaterialState update");
     }
-    json(response, 200, { state: { ...state, userId: user.id, updatedAt } });
+    json(response, 200, { state: { ...state, userId: user.id, isActive: true, updatedAt } });
     return;
   }
-  return methodNotAllowed(response, ["GET", "PUT"]);
+  return methodNotAllowed(response, ["GET", "POST", "PUT"]);
 });

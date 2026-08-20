@@ -153,7 +153,7 @@ try {
     const courseResponse = await callHandler(coursesHandler, login.data.session.access_token, { id: created.courseId }) as { course: CourseRuntimeData };
     const knowledgeRepository = new InMemoryKnowledgeRepository(knowledgeResponse.graph);
     validateCourseRuntime(courseResponse.course, knowledgeRepository, userKnowledgeAccess(created.userId));
-    const projected = buildCourseGraphData(courseResponse.course, { userId: created.userId, courseId: created.courseId, assignmentStates: {}, materialStates: {}, updatedAt: new Date().toISOString() }, knowledgeResponse.graph);
+    const projected = buildCourseGraphData(courseResponse.course, { userId: created.userId, courseId: created.courseId, isActive: true, assignmentStates: {}, materialStates: {}, updatedAt: new Date().toISOString() }, knowledgeResponse.graph);
     skillTree = { nodeCount: projected.knowledgeNodes.length, edgeCount: projected.knowledgeEdges.length, chapterCount: projected.chapters.length };
     assert(skillTree.nodeCount === result.candidates.length, "Formal Course Skill Tree lost generated Knowledge nodes");
   }

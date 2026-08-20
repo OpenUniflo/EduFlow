@@ -24,12 +24,13 @@ export function demoUserCourseStateSeed(userId: string, courseId: string): UserC
       if (["golden-knowledge-assignment-MA04", "golden-chapter-assignment-6"].includes(assignment.id)) return { assignmentId: assignment.id, status: "in-progress", progress: assignment.id.endsWith("6") ? 68 : 45 };
       return { assignmentId: assignment.id, status: "not-started", progress: 0 };
     });
-    return { userId, courseId, assignmentStates: record(states), materialStates: {}, recentLessonId: goldenAgenticAiRuntime.lessons[5].id, updatedAt: DEMO_TIME };
+    return { userId, courseId, isActive: true, assignmentStates: record(states), materialStates: {}, recentLessonId: goldenAgenticAiRuntime.lessons[5].id, updatedAt: DEMO_TIME };
   }
   if (courseId === "agentic-ai") {
     return {
       userId,
       courseId,
+      isActive: true,
       assignmentStates: record(agenticAssignmentStates),
       materialStates: {
         "lesson-04": { materialId: "lesson-04", recentSegmentId: "page-12", progress: 34, viewedSegmentIds: Array.from({ length: 11 }, (_, index) => `page-${index + 1}`), updatedAt: DEMO_TIME }
@@ -47,6 +48,7 @@ export function demoUserCourseStateSeed(userId: string, courseId: string): UserC
     return {
       userId,
       courseId,
+      isActive: true,
       assignmentStates: record(states),
       materialStates: {
         "python-core-handbook": { materialId: "python-core-handbook", recentSegmentId: "page-4", progress: 38, viewedSegmentIds: ["page-1", "page-3", "page-4"], updatedAt: "2026-08-08T08:00:00.000Z" },
@@ -57,5 +59,5 @@ export function demoUserCourseStateSeed(userId: string, courseId: string): UserC
       updatedAt: "2026-08-08T08:00:00.000Z"
     };
   }
-  return { userId, courseId, assignmentStates: {}, materialStates: {}, updatedAt: DEMO_TIME };
+  return { userId, courseId, isActive: false, assignmentStates: {}, materialStates: {}, updatedAt: DEMO_TIME };
 }

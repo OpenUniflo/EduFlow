@@ -3,6 +3,7 @@ import { createServerSupabase, createUserSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 import { dataOrThrow } from "../_lib/query.js";
 import { recomputeMastery, updateKnowledgeAtLeast } from "../_lib/mastery.js";
+import { activateCourse, requireCourseKnowledge, requirePublishedCourse } from "../_lib/courseMembership.js";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
@@ -41,6 +42,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (!body.nodeId) throw new ApiError(400, "invalid_learning_action", "nodeId is required");
     const node = await client.from("knowledge_nodes").select("id").eq("id", body.nodeId).eq("status", "active").maybeSingle();
     if (!dataOrThrow(node.data as Row | null, node.error, "Knowledge lookup")) throw new ApiError(404, "knowledge_not_found", "Knowledge is unavailable");
+    if (body.courseId) {
+      await requireCourseKnowledge(client, body.courseId, body.nodeId);
+      await activateCourse(client, user.id, body.courseId);
+    }
     await updateKnowledgeAtLeast(client, user.id, body.nodeId, "learning");
     json(response, 200, { status: "learning" }); return;
   }
@@ -67,8 +72,9 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const assignmentResult = await client.from("course_assignments").select("*").eq("course_id", body.courseId).eq("id", body.assignmentId).maybeSingle();
   const assignment = dataOrThrow(assignmentResult.data as Row | null, assignmentResult.error, "Assignment lookup");
   if (!assignment) throw new ApiError(404, "assignment_not_found", "Assignment is unavailable");
+  await requirePublishedCourse(client, body.courseId);
   const now = new Date().toISOString();
-  const course = await client.from("user_course_states").upsert({ user_id: user.id, course_id: body.courseId, updated_at: now });
+  const course = await client.from("user_course_states").upsert({ user_id: user.id, course_id: body.courseId, is_active: true, updated_at: now });
   dataOrThrow(course.data, course.error, "Course state initialization");
   const coverageResult = await client.from("assignment_coverages").select("node_id").eq("course_id", body.courseId).eq("assignment_id", body.assignmentId);
   const coverage = dataOrThrow(coverageResult.data as Row[] | null, coverageResult.error, "Assignment coverage lookup");

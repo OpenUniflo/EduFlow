@@ -393,6 +393,7 @@ describe("Material and progress generalization", () => {
     localStorage.setItem(key, JSON.stringify(edited));
     const loaded = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed).getCourseState(edited.userId, edited.courseId);
     expect(loaded.assignmentStates["admin-edit"]).toMatchObject({ status: "completed", progress: 100 });
+    expect(loaded.isActive).toBe(true);
     expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({ schemaVersion: LEARNING_PROGRESS_SCHEMA_VERSION, state: { userId: edited.userId, courseId: edited.courseId } });
   });
 
@@ -596,6 +597,7 @@ describe("Material and progress generalization", () => {
     const state = (courseId: string, completed: boolean): UserCourseState => ({
       userId: "user-1",
       courseId,
+      isActive: true,
       assignmentStates: {
         "assignment-01": { assignmentId: "assignment-01", status: completed ? "completed" : "not-started", progress: completed ? 100 : 0 }
       },

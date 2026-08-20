@@ -90,7 +90,7 @@ const login = await server.auth.signInWithPassword({ email: user.data.user.email
 const [knowledgeResponse, courseResponse] = await Promise.all([callHandler(knowledgeHandler, login.data.session.access_token, {}) as Promise<{ graph: KnowledgeGraph }>, callHandler(coursesHandler, login.data.session.access_token, { id: courseId }) as Promise<{ course: CourseRuntimeData }>]);
 const runtime = courseResponse.course; const graph = knowledgeResponse.graph; const knowledgeRepository = new InMemoryKnowledgeRepository(graph); const access = userKnowledgeAccess(ownerId);
 validateCourseRuntime(runtime, knowledgeRepository, access);
-const userState = { userId: ownerId, courseId, assignmentStates: {}, materialStates: {}, updatedAt: new Date().toISOString() };
+const userState = { userId: ownerId, courseId, isActive: true, assignmentStates: {}, materialStates: {}, updatedAt: new Date().toISOString() };
 const skillTree = buildCourseGraphData(runtime, userState, graph);
 
 const sampledGoldIds = new Set(knowledgeMaterialGold.links.map((link) => link.knowledgeNodeId));

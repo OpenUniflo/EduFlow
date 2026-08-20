@@ -65,6 +65,11 @@ describe("Course authoring draft overlay", () => {
     expect(issue).toBeDefined();
     expect(isDraftCompletenessIssue(issue!)).toBe(true);
   });
+  it("rejects multiple required Learn Micro paths for one Knowledge and context",()=>{
+    const micro=(id:string)=>({id,knowledgeId:"a",courseId:"course",scope:"course" as const,title:id,mode:"learn" as const,estimatedMinutes:5,required:true,status:"draft" as const,units:[{id:`${id}-unit`,pathId:id,title:"Unit",position:0,estimatedMinutes:5,required:true,steps:[{id:`${id}-step`,kind:"explanation" as const,title:"Step",body:"Body"}]}]});
+    const state:CourseAuthoringDraftState={...emptyCourseAuthoringDraft("course"),microPathsEdited:true,microPaths:[micro("one"),micro("two")]};
+    expect(validateCourseAuthoring(runtime,graph,state).fatal.some((issue)=>issue.code==="duplicate-required-learn-micro")).toBe(true);
+  });
   it("rejects a cross-Chapter move that would make the Chapter projection cyclic",()=>{
     let state=addDraftChapter(emptyCourseAuthoringDraft("course"),{id:"chapter-b",courseId:"course",title:"B",description:"B",outcome:"B",color:"#456",order:1});
     state=addExistingKnowledge(state,"b","chapter-a");

@@ -3,6 +3,7 @@ import { createUserSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 import { dataOrThrow } from "../_lib/query.js";
 import { recomputeMastery } from "../_lib/mastery.js";
+import { activateCourse, requireCourseKnowledge } from "../_lib/courseMembership.js";
 
 type Row = Record<string, unknown>;
 type Answer = string | string[] | undefined;
@@ -52,13 +53,22 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     return;
   }
   if (request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
-  const body = request.body as { action?: string; pathId?: string; unitId?: string; stepId?: string; answer?: Answer };
+  const body = request.body as { action?: string; pathId?: string; unitId?: string; stepId?: string; answer?: Answer; contextCourseId?: string };
   if (!body.pathId || !body.action) throw new ApiError(400, "invalid_micro_action", "pathId and action are required");
   const pathResult = await client.from("micro_learning_paths").select("*").eq("id", body.pathId).eq("status", "published").maybeSingle();
   const path = dataOrThrow(pathResult.data as Row | null, pathResult.error, "Micro path lookup");
   if (!path) throw new ApiError(404, "micro_path_not_found", "Micro Learning path is unavailable");
   const now = new Date().toISOString();
   if (body.action === "start") {
+    const pathCourseId = optionalText(path, "course_id");
+    if (body.contextCourseId) {
+      await requireCourseKnowledge(client, body.contextCourseId, text(path, "knowledge_id"));
+      if (pathCourseId && pathCourseId !== body.contextCourseId) throw new ApiError(400, "micro_context_mismatch", "Micro path does not belong to the selected Course context");
+      await activateCourse(client, user.id, body.contextCourseId);
+    } else if (pathCourseId) {
+      await requireCourseKnowledge(client, pathCourseId, text(path, "knowledge_id"));
+      await activateCourse(client, user.id, pathCourseId);
+    }
     const firstUnitResult = await client.from("micro_units").select("*").eq("path_id", body.pathId).order("position").limit(1).maybeSingle();
     const firstUnit = dataOrThrow(firstUnitResult.data as Row | null, firstUnitResult.error, "Micro first unit lookup");
     const firstStepResult = firstUnit ? await client.from("micro_steps").select("id").eq("unit_id", text(firstUnit, "id")).order("position").limit(1).maybeSingle() : null;

@@ -147,6 +147,14 @@
 
 - 技能树 / 实训树 switching is presentation-only.
 
+## Learner Course Membership and Context
+
+- A Published Course is platform-available; it is not automatically a learner's Course. `UserCourseState.isActive` is the durable My Courses membership signal, and client projection placeholders MUST be inactive.
+- The first Course-scoped Start Knowledge, Micro, Material, or Assignment action activates that Course. Browsing a Course, opening a Drawer, or switching Knowledge context MUST NOT activate it; Standalone Global Micro MUST NOT activate any Course.
+- Removing a Course changes only membership and MUST preserve Knowledge state, evidence, Micro progress, Material progress, and Assignment state. A later Course-scoped learning action may reactivate it.
+- Learner Knowledge context options include Standalone plus Published Courses covering that Knowledge. Context switching is presentation-only and MUST NOT mutate learner state.
+- Standalone exposes only Global Micro. A Course context resolves its own Micro before Global fallback, and exposes only that Course's Materials and Assignments. Using Global Micro inside an explicit Course context remains a Course-scoped learning action.
+
 ## Course Authoring Drafts
 
 - Persisted Course authoring drafts are server-side, teacher/admin-only, and are never learner-visible.

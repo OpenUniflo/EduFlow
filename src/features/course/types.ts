@@ -313,6 +313,8 @@ export type UserMaterialState = {
 export type UserCourseState = {
   userId: string;
   courseId: string;
+  /** Durable learner membership. Placeholder projection states are always inactive. */
+  isActive: boolean;
   assignmentStates: Record<string, UserAssignmentState>;
   materialStates: Record<string, UserMaterialState>;
   recentLessonId?: string;

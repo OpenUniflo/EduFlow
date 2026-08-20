@@ -107,7 +107,14 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
   const missingOutcomes = editable.chapters.filter((chapter) => !outcomeChapters.has(chapter.id));
   if (missingOutcomes.length) warnings.push({ code: "missing-chapter-outcome", message: `${missingOutcomes.length} 个篇章没有正式 ChapterOutcome。` });
   if (!editable.finalProjects.length) warnings.push({ code: "missing-final-project", message: "课程尚未配置 FinalProject。" });
-  if (state.microPathsEdited) state.microPaths?.forEach((path) => {
+  if (state.microPathsEdited) {
+    const requiredLearnContexts = new Set<string>();
+    state.microPaths?.forEach((path) => {
+      if (path.required && path.mode === "learn") {
+        const key = `${path.knowledgeId}:${path.courseId ?? "global"}`;
+        if (requiredLearnContexts.has(key)) fatal.push({ code: "duplicate-required-learn-micro", message: `Knowledge ${path.knowledgeId} 在同一课程上下文最多发布一条必修 Learn Micro Path。` });
+        requiredLearnContexts.add(key);
+      }
     if (path.scope !== "course" || path.courseId !== runtime.course.id || !courseNodeIds.has(path.knowledgeId)) fatal.push({ code: "invalid-micro-path", message: `Micro Path ${path.title} 必须绑定当前课程中存在的 Knowledge。` });
     const positions = path.units.map((unit) => unit.position);
     if (new Set(positions).size !== positions.length || positions.some((position) => position < 0)) fatal.push({ code: "invalid-micro-unit-order", message: `Micro Path ${path.title} 的 Unit 顺序无效。` });
@@ -119,7 +126,8 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
         if (step.interaction?.type === "choice" && (!step.interaction.options.length || step.interaction.correctIndex < 0 || step.interaction.correctIndex >= step.interaction.options.length)) fatal.push({ code: "invalid-micro-choice", message: `Choice Step ${step.title} 缺少有效答案。` });
       });
     });
-  });
+    });
+  }
 
   return { fatal, warnings, summary: { chapterCount: editable.chapters.length, knowledgeCount: courseNodeIds.size, assignmentCoveredCount: assignmentCovered.size, materialCoveredCount: materialCovered.size, candidateCount: candidates.length, dagValid: dagValid && chapterDagValid } };
 }

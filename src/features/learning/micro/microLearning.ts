@@ -68,7 +68,7 @@ export interface MicroLearningRepository extends MicroLearningProvider {
   getPath(knowledgeId:string, context?:{courseId?:string; mode?:MicroLearningPath["mode"]}):MicroLearningPath|null;
   getPathProgress(pathId:string):MicroPathProgress|undefined;
   getUnitProgress(unitId:string):MicroUnitProgress|undefined;
-  start(pathId:string):Promise<void>;
+  start(pathId:string, contextCourseId?:string):Promise<void>;
   completeStep(pathId:string, unitId:string, stepId:string, answer?:MicroLearningAnswer):Promise<{correct:boolean; completed:boolean}>;
   subscribe(listener:()=>void):()=>void;
 }
