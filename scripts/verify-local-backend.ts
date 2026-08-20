@@ -145,7 +145,17 @@ try {
   const authoredAssignmentId = `authored-assignment-${suffix}`;
   const authoringBaseMicro = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: "agentic-ai-golden" });
   assertStatus(authoringBaseMicro, 200, "published Micro authoring baseline read");
-  const authoredPath = { id: authoredPathId, knowledgeId: authoredKnowledgeId, courseId: "agentic-ai-golden", scope: "course", title: "Verifier authored Micro", description: "Draft-only until Publish", mode: "learn", estimatedMinutes: 3, required: true, status: "draft", units: [{ id: `${authoredPathId}:unit`, pathId: authoredPathId, title: "Verifier Unit", position: 0, estimatedMinutes: 3, required: true, steps: [{ id: `${authoredPathId}:step`, kind: "interaction", title: "Verifier choice", body: "Choose the verifiable boundary.", interaction: { type: "choice", options: ["Verifiable boundary", "Memorized title"], correctIndex: 0 }, successFeedback: "Correct", retryFeedback: "Retry" }] }] };
+  const authoredPath = { id: authoredPathId, knowledgeId: authoredKnowledgeId, courseId: "agentic-ai-golden", scope: "course", title: "Verifier authored Micro", description: "Draft-only until Publish", mode: "learn", estimatedMinutes: 8, required: true, status: "draft", units: [{ id: `${authoredPathId}:unit`, pathId: authoredPathId, title: "Verifier Unit", position: 0, estimatedMinutes: 8, required: true, steps: [
+    { id: `${authoredPathId}:explanation`, kind: "explanation", title: "Verifier explanation", body: "Explain the verifiable boundary." },
+    { id: `${authoredPathId}:choice`, kind: "interaction", title: "Verifier choice", body: "Choose the verifiable boundary.", interaction: { type: "choice", options: ["Verifiable boundary", "Memorized title"], correctIndex: 0 }, successFeedback: "Correct", retryFeedback: "Retry" },
+    { id: `${authoredPathId}:multiple`, kind: "interaction", title: "Verifier multiple choice", body: "Choose both valid boundaries.", interaction: { type: "multiple-choice", options: ["Input contract", "Output evidence", "Theme"], correctIndexes: [0,1] }, successFeedback: "Correct", retryFeedback: "Retry" },
+    { id: `${authoredPathId}:fill`, kind: "interaction", title: "Verifier fill blank", body: "Name the validation component.", interaction: { type: "fill-blank", answers: ["Verifier"] }, successFeedback: "Correct", retryFeedback: "Retry" },
+    { id: `${authoredPathId}:ordering`, kind: "interaction", title: "Verifier ordering", body: "Order the boundary.", interaction: { type: "ordering", items: ["Input","Verify","Evidence"], correctOrder: ["Input","Verify","Evidence"] }, successFeedback: "Correct", retryFeedback: "Retry" },
+    { id: `${authoredPathId}:trace`, kind: "interaction", title: "Verifier trace", body: "Locate the break.", interaction: { type: "trace", steps: [{ id: "input", label: "Input" },{ id: "skip", label: "Skip validation" }], correctStepId: "skip" }, successFeedback: "Correct", retryFeedback: "Retry" },
+    { id: `${authoredPathId}:workflow`, kind: "interaction", title: "Verifier workflow", body: "Build the workflow.", interaction: { type: "mini-workflow", nodes: ["START","VERIFY","END"], correctOrder: ["START","VERIFY","END"] }, successFeedback: "Correct", retryFeedback: "Retry" },
+    { id: `${authoredPathId}:h5p`, kind: "interaction", title: "Verifier H5P", body: "Complete the imported content.", interaction: { type: "h5p", contentRef: "golden-h5p-agent-fill-blanks", adapter: "h5p-standalone", completionPolicy: "passed" }, successFeedback: "Correct", retryFeedback: "Retry" },
+    { id: `${authoredPathId}:summary`, kind: "summary", title: "Verifier summary", body: "The boundary is persisted." }
+  ] }] };
   const authoredAssignment = { id: authoredAssignmentId, courseId: "agentic-ai-golden", order: Math.max(-1, ...publishedBase.assignments.map((item: any) => item.order)) + 1, title: "Verifier authored Assignment", description: "A manually authored Assignment", requirements: ["Provide evidence"], expectedOutput: "Verifiable answer", acceptanceCriteria: ["Meets stated boundary"], mode: "instruction", estimatedMinutes: 5, experience: { type: "answer", prompt: "Provide evidence" } };
   const authoredCoverage = { id: `${authoredAssignmentId}:coverage`, assignmentId: authoredAssignmentId, nodeId: authoredKnowledgeId, role: "assess", required: true };
   const authoredState = { ...draftState, courseId: "agentic-ai-golden", microPathsEdited: true, microPaths: [...authoringBaseMicro.body.baseMicroPaths, authoredPath], assignments: [...publishedBase.assignments, authoredAssignment], assignmentCoverages: [...publishedBase.assignmentCoverages, authoredCoverage] };
@@ -173,6 +183,20 @@ try {
   assert.equal((await server.from("user_micro_path_progress").select("status").eq("user_id", adminUser.user.id).eq("path_id", preservedPath.id).single()).data?.status, "in_progress", "stable Micro progress must survive republish");
   const learnerNewPublished = await invoke(coursesHandler, "GET", ordinaryUser.token);
   assert.ok(learnerNewPublished.body.courses.find((item: any) => item.course.id === "agentic-ai-golden").assignments.some((item: any) => item.id === authoredAssignmentId), "learner sees authored Assignment only after Publish");
+  const invalidH5PPaths=authoredState.microPaths.map((path:any)=>path.id!==authoredPathId?path:{
+    ...path,
+    units:path.units.map((unit:any)=>({
+      ...unit,
+      steps:unit.steps.map((step:any)=>step.interaction?.type==="h5p"
+        ?{...step,interaction:{...step.interaction,contentRef:"missing-h5p-content"}}
+        :step)
+    }))
+  });
+  const invalidH5PState={...authoredState,microPaths:invalidH5PPaths};
+  const invalidH5PSave=await invoke(courseAuthoringHandler,"PUT",adminUser.token,{state:invalidH5PState,previewRuntime:authoredPreview,expectedRevision:0},{courseId:"agentic-ai-golden"});
+  assertStatus(invalidH5PSave,200,"invalid H5P draft save is allowed before Publish validation");
+  assertStatus(await invoke(courseAuthoringHandler,"POST",adminUser.token,{expectedRevision:invalidH5PSave.body.revision},{courseId:"agentic-ai-golden"}),422,"missing published H5P reference blocks Publish");
+  assert.ifError((await server.from("course_authoring_drafts").delete().eq("course_id","agentic-ai-golden")).error);
 
   const micro = await invoke(microHandler, "GET", adminUser.token);
   assertStatus(micro, 200, "database-backed Micro read");
@@ -236,8 +260,8 @@ try {
   let reverseResult:any;for(const unit of agentPath.units)for(const step of unit.steps){reverseResult=await invoke(microHandler,"POST",ordinaryUser.token,{action:"complete-step",pathId:agentPath.id,unitId:unit.id,stepId:step.id,submission:submissionFor(step,"learner")});assertStatus(reverseResult,200,`accepted-before-Micro ${step.id}`);assert.equal(reverseResult.body.correct,true);}
   assert.equal(reverseResult.body.completed,true,"accepted-before-Micro completion");
   assertStatus(await invoke(microHandler, "POST", ordinaryUser.token, { action: "start", pathId: authoredPathId }), 200, "second required Micro start");
-  const authoredMicroComplete = await invoke(microHandler, "POST", ordinaryUser.token, { action: "complete-step", pathId: authoredPathId, unitId: authoredPath.units[0].id, stepId: authoredPath.units[0].steps[0].id, answer: "Verifiable boundary" });
-  assertStatus(authoredMicroComplete, 200, "second required Micro completion"); assert.equal(authoredMicroComplete.body.completed, true);
+  let authoredMicroComplete:any;for(const step of authoredPath.units[0].steps){authoredMicroComplete=await invoke(microHandler,"POST",ordinaryUser.token,{action:"complete-step",pathId:authoredPathId,unitId:authoredPath.units[0].id,stepId:step.id,submission:submissionFor(step,"authored")});assertStatus(authoredMicroComplete,200,`authored Micro ${step.id}`);assert.equal(authoredMicroComplete.body.correct,true);}
+  assert.equal(authoredMicroComplete.body.completed, true, "second required authored Micro completion");
   const reverseProgress = await invoke(progressHandler, "GET", ordinaryUser.token);
   assert.equal(reverseProgress.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.status, "mastered", "mastery must be recomputed when required Micro completes after Assignment acceptance");
 
