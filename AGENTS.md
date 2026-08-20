@@ -6,6 +6,14 @@
 - `package-lock.json`, `yarn.lock`, and other competing lockfiles MUST NOT be committed.
 - Before pushing dependency changes, `pnpm install --frozen-lockfile` MUST succeed.
 
+## Hosted Deployment Discipline
+
+- A READY frontend deployment does not imply that its target Hosted Supabase schema matches repository migrations.
+- Before Hosted Preview acceptance, identify the environment's Supabase project, compare migration history, apply pending migrations incrementally, synchronize only hosted-safe required fixtures, and smoke authenticated APIs before browser validation.
+- Shared Hosted databases MUST NOT be reset or migrated automatically by every Preview build.
+- Runtime Micro content authority is the database; Demo providers are fixtures/adapters only.
+- Physical serverless entrypoints SHOULD remain consolidated, and deployment limits MUST be checked before adding a top-level API function.
+
 ## Frontend Project Structure
 
 - `src/app` owns application assembly, providers, and the `ApplicationServices` composition root.

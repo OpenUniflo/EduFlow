@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import type { Material } from "@/features/course/types";
 import type { KnowledgeGraph } from "@/features/knowledge/types";
-import { addDraftChapter, addDraftDependency, addExistingKnowledge, addGeneratedMaterial, addKnowledgeCandidate, addMaterialLink, applyCourseAuthoringDraft, createGeneratedArticleDraft, emptyCourseAuthoringDraft, moveCourseKnowledge, readCourseAuthoringDraft, redoCourseAuthoringDraft, removeCourseKnowledge, removeDraftChapter, removeDraftDependency, removeMaterialLink, setManualNodePosition, undoCourseAuthoringDraft, updateDraftChapter, validateDependencyAddition, writeCourseAuthoringDraft } from "./courseAuthoringDraft";
-import { validateCourseAuthoring } from "./courseAuthoringValidation";
+import { addDraftChapter, addDraftDependency, addExistingKnowledge, addGeneratedMaterial, addKnowledgeCandidate, addMaterialLink, applyCourseAuthoringDraft, createGeneratedArticleDraft, emptyCourseAuthoringDraft, moveCourseKnowledge, readCourseAuthoringDraft, redoCourseAuthoringDraft, removeCourseKnowledge, removeDraftChapter, removeDraftDependency, removeMaterialLink, setManualNodePosition, undoCourseAuthoringDraft, updateDraftChapter, validateDependencyAddition, writeCourseAuthoringDraft, type CourseAuthoringDraftState } from "./courseAuthoringDraft";
+import { isDraftCompletenessIssue, validateCourseAuthoring } from "./courseAuthoringValidation";
 import { reduceCourseAuthoringProposal, validateCourseAuthoringProposal, type CourseAuthoringProposal } from "./courseAuthoringProposal";
 
 const baseMaterial: Material = { id: "base", courseId: "course", lessonId: "lesson-a", order: 0, title: "Base", type: "article", segments: [{ id: "base-segment", order: 0 }] };
@@ -57,6 +57,13 @@ describe("Course authoring draft overlay", () => {
   it("reports warnings as publishable and cycles as fatal",()=>{
     const warning=validateCourseAuthoring(runtime,graph,addKnowledgeCandidate(emptyCourseAuthoringDraft("course"),{id:"draft-b",title:"B",description:"B",chapterId:"chapter-a"})); expect(warning.fatal).toHaveLength(0); expect(warning.warnings.length).toBeGreaterThan(0);
     const state=addDraftDependency(addExistingKnowledge(addExistingKnowledge(emptyCourseAuthoringDraft("course"),"b","chapter-a"),"c","chapter-a"),{id:"c-a",source:"c",target:"a",relation:"prerequisite",strength:"hard",reason:"cycle"}); expect(validateCourseAuthoring(runtime,graph,state).fatal.some((issue)=>issue.code==="dependency-cycle")).toBe(true);
+  });
+  it("saves incomplete nested Micro drafts while keeping them publish-blocking",()=>{
+    const state:CourseAuthoringDraftState={...emptyCourseAuthoringDraft("course"),microPathsEdited:true,microPaths:[{id:"micro",knowledgeId:"a",courseId:"course",scope:"course",title:"Draft Micro",mode:"learn",estimatedMinutes:5,required:true,status:"draft",units:[]}]};
+    const result=validateCourseAuthoring(runtime,graph,state);
+    const issue=result.fatal.find((candidate)=>candidate.code==="required-micro-without-unit");
+    expect(issue).toBeDefined();
+    expect(isDraftCompletenessIssue(issue!)).toBe(true);
   });
   it("rejects a cross-Chapter move that would make the Chapter projection cyclic",()=>{
     let state=addDraftChapter(emptyCourseAuthoringDraft("course"),{id:"chapter-b",courseId:"course",title:"B",description:"B",outcome:"B",color:"#456",order:1});

@@ -120,6 +120,16 @@ Start with:
 
 `main` is the Production branch for the Vercel `edu-flow` project. Production uses Hosted Supabase; normal local development uses the Local Supabase stack.
 
+A READY Vercel deployment does not apply or validate Hosted Supabase migrations. Before validating a Preview that depends on new database behavior:
+
+1. identify the Supabase project configured for that Vercel environment;
+2. compare `supabase/migrations` with the Hosted migration history;
+3. apply pending migrations incrementally with the repository's linked Supabase workflow;
+4. synchronize only required, hosted-safe fixture rows without resetting or replacing user data;
+5. smoke the authenticated APIs before browser acceptance.
+
+Shared Hosted databases must not be migrated automatically from every Preview build. Keep physical Vercel function entrypoints consolidated and check the active deployment limits before adding a new top-level `api/*.ts` entrypoint.
+
 Do not commit secrets. Browser code may use only the Supabase URL and publishable key; privileged Supabase credentials remain server-only.
 
 ## License

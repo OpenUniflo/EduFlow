@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createUserSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 import { dataOrThrow } from "../_lib/query.js";
+import { recomputeMastery } from "../_lib/mastery.js";
 
 type Row = Record<string, unknown>;
 type Answer = string | string[] | undefined;
@@ -102,9 +103,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   if (unitCompleted) completedUnitIds.add(body.unitId);
   const pathCompleted = requiredUnits.length > 0 && requiredUnits.every((item) => completedUnitIds.has(text(item, "id")));
   const nextUnit = pathUnits.find((item) => !completedUnitIds.has(text(item, "id")));
-  const nextUnitSteps = nextUnit ? await client.from("micro_steps").select("id").eq("unit_id", text(nextUnit, "id")).order("position").limit(1).maybeSingle() : null;
-  const nextStepRow = nextUnitSteps ? dataOrThrow(nextUnitSteps.data as Row | null, nextUnitSteps.error, "Micro next step lookup") : null;
-  const pathWrite = await client.from("user_micro_path_progress").upsert({ user_id: user.id, path_id: body.pathId, status: pathCompleted ? "completed" : "in_progress", current_unit_id: nextUnit ? text(nextUnit, "id") : null, current_step_id: nextStepRow ? text(nextStepRow, "id") : null, started_at: now, completed_at: pathCompleted ? now : null, updated_at: now });
+  const nextUnitSteps = unitCompleted && nextUnit ? await client.from("micro_steps").select("id").eq("unit_id", text(nextUnit, "id")).order("position").limit(1).maybeSingle() : null;
+  const nextStepRow = nextStep ?? (nextUnitSteps ? dataOrThrow(nextUnitSteps.data as Row | null, nextUnitSteps.error, "Micro next step lookup") : null);
+  const currentUnitId = unitCompleted ? (nextUnit ? text(nextUnit, "id") : null) : body.unitId;
+  const pathWrite = await client.from("user_micro_path_progress").upsert({ user_id: user.id, path_id: body.pathId, status: pathCompleted ? "completed" : "in_progress", current_unit_id: currentUnitId, current_step_id: nextStepRow ? text(nextStepRow, "id") : null, started_at: now, completed_at: pathCompleted ? now : null, updated_at: now });
   dataOrThrow(pathWrite.data, pathWrite.error, "Micro path progress update");
   if (pathCompleted && text(path, "mode") === "learn" && Boolean(value(path, "required"))) {
     const evidence = await client.from("knowledge_evidence").upsert({ user_id: user.id, node_id: text(path, "knowledge_id"), event_type: "micro_path_completed", source_entity_id: body.pathId, outcome: "completed", context: { pathId: body.pathId, courseId: optionalText(path, "course_id") ?? null }, occurred_at: now }, { onConflict: "user_id,node_id,event_type,source_entity_id", ignoreDuplicates: true });
@@ -115,6 +117,8 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const stateWrite = await client.from("user_knowledge_states").upsert({ user_id: user.id, node_id: text(path, "knowledge_id"), status: "learned", updated_at: now });
       dataOrThrow(stateWrite.data, stateWrite.error, "Knowledge learned");
     }
+    const courseId = optionalText(path, "course_id");
+    if (courseId) await recomputeMastery(client, user.id, text(path, "knowledge_id"), courseId);
   }
-  json(response, 200, { correct: true, completed: pathCompleted, pathProgress: { pathId: body.pathId, status: pathCompleted ? "completed" : "in_progress", currentUnitId: nextUnit ? text(nextUnit, "id") : undefined, currentStepId: nextStepRow ? text(nextStepRow, "id") : undefined, startedAt: now, completedAt: pathCompleted ? now : undefined, updatedAt: now } });
+  json(response, 200, { correct: true, completed: pathCompleted, pathProgress: { pathId: body.pathId, status: pathCompleted ? "completed" : "in_progress", currentUnitId: currentUnitId ?? undefined, currentStepId: nextStepRow ? text(nextStepRow, "id") : undefined, startedAt: now, completedAt: pathCompleted ? now : undefined, updatedAt: now } });
 });

@@ -150,6 +150,16 @@ try {
   const authoredCoverage = { id: `${authoredAssignmentId}:coverage`, assignmentId: authoredAssignmentId, nodeId: authoredKnowledgeId, role: "assess", required: true };
   const authoredState = { ...draftState, courseId: "agentic-ai-golden", microPathsEdited: true, microPaths: [...authoringBaseMicro.body.baseMicroPaths, authoredPath], assignments: [...publishedBase.assignments, authoredAssignment], assignmentCoverages: [...publishedBase.assignmentCoverages, authoredCoverage] };
   const authoredPreview = { ...publishedBase, assignments: authoredState.assignments, assignmentCoverages: authoredState.assignmentCoverages };
+  const preservedAssignment = publishedBase.assignments[0];
+  const preservedMaterial = publishedBase.materials[0];
+  const preservedSegment = preservedMaterial.segments[0];
+  const preservedPath = authoringBaseMicro.body.baseMicroPaths[0];
+  const preservedUnit = preservedPath.units[0];
+  const preservedStep = preservedUnit.steps[0];
+  assert.ifError((await server.from("user_course_states").upsert({ user_id: adminUser.user.id, course_id: "agentic-ai-golden", recent_lesson_id: publishedBase.lessons[0].id })).error);
+  assert.ifError((await server.from("user_assignment_states").upsert({ user_id: adminUser.user.id, course_id: "agentic-ai-golden", assignment_id: preservedAssignment.id, status: "started", progress: 25 })).error);
+  assert.ifError((await server.from("user_material_states").upsert({ user_id: adminUser.user.id, course_id: "agentic-ai-golden", material_id: preservedMaterial.id, recent_segment_id: preservedSegment.id, viewed_segment_ids: [preservedSegment.id], completed_segment_ids: [], progress: 25 })).error);
+  assert.ifError((await server.from("user_micro_path_progress").upsert({ user_id: adminUser.user.id, path_id: preservedPath.id, status: "in_progress", current_unit_id: preservedUnit.id, current_step_id: preservedStep.id, started_at: new Date().toISOString() })).error);
   const learnerOldPublished = await invoke(coursesHandler, "GET", ordinaryUser.token);
   assert.ok(!learnerOldPublished.body.courses.find((item: any) => item.course.id === "agentic-ai-golden").assignments.some((item: any) => item.id === authoredAssignmentId), "learner must not see unpublished Assignment edit");
   const authoredSave = await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: authoredState, previewRuntime: authoredPreview, expectedRevision: 0 }, { courseId: "agentic-ai-golden" });
@@ -158,6 +168,9 @@ try {
   assertStatus(authoringPreview, 200, "authored draft preview read"); assert.ok(authoringPreview.body.draft.state.microPaths.some((item: any) => item.id === authoredPathId)); assert.ok(authoringPreview.body.draft.previewRuntime.assignments.some((item: any) => item.id === authoredAssignmentId));
   const authoredPublish = await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: authoredSave.body.revision }, { courseId: "agentic-ai-golden" });
   assertStatus(authoredPublish, 200, "authored Micro and Assignment publish");
+  assert.equal((await server.from("user_assignment_states").select("status").eq("user_id", adminUser.user.id).eq("course_id", "agentic-ai-golden").eq("assignment_id", preservedAssignment.id).single()).data?.status, "started", "stable Assignment state must survive republish");
+  assert.equal((await server.from("user_material_states").select("recent_segment_id").eq("user_id", adminUser.user.id).eq("course_id", "agentic-ai-golden").eq("material_id", preservedMaterial.id).single()).data?.recent_segment_id, preservedSegment.id, "stable Material state must survive republish");
+  assert.equal((await server.from("user_micro_path_progress").select("status").eq("user_id", adminUser.user.id).eq("path_id", preservedPath.id).single()).data?.status, "in_progress", "stable Micro progress must survive republish");
   const learnerNewPublished = await invoke(coursesHandler, "GET", ordinaryUser.token);
   assert.ok(learnerNewPublished.body.courses.find((item: any) => item.course.id === "agentic-ai-golden").assignments.some((item: any) => item.id === authoredAssignmentId), "learner sees authored Assignment only after Publish");
 
@@ -185,8 +198,28 @@ try {
   assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "start-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId }), 200, "learner Assignment start for manual acceptance");
   const submittedAssignment = await invoke(learningHandler, "POST", ordinaryUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId });
   assertStatus(submittedAssignment, 200, "learner Assignment submission for manual acceptance"); assert.equal(submittedAssignment.body.status, "submitted");
+  assertStatus(await invoke(learningHandler, "GET", ordinaryUser.token, undefined, { courseId: "agentic-ai-golden" }), 403, "learner Assignment review denial");
+  const reviewQueue = await invoke(learningHandler, "GET", adminUser.token, undefined, { courseId: "agentic-ai-golden" });
+  assertStatus(reviewQueue, 200, "teacher Assignment review queue");
+  assert.ok(reviewQueue.body.submissions.some((item: any) => item.assignmentId === manualAssignmentId && item.learnerUserId === ordinaryUser.user.id && item.status === "submitted"));
   const manualAcceptance = await invoke(learningHandler, "POST", adminUser.token, { action: "accept-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId, learnerUserId: ordinaryUser.user.id });
   assertStatus(manualAcceptance, 200, "teacher manual Assignment acceptance"); assert.equal(manualAcceptance.body.status, "accepted");
+  const acceptedQueue = await invoke(learningHandler, "GET", adminUser.token, undefined, { courseId: "agentic-ai-golden" });
+  assert.ok(acceptedQueue.body.submissions.some((item: any) => item.assignmentId === manualAssignmentId && item.status === "accepted"));
+  assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "accept-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId, learnerUserId: ordinaryUser.user.id }), 409, "duplicate manual Assignment acceptance denial");
+  assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "start-assignment", courseId: "agentic-ai-golden", assignmentId: authoredAssignmentId }), 200, "second required Assignment start");
+  assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: authoredAssignmentId }), 200, "second required Assignment submission");
+  assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "accept-assignment", courseId: "agentic-ai-golden", assignmentId: authoredAssignmentId, learnerUserId: ordinaryUser.user.id }), 200, "second required Assignment acceptance");
+  assertStatus(await invoke(microHandler, "POST", ordinaryUser.token, { action: "start", pathId: agentPath.id }), 200, "accepted-before-Micro learner start");
+  const reverseFirst = await invoke(microHandler, "POST", ordinaryUser.token, { action: "complete-step", pathId: agentPath.id, unitId: firstUnit.id, stepId: firstUnit.steps[0].id, answer: "先明确目标与可验证边界" });
+  assertStatus(reverseFirst, 200, "accepted-before-Micro first step"); assert.equal(reverseFirst.body.correct, true);
+  const reverseSecond = await invoke(microHandler, "POST", ordinaryUser.token, { action: "complete-step", pathId: agentPath.id, unitId: secondUnit.id, stepId: secondUnit.steps[0].id, answer: ["Candidate", "Verifier", "Atomic Settle", "Cancel Remaining"] });
+  assertStatus(reverseSecond, 200, "accepted-before-Micro completion"); assert.equal(reverseSecond.body.completed, true);
+  assertStatus(await invoke(microHandler, "POST", ordinaryUser.token, { action: "start", pathId: authoredPathId }), 200, "second required Micro start");
+  const authoredMicroComplete = await invoke(microHandler, "POST", ordinaryUser.token, { action: "complete-step", pathId: authoredPathId, unitId: authoredPath.units[0].id, stepId: authoredPath.units[0].steps[0].id, answer: "Verifiable boundary" });
+  assertStatus(authoredMicroComplete, 200, "second required Micro completion"); assert.equal(authoredMicroComplete.body.completed, true);
+  const reverseProgress = await invoke(progressHandler, "GET", ordinaryUser.token);
+  assert.equal(reverseProgress.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.status, "mastered", "mastery must be recomputed when required Micro completes after Assignment acceptance");
 
   const progressBody = {
     userId: ordinaryUser.user.id,

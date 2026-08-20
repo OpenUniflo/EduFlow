@@ -10,6 +10,13 @@ export type CourseAuthoringValidation = {
   summary: { chapterCount: number; knowledgeCount: number; assignmentCoveredCount: number; materialCoveredCount: number; candidateCount: number; dagValid: boolean };
 };
 
+const draftCompletenessCodes = new Set(["required-micro-without-unit", "required-micro-unit-without-step"]);
+
+/** Incomplete nested Micro content is saveable as a Draft but remains fatal at Publish. */
+export function isDraftCompletenessIssue(issue: AuthoringValidationIssue) {
+  return draftCompletenessCodes.has(issue.code);
+}
+
 function findCycle(nodeIds: Set<string>, edges: Array<{ source: string; target: string }>) {
   const outgoing = new Map<string, string[]>();
   edges.forEach((edge) => outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge.target]));

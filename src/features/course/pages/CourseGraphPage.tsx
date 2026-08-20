@@ -19,7 +19,7 @@ import { sortMaterials } from "@/features/material/materialOrdering";
 import { canDesignCourse, canUseCourseDesignFeatures } from "@/features/auth/capabilities";
 import { ExperienceModeToggle } from "@/shared/components/ExperienceModeToggle";
 import { addDraftChapter, addDraftDependency, addExistingKnowledge, addGeneratedMaterial, addKnowledgeCandidate, addMaterialLink, applyCourseAuthoringDraft, clearManualNodePositions, createEditableKnowledgeGraph, createGeneratedArticleDraft, createManualArticleDraft, emptyCourseAuthoringDraft, moveCourseKnowledge, removeCourseKnowledge, removeDraftChapter, removeDraftDependency, removeMaterialLink, reorderDraftChapter, setManualNodePosition, updateDraftChapter, validateDependencyAddition, type CourseAuthoringDraftState } from "@/features/course/authoring/courseAuthoringDraft";
-import { validateCourseAuthoring } from "@/features/course/authoring/courseAuthoringValidation";
+import { isDraftCompletenessIssue, validateCourseAuthoring } from "@/features/course/authoring/courseAuthoringValidation";
 import { validateCourseAuthoringProposal } from "@/features/course/authoring/courseAuthoringProposal";
 import { shouldReserveCourseDrawer } from "@/features/course/graph/courseGraphInteraction";
 import { createMicroLearningNavigation, type MicroLearningProvider } from "@/features/learning/micro/microLearning";
@@ -53,10 +53,11 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   const editableKnowledgeGraph = useMemo(() => draftState ? createEditableKnowledgeGraph(baseKnowledgeGraph, draftState) : baseKnowledgeGraph, [baseKnowledgeGraph, draftState]);
   const runtime = useMemo(() => baseRuntime ? (draftState ? applyCourseAuthoringDraft(baseRuntime, draftState) : baseRuntime) : undefined, [baseRuntime, draftState]);
   const validation = useMemo(() => baseRuntime && draftState ? validateCourseAuthoring(baseRuntime, baseKnowledgeGraph, draftState) : null, [baseKnowledgeGraph, baseRuntime, draftState]);
-  const graphRuntime = validation?.fatal.length ? baseRuntime : runtime;
+  const structuralFatal = validation?.fatal.filter((issue) => !isDraftCompletenessIssue(issue)) ?? [];
+  const graphRuntime = structuralFatal.length ? baseRuntime : runtime;
   const orderedMaterials = useMemo(() => runtime ? sortMaterials(runtime.materials, runtime.lessons) : [], [runtime]);
   const userCourseState = useUserCourseState(session.userId, courseId);
-  const graphData = useMemo(() => graphRuntime ? buildCourseGraphData(graphRuntime, userCourseState, validation?.fatal.length ? baseKnowledgeGraph : editableKnowledgeGraph, userKnowledgeRepository.getUserKnowledge(session.userId)) : null, [baseKnowledgeGraph, editableKnowledgeGraph, graphRuntime, session.userId, userCourseState, validation?.fatal.length]);
+  const graphData = useMemo(() => graphRuntime ? buildCourseGraphData(graphRuntime, userCourseState, structuralFatal.length ? baseKnowledgeGraph : editableKnowledgeGraph, userKnowledgeRepository.getUserKnowledge(session.userId)) : null, [baseKnowledgeGraph, editableKnowledgeGraph, graphRuntime, session.userId, structuralFatal.length, userCourseState]);
   const courseChapters = graphData?.chapters ?? [];
   const courseSkillTreeNodes = graphData?.knowledgeNodes ?? [];
   const courseSkillTreeEdges = graphData?.knowledgeEdges ?? [];
@@ -198,8 +199,9 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     const current = draftRef.current;
     const next = update(current);
     const nextValidation = validateCourseAuthoring(baseRuntime, baseKnowledgeGraph, next);
-    if (nextValidation.fatal.length) {
-      setDesignActionNotice(`无法应用变更：${nextValidation.fatal[0].message}`);
+    const blockingIssue = nextValidation.fatal.find((issue) => !isDraftCompletenessIssue(issue));
+    if (blockingIssue) {
+      setDesignActionNotice(`无法应用变更：${blockingIssue.message}`);
       return false;
     }
     if (JSON.stringify(current) === JSON.stringify(next)) return false;

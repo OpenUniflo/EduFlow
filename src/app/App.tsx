@@ -86,7 +86,7 @@ export default function App() {
         setWorkflowVersion((version) => version + 1);
       } catch (error) {
         console.error("Post-login application initialization failed", error);
-        setStartupError("账号已登录，但应用数据加载失败，请稍后重试。");
+        setStartupError("部分学习数据加载失败，请重试。");
       } finally {
         setReady(true);
       }
@@ -150,7 +150,8 @@ export default function App() {
       [profile] = await Promise.all([hydrateApplicationServices(data.user.id), workflowPersistence.hydrate()]);
     } catch (initializationError) {
       console.error("Post-login application initialization failed", initializationError);
-      throw new Error("账号已登录，但应用数据加载失败，请稍后重试。");
+      setStartupError("部分学习数据加载失败，请重试。");
+      return;
     }
     const name = profile.displayName || data.user.email?.split("@")[0] || "学习者";
     setSession({ userId: data.user.id, name, email: data.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: data.user.created_at });
@@ -164,6 +165,24 @@ export default function App() {
     if (!data.session) return { confirmationRequired: true };
     await signIn({ email: input.email, password: input.password });
     return { confirmationRequired: false };
+  }
+
+  async function retryStartup() {
+    setReady(false);
+    setStartupError("");
+    try {
+      const { data } = await supabaseClient.auth.getSession();
+      if (!data.session) { setSession(null); return; }
+      const [profile] = await Promise.all([hydrateApplicationServices(data.session.user.id), workflowPersistence.hydrate()]);
+      const name = profile.displayName || data.session.user.email?.split("@")[0] || "学习者";
+      setSession({ userId: data.session.user.id, name, email: data.session.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: data.session.user.created_at });
+      setWorkflowVersion((version) => version + 1);
+    } catch (error) {
+      console.error("Post-login application initialization retry failed", error);
+      setStartupError("部分学习数据加载失败，请重试。");
+    } finally {
+      setReady(true);
+    }
   }
 
   function protectedElement(element: ReactNode) {
@@ -193,7 +212,7 @@ export default function App() {
   ) : <NotFoundPage onHome={() => navigate("/")} />;
 
   if (!ready) return <main className="atlas-auth-page"><section className="atlas-auth-panel glass-v2"><h2>正在连接 EduFlow…</h2></section></main>;
-  if (startupError) return <main className="atlas-auth-page"><section className="atlas-auth-panel glass-v2"><h2>数据连接失败</h2><p>{startupError}</p></section></main>;
+  if (startupError) return <main className="atlas-auth-page"><section className="atlas-auth-panel glass-v2"><h2>数据连接失败</h2><p>{startupError}</p><button className="atlas-primary" onClick={() => void retryStartup()}>重新加载</button></section></main>;
 
   return (
     <AuthProvider value={{ session, signIn, signUp, logout }}>
