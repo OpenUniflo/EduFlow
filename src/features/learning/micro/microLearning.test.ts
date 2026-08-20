@@ -60,6 +60,11 @@ describe("Micro Learning assessment integrity", () => {
   it("grades every supported interaction by its actual answer semantics", () => {
     expect(isMicroInteractionCorrect({ type: "choice", options: ["wrong", "right"], correctIndex: 1 }, "wrong")).toBe(false);
     expect(isMicroInteractionCorrect({ type: "choice", options: ["wrong", "right"], correctIndex: 1 }, "right")).toBe(true);
+    expect(isMicroInteractionCorrect({ type: "multiple-choice", options: ["a", "b", "c"], correctIndexes: [0, 2] }, [2, 0])).toBe(true);
+    expect(isMicroInteractionCorrect({ type: "multiple-choice", options: ["a", "b", "c"], correctIndexes: [0, 2] }, [0])).toBe(false);
+    expect(isMicroInteractionCorrect({ type: "multiple-choice", options: ["a", "b", "c"], correctIndexes: [0, 2] }, [0, 1, 2])).toBe(false);
+    expect(isMicroInteractionCorrect({ type: "fill-blank", answers: ["Tool Call"] }, " tool call ")).toBe(true);
+    expect(isMicroInteractionCorrect({ type: "fill-blank", answers: ["Tool Call"], caseSensitive: true }, "tool call")).toBe(false);
     expect(isMicroInteractionCorrect({ type: "ordering", items: ["a", "b"], correctOrder: ["a", "b"] }, ["b", "a"])).toBe(false);
     expect(isMicroInteractionCorrect({ type: "ordering", items: ["a", "b"], correctOrder: ["a", "b"] }, ["a", "b"])).toBe(true);
     expect(isMicroInteractionCorrect({ type: "trace", steps: [{ id: "a", label: "A" }, { id: "b", label: "B" }], correctStepId: "b" }, "a")).toBe(false);
@@ -87,5 +92,13 @@ describe("Micro Learning assessment integrity", () => {
   it("does not expose the deferred fake Matching interaction in Golden lessons", () => {
     const demoProvider = readFileSync(join(process.cwd(), "src/demo/learning/demoMicroLearningProvider.ts"), "utf8");
     expect(demoProvider).not.toMatch(/type:\s*["']matching["']/);
+  });
+
+  it("keeps the production Micro composition root database-backed without a Demo fallback", () => {
+    const services = readFileSync(join(process.cwd(), "src/app/services/applicationServices.ts"), "utf8");
+    const runtime = readFileSync(join(process.cwd(), "src/features/learning/micro/ApiMicroLearningRepository.ts"), "utf8");
+    expect(services).toContain("new ApiMicroLearningRepository()");
+    expect(services).not.toContain("demoMicroLearningProvider");
+    expect(runtime).not.toMatch(/(?:@\/demo|src\/demo|demoMicroLearningProvider)/);
   });
 });

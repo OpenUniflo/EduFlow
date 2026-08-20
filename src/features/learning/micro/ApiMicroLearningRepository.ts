@@ -1,5 +1,5 @@
 import { apiRequest } from "@/shared/api/apiClient";
-import type { MicroLearningPath, MicroLearningRepository, MicroLearningAnswer, MicroPathProgress, MicroUnitProgress } from "./microLearning";
+import type { H5PContentDescriptor, MicroLearningPath, MicroLearningRepository, MicroLearningSubmission, MicroPathProgress, MicroUnitProgress } from "./microLearning";
 
 type Payload = { paths: MicroLearningPath[]; pathProgress: MicroPathProgress[]; unitProgress: MicroUnitProgress[] };
 
@@ -38,8 +38,12 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
     this.emit();
   }
 
-  async completeStep(pathId: string, unitId: string, stepId: string, answer?: MicroLearningAnswer) {
-    const result = await apiRequest<{ correct: boolean; completed: boolean; pathProgress?: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "complete-step", pathId, unitId, stepId, answer }) });
+  resolveH5PContent(pathId:string,unitId:string,stepId:string,contentRef:string) {
+    return apiRequest<H5PContentDescriptor>("/api/micro",{method:"POST",body:JSON.stringify({action:"resolve-h5p",pathId,unitId,stepId,contentRef})});
+  }
+
+  async completeStep(pathId: string, unitId: string, stepId: string, submission?: MicroLearningSubmission) {
+    const result = await apiRequest<{ correct: boolean; completed: boolean; pathProgress?: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "complete-step", pathId, unitId, stepId, submission }) });
     if (result.pathProgress) this.pathProgress.set(pathId, result.pathProgress);
     await this.hydrate("");
     return { correct: result.correct, completed: result.completed };

@@ -179,12 +179,34 @@ try {
   assert.ok(micro.body.paths.some((item: any) => item.id === authoredPathId), "published authored Micro must be readable by runtime");
   const agentPath = micro.body.paths.find((item: any) => item.id === "golden-micro-AG01");
   assert.ok(agentPath && agentPath.units.length === 2, "Golden Micro hierarchy must be read from the database");
+  const unpublishedPathId = `verify-unpublished-micro-${suffix}`;
+  const unpublishedUnitId = `${unpublishedPathId}:unit`;
+  const unpublishedStepId = `${unpublishedPathId}:step`;
+  assert.ifError((await server.from("micro_learning_paths").insert({ id: unpublishedPathId, knowledge_id: "AG01", scope: "global", title: "Unpublished verifier path", mode: "learn", estimated_minutes: 1, required: true, status: "draft" })).error);
+  assert.ifError((await server.from("micro_units").insert({ id: unpublishedUnitId, path_id: unpublishedPathId, title: "Unpublished unit", position: 0, estimated_minutes: 1, required: true })).error);
+  assert.ifError((await server.from("micro_steps").insert({ id: unpublishedStepId, unit_id: unpublishedUnitId, position: 0, kind: "interaction", title: "Unpublished H5P", content: "Verifier-only unpublished content", interaction: { type: "h5p", contentRef: "golden-h5p-agent-fill-blanks", adapter: "h5p-standalone", completionPolicy: "passed" } })).error);
+  assertStatus(await invoke(microHandler, "POST", adminUser.token, { action: "start", pathId: unpublishedPathId }), 404, "unpublished Micro start denial");
+  assertStatus(await invoke(microHandler, "POST", adminUser.token, { action: "resolve-h5p", pathId: unpublishedPathId, unitId: unpublishedUnitId, stepId: unpublishedStepId, contentRef: "golden-h5p-agent-fill-blanks" }), 404, "unpublished H5P resolution denial");
+  assert.ifError((await server.from("micro_learning_paths").delete().eq("id", unpublishedPathId)).error);
+  const submissionFor = (step:any,eventSuffix:string) => {
+    const interaction=step.interaction;if(!interaction)return undefined;
+    if(interaction.type==="choice")return interaction.options[interaction.correctIndex];
+    if(interaction.type==="multiple-choice")return interaction.correctIndexes;
+    if(interaction.type==="fill-blank")return interaction.answers[0];
+    if(interaction.type==="trace")return interaction.correctStepId;
+    if(interaction.type==="ordering"||interaction.type==="mini-workflow")return interaction.correctOrder;
+    return {kind:"h5p-result",contentRef:interaction.contentRef,eventId:`verify:${eventSuffix}:${step.id}`,result:{completed:true,success:true,score:1,maxScore:1}};
+  };
   assertStatus(await invoke(microHandler, "POST", adminUser.token, { action: "start", pathId: agentPath.id }), 200, "Micro start");
-  const firstUnit = agentPath.units[0]; const secondUnit = agentPath.units[1];
-  const first = await invoke(microHandler, "POST", adminUser.token, { action: "complete-step", pathId: agentPath.id, unitId: firstUnit.id, stepId: firstUnit.steps[0].id, answer: "先明确目标与可验证边界" });
-  assertStatus(first, 200, "Micro deterministic choice"); assert.equal(first.body.correct, true);
-  const second = await invoke(microHandler, "POST", adminUser.token, { action: "complete-step", pathId: agentPath.id, unitId: secondUnit.id, stepId: secondUnit.steps[0].id, answer: ["Candidate", "Verifier", "Atomic Settle", "Cancel Remaining"] });
-  assertStatus(second, 200, "Micro deterministic workflow order"); assert.equal(second.body.completed, true);
+  const h5pStep=agentPath.units.flatMap((unit:any)=>unit.steps).find((step:any)=>step.interaction?.type==="h5p"),h5pUnit=agentPath.units.find((unit:any)=>unit.steps.some((step:any)=>step.id===h5pStep.id));
+  assertStatus(await invoke(microHandler,"POST",adminUser.token,{action:"resolve-h5p",pathId:agentPath.id,unitId:h5pUnit.id,stepId:h5pStep.id,contentRef:h5pStep.interaction.contentRef}),200,"H5P content load");
+  assertStatus(await invoke(microHandler,"POST",adminUser.token,{action:"resolve-h5p",pathId:agentPath.id,unitId:h5pUnit.id,stepId:h5pStep.id,contentRef:"wrong-content"}),404,"wrong H5P contentRef rejection");
+  const incomplete=await invoke(microHandler,"POST",adminUser.token,{action:"complete-step",pathId:agentPath.id,unitId:h5pUnit.id,stepId:h5pStep.id,submission:{kind:"h5p-result",contentRef:h5pStep.interaction.contentRef,eventId:"verify:incomplete",result:{completed:false,success:false}}});assertStatus(incomplete,200,"incomplete H5P result");assert.equal(incomplete.body.correct,false);
+  assertStatus(await invoke(microHandler,"POST",adminUser.token,{action:"complete-step",pathId:agentPath.id,unitId:h5pUnit.id,stepId:h5pStep.id,submission:{kind:"h5p-result",contentRef:"wrong-content",eventId:"verify:wrong",result:{completed:true,success:true}}}),400,"unrelated H5P completion rejection");
+  let completedResult:any;for(const unit of agentPath.units)for(const step of unit.steps){completedResult=await invoke(microHandler,"POST",adminUser.token,{action:"complete-step",pathId:agentPath.id,unitId:unit.id,stepId:step.id,submission:submissionFor(step,"admin")});assertStatus(completedResult,200,`Micro Step ${step.id}`);assert.equal(completedResult.body.correct,true);}
+  assert.equal(completedResult.body.completed,true,"Golden Agent Micro completes after all Native and H5P Steps");
+  assertStatus(await invoke(microHandler,"POST",adminUser.token,{action:"complete-step",pathId:agentPath.id,unitId:h5pUnit.id,stepId:h5pStep.id,submission:submissionFor(h5pStep,"admin")}),200,"duplicate H5P completion is idempotent");
+  const evidenceCount=await server.from("knowledge_evidence").select("id",{count:"exact",head:true}).eq("user_id",adminUser.user.id).eq("event_type","micro_path_completed").eq("source_entity_id",agentPath.id);assert.ifError(evidenceCount.error);assert.equal(evidenceCount.count,1,"duplicate H5P completion must not duplicate Evidence");
   const startedKnowledge = await invoke(progressHandler, "GET", adminUser.token);
   assertStatus(startedKnowledge, 200, "Learning state after Micro");
   assert.equal(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.status, "learned");
@@ -211,10 +233,8 @@ try {
   assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: authoredAssignmentId }), 200, "second required Assignment submission");
   assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "accept-assignment", courseId: "agentic-ai-golden", assignmentId: authoredAssignmentId, learnerUserId: ordinaryUser.user.id }), 200, "second required Assignment acceptance");
   assertStatus(await invoke(microHandler, "POST", ordinaryUser.token, { action: "start", pathId: agentPath.id }), 200, "accepted-before-Micro learner start");
-  const reverseFirst = await invoke(microHandler, "POST", ordinaryUser.token, { action: "complete-step", pathId: agentPath.id, unitId: firstUnit.id, stepId: firstUnit.steps[0].id, answer: "先明确目标与可验证边界" });
-  assertStatus(reverseFirst, 200, "accepted-before-Micro first step"); assert.equal(reverseFirst.body.correct, true);
-  const reverseSecond = await invoke(microHandler, "POST", ordinaryUser.token, { action: "complete-step", pathId: agentPath.id, unitId: secondUnit.id, stepId: secondUnit.steps[0].id, answer: ["Candidate", "Verifier", "Atomic Settle", "Cancel Remaining"] });
-  assertStatus(reverseSecond, 200, "accepted-before-Micro completion"); assert.equal(reverseSecond.body.completed, true);
+  let reverseResult:any;for(const unit of agentPath.units)for(const step of unit.steps){reverseResult=await invoke(microHandler,"POST",ordinaryUser.token,{action:"complete-step",pathId:agentPath.id,unitId:unit.id,stepId:step.id,submission:submissionFor(step,"learner")});assertStatus(reverseResult,200,`accepted-before-Micro ${step.id}`);assert.equal(reverseResult.body.correct,true);}
+  assert.equal(reverseResult.body.completed,true,"accepted-before-Micro completion");
   assertStatus(await invoke(microHandler, "POST", ordinaryUser.token, { action: "start", pathId: authoredPathId }), 200, "second required Micro start");
   const authoredMicroComplete = await invoke(microHandler, "POST", ordinaryUser.token, { action: "complete-step", pathId: authoredPathId, unitId: authoredPath.units[0].id, stepId: authoredPath.units[0].steps[0].id, answer: "Verifiable boundary" });
   assertStatus(authoredMicroComplete, 200, "second required Micro completion"); assert.equal(authoredMicroComplete.body.completed, true);

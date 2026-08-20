@@ -14,6 +14,14 @@
 - Runtime Micro content authority is the database; Demo providers are fixtures/adapters only.
 - Physical serverless entrypoints SHOULD remain consolidated, and deployment limits MUST be checked before adding a top-level API function.
 
+## Micro Learning Runtime
+
+- Runtime Micro content authority is the database; Demo fixtures and providers MUST NOT become a Production fallback. Golden demo content MUST use the same persistence and API path as ordinary product content.
+- H5P is a `MicroStep` interaction adapter, never a parallel learning domain. H5P completion MUST flow through EduFlow Step, Unit, Path, Evidence, and mastery rules.
+- Native and H5P completion MUST NOT bypass mastery or Course-context membership semantics. Micro completion may reach `learned`; it MUST NOT directly manufacture mastery.
+- Published Micro edits SHOULD preserve stable Path, Unit, and Step identities so existing learner progress remains valid.
+- H5P assets MAY be publicly readable when relative asset loading requires it, but privileged write access MUST remain server-only and imported packages MUST pass controlled validation.
+
 ## Frontend Project Structure
 
 - `src/app` owns application assembly, providers, and the `ApplicationServices` composition root.

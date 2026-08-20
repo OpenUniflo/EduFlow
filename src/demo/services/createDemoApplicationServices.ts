@@ -21,7 +21,7 @@ export function createDemoApplicationServices(): ApplicationServices {
     learningProgressRepository: new LocalStorageLearningProgressRepository(demoUserCourseStateSeed),
     microLearningRepository: {
       ...demoMicroLearningProvider,
-      async hydrate() {}, getPath() { return null; }, getPathProgress() { return undefined; }, getUnitProgress() { return undefined; }, async start() {}, async completeStep() { return { correct:false, completed:false }; }, subscribe() { return () => {}; }
+      async hydrate() {}, getPath() { return null; }, getPathProgress() { return undefined; }, getUnitProgress() { return undefined; }, async start() {}, async resolveH5PContent() { throw new Error("Demo H5P unavailable"); }, async completeStep() { return { correct:false, completed:false }; }, subscribe() { return () => {}; }
     },
     learnerStateService: { startKnowledge: async () => ({ status:"learning" }), startAssignment: async () => ({ status:"started" }), submitAssignment: async () => ({ status:"submitted", accepted:false }) } as never,
     courseAuthoringDraftRepository: { getDraft: async () => ({ draft: null, baseMicroPaths: [] }), saveDraft: async () => ({ revision: 1, updatedAt: new Date(0).toISOString() }), publish: async () => ({ revision: "demo" }) },

@@ -4,21 +4,14 @@ import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 import { dataOrThrow } from "../_lib/query.js";
 import { recomputeMastery } from "../_lib/mastery.js";
 import { activateCourse, requireCourseKnowledge } from "../_lib/courseMembership.js";
+import { h5pCompletionPasses, nativeInteractionCorrect, parseH5PCompletion, type NativeAnswer } from "../_lib/microInteraction.js";
 
 type Row = Record<string, unknown>;
-type Answer = string | string[] | undefined;
 const value = (row: Row, field: string) => row[field];
 const text = (row: Row, field: string) => String(value(row, field));
 const optionalText = (row: Row, field: string) => value(row, field) == null ? undefined : String(value(row, field));
 
-function interactionCorrect(interaction: unknown, answer: Answer) {
-  if (!interaction || typeof interaction !== "object" || Array.isArray(interaction)) return true;
-  const item = interaction as Record<string, unknown>;
-  if (item.type === "choice") return answer === (item.options as unknown[] | undefined)?.[Number(item.correctIndex)];
-  if (item.type === "trace") return answer === item.correctStepId;
-  if (item.type === "ordering" || item.type === "mini-workflow") return Array.isArray(answer) && Array.isArray(item.correctOrder) && answer.join("|") === item.correctOrder.join("|");
-  return false; // h5p and unknown interaction types require an installed adapter.
-}
+const object = (candidate: unknown): Record<string, unknown> | null => candidate && typeof candidate === "object" && !Array.isArray(candidate) ? candidate as Record<string, unknown> : null;
 
 function mapProgress(row: Row) {
   return { pathId: text(row, "path_id"), status: text(row, "status"), currentUnitId: optionalText(row, "current_unit_id"), currentStepId: optionalText(row, "current_step_id"), startedAt: optionalText(row, "started_at"), completedAt: optionalText(row, "completed_at"), updatedAt: text(row, "updated_at") };
@@ -53,12 +46,37 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     return;
   }
   if (request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
-  const body = request.body as { action?: string; pathId?: string; unitId?: string; stepId?: string; answer?: Answer; contextCourseId?: string };
-  if (!body.pathId || !body.action) throw new ApiError(400, "invalid_micro_action", "pathId and action are required");
+  const body = request.body as { action?: string; pathId?: string; unitId?: string; stepId?: string; submission?: unknown; answer?: NativeAnswer; contentRef?: string; contextCourseId?: string };
+  if (!body.action) throw new ApiError(400, "invalid_micro_action", "action is required");
+  if(body.action==="resolve-h5p-content") {
+    if(!body.contentRef)throw new ApiError(400,"invalid_h5p_request","contentRef is required");
+    const contentResult=await client.from("h5p_contents").select("*").eq("id",body.contentRef).eq("status","published").maybeSingle();const content=dataOrThrow(contentResult.data as Row|null,contentResult.error,"H5P authoring content lookup");
+    if(!content)throw new ApiError(404,"h5p_content_unavailable","H5P content is unavailable");const {data:publicAsset}=client.storage.from("micro-h5p").getPublicUrl(text(content,"storage_path"));
+    json(response,200,{id:text(content,"id"),title:text(content,"title"),contentType:text(content,"content_type"),libraryName:text(content,"library_name"),libraryVersion:`${text(content,"library_major")}.${text(content,"library_minor")}`,contentUrl:publicAsset.publicUrl,completionPolicy:text(content,"completion_policy")});return;
+  }
+  if (!body.pathId) throw new ApiError(400, "invalid_micro_action", "pathId is required");
   const pathResult = await client.from("micro_learning_paths").select("*").eq("id", body.pathId).eq("status", "published").maybeSingle();
   const path = dataOrThrow(pathResult.data as Row | null, pathResult.error, "Micro path lookup");
   if (!path) throw new ApiError(404, "micro_path_not_found", "Micro Learning path is unavailable");
   const now = new Date().toISOString();
+  if (body.action === "resolve-h5p") {
+    if (!body.unitId || !body.stepId || !body.contentRef) throw new ApiError(400, "invalid_h5p_request", "H5P step identity and contentRef are required");
+    const [unitLookup, stepLookup, contentLookup] = await Promise.all([
+      client.from("micro_units").select("id").eq("id", body.unitId).eq("path_id", body.pathId).maybeSingle(),
+      client.from("micro_steps").select("interaction").eq("id", body.stepId).eq("unit_id", body.unitId).maybeSingle(),
+      client.from("h5p_contents").select("*").eq("id", body.contentRef).eq("status", "published").maybeSingle()
+    ]);
+    const unit = dataOrThrow(unitLookup.data as Row | null, unitLookup.error, "H5P unit lookup");
+    const step = dataOrThrow(stepLookup.data as Row | null, stepLookup.error, "H5P step lookup");
+    const content = dataOrThrow(contentLookup.data as Row | null, contentLookup.error, "H5P content lookup");
+    const interaction = object(step?.interaction);
+    if (!unit || !step || interaction?.type !== "h5p" || interaction.contentRef !== body.contentRef) throw new ApiError(404, "h5p_step_not_found", "H5P content is not attached to this Micro step");
+    if (!content) throw new ApiError(404, "h5p_content_unavailable", "H5P content is unavailable");
+    const storagePath = text(content, "storage_path");
+    const { data: publicAsset } = client.storage.from("micro-h5p").getPublicUrl(storagePath);
+    json(response, 200, { id: text(content,"id"), title: text(content,"title"), contentType: text(content,"content_type"), libraryName: text(content,"library_name"), libraryVersion: `${text(content,"library_major")}.${text(content,"library_minor")}`, contentUrl: publicAsset.publicUrl, completionPolicy: text(content,"completion_policy") });
+    return;
+  }
   if (body.action === "start") {
     const pathCourseId = optionalText(path, "course_id");
     if (body.contextCourseId) {
@@ -95,7 +113,18 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const unit = dataOrThrow(unitResult.data as Row | null, unitResult.error, "Micro unit lookup");
   const step = dataOrThrow(stepResult.data as Row | null, stepResult.error, "Micro step lookup");
   if (!unit || !step) throw new ApiError(404, "micro_step_not_found", "Micro step is unavailable");
-  if (!interactionCorrect(value(step, "interaction"), body.answer)) { json(response, 200, { correct: false, completed: false }); return; }
+  const interaction = object(value(step, "interaction"));
+  if (interaction?.type === "h5p") {
+    const completion = parseH5PCompletion(body.submission);
+    if (!completion) throw new ApiError(400, "invalid_h5p_completion", "H5P completion payload is invalid");
+    if (completion.contentRef !== interaction.contentRef) throw new ApiError(400, "h5p_content_mismatch", "H5P completion does not match this Micro step");
+    const contentResult = await client.from("h5p_contents").select("id,completion_policy").eq("id", completion.contentRef).eq("status", "published").maybeSingle();
+    const content = dataOrThrow(contentResult.data as Row | null, contentResult.error, "H5P completion content lookup");
+    if (!content) throw new ApiError(404, "h5p_content_unavailable", "H5P content is unavailable");
+    const policy = (interaction.completionPolicy ?? value(content,"completion_policy")) as "completed"|"passed";
+    if (interaction.completionPolicy && interaction.completionPolicy !== value(content,"completion_policy")) throw new ApiError(409, "h5p_policy_mismatch", "H5P completion policy does not match published content");
+    if (!h5pCompletionPasses(completion,policy)) { json(response, 200, { correct: false, completed: false }); return; }
+  } else if (!nativeInteractionCorrect(interaction, body.submission === undefined ? body.answer : body.submission as NativeAnswer)) { json(response, 200, { correct: false, completed: false }); return; }
   const allSteps = dataOrThrow(allStepsResult.data as Row[] | null, allStepsResult.error, "Micro unit steps lookup");
   const existingResult = await client.from("user_micro_unit_progress").select("*").eq("user_id", user.id).eq("unit_id", body.unitId).maybeSingle();
   const existing = dataOrThrow(existingResult.data as Row | null, existingResult.error, "Micro unit progress lookup");

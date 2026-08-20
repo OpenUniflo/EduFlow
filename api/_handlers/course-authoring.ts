@@ -49,6 +49,20 @@ function assertDraftShape(courseId: string, state: unknown, previewRuntime: unkn
   if (!String(preview.course?.targetOutcome ?? "").trim()) throw new ApiError(400, "course_target_outcome_required", "A Course target outcome is required before publishing");
 }
 
+async function assertPublishedH5PReferences(server:ReturnType<typeof createServerSupabase>,courseId:string) {
+  const result=await server.from("course_authoring_drafts").select("payload").eq("course_id",courseId).maybeSingle();
+  const row=dataOrThrow(result.data as Row|null,result.error,"Authoring H5P draft lookup"); const payload=row?.payload as Record<string,unknown>|undefined; const state=payload?.state as Record<string,unknown>|undefined;
+  if(state?.microPathsEdited!==true)return;
+  const refs=new Set<string>();
+  for(const path of Array.isArray(state.microPaths)?state.microPaths:[])for(const unit of Array.isArray((path as Row).units)?(path as Row).units as unknown[]:[])for(const step of Array.isArray((unit as Row).steps)?(unit as Row).steps as unknown[]:[]) {
+    const interaction=(step as Row).interaction as Row|undefined;if(interaction?.type==="h5p"&&typeof interaction.contentRef==="string")refs.add(interaction.contentRef);
+  }
+  if(!refs.size)return;
+  const contents=await server.from("h5p_contents").select("id").in("id",[...refs]).eq("status","published");
+  const rows=dataOrThrow(contents.data as Row[]|null,contents.error,"Authoring H5P references lookup"); const found=new Set(rows.map((item)=>text(item,"id")));
+  const missing=[...refs].filter((id)=>!found.has(id));if(missing.length)throw new ApiError(422,"h5p_content_unavailable",`Published H5P content is unavailable: ${missing.join(", ")}`);
+}
+
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   const courseId = typeof request.query.courseId === "string" ? request.query.courseId : undefined;
   if (!courseId) throw new ApiError(400, "course_id_required", "courseId is required");
@@ -92,6 +106,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   if (request.method === "POST") {
     const expectedRevision = Number((request.body as { expectedRevision?: unknown }).expectedRevision);
     if (!Number.isInteger(expectedRevision) || expectedRevision < 1) throw new ApiError(400, "invalid_authoring_revision", "A saved draft revision is required");
+    await assertPublishedH5PReferences(server,courseId);
     const result = await server.rpc("publish_course_authoring_draft", { p_course_id: courseId, p_expected_revision: expectedRevision });
     const rows = rpcRows(result, "Course publish");
     if (!rows[0]) throw new ApiError(500, "course_publish_failed", "Course was not published");

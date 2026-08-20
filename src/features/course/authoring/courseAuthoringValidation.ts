@@ -2,6 +2,7 @@ import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime"
 import type { KnowledgeGraph } from "@/features/knowledge/types";
 import { selectPrimaryCurriculumCoverage } from "@/features/course/curriculum/curriculumOrdering";
 import { applyCourseAuthoringDraft, createEditableKnowledgeGraph, type CourseAuthoringDraftState } from "./courseAuthoringDraft";
+import { validateMicroInteraction } from "@/features/learning/micro/microLearning";
 
 export type AuthoringValidationIssue = { code: string; message: string };
 export type CourseAuthoringValidation = {
@@ -123,7 +124,7 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
       if (unit.required && !unit.steps.length) fatal.push({ code: "required-micro-unit-without-step", message: `必修 Unit ${unit.title} 至少需要一个 Step。` });
       unit.steps.forEach((step) => {
         if (!step.title.trim() || !step.body.trim()) fatal.push({ code: "invalid-micro-step", message: `Micro Step 必须包含标题和内容。` });
-        if (step.interaction?.type === "choice" && (!step.interaction.options.length || step.interaction.correctIndex < 0 || step.interaction.correctIndex >= step.interaction.options.length)) fatal.push({ code: "invalid-micro-choice", message: `Choice Step ${step.title} 缺少有效答案。` });
+        if (step.interaction) validateMicroInteraction(step.interaction).forEach((message) => fatal.push({ code: "invalid-micro-interaction", message: `${step.title}：${message}` }));
       });
     });
     });

@@ -35,6 +35,8 @@
     "db:reset": "supabase db reset --local && supabase seed buckets",
     "db:seed:generate": "tsx scripts/generate-supabase-seed.ts",
     "db:seed:storage": "tsx --env-file=.env.local scripts/seed-storage.ts",
+    "h5p:import": "tsx --env-file=.env.local scripts/import-h5p.ts",
+    "h5p:build-golden": "tsx scripts/build-golden-h5p.ts",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
@@ -46,6 +48,7 @@
     "@vitejs/plugin-react": "^5.1.0",
     "@xyflow/react": "^12.10.2",
     "elkjs": "^0.12.0",
+    "h5p-standalone": "3.8.2",
     "lucide-react": "^0.468.0",
     "pdfjs-dist": "^6.2.108",
     "react": "^19.2.0",
@@ -63,6 +66,7 @@
     "@types/three": "^0.185.4",
     "@vercel/node": "5.9.9",
     "eslint": "^10.8.0",
+    "fflate": "0.8.2",
     "supabase": "2.113.0",
     "tsx": "4.23.12",
     "typescript-eslint": "^8.66.0",

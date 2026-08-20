@@ -6837,3 +6837,53 @@ body {
   .learning-knowledge-card { transition: none; }
   .learning-knowledge-card.side:has(~ .active),.learning-knowledge-card.active~.learning-knowledge-card.side { transform: none; }
 }
+
+/* Micro Interactive Runtime */
+body:has(.micro-learning-page) { min-width: 0; overflow: auto; }
+.micro-learning-page { overflow-y: auto; }
+.micro-learning-stage { min-height: 100vh; height: auto; }
+.micro-card { animation: micro-step-enter .22s ease-out; }
+@keyframes micro-step-enter { from { opacity: 0; transform: translateX(18px) scale(.99); } to { opacity: 1; transform: none; } }
+.micro-interaction.multiple-choice button>span { border: 1px solid #d5dbe5; }
+.micro-interaction.multiple-choice button.selected>span { color: #fff; background: #5369d5; }
+.micro-fill-blank { display: grid; gap: 7px; margin-top: 26px; color: #596476; font-size: 12px; }
+.micro-fill-blank input { min-height: 46px; padding: 0 14px; border: 1px solid #dfe2e6; border-radius: 10px; color: #20242b; background: #fff; font: inherit; }
+.micro-fill-blank input:focus-visible,.micro-reorder button:focus-visible,.micro-workflow-accessible button:focus-visible { outline: 2px solid #5264c8; outline-offset: 2px; }
+.micro-reorder { display: grid; gap: 8px; margin-top: 24px; }
+.micro-reorder>div { display: grid; grid-template-columns: auto 26px minmax(0,1fr) auto auto; gap: 8px; align-items: center; min-height: 48px; padding: 7px 9px; border: 1px solid #dfe3e9; border-radius: 11px; background: #fff; transition: border-color .15s,transform .15s; }
+.micro-reorder>div.dragging { z-index: 2; border-color: #6f7ed5; transform: scale(1.01); box-shadow: 0 8px 20px rgba(55,66,104,.12); }
+.micro-reorder>div>span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 7px; color: #5f6980; background: #f0f2f6; font-size: 10px; }
+.micro-reorder button { display: grid; width: 30px; height: 30px; place-items: center; padding: 0; border: 1px solid #e1e4e8; border-radius: 8px; background: #fff; }
+.micro-reorder .micro-drag-handle { touch-action: none; cursor: grab; }
+.micro-mini-workflow { display: grid; gap: 12px; margin-top: 22px; }
+.micro-workflow-canvas { width: 100%; height: 250px; overflow: hidden; border: 1px solid #dfe3e9; border-radius: 14px; background: #f8fafc; }
+.micro-workflow-accessible { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.micro-workflow-accessible li { display: flex; gap: 6px; align-items: center; min-width: 0; padding: 6px 8px; border: 1px solid #e0e4ea; border-radius: 9px; background: #fff; }
+.micro-workflow-accessible li>span { color: #687487; font-size: 10px; }
+.micro-workflow-accessible li>strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; }
+.micro-workflow-accessible button { width: 25px; height: 25px; padding: 0; border: 1px solid #e0e4ea; border-radius: 6px; background: #f8f9fb; }
+.micro-h5p-shell { min-height: 220px; margin-top: 22px; }
+.micro-h5p-host { width: 100%; min-height: 220px; overflow: hidden; border: 1px solid #e0e4ea; border-radius: 14px; background: #fff; }
+.micro-h5p-host iframe { min-height: 320px; }
+.micro-h5p-loading { margin-top: 24px; color: #717b8a; }
+.micro-feedback.retry { display: grid; gap: 7px; }
+.micro-feedback.retry button { width: max-content; padding: 7px 10px; border: 1px solid currentColor; border-radius: 8px; color: inherit; background: transparent; }
+.micro-step-success { animation: micro-success .25s ease-out; }
+@keyframes micro-success { 50% { transform: scale(1.008); } }
+
+@media(max-width:620px) {
+  .micro-learning-stage { display: block; padding: 126px 14px 42px; }
+  .micro-progress,.micro-card { width: 100%; }
+  .micro-card { padding: 20px 0; }
+  .micro-card h1 { font-size: 26px; }
+  .micro-card>footer { position: sticky; bottom: 0; padding: 14px 0; background: linear-gradient(180deg,rgba(251,251,252,0),#fbfbfc 22%); }
+  .micro-reorder>div { grid-template-columns: auto 24px minmax(0,1fr) auto auto; padding: 6px; }
+  .micro-workflow-canvas { height: 220px; }
+  .micro-workflow-accessible { display: grid; grid-template-columns: 1fr; }
+  .micro-workflow-accessible li>strong { flex: 1; }
+  .micro-h5p-host iframe { min-height: 400px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .micro-card,.micro-step-success { animation: none; }
+  .micro-progress i,.micro-reorder>div { transition: none; }
+}
