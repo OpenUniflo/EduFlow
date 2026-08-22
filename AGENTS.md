@@ -6,6 +6,22 @@
 - `package-lock.json`, `yarn.lock`, and other competing lockfiles MUST NOT be committed.
 - Before pushing dependency changes, `pnpm install --frozen-lockfile` MUST succeed.
 
+## Hosted Deployment Discipline
+
+- A READY frontend deployment does not imply that its target Hosted Supabase schema matches repository migrations.
+- Before Hosted Preview acceptance, identify the environment's Supabase project, compare migration history, apply pending migrations incrementally, synchronize only hosted-safe required fixtures, and smoke authenticated APIs before browser validation.
+- Shared Hosted databases MUST NOT be reset or migrated automatically by every Preview build.
+- Runtime Micro content authority is the database; Demo providers are fixtures/adapters only.
+- Physical serverless entrypoints SHOULD remain consolidated, and deployment limits MUST be checked before adding a top-level API function.
+
+## Micro Learning Runtime
+
+- Runtime Micro content authority is the database; Demo fixtures and providers MUST NOT become a Production fallback. Golden demo content MUST use the same persistence and API path as ordinary product content.
+- H5P is a `MicroStep` interaction adapter, never a parallel learning domain. H5P completion MUST flow through EduFlow Step, Unit, Path, Evidence, and mastery rules.
+- Native and H5P completion MUST NOT bypass mastery or Course-context membership semantics. Micro completion may reach `learned`; it MUST NOT directly manufacture mastery.
+- Published Micro edits SHOULD preserve stable Path, Unit, and Step identities so existing learner progress remains valid.
+- H5P assets MAY be publicly readable when relative asset loading requires it, but privileged write access MUST remain server-only and imported packages MUST pass controlled validation.
+
 ## Frontend Project Structure
 
 - `src/app` owns application assembly, providers, and the `ApplicationServices` composition root.
@@ -138,6 +154,21 @@
 ## Course Presentation Stability
 
 - 技能树 / 实训树 switching is presentation-only.
+
+## Learner Course Membership and Context
+
+- A Published Course is platform-available; it is not automatically a learner's Course. `UserCourseState.isActive` is the durable My Courses membership signal, and client projection placeholders MUST be inactive.
+- The first Course-scoped Start Knowledge, Micro, Material, or Assignment action activates that Course. Browsing a Course, opening a Drawer, or switching Knowledge context MUST NOT activate it; Standalone Global Micro MUST NOT activate any Course.
+- Removing a Course changes only membership and MUST preserve Knowledge state, evidence, Micro progress, Material progress, and Assignment state. A later Course-scoped learning action may reactivate it.
+- Learner Knowledge context options include Standalone plus Published Courses covering that Knowledge. Context switching is presentation-only and MUST NOT mutate learner state.
+- Standalone exposes only Global Micro. A Course context resolves its own Micro before Global fallback, and exposes only that Course's Materials and Assignments. Using Global Micro inside an explicit Course context remains a Course-scoped learning action.
+
+## Course Authoring Drafts
+
+- Persisted Course authoring drafts are server-side, teacher/admin-only, and are never learner-visible.
+- Editing a published Course changes only its draft projection until validated Publish succeeds.
+- Preview is derived from the published base plus the current persisted authoring draft; browser localStorage is not authoring content authority.
+- Publish must materialize the validated draft transactionally into canonical Course data and clear the applied draft.
 - Chapter and Atomic nodes MUST use a consistent Knowledge / Assignment companion visual language.
 - Mode switching MUST NOT trigger ELK, fitView, coordinate changes, edge changes, or viewport reset.
 
@@ -381,6 +412,46 @@
 - Knowledge presentation MUST use UserKnowledgeState evidence; it MUST NOT display Assignment completion as Knowledge mastery.
 - UserMaterialState reading position and reading coverage are separate concepts.
 - Opening or reading a Material MUST update its Lesson as the user's recent Lesson through LearningProgressRepository, never through direct local-storage writes.
+
+## Learning Experience Ordering
+
+- Course instructional order is the learning-path backbone; factual prerequisite edges determine new-learning eligibility; explicit UserKnowledgeState determines Learn or Continue presentation.
+- Today Queue and Micro Learning entry order MUST use canonical curriculum ordering. IDs, fixture-array order, graph coordinates, Assignment completion, and Material progress MUST NOT determine Knowledge mastery or new-learning order.
+- Without reliable review-due data, the product MUST NOT present spaced-repetition due claims. Prototype Micro Learning completion is learning activity, not mastery evidence.
+
+## Unified EduFlow Assistant
+
+- The product has one user-visible EduFlow Assistant identity and shell language. Workspace, experience mode, active context, role, and capabilities determine available actions; Feature-specific providers may remain behind adapters.
+- Assistant mutation requires both Design Mode and the existing capability checks. Proposal preview, deterministic validation, Apply, and Undo MUST NOT be bypassed by the unified shell.
+- Learn and Explore Assistant actions may explain, recommend, focus, or start supported experiences, but MUST NOT expose curriculum, material, publication, or Domain mutation without the corresponding authority and validation path.
+
+## Product Chrome
+
+- GlobalNav is the single primary top-level chrome. A page title, contextual control, or workspace tool MUST NOT introduce a second full-width fixed header.
+- Content and management pages use headings in normal document flow; graph, canvas, and reader pages use only lightweight contextual overlays so their primary workspace remains dominant.
+- Micro Learning is interaction-first. Assistant help may be contextual, but product chrome and Assistant actions MUST NOT visually or behaviorally dominate the assessment.
+
+## Micro Learning Assessment Integrity
+
+- Assistant hints and explanations MUST NOT mutate MicroStep answers, grading feedback, Step completion, or Lesson completion, and Assistant actions MUST NOT bypass interaction validation.
+- `MicroLearningPath -> MicroUnit -> MicroStep` is the canonical Micro Learning hierarchy. A legacy MicroLesson/provider may exist only as a demo/test adapter and is never runtime authority.
+- Required Unit completion and resume state MUST be persisted. A completed required Learn Path creates learning evidence and may reach `learned`; it MUST NOT itself claim `mastered`.
+- A Quick Learn CTA MUST be executable only for a published, repository-loaded MicroLearningPath in the Knowledge and Course context. Unsupported and unadapted H5P content MUST render a visible fallback rather than a blank experience.
+
+## Learner State, Evidence, and Assignment Lifecycle
+
+- Durable `UserKnowledgeState` values are `explore`, `learning`, `learned`, `practicing`, and `mastered`. State transitions are monotonic and belong to a centralized policy/application action, never an individual React component.
+- Assignment lifecycle is `not_started -> started -> submitted -> accepted` (with optional `needs_revision`). Submission is not acceptance and neither submission nor course completion is Knowledge mastery.
+- KnowledgeEvidence is user-owned, source-identified, and idempotent. Supported MVP evidence is completed Micro paths, accepted Assignments, and passed Workflows.
+- Mastery requires a completed required Learn Path plus every explicitly required Assignment accepted. A Knowledge without an explicit required Assignment remains `learned` after its required Learn Path.
+- Course progress and UserKnowledgeState are separate projections. PersonalLearningPlan is removed; systematic multi-Knowledge learning belongs to a Course, while MicroLearningPath is a within-Knowledge experience.
+
+## Learner Entry and Today Invariants
+
+- Today is a quick-access projection of active `learning`, `learned`, and `practicing` Knowledge. It MUST NOT add Course candidates, imply curriculum or prerequisite order, or include `explore` or `mastered` Knowledge.
+- Carousel selection and Course navigation are presentation-only. Micro and Material entry first raise the Knowledge to at least `learning`; Assignment entry raises covered Knowledge to at least `practicing`; no weaker action may downgrade state.
+- A Course-specific required Learn Path takes precedence. A published Global required Learn Path is the fallback only when that Course has no matching required Learn Path; Course and Global paths MUST NOT become simultaneous mastery requirements.
+- Standalone Knowledge may use Global Micro but has no Global Material or Global Assignment in the MVP. Starting Knowledge does not require Micro, and Material completion does not infer `learned`; without a required Learn Path the learner may remain `learning` or advance through explicit practice.
 
 ## Knowledge Source Invariants
 

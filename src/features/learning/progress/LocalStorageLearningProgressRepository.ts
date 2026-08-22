@@ -2,7 +2,7 @@ import type { UserAssignmentState, UserCourseState, UserMaterialState } from "@/
 import type { LearningProgressRepository, UserCourseStateFactory } from "./LearningProgressRepository";
 
 const PREFIX = "eduflow:v2:user-course";
-export const LEARNING_PROGRESS_SCHEMA_VERSION = 1;
+export const LEARNING_PROGRESS_SCHEMA_VERSION = 2;
 
 export type PersistedUserCourseStateEnvelope = {
   schemaVersion: typeof LEARNING_PROGRESS_SCHEMA_VERSION;
@@ -29,6 +29,7 @@ export function isValidUserCourseState(value: unknown, expectedUserId?: string, 
   if (!isRecord(value)
     || typeof value.userId !== "string"
     || typeof value.courseId !== "string"
+    || typeof value.isActive !== "boolean"
     || typeof value.updatedAt !== "string"
     || !isRecord(value.assignmentStates)
     || !isRecord(value.materialStates)
@@ -52,6 +53,14 @@ export function isValidUserCourseState(value: unknown, expectedUserId?: string, 
 
 export function migrateLearningProgress(raw: unknown, userId: string, courseId: string): UserCourseState | null {
   if (isRecord(raw) && raw.schemaVersion === LEARNING_PROGRESS_SCHEMA_VERSION && isValidUserCourseState(raw.state, userId, courseId)) return raw.state;
+  if (isRecord(raw) && raw.schemaVersion === 1 && isRecord(raw.state)) {
+    const migrated = { ...raw.state, isActive: true };
+    return isValidUserCourseState(migrated, userId, courseId) ? migrated : null;
+  }
+  if (isRecord(raw) && !("isActive" in raw)) {
+    const migrated = { ...raw, isActive: true };
+    return isValidUserCourseState(migrated, userId, courseId) ? migrated : null;
+  }
   if (isValidUserCourseState(raw, userId, courseId)) return raw;
   return null;
 }
@@ -109,13 +118,13 @@ export class LocalStorageLearningProgressRepository implements LearningProgressR
 
   updateAssignmentState(userId: string, courseId: string, assignmentId: string, state: UserAssignmentState) {
     const current = this.getCourseState(userId, courseId);
-    this.save({ ...current, assignmentStates: { ...current.assignmentStates, [assignmentId]: { ...state, assignmentId } }, updatedAt: new Date().toISOString() });
+    this.save({ ...current, isActive: true, assignmentStates: { ...current.assignmentStates, [assignmentId]: { ...state, assignmentId } }, updatedAt: new Date().toISOString() });
   }
 
   updateMaterialState(userId: string, courseId: string, materialId: string, state: Partial<UserMaterialState>) {
     const current = this.getCourseState(userId, courseId);
     const previous = current.materialStates[materialId] ?? { materialId, updatedAt: new Date().toISOString() };
-    this.save({ ...current, materialStates: { ...current.materialStates, [materialId]: { ...previous, ...state, materialId, updatedAt: state.updatedAt ?? new Date().toISOString() } }, updatedAt: new Date().toISOString() });
+    this.save({ ...current, isActive: true, materialStates: { ...current.materialStates, [materialId]: { ...previous, ...state, materialId, updatedAt: state.updatedAt ?? new Date().toISOString() } }, updatedAt: new Date().toISOString() });
   }
 
   updateMaterialReadingState(userId: string, courseId: string, lessonId: string, materialId: string, state: Partial<UserMaterialState>) {
@@ -124,6 +133,7 @@ export class LocalStorageLearningProgressRepository implements LearningProgressR
     const previous = current.materialStates[materialId] ?? { materialId, updatedAt: now };
     this.save({
       ...current,
+      isActive: true,
       recentLessonId: lessonId,
       materialStates: {
         ...current.materialStates,
@@ -131,6 +141,22 @@ export class LocalStorageLearningProgressRepository implements LearningProgressR
       },
       updatedAt: now
     });
+  }
+
+  async activateCourse(courseId: string) {
+    const current = [...this.cache.values()].find((state) => state.courseId === courseId);
+    if (!current) throw new Error(`Course ${courseId} must be loaded before activation`);
+    const next = { ...current, isActive: true, updatedAt: new Date().toISOString() };
+    this.save(next);
+    return next;
+  }
+
+  async deactivateCourse(courseId: string) {
+    const current = [...this.cache.values()].find((state) => state.courseId === courseId);
+    if (!current) throw new Error(`Course ${courseId} must be loaded before deactivation`);
+    const next = { ...current, isActive: false, updatedAt: new Date().toISOString() };
+    this.save(next);
+    return next;
   }
 
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }

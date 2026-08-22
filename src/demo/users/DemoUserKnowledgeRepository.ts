@@ -9,4 +9,6 @@ export class DemoUserKnowledgeRepository implements UserKnowledgeRepository {
   getUserKnowledge(userId: string) {
     return userId === "student@knowledge-atlas.local" ? demoUserKnowledge.map((record) => ({ ...record })) : SECONDARY_USER_RECORDS.map((record) => ({ ...record }));
   }
+
+  subscribe(_listener: () => void) { return () => {}; }
 }

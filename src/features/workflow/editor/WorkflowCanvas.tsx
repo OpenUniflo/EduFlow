@@ -778,20 +778,20 @@ export function WorkflowAssistant({
   return (
     <section
       className={`workflow-assistant ${open ? "open" : ""}`}
-      aria-label="AI 助手"
+      aria-label="EduFlow Assistant"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
       onFocus={() => setOpen(true)}
       onBlur={handleBlur}
     >
-      <button className="assistant-trigger" aria-label="展开 AI 助手对话框">
+      <button className="assistant-trigger" aria-label="展开 EduFlow Assistant">
         <Sparkles size={22} />
       </button>
 
       <div className="assistant-panel glass">
         <div className="assistant-head">
           <div>
-            <span>AI 助手</span>
+            <span>EduFlow Assistant</span>
             <small>{targetNode ? "节点协作" : "工作流生成"}</small>
           </div>
           <Bot size={20} />

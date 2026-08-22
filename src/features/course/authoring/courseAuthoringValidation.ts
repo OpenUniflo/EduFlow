@@ -2,6 +2,7 @@ import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime"
 import type { KnowledgeGraph } from "@/features/knowledge/types";
 import { selectPrimaryCurriculumCoverage } from "@/features/course/curriculum/curriculumOrdering";
 import { applyCourseAuthoringDraft, createEditableKnowledgeGraph, type CourseAuthoringDraftState } from "./courseAuthoringDraft";
+import { validateMicroInteraction } from "@/features/learning/micro/microLearning";
 
 export type AuthoringValidationIssue = { code: string; message: string };
 export type CourseAuthoringValidation = {
@@ -9,6 +10,13 @@ export type CourseAuthoringValidation = {
   warnings: AuthoringValidationIssue[];
   summary: { chapterCount: number; knowledgeCount: number; assignmentCoveredCount: number; materialCoveredCount: number; candidateCount: number; dagValid: boolean };
 };
+
+const draftCompletenessCodes = new Set(["required-micro-without-unit", "required-micro-unit-without-step"]);
+
+/** Incomplete nested Micro content is saveable as a Draft but remains fatal at Publish. */
+export function isDraftCompletenessIssue(issue: AuthoringValidationIssue) {
+  return draftCompletenessCodes.has(issue.code);
+}
 
 function findCycle(nodeIds: Set<string>, edges: Array<{ source: string; target: string }>) {
   const outgoing = new Map<string, string[]>();
@@ -83,6 +91,12 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
     if (!material || !material.segments.some((segment) => segment.id === coverage.segmentId) || !courseNodeIds.has(coverage.nodeId)) fatal.push({ code: "broken-material-reference", message: `课件关联 ${coverage.id} 存在无效引用。` });
   });
   const assignmentCovered = new Set(editable.assignmentCoverages.map((coverage) => coverage.nodeId));
+  const assignmentIds = new Set(editable.assignments.map((assignment) => assignment.id));
+  editable.assignmentCoverages.forEach((coverage) => {
+    if (!assignmentIds.has(coverage.assignmentId) || !courseNodeIds.has(coverage.nodeId)) fatal.push({ code: "broken-assignment-coverage", message: `Assignment 覆盖 ${coverage.id} 引用了无效 Assignment 或 Knowledge。` });
+  });
+  const assignmentOrders = editable.assignments.map((assignment) => assignment.order);
+  if (new Set(assignmentOrders).size !== assignmentOrders.length) fatal.push({ code: "duplicate-assignment-order", message: "Assignment 顺序必须在课程内唯一。" });
   const materialCovered = new Set(editable.materialKnowledgeCoverages.map((coverage) => coverage.nodeId));
   const missingAssignments = [...courseNodeIds].filter((id) => !assignmentCovered.has(id));
   const missingMaterials = [...courseNodeIds].filter((id) => !materialCovered.has(id));
@@ -94,6 +108,27 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
   const missingOutcomes = editable.chapters.filter((chapter) => !outcomeChapters.has(chapter.id));
   if (missingOutcomes.length) warnings.push({ code: "missing-chapter-outcome", message: `${missingOutcomes.length} 个篇章没有正式 ChapterOutcome。` });
   if (!editable.finalProjects.length) warnings.push({ code: "missing-final-project", message: "课程尚未配置 FinalProject。" });
+  if (state.microPathsEdited) {
+    const requiredLearnContexts = new Set<string>();
+    state.microPaths?.forEach((path) => {
+      if (path.required && path.mode === "learn") {
+        const key = `${path.knowledgeId}:${path.courseId ?? "global"}`;
+        if (requiredLearnContexts.has(key)) fatal.push({ code: "duplicate-required-learn-micro", message: `Knowledge ${path.knowledgeId} 在同一课程上下文最多发布一条必修 Learn Micro Path。` });
+        requiredLearnContexts.add(key);
+      }
+    if (path.scope !== "course" || path.courseId !== runtime.course.id || !courseNodeIds.has(path.knowledgeId)) fatal.push({ code: "invalid-micro-path", message: `Micro Path ${path.title} 必须绑定当前课程中存在的 Knowledge。` });
+    const positions = path.units.map((unit) => unit.position);
+    if (new Set(positions).size !== positions.length || positions.some((position) => position < 0)) fatal.push({ code: "invalid-micro-unit-order", message: `Micro Path ${path.title} 的 Unit 顺序无效。` });
+    if (path.required && !path.units.length) fatal.push({ code: "required-micro-without-unit", message: `必修 Micro Path ${path.title} 至少需要一个 Unit。` });
+    path.units.forEach((unit) => {
+      if (unit.required && !unit.steps.length) fatal.push({ code: "required-micro-unit-without-step", message: `必修 Unit ${unit.title} 至少需要一个 Step。` });
+      unit.steps.forEach((step) => {
+        if (!step.title.trim() || !step.body.trim()) fatal.push({ code: "invalid-micro-step", message: `Micro Step 必须包含标题和内容。` });
+        if (step.interaction) validateMicroInteraction(step.interaction).forEach((message) => fatal.push({ code: "invalid-micro-interaction", message: `${step.title}：${message}` }));
+      });
+    });
+    });
+  }
 
   return { fatal, warnings, summary: { chapterCount: editable.chapters.length, knowledgeCount: courseNodeIds.size, assignmentCoveredCount: assignmentCovered.size, materialCoveredCount: materialCovered.size, candidateCount: candidates.length, dagValid: dagValid && chapterDagValid } };
 }

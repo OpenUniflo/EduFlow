@@ -13,7 +13,7 @@ export class ApiLearningProgressRepository implements LearningProgressRepository
   hydrate(userId: string, courseIds: string[], states: UserCourseState[]) {
     this.states.clear();
     courseIds.forEach((courseId) => this.states.set(courseId, structuredClone(states.find((state) => state.courseId === courseId) ?? {
-      userId, courseId, assignmentStates: {}, materialStates: {}, updatedAt: now()
+      userId, courseId, isActive: false, assignmentStates: {}, materialStates: {}, updatedAt: now()
     })));
     this.emit();
   }
@@ -21,9 +21,17 @@ export class ApiLearningProgressRepository implements LearningProgressRepository
   getCourseState(userId: string, courseId: string) {
     const existing = this.states.get(courseId);
     if (existing) return existing;
-    const initial: UserCourseState = { userId, courseId, assignmentStates: {}, materialStates: {}, updatedAt: now() };
+    const initial: UserCourseState = { userId, courseId, isActive: false, assignmentStates: {}, materialStates: {}, updatedAt: now() };
     this.states.set(courseId, initial);
     return initial;
+  }
+
+  async activateCourse(courseId: string) {
+    return this.setMembership(courseId, "activate-course");
+  }
+
+  async deactivateCourse(courseId: string) {
+    return this.setMembership(courseId, "deactivate-course");
   }
 
   updateAssignmentState(userId: string, courseId: string, assignmentId: string, assignment: UserAssignmentState) {
@@ -53,9 +61,19 @@ export class ApiLearningProgressRepository implements LearningProgressRepository
   }
 
   private persist(state: UserCourseState) {
-    this.states.set(state.courseId, structuredClone(state));
-    this.writes.enqueue(() => apiRequest("/api/progress", { method: "PUT", body: JSON.stringify(state) }));
+    const activeState = { ...state, isActive: true };
+    this.states.set(state.courseId, structuredClone(activeState));
+    this.writes.enqueue(() => apiRequest("/api/progress", { method: "PUT", body: JSON.stringify(activeState) }));
     this.emit();
+  }
+
+  private async setMembership(courseId: string, action: "activate-course" | "deactivate-course") {
+    const result = await apiRequest<{ state: UserCourseState }>("/api/progress", { method: "POST", body: JSON.stringify({ action, courseId }) });
+    const current = this.states.get(courseId);
+    const merged = { ...current, ...result.state, assignmentStates: current?.assignmentStates ?? result.state.assignmentStates, materialStates: current?.materialStates ?? result.state.materialStates };
+    this.states.set(courseId, structuredClone(merged));
+    this.emit();
+    return merged;
   }
 
   private emit() {

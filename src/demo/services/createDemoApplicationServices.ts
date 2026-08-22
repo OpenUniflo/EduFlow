@@ -8,6 +8,7 @@ import { DomainGovernanceService } from "@/features/knowledge/domain/DomainGover
 import { LocalStorageDomainGovernanceRepository } from "@/features/knowledge/domain/LocalStorageDomainGovernanceRepository";
 import { InMemoryKnowledgeRepository } from "@/features/knowledge/repository/InMemoryKnowledgeRepository";
 import { LocalStorageLearningProgressRepository } from "@/features/learning/progress/LocalStorageLearningProgressRepository";
+import { demoMicroLearningProvider } from "@/demo/learning/demoMicroLearningProvider";
 import { DemoCourseCreationService } from "./DemoCourseCreationService";
 
 export function createDemoApplicationServices(): ApplicationServices {
@@ -18,6 +19,12 @@ export function createDemoApplicationServices(): ApplicationServices {
     knowledgeRepository,
     userKnowledgeRepository: new DemoUserKnowledgeRepository(),
     learningProgressRepository: new LocalStorageLearningProgressRepository(demoUserCourseStateSeed),
+    microLearningRepository: {
+      ...demoMicroLearningProvider,
+      async hydrate() {}, getPath() { return null; }, getPathProgress() { return undefined; }, getUnitProgress() { return undefined; }, async start() {}, async resolveH5PContent() { throw new Error("Demo H5P unavailable"); }, async completeStep() { return { correct:false, completed:false }; }, subscribe() { return () => {}; }
+    },
+    learnerStateService: { startKnowledge: async () => ({ status:"learning" }), startAssignment: async () => ({ status:"started" }), submitAssignment: async () => ({ status:"submitted", accepted:false }) } as never,
+    courseAuthoringDraftRepository: { getDraft: async () => ({ draft: null, baseMicroPaths: [] }), saveDraft: async () => ({ revision: 1, updatedAt: new Date(0).toISOString() }), publish: async () => ({ revision: "demo" }) },
     domainGovernanceRepository,
     domainGovernanceService: new DomainGovernanceService(knowledgeRepository, domainGovernanceRepository),
     courseCreationService: new DemoCourseCreationService()

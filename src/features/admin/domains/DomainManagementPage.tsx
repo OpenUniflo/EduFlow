@@ -7,6 +7,7 @@ import { acceptCandidate, assignNodeDomain, assignNodesToDomain, createDomain, i
 import { getDomainMembers } from "@/features/knowledge/domain/domainValidation";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { applicationServices } from "@/app/services/applicationServices";
+import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
 
 const UNCLASSIFIED_MOVE_TARGET = "__unclassified__";
 
@@ -57,7 +58,7 @@ export function DomainManagementPage({ session, onLogout }: { session: MockSessi
 
   return (
     <main className="domain-admin-page">
-      <GlobalNav active="admin" session={session} onLogout={onLogout} />
+      <GlobalNav active="system" session={session} onLogout={onLogout} />
       <header className="domain-admin-header"><div><span>KNOWLEDGE GOVERNANCE</span><h1>知识领域管理</h1><p>领域负责语义分类与颜色治理，不参与知识图布局。</p></div><div className="domain-admin-tabs"><button className={tab === "management" ? "active" : ""} onClick={() => setTab("management")}>领域管理</button><button className={tab === "suggestions" ? "active" : ""} onClick={() => setTab("suggestions")}>自动建议 <i>{candidateGroups.length + governance.proposals.filter((item) => item.status === "pending").length}</i></button></div></header>
 
       {tab === "management" ? <section className="domain-admin-grid">
@@ -89,6 +90,7 @@ export function DomainManagementPage({ session, onLogout }: { session: MockSessi
         <div className="domain-suggestion-column"><div className="domain-suggestion-heading"><CirclePlus size={18} /><span><h2>Domain Proposals</h2><p>发现结果必须经管理员确认，不会直接创建领域。</p></span></div>{governance.proposals.filter((item) => item.status === "pending").map((proposal) => <article className="domain-suggestion-card" key={proposal.id}><div className="proposal-title"><i style={{ background: proposal.suggestedColor }} /><span><small>{proposal.suggestedNodeIds.length} nodes · confidence {Math.round(proposal.confidence * 100)}%</small><h3>{proposal.suggestedName}</h3><p>{proposal.suggestedDescription}</p></span></div><div className="proposal-node-chips">{proposal.suggestedNodeIds.slice(0, 8).map((id) => <span key={id}>{visibleNodes.find((node) => node.id === id)?.title ?? id}</span>)}</div><div className="domain-review-actions"><button className="primary" onClick={() => { try { validateDomainAssignmentTargets(proposal.suggestedNodeIds, access); const domain = createDomain({ actor, name: proposal.suggestedName, description: proposal.suggestedDescription, canonicalColor: proposal.suggestedColor }); assignNodesToDomain({ actor, access, nodeIds: proposal.suggestedNodeIds, domainId: domain.id }); reviewProposal({ actor, proposalId: proposal.id, status: "accepted" }); notify("Proposal 已创建为正式领域并固定成员"); } catch (error) { notify(error instanceof Error ? error.message : "Proposal 节点验证失败"); } }}>创建领域</button><button onClick={() => reviewProposal({ actor, proposalId: proposal.id, status: "rejected" })}>忽略</button></div></article>)}</div>
       </section>}
       <div className={`domain-admin-toast ${message ? "show" : ""}`}>{message}</div>
+      <EduFlowAssistant context={{workspace:"system",experienceMode:"design",userRole:session.role,capabilities:session.capabilities,selectedObject:selectedDomainId||"unclassified"}} contextLabel={selectedDomain?.name??"未分类 Knowledge"}><div className="course-design-assistant-actions"><button onClick={()=>notify("Domain membership 只来自 DomainAssignment，不会从标签或课程推断。")}>解释归属规则</button><button onClick={()=>notify("Domain 颜色只改变语义编码，不会触发 Atlas relayout。")}>颜色会影响布局吗？</button></div><p className="assistant-plain-response">System MVP 只提供治理上下文解释；Domain mutation 仍由页面上的管理员操作与既有校验执行。</p></EduFlowAssistant>
     </main>
   );
 }

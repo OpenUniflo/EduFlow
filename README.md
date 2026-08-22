@@ -11,18 +11,21 @@ Course materials
   -> Course Skill Tree / Assignment Tree
   -> Material Reader
   -> Workflow / practice execution
-  -> Evaluation
-  -> evidence and mastery (later stage)
+  -> deterministic/manual acceptance
+  -> evidence and policy-gated mastery
 ```
 
 The Global Knowledge Atlas, Course Skill Tree, and Personal Atlas are projections over one shared Knowledge Graph. Curriculum, materials, assignments, workflow execution, and mutable user learning state remain separate domain concerns.
+
+The signed-in product is organized around six capability-aware workspaces: **Learning**, **Explore**, **Courses**, **Canvas**, **Teaching**, and **System**. Learning owns Today, Personal Knowledge, activity history, deterministic Today Queue, and database-backed Micro Learning. Explore keeps the Global Knowledge Atlas as its primary surface and resolves a learning goal through existing Knowledge and Courses; systematic multi-Knowledge learning belongs to a Course, not a personal-path product. A single user-visible **EduFlow Assistant** shell adapts to workspace, experience mode, selection, and role capabilities.
 
 ## Current Status
 
 - Round 1: frontend project structure refactor — complete.
 - Round 2: workflow module boundary refactor — complete.
 - Round 3: Supabase-backed data, Auth, and persistence layer — complete.
-- Next: Round 4 — Core Teaching Loop.
+- Round 4: Core Teaching Loop — implemented in the current prototype.
+- Current prototype: Learning / Explore / Unified Assistant product-structure validation.
 
 Round 4 scope and exit criteria are defined in [`docs/ROUND4_CORE_TEACHING_LOOP.md`](docs/ROUND4_CORE_TEACHING_LOOP.md).
 
@@ -116,6 +119,16 @@ Start with:
 ## Deployment
 
 `main` is the Production branch for the Vercel `edu-flow` project. Production uses Hosted Supabase; normal local development uses the Local Supabase stack.
+
+A READY Vercel deployment does not apply or validate Hosted Supabase migrations. Before validating a Preview that depends on new database behavior:
+
+1. identify the Supabase project configured for that Vercel environment;
+2. compare `supabase/migrations` with the Hosted migration history;
+3. apply pending migrations incrementally with the repository's linked Supabase workflow;
+4. synchronize only required, hosted-safe fixture rows without resetting or replacing user data;
+5. smoke the authenticated APIs before browser acceptance.
+
+Shared Hosted databases must not be migrated automatically from every Preview build. Keep physical Vercel function entrypoints consolidated and check the active deployment limits before adding a new top-level `api/*.ts` entrypoint.
 
 Do not commit secrets. Browser code may use only the Supabase URL and publishable key; privileged Supabase credentials remain server-only.
 

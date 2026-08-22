@@ -8,6 +8,22 @@ vi.mock("@/shared/api/apiClient", () => ({ apiRequest: apiRequestMock }));
 describe("ApiLearningProgressRepository write queue", () => {
   beforeEach(() => apiRequestMock.mockReset());
 
+  it("keeps client placeholders inactive while preserving persisted membership", () => {
+    const repository = new ApiLearningProgressRepository();
+    repository.hydrate("user-1", ["active", "placeholder"], [{ userId: "user-1", courseId: "active", isActive: true, assignmentStates: {}, materialStates: {}, updatedAt: "2026" }]);
+    expect(repository.getCourseState("user-1", "active").isActive).toBe(true);
+    expect(repository.getCourseState("user-1", "placeholder").isActive).toBe(false);
+  });
+
+  it("activates and deactivates membership without clearing hydrated progress", async () => {
+    const repository = new ApiLearningProgressRepository();
+    repository.hydrate("user-1", ["course-1"], [{ userId: "user-1", courseId: "course-1", isActive: true, assignmentStates: { assignment: { assignmentId: "assignment", status: "accepted" } }, materialStates: {}, updatedAt: "before" }]);
+    apiRequestMock.mockResolvedValueOnce({ state: { userId: "user-1", courseId: "course-1", isActive: false, assignmentStates: {}, materialStates: {}, updatedAt: "after" } });
+    await repository.deactivateCourse("course-1");
+    expect(repository.getCourseState("user-1", "course-1")).toMatchObject({ isActive: false, assignmentStates: { assignment: { status: "accepted" } } });
+    expect(JSON.parse(apiRequestMock.mock.calls[0][1].body)).toEqual({ action: "deactivate-course", courseId: "course-1" });
+  });
+
   it("keeps successful writes in enqueue order", async () => {
     apiRequestMock.mockResolvedValue(undefined);
     const repository = new ApiLearningProgressRepository();
@@ -19,6 +35,7 @@ describe("ApiLearningProgressRepository write queue", () => {
     expect(apiRequestMock).toHaveBeenCalledTimes(2);
     expect(JSON.parse(apiRequestMock.mock.calls[0][1].body).materialStates).toHaveProperty("material-a");
     expect(JSON.parse(apiRequestMock.mock.calls[1][1].body).materialStates).toHaveProperty("material-b");
+    expect(JSON.parse(apiRequestMock.mock.calls[1][1].body).isActive).toBe(true);
   });
 
   it("runs a later write after a rejected write and reports the failure through flush", async () => {

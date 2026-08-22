@@ -5,7 +5,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import domainsHandler from "../api/domains";
 import knowledgeHandler from "../api/knowledge";
 import materialsHandler from "../api/materials";
-import progressHandler from "../api/progress";
+import progressHandler from "../api/_handlers/progress";
 import { assertLocalSupabaseUrl } from "./local-supabase";
 import { demoUserCourseStateSeed } from "../src/demo/users/demoUserCourseState.seed";
 
@@ -167,7 +167,9 @@ async function seedGoldenProgress(server: LocalServer, userIds: string[]) {
     const state = demoUserCourseStateSeed(userId, "agentic-ai-golden");
     const course = await server.from("user_course_states").upsert({ user_id: userId, course_id: state.courseId, recent_lesson_id: state.recentLessonId, updated_at: updatedAt });
     assert.ifError(course.error);
-    const assignments = await server.from("user_assignment_states").upsert(Object.values(state.assignmentStates).map((assignment) => ({ user_id: userId, course_id: state.courseId, assignment_id: assignment.assignmentId, status: assignment.status, progress: assignment.progress, updated_at: updatedAt })));
+    // Demo's historical "completed" has no acceptance evidence; retain it as a
+    // submitted record rather than falsely claiming accepted practice.
+    const assignments = await server.from("user_assignment_states").upsert(Object.values(state.assignmentStates).map((assignment) => ({ user_id: userId, course_id: state.courseId, assignment_id: assignment.assignmentId, status: assignment.status === "completed" ? "submitted" : assignment.status === "in-progress" ? "started" : assignment.status === "not-started" ? "not_started" : assignment.status, progress: assignment.progress, updated_at: updatedAt })));
     assert.ifError(assignments.error);
   }
 }

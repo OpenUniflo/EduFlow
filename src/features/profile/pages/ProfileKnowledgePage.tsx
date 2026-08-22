@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, CircleDot, Crosshair, Maximize2, Minus, Network, Plus, RotateCcw, Send, Sparkles, Workflow, X } from "lucide-react";
+import { ArrowRight, BookOpen, CircleDot, Crosshair, Maximize2, Minus, Network, Plus, RotateCcw, Send, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
@@ -6,16 +6,20 @@ import { GlobalNav } from "@/app/components/GlobalNav";
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneHandle } from "@/features/knowledge/components/KnowledgeAtlasScene";
 import { buildPersonalAtlasProjection } from "@/features/knowledge/projections/atlasProjections";
 import { resolveNodeDomain, useDomainGovernance } from "@/features/knowledge/domain/domainStore";
-import { workflowLaunchUrl } from "@/features/learning/progress/progressService";
 import { buildPersonalKnowledgeGraph } from "@/features/profile/profileGraph";
 import type { PersonalKnowledgeNode } from "@/features/profile/types";
-import { applicationServices } from "@/app/services/applicationServices";
+import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { buildMaterialDeepLink } from "@/features/material/materialNavigation";
+import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
+import { createMicroLearningNavigation } from "@/features/learning/micro/microLearning";
+import { defaultKnowledgeContextId, projectKnowledgeLearningResources, resolveKnowledgeLearningContext, type KnowledgeAssignmentResource, type KnowledgeMaterialResource } from "@/features/learning/resources/knowledgeLearningResources";
+import { KnowledgeContextSelector } from "@/features/learning/components/KnowledgeContextSelector";
+import { KnowledgeResourceActions } from "@/features/learning/components/KnowledgeResourceActions";
 
 const { courseRepository, learningProgressRepository, knowledgeRepository, userKnowledgeRepository } = applicationServices;
 
-const statusLabels = { mastered: "已掌握", learning: "学习中", explore: "可探索" } as const;
+const statusLabels = { mastered: "已掌握", practicing: "实训中", learned: "已学会", learning: "学习中", explore: "可探索" } as const;
 const relationLabels = { prerequisite: "前置依赖", enables: "能力支持", related: "知识相关" } as const;
 
 function initials(name: string) {
@@ -25,24 +29,28 @@ function initials(name: string) {
   return words.length > 1 ? words.slice(0, 2).map((word) => word[0]).join("").toUpperCase() : clean.slice(0, 2).toUpperCase();
 }
 
-export function ProfileKnowledgePage({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
+export function PersonalKnowledgeView({ session, onLogout, embedded = false }: { session: MockSession; onLogout: () => void; embedded?: boolean }) {
   const navigate = useNavigate();
   const governance = useDomainGovernance();
   const sceneRef = useRef<KnowledgeAtlasSceneHandle>(null);
   const toastTimerRef = useRef<number | null>(null);
   const [progressRevision, setProgressRevision] = useState(0);
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
-  const runtimes = useMemo(() => courseRepository.listCourseRuntimes(), []);
+  useEffect(() => userKnowledgeRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
+  useEffect(() => applicationServices.microLearningRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
+  const runtimes = useMemo(() => courseRepository.listCourseRuntimes().filter((runtime) => runtime.course.lifecycle === "published"), []);
   const userCourseStates = useMemo(() => runtimes.map((runtime) => learningProgressRepository.getCourseState(session.userId, runtime.course.id)), [progressRevision, runtimes, session.userId]);
   const graph = useMemo(() => buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), userKnowledgeRepository.getUserKnowledge(session.userId), runtimes, userCourseStates, governance), [governance, runtimes, session.userId, userCourseStates]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [contextByKnowledge, setContextByKnowledge] = useState<Record<string, string>>({});
   const [searchMatchId, setSearchMatchId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState("");
-  const [courseChooserOpen, setCourseChooserOpen] = useState(false);
-  const [assignmentChooserOpen, setAssignmentChooserOpen] = useState(false);
   const atlas = useMemo(() => buildPersonalAtlasProjection(graph, governance, runtimes), [governance, graph, runtimes]);
   const selected = selectedId ? graph.nodes.find((node) => node.id === selectedId) ?? null : null;
+  const selectedResources = useMemo(() => selectedId ? projectKnowledgeLearningResources({ knowledgeId: selectedId, runtimes, courseStates: userCourseStates, microRepository: applicationServices.microLearningRepository }) : null, [progressRevision, runtimes, selectedId, userCourseStates]);
+  const selectedContextId = selectedResources && selectedId ? (contextByKnowledge[selectedId] ?? defaultKnowledgeContextId(selectedResources)) : "standalone";
+  const selectedContext = selectedResources ? resolveKnowledgeLearningContext(selectedResources, selectedContextId) : null;
   const selectedDomain = selected ? resolveNodeDomain(selected.id, governance).domain : undefined;
   const drawerOpen = Boolean(selected);
   const nodeById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph.nodes]);
@@ -56,7 +64,6 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
     return () => window.removeEventListener("keydown", escape);
   }, [selectedId]);
   useEffect(() => () => { if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current); }, []);
-  useEffect(() => { setCourseChooserOpen(false); setAssignmentChooserOpen(false); }, [selectedId]);
 
   function showToast(message: string) {
     setToast(message);
@@ -94,41 +101,37 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
     showToast("可输入当前图中的知识名称进行搜索和定位");
   }
 
-  function courseOptionsForNode(node: PersonalKnowledgeNode) {
-    const options: Array<{ courseId: string; materialId: string | null; segmentId?: string }> = [];
-    node.curriculumContexts.forEach((context) => {
-      if (context.materialEntries.length) context.materialEntries.forEach((entry) => options.push({ courseId: context.courseId, materialId: entry.materialId, segmentId: entry.segmentId }));
-      else options.push({ courseId: context.courseId, materialId: null });
-    });
-    return Array.from(new Map(options.map((option) => [`${option.courseId}:${option.materialId ?? "course"}:${option.segmentId ?? ""}`, option])).values());
+  async function launchAssignment(context: KnowledgeAssignmentResource) {
+    await applicationServices.learnerStateService.startAssignment(context.courseId, context.assignmentId);
+    await refreshLearnerState(session.userId);
+    navigate(`/courses/${context.courseId}/assignments/${context.assignmentId}`);
   }
 
-  function openCourse(node: PersonalKnowledgeNode) {
-    const options = courseOptionsForNode(node);
-    if (!options.length) return;
-    if (options.length > 1) return setCourseChooserOpen(true);
-    const option = options[0];
-    navigate(option.materialId ? buildMaterialDeepLink({ courseId: option.courseId, materialId: option.materialId, segmentId: option.segmentId }) : `/courses/${option.courseId}`);
+  async function openMaterial(node: PersonalKnowledgeNode, material: KnowledgeMaterialResource) {
+    await applicationServices.learnerStateService.startKnowledge(node.id, material.courseId);
+    await refreshLearnerState(session.userId);
+    navigate(buildMaterialDeepLink({ courseId: material.courseId, materialId: material.materialId, segmentId: material.segmentId }));
   }
 
-  function openAssignment(node: PersonalKnowledgeNode) {
-    if (!node.assignmentContexts.length) return;
-    if (node.assignmentContexts.length > 1) return setAssignmentChooserOpen(true);
-    const context = node.assignmentContexts[0];
-    navigate(context.workflowTemplateId ? workflowLaunchUrl({ courseId: context.courseId, assignmentId: context.assignmentId, workflowTemplateId: context.workflowTemplateId }) : `/courses/${context.courseId}`);
+  async function openMicro(node: PersonalKnowledgeNode) {
+    if (!selectedContext?.micro.available) return;
+    const courseId = selectedContext.kind === "course" ? selectedContext.courseId : undefined;
+    await applicationServices.learnerStateService.startKnowledge(node.id, courseId);
+    await refreshLearnerState(session.userId);
+    const target = createMicroLearningNavigation(node.id, { courseId, returnTo: "/?view=knowledge" });
+    navigate(target.to, { state: target.state });
   }
 
   const incidentEdges = selected ? graph.edges.filter((edge) => edge.source === selected.id || edge.target === selected.id) : [];
 
   return (
-    <main className={`personal-atlas-page ${drawerOpen ? "has-drawer" : ""}`}>
-      <GlobalNav active="profile" session={session} onLogout={onLogout} />
-      <header className="personal-page-title"><h1>我的知识空间</h1><p>Personal Knowledge Atlas</p></header>
+    <main className={`personal-atlas-page ${embedded ? "learning-personal-view" : ""} ${drawerOpen ? "has-drawer" : ""}`}>
+      {!embedded ? <GlobalNav active="learning" session={session} onLogout={onLogout} /> : null}
+      {!embedded ? <header className="personal-page-title"><h1>我的知识</h1><p>Personal Knowledge Atlas</p></header> : null}
       <aside className="personal-summary glass-v2">
-        <div className="personal-identity"><span className="personal-avatar">{initials(session.name)}</span><span><strong>{session.name}</strong><small>{session.email}</small></span><button aria-label="打开个人设置" onClick={() => showToast("个人资料设置将在后续版本开放")}>•••</button></div>
-        <div className="personal-summary-divider" />
+        {!embedded ? <><div className="personal-identity"><span className="personal-avatar">{initials(session.name)}</span><span><strong>{session.name}</strong><small>{session.email}</small></span><button aria-label="打开个人设置" onClick={() => showToast("个人资料设置将在后续版本开放")}>•••</button></div><div className="personal-summary-divider" /></> : null}
         <div className="personal-summary-heading"><span><strong>我的知识空间</strong><small>Personal Knowledge Graph</small></span><i><Network size={15} /></i></div>
-        <div className="personal-summary-stats"><span><strong>{graph.summary.mastered}</strong><small>已掌握</small></span><span><strong>{graph.summary.learning}</strong><small>学习中</small></span><span><strong>{graph.summary.explore}</strong><small>可探索</small></span><span><strong>{graph.summary.completedAssignments}</strong><small>实训验证</small></span></div>
+        <div className="personal-summary-stats"><span><strong>{graph.summary.learning}</strong><small>学习中</small></span><span><strong>{graph.summary.learned??0}</strong><small>已学习</small></span><span><strong>{graph.summary.practicing??0}</strong><small>实训中</small></span><span><strong>{graph.summary.mastered}</strong><small>已掌握</small></span></div>
         <div className="personal-summary-divider" />
         <div className="personal-summary-kicker">知识结构</div>
         <div className="personal-structure-row"><span>直接可探索</span><strong>{graph.summary.explore} 个</strong></div>
@@ -138,20 +141,18 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
       </aside>
 
       <div className="personal-canvas">
-        <KnowledgeAtlasScene ref={sceneRef} variant="personal" nodes={atlas.nodes} edges={atlas.edges} selectedId={selectedId} searchMatchId={searchMatchId} currentLearningId={graph.summary.currentLearningId} autoRotate={false} onNodeClick={(node) => setSelectedId(node.id)} onBackgroundClick={() => { setSelectedId(null); setSearchMatchId(null); setCourseChooserOpen(false); setAssignmentChooserOpen(false); }} />
+        <KnowledgeAtlasScene ref={sceneRef} variant="personal" nodes={atlas.nodes} edges={atlas.edges} selectedId={selectedId} searchMatchId={searchMatchId} currentLearningId={graph.summary.currentLearningId} autoRotate={false} onNodeClick={(node) => setSelectedId(node.id)} onBackgroundClick={() => { setSelectedId(null); setSearchMatchId(null); }} />
+        {!graph.nodes.some((node)=>node.isCore)?<section className="personal-atlas-empty glass-v2"><CircleDot size={28}/><h2>你还没有开始学习任何 Knowledge</h2><p>从探索或课程中开始一个 Knowledge，它会自动出现在这里。</p><div><button className="atlas-primary" onClick={()=>navigate("/explore")}>去探索<ArrowRight size={14}/></button><button className="atlas-secondary" onClick={()=>navigate("/courses")}>查看课程<BookOpen size={14}/></button></div></section>:null}
       </div>
 
       <aside className={`personal-drawer glass-v2 ${drawerOpen ? "open" : ""}`}>
         {selected ? <>
-          <div className="personal-drawer-head"><span><small>{selectedDomain?.name ?? "未分类"} · {selected.scope}</small><h2>{selected.title}</h2><p>{selected.description}</p><i className={`status-${selected.status}`}>{statusLabels[selected.status]}{selected.status === "learning" ? ` · ${selected.progress}%` : ""}</i></span><button onClick={() => { setSelectedId(null); setSearchMatchId(null); setCourseChooserOpen(false); setAssignmentChooserOpen(false); }} aria-label="关闭节点详情"><X size={17} /></button></div>
+          <div className="personal-drawer-head"><span><small>{selectedDomain?.name ?? "未分类"} · {selected.scope}</small><h2>{selected.title}</h2><p>{selected.description}</p><i className={`status-${selected.status}`}>个人知识状态 · {statusLabels[selected.status]}{selected.status === "learning" ? ` · ${selected.progress}%` : ""}</i></span><button onClick={() => { setSelectedId(null); setSearchMatchId(null); }} aria-label="关闭节点详情"><X size={17} /></button></div>
           <section><h3>当前掌握</h3><div className="personal-progress-card"><span><small>个人知识状态</small><strong>{selected.progress ? `${selected.progress}%` : statusLabels[selected.status]}</strong></span><i><b style={{ width: `${selected.progress || 8}%` }} /></i></div></section>
-          <section><h3>课程上下文</h3>{selected.curriculumContexts.length ? <div className="personal-drawer-list">{selected.curriculumContexts.map((context) => <span key={`${context.courseId}:${context.coverageId}`}><small>第 {context.lessonOrder} 课 · {context.role}</small><strong>{context.lessonId}</strong></span>)}</div> : <div className="personal-empty-analysis"><CircleDot size={18} /><strong>暂无课程引用</strong><p>知识节点可独立于课程存在。</p></div>}</section>
+          {selectedResources && selectedContext ? <section><h3>学习上下文与资源</h3><KnowledgeContextSelector resources={selectedResources} value={selectedContextId} onChange={(value) => setContextByKnowledge((current) => ({ ...current, [selected.id]: value }))}/>{selectedContext.kind === "course" ? <div className="personal-progress-card"><span><small>{selectedContext.courseTitle}</small><strong>{[selectedContext.chapterTitle, selectedContext.lessonTitle].filter(Boolean).join(" · ") || "课程 Knowledge"}</strong></span></div> : null}<KnowledgeResourceActions context={selectedContext} onMicro={() => void openMicro(selected)} onMaterial={(resource) => void openMaterial(selected, resource)} onAssignment={(resource) => void launchAssignment(resource)}/></section> : null}
           <section><h3>学习与实践证据</h3>{selected.evidence.length ? <div className="personal-drawer-list">{selected.evidence.map((item, index) => <span key={`${item}-${index}`}><small>证据 {String(index + 1).padStart(2, "0")}</small><strong>{item}</strong></span>)}</div> : <div className="personal-empty-analysis"><CircleDot size={18} /><strong>尚无学习证据</strong><p>节点出现在图中不会自动视为已掌握。</p></div>}</section>
           <section><h3>直接知识关系</h3><div className="personal-relation-tags">{incidentEdges.map((edge) => { const other = nodeById.get(edge.source === selected.id ? edge.target : edge.source); return other ? <button key={edge.id} onClick={() => locateNode(other)}><small>{relationLabels[edge.relation]}</small>{other.title}<ArrowRight size={12} /></button> : null; })}</div></section>
           {selected.status === "explore" ? <div className="personal-explore-note"><CircleDot size={18} /><span><strong>一跳可探索知识</strong><p>它与至少一个核心节点直接相关，但尚未进入你的掌握或学习状态。</p></span></div> : null}
-          {courseChooserOpen ? <section><h3>选择课程上下文</h3><div className="personal-drawer-list">{courseOptionsForNode(selected).map((option) => { const context = selected.curriculumContexts.find((item) => item.courseId === option.courseId); const entry = context?.materialEntries.find((item) => item.materialId === option.materialId && item.segmentId === option.segmentId); return <button key={`${option.courseId}:${option.materialId ?? "course"}:${option.segmentId ?? ""}`} onClick={() => navigate(option.materialId ? buildMaterialDeepLink({ courseId: option.courseId, materialId: option.materialId, segmentId: option.segmentId }) : `/courses/${option.courseId}`)}><small>{entry ? `${option.courseId} · 第 ${entry.segmentOrder} 段 · ${entry.role}` : context?.role}</small><strong>{entry?.materialTitle ?? option.courseId}</strong></button>; })}</div></section> : null}
-          {assignmentChooserOpen ? <section><h3>选择关联实训</h3><div className="personal-drawer-list">{selected.assignmentContexts.map((context) => <button key={`${context.courseId}:${context.coverageId}`} onClick={() => navigate(context.workflowTemplateId ? workflowLaunchUrl({ courseId: context.courseId, assignmentId: context.assignmentId, workflowTemplateId: context.workflowTemplateId }) : `/courses/${context.courseId}`)}><small>{context.courseId} · {context.status}</small><strong>{context.title}</strong></button>)}</div></section> : null}
-          <div className="personal-drawer-actions">{selected.curriculumContexts.length ? <button className="primary" onClick={() => openCourse(selected)}>查看课程上下文<BookOpen size={14} /></button> : null}{selected.assignmentContexts.length ? <button onClick={() => openAssignment(selected)}>查看实训<Workflow size={14} /></button> : null}</div>
         </> : null}
       </aside>
 
@@ -159,9 +160,13 @@ export function ProfileKnowledgePage({ session, onLogout }: { session: MockSessi
         <button onClick={() => sceneRef.current?.zoomBy(1.14)} data-tip="放大" aria-label="放大"><Plus size={17} /></button><button onClick={() => sceneRef.current?.zoomBy(0.88)} data-tip="缩小" aria-label="缩小"><Minus size={17} /></button><button onClick={() => { sceneRef.current?.fit(); showToast("已适配个人知识图"); }} data-tip="适配知识图" aria-label="适配知识图"><Maximize2 size={17} /></button><button onClick={currentLearning} data-tip="定位当前学习" aria-label="定位当前学习"><Crosshair size={17} /></button><span />
         <button onClick={() => { sceneRef.current?.reset(); setSelectedId(null); setSearchMatchId(null); }} data-tip="重置视图" aria-label="重置视图"><RotateCcw size={17} /></button>
       </div>
-      <div className="personal-legend glass-v2"><span><i className="dot mastered" />已掌握</span><span><i className="dot learning" />学习中</span><span><i className="dot explore" />可探索</span><span><i className="diamond" />实训验证</span></div>
-      <form className="personal-ai" onSubmit={(event) => { event.preventDefault(); askKnowledgeSpace(query); }} data-personal-interactive><div className="personal-ai-box glass-v2"><span><Sparkles size={15} /></span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索知识，或基于我的知识空间提问……" aria-label="搜索或向个人知识空间提问" /><button type="submit" aria-label="发送"><Send size={16} /></button></div><div className="personal-ai-suggestions"><button type="button" onClick={() => askKnowledgeSpace("我下一步应该学什么？")}>我下一步应该学什么？</button><button type="button" onClick={() => askKnowledgeSpace("显示直接关联的可探索知识")}>直接关联哪些知识？</button><button type="button" onClick={() => askKnowledgeSpace("我的知识结构如何？")}>我的知识结构如何？</button></div></form>
+      <div className="personal-legend glass-v2"><span><i className="dot mastered" />已掌握</span><span><i className="dot learning" />学习中 / 已学习 / 实训中</span><span><i className="dot explore" />可探索</span><span><i className="diamond" />实训验证</span></div>
+      <EduFlowAssistant context={{workspace:"learning",experienceMode:"learn",userRole:session.role,capabilities:session.capabilities,knowledgeId:selectedId??undefined}} contextLabel={selected?.title??"我的知识"} drawerOpen={drawerOpen}><form className="personal-assistant-form" onSubmit={(event)=>{event.preventDefault();askKnowledgeSpace(query);}}><div className="course-design-assistant-input"><input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="搜索知识或询问下一步…"/><button aria-label="发送"><Send size={15}/></button></div><div className="course-design-assistant-actions"><button type="button" onClick={()=>askKnowledgeSpace("我下一步应该学什么？")}>下一步学什么？</button><button type="button" onClick={()=>askKnowledgeSpace("显示直接关联的可探索知识")}>直接关联知识</button></div><p className="assistant-plain-response"><Sparkles size={12}/>搜索只定位当前 Personal Atlas，不会改变图布局。</p></form></EduFlowAssistant>
       <div className={`personal-toast ${toast ? "show" : ""}`}>{toast}</div>
     </main>
   );
+}
+
+export function ProfileKnowledgePage(props: { session: MockSession; onLogout: () => void }) {
+  return <PersonalKnowledgeView {...props} />;
 }

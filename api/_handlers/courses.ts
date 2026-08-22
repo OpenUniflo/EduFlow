@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createUserSupabase } from "./_lib/supabase.js";
-import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
-import { dataOrThrow } from "./_lib/query.js";
+import { createServerSupabase, createUserSupabase } from "../_lib/supabase.js";
+import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
+import { dataOrThrow } from "../_lib/query.js";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
@@ -9,8 +9,35 @@ const optionalText = (row: Row, key: string) => row[key] == null ? undefined : S
 const number = (row: Row, key: string) => Number(row[key]);
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
-  if (request.method !== "GET") return methodNotAllowed(response, ["GET"]);
-  const { client } = await createUserSupabase(request);
+  const { client, user } = await createUserSupabase(request);
+  if (request.method === "POST") {
+    const body = request.body as { title?: string; description?: string; targetOutcome?: string; accentColor?: string };
+    const title = body.title?.trim(); const targetOutcome = body.targetOutcome?.trim();
+    if (!title || !targetOutcome) throw new ApiError(400, "invalid_course", "title and targetOutcome are required");
+    const profile = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const profileRow = dataOrThrow(profile.data as Row | null, profile.error, "Course creation role lookup");
+    if (!profileRow || !["teacher", "admin"].includes(text(profileRow, "role"))) throw new ApiError(403, "course_creation_forbidden", "Only teachers may create courses");
+    const id = `course-${crypto.randomUUID()}`; const chapterId = `${id}:chapter:1`; const lessonId = `${id}:lesson:1`; const server = createServerSupabase();
+    const createdAt = new Date().toISOString();
+    const courseWrite = await server.from("courses").insert({ id, title, description: body.description?.trim() || title, target_outcome: targetOutcome, accent_color: body.accentColor?.trim() || "#7d6ee7", generation_status: "draft", lifecycle: "draft", author_user_id: user.id, revision: "draft-1", created_at: createdAt, updated_at: createdAt }).select("id").maybeSingle();
+    dataOrThrow(courseWrite.data as Row | null, courseWrite.error, "Course creation write");
+    const curriculumWrite = await server.from("course_curricula").insert({ course_id: id, id: `${id}:curriculum`, generation_mode: "manual" }); dataOrThrow(curriculumWrite.data, curriculumWrite.error, "Curriculum creation write");
+    const chapterWrite = await server.from("curriculum_chapters").insert({ course_id: id, id: chapterId, title: "开始设计", description: "先添加本篇章的原子 Knowledge、课件和实训。", display_order: 0, color: body.accentColor?.trim() || "#7d6ee7", outcome: targetOutcome }); dataOrThrow(chapterWrite.data, chapterWrite.error, "Chapter creation write");
+    const lessonWrite = await server.from("curriculum_lessons").insert({ course_id: id, id: lessonId, chapter_id: chapterId, title: "课程起点", display_order: 0 }); dataOrThrow(lessonWrite.data, lessonWrite.error, "Lesson creation write");
+    json(response, 201, { courseId: id }); return;
+  }
+  if (request.method === "PATCH") {
+    const body = request.body as { courseId?: string; lifecycle?: string };
+    if (!body.courseId || !["draft", "published", "archived"].includes(String(body.lifecycle))) throw new ApiError(400, "invalid_course_lifecycle", "courseId and a valid lifecycle are required");
+    const profile = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const profileRow = dataOrThrow(profile.data as Row | null, profile.error, "Course lifecycle role lookup");
+    if (!profileRow || !["teacher", "admin"].includes(text(profileRow, "role"))) throw new ApiError(403, "course_lifecycle_forbidden", "Only teachers may change course lifecycle");
+    const write = await client.from("courses").update({ lifecycle: body.lifecycle, updated_at: new Date().toISOString() }).eq("id", body.courseId).select("id,lifecycle").maybeSingle();
+    const row = dataOrThrow(write.data as Row | null, write.error, "Course lifecycle update");
+    if (!row) throw new ApiError(404, "course_not_found", "Course not found");
+    json(response, 200, { courseId: text(row, "id"), lifecycle: text(row, "lifecycle") }); return;
+  }
+  if (request.method !== "GET") return methodNotAllowed(response, ["GET", "POST", "PATCH"]);
   const courseId = typeof request.query.id === "string" ? request.query.id : undefined;
   const queries = await Promise.all([
     client.from("courses").select("*").order("id"),
@@ -41,7 +68,11 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     })];
   }));
 
-  const runtimes = courseRows.map((courseRow) => {
+  const profileResult = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  const profile = dataOrThrow(profileResult.data as Row | null, profileResult.error, "Course role lookup");
+  const canManage = profile && ["teacher", "admin"].includes(text(profile, "role"));
+  const readableCourseRows = canManage ? courseRows : courseRows.filter((row) => text(row, "lifecycle") === "published");
+  const runtimes = readableCourseRows.map((courseRow) => {
     const id = text(courseRow, "id");
     const curriculumRow = curriculumRows.find((row) => text(row, "course_id") === id);
     if (!curriculumRow) throw new Error(`Course ${id} has no curriculum`);
@@ -61,14 +92,14 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       };
     });
     return {
-      course: { id, title: text(courseRow, "title"), subtitle: optionalText(courseRow, "subtitle"), description: text(courseRow, "description"), targetOutcome: optionalText(courseRow, "target_outcome"), accentColor: optionalText(courseRow, "accent_color"), generationStatus: text(courseRow, "generation_status") },
+      course: { id, title: text(courseRow, "title"), subtitle: optionalText(courseRow, "subtitle"), description: text(courseRow, "description"), targetOutcome: optionalText(courseRow, "target_outcome"), accentColor: optionalText(courseRow, "accent_color"), generationStatus: text(courseRow, "generation_status"), lifecycle: text(courseRow, "lifecycle") },
       curriculum: { id: text(curriculumRow, "id"), courseId: id, generationMode: text(curriculumRow, "generation_mode"), requestedChapterCount: curriculumRow.requested_chapter_count == null ? undefined : number(curriculumRow, "requested_chapter_count"), sourceStructureId: optionalText(curriculumRow, "source_structure_id") },
       chapters: chapterRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, title: text(row, "title"), description: text(row, "description"), order: number(row, "display_order"), color: text(row, "color"), outcome: text(row, "outcome") })),
       lessons: lessonRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, chapterId: text(row, "chapter_id"), title: text(row, "title"), order: number(row, "display_order") })),
       curriculumCoverages: coverageRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, lessonId: text(row, "lesson_id"), nodeId: text(row, "node_id"), role: text(row, "role"), order: number(row, "display_order") })),
       curriculumSequences: sequenceRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, sourceLessonId: text(row, "source_lesson_id"), targetLessonId: text(row, "target_lesson_id") })),
       assignments: assignmentRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, order: number(row, "display_order"), title: text(row, "title"), description: text(row, "description"), requirements: row.requirements, expectedOutput: text(row, "expected_output"), acceptanceCriteria: row.acceptance_criteria, mode: text(row, "mode"), workflowTemplateId: optionalText(row, "workflow_template_id"), estimatedMinutes: row.estimated_minutes == null ? undefined : number(row, "estimated_minutes"), projectContribution: optionalText(row, "project_contribution"), experience: row.experience ?? undefined, inheritedOutputs: row.inherited_outputs ?? [], dependencyRationale: optionalText(row, "dependency_rationale") })),
-      assignmentCoverages: assignmentCoverageRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), assignmentId: text(row, "assignment_id"), nodeId: text(row, "node_id"), role: text(row, "role") })),
+      assignmentCoverages: assignmentCoverageRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), assignmentId: text(row, "assignment_id"), nodeId: text(row, "node_id"), role: text(row, "role"), required: Boolean(row.required) })),
       assignmentDependencies: assignmentDependencyRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, sourceAssignmentId: text(row, "source_assignment_id"), targetAssignmentId: text(row, "target_assignment_id"), strength: text(row, "strength") })),
       chapterOutcomes: chapterOutcomeRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, chapterId: text(row, "chapter_id"), title: text(row, "title") })),
       assignmentOutcomeCompositions: assignmentOutcomeRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), assignmentId: text(row, "assignment_id"), outcomeId: text(row, "outcome_id") })),

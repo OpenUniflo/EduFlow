@@ -1,8 +1,9 @@
 import type { AssignmentCoverageRole, CurriculumCoverageRole, UserAssignmentStatus } from "@/features/course/types";
 import type { KnowledgeEdge, KnowledgeEvidence, KnowledgeScope, MasteryOrigin } from "../knowledge/types";
 import type { KnowledgeMaterialEntry } from "../material/materialNavigation";
+import type { UserKnowledgeStatus as DurableUserKnowledgeStatus } from "@/features/learning/state/learningState";
 
-export type UserKnowledgeStatus = "mastered" | "learning";
+export type UserKnowledgeStatus = DurableUserKnowledgeStatus;
 export type PersonalKnowledgeStatus = UserKnowledgeStatus | "explore";
 export type UserKnowledgeEvidence = KnowledgeEvidence;
 
@@ -62,6 +63,8 @@ export type PersonalKnowledgeEdge = KnowledgeEdge & {
 export type PersonalKnowledgeSummary = {
   mastered: number;
   learning: number;
+  learned?: number;
+  practicing?: number;
   explore: number;
   completedAssignments: number;
   crossDomainConnections: number;

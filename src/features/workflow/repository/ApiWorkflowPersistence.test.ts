@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PersistedWorkflowSettings } from "./WorkflowPersistence";
-import { ApiWorkflowPersistence, normalizeWorkflowSettings } from "./ApiWorkflowPersistence";
+import { ApiRequestError } from "@/shared/api/apiClient";
+import { ApiWorkflowPersistence, isTransientPostgrestClaimsError, normalizeWorkflowSettings } from "./ApiWorkflowPersistence";
 
 const apiRequestMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/shared/api/apiClient", () => ({ apiRequest: apiRequestMock }));
+vi.mock("@/shared/api/apiClient", () => ({
+  apiRequest: apiRequestMock,
+  ApiRequestError: class ApiRequestError extends Error {
+    constructor(readonly code: string | undefined, message: string, readonly status: number) {
+      super(message);
+    }
+  }
+}));
 
 const defaults: PersistedWorkflowSettings = {
   dailyReminder: true,
@@ -35,6 +43,32 @@ describe("normalizeWorkflowSettings", () => {
     expect(normalizeWorkflowSettings(defaults, { environments: defaults.environments, activeEnvironmentId: "missing" })).toMatchObject({
       activeEnvironmentId: "development"
     });
+  });
+});
+
+describe("ApiWorkflowPersistence hydration", () => {
+  beforeEach(() => apiRequestMock.mockReset());
+
+  it("retries one precise PGRST303 hydration failure and then uses the successful payload", async () => {
+    apiRequestMock
+      .mockRejectedValueOnce(new ApiRequestError("PGRST303", "temporary claims failure", 500))
+      .mockResolvedValueOnce({ state: { activeTemplateId: "workflow-a" }, settings: defaults, builtinWorkflowIds: [] });
+    const persistence = new ApiWorkflowPersistence(defaults);
+
+    await expect(persistence.hydrate()).resolves.toBeUndefined();
+
+    expect(apiRequestMock).toHaveBeenCalledTimes(2);
+    expect(persistence.readState()).toEqual({ activeTemplateId: "workflow-a" });
+  });
+
+  it("does not retry other API failures", async () => {
+    const error = new ApiRequestError("unauthorized", "session expired", 401);
+    apiRequestMock.mockRejectedValueOnce(error);
+
+    await expect(new ApiWorkflowPersistence(defaults).hydrate()).rejects.toBe(error);
+
+    expect(isTransientPostgrestClaimsError(error)).toBe(false);
+    expect(apiRequestMock).toHaveBeenCalledTimes(1);
   });
 });
 

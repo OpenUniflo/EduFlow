@@ -201,9 +201,9 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
 function summarizeAssignmentIds(assignmentIds: string[], assignmentStateById: Map<string, UserAssignmentState>, assignmentOrderById: ReadonlyMap<string, number>) {
   const uniqueIds = Array.from(new Set(assignmentIds)).sort((left, right) => (assignmentOrderById.get(left) ?? Number.MAX_SAFE_INTEGER) - (assignmentOrderById.get(right) ?? Number.MAX_SAFE_INTEGER) || left.localeCompare(right));
   const states = uniqueIds.map((id) => assignmentStateById.get(id));
-  const completedCount = states.filter((state) => state?.status === "completed").length;
-  const inProgressCount = states.filter((state) => state?.status === "in-progress").length;
-  const progress = uniqueIds.length ? Math.round(states.reduce((sum, state) => sum + (state?.progress ?? (state?.status === "completed" ? 100 : 0)), 0) / uniqueIds.length) : 0;
+  const completedCount = states.filter((state) => state?.status === "accepted" || state?.status === "completed").length;
+  const inProgressCount = states.filter((state) => state?.status === "started" || state?.status === "submitted" || state?.status === "needs_revision" || state?.status === "in-progress").length;
+  const progress = uniqueIds.length ? Math.round(states.reduce((sum, state) => sum + (state?.progress ?? ((state?.status === "accepted" || state?.status === "completed") ? 100 : 0)), 0) / uniqueIds.length) : 0;
   return { assignmentIds: uniqueIds, assignmentCount: uniqueIds.length, completedCount, inProgressCount, notStartedCount: uniqueIds.length - completedCount - inProgressCount, progress };
 }
 
@@ -290,13 +290,16 @@ export function buildCourseGraphData(runtime: CourseRuntimeData, userState: User
     current.primaryRelation = current.prerequisiteCount ? "prerequisite" : "enables";
     chapterEdgeByPair.set(key, current);
   });
-  const incidentChapterIds = new Set(Array.from(chapterEdgeByPair.values()).flatMap((edge) => [edge.source, edge.target]));
+  const chapterOrderById = new Map(runtime.chapters.map((chapter) => [chapter.id, chapter.order]));
+  // Chapter Overview is an ordered curriculum projection; backward facts remain visible in the atomic graph.
+  const projectedChapterEdgeByPair = new Map(Array.from(chapterEdgeByPair).filter(([,edge]) => (chapterOrderById.get(edge.source) ?? Number.MAX_SAFE_INTEGER) < (chapterOrderById.get(edge.target) ?? Number.MIN_SAFE_INTEGER)));
+  const incidentChapterIds = new Set(Array.from(projectedChapterEdgeByPair.values()).flatMap((edge) => [edge.source, edge.target]));
   runtime.chapters.filter((chapter) => chapter.order > 1 && !incidentChapterIds.has(chapter.id)).forEach((chapter) => {
     const sequence = [...runtime.curriculumSequences].reverse().find((item) => lessonById.get(item.targetLessonId)?.chapterId === chapter.id && lessonById.get(item.sourceLessonId)?.chapterId !== chapter.id);
     const source = sequence ? lessonById.get(sequence.sourceLessonId)?.chapterId : undefined;
-    if (source) chapterEdgeByPair.set(`${source}:${chapter.id}`, { id: `chapter-sequence-${runtime.course.id}-${source}-${chapter.id}`, source, target: chapter.id, primaryRelation: "sequence", sourceKind: "curriculum-sequence", prerequisiteCount: 0, enablesCount: 0, supportCount: 0 });
+    if (source && (chapterOrderById.get(source) ?? Number.MAX_SAFE_INTEGER) < chapter.order) projectedChapterEdgeByPair.set(`${source}:${chapter.id}`, { id: `chapter-sequence-${runtime.course.id}-${source}-${chapter.id}`, source, target: chapter.id, primaryRelation: "sequence", sourceKind: "curriculum-sequence", prerequisiteCount: 0, enablesCount: 0, supportCount: 0 });
   });
-  const aggregatedChapterEdges = Array.from(chapterEdgeByPair.values()).sort((left, right) => left.source.localeCompare(right.source) || left.target.localeCompare(right.target));
+  const aggregatedChapterEdges = Array.from(projectedChapterEdgeByPair.values()).sort((left, right) => left.source.localeCompare(right.source) || left.target.localeCompare(right.target));
   assertDirectedAcyclic(runtime.chapters.map((chapter) => chapter.id), aggregatedChapterEdges);
   const chapterEdges = transitiveReduction(runtime.chapters.map((chapter) => chapter.id), aggregatedChapterEdges);
   const chapters: CourseChapterProjection[] = [...runtime.chapters].sort((left, right) => left.order - right.order || left.id.localeCompare(right.id)).map((chapter) => {

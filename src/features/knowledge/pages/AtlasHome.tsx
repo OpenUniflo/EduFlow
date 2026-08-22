@@ -74,7 +74,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
 
   return (
     <main className="atlas-home-page">
-      <GlobalNav active="atlas" session={session} onLogout={onLogout} />
+      <GlobalNav active="explore" session={session} onLogout={onLogout} />
       <KnowledgeAtlasScene
         ref={sceneRef}
         className="atlas-star-canvas"
