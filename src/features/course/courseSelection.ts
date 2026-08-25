@@ -7,6 +7,7 @@ export type SelectedAnchor =
 export type CourseDetailFacet = "knowledge" | "assignment";
 
 export type AssignmentDrawerProjection =
+  | { kind: "empty"; contexts: [] }
   | { kind: "group"; contexts: AssignmentContext[] }
   | { kind: "detail"; context: AssignmentContext; canReturnToGroup: boolean };
 
@@ -16,7 +17,7 @@ export type ChapterAssignmentProjection = {
   projectContributions: string[];
 };
 
-export type CourseDrawerProjectionKind = "chapter-knowledge" | "chapter-assignment" | "atomic-knowledge" | "assignment-group" | "assignment-detail";
+export type CourseDrawerProjectionKind = "chapter-knowledge" | "chapter-assignment" | "atomic-knowledge" | "assignment-empty" | "assignment-group" | "assignment-detail";
 
 export function detailFacetForMode(mode: "knowledge" | "assignment"): CourseDetailFacet {
   return mode;
@@ -30,11 +31,14 @@ export function courseDrawerProjectionKind(anchor: SelectedAnchor, mode: "knowle
   if (anchor.kind === "chapter") return mode === "knowledge" ? "chapter-knowledge" : "chapter-assignment";
   if (mode === "knowledge") return "atomic-knowledge";
   if (!node) throw new Error(`Missing CourseSkillTreeNode for anchor ${anchor.id}`);
-  return assignmentProjectionForNode(node, activeAssignmentId).kind === "group" ? "assignment-group" : "assignment-detail";
+  const projection = assignmentProjectionForNode(node, activeAssignmentId);
+  if (projection.kind === "empty") return "assignment-empty";
+  return projection.kind === "group" ? "assignment-group" : "assignment-detail";
 }
 
 export function assignmentProjectionForNode(node: CourseSkillTreeNode, activeAssignmentId: string | null): AssignmentDrawerProjection {
   const contexts = [...node.assignmentContexts].sort((left, right) => left.assignment.order - right.assignment.order || left.assignment.id.localeCompare(right.assignment.id));
+  if (!contexts.length) return { kind: "empty", contexts: [] };
   if (contexts.length > 1 && !activeAssignmentId) return { kind: "group", contexts };
   const context = contexts.find((item) => item.assignmentId === activeAssignmentId) ?? (contexts.length === 1 ? contexts[0] : undefined);
   if (!context) return { kind: "group", contexts };

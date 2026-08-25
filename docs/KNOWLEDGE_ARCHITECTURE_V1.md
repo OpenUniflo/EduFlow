@@ -122,11 +122,13 @@ The User Graph is the owner-specific `scope=user, ownerId=userId` subgraph. A Us
 
 ## 18. Course-local discovery semantics
 
-Course creation is strictly:
+The structural Course route is:
 
-`Upload → Parse → Atomic Knowledge Extraction → Relation Extraction → User Knowledge Graph → Curriculum Generation → Chapter / Lesson → Assignment Generation → Assignment Coverage Validation → Course Ready`.
+`Existing visible Knowledge → Curriculum Generation/Import → Chapter / Lesson → CurriculumCoverage → Course Ready`.
 
-It must not automatically retrieve Global/Tenant nodes or perform replacement, merge, mapping, or promotion. Course Ready requires Assignment coverage for every course KnowledgeNode. Course deletion removes curriculum/material/Assignment associations, not discovered User nodes, provenance, mastery, or evidence. **Course deletion != Knowledge deletion. Course != Knowledge Ontology.**
+Material parsing, Knowledge generation, Assignment generation, and Assignment coverage validation are optional upstream/enrichment pipelines. When they run, their outputs remain subject to their own structural rules; they are not prerequisites for Course Ready.
+
+It must not automatically retrieve Global/Tenant nodes or perform replacement, merge, mapping, or promotion. A Course Knowledge route may be ready without Assignment coverage; missing coverage is an asset-audit gap. Course deletion removes curriculum/material/Assignment associations, not discovered User nodes, provenance, mastery, or evidence. **Course deletion != Knowledge deletion. Course != Knowledge Ontology.**
 
 ## 19. Curriculum
 
@@ -160,7 +162,7 @@ Assignment mode is `instruction` or `workflow`. Both modes have complete task de
 
 `UserAssignmentState(assignmentId, status, progress?)` is separate from Assignment definition and UserKnowledgeState. Assignment completion does not automatically set mastery, though it may produce KnowledgeEvidence in a future evidence pipeline.
 
-Every active course KnowledgeNode must have at least one AssignmentCoverage before Course Ready. Missing coverage is an invariant failure and cannot be replaced by generated UI fallback text. Assignment outputs may be composed into Chapter outcomes and the Course Integrated Project through `expectedOutput` and `projectContribution`; outputs and projects do not become KnowledgeNodes.
+Missing AssignmentCoverage is a non-blocking asset gap and cannot be replaced by generated UI fallback text. Existing AssignmentCoverage records must still resolve valid CourseAssignment and course Knowledge identities. Assignment outputs may be composed into Chapter outcomes and the Course Integrated Project through `expectedOutput` and `projectContribution`; outputs and projects do not become KnowledgeNodes.
 
 ## 24. Similarity Analysis
 
@@ -231,8 +233,8 @@ Structural adjacency may treat all relation types as undirected for layout/commu
 11. Personal visible nodes equal active Core plus all direct one-hop Explore nodes.
 12. Curriculum and Assignment projections preserve all N:M coverage records.
 13. Chapter dependency pairs are unique and derived only from primary membership.
-14. Every active course KnowledgeNode has at least one valid AssignmentCoverage.
-15. Workflow Assignments have a workflowTemplateId; instruction Assignments do not require one.
+14. Missing AssignmentCoverage is an explicit non-blocking Course asset gap; every AssignmentCoverage that exists is structurally valid.
+15. Workflow Assignments that exist have a workflowTemplateId; instruction Assignments do not require one.
 16. KnowledgeEdge IDs are stable semantic identities and never depend on seed-array order or position.
 17. Concrete Domain seed data belongs to demo fixtures, never the core knowledge/domain package.
 18. Material Knowledge contexts sort by coverage-role priority, authoritative Segment order, and stable identity only as a final tie, independent of source record order.

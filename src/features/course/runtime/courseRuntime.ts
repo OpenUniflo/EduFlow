@@ -58,7 +58,7 @@ function validateUniqueOrders<T>(errors: string[], items: readonly T[], order: (
 
 export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext) {
   const errors: string[] = [];
-  const nodeIds = new Set(knowledgeRepository.getVisibleGraph(access).nodes.map((node) => node.id));
+  const nodeIds = new Set(knowledgeRepository.getVisibleGraph(access).nodes.filter((node) => node.status === "active").map((node) => node.id));
   const chapterIds = new Set(runtime.chapters.map((chapter) => chapter.id));
   const lessonIds = new Set(runtime.lessons.map((lesson) => lesson.id));
   const courseNodeIds = new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId));
@@ -74,6 +74,9 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
 
   if (!runtime.curriculum.id.trim()) errors.push("Curriculum id must be a non-empty string");
   if (runtime.curriculum.courseId !== runtime.course.id) errors.push(`Curriculum ${runtime.curriculum.id} belongs to another Course`);
+  if (!runtime.chapters.length) errors.push("Course must contain at least one Chapter");
+  if (!runtime.lessons.length) errors.push("Course must contain at least one Lesson");
+  if (!runtime.curriculumCoverages.length) errors.push("Course must contain at least one CurriculumCoverage Knowledge route");
   if (chapterIds.size !== runtime.chapters.length) errors.push("Chapter ids must be unique");
   if (lessonIds.size !== runtime.lessons.length) errors.push("Lesson ids must be unique");
   if (assignmentIds.size !== runtime.assignments.length) errors.push("Assignment ids must be unique");
@@ -157,10 +160,6 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
     if (assignmentRelations.has(relation)) errors.push(`Duplicate AssignmentCoverage relation ${relation}`);
     assignmentRelations.add(relation);
   });
-  const covered = new Set(runtime.assignmentCoverages.map((coverage) => coverage.nodeId));
-  if (runtime.course.generationStatus !== "curriculum-generated") {
-    courseNodeIds.forEach((nodeId) => { if (!covered.has(nodeId)) errors.push(`KnowledgeNode ${nodeId} has no AssignmentCoverage`); });
-  }
   runtime.materials.forEach((material) => {
     if (material.courseId !== runtime.course.id) errors.push(`Material ${material.id} belongs to another Course`);
     if (!lessonIds.has(material.lessonId)) errors.push(`Material ${material.id} references unknown Lesson`);

@@ -115,16 +115,23 @@
 - Chapter edges aggregate prerequisite/enables counts per ordered chapter pair and undergo transitive reduction. CurriculumSequence may constrain or minimally connect the projection but MUST NOT become a KnowledgeEdge.
 - CurriculumCoverage and AssignmentCoverage remain N:M. Lesson or chapter fields MUST NOT be written into KnowledgeNode.
 
+## Course Foundation Invariants
+
+- A structurally valid Course is a learning-route container composed from Course, CourseCurriculum, the current required Chapter/Lesson structure, CurriculumCoverage, and shared active KnowledgeNode/KnowledgeEdge facts.
+- Material, MaterialSegment, MaterialKnowledgeCoverage, Micro content, CourseAssignment, AssignmentCoverage, AssignmentDependency, ChapterOutcome, FinalProject, and WorkflowTemplate are optional attached assets and MUST NOT be required for Course structural validity.
+- Structural validation is blocking and validates the required route plus every optional asset record that exists. Asset coverage audit is non-blocking and reports missing resources without manufacturing fallback content.
+- Course Graph remains a projection of curriculum coverage and shared Knowledge facts. A persisted CourseGraph table or parallel graph ontology MUST NOT be introduced for asset completeness.
+
 ## Course Assignment Invariants
 
-- Every course KnowledgeNode MUST have at least one AssignmentCoverage.
+- A Course may be structurally valid with no CourseAssignment or AssignmentCoverage. Missing Assignment coverage is a non-blocking asset gap reported by the Course asset coverage audit.
 - Assignment is curriculum data and MUST NOT be represented as a KnowledgeNode or KnowledgeRelation.
 - The user-facing UI term remains "实训树"; the domain model uses Assignment.
 - Assignments are not limited to workflow-canvas tasks. Workflow canvas is an optional execution environment selected by `Assignment.mode`.
 - AssignmentCoverage is N:M. One Assignment may cover multiple KnowledgeNodes, and one KnowledgeNode may be covered by multiple Assignments.
 - Knowledge and Assignment companion cards occupy one stable graph footprint.
 - Switching 技能树 / 实训树 is presentation-only and MUST NOT trigger ELK, fitView, coordinate changes, or viewport reset.
-- Missing AssignmentCoverage is a course-data invariant failure and MUST NOT be silently replaced with generated fallback UI text.
+- When CourseAssignment or AssignmentCoverage records exist, their ownership, references, cardinality, ordering, and dependency DAG MUST remain structurally valid. Missing coverage MUST NOT be replaced with generated fallback Assignment content.
 - Assignment progress is distinct from Knowledge mastery.
 - Assignment outputs may contribute to larger chapter/course outcomes without becoming KnowledgeNodes.
 - Assignment completion may produce KnowledgeEvidence in a future evidence pipeline, but completion MUST NOT automatically set mastery.
@@ -132,7 +139,7 @@
 - AssignmentDependency is a course-owned direct teaching/execution prerequisite between Assignments. It MUST use stable Assignment IDs, remain acyclic, and MUST NOT be mechanically copied from KnowledgeEdge.
 - ChapterOutcome and FinalProject composition MUST use stable course-owned identities and explicit Assignment-to-Outcome and Outcome-to-FinalProject relations; titles and projectContribution text are presentation content, not relationship identity.
 - Goal-constrained Assignment planning MUST combine the persisted Course target outcome with existing Course Knowledge and its factual DAG; planning Steps MUST reference only real active Course Knowledge IDs and MUST NOT invent Knowledge.
-- Every planning Step contains at least one Knowledge ID, all Course Knowledge remains covered by AssignmentCoverage, and one MVP planning Step produces exactly one CourseAssignment. An integrated Assignment MAY cover multiple KnowledgeNodes.
+- When the optional goal-constrained Assignment planning pipeline runs, every planning Step contains at least one Knowledge ID, the generated mapping covers all Course Knowledge, and one MVP planning Step produces exactly one CourseAssignment. An integrated Assignment MAY cover multiple KnowledgeNodes. This mapping-output invariant MUST NOT become a minimum Course structural requirement.
 
 ## Layout and Validation
 

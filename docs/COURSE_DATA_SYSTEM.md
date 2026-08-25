@@ -67,6 +67,10 @@ At minimum, a usable Course must have:
 
 Chapter/Lesson remain part of the current persisted/runtime model where required by the existing schema. Whether Lesson should become optional is tracked separately and must not be changed opportunistically as part of this contract.
 
+Referential validation requires every `lesson.chapterId`, Coverage Lesson/Knowledge endpoint, Sequence source/target, AssignmentCoverage endpoint, Material Lesson/Segment, and MaterialKnowledgeCoverage endpoint to resolve. Sequences cannot self-reference or duplicate the same ordered Lesson pair. AssignmentCoverage is unique by `(assignmentId, nodeId)` regardless of role; exact duplicate MaterialKnowledgeCoverage facts are rejected. Workflow Assignments that exist must declare `workflowTemplateId`.
+
+Structural validity requires a non-empty Course curriculum route under the current schema: Course → CourseCurriculum → Chapter → Lesson → CurriculumCoverage → an active KnowledgeNode visible to the validating actor. Material, MaterialSegment, MaterialKnowledgeCoverage, Micro, CourseAssignment, AssignmentCoverage, AssignmentDependency, ChapterOutcome, FinalProject, and WorkflowTemplate are not minimum structural requirements. If any optional asset record exists, all of its existing ownership, ordering, reference, cardinality, and DAG rules still apply.
+
 ### Optional assets
 
 The following are **not required for Course structural validity** and may be added later:
@@ -245,3 +249,40 @@ V0 Course Foundation does not require:
 The goal is simply:
 
 > A structurally valid Course route can enter the database and normal product runtime without code changes, while missing learning assets remain explicit non-blocking gaps.
+
+## 19. Normalized Course import details
+
+The accepted MVP import path is a Supabase-compatible SQL/seed transaction against normalized tables. No import UI or Course-specific frontend registration is required.
+
+Required records, inserted in dependency order:
+
+1. An active KnowledgeNode and its current KnowledgeNodeRevision must already exist and be visible to the learner/actor who will load the Course. Imports reference stable Knowledge IDs; they do not duplicate Knowledge.
+2. One `courses` row with a unique stable `id`, non-empty `title`, `description`, and `revision`. `generation_status = 'ready'` is the accepted directly discoverable import state; target outcome, subtitle, and accent color are optional.
+3. Exactly one `course_curricula` row for the Course, with a unique curriculum ID and valid generation mode.
+4. At least one `curriculum_chapters` row owned by the Course.
+5. At least one `curriculum_lessons` row owned by the Course and referencing an owned Chapter. Lesson remains required by the current schema; making Lesson optional is outside this contract.
+6. At least one `curriculum_coverages` row owned by the Course and referencing an owned Lesson plus the existing visible active KnowledgeNode.
+
+Chapter and Lesson orders are non-negative and unique course-wide. CurriculumCoverage order is non-negative and unique inside its Lesson. Course-owned IDs are resolved with `course_id`; cross-course references are invalid. Optional CurriculumSequence rows must reference owned Lessons and remain valid structural input.
+
+The following tables may contain zero rows for an imported Course: `course_assignments`, `assignment_coverages`, `assignment_dependencies`, `chapter_outcomes`, `assignment_outcome_compositions`, `final_projects`, `final_project_outcome_compositions`, `materials`, `material_segments`, and `material_knowledge_coverages`. Micro content and Workflow templates are separate optional domains and are not required by the Course import.
+
+`generation_status` is the existing generation/pipeline state, not a persisted publication-lifecycle model. Current Course presentation lifecycle defaults repository Courses to published unless the browser has an explicit draft/archive override. Therefore the accepted direct import uses `ready` and appears through normal discovery. Persisting a richer publication lifecycle is outside Issue #18.
+
+Import verification is:
+
+1. Run the SQL in a transaction and confirm every required row persists without optional asset rows.
+2. Request authenticated `GET /api/courses` and confirm the Course runtime contains the required route plus empty optional arrays.
+3. Hydrate `ApiCourseRepository`; `validateCourseRuntime` must pass.
+4. Confirm Course Center discovery and open Overview/Focused/Full Course Graph projections.
+5. Run `auditCourseAssetCoverage`; missing assets must appear as warnings/information and must not become fake content or structural errors.
+
+Because every stage enumerates normalized records generically, adding another conforming Course requires data changes only, not product-code changes. A new importer helper would duplicate this already testable path and is therefore not part of the MVP.
+
+## 20. Asset Coverage Audit implementation
+
+`auditCourseAssetCoverage(runtime)` is a pure, non-blocking audit. It reports total Course Knowledge plus covered/missing counts and IDs for AssignmentCoverage and MaterialKnowledgeCoverage. It also reports ChapterOutcome and FinalProject gaps. These findings describe asset completeness only and never determine structural validity.
+
+`CourseRuntimeData` currently has no Micro ownership or coverage relation. The audit reports Micro coverage as unavailable information rather than guessing from unrelated data or importing the Micro domain into the Course runtime. A future Micro-aware audit must compose through an explicit Micro boundary.
+
+Course type (`standard | personal`), `owner_user_id`, and `source_course_id` are deferred to #20 / V1B because Issue #18 has no current runtime or persistence need for those fields.

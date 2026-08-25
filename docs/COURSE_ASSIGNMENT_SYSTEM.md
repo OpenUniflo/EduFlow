@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-EduFlow models two mapped teaching dimensions: Knowledge describes what the learner learns; Assignment describes what the learner does after learning. Every active KnowledgeNode referenced by a course must be covered by at least one course Assignment.
+EduFlow models two mapped teaching dimensions: Knowledge describes what the learner learns; Assignment describes what the learner does after learning. A Course may contain only a valid Knowledge/curriculum route; Assignment is an optional attached learning asset whose absence is reported by the Course asset coverage audit.
 
 ## 2. Terminology
 
@@ -33,7 +33,7 @@ The workflow canvas is an optional execution environment for an Assignment. It i
 
 ## 7. Assignment generation
 
-Course creation proceeds as:
+The optional Assignment-generation pipeline proceeds as:
 
 ```text
 Upload Materials
@@ -44,15 +44,15 @@ Upload Materials
   -> Curriculum Generation
   -> Chapter / Lesson
   -> Assignment Generation
-  -> Assignment Coverage Validation
-  -> Course Ready
+  -> Assignment Structural Validation
+  -> Assignment Asset Coverage Audit
 ```
 
 Generation groups genuinely related atomic capabilities into executable tasks. It must not produce placeholder titles such as “学习 X” or “完成 X 练习”.
 
-## 8. Coverage invariant
+## 8. Coverage audit and structural integrity
 
-Before Course Ready, every active KnowledgeNode referenced by CurriculumCoverage must occur in AssignmentCoverage. Coverage references must resolve to an existing CourseAssignment and an existing course KnowledgeNode. Workflow Assignments must have a workflow template. Missing coverage is a data error; UI fallback text is forbidden.
+Missing AssignmentCoverage is an explicit non-blocking asset gap and does not prevent a valid Course route from being ready or rendered. If CourseAssignment or AssignmentCoverage records exist, every Coverage must resolve to an existing CourseAssignment and an existing course KnowledgeNode, duplicate `(assignmentId, nodeId)` pairs remain invalid, Assignment ordering and dependency DAG rules remain enforced, and Workflow Assignments must have a workflow template. UI fallback Assignment content is forbidden.
 
 ## 9. Skill Tree / 实训树 projection
 
@@ -91,7 +91,7 @@ V1 expresses this through `expectedOutput` and `projectContribution`. These outp
 
 ## 14. Data validation
 
-Initialization and tests validate complete course-node coverage, reference integrity, workflow template requirements, N:M examples in both directions, unique chapter aggregation, stable atomic footprints, unique node coordinates, and Chapter bounds containing every expanded footprint.
+Initialization and tests validate structural reference integrity, workflow template requirements for existing Workflow Assignments, N:M examples in complete fixtures, explicit missing-coverage audit results, unique chapter aggregation, stable atomic footprints, unique node coordinates, and Chapter bounds containing every expanded footprint.
 
 ## 15. Evidence relationship
 

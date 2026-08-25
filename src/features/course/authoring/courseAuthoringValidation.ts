@@ -1,6 +1,7 @@
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import type { KnowledgeGraph } from "@/features/knowledge/types";
 import { selectPrimaryCurriculumCoverage } from "@/features/course/curriculum/curriculumOrdering";
+import { auditCourseAssetCoverage } from "@/features/course/runtime/courseAssetCoverage";
 import { applyCourseAuthoringDraft, createEditableKnowledgeGraph, type CourseAuthoringDraftState } from "./courseAuthoringDraft";
 import { validateMicroInteraction } from "@/features/learning/micro/microLearning";
 
@@ -90,24 +91,19 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
     const material = materials.get(coverage.materialId);
     if (!material || !material.segments.some((segment) => segment.id === coverage.segmentId) || !courseNodeIds.has(coverage.nodeId)) fatal.push({ code: "broken-material-reference", message: `课件关联 ${coverage.id} 存在无效引用。` });
   });
-  const assignmentCovered = new Set(editable.assignmentCoverages.map((coverage) => coverage.nodeId));
   const assignmentIds = new Set(editable.assignments.map((assignment) => assignment.id));
   editable.assignmentCoverages.forEach((coverage) => {
     if (!assignmentIds.has(coverage.assignmentId) || !courseNodeIds.has(coverage.nodeId)) fatal.push({ code: "broken-assignment-coverage", message: `Assignment 覆盖 ${coverage.id} 引用了无效 Assignment 或 Knowledge。` });
   });
   const assignmentOrders = editable.assignments.map((assignment) => assignment.order);
   if (new Set(assignmentOrders).size !== assignmentOrders.length) fatal.push({ code: "duplicate-assignment-order", message: "Assignment 顺序必须在课程内唯一。" });
-  const materialCovered = new Set(editable.materialKnowledgeCoverages.map((coverage) => coverage.nodeId));
-  const missingAssignments = [...courseNodeIds].filter((id) => !assignmentCovered.has(id));
-  const missingMaterials = [...courseNodeIds].filter((id) => !materialCovered.has(id));
-  if (missingAssignments.length) warnings.push({ code: "missing-assignment", message: `${missingAssignments.length} 个 Knowledge 尚无 Assignment 覆盖。` });
-  if (missingMaterials.length) warnings.push({ code: "missing-material", message: `${missingMaterials.length} 个 Knowledge 尚无课件覆盖。` });
+  const assetAudit = auditCourseAssetCoverage(editable);
+  if (assetAudit.assignments.missingKnowledgeCount) warnings.push({ code: "missing-assignment", message: `${assetAudit.assignments.missingKnowledgeCount} 个 Knowledge 尚无 Assignment 覆盖。` });
+  if (assetAudit.materials.missingKnowledgeCount) warnings.push({ code: "missing-material", message: `${assetAudit.materials.missingKnowledgeCount} 个 Knowledge 尚无课件覆盖。` });
   const candidates = state.addedKnowledgeCandidates.filter((candidate) => courseNodeIds.has(candidate.id));
   if (candidates.length) warnings.push({ code: "draft-candidate", message: `${candidates.length} 个课程草稿知识点尚未进入全局治理。` });
-  const outcomeChapters = new Set(editable.chapterOutcomes.map((outcome) => outcome.chapterId));
-  const missingOutcomes = editable.chapters.filter((chapter) => !outcomeChapters.has(chapter.id));
-  if (missingOutcomes.length) warnings.push({ code: "missing-chapter-outcome", message: `${missingOutcomes.length} 个篇章没有正式 ChapterOutcome。` });
-  if (!editable.finalProjects.length) warnings.push({ code: "missing-final-project", message: "课程尚未配置 FinalProject。" });
+  if (assetAudit.chapterOutcomes.missingChapterCount) warnings.push({ code: "missing-chapter-outcome", message: `${assetAudit.chapterOutcomes.missingChapterCount} 个篇章没有正式 ChapterOutcome。` });
+  if (assetAudit.finalProjects.missing) warnings.push({ code: "missing-final-project", message: "课程尚未配置 FinalProject。" });
   if (state.microPathsEdited) {
     const requiredLearnContexts = new Set<string>();
     state.microPaths?.forEach((path) => {
@@ -130,5 +126,5 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
     });
   }
 
-  return { fatal, warnings, summary: { chapterCount: editable.chapters.length, knowledgeCount: courseNodeIds.size, assignmentCoveredCount: assignmentCovered.size, materialCoveredCount: materialCovered.size, candidateCount: candidates.length, dagValid: dagValid && chapterDagValid } };
+  return { fatal, warnings, summary: { chapterCount: editable.chapters.length, knowledgeCount: courseNodeIds.size, assignmentCoveredCount: assetAudit.assignments.coveredKnowledgeCount, materialCoveredCount: assetAudit.materials.coveredKnowledgeCount, candidateCount: candidates.length, dagValid: dagValid && chapterDagValid } };
 }
