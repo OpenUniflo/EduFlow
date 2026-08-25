@@ -5,7 +5,7 @@ import { routeOnlyKnowledgeGraph, routeOnlyRuntime } from "./courseFoundation.fi
 import { assignmentProjectionForNode, courseDrawerProjectionKind } from "../courseSelection";
 import { buildCourseGraphProjection } from "../graph/courseGraphProjection";
 import { auditCourseAssetCoverage, courseAssetCoverageLabel } from "./courseAssetCoverage";
-import { buildCourseGraphData, validateCourseRuntime } from "./courseRuntime";
+import { buildCourseGraphData, validateCourseIntegrity, validateCourseRuntime } from "./courseRuntime";
 
 const knowledgeRepository = new InMemoryKnowledgeRepository(routeOnlyKnowledgeGraph);
 
@@ -75,10 +75,30 @@ describe("Course foundation contract", () => {
   it("rejects a Course with no Knowledge route", () => {
     expect(() => validateCourseRuntime({
       ...routeOnlyRuntime,
-      chapters: [],
-      lessons: [],
       curriculumCoverages: []
     }, knowledgeRepository, globalKnowledgeAccess)).toThrow(/at least one CurriculumCoverage Knowledge route/);
+  });
+
+  it("accepts an incomplete Draft with no Knowledge route or optional assets", () => {
+    const draft = { ...routeOnlyRuntime, course: { ...routeOnlyRuntime.course, lifecycle: "draft" as const }, curriculumCoverages: [] };
+
+    expect(validateCourseIntegrity(draft, knowledgeRepository, globalKnowledgeAccess)).toBe(true);
+    expect(draft.materials).toEqual([]);
+    expect(draft.assignments).toEqual([]);
+    const graphData = buildCourseGraphData(draft, { userId: "admin", courseId: draft.course.id, isActive: false, assignmentStates: {}, materialStates: {}, updatedAt: "2026-08-25T00:00:00.000Z" }, routeOnlyKnowledgeGraph);
+    expect(graphData.chapters).toHaveLength(1);
+    expect(graphData.knowledgeNodes).toEqual([]);
+  });
+
+  it("still rejects broken references in an incomplete Draft", () => {
+    const draft = {
+      ...routeOnlyRuntime,
+      course: { ...routeOnlyRuntime.course, lifecycle: "draft" as const },
+      lessons: routeOnlyRuntime.lessons.map((lesson) => ({ ...lesson, chapterId: "missing-chapter" })),
+      curriculumCoverages: []
+    };
+
+    expect(() => validateCourseIntegrity(draft, knowledgeRepository, globalKnowledgeAccess)).toThrow(/references unknown Chapter/);
   });
 
   it("still rejects invalid Material Lesson, Segment, and Knowledge references", () => {

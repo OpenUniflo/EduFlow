@@ -76,6 +76,8 @@ Course validation is divided into:
 
 For example, missing Material or Assignment produces a warning, not a structural failure.
 
+Lifecycle determines which validation boundary applies. A teacher/admin-visible Draft may have no CurriculumCoverage while it is being edited, but all entities and references that do exist must remain internally valid. Published learner-usable Courses must pass the full minimum route validation; Repository hydration must not confuse a legitimately incomplete Draft with corrupted Course data.
+
 ## 3. Global EduFlow Assistant
 
 EduFlow has one global Assistant runtime, not separate AI implementations per page.

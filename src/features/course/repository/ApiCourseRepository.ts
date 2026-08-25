@@ -1,5 +1,5 @@
 import type { CourseRepository } from "./CourseRepository";
-import { validateCourseRuntime, type CourseRuntimeData } from "../runtime/courseRuntime";
+import { validateCourseIntegrity, validateCourseRuntime, type CourseRuntimeData } from "../runtime/courseRuntime";
 import { userKnowledgeAccess, type KnowledgeRepository } from "@/features/knowledge/repository/KnowledgeRepository";
 import { apiRequest } from "@/shared/api/apiClient";
 
@@ -10,7 +10,10 @@ export class ApiCourseRepository implements CourseRepository {
 
   async hydrate(userId: string) {
     const result = await apiRequest<{ courses: CourseRuntimeData[] }>("/api/courses");
-    result.courses.forEach((runtime) => validateCourseRuntime(runtime, this.knowledgeRepository, userKnowledgeAccess(userId)));
+    const access = userKnowledgeAccess(userId);
+    result.courses.forEach((runtime) => runtime.course.lifecycle === "draft"
+      ? validateCourseIntegrity(runtime, this.knowledgeRepository, access)
+      : validateCourseRuntime(runtime, this.knowledgeRepository, access));
     this.runtimes = result.courses;
   }
 

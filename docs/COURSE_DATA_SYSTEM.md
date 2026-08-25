@@ -54,6 +54,12 @@ It is distinct from the learner-specific dynamic `Learning Path` defined by the 
 
 A Course may be structurally valid even when learning assets are incomplete.
 
+### Lifecycle validation boundary
+
+A `draft` Course is an authoring container, not yet a learner-usable route. It may temporarily contain zero CurriculumCoverage and therefore zero Course Knowledge, as well as zero Material, Micro, Assignment, Outcome, FinalProject, and `targetOutcome`. Repository hydration applies integrity validation to every entity that does exist: owned references, Course ownership, ordering, cardinality, and visible Knowledge endpoints may not be dangling or cross-Course. Draft incompleteness is valid; corrupted Draft data is not.
+
+A `published` Course is learner-usable and must pass the full minimum Course route validation below. Moving a Draft to `published` is blocked until the minimum route exists. `archived` retains the existing full structural validation behavior; Issue #18 does not redefine archive semantics.
+
 ### Required for the navigation MVP
 
 At minimum, a usable Course must have:
@@ -269,7 +275,7 @@ Chapter and Lesson orders are non-negative and unique course-wide. CurriculumCov
 
 The following tables may contain zero rows for an imported Course: `course_assignments`, `assignment_coverages`, `assignment_dependencies`, `chapter_outcomes`, `assignment_outcome_compositions`, `final_projects`, `final_project_outcome_compositions`, `materials`, `material_segments`, and `material_knowledge_coverages`. Micro content and Workflow templates are separate optional domains and are not required by the Course import.
 
-`generation_status` is the existing generation/pipeline state, not a persisted publication-lifecycle model. Current Course presentation lifecycle defaults repository Courses to published unless the browser has an explicit draft/archive override. Therefore the accepted direct import uses `ready` and appears through normal discovery. Persisting a richer publication lifecycle is outside Issue #18.
+`generation_status` is the existing generation/pipeline state and remains distinct from the persisted `courses.lifecycle` value. A directly imported learner-usable Course uses `generation_status = 'ready'` and `lifecycle = 'published'`; an incomplete authoring container uses `lifecycle = 'draft'` and remains teacher/admin-only until it passes the minimum route gate.
 
 Import verification is:
 

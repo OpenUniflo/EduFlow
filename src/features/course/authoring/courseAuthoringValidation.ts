@@ -48,6 +48,7 @@ export function validateCourseAuthoring(runtime: CourseRuntimeData, baseGraph: K
 
   const courseNodeIds = new Set(editable.curriculumCoverages.map((coverage) => coverage.nodeId));
   const graphNodeIds = new Set(graph.nodes.map((node) => node.id));
+  if (!courseNodeIds.size) fatal.push({ code: "missing-learning-route", message: "发布前至少需要一个有效的课程 Knowledge route。" });
   const coveragePairs = editable.curriculumCoverages.map((coverage) => `${coverage.lessonId}:${coverage.nodeId}`);
   if (new Set(coveragePairs).size !== coveragePairs.length) fatal.push({ code: "duplicate-coverage", message: "同一课次不能重复覆盖同一个 Knowledge。" });
   courseNodeIds.forEach((nodeId) => { if (!graphNodeIds.has(nodeId)) fatal.push({ code: "missing-knowledge", message: `课程引用了不存在的 Knowledge：${nodeId}` }); });

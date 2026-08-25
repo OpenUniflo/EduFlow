@@ -56,7 +56,8 @@ function validateUniqueOrders<T>(errors: string[], items: readonly T[], order: (
   if (new Set(items.map(order)).size !== items.length) errors.push(`${label} orders must be unique`);
 }
 
-export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext) {
+/** Validates owned data and references without requiring a learner-usable route. */
+export function validateCourseIntegrity(runtime: CourseRuntimeData, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext) {
   const errors: string[] = [];
   const nodeIds = new Set(knowledgeRepository.getVisibleGraph(access).nodes.filter((node) => node.status === "active").map((node) => node.id));
   const chapterIds = new Set(runtime.chapters.map((chapter) => chapter.id));
@@ -76,7 +77,6 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
   if (runtime.curriculum.courseId !== runtime.course.id) errors.push(`Curriculum ${runtime.curriculum.id} belongs to another Course`);
   if (!runtime.chapters.length) errors.push("Course must contain at least one Chapter");
   if (!runtime.lessons.length) errors.push("Course must contain at least one Lesson");
-  if (!runtime.curriculumCoverages.length) errors.push("Course must contain at least one CurriculumCoverage Knowledge route");
   if (chapterIds.size !== runtime.chapters.length) errors.push("Chapter ids must be unique");
   if (lessonIds.size !== runtime.lessons.length) errors.push("Lesson ids must be unique");
   if (assignmentIds.size !== runtime.assignments.length) errors.push("Assignment ids must be unique");
@@ -194,6 +194,13 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
     materialRelations.add(relation);
   });
   if (errors.length) throw new Error(`Invalid CourseRuntimeData ${runtime.course.id}: ${errors.join("; ")}`);
+  return true;
+}
+
+/** Validates a learner-usable Course, including its minimum Knowledge route. */
+export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext) {
+  validateCourseIntegrity(runtime, knowledgeRepository, access);
+  if (!runtime.curriculumCoverages.length) throw new Error(`Invalid CourseRuntimeData ${runtime.course.id}: Course must contain at least one CurriculumCoverage Knowledge route`);
   return true;
 }
 

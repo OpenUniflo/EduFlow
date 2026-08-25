@@ -26,8 +26,12 @@ content. Learner `recent_lesson_id` and stale workflow-run references are made
 safe inside that transaction before Course-owned rows change, while learner
 Knowledge state and evidence remain independent.
 
-The manual Teaching entrypoint creates a `draft` course with a target outcome,
-one initial chapter, and one initial lesson. Design Mode provides manual
+The manual Teaching entrypoint creates a `draft` course with one initial chapter
+and one initial lesson; target outcome is optional Course metadata even if the
+current form prompts authors to provide it. A Draft may temporarily have no
+CurriculumCoverage and remains loadable for continued editing, while dangling
+owned references are still invalid. Full minimum-route validation is required
+before the Course becomes learner-visible. Design Mode provides manual
 Article Material creation/linking plus Path, Unit, native Step, Assignment, and
 AssignmentCoverage editing. The Micro preview runs the same interaction
 contract without publishing it. AI course creation remains a separate

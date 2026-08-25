@@ -177,6 +177,9 @@
 ## Course Authoring Drafts
 
 - Persisted Course authoring drafts are server-side, teacher/admin-only, and are never learner-visible.
+- A Draft Course is a valid editing container and MAY temporarily have zero CurriculumCoverage, Course Knowledge, Material, Micro, Assignment, Outcome, FinalProject, or targetOutcome. Missing minimum-route content is incompleteness, not corruption.
+- Draft repository hydration MUST still validate every existing owned entity, reference, ownership boundary, and ordering invariant; `draft` MUST NOT suppress dangling or cross-Course data failures.
+- A Course MUST pass the full minimum route validation before its lifecycle becomes `published` and learner-usable. Published and archived runtimes retain strict structural validation during repository hydration.
 - Editing a published Course changes only its draft projection until validated Publish succeeds.
 - Preview is derived from the published base plus the current persisted authoring draft; browser localStorage is not authoring content authority.
 - Publish must materialize the validated draft transactionally into canonical Course data and clear the applied draft.

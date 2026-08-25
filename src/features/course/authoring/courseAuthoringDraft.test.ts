@@ -58,6 +58,12 @@ describe("Course authoring draft overlay", () => {
     const warning=validateCourseAuthoring(runtime,graph,addKnowledgeCandidate(emptyCourseAuthoringDraft("course"),{id:"draft-b",title:"B",description:"B",chapterId:"chapter-a"})); expect(warning.fatal).toHaveLength(0); expect(warning.warnings.length).toBeGreaterThan(0);
     const state=addDraftDependency(addExistingKnowledge(addExistingKnowledge(emptyCourseAuthoringDraft("course"),"b","chapter-a"),"c","chapter-a"),{id:"c-a",source:"c",target:"a",relation:"prerequisite",strength:"hard",reason:"cycle"}); expect(validateCourseAuthoring(runtime,graph,state).fatal.some((issue)=>issue.code==="dependency-cycle")).toBe(true);
   });
+  it("keeps an empty Course editable but blocks it in Publish Check",()=>{
+    const emptyRuntime={...runtime,course:{...runtime.course,lifecycle:"draft" as const,targetOutcome:undefined},curriculumCoverages:[],assignments:[],assignmentCoverages:[],chapterOutcomes:[],finalProjects:[],materials:[],materialKnowledgeCoverages:[]};
+    const result=validateCourseAuthoring(emptyRuntime,graph,emptyCourseAuthoringDraft("course"));
+    expect(result.fatal).toContainEqual(expect.objectContaining({code:"missing-learning-route"}));
+    expect(result.summary.knowledgeCount).toBe(0);
+  });
   it("saves incomplete nested Micro drafts while keeping them publish-blocking",()=>{
     const state:CourseAuthoringDraftState={...emptyCourseAuthoringDraft("course"),microPathsEdited:true,microPaths:[{id:"micro",knowledgeId:"a",courseId:"course",scope:"course",title:"Draft Micro",mode:"learn",estimatedMinutes:5,required:true,status:"draft",units:[]}]};
     const result=validateCourseAuthoring(runtime,graph,state);

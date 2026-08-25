@@ -13,16 +13,16 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   if (request.method === "POST") {
     const body = request.body as { title?: string; description?: string; targetOutcome?: string; accentColor?: string };
     const title = body.title?.trim(); const targetOutcome = body.targetOutcome?.trim();
-    if (!title || !targetOutcome) throw new ApiError(400, "invalid_course", "title and targetOutcome are required");
+    if (!title) throw new ApiError(400, "invalid_course", "title is required");
     const profile = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
     const profileRow = dataOrThrow(profile.data as Row | null, profile.error, "Course creation role lookup");
     if (!profileRow || !["teacher", "admin"].includes(text(profileRow, "role"))) throw new ApiError(403, "course_creation_forbidden", "Only teachers may create courses");
     const id = `course-${crypto.randomUUID()}`; const chapterId = `${id}:chapter:1`; const lessonId = `${id}:lesson:1`; const server = createServerSupabase();
     const createdAt = new Date().toISOString();
-    const courseWrite = await server.from("courses").insert({ id, title, description: body.description?.trim() || title, target_outcome: targetOutcome, accent_color: body.accentColor?.trim() || "#7d6ee7", generation_status: "draft", lifecycle: "draft", author_user_id: user.id, revision: "draft-1", created_at: createdAt, updated_at: createdAt }).select("id").maybeSingle();
+    const courseWrite = await server.from("courses").insert({ id, title, description: body.description?.trim() || title, target_outcome: targetOutcome || null, accent_color: body.accentColor?.trim() || "#7d6ee7", generation_status: "draft", lifecycle: "draft", author_user_id: user.id, revision: "draft-1", created_at: createdAt, updated_at: createdAt }).select("id").maybeSingle();
     dataOrThrow(courseWrite.data as Row | null, courseWrite.error, "Course creation write");
     const curriculumWrite = await server.from("course_curricula").insert({ course_id: id, id: `${id}:curriculum`, generation_mode: "manual" }); dataOrThrow(curriculumWrite.data, curriculumWrite.error, "Curriculum creation write");
-    const chapterWrite = await server.from("curriculum_chapters").insert({ course_id: id, id: chapterId, title: "开始设计", description: "先添加本篇章的原子 Knowledge、课件和实训。", display_order: 0, color: body.accentColor?.trim() || "#7d6ee7", outcome: targetOutcome }); dataOrThrow(chapterWrite.data, chapterWrite.error, "Chapter creation write");
+    const chapterWrite = await server.from("curriculum_chapters").insert({ course_id: id, id: chapterId, title: "开始设计", description: "先添加本篇章的原子 Knowledge、课件和实训。", display_order: 0, color: body.accentColor?.trim() || "#7d6ee7", outcome: targetOutcome || "" }); dataOrThrow(chapterWrite.data, chapterWrite.error, "Chapter creation write");
     const lessonWrite = await server.from("curriculum_lessons").insert({ course_id: id, id: lessonId, chapter_id: chapterId, title: "课程起点", display_order: 0 }); dataOrThrow(lessonWrite.data, lessonWrite.error, "Lesson creation write");
     json(response, 201, { courseId: id }); return;
   }
@@ -32,6 +32,15 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const profile = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
     const profileRow = dataOrThrow(profile.data as Row | null, profile.error, "Course lifecycle role lookup");
     if (!profileRow || !["teacher", "admin"].includes(text(profileRow, "role"))) throw new ApiError(403, "course_lifecycle_forbidden", "Only teachers may change course lifecycle");
+    if (body.lifecycle === "published") {
+      const coverageResult = await client.from("curriculum_coverages").select("node_id").eq("course_id", body.courseId);
+      const coverages = dataOrThrow(coverageResult.data as Row[] | null, coverageResult.error, "Course publish route lookup");
+      const coveredNodeIds = [...new Set(coverages.map((row) => text(row, "node_id")))];
+      if (!coveredNodeIds.length) throw new ApiError(422, "course_learning_route_required", "A Published Course requires at least one active Knowledge route");
+      const knowledgeResult = await client.from("knowledge_nodes").select("id").in("id", coveredNodeIds).eq("status", "active");
+      const activeNodes = dataOrThrow(knowledgeResult.data as Row[] | null, knowledgeResult.error, "Course publish Knowledge lookup");
+      if (!activeNodes.length) throw new ApiError(422, "course_learning_route_required", "A Published Course requires at least one active Knowledge route");
+    }
     const write = await client.from("courses").update({ lifecycle: body.lifecycle, updated_at: new Date().toISOString() }).eq("id", body.courseId).select("id,lifecycle").maybeSingle();
     const row = dataOrThrow(write.data as Row | null, write.error, "Course lifecycle update");
     if (!row) throw new ApiError(404, "course_not_found", "Course not found");
