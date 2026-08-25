@@ -60,16 +60,17 @@ At minimum, a usable Course must have:
 
 - stable Course identity;
 - title;
-- target outcome / goal description;
 - at least one valid Knowledge mapping;
 - valid curriculum/graph references required by the current schema;
 - a structurally valid Course Graph.
+
+`targetOutcome` / `courses.target_outcome` is optional Course semantic metadata, not a structural-validity requirement. `null` means that the Course currently has no explicit goal description. A Goal or target outcome may be added or derived later by Goal Resolution / Personal Course flows without changing whether the underlying Course route is structurally valid. When `target_outcome` is present, the current database constraint still requires it to be non-empty after trimming.
 
 Chapter/Lesson remain part of the current persisted/runtime model where required by the existing schema. Whether Lesson should become optional is tracked separately and must not be changed opportunistically as part of this contract.
 
 Referential validation requires every `lesson.chapterId`, Coverage Lesson/Knowledge endpoint, Sequence source/target, AssignmentCoverage endpoint, Material Lesson/Segment, and MaterialKnowledgeCoverage endpoint to resolve. Sequences cannot self-reference or duplicate the same ordered Lesson pair. AssignmentCoverage is unique by `(assignmentId, nodeId)` regardless of role; exact duplicate MaterialKnowledgeCoverage facts are rejected. Workflow Assignments that exist must declare `workflowTemplateId`.
 
-Structural validity requires a non-empty Course curriculum route under the current schema: Course → CourseCurriculum → Chapter → Lesson → CurriculumCoverage → an active KnowledgeNode visible to the validating actor. Material, MaterialSegment, MaterialKnowledgeCoverage, Micro, CourseAssignment, AssignmentCoverage, AssignmentDependency, ChapterOutcome, FinalProject, and WorkflowTemplate are not minimum structural requirements. If any optional asset record exists, all of its existing ownership, ordering, reference, cardinality, and DAG rules still apply.
+Structural validity requires a non-empty Course curriculum route under the current schema: Course → CourseCurriculum → Chapter → Lesson → CurriculumCoverage → an active KnowledgeNode visible to the validating actor. Material, MaterialSegment, MaterialKnowledgeCoverage, Micro, CourseAssignment, AssignmentCoverage, AssignmentDependency, ChapterOutcome, FinalProject, WorkflowTemplate, and `targetOutcome` are not minimum structural requirements. If any optional asset record exists, all of its existing ownership, ordering, reference, cardinality, and DAG rules still apply.
 
 ### Optional assets
 
@@ -134,6 +135,7 @@ Course
 Chapters / Lessons                when required by current schema
 CurriculumCoverage
 Course target Knowledge
+optional target outcome / goal description
 optional CurriculumSequence
 optional Materials
 optional Micro content
