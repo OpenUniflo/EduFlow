@@ -25,6 +25,8 @@ Goal
   -> replan
 ```
 
+This stack describes the goal-driven navigation flow. A Course may also exist as a structurally valid learning-route container before an explicit Goal or `targetOutcome` is attached.
+
 ### Course Graph vs Learning Path
 
 - **Course Graph** answers: what Knowledge is in this Course, how is it organized, and what routes are possible?
@@ -45,10 +47,11 @@ At minimum a usable Course must have:
 
 - stable Course identity;
 - title;
-- target outcome / goal description;
 - at least one valid Knowledge mapping;
 - valid Course curriculum / graph references;
 - a structurally valid Course Graph.
+
+`targetOutcome` is optional Course metadata and is not part of V0 structural validity. `null` means no explicit Course goal description is currently attached. Goal Resolution or Personal Course creation may later derive or add a Goal/target outcome when the navigation flow needs one.
 
 Chapter/Lesson remain compatibility/current curriculum entities where present; this roadmap does not resolve the separate deferred question of making Lesson optional.
 
@@ -125,6 +128,8 @@ Goal
   -> optionally customize a close Course
   -> create a new Personal Course only when needed
 ```
+
+A Course without `targetOutcome` may still participate in matching through its actual Knowledge scope. When a goal-driven flow requires an explicit target, Goal Resolution supplies that target independently rather than treating missing Course metadata as structural invalidity.
 
 ### Matching principle
 
@@ -255,7 +260,7 @@ The current Workflow demo may remain as a demo/practice-environment illustration
 
 ### V0 — Course Foundation
 
-Goal: a valid Course can be imported/created from structured data and appear in the product without code changes; assets may be incomplete.
+Goal: a valid Course can be imported/created from structured data and appear in the product without code changes; assets and explicit target outcome may be incomplete/absent.
 
 Tasks:
 
@@ -339,7 +344,7 @@ Track, but do not implement prematurely:
 
 ## 10. Product acceptance milestones
 
-- **V0:** a Course containing only a valid Knowledge/curriculum route can be imported and displayed; missing assets are warnings.
+- **V0:** a Course containing only a valid Knowledge/curriculum route can be imported and displayed; `targetOutcome` and learning assets may be absent, and missing assets are warnings.
 - **V1A:** the same Assistant runtime can answer context-aware questions from all accepted AI/chat surfaces.
 - **V1B:** a Goal produces existing-Course recommendations first, then optional customization/new Personal Course creation.
 - **V1C:** two learners in the same Course can receive different Learning Paths/Next Actions from different Learner States.
