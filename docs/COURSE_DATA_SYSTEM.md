@@ -2,113 +2,246 @@
 
 ## 1. Purpose
 
-The course data system makes every course a runtime data package rather than a page-specific implementation. Agentic AI and Python Engineering are fixtures consumed through the same public boundary.
+The Course Data System makes every Course a runtime data package rather than a page-specific implementation.
 
-## 2. Core Boundary
+A Course is a **learning-route container over shared Knowledge**, not a bundle that is valid only when every learning asset exists.
 
-`CourseRepository` exposes `listCourseRuntimes()` and `getCourse(courseId)` only. It returns `CourseRuntimeData`, which contains the course definition, chapters, lessons, curriculum coverage, assignments, assignment coverage, materials, and material coverage.
+The current navigation model is:
 
-The repository does not know a user identity and therefore does not return fixed `CourseSummary` status or progress. Application projection combines CourseRuntimeData, LearningProgress, and UserKnowledge through `buildCourseSummary()`.
+```text
+Course
+  -> Course Graph       static route space
+  -> Learner State
+  -> Learning Path      learner-specific dynamic route
+  -> Next Action
+```
 
-Pages and generic services depend on this interface. They do not import individual course seeds.
+See `LEARNING_NAVIGATION_ROADMAP.md` for the current execution plan.
 
-## 3. Runtime Identity
+## 2. Core boundary
 
-Every runtime has a stable `course.id` and a structural `revision`. Unknown IDs are invalid; routing must display Not Found instead of substituting a default course.
+`CourseRepository` exposes Course runtime data through generic repository/API boundaries. Pages and generic services must not import individual course seeds or encode known Course IDs/counts.
+
+Course definition/projection remains separate from learner progress/state. Application projection combines Course runtime data with learner-scoped state.
+
+## 3. Runtime identity
+
+Every runtime has a stable `course.id` and a structural revision/version. Unknown IDs are invalid; routing must display Not Found rather than substituting a default Course.
 
 ## 4. Shared Knowledge Graph
 
-Courses reference stable shared `KnowledgeNode` IDs through `CurriculumCoverage`. They do not own or duplicate KnowledgeNodes or KnowledgeEdges. A shared node may appear in any number of courses.
+Courses reference stable shared `KnowledgeNode` IDs through curriculum/coverage relations. They do not own or duplicate KnowledgeNodes or KnowledgeEdges. A shared node may appear in any number of Courses.
 
-## 5. Course Graph Projection
+Knowledge prerequisite facts remain separate from Course teaching order.
 
-`buildCourseGraphData(runtime, userState, knowledgeGraph)` derives chapter, atomic node, edge, assignment, material, and progress presentation data. Projection is pure and receives its data explicitly.
+## 5. Course Graph projection
 
-## 6. Layout and Cache
+The Course Graph is a static curriculum projection over:
 
-ELK receives the projected structural graph. Its cache key is `courseId + runtime revision`; mode, selection, search, Drawer state, and progress do not invalidate it. React Flow adaptation is also input-driven and does not import a demo course.
+- Course;
+- Chapter/Lesson where present;
+- CurriculumCoverage / ordering data;
+- shared KnowledgeNode / KnowledgeEdge;
+- optional asset mappings.
 
-## 7. Routing
+The Course Graph answers:
 
-Generic routes are parameterized by `courseId`, with material routes additionally parameterized by `materialId`. Route ownership is validated. A material from another course is treated as Not Found.
+> What Knowledge is in this Course, how is it organized, and what routes are possible?
 
-## 8. Course Center
+It is distinct from the learner-specific dynamic `Learning Path` defined by the navigation roadmap.
 
-Course cards, metrics, search, progress, and recent activity are computed from repository runtimes and scoped user state. Adding a valid runtime to the repository automatically exposes it to Course Center.
+## 6. Minimum valid Course contract
 
-## 9. Course Creation Adapter
+A Course may be structurally valid even when learning assets are incomplete.
 
-`CourseCreationService` is an adapter boundary. The current demo implementation returns the Agentic AI fixture, but that choice exists only in the demo adapter; Atlas and other generic UI consume the returned `courseId`.
+### Required for the navigation MVP
 
-## 10. Validation
+At minimum, a usable Course must have:
 
-Runtime validation verifies unique IDs for Chapter, Lesson, CurriculumCoverage, CurriculumSequence, Assignment, AssignmentCoverage, Material, and MaterialKnowledgeCoverage. Every Chapter, Lesson, Coverage, Sequence, Assignment, and Material with course ownership must belong to the runtime Course.
+- stable Course identity;
+- title;
+- target outcome / goal description;
+- at least one valid Knowledge mapping;
+- valid curriculum/graph references required by the current schema;
+- a structurally valid Course Graph.
 
-Referential validation requires every `lesson.chapterId`, Coverage Lesson/Knowledge endpoint, Sequence source/target, AssignmentCoverage endpoint, Material Lesson/Segment, and MaterialKnowledgeCoverage endpoint to resolve. Sequences cannot self-reference or duplicate the same ordered Lesson pair. AssignmentCoverage is unique by `(assignmentId, nodeId)` regardless of role; exact duplicate MaterialKnowledgeCoverage facts are rejected. Every course KnowledgeNode must still have AssignmentCoverage, and workflow Assignments must still declare `workflowTemplateId`.
+Chapter/Lesson remain part of the current persisted/runtime model where required by the existing schema. Whether Lesson should become optional is tracked separately and must not be changed opportunistically as part of this contract.
 
-Ordering validation requires non-negative integer order values. Chapter, Lesson, and CourseAssignment order are unique course-wide; CurriculumCoverage order is unique within a Lesson; Material order is unique within a Lesson; and MaterialSegment order is unique within a Material. PDF page remains the authoritative complete `1..pageCount` ordering.
+### Optional assets
 
-## 11. Multi-course Fixture
+The following are **not required for Course structural validity** and may be added later:
 
-Python Engineering is the second full fixture. It exercises dynamic Course Center discovery, generic overview/focused/full graph modes, instruction and workflow Assignments, N:M mappings, materials, and independent user progress without a Python-specific page branch.
+- Material / MaterialSegment / MaterialKnowledgeCoverage;
+- MicroLearningPath / MicroUnit / MicroStep;
+- CourseAssignment / AssignmentCoverage;
+- ChapterOutcome / FinalProject;
+- WorkflowTemplate / Workflow practice;
+- other future LearningAction providers.
 
-## 12. Seed Boundaries
+A Knowledge node with no Material, Micro, or Assignment is a valid state. Learner UI must present explicit unavailable/empty actions instead of inventing synthetic assets.
 
-Course-specific text and fixtures live under `src/demo`. Generic pages, projections, repositories, layout, progress, and material services must not encode Agentic AI or Python Engineering IDs or counts.
+## 7. Validation split
 
-## 13. Persistence Evolution
+Course validation is divided into two layers.
 
-The current repository is in-memory demo infrastructure. Its interface is designed so an API-backed repository can replace it without changing routes, projections, or page behavior.
+### 7.1 Structural Validation — blocking
 
-## 14. Entity Identity Scope
+Structural validation verifies only invariants required for a coherent Course/runtime, including where applicable:
 
-`KnowledgeNode` identity may be reused by multiple Courses. Course-owned entity IDs are stable within a Course and MUST NOT be assumed globally unique across Course boundaries. Cross-course projections use `(courseId, entityId)` identity or runtime-local lookup; this does not add composite ID fields to persisted entities.
+- unique IDs for Course-owned structural entities;
+- Course ownership/reference validity;
+- valid Chapter/Lesson references under the current schema;
+- valid CurriculumCoverage Knowledge endpoints;
+- valid CurriculumSequence endpoints;
+- no invalid/self/duplicate ordered structural relation where prohibited;
+- non-negative deterministic ordering values;
+- required Course Graph references resolve;
+- graph/curriculum invariants required by the current projection hold.
 
-## 14. Non-goals
+A structural failure blocks publication/use of that runtime.
 
-This version does not implement a production course-generation backend, authoring studio, server synchronization, grading, submission history, or artifact dependency engine.
+### 7.2 Asset Coverage Audit — non-blocking
 
-## 15. Scoped Knowledge Resolution
+Asset coverage reports completeness without determining Course validity.
 
-Course runtime mappings may reference any Global, Tenant, or User KnowledgeNode visible to the active actor. Runtime validation resolves CurriculumCoverage, AssignmentCoverage, and MaterialKnowledgeCoverage through KnowledgeRepository with a KnowledgeAccessContext; `globalKnowledgeGraph` is not the universal Course source.
+Examples:
 
-## 16. Independent Progress Projections
+```text
+WARN 8 Knowledge nodes have no Micro
+WARN 12 Knowledge nodes have no Material
+WARN 18 Knowledge nodes have no Assignment
+Asset completeness: 42%
+```
 
-Chapter `knowledgeProgress` is derived from visible UserKnowledgeState mastery, with missing evidence contributing no fabricated mastery. `assignmentSummary.progress` is derived independently from UserAssignmentState. Knowledge and Assignment presentation modes select the corresponding projection.
+Missing Material/Micro/Assignment/Workflow is a warning, not a structural failure.
 
-## 17. Chapter Deep Links
+The previous invariant that **every Course KnowledgeNode must have AssignmentCoverage** is retired for the navigation MVP.
 
-`/courses/:courseId/chapters/:chapterId` validates ownership and opens the existing Course Graph in focused mode at that Chapter. An unknown Chapter renders a safe Not Found state rather than silently returning to Overview.
+Workflow-specific validation applies only when a Workflow-mode Assignment actually exists.
 
-## 18. PDF Course Material
+## 8. Course Import Contract
 
-Course data may reference a stable static PDF through MaterialSource. It owns Material metadata, Page/Segment addresses, and MaterialKnowledgeCoverage; it does not recreate or own the PDF's visual layout. Adding another PDF course requires a source file/URL, Material metadata, one Segment per page, and coverage records, without changes to the generic Reader UI.
+V0 must support adding a Course without product-code changes by importing valid structured data through supported persistence/seed/import tooling.
 
-## 19. CurriculumChapter
+The import contract should be able to represent at minimum:
 
-`CurriculumChapter` is static curriculum definition only. It contains neither user `progress` nor a duplicated `lessonIds` list. Chapter knowledge progress and Assignment summaries exist only in user-scoped projections.
+```text
+Course
+Chapters / Lessons                when required by current schema
+CurriculumCoverage
+Course target Knowledge
+optional CurriculumSequence
+optional Materials
+optional Micro content
+optional Assignments
+optional Outcomes / Workflow data
+```
 
-## 20. CurriculumLesson Ownership
+Acceptable first implementation forms include:
 
-`CurriculumLesson.chapterId` is the sole authoritative Chapter membership relation. Chapter Lesson lists and counts are derived by filtering runtime Lessons; a Chapter does not store a second copy of membership.
+- committed SQL/seed data;
+- Supabase-compatible structured import;
+- a validated JSON/import script.
 
-## 21. CurriculumCoverage Ordering
+A dedicated import UI is not required for V0.
 
-Every CurriculumCoverage has an integer `order >= 0`, representing deterministic instruction/display order inside its Lesson. Primary coverage selects `introduce` first, then earliest `lesson.order`, then `coverage.order`, with stable IDs used only for exact ties.
+After import, the normal API-backed CourseRepository must discover the Course automatically.
 
-Course Knowledge ordering is `lesson.order -> coverage.order -> role -> nodeId`, with Coverage ID only as a final deterministic tie-break. KnowledgeNode never receives course-specific Lesson, Chapter, or curriculum-order fields, and changing an ID to a UUID does not change business order.
+## 9. Course Center and discovery
 
-## 22. User State
+Course cards, search, learner membership/progress, and recent activity are projections over repository runtimes plus learner state.
 
-Course, Chapter, Assignment, and reading progress are not Course definition data. They belong to `UserCourseState`, `UserAssignmentState`, `UserMaterialState`, `UserKnowledgeState`, or projections derived from those records.
+Adding a valid persisted/published Course through the supported data path must expose it through Course discovery without adding a page-specific branch.
 
-## 23. Canonical Ordering Hierarchy
+`published` means available to eligible learners; it does not itself mean the Course belongs to a learner's `My Courses` membership.
 
-- Course curriculum: `chapter.order -> lesson.order -> coverage.order`.
-- Primary Knowledge coverage: introduce first, then `lesson.order -> coverage.order -> coverage.id` final tie.
-- Course Knowledge presentation: `lesson.order -> coverage.order -> role -> nodeId -> coverageId`.
-- Materials: `lesson.order -> material.order -> material.id` final tie.
-- Non-PDF Segments: `segment.order -> segment.id`; PDF Segments: `page -> segment.id`.
-- Assignments: `assignment.order -> assignment.id`.
+## 10. Course creation adapters
 
-Changing IDs to UUIDs or shuffling repository arrays does not change business presentation order.
+AI/manual Course creation is an application adapter over the same Course contracts.
+
+Automatic arbitrary material -> Course generation is **not required** for the current navigation MVP.
+
+Goal-driven Personal Course creation should prefer selecting/projecting shared Knowledge and should not require Material, Micro, Assignment, or PPT generation.
+
+## 11. Standard and Personal Course
+
+Standard and Personal Courses use the same Course domain concept.
+
+Conceptually a Personal Course may include:
+
+```text
+course_type = personal
+owner_user_id
+source_course_id?    when derived from an existing Course
+```
+
+Personal Course is needed only when the learning goal/scope itself differs from existing Courses.
+
+A learner-specific dynamic Learning Path inside a standard Course does **not** require copying that Course into a Personal Course.
+
+## 12. Entity identity scope
+
+`KnowledgeNode` identity may be reused by multiple Courses. Course-owned entity IDs are stable within a Course and must not be assumed globally unique across Course boundaries. Cross-course projections use Course context plus entity identity as required by the runtime model.
+
+## 13. Persistence
+
+Course runtime data is persisted and read through the API-backed repository/application service layer and Supabase-backed backend contracts.
+
+Demo fixtures may remain for examples/tests, but they must not be authoritative for normal runtime behavior.
+
+React feature/domain code must continue to respect repository/API boundaries rather than querying Supabase tables directly.
+
+## 14. Scoped Knowledge resolution
+
+Course runtime mappings may reference Global, Tenant, or User KnowledgeNodes visible to the active actor. Runtime validation resolves Knowledge endpoints using the applicable access context; a separate Course-owned Knowledge ontology must not be introduced.
+
+## 15. Progress and learner state
+
+Course, Chapter, Assignment, Material, Micro, and Knowledge learner state are not Course definition data.
+
+Keep distinct concepts distinct:
+
+```text
+Course Progress
+!= Micro Progress
+!= Assignment State
+!= LearnerKnowledgeState
+```
+
+The current learner Knowledge status remains user-scoped. Course presentation must not claim that a globally mastered Knowledge necessarily means every Course-specific requirement is completed.
+
+## 16. Ordering contract
+
+Canonical business ordering remains explicit data; IDs are identity and deterministic tie-breakers only.
+
+Under the current schema:
+
+- Course curriculum: `chapter.order -> lesson.order -> coverage.order`;
+- primary Knowledge coverage: role/order rules defined by curriculum projection;
+- Materials: curriculum context -> material order -> stable tie-break;
+- PDF Segments: page order is authoritative;
+- Assignments: assignment order -> stable tie-break.
+
+Shuffling repository arrays or replacing IDs with UUIDs must not change business order.
+
+## 17. Routing and deep links
+
+Generic routes remain parameterized by stable Course/entity IDs. Route ownership must be validated. Unknown or cross-Course entity references render a safe Not Found/unsupported state rather than silently substituting another asset.
+
+## 18. Non-goals for the current V0 contract
+
+V0 Course Foundation does not require:
+
+- automatic document parsing/course generation;
+- Material completeness;
+- Micro completeness;
+- Assignment completeness;
+- real Workflow Runtime;
+- automatic evaluation/mastery;
+- ML recommendation;
+- Capability/Evidence advanced modeling;
+- a Course import UI.
+
+The goal is simply:
+
+> A structurally valid Course route can enter the database and normal product runtime without code changes, while missing learning assets remain explicit non-blocking gaps.
