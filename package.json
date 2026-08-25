@@ -15,7 +15,7 @@
     "preinstall": "node scripts/enforce-pnpm.mjs",
     "dev": "vite --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src api scripts",
+    "lint": "eslint src api scripts tests",
     "test": "vitest run",
     "audit:knowledge": "node scripts/audit-knowledge-relations.mjs",
     "audit:client-secrets": "node scripts/audit-client-secrets.mjs",

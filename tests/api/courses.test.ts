@@ -2,9 +2,9 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createUserSupabase = vi.hoisted(() => vi.fn());
-vi.mock("./_lib/supabase.js", () => ({ createUserSupabase }));
+vi.mock("../../api/_lib/supabase.js", () => ({ createUserSupabase }));
 
-import handler from "./_handlers/courses";
+import handler from "../../api/_handlers/courses";
 
 type Row = Record<string, unknown>;
 

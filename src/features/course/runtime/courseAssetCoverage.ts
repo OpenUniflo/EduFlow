@@ -43,6 +43,12 @@ export type CourseAssetCoverageAudit = {
   issues: CourseAssetCoverageIssue[];
 };
 
+export function courseAssetCoverageLabel(audit: CourseAssetCoverageAudit) {
+  return audit.issues.some((issue) => issue.severity === "warning")
+    ? "学习资产待补充"
+    : "已配置学习资产";
+}
+
 function knowledgeCoverage(courseKnowledgeNodeIds: readonly string[], coveredNodeIds: ReadonlySet<string>): CourseKnowledgeAssetCoverage {
   const coveredKnowledgeNodeIds = courseKnowledgeNodeIds.filter((nodeId) => coveredNodeIds.has(nodeId));
   const missingKnowledgeNodeIds = courseKnowledgeNodeIds.filter((nodeId) => !coveredNodeIds.has(nodeId));

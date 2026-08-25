@@ -40,6 +40,14 @@ Vercel Preview -> Vercel Functions -> Hosted Supabase
 
 `vercel.json` pins Functions to Vercel `sin1`, matching the Hosted Supabase `ap-southeast-1` region so API/database traffic does not cross continents.
 
+### Vercel Function budget
+
+The current `edu-flow` project deploys on Vercel Hobby and is limited to 12 Serverless Functions per deployment. A top-level deployable file under `api/` is a quota-consuming HTTP entrypoint; a rewrite changes its public route but does not consolidate its Function. Tests must live outside Vercel's entrypoint discovery, while reusable libraries and routed handlers remain under non-entrypoint directories such as `api/_lib` and `api/_handlers`.
+
+At the Issue #18 close baseline, the 11 production entrypoints are `course-intent`, `course-mapping`, `course`, `domains`, `health`, `knowledge-generation`, `knowledge`, `learner`, `material-parsing-jobs`, `materials`, and `workflows`. This leaves one Hobby slot reserved before #19. Before adding a Function, run a Vercel build or Preview and inspect the generated Functions; do not infer the count from rewrites or source-file totals alone.
+
+Prefer the existing `course` and `learner` multiplexers when a new route belongs clearly to those domains. Do not add repeated thin wrappers, and do not combine unrelated domains merely to save quota. Function budget is a deployment architecture constraint, not permission to weaken API ownership, authentication, or public-route compatibility.
+
 Hosted schema changes use the same committed files under `supabase/migrations`. Reviewed migrations may be applied to Hosted only after `pnpm db:reset` and local verification succeed. Hosted Supabase must never be reset as part of ordinary development.
 
 Vercel deployment and Hosted Supabase migration deployment are separate operations. Before a Production deployment is considered complete:

@@ -10,6 +10,7 @@ import { CourseDesignAssistant } from "@/features/course/components/CourseDesign
 import { buildCourseDesignAssistantContext, type CourseDesignAssistantProvider, type CourseDesignAssistantResponse } from "@/features/course/courseDesignAssistant";
 import type { CourseGraphView } from "@/features/course/graph/courseGraphProjection";
 import { buildCourseGraphData } from "@/features/course/runtime/courseRuntime";
+import { auditCourseAssetCoverage, courseAssetCoverageLabel } from "@/features/course/runtime/courseAssetCoverage";
 import { useUserCourseState } from "@/features/learning/progress/progressService";
 import type { AssignmentContext, CourseAssignment, CourseChapterProjection, CourseSkillTreeNode } from "@/features/course/types";
 import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
@@ -52,6 +53,7 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   const baseKnowledgeGraph = useMemo(() => knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), [session.userId]);
   const editableKnowledgeGraph = useMemo(() => draftState ? createEditableKnowledgeGraph(baseKnowledgeGraph, draftState) : baseKnowledgeGraph, [baseKnowledgeGraph, draftState]);
   const runtime = useMemo(() => baseRuntime ? (draftState ? applyCourseAuthoringDraft(baseRuntime, draftState) : baseRuntime) : undefined, [baseRuntime, draftState]);
+  const assetAudit = useMemo(() => runtime ? auditCourseAssetCoverage(runtime) : null, [runtime]);
   const validation = useMemo(() => baseRuntime && draftState ? validateCourseAuthoring(baseRuntime, baseKnowledgeGraph, draftState) : null, [baseKnowledgeGraph, baseRuntime, draftState]);
   const structuralFatal = validation?.fatal.filter((issue) => !isDraftCompletenessIssue(issue)) ?? [];
   const graphRuntime = structuralFatal.length ? baseRuntime : runtime;
@@ -450,10 +452,10 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     const lessonIds = new Set(lessons.map((lesson) => lesson.id));
     if (experience === "design") return <>
       <section className="atlas-drawer-section"><h3>篇章设计</h3><p>{chapter.description}</p><div className="course-authoring-inline-actions"><button onClick={renameSelectedChapter}>重命名</button><button disabled={chapter.order<=1} onClick={()=>moveSelectedChapter(-1)}><ArrowUp size={13}/>上移</button><button disabled={chapter.order>=runtime!.chapters.length} onClick={()=>moveSelectedChapter(1)}><ArrowDown size={13}/>下移</button><button className="danger" onClick={deleteSelectedChapter}><Trash2 size={13}/>删除篇章</button></div></section>
-      <section className="atlas-drawer-section"><h3>Coverage Completeness</h3><div className="atlas-drawer-progress-meta"><span>{nodes.length} Knowledge · {chapter.assignmentSummary.assignmentCount} Assignments · {runtime!.materials.filter((material) => lessonIds.has(material.lessonId)).length} Materials</span><strong>完整</strong></div><div className="atlas-drawer-progress"><i style={{width:"100%"}} /></div></section>
+      <section className="atlas-drawer-section"><h3>结构与学习资产</h3><div className="atlas-drawer-info-card"><Check size={15} /><span>Course route 结构有效</span></div>{assetAudit ? <div className="atlas-drawer-progress-meta"><span>{assetAudit.materials.coveredKnowledgeCount}/{assetAudit.knowledgeCount} Knowledge 有 Material · {assetAudit.assignments.coveredKnowledgeCount}/{assetAudit.knowledgeCount} Knowledge 有 Assignment</span><strong>{courseAssetCoverageLabel(assetAudit)}</strong></div> : null}</section>
       <section className="atlas-drawer-section"><h3>Stage Outcome</h3><p>{chapter.outcome}</p></section>
       <section className="atlas-drawer-section"><h3>CurriculumCoverage</h3><div className="atlas-tag-list">{nodes.map((node) => <span key={node.id}>{node.id} · {node.curriculumContexts[0]?.role}</span>)}</div></section>
-      <section className="atlas-drawer-section"><h3>AI 教学建议</h3><p>覆盖与阶段成果一致。建议在综合实训中明确本篇章成果如何被后续篇章继承。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：在篇章目标中明确阶段成果的后续复用接口。")}>优化篇章教学设计</button></section>
+      <section className="atlas-drawer-section"><h3>AI 教学建议</h3><p>{assetAudit && courseAssetCoverageLabel(assetAudit) === "学习资产待补充" ? "课程结构有效，但仍有学习资产待补充。" : "当前已配置的学习资产可继续复核其阶段成果衔接。"} 建议在综合实训中明确本篇章成果如何被后续篇章继承。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：在篇章目标中明确阶段成果的后续复用接口。")}>优化篇章教学设计</button></section>
     </>;
     return <>
       <section className="atlas-drawer-section"><h3>篇章简介</h3><p>{chapter.description}</p></section>
@@ -468,11 +470,13 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   function chapterAssignmentFacet(chapter: CourseChapterProjection) {
     const projection = chapterAssignment!;
     const summary = chapter.assignmentSummary;
+    const chapterNodes = courseSkillTreeNodes.filter((node) => node.chapterId === chapter.id);
+    const assignmentCoveredKnowledgeCount = chapterNodes.filter((node) => node.assignmentContexts.length > 0).length;
     if (experience === "design") return <>
       <section className="atlas-drawer-section"><h3>Chapter Assignment Design</h3><div className="atlas-chapter-assignment-stats"><span><strong>{summary.assignmentCount}</strong>Assignments</span><span><strong>{projection.projectContributions.length}</strong>成果映射</span></div></section>
       <section className="atlas-drawer-section"><h3>覆盖与依赖</h3><p>{projection.assignments.length} 个 Assignment 覆盖本篇章 Knowledge；直接依赖由稳定 Assignment ID 定义。</p><div className="atlas-assignment-switcher">{projection.assignments.map(({assignment}) => <div className="atlas-assignment-row" key={assignment.id}><strong>{assignment.title}</strong><small>{assignment.experience?.type ?? assignment.mode}</small></div>)}</div></section>
       <section className="atlas-drawer-section"><h3>Stage Outcome</h3><p>{summary.outcome}</p></section>
-      <section className="atlas-drawer-section"><h3>Issues / AI Suggestion</h3><p>当前覆盖完整。建议复核 inherited outputs 是否足以支持下一篇章，无需创建展示用依赖。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：补充 inherited outputs 的验收边界和复用说明。")}>AI 优化篇章实训</button></section>
+      <section className="atlas-drawer-section"><h3>Assignment Coverage</h3><p>已配置 {projection.assignments.length} 个 Assignment，覆盖 {assignmentCoveredKnowledgeCount}/{chapterNodes.length} 个 Knowledge。建议复核 inherited outputs 是否足以支持下一篇章，无需创建展示用依赖。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：补充 inherited outputs 的验收边界和复用说明。")}>AI 优化篇章实训</button></section>
     </>;
     return <>
       <section className="atlas-drawer-section"><h3>{chapter.title} · 实训</h3><div className="atlas-chapter-assignment-stats"><span><strong>{summary.assignmentCount}</strong>项实训</span><span><strong>{summary.completedCount}</strong>已完成</span><span><strong>{summary.inProgressCount}</strong>进行中</span><span><strong>{summary.notStartedCount}</strong>未开始</span></div><div className="atlas-drawer-progress-meta"><span>完成度</span><strong>{summary.progress}%</strong></div><div className="atlas-drawer-progress"><i style={{ width: `${summary.progress}%` }} /></div></section>
@@ -483,6 +487,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   }
 
   function atomicKnowledgeFacet(node: CourseSkillTreeNode) {
+    const hasMaterialCoverage = assetAudit?.materials.coveredKnowledgeNodeIds.includes(node.id) ?? false;
+    const hasAssignmentCoverage = assetAudit?.assignments.coveredKnowledgeNodeIds.includes(node.id) ?? false;
     if (experience === "design") return <>
       <section className="atlas-drawer-section"><h3>Knowledge Metadata</h3><p><strong>{node.id}</strong> · {node.knowledge.type} · {node.knowledge.scope}</p><p>{node.description}</p></section>
       <section className="atlas-drawer-section"><h3>所属 Chapter / CurriculumCoverage</h3><label className="course-authoring-field"><span>移动到篇章</span><select value={node.chapterId} onChange={(event)=>updateAuthoringDraft((state)=>moveCourseKnowledge(state,node.id,event.target.value))}>{runtime!.chapters.map((chapter)=><option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}</select></label><div className="atlas-requirement-list">{node.curriculumContexts.map((context) => <div className="atlas-requirement" key={context.id}><span className="atlas-requirement-icon ready">{context.lessonOrder}</span><span>{courseChapters.find((chapter) => chapter.id === context.chapterId)?.title}<small>{context.role} · order {context.order}</small></span></div>)}</div></section>
@@ -491,7 +497,7 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
       <MicroAuthoringEditor paths={draftState?.microPaths ?? []} courseId={runtime!.course.id} knowledgeId={node.id} onPathsChange={(paths) => updateAuthoringDraft((state) => ({ ...state, microPaths: paths, microPathsEdited: true }))} />
       <DraftMicroPreview paths={draftState?.microPaths ?? []} knowledgeId={node.id} />
       <AssignmentAuthoringEditor assignments={draftState?.assignments ?? runtime!.assignments} coverages={draftState?.assignmentCoverages ?? runtime!.assignmentCoverages} courseId={runtime!.course.id} knowledgeId={node.id} onChange={(assignments, assignmentCoverages) => updateAuthoringDraft((state) => ({ ...state, assignments, assignmentCoverages }))} />
-      <section className="atlas-drawer-section"><h3>Mapping 状态</h3><div className="atlas-drawer-info-card"><Check size={15} /><span>课程、课件与实训覆盖完整</span></div></section>
+      <section className="atlas-drawer-section"><h3>结构与学习资产</h3><div className="atlas-drawer-info-card"><Check size={15} /><span>Course route 结构有效</span></div><p>Material {hasMaterialCoverage ? "已映射" : "待补充"} · Assignment {hasAssignmentCoverage ? "已映射" : "待补充"}</p></section>
       <section className="atlas-drawer-section"><h3>课程覆盖操作</h3><p>移除只影响本课程覆盖，不会删除 Global Knowledge。</p><button className="atlas-secondary danger" onClick={removeSelectedKnowledge}><Trash2 size={14}/>从课程移除</button></section>
     </>;
     return <>

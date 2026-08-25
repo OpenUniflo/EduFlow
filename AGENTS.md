@@ -12,7 +12,11 @@
 - Before Hosted Preview acceptance, identify the environment's Supabase project, compare migration history, apply pending migrations incrementally, synchronize only hosted-safe required fixtures, and smoke authenticated APIs before browser validation.
 - Shared Hosted databases MUST NOT be reset or migrated automatically by every Preview build.
 - Runtime Micro content authority is the database; Demo providers are fixtures/adapters only.
-- Physical serverless entrypoints SHOULD remain consolidated, and deployment limits MUST be checked before adding a top-level API function.
+- The current deployment target is Vercel Hobby, with at most 12 Serverless Functions per deployment. This is a deployment constraint, not a Course or other domain-model rule.
+- Every top-level deployable file under `api/` consumes Function budget. Tests MUST NOT live where Vercel discovers them as production Function entrypoints; shared libraries, handlers, and tests belong in non-entrypoint locations.
+- Before adding a Function, inspect the generated Vercel output and remaining budget. Keep capacity available for the roadmap's #19 Assistant boundary; do not wait for a quota-failed Preview to discover exhaustion.
+- Prefer an existing semantically clear multiplexer/handler boundary over another thin wrapper. Do not create unbounded wrapper Functions, but also do not force unrelated domains into one oversized handler merely to reduce the count.
+- Rewrites change routing only; they MUST NOT be treated as proof that the underlying Function count decreased. Preview acceptance requires a real Vercel deployment and generated Function-count evidence.
 
 ## Micro Learning Runtime
 

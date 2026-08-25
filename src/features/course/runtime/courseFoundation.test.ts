@@ -4,7 +4,7 @@ import { globalKnowledgeAccess } from "@/features/knowledge/repository/Knowledge
 import { routeOnlyKnowledgeGraph, routeOnlyRuntime } from "./courseFoundation.fixture";
 import { assignmentProjectionForNode, courseDrawerProjectionKind } from "../courseSelection";
 import { buildCourseGraphProjection } from "../graph/courseGraphProjection";
-import { auditCourseAssetCoverage } from "./courseAssetCoverage";
+import { auditCourseAssetCoverage, courseAssetCoverageLabel } from "./courseAssetCoverage";
 import { buildCourseGraphData, validateCourseRuntime } from "./courseRuntime";
 
 const knowledgeRepository = new InMemoryKnowledgeRepository(routeOnlyKnowledgeGraph);
@@ -50,6 +50,7 @@ describe("Course foundation contract", () => {
       "missing-chapter-outcome",
       "missing-final-project"
     ]);
+    expect(courseAssetCoverageLabel(audit)).toBe("学习资产待补充");
   });
 
   it("still rejects an AssignmentCoverage with a dangling Assignment", () => {
