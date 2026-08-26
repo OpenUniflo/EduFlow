@@ -83,7 +83,8 @@ describe("Micro Learning assessment integrity", () => {
   it("keeps Assistant actions separate from grading and persisted progress writes", () => {
     const source = readFileSync(join(process.cwd(), "src/features/learning/micro/MicroLearningExperience.tsx"), "utf8");
     const assistant = source.slice(source.indexOf("<EduFlowAssistant"));
-    expect(assistant).toContain("setAssistantMessage");
+    expect(assistant).toContain("microPathId:path.id");
+    expect(assistant).toContain("microStepId:step.id");
     expect(assistant).not.toMatch(/setGradingFeedback|completeCurrent\(/);
     expect(source).toContain("repository.completeStep(path.id, unit.id, step.id");
     expect(source).toContain("refreshLearnerState(session.userId)");

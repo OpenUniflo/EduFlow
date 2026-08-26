@@ -15,7 +15,7 @@ const hasAnswer=(answer:MicroLearningAnswer)=>Array.isArray(answer)?answer.lengt
 
 export function MicroLearningExperience({session,onLogout,repository}:{session:MockSession;onLogout():void;repository:MicroLearningRepository}) {
   const navigate=useNavigate(),location=useLocation(),{knowledgeId=""}=useParams(),[searchParams]=useSearchParams(); const courseId=searchParams.get("courseId")??undefined;
-  const [revision,setRevision]=useState(0),[answer,setAnswer]=useState<MicroLearningAnswer>(""),[grading,setGrading]=useState<"success"|"retry"|"error"|null>(null),[whyOpen,setWhyOpen]=useState(false),[busy,setBusy]=useState(false),[pinned,setPinned]=useState<{unitId:string;stepId:string}|null>(null),[assistantMessage,setAssistantMessage]=useState("Assistant 可以解释或提示，但不会替你答题或推进步骤。");
+  const [revision,setRevision]=useState(0),[answer,setAnswer]=useState<MicroLearningAnswer>(""),[grading,setGrading]=useState<"success"|"retry"|"error"|null>(null),[whyOpen,setWhyOpen]=useState(false),[busy,setBusy]=useState(false),[pinned,setPinned]=useState<{unitId:string;stepId:string}|null>(null);
   useEffect(()=>repository.subscribe(()=>setRevision((value)=>value+1)),[repository]);
   const path=useMemo(()=>repository.getPath(knowledgeId,{courseId,mode:"learn"}),[courseId,knowledgeId,repository,revision]); const progress=path?repository.getPathProgress(path.id):undefined;
   useEffect(()=>{if(path&&progress?.status!=="completed"&&progress?.status!=="in_progress")void repository.start(path.id,courseId);},[courseId,path,progress?.status,repository]);
@@ -36,7 +36,7 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
         {whyOpen?<div className="micro-inline-explanation"><strong>提示</strong><p>{grading==="success"?(step.successFeedback??"已完成这一步。"):(step.retryFeedback??"先识别当前步骤要求验证的边界、因果或执行顺序。")}</p></div>:null}
         <footer><button className="atlas-secondary" onClick={()=>setWhyOpen((value)=>!value)}>{whyOpen?"收起提示":"为什么？"}</button><span/>{grading==="success"?<button className="atlas-primary" onClick={()=>{setPinned(null);setGrading(null);}}>继续<ArrowRight size={15}/></button>:interaction?.type==="h5p"?null:interaction?<button className="atlas-primary" disabled={busy||!hasAnswer(answer)} onClick={()=>void completeCurrent()}>{busy?"检查中…":"检查答案"}</button>:<button className="atlas-primary" disabled={busy} onClick={()=>void completeCurrent()}>{busy?"保存中…":"继续"}<ArrowRight size={15}/></button>}</footer>
       </article>}
-    </section><EduFlowAssistant context={context} contextLabel={path.title}><div className="course-design-assistant-actions"><button onClick={()=>setAssistantMessage("提示：先识别当前步骤要求验证的边界、因果或执行顺序，再选择答案。")}>给我提示</button><button onClick={()=>setAssistantMessage(`解释：${step.body}`)}>解释当前步骤</button></div><p className="assistant-plain-response">{assistantMessage}</p></EduFlowAssistant></main>;
+    </section><EduFlowAssistant context={{...context,microPathId:path.id,microUnitId:unit.id,microStepId:step.id}} contextLabel={path.title}/></main>;
 }
 
 function Unsupported({title,body,onBack}:{title:string;body:string;onBack():void}) { return <section className="micro-unsupported"><button className="micro-unsupported-back" onClick={onBack}><ArrowLeft size={16}/>返回</button><div><span className="atlas-kicker">MICRO LEARNING</span><h1>{title}</h1><p>{body}</p><button className="atlas-primary" onClick={onBack}>返回来源<ArrowRight size={15}/></button></div></section>; }

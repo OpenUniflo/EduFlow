@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, CircleDot, Crosshair, Maximize2, Minus, Network, Plus, RotateCcw, Send, Sparkles, X } from "lucide-react";
+import { ArrowRight, BookOpen, CircleDot, Crosshair, Maximize2, Minus, Network, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
@@ -161,7 +161,7 @@ export function PersonalKnowledgeView({ session, onLogout, embedded = false }: {
         <button onClick={() => { sceneRef.current?.reset(); setSelectedId(null); setSearchMatchId(null); }} data-tip="重置视图" aria-label="重置视图"><RotateCcw size={17} /></button>
       </div>
       <div className="personal-legend glass-v2"><span><i className="dot mastered" />已掌握</span><span><i className="dot learning" />学习中 / 已学习 / 实训中</span><span><i className="dot explore" />可探索</span><span><i className="diamond" />实训验证</span></div>
-      <EduFlowAssistant context={{workspace:"learning",experienceMode:"learn",userRole:session.role,capabilities:session.capabilities,knowledgeId:selectedId??undefined}} contextLabel={selected?.title??"我的知识"} drawerOpen={drawerOpen}><form className="personal-assistant-form" onSubmit={(event)=>{event.preventDefault();askKnowledgeSpace(query);}}><div className="course-design-assistant-input"><input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="搜索知识或询问下一步…"/><button aria-label="发送"><Send size={15}/></button></div><div className="course-design-assistant-actions"><button type="button" onClick={()=>askKnowledgeSpace("我下一步应该学什么？")}>下一步学什么？</button><button type="button" onClick={()=>askKnowledgeSpace("显示直接关联的可探索知识")}>直接关联知识</button></div><p className="assistant-plain-response"><Sparkles size={12}/>搜索只定位当前 Personal Atlas，不会改变图布局。</p></form></EduFlowAssistant>
+      <EduFlowAssistant context={{workspace:"learning",experienceMode:"learn",userRole:session.role,capabilities:session.capabilities,courseId:selectedContext?.kind==="course"?selectedContext.courseId:undefined,knowledgeId:selectedId??undefined}} contextLabel={selected?.title??"我的知识"} drawerOpen={drawerOpen}/>
       <div className={`personal-toast ${toast ? "show" : ""}`}>{toast}</div>
     </main>
   );

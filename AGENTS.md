@@ -6,6 +6,19 @@
 - `package-lock.json`, `yarn.lock`, and other competing lockfiles MUST NOT be committed.
 - Before pushing dependency changes, `pnpm install --frozen-lockfile` MUST succeed.
 
+## Infrastructure Reuse
+
+- Generic infrastructure SHOULD prefer mature, maintained, technology-compatible open-source components or official SDKs when they materially reduce protocol and maintenance code. EduFlow MUST retain ownership of product context, permissions, tools, policy, and learning-domain semantics behind thin adapters.
+- Do not reimplement mature LLM streaming, reasoning/tool-call message protocols, generic schema validation, authentication, database/storage, or routing infrastructure merely to avoid dependencies. A dependency MUST still justify its deployment, bundle, lockfile, vendor, and architectural cost; do not introduce a heavy framework for a small problem.
+
+## Global EduFlow Assistant
+
+- Learner-facing Assistant/chat surfaces MUST use the one Global Assistant runtime. Pages provide explicit `AssistantContext` identities and MUST NOT introduce page-specific learner LLM runtimes.
+- Contextual Assistant and Full Chat share the authenticated session/message model, server execution boundary, tool registry, model adapter, and policy. Each historical message persists only a small identity snapshot; the browser MUST NOT send complete product entities as authoritative context.
+- Assistant entity and learner-state access MUST be revalidated server-side through authenticated product data. Browser-supplied user IDs, roles, capabilities, or context payloads are never authority.
+- The LLM is not Navigation authority and MUST NOT manufacture a formal personalized Next Action before the deterministic Navigation Engine exists. CurriculumSequence, AssignmentDependency, KnowledgeEdge, Course progress, and Learner Knowledge state MUST retain their distinct meanings in Assistant tool output and answers.
+- Specialized authoring, mutation, generation, and evaluation providers MAY remain separate, but Learn-mode explanation and retrieval use the Global Assistant runtime.
+
 ## Hosted Deployment Discipline
 
 - A READY frontend deployment does not imply that its target Hosted Supabase schema matches repository migrations.

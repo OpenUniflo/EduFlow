@@ -114,6 +114,8 @@ AssistantContext
 
 The Assistant may interpret language, retrieve context, explain, and call application tools. It must not become the authority for deterministic navigation business rules.
 
+The V1A implementation uses one authenticated `/api/assistant` boundary. AI SDK Core owns generic streaming/reasoning/tool-call protocol and the bounded multi-step loop; EduFlow owns `AssistantContext`, tool permissions, product retrieval, and learning policy. Contextual surfaces and `/messages` share user-owned database sessions. Specialized Design mutation and evaluation adapters remain separate from learner chat. See `ASSISTANT_ARCHITECTURE.md`.
+
 ## 4. Goal resolution and Course reuse
 
 A learning Goal does not immediately create a Personal Course.

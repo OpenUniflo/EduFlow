@@ -8,6 +8,7 @@ import type { AssignmentExperience } from "@/features/course/types";
 import { evaluateTraceSelection } from "@/features/course/assignmentExperience";
 import { workflowLaunchUrl } from "@/features/learning/progress/progressService";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
+import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
 
 function AnswerExperience({ prompt, onSubmit }: { prompt?: string; onSubmit: () => void }) {
   const [answer, setAnswer] = useState("");
@@ -66,5 +67,6 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
         {submitted ? <div className="assignment-submitted"><Check size={34} /><h2>{accepted ? "本次实训已通过确定性验收" : "本次提交已记录"}</h2><p>{accepted ? "已写入有效实践证据；是否 mastered 仍由完整掌握策略决定。" : "状态为 submitted，等待教师或支持的确定性规则验收；提交不等于 mastery。"}</p></div> : experience.type === "answer" ? <AnswerExperience prompt={experience.prompt} onSubmit={() => void submit()} /> : experience.type === "code" ? <CodeExperience experience={experience} onSubmit={() => void submit()} /> : experience.type === "trace" ? <TraceExperience experience={experience} onSubmit={() => void submit(true)} /> : <section className="assignment-experience-body"><h2>画布</h2><p>{experience.prompt}</p><div className="assignment-workflow-preview"><Network size={34} /><strong>继承型工作流已准备</strong><span>画布将从现有 Planner、Workers 与 Merge 结构开始。</span></div><button className="atlas-primary" onClick={() => navigate(workflowLaunchUrl({courseId,assignmentId:assignment.id,workflowTemplateId:assignment.workflowTemplateId!}))}>进入画布 <ArrowRight size={15} /></button></section>}
       </article>
     </div>
+    <EduFlowAssistant context={{workspace:"courses",experienceMode:"learn",userRole:session.role,capabilities:session.capabilities,courseId,knowledgeId:coverages[0]?.nodeId,assignmentId}} contextLabel={assignment.title}/>
   </main>;
 }

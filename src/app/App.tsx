@@ -34,8 +34,13 @@ import { demoCourseCreationScenarioResolver } from "@/demo/scenarios/agenticAiBo
 import { demoLessonAssistantProvider } from "@/demo/scenarios/agenticAiBook/lessonAssistantScripts";
 import { demoWorkflowAssessmentProvider } from "@/demo/scenarios/agenticAiBook/workflowAssessment";
 import { demoCourseDesignAssistantProvider } from "@/demo/scenarios/agenticAiBook/courseDesignAssistantScripts";
-import { demoLearningIntentResolver } from "@/demo/explore/demoLearningIntentResolver";
 import { resolveLegacyRoute } from "@/app/legacyRoutes";
+import { AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeContext";
+import { AssistantMessagesPage } from "@/features/assistant/pages/AssistantMessagesPage";
+
+function AssistantRuntimeBoundary({ session, children }: { session: MockSession | null; children: ReactNode }) {
+  return session ? <AssistantRuntimeProvider session={session}>{children}</AssistantRuntimeProvider> : children;
+}
 
 function LegacyRedirect() {
   const location = useLocation();
@@ -217,11 +222,12 @@ export default function App() {
   return (
     <AuthProvider value={{ session, signIn, signUp, logout }}>
       <NavigationProvider value={navigationContextValue}>
+        <AssistantRuntimeBoundary session={session}>
         <Routes>
           <RouterRoute path="/login" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
           <RouterRoute path="/register" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
           <RouterRoute path="/" element={protectedElement(session ? <LearningPage session={session} onLogout={logout} /> : null)} />
-          <RouterRoute path="/explore" element={protectedElement(session ? <ExplorePage session={session} onLogout={logout} resolver={demoLearningIntentResolver} /> : null)} />
+          <RouterRoute path="/explore" element={protectedElement(session ? <ExplorePage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/learn/micro/:knowledgeId" element={protectedElement(session ? <MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} /> : null)} />
           <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="canvas" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />
           <RouterRoute path="/workflows/:workflowId" element={protectedElement(editor)} />
@@ -242,9 +248,10 @@ export default function App() {
           <RouterRoute path="/profile/*" element={<LegacyRedirect />} />
           <RouterRoute path="/settings/*" element={<Navigate to="/" replace />} />
           <RouterRoute path="/notifications/*" element={<Navigate to="/" replace />} />
-          <RouterRoute path="/messages/*" element={<Navigate to="/" replace />} />
+          <RouterRoute path="/messages/*" element={protectedElement(session ? <AssistantMessagesPage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </AssistantRuntimeBoundary>
       </NavigationProvider>
     </AuthProvider>
   );

@@ -107,8 +107,9 @@ No permanent Knowledge embedding table is introduced by this preflight. The exis
 - `POST /api/knowledge-generation`: generates and atomically persists User Knowledge and Curriculum from a completed Phase 4.1 parsing job.
 - `POST /api/course-intent`: analyzes the existing course-creation conversation for an explicit learner target outcome or returns one contextual clarification question with 3–5 options.
 - `POST /api/course-mapping`: consumes an owning completed Phase 4.2 Course plus its persisted target outcome, resolves provenance coverage, plans goal-constrained Knowledge groups, generates one stable-ID-bound Assignment per Step and direct dependencies, and atomically persists Phase 4.3 composition data.
+- `GET|POST /api/assistant`: lists/loads the authenticated user's Assistant sessions and streams one context-aware response through the bounded Global Assistant tool runtime.
 
-The API is intentionally a small mapping layer rather than a second Domain model or a backend framework.
+The API is intentionally a small mapping layer rather than a second Domain model or a backend framework. The Assistant is the twelfth physical Vercel Function; its session operations, message execution, and tools remain behind that one entrypoint.
 
 Progress and Workflow API adapters serialize browser writes. A rejected request is retained for the next `flush()` call while the internal queue recovers, so later writes still execute in order. Workflow Run History is bounded to the newest 20 rows per user and Workflow; `PUT /api/workflows` enforces the same cap as the application layer and deletes older persisted rows.
 
@@ -125,6 +126,7 @@ The database normalizes:
 - direct Assignment dependencies, ChapterOutcomes, FinalProjects, and their explicit composition relations;
 - Materials, Segments, and MaterialKnowledgeCoverage;
 - user Knowledge, Course, Assignment, and Material state;
+- user-owned Assistant sessions and messages with per-message context identity snapshots;
 - Workflow templates, user Workflow definitions/state, and Workflow Runs.
 
 Course runtimes are reconstructed by `/api/courses`; they are not stored as a JSONB blob. JSONB is limited to document-shaped values such as node provenance/metadata, Workflow graph definitions, editor maps, Run snapshots, Material content blocks, and list-valued criteria.
