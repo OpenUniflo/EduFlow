@@ -24,6 +24,16 @@ describe("Anonymous Viewer architecture", () => {
     }
   });
 
+  it("allows anonymous target metadata only through the parent Course visibility boundary", () => {
+    const migration = read("supabase/migrations/20260827090000_goal_courses_and_personal_visibility.sql");
+    expect(migration).toContain("course_target_knowledge_anon_public_read");
+    expect(migration).toMatch(/course_target_knowledge_anon_public_read[\s\S]*?using \(public\.can_read_course\(course_id\)\)/);
+    expect(migration).toMatch(/course\.course_type = 'personal' and course\.owner_user_id = \(select auth\.uid\(\)\)/);
+    expect(migration).toMatch(/courses_teacher_update[\s\S]*?using \(course_type = 'standard'/);
+    expect(migration).toMatch(/revoke all on function public\.create_personal_course[\s\S]*from public, anon, authenticated/);
+    expect(migration).toMatch(/grant execute on function public\.create_personal_course[\s\S]*to service_role/);
+  });
+
   it("does not introduce a fake guest learner identity", () => {
     const sources = ["src/app/App.tsx", "src/app/services/applicationServices.ts", "src/app/pages/PublicHomePage.tsx", "src/features/learning/micro/ApiMicroLearningRepository.ts"].map(read).join("\n");
     expect(sources).not.toMatch(/userId\s*[:=]\s*["']guest["']/);

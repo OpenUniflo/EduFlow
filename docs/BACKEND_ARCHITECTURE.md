@@ -107,7 +107,7 @@ No permanent Knowledge embedding table is introduced by this preflight. The exis
 - `POST /api/knowledge-generation`: generates and atomically persists User Knowledge and Curriculum from a completed Phase 4.1 parsing job.
 - `POST /api/course-intent`: analyzes the existing course-creation conversation for an explicit learner target outcome or returns one contextual clarification question with 3–5 options.
 - `POST /api/course-mapping`: consumes an owning completed Phase 4.2 Course plus its persisted target outcome, resolves provenance coverage, plans goal-constrained Knowledge groups, generates one stable-ID-bound Assignment per Step and direct dependencies, and atomically persists Phase 4.3 composition data.
-- `GET|POST /api/assistant`: lists/loads the authenticated user's Assistant sessions and streams one context-aware response through the bounded Global Assistant tool runtime.
+- `GET|POST /api/assistant`: lists/loads the authenticated user's Assistant sessions, streams one context-aware response through the bounded Global Assistant tool runtime, and handles confirmed Goal planning/Course selection actions without adding another physical Function.
 
 The API is intentionally a small mapping layer rather than a second Domain model or a backend framework. The Assistant is the twelfth physical Vercel Function; its session operations, message execution, and tools remain behind that one entrypoint.
 
@@ -122,6 +122,7 @@ The database normalizes:
 - profiles and capabilities;
 - Knowledge nodes, revisions, factual edges, Domains, assignments, candidates, and proposals;
 - Courses, curricula, Chapters, Lessons, Coverage, and Sequence;
+- Standard/Personal Course ownership and provenance plus `CourseTargetKnowledge` destinations;
 - Assignments and AssignmentCoverage;
 - direct Assignment dependencies, ChapterOutcomes, FinalProjects, and their explicit composition relations;
 - Materials, Segments, and MaterialKnowledgeCoverage;
@@ -137,7 +138,7 @@ Knowledge relations remain only `prerequisite`, `enables`, and `related`. Curric
 
 All public business tables have RLS enabled.
 
-- Anonymous read is limited by RLS to active Global Knowledge and factual edges, active public Domain classification, published Courses and their curriculum/Assignment/Material definitions, published Micro content, and referenced shared Material objects. Tenant/user Knowledge, drafts, governance work queues, profiles, learner state, Assistant data, and Workflow ownership remain private.
+- Anonymous read is limited by RLS to active Global Knowledge and factual edges, active public Domain classification, published Standard Courses and their curriculum/Assignment/Material definitions, published public Micro content, and referenced shared Material objects. Personal Courses and their child rows are owner-only; they are hidden from anonymous users, other learners, teachers, and administrators. Tenant/user Knowledge, drafts, governance work queues, profiles, learner state, Assistant data, and Workflow ownership remain private.
 - User-owned rows require `auth.uid() = user_id` or `owner_user_id` for every operation.
 - Published `course-materials` objects under `shared/` are readable through short-lived signed URLs when referenced by a published Course; other Material objects remain private.
 - Shared Material upload and Domain mutation require the existing `global-domain-admin` capability. The server verifies capability and the target Course/Lesson/Material before issuing a course-scoped signed upload URL or writing metadata.

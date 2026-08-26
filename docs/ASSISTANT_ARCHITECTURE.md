@@ -10,7 +10,7 @@ page
   -> EduFlowAssistant / Full Chat
   -> /api/assistant
   -> AI SDK Core + OpenAI-compatible provider adapter
-  -> EduFlow read tools
+  -> EduFlow read tools and confirmed structured actions
   -> authenticated Supabase product data
 ```
 
@@ -26,7 +26,7 @@ The tool loop is limited to four model steps and has total, per-step, and stalle
 
 ## Product tools
 
-The runtime exposes only read tools in V1A:
+The model runtime exposes read tools:
 
 - Knowledge search/read/factual neighbors;
 - Course search and Course/curriculum context;
@@ -34,6 +34,9 @@ The runtime exposes only read tools in V1A:
 - Assignment and Micro context;
 - authenticated learner Knowledge and Course state;
 - one current-context resolver composed from the same tools.
+- product-owned Goal planning, which resolves only visible active Knowledge and returns deterministic prerequisite closure plus Course coverage/gaps.
+
+Goal planning keeps its durable write boundary outside the LLM tool loop. The same authenticated `/api/assistant` handler accepts structured `plan-goal`, `use-existing-course`, and `create-personal-course` UI actions. Planning persists a normal conversation exchange but does not create a Course. “Use existing” activates that exact Course identity. Personal Course creation runs only after explicit browser confirmation, re-plans and revalidates all product facts server-side, and invokes one service-role-only transactional database operation. The browser never supplies ownership authority or authoritative Knowledge scope.
 
 KnowledgeEdges are the only Knowledge relation facts. CurriculumSequence and AssignmentDependency remain explicitly labeled teaching/execution relations. Course progress, Material progress, Assignment state, and Learner Knowledge state remain distinct.
 

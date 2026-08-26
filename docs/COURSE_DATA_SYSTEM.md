@@ -179,13 +179,17 @@ Goal-driven Personal Course creation should prefer selecting/projecting shared K
 
 Standard and Personal Courses use the same Course domain concept.
 
-Conceptually a Personal Course may include:
+The persisted Course discriminator and ownership fields are:
 
 ```text
 course_type = personal
 owner_user_id
 source_course_id?    when derived from an existing Course
 ```
+
+`course_type = standard` requires no learner owner. `course_type = personal` requires an owner and a `published` lifecycle so a valid generated route is immediately usable. Standard published Courses keep the existing public/authenticated visibility; Personal Courses and every Course-owned child row are owner-only, including from other learners, teachers, administrators, and anonymous users.
+
+`CourseTargetKnowledge(course_id, knowledge_id, required)` stores the structured Knowledge destination. It is distinct from optional human-readable `targetOutcome`, and each target must be visible, active, and covered by the Course curriculum. A Goal-driven Personal Course contains the target set plus the deterministic factual prerequisite closure in a minimal Course-owned curriculum. It reuses KnowledgeNode and KnowledgeEdge identities and may validly contain no Material, Micro, Assignment, Outcome, or FinalProject.
 
 Personal Course is needed only when the learning goal/scope itself differs from existing Courses.
 

@@ -1,6 +1,7 @@
 import { apiRequest } from "@/shared/api/apiClient";
 import { supabaseClient } from "@/shared/api/supabaseClient";
 import type { AssistantContextSnapshot, AssistantSession, AssistantSessionDetail } from "./assistantContract";
+import type { GoalPlan } from "@/features/course/goal/goalPlanning";
 
 export async function listAssistantSessions() {
   return (await apiRequest<{ sessions: AssistantSession[] }>("/api/assistant")).sessions;
@@ -38,4 +39,18 @@ export async function streamAssistantMessage(input: { sessionId?: string; messag
   text += decoder.decode();
   if (!text.trim()) throw new Error("Assistant returned an empty response");
   return { sessionId, text };
+}
+
+type StructuredAssistantResult = { sessionId: string; assistantMessage: string };
+
+export function planAssistantGoal(input: { sessionId?: string; goalText: string; context: AssistantContextSnapshot }) {
+  return apiRequest<StructuredAssistantResult & { plan: GoalPlan }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "plan-goal", ...input }) });
+}
+
+export function selectAssistantCourse(input: { sessionId?: string; goalText: string; courseId: string; context: AssistantContextSnapshot }) {
+  return apiRequest<StructuredAssistantResult & { courseId: string }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "use-existing-course", ...input }) });
+}
+
+export function confirmAssistantPersonalCourse(input: { sessionId?: string; goalText: string; sourceCourseId?: string; context: AssistantContextSnapshot }) {
+  return apiRequest<StructuredAssistantResult & { courseId: string }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "create-personal-course", ...input }) });
 }

@@ -19,6 +19,14 @@
 - The LLM is not Navigation authority and MUST NOT manufacture a formal personalized Next Action before the deterministic Navigation Engine exists. CurriculumSequence, AssignmentDependency, KnowledgeEdge, Course progress, and Learner Knowledge state MUST retain their distinct meanings in Assistant tool output and answers.
 - Specialized authoring, mutation, generation, and evaluation providers MAY remain separate, but Learn-mode explanation and retrieval use the Global Assistant runtime.
 
+## Goal-driven Course Selection
+
+- A learner Goal is a planning request unless a current product consumer requires an independent Goal lifecycle. Goal resolution MAY use an LLM as a language adapter, but every suggested Knowledge identity MUST be revalidated against visible active Knowledge; deterministic product logic owns prerequisite closure, Course matching, gaps, and persistence.
+- Prerequisite closure MUST use only factual `prerequisite` KnowledgeEdges, remain deterministic, deduplicated, and cycle-safe, and keep target Knowledge distinct from prerequisites. Course matching MUST be based on real Knowledge coverage, expose understandable coverage/gaps, and prefer a suitable existing Course identity before Personal Course creation.
+- `CourseTargetKnowledge` is the structured Course destination and MUST remain distinct from optional human-readable `targetOutcome`. Standard and Personal Courses share the Course domain, repository, graph projection, and routes.
+- A Personal Course is learner-owned, owner-visible only, structurally valid, and immediately usable. It MAY project a minimal curriculum from an existing Course or shared Knowledge, but MUST NOT copy KnowledgeNode or KnowledgeEdge facts and MUST NOT require fabricated Material, Micro, Assignment, Outcome, or FinalProject assets.
+- Selecting an existing Course and creating a Personal Course are explicit authenticated learner actions. The LLM tool loop MUST NOT perform the Personal Course write, and Goal planning MUST NOT manufacture a formal Next Action before the Navigation Engine exists.
+
 ## Anonymous Viewing and Progressive Auth
 
 - Anonymous users MAY browse only published/public learning definitions: active Global Knowledge and factual edges, published Courses and their curriculum graph, public Materials, published Micro paths, and public Assignments.

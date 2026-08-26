@@ -66,9 +66,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     client.from("final_project_outcome_compositions").select("*").order("course_id").order("id"),
     client.from("materials").select("*").order("course_id").order("lesson_id").order("display_order"),
     client.from("material_segments").select("*").order("course_id").order("material_id").order("display_order"),
-    client.from("material_knowledge_coverages").select("*").order("course_id").order("id")
+    client.from("material_knowledge_coverages").select("*").order("course_id").order("id"),
+    client.from("course_target_knowledge").select("*").order("course_id").order("knowledge_id")
   ]);
-  const [courseRows, curriculumRows, chapterRows, lessonRows, coverageRows, sequenceRows, assignmentRows, assignmentCoverageRows, assignmentDependencyRows, chapterOutcomeRows, assignmentOutcomeRows, finalProjectRows, finalProjectOutcomeRows, materialRows, segmentRows, materialCoverageRows] = queries.map((result, index) => dataOrThrow(result.data as Row[] | null, result.error, `Course query ${index + 1}`));
+  const [courseRows, curriculumRows, chapterRows, lessonRows, coverageRows, sequenceRows, assignmentRows, assignmentCoverageRows, assignmentDependencyRows, chapterOutcomeRows, assignmentOutcomeRows, finalProjectRows, finalProjectOutcomeRows, materialRows, segmentRows, materialCoverageRows, targetKnowledgeRows] = queries.map((result, index) => dataOrThrow(result.data as Row[] | null, result.error, `Course query ${index + 1}`));
   const signedUrlByPath = new Map<string, string>();
   await Promise.all(materialRows.flatMap((row) => {
     const path = optionalText(row, "storage_path");
@@ -103,7 +104,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       };
     });
     return {
-      course: { id, title: text(courseRow, "title"), subtitle: optionalText(courseRow, "subtitle"), description: text(courseRow, "description"), targetOutcome: optionalText(courseRow, "target_outcome"), accentColor: optionalText(courseRow, "accent_color"), generationStatus: text(courseRow, "generation_status"), lifecycle: text(courseRow, "lifecycle") },
+      course: { id, title: text(courseRow, "title"), subtitle: optionalText(courseRow, "subtitle"), description: text(courseRow, "description"), targetOutcome: optionalText(courseRow, "target_outcome"), accentColor: optionalText(courseRow, "accent_color"), generationStatus: text(courseRow, "generation_status"), lifecycle: text(courseRow, "lifecycle"), courseType: (optionalText(courseRow, "course_type") ?? "standard"), ownerUserId: optionalText(courseRow, "owner_user_id"), sourceCourseId: optionalText(courseRow, "source_course_id") },
       curriculum: { id: text(curriculumRow, "id"), courseId: id, generationMode: text(curriculumRow, "generation_mode"), requestedChapterCount: curriculumRow.requested_chapter_count == null ? undefined : number(curriculumRow, "requested_chapter_count"), sourceStructureId: optionalText(curriculumRow, "source_structure_id") },
       chapters: chapterRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, title: text(row, "title"), description: text(row, "description"), order: number(row, "display_order"), color: text(row, "color"), outcome: text(row, "outcome") })),
       lessons: lessonRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, chapterId: text(row, "chapter_id"), title: text(row, "title"), order: number(row, "display_order") })),
@@ -118,6 +119,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       finalProjectOutcomeCompositions: finalProjectOutcomeRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), finalProjectId: text(row, "final_project_id"), outcomeId: text(row, "outcome_id") })),
       materials,
       materialKnowledgeCoverages: materialCoverageRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), materialId: text(row, "material_id"), segmentId: text(row, "segment_id"), nodeId: text(row, "node_id"), role: text(row, "role") })),
+      targetKnowledge: targetKnowledgeRows.filter((row) => text(row, "course_id") === id).map((row) => ({ courseId: id, nodeId: text(row, "knowledge_id"), required: Boolean(row.required) })),
       revision: text(courseRow, "revision")
     };
   });

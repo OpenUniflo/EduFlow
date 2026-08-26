@@ -3,6 +3,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { AssistantContextSnapshot } from "../../src/features/assistant/assistantContract.js";
 import { dataOrThrow } from "./query.js";
+import { planLearningGoal } from "./goalPlanningService.js";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
@@ -182,6 +183,7 @@ function safe<T>(execute: () => Promise<T>) {
 export function createAssistantTools(client: SupabaseClient, user: User, context: AssistantContextSnapshot) {
   const id = z.string().trim().min(1).max(240).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
   return {
+    planLearningGoal: tool({ description: "Resolve a learner Goal to real visible Knowledge, factual prerequisite closure, and deterministic existing-Course coverage/gaps. You may first search Knowledge and suggest candidate IDs, but this tool revalidates every ID. This tool never creates a Course or chooses a formal Next Action.", inputSchema: z.object({ goalText: z.string().trim().min(1).max(1000), candidateKnowledgeIds: z.array(id).max(20).optional() }), execute: ({ goalText, candidateKnowledgeIds }: { goalText: string; candidateKnowledgeIds?: string[] }) => safe(() => planLearningGoal(client, goalText, candidateKnowledgeIds)) }),
     searchKnowledge: tool({ description: "Search visible active EduFlow Knowledge by title, description, or tags.", inputSchema: z.object({ query: z.string().trim().min(1).max(300) }), execute: ({ query }: { query: string }) => safe(() => searchKnowledge(client, query)) }),
     getKnowledge: tool({ description: "Read one visible active KnowledgeNode by stable ID.", inputSchema: z.object({ nodeId: id }), execute: ({ nodeId }: { nodeId: string }) => safe(() => getKnowledge(client, nodeId)) }),
     getKnowledgeNeighbors: tool({ description: "Read factual prerequisite, enables, and related KnowledgeEdges for one visible KnowledgeNode.", inputSchema: z.object({ nodeId: id }), execute: ({ nodeId }: { nodeId: string }) => safe(() => getKnowledgeNeighbors(client, nodeId)) }),

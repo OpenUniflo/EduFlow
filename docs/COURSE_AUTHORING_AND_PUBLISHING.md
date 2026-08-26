@@ -36,3 +36,8 @@ Article Material creation/linking plus Path, Unit, native Step, Assignment, and
 AssignmentCoverage editing. The Micro preview runs the same interaction
 contract without publishing it. AI course creation remains a separate
 proposal/demo workflow rather than a prerequisite for authoring.
+
+Goal-driven Personal Course creation is a separate learner boundary, not a
+teacher authoring draft shortcut. It deterministically constructs and validates
+a minimal route, persists it transactionally as an owner-only published Course,
+and does not weaken or bypass the standard Course authoring publish contract.

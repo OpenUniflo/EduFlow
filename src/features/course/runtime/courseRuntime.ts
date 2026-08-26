@@ -5,7 +5,7 @@ import { resolveKnowledgeMaterialEntries, resolveKnowledgeMaterialEntry } from "
 import type { UserKnowledgeRecord } from "../../profile/types";
 import type {
   AssignmentCoverage, AssignmentDependency, AssignmentOutcomeComposition, ChapterOutcome, Course, CourseAssignment, CourseAssignmentSummary, CourseChapterEdge, CourseChapterProjection,
-  CourseCurriculum, CourseSkillTreeEdge, CourseSkillTreeNode, CourseSummary, CurriculumChapter, CurriculumCoverage,
+  CourseCurriculum, CourseSkillTreeEdge, CourseSkillTreeNode, CourseSummary, CourseTargetKnowledge, CurriculumChapter, CurriculumCoverage,
   CurriculumLesson, CurriculumSequence, FinalProject, FinalProjectOutcomeComposition, Material, MaterialKnowledgeCoverage, UserAssignmentState, UserCourseState
 } from "@/features/course/types";
 import { defaultCourseUnlockPolicy, type CourseUnlockPolicy } from "./courseUnlockPolicy";
@@ -29,6 +29,8 @@ export type CourseRuntimeData = {
   finalProjectOutcomeCompositions: FinalProjectOutcomeComposition[];
   materials: Material[];
   materialKnowledgeCoverages: MaterialKnowledgeCoverage[];
+  /** Present when the Course has an explicit structured destination. */
+  targetKnowledge?: CourseTargetKnowledge[];
   revision: string;
 };
 
@@ -71,7 +73,15 @@ export function validateCourseIntegrity(runtime: CourseRuntimeData, knowledgeRep
   const curriculumSequenceIds = new Set(runtime.curriculumSequences.map((sequence) => sequence.id));
   const assignmentCoverageIds = new Set(runtime.assignmentCoverages.map((coverage) => coverage.id));
   const materialKnowledgeCoverageIds = new Set(runtime.materialKnowledgeCoverages.map((coverage) => coverage.id));
+  const targetKnowledgeNodeIds = new Set((runtime.targetKnowledge ?? []).map((target) => target.nodeId));
   const segmentIds = new Set(runtime.materials.flatMap((material) => material.segments.map((segment) => `${material.id}:${segment.id}`)));
+
+  const courseType = runtime.course.courseType ?? "standard";
+  if (courseType === "standard" && runtime.course.ownerUserId) errors.push("Standard Course cannot have a learner owner");
+  if (courseType === "personal" && !runtime.course.ownerUserId) errors.push("Personal Course requires an owner");
+  if (courseType === "personal" && runtime.course.lifecycle !== "published") errors.push("Personal Course must be published");
+  if (courseType === "personal" && !(runtime.targetKnowledge ?? []).some((target) => target.required)) errors.push("Personal Course requires target Knowledge");
+  if (runtime.course.sourceCourseId === runtime.course.id) errors.push("Course cannot source itself");
 
   if (!runtime.curriculum.id.trim()) errors.push("Curriculum id must be a non-empty string");
   if (runtime.curriculum.courseId !== runtime.course.id) errors.push(`Curriculum ${runtime.curriculum.id} belongs to another Course`);
@@ -85,6 +95,12 @@ export function validateCourseIntegrity(runtime: CourseRuntimeData, knowledgeRep
   if (curriculumSequenceIds.size !== runtime.curriculumSequences.length) errors.push("CurriculumSequence ids must be unique");
   if (assignmentCoverageIds.size !== runtime.assignmentCoverages.length) errors.push("AssignmentCoverage ids must be unique");
   if (materialKnowledgeCoverageIds.size !== runtime.materialKnowledgeCoverages.length) errors.push("MaterialKnowledgeCoverage ids must be unique");
+  if (targetKnowledgeNodeIds.size !== (runtime.targetKnowledge ?? []).length) errors.push("CourseTargetKnowledge node ids must be unique");
+  (runtime.targetKnowledge ?? []).forEach((target) => {
+    if (target.courseId !== runtime.course.id) errors.push(`CourseTargetKnowledge ${target.nodeId} belongs to another Course`);
+    if (!nodeIds.has(target.nodeId)) errors.push(`CourseTargetKnowledge references unknown or invisible KnowledgeNode ${target.nodeId}`);
+    if (!courseNodeIds.has(target.nodeId)) errors.push(`CourseTargetKnowledge ${target.nodeId} is outside the Course curriculum`);
+  });
 
   runtime.chapters.forEach((chapter) => {
     if (chapter.courseId !== runtime.course.id) errors.push(`Chapter ${chapter.id} belongs to another Course`);

@@ -145,18 +145,25 @@ A Course without `targetOutcome` may still participate in matching through its a
 
 ### Matching principle
 
-The first version is deterministic and should expose understandable metrics such as:
+V1B is implemented as deterministic product logic over real Knowledge identities. For target set `T`, prerequisite closure `P`, and Course coverage `C`:
+
+```text
+targetCoverage   = |T ∩ C| / |T|
+requiredCoverage = |(T ∪ P) ∩ C| / |T ∪ P|
+```
+
+Ordering is `targetCoverage desc`, `requiredCoverage desc`, missing-target count ascending, standard before personal, then stable Course ID. High/medium/low are centralized V1 UX heuristics, not a learning-effect model. Matching exposes:
 
 - target coverage;
 - required coverage;
 - missing Knowledge;
 - extra Knowledge.
 
-Do not introduce an opaque recommendation model for this stage.
+Goal text is a request, not a persisted entity in V1B. A small language adapter may suggest Knowledge IDs, but the product service revalidates every ID against visible active Knowledge. Ambiguous and unsupported Goals terminate explicitly; no Knowledge identity is invented. Prerequisite closure uses only factual `prerequisite` edges and is deterministic, deduplicated, and cycle-reporting.
 
 ### Personal Course
 
-Standard and personal Courses use the same Course concept.
+Standard and Personal Courses use the same Course concept and normal Course route/repository.
 
 A Personal Course may carry fields such as:
 
@@ -164,7 +171,9 @@ A Personal Course may carry fields such as:
 - `owner_user_id`;
 - optional `source_course_id` when derived from an existing Course.
 
-Personal Course generation should primarily select/project shared Knowledge. It does not require automatic Material, Micro, Assignment, or PPT generation.
+The implemented Personal Course is transactionally created as a structurally valid, immediately usable `published` Course owned by the learner. It contains a minimal curriculum projection of target Knowledge plus factual prerequisite closure, stores required destinations in `CourseTargetKnowledge`, and activates the explicit learner membership. A derived Personal Course retains `source_course_id`; a Course built directly from shared Knowledge leaves it null. KnowledgeNode and KnowledgeEdge facts are never copied. Material, Micro, Assignment, Outcome, and FinalProject may remain absent.
+
+The Global Assistant is the authoritative UX. Planning is read-only; “use existing” and Personal Course creation are structured authenticated actions. Creation requires an explicit preview/confirmation and is never available to the LLM tool loop. This stage does not create a Navigation Engine or formal Next Action.
 
 ## 5. Navigation Engine
 
@@ -312,6 +321,8 @@ Tasks:
 - build match/gap UI;
 - create Personal Course from an existing Course when requested;
 - create a Personal Course from shared Knowledge when no existing Course is suitable.
+
+Status: implemented in Issue #20. Goal history, NavigationDecision, dynamic Learning Path, Attempts, and learned ranking remain deferred.
 
 ### V1C — Rule Navigation
 

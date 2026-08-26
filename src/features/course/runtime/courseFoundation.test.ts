@@ -90,6 +90,26 @@ describe("Course foundation contract", () => {
     expect(graphData.knowledgeNodes).toEqual([]);
   });
 
+  it("accepts an owner-scoped published Personal Course with explicit target Knowledge", () => {
+    const personal = {
+      ...routeOnlyRuntime,
+      course: { ...routeOnlyRuntime.course, id: "personal-course", courseType: "personal" as const, ownerUserId: "learner", sourceCourseId: "standard-source", lifecycle: "published" as const },
+      curriculum: { ...routeOnlyRuntime.curriculum, courseId: "personal-course" },
+      chapters: routeOnlyRuntime.chapters.map((chapter) => ({ ...chapter, courseId: "personal-course" })),
+      lessons: routeOnlyRuntime.lessons.map((lesson) => ({ ...lesson, courseId: "personal-course" })),
+      curriculumCoverages: routeOnlyRuntime.curriculumCoverages.map((coverage) => ({ ...coverage, courseId: "personal-course" })),
+      targetKnowledge: [{ courseId: "personal-course", nodeId: "route-knowledge", required: true }]
+    };
+
+    expect(validateCourseRuntime(personal, knowledgeRepository, globalKnowledgeAccess)).toBe(true);
+  });
+
+  it("rejects Personal Course ownership and target-scope violations", () => {
+    expect(() => validateCourseRuntime({ ...routeOnlyRuntime, course: { ...routeOnlyRuntime.course, courseType: "personal" as const } }, knowledgeRepository, globalKnowledgeAccess)).toThrow(/requires an owner/);
+    expect(() => validateCourseRuntime({ ...routeOnlyRuntime, course: { ...routeOnlyRuntime.course, courseType: "personal" as const, ownerUserId: "learner" } }, knowledgeRepository, globalKnowledgeAccess)).toThrow(/requires target Knowledge/);
+    expect(() => validateCourseRuntime({ ...routeOnlyRuntime, targetKnowledge: [{ courseId: routeOnlyRuntime.course.id, nodeId: "missing-target", required: true }] }, knowledgeRepository, globalKnowledgeAccess)).toThrow(/unknown or invisible KnowledgeNode/);
+  });
+
   it("still rejects broken references in an incomplete Draft", () => {
     const draft = {
       ...routeOnlyRuntime,
