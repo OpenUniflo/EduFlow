@@ -131,7 +131,7 @@ try {
   // only materialize canonical Course rows during Publish.
   const teacherRole = await server.from("profiles").update({ role: "teacher" }).eq("id", adminUser.user.id);
   assert.ifError(teacherRole.error);
-  const manualCourse = await invoke(coursesHandler, "POST", adminUser.token, { title: `Manual ${suffix}`, description: "Created without AI", targetOutcome: "Produce a verifiable manual-course outcome" });
+  const manualCourse = await invoke(coursesHandler, "POST", adminUser.token, { title: `Manual ${suffix}`, description: "Created without AI" });
   assertStatus(manualCourse, 201, "manual course creation");
   const manualCourseId = manualCourse.body.courseId; authoredCourseId = manualCourseId;
   const teacherCourses = await invoke(coursesHandler, "GET", adminUser.token);
@@ -153,6 +153,21 @@ try {
   assertStatus(retainedDraft, 200, "rejected draft retained"); assert.equal(retainedDraft.body.draft.revision, 1);
   const learnerAfterPublish = await invoke(coursesHandler, "GET", ordinaryUser.token);
   assertStatus(learnerAfterPublish, 200, "learner course read after rejected publish"); assert.ok(!learnerAfterPublish.body.courses.some((item: any) => item.course.id === manualCourseId));
+
+  const routeKnowledgeId = golden.curriculumCoverages[0].nodeId;
+  const danglingPreview = { ...manualRuntime, curriculumCoverages: [{ id: `${manualCourseId}:coverage:dangling`, courseId: manualCourseId, lessonId: "another-course:lesson", nodeId: routeKnowledgeId, role: "introduce", order: 0 }] };
+  const danglingSave = await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: draftState, previewRuntime: danglingPreview, expectedRevision: 1 }, { courseId: manualCourseId });
+  assertStatus(danglingSave, 200, "dangling authoring preview save");
+  assertStatus(await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: danglingSave.body.revision }, { courseId: manualCourseId }), 500, "dangling Course-owned reference publish denial");
+
+  const routeOnlyPreview = { ...manualRuntime, curriculumCoverages: [{ id: `${manualCourseId}:coverage:1`, courseId: manualCourseId, lessonId: manualRuntime.lessons[0].id, nodeId: routeKnowledgeId, role: "introduce", order: 0 }] };
+  const routeOnlySave = await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: draftState, previewRuntime: routeOnlyPreview, expectedRevision: danglingSave.body.revision }, { courseId: manualCourseId });
+  assertStatus(routeOnlySave, 200, "route-only authoring preview save");
+  const routeOnlyPublish = await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: routeOnlySave.body.revision }, { courseId: manualCourseId });
+  assertStatus(routeOnlyPublish, 200, "valid route without targetOutcome publish");
+  const publishedRouteOnly = await invoke(coursesHandler, "GET", ordinaryUser.token, undefined, { id: manualCourseId });
+  assertStatus(publishedRouteOnly, 200, "learner reads route-only published Course");
+  assert.equal(publishedRouteOnly.body.course.course.targetOutcome, undefined);
 
   // A published Course keeps its existing learner projection until a versioned
   // authoring draft is published.  The same publish transaction materializes

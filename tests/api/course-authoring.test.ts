@@ -83,7 +83,19 @@ describe("course authoring lifecycle validation", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("allows a route-only saved Draft to reach the transactional publish RPC", async () => {
+  it("allows a route-only saved Draft without targetOutcome to reach the transactional publish RPC", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [{ revision: "published-1" }], error: null });
+    const routeOnlyPreview = { ...previewRuntime, curriculumCoverages: [{ id: "coverage", lessonId: "lesson", nodeId: "knowledge" }] };
+    createServerSupabase.mockReturnValue(serverFor({ payload: { state, previewRuntime: routeOnlyPreview } }, rpc));
+    const recorder = responseRecorder();
+
+    await handler({ method: "POST", query: { courseId: "course" }, headers: {}, body: { expectedRevision: 1 } } as unknown as VercelRequest, recorder.response);
+
+    expect(recorder.statusCode()).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("publish_course_authoring_draft", { p_course_id: "course", p_expected_revision: 1 });
+  });
+
+  it("preserves publishing behavior when targetOutcome is present", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: [{ revision: "published-1" }], error: null });
     const routeOnlyPreview = { ...previewRuntime, course: { ...previewRuntime.course, targetOutcome: "Optional authoring metadata" }, curriculumCoverages: [{ id: "coverage", lessonId: "lesson", nodeId: "knowledge" }] };
     createServerSupabase.mockReturnValue(serverFor({ payload: { state, previewRuntime: routeOnlyPreview } }, rpc));
