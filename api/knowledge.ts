@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createUserSupabase, ensureProfile } from "./_lib/supabase.js";
+import { createOptionalUserSupabase, ensureProfile } from "./_lib/supabase.js";
 import { handleApi, json, methodNotAllowed } from "./_lib/http.js";
 import { dataOrThrow } from "./_lib/query.js";
 
@@ -18,18 +18,18 @@ type ProposalRow = { id: string; suggested_name: string; suggested_description: 
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   if (request.method !== "GET") return methodNotAllowed(response, ["GET"]);
-  const { client, user } = await createUserSupabase(request);
-  await ensureProfile(user);
+  const { client, user } = await createOptionalUserSupabase(request);
+  if (user) await ensureProfile(user);
   const [nodesResult, revisionsResult, edgesResult, domainsResult, assignmentsResult, candidatesResult, proposalsResult, metadataResult, profileResult] = await Promise.all([
-    client.from("knowledge_nodes").select("*").order("id"),
+    user ? client.from("knowledge_nodes").select("*").order("id") : client.from("knowledge_nodes").select("*").eq("scope", "global").eq("status", "active").order("id"),
     client.from("knowledge_node_revisions").select("*").order("node_id").order("version"),
     client.from("knowledge_edges").select("*").eq("lifecycle_status", "active").order("id"),
-    client.from("knowledge_domains").select("*").order("id"),
+    user ? client.from("knowledge_domains").select("*").order("id") : client.from("knowledge_domains").select("*").eq("status", "active").order("id"),
     client.from("domain_assignments").select("*").order("node_id"),
-    client.from("domain_assignment_candidates").select("*").order("node_id"),
-    client.from("domain_proposals").select("*").order("id"),
-    client.from("domain_governance_metadata").select("revision").eq("singleton", true).maybeSingle(),
-    client.from("profiles").select("display_name, role, capabilities").eq("id", user.id).single()
+    user ? client.from("domain_assignment_candidates").select("*").order("node_id") : Promise.resolve({ data: [], error: null }),
+    user ? client.from("domain_proposals").select("*").order("id") : Promise.resolve({ data: [], error: null }),
+    user ? client.from("domain_governance_metadata").select("revision").eq("singleton", true).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    user ? client.from("profiles").select("display_name, role, capabilities").eq("id", user.id).single() : Promise.resolve({ data: null, error: null })
   ]);
   const nodes = dataOrThrow(nodesResult.data as KnowledgeNodeRow[] | null, nodesResult.error, "KnowledgeNode query").map((row) => ({
     id: row.id, title: row.title, description: row.description, type: row.node_type, masteryCriteria: row.mastery_criteria,
@@ -60,5 +60,5 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const proposals = dataOrThrow(proposalsResult.data as ProposalRow[] | null, proposalsResult.error, "Domain proposal query").map((row) => ({ id: row.id, suggestedName: row.suggested_name, suggestedDescription: row.suggested_description ?? undefined, suggestedColor: row.suggested_color, suggestedNodeIds: row.suggested_node_ids, confidence: row.confidence, status: row.status, algorithmVersion: row.algorithm_version, generatedAt: row.generated_at }));
   const metadata = dataOrThrow(metadataResult.data as { revision: number } | null, metadataResult.error, "Domain governance metadata query");
   const profile = dataOrThrow(profileResult.data as { display_name: string; role: string; capabilities: string[] } | null, profileResult.error, "Profile query");
-  json(response, 200, { graph: { nodes, revisions, edges }, governance: { domains, assignments, candidates, proposals, revision: metadata?.revision ?? 0 }, profile: { displayName: profile.display_name, role: profile.role, capabilities: profile.capabilities } });
+  json(response, 200, { graph: { nodes, revisions, edges }, governance: { domains, assignments, candidates, proposals, revision: metadata?.revision ?? 0 }, profile: profile ? { displayName: profile.display_name, role: profile.role, capabilities: profile.capabilities } : null });
 });

@@ -2,8 +2,9 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createUserSupabase = vi.hoisted(() => vi.fn());
+const createOptionalUserSupabase = vi.hoisted(() => vi.fn());
 const createServerSupabase = vi.hoisted(() => vi.fn());
-vi.mock("../../api/_lib/supabase.js", () => ({ createUserSupabase, createServerSupabase }));
+vi.mock("../../api/_lib/supabase.js", () => ({ createUserSupabase, createOptionalUserSupabase, createServerSupabase }));
 
 import handler from "../../api/_handlers/courses";
 
@@ -82,6 +83,8 @@ describe("GET /api/courses", () => {
       user: { id: "learner" },
       token: "token"
     });
+    createOptionalUserSupabase.mockReset();
+    createOptionalUserSupabase.mockImplementation((request) => createUserSupabase(request));
     createServerSupabase.mockReset();
     createServerSupabase.mockReturnValue({ from: (table: string) => queryResult(tableRows[table] ?? []) });
   });
@@ -115,6 +118,17 @@ describe("GET /api/courses", () => {
     const recorder = responseRecorder();
     await handler({ method: "GET", query: {}, headers: {} } as VercelRequest, recorder.response);
 
+    expect(recorder.statusCode()).toBe(200);
+    expect((recorder.body() as { courses: Array<{ course: { id: string } }> }).courses.map((runtime) => runtime.course.id)).toEqual(["route-only-course"]);
+  });
+
+  it("returns only Published Courses to an anonymous viewer", async () => {
+    createOptionalUserSupabase.mockResolvedValueOnce({
+      client: { from: (table: string) => queryResult(tableRows[table] ?? []), storage: { from: () => ({ createSignedUrl: vi.fn() }) } },
+      user: null
+    });
+    const recorder = responseRecorder();
+    await handler({ method: "GET", query: {}, headers: {} } as VercelRequest, recorder.response);
     expect(recorder.statusCode()).toBe(200);
     expect((recorder.body() as { courses: Array<{ course: { id: string } }> }).courses.map((runtime) => runtime.course.id)).toEqual(["route-only-course"]);
   });

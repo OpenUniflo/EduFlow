@@ -1,4 +1,4 @@
-import { BookOpen, Compass, GraduationCap, LogOut, Network, ShieldCheck, Workflow } from "lucide-react";
+import { BookOpen, Compass, GraduationCap, LogIn, LogOut, Network, ShieldCheck, UserPlus, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
@@ -23,6 +23,6 @@ export function GlobalNav({active,session,onLogout}:{active:GlobalNavActive;sess
   return <nav className="atlas-global-nav global-tab-nav" aria-label="全局导航">
     <button className="global-nav-brand glass-v2" onClick={()=>navigate("/")} aria-label="返回学习空间"><span><Network size={18}/></span><strong>EduFlow</strong></button>
     <div className="global-nav-tabs glass-v2">{getPrimaryNavigationItems(session).map((item)=>{const Icon=icons[item.id];return <NavLink key={item.id} to={item.to} className={active===item.id?"active":""}><Icon size={15}/><span>{item.label}</span></NavLink>;})}</div>
-    {session?<div className={`global-account ${accountOpen?"open":""}`}><button className="global-account-trigger glass-v2" onClick={()=>setAccountOpen((value)=>!value)} aria-expanded={accountOpen} aria-label="账户菜单"><span>{initials(session.name)}</span></button>{accountOpen?<div className="global-account-popover glass-v2"><strong>{session.name}</strong><small>{session.email}</small><button onClick={()=>{setAccountOpen(false);navigate("/?view=knowledge");}}><GraduationCap size={14}/>我的知识</button>{onLogout?<button onClick={onLogout}><LogOut size={14}/>退出登录</button>:null}</div>:null}</div>:null}
+    {session?<div className={`global-account ${accountOpen?"open":""}`}><button className="global-account-trigger glass-v2" onClick={()=>setAccountOpen((value)=>!value)} aria-expanded={accountOpen} aria-label="账户菜单"><span>{initials(session.name)}</span></button>{accountOpen?<div className="global-account-popover glass-v2"><strong>{session.name}</strong><small>{session.email}</small><button onClick={()=>{setAccountOpen(false);navigate("/?view=knowledge");}}><GraduationCap size={14}/>我的知识</button>{onLogout?<button onClick={onLogout}><LogOut size={14}/>退出登录</button>:null}</div>:null}</div>:<div className="guest-auth-actions glass-v2"><button onClick={()=>navigate("/login")}><LogIn size={14}/>登录</button><button onClick={()=>navigate("/register")}><UserPlus size={14}/>注册</button></div>}
   </nav>;
 }

@@ -137,11 +137,11 @@ Knowledge relations remain only `prerequisite`, `enables`, and `related`. Curric
 
 All public business tables have RLS enabled.
 
-- Shared Knowledge, Domain, curriculum, Assignment, Material metadata, and Workflow templates use authenticated read. Anonymous access is denied. This keeps the current application private without inventing public catalog semantics.
+- Anonymous read is limited by RLS to active Global Knowledge and factual edges, active public Domain classification, published Courses and their curriculum/Assignment/Material definitions, published Micro content, and referenced shared Material objects. Tenant/user Knowledge, drafts, governance work queues, profiles, learner state, Assistant data, and Workflow ownership remain private.
 - User-owned rows require `auth.uid() = user_id` or `owner_user_id` for every operation.
-- Private `course-materials` objects under `shared/` are readable by authenticated users through short-lived signed URLs.
+- Published `course-materials` objects under `shared/` are readable through short-lived signed URLs when referenced by a published Course; other Material objects remain private.
 - Shared Material upload and Domain mutation require the existing `global-domain-admin` capability. The server verifies capability and the target Course/Lesson/Material before issuing a course-scoped signed upload URL or writing metadata.
-- Server secret operations are trusted application operations, but they do not replace RLS for browser access.
+- Server secret operations are trusted application operations, but they do not replace RLS for browser access or provide a service-role public-read bypass.
 
 Tenant Knowledge rows are not exposed in the current runtime because no tenant membership model exists. This is a minimal safe visibility choice, not a partial Tenant Domain implementation.
 

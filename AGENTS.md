@@ -19,6 +19,14 @@
 - The LLM is not Navigation authority and MUST NOT manufacture a formal personalized Next Action before the deterministic Navigation Engine exists. CurriculumSequence, AssignmentDependency, KnowledgeEdge, Course progress, and Learner Knowledge state MUST retain their distinct meanings in Assistant tool output and answers.
 - Specialized authoring, mutation, generation, and evaluation providers MAY remain separate, but Learn-mode explanation and retrieval use the Global Assistant runtime.
 
+## Anonymous Viewing and Progressive Auth
+
+- Anonymous users MAY browse only published/public learning definitions: active Global Knowledge and factual edges, published Courses and their curriculum graph, public Materials, published Micro paths, and public Assignments.
+- Public catalog hydration and authenticated learner-state hydration MUST remain separate. Anonymous browsing MUST NOT invent a guest user, placeholder learner state, progress, membership, evidence, submission, or score.
+- Guest Micro and Assignment interactions MAY keep ephemeral state in the current browser page and return immediate deterministic feedback, but MUST NOT create durable learner records. Durable progress, My Courses, personal views, messages, settings, admin, and authoring require authentication and preserve an explicit `returnTo` destination.
+- The Global Assistant is authenticated-only. Anonymous pages render a locked explanation and sign-in action without mounting a conversation or starting an Assistant session; every unauthenticated Assistant API request MUST return `401`.
+- Public database access MUST be expressed through narrow `anon` RLS policies and the publishable client. Service-role bypass MUST NOT be used as the public catalog read path, and private governance, drafts, profiles, learner state, and Assistant data remain inaccessible to `anon`.
+
 ## Hosted Deployment Discipline
 
 - A READY frontend deployment does not imply that its target Hosted Supabase schema matches repository migrations.

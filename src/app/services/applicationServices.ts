@@ -58,16 +58,29 @@ export const applicationServices: ApplicationServices = {
   courseCreationService: new BackendCourseCreationService()
 };
 
-export async function hydrateApplicationServices(userId: string) {
-  const knowledge = await apiRequest<{ graph: KnowledgeGraph; governance: DomainGovernanceState; profile: { displayName: string; role: UserRole; capabilities: UserCapability[] } }>("/api/knowledge");
+type KnowledgeHydration = { graph: KnowledgeGraph; governance: DomainGovernanceState; profile: { displayName: string; role: UserRole; capabilities: UserCapability[] } | null };
+
+async function hydrateCatalog(userId?: string) {
+  const knowledge = await apiRequest<KnowledgeHydration>("/api/knowledge");
   knowledgeRepository.hydrate(knowledge.graph);
   domainGovernanceRepository.hydrate(knowledge.governance);
   domainGovernanceService.reloadFromRepository();
   await Promise.all([courseRepository.hydrate(userId), microLearningRepository.hydrate(userId)]);
+  return knowledge.profile;
+}
+
+/** Public catalog hydration never creates a learner identity or requests user state. */
+export async function hydratePublicApplicationServices() {
+  await hydrateCatalog();
+}
+
+export async function hydrateApplicationServices(userId: string) {
+  const profile = await hydrateCatalog(userId);
+  if (!profile) throw new Error("Authenticated profile hydration returned no profile");
   const progress = await apiRequest<{ userKnowledge: UserKnowledgeRecord[]; courseStates: UserCourseState[] }>("/api/progress");
   userKnowledgeRepository.hydrate(progress.userKnowledge);
   learningProgressRepository.hydrate(userId, courseRepository.listCourseRuntimes().map((runtime) => runtime.course.id), progress.courseStates);
-  return knowledge.profile;
+  return profile;
 }
 
 /** Refreshes durable learner projections after a state-machine action. */

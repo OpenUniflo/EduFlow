@@ -6632,6 +6632,9 @@ body {
 .global-nav-tabs a.active::after { position: absolute; right: 3px; bottom: 0; left: 3px; height: 3px; border-radius: 3px 3px 0 0; background: #17191d; content: ""; }
 .global-account-trigger { width: 42px; height: 42px; background: transparent; }
 .global-account-trigger span { width: 32px; height: 32px; color: #464c57; background: #f0f1f3; }
+.guest-auth-actions { display:flex; gap:5px; padding:4px; border:1px solid #e2e4e8; border-radius:11px; background:#fff; box-shadow:none; }
+.guest-auth-actions button { display:flex; height:32px; gap:5px; align-items:center; padding:0 10px; border:0; border-radius:8px; color:#5f6671; background:transparent; font-size:10px; font-weight:750; }
+.guest-auth-actions button:last-child { color:#fff; background:#17191d; }
 .atlas-page-shell { padding-top: 104px; }
 
 .learning-space-page,.micro-learning-page,.explore-page { background: #fbfbfc; }

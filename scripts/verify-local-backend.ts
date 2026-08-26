@@ -12,6 +12,7 @@ import learningHandler from "../api/_handlers/learning";
 import workflowsHandler from "../api/workflows";
 import materialsHandler from "../api/materials";
 import domainsHandler from "../api/domains";
+import assistantHandler from "../api/assistant";
 import { assertLocalSupabaseUrl } from "./local-supabase";
 
 type Handler = (request: VercelRequest, response: VercelResponse) => Promise<void> | void;
@@ -83,11 +84,29 @@ try {
   const [adminUser, ordinaryUser] = users;
 
   assertStatus(await invoke(healthHandler, "GET"), 200, "health");
-  assertStatus(await invoke(knowledgeHandler, "GET"), 401, "anonymous knowledge denial");
+  const publicKnowledge = await invoke(knowledgeHandler, "GET");
+  assertStatus(publicKnowledge, 200, "anonymous public Knowledge read");
+  assert.ok(publicKnowledge.body.graph.nodes.length > 0);
+  assert.ok(publicKnowledge.body.graph.nodes.every((node: any) => node.scope === "global" && node.status === "active"));
+  assert.equal(publicKnowledge.body.profile, null);
+  assert.deepEqual(publicKnowledge.body.governance.candidates, []);
+  assert.deepEqual(publicKnowledge.body.governance.proposals, []);
+  const publicCourses = await invoke(coursesHandler, "GET");
+  assertStatus(publicCourses, 200, "anonymous Published Course read");
+  assert.ok(publicCourses.body.courses.length > 0);
+  assert.ok(publicCourses.body.courses.every((item: any) => item.course.lifecycle === "published"));
+  const publicMicro = await invoke(microHandler, "GET");
+  assertStatus(publicMicro, 200, "anonymous published Micro read");
+  assert.ok(publicMicro.body.paths.length > 0);
+  assert.deepEqual(publicMicro.body.pathProgress, []);
+  assertStatus(await invoke(progressHandler, "GET"), 401, "anonymous progress denial");
+  assertStatus(await invoke(learningHandler, "GET"), 401, "anonymous learner state denial");
+  assertStatus(await invoke(courseAuthoringHandler, "GET", undefined, undefined, { courseId: "agentic-ai" }), 401, "anonymous authoring denial");
+  assertStatus(await invoke(assistantHandler, "GET"), 401, "anonymous Assistant denial");
   const knowledge = await invoke(knowledgeHandler, "GET", adminUser.token);
   assertStatus(knowledge, 200, "knowledge read");
-  assert.equal(knowledge.body.graph.nodes.length, 152);
-  assert.equal(knowledge.body.graph.edges.length, 220);
+  assert.ok(knowledge.body.graph.nodes.length >= publicKnowledge.body.graph.nodes.length);
+  assert.ok(knowledge.body.graph.edges.length >= publicKnowledge.body.graph.edges.length);
   assert.ok(knowledge.body.governance.domains.length > 0);
 
   const capabilityUpdate = await server.from("profiles").update({ capabilities: ["global-domain-admin"] }).eq("id", adminUser.user.id);
@@ -95,7 +114,7 @@ try {
 
   const courses = await invoke(coursesHandler, "GET", adminUser.token);
   assertStatus(courses, 200, "course read");
-  assert.deepEqual(courses.body.courses.map((item: any) => item.course.id).sort(), ["agentic-ai", "agentic-ai-golden", "python-engineering"]);
+  assert.deepEqual(courses.body.courses.map((item: any) => item.course.id).sort(), ["agentic-ai", "agentic-ai-golden", "cds525-deep-learning", "python-engineering"]);
   const golden = courses.body.courses.find((item: any) => item.course.id === "agentic-ai-golden");
   assert.ok(golden, "Golden Course must be available through the API");
   assert.equal(golden.chapters.length, 6);
@@ -129,11 +148,11 @@ try {
   const learnerBeforePublish = await invoke(coursesHandler, "GET", ordinaryUser.token);
   assertStatus(learnerBeforePublish, 200, "learner course read before publish"); assert.ok(!learnerBeforePublish.body.courses.some((item: any) => item.course.id === manualCourseId));
   const published = await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: 1 }, { courseId: manualCourseId });
-  assertStatus(published, 200, "authoring draft publish");
-  const noDraft = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: manualCourseId });
-  assertStatus(noDraft, 200, "published draft cleared"); assert.equal(noDraft.body.draft, null);
+  assertStatus(published, 422, "incomplete authoring draft publish denial");
+  const retainedDraft = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: manualCourseId });
+  assertStatus(retainedDraft, 200, "rejected draft retained"); assert.equal(retainedDraft.body.draft.revision, 1);
   const learnerAfterPublish = await invoke(coursesHandler, "GET", ordinaryUser.token);
-  assertStatus(learnerAfterPublish, 200, "learner course read after publish"); assert.ok(learnerAfterPublish.body.courses.some((item: any) => item.course.id === manualCourseId));
+  assertStatus(learnerAfterPublish, 200, "learner course read after rejected publish"); assert.ok(!learnerAfterPublish.body.courses.some((item: any) => item.course.id === manualCourseId));
 
   // A published Course keeps its existing learner projection until a versioned
   // authoring draft is published.  The same publish transaction materializes

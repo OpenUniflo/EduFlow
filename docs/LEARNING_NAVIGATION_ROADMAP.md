@@ -114,6 +114,14 @@ AssistantContext
 
 The Assistant may interpret language, retrieve context, explain, and call application tools. It must not become the authority for deterministic navigation business rules.
 
+### Anonymous viewing and progressive authentication
+
+The public learning shell is intentionally definition-only. A signed-out visitor may inspect active Global Knowledge, published Courses and course graphs, public Materials, published Micro content, and public Assignments. Public hydration never manufactures a learner identity or mixes in progress, membership, evidence, submission, or score data.
+
+Micro and Assignment pages may provide a page-local anonymous experience with immediate deterministic feedback. That state is disposable and must not write learner records. Personal Atlas, My Courses, durable progress, messages, settings, admin, authoring, and the Global Assistant remain authenticated boundaries. An auth gate preserves the intended destination so the visitor can resume after sign-in.
+
+The database boundary mirrors the UI boundary: narrow `anon` RLS policies expose published/public definitions only, while profiles, drafts, governance proposals, learner state, Assistant sessions/messages, and mutations remain private. Public reads use the publishable client rather than a service-role bypass.
+
 The V1A implementation uses one authenticated `/api/assistant` boundary. AI SDK Core owns generic streaming/reasoning/tool-call protocol and the bounded multi-step loop; EduFlow owns `AssistantContext`, tool permissions, product retrieval, and learning policy. Contextual surfaces and `/messages` share user-owned database sessions. Specialized Design mutation and evaluation adapters remain separate from learner chat. See `ASSISTANT_ARCHITECTURE.md`.
 
 ## 4. Goal resolution and Course reuse

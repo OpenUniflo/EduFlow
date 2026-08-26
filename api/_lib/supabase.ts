@@ -10,6 +10,12 @@ export function createServerSupabase(): SupabaseClient {
   return createClient(env.supabaseUrl, env.supabaseSecretKey, options);
 }
 
+/** Public catalog access is intentionally evaluated as the Supabase anon role. */
+export function createPublicSupabase(): SupabaseClient {
+  const env = readServerEnvironment();
+  return createClient(env.supabaseUrl, env.supabasePublishableKey, options);
+}
+
 export async function createUserSupabase(request: VercelRequest): Promise<{ client: SupabaseClient; user: User; token: string }> {
   const token = bearerToken(request);
   const env = readServerEnvironment();
@@ -20,6 +26,11 @@ export async function createUserSupabase(request: VercelRequest): Promise<{ clie
   const { data, error } = await client.auth.getUser(token);
   if (error || !data.user) throw new ApiError(401, "unauthorized", "The session is invalid or expired");
   return { client, user: data.user, token };
+}
+
+export async function createOptionalUserSupabase(request: VercelRequest): Promise<{ client: SupabaseClient; user: User | null; token?: string }> {
+  if (!request.headers.authorization) return { client: createPublicSupabase(), user: null };
+  return createUserSupabase(request);
 }
 
 export async function ensureProfile(user: User) {

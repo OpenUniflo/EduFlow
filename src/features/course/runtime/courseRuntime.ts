@@ -213,7 +213,7 @@ function summarizeAssignmentIds(assignmentIds: string[], assignmentStateById: Ma
   return { assignmentIds: uniqueIds, assignmentCount: uniqueIds.length, completedCount, inProgressCount, notStartedCount: uniqueIds.length - completedCount - inProgressCount, progress };
 }
 
-export function buildCourseGraphData(runtime: CourseRuntimeData, userState: UserCourseState, graph: KnowledgeGraph, userKnowledge: UserKnowledgeRecord[] = [], unlockPolicy: CourseUnlockPolicy = defaultCourseUnlockPolicy): CourseGraphData {
+export function buildCourseGraphData(runtime: CourseRuntimeData, userState: UserCourseState | undefined, graph: KnowledgeGraph, userKnowledge: UserKnowledgeRecord[] = [], unlockPolicy: CourseUnlockPolicy = defaultCourseUnlockPolicy): CourseGraphData {
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
   runtime.curriculumCoverages.forEach((coverage) => {
     if (!nodeById.has(coverage.nodeId)) throw new Error(`Course ${runtime.course.id} cannot resolve visible KnowledgeNode ${coverage.nodeId}`);
@@ -222,7 +222,7 @@ export function buildCourseGraphData(runtime: CourseRuntimeData, userState: User
   const chapterById = new Map(runtime.chapters.map((chapter) => [chapter.id, chapter]));
   const assignmentById = new Map(runtime.assignments.map((assignment) => [assignment.id, assignment]));
   const assignmentOrderById = new Map(runtime.assignments.map((assignment) => [assignment.id, assignment.order]));
-  const assignmentStateById = new Map(Object.values(userState.assignmentStates).map((state) => [state.assignmentId, state]));
+  const assignmentStateById = new Map(Object.values(userState?.assignmentStates ?? {}).map((state) => [state.assignmentId, state]));
   const userKnowledgeById = new Map(userKnowledge.map((record) => [record.nodeId, record]));
   const curriculumByNode = groupBy(runtime.curriculumCoverages, (coverage) => coverage.nodeId);
   const assignmentByNode = groupBy(runtime.assignmentCoverages, (coverage) => coverage.nodeId);

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createServerSupabase, createUserSupabase } from "../_lib/supabase.js";
+import { createOptionalUserSupabase, createServerSupabase, createUserSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 import { dataOrThrow } from "../_lib/query.js";
 
@@ -9,8 +9,8 @@ const optionalText = (row: Row, key: string) => row[key] == null ? undefined : S
 const number = (row: Row, key: string) => Number(row[key]);
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
-  const { client, user } = await createUserSupabase(request);
   if (request.method === "POST") {
+    const { client, user } = await createUserSupabase(request);
     const body = request.body as { title?: string; description?: string; targetOutcome?: string; accentColor?: string };
     const title = body.title?.trim(); const targetOutcome = body.targetOutcome?.trim();
     if (!title) throw new ApiError(400, "invalid_course", "title is required");
@@ -27,6 +27,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     json(response, 201, { courseId: id }); return;
   }
   if (request.method === "PATCH") {
+    const { client, user } = await createUserSupabase(request);
     const body = request.body as { courseId?: string; lifecycle?: string };
     if (!body.courseId || !["draft", "published", "archived"].includes(String(body.lifecycle))) throw new ApiError(400, "invalid_course_lifecycle", "courseId and a valid lifecycle are required");
     const profile = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
@@ -47,6 +48,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     json(response, 200, { courseId: text(row, "id"), lifecycle: text(row, "lifecycle") }); return;
   }
   if (request.method !== "GET") return methodNotAllowed(response, ["GET", "POST", "PATCH"]);
+  const { client, user } = await createOptionalUserSupabase(request);
   const courseId = typeof request.query.id === "string" ? request.query.id : undefined;
   const queries = await Promise.all([
     client.from("courses").select("*").order("id"),
@@ -77,7 +79,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     })];
   }));
 
-  const profileResult = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  const profileResult = user ? await client.from("profiles").select("role").eq("id", user.id).maybeSingle() : { data: null, error: null };
   const profile = dataOrThrow(profileResult.data as Row | null, profileResult.error, "Course role lookup");
   const canManage = profile && ["teacher", "admin"].includes(text(profile, "role"));
   const readableCourseRows = canManage ? courseRows : courseRows.filter((row) => text(row, "lifecycle") === "published");

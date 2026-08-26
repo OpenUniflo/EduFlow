@@ -32,7 +32,7 @@ export function buildMaterialKnowledgeContext(nodeId: string, roles: MaterialKno
   return { nodeId, title: node.title, description: node.description, roles: sortMaterialCoverageRoles(roles), color: domain?.canonicalColor ?? UNCLASSIFIED_DOMAIN_COLOR };
 }
 
-export function buildKnowledgeAssignmentContexts(runtime: CourseRuntimeData, nodeId: string | null, userState: UserCourseState): AssignmentContext[] {
+export function buildKnowledgeAssignmentContexts(runtime: CourseRuntimeData, nodeId: string | null, userState?: UserCourseState): AssignmentContext[] {
   if (!nodeId) return [];
   const coverages = runtime.assignmentCoverages.filter((coverage) => coverage.nodeId === nodeId);
   const coverageByAssignmentId = new Map<string, typeof coverages[number]>();
@@ -42,7 +42,7 @@ export function buildKnowledgeAssignmentContexts(runtime: CourseRuntimeData, nod
   });
   return sortAssignments(runtime.assignments).flatMap((assignment) => {
     const coverage = coverageByAssignmentId.get(assignment.id);
-    return coverage ? [{ ...coverage, assignment, state: userState.assignmentStates[assignment.id] }] : [];
+    return coverage ? [{ ...coverage, assignment, state: userState?.assignmentStates[assignment.id] }] : [];
   });
 }
 
@@ -53,7 +53,7 @@ export function buildMaterialKnowledgeRoles(runtime: CourseRuntimeData, material
     .map((coverage) => coverage.role));
 }
 
-export function buildMaterialSegmentProjection(runtime: CourseRuntimeData, material: Material, segmentId: string, userState: UserCourseState, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext, governance: DomainGovernanceState): MaterialSegmentProjection | null {
+export function buildMaterialSegmentProjection(runtime: CourseRuntimeData, material: Material, segmentId: string, userState: UserCourseState | undefined, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext, governance: DomainGovernanceState): MaterialSegmentProjection | null {
   const segment = material.segments.find((item) => item.id === segmentId);
   if (!segment) return null;
   const coverages = runtime.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === material.id && coverage.segmentId === segment.id);
@@ -73,7 +73,7 @@ export function buildMaterialSegmentProjection(runtime: CourseRuntimeData, mater
   assignmentCoverageById.forEach((coverage) => coveragesByAssignmentId.set(coverage.assignmentId, [...(coveragesByAssignmentId.get(coverage.assignmentId) ?? []), coverage]));
   const pageAssignmentContexts = sortAssignments(runtime.assignments).flatMap((assignment) => {
     const coverage = [...(coveragesByAssignmentId.get(assignment.id) ?? [])].sort((left, right) => left.nodeId.localeCompare(right.nodeId) || left.id.localeCompare(right.id))[0];
-    return coverage ? [{ ...coverage, assignment, state: userState.assignmentStates[assignment.id] }] : [];
+    return coverage ? [{ ...coverage, assignment, state: userState?.assignmentStates[assignment.id] }] : [];
   });
   return { segment, knowledgeContexts, pageAssignmentContexts };
 }
