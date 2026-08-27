@@ -63,6 +63,25 @@ describe("Goal Planner language adapter", () => {
     expect(result).toMatchObject({ status: "clarify", clarificationQuestion: "你想先完成哪一种图片识别成果？" });
   });
 
+  it("normalizes an over-selected proposal to its coherent direct target subset", async () => {
+    const proposed = {
+      ...ready("image-model"),
+      candidateKnowledgeIds: ["image-model", "optimization"],
+      targetReasons: [
+        { knowledgeId: "image-model", reason: "The requested artifact" },
+        { knowledgeId: "optimization", reason: "A useful training mechanism" }
+      ]
+    };
+    const generateJson = vi.fn()
+      .mockResolvedValueOnce({ value: proposed, metadata: {} })
+      .mockResolvedValueOnce({ value: { coherent: true, directlySupportingKnowledgeIds: ["image-model"] }, metadata: {} });
+    const result = await resolveGoalLanguage(knowledgeClient([
+      { id: "image-model", title: "Image Classification", description: "Train an image classifier", tags: [] },
+      { id: "optimization", title: "Optimization", description: "Tune model parameters", tags: [] }
+    ]), { goalText: "训练一个猫狗分类模型" }, { generateJson } as any);
+    expect(result).toMatchObject({ status: "ready", candidateKnowledgeIds: ["image-model"], targetReasons: [{ knowledgeId: "image-model" }] });
+  });
+
   it("deterministically preserves prior targets for preference-only refinement", async () => {
     const generateJson = vi.fn().mockResolvedValue({ value: ready("agent"), metadata: {} });
     const result = await resolveGoalLanguage(knowledgeClient([{ id: "image-model", title: "Image", description: "Image", tags: [] }, { id: "agent", title: "Agent", description: "Agent", tags: [] }]), { goalText: "Train an image model", previousGoalText: "Train an image model", previousKnowledgeIds: ["image-model"], refinement: "Less theory, more practice" }, { generateJson } as any);
