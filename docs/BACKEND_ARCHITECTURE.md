@@ -38,7 +38,7 @@ Preview uses the existing Vercel `edu-flow` project and Hosted Supabase `Knowled
 Vercel Preview -> Vercel Functions -> Hosted Supabase
 ```
 
-`vercel.json` pins database-heavy Functions to Vercel `sin1`, matching the Hosted Supabase `ap-southeast-1` region. The existing `api/assistant` Function is the narrow exception and runs in `hkg1`: repeated Hosted acceptance showed the configured model provider's direct route from `sin1` resetting while the same bounded request from `hkg1` completed normally. The exception keeps Course, Knowledge, learner-state, and authoring traffic beside the database while giving the authenticated Assistant a working provider route; it does not add a Function or move data authority.
+`vercel.json` pins all Functions to Vercel `sin1`, matching the Hosted Supabase `ap-southeast-1` region. Assistant acceptance must verify both database access and the configured model-provider route from that region. A former `hkg1` Assistant exception was removed after repeated Hosted network failures while a same-deployment `sin1` provider probe remained reachable. Region selection does not add a Function, move data authority, or change the model adapter contract.
 
 ### Vercel Function budget
 
