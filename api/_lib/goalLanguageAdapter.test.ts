@@ -8,13 +8,7 @@ const catalog = [
 ];
 
 function client() {
-  return {
-    from: () => ({
-      select: () => ({
-        eq: () => ({ limit: async () => ({ data: catalog, error: null }) })
-      })
-    })
-  } as never;
+  return { from: () => ({ select: () => ({ eq: () => ({ limit: async () => ({ data: catalog, error: null }) }) }) }) } as never;
 }
 
 function result(value: unknown): StructuredGenerationResult {
@@ -22,28 +16,24 @@ function result(value: unknown): StructuredGenerationResult {
 }
 
 describe("Goal language adapter", () => {
-  it("independently audits an unsupported proposal and still revalidates real catalog IDs", async () => {
-    const generateJson = vi.fn()
-      .mockResolvedValueOnce(result({ status: "unsupported", intentSummary: "No matching knowledge", reason: "Unsupported" }))
-      .mockResolvedValueOnce(result({
-        status: "ready", intentSummary: "Train an image classifier", primaryOutcome: "Train an image classifier", refinementIntent: "preserve_outcome",
-        candidateKnowledgeIds: ["CNN", "SPLIT"], targetReasons: [{ knowledgeId: "CNN", reason: "Direct model capability" }, { knowledgeId: "SPLIT", reason: "Directly validates the trained model" }]
-      }))
-      .mockResolvedValueOnce(result({ coherent: true, directlySupportingKnowledgeIds: ["CNN", "SPLIT"] }));
-
+  it("uses one strict generation and validates real catalog identities", async () => {
+    const generateJson = vi.fn().mockResolvedValue(result({
+      status: "ready", intentSummary: "Train an image classifier", primaryOutcome: "Train an image classifier", refinementIntent: "preserve_outcome", practiceEmphasis: true,
+      candidateKnowledgeIds: ["CNN"], targetReasons: [{ knowledgeId: "CNN", reason: "Direct model capability" }]
+    }));
     const resolved = await resolveGoalLanguage(client(), { goalText: "Train a model that distinguishes two kinds of images" }, { generateJson } as StructuredGenerationClient);
-
-    expect(resolved).toMatchObject({ status: "ready", candidateKnowledgeIds: ["CNN", "SPLIT"] });
-    expect(generateJson).toHaveBeenCalledTimes(3);
-    expect(generateJson.mock.calls[1][0].promptVersion).toBe("goal-unsupported-audit-v1");
+    expect(resolved).toMatchObject({ status: "ready", candidateKnowledgeIds: ["CNN"] });
+    expect(generateJson).toHaveBeenCalledTimes(1);
+    expect(generateJson.mock.calls[0][0].promptVersion).toBe("goal-resolution-v4");
   });
 
-  it("keeps unsupported when an independent catalog-grounded audit agrees", async () => {
-    const generateJson = vi.fn()
-      .mockResolvedValueOnce(result({ status: "unsupported", intentSummary: "Quantum hardware", reason: "No matching knowledge" }))
-      .mockResolvedValueOnce(result({ status: "unsupported", intentSummary: "Quantum hardware", reason: "No matching knowledge" }));
+  it("keeps a clear Goal with no catalog coverage separate from clarification", async () => {
+    const generateJson = vi.fn().mockResolvedValue(result({ status: "no_match", intentSummary: "Build quantum hardware", primaryOutcome: "Build a quantum processor", practiceEmphasis: true, reason: "No visible learning content directly supports this outcome" }));
+    await expect(resolveGoalLanguage(client(), { goalText: "Build a quantum processor" }, { generateJson } as StructuredGenerationClient)).resolves.toMatchObject({ status: "no_match", primaryOutcome: "Build a quantum processor" });
+  });
 
-    await expect(resolveGoalLanguage(client(), { goalText: "Build a quantum processor" }, { generateJson } as StructuredGenerationClient)).resolves.toMatchObject({ status: "unsupported" });
-    expect(generateJson).toHaveBeenCalledTimes(2);
+  it("rejects invalid structured output instead of converting it to clarification", async () => {
+    const generateJson = vi.fn().mockResolvedValue(result({ status: "ready", candidateKnowledgeIds: ["CNN"] }));
+    await expect(resolveGoalLanguage(client(), { goalText: "Train an image classifier" }, { generateJson } as StructuredGenerationClient)).rejects.toThrow();
   });
 });

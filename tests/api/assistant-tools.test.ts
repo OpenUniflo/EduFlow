@@ -76,7 +76,7 @@ describe("Assistant read tool boundaries", () => {
       resolution: { status: "ready", targetKnowledge: [{ id: "K-visible" }] },
       matches: expect.arrayContaining([expect.objectContaining({ courseId: "route-only", targetCoverage: 1, recommendation: "use_existing" })])
     });
-    expect(await execute(clientFor(), "planLearningGoal", { goalText: "Invented", candidateKnowledgeIds: ["K-invented"] })).toMatchObject({ resolution: { status: "unsupported", targetKnowledge: [] } });
+    expect(await execute(clientFor(), "planLearningGoal", { goalText: "Invented", candidateKnowledgeIds: ["K-invented"] })).toMatchObject({ resolution: { status: "no_match", targetKnowledge: [] } });
   });
 
   it("reads a structurally valid route-only Course without requiring optional assets", async () => {

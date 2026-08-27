@@ -75,8 +75,8 @@ export async function createPersonalCourse(server: SupabaseClient, client: Supab
 }
 
 export function goalPlanSummary(plan: GoalPlan) {
-  if (plan.resolution.status === "unsupported") return `未找到可可靠映射的 Knowledge：${plan.resolution.reason ?? "目标暂不支持"}`;
-  if (plan.resolution.status === "ambiguous") return `目标存在歧义：${plan.resolution.candidates.map((item) => item.title).join("、")}`;
+  if (plan.resolution.status === "no_match") return `已理解你的目标，但当前学习内容覆盖不足：${plan.resolution.reason ?? "没有合适匹配"}`;
+  if (plan.resolution.status === "needs_clarification") return `还需要确认目标：${plan.resolution.reason ?? "请补充具体成果"}`;
   const best = plan.matches[0];
   return `已解析目标 Knowledge：${plan.resolution.targetKnowledge.map((item) => item.title).join("、")}。${best ? `最佳现有课程为「${best.courseTitle}」，目标覆盖 ${Math.round(best.targetCoverage * 100)}%，所需范围覆盖 ${Math.round(best.requiredCoverage * 100)}%。` : "当前没有可访问的现有课程。"}`;
 }

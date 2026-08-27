@@ -42,8 +42,8 @@ function ChapterNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
   return (
     <div className={`course-flow-chapter ${data.expanded ? "expanded" : "collapsed"} mode-${data.mode} ${data.selected || data.searchMatch ? "selected" : ""} ${data.dropTarget ? "drop-target" : ""}`} style={{ "--node-color": chapter.color } as React.CSSProperties} onDoubleClick={(event) => { event.stopPropagation(); data.onChapterDoubleClick?.(chapter); }}>
       <Handle type="target" id="in" position={Position.Left} />
-      <div className="course-flow-chapter-presentation knowledge-presentation"><div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")}</small><strong>{chapter.title}</strong><em>{chapter.lessonCount} 课 · {assignment.progress >= 100 ? "✓ 阶段已完成" : assignment.progress ? "● 当前学习" : "可学习"}</em></span></div>{!data.expanded ? <p>{chapter.description}</p> : <div className="course-flow-chapter-caption">{chapter.title} · 原子知识与实训伴生层 · Knowledge mastery {progress}%</div>}</div>
-      <div className="course-flow-chapter-presentation assignment-presentation"><div className="course-flow-chapter-head"><i /><span><small>CHAPTER {String(chapter.order).padStart(2, "0")} · 实训</small><strong>{chapter.title} · 实训</strong><em>{assignment.assignmentCount} 项实训 · 完成度 {assignment.progress}%</em></span></div>{!data.expanded ? <p>{assignmentStatus}<br />篇章成果：{assignment.outcome}</p> : <div className="course-flow-chapter-caption">{assignmentStatus} · 篇章成果：{assignment.outcome}</div>}</div>
+      <div className="course-flow-chapter-presentation knowledge-presentation"><div className="course-flow-chapter-head"><i /><span><small>第 {chapter.displayNumber} 章</small><strong>{chapter.title}</strong><em>{chapter.lessonCount} 课 · {assignment.progress >= 100 ? "✓ 阶段已完成" : assignment.progress ? "● 当前学习" : "已包含"}</em></span></div>{!data.expanded ? <p>{chapter.description}</p> : <div className="course-flow-chapter-caption">{chapter.title} · 课程中的学习内容与实践任务</div>}</div>
+      <div className="course-flow-chapter-presentation assignment-presentation"><div className="course-flow-chapter-head"><i /><span><small>第 {chapter.displayNumber} 章 · 实训</small><strong>{chapter.title} · 实训</strong><em>{assignment.assignmentCount} 项实训 · 完成度 {assignment.progress}%</em></span></div>{!data.expanded ? <p>{assignmentStatus}<br />篇章成果：{assignment.outcome}</p> : <div className="course-flow-chapter-caption">{assignmentStatus} · 篇章成果：{assignment.outcome}</div>}</div>
       {!data.expanded ? <b>双击原位展开</b> : null}
       <Handle type="source" id="out" position={Position.Right} />
     </div>
@@ -52,11 +52,11 @@ function ChapterNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
 
 function KnowledgeNode({ data }: NodeProps<Node<CourseFlowNodeData>>) {
   const node = data.knowledge!;
-  const status = { completed: "已完成", learning: "学习中", available: "可学习", locked: "未解锁" }[node.status];
-  const assignmentStatus = node.assignmentStateSummary.completedCount ? "已完成" : node.assignmentStateSummary.inProgressCount ? "进行中" : node.status === "locked" ? "待解锁" : "可开始";
+  const status = { completed: "已完成", learning: "学习中", available: "已解锁", locked: "前置未满足" }[node.status];
+  const assignmentStatus = node.assignmentCount === 0 ? "未配置" : node.assignmentStateSummary.completedCount ? "已完成" : node.assignmentStateSummary.inProgressCount ? "进行中" : node.status === "locked" ? "待解锁" : "可开始";
   const singleAssignment = node.assignmentContexts.length === 1 ? node.assignmentContexts[0].assignment : null;
-  const assignmentTitle = singleAssignment?.title ?? `${node.assignmentCount} 项课后任务`;
-  const assignmentMeta = singleAssignment?.estimatedMinutes ? `预计 ${singleAssignment.estimatedMinutes} 分钟` : `${node.assignmentStateSummary.inProgressCount} 项进行中`;
+  const assignmentTitle = singleAssignment?.title ?? (node.assignmentCount ? `${node.assignmentCount} 项课后任务` : "暂无实训任务");
+  const assignmentMeta = node.assignmentCount === 0 ? "无可执行实训" : singleAssignment?.estimatedMinutes ? `预计 ${singleAssignment.estimatedMinutes} 分钟` : `${node.assignmentStateSummary.inProgressCount} 项进行中`;
   return (
     <div className={`course-flow-knowledge status-${node.status} mode-${data.mode} has-assignment ${data.selected || data.searchMatch ? "selected" : ""}`} style={{ "--node-color": node.color } as React.CSSProperties}>
       <Handle type="target" id="in" position={Position.Left} isConnectable={data.designEnabled} className="course-dependency-handle target" aria-label={`连接到 ${node.title}`} />

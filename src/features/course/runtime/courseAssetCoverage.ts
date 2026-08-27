@@ -25,10 +25,21 @@ export type CourseAssetCoverageAudit = {
   assignments: CourseKnowledgeAssetCoverage;
   materials: CourseKnowledgeAssetCoverage;
   micro: {
-    status: "unavailable";
-    coveredKnowledgeCount: null;
-    missingKnowledgeCount: null;
+    status: "available" | "unavailable";
+    coveredKnowledgeCount: number | null;
+    missingKnowledgeCount: number | null;
+    coveredKnowledgeNodeIds: string[];
+    missingKnowledgeNodeIds: string[];
     reason: string;
+  };
+  actionability: {
+    actionableKnowledgeCount: number | null;
+    actionableKnowledgeNodeIds: string[];
+    noExecutableActivities: boolean;
+  };
+  practice: {
+    emphasized: boolean;
+    assignmentCoverageGap: boolean;
   };
   chapterOutcomes: {
     totalChapterCount: number;
@@ -61,10 +72,16 @@ function knowledgeCoverage(courseKnowledgeNodeIds: readonly string[], coveredNod
   };
 }
 
-export function auditCourseAssetCoverage(runtime: CourseRuntimeData): CourseAssetCoverageAudit {
+export function auditCourseAssetCoverage(runtime: CourseRuntimeData, options: { microKnowledgeIds?: readonly string[]; practiceEmphasis?: boolean } = {}): CourseAssetCoverageAudit {
   const courseKnowledgeNodeIds = Array.from(new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId))).sort();
   const assignments = knowledgeCoverage(courseKnowledgeNodeIds, new Set(runtime.assignmentCoverages.map((coverage) => coverage.nodeId)));
   const materials = knowledgeCoverage(courseKnowledgeNodeIds, new Set(runtime.materialKnowledgeCoverages.map((coverage) => coverage.nodeId)));
+  const micro = options.microKnowledgeIds ? knowledgeCoverage(courseKnowledgeNodeIds, new Set(options.microKnowledgeIds)) : null;
+  const actionableKnowledgeNodeIds = micro ? courseKnowledgeNodeIds.filter((nodeId) =>
+    materials.coveredKnowledgeNodeIds.includes(nodeId)
+    || assignments.coveredKnowledgeNodeIds.includes(nodeId)
+    || micro.coveredKnowledgeNodeIds.includes(nodeId)
+  ) : [];
   const outcomeChapterIds = new Set(runtime.chapterOutcomes.map((outcome) => outcome.chapterId));
   const missingChapterIds = runtime.chapters.map((chapter) => chapter.id).filter((chapterId) => !outcomeChapterIds.has(chapterId)).sort();
   const issues: CourseAssetCoverageIssue[] = [];
@@ -72,12 +89,12 @@ export function auditCourseAssetCoverage(runtime: CourseRuntimeData): CourseAsse
   if (assignments.missingKnowledgeCount) issues.push({
     code: "missing-assignment-coverage",
     severity: "warning",
-    message: `${assignments.missingKnowledgeCount} Course KnowledgeNode(s) have no AssignmentCoverage`
+    message: `${assignments.missingKnowledgeCount} 个课程学习内容尚无实践任务覆盖`
   });
   if (materials.missingKnowledgeCount) issues.push({
     code: "missing-material-coverage",
     severity: "warning",
-    message: `${materials.missingKnowledgeCount} Course KnowledgeNode(s) have no MaterialKnowledgeCoverage`
+    message: `${materials.missingKnowledgeCount} 个课程学习内容尚无学习资料覆盖`
   });
   issues.push({
     code: "micro-coverage-unavailable",
@@ -87,12 +104,12 @@ export function auditCourseAssetCoverage(runtime: CourseRuntimeData): CourseAsse
   if (missingChapterIds.length) issues.push({
     code: "missing-chapter-outcome",
     severity: "warning",
-    message: `${missingChapterIds.length} Chapter(s) have no ChapterOutcome`
+    message: `${missingChapterIds.length} 个篇章尚未配置篇章成果`
   });
   if (!runtime.finalProjects.length) issues.push({
     code: "missing-final-project",
     severity: "warning",
-    message: "Course has no FinalProject"
+    message: "课程尚未配置最终项目"
   });
 
   return {
@@ -100,11 +117,29 @@ export function auditCourseAssetCoverage(runtime: CourseRuntimeData): CourseAsse
     knowledgeCount: courseKnowledgeNodeIds.length,
     assignments,
     materials,
-    micro: {
+    micro: micro ? {
+      status: "available",
+      coveredKnowledgeCount: micro.coveredKnowledgeCount,
+      missingKnowledgeCount: micro.missingKnowledgeCount,
+      coveredKnowledgeNodeIds: micro.coveredKnowledgeNodeIds,
+      missingKnowledgeNodeIds: micro.missingKnowledgeNodeIds,
+      reason: "Micro coverage was supplied by the Micro runtime boundary"
+    } : {
       status: "unavailable",
       coveredKnowledgeCount: null,
       missingKnowledgeCount: null,
+      coveredKnowledgeNodeIds: [],
+      missingKnowledgeNodeIds: [],
       reason: "CourseRuntimeData has no Micro ownership or coverage relation"
+    },
+    actionability: {
+      actionableKnowledgeCount: micro ? actionableKnowledgeNodeIds.length : null,
+      actionableKnowledgeNodeIds,
+      noExecutableActivities: Boolean(micro && !actionableKnowledgeNodeIds.length)
+    },
+    practice: {
+      emphasized: Boolean(options.practiceEmphasis),
+      assignmentCoverageGap: Boolean(options.practiceEmphasis && assignments.missingKnowledgeCount)
     },
     chapterOutcomes: {
       totalChapterCount: runtime.chapters.length,

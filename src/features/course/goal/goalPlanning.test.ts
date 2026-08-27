@@ -16,17 +16,17 @@ describe("Goal resolution", () => {
     expect(result.targetKnowledge.map((item) => item.id)).toEqual(["RAG", "RERANK", "CITE", "TOOL", "MEMORY", "AGENT"]);
   });
 
-  it("returns unsupported for a missing field instead of inventing Knowledge", () => {
-    expect(resolveGoalToKnowledge({ goalText: "量子引力实验设计", visibleNodes: nodes })).toMatchObject({ status: "unsupported", targetKnowledge: [] });
+  it("returns no_match for a missing validated identity instead of inventing Knowledge", () => {
+    expect(resolveGoalToKnowledge({ goalText: "量子引力实验设计", visibleNodes: nodes })).toMatchObject({ status: "no_match", targetKnowledge: [] });
   });
 
   it("does not reinterpret prose lexically when no structured identities are supplied", () => {
     const result = resolveGoalToKnowledge({ goalText: "Graph", visibleNodes: [node("A", "Graph A"), node("B", "Graph B")] });
-    expect(result).toMatchObject({ status: "unsupported", candidates: [] });
+    expect(result).toMatchObject({ status: "no_match", candidates: [] });
   });
 
   it("rejects a language-adapter Knowledge identity that is not visible", () => {
-    expect(resolveGoalToKnowledge({ goalText: "Agent", visibleNodes: nodes, suggestedKnowledgeIds: ["INVENTED"] })).toMatchObject({ status: "unsupported", reason: expect.stringContaining("INVENTED") });
+    expect(resolveGoalToKnowledge({ goalText: "Agent", visibleNodes: nodes, suggestedKnowledgeIds: ["INVENTED"] })).toMatchObject({ status: "no_match", reason: expect.stringContaining("INVENTED") });
   });
 
   it("resolves a cross-course goal for the medium-match customization path", () => {

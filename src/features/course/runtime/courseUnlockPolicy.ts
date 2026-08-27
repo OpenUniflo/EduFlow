@@ -9,18 +9,18 @@ export type CourseUnlockPolicyInput = {
   sequences: CurriculumSequence[];
   userCourseState?: UserCourseState;
   userKnowledge?: UserKnowledgeRecord;
+  prerequisiteKnowledge: UserKnowledgeRecord[];
 };
 
 export type CourseUnlockPolicy = (input: CourseUnlockPolicyInput) => LearningStatus;
 
-/** Conservative default: evidence controls learning; curriculum sequence controls availability. */
-export const defaultCourseUnlockPolicy: CourseUnlockPolicy = ({ lesson, lessons, sequences, userCourseState, userKnowledge }) => {
-  if (userKnowledge?.status === "mastered") return "completed";
-  if (userKnowledge?.status === "learning" || userKnowledge?.status === "learned" || userKnowledge?.status === "practicing") return "learning";
-  const firstOrder = Math.min(...lessons.map((item) => item.order));
-  if (!userCourseState) return "available";
-  if (!userCourseState.recentLessonId) return lesson.order === firstOrder ? "available" : "locked";
-  if (lesson.id === userCourseState.recentLessonId) return "available";
-  if (sequences.some((sequence) => sequence.sourceLessonId === userCourseState.recentLessonId && sequence.targetLessonId === lesson.id)) return "available";
-  return "locked";
+export function evaluatePrerequisiteReachability(status: UserKnowledgeRecord["status"] | undefined, prerequisiteStatuses: Array<UserKnowledgeRecord["status"] | undefined>): LearningStatus {
+  if (status === "mastered") return "completed";
+  if (status === "learning" || status === "learned" || status === "practicing") return "learning";
+  return prerequisiteStatuses.every((prerequisiteStatus) => prerequisiteStatus === "mastered") ? "available" : "locked";
+}
+
+/** Factual prerequisite mastery controls reachability; curriculum order does not create eligibility. */
+export const defaultCourseUnlockPolicy: CourseUnlockPolicy = ({ userKnowledge, prerequisiteKnowledge }) => {
+  return evaluatePrerequisiteReachability(userKnowledge?.status, prerequisiteKnowledge.map((record) => record.status));
 };

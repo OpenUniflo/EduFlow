@@ -108,7 +108,7 @@ export function PersonalKnowledgeView({ session, onLogout, embedded = false }: {
   }
 
   async function openMaterial(node: PersonalKnowledgeNode, material: KnowledgeMaterialResource) {
-    await applicationServices.learnerStateService.startKnowledge(node.id, material.courseId);
+    await applicationServices.learnerStateService.startMaterial(material.courseId, material.materialId, node.id);
     await refreshLearnerState(session.userId);
     navigate(buildMaterialDeepLink({ courseId: material.courseId, materialId: material.materialId, segmentId: material.segmentId }));
   }
@@ -116,8 +116,6 @@ export function PersonalKnowledgeView({ session, onLogout, embedded = false }: {
   async function openMicro(node: PersonalKnowledgeNode) {
     if (!selectedContext?.micro.available) return;
     const courseId = selectedContext.kind === "course" ? selectedContext.courseId : undefined;
-    await applicationServices.learnerStateService.startKnowledge(node.id, courseId);
-    await refreshLearnerState(session.userId);
     const target = createMicroLearningNavigation(node.id, { courseId, returnTo: "/?view=knowledge" });
     navigate(target.to, { state: target.state });
   }

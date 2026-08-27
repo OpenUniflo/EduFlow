@@ -5,10 +5,12 @@ import { describe, expect, it } from "vitest";
 const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
 describe("Course-scoped learner action membership", () => {
-  it("keeps Standalone startKnowledge mutation-free from Course membership and validates Course-scoped starts", () => {
+  it("allows Knowledge state mutation only through a validated real Material action", () => {
     const learning = source("api/_handlers/learning.ts");
-    expect(learning).toContain("if (body.courseId)");
+    expect(learning).not.toContain('body.action === "start-knowledge"');
+    expect(learning).toContain('body.action === "start-material"');
     expect(learning).toContain("requireCourseKnowledge(client, body.courseId, body.nodeId)");
+    expect(learning).toContain('from("material_knowledge_coverages")');
     expect(learning).toContain("activateCourse(client, user.id, body.courseId)");
   });
   it("activates Course Micro including a Global fallback used in explicit Course context", () => {

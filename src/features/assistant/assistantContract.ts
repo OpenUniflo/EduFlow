@@ -37,6 +37,7 @@ export type CourseSearchTimelineContent = {
   planningId: string;
   goalText: string;
   intentSummary: string;
+  practiceEmphasis?: boolean;
   refinement?: string;
   refinedFromPlanningId?: string;
   plan: import("@/features/course/goal/goalPlanning").GoalPlan;
@@ -53,6 +54,7 @@ export type CourseCreationBrief = {
   targetKnowledge: Array<{ id: string; title: string; description: string }>;
   requestedAdjustments?: string;
   referenceMaterialIntent: "none" | "upload_in_creator";
+  practiceEmphasis?: boolean;
 };
 
 export type AssistantStructuredContent = CourseSearchTimelineContent | CourseCreationBrief;
@@ -83,6 +85,7 @@ export function parseAssistantStructuredContent(value: unknown): AssistantStruct
       type: "course_search", schemaVersion: 1,
       planningId: requiredString(source, "planningId"), goalText: requiredString(source, "goalText"),
       intentSummary: requiredString(source, "intentSummary"),
+      ...(typeof source.practiceEmphasis === "boolean" ? { practiceEmphasis: source.practiceEmphasis } : {}),
       ...(typeof source.refinement === "string" && source.refinement.trim() ? { refinement: source.refinement.trim() } : {}),
       ...(typeof source.refinedFromPlanningId === "string" && source.refinedFromPlanningId.trim() ? { refinedFromPlanningId: source.refinedFromPlanningId.trim() } : {}),
       plan: source.plan as CourseSearchTimelineContent["plan"]
@@ -103,6 +106,7 @@ export function parseAssistantStructuredContent(value: unknown): AssistantStruct
       targetKnowledge,
       ...(typeof source.requestedAdjustments === "string" && source.requestedAdjustments.trim() ? { requestedAdjustments: source.requestedAdjustments.trim() } : {}),
       referenceMaterialIntent: source.referenceMaterialIntent
+      ,...(typeof source.practiceEmphasis === "boolean" ? { practiceEmphasis: source.practiceEmphasis } : {})
     };
   }
   throw new Error("Assistant structured content type is unsupported");

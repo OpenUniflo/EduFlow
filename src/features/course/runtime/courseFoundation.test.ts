@@ -40,6 +40,7 @@ describe("Course foundation contract", () => {
       assignments: { coveredKnowledgeCount: 0, missingKnowledgeCount: 1 },
       materials: { coveredKnowledgeCount: 0, missingKnowledgeCount: 1 },
       micro: { status: "unavailable", coveredKnowledgeCount: null, missingKnowledgeCount: null },
+      actionability: { actionableKnowledgeCount: null, noExecutableActivities: false },
       chapterOutcomes: { coveredChapterCount: 0, missingChapterCount: 1 },
       finalProjects: { count: 0, missing: true }
     });
@@ -51,6 +52,17 @@ describe("Course foundation contract", () => {
       "missing-final-project"
     ]);
     expect(courseAssetCoverageLabel(audit)).toBe("学习资产待补充");
+  });
+
+  it("distinguishes a valid route from an executable Course and reports a structured practice gap", () => {
+    const audit = auditCourseAssetCoverage(routeOnlyRuntime, { microKnowledgeIds: [], practiceEmphasis: true });
+    expect(audit).toMatchObject({
+      knowledgeCount: 1,
+      micro: { status: "available", coveredKnowledgeCount: 0, missingKnowledgeCount: 1 },
+      actionability: { actionableKnowledgeCount: 0, actionableKnowledgeNodeIds: [], noExecutableActivities: true },
+      practice: { emphasized: true, assignmentCoverageGap: true }
+    });
+    expect(validateCourseRuntime(routeOnlyRuntime, knowledgeRepository, globalKnowledgeAccess)).toBe(true);
   });
 
   it("still rejects an AssignmentCoverage with a dangling Assignment", () => {

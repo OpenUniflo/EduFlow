@@ -129,6 +129,7 @@ describe("GET /api/courses", () => {
   });
 
   it("returns only Published Courses to an anonymous viewer", async () => {
+    tableRows.courses.push({ id: "published-personal", title: "Private", description: "Owner-only after Publish", generation_status: "ready", lifecycle: "published", course_type: "personal", owner_user_id: "learner", revision: "personal-v1" });
     createOptionalUserSupabase.mockResolvedValueOnce({
       client: { from: (table: string) => queryResult(tableRows[table] ?? []), storage: { from: () => ({ createSignedUrl: vi.fn() }) } },
       user: null
@@ -137,6 +138,7 @@ describe("GET /api/courses", () => {
     await handler({ method: "GET", query: {}, headers: {} } as VercelRequest, recorder.response);
     expect(recorder.statusCode()).toBe(200);
     expect((recorder.body() as { courses: Array<{ course: { id: string } }> }).courses.map((runtime) => runtime.course.id)).toEqual(["route-only-course"]);
+    tableRows.courses.pop();
   });
 
   it("returns an incomplete Draft alongside Published Courses to an admin", async () => {
@@ -213,7 +215,7 @@ describe("GET /api/courses", () => {
     tableRows.assistant_sessions.pop(); tableRows.assistant_messages.pop();
   });
 
-  it("resumes the same owner Draft by its Course Creation Brief and hides it from another user", async () => {
+  it("resumes the same owner Draft by its Course Creation Brief and returns an opaque empty result to another user", async () => {
     tableRows.courses.push({ id: "personal-resume", title: "Resume", description: "Owner-only", generation_status: "draft", lifecycle: "draft", course_type: "personal", owner_user_id: "learner", revision: "creator-draft-1", creation_brief_message_id: "brief-resume" });
     tableRows.course_curricula.push({ course_id: "personal-resume", id: "personal-resume:curriculum", generation_mode: "manual" });
     tableRows.curriculum_chapters.push({ course_id: "personal-resume", id: "personal-resume:chapter", title: "Route", description: "Route", display_order: 0, color: "#7567e8", outcome: "Goal" });
@@ -226,7 +228,8 @@ describe("GET /api/courses", () => {
     createOptionalUserSupabase.mockResolvedValueOnce({ client: { from: (table: string) => queryResult(tableRows[table] ?? []), storage: { from: () => ({ createSignedUrl: vi.fn() }) } }, user: { id: "other-user" } });
     const other = responseRecorder();
     await handler({ method: "GET", query: { creationBriefMessageId: "brief-resume" }, headers: {} } as unknown as VercelRequest, other.response);
-    expect(other.statusCode()).toBe(404);
+    expect(other.statusCode()).toBe(200);
+    expect(other.body()).toEqual({ course: null, courseId: null, lifecycle: null });
     [tableRows.courses, tableRows.course_curricula, tableRows.curriculum_chapters, tableRows.curriculum_lessons, tableRows.curriculum_coverages, tableRows.course_target_knowledge].forEach((rows) => rows.pop());
   });
 

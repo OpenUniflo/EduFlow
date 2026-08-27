@@ -46,7 +46,7 @@ export async function streamAssistantMessage(input: { sessionId?: string; messag
   return { sessionId, text };
 }
 
-type StructuredAssistantResult = { sessionId: string; assistantMessage: string; messageId?: string; status?: "ready" | "clarify" | "unsupported" };
+type StructuredAssistantResult = { sessionId: string; assistantMessage: string; messageId?: string; status?: "ready" | "needs_clarification" | "no_match"; goalStatus?: "ready" | "needs_clarification"; catalogStatus?: "matched" | "no_match" };
 
 export function planAssistantGoal(input: { sessionId?: string; clarificationMessageId?: string; goalText: string; context: AssistantContextSnapshot }) {
   return apiRequest<StructuredAssistantResult & { plan?: GoalPlan }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "plan-goal", ...input }) });

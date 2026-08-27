@@ -36,6 +36,13 @@ describe("fixed Course Creator pipeline contracts", () => {
     expect(design.requirements.preferences).toEqual([]);
   });
 
+  it("carries structured practice emphasis into the desired Asset Plan without fabricating Assignments", () => {
+    const design = createInitialCourseDesign({ ...brief, practiceEmphasis: true }, graph, null);
+    expect(design.requirements.preferences).toEqual(["偏重实践"]);
+    expect(design.assets.desiredAssignmentKnowledgeIds).toEqual(["foundation", "target"]);
+    expect(design.assets.assignmentKnowledgeIds).toEqual([]);
+  });
+
   it("does not mutate before Proposal Apply and invalidates downstream confirmations after Apply", () => {
     const design = createInitialCourseDesign(brief, graph, null);
     const proposal = { id: "proposal", stage: "requirements" as const, title: "Practice first", summary: "Preview only", operations: [{ type: "setPreferences" as const, values: ["实践优先"] }] };

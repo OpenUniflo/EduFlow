@@ -5,7 +5,7 @@ export type GoalKnowledge = Pick<KnowledgeNode, "id" | "title" | "description">;
 export type GoalKnowledgeCandidate = GoalKnowledge & Pick<KnowledgeNode, "status" | "tags">;
 
 export type GoalResolutionResult = {
-  status: "ready" | "ambiguous" | "unsupported";
+  status: "ready" | "needs_clarification" | "no_match";
   goalText: string;
   targetKnowledge: GoalKnowledge[];
   candidates: GoalKnowledge[];
@@ -63,11 +63,20 @@ export function resolveGoalToKnowledge(input: { goalText: string; visibleNodes: 
   const suggested = [...new Set(input.suggestedKnowledgeIds ?? [])];
   if (suggested.length) {
     const invalid = suggested.filter((id) => !byId.has(id));
-    if (invalid.length) return { status: "unsupported", goalText, targetKnowledge: [], candidates: [], reason: `Suggested Knowledge is unavailable: ${invalid.join(", ")}` };
+    if (invalid.length) return { status: "no_match", goalText, targetKnowledge: [], candidates: [], reason: `Suggested Knowledge is unavailable: ${invalid.join(", ")}` };
     return { status: "ready", goalText, targetKnowledge: suggested.map((id) => knowledge(byId.get(id)!)), candidates: [] };
   }
 
-  return { status: "unsupported", goalText, targetKnowledge: [], candidates: [], reason: "Structured Goal language resolution is required before product validation." };
+  return { status: "no_match", goalText, targetKnowledge: [], candidates: [], reason: "No validated Knowledge target is available for this Goal." };
+}
+
+export function noMatchGoalPlan(goalText: string, reason: string): GoalPlan {
+  return {
+    resolution: { status: "no_match", goalText: goalText.trim(), targetKnowledge: [], candidates: [], reason },
+    prerequisiteKnowledge: [],
+    prerequisiteCycleDetected: false,
+    matches: []
+  };
 }
 
 /** prerequisite edges are directed source prerequisite -> target dependent. */

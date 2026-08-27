@@ -229,7 +229,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       };
     });
     return {
-      course: { id, title: text(courseRow, "title"), subtitle: optionalText(courseRow, "subtitle"), description: text(courseRow, "description"), targetOutcome: optionalText(courseRow, "target_outcome"), accentColor: optionalText(courseRow, "accent_color"), generationStatus: text(courseRow, "generation_status"), lifecycle: text(courseRow, "lifecycle"), courseType: (optionalText(courseRow, "course_type") ?? "standard"), ownerUserId: optionalText(courseRow, "owner_user_id"), sourceCourseId: optionalText(courseRow, "source_course_id"), creationBriefMessageId: optionalText(courseRow, "creation_brief_message_id"), creatorMetadata: courseRow.creator_metadata ?? undefined },
+      course: { id, title: text(courseRow, "title"), subtitle: optionalText(courseRow, "subtitle"), description: text(courseRow, "description"), targetOutcome: optionalText(courseRow, "target_outcome"), accentColor: optionalText(courseRow, "accent_color"), generationStatus: text(courseRow, "generation_status"), lifecycle: text(courseRow, "lifecycle"), courseType: (optionalText(courseRow, "course_type") ?? "standard"), ownerUserId: optionalText(courseRow, "owner_user_id"), sourceCourseId: optionalText(courseRow, "source_course_id"), creationBriefMessageId: optionalText(courseRow, "creation_brief_message_id"), creatorMetadata: courseRow.creator_metadata ?? undefined, createdAt: optionalText(courseRow, "created_at"), updatedAt: optionalText(courseRow, "updated_at") },
       curriculum: { id: text(curriculumRow, "id"), courseId: id, generationMode: text(curriculumRow, "generation_mode"), requestedChapterCount: curriculumRow.requested_chapter_count == null ? undefined : number(curriculumRow, "requested_chapter_count"), sourceStructureId: optionalText(curriculumRow, "source_structure_id") },
       chapters: chapterRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, title: text(row, "title"), description: text(row, "description"), order: number(row, "display_order"), color: text(row, "color"), outcome: text(row, "outcome") })),
       lessons: lessonRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, chapterId: text(row, "chapter_id"), title: text(row, "title"), order: number(row, "display_order") })),
@@ -257,7 +257,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   if (creationBriefMessageId) {
     const ownedRow = readableCourseRows.find((row) => optionalText(row, "creation_brief_message_id") === creationBriefMessageId && optionalText(row, "owner_user_id") === user!.id);
     const runtime = ownedRow ? runtimes.find((item) => item.course.id === text(ownedRow, "id")) : undefined;
-    if (!runtime) throw new ApiError(404, "course_creation_not_found", "No Course has been created from this Brief");
+    if (!runtime) {
+      json(response, 200, { course: null, courseId: null, lifecycle: null });
+      return;
+    }
     json(response, 200, { course: runtime, courseId: runtime.course.id, lifecycle: runtime.course.lifecycle });
     return;
   }

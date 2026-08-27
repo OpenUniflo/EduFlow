@@ -115,7 +115,7 @@ export function createInitialCourseDesign(brief: CourseCreationBrief, graph: Kno
       goal: brief.goal,
       learnerFoundation: "按当前 Learner Context，创建前再次确认",
       timeConstraint: "未指定",
-      preferences: [],
+      preferences: brief.practiceEmphasis ? ["偏重实践"] : [],
       ...(brief.requestedAdjustments ? { requestedAdjustments: brief.requestedAdjustments } : {}),
       ...(brief.sourceCourseId ? { referenceCourseId: brief.sourceCourseId } : {}),
       referenceMaterialNames
@@ -127,7 +127,7 @@ export function createInitialCourseDesign(brief: CourseCreationBrief, graph: Kno
       availableMaterialKnowledgeIds: source ? unique(source.materialKnowledgeCoverages.map((coverage) => coverage.nodeId)).filter((id) => included.has(id)) : [],
       availableMicroKnowledgeIds: [],
       availableAssignmentKnowledgeIds: source ? unique(source.assignmentCoverages.map((coverage) => coverage.nodeId)).filter((id) => included.has(id)) : [],
-      desiredMaterialKnowledgeIds: [], desiredMicroKnowledgeIds: [], desiredAssignmentKnowledgeIds: [], referenceMaterialNames,
+      desiredMaterialKnowledgeIds: [], desiredMicroKnowledgeIds: [], desiredAssignmentKnowledgeIds: brief.practiceEmphasis ? [...included] : [], referenceMaterialNames,
       ...(brief.sourceCourseId ? { referenceCourseId: brief.sourceCourseId } : {})
     }
   };

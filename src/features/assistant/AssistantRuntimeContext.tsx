@@ -12,7 +12,7 @@ type RuntimeValue = {
   error: string;
   selectSession(sessionId: string | null): Promise<void>;
   send(message: string, context: AssistantContextSnapshot): Promise<void>;
-  planGoal(goalText: string, context: AssistantContextSnapshot): Promise<void>;
+  planGoal(goalText: string, context: AssistantContextSnapshot): Promise<boolean>;
   refineGoal(planningMessageId: string, refinement: string, context: AssistantContextSnapshot): Promise<void>;
   useExistingCourse(planningMessageId: string, courseId: string, context: AssistantContextSnapshot): Promise<string>;
   prepareCourseBrief(input: { planningMessageId: string; sourceCourseId?: string; requestedAdjustments?: string; referenceMaterialIntent: "none" | "upload_in_creator" }, context: AssistantContextSnapshot): Promise<void>;
@@ -102,13 +102,14 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
 
   const planGoal = useCallback(async (value: string, context: AssistantContextSnapshot) => {
     const nextGoal = value.trim();
-    if (!nextGoal || sending) return;
+    if (!nextGoal || sending) return false;
     setSending(true); setError("");
     try {
       const result = await planAssistantGoal({ sessionId: activeSessionId ?? undefined, ...(clarificationMessageId ? { clarificationMessageId } : {}), goalText: nextGoal, context });
-      setClarificationMessageId(result.status === "clarify" && result.messageId ? result.messageId : null);
+      setClarificationMessageId(result.status === "needs_clarification" && result.messageId ? result.messageId : null);
       await reloadStructuredSession(result.sessionId);
-    } catch (planningError) { setError(planningError instanceof Error ? planningError.message : "学习目标规划失败"); }
+      return true;
+    } catch (planningError) { setError(planningError instanceof Error ? planningError.message : "学习目标规划失败"); return false; }
     finally { setSending(false); }
   }, [activeSessionId, clarificationMessageId, reloadStructuredSession, sending]);
 

@@ -83,7 +83,7 @@ function structuredCards(db: ReturnType<typeof database>) {
 describe("Assistant structured Goal actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resolveGoalLanguage.mockImplementation(async (_client, input: { goalText: string }) => ({ status: "ready", intentSummary: "Build an agent", primaryOutcome: input.goalText, refinementIntent: "preserve_outcome", candidateKnowledgeIds: ["A"], targetReasons: [{ knowledgeId: "A", reason: "Direct outcome" }] }));
+    resolveGoalLanguage.mockImplementation(async (_client, input: { goalText: string }) => ({ status: "ready", intentSummary: "Build an agent", primaryOutcome: input.goalText, refinementIntent: "preserve_outcome", practiceEmphasis: false, candidateKnowledgeIds: ["A"], targetReasons: [{ knowledgeId: "A", reason: "Direct outcome" }] }));
     planLearningGoal.mockResolvedValue(plan);
     useExistingCourse.mockResolvedValue({ courseId: "standard-course", match: { courseTitle: "Standard Course" } });
   });
@@ -104,6 +104,77 @@ describe("Assistant structured Goal actions", () => {
     expect(result.status()).toBe(503);
     expect(structuredCards(db)).toEqual([]);
     expect([...db.messages.values()]).toEqual([]);
+    expect(db.writes.some((write) => write.table === "assistant_sessions")).toBe(false);
+  });
+
+  it("treats invalid structured output as an error without creating an empty session", async () => {
+    const db = database();
+    resolveGoalLanguage.mockRejectedValueOnce(new Error("Goal candidate identities failed catalog validation"));
+    const result = await request(db, { action: "plan-goal", goalText: "Build an image model" });
+    expect(result.status()).toBe(422);
+    expect(result.body()).toMatchObject({ error: { code: "invalid_goal_output" } });
+    expect(db.writes.some((write) => write.table === "assistant_sessions" || write.table === "assistant_messages")).toBe(false);
+  });
+
+  it("persists a clear no-match Goal as a structured business result", async () => {
+    const db = database();
+    resolveGoalLanguage.mockResolvedValueOnce({ status: "no_match", intentSummary: "Build quantum hardware", primaryOutcome: "Build a quantum processor", practiceEmphasis: true, reason: "当前学习内容没有覆盖量子处理器" });
+    const result = await request(db, { action: "plan-goal", goalText: "Build a quantum processor" });
+    expect(result.status()).toBe(200);
+    expect(result.body()).toMatchObject({ status: "no_match", goalStatus: "ready", catalogStatus: "no_match" });
+    expect(structuredCards(db)).toContainEqual(expect.objectContaining({
+      type: "course_search",
+      goalText: "Build a quantum processor",
+      plan: expect.objectContaining({ resolution: expect.objectContaining({ status: "no_match" }) })
+    }));
+    expect(planLearningGoal).not.toHaveBeenCalled();
+  });
+
+  it("keeps a fixed ten-Goal HTTP regression set in explicit business states", async () => {
+    const cases = [
+      { goal: "我要构建一个猫狗图片分类模型", expected: "ready" },
+      { goal: "用文档问答做一个可引用来源的助手", expected: "ready" },
+      { goal: "实作一个能调用工具完成任务的 Agent", expected: "ready" },
+      { goal: "让 Agent 具备可恢复的长期记忆", expected: "ready" },
+      { goal: "我想学 AI", expected: "needs_clarification" },
+      { goal: "我想学编程", expected: "needs_clarification" },
+      { goal: "构建量子处理器", expected: "no_match" },
+      { goal: "设计火星载人生命维持系统", expected: "no_match" },
+      { goal: "为 RAG 助手增加评估和可观测性", expected: "ready" },
+      { goal: "做一个能分解任务并使用多个工具的助手", expected: "ready" }
+    ] as const;
+    resolveGoalLanguage.mockImplementation(async (_client, input: { goalText: string }) => {
+      const item = cases.find((candidate) => candidate.goal === input.goalText)!;
+      if (item.expected === "needs_clarification") return { status: "needs_clarification", intentSummary: input.goalText, clarificationQuestion: "你希望先做出什么具体成果？" };
+      if (item.expected === "no_match") return { status: "no_match", intentSummary: input.goalText, primaryOutcome: input.goalText, practiceEmphasis: false, reason: "当前学习内容未覆盖该目标" };
+      return { status: "ready", intentSummary: input.goalText, primaryOutcome: input.goalText, refinementIntent: "preserve_outcome", practiceEmphasis: input.goalText.includes("实作"), candidateKnowledgeIds: ["A"], targetReasons: [{ knowledgeId: "A", reason: "直接对应目标成果" }] };
+    });
+
+    for (const item of cases) {
+      const result = await request(database(), { action: "plan-goal", goalText: item.goal });
+      expect(result.status(), item.goal).toBe(200);
+      expect(result.body().status, item.goal).toBe(item.expected);
+      if (item.expected === "no_match") expect(result.body().goalStatus, item.goal).toBe("ready");
+    }
+  });
+
+  it("keeps clarification state stable across repeated runs of three clear Goals", async () => {
+    const goals = ["我要构建一个猫狗图片分类模型", "用文档问答做一个可引用来源的助手", "实作一个能调用工具完成任务的 Agent"];
+    resolveGoalLanguage.mockImplementation(async (_client, input: { goalText: string }) => ({ status: "ready", intentSummary: input.goalText, primaryOutcome: input.goalText, refinementIntent: "preserve_outcome", practiceEmphasis: false, candidateKnowledgeIds: ["A"], targetReasons: [{ knowledgeId: "A", reason: "直接对应目标成果" }] }));
+    for (const goal of goals) {
+      const statuses = [];
+      for (let attempt = 0; attempt < 5; attempt += 1) statuses.push((await request(database(), { action: "plan-goal", goalText: goal })).body().status);
+      expect(statuses).toEqual(["ready", "ready", "ready", "ready", "ready"]);
+    }
+  });
+
+  it("rejects blank and oversized Goal input before calling the adapter", async () => {
+    for (const goalText of ["   ", "x".repeat(1001)]) {
+      const result = await request(database(), { action: "plan-goal", goalText });
+      expect(result.status()).toBe(400);
+      expect(result.body()).toMatchObject({ error: { code: "invalid_goal" } });
+    }
+    expect(resolveGoalLanguage).not.toHaveBeenCalled();
   });
 
   it("persists multiple independent planning cards in the same session", async () => {
@@ -143,7 +214,7 @@ describe("Assistant structured Goal actions", () => {
 
   it("continues search by appending a refined card without overwriting the source", async () => {
     const db = database(); const planningMessageId = seedPlanningMessage(db);
-    resolveGoalLanguage.mockResolvedValueOnce({ status: "ready", intentSummary: "Prefer practical projects", primaryOutcome: "Agent", refinementIntent: "preserve_outcome", candidateKnowledgeIds: ["A"], targetReasons: [{ knowledgeId: "A", reason: "Direct outcome" }] });
+    resolveGoalLanguage.mockResolvedValueOnce({ status: "ready", intentSummary: "Prefer practical projects", primaryOutcome: "Agent", refinementIntent: "preserve_outcome", practiceEmphasis: true, candidateKnowledgeIds: ["A"], targetReasons: [{ knowledgeId: "A", reason: "Direct outcome" }] });
     const result = await request(db, { action: "refine-goal", planningMessageId, refinement: "Too theoretical" });
     expect(result.status()).toBe(200);
     expect(db.messages.get(planningMessageId)?.structured_content.refinement).toBeUndefined();

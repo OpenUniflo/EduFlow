@@ -22,6 +22,8 @@ export type Course = {
   creationBriefMessageId?: string;
   /** Small persisted design snapshot needed to resume Course Creator after refresh. */
   creatorMetadata?: CourseCreatorMetadata;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type CourseCreatorMetadata = {
@@ -263,6 +265,8 @@ export type CourseAssignmentSummary = {
 };
 
 export type CourseChapterProjection = CurriculumChapter & {
+  /** One-based ordinal for presentation only; `order` remains the persisted curriculum order. */
+  displayNumber: number;
   lessonCount: number;
   knowledgeProgress: number;
   knowledgeEvidenceCount: number;

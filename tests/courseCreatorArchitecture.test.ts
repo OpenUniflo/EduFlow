@@ -59,4 +59,11 @@ describe("Course Creator persistence and authority boundaries", () => {
     expect(config.regions).toEqual(["sin1"]);
     expect(config.functions["api/assistant.ts"]).toMatchObject({ maxDuration: 120, regions: ["sin1"] });
   });
+
+  it("restores Personal Creator and teaching authoring to their source contexts", () => {
+    const page = read("src/features/course/pages/CourseGraphPage.tsx");
+    expect(page).toContain("window.location.assign(`/courses/create?briefId=");
+    expect(page).toContain('const overviewReturnTarget = authoringRoute ? "/teaching" : "/courses"');
+    expect(page).toContain('aria-label={authoringRoute ? "返回教学管理" : "返回课程中心"}');
+  });
 });

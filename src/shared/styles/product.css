@@ -6831,6 +6831,8 @@ body {
 .course-path-node small { color: #7c8490; font-size: 10px; }
 .course-path-node>em { color: #8a919b; font-size: 10px; font-style: normal; }
 .course-path-node.completed>i { color: #fff; background: #3f896d; }
+.course-path-node.learned { border-color: #b7d3c7; background: #f7fbf9; }
+.course-path-node.learned>i { color: #fff; background: #5f9b82; }
 .course-path-node.underway { border-color: #9db5aa; box-shadow: 0 5px 16px rgba(44,92,73,.1); }
 .course-path-node.underway>i { color: #fff; background: #356f5a; }
 .course-path-node.blocked { opacity: .55; }

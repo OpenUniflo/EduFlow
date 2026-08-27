@@ -6,35 +6,34 @@ import { dataOrThrow } from "./query.js";
 
 type Row = Record<string, unknown>;
 
+const targetReasonSchema = z.object({
+  knowledgeId: z.string().trim().min(1),
+  reason: z.string().trim().min(1).max(300)
+});
+
 const outputSchema = z.discriminatedUnion("status", [
   z.object({
     status: z.literal("ready"),
     intentSummary: z.string().trim().min(1).max(500),
     primaryOutcome: z.string().trim().min(1).max(500),
     refinementIntent: z.enum(["preserve_outcome", "change_outcome"]),
+    practiceEmphasis: z.boolean(),
     candidateKnowledgeIds: z.array(z.string().trim().min(1)).min(1).max(6),
-    targetReasons: z.array(z.object({
-      knowledgeId: z.string().trim().min(1),
-      reason: z.string().trim().min(1).max(300)
-    })).min(1).max(6)
+    targetReasons: z.array(targetReasonSchema).min(1).max(6)
   }),
   z.object({
-    status: z.literal("clarify"),
+    status: z.literal("needs_clarification"),
     intentSummary: z.string().trim().min(1).max(500),
     clarificationQuestion: z.string().trim().min(1).max(500)
   }),
   z.object({
-    status: z.literal("unsupported"),
+    status: z.literal("no_match"),
     intentSummary: z.string().trim().min(1).max(500),
+    primaryOutcome: z.string().trim().min(1).max(500),
+    practiceEmphasis: z.boolean(),
     reason: z.string().trim().min(1).max(500)
   })
 ]);
-
-const semanticCheckSchema = z.object({
-  coherent: z.boolean(),
-  directlySupportingKnowledgeIds: z.array(z.string().trim().min(1)).max(6),
-  clarificationQuestion: z.string().trim().min(1).max(500).optional()
-});
 
 export type GoalLanguageResolution = z.infer<typeof outputSchema>;
 
@@ -42,31 +41,15 @@ export function parseGoalLanguageResolution(value: unknown): GoalLanguageResolut
   return outputSchema.parse(value);
 }
 
-function safeGoalLanguageResolution(value: unknown): GoalLanguageResolution {
-  const strict = outputSchema.safeParse(value);
-  if (strict.success) return strict.data;
-  const row = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  const status = row.status;
-  const summary = typeof row.intentSummary === "string" && row.intentSummary.trim() ? row.intentSummary.trim() : "我需要再确认一下你最想先完成的具体成果。";
-  if (status === "ready" && Array.isArray(row.candidateKnowledgeIds) && row.candidateKnowledgeIds.length) {
-    const candidateKnowledgeIds = [...new Set(row.candidateKnowledgeIds.filter((id): id is string => typeof id === "string" && Boolean(id.trim())).map((id) => id.trim()))].slice(0, 6);
-    if (candidateKnowledgeIds.length) return {
-      status: "ready", intentSummary: summary,
-      primaryOutcome: typeof row.primaryOutcome === "string" && row.primaryOutcome.trim() ? row.primaryOutcome.trim() : summary,
-      refinementIntent: row.refinementIntent === "change_outcome" ? "change_outcome" : "preserve_outcome",
-      candidateKnowledgeIds,
-      targetReasons: candidateKnowledgeIds.map((knowledgeId) => ({ knowledgeId, reason: "该候选被提议为直接支持主要成果，仍需独立语义复核。" }))
-    };
-  }
-  if (status === "unsupported") return { status: "unsupported", intentSummary: summary, reason: typeof row.reason === "string" && row.reason.trim() ? row.reason.trim() : "当前可见学习内容暂时无法可靠支持这个目标。" };
-  const question = [row.clarificationQuestion, row.question, row.clarification, row.reason].find((item) => typeof item === "string" && item.trim());
-  return { status: "clarify", intentSummary: summary, clarificationQuestion: typeof question === "string" ? question.trim() : "你最想先做出什么具体结果？" };
-}
-
 export function isGoalLanguageProviderUnavailable(error: unknown) {
   return error instanceof TypeError || (error instanceof Error && /(?:fetch|network|timeout|timed out|ECONN|provider|upstream|socket)/i.test(error.message));
 }
 
+/**
+ * The model is a language adapter only. One strict structured result decides
+ * whether the Goal itself needs clarification and suggests catalog identities;
+ * product code then validates every identity deterministically.
+ */
 export async function resolveGoalLanguage(
   client: SupabaseClient,
   input: { goalText: string; previousGoalText?: string; previousKnowledgeIds?: string[]; refinement?: string; conversationContext?: Array<{ role: string; content: string }> },
@@ -78,64 +61,51 @@ export async function resolveGoalLanguage(
     id: String(row.id), title: String(row.title), description: String(row.description).slice(0, 600),
     tags: Array.isArray(row.tags) ? row.tags.map(String).slice(0, 12) : []
   }));
-  const generated = await generator.generateJson({
-    stage: "goal-resolution", promptVersion: "goal-resolution-v3", schemaVersion: "2", temperature: 0, maxTokens: 1200,
-    system: `You are the language-understanding adapter for EduFlow Goal Planner. Understand novice outcome language semantically. When conversationContext is present, the current goalText is an explicitly linked answer to a prior Assistant clarification; resolve it together with that exchange instead of treating it as a new standalone request. intentSummary and primaryOutcome must describe the resolved whole outcome, not only the latest reply. Clarify only when the missing answer could change the direct target Knowledge identities. Once the capability and artifact class are clear enough to choose a minimal target set, return ready. If one atomic catalog identity names the concrete capability or artifact the learner wants, prefer that identity alone; its internal theory, training mechanics, optimization, evaluation, and background belong to prerequisite closure or later Course scope unless the learner explicitly makes them separate outcomes. Do not ask how much theory to understand or whether to include such supporting mechanisms once the concrete outcome is known. Do not ask about UI versus command line, packaging, deployment, framework, device, hosting, delivery format, pace, depth, or practice style when those details would not change the direct target Knowledge; those are later Course Creator preferences. You may select only IDs present in the supplied visible active Knowledge catalog. Select at most 6 independently teachable target identities that directly constitute the same primary outcome. Do not select background, prerequisites, broad adjacent topics, alternative solution families, or Knowledge that is merely useful. Prerequisites are computed by the product later. If the resolved outcome is still too broad or the direct target set is uncertain, ask one concise novice-friendly clarification question using outcome examples rather than specialist architecture names. Never invent an identity, Course, score, prerequisite, or learning path. For ready output return {"status":"ready","intentSummary":"...","primaryOutcome":"...","refinementIntent":"preserve_outcome|change_outcome","candidateKnowledgeIds":["..."],"targetReasons":[{"knowledgeId":"...","reason":"how this directly delivers the primary outcome"}]}. Every candidate must have exactly one reason. Otherwise return the clarify or unsupported shape. A refinement request comes from the product's Continue Search action and therefore preserves previousGoalText and its validated targets; a different outcome must be submitted as a new Goal action.`,
-    user: JSON.stringify({ goalText: input.goalText, goalTextRole: input.conversationContext?.length ? "answer_to_latest_clarification" : "initial_goal", previousGoalText: input.previousGoalText, previousKnowledgeIds: input.previousKnowledgeIds, refinement: input.refinement, conversationContext: input.conversationContext, visibleKnowledgeCatalog: catalog })
-  });
-  let parsed = safeGoalLanguageResolution(generated.value);
-  if (parsed.status === "unsupported") {
-    const adjudicated = await generator.generateJson({
-      stage: "goal-resolution", promptVersion: "goal-unsupported-audit-v1", schemaVersion: "2", temperature: 0, maxTokens: 1200,
-      system: `Independently audit whether EduFlow's visible active Knowledge catalog can support the learner's concrete outcome. The earlier adapter may have missed relevant identities. If the catalog contains a minimal coherent set of direct target Knowledge, return the complete ready contract with at most 6 real catalog IDs and exactly one reason per ID. Prefer a concrete capability or artifact identity over its prerequisites, background, internal mechanisms, or adjacent topics. Return clarify only when different learner answers would materially change the direct target identities. Return unsupported only when no catalog identity can directly support the outcome. Never invent an ID, use lexical phrase rules, or infer a prerequisite relation.`,
-      user: JSON.stringify({ goalText: input.goalText, conversationContext: input.conversationContext, previousGoalText: input.previousGoalText, refinement: input.refinement, proposedUnsupportedReason: parsed.reason, visibleKnowledgeCatalog: catalog })
-    });
-    parsed = safeGoalLanguageResolution(adjudicated.value);
-  }
-  if (parsed.status === "clarify" && input.conversationContext?.length) {
-    const adjudicated = await generator.generateJson({
-      stage: "goal-resolution", promptVersion: "goal-clarification-audit-v1", schemaVersion: "2", temperature: 0, maxTokens: 1200,
-      system: `Independently decide whether the proposed clarification is necessary to choose EduFlow's direct target Knowledge identities. Use the resolved conversation, current learner reply, proposed question, and visible active Knowledge catalog. Clarification is necessary only when different answers would select materially different direct outcome identities. If one atomic catalog identity names the learner's concrete capability or artifact, return ready with that identity rather than asking whether to include theory, understanding, training mechanics, optimization, evaluation, or background; those are prerequisite or Course-scope concerns. UI versus command line, packaging, deployment, framework, device, hosting, delivery format, pace, depth, and practice preference belong to later Course Creator choices and do not justify blocking Goal resolution. If necessary, return the clarify contract with one concise question. If unnecessary and the catalog supports the outcome, return the complete ready contract with a minimal coherent target set, exactly one reason per target, and no prerequisites or adjacent topics. If the catalog cannot support it, return unsupported. Never invent an ID.`,
-      user: JSON.stringify({ goalText: input.goalText, conversationContext: input.conversationContext, proposedClarification: parsed.clarificationQuestion, visibleKnowledgeCatalog: catalog })
-    });
-    parsed = safeGoalLanguageResolution(adjudicated.value);
-  }
-  if (parsed.status !== "ready") return parsed;
-
   const catalogIds = new Set(catalog.map((item) => item.id));
+
+  // Continue Search changes Course preferences, not the confirmed Goal.
   if (input.refinement && input.previousKnowledgeIds?.length) {
-    const preservedIds = [...new Set(input.previousKnowledgeIds)].filter((id) => catalogIds.has(id));
-    if (preservedIds.length !== new Set(input.previousKnowledgeIds).size) return { status: "unsupported", intentSummary: parsed.intentSummary, reason: "原学习目标包含当前不可用的 Knowledge。" };
+    const previousIds = [...new Set(input.previousKnowledgeIds)];
+    const preservedIds = previousIds.filter((id) => catalogIds.has(id));
+    if (preservedIds.length !== previousIds.length) throw new Error("Previously validated Goal Knowledge is no longer visible");
+    const outcome = input.previousGoalText?.trim() || input.goalText.trim();
     return {
-      ...parsed,
-      primaryOutcome: input.previousGoalText ?? input.goalText,
+      status: "ready",
+      intentSummary: outcome,
+      primaryOutcome: outcome,
       refinementIntent: "preserve_outcome",
+      practiceEmphasis: false,
       candidateKnowledgeIds: preservedIds,
-      targetReasons: preservedIds.map((knowledgeId) => ({ knowledgeId, reason: "保留原始学习目标的已验证核心目标。" }))
+      targetReasons: preservedIds.map((knowledgeId) => ({ knowledgeId, reason: "保留原始学习目标中已经验证的核心学习内容。" }))
     };
   }
+
+  const generated = await generator.generateJson({
+    stage: "goal-resolution", promptVersion: "goal-resolution-v4", schemaVersion: "3", temperature: 0, maxTokens: 1200,
+    system: `You are the single language-understanding adapter for EduFlow Goal Planner. Decide Goal clarity independently from catalog coverage. Return exactly one strict JSON shape with status ready, needs_clarification, or no_match. A Goal is clear once the learner names a concrete capability or deliverable class well enough to choose direct target Knowledge. Do not ask about theory depth, training mechanics, optimization, evaluation, UI versus command line, packaging, deployment, framework, device, hosting, delivery format, pace, or practice style when those choices would not change the direct outcome identity. Preserve an explicitly stated hands-on, project, implementation, or build preference only as the boolean practiceEmphasis; it must not change Goal clarity or target identity. Use needs_clarification only when different learner answers would materially change that identity. Use no_match only when the Goal is already clear but no visible active catalog identity directly supports it. For ready, select at most 6 real catalog IDs that directly constitute one primary outcome; exclude prerequisites, background, internal mechanisms, adjacent topics, and alternatives. If one atomic identity names the concrete capability or artifact, prefer it alone. Every candidate must have exactly one reason. Never invent an ID, Course, score, prerequisite, or learning path. Return ready as {"status":"ready","intentSummary":"...","primaryOutcome":"...","refinementIntent":"preserve_outcome|change_outcome","practiceEmphasis":boolean,"candidateKnowledgeIds":["..."],"targetReasons":[{"knowledgeId":"...","reason":"..."}]}; needs_clarification as {"status":"needs_clarification","intentSummary":"...","clarificationQuestion":"..."}; no_match as {"status":"no_match","intentSummary":"...","primaryOutcome":"...","practiceEmphasis":boolean,"reason":"..."}.`,
+    user: JSON.stringify({
+      goalText: input.goalText,
+      goalTextRole: input.conversationContext?.length ? "answer_to_latest_clarification" : "initial_goal",
+      previousGoalText: input.previousGoalText,
+      conversationContext: input.conversationContext,
+      visibleKnowledgeCatalog: catalog
+    })
+  });
+  const parsed = parseGoalLanguageResolution(generated.value);
+  if (parsed.status !== "ready") return parsed;
+
   const candidateIds = [...new Set(parsed.candidateKnowledgeIds)];
   const reasonIds = parsed.targetReasons.map((item) => item.knowledgeId);
-  if (candidateIds.some((id) => !catalogIds.has(id)) || reasonIds.length !== candidateIds.length || reasonIds.some((id) => !candidateIds.includes(id)) || new Set(reasonIds).size !== reasonIds.length) {
-    return { status: "unsupported", intentSummary: parsed.intentSummary, reason: "目标候选未通过真实 Knowledge 身份校验。" };
-  }
+  if (
+    candidateIds.some((id) => !catalogIds.has(id))
+    || reasonIds.length !== candidateIds.length
+    || reasonIds.some((id) => !candidateIds.includes(id))
+    || new Set(reasonIds).size !== reasonIds.length
+  ) throw new Error("Goal candidate identities failed catalog validation");
 
-  const selectedKnowledge = catalog.filter((item) => candidateIds.includes(item.id));
-  const checked = await generator.generateJson({
-    stage: "goal-resolution", promptVersion: "goal-semantic-check-v1", schemaVersion: "1", temperature: 0, maxTokens: 700,
-    system: `Independently normalize a proposed EduFlow Goal target set. Return JSON only: {"coherent":boolean,"directlySupportingKnowledgeIds":["..."],"clarificationQuestion"?:"..."}. directlySupportingKnowledgeIds may be a non-empty subset of the supplied proposal: remove prerequisites, internal mechanisms, background topics, adjacent domains, alternative solution families, and speculative helpful topics. Set coherent=true when the retained subset is minimal, bounded, and every retained item directly delivers the same primary outcome, even if you removed proposed items. If one atomic identity names the concrete capability or artifact, prefer it over its internal mechanisms. Use only supplied IDs. Set coherent=false only when no non-empty coherent direct subset can be established or the primary outcome itself remains ambiguous; then ask one concise novice-friendly clarification question.`,
-    user: JSON.stringify({ goalText: input.goalText, conversationContext: input.conversationContext, previousGoalText: input.previousGoalText, refinement: input.refinement, primaryOutcome: parsed.primaryOutcome, proposedTargets: selectedKnowledge, targetReasons: parsed.targetReasons })
-  });
-  const semanticResult = semanticCheckSchema.safeParse(checked.value);
-  if (!semanticResult.success) return { status: "clarify", intentSummary: parsed.intentSummary, clarificationQuestion: "为了避免把课程范围扩得太大，你最想先完成哪一个具体成果？" };
-  const semantic = semanticResult.data;
-  const directIds = [...new Set(semantic.directlySupportingKnowledgeIds)].filter((id) => candidateIds.includes(id));
-  if (!semantic.coherent || !directIds.length) {
-    return { status: "clarify", intentSummary: parsed.intentSummary, clarificationQuestion: semantic.clarificationQuestion ?? "为了避免把课程范围扩得太大，你最想先完成哪一个具体成果？" };
-  }
   return {
     ...parsed,
-    candidateKnowledgeIds: directIds,
-    targetReasons: directIds.map((knowledgeId) => parsed.targetReasons.find((reason) => reason.knowledgeId === knowledgeId)!)
+    candidateKnowledgeIds: candidateIds,
+    targetReasons: candidateIds.map((knowledgeId) => parsed.targetReasons.find((reason) => reason.knowledgeId === knowledgeId)!)
   };
 }

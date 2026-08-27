@@ -10,6 +10,7 @@ import { createUserSupabase } from "./_lib/supabase.js";
 import { goalPlanSummary, planLearningGoal, useExistingCourse } from "./_lib/goalPlanningService.js";
 import { isGoalLanguageProviderUnavailable, resolveGoalLanguage } from "./_lib/goalLanguageAdapter.js";
 import { generateCourseCreatorProposal, isCourseCreatorProviderUnavailable } from "./_lib/courseCreatorProposal.js";
+import { noMatchGoalPlan } from "../src/features/course/goal/goalPlanning.js";
 
 type Row = Record<string, unknown>;
 
@@ -113,13 +114,15 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       if (!goalText || goalText.length > 1000) throw new ApiError(400, "invalid_goal", "A Goal between 1 and 1000 characters is required");
       const clarification = body.clarificationMessageId == null ? undefined : await ownedStructuredMessage(client, user.id, body.clarificationMessageId);
       if (clarification && (clarification.row.role !== "assistant" || clarification.row.message_kind !== "goal_clarification" || clarification.content)) throw new ApiError(409, "goal_clarification_required", "The selected message is not a Goal clarification");
-      const session = clarification
+      const existingSession = clarification
         ? await ownedSession(client, user.id, String(clarification.row.session_id))
-        : await getOrCreateSession(client, user.id, body.sessionId, goalText);
-      const sessionId = String(session.id);
-      if (clarification && typeof body.sessionId === "string" && body.sessionId.trim() && body.sessionId.trim() !== sessionId) throw new ApiError(409, "goal_clarification_session_mismatch", "Goal clarification belongs to another session");
+        : typeof body.sessionId === "string" && body.sessionId.trim()
+          ? await ownedSession(client, user.id, body.sessionId.trim())
+          : undefined;
+      const existingSessionId = existingSession ? String(existingSession.id) : undefined;
+      if (clarification && typeof body.sessionId === "string" && body.sessionId.trim() && body.sessionId.trim() !== existingSessionId) throw new ApiError(409, "goal_clarification_session_mismatch", "Goal clarification belongs to another session");
       const conversationResult = clarification
-        ? await client.from("assistant_messages").select("role,content,message_kind").eq("session_id", sessionId).lte("sequence", Number(clarification.row.sequence)).order("sequence", { ascending: false }).limit(20)
+        ? await client.from("assistant_messages").select("role,content,message_kind").eq("session_id", existingSessionId!).lte("sequence", Number(clarification.row.sequence)).order("sequence", { ascending: false }).limit(20)
         : { data: [], error: null };
       const conversationRows = dataOrThrow(conversationResult.data as Row[] | null, conversationResult.error, "Goal clarification history lookup").reverse().filter((row) => row.message_kind !== "action").slice(-8);
       let language;
@@ -128,18 +131,30 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       } catch (error) {
         console.error("Goal language resolution failed", error instanceof Error ? error.message : "Unknown Goal language error");
         if (isGoalLanguageProviderUnavailable(error)) throw new ApiError(503, "goal_provider_unavailable", "学习目标理解服务暂时不可用，当前对话没有发生变化。请稍后重试。");
-        throw error;
+        throw new ApiError(422, "invalid_goal_output", "目标规划结果未通过校验，当前对话没有发生变化。请修改目标或重试。");
       }
-      if (language.status !== "ready") {
-        const summary = language.status === "clarify" ? language.clarificationQuestion : language.reason;
-        const assistantRow = await persistAssistantExchange(client, sessionId, goalText, summary, context, undefined, "utterance", language.status === "clarify" ? "goal_clarification" : "utterance");
-        json(response, 200, { sessionId, status: language.status, assistantMessage: summary, messageId: String(assistantRow.id) });
+      // Create a new session only after language resolution reached a valid
+      // business state. Provider and parse failures therefore cannot leave an
+      // empty conversation behind.
+      const session = existingSession ?? await getOrCreateSession(client, user.id, undefined, goalText);
+      const sessionId = String(session.id);
+      if (language.status === "needs_clarification") {
+        const assistantRow = await persistAssistantExchange(client, sessionId, goalText, language.clarificationQuestion, context, undefined, "utterance", "goal_clarification");
+        json(response, 200, { sessionId, status: language.status, assistantMessage: language.clarificationQuestion, messageId: String(assistantRow.id) });
+        return;
+      }
+      if (language.status === "no_match") {
+        const plan = noMatchGoalPlan(language.primaryOutcome, language.reason);
+        const summary = goalPlanSummary(plan);
+        const structuredContent: CourseSearchTimelineContent = { type: "course_search", schemaVersion: 1, planningId: crypto.randomUUID(), goalText: language.primaryOutcome, intentSummary: language.intentSummary, practiceEmphasis: language.practiceEmphasis, plan };
+        const assistantRow = await persistAssistantExchange(client, sessionId, goalText, summary, context, structuredContent);
+        json(response, 200, { sessionId, status: "no_match", goalStatus: "ready", catalogStatus: "no_match", plan, assistantMessage: summary, messageId: String(assistantRow.id) });
         return;
       }
       const resolvedGoalText = language.primaryOutcome;
       const plan = await planLearningGoal(client, resolvedGoalText, language.candidateKnowledgeIds);
       const summary = goalPlanSummary(plan);
-      const structuredContent: CourseSearchTimelineContent = { type: "course_search", schemaVersion: 1, planningId: crypto.randomUUID(), goalText: resolvedGoalText, intentSummary: language.intentSummary, plan };
+      const structuredContent: CourseSearchTimelineContent = { type: "course_search", schemaVersion: 1, planningId: crypto.randomUUID(), goalText: resolvedGoalText, intentSummary: language.intentSummary, practiceEmphasis: language.practiceEmphasis, plan };
       const assistantRow = await persistAssistantExchange(client, sessionId, goalText, summary, context, structuredContent);
       json(response, 200, { sessionId, status: "ready", plan, assistantMessage: summary, messageId: String(assistantRow.id) });
       return;
@@ -208,17 +223,17 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
         });
       } catch (error) {
         if (isGoalLanguageProviderUnavailable(error)) throw new ApiError(503, "goal_provider_unavailable", "学习目标理解服务暂时不可用，当前对话没有发生变化。请稍后重试。");
-        throw error;
+        throw new ApiError(422, "invalid_goal_output", "目标规划结果未通过校验，当前对话没有发生变化。请修改要求或重试。");
       }
       if (language.status !== "ready") {
-        const summary = language.status === "clarify" ? language.clarificationQuestion : language.reason;
-        const assistantRow = await persistAssistantExchange(client, sessionId, refinement, summary, context, undefined, "utterance", language.status === "clarify" ? "goal_clarification" : "utterance");
+        const summary = language.status === "needs_clarification" ? language.clarificationQuestion : language.reason;
+        const assistantRow = await persistAssistantExchange(client, sessionId, refinement, summary, context, undefined, "utterance", language.status === "needs_clarification" ? "goal_clarification" : "utterance");
         json(response, 200, { sessionId, status: language.status, assistantMessage: summary, messageId: String(assistantRow.id) });
         return;
       }
       const plan = await planLearningGoal(client, snapshot.goalText, language.candidateKnowledgeIds);
       const summary = goalPlanSummary(plan);
-      const structuredContent: CourseSearchTimelineContent = { type: "course_search", schemaVersion: 1, planningId: crypto.randomUUID(), goalText: snapshot.goalText, intentSummary: language.intentSummary, refinement, refinedFromPlanningId: snapshot.planningId, plan };
+      const structuredContent: CourseSearchTimelineContent = { type: "course_search", schemaVersion: 1, planningId: crypto.randomUUID(), goalText: snapshot.goalText, intentSummary: language.intentSummary, practiceEmphasis: snapshot.practiceEmphasis, refinement, refinedFromPlanningId: snapshot.planningId, plan };
       const assistantRow = await persistAssistantExchange(client, sessionId, refinement, summary, context, structuredContent);
       json(response, 200, { sessionId, status: "ready", plan, assistantMessage: summary, messageId: String(assistantRow.id) });
       return;
@@ -241,7 +256,8 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
         type: "course_creation_brief", schemaVersion: 1, briefId: crypto.randomUUID(), planningId: snapshot.planningId, planningMessageId: String(planningMessage.row.id),
         goal: snapshot.goalText, ...(sourceCourseId ? { sourceCourseId } : {}),
         targetKnowledge: plan.resolution.status === "ready" ? plan.resolution.targetKnowledge : [],
-        ...(requestedAdjustments ? { requestedAdjustments } : {}), referenceMaterialIntent: body.referenceMaterialIntent
+        ...(requestedAdjustments ? { requestedAdjustments } : {}), referenceMaterialIntent: body.referenceMaterialIntent,
+        ...(snapshot.practiceEmphasis != null ? { practiceEmphasis: snapshot.practiceEmphasis } : {})
       };
       const userContent = sourceCourseId ? `基于课程 ${sourceCourseId} 准备创建需求` : "准备个性化学习路线的创建需求";
       const summary = "我整理好了你的 Course Creation Brief。你可以继续修改，或进入课程创建页面检查后再创建。";
