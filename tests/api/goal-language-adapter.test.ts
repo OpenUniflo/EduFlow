@@ -44,6 +44,19 @@ describe("Goal Planner language adapter", () => {
     expect(JSON.parse(generateJson.mock.calls[1][0].user)).toMatchObject({ conversationContext });
   });
 
+  it("independently rejects a packaging-only clarification and resolves real target identities", async () => {
+    const clarify = { status: "clarify", intentSummary: "Train an image classifier", clarificationQuestion: "你要网页还是命令行工具？" };
+    const generateJson = vi.fn()
+      .mockResolvedValueOnce({ value: clarify, metadata: {} })
+      .mockResolvedValueOnce({ value: ready("image-model"), metadata: {} })
+      .mockResolvedValueOnce({ value: { coherent: true, directlySupportingKnowledgeIds: ["image-model"] }, metadata: {} });
+    const conversationContext = [{ role: "user", content: "我想训练模型" }, { role: "assistant", content: "具体做什么？" }];
+    const result = await resolveGoalLanguage(knowledgeClient([{ id: "image-model", title: "Image Classification", description: "Train an image classifier", tags: [] }]), { goalText: "识别猫狗的小项目", conversationContext }, { generateJson } as any);
+    expect(result).toMatchObject({ status: "ready", candidateKnowledgeIds: ["image-model"] });
+    expect(generateJson.mock.calls[1][0]).toMatchObject({ promptVersion: "goal-clarification-audit-v1" });
+    expect(generateJson).toHaveBeenCalledTimes(3);
+  });
+
   it("rejects real but semantically inconsistent targets", async () => {
     const generateJson = vi.fn().mockResolvedValueOnce({ value: ready("language-model"), metadata: {} }).mockResolvedValueOnce({ value: { coherent: false, directlySupportingKnowledgeIds: [], clarificationQuestion: "你想先完成哪一种图片识别成果？" }, metadata: {} });
     const result = await resolveGoalLanguage(knowledgeClient([{ id: "language-model", title: "Language Model", description: "Text", tags: [] }]), { goalText: "做图片识别" }, { generateJson } as any);
