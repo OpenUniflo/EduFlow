@@ -126,6 +126,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       try {
         language = await resolveGoalLanguage(client, { goalText, conversationContext: conversationRows.map((row) => ({ role: String(row.role), content: String(row.content) })) });
       } catch (error) {
+        console.error("Goal language resolution failed", error instanceof Error ? error.message : "Unknown Goal language error");
         if (isGoalLanguageProviderUnavailable(error)) throw new ApiError(503, "goal_provider_unavailable", "学习目标理解服务暂时不可用，当前对话没有发生变化。请稍后重试。");
         throw error;
       }
