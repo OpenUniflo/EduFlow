@@ -8,7 +8,7 @@ import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
 import { dataOrThrow } from "./_lib/query.js";
 import { createUserSupabase } from "./_lib/supabase.js";
 import { goalPlanSummary, planLearningGoal, useExistingCourse } from "./_lib/goalPlanningService.js";
-import { resolveGoalLanguage } from "./_lib/goalLanguageAdapter.js";
+import { isGoalLanguageProviderUnavailable, resolveGoalLanguage } from "./_lib/goalLanguageAdapter.js";
 import { generateCourseCreatorProposal, isCourseCreatorProviderUnavailable } from "./_lib/courseCreatorProposal.js";
 import { classifyCourseCreatorIntent } from "../src/features/course/creation/courseCreatorIntent.js";
 
@@ -116,7 +116,13 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const sessionId = String(session.id);
       const conversationResult = await client.from("assistant_messages").select("role,content").eq("session_id", sessionId).order("sequence", { ascending: false }).limit(8);
       const conversationRows = dataOrThrow(conversationResult.data as Row[] | null, conversationResult.error, "Goal clarification history lookup").reverse();
-      const language = await resolveGoalLanguage(client, { goalText, conversationContext: conversationRows.map((row) => ({ role: String(row.role), content: String(row.content) })) });
+      let language;
+      try {
+        language = await resolveGoalLanguage(client, { goalText, conversationContext: conversationRows.map((row) => ({ role: String(row.role), content: String(row.content) })) });
+      } catch (error) {
+        if (isGoalLanguageProviderUnavailable(error)) throw new ApiError(503, "goal_provider_unavailable", "学习目标理解服务暂时不可用，当前对话没有发生变化。请稍后重试。");
+        throw error;
+      }
       if (language.status !== "ready") {
         const summary = language.status === "clarify" ? language.clarificationQuestion : language.reason;
         const assistantRow = await persistAssistantExchange(client, sessionId, goalText, summary, context);
@@ -189,12 +195,18 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (body.action === "refine-goal") {
       const refinement = typeof body.refinement === "string" ? body.refinement.trim() : "";
       if (!refinement || refinement.length > 1000) throw new ApiError(400, "invalid_refinement", "A refinement between 1 and 1000 characters is required");
-      const language = await resolveGoalLanguage(client, {
-        goalText: snapshot.goalText,
-        previousGoalText: snapshot.goalText,
-        previousKnowledgeIds: targetIds(snapshot),
-        refinement
-      });
+      let language;
+      try {
+        language = await resolveGoalLanguage(client, {
+          goalText: snapshot.goalText,
+          previousGoalText: snapshot.goalText,
+          previousKnowledgeIds: targetIds(snapshot),
+          refinement
+        });
+      } catch (error) {
+        if (isGoalLanguageProviderUnavailable(error)) throw new ApiError(503, "goal_provider_unavailable", "学习目标理解服务暂时不可用，当前对话没有发生变化。请稍后重试。");
+        throw error;
+      }
       if (language.status !== "ready") {
         const summary = language.status === "clarify" ? language.clarificationQuestion : language.reason;
         const assistantRow = await persistAssistantExchange(client, sessionId, refinement, summary, context);

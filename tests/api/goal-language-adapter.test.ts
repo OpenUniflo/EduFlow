@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { parseGoalLanguageResolution, resolveGoalLanguage } from "../../api/_lib/goalLanguageAdapter";
+import { isGoalLanguageProviderUnavailable, parseGoalLanguageResolution, resolveGoalLanguage } from "../../api/_lib/goalLanguageAdapter";
 
 const ready = (id: string, refinementIntent: "preserve_outcome" | "change_outcome" = "preserve_outcome") => ({
   status: "ready" as const, intentSummary: "Build the requested outcome", primaryOutcome: "Complete the requested outcome", refinementIntent,
@@ -12,6 +12,11 @@ function knowledgeClient(rows: Array<Record<string, unknown>>) {
 }
 
 describe("Goal Planner language adapter", () => {
+  it("recognizes transient provider failures without treating validation errors as outages", () => {
+    expect(isGoalLanguageProviderUnavailable(new Error("LLM provider network error"))).toBe(true);
+    expect(isGoalLanguageProviderUnavailable(new Error("Invalid target contract"))).toBe(false);
+  });
+
   it("accepts only the bounded structured resolution contract", () => {
     expect(parseGoalLanguageResolution(ready("knowledge-rag"))).toMatchObject({ status: "ready", candidateKnowledgeIds: ["knowledge-rag"] });
     expect(() => parseGoalLanguageResolution({ ...ready("knowledge-rag"), candidateKnowledgeIds: [], targetReasons: [] })).toThrow();

@@ -9,7 +9,7 @@ vi.mock("../../api/_lib/supabase.js", () => ({ createUserSupabase }));
 vi.mock("../../api/_lib/goalPlanningService.js", () => ({
   planLearningGoal, useExistingCourse, createPersonalCourse: vi.fn(), goalPlanSummary: () => "Structured Goal summary"
 }));
-vi.mock("../../api/_lib/goalLanguageAdapter.js", () => ({ resolveGoalLanguage }));
+vi.mock("../../api/_lib/goalLanguageAdapter.js", () => ({ resolveGoalLanguage, isGoalLanguageProviderUnavailable: (error: unknown) => error instanceof TypeError }));
 
 import handler from "../../api/assistant";
 
@@ -95,6 +95,15 @@ describe("Assistant structured Goal actions", () => {
     expect(planLearningGoal).toHaveBeenCalledWith(expect.anything(), "I want AI to do things for me", ["A"]);
     const card = structuredCards(db).find((value) => value.type === "course_search");
     expect(card).toMatchObject({ type: "course_search", schemaVersion: 1, goalText: "I want AI to do things for me", plan });
+  });
+
+  it("returns a retryable 503 and persists no exchange when Goal provider networking fails", async () => {
+    const db = database();
+    resolveGoalLanguage.mockRejectedValueOnce(new TypeError("network error"));
+    const result = await request(db, { action: "plan-goal", goalText: "Build an image model" });
+    expect(result.status()).toBe(503);
+    expect(structuredCards(db)).toEqual([]);
+    expect([...db.messages.values()]).toEqual([]);
   });
 
   it("persists multiple independent planning cards in the same session", async () => {
