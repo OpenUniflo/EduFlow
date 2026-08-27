@@ -12,29 +12,7 @@ export class OpenAICompatibleJsonGenerationClient implements StructuredGeneratio
   constructor(private readonly config: LlmEnvironment, private readonly request: typeof fetch = fetch, private readonly timeoutMs = 60_000) {}
 
   async generateJson(input: StructuredGenerationRequest): Promise<StructuredGenerationResult> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    let response: Response;
-    try {
-      response = await this.request(`${this.config.llmBaseUrl}/chat/completions`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${this.config.llmApiKey}`, "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: this.config.llmModel,
-          thinking: { type: "disabled" },
-          messages: [{ role: "system", content: input.system }, { role: "user", content: input.user }],
-          response_format: { type: "json_object" }, max_tokens: input.maxTokens,
-          temperature: input.temperature, stream: false
-        })
-      });
-    } catch (error) {
-      if (controller.signal.aborted) throw new Error(`LLM request timed out: provider=${this.config.llmProvider}, model=${this.config.llmModel}`);
-      void error;
-      throw new Error(`LLM request failed: provider=${this.config.llmProvider}, model=${this.config.llmModel}, network error`);
-    } finally {
-      clearTimeout(timeout);
-    }
+    const response = await this.requestWithTransientRetry(input);
     if (!response.ok) throw new Error(`LLM request failed: provider=${this.config.llmProvider}, model=${this.config.llmModel}, HTTP ${response.status}`);
     let payload: DeepSeekResponse;
     try {
@@ -62,6 +40,46 @@ export class OpenAICompatibleJsonGenerationClient implements StructuredGeneratio
       ...(typeof payload.usage?.prompt_tokens === "number" ? { promptTokens: payload.usage.prompt_tokens } : {}),
       ...(typeof payload.usage?.completion_tokens === "number" ? { completionTokens: payload.usage.completion_tokens } : {})
     } };
+  }
+
+  private async requestWithTransientRetry(input: StructuredGenerationRequest): Promise<Response> {
+    const maximumAttempts = 3;
+    for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+      let response: Response;
+      try {
+        response = await this.request(`${this.config.llmBaseUrl}/chat/completions`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${this.config.llmApiKey}`, "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model: this.config.llmModel,
+            thinking: { type: "disabled" },
+            messages: [{ role: "system", content: input.system }, { role: "user", content: input.user }],
+            response_format: { type: "json_object" }, max_tokens: input.maxTokens,
+            temperature: input.temperature, stream: false
+          })
+        });
+      } catch (error) {
+        if (controller.signal.aborted) throw new Error(`LLM request timed out: provider=${this.config.llmProvider}, model=${this.config.llmModel}`);
+        void error;
+        if (attempt === maximumAttempts) throw new Error(`LLM request failed: provider=${this.config.llmProvider}, model=${this.config.llmModel}, network error`);
+        await this.waitBeforeRetry(attempt);
+        continue;
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (response.ok || (response.status !== 429 && response.status < 500)) return response;
+      if (attempt === maximumAttempts) return response;
+      await this.waitBeforeRetry(attempt);
+    }
+    throw new Error(`LLM request failed: provider=${this.config.llmProvider}, model=${this.config.llmModel}, network error`);
+  }
+
+  private async waitBeforeRetry(attempt: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 150 * attempt));
   }
 }
 
