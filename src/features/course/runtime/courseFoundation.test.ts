@@ -102,6 +102,7 @@ describe("Course foundation contract", () => {
     };
 
     expect(validateCourseRuntime(personal, knowledgeRepository, globalKnowledgeAccess)).toBe(true);
+    expect(validateCourseIntegrity({ ...personal, course: { ...personal.course, lifecycle: "draft" as const } }, knowledgeRepository, globalKnowledgeAccess)).toBe(true);
   });
 
   it("rejects Personal Course ownership and target-scope violations", () => {

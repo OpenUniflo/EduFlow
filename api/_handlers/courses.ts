@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createOptionalUserSupabase, createServerSupabase, createUserSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 import { dataOrThrow } from "../_lib/query.js";
+import { parseAssistantStructuredContent } from "../../src/features/assistant/assistantContract.js";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
@@ -11,7 +12,56 @@ const number = (row: Row, key: string) => Number(row[key]);
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   if (request.method === "POST") {
     const { client, user } = await createUserSupabase(request);
-    const body = request.body as { title?: string; description?: string; targetOutcome?: string; accentColor?: string };
+    const body = request.body as { title?: string; description?: string; targetOutcome?: string; accentColor?: string; creationBriefMessageId?: string; requirements?: { goal?: string; referenceCourseId?: string }; scope?: { targetKnowledgeIds?: string[]; prerequisiteKnowledgeIds?: string[]; optionalKnowledgeIds?: string[] }; curriculum?: { chapters?: Array<{ id?: string; title?: string; knowledgeIds?: string[] }> } };
+    if (body.creationBriefMessageId) {
+      const messageResult = await client.from("assistant_messages").select("structured_content,session_id").eq("id", body.creationBriefMessageId).maybeSingle();
+      const messageRow = dataOrThrow(messageResult.data as Row | null, messageResult.error, "Course Creation Brief lookup");
+      if (!messageRow) throw new ApiError(404, "course_creation_brief_not_found", "Course Creation Brief not found");
+      const sessionResult = await client.from("assistant_sessions").select("id").eq("id", text(messageRow, "session_id")).eq("user_id", user.id).maybeSingle();
+      if (!dataOrThrow(sessionResult.data as Row | null, sessionResult.error, "Course Creation Brief ownership lookup")) throw new ApiError(404, "course_creation_brief_not_found", "Course Creation Brief not found");
+      let brief;
+      try { brief = parseAssistantStructuredContent(messageRow.structured_content); }
+      catch { throw new ApiError(409, "invalid_course_creation_brief", "Course Creation Brief is invalid"); }
+      if (brief?.type !== "course_creation_brief") throw new ApiError(409, "course_creation_brief_required", "The timeline item is not a Course Creation Brief");
+      const goal = body.requirements?.goal?.trim() ?? "";
+      const targetKnowledgeIds = [...new Set(body.scope?.targetKnowledgeIds ?? [])];
+      const prerequisiteKnowledgeIds = [...new Set(body.scope?.prerequisiteKnowledgeIds ?? [])];
+      const optionalKnowledgeIds = [...new Set(body.scope?.optionalKnowledgeIds ?? [])];
+      const scopeIds = [...new Set([...prerequisiteKnowledgeIds, ...optionalKnowledgeIds, ...targetKnowledgeIds])];
+      const chapters = body.curriculum?.chapters ?? [];
+      if (!goal || goal.length > 1000 || !targetKnowledgeIds.length || !chapters.length || chapters.length > 20) throw new ApiError(400, "invalid_course_creator_design", "Confirmed requirements, target Knowledge, and curriculum Chapters are required");
+      const placedIds = chapters.flatMap((chapter) => Array.isArray(chapter.knowledgeIds) ? chapter.knowledgeIds : []);
+      if (placedIds.length !== new Set(placedIds).size || placedIds.length !== scopeIds.length || scopeIds.some((id) => !placedIds.includes(id))) throw new ApiError(400, "invalid_course_creator_structure", "Curriculum placement must contain every scoped Knowledge exactly once");
+      if (chapters.some((chapter) => !chapter.title?.trim() || !chapter.knowledgeIds?.length)) throw new ApiError(400, "invalid_course_creator_structure", "Every Chapter requires a title and Knowledge placement");
+      const [knowledgeResult, edgeResult] = await Promise.all([
+        client.from("knowledge_nodes").select("id").in("id", scopeIds).eq("status", "active"),
+        client.from("knowledge_edges").select("source_node_id,target_node_id,relation").eq("relation", "prerequisite").eq("lifecycle_status", "active")
+      ]);
+      const visibleIds = new Set(dataOrThrow(knowledgeResult.data as Row[] | null, knowledgeResult.error, "Course Creator Knowledge validation").map((row) => text(row, "id")));
+      if (visibleIds.size !== scopeIds.length) throw new ApiError(422, "course_creator_knowledge_unavailable", "Course scope includes unavailable Knowledge");
+      const edgeRows = dataOrThrow(edgeResult.data as Row[] | null, edgeResult.error, "Course Creator prerequisite validation");
+      const byTarget = new Map<string, string[]>();
+      edgeRows.forEach((row) => byTarget.set(text(row, "target_node_id"), [...(byTarget.get(text(row, "target_node_id")) ?? []), text(row, "source_node_id")]));
+      const factual = new Set<string>();
+      function visit(nodeId: string, visiting = new Set<string>()) {
+        if (visiting.has(nodeId)) return;
+        const next = new Set(visiting); next.add(nodeId);
+        (byTarget.get(nodeId) ?? []).forEach((sourceId) => { factual.add(sourceId); visit(sourceId, next); });
+      }
+      targetKnowledgeIds.forEach((id) => visit(id));
+      if (prerequisiteKnowledgeIds.some((id) => !factual.has(id))) throw new ApiError(422, "invalid_course_creator_prerequisite", "Prerequisite labels must come from factual KnowledgeEdges");
+      if ([...factual].some((id) => !targetKnowledgeIds.includes(id) && !prerequisiteKnowledgeIds.includes(id))) throw new ApiError(422, "incomplete_course_creator_prerequisite", "Course scope must include the factual prerequisite closure");
+      const sourceCourseId = body.requirements?.referenceCourseId?.trim() || brief.sourceCourseId;
+      if (sourceCourseId !== brief.sourceCourseId) throw new ApiError(422, "invalid_course_creator_reference", "Reference Course must come from the owned Course Creation Brief");
+      const result = await createServerSupabase().rpc("create_personal_course_draft", {
+        p_owner_user_id: user.id, p_goal_text: goal, p_source_course_id: sourceCourseId ?? null,
+        p_target_knowledge_ids: targetKnowledgeIds,
+        p_chapters: chapters.map((chapter) => ({ title: chapter.title!.trim(), knowledgeIds: chapter.knowledgeIds }))
+      });
+      const rows = dataOrThrow(result.data as Row[] | null, result.error, "Personal Course Draft creation");
+      if (!rows[0]) throw new ApiError(500, "course_draft_creation_failed", "Course Draft was not created");
+      json(response, 201, { courseId: text(rows[0], "course_id"), lifecycle: "draft" }); return;
+    }
     const title = body.title?.trim(); const targetOutcome = body.targetOutcome?.trim();
     if (!title) throw new ApiError(400, "invalid_course", "title is required");
     const profile = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
@@ -30,9 +80,17 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const { client, user } = await createUserSupabase(request);
     const body = request.body as { courseId?: string; lifecycle?: string };
     if (!body.courseId || !["draft", "published", "archived"].includes(String(body.lifecycle))) throw new ApiError(400, "invalid_course_lifecycle", "courseId and a valid lifecycle are required");
-    const profile = await client.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const [profile, courseResult] = await Promise.all([
+      client.from("profiles").select("role").eq("id", user.id).maybeSingle(),
+      client.from("courses").select("id,lifecycle,course_type,owner_user_id").eq("id", body.courseId).maybeSingle()
+    ]);
     const profileRow = dataOrThrow(profile.data as Row | null, profile.error, "Course lifecycle role lookup");
-    if (!profileRow || !["teacher", "admin"].includes(text(profileRow, "role"))) throw new ApiError(403, "course_lifecycle_forbidden", "Only teachers may change course lifecycle");
+    const courseRow = dataOrThrow(courseResult.data as Row | null, courseResult.error, "Course lifecycle ownership lookup");
+    if (!courseRow) throw new ApiError(404, "course_not_found", "Course not found");
+    const manager = Boolean(profileRow && ["teacher", "admin"].includes(text(profileRow, "role")));
+    const courseType = optionalText(courseRow, "course_type") ?? "standard";
+    const personalOwner = courseType === "personal" && optionalText(courseRow, "owner_user_id") === user.id;
+    if (!(manager && courseType === "standard") && !personalOwner) throw new ApiError(403, "course_lifecycle_forbidden", "Course lifecycle permission is required");
     if (body.lifecycle === "published") {
       const coverageResult = await client.from("curriculum_coverages").select("node_id").eq("course_id", body.courseId);
       const coverages = dataOrThrow(coverageResult.data as Row[] | null, coverageResult.error, "Course publish route lookup");
@@ -42,7 +100,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const activeNodes = dataOrThrow(knowledgeResult.data as Row[] | null, knowledgeResult.error, "Course publish Knowledge lookup");
       if (!activeNodes.length) throw new ApiError(422, "course_learning_route_required", "A Published Course requires at least one active Knowledge route");
     }
-    const write = await client.from("courses").update({ lifecycle: body.lifecycle, updated_at: new Date().toISOString() }).eq("id", body.courseId).select("id,lifecycle").maybeSingle();
+    const write = await createServerSupabase().from("courses").update({ lifecycle: body.lifecycle, generation_status: body.lifecycle === "published" ? "ready" : undefined, updated_at: new Date().toISOString() }).eq("id", body.courseId).select("id,lifecycle").maybeSingle();
     const row = dataOrThrow(write.data as Row | null, write.error, "Course lifecycle update");
     if (!row) throw new ApiError(404, "course_not_found", "Course not found");
     json(response, 200, { courseId: text(row, "id"), lifecycle: text(row, "lifecycle") }); return;
@@ -83,7 +141,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const profileResult = user ? await client.from("profiles").select("role").eq("id", user.id).maybeSingle() : { data: null, error: null };
   const profile = dataOrThrow(profileResult.data as Row | null, profileResult.error, "Course role lookup");
   const canManage = profile && ["teacher", "admin"].includes(text(profile, "role"));
-  const readableCourseRows = canManage ? courseRows : courseRows.filter((row) => text(row, "lifecycle") === "published");
+  const readableCourseRows = canManage ? courseRows : courseRows.filter((row) => text(row, "lifecycle") === "published" || (user && text(row, "course_type") === "personal" && optionalText(row, "owner_user_id") === user.id));
   const runtimes = readableCourseRows.map((courseRow) => {
     const id = text(courseRow, "id");
     const curriculumRow = curriculumRows.find((row) => text(row, "course_id") === id);

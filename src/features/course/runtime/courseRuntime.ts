@@ -79,7 +79,6 @@ export function validateCourseIntegrity(runtime: CourseRuntimeData, knowledgeRep
   const courseType = runtime.course.courseType ?? "standard";
   if (courseType === "standard" && runtime.course.ownerUserId) errors.push("Standard Course cannot have a learner owner");
   if (courseType === "personal" && !runtime.course.ownerUserId) errors.push("Personal Course requires an owner");
-  if (courseType === "personal" && runtime.course.lifecycle !== "published") errors.push("Personal Course must be published");
   if (courseType === "personal" && !(runtime.targetKnowledge ?? []).some((target) => target.required)) errors.push("Personal Course requires target Knowledge");
   if (runtime.course.sourceCourseId === runtime.course.id) errors.push("Course cannot source itself");
 

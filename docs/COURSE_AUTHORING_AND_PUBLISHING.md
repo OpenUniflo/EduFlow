@@ -38,6 +38,9 @@ contract without publishing it. AI course creation remains a separate
 proposal/demo workflow rather than a prerequisite for authoring.
 
 Goal-driven Personal Course creation is a separate learner boundary, not a
-teacher authoring draft shortcut. It deterministically constructs and validates
-a minimal route, persists it transactionally as an owner-only published Course,
-and does not weaken or bypass the standard Course authoring publish contract.
+teacher authoring draft shortcut. The fixed Course Creator pipeline validates
+Requirements, Scope, Structure, and Asset review before it transactionally
+persists an owner-only Personal Draft. Learner Preview reads the real Course
+projection and explicit Publish applies the full minimum-route guard. The older
+direct-publish Personal Course RPC remains a compatibility capability, not the
+user-facing Creator path.

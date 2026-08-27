@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createUserSupabase = vi.hoisted(() => vi.fn());
 const createOptionalUserSupabase = vi.hoisted(() => vi.fn());
 const createServerSupabase = vi.hoisted(() => vi.fn());
+const serverRpc = vi.hoisted(() => vi.fn());
 vi.mock("../../api/_lib/supabase.js", () => ({ createUserSupabase, createOptionalUserSupabase, createServerSupabase }));
 
 import handler from "../../api/_handlers/courses";
@@ -41,6 +42,10 @@ const tableRows: Record<string, Row[]> = {
   materials: [],
   material_segments: [],
   material_knowledge_coverages: []
+  ,course_target_knowledge: [],
+  knowledge_edges: [],
+  assistant_messages: [],
+  assistant_sessions: []
 };
 
 function queryResult(rows: Row[]) {
@@ -86,7 +91,8 @@ describe("GET /api/courses", () => {
     createOptionalUserSupabase.mockReset();
     createOptionalUserSupabase.mockImplementation((request) => createUserSupabase(request));
     createServerSupabase.mockReset();
-    createServerSupabase.mockReturnValue({ from: (table: string) => queryResult(tableRows[table] ?? []) });
+    serverRpc.mockReset();
+    createServerSupabase.mockReturnValue({ from: (table: string) => queryResult(tableRows[table] ?? []), rpc: serverRpc });
   });
 
   it("maps a persisted route-only Course while every optional asset table is empty", async () => {
@@ -174,5 +180,35 @@ describe("GET /api/courses", () => {
     expect(recorder.statusCode()).toBe(201);
     expect(recorder.body()).toMatchObject({ courseId: expect.stringMatching(/^course-/) });
     tableRows.profiles[0].role = "student";
+  });
+
+  it("returns an owner-private Personal Draft to its learner owner", async () => {
+    tableRows.courses.push({ id: "personal-draft", title: "Personal Draft", description: "Owner-only", generation_status: "draft", lifecycle: "draft", course_type: "personal", owner_user_id: "learner", revision: "creator-draft-1" });
+    tableRows.course_curricula.push({ course_id: "personal-draft", id: "personal-draft:curriculum", generation_mode: "manual" });
+    tableRows.curriculum_chapters.push({ course_id: "personal-draft", id: "personal-draft:chapter", title: "Route", description: "Route", display_order: 0, color: "#7567e8", outcome: "Goal" });
+    tableRows.curriculum_lessons.push({ course_id: "personal-draft", id: "personal-draft:lesson", chapter_id: "personal-draft:chapter", title: "Route", display_order: 0 });
+    tableRows.curriculum_coverages.push({ course_id: "personal-draft", id: "personal-draft:coverage", lesson_id: "personal-draft:lesson", node_id: "route-knowledge", role: "assess", display_order: 0 });
+    tableRows.course_target_knowledge.push({ course_id: "personal-draft", knowledge_id: "route-knowledge", required: true });
+    const recorder = responseRecorder();
+    await handler({ method: "GET", query: {}, headers: {} } as VercelRequest, recorder.response);
+    expect((recorder.body() as { courses: Array<{ course: { id: string; lifecycle: string; ownerUserId?: string } }> }).courses).toEqual(expect.arrayContaining([expect.objectContaining({ course: expect.objectContaining({ id: "personal-draft", lifecycle: "draft", ownerUserId: "learner" }) })]));
+    [tableRows.courses, tableRows.course_curricula, tableRows.curriculum_chapters, tableRows.curriculum_lessons, tableRows.curriculum_coverages, tableRows.course_target_knowledge].forEach((rows) => rows.pop());
+  });
+
+  it("creates a Personal Draft from an owned Brief without requiring Material", async () => {
+    tableRows.assistant_sessions.push({ id: "session", user_id: "learner" });
+    tableRows.assistant_messages.push({ id: "brief-message", session_id: "session", structured_content: { type: "course_creation_brief", schemaVersion: 1, briefId: "brief", planningId: "plan", planningMessageId: "plan-message", goal: "Train a model", targetKnowledge: [{ id: "route-knowledge", title: "Route Knowledge", description: "A valid target" }], referenceMaterialIntent: "none" } });
+    serverRpc.mockResolvedValueOnce({ data: [{ course_id: "personal-new-draft" }], error: null });
+    const recorder = responseRecorder();
+    await handler({ method: "POST", query: {}, headers: {}, body: {
+      creationBriefMessageId: "brief-message",
+      requirements: { goal: "Train a model" },
+      scope: { targetKnowledgeIds: ["route-knowledge"], prerequisiteKnowledgeIds: [], optionalKnowledgeIds: [] },
+      curriculum: { chapters: [{ id: "chapter", title: "First route", knowledgeIds: ["route-knowledge"] }] }
+    } } as VercelRequest, recorder.response);
+    expect(recorder.statusCode()).toBe(201);
+    expect(recorder.body()).toEqual({ courseId: "personal-new-draft", lifecycle: "draft" });
+    expect(serverRpc).toHaveBeenCalledWith("create_personal_course_draft", expect.objectContaining({ p_owner_user_id: "learner", p_source_course_id: null, p_target_knowledge_ids: ["route-knowledge"] }));
+    tableRows.assistant_sessions.pop(); tableRows.assistant_messages.pop();
   });
 });

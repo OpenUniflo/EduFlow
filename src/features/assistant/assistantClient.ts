@@ -2,6 +2,7 @@ import { apiRequest } from "@/shared/api/apiClient";
 import { supabaseClient } from "@/shared/api/supabaseClient";
 import type { AssistantContextSnapshot, AssistantMessage, AssistantSession, AssistantSessionDetail, CourseCreationBrief } from "./assistantContract";
 import type { GoalPlan } from "@/features/course/goal/goalPlanning";
+import type { CourseCreatorDesign, CourseCreatorProposal, CourseCreatorStage } from "@/features/course/creation/courseCreator";
 
 export async function listAssistantSessions() {
   return (await apiRequest<{ sessions: AssistantSession[] }>("/api/assistant")).sessions;
@@ -61,4 +62,8 @@ export function selectAssistantCourse(input: { planningMessageId: string; course
 
 export function prepareAssistantCourseBrief(input: { planningMessageId: string; sourceCourseId?: string; requestedAdjustments?: string; referenceMaterialIntent: "none" | "upload_in_creator"; context: AssistantContextSnapshot }) {
   return apiRequest<StructuredAssistantResult & { brief: CourseCreationBrief }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "prepare-course-brief", ...input }) });
+}
+
+export function proposeCourseCreatorAdjustment(input: { briefMessageId: string; stage: CourseCreatorStage; instruction: string; current: CourseCreatorDesign; context: AssistantContextSnapshot }) {
+  return apiRequest<{ sessionId: string; proposal: CourseCreatorProposal }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "course-creator-proposal", ...input }) });
 }

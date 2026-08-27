@@ -177,6 +177,15 @@ Goal-driven Personal Course creation should prefer selecting/projecting shared K
 
 Goal Planner does not itself create a Personal Course. It persists a `CourseCreationBrief` in the owning Assistant timeline and hands the Creator only the owning message reference. The minimum Brief contains the Goal, validated target Knowledge snapshot, optional readable `sourceCourseId`, optional requested adjustments, and optional reference-material intent. Reference Material is never a creation prerequisite. The Course Creator re-reads the Brief through the authenticated Assistant boundary before any Course-domain write.
 
+Course Creator uses one fixed pipeline for every input combination:
+
+```text
+Requirements -> Knowledge Scope -> Curriculum Structure -> Learning Assets
+             -> persisted Course Draft -> Learner Preview / explicit Publish
+```
+
+Course, Material, Knowledge, learner context, and a supported Golden scenario are Creation References, not creation modes. Steps 1-4 are a client design preview anchored by the persisted Brief; changing an upstream confirmed output invalidates downstream results. Step 5 is the first Course-domain write. Step 6 reuses the real Course graph/learner projection and changes `draft -> published` only after an explicit user action. Missing Material, Micro, or Assignment remains an Asset Coverage warning. Arbitrary Material extraction/alignment and full asset generation remain deferred.
+
 ## 11. Standard and Personal Course
 
 Standard and Personal Courses use the same Course domain concept.
@@ -189,7 +198,7 @@ owner_user_id
 source_course_id?    when derived from an existing Course
 ```
 
-`course_type = standard` requires no learner owner. `course_type = personal` requires an owner and a `published` lifecycle so a valid generated route is immediately usable. Standard published Courses keep the existing public/authenticated visibility; Personal Courses and every Course-owned child row are owner-only, including from other learners, teachers, administrators, and anonymous users.
+`course_type = standard` requires no learner owner. `course_type = personal` requires an owner and permits `draft`, `published`, or `archived`. A Personal Draft is owner-private and not learner-usable; explicit Publish requires the full minimum route. Standard published Courses keep the existing public/authenticated visibility; Personal Courses and every Course-owned child row are owner-only, including from other learners, teachers, administrators, and anonymous users.
 
 `CourseTargetKnowledge(course_id, knowledge_id, required)` stores the structured Knowledge destination. It is distinct from optional human-readable `targetOutcome`, and each target must be visible, active, and covered by the Course curriculum. A Goal-driven Personal Course contains the target set plus the deterministic factual prerequisite closure in a minimal Course-owned curriculum. It reuses KnowledgeNode and KnowledgeEdge identities and may validly contain no Material, Micro, Assignment, Outcome, or FinalProject.
 

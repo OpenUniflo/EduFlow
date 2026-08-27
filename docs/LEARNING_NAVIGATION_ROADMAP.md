@@ -175,7 +175,7 @@ A Personal Course may carry fields such as:
 - `owner_user_id`;
 - optional `source_course_id` when derived from an existing Course.
 
-The implemented Personal Course is transactionally created as a structurally valid, immediately usable `published` Course owned by the learner. It contains a minimal curriculum projection of target Knowledge plus factual prerequisite closure, stores required destinations in `CourseTargetKnowledge`, and activates the explicit learner membership. A derived Personal Course retains `source_course_id`; a Course built directly from shared Knowledge leaves it null. KnowledgeNode and KnowledgeEdge facts are never copied. Material, Micro, Assignment, Outcome, and FinalProject may remain absent.
+The completed #20 compatibility RPC can transactionally create an immediately usable Published Personal Course, but the user-facing Course Creator does not use that shortcut. It follows the fixed six-stage pipeline and first persists an owner-private `draft` only after Requirements, Scope, Structure, and Asset review. Explicit Publish then makes the validated Course learner-usable. The Course contains target Knowledge plus factual prerequisite closure, stores required destinations in `CourseTargetKnowledge`, and retains `source_course_id` when derived from a reference Course. KnowledgeNode and KnowledgeEdge facts are never copied. Material, Micro, Assignment, Outcome, and FinalProject may remain absent.
 
 The Global Assistant is the authoritative Goal Planner UX. Planning and Brief preparation are read-only with respect to Course data; “use existing” is an explicit authenticated membership action. Course creation requires review in the Course Creator and is never available to the LLM tool loop. This stage does not create a Navigation Engine or formal Next Action.
 
@@ -327,6 +327,19 @@ Tasks:
 - create a Personal Course from shared Knowledge when no existing Course is suitable.
 
 Status: implemented in Issue #20, including persisted multi-result Goal Planner timeline and Course Creator Brief handoff. Independent Goal lifecycle, NavigationDecision, dynamic Learning Path, Attempts, and learned ranking remain deferred.
+
+### Course Creator MVP — Brief to usable Course
+
+Course Creator is the product boundary between #20 and #21. It uses one fixed flow for Goal-only, Reference Course, optional Reference Material, and Golden-supported references:
+
+1. Requirements / Course Blueprint;
+2. factual Knowledge Scope and optional reference diff;
+3. horizontal Course Skill Tree curriculum draft;
+4. non-blocking Learning Asset Coverage;
+5. persisted owner-private Personal Course Draft;
+6. learner preview, structural checks, and explicit Publish.
+
+The same Global Assistant identity may produce stage-owned structured Proposals, but it cannot Apply or Publish. Manual and AI edits share the same reducer and deterministic validation path. This creates a Course scope/route space, not a NavigationDecision, dynamic Learning Path, or Next Action.
 
 ### V1C — Rule Navigation
 

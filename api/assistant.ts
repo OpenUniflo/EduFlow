@@ -9,6 +9,7 @@ import { dataOrThrow } from "./_lib/query.js";
 import { createUserSupabase } from "./_lib/supabase.js";
 import { goalPlanSummary, planLearningGoal, useExistingCourse } from "./_lib/goalPlanningService.js";
 import { resolveGoalLanguage } from "./_lib/goalLanguageAdapter.js";
+import { generateCourseCreatorProposal } from "./_lib/courseCreatorProposal.js";
 
 type Row = Record<string, unknown>;
 
@@ -102,7 +103,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   }
   if (request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
 
-  const body = request.body as { action?: unknown; sessionId?: unknown; message?: unknown; planningMessageId?: unknown; goalText?: unknown; refinement?: unknown; courseId?: unknown; sourceCourseId?: unknown; requestedAdjustments?: unknown; referenceMaterialIntent?: unknown; context?: unknown };
+  const body = request.body as { action?: unknown; sessionId?: unknown; message?: unknown; planningMessageId?: unknown; briefMessageId?: unknown; stage?: unknown; instruction?: unknown; current?: unknown; goalText?: unknown; refinement?: unknown; courseId?: unknown; sourceCourseId?: unknown; requestedAdjustments?: unknown; referenceMaterialIntent?: unknown; context?: unknown };
   if (typeof body.action === "string") {
     let context: AssistantContextSnapshot;
     try { context = parseAssistantContext(body.context); }
@@ -126,6 +127,46 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const structuredContent: CourseSearchTimelineContent = { type: "course_search", schemaVersion: 1, planningId: crypto.randomUUID(), goalText, intentSummary: language.intentSummary, plan };
       const assistantRow = await persistAssistantExchange(client, sessionId, goalText, summary, context, structuredContent);
       json(response, 200, { sessionId, status: "ready", plan, assistantMessage: summary, messageId: String(assistantRow.id) });
+      return;
+    }
+    if (body.action === "course-creator-proposal") {
+      const instruction = typeof body.instruction === "string" ? body.instruction.trim() : "";
+      const stage = typeof body.stage === "string" ? body.stage.trim() : "";
+      if (!instruction || instruction.length > 2000) throw new ApiError(400, "invalid_creator_instruction", "A Course Creator instruction between 1 and 2000 characters is required");
+      if (!["requirements", "scope", "structure", "assets", "draft", "publish"].includes(stage)) throw new ApiError(400, "invalid_creator_stage", "Course Creator stage is invalid");
+      const briefMessage = await ownedStructuredMessage(client, user.id, body.briefMessageId);
+      if (briefMessage.content?.type !== "course_creation_brief") throw new ApiError(409, "course_creation_brief_required", "The selected timeline item is not a Course Creation Brief");
+      const current = body.current && typeof body.current === "object" && !Array.isArray(body.current) ? body.current as Record<string, unknown> : {};
+      const curriculum = current.curriculum && typeof current.curriculum === "object" ? current.curriculum as Record<string, unknown> : {};
+      const chapters = Array.isArray(curriculum.chapters) ? curriculum.chapters as Row[] : [];
+      const knowledgeResult = await client.from("knowledge_nodes").select("id,title,description").eq("status", "active").limit(1000);
+      const visibleKnowledge = dataOrThrow(knowledgeResult.data as Row[] | null, knowledgeResult.error, "Course Creator Knowledge catalog lookup").map((row) => ({ id: String(row.id), title: String(row.title), description: String(row.description).slice(0, 600) }));
+      let generated;
+      try {
+        generated = await generateCourseCreatorProposal({ stage, instruction, brief: briefMessage.content, current, visibleKnowledge, chapterIds: chapters.map((chapter) => String(chapter.id)).filter(Boolean) });
+      } catch (error) {
+        console.error("Course Creator proposal rejected", error instanceof Error ? error.message : "Unknown proposal error");
+        throw new ApiError(422, "invalid_creator_proposal", "Assistant Proposal 未通过产品边界校验；请缩小调整范围或重试。未应用任何修改。");
+      }
+      const operations: Array<Record<string, unknown>> = [];
+      if (stage === "requirements") {
+        if (generated.goal != null) operations.push({ type: "setRequirement", field: "goal", value: generated.goal });
+        if (generated.learnerFoundation != null) operations.push({ type: "setRequirement", field: "learnerFoundation", value: generated.learnerFoundation });
+        if (generated.timeConstraint != null) operations.push({ type: "setRequirement", field: "timeConstraint", value: generated.timeConstraint });
+        if (generated.preferences != null) operations.push({ type: "setPreferences", values: generated.preferences });
+      }
+      if (stage === "scope") {
+        (generated.removeKnowledgeIds ?? []).forEach((nodeId) => operations.push({ type: "excludeKnowledge", nodeId }));
+        (generated.addKnowledgeIds ?? []).forEach((nodeId) => operations.push({ type: "includeKnowledge", nodeId, role: "optional" }));
+      }
+      if (stage === "structure") {
+        (generated.moves ?? []).forEach((move) => operations.push({ type: "moveKnowledge", nodeId: move.nodeId, chapterId: move.chapterId }));
+        if (generated.orderedKnowledgeIds?.length) operations.push({ type: "reorderKnowledge", orderedKnowledgeIds: generated.orderedKnowledgeIds });
+      }
+      const proposal = { id: crypto.randomUUID(), stage, title: generated.title, summary: generated.summary, operations };
+      const sessionId = String(briefMessage.row.session_id);
+      await persistAssistantExchange(client, sessionId, instruction, `已准备「${generated.title}」Proposal。请先查看可视化差异和确定性验证，再决定是否 Apply。`, context);
+      json(response, 200, { sessionId, proposal });
       return;
     }
     const planningMessage = await ownedStructuredMessage(client, user.id, body.planningMessageId);
