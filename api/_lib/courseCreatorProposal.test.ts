@@ -3,19 +3,23 @@ import { generateCourseCreatorProposal, isCourseCreatorProviderUnavailable, pars
 
 describe("Course Creator structured proposal validation", () => {
   it("accepts only product-visible Knowledge and current Chapters", () => {
-    expect(parseGeneratedCourseCreatorProposal({ title: "Practice earlier", summary: "Move the target", moves: [{ nodeId: "target", chapterId: "practice" }] }, new Set(["target"]), new Set(["practice"]))).toMatchObject({ title: "Practice earlier" });
-    expect(() => parseGeneratedCourseCreatorProposal({ title: "Invent", summary: "Bad", addKnowledgeIds: ["invented"] }, new Set(["target"]), new Set())).toThrow(/unavailable Knowledge/);
-    expect(() => parseGeneratedCourseCreatorProposal({ title: "Move", summary: "Bad", moves: [{ nodeId: "target", chapterId: "invented" }] }, new Set(["target"]), new Set(["practice"]))).toThrow(/unavailable Chapters/);
+    expect(parseGeneratedCourseCreatorProposal({ intent: "edit", title: "Practice earlier", summary: "Move the target", moves: [{ nodeId: "target", chapterId: "practice" }] }, new Set(["target"]), new Set(["practice"]))).toMatchObject({ title: "Practice earlier" });
+    expect(() => parseGeneratedCourseCreatorProposal({ intent: "edit", title: "Invent", summary: "Bad", knowledgeChanges: [{ nodeId: "invented", action: "include", role: "target" }] }, new Set(["target"]), new Set())).toThrow(/unavailable Knowledge/);
+    expect(() => parseGeneratedCourseCreatorProposal({ intent: "edit", title: "Move", summary: "Bad", moves: [{ nodeId: "target", chapterId: "invented" }] }, new Set(["target"]), new Set(["practice"]))).toThrow(/unavailable Chapters/);
   });
 
-  it("does not turn a narrowing Scope request into bulk Knowledge additions", async () => {
+  it("preserves the structured target/optional role without keyword rewriting", async () => {
     const result = await generateCourseCreatorProposal({
-      stage: "scope", instruction: "内容太多，只保留必须学的", intent: "edit", brief: {},
+      stage: "scope", instruction: "太多了，精简，但把部署保留为核心目标。", brief: {},
       current: { scope: { targetKnowledgeIds: ["target"], prerequisiteKnowledgeIds: [], optionalKnowledgeIds: [] }, curriculum: { chapters: [{ id: "chapter" }] } },
       visibleKnowledge: [{ id: "target", title: "Target", description: "Target" }, { id: "extra", title: "Extra", description: "Extra" }], chapterIds: ["chapter"]
-    }, { generateJson: async () => ({ value: { title: "Narrow", summary: "Keep minimum", addKnowledgeIds: ["extra"], orderedKnowledgeIds: ["target"] }, metadata: {} as never }) });
-    expect(result.addKnowledgeIds).toEqual([]);
+    }, { generateJson: async () => ({ value: { intent: "edit", title: "Narrow", summary: "Keep deployment as a target", knowledgeChanges: [{ nodeId: "extra", action: "include", role: "target" }], orderedKnowledgeIds: ["target"] }, metadata: {} as never }) });
+    expect(result.knowledgeChanges).toEqual([{ nodeId: "extra", action: "include", role: "target" }]);
     expect(result.orderedKnowledgeIds).toEqual(["target"]);
+  });
+
+  it("defaults ambiguous model output to no mutation by rejecting a missing intent", () => {
+    expect(() => parseGeneratedCourseCreatorProposal({ title: "Maybe", summary: "Unclear", knowledgeChanges: [{ nodeId: "target", action: "include", role: "target" }] }, new Set(["target"]), new Set())).toThrow();
   });
 
   it("separates provider failures from invalid proposal output", () => {

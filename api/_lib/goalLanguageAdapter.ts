@@ -63,10 +63,6 @@ function safeGoalLanguageResolution(value: unknown): GoalLanguageResolution {
   return { status: "clarify", intentSummary: summary, clarificationQuestion: typeof question === "string" ? question.trim() : "你最想先做出什么具体结果？" };
 }
 
-export function hasExplicitOutcomeChangeLanguage(value: string) {
-  return /(?:不想|不要).{0,24}(?:了|而是|改)|(?:改|换)(?:成|为|学|目标)|重新(?:选择|确定).{0,8}(?:目标|方向)|(?:switch|change|replace).{0,24}(?:goal|subject|outcome|to)|(?:instead of|no longer want)/iu.test(value);
-}
-
 export function isGoalLanguageProviderUnavailable(error: unknown) {
   return error instanceof TypeError || (error instanceof Error && /(?:fetch|network|timeout|timed out|ECONN|provider|upstream|socket)/i.test(error.message));
 }
@@ -84,7 +80,7 @@ export async function resolveGoalLanguage(
   }));
   const generated = await generator.generateJson({
     stage: "goal-resolution", promptVersion: "goal-resolution-v3", schemaVersion: "2", temperature: 0, maxTokens: 1200,
-    system: `You are the language-understanding adapter for EduFlow Goal Planner. Understand novice outcome language semantically. When conversationContext is present, the current goalText may be the learner's short answer to the most recent Assistant clarification; resolve it together with the earlier learner goal instead of treating it as a new standalone request or repeating an already-answered question. intentSummary and primaryOutcome must describe the resolved whole outcome, not only the latest reply. Clarify only when the missing answer could change the direct target Knowledge identities. Once the capability and artifact class are clear enough to choose a minimal target set, return ready. If one atomic catalog identity names the concrete capability or artifact the learner wants, prefer that identity alone; its internal theory, training mechanics, optimization, evaluation, and background belong to prerequisite closure or later Course scope unless the learner explicitly makes them separate outcomes. Do not ask how much theory to understand or whether to include such supporting mechanisms once the concrete outcome is known. Do not ask about UI versus command line, packaging, deployment, framework, device, hosting, delivery format, pace, depth, or practice style when those details would not change the direct target Knowledge; those are later Course Creator preferences. You may select only IDs present in the supplied visible active Knowledge catalog. Select at most 6 independently teachable target identities that directly constitute the same primary outcome. Do not select background, prerequisites, broad adjacent topics, alternative solution families, or Knowledge that is merely useful. Prerequisites are computed by the product later. If the resolved outcome is still too broad or the direct target set is uncertain, ask one concise novice-friendly clarification question using outcome examples rather than specialist architecture names. Never invent an identity, Course, score, prerequisite, or learning path. For ready output return {"status":"ready","intentSummary":"...","primaryOutcome":"...","refinementIntent":"preserve_outcome|change_outcome","candidateKnowledgeIds":["..."],"targetReasons":[{"knowledgeId":"...","reason":"how this directly delivers the primary outcome"}]}. Every candidate must have exactly one reason. Otherwise return the clarify or unsupported shape. When refinement is present, previousGoalText is authoritative. Practical, shorter, easier, project-oriented, pace, depth, and format preferences preserve the outcome. Mark change_outcome only when the learner explicitly replaces the subject/capability.`,
+    system: `You are the language-understanding adapter for EduFlow Goal Planner. Understand novice outcome language semantically. When conversationContext is present, the current goalText is an explicitly linked answer to a prior Assistant clarification; resolve it together with that exchange instead of treating it as a new standalone request. intentSummary and primaryOutcome must describe the resolved whole outcome, not only the latest reply. Clarify only when the missing answer could change the direct target Knowledge identities. Once the capability and artifact class are clear enough to choose a minimal target set, return ready. If one atomic catalog identity names the concrete capability or artifact the learner wants, prefer that identity alone; its internal theory, training mechanics, optimization, evaluation, and background belong to prerequisite closure or later Course scope unless the learner explicitly makes them separate outcomes. Do not ask how much theory to understand or whether to include such supporting mechanisms once the concrete outcome is known. Do not ask about UI versus command line, packaging, deployment, framework, device, hosting, delivery format, pace, depth, or practice style when those details would not change the direct target Knowledge; those are later Course Creator preferences. You may select only IDs present in the supplied visible active Knowledge catalog. Select at most 6 independently teachable target identities that directly constitute the same primary outcome. Do not select background, prerequisites, broad adjacent topics, alternative solution families, or Knowledge that is merely useful. Prerequisites are computed by the product later. If the resolved outcome is still too broad or the direct target set is uncertain, ask one concise novice-friendly clarification question using outcome examples rather than specialist architecture names. Never invent an identity, Course, score, prerequisite, or learning path. For ready output return {"status":"ready","intentSummary":"...","primaryOutcome":"...","refinementIntent":"preserve_outcome|change_outcome","candidateKnowledgeIds":["..."],"targetReasons":[{"knowledgeId":"...","reason":"how this directly delivers the primary outcome"}]}. Every candidate must have exactly one reason. Otherwise return the clarify or unsupported shape. A refinement request comes from the product's Continue Search action and therefore preserves previousGoalText and its validated targets; a different outcome must be submitted as a new Goal action.`,
     user: JSON.stringify({ goalText: input.goalText, goalTextRole: input.conversationContext?.length ? "answer_to_latest_clarification" : "initial_goal", previousGoalText: input.previousGoalText, previousKnowledgeIds: input.previousKnowledgeIds, refinement: input.refinement, conversationContext: input.conversationContext, visibleKnowledgeCatalog: catalog })
   });
   let parsed = safeGoalLanguageResolution(generated.value);
@@ -99,24 +95,21 @@ export async function resolveGoalLanguage(
   if (parsed.status !== "ready") return parsed;
 
   const catalogIds = new Set(catalog.map((item) => item.id));
+  if (input.refinement && input.previousKnowledgeIds?.length) {
+    const preservedIds = [...new Set(input.previousKnowledgeIds)].filter((id) => catalogIds.has(id));
+    if (preservedIds.length !== new Set(input.previousKnowledgeIds).size) return { status: "unsupported", intentSummary: parsed.intentSummary, reason: "原学习目标包含当前不可用的 Knowledge。" };
+    return {
+      ...parsed,
+      primaryOutcome: input.previousGoalText ?? input.goalText,
+      refinementIntent: "preserve_outcome",
+      candidateKnowledgeIds: preservedIds,
+      targetReasons: preservedIds.map((knowledgeId) => ({ knowledgeId, reason: "保留原始学习目标的已验证核心目标。" }))
+    };
+  }
   const candidateIds = [...new Set(parsed.candidateKnowledgeIds)];
   const reasonIds = parsed.targetReasons.map((item) => item.knowledgeId);
   if (candidateIds.some((id) => !catalogIds.has(id)) || reasonIds.length !== candidateIds.length || reasonIds.some((id) => !candidateIds.includes(id)) || new Set(reasonIds).size !== reasonIds.length) {
     return { status: "unsupported", intentSummary: parsed.intentSummary, reason: "目标候选未通过真实 Knowledge 身份校验。" };
-  }
-
-  const explicitChange = Boolean(input.refinement && hasExplicitOutcomeChangeLanguage(input.refinement));
-  if (input.refinement && parsed.refinementIntent === "change_outcome" && !explicitChange) {
-    return { status: "clarify", intentSummary: parsed.intentSummary, clarificationQuestion: `你是想继续原来的「${input.previousGoalText ?? input.goalText}」并调整学习方式，还是要更换学习目标？` };
-  }
-  if (input.refinement && !explicitChange && input.previousKnowledgeIds?.length) {
-    return {
-      ...parsed,
-      primaryOutcome: input.previousGoalText ?? parsed.primaryOutcome,
-      refinementIntent: "preserve_outcome",
-      candidateKnowledgeIds: [...new Set(input.previousKnowledgeIds)].filter((id) => catalogIds.has(id)),
-      targetReasons: [...new Set(input.previousKnowledgeIds)].filter((id) => catalogIds.has(id)).map((knowledgeId) => ({ knowledgeId, reason: "保留原始学习目标的已验证核心目标。" }))
-    };
   }
 
   const selectedKnowledge = catalog.filter((item) => candidateIds.includes(item.id));

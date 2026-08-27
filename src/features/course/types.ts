@@ -18,6 +18,21 @@ export type Course = {
   courseType?: CourseType;
   ownerUserId?: string;
   sourceCourseId?: string;
+  /** Stable recovery link for an owner-private Personal Course Draft. */
+  creationBriefMessageId?: string;
+  /** Small persisted design snapshot needed to resume Course Creator after refresh. */
+  creatorMetadata?: CourseCreatorMetadata;
+};
+
+export type CourseCreatorMetadata = {
+  schemaVersion: 1;
+  learnerFoundation: string;
+  timeConstraint: string;
+  preferences: string[];
+  requestedAdjustments?: string;
+  desiredMaterialKnowledgeIds: string[];
+  desiredMicroKnowledgeIds: string[];
+  desiredAssignmentKnowledgeIds: string[];
 };
 
 /** Structured Course destination; it does not replace human-readable targetOutcome. */

@@ -202,9 +202,10 @@ describe("GET /api/courses", () => {
     const recorder = responseRecorder();
     await handler({ method: "POST", query: {}, headers: {}, body: {
       creationBriefMessageId: "brief-message",
-      requirements: { goal: "Train a model" },
+      requirements: { goal: "Train a model", learnerFoundation: "Some Python", timeConstraint: "Two weeks", preferences: ["Practice first"] },
       scope: { targetKnowledgeIds: ["route-knowledge"], prerequisiteKnowledgeIds: [], optionalKnowledgeIds: [] },
-      curriculum: { chapters: [{ id: "chapter", title: "First route", knowledgeIds: ["route-knowledge"] }] }
+      curriculum: { chapters: [{ id: "chapter", title: "First route", knowledgeIds: ["route-knowledge"] }] },
+      creatorMetadata: { desiredMaterialKnowledgeIds: [], desiredMicroKnowledgeIds: [], desiredAssignmentKnowledgeIds: ["route-knowledge"] }
     } } as VercelRequest, recorder.response);
     expect(recorder.statusCode()).toBe(201);
     expect(recorder.body()).toEqual({ courseId: "personal-new-draft", lifecycle: "draft" });

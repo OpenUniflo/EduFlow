@@ -7,8 +7,7 @@ import type { MockSession } from "@/features/auth/types";
 import { getAssistantTimelineMessage, proposeCourseCreatorAdjustment } from "@/features/assistant/assistantClient";
 import type { CourseCreationBrief } from "@/features/assistant/assistantContract";
 import type { CourseCreationScenario, CourseCreationScenarioResolver } from "@/features/course/creation/demoScenario";
-import { applyCourseCreatorProposal, courseCreatorStages, createCoursePreviewRuntime, createInitialCourseDesign, includedCourseKnowledgeIds, invalidateConfirmedThrough, restoreCourseCreatorDesign, validateCourseCreatorDesign, type CourseCreatorDesign, type CourseCreatorOperation, type CourseCreatorProposal, type CourseCreatorStage } from "@/features/course/creation/courseCreator";
-import { classifyCourseCreatorIntent } from "@/features/course/creation/courseCreatorIntent";
+import { applyCourseCreatorProposal, courseCreatorMetadata, courseCreatorStages, createCoursePreviewRuntime, createInitialCourseDesign, includedCourseKnowledgeIds, invalidateConfirmedThrough, restoreCourseCreatorDesign, validateCourseCreatorDesign, type CourseCreatorDesign, type CourseCreatorOperation, type CourseCreatorProposal, type CourseCreatorStage } from "@/features/course/creation/courseCreator";
 import { buildCourseGraphData, type CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import { CourseGraph } from "@/features/course/graph/CourseGraph";
 import { auditCourseAssetCoverage } from "@/features/course/runtime/courseAssetCoverage";
@@ -136,18 +135,10 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
   }
   async function askAssistant() {
     if (!design || !briefMessageId || !assistantInput.trim()) return;
-    if (classifyCourseCreatorIntent(assistantInput) === "navigate") {
-      if (stageIndex < 4 && validation.valid && !pendingProposal) {
-        confirmAndContinue(); setAssistantInput(""); setAssistantError("");
-      } else {
-        setAssistantError(stageIndex === 4 ? "请使用“创建课程草稿”确认首次持久化。" : "当前结果尚未通过检查，暂时不能进入下一步。");
-      }
-      return;
-    }
     setAssistantBusy(true); setAssistantError("");
     try {
       const result = await proposeCourseCreatorAdjustment({ briefMessageId, stage: courseCreatorStages[stageIndex], instruction: assistantInput.trim(), current: design, context: { workspace: "courses", experienceMode: "design", courseId: draftCourseId ?? undefined, selectedObject: `course-creator:${courseCreatorStages[stageIndex]}` } });
-      if (result.proposal) setPendingProposal(result.proposal);
+      setPendingProposal(result.proposal);
       setAssistantInput("");
     } catch (error) { setAssistantError(error instanceof Error ? error.message : "Assistant Proposal 生成失败"); }
     finally { setAssistantBusy(false); }
@@ -160,7 +151,7 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
     if (!design || !briefMessageId || !validation.valid) return;
     setPublishing(true); setAssistantError("");
     try {
-      const result = await apiRequest<{ courseId: string; lifecycle: "draft" | "published" }>("/api/courses", { method: "POST", body: JSON.stringify({ creationBriefMessageId: briefMessageId, requirements: design.requirements, scope: design.scope, curriculum: design.curriculum }) });
+      const result = await apiRequest<{ courseId: string; lifecycle: "draft" | "published" }>("/api/courses", { method: "POST", body: JSON.stringify({ creationBriefMessageId: briefMessageId, requirements: design.requirements, scope: design.scope, curriculum: design.curriculum, creatorMetadata: courseCreatorMetadata(design) }) });
       const [loaded, check] = await Promise.all([
         apiRequest<{ course: CourseRuntimeData }>(`/api/courses?id=${encodeURIComponent(result.courseId)}`),
         apiRequest<{ validation: NonNullable<typeof publishValidation> }>(`/api/courses?publishCheckCourseId=${encodeURIComponent(result.courseId)}`)
@@ -209,7 +200,7 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
 
 function ResultTitle({ icon, step, title }: { icon: React.ReactNode; step: string; title: string }) { return <div className="creator-section-title">{icon}<span><small>{step}</small><h2>{title}</h2></span></div>; }
 function RequirementsResult({ design, sourceTitle, files, goldenReference, manual, setManual, queue, setFiles }: any) {
-  return <><ResultTitle icon={<FileText/>} step="STEP 1 RESULT" title="Course Blueprint Card"/><div className="creator-blueprint"><span className="atlas-kicker">COURSE GOAL</span><h3>{design.requirements.goal}</h3><dl><div><dt>学习者基础</dt><dd>{design.requirements.learnerFoundation}</dd></div><div><dt>时间约束</dt><dd>{design.requirements.timeConstraint}</dd></div><div><dt>学习偏好</dt><dd>{design.requirements.preferences.join(" · ") || "未指定"}</dd></div><div><dt>Reference Course</dt><dd>{sourceTitle ?? "无"}</dd></div><div><dt>Reference Material</dt><dd>{files.map((file: File) => file.name).join("、") || "无（可完整创建）"}</dd></div></dl>{goldenReference ? <p className="creator-reference-note"><Sparkles size={14}/>已识别 Golden reference「{goldenReference.sourceLabel}」；它只辅助 Proposal，不会绕过六步确认。</p> : null}</div><details className="creator-manual"><summary>手动修改需求</summary><label>课程目标<textarea value={manual.goal} onChange={(event) => setManual.goal(event.target.value)}/></label><label>学习者基础<input value={manual.foundation} onChange={(event) => setManual.foundation(event.target.value)}/></label><label>时间约束<input value={manual.time} onChange={(event) => setManual.time(event.target.value)}/></label><label>学习偏好<input value={manual.preferences} onChange={(event) => setManual.preferences(event.target.value)}/></label><label className="atlas-secondary creator-upload"><Upload size={14}/>添加可选 PDF<input hidden type="file" accept=".pdf" onChange={(event) => { const file = event.target.files?.[0]; if (file) setFiles([file]); }}/></label><button className="atlas-secondary" onClick={queue}>生成修改 Proposal</button></details></>;
+  return <><ResultTitle icon={<FileText/>} step="STEP 1 RESULT" title="Course Blueprint Card"/><div className="creator-blueprint"><span className="atlas-kicker">COURSE GOAL</span><h3>{design.requirements.goal}</h3><dl><div><dt>学习者基础</dt><dd>{design.requirements.learnerFoundation}</dd></div><div><dt>时间约束</dt><dd>{design.requirements.timeConstraint}</dd></div><div><dt>学习偏好</dt><dd>{design.requirements.preferences.join(" · ") || "未指定"}</dd></div>{design.requirements.requestedAdjustments ? <div><dt>补充要求（原文）</dt><dd>{design.requirements.requestedAdjustments}</dd></div> : null}<div><dt>Reference Course</dt><dd>{sourceTitle ?? "无"}</dd></div><div><dt>Reference Material</dt><dd>{files.map((file: File) => file.name).join("、") || "无（可完整创建）"}</dd></div></dl>{goldenReference ? <p className="creator-reference-note"><Sparkles size={14}/>已识别 Golden reference「{goldenReference.sourceLabel}」；它只辅助 Proposal，不会绕过六步确认。</p> : null}</div><details className="creator-manual"><summary>手动修改需求</summary><label>课程目标<textarea value={manual.goal} onChange={(event) => setManual.goal(event.target.value)}/></label><label>学习者基础<input value={manual.foundation} onChange={(event) => setManual.foundation(event.target.value)}/></label><label>时间约束<input value={manual.time} onChange={(event) => setManual.time(event.target.value)}/></label><label>学习偏好<input value={manual.preferences} onChange={(event) => setManual.preferences(event.target.value)}/></label><label className="atlas-secondary creator-upload"><Upload size={14}/>添加可选 PDF<input hidden type="file" accept=".pdf" onChange={(event) => { const file = event.target.files?.[0]; if (file) setFiles([file]); }}/></label><button className="atlas-secondary" onClick={queue}>生成修改 Proposal</button></details></>;
 }
 function ScopeResult({ design, sourceRuntime, sourceDiff, sourceCount, titleById, setProposal }: any) {
   return <><ResultTitle icon={<Network/>} step="STEP 2 RESULT" title="这门课要学什么"/>{sourceRuntime ? <div className="creator-scope-diff"><span>参考课程<strong>{sourceCount} 项学习内容</strong></span><span className="keep">保留<strong>{sourceDiff.keep.length}</strong></span><span className="remove">暂不学习<strong>{sourceDiff.remove.length}</strong></span><span className="add">新增<strong>{sourceDiff.add.length}</strong></span></div> : null}<div className="creator-scope-map">{(["targetKnowledgeIds", "prerequisiteKnowledgeIds", "optionalKnowledgeIds", "excludedKnowledgeIds"] as const).map((key) => <ScopeBucket key={key} bucketKey={key} ids={design.scope[key]} titleById={titleById} setProposal={setProposal}/>)}</div></>;

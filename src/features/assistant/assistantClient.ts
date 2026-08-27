@@ -48,7 +48,7 @@ export async function streamAssistantMessage(input: { sessionId?: string; messag
 
 type StructuredAssistantResult = { sessionId: string; assistantMessage: string; messageId?: string; status?: "ready" | "clarify" | "unsupported" };
 
-export function planAssistantGoal(input: { sessionId?: string; goalText: string; context: AssistantContextSnapshot }) {
+export function planAssistantGoal(input: { sessionId?: string; clarificationMessageId?: string; goalText: string; context: AssistantContextSnapshot }) {
   return apiRequest<StructuredAssistantResult & { plan?: GoalPlan }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "plan-goal", ...input }) });
 }
 
@@ -65,5 +65,5 @@ export function prepareAssistantCourseBrief(input: { planningMessageId: string; 
 }
 
 export function proposeCourseCreatorAdjustment(input: { briefMessageId: string; stage: CourseCreatorStage; instruction: string; current: CourseCreatorDesign; context: AssistantContextSnapshot }) {
-  return apiRequest<{ sessionId: string; intent: "navigate" | "explain" | "edit"; proposal?: CourseCreatorProposal }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "course-creator-proposal", ...input }) });
+  return apiRequest<{ sessionId: string; intent: "explain" | "edit"; proposal: CourseCreatorProposal }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "course-creator-proposal", ...input }) });
 }

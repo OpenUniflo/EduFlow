@@ -11,6 +11,7 @@ export type CourseCreationRequirements = {
   learnerFoundation: string;
   timeConstraint: string;
   preferences: string[];
+  requestedAdjustments?: string;
   referenceCourseId?: string;
   referenceMaterialNames: string[];
 };
@@ -72,11 +73,6 @@ export function invalidateConfirmedThrough(currentConfirmedThrough: number, chan
 const unique = (values: readonly string[]) => [...new Set(values)];
 const activeNodeIds = (graph: KnowledgeGraph) => new Set(graph.nodes.filter((node) => node.status === "active").map((node) => node.id));
 
-function parseAdjustments(value: string | undefined) {
-  if (!value) return [];
-  return value.split(/[，,；;。\n]/).map((item) => item.trim()).filter(Boolean).slice(0, 8);
-}
-
 function sourceKnowledgeIds(source: CourseRuntimeData | null) {
   return source ? unique(source.curriculumCoverages.map((coverage) => coverage.nodeId)) : [];
 }
@@ -119,7 +115,8 @@ export function createInitialCourseDesign(brief: CourseCreationBrief, graph: Kno
       goal: brief.goal,
       learnerFoundation: "按当前 Learner Context，创建前再次确认",
       timeConstraint: "未指定",
-      preferences: parseAdjustments(brief.requestedAdjustments),
+      preferences: [],
+      ...(brief.requestedAdjustments ? { requestedAdjustments: brief.requestedAdjustments } : {}),
       ...(brief.sourceCourseId ? { referenceCourseId: brief.sourceCourseId } : {}),
       referenceMaterialNames
     },
@@ -146,15 +143,30 @@ export function restoreCourseCreatorDesign(base: CourseCreatorDesign, runtime: C
   const prerequisiteKnowledgeIds = includedIds.filter((id) => factualPrerequisites.has(id) && !targetKnowledgeIds.includes(id));
   const prerequisiteSet = new Set(prerequisiteKnowledgeIds);
   const optionalKnowledgeIds = includedIds.filter((id) => !targetKnowledgeIds.includes(id) && !prerequisiteSet.has(id));
+  const metadata = runtime.course.creatorMetadata;
   return normalizeCourseCreatorDesign({
     ...base,
-    requirements: { ...base.requirements, goal: runtime.course.targetOutcome?.trim() || runtime.course.title },
+    requirements: {
+      ...base.requirements,
+      goal: runtime.course.targetOutcome?.trim() || runtime.course.title,
+      ...(metadata ? {
+        learnerFoundation: metadata.learnerFoundation,
+        timeConstraint: metadata.timeConstraint,
+        preferences: metadata.preferences,
+        ...(metadata.requestedAdjustments ? { requestedAdjustments: metadata.requestedAdjustments } : {})
+      } : {})
+    },
     scope: { targetKnowledgeIds, prerequisiteKnowledgeIds, optionalKnowledgeIds, excludedKnowledgeIds: base.scope.excludedKnowledgeIds.filter((id) => !included.has(id)) },
     curriculum: { chapters: sourceChapters(runtime, included) },
     assets: {
       ...base.assets,
       materialKnowledgeIds: unique(runtime.materialKnowledgeCoverages.map((coverage) => coverage.nodeId)).filter((id) => included.has(id)),
-      assignmentKnowledgeIds: unique(runtime.assignmentCoverages.map((coverage) => coverage.nodeId)).filter((id) => included.has(id))
+      assignmentKnowledgeIds: unique(runtime.assignmentCoverages.map((coverage) => coverage.nodeId)).filter((id) => included.has(id)),
+      ...(metadata ? {
+        desiredMaterialKnowledgeIds: metadata.desiredMaterialKnowledgeIds.filter((id) => included.has(id)),
+        desiredMicroKnowledgeIds: metadata.desiredMicroKnowledgeIds.filter((id) => included.has(id)),
+        desiredAssignmentKnowledgeIds: metadata.desiredAssignmentKnowledgeIds.filter((id) => included.has(id))
+      } : {})
     }
   }, graph);
 }
@@ -287,10 +299,23 @@ export function createCoursePreviewRuntime(design: CourseCreatorDesign, courseId
   const lessons = chapters.map((chapter, index) => ({ id: `${chapter.id}:lesson`, courseId, chapterId: chapter.id, title: chapter.title, order: index }));
   const curriculumCoverages = design.curriculum.chapters.flatMap((chapter, chapterIndex) => chapter.knowledgeIds.map((nodeId, order) => ({ id: `${courseId}:coverage:${chapterIndex}:${order}`, courseId, lessonId: `${chapter.id}:lesson`, nodeId, role: design.scope.targetKnowledgeIds.includes(nodeId) ? "assess" as const : "introduce" as const, order })));
   return {
-    course: { id: courseId, title: design.requirements.goal.slice(0, 80), description: design.requirements.goal, targetOutcome: design.requirements.goal, lifecycle: "draft", courseType: "personal", ownerUserId: "creator-preview-owner", sourceCourseId: design.requirements.referenceCourseId, generationStatus: "draft", accentColor: "#7567e8" },
+    course: { id: courseId, title: design.requirements.goal.slice(0, 80), description: design.requirements.goal, targetOutcome: design.requirements.goal, lifecycle: "draft", courseType: "personal", ownerUserId: "creator-preview-owner", sourceCourseId: design.requirements.referenceCourseId, generationStatus: "draft", accentColor: "#7567e8", creatorMetadata: courseCreatorMetadata(design) },
     curriculum: { id: `${courseId}:curriculum`, courseId, generationMode: "manual" }, chapters, lessons, curriculumCoverages,
     curriculumSequences: lessons.slice(1).map((lesson, index) => ({ id: `${courseId}:sequence:${index}`, courseId, sourceLessonId: lessons[index].id, targetLessonId: lesson.id })),
     assignments: [], assignmentCoverages: [], assignmentDependencies: [], chapterOutcomes: [], assignmentOutcomeCompositions: [], finalProjects: [], finalProjectOutcomeCompositions: [], materials: [], materialKnowledgeCoverages: [],
     targetKnowledge: design.scope.targetKnowledgeIds.map((nodeId) => ({ courseId, nodeId, required: true })), revision: `creator-${design.curriculum.chapters.map((chapter) => chapter.knowledgeIds.join(",")).join("|")}`
+  };
+}
+
+export function courseCreatorMetadata(design: CourseCreatorDesign) {
+  return {
+    schemaVersion: 1 as const,
+    learnerFoundation: design.requirements.learnerFoundation,
+    timeConstraint: design.requirements.timeConstraint,
+    preferences: design.requirements.preferences,
+    ...(design.requirements.requestedAdjustments ? { requestedAdjustments: design.requirements.requestedAdjustments } : {}),
+    desiredMaterialKnowledgeIds: design.assets.desiredMaterialKnowledgeIds,
+    desiredMicroKnowledgeIds: design.assets.desiredMicroKnowledgeIds,
+    desiredAssignmentKnowledgeIds: design.assets.desiredAssignmentKnowledgeIds
   };
 }

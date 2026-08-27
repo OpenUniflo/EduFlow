@@ -11,7 +11,7 @@ function runtime(id: string, covered: string[], title = id, _targetOutcome?: str
 
 describe("Goal resolution", () => {
   it("resolves the Golden Agent goal to existing Knowledge identities", () => {
-    const result = resolveGoalToKnowledge({ goalText: "开发包含 RAG、Tool Calling 和 Memory 的 AI Agent", visibleNodes: nodes });
+    const result = resolveGoalToKnowledge({ goalText: "开发包含 RAG、Tool Calling 和 Memory 的 AI Agent", visibleNodes: nodes, suggestedKnowledgeIds: ["RAG", "RERANK", "CITE", "TOOL", "MEMORY", "AGENT"] });
     expect(result.status).toBe("ready");
     expect(result.targetKnowledge.map((item) => item.id)).toEqual(["RAG", "RERANK", "CITE", "TOOL", "MEMORY", "AGENT"]);
   });
@@ -20,9 +20,9 @@ describe("Goal resolution", () => {
     expect(resolveGoalToKnowledge({ goalText: "量子引力实验设计", visibleNodes: nodes })).toMatchObject({ status: "unsupported", targetKnowledge: [] });
   });
 
-  it("returns ambiguity when candidates have equivalent evidence", () => {
+  it("does not reinterpret prose lexically when no structured identities are supplied", () => {
     const result = resolveGoalToKnowledge({ goalText: "Graph", visibleNodes: [node("A", "Graph A"), node("B", "Graph B")] });
-    expect(result).toMatchObject({ status: "ambiguous", candidates: [{ id: "A" }, { id: "B" }] });
+    expect(result).toMatchObject({ status: "unsupported", candidates: [] });
   });
 
   it("rejects a language-adapter Knowledge identity that is not visible", () => {
@@ -30,7 +30,7 @@ describe("Goal resolution", () => {
   });
 
   it("resolves a cross-course goal for the medium-match customization path", () => {
-    expect(resolveGoalToKnowledge({ goalText: "学习 Docker 和 Deep Learning", visibleNodes: nodes }).targetKnowledge.map((item) => item.id)).toEqual(["DEEP", "DOCKER"]);
+    expect(resolveGoalToKnowledge({ goalText: "学习 Docker 和 Deep Learning", visibleNodes: nodes, suggestedKnowledgeIds: ["DEEP", "DOCKER"] }).targetKnowledge.map((item) => item.id)).toEqual(["DEEP", "DOCKER"]);
   });
 });
 

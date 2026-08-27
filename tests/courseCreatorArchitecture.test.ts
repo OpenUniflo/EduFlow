@@ -26,6 +26,21 @@ describe("Course Creator persistence and authority boundaries", () => {
     expect(migration).toMatch(/grant execute on function public\.create_personal_course_draft_for_brief[\s\S]*to service_role/);
   });
 
+  it("qualifies replacement SQL and persists only the creator state needed for recovery", () => {
+    const migration = read("supabase/migrations/20260827233000_creator_closeout.sql");
+    expect(migration).toContain("add column message_kind");
+    expect(migration).toContain("add column creator_metadata jsonb");
+    expect(migration).toContain("target.course_id = created_course_id");
+    expect(migration).toContain("sequence_row.course_id = created_course_id");
+    expect(migration).toContain("coverage.course_id = created_course_id");
+    expect(migration).toContain("lesson.course_id = created_course_id");
+    expect(migration).toContain("chapter_row.course_id = created_course_id");
+    expect(migration).toContain("course_row.id = created_course_id");
+    expect(migration).not.toMatch(/delete from public\.(?:course_target_knowledge|curriculum_sequences|curriculum_coverages|curriculum_lessons|curriculum_chapters)\s+where\s+course_id\s*=/);
+    expect(migration).toMatch(/revoke all on function public\.create_personal_course_draft_for_brief\(uuid,uuid,text,text,text\[\],jsonb,jsonb\)[\s\S]*from public, anon, authenticated/);
+    expect(migration).toMatch(/grant execute on function public\.create_personal_course_draft_for_brief\(uuid,uuid,text,text,text\[\],jsonb,jsonb\)[\s\S]*to service_role/);
+  });
+
   it("keeps AI outside Course mutation and Publish authority", () => {
     const assistant = read("api/assistant.ts");
     expect(assistant).toContain('body.action === "course-creator-proposal"');

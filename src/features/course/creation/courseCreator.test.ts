@@ -30,6 +30,12 @@ describe("fixed Course Creator pipeline contracts", () => {
     expect(validateCourseCreatorDesign(design, graph).valid).toBe(true);
   });
 
+  it("keeps mixed requested adjustments as raw requirements instead of punctuation-derived preferences", () => {
+    const design = createInitialCourseDesign({ ...brief, requestedAdjustments: "我只有两周；去掉数学；加入部署；多做实践" }, graph, null);
+    expect(design.requirements.requestedAdjustments).toBe("我只有两周；去掉数学；加入部署；多做实践");
+    expect(design.requirements.preferences).toEqual([]);
+  });
+
   it("does not mutate before Proposal Apply and invalidates downstream confirmations after Apply", () => {
     const design = createInitialCourseDesign(brief, graph, null);
     const proposal = { id: "proposal", stage: "requirements" as const, title: "Practice first", summary: "Preview only", operations: [{ type: "setPreferences" as const, values: ["实践优先"] }] };
@@ -64,6 +70,21 @@ describe("fixed Course Creator pipeline contracts", () => {
     expect(restored.requirements.goal).toBe("Persisted first model course");
     expect(restored.scope).toMatchObject({ targetKnowledgeIds: ["target"], prerequisiteKnowledgeIds: ["foundation"], optionalKnowledgeIds: ["extra"] });
     expect(restored.curriculum.chapters.flatMap((chapter) => chapter.knowledgeIds)).toEqual(edited.curriculum.chapters.flatMap((chapter) => chapter.knowledgeIds));
+  });
+
+  it("restores confirmed requirements and desired Asset Plan from creator metadata", () => {
+    const base = createInitialCourseDesign({ ...brief, requestedAdjustments: "原始补充要求" }, graph, null);
+    const edited = applyCourseCreatorProposal(
+      applyCourseCreatorProposal(base, { id: "requirements", stage: "requirements", title: "Requirements", summary: "Persist", operations: [
+        { type: "setRequirement", field: "learnerFoundation", value: "会一点 Python" },
+        { type: "setRequirement", field: "timeConstraint", value: "两周" },
+        { type: "setPreferences", values: ["实践优先"] }
+      ] }, graph),
+      { id: "assets", stage: "assets", title: "Assets", summary: "Persist", operations: [{ type: "setDesiredAsset", nodeId: "target", assetType: "assignment", desired: true }] }, graph
+    );
+    const restored = restoreCourseCreatorDesign(base, createCoursePreviewRuntime(edited, "persisted"), graph);
+    expect(restored.requirements).toMatchObject({ learnerFoundation: "会一点 Python", timeConstraint: "两周", preferences: ["实践优先"], requestedAdjustments: "原始补充要求" });
+    expect(restored.assets.desiredAssignmentKnowledgeIds).toEqual(["target"]);
   });
 
   it("separates real reusable coverage from the desired Asset Plan", () => {

@@ -48,42 +48,8 @@ export type GoalPlan = {
   matches: CourseMatch[];
 };
 
-const conceptGlossary: Array<{ pattern: RegExp; concepts: string[] }> = [
-  { pattern: /\b(?:rag|retrieval[ -]augmented generation)\b|检索增强/i, concepts: ["retrieval", "reranking", "citation"] },
-  { pattern: /\b(?:tool|function)[ -]calling\b|工具调用/i, concepts: ["function calling"] },
-  { pattern: /\b(?:long[ -]term )?memory\b|长期记忆|记忆系统/i, concepts: ["long-term memory"] },
-  { pattern: /\b(?:llm|ai)[ -]agent\b|智能体架构/i, concepts: ["llm agent architecture"] },
-  { pattern: /\bdeep[ -]learning\b|深度学习/i, concepts: ["deep learning"] },
-  { pattern: /\bdocker\b|容器化/i, concepts: ["docker"] }
-];
-
-const ignoredTerms = new Set(["a", "an", "the", "and", "or", "with", "build", "develop", "learn", "course", "包含", "一个", "独立", "开发", "学会", "学习", "课程", "我想", "能够"]);
-
-function normalize(value: string) {
-  return value.normalize("NFKC").toLocaleLowerCase().replace(/[‐‑‒–—]/g, "-").replace(/[^\p{L}\p{N}+#.-]+/gu, " ").trim();
-}
-
 function knowledge(value: GoalKnowledgeCandidate): GoalKnowledge {
   return { id: value.id, title: value.title, description: value.description };
-}
-
-function conceptScore(node: GoalKnowledgeCandidate, concept: string) {
-  const title = normalize(node.title);
-  const description = normalize(node.description);
-  const tags = normalize((node.tags ?? []).join(" "));
-  const phrase = normalize(concept);
-  if (title === phrase) return 100;
-  if (title.includes(phrase)) return 60;
-  if (description.includes(phrase)) return 20;
-  if (tags.includes(phrase)) return 15;
-  const terms = phrase.split(/\s+/).filter((term) => term.length > 1 && !ignoredTerms.has(term));
-  return terms.reduce((score, term) => score + (title.includes(term) ? 8 : description.includes(term) ? 2 : tags.includes(term) ? 1 : 0), 0);
-}
-
-function ranked(nodes: GoalKnowledgeCandidate[], concept: string) {
-  return nodes.map((node) => ({ node, score: conceptScore(node, concept) }))
-    .filter(({ score }) => score > 0)
-    .sort((left, right) => right.score - left.score || left.node.id.localeCompare(right.node.id));
 }
 
 /**
@@ -101,28 +67,7 @@ export function resolveGoalToKnowledge(input: { goalText: string; visibleNodes: 
     return { status: "ready", goalText, targetKnowledge: suggested.map((id) => knowledge(byId.get(id)!)), candidates: [] };
   }
 
-  const concepts = conceptGlossary.filter(({ pattern }) => pattern.test(goalText)).flatMap(({ concepts: matches }) => matches);
-  if (concepts.length) {
-    const selected = new Map<string, GoalKnowledgeCandidate>();
-    const ambiguous = new Map<string, GoalKnowledgeCandidate>();
-    for (const concept of concepts) {
-      const candidates = ranked(nodes, concept);
-      if (!candidates.length) continue;
-      const top = candidates[0];
-      const tied = candidates.filter((candidate) => candidate.score === top.score);
-      if (tied.length > 1) tied.forEach(({ node }) => ambiguous.set(node.id, node));
-      else if (top.score >= 20) selected.set(top.node.id, top.node);
-    }
-    if (ambiguous.size) return { status: "ambiguous", goalText, targetKnowledge: [...selected.values()].map(knowledge), candidates: [...ambiguous.values()].map(knowledge), reason: "Multiple visible Knowledge nodes match one or more goal concepts equally." };
-    if (selected.size) return { status: "ready", goalText, targetKnowledge: [...selected.values()].map(knowledge), candidates: [] };
-  }
-
-  const fallback = ranked(nodes, normalize(goalText).split(/\s+/).filter((term) => term.length > 1 && !ignoredTerms.has(term)).join(" "));
-  if (!fallback.length) return { status: "unsupported", goalText, targetKnowledge: [], candidates: [], reason: "No visible active Knowledge reliably matches this goal." };
-  const top = fallback[0];
-  const close = fallback.filter((candidate) => candidate.score >= top.score * 0.85).slice(0, 5);
-  if (close.length > 1) return { status: "ambiguous", goalText, targetKnowledge: [], candidates: close.map(({ node }) => knowledge(node)), reason: "The goal matches multiple visible Knowledge nodes with similar lexical evidence." };
-  return { status: "ready", goalText, targetKnowledge: [knowledge(top.node)], candidates: [] };
+  return { status: "unsupported", goalText, targetKnowledge: [], candidates: [], reason: "Structured Goal language resolution is required before product validation." };
 }
 
 /** prerequisite edges are directed source prerequisite -> target dependent. */

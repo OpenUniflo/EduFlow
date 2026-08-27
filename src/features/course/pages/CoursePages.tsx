@@ -17,7 +17,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession |
   const [progressRevision, setProgressRevision] = useState(0);
   useEffect(() => learningProgressRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
   useEffect(() => userKnowledgeRepository.subscribe(() => setProgressRevision((value) => value + 1)), []);
-  const courses = useMemo(() => courseRepository.listCourseRuntimes().filter((runtime) => runtime.course.lifecycle === "published").flatMap((runtime) => {
+  const courses = useMemo(() => courseRepository.listCourseRuntimes().filter((runtime) => runtime.course.lifecycle === "published" || (session && runtime.course.courseType === "personal" && runtime.course.lifecycle === "draft" && runtime.course.ownerUserId === session.userId)).flatMap((runtime) => {
     try {
       const state = session ? learningProgressRepository.getCourseState(session.userId, runtime.course.id) : undefined;
       const graph=knowledgeRepository.getVisibleGraph(session ? userKnowledgeAccess(session.userId) : globalKnowledgeAccess);
@@ -29,7 +29,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession |
     }
   }), [progressRevision, session]);
   const needle = query.trim().toLowerCase();
-  const tabCourses = tab === "mine" ? courses.filter(({ state }) => state?.isActive) : courses;
+  const tabCourses = tab === "mine" ? courses.filter(({ runtime, state }) => runtime.course.lifecycle === "draft" || state?.isActive) : courses.filter(({ runtime }) => runtime.course.lifecycle === "published");
   const visible = tabCourses.filter(({ runtime, graphData }) => !needle || [
     runtime.course.title,
     runtime.course.subtitle ?? "",
@@ -37,8 +37,8 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession |
     ...runtime.chapters.map((chapter) => chapter.title),
     ...graphData.knowledgeNodes.map((node) => node.title)
   ].some((value) => value.toLowerCase().includes(needle)));
-  const recent = session ? [...courses].filter(({ state,summary }) => state?.isActive && summary).sort((left, right) => (right.summary?.updatedAt ?? "").localeCompare(left.summary?.updatedAt ?? ""))[0] : undefined;
-  const learningCount = courses.filter((item) => item.state?.isActive).length;
+  const recent = session ? [...courses].filter(({ runtime,state,summary }) => runtime.course.lifecycle === "published" && state?.isActive && summary).sort((left, right) => (right.summary?.updatedAt ?? "").localeCompare(left.summary?.updatedAt ?? ""))[0] : undefined;
+  const learningCount = courses.filter((item) => item.runtime.course.lifecycle === "published" && item.state?.isActive).length;
 
   async function setMembership(courseId: string, active: boolean) {
     setMembershipBusy(courseId);
@@ -68,7 +68,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession |
         <section className="atlas-course-section">
           <div className="atlas-section-row"><h2>{tab === "mine" ? "我的课程" : "全部课程"}</h2><span>{visible.length} 门课程</span></div>
           <div className="atlas-course-grid">
-            {visible.map(({ runtime, summary, state, graphData }) => <article className="atlas-course-card" key={runtime.course.id} onClick={() => navigate(`/courses/${runtime.course.id}`)}><div className="atlas-card-accent" style={{ background: runtime.course.accentColor }} /><div className="atlas-pill">{runtime.course.courseType==="personal"?"个人课程":state?.isActive ? "我的课程" : "标准课程"} · {runtime.course.title}</div><h3>{runtime.course.subtitle ?? runtime.course.title}</h3><p>{runtime.course.description}</p>{pathPreview(runtime.chapters)}<div className="atlas-course-meta"><span>{runtime.lessons.length} 课</span><span>{graphData.knowledgeNodes.length} 原子节点</span><span>{runtime.assignments.length} 实训</span></div>{session&&summary?<div className="atlas-progress-row"><span>实训进度</span><div className="atlas-progress-track"><i style={{ width: `${summary.progress}%` }} /></div><strong>{summary.progress}%</strong></div>:null}<div className="atlas-card-actions">{!session?<button className="atlas-primary">浏览课程</button>:state?.isActive ? <><button className="atlas-primary" onClick={(event) => { event.stopPropagation(); navigate(`/courses/${runtime.course.id}`); }}>继续课程</button><button className="atlas-secondary" disabled={membershipBusy === runtime.course.id} onClick={(event) => { event.stopPropagation(); void setMembership(runtime.course.id, false); }}>移出我的课程</button></> : <button className="atlas-primary" disabled={membershipBusy === runtime.course.id} onClick={(event) => { event.stopPropagation(); void setMembership(runtime.course.id, true); }}>开始课程</button>}</div></article>)}
+            {visible.map(({ runtime, summary, state, graphData }) => { const personalDraft = runtime.course.courseType === "personal" && runtime.course.lifecycle === "draft"; return <article className="atlas-course-card" key={runtime.course.id} onClick={() => navigate(`/courses/${runtime.course.id}`)}><div className="atlas-card-accent" style={{ background: runtime.course.accentColor }} /><div className="atlas-pill">{personalDraft ? "课程草稿" : runtime.course.courseType==="personal"?"个人课程":state?.isActive ? "我的课程" : "标准课程"} · {runtime.course.title}</div><h3>{runtime.course.subtitle ?? runtime.course.title}</h3><p>{runtime.course.description}</p>{pathPreview(runtime.chapters)}<div className="atlas-course-meta"><span>{runtime.lessons.length} 课</span><span>{graphData.knowledgeNodes.length} 原子节点</span><span>{runtime.assignments.length} 实训</span></div>{session&&summary&&!personalDraft?<div className="atlas-progress-row"><span>实训进度</span><div className="atlas-progress-track"><i style={{ width: `${summary.progress}%` }} /></div><strong>{summary.progress}%</strong></div>:null}<div className="atlas-card-actions">{personalDraft ? <><button className="atlas-primary" disabled={!runtime.course.creationBriefMessageId} onClick={(event) => { event.stopPropagation(); if (runtime.course.creationBriefMessageId) navigate(`/courses/create?briefId=${encodeURIComponent(runtime.course.creationBriefMessageId)}`); }}>继续创建</button><button className="atlas-secondary" onClick={(event) => { event.stopPropagation(); navigate(`/courses/${runtime.course.id}`); }}>预览草稿</button></> : !session?<button className="atlas-primary">浏览课程</button>:state?.isActive ? <><button className="atlas-primary" onClick={(event) => { event.stopPropagation(); navigate(`/courses/${runtime.course.id}`); }}>继续课程</button><button className="atlas-secondary" disabled={membershipBusy === runtime.course.id} onClick={(event) => { event.stopPropagation(); void setMembership(runtime.course.id, false); }}>移出我的课程</button></> : <button className="atlas-primary" disabled={membershipBusy === runtime.course.id} onClick={(event) => { event.stopPropagation(); void setMembership(runtime.course.id, true); }}>开始课程</button>}</div></article>; })}
             {!visible.length && tab === "mine" ? <article className="learning-empty"><h3>你还没有开始任何课程</h3><p>浏览公开课程；开始课程只加入 My Courses，不会自动开始第一个 Knowledge。</p><button className="atlas-primary" onClick={() => setTab("all")}>浏览全部课程 <ArrowRight size={15}/></button></article> : null}
           </div>
         </section>

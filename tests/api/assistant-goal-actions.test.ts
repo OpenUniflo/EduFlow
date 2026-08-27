@@ -22,11 +22,11 @@ function database() {
   const messages = new Map<string, any>();
   let sequence = 0;
   const db = { writes, sessions, messages, from(table: string) {
-    let inserted: any; const filters = new Map<string, unknown>();
+    let inserted: any; const filters = new Map<string, unknown>(); const upperBounds = new Map<string, number>();
     const builder: any = {
       insert: (value: any) => { inserted = value; writes.push({ table, value }); return builder; },
       select: () => builder, update: (value: any) => { writes.push({ table, value }); return builder; },
-      eq: (key: string, value: unknown) => { filters.set(key, value); return builder; }, order: () => builder, limit: () => builder,
+      eq: (key: string, value: unknown) => { filters.set(key, value); return builder; }, lte: (key: string, value: number) => { upperBounds.set(key, value); return builder; }, order: () => builder, limit: () => builder,
       maybeSingle: async () => {
         if (table === "assistant_sessions") return { data: sessions.get(String(filters.get("id"))) ?? null, error: null };
         if (table === "assistant_messages") return { data: messages.get(String(filters.get("id"))) ?? null, error: null };
@@ -42,7 +42,7 @@ function database() {
       },
       then: <TResult1 = { data: any; error: null }>(onfulfilled?: ((value: { data: any; error: null }) => TResult1 | PromiseLike<TResult1>) | null) => {
         let data: any = null;
-        if (table === "assistant_messages" && inserted == null) data = [];
+        if (table === "assistant_messages" && inserted == null) data = [...messages.values()].filter((row) => [...filters].every(([key, value]) => (key === "message_kind" ? (row[key] ?? "utterance") : row[key]) === value) && [...upperBounds].every(([key, value]) => Number(row[key]) <= value));
         if (table === "assistant_messages" && Array.isArray(inserted)) {
           data = inserted.map((value) => { const row = { id: `message-${++sequence}`, created_at: `2026-08-27T00:00:${String(sequence).padStart(2, "0")}Z`, ...value }; messages.set(row.id, row); return row; });
         }
@@ -114,6 +114,26 @@ describe("Assistant structured Goal actions", () => {
     expect(cards).toHaveLength(2); expect(cards[0].planningId).not.toBe(cards[1].planningId); expect(cards.map((card) => card.goalText)).toEqual(["Goal one", "Goal two"]);
   });
 
+  it("treats history as clarification context only through an explicit message identity", async () => {
+    const db = database();
+    db.messages.set("goal-clarification", { id: "goal-clarification", session_id: "session-1", sequence: 2, role: "assistant", message_kind: "goal_clarification", content: "你想训练什么模型？" });
+    db.messages.set("goal-user", { id: "goal-user", session_id: "session-1", sequence: 1, role: "user", message_kind: "utterance", content: "我想训练一个模型" });
+    const result = await request(db, { action: "plan-goal", sessionId: "session-1", clarificationMessageId: "goal-clarification", goalText: "猫狗分类模型" });
+    expect(result.status()).toBe(200);
+    expect(resolveGoalLanguage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ conversationContext: [
+      { role: "user", content: "我想训练一个模型" },
+      { role: "assistant", content: "你想训练什么模型？" }
+    ] }));
+  });
+
+  it("rejects an arbitrary Assistant utterance as clarification authority", async () => {
+    const db = database();
+    db.messages.set("plain-assistant", { id: "plain-assistant", session_id: "session-1", sequence: 1, role: "assistant", message_kind: "utterance", content: "普通回答" });
+    const result = await request(db, { action: "plan-goal", sessionId: "session-1", clarificationMessageId: "plain-assistant", goalText: "新目标" });
+    expect(result.status()).toBe(409);
+    expect(resolveGoalLanguage).not.toHaveBeenCalled();
+  });
+
   it("uses the selected card snapshot instead of a mutable current Goal", async () => {
     const db = database(); const planningMessageId = seedPlanningMessage(db);
     const result = await request(db, { action: "use-existing-course", planningMessageId, courseId: "standard-course" });
@@ -128,7 +148,9 @@ describe("Assistant structured Goal actions", () => {
     expect(result.status()).toBe(200);
     expect(db.messages.get(planningMessageId)?.structured_content.refinement).toBeUndefined();
     const next = structuredCards(db).find((value) => value.refinedFromPlanningId);
-    expect(next).toMatchObject({ refinement: "Too theoretical", refinedFromPlanningId: "planning-1" });
+    expect(next).toMatchObject({ goalText: "Agent", refinement: "Too theoretical", refinedFromPlanningId: "planning-1" });
+    expect(next.goalText).not.toContain("偏好调整");
+    expect(planLearningGoal).toHaveBeenLastCalledWith(expect.anything(), "Agent", ["A"]);
   });
 
   it("prepares a recoverable Brief with sourceCourseId and performs no Course write", async () => {
@@ -136,6 +158,7 @@ describe("Assistant structured Goal actions", () => {
     const result = await request(db, { action: "prepare-course-brief", planningMessageId, sourceCourseId: "standard-course", requestedAdjustments: "More projects", referenceMaterialIntent: "none" });
     expect(result.status()).toBe(201);
     expect(result.body()).toMatchObject({ brief: { type: "course_creation_brief", sourceCourseId: "standard-course", planningMessageId, requestedAdjustments: "More projects", referenceMaterialIntent: "none" } });
+    expect(db.writes.find((write) => write.table === "assistant_messages" && Array.isArray(write.value))?.value[0]).toMatchObject({ role: "user", message_kind: "action" });
     expect(db.writes.some((write) => write.table === "courses")).toBe(false);
   });
 });

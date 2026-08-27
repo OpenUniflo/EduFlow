@@ -89,9 +89,9 @@ describe("Goal Planner language adapter", () => {
     expect(generateJson).toHaveBeenCalledTimes(1);
   });
 
-  it("requires explicit change language before outcome drift", async () => {
+  it("keeps refinement outcome-stable even when the model proposes drift", async () => {
     const generateJson = vi.fn().mockResolvedValue({ value: ready("agent", "change_outcome"), metadata: {} });
     const result = await resolveGoalLanguage(knowledgeClient([{ id: "image-model", title: "Image", description: "Image", tags: [] }, { id: "agent", title: "Agent", description: "Agent", tags: [] }]), { goalText: "Train an image model", previousGoalText: "Train an image model", previousKnowledgeIds: ["image-model"], refinement: "More practical" }, { generateJson } as any);
-    expect(result.status).toBe("clarify");
+    expect(result).toMatchObject({ status: "ready", candidateKnowledgeIds: ["image-model"], refinementIntent: "preserve_outcome" });
   });
 });

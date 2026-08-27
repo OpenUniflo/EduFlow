@@ -38,7 +38,7 @@ async function validatePersistedCourseForPublish(client: ReturnType<typeof creat
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   if (request.method === "POST") {
     const { client, user } = await createUserSupabase(request);
-    const body = request.body as { title?: string; description?: string; targetOutcome?: string; accentColor?: string; creationBriefMessageId?: string; requirements?: { goal?: string; referenceCourseId?: string }; scope?: { targetKnowledgeIds?: string[]; prerequisiteKnowledgeIds?: string[]; optionalKnowledgeIds?: string[] }; curriculum?: { chapters?: Array<{ id?: string; title?: string; knowledgeIds?: string[] }> } };
+    const body = request.body as { title?: string; description?: string; targetOutcome?: string; accentColor?: string; creationBriefMessageId?: string; requirements?: { goal?: string; learnerFoundation?: string; timeConstraint?: string; preferences?: string[]; referenceCourseId?: string }; scope?: { targetKnowledgeIds?: string[]; prerequisiteKnowledgeIds?: string[]; optionalKnowledgeIds?: string[] }; curriculum?: { chapters?: Array<{ id?: string; title?: string; knowledgeIds?: string[] }> }; creatorMetadata?: { desiredMaterialKnowledgeIds?: string[]; desiredMicroKnowledgeIds?: string[]; desiredAssignmentKnowledgeIds?: string[] } };
     if (body.creationBriefMessageId) {
       const messageResult = await client.from("assistant_messages").select("structured_content,session_id").eq("id", body.creationBriefMessageId).maybeSingle();
       const messageRow = dataOrThrow(messageResult.data as Row | null, messageResult.error, "Course Creation Brief lookup");
@@ -79,10 +79,39 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       if ([...factual].some((id) => !targetKnowledgeIds.includes(id) && !prerequisiteKnowledgeIds.includes(id))) throw new ApiError(422, "incomplete_course_creator_prerequisite", "Course scope must include the factual prerequisite closure");
       const sourceCourseId = body.requirements?.referenceCourseId?.trim() || brief.sourceCourseId;
       if (sourceCourseId !== brief.sourceCourseId) throw new ApiError(422, "invalid_course_creator_reference", "Reference Course must come from the owned Course Creation Brief");
+      const learnerFoundationValue = body.requirements?.learnerFoundation;
+      const timeConstraintValue = body.requirements?.timeConstraint;
+      const preferenceValues = body.requirements?.preferences;
+      const desiredMaterialValues = body.creatorMetadata?.desiredMaterialKnowledgeIds;
+      const desiredMicroValues = body.creatorMetadata?.desiredMicroKnowledgeIds;
+      const desiredAssignmentValues = body.creatorMetadata?.desiredAssignmentKnowledgeIds;
+      if (typeof learnerFoundationValue !== "string" || typeof timeConstraintValue !== "string" || !Array.isArray(preferenceValues) || preferenceValues.some((value) => typeof value !== "string")
+        || !Array.isArray(desiredMaterialValues) || desiredMaterialValues.some((id) => typeof id !== "string")
+        || !Array.isArray(desiredMicroValues) || desiredMicroValues.some((id) => typeof id !== "string")
+        || !Array.isArray(desiredAssignmentValues) || desiredAssignmentValues.some((id) => typeof id !== "string")) throw new ApiError(400, "invalid_course_creator_metadata", "Course Creator recovery metadata is invalid");
+      const learnerFoundation = learnerFoundationValue.trim();
+      const timeConstraint = timeConstraintValue.trim();
+      const preferences = [...new Set(preferenceValues.map((value) => value.trim()).filter(Boolean))];
+      const desiredMaterialKnowledgeIds = [...new Set(desiredMaterialValues)];
+      const desiredMicroKnowledgeIds = [...new Set(desiredMicroValues)];
+      const desiredAssignmentKnowledgeIds = [...new Set(desiredAssignmentValues)];
+      if (!learnerFoundation || learnerFoundation.length > 500 || !timeConstraint || timeConstraint.length > 300 || preferences.length > 8 || preferences.some((value) => value.length > 160)) throw new ApiError(400, "invalid_course_creator_metadata", "Course Creator requirements metadata is invalid");
+      if ([...desiredMaterialKnowledgeIds, ...desiredMicroKnowledgeIds, ...desiredAssignmentKnowledgeIds].some((id) => !scopeIds.includes(id))) throw new ApiError(400, "invalid_course_creator_metadata", "Desired assets must reference scoped Knowledge");
+      const creatorMetadata = {
+        schemaVersion: 1,
+        learnerFoundation,
+        timeConstraint,
+        preferences,
+        ...(brief.requestedAdjustments ? { requestedAdjustments: brief.requestedAdjustments } : {}),
+        desiredMaterialKnowledgeIds,
+        desiredMicroKnowledgeIds,
+        desiredAssignmentKnowledgeIds
+      };
       const result = await createServerSupabase().rpc("create_personal_course_draft_for_brief", {
         p_owner_user_id: user.id, p_creation_brief_message_id: body.creationBriefMessageId, p_goal_text: goal, p_source_course_id: sourceCourseId ?? null,
         p_target_knowledge_ids: targetKnowledgeIds,
-        p_chapters: chapters.map((chapter) => ({ title: chapter.title!.trim(), knowledgeIds: chapter.knowledgeIds }))
+        p_chapters: chapters.map((chapter) => ({ title: chapter.title!.trim(), knowledgeIds: chapter.knowledgeIds })),
+        p_creator_metadata: creatorMetadata
       });
       const rows = dataOrThrow(result.data as Row[] | null, result.error, "Personal Course Draft creation");
       if (!rows[0]) throw new ApiError(500, "course_draft_creation_failed", "Course Draft was not created");
@@ -175,7 +204,11 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const profileResult = user ? await client.from("profiles").select("role").eq("id", user.id).maybeSingle() : { data: null, error: null };
   const profile = dataOrThrow(profileResult.data as Row | null, profileResult.error, "Course role lookup");
   const canManage = profile && ["teacher", "admin"].includes(text(profile, "role"));
-  const readableCourseRows = canManage ? courseRows : courseRows.filter((row) => text(row, "lifecycle") === "published" || (user && text(row, "course_type") === "personal" && optionalText(row, "owner_user_id") === user.id));
+  const readableCourseRows = courseRows.filter((row) => {
+    const personal = text(row, "course_type") === "personal";
+    if (personal) return Boolean(user && optionalText(row, "owner_user_id") === user.id);
+    return Boolean(canManage || text(row, "lifecycle") === "published");
+  });
   const runtimes = readableCourseRows.map((courseRow) => {
     const id = text(courseRow, "id");
     const curriculumRow = curriculumRows.find((row) => text(row, "course_id") === id);
@@ -196,7 +229,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       };
     });
     return {
-      course: { id, title: text(courseRow, "title"), subtitle: optionalText(courseRow, "subtitle"), description: text(courseRow, "description"), targetOutcome: optionalText(courseRow, "target_outcome"), accentColor: optionalText(courseRow, "accent_color"), generationStatus: text(courseRow, "generation_status"), lifecycle: text(courseRow, "lifecycle"), courseType: (optionalText(courseRow, "course_type") ?? "standard"), ownerUserId: optionalText(courseRow, "owner_user_id"), sourceCourseId: optionalText(courseRow, "source_course_id") },
+      course: { id, title: text(courseRow, "title"), subtitle: optionalText(courseRow, "subtitle"), description: text(courseRow, "description"), targetOutcome: optionalText(courseRow, "target_outcome"), accentColor: optionalText(courseRow, "accent_color"), generationStatus: text(courseRow, "generation_status"), lifecycle: text(courseRow, "lifecycle"), courseType: (optionalText(courseRow, "course_type") ?? "standard"), ownerUserId: optionalText(courseRow, "owner_user_id"), sourceCourseId: optionalText(courseRow, "source_course_id"), creationBriefMessageId: optionalText(courseRow, "creation_brief_message_id"), creatorMetadata: courseRow.creator_metadata ?? undefined },
       curriculum: { id: text(curriculumRow, "id"), courseId: id, generationMode: text(curriculumRow, "generation_mode"), requestedChapterCount: curriculumRow.requested_chapter_count == null ? undefined : number(curriculumRow, "requested_chapter_count"), sourceStructureId: optionalText(curriculumRow, "source_structure_id") },
       chapters: chapterRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, title: text(row, "title"), description: text(row, "description"), order: number(row, "display_order"), color: text(row, "color"), outcome: text(row, "outcome") })),
       lessons: lessonRows.filter((row) => text(row, "course_id") === id).map((row) => ({ id: text(row, "id"), courseId: id, chapterId: text(row, "chapter_id"), title: text(row, "title"), order: number(row, "display_order") })),

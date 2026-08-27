@@ -29,6 +29,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [clarificationMessageId, setClarificationMessageId] = useState<string | null>(null);
 
   const reloadSessions = useCallback(async () => {
     const next = await listAssistantSessions();
@@ -39,6 +40,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   const selectSession = useCallback(async (sessionId: string | null) => {
     setError("");
     setActiveSessionId(sessionId);
+    setClarificationMessageId(null);
     if (!sessionId) {
       window.localStorage.removeItem(storageKey);
       setMessages([]);
@@ -103,11 +105,12 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     if (!nextGoal || sending) return;
     setSending(true); setError("");
     try {
-      const result = await planAssistantGoal({ sessionId: activeSessionId ?? undefined, goalText: nextGoal, context });
+      const result = await planAssistantGoal({ sessionId: activeSessionId ?? undefined, ...(clarificationMessageId ? { clarificationMessageId } : {}), goalText: nextGoal, context });
+      setClarificationMessageId(result.status === "clarify" && result.messageId ? result.messageId : null);
       await reloadStructuredSession(result.sessionId);
     } catch (planningError) { setError(planningError instanceof Error ? planningError.message : "学习目标规划失败"); }
     finally { setSending(false); }
-  }, [activeSessionId, reloadStructuredSession, sending]);
+  }, [activeSessionId, clarificationMessageId, reloadStructuredSession, sending]);
 
   const refineGoal = useCallback(async (planningMessageId: string, refinement: string, context: AssistantContextSnapshot) => {
     if (!refinement.trim() || sending) return;

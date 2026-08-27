@@ -21,6 +21,9 @@
 
 ## Goal-driven Course Selection
 
+- Product/domain state MUST NOT be encoded by concatenating user-facing prose. Goal, preference, constraint, scope adjustment, outcome change, and UI action MUST remain structurally distinct when they affect product behavior.
+- Natural-language keyword lists, regexes, or hand-maintained domain glossaries MUST NOT be authoritative for learning-domain decisions when the Assistant can return a structured semantic result. Product code validates structured identities and factual constraints instead of reinterpreting prose.
+- Explicit UI actions SHOULD own deterministic workflow navigation when available; the Assistant MUST NOT require phrase matching for actions already represented by product controls.
 - A learner Goal is a planning request unless a current product consumer requires an independent Goal lifecycle. Goal resolution MAY use an LLM as a language adapter, but every suggested Knowledge identity MUST be revalidated against visible active Knowledge; deterministic product logic owns prerequisite closure, Course matching, gaps, and persistence.
 - Prerequisite closure MUST use only factual `prerequisite` KnowledgeEdges, remain deterministic, deduplicated, and cycle-safe, and keep target Knowledge distinct from prerequisites. Course matching MUST be based on real Knowledge coverage, expose understandable coverage/gaps, and prefer a suitable existing Course identity before Personal Course creation.
 - `CourseTargetKnowledge` is the structured Course destination and MUST remain distinct from optional human-readable `targetOutcome`. Standard and Personal Courses share the Course domain, repository, graph projection, and routes.
