@@ -30,10 +30,11 @@ function CourseSearchCard({ message, content, context }: { message: AssistantMes
     <div className="assistant-goal-plan-heading"><Target size={15} /><strong>Course Search</strong><span>{content.refinement ? "继续寻找结果" : "学习目标规划"}</span></div>
     <p>{content.intentSummary}</p>{content.refinement ? <small>本轮调整：{content.refinement}</small> : null}
     {ready ? <>
-      <div className="assistant-goal-knowledge"><small>目标 Knowledge</small>{content.plan.resolution.targetKnowledge.map((item) => <span key={item.id}>{item.title}</span>)}</div>
-      <div className="assistant-goal-knowledge prerequisites"><small>事实前置</small>{content.plan.prerequisiteKnowledge.length ? content.plan.prerequisiteKnowledge.map((item) => <span key={item.id}>{item.title}</span>) : <em>无额外 prerequisite</em>}</div>
+      <div className="assistant-goal-knowledge"><small>核心目标</small>{content.plan.resolution.targetKnowledge.map((item) => <span key={item.id}>{item.title}</span>)}</div>
+      <div className="assistant-goal-knowledge prerequisites"><small>必要基础</small>{content.plan.prerequisiteKnowledge.length ? content.plan.prerequisiteKnowledge.map((item) => <span key={item.id}>{item.title}</span>) : <em>无额外必要基础</em>}</div>
       <div className="assistant-course-results">{content.plan.matches.map((match) => <article key={match.courseId} className={`assistant-course-match ${match.level}`}>
-        <div><strong>{match.courseTitle}</strong><span>{match.level.toUpperCase()} · {match.courseType === "personal" ? "个人课程" : "标准课程"}</span></div><p>目标覆盖 {Math.round(match.targetCoverage * 100)}% · 所需范围覆盖 {Math.round(match.requiredCoverage * 100)}%</p>
+        <div><strong>{match.courseTitle}</strong><span>{match.level.toUpperCase()} · {match.courseType === "personal" ? "个人课程" : "标准课程"}</span></div><p>目标覆盖 {Math.round(match.targetCoverage * 100)}% · 必要范围覆盖 {Math.round(match.requiredCoverage * 100)}% · 额外范围 {match.extraKnowledgeIds.length} 项</p>
+        {match.extraKnowledgeIds.length ? <small>这门课覆盖你的部分或全部目标，但还包含额外内容；可以使用整门课程，也可以基于它创建精简版本。</small> : null}
         {expandedCourseId === match.courseId ? <div className="assistant-match-gaps"><small>缺少目标：{match.missingTargetKnowledgeIds.join("、") || "无"}</small><small>缺少前置：{match.missingPrerequisiteKnowledgeIds.join("、") || "无"}</small><small>额外范围：{match.extraKnowledgeIds.length} 项</small></div> : null}
         <div className="assistant-goal-actions"><button disabled={runtime.sending} onClick={() => void useCourse(match.courseId)}>使用这门课程</button><button disabled={runtime.sending} onClick={() => setComposerCourseId(match.courseId)}>基于这门课程创建</button><button className="secondary" onClick={() => setExpandedCourseId((value) => value === match.courseId ? undefined : match.courseId)}>查看差异</button></div>
         {composerCourseId === match.courseId ? <BriefComposer planningMessageId={message.id} sourceCourseId={match.courseId} context={context} onDone={() => setComposerCourseId(null)} /> : null}

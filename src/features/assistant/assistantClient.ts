@@ -65,5 +65,5 @@ export function prepareAssistantCourseBrief(input: { planningMessageId: string; 
 }
 
 export function proposeCourseCreatorAdjustment(input: { briefMessageId: string; stage: CourseCreatorStage; instruction: string; current: CourseCreatorDesign; context: AssistantContextSnapshot }) {
-  return apiRequest<{ sessionId: string; proposal: CourseCreatorProposal }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "course-creator-proposal", ...input }) });
+  return apiRequest<{ sessionId: string; intent: "navigate" | "explain" | "edit"; proposal?: CourseCreatorProposal }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "course-creator-proposal", ...input }) });
 }

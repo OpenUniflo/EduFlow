@@ -25,6 +25,7 @@ export type CourseMatch = {
   courseType: "standard" | "personal";
   targetCoverage: number;
   requiredCoverage: number;
+  scopePrecision: number;
   missingTargetKnowledgeIds: string[];
   missingPrerequisiteKnowledgeIds: string[];
   extraKnowledgeIds: string[];
@@ -167,7 +168,12 @@ export function matchCoursesToGoal(input: { targetKnowledgeIds: string[]; prereq
     const targetCoverage = ratio(targetIds.length - missingTargetKnowledgeIds.length, targetIds.length);
     const requiredCoverage = ratio(requiredIds.filter((id) => covered.has(id)).length, requiredIds.length);
     const extraKnowledgeIds = [...covered].filter((id) => !requiredIds.includes(id)).sort();
-    const level: CourseMatchLevel = targetCoverage === 1 && requiredCoverage >= 0.8 ? "high" : targetCoverage >= 0.5 || requiredCoverage >= 0.6 ? "medium" : "low";
+    const scopePrecision = ratio(requiredIds.filter((id) => covered.has(id)).length, covered.size);
+    const level: CourseMatchLevel = targetCoverage === 1 && requiredCoverage >= 0.8 && scopePrecision >= 0.5
+      ? "high"
+      : targetCoverage >= 0.5 || requiredCoverage >= 0.6
+        ? "medium"
+        : "low";
     const recommendation: CourseMatch["recommendation"] = level === "high" ? "use_existing" : level === "medium" ? "customize" : "create_personal";
     return {
       courseId: course.id,
@@ -175,6 +181,7 @@ export function matchCoursesToGoal(input: { targetKnowledgeIds: string[]; prereq
       courseType: course.courseType,
       targetCoverage,
       requiredCoverage,
+      scopePrecision,
       missingTargetKnowledgeIds,
       missingPrerequisiteKnowledgeIds,
       extraKnowledgeIds,
@@ -184,6 +191,7 @@ export function matchCoursesToGoal(input: { targetKnowledgeIds: string[]; prereq
   }).sort((left, right) => right.targetCoverage - left.targetCoverage
     || right.requiredCoverage - left.requiredCoverage
     || left.missingTargetKnowledgeIds.length - right.missingTargetKnowledgeIds.length
+    || left.extraKnowledgeIds.length - right.extraKnowledgeIds.length
     || Number(left.courseType === "personal") - Number(right.courseType === "personal")
     || left.courseId.localeCompare(right.courseId));
 }

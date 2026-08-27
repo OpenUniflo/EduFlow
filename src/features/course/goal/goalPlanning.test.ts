@@ -72,4 +72,15 @@ describe("Course matching", () => {
   it("can rate a route-only Course with null targetOutcome as high", () => {
     expect(matchCoursesToGoal({ targetKnowledgeIds: ["TOOL"], prerequisiteKnowledgeIds: [], courses: [runtime("route", ["TOOL"], "Route", undefined)] })[0].level).toBe("high");
   });
+
+  it("prefers the focused route and does not label a broad route as highly matched", () => {
+    const broadExtras = Array.from({ length: 20 }, (_, index) => `EXTRA-${index}`);
+    const matches = matchCoursesToGoal({ targetKnowledgeIds: ["TOOL"], prerequisiteKnowledgeIds: ["AGENT"], courses: [
+      runtime("broad", ["TOOL", "AGENT", ...broadExtras]),
+      runtime("focused", ["TOOL", "AGENT"])
+    ] });
+    expect(matches.map((match) => match.courseId)).toEqual(["focused", "broad"]);
+    expect(matches[0]).toMatchObject({ level: "high", scopePrecision: 1 });
+    expect(matches[1]).toMatchObject({ level: "medium", extraKnowledgeIds: [...broadExtras].sort() });
+  });
 });

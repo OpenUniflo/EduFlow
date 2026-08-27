@@ -83,7 +83,7 @@ function structuredCards(db: ReturnType<typeof database>) {
 describe("Assistant structured Goal actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resolveGoalLanguage.mockResolvedValue({ status: "ready", intentSummary: "Build an agent", candidateKnowledgeIds: ["A"] });
+    resolveGoalLanguage.mockImplementation(async (_client, input: { goalText: string }) => ({ status: "ready", intentSummary: "Build an agent", primaryOutcome: input.goalText, refinementIntent: "preserve_outcome", candidateKnowledgeIds: ["A"], targetReasons: [{ knowledgeId: "A", reason: "Direct outcome" }] }));
     planLearningGoal.mockResolvedValue(plan);
     useExistingCourse.mockResolvedValue({ courseId: "standard-course", match: { courseTitle: "Standard Course" } });
   });
@@ -114,7 +114,7 @@ describe("Assistant structured Goal actions", () => {
 
   it("continues search by appending a refined card without overwriting the source", async () => {
     const db = database(); const planningMessageId = seedPlanningMessage(db);
-    resolveGoalLanguage.mockResolvedValueOnce({ status: "ready", intentSummary: "Prefer practical projects", candidateKnowledgeIds: ["A"] });
+    resolveGoalLanguage.mockResolvedValueOnce({ status: "ready", intentSummary: "Prefer practical projects", primaryOutcome: "Agent", refinementIntent: "preserve_outcome", candidateKnowledgeIds: ["A"], targetReasons: [{ knowledgeId: "A", reason: "Direct outcome" }] });
     const result = await request(db, { action: "refine-goal", planningMessageId, refinement: "Too theoretical" });
     expect(result.status()).toBe(200);
     expect(db.messages.get(planningMessageId)?.structured_content.refinement).toBeUndefined();

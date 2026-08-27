@@ -9,7 +9,8 @@ import { dataOrThrow } from "./_lib/query.js";
 import { createUserSupabase } from "./_lib/supabase.js";
 import { goalPlanSummary, planLearningGoal, useExistingCourse } from "./_lib/goalPlanningService.js";
 import { resolveGoalLanguage } from "./_lib/goalLanguageAdapter.js";
-import { generateCourseCreatorProposal } from "./_lib/courseCreatorProposal.js";
+import { generateCourseCreatorProposal, isCourseCreatorProviderUnavailable } from "./_lib/courseCreatorProposal.js";
+import { classifyCourseCreatorIntent } from "../src/features/course/creation/courseCreatorIntent.js";
 
 type Row = Record<string, unknown>;
 
@@ -97,7 +98,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       return;
     }
     const session = await ownedSession(client, user.id, sessionId);
-    const messagesResult = await client.from("assistant_messages").select("*").eq("session_id", sessionId).order("created_at").order("id").limit(200);
+    const messagesResult = await client.from("assistant_messages").select("*").eq("session_id", sessionId).order("sequence").limit(200);
     json(response, 200, { ...sessionJson(session), messages: dataOrThrow(messagesResult.data as Row[] | null, messagesResult.error, "Assistant message history").map(messageJson) });
     return;
   }
@@ -113,7 +114,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       if (!goalText || goalText.length > 1000) throw new ApiError(400, "invalid_goal", "A Goal between 1 and 1000 characters is required");
       const session = await getOrCreateSession(client, user.id, body.sessionId, goalText);
       const sessionId = String(session.id);
-      const conversationResult = await client.from("assistant_messages").select("role,content").eq("session_id", sessionId).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(8);
+      const conversationResult = await client.from("assistant_messages").select("role,content").eq("session_id", sessionId).order("sequence", { ascending: false }).limit(8);
       const conversationRows = dataOrThrow(conversationResult.data as Row[] | null, conversationResult.error, "Goal clarification history lookup").reverse();
       const language = await resolveGoalLanguage(client, { goalText, conversationContext: conversationRows.map((row) => ({ role: String(row.role), content: String(row.content) })) });
       if (language.status !== "ready") {
@@ -122,9 +123,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
         json(response, 200, { sessionId, status: language.status, assistantMessage: summary, messageId: String(assistantRow.id) });
         return;
       }
-      const plan = await planLearningGoal(client, goalText, language.candidateKnowledgeIds);
+      const resolvedGoalText = language.primaryOutcome;
+      const plan = await planLearningGoal(client, resolvedGoalText, language.candidateKnowledgeIds);
       const summary = goalPlanSummary(plan);
-      const structuredContent: CourseSearchTimelineContent = { type: "course_search", schemaVersion: 1, planningId: crypto.randomUUID(), goalText, intentSummary: language.intentSummary, plan };
+      const structuredContent: CourseSearchTimelineContent = { type: "course_search", schemaVersion: 1, planningId: crypto.randomUUID(), goalText: resolvedGoalText, intentSummary: language.intentSummary, plan };
       const assistantRow = await persistAssistantExchange(client, sessionId, goalText, summary, context, structuredContent);
       json(response, 200, { sessionId, status: "ready", plan, assistantMessage: summary, messageId: String(assistantRow.id) });
       return;
@@ -136,6 +138,11 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       if (!["requirements", "scope", "structure", "assets", "draft", "publish"].includes(stage)) throw new ApiError(400, "invalid_creator_stage", "Course Creator stage is invalid");
       const briefMessage = await ownedStructuredMessage(client, user.id, body.briefMessageId);
       if (briefMessage.content?.type !== "course_creation_brief") throw new ApiError(409, "course_creation_brief_required", "The selected timeline item is not a Course Creation Brief");
+      const creatorIntent = classifyCourseCreatorIntent(instruction);
+      if (creatorIntent === "navigate") {
+        json(response, 200, { sessionId: String(briefMessage.row.session_id), intent: "navigate" });
+        return;
+      }
       const current = body.current && typeof body.current === "object" && !Array.isArray(body.current) ? body.current as Record<string, unknown> : {};
       const curriculum = current.curriculum && typeof current.curriculum === "object" ? current.curriculum as Record<string, unknown> : {};
       const chapters = Array.isArray(curriculum.chapters) ? curriculum.chapters as Row[] : [];
@@ -143,30 +150,36 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const visibleKnowledge = dataOrThrow(knowledgeResult.data as Row[] | null, knowledgeResult.error, "Course Creator Knowledge catalog lookup").map((row) => ({ id: String(row.id), title: String(row.title), description: String(row.description).slice(0, 600) }));
       let generated;
       try {
-        generated = await generateCourseCreatorProposal({ stage, instruction, brief: briefMessage.content, current, visibleKnowledge, chapterIds: chapters.map((chapter) => String(chapter.id)).filter(Boolean) });
+        generated = await generateCourseCreatorProposal({ stage, instruction, intent: creatorIntent, brief: briefMessage.content, current, visibleKnowledge, chapterIds: chapters.map((chapter) => String(chapter.id)).filter(Boolean) });
       } catch (error) {
         console.error("Course Creator proposal rejected", error instanceof Error ? error.message : "Unknown proposal error");
+        if (isCourseCreatorProviderUnavailable(error)) {
+          throw new ApiError(503, "creator_provider_unavailable", "AI 暂时不可用，当前课程没有发生变化。可以稍后重试。");
+        }
         throw new ApiError(422, "invalid_creator_proposal", "Assistant Proposal 未通过产品边界校验；请缩小调整范围或重试。未应用任何修改。");
       }
       const operations: Array<Record<string, unknown>> = [];
-      if (stage === "requirements") {
+      if (creatorIntent === "edit" && stage === "requirements") {
         if (generated.goal != null) operations.push({ type: "setRequirement", field: "goal", value: generated.goal });
         if (generated.learnerFoundation != null) operations.push({ type: "setRequirement", field: "learnerFoundation", value: generated.learnerFoundation });
         if (generated.timeConstraint != null) operations.push({ type: "setRequirement", field: "timeConstraint", value: generated.timeConstraint });
         if (generated.preferences != null) operations.push({ type: "setPreferences", values: generated.preferences });
       }
-      if (stage === "scope") {
+      if (creatorIntent === "edit" && stage === "scope") {
         (generated.removeKnowledgeIds ?? []).forEach((nodeId) => operations.push({ type: "excludeKnowledge", nodeId }));
         (generated.addKnowledgeIds ?? []).forEach((nodeId) => operations.push({ type: "includeKnowledge", nodeId, role: "optional" }));
       }
-      if (stage === "structure") {
+      if (creatorIntent === "edit" && stage === "structure") {
         (generated.moves ?? []).forEach((move) => operations.push({ type: "moveKnowledge", nodeId: move.nodeId, chapterId: move.chapterId }));
         if (generated.orderedKnowledgeIds?.length) operations.push({ type: "reorderKnowledge", orderedKnowledgeIds: generated.orderedKnowledgeIds });
       }
-      const proposal = { id: crypto.randomUUID(), stage, title: generated.title, summary: generated.summary, operations };
+      if (creatorIntent === "edit" && stage === "assets") {
+        (generated.desiredAssets ?? []).forEach((item) => operations.push({ type: "setDesiredAsset", ...item }));
+      }
+      const proposal = { id: crypto.randomUUID(), kind: creatorIntent, stage, title: generated.title, summary: generated.summary, operations };
       const sessionId = String(briefMessage.row.session_id);
-      await persistAssistantExchange(client, sessionId, instruction, `已准备「${generated.title}」Proposal。请先查看可视化差异和确定性验证，再决定是否 Apply。`, context);
-      json(response, 200, { sessionId, proposal });
+      await persistAssistantExchange(client, sessionId, instruction, creatorIntent === "explain" ? generated.summary : `已准备「${generated.title}」Proposal。请先查看可视化差异和确定性验证，再决定是否 Apply。`, context);
+      json(response, 200, { sessionId, intent: creatorIntent, proposal });
       return;
     }
     const planningMessage = await ownedStructuredMessage(client, user.id, body.planningMessageId);
@@ -176,7 +189,12 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (body.action === "refine-goal") {
       const refinement = typeof body.refinement === "string" ? body.refinement.trim() : "";
       if (!refinement || refinement.length > 1000) throw new ApiError(400, "invalid_refinement", "A refinement between 1 and 1000 characters is required");
-      const language = await resolveGoalLanguage(client, { goalText: snapshot.goalText, previousGoalText: snapshot.goalText, refinement });
+      const language = await resolveGoalLanguage(client, {
+        goalText: snapshot.goalText,
+        previousGoalText: snapshot.goalText,
+        previousKnowledgeIds: targetIds(snapshot),
+        refinement
+      });
       if (language.status !== "ready") {
         const summary = language.status === "clarify" ? language.clarificationQuestion : language.reason;
         const assistantRow = await persistAssistantExchange(client, sessionId, refinement, summary, context);
@@ -234,7 +252,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const touch = await client.from("assistant_sessions").update({ updated_at: now }).eq("id", sessionId).eq("user_id", user.id);
   dataOrThrow(touch.data, touch.error, "Assistant session update");
 
-  const historyResult = await client.from("assistant_messages").select("role,content").eq("session_id", sessionId).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(30);
+  const historyResult = await client.from("assistant_messages").select("role,content").eq("session_id", sessionId).order("sequence", { ascending: false }).limit(30);
   const historyRows = dataOrThrow(historyResult.data as Row[] | null, historyResult.error, "Assistant model history").reverse();
   const messages: ModelMessage[] = historyRows.map((row) => ({ role: String(row.role) as "user" | "assistant", content: String(row.content) }));
   const env = readLlmEnvironment();

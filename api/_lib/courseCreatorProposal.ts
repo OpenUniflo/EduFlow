@@ -13,15 +13,20 @@ const proposalSchema = z.object({
   removeKnowledgeIds: z.array(z.string().trim().min(1)).max(1000).optional(),
   orderedKnowledgeIds: z.array(z.string().trim().min(1)).max(1000).optional(),
   moves: z.array(z.object({ nodeId: z.string().trim().min(1), chapterId: z.string().trim().min(1) })).max(1000).optional()
+  ,desiredAssets: z.array(z.object({ nodeId: z.string().trim().min(1), assetType: z.enum(["material", "micro", "assignment"]), desired: z.boolean() })).max(1000).optional()
 });
 
 export type GeneratedCourseCreatorProposal = z.infer<typeof proposalSchema>;
+
+export function isCourseCreatorProviderUnavailable(error: unknown) {
+  return error instanceof TypeError || (error instanceof Error && /(?:fetch|network|timeout|timed out|ECONN|provider|upstream|socket)/i.test(error.message));
+}
 
 export function parseGeneratedCourseCreatorProposal(value: unknown, allowedKnowledgeIds: ReadonlySet<string>, allowedChapterIds: ReadonlySet<string>) {
   const parsed = proposalSchema.parse(value);
   const knowledgeIds = [
     ...(parsed.addKnowledgeIds ?? []), ...(parsed.removeKnowledgeIds ?? []), ...(parsed.orderedKnowledgeIds ?? []),
-    ...(parsed.moves ?? []).map((move) => move.nodeId)
+    ...(parsed.moves ?? []).map((move) => move.nodeId), ...(parsed.desiredAssets ?? []).map((item) => item.nodeId)
   ];
   const invalidKnowledgeIds = [...new Set(knowledgeIds)].filter((id) => !allowedKnowledgeIds.has(id));
   if (invalidKnowledgeIds.length) throw new Error(`Course Creator proposal references unavailable Knowledge: ${invalidKnowledgeIds.join(", ")}`);
@@ -33,6 +38,7 @@ export function parseGeneratedCourseCreatorProposal(value: unknown, allowedKnowl
 export async function generateCourseCreatorProposal(input: {
   stage: string;
   instruction: string;
+  intent: "explain" | "edit";
   brief: unknown;
   current: unknown;
   visibleKnowledge: Array<{ id: string; title: string; description: string }>;
@@ -40,7 +46,7 @@ export async function generateCourseCreatorProposal(input: {
 }, generator: StructuredGenerationClient = createJsonGenerationClient()) {
   const generated = await generator.generateJson({
     stage: "course-creator-proposal", promptVersion: "course-creator-proposal-v1", schemaVersion: "1", temperature: 0, maxTokens: 1200,
-    system: `You are the proposal adapter inside EduFlow's single Course Creator pipeline. Return JSON only. You never mutate or publish. The product validates and the user must explicitly apply. Use only Knowledge IDs and Chapter IDs supplied by the product. Never turn curriculum order into a Knowledge prerequisite. For requirements, propose only goal/foundation/time/preferences. For scope, use addKnowledgeIds/removeKnowledgeIds; add only visible existing Knowledge. For structure, use orderedKnowledgeIds and moves; do not add or remove Knowledge facts. For assets/draft/publish, explain warnings or recommended edits without claiming that missing assets block creation. Output: {"title":"...","summary":"...","goal"?:"...","learnerFoundation"?:"...","timeConstraint"?:"...","preferences"?:[],"addKnowledgeIds"?:[],"removeKnowledgeIds"?:[],"orderedKnowledgeIds"?:[],"moves"?:[]}.`,
+    system: `You are the proposal adapter inside EduFlow's single Course Creator pipeline. Return JSON only. You never mutate or publish. The product validates and the user must explicitly apply. If intent is explain, answer in title/summary and return no mutation fields. If intent is edit, use only Knowledge IDs and Chapter IDs supplied by the product. Never turn curriculum order into a Knowledge prerequisite. For requirements, propose only goal/foundation/time/preferences. For scope, use addKnowledgeIds/removeKnowledgeIds; add only visible existing Knowledge. For structure, use orderedKnowledgeIds and moves; do not add or remove Knowledge facts. For assets, desiredAssets may mark a Material, Micro, or Assignment as desired for existing scoped Knowledge; this is a plan only and must not claim to create an asset. For draft/publish, explain warnings or recommended edits without claiming that missing assets block creation. Output: {"title":"...","summary":"...","goal"?:"...","learnerFoundation"?:"...","timeConstraint"?:"...","preferences"?:[],"addKnowledgeIds"?:[],"removeKnowledgeIds"?:[],"orderedKnowledgeIds"?:[],"moves"?:[],"desiredAssets"?: [{"nodeId":"...","assetType":"material|micro|assignment","desired":true}]}.`,
     user: JSON.stringify(input)
   });
   const parsed = parseGeneratedCourseCreatorProposal(generated.value, new Set(input.visibleKnowledge.map((item) => item.id)), new Set(input.chapterIds));
@@ -48,11 +54,17 @@ export async function generateCourseCreatorProposal(input: {
   const currentIds = new Set([...(current.scope?.targetKnowledgeIds ?? []), ...(current.scope?.prerequisiteKnowledgeIds ?? []), ...(current.scope?.optionalKnowledgeIds ?? [])]);
   const unique = (ids: string[] | undefined) => [...new Set(ids ?? [])];
   const narrowingScope = input.stage === "scope" && /(?:only|shorter|too much|minimum|保留|太多|缩短|精简|最少|必须)/i.test(input.instruction);
+  if (input.intent === "explain") return {
+    ...parsed,
+    goal: undefined, learnerFoundation: undefined, timeConstraint: undefined, preferences: undefined,
+    addKnowledgeIds: [], removeKnowledgeIds: [], orderedKnowledgeIds: [], moves: [], desiredAssets: []
+  };
   return {
     ...parsed,
     addKnowledgeIds: narrowingScope ? [] : unique(parsed.addKnowledgeIds).filter((id) => !currentIds.has(id)).slice(0, 20),
     removeKnowledgeIds: unique(parsed.removeKnowledgeIds).filter((id) => currentIds.has(id)).slice(0, 20),
     orderedKnowledgeIds: unique(parsed.orderedKnowledgeIds).filter((id) => currentIds.has(id)).slice(0, 80),
-    moves: (parsed.moves ?? []).filter((move, index, values) => currentIds.has(move.nodeId) && values.findIndex((candidate) => candidate.nodeId === move.nodeId) === index).slice(0, 40)
+    moves: (parsed.moves ?? []).filter((move, index, values) => currentIds.has(move.nodeId) && values.findIndex((candidate) => candidate.nodeId === move.nodeId) === index).slice(0, 40),
+    desiredAssets: (parsed.desiredAssets ?? []).filter((item, index, values) => currentIds.has(item.nodeId) && values.findIndex((candidate) => candidate.nodeId === item.nodeId && candidate.assetType === item.assetType) === index).slice(0, 80)
   };
 }

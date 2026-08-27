@@ -158,7 +158,7 @@ describe("GET /api/courses", () => {
     await handler({ method: "PATCH", query: {}, headers: {}, body: { courseId: "empty-draft", lifecycle: "published" } } as VercelRequest, recorder.response);
 
     expect(recorder.statusCode()).toBe(422);
-    expect(recorder.body()).toMatchObject({ error: { code: "course_learning_route_required" } });
+    expect(recorder.body()).toMatchObject({ error: { code: "course_structure_invalid" } });
     tableRows.profiles[0].role = "student";
   });
 
@@ -198,7 +198,7 @@ describe("GET /api/courses", () => {
   it("creates a Personal Draft from an owned Brief without requiring Material", async () => {
     tableRows.assistant_sessions.push({ id: "session", user_id: "learner" });
     tableRows.assistant_messages.push({ id: "brief-message", session_id: "session", structured_content: { type: "course_creation_brief", schemaVersion: 1, briefId: "brief", planningId: "plan", planningMessageId: "plan-message", goal: "Train a model", targetKnowledge: [{ id: "route-knowledge", title: "Route Knowledge", description: "A valid target" }], referenceMaterialIntent: "none" } });
-    serverRpc.mockResolvedValueOnce({ data: [{ course_id: "personal-new-draft" }], error: null });
+    serverRpc.mockResolvedValueOnce({ data: [{ course_id: "personal-new-draft", lifecycle: "draft" }], error: null });
     const recorder = responseRecorder();
     await handler({ method: "POST", query: {}, headers: {}, body: {
       creationBriefMessageId: "brief-message",
@@ -208,7 +208,40 @@ describe("GET /api/courses", () => {
     } } as VercelRequest, recorder.response);
     expect(recorder.statusCode()).toBe(201);
     expect(recorder.body()).toEqual({ courseId: "personal-new-draft", lifecycle: "draft" });
-    expect(serverRpc).toHaveBeenCalledWith("create_personal_course_draft", expect.objectContaining({ p_owner_user_id: "learner", p_source_course_id: null, p_target_knowledge_ids: ["route-knowledge"] }));
+    expect(serverRpc).toHaveBeenCalledWith("create_personal_course_draft_for_brief", expect.objectContaining({ p_owner_user_id: "learner", p_creation_brief_message_id: "brief-message", p_source_course_id: null, p_target_knowledge_ids: ["route-knowledge"] }));
     tableRows.assistant_sessions.pop(); tableRows.assistant_messages.pop();
+  });
+
+  it("resumes the same owner Draft by its Course Creation Brief and hides it from another user", async () => {
+    tableRows.courses.push({ id: "personal-resume", title: "Resume", description: "Owner-only", generation_status: "draft", lifecycle: "draft", course_type: "personal", owner_user_id: "learner", revision: "creator-draft-1", creation_brief_message_id: "brief-resume" });
+    tableRows.course_curricula.push({ course_id: "personal-resume", id: "personal-resume:curriculum", generation_mode: "manual" });
+    tableRows.curriculum_chapters.push({ course_id: "personal-resume", id: "personal-resume:chapter", title: "Route", description: "Route", display_order: 0, color: "#7567e8", outcome: "Goal" });
+    tableRows.curriculum_lessons.push({ course_id: "personal-resume", id: "personal-resume:lesson", chapter_id: "personal-resume:chapter", title: "Route", display_order: 0 });
+    tableRows.curriculum_coverages.push({ course_id: "personal-resume", id: "personal-resume:coverage", lesson_id: "personal-resume:lesson", node_id: "route-knowledge", role: "assess", display_order: 0 });
+    tableRows.course_target_knowledge.push({ course_id: "personal-resume", knowledge_id: "route-knowledge", required: true });
+    const owner = responseRecorder();
+    await handler({ method: "GET", query: { creationBriefMessageId: "brief-resume" }, headers: {} } as unknown as VercelRequest, owner.response);
+    expect(owner.body()).toMatchObject({ courseId: "personal-resume", lifecycle: "draft" });
+    createOptionalUserSupabase.mockResolvedValueOnce({ client: { from: (table: string) => queryResult(tableRows[table] ?? []), storage: { from: () => ({ createSignedUrl: vi.fn() }) } }, user: { id: "other-user" } });
+    const other = responseRecorder();
+    await handler({ method: "GET", query: { creationBriefMessageId: "brief-resume" }, headers: {} } as unknown as VercelRequest, other.response);
+    expect(other.statusCode()).toBe(404);
+    [tableRows.courses, tableRows.course_curricula, tableRows.curriculum_chapters, tableRows.curriculum_lessons, tableRows.curriculum_coverages, tableRows.course_target_knowledge].forEach((rows) => rows.pop());
+  });
+
+  it("activates Personal Course membership on completion without writing Knowledge progress", async () => {
+    tableRows.courses.push({ id: "personal-publish", title: "Personal", description: "Personal", generation_status: "draft", lifecycle: "draft", course_type: "personal", owner_user_id: "learner", revision: "creator-draft-1" });
+    tableRows.course_curricula.push({ course_id: "personal-publish", id: "personal-publish:curriculum", generation_mode: "manual" });
+    tableRows.curriculum_chapters.push({ course_id: "personal-publish", id: "personal-publish:chapter", title: "Route", description: "Route", display_order: 0, color: "#7567e8", outcome: "Goal" });
+    tableRows.curriculum_lessons.push({ course_id: "personal-publish", id: "personal-publish:lesson", chapter_id: "personal-publish:chapter", title: "Route", display_order: 0 });
+    tableRows.curriculum_coverages.push({ course_id: "personal-publish", id: "personal-publish:coverage", lesson_id: "personal-publish:lesson", node_id: "route-knowledge", role: "assess", display_order: 0 });
+    tableRows.course_target_knowledge.push({ course_id: "personal-publish", knowledge_id: "route-knowledge", required: true });
+    const membershipUpsert = vi.fn().mockResolvedValue({ data: null, error: null });
+    createServerSupabase.mockReturnValue({ from: (table: string) => table === "user_course_states" ? { upsert: membershipUpsert } : queryResult(tableRows[table] ?? []), rpc: serverRpc });
+    const recorder = responseRecorder();
+    await handler({ method: "PATCH", query: {}, headers: {}, body: { courseId: "personal-publish", lifecycle: "published" } } as VercelRequest, recorder.response);
+    expect(recorder.statusCode()).toBe(200);
+    expect(membershipUpsert).toHaveBeenCalledWith(expect.objectContaining({ user_id: "learner", course_id: "personal-publish", is_active: true }));
+    [tableRows.courses, tableRows.course_curricula, tableRows.curriculum_chapters, tableRows.curriculum_lessons, tableRows.curriculum_coverages, tableRows.course_target_knowledge].forEach((rows) => rows.pop());
   });
 });

@@ -131,8 +131,16 @@ try {
   // them and persists every Search/Brief result in the owning timeline.
   const goalText = "我想做一个能看我自己的资料，然后根据资料回答问题的东西。";
   const assistantContext = { workspace: "explore", experienceMode: "learn" };
-  const goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", goalText, context: assistantContext });
+  let goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", goalText, context: assistantContext });
   assertStatus(goalPlan, 200, "Assistant Goal planning");
+  if (goalPlan.body.status === "clarify") {
+    goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", sessionId: goalPlan.body.sessionId, goalText: "明确目标：学习 RAG、Reranking 和 Citation，用它们检索私有资料并给出有依据的回答。", context: assistantContext });
+    assertStatus(goalPlan, 200, "Assistant Goal clarification follow-up");
+  }
+  if (goalPlan.body.status === "clarify") {
+    goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", sessionId: goalPlan.body.sessionId, goalText: "是的，先只保留直接完成检索、重排和引用这三个核心成果的学习目标；准备步骤由系统作为必要基础处理。", context: assistantContext });
+    assertStatus(goalPlan, 200, "Assistant Goal semantic-scope follow-up");
+  }
   assert.equal(goalPlan.body.plan.resolution.status, "ready");
   assert.ok(goalPlan.body.plan.resolution.targetKnowledge.length > 0);
   assert.ok(goalPlan.body.plan.resolution.targetKnowledge.every((item: any) => knowledge.body.graph.nodes.some((node: any) => node.id === item.id)), "Goal targets must be existing visible Knowledge IDs");

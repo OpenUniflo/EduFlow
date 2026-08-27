@@ -152,16 +152,17 @@ V1B is implemented as deterministic product logic over real Knowledge identities
 ```text
 targetCoverage   = |T ∩ C| / |T|
 requiredCoverage = |(T ∪ P) ∩ C| / |T ∪ P|
+scopePrecision   = |(T ∪ P) ∩ C| / |C|
 ```
 
-Ordering is `targetCoverage desc`, `requiredCoverage desc`, missing-target count ascending, standard before personal, then stable Course ID. High/medium/low are centralized V1 UX heuristics, not a learning-effect model. Matching exposes:
+Ordering is `targetCoverage desc`, `requiredCoverage desc`, missing-target count ascending, extra-scope count ascending, standard before personal, then stable Course ID. A broad Course cannot receive `high` merely because it contains the required scope: `high` also requires at least 50% scope precision. High/medium/low are centralized V1 UX heuristics, not a learning-effect model. Matching exposes:
 
 - target coverage;
 - required coverage;
 - missing Knowledge;
 - extra Knowledge.
 
-Goal text is a planning request, not an independent Goal lifecycle entity in V1B. The LLM language adapter interprets novice language and may suggest Knowledge IDs, but the product service revalidates every ID against visible active Knowledge. Ambiguous and unsupported Goals terminate explicitly; no Knowledge identity is invented. Prerequisite closure uses only factual `prerequisite` edges and is deterministic, deduplicated, and cycle-reporting.
+Goal text is a planning request, not an independent Goal lifecycle entity in V1B. The LLM language adapter proposes a bounded (at most six) minimal target set with one primary outcome and a direct-outcome reason for every identity. An independent structured semantic check rejects real-but-incoherent IDs, while the product service revalidates every ID against visible active Knowledge. Preference-only refinement deterministically retains the prior validated target identities; only explicit outcome-change language may replace them. Ambiguous and unsupported Goals terminate with clarification rather than scope expansion. Prerequisite closure uses only factual `prerequisite` edges and is deterministic, deduplicated, and cycle-reporting.
 
 High/medium/low are advisory labels only. Every displayed candidate retains Use, Create from this Course, and Compare actions, and every Search result retains Continue Search and Create Personalized Route. Search results and Course Creation Briefs are persisted Assistant timeline messages with stable identities. Refinement appends another result rather than mutating history. Creating a route first collects optional adjustments and reference-material intent, then hands a recoverable Brief to Course Creator; Goal Planner does not write the Course.
 
@@ -175,7 +176,7 @@ A Personal Course may carry fields such as:
 - `owner_user_id`;
 - optional `source_course_id` when derived from an existing Course.
 
-The completed #20 compatibility RPC can transactionally create an immediately usable Published Personal Course, but the user-facing Course Creator does not use that shortcut. It follows the fixed six-stage pipeline and first persists an owner-private `draft` only after Requirements, Scope, Structure, and Asset review. Explicit Publish then makes the validated Course learner-usable. The Course contains target Knowledge plus factual prerequisite closure, stores required destinations in `CourseTargetKnowledge`, and retains `source_course_id` when derived from a reference Course. KnowledgeNode and KnowledgeEdge facts are never copied. Material, Micro, Assignment, Outcome, and FinalProject may remain absent.
+The completed #20 compatibility RPC can transactionally create an immediately usable Published Personal Course, but the user-facing Course Creator does not use that shortcut. It follows the fixed six-stage pipeline and first persists an owner-private `draft` only after Requirements, Scope, Structure, and Asset review. `creation_brief_message_id` is the stable, owner-scoped provenance/recovery key; one Brief can yield at most one Course, concurrent retries are serialized, and a Draft may be updated without changing its Course identity. The persisted Step 5 result waits for learner confirmation before Step 6. Completing creation runs the server structural validator, changes `draft -> published`, and activates owner membership without starting Knowledge or writing mastery. The Course contains target Knowledge plus factual prerequisite closure, stores required destinations in `CourseTargetKnowledge`, and retains `source_course_id` when derived from a reference Course. KnowledgeNode and KnowledgeEdge facts are never copied. Material, Micro, Assignment, Outcome, and FinalProject may remain absent.
 
 The Global Assistant is the authoritative Goal Planner UX. Planning and Brief preparation are read-only with respect to Course data; “use existing” is an explicit authenticated membership action. Course creation requires review in the Course Creator and is never available to the LLM tool loop. This stage does not create a Navigation Engine or formal Next Action.
 

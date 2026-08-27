@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CourseCreationBrief } from "@/features/assistant/assistantContract";
 import type { KnowledgeGraph } from "@/features/knowledge/types";
-import { applyCourseCreatorProposal, createCoursePreviewRuntime, createInitialCourseDesign, invalidateConfirmedThrough, validateCourseCreatorDesign } from "./courseCreator";
+import { applyCourseCreatorProposal, createCoursePreviewRuntime, createInitialCourseDesign, invalidateConfirmedThrough, restoreCourseCreatorDesign, validateCourseCreatorDesign } from "./courseCreator";
 
 const graph: KnowledgeGraph = {
   revisions: [],
@@ -34,16 +34,17 @@ describe("fixed Course Creator pipeline contracts", () => {
     const design = createInitialCourseDesign(brief, graph, null);
     const proposal = { id: "proposal", stage: "requirements" as const, title: "Practice first", summary: "Preview only", operations: [{ type: "setPreferences" as const, values: ["实践优先"] }] };
     expect(design.requirements.preferences).toEqual([]);
-    const next = applyCourseCreatorProposal(design, proposal);
+    const next = applyCourseCreatorProposal(design, proposal, graph);
     expect(design.requirements.preferences).toEqual([]);
     expect(next.requirements.preferences).toEqual(["实践优先"]);
     expect(invalidateConfirmedThrough(4, 1)).toBe(0);
   });
 
-  it("rejects removal of factual prerequisite closure and never changes KnowledgeEdge facts", () => {
+  it("automatically restores factual prerequisite closure and never changes KnowledgeEdge facts", () => {
     const design = createInitialCourseDesign(brief, graph, null);
-    const next = applyCourseCreatorProposal(design, { id: "proposal", stage: "scope", title: "Too short", summary: "Remove foundation", operations: [{ type: "excludeKnowledge", nodeId: "foundation" }] });
-    expect(validateCourseCreatorDesign(next, graph).fatal).toContain("缺少事实前置 Knowledge：foundation");
+    const next = applyCourseCreatorProposal(design, { id: "proposal", stage: "scope", title: "Too short", summary: "Remove foundation", operations: [{ type: "excludeKnowledge", nodeId: "foundation" }] }, graph);
+    expect(next.scope.prerequisiteKnowledgeIds).toEqual(["foundation"]);
+    expect(validateCourseCreatorDesign(next, graph).valid).toBe(true);
     expect(graph.edges).toEqual([{ id: "foundation-target", source: "foundation", target: "target", relation: "prerequisite", strength: "hard", reason: "Foundation is factual prerequisite" }]);
   });
 
@@ -53,5 +54,26 @@ describe("fixed Course Creator pipeline contracts", () => {
     expect(runtime.targetKnowledge).toEqual([{ courseId: "creator-preview", nodeId: "target", required: true }]);
     expect(runtime.materials).toEqual([]);
     expect(runtime.assignments).toEqual([]);
+  });
+
+  it("restores the editable scope and structure from the persisted Draft after refresh", () => {
+    const base = createInitialCourseDesign(brief, graph, null);
+    const edited = applyCourseCreatorProposal(base, { id: "scope", stage: "scope", title: "Keep one option", summary: "Persisted edit", operations: [{ type: "includeKnowledge", nodeId: "extra", role: "optional" }] }, graph);
+    const runtime = createCoursePreviewRuntime({ ...edited, requirements: { ...edited.requirements, goal: "Persisted first model course" } }, "persisted-draft");
+    const restored = restoreCourseCreatorDesign(base, runtime, graph);
+    expect(restored.requirements.goal).toBe("Persisted first model course");
+    expect(restored.scope).toMatchObject({ targetKnowledgeIds: ["target"], prerequisiteKnowledgeIds: ["foundation"], optionalKnowledgeIds: ["extra"] });
+    expect(restored.curriculum.chapters.flatMap((chapter) => chapter.knowledgeIds)).toEqual(edited.curriculum.chapters.flatMap((chapter) => chapter.knowledgeIds));
+  });
+
+  it("separates real reusable coverage from the desired Asset Plan", () => {
+    const source = createCoursePreviewRuntime(createInitialCourseDesign(brief, graph, null), "source");
+    source.materialKnowledgeCoverages = [{ id: "material-map", materialId: "material", segmentId: "segment", nodeId: "target", role: "explain" }];
+    source.assignmentCoverages = [{ id: "assignment-map", assignmentId: "assignment", nodeId: "foundation", role: "practice", required: true }];
+    const design = createInitialCourseDesign(brief, graph, source);
+    expect(design.assets).toMatchObject({ availableMaterialKnowledgeIds: ["target"], availableAssignmentKnowledgeIds: ["foundation"], materialKnowledgeIds: [], assignmentKnowledgeIds: [] });
+    const next = applyCourseCreatorProposal(design, { id: "assets", stage: "assets", title: "Practice", summary: "Plan only", operations: [{ type: "setDesiredAsset", nodeId: "target", assetType: "assignment", desired: true }] }, graph);
+    expect(next.assets.desiredAssignmentKnowledgeIds).toEqual(["target"]);
+    expect(next.assets.assignmentKnowledgeIds).toEqual([]);
   });
 });
