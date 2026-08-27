@@ -38,13 +38,13 @@ Preview uses the existing Vercel `edu-flow` project and Hosted Supabase `Knowled
 Vercel Preview -> Vercel Functions -> Hosted Supabase
 ```
 
-`vercel.json` pins Functions to Vercel `sin1`, matching the Hosted Supabase `ap-southeast-1` region so API/database traffic does not cross continents.
+`vercel.json` pins database-heavy Functions to Vercel `sin1`, matching the Hosted Supabase `ap-southeast-1` region. The existing `api/assistant` Function is the narrow exception and runs in `hkg1`: repeated Hosted acceptance showed the configured model provider's direct route from `sin1` resetting while the same bounded request from `hkg1` completed normally. The exception keeps Course, Knowledge, learner-state, and authoring traffic beside the database while giving the authenticated Assistant a working provider route; it does not add a Function or move data authority.
 
 ### Vercel Function budget
 
 The current `edu-flow` project deploys on Vercel Hobby and is limited to 12 Serverless Functions per deployment. A top-level deployable file under `api/` is a quota-consuming HTTP entrypoint; a rewrite changes its public route but does not consolidate its Function. Tests must live outside Vercel's entrypoint discovery, while reusable libraries and routed handlers remain under non-entrypoint directories such as `api/_lib` and `api/_handlers`.
 
-At the Issue #18 close baseline, the 11 production entrypoints are `course-intent`, `course-mapping`, `course`, `domains`, `health`, `knowledge-generation`, `knowledge`, `learner`, `material-parsing-jobs`, `materials`, and `workflows`. This leaves one Hobby slot reserved before #19. Before adding a Function, run a Vercel build or Preview and inspect the generated Functions; do not infer the count from rewrites or source-file totals alone.
+The 12 production entrypoints are `assistant`, `course-intent`, `course-mapping`, `course`, `domains`, `health`, `knowledge-generation`, `knowledge`, `learner`, `material-parsing-jobs`, `materials`, and `workflows`. The reserved #19 slot is now occupied by the Global Assistant boundary. Before adding or consolidating a Function, run a Vercel build or Preview and inspect the generated Functions; do not infer the count from rewrites or source-file totals alone.
 
 Prefer the existing `course` and `learner` multiplexers when a new route belongs clearly to those domains. Do not add repeated thin wrappers, and do not combine unrelated domains merely to save quota. Function budget is a deployment architecture constraint, not permission to weaken API ownership, authentication, or public-route compatibility.
 

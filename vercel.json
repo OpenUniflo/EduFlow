@@ -6,7 +6,8 @@
       "maxDuration": 300
     },
     "api/assistant.ts": {
-      "maxDuration": 120
+      "maxDuration": 120,
+      "regions": ["hkg1"]
     },
     "api/**/*.ts": {
       "maxDuration": 30
