@@ -1,6 +1,6 @@
 import { apiRequest } from "@/shared/api/apiClient";
 import { supabaseClient } from "@/shared/api/supabaseClient";
-import type { AssistantContextSnapshot, AssistantSession, AssistantSessionDetail } from "./assistantContract";
+import type { AssistantContextSnapshot, AssistantMessage, AssistantSession, AssistantSessionDetail, CourseCreationBrief } from "./assistantContract";
 import type { GoalPlan } from "@/features/course/goal/goalPlanning";
 
 export async function listAssistantSessions() {
@@ -9,6 +9,10 @@ export async function listAssistantSessions() {
 
 export function getAssistantSession(sessionId: string) {
   return apiRequest<AssistantSessionDetail>(`/api/assistant?sessionId=${encodeURIComponent(sessionId)}`);
+}
+
+export async function getAssistantTimelineMessage(messageId: string) {
+  return (await apiRequest<{ message: AssistantMessage }>(`/api/assistant?messageId=${encodeURIComponent(messageId)}`)).message;
 }
 
 export async function streamAssistantMessage(input: { sessionId?: string; message: string; context: AssistantContextSnapshot }, onDelta: (delta: string) => void, onSession?: (sessionId: string) => void) {
@@ -41,16 +45,20 @@ export async function streamAssistantMessage(input: { sessionId?: string; messag
   return { sessionId, text };
 }
 
-type StructuredAssistantResult = { sessionId: string; assistantMessage: string };
+type StructuredAssistantResult = { sessionId: string; assistantMessage: string; messageId?: string; status?: "ready" | "clarify" | "unsupported" };
 
 export function planAssistantGoal(input: { sessionId?: string; goalText: string; context: AssistantContextSnapshot }) {
-  return apiRequest<StructuredAssistantResult & { plan: GoalPlan }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "plan-goal", ...input }) });
+  return apiRequest<StructuredAssistantResult & { plan?: GoalPlan }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "plan-goal", ...input }) });
 }
 
-export function selectAssistantCourse(input: { sessionId?: string; goalText: string; courseId: string; context: AssistantContextSnapshot }) {
+export function refineAssistantGoal(input: { planningMessageId: string; refinement: string; context: AssistantContextSnapshot }) {
+  return apiRequest<StructuredAssistantResult & { plan?: GoalPlan }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "refine-goal", ...input }) });
+}
+
+export function selectAssistantCourse(input: { planningMessageId: string; courseId: string; context: AssistantContextSnapshot }) {
   return apiRequest<StructuredAssistantResult & { courseId: string }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "use-existing-course", ...input }) });
 }
 
-export function confirmAssistantPersonalCourse(input: { sessionId?: string; goalText: string; sourceCourseId?: string; context: AssistantContextSnapshot }) {
-  return apiRequest<StructuredAssistantResult & { courseId: string }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "create-personal-course", ...input }) });
+export function prepareAssistantCourseBrief(input: { planningMessageId: string; sourceCourseId?: string; requestedAdjustments?: string; referenceMaterialIntent: "none" | "upload_in_creator"; context: AssistantContextSnapshot }) {
+  return apiRequest<StructuredAssistantResult & { brief: CourseCreationBrief }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "prepare-course-brief", ...input }) });
 }

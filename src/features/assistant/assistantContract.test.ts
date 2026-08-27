@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAssistantContext } from "./assistantContract";
+import { parseAssistantContext, parseAssistantStructuredContent } from "./assistantContract";
 import { snapshotAssistantContext } from "./assistantContext";
 
 describe("Assistant request contract", () => {
@@ -18,5 +18,19 @@ describe("Assistant request contract", () => {
 
   it("ignores browser-supplied user authority fields", () => {
     expect(parseAssistantContext({ workspace: "messages", experienceMode: "learn", userId: "someone-else", capabilities: ["global-domain-admin"] })).toEqual({ workspace: "messages", experienceMode: "learn" });
+  });
+});
+
+describe("Assistant structured timeline contract", () => {
+  it("parses recoverable Course Search and Brief cards", () => {
+    const search = parseAssistantStructuredContent({ type: "course_search", schemaVersion: 1, planningId: "planning-1", goalText: "Build an AI", intentSummary: "Build an AI", plan: { resolution: { status: "ready", goalText: "Build an AI", targetKnowledge: [], candidates: [] }, prerequisiteKnowledge: [], prerequisiteCycleDetected: false, matches: [] } });
+    expect(search?.type).toBe("course_search");
+    const brief = parseAssistantStructuredContent({ type: "course_creation_brief", schemaVersion: 1, briefId: "brief-1", planningId: "planning-1", planningMessageId: "message-1", goal: "Build an AI", targetKnowledge: [], referenceMaterialIntent: "none" });
+    expect(brief).toMatchObject({ type: "course_creation_brief", planningMessageId: "message-1", referenceMaterialIntent: "none" });
+  });
+
+  it("rejects malformed and future structured content", () => {
+    expect(() => parseAssistantStructuredContent({ type: "course_search", schemaVersion: 2 })).toThrow();
+    expect(() => parseAssistantStructuredContent({ type: "course_creation_brief", schemaVersion: 1, briefId: "brief" })).toThrow();
   });
 });

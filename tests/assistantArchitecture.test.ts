@@ -23,6 +23,16 @@ describe("Global Assistant architecture", () => {
     expect(migration).toContain("auth.uid()");
   });
 
+  it("persists structured timeline content under the existing message RLS", () => {
+    const migration = read("supabase/migrations/20260827180000_assistant_structured_timeline.sql");
+    const source = read("api/assistant.ts");
+    expect(migration).toContain("add column structured_content jsonb");
+    expect(source).toContain("planningMessageId");
+    expect(source).toContain('body.action === "refine-goal"');
+    expect(source).toContain('body.action === "prepare-course-brief"');
+    expect(source).not.toContain('body.action === "create-personal-course"');
+  });
+
   it("keeps Next Action authority outside the LLM", () => {
     expect(read("api/assistant.ts")).toContain("There is no authoritative Navigation Engine");
   });

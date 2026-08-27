@@ -26,6 +26,9 @@
 - `CourseTargetKnowledge` is the structured Course destination and MUST remain distinct from optional human-readable `targetOutcome`. Standard and Personal Courses share the Course domain, repository, graph projection, and routes.
 - A Personal Course is learner-owned, owner-visible only, structurally valid, and immediately usable. It MAY project a minimal curriculum from an existing Course or shared Knowledge, but MUST NOT copy KnowledgeNode or KnowledgeEdge facts and MUST NOT require fabricated Material, Micro, Assignment, Outcome, or FinalProject assets.
 - Selecting an existing Course and creating a Personal Course are explicit authenticated learner actions. The LLM tool loop MUST NOT perform the Personal Course write, and Goal planning MUST NOT manufacture a formal Next Action before the Navigation Engine exists.
+- Learner-facing Course Search results and Course Creation Briefs MUST be persisted at their conversation position as structured Assistant timeline content. A session MAY contain multiple independent planning results and MUST NOT use one global mutable Goal Plan as historical UI authority.
+- Course match levels and coverage metrics are advisory ranking/explanation signals. They MUST NOT remove the learner's ability to use a displayed Course, create from it, continue searching, or prepare a personalized Course route.
+- Goal Planner MUST hand creation to the Course creation domain through a recoverable Course Creation Brief. The Assistant tool loop MUST NOT silently create a Personal Course, and novice-language acceptance MUST NOT be satisfied with test-specific phrase mappings or Knowledge/Course fixtures.
 
 ## Anonymous Viewing and Progressive Auth
 

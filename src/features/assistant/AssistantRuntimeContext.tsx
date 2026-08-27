@@ -1,8 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { MockSession } from "@/features/auth/types";
 import type { AssistantContextSnapshot, AssistantMessage, AssistantSession } from "./assistantContract";
-import { confirmAssistantPersonalCourse, getAssistantSession, listAssistantSessions, planAssistantGoal, selectAssistantCourse, streamAssistantMessage } from "./assistantClient";
-import type { GoalPlan } from "@/features/course/goal/goalPlanning";
+import { getAssistantSession, listAssistantSessions, planAssistantGoal, prepareAssistantCourseBrief, refineAssistantGoal, selectAssistantCourse, streamAssistantMessage } from "./assistantClient";
 
 type RuntimeValue = {
   sessions: AssistantSession[];
@@ -11,14 +10,12 @@ type RuntimeValue = {
   loading: boolean;
   sending: boolean;
   error: string;
-  goalPlan: GoalPlan | null;
-  goalText: string;
   selectSession(sessionId: string | null): Promise<void>;
   send(message: string, context: AssistantContextSnapshot): Promise<void>;
   planGoal(goalText: string, context: AssistantContextSnapshot): Promise<void>;
-  useExistingCourse(courseId: string, context: AssistantContextSnapshot): Promise<string>;
-  createPersonalCourse(sourceCourseId: string | undefined, context: AssistantContextSnapshot): Promise<string>;
-  clearGoalPlan(): void;
+  refineGoal(planningMessageId: string, refinement: string, context: AssistantContextSnapshot): Promise<void>;
+  useExistingCourse(planningMessageId: string, courseId: string, context: AssistantContextSnapshot): Promise<string>;
+  prepareCourseBrief(input: { planningMessageId: string; sourceCourseId?: string; requestedAdjustments?: string; referenceMaterialIntent: "none" | "upload_in_creator" }, context: AssistantContextSnapshot): Promise<void>;
   reloadSessions(): Promise<AssistantSession[]>;
 };
 
@@ -32,8 +29,6 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const [goalPlan, setGoalPlan] = useState<GoalPlan | null>(null);
-  const [goalText, setGoalText] = useState("");
 
   const reloadSessions = useCallback(async () => {
     const next = await listAssistantSessions();
@@ -44,7 +39,6 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   const selectSession = useCallback(async (sessionId: string | null) => {
     setError("");
     setActiveSessionId(sessionId);
-    setGoalPlan(null); setGoalText("");
     if (!sessionId) {
       window.localStorage.removeItem(storageKey);
       setMessages([]);
@@ -110,37 +104,41 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     setSending(true); setError("");
     try {
       const result = await planAssistantGoal({ sessionId: activeSessionId ?? undefined, goalText: nextGoal, context });
-      setGoalText(nextGoal); setGoalPlan(result.plan);
       await reloadStructuredSession(result.sessionId);
     } catch (planningError) { setError(planningError instanceof Error ? planningError.message : "学习目标规划失败"); }
     finally { setSending(false); }
   }, [activeSessionId, reloadStructuredSession, sending]);
 
-  const useExistingCourse = useCallback(async (courseId: string, context: AssistantContextSnapshot) => {
-    if (!goalText || sending) throw new Error("学习目标规划尚未完成");
+  const refineGoal = useCallback(async (planningMessageId: string, refinement: string, context: AssistantContextSnapshot) => {
+    if (!refinement.trim() || sending) return;
+    setSending(true); setError("");
+    try { const result = await refineAssistantGoal({ planningMessageId, refinement: refinement.trim(), context }); await reloadStructuredSession(result.sessionId); }
+    catch (refinementError) { setError(refinementError instanceof Error ? refinementError.message : "继续寻找失败"); }
+    finally { setSending(false); }
+  }, [reloadStructuredSession, sending]);
+
+  const useExistingCourse = useCallback(async (planningMessageId: string, courseId: string, context: AssistantContextSnapshot) => {
+    if (sending) throw new Error("Assistant 正在处理另一项请求");
     setSending(true); setError("");
     try {
-      const result = await selectAssistantCourse({ sessionId: activeSessionId ?? undefined, goalText, courseId, context });
+      const result = await selectAssistantCourse({ planningMessageId, courseId, context });
       await reloadStructuredSession(result.sessionId);
       return result.courseId;
     } catch (selectionError) { const message = selectionError instanceof Error ? selectionError.message : "课程选择失败"; setError(message); throw selectionError; }
     finally { setSending(false); }
-  }, [activeSessionId, goalText, reloadStructuredSession, sending]);
+  }, [reloadStructuredSession, sending]);
 
-  const createPersonalCourse = useCallback(async (sourceCourseId: string | undefined, context: AssistantContextSnapshot) => {
-    if (!goalText || sending) throw new Error("学习目标规划尚未完成");
+  const prepareCourseBrief = useCallback(async (input: { planningMessageId: string; sourceCourseId?: string; requestedAdjustments?: string; referenceMaterialIntent: "none" | "upload_in_creator" }, context: AssistantContextSnapshot) => {
+    if (sending) throw new Error("Assistant 正在处理另一项请求");
     setSending(true); setError("");
     try {
-      const result = await confirmAssistantPersonalCourse({ sessionId: activeSessionId ?? undefined, goalText, sourceCourseId, context });
+      const result = await prepareAssistantCourseBrief({ ...input, context });
       await reloadStructuredSession(result.sessionId);
-      return result.courseId;
-    } catch (creationError) { const message = creationError instanceof Error ? creationError.message : "个人课程创建失败"; setError(message); throw creationError; }
+    } catch (creationError) { const message = creationError instanceof Error ? creationError.message : "创建需求整理失败"; setError(message); throw creationError; }
     finally { setSending(false); }
-  }, [activeSessionId, goalText, reloadStructuredSession, sending]);
+  }, [reloadStructuredSession, sending]);
 
-  const clearGoalPlan = useCallback(() => { setGoalPlan(null); setGoalText(""); }, []);
-
-  const value = useMemo<RuntimeValue>(() => ({ sessions, activeSessionId, messages, loading, sending, error, goalPlan, goalText, selectSession, send, planGoal, useExistingCourse, createPersonalCourse, clearGoalPlan, reloadSessions }), [activeSessionId, clearGoalPlan, createPersonalCourse, error, goalPlan, goalText, loading, messages, planGoal, reloadSessions, selectSession, send, sending, sessions, useExistingCourse]);
+  const value = useMemo<RuntimeValue>(() => ({ sessions, activeSessionId, messages, loading, sending, error, selectSession, send, planGoal, refineGoal, useExistingCourse, prepareCourseBrief, reloadSessions }), [activeSessionId, error, loading, messages, planGoal, prepareCourseBrief, refineGoal, reloadSessions, selectSession, send, sending, sessions, useExistingCourse]);
   return <AssistantRuntimeContext.Provider value={value}>{children}</AssistantRuntimeContext.Provider>;
 }
 

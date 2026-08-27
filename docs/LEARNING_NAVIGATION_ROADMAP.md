@@ -136,9 +136,11 @@ Goal
   -> prerequisite closure
   -> search existing accessible Courses
   -> calculate match / gaps
-  -> recommend an existing Course when suitable
-  -> optionally customize a close Course
-  -> create a new Personal Course only when needed
+  -> rank and explain existing Course candidates
+  -> let the learner use, create from, or reject any candidate
+  -> continue searching when requested
+  -> prepare a Course Creation Brief when a new scope is wanted
+  -> hand the Brief to Course Creator for review and creation
 ```
 
 A Course without `targetOutcome` may still participate in matching through its actual Knowledge scope. When a goal-driven flow requires an explicit target, Goal Resolution supplies that target independently rather than treating missing Course metadata as structural invalidity.
@@ -159,7 +161,9 @@ Ordering is `targetCoverage desc`, `requiredCoverage desc`, missing-target count
 - missing Knowledge;
 - extra Knowledge.
 
-Goal text is a request, not a persisted entity in V1B. A small language adapter may suggest Knowledge IDs, but the product service revalidates every ID against visible active Knowledge. Ambiguous and unsupported Goals terminate explicitly; no Knowledge identity is invented. Prerequisite closure uses only factual `prerequisite` edges and is deterministic, deduplicated, and cycle-reporting.
+Goal text is a planning request, not an independent Goal lifecycle entity in V1B. The LLM language adapter interprets novice language and may suggest Knowledge IDs, but the product service revalidates every ID against visible active Knowledge. Ambiguous and unsupported Goals terminate explicitly; no Knowledge identity is invented. Prerequisite closure uses only factual `prerequisite` edges and is deterministic, deduplicated, and cycle-reporting.
+
+High/medium/low are advisory labels only. Every displayed candidate retains Use, Create from this Course, and Compare actions, and every Search result retains Continue Search and Create Personalized Route. Search results and Course Creation Briefs are persisted Assistant timeline messages with stable identities. Refinement appends another result rather than mutating history. Creating a route first collects optional adjustments and reference-material intent, then hands a recoverable Brief to Course Creator; Goal Planner does not write the Course.
 
 ### Personal Course
 
@@ -173,7 +177,7 @@ A Personal Course may carry fields such as:
 
 The implemented Personal Course is transactionally created as a structurally valid, immediately usable `published` Course owned by the learner. It contains a minimal curriculum projection of target Knowledge plus factual prerequisite closure, stores required destinations in `CourseTargetKnowledge`, and activates the explicit learner membership. A derived Personal Course retains `source_course_id`; a Course built directly from shared Knowledge leaves it null. KnowledgeNode and KnowledgeEdge facts are never copied. Material, Micro, Assignment, Outcome, and FinalProject may remain absent.
 
-The Global Assistant is the authoritative UX. Planning is read-only; “use existing” and Personal Course creation are structured authenticated actions. Creation requires an explicit preview/confirmation and is never available to the LLM tool loop. This stage does not create a Navigation Engine or formal Next Action.
+The Global Assistant is the authoritative Goal Planner UX. Planning and Brief preparation are read-only with respect to Course data; “use existing” is an explicit authenticated membership action. Course creation requires review in the Course Creator and is never available to the LLM tool loop. This stage does not create a Navigation Engine or formal Next Action.
 
 ## 5. Navigation Engine
 
@@ -322,7 +326,7 @@ Tasks:
 - create Personal Course from an existing Course when requested;
 - create a Personal Course from shared Knowledge when no existing Course is suitable.
 
-Status: implemented in Issue #20. Goal history, NavigationDecision, dynamic Learning Path, Attempts, and learned ranking remain deferred.
+Status: implemented in Issue #20, including persisted multi-result Goal Planner timeline and Course Creator Brief handoff. Independent Goal lifecycle, NavigationDecision, dynamic Learning Path, Attempts, and learned ranking remain deferred.
 
 ### V1C — Rule Navigation
 

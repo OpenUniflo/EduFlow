@@ -41,11 +41,11 @@ export async function planLearningGoal(client: SupabaseClient, goalText: string,
   return { resolution, prerequisiteKnowledge, prerequisiteCycleDetected: closure.cycleDetected, matches };
 }
 
-export async function useExistingCourse(client: SupabaseClient, user: User, input: { goalText: string; courseId: string }) {
-  const plan = await planLearningGoal(client, input.goalText);
+export async function useExistingCourse(client: SupabaseClient, user: User, input: { goalText: string; courseId: string; candidateKnowledgeIds?: string[] }) {
+  const plan = await planLearningGoal(client, input.goalText, input.candidateKnowledgeIds);
   if (plan.resolution.status !== "ready" || plan.prerequisiteCycleDetected) throw new ApiError(409, "goal_not_ready", "The learning goal is not ready for Course selection");
   const match = plan.matches.find((candidate) => candidate.courseId === input.courseId);
-  if (!match || match.level === "low") throw new ApiError(409, "course_match_not_suitable", "The selected Course is not a suitable existing Course match");
+  if (!match) throw new ApiError(404, "course_not_available", "The selected Course is unavailable");
   const write = await client.from("user_course_states").upsert({ user_id: user.id, course_id: input.courseId, is_active: true, updated_at: new Date().toISOString() });
   dataOrThrow(write.data, write.error, "Goal existing Course membership activation");
   return { courseId: input.courseId, match };
@@ -57,7 +57,7 @@ export async function createPersonalCourse(server: SupabaseClient, client: Supab
   if (plan.prerequisiteCycleDetected) throw new ApiError(409, "goal_prerequisite_cycle", "The factual prerequisite graph contains a cycle for this goal");
   if (input.sourceCourseId) {
     const source = plan.matches.find((candidate) => candidate.courseId === input.sourceCourseId);
-    if (!source || source.level === "low") throw new ApiError(409, "personal_course_source_unsuitable", "The selected source Course is unavailable or does not cover enough of the goal");
+    if (!source) throw new ApiError(404, "personal_course_source_unavailable", "The selected source Course is unavailable");
   }
   const targetIds = plan.resolution.targetKnowledge.map((item) => item.id);
   const orderedIds = [...plan.prerequisiteKnowledge.map((item) => item.id), ...targetIds.filter((id) => !plan.prerequisiteKnowledge.some((item) => item.id === id))];

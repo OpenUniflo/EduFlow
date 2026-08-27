@@ -1,13 +1,14 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { stepCountIs, streamText, type ModelMessage } from "ai";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { parseAssistantContext, type AssistantContextSnapshot } from "../src/features/assistant/assistantContract.js";
+import { parseAssistantContext, parseAssistantStructuredContent, type AssistantContextSnapshot, type AssistantStructuredContent, type CourseCreationBrief, type CourseSearchTimelineContent } from "../src/features/assistant/assistantContract.js";
 import { createAssistantTools } from "./_lib/assistantTools.js";
 import { readLlmEnvironment } from "./_lib/env.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
 import { dataOrThrow } from "./_lib/query.js";
-import { createServerSupabase, createUserSupabase } from "./_lib/supabase.js";
-import { createPersonalCourse, goalPlanSummary, planLearningGoal, useExistingCourse } from "./_lib/goalPlanningService.js";
+import { createUserSupabase } from "./_lib/supabase.js";
+import { goalPlanSummary, planLearningGoal, useExistingCourse } from "./_lib/goalPlanningService.js";
+import { resolveGoalLanguage } from "./_lib/goalLanguageAdapter.js";
 
 type Row = Record<string, unknown>;
 
@@ -26,7 +27,7 @@ function sessionJson(row: Row) {
 }
 
 function messageJson(row: Row) {
-  return { id: String(row.id), sessionId: String(row.session_id), role: String(row.role), content: String(row.content), context: row.context_snapshot, createdAt: String(row.created_at) };
+  return { id: String(row.id), sessionId: String(row.session_id), role: String(row.role), content: String(row.content), structuredContent: parseAssistantStructuredContent(row.structured_content), context: row.context_snapshot, createdAt: String(row.created_at) };
 }
 
 async function ownedSession(client: Awaited<ReturnType<typeof createUserSupabase>>["client"], userId: string, sessionId: string) {
@@ -42,19 +43,49 @@ async function getOrCreateSession(client: Awaited<ReturnType<typeof createUserSu
   return dataOrThrow(result.data as Row | null, result.error, "Assistant session creation");
 }
 
-async function persistAssistantExchange(client: Awaited<ReturnType<typeof createUserSupabase>>["client"], sessionId: string, userContent: string, assistantContent: string, context: AssistantContextSnapshot) {
-  const write = await client.from("assistant_messages").insert([
-    { session_id: sessionId, role: "user", content: userContent, context_snapshot: context },
-    { session_id: sessionId, role: "assistant", content: assistantContent, context_snapshot: context }
-  ]);
-  dataOrThrow(write.data, write.error, "Assistant structured exchange write");
+async function persistAssistantExchange(client: Awaited<ReturnType<typeof createUserSupabase>>["client"], sessionId: string, userContent: string, assistantContent: string, context: AssistantContextSnapshot, structuredContent?: AssistantStructuredContent) {
+  const userWrite = await client.from("assistant_messages").insert({ session_id: sessionId, role: "user", content: userContent, context_snapshot: context });
+  dataOrThrow(userWrite.data, userWrite.error, "Assistant structured user message write");
+  const assistantWrite = await client.from("assistant_messages").insert({ session_id: sessionId, role: "assistant", content: assistantContent, structured_content: structuredContent ?? null, context_snapshot: context }).select("*").single();
+  const assistantMessage = dataOrThrow(assistantWrite.data as Row | null, assistantWrite.error, "Assistant structured response write");
   const touch = await client.from("assistant_sessions").update({ updated_at: new Date().toISOString() }).eq("id", sessionId);
   dataOrThrow(touch.data, touch.error, "Assistant structured session update");
+  return assistantMessage;
+}
+
+async function ownedStructuredMessage(client: Awaited<ReturnType<typeof createUserSupabase>>["client"], userId: string, messageId: unknown) {
+  if (typeof messageId !== "string" || !messageId.trim()) throw new ApiError(400, "planning_message_required", "A planning message identity is required");
+  const result = await client.from("assistant_messages").select("*").eq("id", messageId.trim()).maybeSingle();
+  const row = dataOrThrow(result.data as Row | null, result.error, "Assistant structured message lookup");
+  if (!row) throw new ApiError(404, "assistant_message_not_found", "Assistant timeline item not found");
+  await ownedSession(client, userId, String(row.session_id));
+  return { row, content: parseAssistantStructuredContent(row.structured_content) };
+}
+
+function courseSearchContent(content: AssistantStructuredContent | undefined): CourseSearchTimelineContent {
+  if (content?.type !== "course_search") throw new ApiError(409, "planning_snapshot_required", "The selected timeline item is not a Course Search result");
+  return content;
+}
+
+function targetIds(content: CourseSearchTimelineContent) {
+  return content.plan.resolution.status === "ready" ? content.plan.resolution.targetKnowledge.map((item) => item.id) : [];
+}
+
+async function currentPlanForCard(client: Awaited<ReturnType<typeof createUserSupabase>>["client"], content: CourseSearchTimelineContent) {
+  const ids = targetIds(content);
+  if (!ids.length) throw new ApiError(409, "goal_not_ready", "This Goal result has no validated Knowledge targets");
+  return planLearningGoal(client, content.goalText, ids);
 }
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   const { client, user } = await createUserSupabase(request);
   if (request.method === "GET") {
+    const messageId = typeof request.query.messageId === "string" ? request.query.messageId : undefined;
+    if (messageId) {
+      const message = await ownedStructuredMessage(client, user.id, messageId);
+      json(response, 200, { message: messageJson(message.row) });
+      return;
+    }
     const sessionId = typeof request.query.sessionId === "string" ? request.query.sessionId : undefined;
     if (!sessionId) {
       const result = await client.from("assistant_sessions").select("*").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(50);
@@ -68,36 +99,78 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   }
   if (request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
 
-  const body = request.body as { action?: unknown; sessionId?: unknown; message?: unknown; goalText?: unknown; courseId?: unknown; sourceCourseId?: unknown; context?: unknown };
+  const body = request.body as { action?: unknown; sessionId?: unknown; message?: unknown; planningMessageId?: unknown; goalText?: unknown; refinement?: unknown; courseId?: unknown; sourceCourseId?: unknown; requestedAdjustments?: unknown; referenceMaterialIntent?: unknown; context?: unknown };
   if (typeof body.action === "string") {
     let context: AssistantContextSnapshot;
     try { context = parseAssistantContext(body.context); }
     catch (error) { throw new ApiError(400, "invalid_assistant_context", error instanceof Error ? error.message : "Assistant context is invalid"); }
-    const goalText = typeof body.goalText === "string" ? body.goalText.trim() : "";
-    if (!goalText || goalText.length > 1000) throw new ApiError(400, "invalid_goal", "A Goal between 1 and 1000 characters is required");
-    const session = await getOrCreateSession(client, user.id, body.sessionId, goalText);
-    const sessionId = String(session.id);
     if (body.action === "plan-goal") {
-      const plan = await planLearningGoal(client, goalText);
+      const goalText = typeof body.goalText === "string" ? body.goalText.trim() : "";
+      if (!goalText || goalText.length > 1000) throw new ApiError(400, "invalid_goal", "A Goal between 1 and 1000 characters is required");
+      const session = await getOrCreateSession(client, user.id, body.sessionId, goalText);
+      const sessionId = String(session.id);
+      const conversationResult = await client.from("assistant_messages").select("role,content").eq("session_id", sessionId).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(8);
+      const conversationRows = dataOrThrow(conversationResult.data as Row[] | null, conversationResult.error, "Goal clarification history lookup").reverse();
+      const language = await resolveGoalLanguage(client, { goalText, conversationContext: conversationRows.map((row) => ({ role: String(row.role), content: String(row.content) })) });
+      if (language.status !== "ready") {
+        const summary = language.status === "clarify" ? language.clarificationQuestion : language.reason;
+        const assistantRow = await persistAssistantExchange(client, sessionId, goalText, summary, context);
+        json(response, 200, { sessionId, status: language.status, assistantMessage: summary, messageId: String(assistantRow.id) });
+        return;
+      }
+      const plan = await planLearningGoal(client, goalText, language.candidateKnowledgeIds);
       const summary = goalPlanSummary(plan);
-      await persistAssistantExchange(client, sessionId, goalText, summary, context);
-      json(response, 200, { sessionId, plan, assistantMessage: summary });
+      const structuredContent: CourseSearchTimelineContent = { type: "course_search", schemaVersion: 1, planningId: crypto.randomUUID(), goalText, intentSummary: language.intentSummary, plan };
+      const assistantRow = await persistAssistantExchange(client, sessionId, goalText, summary, context, structuredContent);
+      json(response, 200, { sessionId, status: "ready", plan, assistantMessage: summary, messageId: String(assistantRow.id) });
+      return;
+    }
+    const planningMessage = await ownedStructuredMessage(client, user.id, body.planningMessageId);
+    const snapshot = courseSearchContent(planningMessage.content);
+    const session = await ownedSession(client, user.id, String(planningMessage.row.session_id));
+    const sessionId = String(session.id);
+    if (body.action === "refine-goal") {
+      const refinement = typeof body.refinement === "string" ? body.refinement.trim() : "";
+      if (!refinement || refinement.length > 1000) throw new ApiError(400, "invalid_refinement", "A refinement between 1 and 1000 characters is required");
+      const language = await resolveGoalLanguage(client, { goalText: `${snapshot.goalText}\n用户对结果的反馈：${refinement}`, previousGoalText: snapshot.goalText, refinement });
+      if (language.status !== "ready") {
+        const summary = language.status === "clarify" ? language.clarificationQuestion : language.reason;
+        const assistantRow = await persistAssistantExchange(client, sessionId, refinement, summary, context);
+        json(response, 200, { sessionId, status: language.status, assistantMessage: summary, messageId: String(assistantRow.id) });
+        return;
+      }
+      const refinedGoal = `${snapshot.goalText}\n偏好调整：${refinement}`;
+      const plan = await planLearningGoal(client, refinedGoal, language.candidateKnowledgeIds);
+      const summary = goalPlanSummary(plan);
+      const structuredContent: CourseSearchTimelineContent = { type: "course_search", schemaVersion: 1, planningId: crypto.randomUUID(), goalText: refinedGoal, intentSummary: language.intentSummary, refinement, refinedFromPlanningId: snapshot.planningId, plan };
+      const assistantRow = await persistAssistantExchange(client, sessionId, refinement, summary, context, structuredContent);
+      json(response, 200, { sessionId, status: "ready", plan, assistantMessage: summary, messageId: String(assistantRow.id) });
       return;
     }
     if (body.action === "use-existing-course") {
       if (typeof body.courseId !== "string" || !body.courseId.trim()) throw new ApiError(400, "course_id_required", "courseId is required");
-      const selection = await useExistingCourse(client, user, { goalText, courseId: body.courseId.trim() });
+      const selection = await useExistingCourse(client, user, { goalText: snapshot.goalText, courseId: body.courseId.trim(), candidateKnowledgeIds: targetIds(snapshot) });
       const summary = `已将现有课程「${selection.match.courseTitle}」加入我的课程；未复制 Course identity。`;
       await persistAssistantExchange(client, sessionId, `使用现有课程：${selection.match.courseTitle}`, summary, context);
       json(response, 200, { sessionId, courseId: selection.courseId, assistantMessage: summary });
       return;
     }
-    if (body.action === "create-personal-course") {
+    if (body.action === "prepare-course-brief") {
       const sourceCourseId = typeof body.sourceCourseId === "string" && body.sourceCourseId.trim() ? body.sourceCourseId.trim() : undefined;
-      const created = await createPersonalCourse(createServerSupabase(), client, user, { goalText, sourceCourseId });
-      const summary = sourceCourseId ? "已按确认的目标范围创建个人课程，并保留来源课程 provenance。" : "已按确认的目标 Knowledge 与事实前置范围创建个人课程。";
-      await persistAssistantExchange(client, sessionId, sourceCourseId ? `确认基于课程 ${sourceCourseId} 定制` : "确认创建个人课程", summary, context);
-      json(response, 201, { sessionId, courseId: created.courseId, assistantMessage: summary });
+      const requestedAdjustments = typeof body.requestedAdjustments === "string" && body.requestedAdjustments.trim() ? body.requestedAdjustments.trim().slice(0, 2000) : undefined;
+      if (body.referenceMaterialIntent !== "none" && body.referenceMaterialIntent !== "upload_in_creator") throw new ApiError(400, "invalid_reference_material_intent", "Reference material intent is invalid");
+      const plan = await currentPlanForCard(client, snapshot);
+      if (sourceCourseId && !plan.matches.some((candidate) => candidate.courseId === sourceCourseId)) throw new ApiError(404, "source_course_unavailable", "The source Course is unavailable");
+      const brief: CourseCreationBrief = {
+        type: "course_creation_brief", schemaVersion: 1, briefId: crypto.randomUUID(), planningId: snapshot.planningId, planningMessageId: String(planningMessage.row.id),
+        goal: snapshot.goalText, ...(sourceCourseId ? { sourceCourseId } : {}),
+        targetKnowledge: plan.resolution.status === "ready" ? plan.resolution.targetKnowledge : [],
+        ...(requestedAdjustments ? { requestedAdjustments } : {}), referenceMaterialIntent: body.referenceMaterialIntent
+      };
+      const userContent = sourceCourseId ? `基于课程 ${sourceCourseId} 准备创建需求` : "准备个性化学习路线的创建需求";
+      const summary = "我整理好了你的 Course Creation Brief。你可以继续修改，或进入课程创建页面检查后再创建。";
+      const assistantRow = await persistAssistantExchange(client, sessionId, userContent, summary, context, brief);
+      json(response, 201, { sessionId, brief, messageId: String(assistantRow.id), assistantMessage: summary });
       return;
     }
     throw new ApiError(400, "invalid_assistant_action", "Assistant action is invalid");

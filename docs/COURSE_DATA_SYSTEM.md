@@ -175,6 +175,8 @@ Automatic arbitrary material -> Course generation is **not required** for the cu
 
 Goal-driven Personal Course creation should prefer selecting/projecting shared Knowledge and should not require Material, Micro, Assignment, or PPT generation.
 
+Goal Planner does not itself create a Personal Course. It persists a `CourseCreationBrief` in the owning Assistant timeline and hands the Creator only the owning message reference. The minimum Brief contains the Goal, validated target Knowledge snapshot, optional readable `sourceCourseId`, optional requested adjustments, and optional reference-material intent. Reference Material is never a creation prerequisite. The Course Creator re-reads the Brief through the authenticated Assistant boundary before any Course-domain write.
+
 ## 11. Standard and Personal Course
 
 Standard and Personal Courses use the same Course domain concept.

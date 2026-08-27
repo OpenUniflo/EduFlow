@@ -2,76 +2,116 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createUserSupabase = vi.hoisted(() => vi.fn());
-const createServerSupabase = vi.hoisted(() => vi.fn());
 const planLearningGoal = vi.hoisted(() => vi.fn());
 const useExistingCourse = vi.hoisted(() => vi.fn());
-const createPersonalCourse = vi.hoisted(() => vi.fn());
-vi.mock("../../api/_lib/supabase.js", () => ({ createUserSupabase, createServerSupabase }));
+const resolveGoalLanguage = vi.hoisted(() => vi.fn());
+vi.mock("../../api/_lib/supabase.js", () => ({ createUserSupabase }));
 vi.mock("../../api/_lib/goalPlanningService.js", () => ({
-  planLearningGoal,
-  useExistingCourse,
-  createPersonalCourse,
-  goalPlanSummary: () => "Structured Goal summary"
+  planLearningGoal, useExistingCourse, createPersonalCourse: vi.fn(), goalPlanSummary: () => "Structured Goal summary"
 }));
+vi.mock("../../api/_lib/goalLanguageAdapter.js", () => ({ resolveGoalLanguage }));
 
 import handler from "../../api/assistant";
 
 const context = { workspace: "explore", experienceMode: "learn" };
-const plan = { resolution: { status: "ready", goalText: "Agent", targetKnowledge: [{ id: "A", title: "Agent", description: "Agent" }], candidates: [] }, prerequisiteKnowledge: [], prerequisiteCycleDetected: false, matches: [] };
+const plan = { resolution: { status: "ready", goalText: "Agent", targetKnowledge: [{ id: "A", title: "Agent", description: "Agent" }], candidates: [] }, prerequisiteKnowledge: [], prerequisiteCycleDetected: false, matches: [{ courseId: "standard-course", courseTitle: "Standard Course", courseType: "standard", targetCoverage: 1, requiredCoverage: 1, missingTargetKnowledgeIds: [], missingPrerequisiteKnowledgeIds: [], extraKnowledgeIds: [], level: "high", recommendation: "use_existing" }] };
 
-function client() {
-  const writes: Array<{ table: string; value: unknown }> = [];
-  return { writes, from(table: string) {
-    let inserted: unknown;
-    const builder = {
-      insert: (value: unknown) => { inserted = value; writes.push({ table, value }); return builder; },
-      select: () => builder,
-      update: (value: unknown) => { writes.push({ table, value }); return builder; },
-      eq: () => builder,
-      single: async () => ({ data: table === "assistant_sessions" ? { id: "session-1", user_id: "learner" } : inserted, error: null }),
-      then: <TResult1 = { data: null; error: null }>(onfulfilled?: ((value: { data: null; error: null }) => TResult1 | PromiseLike<TResult1>) | null) => Promise.resolve({ data: null, error: null }).then(onfulfilled)
+function database() {
+  const writes: Array<{ table: string; value: any }> = [];
+  const sessions = new Map<string, any>([["session-1", { id: "session-1", user_id: "learner", title: "Goal", created_at: "2026-08-27T00:00:00Z", updated_at: "2026-08-27T00:00:00Z" }]]);
+  const messages = new Map<string, any>();
+  let sequence = 0;
+  const db = { writes, sessions, messages, from(table: string) {
+    let inserted: any; const filters = new Map<string, unknown>();
+    const builder: any = {
+      insert: (value: any) => { inserted = value; writes.push({ table, value }); return builder; },
+      select: () => builder, update: (value: any) => { writes.push({ table, value }); return builder; },
+      eq: (key: string, value: unknown) => { filters.set(key, value); return builder; }, order: () => builder, limit: () => builder,
+      maybeSingle: async () => {
+        if (table === "assistant_sessions") return { data: sessions.get(String(filters.get("id"))) ?? null, error: null };
+        if (table === "assistant_messages") return { data: messages.get(String(filters.get("id"))) ?? null, error: null };
+        return { data: null, error: null };
+      },
+      single: async () => {
+        if (table === "assistant_sessions") return { data: sessions.get("session-1"), error: null };
+        if (table === "assistant_messages") {
+          const row = { id: `message-${++sequence}`, created_at: `2026-08-27T00:00:0${sequence}Z`, ...inserted };
+          messages.set(row.id, row); return { data: row, error: null };
+        }
+        return { data: inserted, error: null };
+      },
+      then: <TResult1 = { data: any; error: null }>(onfulfilled?: ((value: { data: any; error: null }) => TResult1 | PromiseLike<TResult1>) | null) => Promise.resolve({ data: table === "assistant_messages" && inserted == null ? [] : null, error: null }).then(onfulfilled)
     };
     return builder;
   } };
+  return db;
 }
 
 function recorder() {
-  let status = 0; let body: unknown;
+  let status = 0; let body: any;
   const response = { status(code: number) { status = code; return response; }, json(value: unknown) { body = value; return response; }, setHeader: vi.fn() } as unknown as VercelResponse;
   return { response, status: () => status, body: () => body };
+}
+
+async function request(db: ReturnType<typeof database>, body: Record<string, unknown>) {
+  createUserSupabase.mockResolvedValue({ client: db, user: { id: "learner" } });
+  const result = recorder();
+  await handler({ method: "POST", headers: {}, query: {}, body: { context, ...body } } as unknown as VercelRequest, result.response);
+  return result;
+}
+
+function seedPlanningMessage(db: ReturnType<typeof database>, id = "planning-message") {
+  db.messages.set(id, { id, session_id: "session-1", role: "assistant", content: "plan", context_snapshot: context, created_at: "2026-08-27T00:00:00Z", structured_content: { type: "course_search", schemaVersion: 1, planningId: "planning-1", goalText: "Agent", intentSummary: "Build an agent", plan } });
+  return id;
 }
 
 describe("Assistant structured Goal actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    const database = client();
-    createUserSupabase.mockResolvedValue({ client: database, user: { id: "learner" } });
-    createServerSupabase.mockReturnValue({ rpc: vi.fn() });
+    resolveGoalLanguage.mockResolvedValue({ status: "ready", intentSummary: "Build an agent", candidateKnowledgeIds: ["A"] });
     planLearningGoal.mockResolvedValue(plan);
     useExistingCourse.mockResolvedValue({ courseId: "standard-course", match: { courseTitle: "Standard Course" } });
-    createPersonalCourse.mockResolvedValue({ courseId: "personal-course", plan });
   });
 
-  it("returns a product-owned Goal plan through the existing Assistant endpoint", async () => {
-    const result = recorder();
-    await handler({ method: "POST", headers: {}, query: {}, body: { action: "plan-goal", goalText: "Agent", context } } as unknown as VercelRequest, result.response);
+  it("uses LLM candidates only as input to product-owned revalidation and persists a Course Search card", async () => {
+    const db = database(); const result = await request(db, { action: "plan-goal", goalText: "I want AI to do things for me" });
     expect(result.status()).toBe(200);
-    expect(result.body()).toMatchObject({ sessionId: "session-1", plan: { resolution: { status: "ready" } } });
-    expect(planLearningGoal).toHaveBeenCalledWith(expect.anything(), "Agent");
+    expect(resolveGoalLanguage).toHaveBeenCalled();
+    expect(planLearningGoal).toHaveBeenCalledWith(expect.anything(), "I want AI to do things for me", ["A"]);
+    const card = db.writes.find((write) => write.table === "assistant_messages" && write.value.structured_content)?.value.structured_content;
+    expect(card).toMatchObject({ type: "course_search", schemaVersion: 1, goalText: "I want AI to do things for me", plan });
   });
 
-  it("uses the same existing Course identity after explicit selection", async () => {
-    const result = recorder();
-    await handler({ method: "POST", headers: {}, query: {}, body: { action: "use-existing-course", goalText: "Agent", courseId: "standard-course", context } } as unknown as VercelRequest, result.response);
+  it("persists multiple independent planning cards in the same session", async () => {
+    const db = database();
+    await request(db, { action: "plan-goal", sessionId: "session-1", goalText: "Goal one" });
+    await request(db, { action: "plan-goal", sessionId: "session-1", goalText: "Goal two" });
+    const cards = db.writes.filter((write) => write.value?.structured_content?.type === "course_search").map((write) => write.value.structured_content);
+    expect(cards).toHaveLength(2); expect(cards[0].planningId).not.toBe(cards[1].planningId); expect(cards.map((card) => card.goalText)).toEqual(["Goal one", "Goal two"]);
+  });
+
+  it("uses the selected card snapshot instead of a mutable current Goal", async () => {
+    const db = database(); const planningMessageId = seedPlanningMessage(db);
+    const result = await request(db, { action: "use-existing-course", planningMessageId, courseId: "standard-course" });
     expect(result.status()).toBe(200);
-    expect(result.body()).toMatchObject({ courseId: "standard-course" });
+    expect(useExistingCourse).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "learner" }), { goalText: "Agent", courseId: "standard-course", candidateKnowledgeIds: ["A"] });
   });
 
-  it("creates a Personal Course only for the explicit confirmation action", async () => {
-    const result = recorder();
-    await handler({ method: "POST", headers: {}, query: {}, body: { action: "create-personal-course", goalText: "Agent", sourceCourseId: "standard-course", context } } as unknown as VercelRequest, result.response);
+  it("continues search by appending a refined card without overwriting the source", async () => {
+    const db = database(); const planningMessageId = seedPlanningMessage(db);
+    resolveGoalLanguage.mockResolvedValueOnce({ status: "ready", intentSummary: "Prefer practical projects", candidateKnowledgeIds: ["A"] });
+    const result = await request(db, { action: "refine-goal", planningMessageId, refinement: "Too theoretical" });
+    expect(result.status()).toBe(200);
+    expect(db.messages.get(planningMessageId)?.structured_content.refinement).toBeUndefined();
+    const next = db.writes.find((write) => write.value?.structured_content?.refinedFromPlanningId)?.value.structured_content;
+    expect(next).toMatchObject({ refinement: "Too theoretical", refinedFromPlanningId: "planning-1" });
+  });
+
+  it("prepares a recoverable Brief with sourceCourseId and performs no Course write", async () => {
+    const db = database(); const planningMessageId = seedPlanningMessage(db);
+    const result = await request(db, { action: "prepare-course-brief", planningMessageId, sourceCourseId: "standard-course", requestedAdjustments: "More projects", referenceMaterialIntent: "none" });
     expect(result.status()).toBe(201);
-    expect(result.body()).toMatchObject({ courseId: "personal-course" });
-    expect(createPersonalCourse).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ id: "learner" }), { goalText: "Agent", sourceCourseId: "standard-course" });
+    expect(result.body()).toMatchObject({ brief: { type: "course_creation_brief", sourceCourseId: "standard-course", planningMessageId, requestedAdjustments: "More projects", referenceMaterialIntent: "none" } });
+    expect(db.writes.some((write) => write.table === "courses")).toBe(false);
   });
 });

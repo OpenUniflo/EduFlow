@@ -127,64 +127,42 @@ try {
   assert.equal(pdfResponse.status, 200);
   assert.equal(new TextDecoder().decode((await pdfResponse.arrayBuffer()).slice(0, 5)), "%PDF-");
 
-  // Goal planning is product-owned inside the one Assistant boundary. Existing
-  // Courses are selected first; Personal Course writes require an explicit action.
-  const goalText = "开发包含 RAG、Tool Calling 和 Memory 的 AI Agent";
+  // LLM language understanding proposes candidates; product logic revalidates
+  // them and persists every Search/Brief result in the owning timeline.
+  const goalText = "我想做一个能看我自己的资料，然后根据资料回答问题的东西。";
   const assistantContext = { workspace: "explore", experienceMode: "learn" };
   const goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", goalText, context: assistantContext });
   assertStatus(goalPlan, 200, "Assistant Goal planning");
   assert.equal(goalPlan.body.plan.resolution.status, "ready");
-  assert.ok(goalPlan.body.plan.resolution.targetKnowledge.length >= 4);
+  assert.ok(goalPlan.body.plan.resolution.targetKnowledge.length > 0);
   assert.ok(goalPlan.body.plan.resolution.targetKnowledge.every((item: any) => knowledge.body.graph.nodes.some((node: any) => node.id === item.id)), "Goal targets must be existing visible Knowledge IDs");
   assert.equal(goalPlan.body.plan.prerequisiteCycleDetected, false);
-  const suitableMatch = goalPlan.body.plan.matches.find((match: any) => match.level === "high" || match.level === "medium");
-  assert.ok(suitableMatch, "Golden Goal must have an existing suitable Course match");
+  const candidate = goalPlan.body.plan.matches[0];
+  assert.ok(candidate, "Goal planning must expose at least one readable Course candidate");
   const personalBefore = await server.from("courses").select("id").eq("course_type", "personal");
   assert.ifError(personalBefore.error);
-  const knowledgeCountBefore = await server.from("knowledge_nodes").select("id", { count: "exact", head: true });
-  assert.ifError(knowledgeCountBefore.error);
-  const existingSelection = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "use-existing-course", sessionId: goalPlan.body.sessionId, goalText, courseId: suitableMatch.courseId, context: assistantContext });
+  const existingSelection = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "use-existing-course", planningMessageId: goalPlan.body.messageId, courseId: candidate.courseId, context: assistantContext });
   assertStatus(existingSelection, 200, "explicit existing Course selection");
-  assert.equal(existingSelection.body.courseId, suitableMatch.courseId, "existing Course identity must be reused");
+  assert.equal(existingSelection.body.courseId, candidate.courseId, "existing Course identity must be reused regardless of advisory match level");
   const personalAfterExisting = await server.from("courses").select("id").eq("course_type", "personal");
   assert.equal(personalAfterExisting.data?.length, personalBefore.data?.length, "existing Course selection must not create a Personal Course");
 
-  const mediumGoalText = "学习 Docker 和 Deep Learning";
-  const mediumPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", sessionId: goalPlan.body.sessionId, goalText: mediumGoalText, context: assistantContext });
-  assertStatus(mediumPlan, 200, "Assistant medium-match Goal planning");
-  assert.deepEqual(mediumPlan.body.plan.resolution.targetKnowledge.map((item: any) => item.id).sort(), ["CDS525-K001", "PY95"]);
-  assert.equal(mediumPlan.body.plan.matches[0].level, "medium", "cross-Course Goal must expose the customization path");
-  const mediumMatch = mediumPlan.body.plan.matches[0];
-  const customized = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "create-personal-course", sessionId: goalPlan.body.sessionId, goalText: mediumGoalText, sourceCourseId: mediumMatch.courseId, context: assistantContext });
-  assertStatus(customized, 201, "confirmed Personal Course from existing Course");
-  const fromKnowledge = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "create-personal-course", sessionId: goalPlan.body.sessionId, goalText, context: assistantContext });
-  assertStatus(fromKnowledge, 201, "confirmed Personal Course from shared Knowledge");
-  const ownerCourses = await invoke(coursesHandler, "GET", ordinaryUser.token);
-  for (const personalId of [customized.body.courseId, fromKnowledge.body.courseId]) {
-    const personal = ownerCourses.body.courses.find((item: any) => item.course.id === personalId);
-    assert.ok(personal, "Personal Course owner must read the normal Course runtime");
-    assert.equal(personal.course.courseType, "personal");
-    assert.equal(personal.course.ownerUserId, ordinaryUser.user.id);
-    assert.ok(personal.targetKnowledge.length > 0);
-    assert.deepEqual(personal.assignments, []); assert.deepEqual(personal.materials, []);
-  }
-  assert.equal(ownerCourses.body.courses.find((item: any) => item.course.id === customized.body.courseId).course.sourceCourseId, mediumMatch.courseId);
-  assert.equal(ownerCourses.body.courses.find((item: any) => item.course.id === fromKnowledge.body.courseId).course.sourceCourseId, undefined);
-  const otherLearnerCourses = await invoke(coursesHandler, "GET", adminUser.token);
-  assert.ok(!otherLearnerCourses.body.courses.some((item: any) => [customized.body.courseId, fromKnowledge.body.courseId].includes(item.course.id)), "another learner must not read Personal Courses");
-  const blindAdminUpdate = await adminUser.client.from("courses").update({ title: "unauthorized-personal-update" }).eq("id", customized.body.courseId).select("id");
-  assert.ok(blindAdminUpdate.error?.code === "42501" || blindAdminUpdate.data?.length === 0, "an administrator must not blind-update another learner's Personal Course");
-  const unchangedPersonal = await server.from("courses").select("title").eq("id", customized.body.courseId).single();
-  assert.notEqual(unchangedPersonal.data?.title, "unauthorized-personal-update");
-  const anonymousAfterPersonal = await invoke(coursesHandler, "GET");
-  assert.ok(!anonymousAfterPersonal.body.courses.some((item: any) => [customized.body.courseId, fromKnowledge.body.courseId].includes(item.course.id)), "anonymous viewer must not read Personal Courses");
-  const ownerTargets = await ordinaryUser.client.from("course_target_knowledge").select("course_id,knowledge_id").eq("course_id", customized.body.courseId);
-  const otherTargets = await adminUser.client.from("course_target_knowledge").select("course_id,knowledge_id").eq("course_id", customized.body.courseId);
-  assert.ok(ownerTargets.data?.length, "owner must read Personal Course target structure");
-  assert.deepEqual(otherTargets.data, [], "another learner must not read Personal Course target structure");
-  const knowledgeCountAfter = await server.from("knowledge_nodes").select("id", { count: "exact", head: true });
-  assert.ifError(knowledgeCountAfter.error);
-  assert.equal(knowledgeCountAfter.count, knowledgeCountBefore.count, "Personal Course creation must reuse shared Knowledge without copying nodes");
+  const refined = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "refine-goal", planningMessageId: goalPlan.body.messageId, refinement: "这些课程太理论了，我更想实际做东西。", context: assistantContext });
+  assertStatus(refined, 200, "Assistant Goal refinement");
+  assert.notEqual(refined.body.messageId, goalPlan.body.messageId, "refinement must append a new timeline result");
+  const sourceBrief = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "prepare-course-brief", planningMessageId: goalPlan.body.messageId, sourceCourseId: candidate.courseId, requestedAdjustments: "保留能做项目的部分", referenceMaterialIntent: "none", context: assistantContext });
+  assertStatus(sourceBrief, 201, "Course Creation Brief from existing Course");
+  assert.equal(sourceBrief.body.brief.sourceCourseId, candidate.courseId);
+  const personalBrief = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "prepare-course-brief", planningMessageId: refined.body.messageId, referenceMaterialIntent: "upload_in_creator", context: assistantContext });
+  assertStatus(personalBrief, 201, "personalized route Course Creation Brief");
+  assert.equal(personalBrief.body.brief.sourceCourseId, undefined);
+  const personalAfterBriefs = await server.from("courses").select("id").eq("course_type", "personal");
+  assert.equal(personalAfterBriefs.data?.length, personalBefore.data?.length, "Brief preparation must not create a Personal Course");
+  const timelineRows = await server.from("assistant_messages").select("id,session_id,structured_content").eq("session_id", goalPlan.body.sessionId).not("structured_content", "is", null).order("created_at");
+  assert.ifError(timelineRows.error);
+  assert.deepEqual(timelineRows.data?.map((row: any) => row.structured_content.type), ["course_search", "course_search", "course_creation_brief", "course_creation_brief"]);
+  assertStatus(await invoke(assistantHandler, "GET", ordinaryUser.token, undefined, { messageId: sourceBrief.body.messageId }), 200, "Brief owner reload");
+  assertStatus(await invoke(assistantHandler, "GET", adminUser.token, undefined, { messageId: sourceBrief.body.messageId }), 404, "other-user Brief denial");
 
   // Authoring drafts are server-owned, isolated from learners, versioned, and
   // only materialize canonical Course rows during Publish.
@@ -467,7 +445,7 @@ try {
   assertStatus(await invoke(domainsHandler, "PUT", ordinaryUser.token, knowledge.body.governance), 403, "non-admin Domain mutation denial");
   assertStatus(await invoke(domainsHandler, "PUT", adminUser.token, knowledge.body.governance), 200, "admin Domain mutation");
 
-  console.log("Local backend verification passed: Auth, Health, Knowledge, Goal planning, Personal Courses, Course visibility, Micro progress, learning state, evidence, signed PDF, RLS, Workflows, upload, and authorization.");
+  console.log("Local backend verification passed: Auth, Health, Knowledge, Goal timeline/Briefs, Course visibility, Micro progress, learning state, evidence, signed PDF, RLS, Workflows, upload, and authorization.");
 } finally {
   if (authoredCourseId) await server.from("courses").delete().eq("id", authoredCourseId);
   if (uploadedMaterialId) await server.from("materials").delete().eq("course_id", "python-engineering").eq("id", uploadedMaterialId);

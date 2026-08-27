@@ -36,7 +36,9 @@ The model runtime exposes read tools:
 - one current-context resolver composed from the same tools.
 - product-owned Goal planning, which resolves only visible active Knowledge and returns deterministic prerequisite closure plus Course coverage/gaps.
 
-Goal planning keeps its durable write boundary outside the LLM tool loop. The same authenticated `/api/assistant` handler accepts structured `plan-goal`, `use-existing-course`, and `create-personal-course` UI actions. Planning persists a normal conversation exchange but does not create a Course. “Use existing” activates that exact Course identity. Personal Course creation runs only after explicit browser confirmation, re-plans and revalidates all product facts server-side, and invokes one service-role-only transactional database operation. The browser never supplies ownership authority or authoritative Knowledge scope.
+Goal planning keeps its durable write boundary outside the LLM tool loop. Explicit Goal mode first uses the server-side structured language adapter to interpret novice language against the visible active Knowledge catalog. The model returns candidate IDs only; the product Goal Planning Service revalidates every ID and remains the authority for factual prerequisite closure and deterministic Course metrics.
+
+The same authenticated `/api/assistant` handler accepts `plan-goal`, `refine-goal`, `use-existing-course`, and `prepare-course-brief` actions. Course Search and Course Creation Brief results are versioned structured content on ordinary Assistant messages. Each action references the owning persisted planning message, and the server reloads its snapshot and revalidates current Knowledge/Course visibility. Match levels explain and rank; they do not decide which actions are available. Continue Search appends a new result. Preparing a Brief performs no Course write. Personal Course persistence remains a Course-domain capability for the Course Creator after explicit review, never an implicit Goal Planner ending.
 
 KnowledgeEdges are the only Knowledge relation facts. CurriculumSequence and AssignmentDependency remain explicitly labeled teaching/execution relations. Course progress, Material progress, Assignment state, and Learner Knowledge state remain distinct.
 
@@ -44,11 +46,11 @@ The LLM is not navigation authority. Until the Navigation Engine exists, the Ass
 
 ## Sessions, messages, and context snapshots
 
-`assistant_sessions` is owned by `auth.users.id`. `assistant_messages` belongs to a session and stores role, text, timestamp, and a small context identity snapshot. Message-level snapshots are required because one session may move from Explore to Material while historical meaning remains page-specific.
+`assistant_sessions` is owned by `auth.users.id`. `assistant_messages` belongs to a session and stores role, text, timestamp, a small context identity snapshot, and optional versioned `structured_content`. The current structured types are `course_search` and `course_creation_brief`; this is a bounded timeline contract, not a general card DSL. Message-level snapshots are required because one session may move from Explore to Material while historical meaning remains page-specific.
 
 RLS permits only the owning authenticated user to read or write sessions and their messages. The server derives identity from the bearer session and never accepts a browser user ID as authority. The active session pointer in local storage is presentation state only; all conversation content remains database authority. The pointer is recorded as soon as streaming response headers provide the server-created session ID, so navigating during a first response still resumes the same conversation.
 
-The floating Assistant and `/messages` use the same client state, session IDs, endpoint, persistence, tools, model, and policy. Refresh reloads the active session from the server.
+The floating Assistant and `/messages` use the same client state, session IDs, endpoint, persistence, tools, model, and policy. Refresh reloads text and structured cards from the server. One session may contain multiple unrelated Goals, refinements, Search cards, and Briefs; there is no singleton Goal Plan UI authority.
 
 ## Specialized AI boundary
 
