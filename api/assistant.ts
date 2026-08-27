@@ -135,7 +135,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (body.action === "refine-goal") {
       const refinement = typeof body.refinement === "string" ? body.refinement.trim() : "";
       if (!refinement || refinement.length > 1000) throw new ApiError(400, "invalid_refinement", "A refinement between 1 and 1000 characters is required");
-      const language = await resolveGoalLanguage(client, { goalText: `${snapshot.goalText}\n用户对结果的反馈：${refinement}`, previousGoalText: snapshot.goalText, refinement });
+      const language = await resolveGoalLanguage(client, { goalText: snapshot.goalText, previousGoalText: snapshot.goalText, refinement });
       if (language.status !== "ready") {
         const summary = language.status === "clarify" ? language.clarificationQuestion : language.reason;
         const assistantRow = await persistAssistantExchange(client, sessionId, refinement, summary, context);

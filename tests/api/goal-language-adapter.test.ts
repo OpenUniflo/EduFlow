@@ -17,4 +17,14 @@ describe("Goal Planner language adapter", () => {
     const prompt = JSON.parse(generateJson.mock.calls[0][0].user);
     expect(prompt.visibleKnowledgeCatalog).toEqual([{ id: "knowledge-rag", title: "Retrieval", description: "Ground answers in sources", tags: ["documents"] }]);
   });
+
+  it("keeps refinement separate from the authoritative original outcome", async () => {
+    const generateJson = vi.fn().mockResolvedValue({ value: { status: "ready", intentSummary: "Build an image classifier through projects", candidateKnowledgeIds: ["image-model"] }, metadata: {} });
+    const query: any = { select: () => query, eq: () => query, limit: async () => ({ data: [{ id: "image-model", title: "Image Classification", description: "Train image classifiers", tags: [] }], error: null }) };
+    await resolveGoalLanguage({ from: vi.fn(() => query) } as any, { goalText: "Train an image model", previousGoalText: "Train an image model", refinement: "Less theory, more practice" }, { generateJson } as any);
+    const request = generateJson.mock.calls[0][0];
+    expect(JSON.parse(request.user)).toMatchObject({ goalText: "Train an image model", previousGoalText: "Train an image model", refinement: "Less theory, more practice" });
+    expect(request.system).toContain("previousGoalText is the authoritative learning outcome");
+    expect(request.system).toContain("must not introduce a different subject");
+  });
 });
