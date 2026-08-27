@@ -54,9 +54,9 @@ describe("Course Creator persistence and authority boundaries", () => {
     expect(entries.map((entry) => entry.name)).not.toContain("course-creator.ts");
   });
 
-  it("keeps database Functions in Singapore while routing the existing Assistant through Hong Kong", () => {
+  it("keeps database Functions and the existing Assistant in Singapore", () => {
     const config = JSON.parse(read("vercel.json"));
     expect(config.regions).toEqual(["sin1"]);
-    expect(config.functions["api/assistant.ts"]).toMatchObject({ maxDuration: 120, regions: ["hkg1"] });
+    expect(config.functions["api/assistant.ts"]).toMatchObject({ maxDuration: 120, regions: ["sin1"] });
   });
 });
