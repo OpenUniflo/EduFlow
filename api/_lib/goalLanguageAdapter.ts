@@ -84,6 +84,14 @@ export async function resolveGoalLanguage(
     user: JSON.stringify({ goalText: input.goalText, goalTextRole: input.conversationContext?.length ? "answer_to_latest_clarification" : "initial_goal", previousGoalText: input.previousGoalText, previousKnowledgeIds: input.previousKnowledgeIds, refinement: input.refinement, conversationContext: input.conversationContext, visibleKnowledgeCatalog: catalog })
   });
   let parsed = safeGoalLanguageResolution(generated.value);
+  if (parsed.status === "unsupported") {
+    const adjudicated = await generator.generateJson({
+      stage: "goal-resolution", promptVersion: "goal-unsupported-audit-v1", schemaVersion: "2", temperature: 0, maxTokens: 1200,
+      system: `Independently audit whether EduFlow's visible active Knowledge catalog can support the learner's concrete outcome. The earlier adapter may have missed relevant identities. If the catalog contains a minimal coherent set of direct target Knowledge, return the complete ready contract with at most 6 real catalog IDs and exactly one reason per ID. Prefer a concrete capability or artifact identity over its prerequisites, background, internal mechanisms, or adjacent topics. Return clarify only when different learner answers would materially change the direct target identities. Return unsupported only when no catalog identity can directly support the outcome. Never invent an ID, use lexical phrase rules, or infer a prerequisite relation.`,
+      user: JSON.stringify({ goalText: input.goalText, conversationContext: input.conversationContext, previousGoalText: input.previousGoalText, refinement: input.refinement, proposedUnsupportedReason: parsed.reason, visibleKnowledgeCatalog: catalog })
+    });
+    parsed = safeGoalLanguageResolution(adjudicated.value);
+  }
   if (parsed.status === "clarify" && input.conversationContext?.length) {
     const adjudicated = await generator.generateJson({
       stage: "goal-resolution", promptVersion: "goal-clarification-audit-v1", schemaVersion: "2", temperature: 0, maxTokens: 1200,
