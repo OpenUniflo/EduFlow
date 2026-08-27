@@ -40,7 +40,14 @@ function database() {
         }
         return { data: inserted, error: null };
       },
-      then: <TResult1 = { data: any; error: null }>(onfulfilled?: ((value: { data: any; error: null }) => TResult1 | PromiseLike<TResult1>) | null) => Promise.resolve({ data: table === "assistant_messages" && inserted == null ? [] : null, error: null }).then(onfulfilled)
+      then: <TResult1 = { data: any; error: null }>(onfulfilled?: ((value: { data: any; error: null }) => TResult1 | PromiseLike<TResult1>) | null) => {
+        let data: any = null;
+        if (table === "assistant_messages" && inserted == null) data = [];
+        if (table === "assistant_messages" && Array.isArray(inserted)) {
+          data = inserted.map((value) => { const row = { id: `message-${++sequence}`, created_at: `2026-08-27T00:00:${String(sequence).padStart(2, "0")}Z`, ...value }; messages.set(row.id, row); return row; });
+        }
+        return Promise.resolve({ data, error: null }).then(onfulfilled);
+      }
     };
     return builder;
   } };
@@ -65,6 +72,14 @@ function seedPlanningMessage(db: ReturnType<typeof database>, id = "planning-mes
   return id;
 }
 
+function structuredCards(db: ReturnType<typeof database>) {
+  return db.writes
+    .filter((write) => write.table === "assistant_messages")
+    .flatMap((write) => Array.isArray(write.value) ? write.value : [write.value])
+    .map((value) => value?.structured_content)
+    .filter(Boolean);
+}
+
 describe("Assistant structured Goal actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,7 +93,7 @@ describe("Assistant structured Goal actions", () => {
     expect(result.status()).toBe(200);
     expect(resolveGoalLanguage).toHaveBeenCalled();
     expect(planLearningGoal).toHaveBeenCalledWith(expect.anything(), "I want AI to do things for me", ["A"]);
-    const card = db.writes.find((write) => write.table === "assistant_messages" && write.value.structured_content)?.value.structured_content;
+    const card = structuredCards(db).find((value) => value.type === "course_search");
     expect(card).toMatchObject({ type: "course_search", schemaVersion: 1, goalText: "I want AI to do things for me", plan });
   });
 
@@ -86,7 +101,7 @@ describe("Assistant structured Goal actions", () => {
     const db = database();
     await request(db, { action: "plan-goal", sessionId: "session-1", goalText: "Goal one" });
     await request(db, { action: "plan-goal", sessionId: "session-1", goalText: "Goal two" });
-    const cards = db.writes.filter((write) => write.value?.structured_content?.type === "course_search").map((write) => write.value.structured_content);
+    const cards = structuredCards(db).filter((value) => value.type === "course_search");
     expect(cards).toHaveLength(2); expect(cards[0].planningId).not.toBe(cards[1].planningId); expect(cards.map((card) => card.goalText)).toEqual(["Goal one", "Goal two"]);
   });
 
@@ -103,7 +118,7 @@ describe("Assistant structured Goal actions", () => {
     const result = await request(db, { action: "refine-goal", planningMessageId, refinement: "Too theoretical" });
     expect(result.status()).toBe(200);
     expect(db.messages.get(planningMessageId)?.structured_content.refinement).toBeUndefined();
-    const next = db.writes.find((write) => write.value?.structured_content?.refinedFromPlanningId)?.value.structured_content;
+    const next = structuredCards(db).find((value) => value.refinedFromPlanningId);
     expect(next).toMatchObject({ refinement: "Too theoretical", refinedFromPlanningId: "planning-1" });
   });
 

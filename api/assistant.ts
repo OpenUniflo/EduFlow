@@ -44,10 +44,13 @@ async function getOrCreateSession(client: Awaited<ReturnType<typeof createUserSu
 }
 
 async function persistAssistantExchange(client: Awaited<ReturnType<typeof createUserSupabase>>["client"], sessionId: string, userContent: string, assistantContent: string, context: AssistantContextSnapshot, structuredContent?: AssistantStructuredContent) {
-  const userWrite = await client.from("assistant_messages").insert({ session_id: sessionId, role: "user", content: userContent, context_snapshot: context });
-  dataOrThrow(userWrite.data, userWrite.error, "Assistant structured user message write");
-  const assistantWrite = await client.from("assistant_messages").insert({ session_id: sessionId, role: "assistant", content: assistantContent, structured_content: structuredContent ?? null, context_snapshot: context }).select("*").single();
-  const assistantMessage = dataOrThrow(assistantWrite.data as Row | null, assistantWrite.error, "Assistant structured response write");
+  const write = await client.from("assistant_messages").insert([
+    { session_id: sessionId, role: "user", content: userContent, context_snapshot: context },
+    { session_id: sessionId, role: "assistant", content: assistantContent, structured_content: structuredContent ?? null, context_snapshot: context }
+  ]).select("*");
+  const rows = dataOrThrow(write.data as Row[] | null, write.error, "Assistant structured exchange write");
+  const assistantMessage = rows.find((row) => row.role === "assistant");
+  if (!assistantMessage) throw new ApiError(500, "assistant_message_write_failed", "Assistant timeline item was not returned after persistence");
   const touch = await client.from("assistant_sessions").update({ updated_at: new Date().toISOString() }).eq("id", sessionId);
   dataOrThrow(touch.data, touch.error, "Assistant structured session update");
   return assistantMessage;
