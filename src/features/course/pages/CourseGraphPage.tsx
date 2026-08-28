@@ -9,7 +9,7 @@ import { CoursePathView } from "@/features/course/path/CoursePathView";
 import { CourseDesignAssistant } from "@/features/course/components/CourseDesignAssistant";
 import { buildCourseDesignAssistantContext, type CourseDesignAssistantProvider, type CourseDesignAssistantResponse } from "@/features/course/courseDesignAssistant";
 import type { CourseGraphView } from "@/features/course/graph/courseGraphProjection";
-import { buildCourseGraphData } from "@/features/course/runtime/courseRuntime";
+import { buildCourseGraphData, type CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import { auditCourseAssetCoverage, courseAssetCoverageLabel } from "@/features/course/runtime/courseAssetCoverage";
 import { useOptionalUserCourseState } from "@/features/learning/progress/progressService";
 import type { AssignmentContext, CourseAssignment, CourseChapterProjection, CourseSkillTreeNode } from "@/features/course/types";
@@ -47,6 +47,7 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   const baseRuntime = storedRuntime && isCourseVisibleToViewer(storedRuntime.course, session?.userId, canDesignCourse(session)) ? storedRuntime : null;
   const authoringRoute = new URLSearchParams(window.location.search).get("experience") === "design" && canDesignCourse(session);
   const [draftState, setDraftState] = useState<CourseAuthoringDraftState | null>(null);
+  const [authoringBaseRuntime, setAuthoringBaseRuntime] = useState<CourseRuntimeData | null>(null);
   const [draftRevision, setDraftRevision] = useState(0);
   const [draftLoading, setDraftLoading] = useState(authoringRoute);
   const [history, setHistory] = useState<{ past: CourseAuthoringDraftState[]; future: CourseAuthoringDraftState[] }>({ past: [], future: [] });
@@ -55,7 +56,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   const saveChain = useRef(Promise.resolve());
   const baseKnowledgeGraph = useMemo(() => knowledgeRepository.getVisibleGraph(session ? userKnowledgeAccess(session.userId) : globalKnowledgeAccess), [session]);
   const editableKnowledgeGraph = useMemo(() => draftState ? createEditableKnowledgeGraph(baseKnowledgeGraph, draftState) : baseKnowledgeGraph, [baseKnowledgeGraph, draftState]);
-  const runtime = useMemo(() => baseRuntime ? (draftState ? applyCourseAuthoringDraft(baseRuntime, draftState) : baseRuntime) : undefined, [baseRuntime, draftState]);
+  const effectiveBaseRuntime = authoringRoute ? authoringBaseRuntime ?? baseRuntime : baseRuntime;
+  const runtime = useMemo(() => effectiveBaseRuntime ? (draftState ? applyCourseAuthoringDraft(effectiveBaseRuntime, draftState) : effectiveBaseRuntime) : undefined, [draftState, effectiveBaseRuntime]);
   const lessonDisplayNumberById = useMemo(() => new Map((runtime ? [...runtime.lessons] : [])
     .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
     .map((lesson, index) => [lesson.id, index + 1])), [runtime]);
@@ -70,9 +72,9 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
       practiceEmphasis: Boolean(runtime.course.creatorMetadata?.desiredAssignmentKnowledgeIds.length)
     });
   }, [microLearningProvider, runtime]);
-  const validation = useMemo(() => baseRuntime && draftState ? validateCourseAuthoring(baseRuntime, baseKnowledgeGraph, draftState) : null, [baseKnowledgeGraph, baseRuntime, draftState]);
+  const validation = useMemo(() => effectiveBaseRuntime && draftState ? validateCourseAuthoring(effectiveBaseRuntime, baseKnowledgeGraph, draftState) : null, [baseKnowledgeGraph, draftState, effectiveBaseRuntime]);
   const structuralFatal = validation?.fatal.filter((issue) => !isDraftCompletenessIssue(issue)) ?? [];
-  const graphRuntime = structuralFatal.length ? baseRuntime : runtime;
+  const graphRuntime = structuralFatal.length ? effectiveBaseRuntime : runtime;
   const orderedMaterials = useMemo(() => runtime ? sortMaterials(runtime.materials, runtime.lessons) : [], [runtime]);
   const userCourseState = useOptionalUserCourseState(session?.userId, courseId);
   const graphData = useMemo(() => graphRuntime ? buildCourseGraphData(graphRuntime, userCourseState, structuralFatal.length ? baseKnowledgeGraph : editableKnowledgeGraph, session ? userKnowledgeRepository.getUserKnowledge(session.userId) : []) : null, [baseKnowledgeGraph, editableKnowledgeGraph, graphRuntime, session, structuralFatal.length, userCourseState]);
@@ -133,15 +135,16 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   const invalidChapter = Boolean(runtime && routeChapterId && !routeChapter);
 
   useEffect(() => {
-    if (!baseRuntime || !authoringRoute) { setDraftState(null); draftRef.current = null; setDraftLoading(false); return; }
+    if (!baseRuntime || !authoringRoute) { setAuthoringBaseRuntime(null); setDraftState(null); draftRef.current = null; setDraftLoading(false); return; }
     let active = true; setDraftLoading(true); setHistory({ past: [], future: [] });
     void courseAuthoringDraftRepository.getDraft(baseRuntime.course.id).then((result) => {
       if (!active) return;
       const saved = result.draft;
+      setAuthoringBaseRuntime(saved?.previewRuntime ?? baseRuntime);
       const state = !saved?.state.microPathsEdited ? { ...(saved?.state ?? emptyCourseAuthoringDraft(baseRuntime.course.id)), microPaths: result.baseMicroPaths } : saved.state;
       draftRef.current = state; draftRevisionRef.current = saved?.revision ?? 0;
       setDraftState(state); setDraftRevision(saved?.revision ?? 0); setDraftLoading(false);
-    }).catch(() => { if (active) { setDraftLoading(false); setDesignActionNotice("无法读取服务端课程草稿，请检查权限或网络。"); } });
+    }).catch(() => { if (active) { setAuthoringBaseRuntime(baseRuntime); setDraftLoading(false); setDesignActionNotice("无法读取服务端课程草稿，请检查权限或网络。"); } });
     return () => { active = false; };
   }, [authoringRoute, baseRuntime]);
 
@@ -214,10 +217,10 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   function switchMode() { setMode((current) => current === "knowledge" ? "assignment" : "knowledge"); setActiveAssignmentId(null); setDrawerTab("detail"); }
 
   function updateAuthoringDraft(update: (state: CourseAuthoringDraftState) => CourseAuthoringDraftState) {
-    if (!baseRuntime || !draftRef.current) return false;
+    if (!effectiveBaseRuntime || !draftRef.current) return false;
     const current = draftRef.current;
     const next = update(current);
-    const nextValidation = validateCourseAuthoring(baseRuntime, baseKnowledgeGraph, next);
+    const nextValidation = validateCourseAuthoring(effectiveBaseRuntime, baseKnowledgeGraph, next);
     const blockingIssue = nextValidation.fatal.find((issue) => !isDraftCompletenessIssue(issue));
     if (blockingIssue) {
       setDesignActionNotice(`无法应用变更：${blockingIssue.message}`);
@@ -226,8 +229,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     if (JSON.stringify(current) === JSON.stringify(next)) return false;
     draftRef.current = next; setDraftState(next); setHistory((value) => ({ past: [...value.past, current].slice(-50), future: [] }));
     saveChain.current = saveChain.current.catch(() => undefined).then(async () => {
-      const previewRuntime = applyCourseAuthoringDraft(baseRuntime, next);
-      const saved = await courseAuthoringDraftRepository.saveDraft(baseRuntime.course.id, { state: next, previewRuntime, revision: draftRevisionRef.current, expectedRevision: draftRevisionRef.current });
+      const previewRuntime = applyCourseAuthoringDraft(effectiveBaseRuntime, next);
+      const saved = await courseAuthoringDraftRepository.saveDraft(effectiveBaseRuntime.course.id, { state: next, previewRuntime, revision: draftRevisionRef.current, expectedRevision: draftRevisionRef.current });
       draftRevisionRef.current = saved.revision; setDraftRevision(saved.revision);
     }).catch(() => { setDesignActionNotice("草稿未保存：请刷新后处理冲突或重试。"); });
     return true;
@@ -246,8 +249,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     void persistDraft(next);
   }
   async function persistDraft(state: CourseAuthoringDraftState) {
-    if (!baseRuntime) return;
-    try { const saved = await courseAuthoringDraftRepository.saveDraft(baseRuntime.course.id, { state, previewRuntime: applyCourseAuthoringDraft(baseRuntime, state), revision: draftRevisionRef.current, expectedRevision: draftRevisionRef.current }); draftRevisionRef.current = saved.revision; setDraftRevision(saved.revision); }
+    if (!effectiveBaseRuntime) return;
+    try { const saved = await courseAuthoringDraftRepository.saveDraft(effectiveBaseRuntime.course.id, { state, previewRuntime: applyCourseAuthoringDraft(effectiveBaseRuntime, state), revision: draftRevisionRef.current, expectedRevision: draftRevisionRef.current }); draftRevisionRef.current = saved.revision; setDraftRevision(saved.revision); }
     catch { setDesignActionNotice("草稿未保存：请刷新后处理冲突或重试。"); }
   }
 
@@ -276,9 +279,9 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   }
 
   function deleteSelectedChapter() {
-    if (!selectedChapter || !runtime || !baseRuntime) return;
-    const outcomeIds=baseRuntime.chapterOutcomes.filter((outcome)=>outcome.chapterId===selectedChapter.id).map((outcome)=>outcome.id);
-    if(baseRuntime.finalProjectOutcomeCompositions.some((composition)=>outcomeIds.includes(composition.outcomeId))){setDesignActionNotice("该篇章成果被 FinalProject 引用，Prototype 为避免静默破坏组合关系而禁止删除。");return;}
+    if (!selectedChapter || !runtime || !effectiveBaseRuntime) return;
+    const outcomeIds=effectiveBaseRuntime.chapterOutcomes.filter((outcome)=>outcome.chapterId===selectedChapter.id).map((outcome)=>outcome.id);
+    if(effectiveBaseRuntime.finalProjectOutcomeCompositions.some((composition)=>outcomeIds.includes(composition.outcomeId))){setDesignActionNotice("该篇章成果被 FinalProject 引用，Prototype 为避免静默破坏组合关系而禁止删除。");return;}
     const nodeIds=courseSkillTreeNodes.filter((node)=>node.chapterId===selectedChapter.id).map((node)=>node.id);
     if(!window.confirm(`删除“${selectedChapter.title}”？其中 ${nodeIds.length} 个 Knowledge 将移到“未分组”；全局 Knowledge 不会删除。`))return;
     updateAuthoringDraft((state)=>removeDraftChapter(state,selectedChapter.id,nodeIds));
@@ -326,8 +329,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   }
 
   function applyAssistantProposal(response:CourseDesignAssistantResponse) {
-    if(!response.proposal||!baseRuntime||!draftState)return;
-    const result=validateCourseAuthoringProposal(baseRuntime,baseKnowledgeGraph,draftState,response.proposal);
+    if(!response.proposal||!effectiveBaseRuntime||!draftState)return;
+    const result=validateCourseAuthoringProposal(effectiveBaseRuntime,baseKnowledgeGraph,draftState,response.proposal);
     if(!result.valid){setDesignActionNotice(`AI Proposal 未应用：${result.validation.fatal[0]?.message ?? "校验失败"}`);return;}
     if (updateAuthoringDraft(() => result.state)) setDesignActionNotice("AI Proposal 已验证并应用，可使用 Undo 撤回。");
   }

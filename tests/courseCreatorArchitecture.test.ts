@@ -66,6 +66,8 @@ describe("Course Creator persistence and authority boundaries", () => {
     expect(page).toContain("teacherCreatorPreview");
     expect(page).toContain("/teaching/create?courseId=");
     expect(page).toContain('"返回教学管理"');
+    expect(page).toContain("setAuthoringBaseRuntime(saved?.previewRuntime ?? baseRuntime)");
+    expect(page).toContain("applyCourseAuthoringDraft(effectiveBaseRuntime");
   });
 
   it("renders factual prerequisites as separate readonly scope items", () => {
