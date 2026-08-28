@@ -7,10 +7,28 @@ import {
   createMicroLearningNavigation,
   isMicroInteractionCorrect,
   resolveMicroLearningReturnTarget,
+  firstMicroReviewStep,
+  nextMicroReviewStep,
+  isMicroReviewSubmissionCorrect,
+  type MicroLearningPath,
   type MicroStep
 } from "./microLearning";
 
 describe("Micro Learning navigation", () => {
+  it("replays required steps locally without changing persisted completion", () => {
+    const path:MicroLearningPath = { id:"path",knowledgeId:"knowledge",scope:"global",title:"Review",estimatedMinutes:2,mode:"learn",required:true,status:"published",units:[
+      {id:"optional",pathId:"path",title:"Optional",position:0,estimatedMinutes:1,required:false,steps:[{id:"skip",kind:"summary",title:"Skip",body:"Skip"}]},
+      {id:"required",pathId:"path",title:"Required",position:1,estimatedMinutes:1,required:true,steps:[{id:"first",kind:"interaction",title:"First",body:"First",interaction:{type:"choice",options:["yes","no"],correctIndex:0}},{id:"last",kind:"summary",title:"Last",body:"Last"}]}
+    ]};
+    expect(firstMicroReviewStep(path)).toEqual({unitId:"required",stepId:"first"});
+    expect(nextMicroReviewStep(path,{unitId:"required",stepId:"first"})).toEqual({unitId:"required",stepId:"last"});
+    expect(nextMicroReviewStep(path,{unitId:"required",stepId:"last"})).toBeNull();
+    expect(isMicroReviewSubmissionCorrect(path.units[1].steps[0].interaction,"yes")).toBe(true);
+    const completedH5p={kind:"h5p-result" as const,contentRef:"h5p/review",eventId:"review-1",result:{completed:true,success:false}};
+    expect(isMicroReviewSubmissionCorrect({type:"h5p",contentRef:"h5p/review",completionPolicy:"completed"},completedH5p)).toBe(true);
+    expect(isMicroReviewSubmissionCorrect({type:"h5p",contentRef:"h5p/review",completionPolicy:"passed"},completedH5p)).toBe(false);
+    expect(isMicroReviewSubmissionCorrect({type:"h5p",contentRef:"h5p/other"},completedH5p)).toBe(false);
+  });
   it("carries Learning Home as the explicit return target", () => {
     expect(createMicroLearningNavigation("AG01", { courseId: "agentic-ai", returnTo: "/" })).toEqual({
       to: "/learn/micro/AG01?courseId=agentic-ai",
@@ -88,6 +106,16 @@ describe("Micro Learning assessment integrity", () => {
     expect(assistant).not.toMatch(/setGradingFeedback|completeCurrent\(/);
     expect(source).toContain("repository.completeStep(path.id, unit.id, step.id");
     expect(source).toContain("refreshLearnerState(session.userId)");
+  });
+
+  it("keeps completed-path review local and leaves first completion persistence unchanged", () => {
+    const source = readFileSync(join(process.cwd(), "src/features/learning/micro/MicroLearningExperience.tsx"), "utf8");
+    const reviewBranch=source.slice(source.indexOf("if(reviewCursor)"),source.indexOf("setBusy(true)",source.indexOf("if(reviewCursor)")));
+    expect(reviewBranch).toContain("isMicroReviewSubmissionCorrect");
+    expect(reviewBranch).not.toContain("repository.completeStep");
+    expect(reviewBranch).not.toContain("refreshLearnerState");
+    expect(source).toContain("repository.completeStep(path.id, unit.id, step.id");
+    expect(source).toContain("主动复习不会清空进度、重复完成证据或降低学习状态");
   });
 
   it("does not expose the deferred fake Matching interaction in Golden lessons", () => {

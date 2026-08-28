@@ -63,7 +63,28 @@ describe("Course Creator persistence and authority boundaries", () => {
   it("restores Personal Creator and teaching authoring to their source contexts", () => {
     const page = read("src/features/course/pages/CourseGraphPage.tsx");
     expect(page).toContain("window.location.assign(`/courses/create?briefId=");
-    expect(page).toContain('const overviewReturnTarget = authoringRoute ? "/teaching" : "/courses"');
-    expect(page).toContain('aria-label={authoringRoute ? "返回教学管理" : "返回课程中心"}');
+    expect(page).toContain("teacherCreatorPreview");
+    expect(page).toContain("/teaching/create?courseId=");
+    expect(page).toContain('"返回教学管理"');
+  });
+
+  it("renders factual prerequisites as separate readonly scope items", () => {
+    const page = read("src/features/course/pages/CourseCreationWorkspacePage.tsx");
+    expect(page).toContain('className="creator-scope-item readonly"');
+    expect(page).toContain("由事实前置关系自动整理，不能手工指定。");
+    expect(page).not.toMatch(/derived \? <button/);
+    expect(read("src/shared/styles/product.css")).toContain(".creator-scope-item.readonly{display:grid");
+  });
+
+  it("routes teacher and learner entries through the same staged Creator UI", () => {
+    const app=read("src/app/App.tsx"); const workspace=read("src/features/course/pages/CourseCreationWorkspacePage.tsx");
+    expect(app).toContain('path="/courses/create"');
+    expect(app).toContain('entryMode="learner"');
+    expect(app).toContain('path="/teaching/create"');
+    expect(app).toContain('entryMode="teacher"');
+    expect(app).not.toContain("<ManualCourseCreationPage");
+    expect(workspace).toContain('profile:{courseType:"standard",authoringRole:"teacher"');
+    expect(workspace).toContain("courseAuthoringDraftRepository.saveDraft");
+    expect(workspace).toContain("courseAuthoringDraftRepository.publish");
   });
 });

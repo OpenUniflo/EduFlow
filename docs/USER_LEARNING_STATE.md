@@ -24,6 +24,8 @@ Browsing a Knowledge detail, selecting a Course context, opening a Drawer, or vi
 
 Successful Micro path completion may advance `learning -> learned` and persists evidence, but does not imply `mastered`. Course route presentation keeps `learned` visibly distinct from both “进行中” and “已掌握”. Factual prerequisite reachability continues to require mastery under the current policy, so completing one Micro does not silently unlock dependents that require mastered evidence.
 
+Reopening a completed Micro for active review is presentation-local. It must not reset or rewrite progress, duplicate completion Evidence, change completion timestamps, or downgrade `learned`/`mastered`; the normal first-completion path remains the only persistence path.
+
 ## 6. Repository
 
 `LearningProgressRepository` loads, saves, and subscribes to states by user and course. Application composition uses `ApiLearningProgressRepository`, backed by `/api/progress` and owner-scoped PostgreSQL rows. The LocalStorage adapter receives a `UserCourseStateFactory` and remains only for Demo/test compatibility; it does not import Demo fixtures.

@@ -1,10 +1,11 @@
-import type { CourseCreationBrief } from "@/features/assistant/assistantContract";
 import { computePrerequisiteClosure } from "@/features/course/goal/goalPlanning";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import type { KnowledgeGraph } from "@/features/knowledge/types";
 
 export const courseCreatorStages = ["requirements", "scope", "structure", "assets", "draft", "publish"] as const;
 export type CourseCreatorStage = (typeof courseCreatorStages)[number];
+export type CourseCreatorProfile = { courseType:"personal"|"standard"; authoringRole:"learner"|"teacher"; visibility:"owner-private"|"platform-published"; source:"assistant-brief"|"teacher-manual" };
+export type CourseCreatorInput = { goal:string; targetKnowledge:Array<{id:string;title:string;description:string}>; sourceCourseId?:string; requestedAdjustments?:string; practiceEmphasis?:boolean; referenceMaterialIntent?:"none"|"upload_in_creator"; availableKnowledgeIds?:string[]; profile?:CourseCreatorProfile };
 
 export type CourseCreationRequirements = {
   goal: string;
@@ -41,6 +42,7 @@ export type CourseAssetPlan = {
 };
 
 export type CourseCreatorDesign = {
+  profile: CourseCreatorProfile;
   requirements: CourseCreationRequirements;
   scope: CourseScope;
   curriculum: CourseCurriculumDraft;
@@ -96,13 +98,13 @@ function sourceChapters(source: CourseRuntimeData, included: Set<string>): Curri
     });
 }
 
-export function createInitialCourseDesign(brief: CourseCreationBrief, graph: KnowledgeGraph, source: CourseRuntimeData | null, referenceMaterialNames: string[] = []): CourseCreatorDesign {
+export function createInitialCourseDesign(brief: CourseCreatorInput, graph: KnowledgeGraph, source: CourseRuntimeData | null, referenceMaterialNames: string[] = []): CourseCreatorDesign {
   const visible = activeNodeIds(graph);
   const targetKnowledgeIds = unique(brief.targetKnowledge.map((item) => item.id)).filter((id) => visible.has(id));
   const closure = computePrerequisiteClosure(targetKnowledgeIds, graph.edges);
   const prerequisiteKnowledgeIds = closure.prerequisiteKnowledgeIds.filter((id) => visible.has(id) && !targetKnowledgeIds.includes(id));
   const included = new Set([...prerequisiteKnowledgeIds, ...targetKnowledgeIds]);
-  const excludedKnowledgeIds = sourceKnowledgeIds(source).filter((id) => visible.has(id) && !included.has(id));
+  const excludedKnowledgeIds = unique([...(brief.availableKnowledgeIds??[]),...sourceKnowledgeIds(source)]).filter((id) => visible.has(id) && !included.has(id));
   let chapters = source ? sourceChapters(source, included) : [];
   const placed = new Set(chapters.flatMap((chapter) => chapter.knowledgeIds));
   const remainingPrerequisites = prerequisiteKnowledgeIds.filter((id) => !placed.has(id));
@@ -111,6 +113,7 @@ export function createInitialCourseDesign(brief: CourseCreationBrief, graph: Kno
   if (remainingTargets.length) chapters.push({ id: "creator-chapter-outcome", title: "核心与成果", knowledgeIds: remainingTargets });
   if (!chapters.length) chapters = [{ id: "creator-chapter-outcome", title: "目标路线", knowledgeIds: targetKnowledgeIds }];
   return {
+    profile: brief.profile??{courseType:"personal",authoringRole:"learner",visibility:"owner-private",source:"assistant-brief"},
     requirements: {
       goal: brief.goal,
       learnerFoundation: "按当前 Learner Context，创建前再次确认",
@@ -299,7 +302,7 @@ export function createCoursePreviewRuntime(design: CourseCreatorDesign, courseId
   const lessons = chapters.map((chapter, index) => ({ id: `${chapter.id}:lesson`, courseId, chapterId: chapter.id, title: chapter.title, order: index }));
   const curriculumCoverages = design.curriculum.chapters.flatMap((chapter, chapterIndex) => chapter.knowledgeIds.map((nodeId, order) => ({ id: `${courseId}:coverage:${chapterIndex}:${order}`, courseId, lessonId: `${chapter.id}:lesson`, nodeId, role: design.scope.targetKnowledgeIds.includes(nodeId) ? "assess" as const : "introduce" as const, order })));
   return {
-    course: { id: courseId, title: design.requirements.goal.slice(0, 80), description: design.requirements.goal, targetOutcome: design.requirements.goal, lifecycle: "draft", courseType: "personal", ownerUserId: "creator-preview-owner", sourceCourseId: design.requirements.referenceCourseId, generationStatus: "draft", accentColor: "#7567e8", creatorMetadata: courseCreatorMetadata(design) },
+    course: { id: courseId, title: design.requirements.goal.slice(0, 80), description: design.requirements.goal, targetOutcome: design.requirements.goal, lifecycle: "draft", courseType: design.profile.courseType, ...(design.profile.courseType==="personal"?{ownerUserId:"creator-preview-owner"}:{}), sourceCourseId: design.requirements.referenceCourseId, generationStatus: "draft", accentColor: "#7567e8", creatorMetadata: courseCreatorMetadata(design) },
     curriculum: { id: `${courseId}:curriculum`, courseId, generationMode: "manual" }, chapters, lessons, curriculumCoverages,
     curriculumSequences: lessons.slice(1).map((lesson, index) => ({ id: `${courseId}:sequence:${index}`, courseId, sourceLessonId: lessons[index].id, targetLessonId: lesson.id })),
     assignments: [], assignmentCoverages: [], assignmentDependencies: [], chapterOutcomes: [], assignmentOutcomeCompositions: [], finalProjects: [], finalProjectOutcomeCompositions: [], materials: [], materialKnowledgeCoverages: [],

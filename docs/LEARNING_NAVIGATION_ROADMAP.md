@@ -337,12 +337,12 @@ Course Creator is the product boundary between #20 and #21. It uses one fixed fl
 2. factual Knowledge Scope and optional reference diff;
 3. horizontal Course Skill Tree curriculum draft;
 4. non-blocking Learning Asset Coverage;
-5. persisted owner-private Personal Course Draft;
-6. learner preview, structural checks, and explicit Publish.
+5. persisted Course Draft: owner-private Personal for learners, Standard authoring draft for teachers/admins;
+6. shared preview, structural checks, and explicit Publish, followed by learner Course or advanced Design Mode.
 
 The same Global Assistant identity may produce stage-owned structured Proposals, but it cannot Apply or Publish. Manual and AI edits share the same reducer and deterministic validation path. This creates a Course scope/route space, not a NavigationDecision, dynamic Learning Path, or Next Action.
 
-The learner Goal entry and teacher/admin authoring entry remain separate presentations in the current MVP. Learners enter the fixed six-stage flow from an Assistant Course Creation Brief; teachers/admins enter Design Mode from Teaching Management. Both persist the same Course domain, use the same runtime graph/preview semantics, and return to their owning entry (`Brief -> Creator`, `Design Mode -> Teaching Management`). They are not yet one unified UI or one identical client validation function. A future unified entry may compose the two presentations, but this closeout does not add a compatibility layer or bypass either explicit confirmation boundary.
+The learner Goal entry and teacher/admin authoring entry now converge on the same fixed six-stage workspace and identical design/reducer/preview/validation/confirmation pipeline. Learners enter from an authenticated Assistant Course Creation Brief and produce an owner-private Personal Course. Teachers/admins enter from Teaching Management, provide explicit structured Requirements, and produce a recoverable Standard Course authoring draft; after Publish they may continue into the existing advanced Design Mode. Neither adapter bypasses Proposal/Preview/Validation/Confirm/Apply or explicit Publish, and no parallel Course ontology or API contract was added.
 
 ### V1C — Rule Navigation
 

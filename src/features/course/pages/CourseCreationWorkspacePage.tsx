@@ -5,9 +5,9 @@ import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
 import { getAssistantTimelineMessage, proposeCourseCreatorAdjustment } from "@/features/assistant/assistantClient";
-import type { CourseCreationBrief } from "@/features/assistant/assistantContract";
 import type { CourseCreationScenario, CourseCreationScenarioResolver } from "@/features/course/creation/demoScenario";
-import { applyCourseCreatorProposal, courseCreatorMetadata, courseCreatorStages, createCoursePreviewRuntime, createInitialCourseDesign, includedCourseKnowledgeIds, invalidateConfirmedThrough, restoreCourseCreatorDesign, validateCourseCreatorDesign, type CourseCreatorDesign, type CourseCreatorOperation, type CourseCreatorProposal, type CourseCreatorStage } from "@/features/course/creation/courseCreator";
+import { applyCourseCreatorProposal, courseCreatorMetadata, courseCreatorStages, createCoursePreviewRuntime, createInitialCourseDesign, includedCourseKnowledgeIds, invalidateConfirmedThrough, restoreCourseCreatorDesign, validateCourseCreatorDesign, type CourseCreatorDesign, type CourseCreatorInput, type CourseCreatorOperation, type CourseCreatorProposal, type CourseCreatorStage } from "@/features/course/creation/courseCreator";
+import { emptyCourseAuthoringDraft } from "@/features/course/authoring/courseAuthoringDraft";
 import { buildCourseGraphData, type CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import { CourseGraph } from "@/features/course/graph/CourseGraph";
 import { auditCourseAssetCoverage } from "@/features/course/runtime/courseAssetCoverage";
@@ -30,15 +30,16 @@ function operationLabel(operation: CourseCreatorOperation, titleById: Map<string
   return `调整教学顺序：${operation.orderedKnowledgeIds.map((id) => titleById.get(id) ?? id).join(" → ")}`;
 }
 const graphCallbacks = { onChapterClick: () => {}, onChapterDoubleClick: () => {}, onKnowledgeClick: () => {}, onAssignmentClick: () => {} };
+function creatorPublishValidation(runtime:CourseRuntimeData) { const knowledgeCount=new Set(runtime.curriculumCoverages.map((item)=>item.nodeId)).size; const materialCovered=new Set(runtime.materialKnowledgeCoverages.map((item)=>item.nodeId)).size; const assignmentCovered=new Set(runtime.assignmentCoverages.map((item)=>item.nodeId)).size; return {valid:Boolean(runtime.chapters.length&&runtime.lessons.length&&knowledgeCount),knowledgeCount,materialCovered,assignmentCovered,warnings:{missingMaterial:knowledgeCount-materialCovered,missingAssignment:knowledgeCount-assignmentCovered,microCoverageAvailable:false}}; }
 
-export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { session: MockSession; onLogout(): void; resolver: CourseCreationScenarioResolver }) {
+export function CourseCreationWorkspacePage({ session, onLogout, resolver, entryMode="learner" }: { session: MockSession; onLogout(): void; resolver: CourseCreationScenarioResolver; entryMode?:"learner"|"teacher" }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const briefMessageId = new URLSearchParams(location.search).get("briefId");
+  const routeParams = new URLSearchParams(location.search); const briefMessageId = routeParams.get("briefId"); const teacherCourseId=routeParams.get("courseId"); const isTeacher=entryMode==="teacher";
   const initialFiles = ((location.state as { files?: File[] } | null)?.files ?? []);
   const [files, setFiles] = useState<File[]>(initialFiles);
   const [goldenReference, setGoldenReference] = useState<CourseCreationScenario | null>(null);
-  const [brief, setBrief] = useState<CourseCreationBrief | null>(null);
+  const [brief, setBrief] = useState<CourseCreatorInput | null>(null);
   const [design, setDesign] = useState<CourseCreatorDesign | null>(null);
   const [stageIndex, setStageIndex] = useState(0);
   const [confirmedThrough, setConfirmedThrough] = useState(-1);
@@ -51,34 +52,45 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
   const [persistedRuntime, setPersistedRuntime] = useState<CourseRuntimeData | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
+  const [draftRevision,setDraftRevision]=useState(0);
   const [recoveryChecked, setRecoveryChecked] = useState(false);
   const [publishValidation, setPublishValidation] = useState<{ valid: boolean; knowledgeCount: number; materialCovered: number; assignmentCovered: number; warnings: { missingMaterial: number; missingAssignment: number; microCoverageAvailable: boolean } } | null>(null);
   const [manualGoal, setManualGoal] = useState("");
   const [manualFoundation, setManualFoundation] = useState("");
   const [manualTime, setManualTime] = useState("");
   const [manualPreferences, setManualPreferences] = useState("");
+  const [manualTargetId,setManualTargetId]=useState("");
 
   const access = useMemo(() => userKnowledgeAccess(session.userId), [session.userId]);
-  const graph = applicationServices.knowledgeRepository.getVisibleGraph(access);
+  const graph = useMemo(() => applicationServices.knowledgeRepository.getVisibleGraph(access), [access]);
   const titleById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node.title])), [graph.nodes]);
   const sourceRuntime = brief?.sourceCourseId ? applicationServices.courseRepository.getCourse(brief.sourceCourseId) : null;
 
   useEffect(() => {
     let alive = true;
+    if(isTeacher){if(!brief)setBrief({goal:"",targetKnowledge:[],availableKnowledgeIds:graph.nodes.filter((node)=>node.status==="active").map((node)=>node.id),profile:{courseType:"standard",authoringRole:"teacher",visibility:"platform-published",source:"teacher-manual"}});return()=>{alive=false;};}
     if (!briefMessageId) { setBriefError("请从 Assistant 的 Course Creation Brief 进入创建流程。"); return; }
     void getAssistantTimelineMessage(briefMessageId).then((message) => {
       if (!alive) return;
       if (message.structuredContent?.type !== "course_creation_brief") throw new Error("该 Assistant timeline 项不是 Course Creation Brief");
-      setBrief(message.structuredContent);
+      setBrief({...message.structuredContent,profile:{courseType:"personal",authoringRole:"learner",visibility:"owner-private",source:"assistant-brief"}});
     }).catch((error) => { if (alive) setBriefError(error instanceof Error ? error.message : "Course Creation Brief 加载失败"); });
     return () => { alive = false; };
-  }, [briefMessageId]);
+  }, [briefMessageId,graph.nodes,isTeacher]);
   useEffect(() => {
     if (!draftCourseId) { setPublishValidation(null); return; }
+    if(isTeacher){setPublishValidation(persistedRuntime?creatorPublishValidation(persistedRuntime):null);return;}
     void apiRequest<{ validation: NonNullable<typeof publishValidation> }>(`/api/courses?publishCheckCourseId=${encodeURIComponent(draftCourseId)}`).then((result) => setPublishValidation(result.validation)).catch((error) => setAssistantError(error instanceof Error ? error.message : "课程结构检查失败"));
-  }, [draftCourseId]);
+  }, [draftCourseId,isTeacher,persistedRuntime]);
   useEffect(() => {
     let alive = true;
+    if(isTeacher){
+      if(!teacherCourseId){setRecoveryChecked(true);return;}
+      void Promise.all([apiRequest<{course:CourseRuntimeData}>(`/api/courses?id=${encodeURIComponent(teacherCourseId)}`),applicationServices.courseAuthoringDraftRepository.getDraft(teacherCourseId)]).then(([loaded,authoring])=>{
+        if(!alive)return; const runtime=authoring.draft?.previewRuntime??loaded.course; setDraftCourseId(teacherCourseId);setPersistedRuntime(runtime);setDraftRevision(authoring.draft?.revision??0);
+        if(loaded.course.course.lifecycle==="published"){setPublished(true);setConfirmedThrough(5);setStageIndex(5);}else{setConfirmedThrough(3);setStageIndex(4);}setRecoveryChecked(true);
+      }).catch((error)=>{if(alive){setBriefError(error instanceof Error?error.message:"教师课程草稿恢复失败");setRecoveryChecked(true);}});return()=>{alive=false;};
+    }
     if (!briefMessageId) return;
     void apiRequest<{ course: CourseRuntimeData | null; courseId: string | null; lifecycle: "draft" | "published" | null }>(`/api/courses?creationBriefMessageId=${encodeURIComponent(briefMessageId)}`).then((result) => {
       if (!alive) return;
@@ -93,7 +105,7 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
       setRecoveryChecked(true);
     });
     return () => { alive = false; };
-  }, [briefMessageId]);
+  }, [briefMessageId,isTeacher,teacherCourseId]);
   useEffect(() => {
     let alive = true;
     void resolver.resolve(files).then((scenario) => { if (alive) setGoldenReference(scenario); });
@@ -103,7 +115,7 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
     if (!brief || design || !recoveryChecked) return;
     const base = createInitialCourseDesign(brief, graph, sourceRuntime, files.map((file) => file.name));
     const initial = persistedRuntime ? restoreCourseCreatorDesign(base, persistedRuntime, graph) : base;
-    setDesign(initial); setManualGoal(initial.requirements.goal); setManualFoundation(initial.requirements.learnerFoundation); setManualTime(initial.requirements.timeConstraint); setManualPreferences(initial.requirements.preferences.join("，"));
+    setDesign(initial); setManualGoal(initial.requirements.goal); setManualFoundation(initial.requirements.learnerFoundation); setManualTime(initial.requirements.timeConstraint); setManualPreferences(initial.requirements.preferences.join("，"));setManualTargetId(initial.scope.targetKnowledgeIds[0]??"");
   }, [brief, design, files, graph, persistedRuntime, recoveryChecked, sourceRuntime]);
   useEffect(() => {
     const referenceMaterialNames = files.map((file) => file.name);
@@ -133,7 +145,8 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
   function queueManualRequirements() {
     setPendingProposal(proposalFor("requirements", "需求手动调整", [
       { type: "setRequirement", field: "goal", value: manualGoal.trim() }, { type: "setRequirement", field: "learnerFoundation", value: manualFoundation.trim() },
-      { type: "setRequirement", field: "timeConstraint", value: manualTime.trim() }, { type: "setPreferences", values: manualPreferences.split(/[，,；;\n]/).map((item) => item.trim()).filter(Boolean) }
+      { type: "setRequirement", field: "timeConstraint", value: manualTime.trim() }, { type: "setPreferences", values: manualPreferences.split(/[，,；;\n]/).map((item) => item.trim()).filter(Boolean) },
+      ...(manualTargetId&&!design?.scope.targetKnowledgeIds.includes(manualTargetId)?[{type:"includeKnowledge" as const,nodeId:manualTargetId,role:"target" as const}]:[])
     ]));
   }
   function applyPending() {
@@ -141,7 +154,7 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
     setDesign(proposedDesign); setPendingProposal(null); setConfirmedThrough((value) => invalidateConfirmedThrough(value, stageIndex));
   }
   async function askAssistant() {
-    if (!design || !briefMessageId || !assistantInput.trim()) return;
+    if (!design || !briefMessageId || isTeacher || !assistantInput.trim()) return;
     setAssistantBusy(true); setAssistantError("");
     try {
       const result = await proposeCourseCreatorAdjustment({ briefMessageId, stage: courseCreatorStages[stageIndex], instruction: assistantInput.trim(), current: design, context: { workspace: "courses", experienceMode: "design", courseId: draftCourseId ?? undefined, selectedObject: `course-creator:${courseCreatorStages[stageIndex]}` } });
@@ -155,9 +168,17 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
     setConfirmedThrough((value) => Math.max(value, stageIndex)); setStageIndex((value) => Math.min(5, value + 1)); setPendingProposal(null);
   }
   async function createDraft() {
-    if (!design || !briefMessageId || !validation.valid) return;
+    if (!design || (!isTeacher&&!briefMessageId) || !validation.valid) return;
     setPublishing(true); setAssistantError("");
     try {
+      if(isTeacher){
+        const courseId=draftCourseId??(await apiRequest<{courseId:string}>("/api/courses",{method:"POST",body:JSON.stringify({title:design.requirements.goal,description:design.requirements.goal,targetOutcome:design.requirements.goal})})).courseId;
+        if(!draftCourseId)setDraftCourseId(courseId);
+        const runtime=createCoursePreviewRuntime(design,courseId); const state=emptyCourseAuthoringDraft(courseId);
+        const saved=await applicationServices.courseAuthoringDraftRepository.saveDraft(courseId,{state,previewRuntime:runtime,revision:draftRevision,expectedRevision:draftRevision});
+        setDraftCourseId(courseId);setPersistedRuntime(runtime);setDraftRevision(saved.revision);setPublishValidation(creatorPublishValidation(runtime));setConfirmedThrough(3);setStageIndex(4);
+        if(!draftCourseId)navigate(`/teaching/create?courseId=${encodeURIComponent(courseId)}`,{replace:true});return;
+      }
       const result = await apiRequest<{ courseId: string; lifecycle: "draft" | "published" }>("/api/courses", { method: "POST", body: JSON.stringify({ creationBriefMessageId: briefMessageId, requirements: design.requirements, scope: design.scope, curriculum: design.curriculum, creatorMetadata: courseCreatorMetadata(design) }) });
       const [loaded, check] = await Promise.all([
         apiRequest<{ course: CourseRuntimeData }>(`/api/courses?id=${encodeURIComponent(result.courseId)}`),
@@ -174,25 +195,28 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
     if (!draftCourseId || published) return;
     setPublishing(true); setAssistantError("");
     try {
-      await apiRequest("/api/courses", { method: "PATCH", body: JSON.stringify({ courseId: draftCourseId, lifecycle: "published" }) });
+      if(isTeacher)await applicationServices.courseAuthoringDraftRepository.publish(draftCourseId,draftRevision);
+      else await apiRequest("/api/courses", { method: "PATCH", body: JSON.stringify({ courseId: draftCourseId, lifecycle: "published" }) });
       const loaded = await apiRequest<{ course: CourseRuntimeData }>(`/api/courses?id=${encodeURIComponent(draftCourseId)}`);
       setPersistedRuntime(loaded.course); setPublished(true); setConfirmedThrough(5);
     } catch (error) { setAssistantError(error instanceof Error ? error.message : "Course Publish 失败"); }
     finally { setPublishing(false); }
   }
 
-  if (briefError) return <main className="atlas-page-shell creator-page"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="creator-error glass-v2"><h1>无法开始 Course Creator</h1><p>{briefError}</p><button className="atlas-primary" onClick={() => navigate("/messages")}>返回 Assistant</button></section></main>;
-  if (!design || !brief) return <main className="atlas-page-shell creator-page"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="creator-error glass-v2"><Sparkles/><h1>正在读取 Course Creation Brief…</h1></section></main>;
+  if (briefError) return <main className="atlas-page-shell creator-page"><GlobalNav active={isTeacher?"teaching":"courses"} session={session} onLogout={onLogout} /><section className="creator-error glass-v2"><h1>无法开始 Course Creator</h1><p>{briefError}</p><button className="atlas-primary" onClick={() => navigate(isTeacher?"/teaching":"/messages")}>{isTeacher?"返回教学管理":"返回 Assistant"}</button></section></main>;
+  if (!design || !brief) return <main className="atlas-page-shell creator-page"><GlobalNav active={isTeacher?"teaching":"courses"} session={session} onLogout={onLogout} /><section className="creator-error glass-v2"><Sparkles/><h1>正在读取课程创建上下文…</h1></section></main>;
 
   const stage = courseCreatorStages[stageIndex];
   const displayRuntime = persistedRuntime ?? previewRuntime!;
   const displayGraphData = persistedRuntime ? buildCourseGraphData(persistedRuntime, undefined, graph) : graphData!;
+  const previewHref=draftCourseId?(isTeacher?`/courses/${draftCourseId}?experience=design&creator=teacher`:`/courses/${draftCourseId}`):"";
+  const completedHref=draftCourseId?(isTeacher?`/courses/${draftCourseId}?experience=design`:`/courses/${draftCourseId}`):"";
 
-  return <main className="atlas-page-shell creator-page"><GlobalNav active="courses" session={session} onLogout={onLogout} /><div className="creator-shell">
-    <header className="creator-heading"><div><span className="atlas-kicker">六步课程创建</span><h1>{design.requirements.goal}</h1><p>参考课程和资料只帮助你做决定，不会改变六步流程；没有资料也可以完成创建。</p></div>{draftCourseId ? <span className={`creator-lifecycle ${published ? "published" : "draft"}`}>{published ? "已完成" : "课程草稿"}</span> : null}</header>
+  return <main className="atlas-page-shell creator-page"><GlobalNav active={isTeacher?"teaching":"courses"} session={session} onLogout={onLogout} /><div className="creator-shell">
+    <header className="creator-heading"><div><span className="atlas-kicker">六步课程创建 · {isTeacher?"标准课程":"个人课程"}</span><h1>{design.requirements.goal||"创建一门标准课程"}</h1><p>参考课程和资料只帮助你做决定，不会改变六步流程；没有资料也可以完成创建。</p></div>{draftCourseId ? <span className={`creator-lifecycle ${published ? "published" : "draft"}`}>{published ? "已发布" : "课程草稿"}</span> : null}</header>
     <nav className="creator-stepper" aria-label="Course Creator stages">{stageLabels.map((label, index) => <button key={label} className={`${index === stageIndex ? "active" : ""} ${index <= confirmedThrough ? "done" : ""}`} disabled={index > Math.max(stageIndex, confirmedThrough + 1)} onClick={() => { setStageIndex(index); setPendingProposal(null); }}><i>{index <= confirmedThrough ? <Check size={13}/> : index + 1}</i><span>{label}<small>{stageOutputLabels[index]}</small></span>{index < 5 ? <ChevronRight size={14}/> : null}</button>)}</nav>
     <div className="creator-workspace"><section className="creator-result glass-v2">
-      {stage === "requirements" ? <RequirementsResult design={design} sourceTitle={sourceRuntime?.course.title} files={files} goldenReference={goldenReference} manual={{ goal: manualGoal, foundation: manualFoundation, time: manualTime, preferences: manualPreferences }} setManual={{ goal: setManualGoal, foundation: setManualFoundation, time: setManualTime, preferences: setManualPreferences }} queue={queueManualRequirements} setFiles={setFiles}/> : null}
+      {stage === "requirements" ? <RequirementsResult design={design} sourceTitle={sourceRuntime?.course.title} files={files} goldenReference={goldenReference} knowledgeOptions={graph.nodes.filter((node)=>node.status==="active")} manual={{ goal: manualGoal, foundation: manualFoundation, time: manualTime, preferences: manualPreferences,targetId:manualTargetId }} setManual={{ goal: setManualGoal, foundation: setManualFoundation, time: setManualTime, preferences: setManualPreferences,targetId:setManualTargetId }} queue={queueManualRequirements} setFiles={setFiles}/> : null}
       {stage === "scope" ? <ScopeResult design={design} sourceRuntime={sourceRuntime} sourceDiff={sourceDiff} sourceCount={sourceIds.size} titleById={titleById} setProposal={setPendingProposal}/> : null}
       {stage === "structure" ? <StructureResult design={design} graphData={graphData!} titleById={titleById} setProposal={setPendingProposal}/> : null}
       {stage === "assets" ? <AssetsResult design={design} includedIds={includedIds} executableMicroKnowledgeIds={executableMicroKnowledgeIds} titleById={titleById} files={files} sourceRuntime={sourceRuntime} setProposal={setPendingProposal}/> : null}
@@ -200,14 +224,14 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver }: { s
       {stage === "publish" ? <PublishResult runtime={displayRuntime} graphData={displayGraphData} assetAudit={assetAudit} validation={publishValidation}/> : null}
       {pendingProposal && proposedValidation ? <ProposalPreview proposal={pendingProposal} validation={proposedValidation} titleById={titleById} cancel={() => setPendingProposal(null)} apply={applyPending}/> : null}
     </section>
-    <aside className="creator-assistant glass-v2"><header><Bot/><span><strong>EduFlow Assistant</strong><small>同一个 Global Assistant · {stageLabels[stageIndex]} Context</small></span></header><div className="creator-assistant-context"><span>当前产物</span><strong>{stageOutputLabels[stageIndex]}</strong><small>Assistant → Proposal → Preview → Validation → Confirm → Apply</small></div><p>{["澄清 Goal、基础、限制与偏好。", "缩放 Knowledge 范围；只引用真实可见 Knowledge。", "调整章节与教学顺序；不修改 Knowledge prerequisite facts。", "解释 asset gap；缺失资源不阻止创建。", "检查 Draft 与 validation；不能自行落库。", "解释 Publish warning；不能自行发布。"][stageIndex]}</p><textarea value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder={stageIndex === 1 ? "例如：内容太多，只保留做出第一个模型必须学的" : stageIndex === 2 ? "例如：不要先讲太多理论，早点让我完成第一次实践" : "告诉 Assistant 你想怎样微调当前阶段"}/><button className="atlas-primary" disabled={assistantBusy || !assistantInput.trim()} onClick={() => void askAssistant()}>{assistantBusy ? "正在生成 Proposal…" : "生成结构化 Proposal"}</button>{assistantError ? <p role="alert" className="creator-assistant-error">{assistantError}</p> : null}<small>AI 不直接修改数据库，也不能替你 Publish。</small></aside></div>
-    <footer className="creator-footer"><button className="atlas-secondary" disabled={stageIndex === 0 || published} onClick={() => { setStageIndex((value) => Math.max(0, value - 1)); setPendingProposal(null); }}><ArrowLeft size={15}/>返回修改</button><span>{validation.fatal[0] ?? validation.warnings[0] ?? "当前阶段通过确定性检查"}</span>{stageIndex < 4 ? <button className="atlas-primary" disabled={!validation.valid || Boolean(pendingProposal)} onClick={confirmAndContinue}>确认{stageLabels[stageIndex]}并继续<ChevronRight size={15}/></button> : stageIndex === 4 ? draftCourseId ? <><button className="atlas-secondary" onClick={() => window.location.assign(`/courses/${draftCourseId}`)}>打开课程草稿</button><button className="atlas-secondary" disabled={publishing || !validation.valid} onClick={() => void createDraft()}>{publishing ? "正在保存…" : "保存当前修改"}</button><button className="atlas-primary" onClick={() => { setConfirmedThrough(4); setStageIndex(5); }}>确认草稿，进入最后检查<ChevronRight size={15}/></button></> : <button className="atlas-primary" disabled={publishing || !validation.valid} onClick={() => void createDraft()}>{publishing ? "正在创建课程草稿…" : "创建课程草稿"}</button> : published ? <button className="atlas-primary" onClick={() => window.location.assign(`/courses/${draftCourseId}`)}>打开我的课程</button> : <><button className="atlas-secondary" onClick={() => window.location.assign(`/courses/${draftCourseId}`)}>打开草稿预览</button><button className="atlas-primary" disabled={publishing || !draftCourseId || !publishValidation?.valid} onClick={() => void publishCourse()}>{publishing ? "正在完成…" : "完成创建"}</button></>}</footer>
+    <aside className="creator-assistant glass-v2"><header><Bot/><span><strong>EduFlow Assistant</strong><small>同一个 Global Assistant · {stageLabels[stageIndex]} Context</small></span></header><div className="creator-assistant-context"><span>当前产物</span><strong>{stageOutputLabels[stageIndex]}</strong><small>Assistant → Proposal → Preview → Validation → Confirm → Apply</small></div><p>{isTeacher?"教师手动入口使用同一 Proposal / Preview / Validation / Apply 管线；完成草稿后可进入高级 Design Mode。":["澄清 Goal、基础、限制与偏好。", "缩放 Knowledge 范围；只引用真实可见 Knowledge。", "调整章节与教学顺序；不修改 Knowledge prerequisite facts。", "解释 asset gap；缺失资源不阻止创建。", "检查 Draft 与 validation；不能自行落库。", "解释 Publish warning；不能自行发布。"][stageIndex]}</p><textarea disabled={isTeacher} value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder={isTeacher?"教师入口暂不伪造 Assistant Brief；请使用左侧正式手动 Proposal。":stageIndex === 1 ? "例如：内容太多，只保留做出第一个模型必须学的" : stageIndex === 2 ? "例如：不要先讲太多理论，早点让我完成第一次实践" : "告诉 Assistant 你想怎样微调当前阶段"}/><button className="atlas-primary" disabled={isTeacher||assistantBusy || !assistantInput.trim()} onClick={() => void askAssistant()}>{assistantBusy ? "正在生成 Proposal…" : "生成结构化 Proposal"}</button>{assistantError ? <p role="alert" className="creator-assistant-error">{assistantError}</p> : null}<small>AI 不直接修改数据库，也不能替你 Publish。</small></aside></div>
+    <footer className="creator-footer"><button className="atlas-secondary" disabled={stageIndex === 0 || published} onClick={() => { setStageIndex((value) => Math.max(0, value - 1)); setPendingProposal(null); }}><ArrowLeft size={15}/>返回修改</button><span>{validation.fatal[0] ?? validation.warnings[0] ?? "当前阶段通过确定性检查"}</span>{stageIndex < 4 ? <button className="atlas-primary" disabled={!validation.valid || Boolean(pendingProposal)} onClick={confirmAndContinue}>确认{stageLabels[stageIndex]}并继续<ChevronRight size={15}/></button> : stageIndex === 4 ? draftCourseId ? <><button className="atlas-secondary" onClick={() => window.location.assign(previewHref)}>打开课程草稿</button><button className="atlas-secondary" disabled={publishing || !validation.valid} onClick={() => void createDraft()}>{publishing ? "正在保存…" : "保存当前修改"}</button><button className="atlas-primary" onClick={() => { setConfirmedThrough(4); setStageIndex(5); }}>确认草稿，进入最后检查<ChevronRight size={15}/></button></> : <button className="atlas-primary" disabled={publishing || !validation.valid} onClick={() => void createDraft()}>{publishing ? "正在创建课程草稿…" : "创建课程草稿"}</button> : published ? <button className="atlas-primary" onClick={() => window.location.assign(completedHref)}>{isTeacher?"进入高级 Design Mode":"打开我的课程"}</button> : <><button className="atlas-secondary" onClick={() => window.location.assign(previewHref)}>打开草稿预览</button><button className="atlas-primary" disabled={publishing || !draftCourseId || !publishValidation?.valid} onClick={() => void publishCourse()}>{publishing ? "正在完成…" : isTeacher?"发布标准课程":"完成创建"}</button></>}</footer>
   </div></main>;
 }
 
 function ResultTitle({ icon, step, title }: { icon: React.ReactNode; step: string; title: string }) { return <div className="creator-section-title">{icon}<span><small>{step}</small><h2>{title}</h2></span></div>; }
-function RequirementsResult({ design, sourceTitle, files, goldenReference, manual, setManual, queue, setFiles }: any) {
-  return <><ResultTitle icon={<FileText/>} step="STEP 1 RESULT" title="Course Blueprint Card"/><div className="creator-blueprint"><span className="atlas-kicker">COURSE GOAL</span><h3>{design.requirements.goal}</h3><dl><div><dt>学习者基础</dt><dd>{design.requirements.learnerFoundation}</dd></div><div><dt>时间约束</dt><dd>{design.requirements.timeConstraint}</dd></div><div><dt>学习偏好</dt><dd>{design.requirements.preferences.join(" · ") || "未指定"}</dd></div>{design.requirements.requestedAdjustments ? <div><dt>补充要求（原文）</dt><dd>{design.requirements.requestedAdjustments}</dd></div> : null}<div><dt>Reference Course</dt><dd>{sourceTitle ?? "无"}</dd></div><div><dt>Reference Material</dt><dd>{files.map((file: File) => file.name).join("、") || "无（可完整创建）"}</dd></div></dl>{goldenReference ? <p className="creator-reference-note"><Sparkles size={14}/>已识别 Golden reference「{goldenReference.sourceLabel}」；它只辅助 Proposal，不会绕过六步确认。</p> : null}</div><details className="creator-manual"><summary>手动修改需求</summary><label>课程目标<textarea value={manual.goal} onChange={(event) => setManual.goal(event.target.value)}/></label><label>学习者基础<input value={manual.foundation} onChange={(event) => setManual.foundation(event.target.value)}/></label><label>时间约束<input value={manual.time} onChange={(event) => setManual.time(event.target.value)}/></label><label>学习偏好<input value={manual.preferences} onChange={(event) => setManual.preferences(event.target.value)}/></label><label className="atlas-secondary creator-upload"><Upload size={14}/>添加可选 PDF<input hidden type="file" accept=".pdf" onChange={(event) => { const file = event.target.files?.[0]; if (file) setFiles([file]); }}/></label><button className="atlas-secondary" onClick={queue}>生成修改 Proposal</button></details></>;
+function RequirementsResult({ design, sourceTitle, files, goldenReference, knowledgeOptions, manual, setManual, queue, setFiles }: any) {
+  return <><ResultTitle icon={<FileText/>} step="STEP 1 RESULT" title="Course Blueprint Card"/><div className="creator-blueprint"><span className="atlas-kicker">COURSE GOAL</span><h3>{design.requirements.goal||"请填写课程目标并选择核心学习内容"}</h3><dl><div><dt>学习者基础</dt><dd>{design.requirements.learnerFoundation}</dd></div><div><dt>时间约束</dt><dd>{design.requirements.timeConstraint}</dd></div><div><dt>学习偏好</dt><dd>{design.requirements.preferences.join(" · ") || "未指定"}</dd></div>{design.requirements.requestedAdjustments ? <div><dt>补充要求（原文）</dt><dd>{design.requirements.requestedAdjustments}</dd></div> : null}<div><dt>Reference Course</dt><dd>{sourceTitle ?? "无"}</dd></div><div><dt>Reference Material</dt><dd>{files.map((file: File) => file.name).join("、") || "无（可完整创建）"}</dd></div></dl>{goldenReference ? <p className="creator-reference-note"><Sparkles size={14}/>已识别 Golden reference「{goldenReference.sourceLabel}」；它只辅助 Proposal，不会绕过六步确认。</p> : null}</div><details className="creator-manual" open={design.profile.authoringRole==="teacher"}><summary>手动修改需求</summary><label>课程目标<textarea value={manual.goal} onChange={(event) => setManual.goal(event.target.value)}/></label>{design.profile.authoringRole==="teacher"?<label>核心学习内容<select required value={manual.targetId} onChange={(event)=>setManual.targetId(event.target.value)}><option value="">请选择一个正式 Knowledge</option>{knowledgeOptions.map((node:any)=><option key={node.id} value={node.id}>{node.title}</option>)}</select></label>:null}<label>学习者基础<input value={manual.foundation} onChange={(event) => setManual.foundation(event.target.value)}/></label><label>时间约束<input value={manual.time} onChange={(event) => setManual.time(event.target.value)}/></label><label>学习偏好<input value={manual.preferences} onChange={(event) => setManual.preferences(event.target.value)}/></label><label className="atlas-secondary creator-upload"><Upload size={14}/>添加可选 PDF<input hidden type="file" accept=".pdf" onChange={(event) => { const file = event.target.files?.[0]; if (file) setFiles([file]); }}/></label><button className="atlas-secondary" onClick={queue}>生成修改 Proposal</button></details></>;
 }
 function ScopeResult({ design, sourceRuntime, sourceDiff, sourceCount, titleById, setProposal }: any) {
   return <><ResultTitle icon={<Network/>} step="STEP 2 RESULT" title="这门课要学什么"/>{sourceRuntime ? <div className="creator-scope-diff"><span>参考课程<strong>{sourceCount} 项学习内容</strong></span><span className="keep">保留<strong>{sourceDiff.keep.length}</strong></span><span className="remove">暂不学习<strong>{sourceDiff.remove.length}</strong></span><span className="add">新增<strong>{sourceDiff.add.length}</strong></span></div> : null}<div className="creator-scope-map">{(["targetKnowledgeIds", "prerequisiteKnowledgeIds", "optionalKnowledgeIds", "excludedKnowledgeIds"] as const).map((key) => <ScopeBucket key={key} bucketKey={key} ids={design.scope[key]} titleById={titleById} setProposal={setProposal}/>)}</div></>;
@@ -215,7 +239,7 @@ function ScopeResult({ design, sourceRuntime, sourceDiff, sourceCount, titleById
 function ScopeBucket({ bucketKey, ids, titleById, setProposal }: { bucketKey: "targetKnowledgeIds" | "prerequisiteKnowledgeIds" | "optionalKnowledgeIds" | "excludedKnowledgeIds"; ids: string[]; titleById: Map<string, string>; setProposal(value: CourseCreatorProposal): void }) {
   const [expanded, setExpanded] = useState(false); const visible = expanded ? ids : ids.slice(0, 8); const derived = bucketKey === "prerequisiteKnowledgeIds";
   const labels = { targetKnowledgeIds: "核心目标", prerequisiteKnowledgeIds: "必要基础", optionalKnowledgeIds: "可选扩展", excludedKnowledgeIds: "暂不学习" };
-  return <section className={bucketKey}><h3>{labels[bucketKey]}<small>{ids.length}</small></h3>{derived ? <p>由事实前置关系自动整理，不能手工指定。</p> : null}{visible.map((id) => derived ? <span key={id}><strong>{titleById.get(id) ?? id}</strong></span> : <button key={id} onClick={() => bucketKey === "excludedKnowledgeIds" ? setProposal(proposalFor("scope", "加入学习内容", [{ type: "includeKnowledge", nodeId: id, role: "optional" }])) : setProposal(proposalFor("scope", "移除学习内容", [{ type: "excludeKnowledge", nodeId: id }]))}><strong>{titleById.get(id) ?? id}</strong>{bucketKey === "excludedKnowledgeIds" ? "+" : "×"}</button>)}{ids.length > 8 ? <button className="atlas-secondary" onClick={() => setExpanded((value) => !value)}>{expanded ? "收起" : `展开全部（${ids.length}）`}</button> : null}{!ids.length ? <p>无</p> : null}</section>;
+  return <section className={bucketKey}><h3>{labels[bucketKey]}<small>{ids.length}</small></h3>{derived ? <p>由事实前置关系自动整理，不能手工指定。</p> : null}{visible.map((id) => derived ? <span className="creator-scope-item readonly" key={id}><strong>{titleById.get(id) ?? id}</strong></span> : <button className="creator-scope-item" key={id} onClick={() => bucketKey === "excludedKnowledgeIds" ? setProposal(proposalFor("scope", "加入学习内容", [{ type: "includeKnowledge", nodeId: id, role: "optional" }])) : setProposal(proposalFor("scope", "移除学习内容", [{ type: "excludeKnowledge", nodeId: id }]))}><strong>{titleById.get(id) ?? id}</strong>{bucketKey === "excludedKnowledgeIds" ? "+" : "×"}</button>)}{ids.length > 8 ? <button className="atlas-secondary" onClick={() => setExpanded((value) => !value)}>{expanded ? "收起" : `展开全部（${ids.length}）`}</button> : null}{!ids.length ? <p>无</p> : null}</section>;
 }
 function StructureResult({ design, graphData, titleById, setProposal }: any) {
   return <><ResultTitle icon={<GitCompare/>} step="STEP 3 RESULT · LEFT → RIGHT" title="Horizontal Course Skill Tree Draft"/><div className="creator-graph"><CourseGraph graphData={graphData} view="full" focusedChapterId={null} mode="knowledge" selectedId={null} searchMatchId={null} {...graphCallbacks}/></div><div className="creator-chapter-summary">{design.curriculum.chapters.map((chapter: any, index: number) => <article key={chapter.id}><small>CHAPTER {index + 1}</small><strong>{chapter.title}</strong><span>{chapter.knowledgeIds.length} Knowledge</span>{chapter.knowledgeIds.map((id: string) => <label key={id}>{titleById.get(id) ?? id}<select value={chapter.id} onChange={(event) => setProposal(proposalFor("structure", "移动 Knowledge", [{ type: "moveKnowledge", nodeId: id, chapterId: event.target.value }]))}>{design.curriculum.chapters.map((candidate: any) => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}</select></label>)}</article>)}</div></>;

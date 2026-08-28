@@ -104,4 +104,13 @@ describe("fixed Course Creator pipeline contracts", () => {
     expect(next.assets.desiredAssignmentKnowledgeIds).toEqual(["target"]);
     expect(next.assets.assignmentKnowledgeIds).toEqual([]);
   });
+
+  it("uses the same Creator design for teacher Standard and learner Personal entries", () => {
+    const teacher = createInitialCourseDesign({ goal:"", targetKnowledge:[], availableKnowledgeIds:["foundation","target","extra"], profile:{courseType:"standard",authoringRole:"teacher",visibility:"platform-published",source:"teacher-manual"} }, graph, null);
+    expect(teacher.profile).toMatchObject({courseType:"standard",authoringRole:"teacher"});
+    expect(teacher.scope.excludedKnowledgeIds).toEqual(["foundation","target","extra"]);
+    const selected = applyCourseCreatorProposal(teacher,{id:"target",stage:"requirements",title:"Target",summary:"Select target",operations:[{type:"includeKnowledge",nodeId:"target",role:"target"}]},graph);
+    expect(createCoursePreviewRuntime(selected).course).toMatchObject({courseType:"standard",lifecycle:"draft"});
+    expect(createCoursePreviewRuntime(createInitialCourseDesign(brief,graph,null)).course.courseType).toBe("personal");
+  });
 });
