@@ -12,6 +12,8 @@ MaterialReaderShell owns course-facing state and metadata. PdfMaterialViewer own
 
 The stable page retains three independent areas: Material Outline, original PDF, and Knowledge/Assignment context. MaterialRenderer switches between PDF and Document/Article renderers without introducing Course logic into PdfMaterialViewer.
 
+`courseId + materialId` and the server-owned `storage_path` are the stable Material identity. A signed URL is only a short-lived transport credential: the reader requests a current URL when loading, refreshes it once after a recoverable fatal load error, and requests another current URL when the learner chooses Reload. It never treats the URL cached in Course Runtime as the durable recovery source.
+
 ## 4. activeSegmentId
 
 `activeSegmentId` is the single live position. It drives current PDF page, Outline selection, MaterialKnowledgeCoverage projection, unique Assignment projection, query state, and debounced UserMaterialState persistence.

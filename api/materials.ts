@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createServerSupabase, createUserSupabase, requireCapability } from "./_lib/supabase.js";
+import { createOptionalUserSupabase, createServerSupabase, createUserSupabase, requireCapability } from "./_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
 import { dataOrThrow } from "./_lib/query.js";
 
@@ -49,6 +49,20 @@ function validateSegments(materialType: string, pageCount: number | undefined, s
 }
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
+  if (request.method === "GET") {
+    const courseId = typeof request.query.courseId === "string" ? request.query.courseId : "";
+    const materialId = typeof request.query.materialId === "string" ? request.query.materialId : "";
+    if (!courseId || !materialId) throw new ApiError(400, "invalid_material_source", "Course and material are required");
+    const { client } = await createOptionalUserSupabase(request);
+    const material = await client.from("materials").select("storage_path, material_type").eq("course_id", courseId).eq("id", materialId).maybeSingle();
+    if (material.error) throw new Error(`Material source lookup failed: ${material.error.code}`);
+    if (!material.data?.storage_path || material.data.material_type !== "pdf") throw new ApiError(404, "material_source_not_found", "Course PDF material not found");
+    const expiresIn = 3600;
+    const signed = await client.storage.from("course-materials").createSignedUrl(material.data.storage_path, expiresIn);
+    if (signed.error || !signed.data) throw new Error(`Material signed URL failed: ${signed.error?.message ?? "unknown"}`);
+    json(response, 200, { sourceUrl: signed.data.signedUrl, expiresIn });
+    return;
+  }
   const { client, user } = await createUserSupabase(request);
   await requireCapability(user, "global-domain-admin");
   if (request.method === "POST") {
@@ -109,5 +123,5 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     json(response, 201, { material: { id: body.materialId, courseId: body.courseId, lessonId: body.lessonId, storagePath: body.path, type: materialType }, parsingJob: job });
     return;
   }
-  return methodNotAllowed(response, ["POST", "PUT"]);
+  return methodNotAllowed(response, ["GET", "POST", "PUT"]);
 });

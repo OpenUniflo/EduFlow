@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { MaterialSegment } from "@/features/course/types";
+import { getMaterialSourceUrl } from "@/features/material/ApiMaterialStorageService";
 import { selectPageAtReadingAnchor, type MaterialNavigationRequest, type VisiblePageCandidate } from "./materialReaderState";
+import { loadPdfWithFreshSource } from "./pdfSourceLifecycle";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -58,8 +60,9 @@ function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, 
   </article>;
 }
 
-export function PdfMaterialViewer({ sourceUrl, sourcePageCount, segments, activePage, zoom, navigationRequest, onVisiblePageChange, onNavigationSettled, onFatalError }: {
-  sourceUrl: string;
+export function PdfMaterialViewer({ courseId, materialId, sourcePageCount, segments, activePage, zoom, navigationRequest, onVisiblePageChange, onNavigationSettled, onFatalError }: {
+  courseId: string;
+  materialId: string;
   sourcePageCount: number;
   segments: MaterialSegment[];
   activePage: number;
@@ -87,21 +90,32 @@ export function PdfMaterialViewer({ sourceUrl, sourcePageCount, segments, active
 
   useEffect(() => {
     let disposed = false;
+    let loadingTask: ReturnType<typeof getDocument> | null = null;
     setDocument(null);
     setPageAspectRatios(new Map());
     setError(null);
-    const loadingTask = getDocument({ url: sourceUrl });
-    loadingTask.promise.then(async (loaded) => {
-      if (disposed) return loadingTask.destroy();
-      if (loaded.numPages !== sourcePageCount) {
-        return loadingTask.destroy().then(() => { throw new Error(`PDF page count ${loaded.numPages} does not match Material source ${sourcePageCount}`); });
+    loadPdfWithFreshSource({
+      resolveSourceUrl: () => getMaterialSourceUrl(courseId, materialId),
+      shouldRefresh: (reason) => !(reason instanceof Error && reason.name === "PasswordException"),
+      load: async (freshSourceUrl) => {
+        loadingTask = getDocument({ url: freshSourceUrl });
+        try {
+          const loaded = await loadingTask.promise;
+          if (loaded.numPages !== sourcePageCount) throw new Error(`PDF page count ${loaded.numPages} does not match Material source ${sourcePageCount}`);
+          const ratios = await Promise.all(Array.from({ length: loaded.numPages }, async (_, index) => {
+            const page = index + 1;
+            const viewport = (await loaded.getPage(page)).getViewport({ scale: 1 });
+            return [page, viewport.height / viewport.width] as const;
+          }));
+          return { loaded, ratios };
+        } catch (reason) {
+          await loadingTask.destroy();
+          loadingTask = null;
+          throw reason;
+        }
       }
-      const ratios = await Promise.all(Array.from({ length: loaded.numPages }, async (_, index) => {
-        const page = index + 1;
-        const viewport = (await loaded.getPage(page)).getViewport({ scale: 1 });
-        return [page, viewport.height / viewport.width] as const;
-      }));
-      if (disposed) return loadingTask.destroy();
+    }).then(async ({ loaded, ratios }) => {
+      if (disposed) return loadingTask?.destroy();
       setPageAspectRatios(new Map(ratios));
       setDocument(loaded);
     }).catch((reason: unknown) => {
@@ -112,9 +126,9 @@ export function PdfMaterialViewer({ sourceUrl, sourcePageCount, segments, active
     });
     return () => {
       disposed = true;
-      loadingTask.destroy();
+      void loadingTask?.destroy();
     };
-  }, [onFatalError, reloadKey, sourcePageCount, sourceUrl]);
+  }, [courseId, materialId, onFatalError, reloadKey, sourcePageCount]);
 
   useEffect(() => {
     const root = rootRef.current;
