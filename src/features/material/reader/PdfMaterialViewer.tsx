@@ -83,6 +83,8 @@ export function PdfMaterialViewer({ courseId, materialId, staticSourceUrl, sourc
   const [availableWidth, setAvailableWidth] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const activePageRef = useRef(activePage);
+  activePageRef.current = activePage;
   const pendingRecoveryPageRef = useRef<number | null>(null);
   const pageRecoveryGuardRef = useRef<ReturnType<typeof createPdfPageRecoveryGuard> | null>(null);
   if (!pageRecoveryGuardRef.current) {
@@ -90,8 +92,8 @@ export function PdfMaterialViewer({ courseId, materialId, staticSourceUrl, sourc
   }
   const pageBySegmentId = useMemo(() => new Map(segments.map((segment) => [segment.id, segment.page ?? segment.order])), [segments]);
   const recoverDocumentAfterPageFailure = useCallback((reason: unknown) => {
-    if (pageRecoveryGuardRef.current!.recover(reason)) pendingRecoveryPageRef.current = activePage;
-  }, [activePage]);
+    if (pageRecoveryGuardRef.current!.recover(reason)) pendingRecoveryPageRef.current = activePageRef.current;
+  }, []);
   const reloadManually = () => {
     pendingRecoveryPageRef.current = null;
     pageRecoveryGuardRef.current!.reset();
