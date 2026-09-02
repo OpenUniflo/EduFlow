@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { loadPdfWithFreshSource } from "./pdfSourceLifecycle";
+import { createPdfPageRecoveryGuard, loadPdfWithFreshSource, resolvePdfSourceUrl } from "./pdfSourceLifecycle";
 
 describe("loadPdfWithFreshSource", () => {
   it("loads once with a current source when the first attempt succeeds", async () => {
@@ -58,5 +58,51 @@ describe("loadPdfWithFreshSource", () => {
 
     expect(resolveSourceUrl).toHaveBeenCalledTimes(2);
     expect(load).toHaveBeenNthCalledWith(2, "reload-url");
+  });
+});
+
+describe("createPdfPageRecoveryGuard", () => {
+  it("allows only one automatic document recovery for concurrent page failures", () => {
+    const recover = vi.fn();
+    const guard = createPdfPageRecoveryGuard(recover);
+
+    expect(guard.recover(new Error("page range expired"))).toBe(true);
+    expect(guard.recover(new Error("another page failed"))).toBe(false);
+    expect(recover).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores cancellation and password failures", () => {
+    const recover = vi.fn();
+    const guard = createPdfPageRecoveryGuard(recover);
+
+    expect(guard.recover(Object.assign(new Error("cancelled"), { name: "RenderingCancelledException" }))).toBe(false);
+    expect(guard.recover(Object.assign(new Error("password"), { name: "PasswordException" }))).toBe(false);
+    expect(recover).not.toHaveBeenCalled();
+  });
+
+  it("allows manual Reload to start a new recovery lifecycle", () => {
+    const recover = vi.fn();
+    const guard = createPdfPageRecoveryGuard(recover);
+
+    expect(guard.recover(new Error("first lifecycle"))).toBe(true);
+    guard.reset();
+    expect(guard.recover(new Error("manual reload lifecycle"))).toBe(true);
+    expect(recover).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("resolvePdfSourceUrl", () => {
+  it("uses a stable repository-owned URL without calling the managed source endpoint", async () => {
+    const resolveManagedSourceUrl = vi.fn().mockResolvedValue("signed-url");
+
+    await expect(resolvePdfSourceUrl("/materials/demo.pdf", resolveManagedSourceUrl)).resolves.toBe("/materials/demo.pdf");
+    expect(resolveManagedSourceUrl).not.toHaveBeenCalled();
+  });
+
+  it("resolves managed PDFs just in time when no stable URL exists", async () => {
+    const resolveManagedSourceUrl = vi.fn().mockResolvedValue("signed-url");
+
+    await expect(resolvePdfSourceUrl(undefined, resolveManagedSourceUrl)).resolves.toBe("signed-url");
+    expect(resolveManagedSourceUrl).toHaveBeenCalledTimes(1);
   });
 });

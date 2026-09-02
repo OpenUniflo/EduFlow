@@ -1,15 +1,15 @@
 import { AlertTriangle, LoaderCircle, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { MaterialSegment } from "@/features/course/types";
 import { getMaterialSourceUrl } from "@/features/material/ApiMaterialStorageService";
 import { selectPageAtReadingAnchor, type MaterialNavigationRequest, type VisiblePageCandidate } from "./materialReaderState";
-import { loadPdfWithFreshSource } from "./pdfSourceLifecycle";
+import { createPdfPageRecoveryGuard, loadPdfWithFreshSource, resolvePdfSourceUrl } from "./pdfSourceLifecycle";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, initialAspectRatio }: {
+function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, initialAspectRatio, onFatalError }: {
   document: PDFDocumentProxy;
   page: number;
   segment: MaterialSegment;
@@ -17,6 +17,7 @@ function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, 
   zoom: number;
   active: boolean;
   initialAspectRatio: number;
+  onFatalError(reason: unknown): void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [aspectRatio, setAspectRatio] = useState(initialAspectRatio);
@@ -46,13 +47,16 @@ function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, 
       renderTask = pdfPage.render({ canvas, viewport: renderViewport });
       return renderTask.promise;
     }).then(() => { if (!cancelled) setRendered(true); }).catch((error: unknown) => {
-      if (!cancelled && !(error instanceof Error && error.name === "RenderingCancelledException")) setRenderError(true);
+      if (!cancelled && !(error instanceof Error && error.name === "RenderingCancelledException")) {
+        setRenderError(true);
+        onFatalError(error);
+      }
     });
     return () => {
       cancelled = true;
       renderTask?.cancel();
     };
-  }, [availableWidth, document, page, zoom]);
+  }, [availableWidth, document, onFatalError, page, zoom]);
 
   return <article className={`atlas-pdf-page ${active ? "current" : ""}`} data-segment-id={segment.id} data-page-number={page} style={{ width: availableWidth > 0 ? `${Math.round(availableWidth * zoom)}px` : "min(100%, 820px)", aspectRatio: `1 / ${aspectRatio}` }}>
     <canvas ref={canvasRef} aria-label={`PDF 第 ${page} 页`} />
@@ -60,9 +64,10 @@ function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, 
   </article>;
 }
 
-export function PdfMaterialViewer({ courseId, materialId, sourcePageCount, segments, activePage, zoom, navigationRequest, onVisiblePageChange, onNavigationSettled, onFatalError }: {
+export function PdfMaterialViewer({ courseId, materialId, staticSourceUrl, sourcePageCount, segments, activePage, zoom, navigationRequest, onVisiblePageChange, onNavigationSettled, onFatalError }: {
   courseId: string;
   materialId: string;
+  staticSourceUrl?: string;
   sourcePageCount: number;
   segments: MaterialSegment[];
   activePage: number;
@@ -78,7 +83,25 @@ export function PdfMaterialViewer({ courseId, materialId, sourcePageCount, segme
   const [availableWidth, setAvailableWidth] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const pendingRecoveryPageRef = useRef<number | null>(null);
+  const pageRecoveryGuardRef = useRef<ReturnType<typeof createPdfPageRecoveryGuard> | null>(null);
+  if (!pageRecoveryGuardRef.current) {
+    pageRecoveryGuardRef.current = createPdfPageRecoveryGuard(() => setReloadKey((value) => value + 1));
+  }
   const pageBySegmentId = useMemo(() => new Map(segments.map((segment) => [segment.id, segment.page ?? segment.order])), [segments]);
+  const recoverDocumentAfterPageFailure = useCallback((reason: unknown) => {
+    if (pageRecoveryGuardRef.current!.recover(reason)) pendingRecoveryPageRef.current = activePage;
+  }, [activePage]);
+  const reloadManually = () => {
+    pendingRecoveryPageRef.current = null;
+    pageRecoveryGuardRef.current!.reset();
+    setReloadKey((value) => value + 1);
+  };
+
+  useEffect(() => {
+    pageRecoveryGuardRef.current!.reset();
+    pendingRecoveryPageRef.current = null;
+  }, [courseId, materialId]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -95,8 +118,8 @@ export function PdfMaterialViewer({ courseId, materialId, sourcePageCount, segme
     setPageAspectRatios(new Map());
     setError(null);
     loadPdfWithFreshSource({
-      resolveSourceUrl: () => getMaterialSourceUrl(courseId, materialId),
-      shouldRefresh: (reason) => !(reason instanceof Error && reason.name === "PasswordException"),
+      resolveSourceUrl: () => resolvePdfSourceUrl(staticSourceUrl, () => getMaterialSourceUrl(courseId, materialId)),
+      shouldRefresh: (reason) => !staticSourceUrl && !(reason instanceof Error && reason.name === "PasswordException"),
       load: async (freshSourceUrl) => {
         loadingTask = getDocument({ url: freshSourceUrl });
         try {
@@ -128,7 +151,14 @@ export function PdfMaterialViewer({ courseId, materialId, sourcePageCount, segme
       disposed = true;
       void loadingTask?.destroy();
     };
-  }, [courseId, materialId, onFatalError, reloadKey, sourcePageCount]);
+  }, [courseId, materialId, onFatalError, reloadKey, sourcePageCount, staticSourceUrl]);
+
+  useEffect(() => {
+    const page = pendingRecoveryPageRef.current;
+    if (!document || page === null) return;
+    pendingRecoveryPageRef.current = null;
+    window.requestAnimationFrame(() => rootRef.current?.querySelector<HTMLElement>(`[data-page-number="${page}"]`)?.scrollIntoView({ block: "center" }));
+  }, [document]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -166,10 +196,10 @@ export function PdfMaterialViewer({ courseId, materialId, sourcePageCount, segme
   }, [document, navigationRequest, onNavigationSettled, onVisiblePageChange, pageBySegmentId]);
 
   return <section className="atlas-lesson-scroll atlas-pdf-scroll" ref={rootRef}>
-    {error ? <div className="atlas-pdf-state atlas-pdf-error"><AlertTriangle size={28} /><h2>课件 PDF 加载失败</h2><p>{error}</p><button className="atlas-primary" onClick={() => setReloadKey((value) => value + 1)}><RotateCcw size={15} />重新加载</button></div> : !document ? <div className="atlas-pdf-state"><LoaderCircle size={30} className="atlas-spin" /><h2>正在加载原始 PDF</h2><p>首次打开可能需要几秒钟。</p></div> : <div className="atlas-pdf-pages" style={{ "--pdf-zoom": zoom } as React.CSSProperties}>
+    {error ? <div className="atlas-pdf-state atlas-pdf-error"><AlertTriangle size={28} /><h2>课件 PDF 加载失败</h2><p>{error}</p><button className="atlas-primary" onClick={reloadManually}><RotateCcw size={15} />重新加载</button></div> : !document ? <div className="atlas-pdf-state"><LoaderCircle size={30} className="atlas-spin" /><h2>正在加载原始 PDF</h2><p>首次打开可能需要几秒钟。</p></div> : <div className="atlas-pdf-pages" style={{ "--pdf-zoom": zoom } as React.CSSProperties}>
       {segments.map((segment) => {
         const page = segment.page ?? segment.order;
-        return <PdfPageCanvas key={segment.id} document={document} page={page} segment={segment} availableWidth={availableWidth} zoom={zoom} active={page === activePage} initialAspectRatio={pageAspectRatios.get(page) ?? 1.414} />;
+        return <PdfPageCanvas key={segment.id} document={document} page={page} segment={segment} availableWidth={availableWidth} zoom={zoom} active={page === activePage} initialAspectRatio={pageAspectRatios.get(page) ?? 1.414} onFatalError={recoverDocumentAfterPageFailure} />;
       })}
     </div>}
   </section>;

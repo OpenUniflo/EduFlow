@@ -27,7 +27,7 @@ function responseRecorder() {
     json(value: unknown) { body = value; return response; },
     setHeader: vi.fn()
   } as unknown as VercelResponse;
-  return { response, statusCode: () => statusCode, body: () => body };
+  return { response, statusCode: () => statusCode, body: () => body, setHeader: response.setHeader as unknown as ReturnType<typeof vi.fn> };
 }
 
 describe("/api/materials", () => {
@@ -56,6 +56,7 @@ describe("/api/materials", () => {
     expect(recorder.statusCode()).toBe(200);
     expect(recorder.body()).toEqual({ sourceUrl: "fresh-source-url", expiresIn: 3600 });
     expect(createSignedUrl).toHaveBeenCalledWith("shared/course/material.pdf", 3600);
+    expect(recorder.setHeader).toHaveBeenCalledWith("Cache-Control", expect.stringContaining("no-store"));
     expect(requireCapability).not.toHaveBeenCalled();
   });
 

@@ -304,7 +304,8 @@ export type MaterialSegment = {
 
 export type MaterialSource = {
   kind: "pdf";
-  url: string;
+  /** Stable repository-owned URL. Managed PDFs resolve a temporary URL just in time. */
+  url?: string;
   pageCount: number;
 };
 

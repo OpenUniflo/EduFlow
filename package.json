@@ -21,6 +21,7 @@
     "audit:client-secrets": "node scripts/audit-client-secrets.mjs",
     "auth:bootstrap-local": "node --env-file=.env.local --import tsx scripts/bootstrap-local-users.ts",
     "verify:backend:local": "node --env-file=.env.local --import tsx scripts/verify-local-backend.ts",
+    "verify:material-rls:local": "node --env-file=.env.local --import tsx scripts/verify-material-rls.ts",
     "verify:embedding": "node --env-file=.env.local --import tsx scripts/verify-embedding.ts",
     "verify:embedding:local": "node --env-file=.env.local --import tsx scripts/verify-embedding-pgvector.ts",
     "verify:knowledge-generation:local": "node --env-file=.env.local --import tsx scripts/verify-knowledge-generation-persistence.ts",

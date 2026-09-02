@@ -148,4 +148,14 @@ describe("Course foundation contract", () => {
       materialKnowledgeCoverages: [{ id: "bad-node", materialId: material.id, segmentId: "route-segment", nodeId: "missing-knowledge", role: "explain" }]
     }, knowledgeRepository, globalKnowledgeAccess)).toThrow(/references a node outside the Course/);
   });
+
+  it("accepts managed PDF metadata without a temporary runtime URL", () => {
+    const managedPdf = {
+      id: "managed-pdf", courseId: routeOnlyRuntime.course.id, lessonId: "route-only-lesson", order: 0,
+      title: "Managed PDF", type: "pdf" as const, source: { kind: "pdf" as const, pageCount: 1 },
+      segments: [{ id: "page-1", order: 0, page: 1 }]
+    };
+
+    expect(validateCourseRuntime({ ...routeOnlyRuntime, materials: [managedPdf] }, knowledgeRepository, globalKnowledgeAccess)).toBe(true);
+  });
 });

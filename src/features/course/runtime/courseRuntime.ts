@@ -185,7 +185,7 @@ export function validateCourseIntegrity(runtime: CourseRuntimeData, knowledgeRep
     if (material.type === "pdf") {
       if (!material.source || material.source.kind !== "pdf") errors.push(`PDF Material ${material.id} requires a PDF source`);
       else {
-        if (!material.source.url.trim()) errors.push(`PDF Material ${material.id} source URL is empty`);
+        if (material.source.url !== undefined && !material.source.url.trim()) errors.push(`PDF Material ${material.id} source URL is empty`);
         if (!Number.isInteger(material.source.pageCount) || material.source.pageCount <= 0) errors.push(`PDF Material ${material.id} has invalid pageCount`);
         if (material.segments.length !== material.source.pageCount) errors.push(`PDF Material ${material.id} pageCount does not match Segments`);
         const pages = material.segments.map((segment) => segment.page);

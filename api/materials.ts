@@ -60,6 +60,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const expiresIn = 3600;
     const signed = await client.storage.from("course-materials").createSignedUrl(material.data.storage_path, expiresIn);
     if (signed.error || !signed.data) throw new Error(`Material signed URL failed: ${signed.error?.message ?? "unknown"}`);
+    response.setHeader("Cache-Control", "private, no-store");
     json(response, 200, { sourceUrl: signed.data.signedUrl, expiresIn });
     return;
   }

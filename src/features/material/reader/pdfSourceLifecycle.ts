@@ -12,3 +12,20 @@ export async function loadPdfWithFreshSource<T>({ resolveSourceUrl, load, should
   const refreshedSourceUrl = await resolveSourceUrl();
   return load(refreshedSourceUrl);
 }
+
+export function resolvePdfSourceUrl(staticSourceUrl: string | undefined, resolveManagedSourceUrl: () => Promise<string>) {
+  return staticSourceUrl ? Promise.resolve(staticSourceUrl) : resolveManagedSourceUrl();
+}
+
+export function createPdfPageRecoveryGuard(onRecover: () => void) {
+  let recoveryUsed = false;
+  return {
+    recover(reason: unknown) {
+      if (recoveryUsed || (reason instanceof Error && ["RenderingCancelledException", "PasswordException"].includes(reason.name))) return false;
+      recoveryUsed = true;
+      onRecover();
+      return true;
+    },
+    reset() { recoveryUsed = false; }
+  };
+}

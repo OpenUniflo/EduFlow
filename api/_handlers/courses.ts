@@ -191,16 +191,6 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     client.from("course_target_knowledge").select("*").order("course_id").order("knowledge_id")
   ]);
   const [courseRows, curriculumRows, chapterRows, lessonRows, coverageRows, sequenceRows, assignmentRows, assignmentCoverageRows, assignmentDependencyRows, chapterOutcomeRows, assignmentOutcomeRows, finalProjectRows, finalProjectOutcomeRows, materialRows, segmentRows, materialCoverageRows, targetKnowledgeRows] = queries.map((result, index) => dataOrThrow(result.data as Row[] | null, result.error, `Course query ${index + 1}`));
-  const signedUrlByPath = new Map<string, string>();
-  await Promise.all(materialRows.flatMap((row) => {
-    const path = optionalText(row, "storage_path");
-    if (!path) return [];
-    return [client.storage.from("course-materials").createSignedUrl(path, 3600).then(({ data, error }) => {
-      if (error || !data) throw new Error(`Material signed URL failed: ${error?.message ?? path}`);
-      signedUrlByPath.set(path, data.signedUrl);
-    })];
-  }));
-
   const profileResult = user ? await client.from("profiles").select("role").eq("id", user.id).maybeSingle() : { data: null, error: null };
   const profile = dataOrThrow(profileResult.data as Row | null, profileResult.error, "Course role lookup");
   const canManage = profile && ["teacher", "admin"].includes(text(profile, "role"));
@@ -220,7 +210,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       return {
         id: materialId, courseId: id, lessonId: text(row, "lesson_id"), order: number(row, "display_order"),
         title: text(row, "title"), description: optionalText(row, "description"), type: ["pptx", "docx"].includes(text(row, "material_type")) ? "document" : text(row, "material_type"),
-        source: path && pageCount ? { kind: "pdf", url: signedUrlByPath.get(path), pageCount } : undefined,
+        source: path && pageCount ? { kind: "pdf", pageCount } : undefined,
         duration: optionalText(row, "duration"),
         segments: segmentRows.filter((segment) => text(segment, "course_id") === id && text(segment, "material_id") === materialId).map((segment) => ({
           id: text(segment, "id"), order: number(segment, "display_order"), page: segment.page == null ? undefined : number(segment, "page"),

@@ -121,9 +121,13 @@ try {
   assert.equal(golden.assignments.length, 37);
   assert.deepEqual(new Set(golden.assignments.map((item: any) => item.experience?.type)), new Set(["answer", "code", "trace", "workflow"]));
   assertStatus(await invoke(coursesHandler, "GET", adminUser.token, undefined, { id: "missing-course" }), 404, "unknown course denial");
-  const signedPdf = courses.body.courses.flatMap((item: any) => item.materials).find((item: any) => item.source?.kind === "pdf")?.source?.url;
-  assert.ok(signedPdf);
-  const pdfResponse = await fetch(signedPdf);
+  const pdfMaterial = courses.body.courses.flatMap((item: any) => item.materials).find((item: any) => item.source?.kind === "pdf");
+  assert.ok(pdfMaterial);
+  assert.equal(pdfMaterial.source.url, undefined, "managed Course Runtime must not contain a temporary signed URL");
+  const source = await invoke(materialsHandler, "GET", adminUser.token, undefined, { courseId: pdfMaterial.courseId, materialId: pdfMaterial.id });
+  assertStatus(source, 200, "just-in-time PDF source resolution");
+  assert.match(String(source.headers["Cache-Control"]), /no-store/);
+  const pdfResponse = await fetch(source.body.sourceUrl);
   assert.equal(pdfResponse.status, 200);
   assert.equal(new TextDecoder().decode((await pdfResponse.arrayBuffer()).slice(0, 5)), "%PDF-");
 

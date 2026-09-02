@@ -77,13 +77,15 @@ function responseRecorder() {
 }
 
 describe("GET /api/courses", () => {
+  const createSignedUrl = vi.fn();
+
   beforeEach(() => {
     tableRows.profiles[0].role = "student";
     createUserSupabase.mockReset();
     createUserSupabase.mockResolvedValue({
       client: {
         from: (table: string) => queryResult(tableRows[table] ?? []),
-        storage: { from: () => ({ createSignedUrl: vi.fn() }) }
+        storage: { from: () => ({ createSignedUrl }) }
       },
       user: { id: "learner" },
       token: "token"
@@ -92,7 +94,25 @@ describe("GET /api/courses", () => {
     createOptionalUserSupabase.mockImplementation((request) => createUserSupabase(request));
     createServerSupabase.mockReset();
     serverRpc.mockReset();
+    createSignedUrl.mockReset();
     createServerSupabase.mockReturnValue({ from: (table: string) => queryResult(tableRows[table] ?? []), rpc: serverRpc });
+  });
+
+  it("hydrates managed PDF metadata without creating or returning a signed URL", async () => {
+    tableRows.materials.push({ course_id: "route-only-course", id: "managed-pdf", lesson_id: "route-only-lesson", display_order: 0, title: "Managed PDF", material_type: "pdf", storage_path: "shared/route-only-course/managed.pdf", page_count: 2 });
+    tableRows.material_segments.push(
+      { course_id: "route-only-course", material_id: "managed-pdf", id: "page-1", display_order: 0, page: 1 },
+      { course_id: "route-only-course", material_id: "managed-pdf", id: "page-2", display_order: 1, page: 2 }
+    );
+    const recorder = responseRecorder();
+
+    await handler({ method: "GET", query: { id: "route-only-course" }, headers: {} } as unknown as VercelRequest, recorder.response);
+
+    expect(recorder.statusCode()).toBe(200);
+    expect((recorder.body() as { course: { materials: Array<{ source: Record<string, unknown> }> } }).course.materials[0].source).toEqual({ kind: "pdf", pageCount: 2 });
+    expect(createSignedUrl).not.toHaveBeenCalled();
+    tableRows.materials.pop();
+    tableRows.material_segments.splice(-2);
   });
 
   it("maps a persisted route-only Course while every optional asset table is empty", async () => {

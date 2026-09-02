@@ -12,7 +12,7 @@ MaterialReaderShell owns course-facing state and metadata. PdfMaterialViewer own
 
 The stable page retains three independent areas: Material Outline, original PDF, and Knowledge/Assignment context. MaterialRenderer switches between PDF and Document/Article renderers without introducing Course logic into PdfMaterialViewer.
 
-`courseId + materialId` and the server-owned `storage_path` are the stable Material identity. A signed URL is only a short-lived transport credential: the reader requests a current URL when loading, refreshes it once after a recoverable fatal load error, and requests another current URL when the learner chooses Reload. It never treats the URL cached in Course Runtime as the durable recovery source.
+`courseId + materialId` and the server-owned `storage_path` are the stable Material identity. A signed URL is only a short-lived transport credential: Course Runtime must not contain it, and the reader requests a current URL when loading, refreshes it once after a recoverable fatal load error, and requests another current URL when the learner chooses Reload. Post-load page access can still use PDF.js range requests, so the reader also performs at most one document-level refresh for a fatal page load/render error and returns to the active page. It never persists a signed URL or treats one as the durable recovery source.
 
 ## 4. activeSegmentId
 
@@ -63,11 +63,11 @@ Loading, PDF load failure, password/unsupported input, retry, and normal display
 - `public/materials/python-engineering/lesson-04.pdf` - 10 pages.
 - `public/materials/python-engineering/lesson-07.pdf` - 10 pages.
 
-Files are committed static assets. Neither the browser nor deployment runtime generates them.
+Files are committed static assets. Their stable same-origin URLs remain in the Demo runtime and load directly; managed private PDFs omit a runtime URL and resolve temporary access just in time. Neither the browser nor deployment runtime generates the fixtures.
 
 ## 15. Production Considerations
 
-Course runtime validation checks source metadata before rendering. Static public URLs provide same-origin PDF and worker loading. Future uploaded sources may add authenticated URLs, Range optimization, lazy rendering, text layers, and large-document virtualization without changing the state machine.
+Course runtime validation checks page-count and Segment completeness before rendering. Static public URLs provide same-origin PDF and worker loading, while managed sources use the Material source endpoint with a non-cacheable response. Future uploaded sources may add Range optimization, lazy rendering, text layers, and large-document virtualization without changing the bounded recovery policy.
 
 ## 16. UI State Integration
 
