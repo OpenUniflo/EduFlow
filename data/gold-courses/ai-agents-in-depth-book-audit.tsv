@@ -1,0 +1,118 @@
+knowledge_id	classification	printed_ranges	pdf_ranges	deep_link_pdf_page	evidence
+A02	DIRECT	7-14	15-22	15	1.1 Agent formula and architecture
+AGC01	DIRECT	8-9	16-17	16	1.1.1 observation and action spaces
+R10	DIRECT	14-17	22-25	22	1.1.5 ReAct loop
+AGC02	DIRECT	18-26	26-34	26	1.2 Harness engineering
+AGC03	DIRECT	21	29	29	1.2.4 model selection
+H02	DIRECT	22-24	30-32	30	1.2.5 workflow and autonomy
+WF05	CROSS_SECTION	22-25;164-165	30-33;172-173	30	orchestration plus evaluation and guardrails
+S01	DIRECT	25-26	33-34	33	1.2.6 guardrails and safety
+S02	DIRECT	19;110-113	27;118-121	27	Harness sandbox and execution-tool isolation
+S03	DIRECT	107;144	115;152	115	tool and Coding Agent least-privilege boundaries
+CTX01	DIRECT	31-39	39-47	39	2.2 API message context
+RT01	DIRECT	32-39	40-47	40	2.2.3-2.2.4 core Agent loop
+CTX02	DIRECT	45-46	53-54	53	2.3.1 chat template
+CTX03	DIRECT	47	55	55	2.3.2 KV Cache
+CTX04	DIRECT	48	56	56	2.3.3 Prompt Cache
+CTX05	DIRECT	48-49	56-57	56	2.3.4 cache as architecture constraint
+CTX06	DIRECT	50-52	58-60	58	2.4 system prompt design
+CTX07	DIRECT	52	60	60	2.4.5 few-shot examples
+CTX08	DIRECT	53-54	61-62	61	2.4.7 prompt injection
+MA04	DIRECT	55-58	63-66	63	2.5 Agent Skills
+C03	DIRECT	59-63	67-71	67	2.6 Agent state bar
+RT06	CROSS_SECTION	59-63;175-186	67-71;183-194	67	state trajectory plus evaluation observability
+CTX09	DIRECT	64-68	72-76	72	2.7 context compression
+CTX10	DIRECT	69	77	77	2.7.7 sub-Agent context isolation
+K04	DIRECT	59-63	67-71	67	2.6 persistent and transient working state
+K05	DIRECT	71-80	79-88	79	3.1 user memory system
+MEM01	DIRECT	73-75	81-83	81	3.1.2-3.1.4 memory representations
+MEM02	DIRECT	75	83	83	3.1.4 executable code representation
+MEM03	DIRECT	79	87	87	3.1.7 compression and consolidation
+MEM04	DIRECT	79	87	87	3.1.8 log redaction
+K12	DIRECT	81	89	89	3.2.1 chunking
+K13	DIRECT	82-83	90-91	90	3.2.2 dense embedding
+RAG01	DIRECT	82-83	90-91	90	3.2.2 dense retrieval
+RAG02	DIRECT	84-85	92-93	92	3.2.3 sparse retrieval
+RAG03	DIRECT	86-87	94-95	94	3.2.4 hybrid retrieval
+RAG04	DIRECT	88-92	96-100	96	3.3 structured knowledge indexing
+RAG05	DIRECT	92-94	100-102	100	3.3.3 knowledge update
+RAG06	DIRECT	94-96	102-104	102	3.3.4 Agentic RAG
+RAG07	DIRECT	97	105	105	3.3.5 context-aware retrieval
+RAG08	DIRECT	100	108	108	3.3.7 multimodal memory
+MA03	DIRECT	102-103	110-111	110	4.1-4.2 tools
+T11	DIRECT	103-105	111-113	111	4.2 tool interface design
+T12	DIRECT	32-39	40-47	40	2.2.3-2.2.4 function calling loop
+TOOL01	DIRECT	103	111	111	4.2.2 tool granularity
+TOOL02	DIRECT	104	112	112	4.2.3 tool generality
+TOOL03	DIRECT	104	112	112	4.2.4 tool descriptions
+T14	DIRECT	104-105	112-113	112	4.2.5 argument fidelity
+MA06	DIRECT	105-106	113-114	113	4.3 MCP ecosystem
+TOOL04	DIRECT	115-125	123-133	123	4.7 event-driven asynchronous Agent
+TOOL05	DIRECT	117	125	125	4.7.3-4.7.4 triggers and communication
+TOOL06	DIRECT	118	126	126	4.7.5 virtual identity
+TOOL07	DIRECT	119-124	127-132	127	4.7.6-4.7.7 interruptible execution
+TOOL08	DIRECT	126-129	134-137	134	4.8 progressive tool disclosure
+RT14	DIRECT	138-140	146-148	146	5.1.5-5.1.6 failure recovery
+CODE01	DIRECT	141-143	149-151	149	5.1.7-5.1.8 search and editing
+CODE02	DIRECT	146	154	154	5.2.1 code as reasoning
+CODE03	DIRECT	147-148	155-156	155	5.2.2 deterministic business rules
+CODE04	DIRECT	152	160	160	5.2.4 system adapter
+CODE05	DIRECT	153-157	161-165	161	5.2.5 generative UI
+CODE06	DIRECT	158-160	166-168	166	5.2.6 Agent bootstrap
+EVAL01	DIRECT	164-165	172-173	172	6.2 evaluation metric system
+EVAL02	DIRECT	164	172	172	6.2.1 Pass@k
+EVAL03	DIRECT	164	172	172	6.2.2 Pass^k
+E14	CROSS_SECTION	165;175-179	173;183-187	173	process metrics plus trajectory failure attribution
+EVAL04	DIRECT	165	173	173	6.2.4 safety robustness and trajectory coverage
+EVAL05	DIRECT	165	173	173	6.2.5 human and adversarial review
+EVAL06	DIRECT	166-168	174-176	174	6.3 automated evaluation environments
+EVAL07	DIRECT	169-172	177-180	177	6.4 evaluation datasets
+EVAL08	DIRECT	173-175	181-183	181	6.5.1 LLM-as-a-Judge
+E05	DIRECT	177-179	185-187	185	6.5.3 regression tasks
+EVAL09	DIRECT	180	188	188	6.5.4 pairwise comparison and ranking
+EVAL11	CROSS_SECTION	181-184;187-188	189-192;195-196	189	model selection plus improvement decisions
+EVAL10	DIRECT	185	193	193	6.7 statistical significance
+E06	DIRECT	185-186	193-194	193	6.8 observability
+EVAL12	DIRECT	191-192	199-200	199	6.11 simulation fidelity and domain randomization
+TRAIN01	DIRECT	194-198	202-206	202	7.1 pretraining SFT and RL
+TRAIN02	DIRECT	195;208-210	203;216-218	203	SFT objective and data masking
+TRAIN03	DIRECT	196-197;211	204-205;219	204	SFT versus RL selection
+TRAIN04	DIRECT	196	204	204	LoRA parameter-efficient tuning
+TRAIN05	DIRECT	210	218	218	7.5 SFT trajectory synthesis
+TRAIN06	DIRECT	212-214	220-222	220	7.7 single-turn RL memory and generalization
+TRAIN07	DIRECT	215	223	223	7.8 rollout-to-update loop
+TRAIN08	DIRECT	216-217	224-225	224	7.9 RL and simulated environments
+TRAIN09	DIRECT	217	225	225	7.9.3 task distribution and evaluation isolation
+TRAIN10	DIRECT	218-221	226-229	226	7.10 multi-turn credit assignment
+EVO01	DIRECT	232	240	240	8.1 runtime trajectory signals
+EVO02	DIRECT	235	243	243	8.2.1 experience to knowledge
+EVO03	DIRECT	236-237	244-245	244	8.2.2 experience to instructions
+EVO04	DIRECT	238-239	246-247	246	8.2.3 experience to programs
+EVO05	DIRECT	240	248	248	8.2.4 experience to parameters
+EVO06	DIRECT	240	248	248	8.2.5 improving update methods
+EVO07	DIRECT	241-244	249-252	249	8.3 continual evolution loop
+S08	EDUFLOW_ADDED				generic service deployment is a route bridge not reliably taught by the book
+EVO08	DIRECT	244	252	252	8.3.5 sleep learning
+MM01	DIRECT	247	255	255	9.1.1 speech interaction timing
+MM02	DIRECT	248-250	256-258	256	9.1.2 cascading voice pipeline
+MM03	DIRECT	251	259	259	9.1.3 end-to-end omni model
+MM04	DIRECT	252	260	260	9.1.4 full-duplex interaction
+MM05	DIRECT	252-254	260-262	260	9.1.5 real-time and deep-thinking timing
+MM06	DIRECT	254	262	262	9.1.6 natural speech synthesis
+CU01	DIRECT	256	264	264	9.2.1 action spaces
+CU02	DIRECT	257-258	265-266	265	9.2.2 visual grounding
+CU03	DIRECT	259	267	267	9.2.3 multimodal GUI perception
+CU04	DIRECT	260	268	268	9.2.4 Computer Use world model
+CU05	DIRECT	260	268	268	9.2.5 mobile ecosystem constraints
+ROB01	DIRECT	261-262	269-270	269	9.3.1 hardware and algorithm division
+MAC01	DIRECT	268-269	276-277	276	10.1 collaboration classification
+MAC02	DIRECT	269-270	277-278	277	10.2 multi-Agent suitability
+MAC03	DIRECT	271	279	279	10.3 shared-context collaboration
+MAC04	DIRECT	271-285	279-293	279	10.4 non-shared-context collaboration
+MAC05	DIRECT	272-273	280-281	280	10.4.1 filesystem collaboration
+MAC06	DIRECT	274-275;279	282-283;287	282	10.4.2 and manager communication control
+MAC07	DIRECT	288	296	296	10.5.1 concurrency conflict
+MAC08	DIRECT	289	297	297	10.5.2 error cascade
+MAC09	DIRECT	289	297	297	10.5.3 premature termination and runaway loops
+MAC10	DIRECT	289	297	297	10.5.4 understanding debt
+MAC11	DIRECT	290-294	298-302	298	10.6 Agent society

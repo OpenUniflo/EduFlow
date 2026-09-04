@@ -95,7 +95,7 @@ try {
     assert.ifError((await server.from("course_curricula").insert({ course_id: fixture.courseId, id: `${fixture.courseId}:curriculum`, generation_mode: "manual" })).error);
     assert.ifError((await server.from("curriculum_chapters").insert({ course_id: fixture.courseId, id: chapterId, title: "RLS", description: "RLS", display_order: 0, color: "#6078db", outcome: "Verify RLS" })).error);
     assert.ifError((await server.from("curriculum_lessons").insert({ course_id: fixture.courseId, id: lessonId, chapter_id: chapterId, title: "RLS", display_order: 0 })).error);
-    assert.ifError((await server.from("materials").insert({ course_id: fixture.courseId, id: fixture.materialId, lesson_id: lessonId, display_order: 0, title: "RLS PDF", material_type: "pdf", storage_path: fixture.storagePath, page_count: 8 })).error);
+    assert.ifError((await server.from("materials").insert({ course_id: fixture.courseId, id: fixture.materialId, display_order: 0, title: "RLS PDF", material_type: "pdf", storage_path: fixture.storagePath, page_count: 8 })).error);
   }
   const pdf = await readFile("supabase/course-materials/shared/python-engineering/lesson-02.pdf");
   for (const fixture of fixtures) assert.ifError((await server.storage.from("course-materials").upload(fixture.storagePath, pdf, { contentType: "application/pdf" })).error);

@@ -211,7 +211,7 @@ describe("Material and progress generalization", () => {
   });
 
   it("derives Material, Segment, and Assignment order independently of fixture array order", () => {
-    expect(sortMaterials([...python.materials].reverse(), python.lessons).map((item) => item.id)).toEqual(sortMaterials(python.materials, python.lessons).map((item) => item.id));
+    expect(sortMaterials([...python.materials].reverse()).map((item) => item.id)).toEqual(sortMaterials(python.materials).map((item) => item.id));
     const article = python.materials.find((item) => item.type === "article")!;
     expect(sortMaterialSegments({ ...article, segments: [...article.segments].reverse() }).map((item) => item.id)).toEqual(sortMaterialSegments(article).map((item) => item.id));
     expect(sortAssignments([...python.assignments].reverse()).map((item) => item.id)).toEqual(sortAssignments(python.assignments).map((item) => item.id));
@@ -384,6 +384,10 @@ describe("Material and progress generalization", () => {
     const state = progress.getCourseState("reader", agentic.course.id);
     expect(state.recentLessonId).toBe("L04");
     expect(state.materialStates["lesson-04"]).toMatchObject({ recentSegmentId: "page-32", progress: 3 });
+    progress.updateMaterialReadingState("reader", agentic.course.id, undefined, "lesson-04", { recentSegmentId: "unmapped-page", viewedSegmentIds: ["page-32", "unmapped-page"], progress: 6 });
+    const unmapped = progress.getCourseState("reader", agentic.course.id);
+    expect(unmapped.recentLessonId).toBe("L04");
+    expect(unmapped.materialStates["lesson-04"]).toMatchObject({ recentSegmentId: "unmapped-page", progress: 6 });
   });
 
   it("migrates legacy learning progress to the current envelope without clearing valid edits", () => {
@@ -538,7 +542,7 @@ describe("Material and progress generalization", () => {
       assignments: [{ id: "A", courseId: "scoped-course", order: 0, title: "A", description: "A", requirements: ["A"], expectedOutput: "A", acceptanceCriteria: ["A"], mode: "instruction" }],
       assignmentCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `ac-${nodeId}`, assignmentId: "A", nodeId, role: "practice" as const })),
       assignmentDependencies: [], chapterOutcomes: [], assignmentOutcomeCompositions: [], finalProjects: [], finalProjectOutcomeCompositions: [],
-      materials: [{ id: "M", courseId: "scoped-course", lessonId: "L", order: 0, title: "M", type: "article", segments: [{ id: "S", order: 1, title: "S", content: {} }] }],
+      materials: [{ id: "M", courseId: "scoped-course", order: 0, title: "M", type: "article", segments: [{ id: "S", order: 1, title: "S", content: {} }] }],
       materialKnowledgeCoverages: ["G", "T", "U"].map((nodeId) => ({ id: `mc-${nodeId}`, materialId: "M", segmentId: "S", nodeId, role: "introduce" as const })),
       revision: "v1"
     };

@@ -63,7 +63,7 @@ try {
     await server.from("course_curricula").insert({ course_id: courseId, id: `curriculum-${suffix}`, generation_mode: "follow-source" }),
     await server.from("curriculum_chapters").insert({ course_id: courseId, id: `placeholder-chapter-${suffix}`, title: "Upload", description: "Upload", display_order: 0, color: "#000000", outcome: "Parsed" }),
     await server.from("curriculum_lessons").insert({ course_id: courseId, id: `placeholder-lesson-${suffix}`, chapter_id: `placeholder-chapter-${suffix}`, title: "Upload", display_order: 0 }),
-    await server.from("materials").insert({ course_id: courseId, id: materialId, lesson_id: `placeholder-lesson-${suffix}`, display_order: 0, title: "Source", material_type: "docx", uploaded_by: userId })
+    await server.from("materials").insert({ course_id: courseId, id: materialId, display_order: 0, title: "Source", material_type: "docx", uploaded_by: userId })
   ];
   setup.forEach((result) => { if (result.error) throw new Error(`setup failed: ${result.error.message}`); });
 

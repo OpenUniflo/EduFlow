@@ -36,7 +36,7 @@ export function updateMaterialState(userId: string, courseId: string, materialId
   learningProgressRepository.updateMaterialState(userId, courseId, materialId, state);
 }
 
-export function updateMaterialReadingState(userId: string, courseId: string, lessonId: string, materialId: string, state: Partial<UserMaterialState>) {
+export function updateMaterialReadingState(userId: string, courseId: string, lessonId: string | undefined, materialId: string, state: Partial<UserMaterialState>) {
   learningProgressRepository.updateMaterialReadingState(userId, courseId, lessonId, materialId, state);
 }
 

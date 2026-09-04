@@ -62,14 +62,13 @@ export const goldenAssignmentDependencies: AssignmentDependency[] = [
   dependency("golden-knowledge-dependency-reliability-capstone",assignmentId("W13"),chapterAssignments[5].id)
 ];
 export const goldenOutcomes: ChapterOutcome[] = goldenChapters.map((chapter,index) => ({ id:`golden-outcome-${index+1}`,courseId:GOLDEN_COURSE_ID,chapterId:chapter.id,title:chapter.outcome }));
-const lesson6 = goldenLessons[5].id;
 export const goldenMaterials: Material[] = [
-  { id:"golden-parallel-lesson",courseId:GOLDEN_COURSE_ID,lessonId:lesson6,order:1,title:"并行执行与结果汇合",description:"AI Native Lesson",type:"article",duration:"35 分钟",segments:[
+  { id:"golden-parallel-lesson",courseId:GOLDEN_COURSE_ID,order:1,title:"并行执行与结果汇合",description:"AI Native Lesson",type:"article",duration:"35 分钟",segments:[
     {id:"parallel-problem",order:1,title:"Research Agent 的等待瓶颈",section:"Problem / Scenario",content:{lead:"同时查询 Web、Paper Database 与 Internal Knowledge Base。",bullets:["Research Agent","Search Tool","Paper Retriever","Internal RAG"]}},
     {id:"parallel-flow",order:2,title:"并行汇合结构",section:"Diagram / Flow",content:{code:"          ┌→ Web ──────┐\nPlanner ──┼→ Paper ────┼→ Merge\n          └→ RAG ──────┘",visual:"flow"}},
     {id:"parallel-trace",order:3,title:"模拟 Trace",section:"Trace",content:{code:"Planner start\nWeb start\nPaper start\nRAG start\nRAG finish\nWeb finish\nPaper finish\nMerge received 3/3",visual:"trace"}},
     {id:"parallel-practice",order:4,title:"进入实训",section:"Practice CTA",content:{lead:"连接、调整和扩展已加载的并行结构与 Merge。",visual:"practice"}}]},
-  { id:"golden-failure-lesson",courseId:GOLDEN_COURSE_ID,lessonId:lesson6,order:2,title:"故障、验证与终止",description:"AI Native Lesson",type:"article",duration:"40 分钟",segments:[
+  { id:"golden-failure-lesson",courseId:GOLDEN_COURSE_ID,order:2,title:"故障、验证与终止",description:"AI Native Lesson",type:"article",duration:"40 分钟",segments:[
     {id:"failure-case",order:1,title:"Candidate 不等于成功",section:"Warning / Failure Case",content:{code:"错误：Candidate → Cancel Others",visual:"decision"}},
     {id:"verified-settle",order:2,title:"可靠终止链路",section:"Explanation",content:{code:"Candidate → Verifier → Verified Success → Atomic Settle → Cancel Remaining Workers",bullets:["Worker timeout → Retry","重试耗尽 → Fallback","Verifier reject → 返回执行路径"],visual:"flow"}},
     {id:"source-reference",order:3,title:"来源",section:"Source Reference",content:{lead:"对应原教材 Runtime、Evaluation 与 Multi-Agent 主题；不复制原文。"}},

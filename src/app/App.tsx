@@ -8,7 +8,7 @@ import { NavigationProvider } from "@/app/providers/NavigationContext";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import { NotFoundPage } from "@/app/pages/PlaceholderPages";
 import { PublicHomePage } from "@/app/pages/PublicHomePage";
-import { applicationServices, hydrateApplicationServices, hydratePublicApplicationServices } from "@/app/services/applicationServices";
+import { applicationServices, hydrateApplicationServices, hydratePublicApplicationServices, resetAuthenticatedApplicationServices } from "@/app/services/applicationServices";
 import { attachWorkflowAssignmentMetadata, resolveWorkflowAssignmentContext, completeWorkflowAssignmentRun } from "@/app/integrations/workflowAssignmentIntegration";
 import { ExplorePage } from "@/features/explore/pages/ExplorePage";
 import { LearningPage } from "@/features/learning/pages/LearningPage";
@@ -35,6 +35,7 @@ import { demoLessonAssistantProvider } from "@/demo/scenarios/agenticAiBook/less
 import { demoWorkflowAssessmentProvider } from "@/demo/scenarios/agenticAiBook/workflowAssessment";
 import { demoCourseDesignAssistantProvider } from "@/demo/scenarios/agenticAiBook/courseDesignAssistantScripts";
 import { resolveLegacyRoute } from "@/app/legacyRoutes";
+import { ApiRequestError } from "@/shared/api/apiClient";
 import { AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeContext";
 import { AssistantMessagesPage } from "@/features/assistant/pages/AssistantMessagesPage";
 import { authGateState, resolveAuthRedirect } from "@/features/auth/authRedirect";
@@ -84,7 +85,15 @@ export default function App() {
         setWorkflowVersion((version) => version + 1);
       } catch (error) {
         console.error("Post-login application initialization failed", error);
-        setStartupError("部分学习数据加载失败，请重试。");
+        if (authSession && error instanceof ApiRequestError && error.status === 401) {
+          resetAuthenticatedApplicationServices();
+          workflowPersistence.resetAuthenticatedState();
+          setSession(null);
+          await hydratePublicApplicationServices();
+          if (active) navigate("/login", { replace: true, state: authGateState(location) });
+        } else {
+          setStartupError("部分学习数据加载失败，请重试。");
+        }
       } finally {
         setReady(true);
       }
@@ -92,7 +101,11 @@ export default function App() {
     void restore();
     const { data } = supabaseClient.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT" && active) {
+        workflow.stopRun();
+        resetAuthenticatedApplicationServices();
+        workflowPersistence.resetAuthenticatedState();
         setSession(null);
+        setWorkflowVersion((version) => version + 1);
         void hydratePublicApplicationServices().catch((error) => { console.error("Public catalog rehydration failed", error); setStartupError("公开学习内容加载失败，请重试。"); });
       }
     });
@@ -181,7 +194,15 @@ export default function App() {
       setWorkflowVersion((version) => version + 1);
     } catch (error) {
       console.error("Post-login application initialization retry failed", error);
-      setStartupError("部分学习数据加载失败，请重试。");
+      if (error instanceof ApiRequestError && error.status === 401) {
+        resetAuthenticatedApplicationServices();
+        workflowPersistence.resetAuthenticatedState();
+        setSession(null);
+        await hydratePublicApplicationServices();
+        navigate("/login", { replace: true, state: authGateState(location) });
+      } else {
+        setStartupError("部分学习数据加载失败，请重试。");
+      }
     } finally {
       setReady(true);
     }

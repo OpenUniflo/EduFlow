@@ -104,7 +104,7 @@ try {
     const sourceBytes = await (await import("node:fs/promises")).readFile(CORPUS);
     const upload = await server.storage.from("course-materials").upload(created.storagePath, sourceBytes, { contentType: "application/pdf", upsert: true });
     if (upload.error) throw new Error(`Canonical source upload failed: ${upload.error.message}`);
-    const material = await server.from("materials").insert({ course_id: created.courseId, id: created.materialId, lesson_id: `upload-lesson-${suffix}`, display_order: 0, title: "深入理解 AI Agent", material_type: "pdf", storage_path: created.storagePath, page_count: 307, uploaded_by: created.userId });
+    const material = await server.from("materials").insert({ course_id: created.courseId, id: created.materialId, display_order: 0, title: "深入理解 AI Agent", material_type: "pdf", storage_path: created.storagePath, page_count: 307, uploaded_by: created.userId });
     if (material.error) throw new Error(`Acceptance Material insert failed: ${material.error.message}`);
     const segments = Array.from({ length: 307 }, (_, index) => ({ course_id: created.courseId, material_id: created.materialId, id: `page-${index + 1}`, display_order: index, page: index + 1, title: `Page ${index + 1}` }));
     const segmentInsert = await server.from("material_segments").insert(segments);

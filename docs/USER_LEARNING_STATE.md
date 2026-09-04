@@ -10,7 +10,7 @@ Learning state is mutable, user-owned data layered over immutable curriculum def
 
 ## 3. Assignment State
 
-`UserAssignmentState` is keyed by stable `assignmentId` and stores `not-started`, `in-progress`, or `completed` plus optional progress. The CourseAssignment definition never stores user completion.
+`UserAssignmentState` is keyed by stable `assignmentId` and projects `not_started`, `started`, `submitted`, `needs_revision`, or `accepted` plus optional progress. The CourseAssignment definition never stores user completion, submission, or pass state.
 
 ## 4. Material State
 
@@ -60,9 +60,11 @@ When no Material/Assignment `recentLessonId` exists, the recent Course card may 
 
 Local storage is a compatibility adapter. The server repository is the application source of truth and preserves the same scoped identity and update semantics. Existing LocalStorage payloads are not automatically imported into a Supabase account.
 
-## 13. Non-goals
+## 13. Attempt and Result Boundary
 
-This version does not implement submissions, grading, audit history, teacher overrides, automatic mastery assignment, or a complete evidence pipeline. Authenticated progress itself is synchronized through the backend.
+Every authenticated Assignment submission stores the actual typed response in an immutable numbered `LearningAttempt`. An atomic server-only transaction appends the corresponding versioned `PerformanceResult` and learning events. Rule-supported experiences are evaluated against the published Assignment contract; open answer/code/workflow evidence remains `pending` until a teacher review appends a manual Result version. Authenticated clients cannot call the result-writing RPC directly.
+
+An idempotency key is scoped to learner, Course, and Assignment. Exact retries return the original Attempt/Result; a new retry key creates the next Attempt. `submitted` and `completed` are never aliases for `passed`. A failed Result projects `needs_revision` without lowering monotonic Knowledge state; a passed Result projects `accepted` and may contribute evidence to the centralized mastery policy.
 
 ## 14. State Boundaries
 
@@ -73,11 +75,17 @@ This version does not implement submissions, grading, audit history, teacher ove
 
 These records are related but not interchangeable. Assignment completion may later produce KnowledgeEvidence; it never directly overwrites mastery. Material reading likewise does not imply mastery or Assignment completion.
 
-## 15. Material Reading Updates
+## 15. Deterministic Navigation
 
-`updateMaterialReadingState` atomically records recent Segment, viewed Segment IDs, derived reading progress, and the Material's Lesson as `recentLessonId`. Intersection-driven writes are debounced so UI response is immediate without writing local storage on every observer callback.
+The rule Navigation Engine consumes the Course route, factual prerequisite edges, learner Knowledge state, completed required Micro paths, latest PerformanceResults, and available course actions. Curriculum order ranks candidates; only factual prerequisite mastery gates eligibility. It emits a learner-specific route projection and one explained action (`skip`, `review`, `remediation`, `practice`, or `next`) with a policy version and reason code.
 
-## 16. PDF Reading State
+Each input state is hashed canonically and persisted as one `NavigationDecision` per learner/Course/policy/input hash. Re-reading unchanged state returns the same decision; a failed Practice prioritizes remediation, while a later pass and resulting state change produces a new decision. The LLM is not Navigation authority.
+
+## 16. Material Reading Updates
+
+`updateMaterialReadingState` atomically records recent Segment, viewed Segment IDs, and derived reading progress. `recentLessonId`, when available, is presentation context derived from the Segment's Knowledge mapping and canonical CurriculumCoverage rather than a Material ownership field. Intersection-driven writes are debounced so UI response is immediate without writing local storage on every observer callback.
+
+## 17. PDF Reading State
 
 For PDF Material, `recentSegmentId` identifies the current PDF page/Segment only. `viewedSegmentIds` is the unique set of pages that actually became active at the reading anchor. Completion progress is `viewed / total`, not the numeric page position.
 

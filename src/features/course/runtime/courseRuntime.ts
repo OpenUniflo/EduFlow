@@ -177,7 +177,6 @@ export function validateCourseIntegrity(runtime: CourseRuntimeData, knowledgeRep
   });
   runtime.materials.forEach((material) => {
     if (material.courseId !== runtime.course.id) errors.push(`Material ${material.id} belongs to another Course`);
-    if (!lessonIds.has(material.lessonId)) errors.push(`Material ${material.id} references unknown Lesson`);
     validateNonNegativeIntegerOrder(errors, "Material", material.id, material.order);
     if (new Set(material.segments.map((segment) => segment.id)).size !== material.segments.length) errors.push(`Material ${material.id} Segment ids must be unique`);
     material.segments.forEach((segment) => validateNonNegativeIntegerOrder(errors, "MaterialSegment", segment.id, segment.order));
@@ -197,7 +196,7 @@ export function validateCourseIntegrity(runtime: CourseRuntimeData, knowledgeRep
       }
     }
   });
-  groupBy(runtime.materials, (material) => material.lessonId).forEach((materials, lessonId) => validateUniqueOrders(errors, materials, (material) => material.order, `Material in Lesson ${lessonId}`));
+  validateUniqueOrders(errors, runtime.materials, (material) => material.order, `Material in Course ${runtime.course.id}`);
   const materialRelations = new Set<string>();
   runtime.materialKnowledgeCoverages.forEach((coverage) => {
     if (!materialIds.has(coverage.materialId)) errors.push(`MaterialKnowledgeCoverage ${coverage.id} references unknown Material`);
@@ -277,7 +276,7 @@ export function buildCourseGraphData(runtime: CourseRuntimeData, userState: User
       const material = materialById.get(materialId);
       const entry = resolveKnowledgeMaterialEntry(runtime, nodeId, materialId);
       return material && entry ? [{
-        materialId, materialTitle: material.title, lessonId: material.lessonId,
+        materialId, materialTitle: material.title, lessonId: entry.lessonId,
         segmentIds: Array.from(new Set(coverages.map((coverage) => coverage.segmentId))).sort((left, right) => {
           const leftSegment = material.segments.find((segment) => segment.id === left);
           const rightSegment = material.segments.find((segment) => segment.id === right);

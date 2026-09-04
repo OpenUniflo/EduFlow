@@ -89,3 +89,10 @@ export async function refreshLearnerState(userId: string) {
   userKnowledgeRepository.hydrate(progress.userKnowledge);
   learningProgressRepository.hydrate(userId, courseRepository.listCourseRuntimes().map((runtime) => runtime.course.id), progress.courseStates);
 }
+
+/** Synchronously drops every user-scoped projection before another identity can hydrate. */
+export function resetAuthenticatedApplicationServices() {
+  userKnowledgeRepository.hydrate([]);
+  learningProgressRepository.resetAuthenticatedState();
+  microLearningRepository.resetAuthenticatedState();
+}

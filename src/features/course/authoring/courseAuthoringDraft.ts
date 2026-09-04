@@ -159,7 +159,9 @@ export function applyCourseAuthoringDraft(runtime: CourseRuntimeData, state: Cou
   const additions = [...state.addedKnowledgeNodeIds, ...state.addedKnowledgeCandidates.map((candidate) => ({ nodeId: candidate.id, chapterId: candidate.chapterId }))].filter((item) => !removedNodes.has(item.nodeId) && !coveredNodeIds.has(item.nodeId) && activeChapterIds.has(item.chapterId)).map((item) => ({ id: `authoring-coverage:${item.nodeId}`, courseId: runtime.course.id, lessonId: primaryLessonByChapter.get(item.chapterId)!, nodeId: item.nodeId, role: "introduce" as const, order: 0 }));
   curriculumCoverages = [...curriculumCoverages, ...additions]; const grouped = new Map<string, typeof curriculumCoverages>(); curriculumCoverages.forEach((coverage) => grouped.set(coverage.lessonId, [...(grouped.get(coverage.lessonId) ?? []), coverage])); curriculumCoverages = Array.from(grouped.values()).flatMap((items) => items.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)).map((coverage, order) => ({ ...coverage, order })));
   const removedMaterialLink = (nodeId: string, materialId: string) => state.removedLinks.some((link) => link.nodeId === nodeId && link.materialId === materialId);
-  const materials = [...runtime.materials.filter((material) => activeLessonIds.has(material.lessonId)), ...state.generatedMaterials.filter((draft) => activeLessonIds.has(draft.lessonId) && !runtime.materials.some((material) => material.id === draft.id))];
+  const materials = [...runtime.materials, ...state.generatedMaterials.filter((draft) => !runtime.materials.some((material) => material.id === draft.id))]
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
+    .map((material, order) => ({ ...material, order }));
   const materialKnowledgeCoverages = runtime.materialKnowledgeCoverages.filter((coverage) => !removedNodes.has(coverage.nodeId) && !removedMaterialLink(coverage.nodeId, coverage.materialId));
   const materialAdditions: MaterialKnowledgeCoverage[] = state.addedLinks.flatMap((link) => { if (removedNodes.has(link.nodeId) || removedMaterialLink(link.nodeId, link.materialId) || materialKnowledgeCoverages.some((coverage) => coverage.nodeId === link.nodeId && coverage.materialId === link.materialId)) return []; const segment = materials.find((item) => item.id === link.materialId)?.segments[0]; return segment ? [{ id: `authoring-material-coverage:${link.materialId}:${link.nodeId}`, materialId: link.materialId, segmentId: segment.id, nodeId: link.nodeId, role: "explain" as const }] : []; });
   const chapterOutcomes = runtime.chapterOutcomes.filter((outcome) => activeChapterIds.has(outcome.chapterId));
@@ -184,9 +186,8 @@ export function createEditableKnowledgeRepository(base: KnowledgeRepository, sta
 }
 
 export function createGeneratedArticleDraft(input: { runtime: CourseRuntimeData; nodeId: string; nodeTitle: string; createId?: () => string }): Material {
-  const lessonId = input.runtime.curriculumCoverages.find((coverage) => coverage.nodeId === input.nodeId)?.lessonId; if (!lessonId) throw new Error(`Cannot generate Material for KnowledgeNode ${input.nodeId} without CurriculumCoverage`);
-  const id = `draft-material-${(input.createId ?? (() => crypto.randomUUID()))()}`; const order = Math.max(-1, ...input.runtime.materials.filter((material) => material.lessonId === lessonId).map((material) => material.order)) + 1;
-  return { id, courseId: input.runtime.course.id, lessonId, order, title: `${input.nodeTitle} · AI 课件草稿`, description: `围绕“${input.nodeTitle}”生成的 Article Material，供教师继续预览与修改。`, type: "article", duration: "12 分钟", segments: [
+  const id = `draft-material-${(input.createId ?? (() => crypto.randomUUID()))()}`; const order = Math.max(-1, ...input.runtime.materials.map((material) => material.order)) + 1;
+  return { id, courseId: input.runtime.course.id, order, title: `${input.nodeTitle} · AI 课件草稿`, description: `围绕“${input.nodeTitle}”生成的 Article Material，供教师继续预览与修改。`, type: "article", duration: "12 分钟", segments: [
     { id: `${id}-overview`, order: 0, title: "学习目标与核心概念", content: { lead: `理解 ${input.nodeTitle} 的核心目标、适用边界与关键术语。`, bullets: ["明确可观察的学习目标", "建立概念与工程场景的联系", "识别常见误区"], visual: "overview" } },
     { id: `${id}-example`, order: 1, title: "工程示例", content: { lead: `通过一个最小工程案例拆解 ${input.nodeTitle}。`, paragraphs: ["先确认输入、输出与约束，再观察关键决策如何影响结果。", "示例保留可复核的中间产物，便于课堂讨论与后续实训。"], visual: "flow" } },
     { id: `${id}-practice`, order: 2, title: "检查与延伸", content: { lead: "使用以下问题检查理解，并为对应实训准备证据。", bullets: ["能否解释为什么采用该方案？", "失败时最先检查哪一项？", "产出如何被后续课程步骤复用？"], visual: "practice" } }
@@ -195,9 +196,7 @@ export function createGeneratedArticleDraft(input: { runtime: CourseRuntimeData;
 
 /** Minimal manual Article authoring; AI generation is optional automation, never authority. */
 export function createManualArticleDraft(input: { runtime: CourseRuntimeData; nodeId: string; title: string; content: string; createId?: () => string }): Material {
-  const lessonId = input.runtime.curriculumCoverages.find((coverage) => coverage.nodeId === input.nodeId)?.lessonId;
-  if (!lessonId) throw new Error(`Cannot create Material for KnowledgeNode ${input.nodeId} without CurriculumCoverage`);
   const id = `draft-material-${(input.createId ?? (() => crypto.randomUUID()))()}`;
-  const order = Math.max(-1, ...input.runtime.materials.filter((material) => material.lessonId === lessonId).map((material) => material.order)) + 1;
-  return { id, courseId: input.runtime.course.id, lessonId, order, title: input.title, description: `教师手工创建的 Article Material。`, type: "article", duration: "自定进度", segments: [{ id: `${id}-content`, order: 0, title: input.title, content: { lead: input.content, visual: "overview" } }] };
+  const order = Math.max(-1, ...input.runtime.materials.map((material) => material.order)) + 1;
+  return { id, courseId: input.runtime.course.id, order, title: input.title, description: `教师手工创建的 Article Material。`, type: "article", duration: "自定进度", segments: [{ id: `${id}-content`, order: 0, title: input.title, content: { lead: input.content, visual: "overview" } }] };
 }

@@ -127,14 +127,14 @@ export class LocalStorageLearningProgressRepository implements LearningProgressR
     this.save({ ...current, isActive: true, materialStates: { ...current.materialStates, [materialId]: { ...previous, ...state, materialId, updatedAt: state.updatedAt ?? new Date().toISOString() } }, updatedAt: new Date().toISOString() });
   }
 
-  updateMaterialReadingState(userId: string, courseId: string, lessonId: string, materialId: string, state: Partial<UserMaterialState>) {
+  updateMaterialReadingState(userId: string, courseId: string, lessonId: string | undefined, materialId: string, state: Partial<UserMaterialState>) {
     const current = this.getCourseState(userId, courseId);
     const now = new Date().toISOString();
     const previous = current.materialStates[materialId] ?? { materialId, updatedAt: now };
     this.save({
       ...current,
       isActive: true,
-      recentLessonId: lessonId,
+      ...(lessonId ? { recentLessonId: lessonId } : {}),
       materialStates: {
         ...current.materialStates,
         [materialId]: { ...previous, ...state, materialId, updatedAt: state.updatedAt ?? now }

@@ -85,22 +85,22 @@ const pdfSegments = (titles: string[], sections: string[]) => titles.map((title,
 
 export const pythonEngineeringMaterials: Material[] = [
   {
-    id: "python-core-handbook", courseId: pythonEngineeringCourse.id, lessonId: "PY-L02", order: 0, title: "Python 函数与模块工程", description: "从控制流、函数、作用域到可维护模块。", type: "pdf", duration: "45 分钟",
+    id: "python-core-handbook", courseId: pythonEngineeringCourse.id, order: 0, title: "Python 函数与模块工程", description: "从控制流、函数、作用域到可维护模块。", type: "pdf", duration: "45 分钟",
     source: { kind: "pdf", url: "/materials/python-engineering/lesson-02.pdf", pageCount: 8 },
     segments: pdfSegments(["函数与模块工程", "控制流的可测试边界", "函数输入输出契约", "作用域、闭包与引用", "模块公开接口", "项目结构与依赖方向", "重构为可测试模块", "异常契约作为模块边界"], ["Overview", "Functions", "Functions", "Scope", "Modules", "Engineering", "Practice", "Bridge"])
   },
   {
-    id: "python-quality-testing", courseId: pythonEngineeringCourse.id, lessonId: "PY-L04", order: 0, title: "异常、类型与自动化测试", description: "用 Exception、Type Hint、pytest 与 Unit Test 建立质量防线。", type: "pdf", duration: "55 分钟",
+    id: "python-quality-testing", courseId: pythonEngineeringCourse.id, order: 1, title: "异常、类型与自动化测试", description: "用 Exception、Type Hint、pytest 与 Unit Test 建立质量防线。", type: "pdf", duration: "55 分钟",
     source: { kind: "pdf", url: "/materials/python-engineering/lesson-04.pdf", pageCount: 10 },
     segments: pdfSegments(["异常、类型与自动化测试", "失败是接口的一部分", "异常层级与边界", "Exception 设计实战", "Type Hint 与静态反馈", "pytest 测试结构", "Unit Test 与依赖隔离", "参数化与失败路径", "从异常契约到测试契约", "质量防线综合练习"], ["Overview", "Exception", "Exception", "Exception", "Typing", "pytest", "Unit Test", "Testing", "Integration", "Practice"])
   },
   {
-    id: "python-async-service-guide", courseId: pythonEngineeringCourse.id, lessonId: "PY-L07", order: 0, title: "异步 Python 服务实战", description: "构建具有超时、取消、重试和观测能力的服务。", type: "pdf", duration: "60 分钟",
+    id: "python-async-service-guide", courseId: pythonEngineeringCourse.id, order: 2, title: "异步 Python 服务实战", description: "构建具有超时、取消、重试和观测能力的服务。", type: "pdf", duration: "60 分钟",
     source: { kind: "pdf", url: "/materials/python-engineering/lesson-07.pdf", pageCount: 10 },
     segments: pdfSegments(["异步 Python 服务实战", "Event Loop 与协程", "async/await 执行模型", "并发任务与背压", "超时边界", "取消与资源清理", "异常传播", "有界重试与 Backoff", "日志、指标与 Trace", "可靠异步服务练习"], ["Overview", "Async", "Async", "Concurrency", "Reliability", "Reliability", "Exception", "Recovery", "Production", "Practice"])
   },
   {
-    id: "python-core-notes", courseId: pythonEngineeringCourse.id, lessonId: "PY-L02", order: 1, title: "Python 模块边界速查", description: "非 PDF 辅助资料，用于验证 Article renderer。", type: "article", duration: "10 分钟",
+    id: "python-core-notes", courseId: pythonEngineeringCourse.id, order: 3, title: "Python 模块边界速查", description: "非 PDF 辅助资料，用于验证 Article renderer。", type: "article", duration: "10 分钟",
     segments: [
       { id: "notes-contract", order: 1, title: "函数契约速查", section: "Reference", content: { lead: "用输入、输出与失败三部分描述函数边界。", bullets: ["明确输入类型", "控制副作用", "记录失败语义"] } },
       { id: "notes-layout", order: 2, title: "模块布局速查", section: "Reference", content: { lead: "让公开接口与内部实现保持清晰分层。", bullets: ["包入口", "内部模块", "测试目录"] } }

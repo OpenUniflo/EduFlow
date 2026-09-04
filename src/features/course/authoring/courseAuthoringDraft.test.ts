@@ -6,7 +6,7 @@ import { addDraftChapter, addDraftDependency, addExistingKnowledge, addGenerated
 import { isDraftCompletenessIssue, validateCourseAuthoring } from "./courseAuthoringValidation";
 import { reduceCourseAuthoringProposal, validateCourseAuthoringProposal, type CourseAuthoringProposal } from "./courseAuthoringProposal";
 
-const baseMaterial: Material = { id: "base", courseId: "course", lessonId: "lesson-a", order: 0, title: "Base", type: "article", segments: [{ id: "base-segment", order: 0 }] };
+const baseMaterial: Material = { id: "base", courseId: "course", order: 0, title: "Base", type: "article", segments: [{ id: "base-segment", order: 0 }] };
 const runtime: CourseRuntimeData = {
   course:{id:"course",title:"Course",description:"Course"}, curriculum:{id:"curriculum",courseId:"course",generationMode:"manual"}, revision:"1",
   chapters:[{id:"chapter-a",courseId:"course",title:"A",description:"A",outcome:"A outcome",color:"#123",order:0}], lessons:[{id:"lesson-a",courseId:"course",chapterId:"chapter-a",title:"A",order:0}], curriculumCoverages:[{id:"coverage-a",courseId:"course",lessonId:"lesson-a",nodeId:"a",order:0,role:"introduce"}], curriculumSequences:[],

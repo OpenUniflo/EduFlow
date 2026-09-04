@@ -8,17 +8,43 @@ type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
 const optionalText = (row: Row, key: string) => row[key] == null ? undefined : String(row[key]);
 const number = (row: Row, key: string) => Number(row[key]);
+type RangeQuery = { range(from: number, to: number): PromiseLike<{ data: unknown[] | null; error: { message: string } | null }> };
+async function fetchAll(query: RangeQuery, label: string) {
+  const output: Row[] = [];
+  const pageSize = 500;
+  for (let from = 0; ; from += pageSize) {
+    const result = await query.range(from, from + pageSize - 1);
+    if (result.error) throw new Error(`${label}: ${result.error.message}`);
+    const page = (result.data ?? []) as Row[];
+    output.push(...page);
+    if (page.length < pageSize) return output;
+  }
+}
 
 async function validatePersistedCourseForPublish(client: ReturnType<typeof createServerSupabase>, courseId: string) {
-  const tables = ["courses", "course_curricula", "curriculum_chapters", "curriculum_lessons", "curriculum_coverages", "course_target_knowledge", "curriculum_sequences", "course_assignments", "assignment_coverages", "assignment_dependencies", "materials", "material_segments", "material_knowledge_coverages"] as const;
-  const results = await Promise.all(tables.map((table) => client.from(table).select("*").eq(table === "courses" ? "id" : "course_id", courseId)));
-  const rows = new Map(tables.map((table, index) => [table, dataOrThrow(results[index].data as Row[] | null, results[index].error, `Course publish ${table} validation`)]));
+  const tableQueries = [
+    ["courses", client.from("courses").select("*").eq("id", courseId).order("id")],
+    ["course_curricula", client.from("course_curricula").select("*").eq("course_id", courseId).order("course_id").order("id")],
+    ["curriculum_chapters", client.from("curriculum_chapters").select("*").eq("course_id", courseId).order("display_order").order("id")],
+    ["curriculum_lessons", client.from("curriculum_lessons").select("*").eq("course_id", courseId).order("chapter_id").order("display_order").order("id")],
+    ["curriculum_coverages", client.from("curriculum_coverages").select("*").eq("course_id", courseId).order("lesson_id").order("display_order").order("id")],
+    ["course_target_knowledge", client.from("course_target_knowledge").select("*").eq("course_id", courseId).order("knowledge_id")],
+    ["curriculum_sequences", client.from("curriculum_sequences").select("*").eq("course_id", courseId).order("id")],
+    ["course_assignments", client.from("course_assignments").select("*").eq("course_id", courseId).order("display_order").order("id")],
+    ["assignment_coverages", client.from("assignment_coverages").select("*").eq("course_id", courseId).order("id")],
+    ["assignment_dependencies", client.from("assignment_dependencies").select("*").eq("course_id", courseId).order("id")],
+    ["materials", client.from("materials").select("*").eq("course_id", courseId).order("display_order").order("id")],
+    ["material_segments", client.from("material_segments").select("*").eq("course_id", courseId).order("material_id").order("display_order").order("id")],
+    ["material_knowledge_coverages", client.from("material_knowledge_coverages").select("*").eq("course_id", courseId).order("id")]
+  ] as const;
+  const results = await Promise.all(tableQueries.map(([table, query]) => fetchAll(query, `Course publish ${table} validation`)));
+  const rows = new Map(tableQueries.map(([table], index) => [table, results[index]]));
   const course = rows.get("courses")![0]; const curricula = rows.get("course_curricula")!; const chapters = rows.get("curriculum_chapters")!; const lessons = rows.get("curriculum_lessons")!; const coverages = rows.get("curriculum_coverages")!;
   if (!course || curricula.length !== 1 || !chapters.length || !lessons.length || !coverages.length) throw new ApiError(422, "course_structure_invalid", "课程结构尚不完整，暂时无法完成创建。");
   const chapterIds = new Set(chapters.map((row) => text(row, "id"))); const lessonIds = new Set(lessons.map((row) => text(row, "id"))); const coveredIds = new Set(coverages.map((row) => text(row, "node_id")));
   if (lessons.some((row) => !chapterIds.has(text(row, "chapter_id"))) || coverages.some((row) => !lessonIds.has(text(row, "lesson_id")))) throw new ApiError(422, "course_structure_invalid", "课程结构包含失效关系，暂时无法完成创建。");
-  const knowledgeResult = await client.from("knowledge_nodes").select("id").in("id", [...coveredIds]).eq("status", "active");
-  const activeIds = new Set(dataOrThrow(knowledgeResult.data as Row[] | null, knowledgeResult.error, "Course publish Knowledge validation").map((row) => text(row, "id")));
+  const knowledgeRows = await fetchAll(client.from("knowledge_nodes").select("id").in("id", [...coveredIds]).eq("status", "active").order("id"), "Course publish Knowledge validation");
+  const activeIds = new Set(knowledgeRows.map((row) => text(row, "id")));
   if (activeIds.size !== coveredIds.size) throw new ApiError(422, "course_knowledge_invalid", "课程包含不可用的学习内容，暂时无法完成创建。");
   const targets = rows.get("course_target_knowledge")!;
   if (optionalText(course, "course_type") === "personal" && (!targets.length || targets.some((row) => !coveredIds.has(text(row, "knowledge_id"))))) throw new ApiError(422, "course_target_invalid", "个人课程的核心目标无效。");
@@ -172,25 +198,25 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const creationBriefMessageId = typeof request.query.creationBriefMessageId === "string" ? request.query.creationBriefMessageId : undefined;
   if (creationBriefMessageId && !user) throw new ApiError(401, "authentication_required", "Authentication is required");
   const queries = await Promise.all([
-    client.from("courses").select("*").order("id"),
-    client.from("course_curricula").select("*").order("course_id"),
-    client.from("curriculum_chapters").select("*").order("course_id").order("display_order"),
-    client.from("curriculum_lessons").select("*").order("course_id").order("display_order"),
-    client.from("curriculum_coverages").select("*").order("course_id").order("lesson_id").order("display_order"),
-    client.from("curriculum_sequences").select("*").order("course_id").order("id"),
-    client.from("course_assignments").select("*").order("course_id").order("display_order"),
-    client.from("assignment_coverages").select("*").order("course_id").order("id"),
-    client.from("assignment_dependencies").select("*").order("course_id").order("id"),
-    client.from("chapter_outcomes").select("*").order("course_id").order("id"),
-    client.from("assignment_outcome_compositions").select("*").order("course_id").order("id"),
-    client.from("final_projects").select("*").order("course_id").order("id"),
-    client.from("final_project_outcome_compositions").select("*").order("course_id").order("id"),
-    client.from("materials").select("*").order("course_id").order("lesson_id").order("display_order"),
-    client.from("material_segments").select("*").order("course_id").order("material_id").order("display_order"),
-    client.from("material_knowledge_coverages").select("*").order("course_id").order("id"),
-    client.from("course_target_knowledge").select("*").order("course_id").order("knowledge_id")
+    fetchAll(client.from("courses").select("*").order("id"),"Course list"),
+    fetchAll(client.from("course_curricula").select("*").order("course_id"),"Course curricula"),
+    fetchAll(client.from("curriculum_chapters").select("*").order("course_id").order("display_order").order("id"),"Course chapters"),
+    fetchAll(client.from("curriculum_lessons").select("*").order("course_id").order("display_order").order("id"),"Course lessons"),
+    fetchAll(client.from("curriculum_coverages").select("*").order("course_id").order("lesson_id").order("display_order").order("id"),"Course coverages"),
+    fetchAll(client.from("curriculum_sequences").select("*").order("course_id").order("id"),"Course sequences"),
+    fetchAll(client.from("course_assignments").select("*").order("course_id").order("display_order").order("id"),"Course assignments"),
+    fetchAll(client.from("assignment_coverages").select("*").order("course_id").order("id"),"Assignment coverages"),
+    fetchAll(client.from("assignment_dependencies").select("*").order("course_id").order("id"),"Assignment dependencies"),
+    fetchAll(client.from("chapter_outcomes").select("*").order("course_id").order("id"),"Chapter outcomes"),
+    fetchAll(client.from("assignment_outcome_compositions").select("*").order("course_id").order("id"),"Assignment outcomes"),
+    fetchAll(client.from("final_projects").select("*").order("course_id").order("id"),"Final projects"),
+    fetchAll(client.from("final_project_outcome_compositions").select("*").order("course_id").order("id"),"Final project outcomes"),
+    fetchAll(client.from("materials").select("*").order("course_id").order("display_order").order("id"),"Course materials"),
+    fetchAll(client.from("material_segments").select("*").order("course_id").order("material_id").order("display_order").order("id"),"Material segments"),
+    fetchAll(client.from("material_knowledge_coverages").select("*").order("course_id").order("id"),"Material coverages"),
+    fetchAll(client.from("course_target_knowledge").select("*").order("course_id").order("knowledge_id"),"Course targets")
   ]);
-  const [courseRows, curriculumRows, chapterRows, lessonRows, coverageRows, sequenceRows, assignmentRows, assignmentCoverageRows, assignmentDependencyRows, chapterOutcomeRows, assignmentOutcomeRows, finalProjectRows, finalProjectOutcomeRows, materialRows, segmentRows, materialCoverageRows, targetKnowledgeRows] = queries.map((result, index) => dataOrThrow(result.data as Row[] | null, result.error, `Course query ${index + 1}`));
+  const [courseRows, curriculumRows, chapterRows, lessonRows, coverageRows, sequenceRows, assignmentRows, assignmentCoverageRows, assignmentDependencyRows, chapterOutcomeRows, assignmentOutcomeRows, finalProjectRows, finalProjectOutcomeRows, materialRows, segmentRows, materialCoverageRows, targetKnowledgeRows] = queries;
   const profileResult = user ? await client.from("profiles").select("role").eq("id", user.id).maybeSingle() : { data: null, error: null };
   const profile = dataOrThrow(profileResult.data as Row | null, profileResult.error, "Course role lookup");
   const canManage = profile && ["teacher", "admin"].includes(text(profile, "role"));
@@ -208,7 +234,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const path = optionalText(row, "storage_path");
       const pageCount = row.page_count == null ? undefined : number(row, "page_count");
       return {
-        id: materialId, courseId: id, lessonId: text(row, "lesson_id"), order: number(row, "display_order"),
+        id: materialId, courseId: id, order: number(row, "display_order"),
         title: text(row, "title"), description: optionalText(row, "description"), type: ["pptx", "docx"].includes(text(row, "material_type")) ? "document" : text(row, "material_type"),
         source: path && pageCount ? { kind: "pdf", pageCount } : undefined,
         duration: optionalText(row, "duration"),

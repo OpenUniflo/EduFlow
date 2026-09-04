@@ -1,11 +1,22 @@
+import { createHash } from "node:crypto";
 import { mkdir,writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { strFromU8,strToU8,unzipSync,zipSync } from "fflate";
 
 const output=process.argv[2]??"/tmp/eduflow-golden-h5p";await mkdir(output,{recursive:true});
+const zipOptions = { level: 6 as const, mtime: new Date("2020-01-01T00:00:00.000Z") };
+const packageHashes: Record<string, string> = {};
 const json=(value:unknown)=>strToU8(JSON.stringify(value));
 async function download(url:string){const response=await fetch(url);if(!response.ok)throw new Error(`${url}: ${response.status}`);return new Uint8Array(await response.arrayBuffer());}
-async function template(name:string,id:string,mutate:(content:Record<string,unknown>,files:Record<string,Uint8Array>)=>void){const source=`https://h5p.org/sites/default/files/h5p/exports/${name}.h5p`;const files=unzipSync(await download(source));const definition=JSON.parse(strFromU8(files["h5p.json"])) as Record<string,unknown>;const content=JSON.parse(strFromU8(files["content/content.json"])) as Record<string,unknown>;mutate(content,files);definition.title=id;definition.license="CC BY";definition.licenseVersion="4.0";definition.authors=[{name:"H5P Group",role:"Originator"},{name:"EduFlow",role:"Editor"}];definition.source=source;files["h5p.json"]=json(definition);files["content/content.json"]=json(content);await writeFile(join(output,`${id}.h5p`),zipSync(files,{level:6}));}
+async function writePackage(id: string, files: Record<string, Uint8Array>) {
+  const first = zipSync(files, zipOptions);
+  const second = zipSync(files, zipOptions);
+  const sha = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+  if (sha(first) !== sha(second)) throw new Error(`${id} package build is not reproducible`);
+  packageHashes[id] = sha(first);
+  await writeFile(join(output, `${id}.h5p`), first);
+}
+async function template(name:string,id:string,mutate:(content:Record<string,unknown>,files:Record<string,Uint8Array>)=>void){const source=`https://h5p.org/sites/default/files/h5p/exports/${name}.h5p`;const files=unzipSync(await download(source));const definition=JSON.parse(strFromU8(files["h5p.json"])) as Record<string,unknown>;const content=JSON.parse(strFromU8(files["content/content.json"])) as Record<string,unknown>;mutate(content,files);definition.title=id;definition.license="CC BY";definition.licenseVersion="4.0";definition.authors=[{name:"H5P Group",role:"Originator"},{name:"EduFlow",role:"Editor"}];definition.source=source;files["h5p.json"]=json(definition);files["content/content.json"]=json(content);await writePackage(id,files);}
 
 await template("drag-the-words-1399","golden-h5p-agent-drag-words",(content)=>{content.taskDescription="<p>将组件拖到 Agent 行动循环中的正确职责。</p>";content.textField="*Model* 负责判断下一步动作，*Tool* 执行受控外部动作，*State* 保存循环所需上下文。";content.distractors="*Theme* *Avatar*";content.correctText="组件职责正确";content.incorrectText="检查判断、动作与上下文的边界";});
 await template("fill-in-the-blanks-837","golden-h5p-agent-fill-blanks",(content,files)=>{content.text="<p>补全 Agent 行动循环。</p>";content.questions=["Agent 先 *observe/观察* 当前状态，再由 Model *decide/判断* 动作，Tool 执行后必须 *verify/验证* 结果。"];delete content.media;for(const name of Object.keys(files))if(name.startsWith("content/images/"))delete files[name];});
@@ -17,5 +28,5 @@ original.passPercentage=100;original.questions=prompts.map((prompt,index)=>{cons
 const assetUrls=[...embed.matchAll(/(?:src|href)="([^"]*\/sites\/default\/files\/h5p\/libraries\/[^"]+)"/g)].map((match)=>new URL(match[1],"https://h5p.org").toString().replace(/&amp;/g,"&"));const scripts=assetUrls.filter((url)=>/\.js(?:\?|$)/.test(url)),styles=assetUrls.filter((url)=>/\.css(?:\?|$)/.test(url));const qFiles:Record<string,Uint8Array>={"content/content.json":json(original)};const localPath=(url:string)=>`vendor/${new URL(url).pathname.split("/libraries/")[1]}`;
 for(const url of scripts)qFiles[`H5P.QuestionSet-1.20/${localPath(url)}`]=await download(url);
 for(const url of styles){const bytes=await download(url);qFiles[`H5P.QuestionSet-1.20/${localPath(url)}`]=bytes;const css=strFromU8(bytes);for(const match of css.matchAll(/url\(([^)]+)\)/g)){const reference=decodeURIComponent(match[1].trim()).replace(/^["']|["']$/g,"");if(reference.startsWith("data:"))continue;const assetUrl=new URL(reference,url).toString();if(new URL(assetUrl).hostname!=="h5p.org"||!new URL(assetUrl).pathname.includes("/libraries/")||!/\.(?:woff2?|ttf|eot)$/i.test(new URL(assetUrl).pathname))continue;qFiles[`H5P.QuestionSet-1.20/${localPath(assetUrl)}`]=await download(assetUrl);}}
-qFiles["H5P.QuestionSet-1.20/library.json"]=json({title:"Question Set",machineName:"H5P.QuestionSet",majorVersion:1,minorVersion:20,patchVersion:31,runnable:1,embedTypes:["div"],preloadedJs:scripts.map((url)=>({path:localPath(url)})),preloadedCss:styles.map((url)=>({path:localPath(url)}))});qFiles["h5p.json"]=json({title:"golden-h5p-recovery-question-set",language:"zh",mainLibrary:"H5P.QuestionSet",embedTypes:["div"],license:"CC BY",licenseVersion:"4.0",authors:[{name:"H5P Group",role:"Originator"},{name:"EduFlow",role:"Editor"}],source:"https://h5p.org/question-set",preloadedDependencies:[{machineName:"H5P.QuestionSet",majorVersion:1,minorVersion:20}]});await writeFile(join(output,"golden-h5p-recovery-question-set.h5p"),zipSync(qFiles,{level:6}));
-console.log(`Built four controlled Golden H5P packages in ${output}.`);
+qFiles["H5P.QuestionSet-1.20/library.json"]=json({title:"Question Set",machineName:"H5P.QuestionSet",majorVersion:1,minorVersion:20,patchVersion:31,runnable:1,embedTypes:["div"],preloadedJs:scripts.map((url)=>({path:localPath(url)})),preloadedCss:styles.map((url)=>({path:localPath(url)}))});qFiles["h5p.json"]=json({title:"golden-h5p-recovery-question-set",language:"zh",mainLibrary:"H5P.QuestionSet",embedTypes:["div"],license:"CC BY",licenseVersion:"4.0",authors:[{name:"H5P Group",role:"Originator"},{name:"EduFlow",role:"Editor"}],source:"https://h5p.org/question-set",preloadedDependencies:[{machineName:"H5P.QuestionSet",majorVersion:1,minorVersion:20}]});await writePackage("golden-h5p-recovery-question-set",qFiles);
+console.log(JSON.stringify({ status: "PASS", output, packageHashes }, null, 2));

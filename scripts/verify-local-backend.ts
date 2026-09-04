@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
@@ -114,11 +115,15 @@ try {
 
   const courses = await invoke(coursesHandler, "GET", adminUser.token);
   assertStatus(courses, 200, "course read");
-  assert.deepEqual(courses.body.courses.map((item: any) => item.course.id).sort(), ["agentic-ai", "agentic-ai-golden", "cds525-deep-learning", "python-engineering"]);
+  const requiredCourseIds = ["agentic-ai", "agentic-ai-golden", "ai-agents-in-depth", "cds525-deep-learning", "python-engineering"];
+  assert.ok(requiredCourseIds.every((courseId) => courses.body.courses.some((item: any) => item.course.id === courseId)), "all required local Course definitions must be visible");
+  const agentBookCourse = courses.body.courses.find((item: any) => item.course.id === "ai-agents-in-depth");
+  assert.equal(agentBookCourse.curriculumCoverages.length, 117);
   const golden = courses.body.courses.find((item: any) => item.course.id === "agentic-ai-golden");
   assert.ok(golden, "Golden Course must be available through the API");
   assert.equal(golden.chapters.length, 6);
   assert.equal(golden.assignments.length, 37);
+  const goldenDefinitionFingerprint = createHash("sha256").update(JSON.stringify(golden)).digest("hex");
   assert.deepEqual(new Set(golden.assignments.map((item: any) => item.experience?.type)), new Set(["answer", "code", "trace", "workflow"]));
   assertStatus(await invoke(coursesHandler, "GET", adminUser.token, undefined, { id: "missing-course" }), 404, "unknown course denial");
   const pdfMaterial = courses.body.courses.flatMap((item: any) => item.materials).find((item: any) => item.source?.kind === "pdf");
@@ -137,14 +142,15 @@ try {
   const assistantContext = { workspace: "explore", experienceMode: "learn" };
   let goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", goalText, context: assistantContext });
   assertStatus(goalPlan, 200, "Assistant Goal planning");
-  if (goalPlan.body.status === "clarify") {
+  if (goalPlan.body.status === "needs_clarification") {
     goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", sessionId: goalPlan.body.sessionId, clarificationMessageId: goalPlan.body.messageId, goalText: "明确目标：学习 RAG、Reranking 和 Citation，用它们检索私有资料并给出有依据的回答。", context: assistantContext });
     assertStatus(goalPlan, 200, "Assistant Goal clarification follow-up");
   }
-  if (goalPlan.body.status === "clarify") {
+  if (goalPlan.body.status === "needs_clarification") {
     goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", sessionId: goalPlan.body.sessionId, clarificationMessageId: goalPlan.body.messageId, goalText: "是的，先只保留直接完成检索、重排和引用这三个核心成果的学习目标；准备步骤由系统作为必要基础处理。", context: assistantContext });
     assertStatus(goalPlan, 200, "Assistant Goal semantic-scope follow-up");
   }
+  assert.ok(goalPlan.body.plan, `Goal Planner did not reach a plan: ${JSON.stringify(goalPlan.body)}`);
   assert.equal(goalPlan.body.plan.resolution.status, "ready");
   assert.ok(goalPlan.body.plan.resolution.targetKnowledge.length > 0);
   assert.ok(goalPlan.body.plan.resolution.targetKnowledge.every((item: any) => knowledge.body.graph.nodes.some((node: any) => node.id === item.id)), "Goal targets must be existing visible Knowledge IDs");
@@ -258,17 +264,37 @@ try {
   assertStatus(publishedRouteOnly, 200, "learner reads route-only published Course");
   assert.equal(publishedRouteOnly.body.course.course.targetOutcome, undefined);
 
-  // A published Course keeps its existing learner projection until a versioned
-  // authoring draft is published.  The same publish transaction materializes
-  // authored Micro hierarchy and AssignmentCoverage.
-  const publishedBase = teacherCourses.body.courses.find((item: any) => item.course.id === "agentic-ai-golden");
-  assert.ok(publishedBase, "published authoring base must exist");
-  const authoredKnowledgeId = publishedBase.curriculumCoverages[0].nodeId;
+  // Exercise repeated Publish and learner-state preservation only on the
+  // disposable Course created by this verifier. Canonical Golden definitions
+  // remain a read-only regression oracle.
+  const authoringCourseId = manualCourseId;
+  const authoredKnowledgeId = routeKnowledgeId;
+  const baselineMaterialId = `${authoringCourseId}:material:baseline`;
+  const baselineSegmentId = `${baselineMaterialId}:segment:1`;
+  const baselineAssignmentId = `${authoringCourseId}:assignment:baseline`;
+  const baselinePathId = `${authoringCourseId}:micro:baseline`;
+  const baselinePath = { id: baselinePathId, knowledgeId: authoredKnowledgeId, courseId: authoringCourseId, scope: "course", title: "Verifier baseline Micro", description: "Stable across a later Publish", mode: "learn", estimatedMinutes: 2, required: false, status: "published", units: [{ id: `${baselinePathId}:unit`, pathId: baselinePathId, title: "Baseline", position: 0, estimatedMinutes: 2, required: true, steps: [{ id: `${baselinePathId}:step`, kind: "explanation", title: "Baseline", body: "Stable baseline content." }] }] };
+  const baselineMaterial = { id: baselineMaterialId, courseId: authoringCourseId, order: 0, title: "Verifier baseline Material", type: "document", segments: [{ id: baselineSegmentId, order: 0, title: "Baseline", content: "Stable baseline material." }] };
+  const baselineAssignment = { id: baselineAssignmentId, courseId: authoringCourseId, order: 0, title: "Verifier baseline Assignment", description: "Stable across a later Publish", requirements: ["Provide evidence"], expectedOutput: "Evidence", acceptanceCriteria: ["Evidence is present"], mode: "instruction", estimatedMinutes: 2, experience: { type: "answer", prompt: "Provide evidence" } };
+  const baselineRuntime = {
+    ...publishedRouteOnly.body.course,
+    materials: [baselineMaterial],
+    materialKnowledgeCoverages: [{ id: `${baselineMaterialId}:coverage`, materialId: baselineMaterialId, segmentId: baselineSegmentId, nodeId: authoredKnowledgeId, role: "introduce" }],
+    assignments: [baselineAssignment],
+    assignmentCoverages: [{ id: `${baselineAssignmentId}:coverage`, assignmentId: baselineAssignmentId, nodeId: authoredKnowledgeId, role: "assess", required: false }]
+  };
+  const baselineState = { ...draftState, courseId: authoringCourseId, microPathsEdited: true, microPaths: [baselinePath] };
+  const baselineSave = await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: baselineState, previewRuntime: baselineRuntime, expectedRevision: 0 }, { courseId: authoringCourseId });
+  assertStatus(baselineSave, 200, "temporary authoring baseline save");
+  assertStatus(await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: baselineSave.body.revision }, { courseId: authoringCourseId }), 200, "temporary authoring baseline publish");
+  const publishedBaseResponse = await invoke(coursesHandler, "GET", adminUser.token, undefined, { id: authoringCourseId });
+  assertStatus(publishedBaseResponse, 200, "temporary published authoring baseline read");
+  const publishedBase = publishedBaseResponse.body.course;
   const authoredPathId = `authored-micro-${suffix}`;
   const authoredAssignmentId = `authored-assignment-${suffix}`;
-  const authoringBaseMicro = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: "agentic-ai-golden" });
+  const authoringBaseMicro = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: authoringCourseId });
   assertStatus(authoringBaseMicro, 200, "published Micro authoring baseline read");
-  const authoredPath = { id: authoredPathId, knowledgeId: authoredKnowledgeId, courseId: "agentic-ai-golden", scope: "course", title: "Verifier authored Micro", description: "Draft-only until Publish", mode: "learn", estimatedMinutes: 8, required: true, status: "draft", units: [{ id: `${authoredPathId}:unit`, pathId: authoredPathId, title: "Verifier Unit", position: 0, estimatedMinutes: 8, required: true, steps: [
+  const authoredPath = { id: authoredPathId, knowledgeId: authoredKnowledgeId, courseId: authoringCourseId, scope: "course", title: "Verifier authored Micro", description: "Draft-only until Publish", mode: "learn", estimatedMinutes: 8, required: true, status: "draft", units: [{ id: `${authoredPathId}:unit`, pathId: authoredPathId, title: "Verifier Unit", position: 0, estimatedMinutes: 8, required: true, steps: [
     { id: `${authoredPathId}:explanation`, kind: "explanation", title: "Verifier explanation", body: "Explain the verifiable boundary." },
     { id: `${authoredPathId}:choice`, kind: "interaction", title: "Verifier choice", body: "Choose the verifiable boundary.", interaction: { type: "choice", options: ["Verifiable boundary", "Memorized title"], correctIndex: 0 }, successFeedback: "Correct", retryFeedback: "Retry" },
     { id: `${authoredPathId}:multiple`, kind: "interaction", title: "Verifier multiple choice", body: "Choose both valid boundaries.", interaction: { type: "multiple-choice", options: ["Input contract", "Output evidence", "Theme"], correctIndexes: [0,1] }, successFeedback: "Correct", retryFeedback: "Retry" },
@@ -279,9 +305,9 @@ try {
     { id: `${authoredPathId}:h5p`, kind: "interaction", title: "Verifier H5P", body: "Complete the imported content.", interaction: { type: "h5p", contentRef: "golden-h5p-agent-fill-blanks", adapter: "h5p-standalone", completionPolicy: "passed" }, successFeedback: "Correct", retryFeedback: "Retry" },
     { id: `${authoredPathId}:summary`, kind: "summary", title: "Verifier summary", body: "The boundary is persisted." }
   ] }] };
-  const authoredAssignment = { id: authoredAssignmentId, courseId: "agentic-ai-golden", order: Math.max(-1, ...publishedBase.assignments.map((item: any) => item.order)) + 1, title: "Verifier authored Assignment", description: "A manually authored Assignment", requirements: ["Provide evidence"], expectedOutput: "Verifiable answer", acceptanceCriteria: ["Meets stated boundary"], mode: "instruction", estimatedMinutes: 5, experience: { type: "answer", prompt: "Provide evidence" } };
+  const authoredAssignment = { id: authoredAssignmentId, courseId: authoringCourseId, order: Math.max(-1, ...publishedBase.assignments.map((item: any) => item.order)) + 1, title: "Verifier authored Assignment", description: "A manually authored Assignment", requirements: ["Provide evidence"], expectedOutput: "Verifiable answer", acceptanceCriteria: ["Meets stated boundary"], mode: "instruction", estimatedMinutes: 5, experience: { type: "answer", prompt: "Provide evidence" } };
   const authoredCoverage = { id: `${authoredAssignmentId}:coverage`, assignmentId: authoredAssignmentId, nodeId: authoredKnowledgeId, role: "assess", required: true };
-  const authoredState = { ...draftState, courseId: "agentic-ai-golden", microPathsEdited: true, microPaths: [...authoringBaseMicro.body.baseMicroPaths, authoredPath], assignments: [...publishedBase.assignments, authoredAssignment], assignmentCoverages: [...publishedBase.assignmentCoverages, authoredCoverage] };
+  const authoredState = { ...draftState, courseId: authoringCourseId, microPathsEdited: true, microPaths: [...authoringBaseMicro.body.baseMicroPaths, authoredPath], assignments: [...publishedBase.assignments, authoredAssignment], assignmentCoverages: [...publishedBase.assignmentCoverages, authoredCoverage] };
   const authoredPreview = { ...publishedBase, assignments: authoredState.assignments, assignmentCoverages: authoredState.assignmentCoverages };
   const preservedAssignment = publishedBase.assignments[0];
   const preservedMaterial = publishedBase.materials[0];
@@ -289,23 +315,23 @@ try {
   const preservedPath = authoringBaseMicro.body.baseMicroPaths[0];
   const preservedUnit = preservedPath.units[0];
   const preservedStep = preservedUnit.steps[0];
-  assert.ifError((await server.from("user_course_states").upsert({ user_id: adminUser.user.id, course_id: "agentic-ai-golden", recent_lesson_id: publishedBase.lessons[0].id })).error);
-  assert.ifError((await server.from("user_assignment_states").upsert({ user_id: adminUser.user.id, course_id: "agentic-ai-golden", assignment_id: preservedAssignment.id, status: "started", progress: 25 })).error);
-  assert.ifError((await server.from("user_material_states").upsert({ user_id: adminUser.user.id, course_id: "agentic-ai-golden", material_id: preservedMaterial.id, recent_segment_id: preservedSegment.id, viewed_segment_ids: [preservedSegment.id], completed_segment_ids: [], progress: 25 })).error);
+  assert.ifError((await server.from("user_course_states").upsert({ user_id: adminUser.user.id, course_id: authoringCourseId, recent_lesson_id: publishedBase.lessons[0].id })).error);
+  assert.ifError((await server.from("user_assignment_states").upsert({ user_id: adminUser.user.id, course_id: authoringCourseId, assignment_id: preservedAssignment.id, status: "started", progress: 25 })).error);
+  assert.ifError((await server.from("user_material_states").upsert({ user_id: adminUser.user.id, course_id: authoringCourseId, material_id: preservedMaterial.id, recent_segment_id: preservedSegment.id, viewed_segment_ids: [preservedSegment.id], completed_segment_ids: [], progress: 25 })).error);
   assert.ifError((await server.from("user_micro_path_progress").upsert({ user_id: adminUser.user.id, path_id: preservedPath.id, status: "in_progress", current_unit_id: preservedUnit.id, current_step_id: preservedStep.id, started_at: new Date().toISOString() })).error);
   const learnerOldPublished = await invoke(coursesHandler, "GET", ordinaryUser.token);
-  assert.ok(!learnerOldPublished.body.courses.find((item: any) => item.course.id === "agentic-ai-golden").assignments.some((item: any) => item.id === authoredAssignmentId), "learner must not see unpublished Assignment edit");
-  const authoredSave = await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: authoredState, previewRuntime: authoredPreview, expectedRevision: 0 }, { courseId: "agentic-ai-golden" });
+  assert.ok(!learnerOldPublished.body.courses.find((item: any) => item.course.id === authoringCourseId).assignments.some((item: any) => item.id === authoredAssignmentId), "learner must not see unpublished Assignment edit");
+  const authoredSave = await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: authoredState, previewRuntime: authoredPreview, expectedRevision: 0 }, { courseId: authoringCourseId });
   assertStatus(authoredSave, 200, "authored Micro and Assignment draft save");
-  const authoringPreview = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: "agentic-ai-golden" });
+  const authoringPreview = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: authoringCourseId });
   assertStatus(authoringPreview, 200, "authored draft preview read"); assert.ok(authoringPreview.body.draft.state.microPaths.some((item: any) => item.id === authoredPathId)); assert.ok(authoringPreview.body.draft.previewRuntime.assignments.some((item: any) => item.id === authoredAssignmentId));
-  const authoredPublish = await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: authoredSave.body.revision }, { courseId: "agentic-ai-golden" });
+  const authoredPublish = await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: authoredSave.body.revision }, { courseId: authoringCourseId });
   assertStatus(authoredPublish, 200, "authored Micro and Assignment publish");
-  assert.equal((await server.from("user_assignment_states").select("status").eq("user_id", adminUser.user.id).eq("course_id", "agentic-ai-golden").eq("assignment_id", preservedAssignment.id).single()).data?.status, "started", "stable Assignment state must survive republish");
-  assert.equal((await server.from("user_material_states").select("recent_segment_id").eq("user_id", adminUser.user.id).eq("course_id", "agentic-ai-golden").eq("material_id", preservedMaterial.id).single()).data?.recent_segment_id, preservedSegment.id, "stable Material state must survive republish");
+  assert.equal((await server.from("user_assignment_states").select("status").eq("user_id", adminUser.user.id).eq("course_id", authoringCourseId).eq("assignment_id", preservedAssignment.id).single()).data?.status, "started", "stable Assignment state must survive republish");
+  assert.equal((await server.from("user_material_states").select("recent_segment_id").eq("user_id", adminUser.user.id).eq("course_id", authoringCourseId).eq("material_id", preservedMaterial.id).single()).data?.recent_segment_id, preservedSegment.id, "stable Material state must survive republish");
   assert.equal((await server.from("user_micro_path_progress").select("status").eq("user_id", adminUser.user.id).eq("path_id", preservedPath.id).single()).data?.status, "in_progress", "stable Micro progress must survive republish");
   const learnerNewPublished = await invoke(coursesHandler, "GET", ordinaryUser.token);
-  assert.ok(learnerNewPublished.body.courses.find((item: any) => item.course.id === "agentic-ai-golden").assignments.some((item: any) => item.id === authoredAssignmentId), "learner sees authored Assignment only after Publish");
+  assert.ok(learnerNewPublished.body.courses.find((item: any) => item.course.id === authoringCourseId).assignments.some((item: any) => item.id === authoredAssignmentId), "learner sees authored Assignment only after Publish");
   const invalidH5PPaths=authoredState.microPaths.map((path:any)=>path.id!==authoredPathId?path:{
     ...path,
     units:path.units.map((unit:any)=>({
@@ -316,10 +342,14 @@ try {
     }))
   });
   const invalidH5PState={...authoredState,microPaths:invalidH5PPaths};
-  const invalidH5PSave=await invoke(courseAuthoringHandler,"PUT",adminUser.token,{state:invalidH5PState,previewRuntime:authoredPreview,expectedRevision:0},{courseId:"agentic-ai-golden"});
+  const invalidH5PSave=await invoke(courseAuthoringHandler,"PUT",adminUser.token,{state:invalidH5PState,previewRuntime:authoredPreview,expectedRevision:0},{courseId:authoringCourseId});
   assertStatus(invalidH5PSave,200,"invalid H5P draft save is allowed before Publish validation");
-  assertStatus(await invoke(courseAuthoringHandler,"POST",adminUser.token,{expectedRevision:invalidH5PSave.body.revision},{courseId:"agentic-ai-golden"}),422,"missing published H5P reference blocks Publish");
-  assert.ifError((await server.from("course_authoring_drafts").delete().eq("course_id","agentic-ai-golden")).error);
+  assertStatus(await invoke(courseAuthoringHandler,"POST",adminUser.token,{expectedRevision:invalidH5PSave.body.revision},{courseId:authoringCourseId}),422,"missing published H5P reference blocks Publish");
+  assert.ifError((await server.from("course_authoring_drafts").delete().eq("course_id",authoringCourseId)).error);
+  const goldenAfterAuthoring = await invoke(coursesHandler, "GET", adminUser.token, undefined, { id: "agentic-ai-golden" });
+  assertStatus(goldenAfterAuthoring, 200, "canonical Golden Course read-only guard");
+  assert.equal(goldenAfterAuthoring.body.course.assignments.length, 37, "verifier must not mutate canonical Golden Assignments");
+  assert.equal(createHash("sha256").update(JSON.stringify(goldenAfterAuthoring.body.course)).digest("hex"), goldenDefinitionFingerprint, "verifier must not mutate the canonical Golden definition");
 
   const micro = await invoke(microHandler, "GET", adminUser.token);
   assertStatus(micro, 200, "database-backed Micro read");
@@ -359,13 +389,12 @@ try {
   assert.equal(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.status, "learned");
   assert.ok(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.evidence?.some((item: any) => item.type === "micro_path_completed"));
 
-  assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "start-knowledge", nodeId: "RT14" }), 200, "explicit Knowledge start");
   assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "start-assignment", courseId: "agentic-ai-golden", assignmentId: "golden-knowledge-assignment-RT14" }), 200, "Assignment start");
-  const deterministicSubmit = await invoke(learningHandler, "POST", adminUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: "golden-knowledge-assignment-RT14", deterministicAccepted: true });
+  const deterministicSubmit = await invoke(learningHandler, "POST", adminUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: "golden-knowledge-assignment-RT14", response: { kind: "trace", selectedStepId: "cancel" }, idempotencyKey: `verify-rt14-${suffix}` });
   assertStatus(deterministicSubmit, 200, "deterministic Assignment acceptance"); assert.equal(deterministicSubmit.body.status, "accepted");
   const manualAssignmentId = "golden-knowledge-assignment-AG01";
   assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "start-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId }), 200, "learner Assignment start for manual acceptance");
-  const submittedAssignment = await invoke(learningHandler, "POST", ordinaryUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId });
+  const submittedAssignment = await invoke(learningHandler, "POST", ordinaryUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId, response: { kind: "answer", text: "Verifier evidence for manual review." }, idempotencyKey: `verify-manual-${suffix}` });
   assertStatus(submittedAssignment, 200, "learner Assignment submission for manual acceptance"); assert.equal(submittedAssignment.body.status, "submitted");
   assertStatus(await invoke(learningHandler, "GET", ordinaryUser.token, undefined, { courseId: "agentic-ai-golden" }), 403, "learner Assignment review denial");
   const reviewQueue = await invoke(learningHandler, "GET", adminUser.token, undefined, { courseId: "agentic-ai-golden" });
@@ -376,9 +405,9 @@ try {
   const acceptedQueue = await invoke(learningHandler, "GET", adminUser.token, undefined, { courseId: "agentic-ai-golden" });
   assert.ok(acceptedQueue.body.submissions.some((item: any) => item.assignmentId === manualAssignmentId && item.status === "accepted"));
   assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "accept-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId, learnerUserId: ordinaryUser.user.id }), 409, "duplicate manual Assignment acceptance denial");
-  assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "start-assignment", courseId: "agentic-ai-golden", assignmentId: authoredAssignmentId }), 200, "second required Assignment start");
-  assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: authoredAssignmentId }), 200, "second required Assignment submission");
-  assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "accept-assignment", courseId: "agentic-ai-golden", assignmentId: authoredAssignmentId, learnerUserId: ordinaryUser.user.id }), 200, "second required Assignment acceptance");
+  assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "start-assignment", courseId: authoringCourseId, assignmentId: authoredAssignmentId }), 200, "second required Assignment start");
+  assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "submit-assignment", courseId: authoringCourseId, assignmentId: authoredAssignmentId, response: { kind: "answer", text: "Verifier authored Assignment evidence." }, idempotencyKey: `verify-authored-${suffix}` }), 200, "second required Assignment submission");
+  assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "accept-assignment", courseId: authoringCourseId, assignmentId: authoredAssignmentId, learnerUserId: ordinaryUser.user.id }), 200, "second required Assignment acceptance");
   assertStatus(await invoke(microHandler, "POST", ordinaryUser.token, { action: "start", pathId: agentPath.id }), 200, "accepted-before-Micro learner start");
   let reverseResult:any;for(const unit of agentPath.units)for(const step of unit.steps){reverseResult=await invoke(microHandler,"POST",ordinaryUser.token,{action:"complete-step",pathId:agentPath.id,unitId:unit.id,stepId:step.id,submission:submissionFor(step,"learner")});assertStatus(reverseResult,200,`accepted-before-Micro ${step.id}`);assert.equal(reverseResult.body.correct,true);}
   assert.equal(reverseResult.body.completed,true,"accepted-before-Micro completion");
@@ -473,9 +502,9 @@ try {
   assert.equal(adminAfterOrdinaryWrite.body.state.runHistory[workflowId].length, 20);
   assert.equal(adminAfterOrdinaryWrite.body.state.runHistory[workflowId][0].id, newestRun.id, "another user must not alter the first user's runs");
 
-  const uploadRequest = { courseId: "python-engineering", lessonId: "PY-L02", filename: "local-verifier.pdf", contentType: "application/pdf", size: 120_000 };
+  const uploadRequest = { courseId: "python-engineering", filename: "local-verifier.pdf", contentType: "application/pdf", size: 120_000 };
   assertStatus(await invoke(materialsHandler, "POST", ordinaryUser.token, uploadRequest), 403, "non-admin upload denial");
-  assertStatus(await invoke(materialsHandler, "POST", adminUser.token, { ...uploadRequest, lessonId: "missing-lesson" }), 404, "unknown lesson denial");
+  assertStatus(await invoke(materialsHandler, "POST", adminUser.token, { ...uploadRequest, courseId: "missing-course" }), 404, "unknown course denial");
   const upload = await invoke(materialsHandler, "POST", adminUser.token, uploadRequest);
   assertStatus(upload, 200, "signed upload creation");
   uploadedPath = upload.body.path;
@@ -483,7 +512,7 @@ try {
   const uploadResult = await adminUser.client.storage.from("course-materials").uploadToSignedUrl(upload.body.path, upload.body.token, pdf, { contentType: "application/pdf" });
   assert.ifError(uploadResult.error);
   const metadata = {
-    courseId: "python-engineering", lessonId: "PY-L02", materialId: uploadedMaterialId, order: 999,
+    courseId: "python-engineering", materialId: uploadedMaterialId, order: 999,
     title: "Local verifier PDF", path: uploadedPath, contentType: "application/pdf", pageCount: 8,
     segments: Array.from({ length: 8 }, (_, index) => ({ id: `${uploadedMaterialId}-page-${index + 1}`, order: index + 1, page: index + 1, title: `Page ${index + 1}` }))
   };

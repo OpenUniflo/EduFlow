@@ -3,7 +3,6 @@ import { apiRequest } from "@/shared/api/apiClient";
 
 type MaterialMetadata = {
   courseId: string;
-  lessonId: string;
   materialId: string;
   order: number;
   title: string;
@@ -23,7 +22,7 @@ export class ApiMaterialStorageService {
   async upload(file: File, metadata: MaterialMetadata) {
     const signed = await apiRequest<{ path: string; token: string }>("/api/materials", {
       method: "POST",
-      body: JSON.stringify({ courseId: metadata.courseId, lessonId: metadata.lessonId, filename: file.name, contentType: file.type, size: file.size })
+      body: JSON.stringify({ courseId: metadata.courseId, filename: file.name, contentType: file.type, size: file.size })
     });
     const upload = await supabaseClient.storage.from("course-materials").uploadToSignedUrl(signed.path, signed.token, file, { contentType: file.type });
     if (upload.error) throw upload.error;

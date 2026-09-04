@@ -16,7 +16,7 @@ const runtime: CourseRuntimeData = {
     { id: "cc-1", courseId: "course-1", lessonId: "lesson-1", nodeId: "node-1", role: "introduce", order: 0 },
     { id: "cc-2", courseId: "course-1", lessonId: "lesson-1", nodeId: "node-2", role: "introduce", order: 1 }
   ], curriculumSequences: [], assignments: [], assignmentCoverages: [], assignmentDependencies: [], chapterOutcomes: [], assignmentOutcomeCompositions: [], finalProjects: [], finalProjectOutcomeCompositions: [],
-  materials: [{ id: "material-1", courseId: "course-1", lessonId: "lesson-1", order: 0, title: "Book", type: "pdf", source: { kind: "pdf", url: "/book.pdf", pageCount: 2 }, segments: [{ id: "page-1", order: 0, page: 1 }, { id: "page-2", order: 1, page: 2 }] }],
+  materials: [{ id: "material-1", courseId: "course-1", order: 0, title: "Book", type: "pdf", source: { kind: "pdf", url: "/book.pdf", pageCount: 2 }, segments: [{ id: "page-1", order: 0, page: 1 }, { id: "page-2", order: 1, page: 2 }] }],
   materialKnowledgeCoverages: [], revision: "run-1"
 };
 const node = (id: string, pages: number[]): KnowledgeNode => ({ id, title: id, description: id, type: "conceptual", masteryCriteria: ["explain"], scope: "user", ownerId: "user-1", currentRevisionId: `${id}-r1`, status: "active", provenance: [{ sourceType: "material", sourceId: "material-1", materialId: "material-1", courseId: "course-1", sourceLocations: pages.map((page) => ({ rawBlockId: `b-${page}`, ordinal: page, sectionPath: ["Chapter"], page })) }] });

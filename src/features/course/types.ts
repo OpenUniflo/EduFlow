@@ -209,6 +209,7 @@ export type AssignmentStateSummary = {
 export type MaterialContext = {
   materialId: string;
   materialTitle: string;
+  /** Presentation context derived from MaterialKnowledgeCoverage -> CurriculumCoverage. */
   lessonId: string;
   segmentIds: string[];
   roles: MaterialKnowledgeCoverageRole[];
@@ -312,8 +313,7 @@ export type MaterialSource = {
 export type Material = {
   id: string;
   courseId: string;
-  lessonId: string;
-  /** Stable instructional/display order inside the owning Lesson. */
+  /** Stable instructional/display order inside the owning Course. */
   order: number;
   title: string;
   description?: string;

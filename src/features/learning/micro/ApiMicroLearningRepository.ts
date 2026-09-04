@@ -36,6 +36,14 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
   getPathProgress(pathId: string) { return this.pathProgress.get(pathId); }
   getUnitProgress(unitId: string) { return this.unitProgress.get(unitId); }
 
+  resetAuthenticatedState() {
+    this.userId = undefined;
+    this.pathProgress.clear();
+    this.unitProgress.clear();
+    this.guestCompletedSteps.clear();
+    this.emit();
+  }
+
   async start(pathId: string, contextCourseId?: string) {
     if (!this.userId) {
       const path = this.paths.find((item) => item.id === pathId);
@@ -53,8 +61,8 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
     return apiRequest<H5PContentDescriptor>("/api/micro",{method:"POST",body:JSON.stringify({action:"resolve-h5p",pathId,unitId,stepId,contentRef})});
   }
 
-  async completeStep(pathId: string, unitId: string, stepId: string, submission?: MicroLearningSubmission) {
-    const result = await apiRequest<{ correct: boolean; completed: boolean; pathProgress?: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "complete-step", pathId, unitId, stepId, submission }) });
+  async completeStep(pathId: string, unitId: string, stepId: string, submission?: MicroLearningSubmission,contextCourseId?:string) {
+    const result = await apiRequest<{ correct: boolean; completed: boolean; pathProgress?: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "complete-step", pathId, unitId, stepId, submission,contextCourseId }) });
     if (!this.userId) {
       if (!result.correct) return { correct: false, completed: false };
       const path = this.paths.find((item) => item.id === pathId); const unit = path?.units.find((item) => item.id === unitId);

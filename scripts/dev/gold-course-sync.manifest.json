@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "remoteApp": "https://edu-flow-six-phi.vercel.app",
+  "courses": [
+    {
+      "courseId": "ai-agents-in-depth",
+      "definitionSha256": "e9efaf57476925962141b4375c1b901211d6ade8daf89027ea22a22f9f22b517",
+      "counts": { "chapters": 9, "lessons": 9, "coverages": 117, "materials": 1, "segments": 36, "materialCoverages": 85, "assignments": 127 }
+    },
+    {
+      "courseId": "cds525-deep-learning",
+      "definitionSha256": "b0d257ee93bf3f5baaf6ba883918eb6ac2a2e33ecabfcdbde7964a354822813e",
+      "counts": { "chapters": 6, "lessons": 26, "coverages": 90, "materials": 12, "segments": 790, "materialCoverages": 90, "assignments": 97 }
+    }
+  ],
+  "assets": [
+    { "courseId": "ai-agents-in-depth", "materialId": "ai-agents-in-depth-book", "path": "shared/ai-agents-in-depth/AI-Agents-in-Depth-zh-CN.pdf", "size": 10994364, "sha256": "0b47ef3f02396b694bea58be02706ce60ff1e7e3dae293475abe111d69cb2f3b", "pageCount": 307, "segmentCount": 307, "minPage": 1, "maxPage": 307 },
+    { "courseId": "ai-agents-in-depth", "materialId": "M03-memory-rag", "path": "shared/ai-agents-in-depth/M03-memory-rag-full-v1.pdf", "size": 921238, "sha256": "ccb30b809764ad56af6a35e409e98cfa509f48ec09fd571ce8f916130d6ffd16", "pageCount": 36, "segmentCount": 36, "minPage": 1, "maxPage": 36 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l00", "path": "shared/cds525-deep-learning/CDS 525 Lecture 0  (1).pdf", "size": 455233, "sha256": "d0504af5667ce6551615cf0b1f2e6c3e7808e44af66eca5d57b5b3b1947f99a9", "pageCount": 23, "segmentCount": 23, "minPage": 1, "maxPage": 23 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l01", "path": "shared/cds525-deep-learning/CDS 525 Lecture 1_v4.pdf", "size": 3289949, "sha256": "abf242f9b938e23d020190057e67bc4f8d886ca592052d2fbe00d81c882f92bc", "pageCount": 66, "segmentCount": 66, "minPage": 1, "maxPage": 66 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l10", "path": "shared/cds525-deep-learning/CDS 525 Lecture 10 v4.pdf", "size": 4351003, "sha256": "4e56bad205893e7ce4d7c3a015f6fff2bd1fe41ee44c8766bd034350f3c000dd", "pageCount": 56, "segmentCount": 56, "minPage": 1, "maxPage": 56 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l02", "path": "shared/cds525-deep-learning/CDS 525 Lecture 2 v4 (1).pdf", "size": 13813527, "sha256": "d733af249c9e34f7715f25040d301346bb112f6c12784ea085331c1af532dd50", "pageCount": 68, "segmentCount": 68, "minPage": 1, "maxPage": 68 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l03", "path": "shared/cds525-deep-learning/CDS 525 Lecture 3 v4.pdf", "size": 26462757, "sha256": "520dccee8637d33fdde3f4571b0ec2fc2da70cbcd1615579a562b137332604db", "pageCount": 75, "segmentCount": 75, "minPage": 1, "maxPage": 75 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l04", "path": "shared/cds525-deep-learning/CDS 525 Lecture 4 v4.pdf", "size": 5242792, "sha256": "3b35c92c18cbaee6f5142f9b101e350ae6fea7fa68ff058882aa168d0a21e7b5", "pageCount": 79, "segmentCount": 79, "minPage": 1, "maxPage": 79 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l05", "path": "shared/cds525-deep-learning/CDS 525 Lecture 5 for students.pdf", "size": 4403997, "sha256": "92ded8066041e18e6afce743365a43aa86459249a06eb357e80f8cc4c199ac60", "pageCount": 87, "segmentCount": 87, "minPage": 1, "maxPage": 87 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l06", "path": "shared/cds525-deep-learning/CDS 525 Lecture 6 v4.pdf", "size": 2935722, "sha256": "244bd6d2dd6a7b270c412d8f8d7b3351b71676da4156f441818173b3e367aa2e", "pageCount": 51, "segmentCount": 51, "minPage": 1, "maxPage": 51 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l07", "path": "shared/cds525-deep-learning/CDS 525 Lecture 7 v5.pdf", "size": 3759668, "sha256": "2edc69fc7a00263d09b030c66b0b0384b364f3fdab69a08621f59b62a0c8e097", "pageCount": 64, "segmentCount": 64, "minPage": 1, "maxPage": 64 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l08", "path": "shared/cds525-deep-learning/CDS 525 Lecture 8 v7.pdf", "size": 5472232, "sha256": "6f52aaab286c0c45afcf90d903020974b746130c4ebe17063ef6e2c207b85731", "pageCount": 80, "segmentCount": 80, "minPage": 1, "maxPage": 80 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-l09", "path": "shared/cds525-deep-learning/CDS 525 Lecture 9 v6.pdf", "size": 5500221, "sha256": "e48762b60bfd93604ca096f23e0c426ef9015ef78ca134a7d8a27b25bb0ec673", "pageCount": 80, "segmentCount": 80, "minPage": 1, "maxPage": 80 },
+    { "courseId": "cds525-deep-learning", "materialId": "cds525-mat-review", "path": "shared/cds525-deep-learning/CDS 525 Lecture Review.pdf", "size": 21464150, "sha256": "3ff99b42311c6226856058d3befc499a0d3995145391747b40426722682d24b4", "pageCount": 61, "segmentCount": 61, "minPage": 1, "maxPage": 61 }
+  ]
+}

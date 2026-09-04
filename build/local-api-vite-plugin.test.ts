@@ -10,7 +10,8 @@ describe("local consolidated API adapter", () => {
       "/api/course-authoring": "authoring",
       "/api/learning": "learning",
       "/api/micro": "micro",
-      "/api/progress": "progress"
+      "/api/progress": "progress",
+      "/api/navigation": "navigation"
     });
     const vercel = readFileSync(join(process.cwd(), "vercel.json"), "utf8");
     for (const [path, resource] of Object.entries(consolidatedResourceForPath)) {

@@ -45,10 +45,10 @@ export class ApiLearningProgressRepository implements LearningProgressRepository
     this.persist({ ...current, materialStates: { ...current.materialStates, [materialId]: { ...previous, ...update, materialId, updatedAt: update.updatedAt ?? now() } }, updatedAt: now() });
   }
 
-  updateMaterialReadingState(userId: string, courseId: string, lessonId: string, materialId: string, update: Partial<UserMaterialState>) {
+  updateMaterialReadingState(userId: string, courseId: string, lessonId: string | undefined, materialId: string, update: Partial<UserMaterialState>) {
     const current = this.getCourseState(userId, courseId);
     const previous = current.materialStates[materialId] ?? { materialId, updatedAt: now() };
-    this.persist({ ...current, recentLessonId: lessonId, materialStates: { ...current.materialStates, [materialId]: { ...previous, ...update, materialId, updatedAt: update.updatedAt ?? now() } }, updatedAt: now() });
+    this.persist({ ...current, ...(lessonId ? { recentLessonId: lessonId } : {}), materialStates: { ...current.materialStates, [materialId]: { ...previous, ...update, materialId, updatedAt: update.updatedAt ?? now() } }, updatedAt: now() });
   }
 
   subscribe(listener: () => void) {
@@ -58,6 +58,12 @@ export class ApiLearningProgressRepository implements LearningProgressRepository
 
   flush() {
     return this.writes.flush();
+  }
+
+  resetAuthenticatedState() {
+    this.writes.cancel();
+    this.states.clear();
+    this.emit();
   }
 
   private persist(state: UserCourseState) {

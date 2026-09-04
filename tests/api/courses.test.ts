@@ -51,7 +51,7 @@ const tableRows: Record<string, Row[]> = {
 function queryResult(rows: Row[]) {
   let selected = [...rows];
   let patch: Row | null = null;
-  const result = () => Promise.resolve({ data: selected.map((row) => patch ? { ...row, ...patch } : row), error: null });
+  const result = (from = 0, to = 999) => Promise.resolve({ data: selected.slice(from, to + 1).map((row) => patch ? { ...row, ...patch } : row), error: null });
   const builder = {
     select: () => builder,
     insert: (value: Row) => { selected = [value]; return builder; },
@@ -59,6 +59,7 @@ function queryResult(rows: Row[]) {
     eq: (key: string, value: unknown) => { selected = selected.filter((row) => row[key] === value); return builder; },
     in: (key: string, values: unknown[]) => { selected = selected.filter((row) => values.includes(row[key])); return builder; },
     order: () => builder,
+    range: (from: number, to: number) => result(from, to),
     maybeSingle: () => result().then(({ data, error }) => ({ data: data[0] ?? null, error })),
     then: <TResult1 = { data: Row[]; error: null }, TResult2 = never>(onfulfilled?: ((value: { data: Row[]; error: null }) => TResult1 | PromiseLike<TResult1>) | null, onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null) => result().then(onfulfilled, onrejected)
   };
@@ -191,6 +192,30 @@ describe("GET /api/courses", () => {
 
     expect(recorder.statusCode()).toBe(200);
     expect(recorder.body()).toMatchObject({ courseId: "route-only-course", lifecycle: "published" });
+    tableRows.profiles[0].role = "student";
+  });
+
+  it("validates Course-owned rows beyond the PostgREST default 1000-row page", async () => {
+    tableRows.profiles[0].role = "admin";
+    tableRows.materials.push({ course_id: "route-only-course", id: "large-material", display_order: 0, title: "Large", material_type: "pdf" });
+    const segments = Array.from({ length: 1001 }, (_, index) => ({
+      course_id: "route-only-course", material_id: "large-material", id: `segment-${String(index).padStart(4, "0")}`, display_order: index
+    }));
+    const mappings = segments.map((segment, index) => ({
+      course_id: "route-only-course", id: `mapping-${String(index).padStart(4, "0")}`, material_id: "large-material",
+      segment_id: index === 1000 ? "missing-segment-after-page-one" : segment.id, node_id: "route-knowledge"
+    }));
+    tableRows.material_segments.push(...segments);
+    tableRows.material_knowledge_coverages.push(...mappings);
+    const recorder = responseRecorder();
+
+    await handler({ method: "PATCH", query: {}, headers: {}, body: { courseId: "route-only-course", lifecycle: "published" } } as VercelRequest, recorder.response);
+
+    expect(recorder.statusCode()).toBe(422);
+    expect(recorder.body()).toMatchObject({ error: { code: "course_material_invalid" } });
+    tableRows.material_knowledge_coverages.splice(-mappings.length);
+    tableRows.material_segments.splice(-segments.length);
+    tableRows.materials.pop();
     tableRows.profiles[0].role = "student";
   });
 

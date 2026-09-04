@@ -1,0 +1,22 @@
+export const NAVIGATION_POLICY_VERSION = "course-rule-v1" as const;
+export type NavigationKnowledgeStatus = "mastered" | "learning" | "learned" | "practicing";
+export type NavigationActionKind = "skip" | "remediation" | "review" | "practice" | "next";
+export type NavigationResourceKind = "micro" | "material" | "assignment" | "course";
+export type NavigationAsset = { id: string; nodeId: string; order: number; required?: boolean };
+export type NavigationNode = { id: string; title: string; lessonOrder: number; coverageOrder: number };
+export type NavigationPathItem = { nodeId: string; title: string; state: "skipped" | "underway" | "eligible" | "blocked"; blockedBy: string[] };
+export type NavigationNextAction = { kind: NavigationActionKind; nodeId?: string; resourceKind: NavigationResourceKind; resourceId?: string; reasonCode: string; reason: string };
+export type NavigationPlan = { policyVersion: typeof NAVIGATION_POLICY_VERSION; courseId: string; path: NavigationPathItem[]; skippedNodeIds: string[]; nextAction: NavigationNextAction };
+export type NavigationDecision = NavigationPlan & { decisionId: string; decidedAt: string };
+export type NavigationEngineInput = {
+  courseId: string;
+  targetNodeIds: string[];
+  nodes: NavigationNode[];
+  prerequisiteEdges: Array<{ source: string; target: string }>;
+  knowledgeStatuses: Record<string, NavigationKnowledgeStatus | undefined>;
+  microPaths: NavigationAsset[];
+  completedMicroPathIds: string[];
+  assignments: NavigationAsset[];
+  assignmentOutcomes: Record<string, "passed" | "failed" | "pending" | undefined>;
+  materials: NavigationAsset[];
+};

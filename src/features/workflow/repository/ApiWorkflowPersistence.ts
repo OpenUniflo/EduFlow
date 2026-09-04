@@ -35,9 +35,11 @@ export class ApiWorkflowPersistence implements WorkflowPersistence {
   private builtinWorkflowIds: string[] = [];
   private readonly writes = new RecoverableWriteQueue();
   private hydrated = false;
+  private readonly defaultSettings: PersistedWorkflowSettings;
 
   constructor(defaultSettings: PersistedWorkflowSettings) {
-    this.settings = structuredClone(defaultSettings);
+    this.defaultSettings = structuredClone(defaultSettings);
+    this.settings = structuredClone(this.defaultSettings);
   }
 
   async hydrate() {
@@ -75,6 +77,14 @@ export class ApiWorkflowPersistence implements WorkflowPersistence {
 
   flush() {
     return this.writes.flush();
+  }
+
+  resetAuthenticatedState() {
+    this.writes.cancel();
+    this.state = {};
+    this.settings = structuredClone(this.defaultSettings);
+    this.builtinWorkflowIds = [];
+    this.hydrated = false;
   }
 
   private queueWrite() {

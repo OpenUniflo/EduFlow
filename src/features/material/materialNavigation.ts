@@ -35,10 +35,14 @@ export function resolveKnowledgeMaterialEntry(runtime: CourseRuntimeData, nodeId
     .filter((item) => item.nodeId === nodeId && item.materialId === materialId && segmentById.has(item.segmentId))
     .sort((left, right) => compareMaterialKnowledgeCoverages(left, right, segmentOrderById))[0];
   const segment = coverage ? segmentById.get(coverage.segmentId) : undefined;
-  return coverage && segment ? {
+  const lessonId = selectPrimaryCurriculumCoverage(
+    runtime.curriculumCoverages.filter((item) => item.nodeId === nodeId),
+    runtime.lessons
+  )?.lessonId;
+  return coverage && segment && lessonId ? {
     materialId,
     materialTitle: material.title,
-    lessonId: material.lessonId,
+    lessonId,
     segmentId: segment.id,
     segmentTitle: segment.title,
     segmentOrder: getMaterialSegmentOrder(material, segment),
@@ -47,17 +51,12 @@ export function resolveKnowledgeMaterialEntry(runtime: CourseRuntimeData, nodeId
 }
 
 export function resolveKnowledgeMaterialEntries(runtime: CourseRuntimeData, nodeId: string) {
-  const nodeCoverages = runtime.curriculumCoverages.filter((coverage) => coverage.nodeId === nodeId);
-  const primaryLessonId = selectPrimaryCurriculumCoverage(nodeCoverages, runtime.lessons)?.lessonId;
   const materialById = new Map(runtime.materials.map((material) => [material.id, material]));
-  const lessonOrderById = new Map(runtime.lessons.map((lesson) => [lesson.id, lesson.order]));
   const materialIds = Array.from(new Set(runtime.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === nodeId).map((coverage) => coverage.materialId)));
   return materialIds.flatMap((materialId) => {
     const entry = resolveKnowledgeMaterialEntry(runtime, nodeId, materialId);
     return entry ? [entry] : [];
-  }).sort((left, right) => Number(right.lessonId === primaryLessonId) - Number(left.lessonId === primaryLessonId)
-    || MATERIAL_COVERAGE_ROLE_PRIORITY[left.role] - MATERIAL_COVERAGE_ROLE_PRIORITY[right.role]
-    || (lessonOrderById.get(left.lessonId) ?? Number.MAX_SAFE_INTEGER) - (lessonOrderById.get(right.lessonId) ?? Number.MAX_SAFE_INTEGER)
+  }).sort((left, right) => MATERIAL_COVERAGE_ROLE_PRIORITY[left.role] - MATERIAL_COVERAGE_ROLE_PRIORITY[right.role]
     || (materialById.get(left.materialId)?.order ?? Number.MAX_SAFE_INTEGER) - (materialById.get(right.materialId)?.order ?? Number.MAX_SAFE_INTEGER)
     || left.segmentOrder - right.segmentOrder
     || left.materialId.localeCompare(right.materialId));

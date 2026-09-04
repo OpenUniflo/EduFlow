@@ -95,7 +95,7 @@ async function getCourseContext(client: SupabaseClient, user: User, courseId: st
 
 async function getMaterialContext(client: SupabaseClient, user: User, courseId: string, materialId: string, segmentId?: string) {
   if (!await readableCourse(client, user, courseId)) return null;
-  const materialResult = await client.from("materials").select("id,course_id,lesson_id,title,description,material_type").eq("course_id", courseId).eq("id", materialId).maybeSingle();
+  const materialResult = await client.from("materials").select("id,course_id,title,description,material_type").eq("course_id", courseId).eq("id", materialId).maybeSingle();
   const material = dataOrThrow(materialResult.data as Row | null, materialResult.error, "Assistant Material lookup");
   if (!material) return null;
   let segmentQuery = client.from("material_segments").select("id,display_order,page,title,section,content").eq("course_id", courseId).eq("material_id", materialId).order("display_order");
@@ -110,7 +110,7 @@ async function getMaterialContext(client: SupabaseClient, user: User, courseId: 
   const nodesResult = nodeIds.length ? await client.from("knowledge_nodes").select("id,title,description").in("id", nodeIds).eq("status", "active") : { data: [], error: null };
   const nodes = dataOrThrow(nodesResult.data as Row[] | null, nodesResult.error, "Assistant Material Knowledge lookup");
   return {
-    material: { id: text(material, "id"), courseId, lessonId: text(material, "lesson_id"), title: text(material, "title"), description: optionalText(material, "description"), type: text(material, "material_type") },
+    material: { id: text(material, "id"), courseId, title: text(material, "title"), description: optionalText(material, "description"), type: text(material, "material_type") },
     segments: segments.map((row) => ({ id: text(row, "id"), order: Number(row.display_order), page: row.page == null ? undefined : Number(row.page), title: optionalText(row, "title"), section: optionalText(row, "section"), contentExcerpt: row.content == null ? undefined : JSON.stringify(row.content).slice(0, 6_000) })),
     knowledgeCoverage: coverage.map((row) => ({ segmentId: text(row, "segment_id"), nodeId: text(row, "node_id"), role: text(row, "role") })),
     knowledge: nodes.map((row) => ({ id: text(row, "id"), title: text(row, "title"), description: limitText(row.description, 500) }))

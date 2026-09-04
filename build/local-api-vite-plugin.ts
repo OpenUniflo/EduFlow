@@ -20,6 +20,7 @@ const handlers = new Map([
   ["/api/learning", learnerHandler],
   ["/api/micro", learnerHandler],
   ["/api/progress", learnerHandler],
+  ["/api/navigation", learnerHandler],
   ["/api/workflows", workflowsHandler],
   ["/api/materials", materialsHandler],
   ["/api/domains", domainsHandler],
@@ -29,8 +30,8 @@ const handlers = new Map([
 ]);
 
 /** Public client paths must match the resource injected by the Vercel rewrite. */
-export const consolidatedResourceForPath: Record<string, "courses" | "authoring" | "learning" | "micro" | "progress"> = {
-  "/api/courses": "courses", "/api/course-authoring": "authoring", "/api/learning": "learning", "/api/micro": "micro", "/api/progress": "progress"
+export const consolidatedResourceForPath: Record<string, "courses" | "authoring" | "learning" | "micro" | "progress" | "navigation"> = {
+  "/api/courses": "courses", "/api/course-authoring": "authoring", "/api/learning": "learning", "/api/micro": "micro", "/api/progress": "progress", "/api/navigation": "navigation"
 };
 
 async function readBody(request: IncomingMessage) {

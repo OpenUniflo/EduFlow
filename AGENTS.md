@@ -324,7 +324,7 @@
 ## Explicit Ordering
 
 - `CurriculumChapter.order` and `CurriculumLesson.order` are unique course-wide; `CurriculumCoverage.order` is unique within a Lesson.
-- `Material.order` is unique within a Lesson. Non-PDF content uses `MaterialSegment.order`; PDF content uses the complete unique `page` sequence. `CourseAssignment.order` is unique course-wide.
+- `Material.order` is unique within a Course. Non-PDF content uses `MaterialSegment.order`; PDF content uses the complete unique `page` sequence. `CourseAssignment.order` is unique course-wide.
 - Canonical helpers own curriculum, material coverage, segment, material, and Assignment sorting. Fixture-array order and IDs MUST NOT substitute for these fields.
 
 ## Shared Selection Rules
@@ -386,7 +386,7 @@
 
 ## Material Invariants
 
-- `Material` belongs to a Course and Lesson and is composed of addressable `MaterialSegment` records.
+- `Material` belongs to a Course, not a Lesson, and is composed of addressable `MaterialSegment` records. Lesson context derives only through CurriculumCoverage, Knowledge, and MaterialKnowledgeCoverage.
 - `MaterialKnowledgeCoverage` is the authoritative N:M mapping between material segments and KnowledgeNodes. Page-number switches and course-specific material lookup tables are forbidden in generic viewers.
 - Material routes MUST validate both material existence and course ownership.
 - Zero, one, and multiple matching materials MUST be represented honestly; generic UI MUST NOT silently open an unrelated fixed material.
@@ -468,7 +468,7 @@
 - Knowledge mastery and Assignment completion are separate states and separate projections.
 - Knowledge presentation MUST use UserKnowledgeState evidence; it MUST NOT display Assignment completion as Knowledge mastery.
 - UserMaterialState reading position and reading coverage are separate concepts.
-- Opening or reading a Material MUST update its Lesson as the user's recent Lesson through LearningProgressRepository, never through direct local-storage writes.
+- Opening or reading a Material MAY update the user's recent Lesson only when it can be derived from the active Segment's Knowledge mapping and canonical CurriculumCoverage; it MUST NOT copy Lesson ownership onto Material.
 
 ## Learning Experience Ordering
 
@@ -494,14 +494,17 @@
 - `MicroLearningPath -> MicroUnit -> MicroStep` is the canonical Micro Learning hierarchy. A legacy MicroLesson/provider may exist only as a demo/test adapter and is never runtime authority.
 - Required Unit completion and resume state MUST be persisted. A completed required Learn Path creates learning evidence and may reach `learned`; it MUST NOT itself claim `mastered`.
 - A Quick Learn CTA MUST be executable only for a published, repository-loaded MicroLearningPath in the Knowledge and Course context. Unsupported and unadapted H5P content MUST render a visible fallback rather than a blank experience.
+- Native Micro definitions are content data interpreted by shared renderers. Course-specific arbitrary HTML/CSS and course-ID renderer branches are forbidden. Explore interactions teach through valid manipulation without claiming a unique answer; Challenge interactions carry an explicit deterministic target.
 
 ## Learner State, Evidence, and Assignment Lifecycle
 
 - Durable `UserKnowledgeState` values are `explore`, `learning`, `learned`, `practicing`, and `mastered`. State transitions are monotonic and belong to a centralized policy/application action, never an individual React component.
 - Assignment lifecycle is `not_started -> started -> submitted -> accepted` (with optional `needs_revision`). Submission is not acceptance and neither submission nor course completion is Knowledge mastery.
+- An authenticated Assignment submission MUST persist the actual response as an immutable numbered Attempt and append a versioned PerformanceResult through a server-only atomic boundary. Clients MUST NOT provide or directly write an authoritative pass/fail flag.
 - KnowledgeEvidence is user-owned, source-identified, and idempotent. Supported MVP evidence is completed Micro paths, accepted Assignments, and passed Workflows.
 - Mastery requires a completed required Learn Path plus every explicitly required Assignment accepted. A Knowledge without an explicit required Assignment remains `learned` after its required Learn Path.
 - Course progress and UserKnowledgeState are separate projections. PersonalLearningPlan is removed; systematic multi-Knowledge learning belongs to a Course, while MicroLearningPath is a within-Knowledge experience.
+- Deterministic Navigation ranks Course candidates by explicit curriculum order, gates eligibility only with factual prerequisite mastery, prioritizes failed Practice remediation, and persists a versioned explained NavigationDecision for each canonical learner-state input. The LLM is not Navigation authority.
 
 ## Learner Entry and Today Invariants
 

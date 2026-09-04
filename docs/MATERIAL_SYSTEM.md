@@ -6,7 +6,7 @@ The Material system represents reusable course-owned learning content without en
 
 ## 2. Material
 
-A `Material` has a stable ID, `courseId`, `lessonId`, explicit Lesson-local `order`, title, kind, and addressable Segments. It is curriculum data, not a KnowledgeNode.
+A `Material` has a stable ID, `courseId`, explicit Course-local `order`, title, kind, and addressable Segments. It is Course-owned curriculum data, not a KnowledgeNode. A Lesson never owns a Material; Lesson context is derived through `CurriculumCoverage -> KnowledgeNode -> MaterialKnowledgeCoverage`.
 
 ## 3. MaterialSegment
 
@@ -64,11 +64,11 @@ After initialization, outline clicks and previous/next actions may scroll smooth
 
 ## 14. Knowledge Material Entry Resolution
 
-A KnowledgeNode may map to several Segments in one Material and to several Materials. Each Material gets one deterministic entry using `introduce > explain > example > practice-reference`, then authoritative Segment order (`order` for non-PDF, `page` for PDF), then stable ID. Multiple Materials order by primary Lesson, `lesson.order`, `material.order`, then ID only as the final tie. Zero entries render an explicit empty state, one opens directly, and several produce a chooser showing Material, Segment order/title, and role.
+A KnowledgeNode may map to several Segments in one Material and to several Materials. Each Material gets one deterministic entry using `introduce > explain > example > practice-reference`, then authoritative Segment order (`order` for non-PDF, `page` for PDF), then stable ID. Multiple Materials order by Course-local `material.order`, then ID only as the final tie. Zero entries render an explicit empty state, one opens directly, and several produce a chooser showing Material, Segment order/title, and role.
 
 ## 15. Reading Position and Completion
 
-`recentSegmentId` is position. `viewedSegmentIds` is observed reading coverage. `progress` is the ratio of viewed Segment IDs to total Segments. Jumping directly to the final Segment therefore records that position and one viewed Segment; it cannot produce 100% completion. Reader persistence is debounced and atomically updates the Material state and its `recentLessonId` through LearningProgressRepository.
+`recentSegmentId` is position. `viewedSegmentIds` is observed reading coverage. `progress` is the ratio of viewed Segment IDs to total Segments. Jumping directly to the final Segment therefore records that position and one viewed Segment; it cannot produce 100% completion. Reader persistence is debounced and atomically updates the Material state. When the active Segment maps to Course Knowledge, `recentLessonId` is derived from that Knowledge's canonical earliest CurriculumCoverage; an unmapped Segment never fabricates a Lesson relationship.
 
 ## 16. Knowledge, Assignment, and Domain Context
 
@@ -117,3 +117,7 @@ Selection and Pin are session-only Reader UI state. They do not persist in UserM
 GlobalNav, Material Header, Outline, PDF Reader, Knowledge Context, and Material Controls are independent floating panels. Their backgrounds, borders, shadows, and visible surfaces do not overlap to form a larger container.
 
 Material Header starts at a real `--material-header-left` boundary derived from the shared shell margin, responsive GlobalNav width, and panel gap. Its normal internal padding never acts as navigation reserve. When GlobalNav hides brand copy, a responsive token override contracts the same geometry without duplicated pixel offsets.
+
+## 24. Course-owned source of truth
+
+The database, TypeScript model, APIs, authoring pipeline, seeds, and readers do not carry `Material.lessonId`. `materials.course_id` is the ownership source of truth; `MaterialKnowledgeCoverage` is the content-to-Knowledge source of truth; `CurriculumCoverage` is the Knowledge-to-Lesson source of truth. These relations may be joined for presentation but must not be copied back into Material.

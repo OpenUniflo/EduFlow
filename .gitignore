@@ -10,4 +10,6 @@ dist/
 /phase4.2-acceptance/
 /tmp/phase4-3-eval/
 /fixtures/demo-agentic-ai/source/*.pdf
+/docs/local/AI-Agents-in-Depth-zh-CN.pdf
+/tmp/gold-course-sync/
 .vercel

@@ -134,9 +134,9 @@ describe("Course foundation contract", () => {
     expect(() => validateCourseIntegrity(draft, knowledgeRepository, globalKnowledgeAccess)).toThrow(/references unknown Chapter/);
   });
 
-  it("still rejects invalid Material Lesson, Segment, and Knowledge references", () => {
-    const material = { id: "route-material", courseId: routeOnlyRuntime.course.id, lessonId: "route-only-lesson", order: 0, title: "Route material", type: "article" as const, segments: [{ id: "route-segment", order: 0 }] };
-    expect(() => validateCourseRuntime({ ...routeOnlyRuntime, materials: [{ ...material, lessonId: "missing-lesson" }] }, knowledgeRepository, globalKnowledgeAccess)).toThrow(/references unknown Lesson/);
+  it("rejects duplicate course Material order, invalid Segment, and invalid Knowledge references", () => {
+    const material = { id: "route-material", courseId: routeOnlyRuntime.course.id, order: 0, title: "Route material", type: "article" as const, segments: [{ id: "route-segment", order: 0 }] };
+    expect(() => validateCourseRuntime({ ...routeOnlyRuntime, materials: [material, { ...material, id: "route-material-2" }] }, knowledgeRepository, globalKnowledgeAccess)).toThrow(/Material in Course .* orders must be unique/);
     expect(() => validateCourseRuntime({
       ...routeOnlyRuntime,
       materials: [material],
@@ -151,7 +151,7 @@ describe("Course foundation contract", () => {
 
   it("accepts managed PDF metadata without a temporary runtime URL", () => {
     const managedPdf = {
-      id: "managed-pdf", courseId: routeOnlyRuntime.course.id, lessonId: "route-only-lesson", order: 0,
+      id: "managed-pdf", courseId: routeOnlyRuntime.course.id, order: 0,
       title: "Managed PDF", type: "pdf" as const, source: { kind: "pdf" as const, pageCount: 1 },
       segments: [{ id: "page-1", order: 0, page: 1 }]
     };

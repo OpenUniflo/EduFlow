@@ -22,6 +22,7 @@ import type { LessonAssistantProvider, LessonAssistantResult } from "@/features/
 import { ExperienceModeToggle } from "@/shared/components/ExperienceModeToggle";
 import { applyCourseAuthoringDraft, createEditableKnowledgeRepository, type CourseAuthoringDraftState } from "@/features/course/authoring/courseAuthoringDraft";
 import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
+import { selectPrimaryCurriculumCoverage } from "@/features/course/curriculum/curriculumOrdering";
 
 const PERSIST_DELAY_MS = 350;
 
@@ -77,7 +78,11 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   const activeAssignment = knowledgeAssignmentContexts.find((context) => context.assignmentId === activeAssignmentId) ?? null;
   const orderedSegments = useMemo(() => sortMaterialSegments(renderedMaterial), [renderedMaterial]);
   const activeIndex = orderedSegments.findIndex((segment) => segment.id === reader.activeSegmentId);
-  const lesson = runtime.lessons.find((item) => item.id === material.lessonId);
+  const contextualCoverage = selectPrimaryCurriculumCoverage(
+    runtime.curriculumCoverages.filter((coverage) => coverage.nodeId === currentPagePrimaryKnowledgeId),
+    runtime.lessons
+  );
+  const lesson = runtime.lessons.find((item) => item.id === contextualCoverage?.lessonId);
 
   useEffect(() => {
     viewedSegmentIdsRef.current = new Set(savedState?.viewedSegmentIds ?? savedState?.completedSegmentIds ?? []);
@@ -93,14 +98,14 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
     if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
     persistTimerRef.current = window.setTimeout(() => {
       const viewedSegmentIds = orderedSegments.map((segment) => segment.id).filter((id) => viewedSegmentIdsRef.current.has(id));
-      updateMaterialReadingState(session.userId, runtime.course.id, material.lessonId, material.id, {
+      updateMaterialReadingState(session.userId, runtime.course.id, lesson?.id, material.id, {
         recentSegmentId: reader.activeSegmentId,
         viewedSegmentIds,
         progress: Math.round((viewedSegmentIds.length / Math.max(1, material.segments.length)) * 100)
       });
     }, PERSIST_DELAY_MS);
     return () => { if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current); };
-  }, [material, orderedSegments, reader.activeSegmentId, runtime.course.id, session]);
+  }, [lesson, material, orderedSegments, reader.activeSegmentId, runtime.course.id, session]);
 
   useEffect(() => {
     if (activeAssignmentId && !knowledgeAssignmentContexts.some((context) => context.assignmentId === activeAssignmentId)) setActiveAssignmentId(null);
