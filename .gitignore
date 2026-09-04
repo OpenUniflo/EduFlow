@@ -10,3 +10,4 @@ dist/
 /phase4.2-acceptance/
 /tmp/phase4-3-eval/
 /fixtures/demo-agentic-ai/source/*.pdf
+.vercel

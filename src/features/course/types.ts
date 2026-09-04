@@ -2,6 +2,7 @@ import type { KnowledgeEdge, KnowledgeNode, KnowledgeScope } from "@/features/kn
 
 export type LearningStatus = "completed" | "learning" | "available" | "locked";
 export type CourseLifecycle = "draft" | "published" | "archived";
+export type CourseType = "standard" | "personal";
 export type CurriculumGenerationMode = "auto" | "auto-fixed-count" | "follow-source" | "manual";
 
 export type Course = {
@@ -14,6 +15,33 @@ export type Course = {
   accentColor?: string;
   generationStatus?: "draft" | "parsed" | "curriculum-generated" | "ready";
   lifecycle?: CourseLifecycle;
+  courseType?: CourseType;
+  ownerUserId?: string;
+  sourceCourseId?: string;
+  /** Stable recovery link for an owner-private Personal Course Draft. */
+  creationBriefMessageId?: string;
+  /** Small persisted design snapshot needed to resume Course Creator after refresh. */
+  creatorMetadata?: CourseCreatorMetadata;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CourseCreatorMetadata = {
+  schemaVersion: 1;
+  learnerFoundation: string;
+  timeConstraint: string;
+  preferences: string[];
+  requestedAdjustments?: string;
+  desiredMaterialKnowledgeIds: string[];
+  desiredMicroKnowledgeIds: string[];
+  desiredAssignmentKnowledgeIds: string[];
+};
+
+/** Structured Course destination; it does not replace human-readable targetOutcome. */
+export type CourseTargetKnowledge = {
+  courseId: string;
+  nodeId: string;
+  required: boolean;
 };
 
 export type CourseSummary = {
@@ -237,6 +265,8 @@ export type CourseAssignmentSummary = {
 };
 
 export type CourseChapterProjection = CurriculumChapter & {
+  /** One-based ordinal for presentation only; `order` remains the persisted curriculum order. */
+  displayNumber: number;
   lessonCount: number;
   knowledgeProgress: number;
   knowledgeEvidenceCount: number;
@@ -274,7 +304,8 @@ export type MaterialSegment = {
 
 export type MaterialSource = {
   kind: "pdf";
-  url: string;
+  /** Stable repository-owned URL. Managed PDFs resolve a temporary URL just in time. */
+  url?: string;
   pageCount: number;
 };
 

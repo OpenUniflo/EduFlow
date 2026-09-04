@@ -5,7 +5,7 @@ import { resolveKnowledgeMaterialEntries, resolveKnowledgeMaterialEntry } from "
 import type { UserKnowledgeRecord } from "../../profile/types";
 import type {
   AssignmentCoverage, AssignmentDependency, AssignmentOutcomeComposition, ChapterOutcome, Course, CourseAssignment, CourseAssignmentSummary, CourseChapterEdge, CourseChapterProjection,
-  CourseCurriculum, CourseSkillTreeEdge, CourseSkillTreeNode, CourseSummary, CurriculumChapter, CurriculumCoverage,
+  CourseCurriculum, CourseSkillTreeEdge, CourseSkillTreeNode, CourseSummary, CourseTargetKnowledge, CurriculumChapter, CurriculumCoverage,
   CurriculumLesson, CurriculumSequence, FinalProject, FinalProjectOutcomeComposition, Material, MaterialKnowledgeCoverage, UserAssignmentState, UserCourseState
 } from "@/features/course/types";
 import { defaultCourseUnlockPolicy, type CourseUnlockPolicy } from "./courseUnlockPolicy";
@@ -29,6 +29,8 @@ export type CourseRuntimeData = {
   finalProjectOutcomeCompositions: FinalProjectOutcomeComposition[];
   materials: Material[];
   materialKnowledgeCoverages: MaterialKnowledgeCoverage[];
+  /** Present when the Course has an explicit structured destination. */
+  targetKnowledge?: CourseTargetKnowledge[];
   revision: string;
 };
 
@@ -56,9 +58,10 @@ function validateUniqueOrders<T>(errors: string[], items: readonly T[], order: (
   if (new Set(items.map(order)).size !== items.length) errors.push(`${label} orders must be unique`);
 }
 
-export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext) {
+/** Validates owned data and references without requiring a learner-usable route. */
+export function validateCourseIntegrity(runtime: CourseRuntimeData, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext) {
   const errors: string[] = [];
-  const nodeIds = new Set(knowledgeRepository.getVisibleGraph(access).nodes.map((node) => node.id));
+  const nodeIds = new Set(knowledgeRepository.getVisibleGraph(access).nodes.filter((node) => node.status === "active").map((node) => node.id));
   const chapterIds = new Set(runtime.chapters.map((chapter) => chapter.id));
   const lessonIds = new Set(runtime.lessons.map((lesson) => lesson.id));
   const courseNodeIds = new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId));
@@ -70,10 +73,19 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
   const curriculumSequenceIds = new Set(runtime.curriculumSequences.map((sequence) => sequence.id));
   const assignmentCoverageIds = new Set(runtime.assignmentCoverages.map((coverage) => coverage.id));
   const materialKnowledgeCoverageIds = new Set(runtime.materialKnowledgeCoverages.map((coverage) => coverage.id));
+  const targetKnowledgeNodeIds = new Set((runtime.targetKnowledge ?? []).map((target) => target.nodeId));
   const segmentIds = new Set(runtime.materials.flatMap((material) => material.segments.map((segment) => `${material.id}:${segment.id}`)));
+
+  const courseType = runtime.course.courseType ?? "standard";
+  if (courseType === "standard" && runtime.course.ownerUserId) errors.push("Standard Course cannot have a learner owner");
+  if (courseType === "personal" && !runtime.course.ownerUserId) errors.push("Personal Course requires an owner");
+  if (courseType === "personal" && !(runtime.targetKnowledge ?? []).some((target) => target.required)) errors.push("Personal Course requires target Knowledge");
+  if (runtime.course.sourceCourseId === runtime.course.id) errors.push("Course cannot source itself");
 
   if (!runtime.curriculum.id.trim()) errors.push("Curriculum id must be a non-empty string");
   if (runtime.curriculum.courseId !== runtime.course.id) errors.push(`Curriculum ${runtime.curriculum.id} belongs to another Course`);
+  if (!runtime.chapters.length) errors.push("Course must contain at least one Chapter");
+  if (!runtime.lessons.length) errors.push("Course must contain at least one Lesson");
   if (chapterIds.size !== runtime.chapters.length) errors.push("Chapter ids must be unique");
   if (lessonIds.size !== runtime.lessons.length) errors.push("Lesson ids must be unique");
   if (assignmentIds.size !== runtime.assignments.length) errors.push("Assignment ids must be unique");
@@ -82,6 +94,12 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
   if (curriculumSequenceIds.size !== runtime.curriculumSequences.length) errors.push("CurriculumSequence ids must be unique");
   if (assignmentCoverageIds.size !== runtime.assignmentCoverages.length) errors.push("AssignmentCoverage ids must be unique");
   if (materialKnowledgeCoverageIds.size !== runtime.materialKnowledgeCoverages.length) errors.push("MaterialKnowledgeCoverage ids must be unique");
+  if (targetKnowledgeNodeIds.size !== (runtime.targetKnowledge ?? []).length) errors.push("CourseTargetKnowledge node ids must be unique");
+  (runtime.targetKnowledge ?? []).forEach((target) => {
+    if (target.courseId !== runtime.course.id) errors.push(`CourseTargetKnowledge ${target.nodeId} belongs to another Course`);
+    if (!nodeIds.has(target.nodeId)) errors.push(`CourseTargetKnowledge references unknown or invisible KnowledgeNode ${target.nodeId}`);
+    if (!courseNodeIds.has(target.nodeId)) errors.push(`CourseTargetKnowledge ${target.nodeId} is outside the Course curriculum`);
+  });
 
   runtime.chapters.forEach((chapter) => {
     if (chapter.courseId !== runtime.course.id) errors.push(`Chapter ${chapter.id} belongs to another Course`);
@@ -157,10 +175,6 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
     if (assignmentRelations.has(relation)) errors.push(`Duplicate AssignmentCoverage relation ${relation}`);
     assignmentRelations.add(relation);
   });
-  const covered = new Set(runtime.assignmentCoverages.map((coverage) => coverage.nodeId));
-  if (runtime.course.generationStatus !== "curriculum-generated") {
-    courseNodeIds.forEach((nodeId) => { if (!covered.has(nodeId)) errors.push(`KnowledgeNode ${nodeId} has no AssignmentCoverage`); });
-  }
   runtime.materials.forEach((material) => {
     if (material.courseId !== runtime.course.id) errors.push(`Material ${material.id} belongs to another Course`);
     if (!lessonIds.has(material.lessonId)) errors.push(`Material ${material.id} references unknown Lesson`);
@@ -171,7 +185,7 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
     if (material.type === "pdf") {
       if (!material.source || material.source.kind !== "pdf") errors.push(`PDF Material ${material.id} requires a PDF source`);
       else {
-        if (!material.source.url.trim()) errors.push(`PDF Material ${material.id} source URL is empty`);
+        if (material.source.url !== undefined && !material.source.url.trim()) errors.push(`PDF Material ${material.id} source URL is empty`);
         if (!Number.isInteger(material.source.pageCount) || material.source.pageCount <= 0) errors.push(`PDF Material ${material.id} has invalid pageCount`);
         if (material.segments.length !== material.source.pageCount) errors.push(`PDF Material ${material.id} pageCount does not match Segments`);
         const pages = material.segments.map((segment) => segment.page);
@@ -198,6 +212,13 @@ export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepos
   return true;
 }
 
+/** Validates a learner-usable Course, including its minimum Knowledge route. */
+export function validateCourseRuntime(runtime: CourseRuntimeData, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext) {
+  validateCourseIntegrity(runtime, knowledgeRepository, access);
+  if (!runtime.curriculumCoverages.length) throw new Error(`Invalid CourseRuntimeData ${runtime.course.id}: Course must contain at least one CurriculumCoverage Knowledge route`);
+  return true;
+}
+
 function summarizeAssignmentIds(assignmentIds: string[], assignmentStateById: Map<string, UserAssignmentState>, assignmentOrderById: ReadonlyMap<string, number>) {
   const uniqueIds = Array.from(new Set(assignmentIds)).sort((left, right) => (assignmentOrderById.get(left) ?? Number.MAX_SAFE_INTEGER) - (assignmentOrderById.get(right) ?? Number.MAX_SAFE_INTEGER) || left.localeCompare(right));
   const states = uniqueIds.map((id) => assignmentStateById.get(id));
@@ -207,16 +228,19 @@ function summarizeAssignmentIds(assignmentIds: string[], assignmentStateById: Ma
   return { assignmentIds: uniqueIds, assignmentCount: uniqueIds.length, completedCount, inProgressCount, notStartedCount: uniqueIds.length - completedCount - inProgressCount, progress };
 }
 
-export function buildCourseGraphData(runtime: CourseRuntimeData, userState: UserCourseState, graph: KnowledgeGraph, userKnowledge: UserKnowledgeRecord[] = [], unlockPolicy: CourseUnlockPolicy = defaultCourseUnlockPolicy): CourseGraphData {
+export function buildCourseGraphData(runtime: CourseRuntimeData, userState: UserCourseState | undefined, graph: KnowledgeGraph, userKnowledge: UserKnowledgeRecord[] = [], unlockPolicy: CourseUnlockPolicy = defaultCourseUnlockPolicy): CourseGraphData {
   const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
   runtime.curriculumCoverages.forEach((coverage) => {
     if (!nodeById.has(coverage.nodeId)) throw new Error(`Course ${runtime.course.id} cannot resolve visible KnowledgeNode ${coverage.nodeId}`);
   });
   const lessonById = new Map(runtime.lessons.map((lesson) => [lesson.id, lesson]));
+  const lessonDisplayNumberById = new Map([...runtime.lessons]
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
+    .map((lesson, index) => [lesson.id, index + 1]));
   const chapterById = new Map(runtime.chapters.map((chapter) => [chapter.id, chapter]));
   const assignmentById = new Map(runtime.assignments.map((assignment) => [assignment.id, assignment]));
   const assignmentOrderById = new Map(runtime.assignments.map((assignment) => [assignment.id, assignment.order]));
-  const assignmentStateById = new Map(Object.values(userState.assignmentStates).map((state) => [state.assignmentId, state]));
+  const assignmentStateById = new Map(Object.values(userState?.assignmentStates ?? {}).map((state) => [state.assignmentId, state]));
   const userKnowledgeById = new Map(userKnowledge.map((record) => [record.nodeId, record]));
   const curriculumByNode = groupBy(runtime.curriculumCoverages, (coverage) => coverage.nodeId);
   const assignmentByNode = groupBy(runtime.assignmentCoverages, (coverage) => coverage.nodeId);
@@ -269,11 +293,17 @@ export function buildCourseGraphData(runtime: CourseRuntimeData, userState: User
       id: knowledge.id, knowledge, title: knowledge.title, description: knowledge.description, scope: knowledge.scope,
       primaryCoverage: { ...primaryCoverage, lessonOrder: lesson.order, chapterId: chapter.id }, curriculumContexts,
       assignmentContexts, assignmentCount: assignmentStateSummary.assignmentCount, assignmentStateSummary,
-      lessonId: lesson.id, lesson: lesson.order, chapterId: chapter.id,
+      lessonId: lesson.id, lesson: lessonDisplayNumberById.get(lesson.id) ?? 1, chapterId: chapter.id,
       coverageRoles: Array.from(new Set(curriculumContexts.map((coverage) => coverage.role))),
       materialIds: materialContexts.map((context) => context.materialId), materialContexts,
       assignmentIds: assignmentStateSummary.assignmentIds,
-      status: unlockPolicy({ knowledge, lesson, lessons: runtime.lessons, sequences: runtime.curriculumSequences, userCourseState: userState, userKnowledge: knowledgeState }),
+      status: unlockPolicy({
+        knowledge, lesson, lessons: runtime.lessons, sequences: runtime.curriculumSequences, userCourseState: userState, userKnowledge: knowledgeState,
+        prerequisiteKnowledge: knowledgeEdges.filter((edge) => edge.relation === "prerequisite" && edge.target === nodeId).flatMap((edge) => {
+          const record = userKnowledgeById.get(edge.source);
+          return record ? [record] : [{ nodeId: edge.source, status: "explore" as const, mastery: 0 } as UserKnowledgeRecord];
+        })
+      }),
       knowledgeProgress: knowledgeState?.mastery ?? 0, hasKnowledgeEvidence: Boolean(knowledgeState), color: chapter.color
     };
   }).sort(compareCourseKnowledgeOrder);
@@ -302,13 +332,13 @@ export function buildCourseGraphData(runtime: CourseRuntimeData, userState: User
   const aggregatedChapterEdges = Array.from(projectedChapterEdgeByPair.values()).sort((left, right) => left.source.localeCompare(right.source) || left.target.localeCompare(right.target));
   assertDirectedAcyclic(runtime.chapters.map((chapter) => chapter.id), aggregatedChapterEdges);
   const chapterEdges = transitiveReduction(runtime.chapters.map((chapter) => chapter.id), aggregatedChapterEdges);
-  const chapters: CourseChapterProjection[] = [...runtime.chapters].sort((left, right) => left.order - right.order || left.id.localeCompare(right.id)).map((chapter) => {
+  const chapters: CourseChapterProjection[] = [...runtime.chapters].sort((left, right) => left.order - right.order || left.id.localeCompare(right.id)).map((chapter, chapterIndex) => {
     const chapterLessonIds = new Set(runtime.lessons.filter((lesson) => lesson.chapterId === chapter.id).map((lesson) => lesson.id));
     const chapterNodeIds = new Set(runtime.curriculumCoverages.filter((coverage) => chapterLessonIds.has(coverage.lessonId)).map((coverage) => coverage.nodeId));
     const summary = summarizeAssignmentIds(runtime.assignmentCoverages.filter((coverage) => chapterNodeIds.has(coverage.nodeId)).map((coverage) => coverage.assignmentId), assignmentStateById, assignmentOrderById);
     const knowledgeEvidenceCount = Array.from(chapterNodeIds).filter((nodeId) => userKnowledgeById.has(nodeId)).length;
     const knowledgeProgress = chapterNodeIds.size ? Math.round(Array.from(chapterNodeIds).reduce((sum, nodeId) => sum + (userKnowledgeById.get(nodeId)?.mastery ?? 0), 0) / chapterNodeIds.size) : 0;
-    return { ...chapter, lessonCount: chapterLessonIds.size, knowledgeProgress, knowledgeEvidenceCount, assignmentSummary: { chapterId: chapter.id, ...summary, outcome: chapter.outcome } };
+    return { ...chapter, displayNumber: chapterIndex + 1, lessonCount: chapterLessonIds.size, knowledgeProgress, knowledgeEvidenceCount, assignmentSummary: { chapterId: chapter.id, ...summary, outcome: chapter.outcome } };
   });
   const aggregate = summarizeAssignmentIds(sortAssignments(runtime.assignments).map((assignment) => assignment.id), assignmentStateById, assignmentOrderById);
   return { courseId: runtime.course.id, revision: runtime.revision, chapters, knowledgeNodes, knowledgeEdges, chapterEdges, assignmentSummary: { courseId: runtime.course.id, ...aggregate } };

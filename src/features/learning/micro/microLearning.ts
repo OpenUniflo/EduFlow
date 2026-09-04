@@ -43,6 +43,29 @@ export function isMicroInteractionCorrect(interaction:MicroInteraction, answer:M
   return answer===interaction.correctStepId;
 }
 
+export type MicroReviewCursor = { unitId:string; stepId:string };
+
+export function microReviewSteps(path:MicroLearningPath):MicroReviewCursor[] {
+  const requiredUnits=path.units.filter((unit)=>unit.required&&unit.steps.length);
+  return (requiredUnits.length?requiredUnits:path.units.filter((unit)=>unit.steps.length)).flatMap((unit)=>unit.steps.map((step)=>({unitId:unit.id,stepId:step.id})));
+}
+
+export function firstMicroReviewStep(path:MicroLearningPath) {
+  return microReviewSteps(path)[0]??null;
+}
+
+export function nextMicroReviewStep(path:MicroLearningPath,current:MicroReviewCursor) {
+  const steps=microReviewSteps(path); const index=steps.findIndex((item)=>item.unitId===current.unitId&&item.stepId===current.stepId);
+  return index>=0?steps[index+1]??null:null;
+}
+
+export function isMicroReviewSubmissionCorrect(interaction:MicroInteraction|undefined,submission:MicroLearningSubmission|undefined) {
+  if(!interaction)return true;
+  if(interaction.type!=="h5p")return isMicroInteractionCorrect(interaction,(submission??"") as MicroLearningAnswer);
+  if(!submission||typeof submission!=="object"||Array.isArray(submission)||submission.kind!=="h5p-result"||submission.contentRef!==interaction.contentRef)return false;
+  return submission.result.completed&&(interaction.completionPolicy!=="passed"||submission.result.success===true);
+}
+
 export type MicroStep = {
   id:string;
   kind:"challenge"|"feedback"|"explanation"|"interaction"|"application"|"check"|"summary";

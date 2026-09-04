@@ -38,7 +38,15 @@ Preview uses the existing Vercel `edu-flow` project and Hosted Supabase `Knowled
 Vercel Preview -> Vercel Functions -> Hosted Supabase
 ```
 
-`vercel.json` pins Functions to Vercel `sin1`, matching the Hosted Supabase `ap-southeast-1` region so API/database traffic does not cross continents.
+`vercel.json` pins all Functions to Vercel `sin1`, matching the Hosted Supabase `ap-southeast-1` region. Assistant acceptance must verify both database access and the configured model-provider route from that region. A former `hkg1` Assistant exception was removed after repeated Hosted network failures while a same-deployment `sin1` provider probe remained reachable. Region selection does not add a Function, move data authority, or change the model adapter contract.
+
+### Vercel Function budget
+
+The current `edu-flow` project deploys on Vercel Hobby and is limited to 12 Serverless Functions per deployment. A top-level deployable file under `api/` is a quota-consuming HTTP entrypoint; a rewrite changes its public route but does not consolidate its Function. Tests must live outside Vercel's entrypoint discovery, while reusable libraries and routed handlers remain under non-entrypoint directories such as `api/_lib` and `api/_handlers`.
+
+The 12 production entrypoints are `assistant`, `course-intent`, `course-mapping`, `course`, `domains`, `health`, `knowledge-generation`, `knowledge`, `learner`, `material-parsing-jobs`, `materials`, and `workflows`. The reserved #19 slot is now occupied by the Global Assistant boundary. Before adding or consolidating a Function, run a Vercel build or Preview and inspect the generated Functions; do not infer the count from rewrites or source-file totals alone.
+
+Prefer the existing `course` and `learner` multiplexers when a new route belongs clearly to those domains. Do not add repeated thin wrappers, and do not combine unrelated domains merely to save quota. Function budget is a deployment architecture constraint, not permission to weaken API ownership, authentication, or public-route compatibility.
 
 Hosted schema changes use the same committed files under `supabase/migrations`. Reviewed migrations may be applied to Hosted only after `pnpm db:reset` and local verification succeed. Hosted Supabase must never be reset as part of ordinary development.
 
@@ -99,8 +107,9 @@ No permanent Knowledge embedding table is introduced by this preflight. The exis
 - `POST /api/knowledge-generation`: generates and atomically persists User Knowledge and Curriculum from a completed Phase 4.1 parsing job.
 - `POST /api/course-intent`: analyzes the existing course-creation conversation for an explicit learner target outcome or returns one contextual clarification question with 3–5 options.
 - `POST /api/course-mapping`: consumes an owning completed Phase 4.2 Course plus its persisted target outcome, resolves provenance coverage, plans goal-constrained Knowledge groups, generates one stable-ID-bound Assignment per Step and direct dependencies, and atomically persists Phase 4.3 composition data.
+- `GET|POST /api/assistant`: lists/loads the authenticated user's Assistant sessions, streams one context-aware response through the bounded Global Assistant tool runtime, and handles confirmed Goal planning/Course selection actions without adding another physical Function.
 
-The API is intentionally a small mapping layer rather than a second Domain model or a backend framework.
+The API is intentionally a small mapping layer rather than a second Domain model or a backend framework. The Assistant is the twelfth physical Vercel Function; its session operations, message execution, and tools remain behind that one entrypoint.
 
 Progress and Workflow API adapters serialize browser writes. A rejected request is retained for the next `flush()` call while the internal queue recovers, so later writes still execute in order. Workflow Run History is bounded to the newest 20 rows per user and Workflow; `PUT /api/workflows` enforces the same cap as the application layer and deletes older persisted rows.
 
@@ -113,10 +122,12 @@ The database normalizes:
 - profiles and capabilities;
 - Knowledge nodes, revisions, factual edges, Domains, assignments, candidates, and proposals;
 - Courses, curricula, Chapters, Lessons, Coverage, and Sequence;
+- Standard/Personal Course ownership and provenance plus `CourseTargetKnowledge` destinations;
 - Assignments and AssignmentCoverage;
 - direct Assignment dependencies, ChapterOutcomes, FinalProjects, and their explicit composition relations;
 - Materials, Segments, and MaterialKnowledgeCoverage;
 - user Knowledge, Course, Assignment, and Material state;
+- user-owned Assistant sessions and messages with per-message context identity snapshots;
 - Workflow templates, user Workflow definitions/state, and Workflow Runs.
 
 Course runtimes are reconstructed by `/api/courses`; they are not stored as a JSONB blob. JSONB is limited to document-shaped values such as node provenance/metadata, Workflow graph definitions, editor maps, Run snapshots, Material content blocks, and list-valued criteria.
@@ -127,11 +138,12 @@ Knowledge relations remain only `prerequisite`, `enables`, and `related`. Curric
 
 All public business tables have RLS enabled.
 
-- Shared Knowledge, Domain, curriculum, Assignment, Material metadata, and Workflow templates use authenticated read. Anonymous access is denied. This keeps the current application private without inventing public catalog semantics.
-- User-owned rows require `auth.uid() = user_id` or `owner_user_id` for every operation.
-- Private `course-materials` objects under `shared/` are readable by authenticated users through short-lived signed URLs.
+- Anonymous read is limited by RLS to active Global Knowledge and factual edges, active public Domain classification, published Standard Courses and their curriculum/Assignment/Material definitions, published public Micro content, and referenced shared Material objects. Personal Courses and their child rows are owner-only; they are hidden from anonymous users, other learners, teachers, and administrators. Tenant/user Knowledge, drafts, governance work queues, profiles, learner state, Assistant data, and Workflow ownership remain private.
+- User-owned rows require `auth.uid() = user_id` or `owner_user_id` for every operation. Personal Course Drafts and all owned child rows are readable only by their learner owner; Course Creator writes them transactionally through the service-role-only `create_personal_course_draft_for_brief` RPC after the API revalidates Brief ownership, Knowledge visibility, factual prerequisite closure, reference visibility, placement uniqueness, target coverage, and bounded creator recovery metadata. The Brief message identity serializes retries and preserves one Course identity. Publish remains a separate explicit API action.
+- `assistant_messages.message_kind` separates semantic utterances, verifiable Goal clarifications, and deterministic UI action audit rows. Action prose remains visible in the timeline but is excluded from Goal clarification and model semantic history. `courses.creator_metadata` is a bounded recovery snapshot, not Course, Knowledge, or curriculum authority.
+- Published `course-materials` objects under `shared/` are readable through short-lived signed URLs when referenced by a published Course; other Material objects remain private.
 - Shared Material upload and Domain mutation require the existing `global-domain-admin` capability. The server verifies capability and the target Course/Lesson/Material before issuing a course-scoped signed upload URL or writing metadata.
-- Server secret operations are trusted application operations, but they do not replace RLS for browser access.
+- Server secret operations are trusted application operations, but they do not replace RLS for browser access or provide a service-role public-read bypass.
 
 Tenant Knowledge rows are not exposed in the current runtime because no tenant membership model exists. This is a minimal safe visibility choice, not a partial Tenant Domain implementation.
 

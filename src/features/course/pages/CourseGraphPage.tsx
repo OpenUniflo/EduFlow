@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, Check, Clock3, Crosshair, FileText, Layers3, Maximize2, Minus, Network, Play, Plus, Redo2, Search, Settings2, Sparkles, Target, Trash2, Undo2, WandSparkles, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, Check, Clock3, Crosshair, FileText, Layers3, Maximize2, Minus, Network, Plus, Redo2, Search, Settings2, Sparkles, Target, Trash2, Undo2, WandSparkles, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
@@ -9,11 +9,12 @@ import { CoursePathView } from "@/features/course/path/CoursePathView";
 import { CourseDesignAssistant } from "@/features/course/components/CourseDesignAssistant";
 import { buildCourseDesignAssistantContext, type CourseDesignAssistantProvider, type CourseDesignAssistantResponse } from "@/features/course/courseDesignAssistant";
 import type { CourseGraphView } from "@/features/course/graph/courseGraphProjection";
-import { buildCourseGraphData } from "@/features/course/runtime/courseRuntime";
-import { useUserCourseState } from "@/features/learning/progress/progressService";
+import { buildCourseGraphData, type CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
+import { auditCourseAssetCoverage, courseAssetCoverageLabel } from "@/features/course/runtime/courseAssetCoverage";
+import { useOptionalUserCourseState } from "@/features/learning/progress/progressService";
 import type { AssignmentContext, CourseAssignment, CourseChapterProjection, CourseSkillTreeNode } from "@/features/course/types";
 import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
-import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
+import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { buildMaterialDeepLink } from "@/features/material/materialNavigation";
 import { sortMaterials } from "@/features/material/materialOrdering";
 import { canDesignCourse, canUseCourseDesignFeatures } from "@/features/auth/capabilities";
@@ -26,38 +27,57 @@ import { createMicroLearningNavigation, type MicroLearningProvider } from "@/fea
 import { MicroAuthoringEditor } from "@/features/course/authoring/MicroAuthoringEditor";
 import { AssignmentAuthoringEditor } from "@/features/course/authoring/AssignmentAuthoringEditor";
 import { DraftMicroPreview } from "@/features/course/authoring/DraftMicroPreview";
+import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
+import { isCourseVisibleToViewer } from "@/features/course/runtime/courseVisibility";
 
 const { courseRepository, knowledgeRepository, userKnowledgeRepository, courseAuthoringDraftRepository } = applicationServices;
 
-const knowledgeStatusLabel = { completed: "已掌握", learning: "学习中", available: "可学习", locked: "未解锁" } as const;
+const knowledgeStatusLabel = { completed: "已掌握", learning: "学习中", available: "已解锁", locked: "前置未满足" } as const;
 const assignmentStatusLabel = { accepted: "已验收", submitted: "已提交", started: "进行中", needs_revision: "需修改", not_started: "未开始", completed: "已完成", "in-progress": "进行中", "not-started": "未开始" } as const;
 
 function lessonsForChapter(runtime: NonNullable<ReturnType<typeof courseRepository.getCourse>>, chapterId: string) {
   return runtime.lessons.filter((lesson) => lesson.chapterId === chapterId).sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
 }
 
-export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvider, microLearningProvider }: { session: MockSession; onLogout: () => void; courseDesignAssistantProvider?:CourseDesignAssistantProvider; microLearningProvider?:MicroLearningProvider }) {
+export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvider, microLearningProvider }: { session: MockSession | null; onLogout: () => void; courseDesignAssistantProvider?:CourseDesignAssistantProvider; microLearningProvider?:MicroLearningProvider }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { courseId = "", chapterId: routeChapterId } = useParams();
-  const baseRuntime = courseRepository.getCourse(courseId);
+  const storedRuntime = courseRepository.getCourse(courseId);
+  const baseRuntime = storedRuntime && isCourseVisibleToViewer(storedRuntime.course, session?.userId, canDesignCourse(session)) ? storedRuntime : null;
   const authoringRoute = new URLSearchParams(window.location.search).get("experience") === "design" && canDesignCourse(session);
   const [draftState, setDraftState] = useState<CourseAuthoringDraftState | null>(null);
+  const [authoringBaseRuntime, setAuthoringBaseRuntime] = useState<CourseRuntimeData | null>(null);
   const [draftRevision, setDraftRevision] = useState(0);
   const [draftLoading, setDraftLoading] = useState(authoringRoute);
   const [history, setHistory] = useState<{ past: CourseAuthoringDraftState[]; future: CourseAuthoringDraftState[] }>({ past: [], future: [] });
   const draftRef = useRef<CourseAuthoringDraftState | null>(null);
   const draftRevisionRef = useRef(0);
   const saveChain = useRef(Promise.resolve());
-  const baseKnowledgeGraph = useMemo(() => knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), [session.userId]);
+  const baseKnowledgeGraph = useMemo(() => knowledgeRepository.getVisibleGraph(session ? userKnowledgeAccess(session.userId) : globalKnowledgeAccess), [session]);
   const editableKnowledgeGraph = useMemo(() => draftState ? createEditableKnowledgeGraph(baseKnowledgeGraph, draftState) : baseKnowledgeGraph, [baseKnowledgeGraph, draftState]);
-  const runtime = useMemo(() => baseRuntime ? (draftState ? applyCourseAuthoringDraft(baseRuntime, draftState) : baseRuntime) : undefined, [baseRuntime, draftState]);
-  const validation = useMemo(() => baseRuntime && draftState ? validateCourseAuthoring(baseRuntime, baseKnowledgeGraph, draftState) : null, [baseKnowledgeGraph, baseRuntime, draftState]);
+  const effectiveBaseRuntime = authoringRoute ? authoringBaseRuntime ?? baseRuntime : baseRuntime;
+  const runtime = useMemo(() => effectiveBaseRuntime ? (draftState ? applyCourseAuthoringDraft(effectiveBaseRuntime, draftState) : effectiveBaseRuntime) : undefined, [draftState, effectiveBaseRuntime]);
+  const lessonDisplayNumberById = useMemo(() => new Map((runtime ? [...runtime.lessons] : [])
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
+    .map((lesson, index) => [lesson.id, index + 1])), [runtime]);
+  const personalDraftPreview = runtime?.course.courseType === "personal" && runtime.course.lifecycle === "draft";
+  const assetAudit = useMemo(() => {
+    if (!runtime) return null;
+    const microProvider = microLearningProvider ?? applicationServices.microLearningRepository;
+    const knowledgeIds = [...new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId))];
+    const microKnowledgeIds = knowledgeIds.filter((nodeId) => Boolean(microProvider.getLesson(nodeId, { courseId: runtime.course.id })));
+    return auditCourseAssetCoverage(runtime, {
+      microKnowledgeIds,
+      practiceEmphasis: Boolean(runtime.course.creatorMetadata?.desiredAssignmentKnowledgeIds.length)
+    });
+  }, [microLearningProvider, runtime]);
+  const validation = useMemo(() => effectiveBaseRuntime && draftState ? validateCourseAuthoring(effectiveBaseRuntime, baseKnowledgeGraph, draftState) : null, [baseKnowledgeGraph, draftState, effectiveBaseRuntime]);
   const structuralFatal = validation?.fatal.filter((issue) => !isDraftCompletenessIssue(issue)) ?? [];
-  const graphRuntime = structuralFatal.length ? baseRuntime : runtime;
+  const graphRuntime = structuralFatal.length ? effectiveBaseRuntime : runtime;
   const orderedMaterials = useMemo(() => runtime ? sortMaterials(runtime.materials, runtime.lessons) : [], [runtime]);
-  const userCourseState = useUserCourseState(session.userId, courseId);
-  const graphData = useMemo(() => graphRuntime ? buildCourseGraphData(graphRuntime, userCourseState, structuralFatal.length ? baseKnowledgeGraph : editableKnowledgeGraph, userKnowledgeRepository.getUserKnowledge(session.userId)) : null, [baseKnowledgeGraph, editableKnowledgeGraph, graphRuntime, session.userId, structuralFatal.length, userCourseState]);
+  const userCourseState = useOptionalUserCourseState(session?.userId, courseId);
+  const graphData = useMemo(() => graphRuntime ? buildCourseGraphData(graphRuntime, userCourseState, structuralFatal.length ? baseKnowledgeGraph : editableKnowledgeGraph, session ? userKnowledgeRepository.getUserKnowledge(session.userId) : []) : null, [baseKnowledgeGraph, editableKnowledgeGraph, graphRuntime, session, structuralFatal.length, userCourseState]);
   const courseChapters = graphData?.chapters ?? [];
   const courseSkillTreeNodes = graphData?.knowledgeNodes ?? [];
   const courseSkillTreeEdges = graphData?.knowledgeEdges ?? [];
@@ -115,15 +135,16 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   const invalidChapter = Boolean(runtime && routeChapterId && !routeChapter);
 
   useEffect(() => {
-    if (!baseRuntime || !authoringRoute) { setDraftState(null); draftRef.current = null; setDraftLoading(false); return; }
+    if (!baseRuntime || !authoringRoute) { setAuthoringBaseRuntime(null); setDraftState(null); draftRef.current = null; setDraftLoading(false); return; }
     let active = true; setDraftLoading(true); setHistory({ past: [], future: [] });
     void courseAuthoringDraftRepository.getDraft(baseRuntime.course.id).then((result) => {
       if (!active) return;
       const saved = result.draft;
+      setAuthoringBaseRuntime(saved?.previewRuntime ?? baseRuntime);
       const state = !saved?.state.microPathsEdited ? { ...(saved?.state ?? emptyCourseAuthoringDraft(baseRuntime.course.id)), microPaths: result.baseMicroPaths } : saved.state;
       draftRef.current = state; draftRevisionRef.current = saved?.revision ?? 0;
       setDraftState(state); setDraftRevision(saved?.revision ?? 0); setDraftLoading(false);
-    }).catch(() => { if (active) { setDraftLoading(false); setDesignActionNotice("无法读取服务端课程草稿，请检查权限或网络。"); } });
+    }).catch(() => { if (active) { setAuthoringBaseRuntime(baseRuntime); setDraftLoading(false); setDesignActionNotice("无法读取服务端课程草稿，请检查权限或网络。"); } });
     return () => { active = false; };
   }, [authoringRoute, baseRuntime]);
 
@@ -191,16 +212,15 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   function selectChapter(chapter: CourseChapterProjection) { selectAnchor({ kind: "chapter", id: chapter.id }); }
   function selectKnowledge(node: CourseSkillTreeNode) { selectAnchor({ kind: "knowledge", id: node.id }); }
   const selectedMicroLesson = selectedNode ? microLearningProvider?.getLesson(selectedNode.id, { courseId: runtime?.course.id }) : null;
-  async function startSelectedKnowledge(nodeId:string){if(!runtime)return;await applicationServices.learnerStateService.startKnowledge(nodeId,runtime.course.id);await refreshLearnerState(session.userId);}
-  async function launchMicroLearning(nodeId:string){if(!runtime||!microLearningProvider?.getLesson(nodeId,{courseId:runtime.course.id}))return;await applicationServices.learnerStateService.startKnowledge(nodeId,runtime.course.id);await refreshLearnerState(session.userId);const target=createMicroLearningNavigation(nodeId,{courseId:runtime.course.id,returnTo:`${location.pathname}${location.search}`});navigate(target.to,{state:target.state});}
-  async function launchMaterialLearning(nodeId:string,materialId:string){if(!runtime)return;await applicationServices.learnerStateService.startKnowledge(nodeId,runtime.course.id);await refreshLearnerState(session.userId);navigate(materialLink(materialId));}
+  async function launchMicroLearning(nodeId:string){if(!runtime||personalDraftPreview||!microLearningProvider?.getLesson(nodeId,{courseId:runtime.course.id}))return;const target=createMicroLearningNavigation(nodeId,{courseId:runtime.course.id,returnTo:`${location.pathname}${location.search}`});navigate(target.to,{state:target.state});}
+  async function launchMaterialLearning(nodeId:string,materialId:string){if(!runtime||personalDraftPreview)return;if(session){await applicationServices.learnerStateService.startMaterial(runtime.course.id,materialId,nodeId);await refreshLearnerState(session.userId);}navigate(materialLink(materialId));}
   function switchMode() { setMode((current) => current === "knowledge" ? "assignment" : "knowledge"); setActiveAssignmentId(null); setDrawerTab("detail"); }
 
   function updateAuthoringDraft(update: (state: CourseAuthoringDraftState) => CourseAuthoringDraftState) {
-    if (!baseRuntime || !draftRef.current) return false;
+    if (!effectiveBaseRuntime || !draftRef.current) return false;
     const current = draftRef.current;
     const next = update(current);
-    const nextValidation = validateCourseAuthoring(baseRuntime, baseKnowledgeGraph, next);
+    const nextValidation = validateCourseAuthoring(effectiveBaseRuntime, baseKnowledgeGraph, next);
     const blockingIssue = nextValidation.fatal.find((issue) => !isDraftCompletenessIssue(issue));
     if (blockingIssue) {
       setDesignActionNotice(`无法应用变更：${blockingIssue.message}`);
@@ -209,8 +229,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     if (JSON.stringify(current) === JSON.stringify(next)) return false;
     draftRef.current = next; setDraftState(next); setHistory((value) => ({ past: [...value.past, current].slice(-50), future: [] }));
     saveChain.current = saveChain.current.catch(() => undefined).then(async () => {
-      const previewRuntime = applyCourseAuthoringDraft(baseRuntime, next);
-      const saved = await courseAuthoringDraftRepository.saveDraft(baseRuntime.course.id, { state: next, previewRuntime, revision: draftRevisionRef.current, expectedRevision: draftRevisionRef.current });
+      const previewRuntime = applyCourseAuthoringDraft(effectiveBaseRuntime, next);
+      const saved = await courseAuthoringDraftRepository.saveDraft(effectiveBaseRuntime.course.id, { state: next, previewRuntime, revision: draftRevisionRef.current, expectedRevision: draftRevisionRef.current });
       draftRevisionRef.current = saved.revision; setDraftRevision(saved.revision);
     }).catch(() => { setDesignActionNotice("草稿未保存：请刷新后处理冲突或重试。"); });
     return true;
@@ -229,8 +249,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     void persistDraft(next);
   }
   async function persistDraft(state: CourseAuthoringDraftState) {
-    if (!baseRuntime) return;
-    try { const saved = await courseAuthoringDraftRepository.saveDraft(baseRuntime.course.id, { state, previewRuntime: applyCourseAuthoringDraft(baseRuntime, state), revision: draftRevisionRef.current, expectedRevision: draftRevisionRef.current }); draftRevisionRef.current = saved.revision; setDraftRevision(saved.revision); }
+    if (!effectiveBaseRuntime) return;
+    try { const saved = await courseAuthoringDraftRepository.saveDraft(effectiveBaseRuntime.course.id, { state, previewRuntime: applyCourseAuthoringDraft(effectiveBaseRuntime, state), revision: draftRevisionRef.current, expectedRevision: draftRevisionRef.current }); draftRevisionRef.current = saved.revision; setDraftRevision(saved.revision); }
     catch { setDesignActionNotice("草稿未保存：请刷新后处理冲突或重试。"); }
   }
 
@@ -259,9 +279,9 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   }
 
   function deleteSelectedChapter() {
-    if (!selectedChapter || !runtime || !baseRuntime) return;
-    const outcomeIds=baseRuntime.chapterOutcomes.filter((outcome)=>outcome.chapterId===selectedChapter.id).map((outcome)=>outcome.id);
-    if(baseRuntime.finalProjectOutcomeCompositions.some((composition)=>outcomeIds.includes(composition.outcomeId))){setDesignActionNotice("该篇章成果被 FinalProject 引用，Prototype 为避免静默破坏组合关系而禁止删除。");return;}
+    if (!selectedChapter || !runtime || !effectiveBaseRuntime) return;
+    const outcomeIds=effectiveBaseRuntime.chapterOutcomes.filter((outcome)=>outcome.chapterId===selectedChapter.id).map((outcome)=>outcome.id);
+    if(effectiveBaseRuntime.finalProjectOutcomeCompositions.some((composition)=>outcomeIds.includes(composition.outcomeId))){setDesignActionNotice("该篇章成果被 FinalProject 引用，Prototype 为避免静默破坏组合关系而禁止删除。");return;}
     const nodeIds=courseSkillTreeNodes.filter((node)=>node.chapterId===selectedChapter.id).map((node)=>node.id);
     if(!window.confirm(`删除“${selectedChapter.title}”？其中 ${nodeIds.length} 个 Knowledge 将移到“未分组”；全局 Knowledge 不会删除。`))return;
     updateAuthoringDraft((state)=>removeDraftChapter(state,selectedChapter.id,nodeIds));
@@ -309,8 +329,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   }
 
   function applyAssistantProposal(response:CourseDesignAssistantResponse) {
-    if(!response.proposal||!baseRuntime||!draftState)return;
-    const result=validateCourseAuthoringProposal(baseRuntime,baseKnowledgeGraph,draftState,response.proposal);
+    if(!response.proposal||!effectiveBaseRuntime||!draftState)return;
+    const result=validateCourseAuthoringProposal(effectiveBaseRuntime,baseKnowledgeGraph,draftState,response.proposal);
     if(!result.valid){setDesignActionNotice(`AI Proposal 未应用：${result.validation.fatal[0]?.message ?? "校验失败"}`);return;}
     if (updateAuthoringDraft(() => result.state)) setDesignActionNotice("AI Proposal 已验证并应用，可使用 Undo 撤回。");
   }
@@ -418,7 +438,7 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
 
   function materialLink(materialId: string, node = selectedNode) {
     const segmentId = node?.materialContexts.find((context) => context.materialId === materialId)?.primarySegmentId
-      ?? userCourseState.materialStates[materialId]?.recentSegmentId;
+      ?? userCourseState?.materialStates[materialId]?.recentSegmentId;
     const link = buildMaterialDeepLink({ courseId: runtime!.course.id, materialId, segmentId });
     if (!designEnabled) return link;
     return `${link}${link.includes("?") ? "&" : "?"}experience=design`;
@@ -440,22 +460,26 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     return <><section className="atlas-drawer-section atlas-assignment-group"><h3>{node.title} · 实训</h3><div className="atlas-drawer-progress-meta"><span>{node.assignmentCount} 项实训</span><strong>{node.assignmentStateSummary.progress}%</strong></div><div className="atlas-drawer-progress"><i style={{ width: `${node.assignmentStateSummary.progress}%` }} /></div><div className="atlas-assignment-switcher">{node.assignmentContexts.map((context, index) => <button key={context.assignmentId} onClick={() => setActiveAssignmentId(context.assignmentId)}><span>{String(index + 1).padStart(2, "0")}</span><strong>{context.assignment.title}</strong><small>{assignmentStatusLabel[context.state?.status ?? "not-started"]}</small><ArrowRight size={13} /></button>)}</div></section></>;
   }
 
+  function emptyAssignmentFacet(node: CourseSkillTreeNode) {
+    return <section className="atlas-drawer-section atlas-assignment-group"><h3>{node.title} · 实训</h3><div className="atlas-related-material-empty"><FileText size={22}/><strong>暂未配置实训</strong><span>该 Knowledge route 仍可学习；Assignment 是可后续补充的课程资产。</span></div></section>;
+  }
+
   function chapterKnowledgeFacet(chapter: CourseChapterProjection) {
     const nodes = courseSkillTreeNodes.filter((node) => node.chapterId === chapter.id);
     const lessons = lessonsForChapter(runtime!, chapter.id);
     const lessonIds = new Set(lessons.map((lesson) => lesson.id));
     if (experience === "design") return <>
       <section className="atlas-drawer-section"><h3>篇章设计</h3><p>{chapter.description}</p><div className="course-authoring-inline-actions"><button onClick={renameSelectedChapter}>重命名</button><button disabled={chapter.order<=1} onClick={()=>moveSelectedChapter(-1)}><ArrowUp size={13}/>上移</button><button disabled={chapter.order>=runtime!.chapters.length} onClick={()=>moveSelectedChapter(1)}><ArrowDown size={13}/>下移</button><button className="danger" onClick={deleteSelectedChapter}><Trash2 size={13}/>删除篇章</button></div></section>
-      <section className="atlas-drawer-section"><h3>Coverage Completeness</h3><div className="atlas-drawer-progress-meta"><span>{nodes.length} Knowledge · {chapter.assignmentSummary.assignmentCount} Assignments · {runtime!.materials.filter((material) => lessonIds.has(material.lessonId)).length} Materials</span><strong>完整</strong></div><div className="atlas-drawer-progress"><i style={{width:"100%"}} /></div></section>
+      <section className="atlas-drawer-section"><h3>结构与学习资产</h3><div className="atlas-drawer-info-card"><Check size={15} /><span>Course route 结构有效</span></div>{assetAudit ? <div className="atlas-drawer-progress-meta"><span>{assetAudit.materials.coveredKnowledgeCount}/{assetAudit.knowledgeCount} Knowledge 有 Material · {assetAudit.assignments.coveredKnowledgeCount}/{assetAudit.knowledgeCount} Knowledge 有 Assignment</span><strong>{courseAssetCoverageLabel(assetAudit)}</strong></div> : null}</section>
       <section className="atlas-drawer-section"><h3>Stage Outcome</h3><p>{chapter.outcome}</p></section>
       <section className="atlas-drawer-section"><h3>CurriculumCoverage</h3><div className="atlas-tag-list">{nodes.map((node) => <span key={node.id}>{node.id} · {node.curriculumContexts[0]?.role}</span>)}</div></section>
-      <section className="atlas-drawer-section"><h3>AI 教学建议</h3><p>覆盖与阶段成果一致。建议在综合实训中明确本篇章成果如何被后续篇章继承。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：在篇章目标中明确阶段成果的后续复用接口。")}>优化篇章教学设计</button></section>
+      <section className="atlas-drawer-section"><h3>AI 教学建议</h3><p>{assetAudit && courseAssetCoverageLabel(assetAudit) === "学习资产待补充" ? "课程结构有效，但仍有学习资产待补充。" : "当前已配置的学习资产可继续复核其阶段成果衔接。"} 建议在综合实训中明确本篇章成果如何被后续篇章继承。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：在篇章目标中明确阶段成果的后续复用接口。")}>优化篇章教学设计</button></section>
     </>;
     return <>
       <section className="atlas-drawer-section"><h3>篇章简介</h3><p>{chapter.description}</p></section>
-      <section className="atlas-drawer-section"><h3>Knowledge Progress</h3><div className="atlas-drawer-progress-meta"><span>{lessons.length} 课 · {chapter.knowledgeEvidenceCount}/{nodes.length} 个节点有掌握证据</span><strong>{chapter.knowledgeProgress}%</strong></div><div className="atlas-drawer-progress"><i style={{ width: `${chapter.knowledgeProgress}%` }} /></div></section>
-      <section className="atlas-drawer-section"><h3>课程覆盖</h3><div className="atlas-requirement-list">{lessons.map((lesson) => <div className="atlas-requirement" key={lesson.id}><span className="atlas-requirement-icon ready">{lesson.order}</span><span><strong>第 {lesson.order} 课</strong><small>{nodes.filter((node) => node.lessonId === lesson.id).length} 个 KnowledgeNodes</small></span></div>)}</div></section>
-      <section className="atlas-drawer-section"><h3>主要 Atomic KnowledgeNodes</h3><div className="atlas-tag-list">{nodes.slice(0, 12).map((node) => <span key={node.id}>{node.title}</span>)}</div></section>
+      <section className="atlas-drawer-section"><h3>学习进度</h3><div className="atlas-drawer-progress-meta"><span>{lessons.length} 课 · {chapter.knowledgeEvidenceCount}/{nodes.length} 个知识点有学习记录</span><strong>{chapter.knowledgeProgress}%</strong></div><div className="atlas-drawer-progress"><i style={{ width: `${chapter.knowledgeProgress}%` }} /></div></section>
+      <section className="atlas-drawer-section"><h3>课程覆盖</h3><div className="atlas-requirement-list">{lessons.map((lesson) => { const displayNumber = lessonDisplayNumberById.get(lesson.id) ?? 1; return <div className="atlas-requirement" key={lesson.id}><span className="atlas-requirement-icon ready">{displayNumber}</span><span><strong>第 {displayNumber} 课</strong><small>{nodes.filter((node) => node.lessonId === lesson.id).length} 个知识点</small></span></div>; })}</div></section>
+      <section className="atlas-drawer-section"><h3>主要知识点</h3><div className="atlas-tag-list">{nodes.slice(0, 12).map((node) => <span key={node.id}>{node.title}</span>)}</div></section>
       <section className="atlas-drawer-section"><h3>关联课件</h3><p>{runtime!.materials.filter((material) => lessonIds.has(material.lessonId)).length} 份篇章课件与课程覆盖保持关联。</p></section>
       <section className="atlas-drawer-section"><h3>对应实训</h3><p>{chapter.assignmentSummary.assignmentCount} 项对应实训，可切换到实训树查看聚合详情。</p></section>
     </>;
@@ -464,11 +488,13 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   function chapterAssignmentFacet(chapter: CourseChapterProjection) {
     const projection = chapterAssignment!;
     const summary = chapter.assignmentSummary;
+    const chapterNodes = courseSkillTreeNodes.filter((node) => node.chapterId === chapter.id);
+    const assignmentCoveredKnowledgeCount = chapterNodes.filter((node) => node.assignmentContexts.length > 0).length;
     if (experience === "design") return <>
       <section className="atlas-drawer-section"><h3>Chapter Assignment Design</h3><div className="atlas-chapter-assignment-stats"><span><strong>{summary.assignmentCount}</strong>Assignments</span><span><strong>{projection.projectContributions.length}</strong>成果映射</span></div></section>
       <section className="atlas-drawer-section"><h3>覆盖与依赖</h3><p>{projection.assignments.length} 个 Assignment 覆盖本篇章 Knowledge；直接依赖由稳定 Assignment ID 定义。</p><div className="atlas-assignment-switcher">{projection.assignments.map(({assignment}) => <div className="atlas-assignment-row" key={assignment.id}><strong>{assignment.title}</strong><small>{assignment.experience?.type ?? assignment.mode}</small></div>)}</div></section>
       <section className="atlas-drawer-section"><h3>Stage Outcome</h3><p>{summary.outcome}</p></section>
-      <section className="atlas-drawer-section"><h3>Issues / AI Suggestion</h3><p>当前覆盖完整。建议复核 inherited outputs 是否足以支持下一篇章，无需创建展示用依赖。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：补充 inherited outputs 的验收边界和复用说明。")}>AI 优化篇章实训</button></section>
+      <section className="atlas-drawer-section"><h3>Assignment Coverage</h3><p>已配置 {projection.assignments.length} 个 Assignment，覆盖 {assignmentCoveredKnowledgeCount}/{chapterNodes.length} 个 Knowledge。建议复核 inherited outputs 是否足以支持下一篇章，无需创建展示用依赖。</p><button className="atlas-secondary" onClick={() => setDesignActionNotice("Prototype · AI 建议：补充 inherited outputs 的验收边界和复用说明。")}>AI 优化篇章实训</button></section>
     </>;
     return <>
       <section className="atlas-drawer-section"><h3>{chapter.title} · 实训</h3><div className="atlas-chapter-assignment-stats"><span><strong>{summary.assignmentCount}</strong>项实训</span><span><strong>{summary.completedCount}</strong>已完成</span><span><strong>{summary.inProgressCount}</strong>进行中</span><span><strong>{summary.notStartedCount}</strong>未开始</span></div><div className="atlas-drawer-progress-meta"><span>完成度</span><strong>{summary.progress}%</strong></div><div className="atlas-drawer-progress"><i style={{ width: `${summary.progress}%` }} /></div></section>
@@ -479,6 +505,8 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   }
 
   function atomicKnowledgeFacet(node: CourseSkillTreeNode) {
+    const hasMaterialCoverage = assetAudit?.materials.coveredKnowledgeNodeIds.includes(node.id) ?? false;
+    const hasAssignmentCoverage = assetAudit?.assignments.coveredKnowledgeNodeIds.includes(node.id) ?? false;
     if (experience === "design") return <>
       <section className="atlas-drawer-section"><h3>Knowledge Metadata</h3><p><strong>{node.id}</strong> · {node.knowledge.type} · {node.knowledge.scope}</p><p>{node.description}</p></section>
       <section className="atlas-drawer-section"><h3>所属 Chapter / CurriculumCoverage</h3><label className="course-authoring-field"><span>移动到篇章</span><select value={node.chapterId} onChange={(event)=>updateAuthoringDraft((state)=>moveCourseKnowledge(state,node.id,event.target.value))}>{runtime!.chapters.map((chapter)=><option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}</select></label><div className="atlas-requirement-list">{node.curriculumContexts.map((context) => <div className="atlas-requirement" key={context.id}><span className="atlas-requirement-icon ready">{context.lessonOrder}</span><span>{courseChapters.find((chapter) => chapter.id === context.chapterId)?.title}<small>{context.role} · order {context.order}</small></span></div>)}</div></section>
@@ -487,20 +515,22 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
       <MicroAuthoringEditor paths={draftState?.microPaths ?? []} courseId={runtime!.course.id} knowledgeId={node.id} onPathsChange={(paths) => updateAuthoringDraft((state) => ({ ...state, microPaths: paths, microPathsEdited: true }))} />
       <DraftMicroPreview paths={draftState?.microPaths ?? []} knowledgeId={node.id} />
       <AssignmentAuthoringEditor assignments={draftState?.assignments ?? runtime!.assignments} coverages={draftState?.assignmentCoverages ?? runtime!.assignmentCoverages} courseId={runtime!.course.id} knowledgeId={node.id} onChange={(assignments, assignmentCoverages) => updateAuthoringDraft((state) => ({ ...state, assignments, assignmentCoverages }))} />
-      <section className="atlas-drawer-section"><h3>Mapping 状态</h3><div className="atlas-drawer-info-card"><Check size={15} /><span>课程、课件与实训覆盖完整</span></div></section>
+      <section className="atlas-drawer-section"><h3>结构与学习资产</h3><div className="atlas-drawer-info-card"><Check size={15} /><span>Course route 结构有效</span></div><p>Material {hasMaterialCoverage ? "已映射" : "待补充"} · Assignment {hasAssignmentCoverage ? "已映射" : "待补充"}</p></section>
       <section className="atlas-drawer-section"><h3>课程覆盖操作</h3><p>移除只影响本课程覆盖，不会删除 Global Knowledge。</p><button className="atlas-secondary danger" onClick={removeSelectedKnowledge}><Trash2 size={14}/>从课程移除</button></section>
     </>;
     return <>
       <section className="atlas-drawer-section"><h3>简介</h3><p>{node.description}</p></section>
-      <section className="atlas-drawer-section"><h3>Knowledge Progress</h3><div className="atlas-drawer-progress-meta"><span>{node.hasKnowledgeEvidence ? "来自 UserKnowledgeState" : "暂无掌握证据"}</span><strong>{node.knowledgeProgress}%</strong></div><div className="atlas-drawer-progress"><i style={{ width: `${node.knowledgeProgress}%` }} /></div></section>
-      <section className="atlas-drawer-section"><h3>课程覆盖</h3><div className="atlas-requirement-list">{node.curriculumContexts.map((context) => <div className="atlas-requirement" key={context.id}><span className="atlas-requirement-icon ready">{context.lessonOrder}</span><span><strong>第 {context.lessonOrder} 课 · {context.role}</strong><small>{courseChapters.find((chapter) => chapter.id === context.chapterId)?.title}</small></span></div>)}</div></section>
+      <section className="atlas-drawer-section"><h3>学习进度</h3><div className="atlas-drawer-progress-meta"><span>{node.hasKnowledgeEvidence ? "已有学习记录" : "暂无掌握证据"}</span><strong>{node.knowledgeProgress}%</strong></div><div className="atlas-drawer-progress"><i style={{ width: `${node.knowledgeProgress}%` }} /></div></section>
+      <section className="atlas-drawer-section"><h3>课程覆盖</h3><div className="atlas-requirement-list">{node.curriculumContexts.map((context) => { const displayNumber = lessonDisplayNumberById.get(context.lessonId) ?? 1; return <div className="atlas-requirement" key={context.id}><span className="atlas-requirement-icon ready">{displayNumber}</span><span><strong>第 {displayNumber} 课 · {context.role}</strong><small>{courseChapters.find((chapter) => chapter.id === context.chapterId)?.title}</small></span></div>; })}</div></section>
       <section className="atlas-drawer-section"><h3>对应实训</h3><p>{node.assignmentCount} 项对应实训；切换到实训树查看任务详情。</p></section>
       <section className="atlas-drawer-section"><h3>前置要求</h3><div className="atlas-requirement-list">{courseSkillTreeEdges.some((edge) => edge.relation === "prerequisite" && edge.target === node.id) ? courseSkillTreeEdges.filter((edge) => edge.relation === "prerequisite" && edge.target === node.id).map((edge) => courseSkillTreeNodes.find((item) => item.id === edge.source)).map((item) => item ? <button className="atlas-requirement interactive" key={item.id} onClick={() => selectPrerequisite(item.id)}><span className={`atlas-requirement-icon ${item.status === "locked" ? "waiting" : "ready"}`}>{item.status === "locked" ? "!" : <Check size={14} />}</span><span><strong>{item.title}</strong><small>第 {item.lesson} 课 · {knowledgeStatusLabel[item.status]}</small></span><ArrowRight size={14} /></button> : null) : <div className="atlas-requirement"><span className="atlas-requirement-icon ready"><Check size={14} /></span><span>当前节点可开始学习</span></div>}</div></section>
     </>;
   }
 
   const drawerTitle = selectedChapter ? `${selectedChapter.title}${detailFacet === "assignment" ? " · 实训" : ""}` : selectedNode ? `${selectedNode.title}${detailFacet === "assignment" && assignmentProjection?.kind === "group" ? " · 实训" : assignmentProjection?.kind === "detail" ? assignmentProjection.context.assignment.title : ""}` : "";
-  const drawerStatus = selectedChapter ? detailFacet === "assignment" ? `${selectedChapter.assignmentSummary.progress}%` : selectedChapter.assignmentSummary.progress >= 100 ? "阶段已完成" : selectedChapter.assignmentSummary.progress ? "当前学习" : "可学习" : selectedNode ? detailFacet === "knowledge" ? knowledgeStatusLabel[selectedNode.status] : assignmentProjection?.kind === "detail" ? assignmentStatusLabel[assignmentProjection.context.state?.status ?? "not-started"] : `${selectedNode.assignmentCount} 项` : "";
+  const drawerStatus = selectedChapter ? detailFacet === "assignment" ? `${selectedChapter.assignmentSummary.progress}%` : selectedChapter.assignmentSummary.progress >= 100 ? "阶段已完成" : selectedChapter.assignmentSummary.progress ? "当前学习" : "已包含" : selectedNode ? detailFacet === "knowledge" ? knowledgeStatusLabel[selectedNode.status] : assignmentProjection?.kind === "detail" ? assignmentStatusLabel[assignmentProjection.context.state?.status ?? "not-started"] : `${selectedNode.assignmentCount} 项` : "";
+  const teacherCreatorPreview=authoringRoute&&new URLSearchParams(window.location.search).get("creator")==="teacher";
+  const overviewReturnTarget = teacherCreatorPreview?`/teaching/create?courseId=${encodeURIComponent(courseId)}`:authoringRoute ? "/teaching" : "/courses";
 
   if (!runtime || !graphData || invalidChapter) {
     return <main className="atlas-graph-page"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>{invalidChapter ? "篇章不存在" : "课程不存在"}</h1><p>{invalidChapter ? `课程 “${courseId}” 中没有篇章 “${routeChapterId}”。` : `没有找到课程 “${courseId}”。`}</p><button className="atlas-primary" onClick={() => navigate(invalidChapter ? `/courses/${courseId}` : "/courses")}>返回课程</button></section></main>;
@@ -510,21 +540,24 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
     <main className="atlas-graph-page" data-experience={experience}>
       <GlobalNav active={experience === "design" ? "teaching" : "courses"} session={session} onLogout={onLogout} />
       <header className="atlas-skill-course-island">
-        <div className="atlas-skill-header-left"><button onClick={() => view === "overview" ? navigate("/courses") : changeView("overview")} aria-label="返回上一级"><ArrowLeft size={18} /></button><span className="atlas-skill-divider" /><div className="atlas-skill-title"><span>{runtime.course.title}</span><strong>{presentation === "path" ? "课程学习路径" : view === "overview" ? "课程篇章总览" : view === "focused" ? "聚焦篇章" : `完整课程${mode === "knowledge" ? "技能树" : "实训树"}`}</strong>{view === "focused" && presentation === "graph" ? <small>/ {courseChapters.find((item) => item.id === focusedChapterId)?.title}</small> : null}</div></div>
+        <div className="atlas-skill-header-left"><button onClick={() => view === "overview" ? navigate(overviewReturnTarget) : changeView("overview")} aria-label={teacherCreatorPreview?"返回课程创建":authoringRoute ? "返回教学管理" : "返回课程中心"}><ArrowLeft size={18} /></button><span className="atlas-skill-divider" /><div className="atlas-skill-title"><span>{runtime.course.title}</span><strong>{presentation === "path" ? "课程路线" : view === "overview" ? "课程篇章总览" : view === "focused" ? "聚焦篇章" : `完整课程${mode === "knowledge" ? "技能树" : "实训树"}`}</strong>{view === "focused" && presentation === "graph" ? <small>/ {courseChapters.find((item) => item.id === focusedChapterId)?.title}</small> : null}</div>{personalDraftPreview && runtime.course.creationBriefMessageId ? <button className="atlas-skill-focus" onClick={() => window.location.assign(`/courses/create?briefId=${encodeURIComponent(runtime.course.creationBriefMessageId!)}`)}>返回课程创建</button> : teacherCreatorPreview?<button className="atlas-skill-focus" onClick={()=>window.location.assign(overviewReturnTarget)}>返回课程创建</button>:null}</div>
         <div className="atlas-skill-header-center">{canDesignCourse(session) ? <ExperienceModeToggle value={experience} onChange={setExperience} /> : null}</div>
-        <div className="atlas-skill-header-actions"><button className="atlas-skill-focus" onClick={() => setPresentation((value) => value === "path" ? "graph" : "path")}>{presentation === "path" ? "查看课程图" : "学习路径"} <ArrowRight size={12} /></button>{presentation === "graph" ? view !== "full" ? <button className="atlas-skill-focus" onClick={() => changeView("full")}>展开全部篇章 <ArrowRight size={12} /></button> : <button className="atlas-skill-focus" onClick={() => changeView("overview")}>折叠为篇章总览 <X size={12} /></button> : null}</div>
+        <div className="atlas-skill-header-actions"><button className="atlas-skill-focus" onClick={() => setPresentation((value) => value === "path" ? "graph" : "path")}>{presentation === "path" ? "查看课程图" : "课程路线"} <ArrowRight size={12} /></button>{presentation === "graph" ? view !== "full" ? <button className="atlas-skill-focus" onClick={() => changeView("full")}>展开全部篇章 <ArrowRight size={12} /></button> : <button className="atlas-skill-focus" onClick={() => changeView("overview")}>折叠为篇章总览 <X size={12} /></button> : null}</div>
       </header>
 
+      {personalDraftPreview ? <section className="creator-warning"><strong>课程草稿预览</strong><p>可以浏览课程结构和内容预览；完成创建前不会记录学习进度、开始快速学习或提交实践任务。请使用顶部“返回课程创建”继续编辑。</p></section> : null}
+      {runtime.course.courseType === "personal" && assetAudit?.actionability.noExecutableActivities ? <section className="creator-warning"><strong>课程结构已经创建，但当前没有可执行学习活动</strong><p>课程包含 {assetAudit.knowledgeCount} 个学习内容；快速学习、学习资料和实践任务目前均为 0。浏览课程不会自动改变学习状态。</p>{assetAudit.practice.assignmentCoverageGap ? <p><strong>实践覆盖不足：</strong>你的创建计划强调实践，但目前没有覆盖这些学习内容的实践任务。</p> : null}</section> : runtime.course.courseType === "personal" && assetAudit?.practice.assignmentCoverageGap ? <section className="creator-warning"><strong>实践覆盖仍有缺口</strong><p>{assetAudit.assignments.missingKnowledgeCount} 个学习内容尚无实践任务；课程结构有效，但实践目标尚未完全可执行。</p></section> : null}
+
       {designEnabled && presentation === "graph" ? <div className={`course-authoring-toolbar glass-v2 ${drawerOpen ? "drawer-open" : ""}`}><button disabled={draftLoading} onClick={createChapter} title="新建篇章"><Plus size={14}/>新建篇章</button><button disabled={draftLoading} onClick={()=>setKnowledgePickerOpen(true)} title="添加知识点"><Plus size={14}/>添加知识点</button><button disabled={draftLoading} onClick={createCandidate} title="草稿知识点"><Sparkles size={14}/>草稿知识点</button><span/><button disabled={!historyStatus.canUndo || draftLoading} onClick={undoDraft} title="Undo · Cmd/Ctrl + Z"><Undo2 size={14}/>Undo</button><button disabled={!historyStatus.canRedo || draftLoading} onClick={redoDraft} title="Redo · Cmd/Ctrl + Shift + Z"><Redo2 size={14}/>Redo</button><button disabled={draftLoading} onClick={()=>{if(Object.keys(draftState?.manualNodePositions??{}).length&&!window.confirm("自动整理会覆盖手动布局，继续吗？"))return;updateAuthoringDraft(clearManualNodePositions);window.setTimeout(()=>graphRef.current?.fit(),80);}} title="自动整理"><WandSparkles size={14}/>自动整理</button><button className="publish" disabled={draftLoading || !draftRevision} onClick={()=>setPublishCheckOpen(true)}>{draftLoading ? "读取草稿…" : "发布检查"}</button></div>:null}
-      {presentation === "path" ? <CoursePathView graph={graphData} userKnowledge={userKnowledgeRepository.getUserKnowledge(session.userId)} microMinutes={(nodeId)=>applicationServices.microLearningRepository.getPath(nodeId,{courseId:runtime.course.id,mode:"learn"})?.estimatedMinutes} onSelect={(nodeId: string) => { const node=courseSkillTreeNodes.find((item)=>item.id===nodeId); if(node) selectKnowledge(node); }} /> : <div className={`atlas-graph-stage ${drawerOpen ? "drawer-open" : ""}`}><CourseGraph ref={graphRef} graphData={graphData} view={view} focusedChapterId={focusedChapterId} mode={mode} selectedId={selectedFlowId} searchMatchId={searchMatch} designEnabled={designEnabled} manualPositions={draftState?.manualNodePositions} onKnowledgeDrop={(nodeId,chapterId,position)=>updateAuthoringDraft((state)=>setManualNodePosition(moveCourseKnowledge(state,nodeId,chapterId),nodeId,position))} onDependencyCreate={createDependency} onDependencySelect={setSelectedDependencyId} onChapterClick={selectChapter} onChapterDoubleClick={focusChapter} onKnowledgeClick={selectKnowledge} onAssignmentClick={selectKnowledge} /></div>}
+      {presentation === "path" ? <CoursePathView graph={graphData} userKnowledge={session?userKnowledgeRepository.getUserKnowledge(session.userId):[]} microMinutes={(nodeId)=>applicationServices.microLearningRepository.getPath(nodeId,{courseId:runtime.course.id,mode:"learn"})?.estimatedMinutes} onSelect={(nodeId: string) => { const node=courseSkillTreeNodes.find((item)=>item.id===nodeId); if(node) selectKnowledge(node); }} /> : <div className={`atlas-graph-stage ${drawerOpen ? "drawer-open" : ""}`}><CourseGraph ref={graphRef} graphData={graphData} view={view} focusedChapterId={focusedChapterId} mode={mode} selectedId={selectedFlowId} searchMatchId={searchMatch} designEnabled={designEnabled} manualPositions={draftState?.manualNodePositions} onKnowledgeDrop={(nodeId,chapterId,position)=>updateAuthoringDraft((state)=>setManualNodePosition(moveCourseKnowledge(state,nodeId,chapterId),nodeId,position))} onDependencyCreate={createDependency} onDependencySelect={setSelectedDependencyId} onChapterClick={selectChapter} onChapterDoubleClick={focusChapter} onKnowledgeClick={selectKnowledge} onAssignmentClick={selectKnowledge} /></div>}
       {presentation === "graph" ? <><div className={`atlas-graph-meta ${drawerOpen ? "drawer-open" : ""}`}><div className={`atlas-graph-search glass-v2 ${searchExpanded ? "expanded" : ""}`}><button onClick={() => { setSearchExpanded((value) => !value); window.setTimeout(() => searchRef.current?.focus(), 0); }} aria-label="搜索技能树"><Search size={20} /></button><input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") executeSearch(); }} placeholder="搜索篇章、知识点或实训…" /></div></div><div className={`atlas-graph-toolbar glass-v2 ${drawerOpen ? "drawer-open" : ""}`}><button onClick={() => graphRef.current?.zoomIn()} data-tip="放大" aria-label="放大"><Plus size={17} /></button><button onClick={() => graphRef.current?.zoomOut()} data-tip="缩小" aria-label="缩小"><Minus size={17} /></button><button onClick={() => graphRef.current?.fit()} data-tip="适配全图" aria-label="适配全图"><Maximize2 size={17} /></button><span /><button className={mode === "assignment" ? "active" : ""} onClick={switchMode} data-tip="切换技能树 / 实训树" aria-label="切换技能树与实训树"><Layers3 size={17} /></button><button onClick={() => setMaterialsOpen(true)} data-tip="查看全部关联课件" aria-label="查看关联课件"><BookOpen size={17} /></button><button disabled={!selectedAnchor} onClick={() => selectedFlowId && graphRef.current?.focus(selectedFlowId)} data-tip="定位当前节点" aria-label="定位当前节点"><Crosshair size={17} /></button><button onClick={() => changeView("overview")} data-tip="返回篇章总览" aria-label="返回篇章总览"><Network size={17} /></button></div><button className={`atlas-graph-legend glass-v2 ${legendCollapsed ? "collapsed" : ""}`} onClick={() => setLegendCollapsed((value) => !value)}><strong>学习状态 <span>{legendCollapsed ? "＋" : "－"}</span></strong><div><span><i className="done" /> 已掌握</span><span><i className="learning" /> 学习中</span><span><i className="available" /> 可学习</span><span><i className="locked" /> 未解锁</span><span><i className="sequence" /> 教学顺序补充</span></div></button><div className="atlas-graph-help glass-v2">拖动画布 · 滚轮缩放 · 单击卡片查看 · 双击篇章原位展开</div></> : null}
 
       {drawerVisible && selectedAnchor && (selectedChapter || selectedNode) ? <aside className="atlas-detail-drawer open">
         <button className="atlas-panel-close" onClick={() => setDrawerVisible(false)} aria-label="关闭详情"><X size={17} /></button>
-        <div className="atlas-drawer-head"><span>{experience === "design" ? "课程设计模式 · " : "学习模式 · "}{selectedChapter ? `课程篇章 · ${detailFacet === "knowledge" ? "Knowledge Facet" : "Assignment Aggregate"}` : `原子知识位置 · ${detailFacet === "knowledge" ? "Knowledge Facet" : "Assignment Facet"}`}</span><h2>{drawerTitle}</h2><div><i className="atlas-pill">{selectedChapter ? `${selectedChapter.lessonCount} 课` : selectedNode ? `第 ${selectedNode.lesson} 课` : ""}</i><i className="atlas-pill success">{drawerStatus}</i></div></div>
+        <div className="atlas-drawer-head"><span>{experience === "design" ? selectedChapter ? `课程设计 · ${detailFacet === "knowledge" ? "知识结构" : "实训汇总"}` : `课程设计 · ${detailFacet === "knowledge" ? "知识点" : "实训"}` : selectedChapter ? `课程篇章 · ${detailFacet === "knowledge" ? "学习内容" : "实训汇总"}` : `知识点 · ${detailFacet === "knowledge" ? "学习详情" : "实训详情"}`}</span><h2>{drawerTitle}</h2><div><i className="atlas-pill">{selectedChapter ? `${selectedChapter.lessonCount} 课` : selectedNode ? `第 ${selectedNode.lesson} 课` : ""}</i><i className="atlas-pill success">{drawerStatus}</i></div></div>
         {detailFacet === "knowledge" ? <div className="atlas-drawer-tabs"><button className={drawerTab === "detail" ? "active" : ""} onClick={() => setDrawerTab("detail")}>节点详情</button><button className={drawerTab === "materials" ? "active" : ""} onClick={() => setDrawerTab("materials")}>关联课件</button></div> : null}
-        <div className="atlas-drawer-body">{detailFacet === "knowledge" && drawerTab === "materials" ? relatedMaterialsPanel() : selectedChapter ? detailFacet === "knowledge" ? chapterKnowledgeFacet(selectedChapter) : chapterAssignmentFacet(selectedChapter) : selectedNode ? detailFacet === "knowledge" ? atomicKnowledgeFacet(selectedNode) : assignmentProjection?.kind === "group" ? assignmentGroup(selectedNode) : assignmentProjection?.kind === "detail" ? assignmentDetail(assignmentProjection.context.assignment, assignmentProjection.context, selectedNode, assignmentProjection.canReturnToGroup) : null : null}</div>
-        <div className="atlas-drawer-actions"><button className="atlas-secondary" onClick={() => selectedFlowId && graphRef.current?.focus(selectedFlowId)}><Target size={15} />定位节点</button>{selectedNode && detailFacet === "knowledge" && !designEnabled && selectedNode.status === "available" ? <button className="atlas-primary" onClick={() => void startSelectedKnowledge(selectedNode.id)}><Play size={14}/>开始学习</button> : null}{selectedNode && detailFacet === "knowledge" && !designEnabled && selectedMicroLesson ? <button className="atlas-secondary" onClick={() => launchMicroLearning(selectedNode.id)}><Sparkles size={14}/>快速学习</button> : null}{detailFacet === "knowledge" && drawerTab === "materials" ? designEnabled && selectedNode ? <><button className="atlas-secondary" disabled={generatingMaterial} onClick={() => void generateMaterialForSelected()}><Sparkles size={14}/>{generatingMaterial ? "正在生成课件…" : "AI 生成课件"}</button><button className="atlas-primary" onClick={() => setMaterialPickerOpen(true)}>＋ 选择关联课件</button></> : null : selectedChapter ? <button className="atlas-primary" onClick={() => focusChapter(selectedChapter)}>原位展开篇章</button> : selectedNode && detailFacet === "knowledge" && drawerMaterialItems.length === 1 ? <button className="atlas-primary" onClick={() => void launchMaterialLearning(selectedNode.id,drawerMaterialItems[0].material.id)}><FileText size={15} />查看课件详情</button> : selectedNode && detailFacet === "knowledge" && drawerMaterialItems.length > 1 ? <button className="atlas-primary" onClick={() => setDrawerTab("materials")}><FileText size={15} />{designEnabled ? "管理关联课件" : "查看关联课件"}</button> : selectedNode && detailFacet === "knowledge" && !drawerMaterialItems.length && designEnabled ? <button className="atlas-primary" onClick={() => {setDrawerTab("materials");setMaterialPickerOpen(true);}}>＋ 选择关联课件</button> : assignmentProjection?.kind === "detail" ? <button className="atlas-primary" onClick={() => navigate(`/courses/${runtime.course.id}/assignments/${assignmentProjection.context.assignment.id}`)}><Settings2 size={15} />{experience === "design" ? "预览实训" : "开始 / 继续实训"}</button> : null}</div>
+        <div className="atlas-drawer-body">{detailFacet === "knowledge" && drawerTab === "materials" ? relatedMaterialsPanel() : selectedChapter ? detailFacet === "knowledge" ? chapterKnowledgeFacet(selectedChapter) : chapterAssignmentFacet(selectedChapter) : selectedNode ? detailFacet === "knowledge" ? atomicKnowledgeFacet(selectedNode) : assignmentProjection?.kind === "empty" ? emptyAssignmentFacet(selectedNode) : assignmentProjection?.kind === "group" ? assignmentGroup(selectedNode) : assignmentProjection?.kind === "detail" ? assignmentDetail(assignmentProjection.context.assignment, assignmentProjection.context, selectedNode, assignmentProjection.canReturnToGroup) : null : null}</div>
+        <div className="atlas-drawer-actions"><button className="atlas-secondary" onClick={() => selectedFlowId && graphRef.current?.focus(selectedFlowId)}><Target size={15} />定位节点</button>{selectedNode && detailFacet === "knowledge" && !designEnabled && !personalDraftPreview && selectedMicroLesson ? <button className="atlas-secondary" onClick={() => launchMicroLearning(selectedNode.id)}><Sparkles size={14}/>快速学习</button> : null}{detailFacet === "knowledge" && drawerTab === "materials" ? designEnabled && selectedNode ? <><button className="atlas-secondary" disabled={generatingMaterial} onClick={() => void generateMaterialForSelected()}><Sparkles size={14}/>{generatingMaterial ? "正在生成课件…" : "AI 生成课件"}</button><button className="atlas-primary" onClick={() => setMaterialPickerOpen(true)}>＋ 选择关联课件</button></> : null : selectedChapter ? <button className="atlas-primary" onClick={() => focusChapter(selectedChapter)}>原位展开篇章</button> : selectedNode && detailFacet === "knowledge" && drawerMaterialItems.length === 1 ? personalDraftPreview ? <span>资料仅供预览</span> : <button className="atlas-primary" onClick={() => void launchMaterialLearning(selectedNode.id,drawerMaterialItems[0].material.id)}><FileText size={15} />查看课件详情</button> : selectedNode && detailFacet === "knowledge" && drawerMaterialItems.length > 1 ? <button className="atlas-primary" onClick={() => setDrawerTab("materials")}><FileText size={15} />{designEnabled ? "管理关联课件" : "查看关联课件"}</button> : selectedNode && detailFacet === "knowledge" && !drawerMaterialItems.length && designEnabled ? <button className="atlas-primary" onClick={() => {setDrawerTab("materials");setMaterialPickerOpen(true);}}>＋ 选择关联课件</button> : assignmentProjection?.kind === "detail" && !personalDraftPreview ? <button className="atlas-primary" onClick={() => navigate(`/courses/${runtime.course.id}/assignments/${assignmentProjection.context.assignment.id}`)}><Settings2 size={15} />{experience === "design" ? "预览实训" : "开始 / 继续实训"}</button> : null}</div>
       </aside> : null}
 
       {materialPickerOpen && selectedNode && designEnabled ? <div className="atlas-material-picker-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setMaterialPickerOpen(false); }}><section className="atlas-material-picker glass-v2" role="dialog" aria-modal="true" aria-label="选择关联课件"><header><div><span className="atlas-kicker">MATERIAL AUTHORING</span><h2>选择关联课件</h2><p>为 {selectedNode.title} 关联当前课程中的课件。</p></div><button onClick={() => setMaterialPickerOpen(false)} aria-label="关闭课件选择器"><X size={17}/></button></header><div className="atlas-material-picker-list">{orderedMaterials.length ? orderedMaterials.map((material) => { const linked = runtime.materialKnowledgeCoverages.some((coverage) => coverage.nodeId === selectedNode.id && coverage.materialId === material.id); const lesson = runtime.lessons.find((item) => item.id === material.lessonId); const chapter = runtime.chapters.find((item) => item.id === lesson?.chapterId); return <button key={material.id} disabled={linked} onClick={() => linkMaterialToSelected(material.id)}><FileText size={18}/><span><strong>{material.title}</strong><small>{material.type.toUpperCase()} · {chapter?.title ?? "未分类篇章"} / {lesson?.title ?? "未分类课"} · {material.duration ?? "自定进度"}</small></span><i>{linked ? "已关联" : "关联"}</i></button>; }) : <div className="atlas-related-material-empty"><FileText size={22}/><strong>暂无可用课件</strong><span>可手工创建一份最小 Article 草稿。</span></div>}</div><footer><button className="atlas-secondary" onClick={createManualMaterialForSelected}><FileText size={14}/>手工创建 Article</button><button className="atlas-secondary" disabled={generatingMaterial} onClick={() => void generateMaterialForSelected()}><Sparkles size={14}/>{generatingMaterial ? "Analyzing selected Knowledge…" : "AI 生成课件"}</button><button className="atlas-primary" onClick={() => setMaterialPickerOpen(false)}>完成</button></footer></section></div> : null}
@@ -533,9 +566,9 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
 
       {publishCheckOpen&&validation?<div className="atlas-material-picker-backdrop"><section className="atlas-material-picker course-publish-check glass-v2" role="dialog" aria-modal="true" aria-label="发布检查"><header><div><span className="atlas-kicker">PUBLICATION CHECK</span><h2>发布检查</h2><p>从当前 Base Runtime + Authoring Overlay 得到确定性结果。</p></div><button onClick={()=>setPublishCheckOpen(false)} aria-label="关闭发布检查"><X size={17}/></button></header><div className="course-publish-summary"><span><Check size={14}/>{validation.summary.chapterCount} 个篇章</span><span><Check size={14}/>{validation.summary.knowledgeCount} 个 Knowledge</span><span><Check size={14}/>{validation.summary.assignmentCoveredCount} 个 Knowledge 有 Assignment</span><span><Check size={14}/>{validation.summary.materialCoveredCount} 个 Knowledge 有课件</span><span><Check size={14}/>依赖图{validation.summary.dagValid?"无循环":"存在循环"}</span></div>{validation.fatal.length?<section className="course-publish-issues fatal"><strong>必须修复</strong>{validation.fatal.map((issue)=><p key={`${issue.code}:${issue.message}`}>× {issue.message}</p>)}</section>:<section className="course-publish-issues success"><strong>结构校验通过</strong><p>没有阻止发布的 broken reference 或 DAG 问题。</p></section>}{validation.warnings.length?<section className="course-publish-issues warning"><strong>发布警告</strong>{validation.warnings.map((issue)=><p key={`${issue.code}:${issue.message}`}>⚠ {issue.message}</p>)}</section>:null}<footer><button className="atlas-secondary" onClick={()=>setPublishCheckOpen(false)}>返回修改</button><button className="atlas-primary" disabled={validation.fatal.length>0} onClick={publishCourse}>{validation.warnings.length?"仍然发布":"发布课程"}</button></footer></section></div>:null}
 
-      {materialsOpen ? <aside className="atlas-detail-drawer atlas-materials-drawer open"><button className="atlas-panel-close" onClick={() => setMaterialsOpen(false)} aria-label="关闭课件列表"><X size={17} /></button><div className="atlas-drawer-head"><span>课程资料</span><h2>全部关联课件</h2><div><i className="atlas-pill">{orderedMaterials.length} 份课件</i><i className="atlas-pill">课程级</i></div></div><div className="atlas-drawer-body"><p>课件、Knowledge 与 Assignment 通过覆盖数据动态关联。</p>{orderedMaterials.map((material) => <button className="atlas-material-card" key={material.id} onClick={() => navigate(materialLink(material.id, null))}><div><span>{material.type.toUpperCase()} · {material.segments.length} 个内容段</span><strong>{material.title}</strong><p>{material.description}</p></div><div className="atlas-course-meta"><span>{material.duration ?? "自定进度"}</span></div></button>)}</div>{orderedMaterials.length ? <div className="atlas-drawer-actions"><button className="atlas-primary" onClick={() => { const recent = Object.values(userCourseState.materialStates).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.materialId; const material = orderedMaterials.find((item) => item.id === recent) ?? orderedMaterials[0]; navigate(materialLink(material.id, null)); }}>打开最近课件 <ArrowRight size={15} /></button></div> : null}</aside> : null}
+      {materialsOpen ? <aside className="atlas-detail-drawer atlas-materials-drawer open"><button className="atlas-panel-close" onClick={() => setMaterialsOpen(false)} aria-label="关闭课件列表"><X size={17} /></button><div className="atlas-drawer-head"><span>课程资料</span><h2>全部关联课件</h2><div><i className="atlas-pill">{orderedMaterials.length} 份课件</i><i className="atlas-pill">课程级</i></div></div><div className="atlas-drawer-body"><p>课件、Knowledge 与 Assignment 通过覆盖数据动态关联。</p>{orderedMaterials.map((material) => <button className="atlas-material-card" key={material.id} onClick={() => navigate(materialLink(material.id, null))}><div><span>{material.type.toUpperCase()} · {material.segments.length} 个内容段</span><strong>{material.title}</strong><p>{material.description}</p></div><div className="atlas-course-meta"><span>{material.duration ?? "自定进度"}</span></div></button>)}</div>{orderedMaterials.length ? <div className="atlas-drawer-actions"><button className="atlas-primary" onClick={() => { const recent = Object.values(userCourseState?.materialStates ?? {}).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.materialId; const material = orderedMaterials.find((item) => item.id === recent) ?? orderedMaterials[0]; navigate(materialLink(material.id, null)); }}>{session?"打开最近课件":"打开课件"} <ArrowRight size={15} /></button></div> : null}</aside> : null}
       {selectedDependencyId && designEnabled ? <div className="course-authoring-edge-action glass-v2"><span>已选择依赖</span><code>{selectedDependencyId}</code><button onClick={deleteSelectedDependency}><Trash2 size={13}/>删除依赖</button><button onClick={()=>setSelectedDependencyId(null)} aria-label="取消选择依赖"><X size={13}/></button></div>:null}
-      {assistantContext ? <CourseDesignAssistant context={assistantContext} shellContext={{workspace:"courses",experienceMode:experience,userRole:session.role,capabilities:session.capabilities,courseId:runtime.course.id,chapterId:selectedChapter?.id,knowledgeId:selectedNode?.id,assignmentId:activeAssignmentId??undefined,selectedObject:selectedAnchor?.kind}} designEnabled={designEnabled} provider={courseDesignAssistantProvider} drawerOpen={drawerOpen} onAction={handleAssistantAction} onApplyProposal={applyAssistantProposal}/> : null}
+      {assistantContext ? session ? <CourseDesignAssistant context={assistantContext} shellContext={{workspace:"courses",experienceMode:experience,userRole:session.role,capabilities:session.capabilities,courseId:runtime.course.id,chapterId:selectedChapter?.id,knowledgeId:selectedNode?.id,assignmentId:activeAssignmentId??undefined,selectedObject:selectedAnchor?.kind}} designEnabled={designEnabled} provider={courseDesignAssistantProvider} drawerOpen={drawerOpen} onAction={handleAssistantAction} onApplyProposal={applyAssistantProposal}/> : <EduFlowAssistant locked contextLabel={assistantContext.label} drawerOpen={drawerOpen}/> : null}
       {toast ? <div className="atlas-toast"><Sparkles size={16} />{view === "focused" ? "篇章已在宏观位置展开，其他篇章保持折叠" : "课程图已更新"}</div> : null}
       {designActionNotice ? <div className="atlas-toast" role="status"><Sparkles size={16} />{designActionNotice}</div> : null}
     </main>

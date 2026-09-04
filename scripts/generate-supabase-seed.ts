@@ -101,7 +101,8 @@ function seedCourse(runtime: CourseRuntimeData) {
   runtime.finalProjects.forEach((project) => lines.push(insert("final_projects", ["course_id", "id", "title", "description"], [project.courseId, project.id, project.title, project.description])));
   runtime.finalProjectOutcomeCompositions.forEach((composition) => lines.push(insert("final_project_outcome_compositions", ["course_id", "id", "final_project_id", "outcome_id"], [runtime.course.id, composition.id, composition.finalProjectId, composition.outcomeId])));
   runtime.materials.forEach((material) => {
-    const storagePath = material.source?.url.startsWith("/materials/") ? `shared/${material.source.url.slice("/materials/".length)}` : undefined;
+    const sourceUrl = material.source?.url;
+    const storagePath = sourceUrl?.startsWith("/materials/") ? `shared/${sourceUrl.slice("/materials/".length)}` : undefined;
     lines.push(insert("materials", ["course_id", "id", "lesson_id", "display_order", "title", "description", "material_type", "storage_path", "page_count", "duration"], [
       material.courseId, material.id, material.lessonId, material.order, material.title, material.description, material.type, storagePath, material.source?.pageCount, material.duration
     ]));

@@ -7,7 +7,8 @@ import { AuthPage } from "@/features/auth/pages/AuthPage";
 import { NavigationProvider } from "@/app/providers/NavigationContext";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import { NotFoundPage } from "@/app/pages/PlaceholderPages";
-import { applicationServices, hydrateApplicationServices } from "@/app/services/applicationServices";
+import { PublicHomePage } from "@/app/pages/PublicHomePage";
+import { applicationServices, hydrateApplicationServices, hydratePublicApplicationServices } from "@/app/services/applicationServices";
 import { attachWorkflowAssignmentMetadata, resolveWorkflowAssignmentContext, completeWorkflowAssignmentRun } from "@/app/integrations/workflowAssignmentIntegration";
 import { ExplorePage } from "@/features/explore/pages/ExplorePage";
 import { LearningPage } from "@/features/learning/pages/LearningPage";
@@ -16,7 +17,6 @@ import { CourseCenterPage } from "@/features/course/pages/CoursePages";
 import { CourseManagementPage } from "@/features/course/pages/CourseManagementPage";
 import { CourseCreationWorkspacePage } from "@/features/course/pages/CourseCreationWorkspacePage";
 import { CourseGraphPage } from "@/features/course/pages/CourseGraphPage";
-import { ManualCourseCreationPage } from "@/features/course/pages/ManualCourseCreationPage";
 import { AssignmentExperiencePage } from "@/features/course/pages/AssignmentExperiencePage";
 import { LessonPage } from "@/features/material/pages/LessonPage";
 import { DomainManagementPage } from "@/features/admin/domains/DomainManagementPage";
@@ -34,21 +34,18 @@ import { demoCourseCreationScenarioResolver } from "@/demo/scenarios/agenticAiBo
 import { demoLessonAssistantProvider } from "@/demo/scenarios/agenticAiBook/lessonAssistantScripts";
 import { demoWorkflowAssessmentProvider } from "@/demo/scenarios/agenticAiBook/workflowAssessment";
 import { demoCourseDesignAssistantProvider } from "@/demo/scenarios/agenticAiBook/courseDesignAssistantScripts";
-import { demoLearningIntentResolver } from "@/demo/explore/demoLearningIntentResolver";
 import { resolveLegacyRoute } from "@/app/legacyRoutes";
+import { AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeContext";
+import { AssistantMessagesPage } from "@/features/assistant/pages/AssistantMessagesPage";
+import { authGateState, resolveAuthRedirect } from "@/features/auth/authRedirect";
+
+function AssistantRuntimeBoundary({ session, children }: { session: MockSession | null; children: ReactNode }) {
+  return session ? <AssistantRuntimeProvider session={session}>{children}</AssistantRuntimeProvider> : children;
+}
 
 function LegacyRedirect() {
   const location = useLocation();
   return <Navigate to={resolveLegacyRoute(location.pathname,location.search)} replace />;
-}
-
-function getAuthRedirect(state: unknown) {
-  if (!state || typeof state !== "object" || !("from" in state)) return "/";
-  const from = (state as { from?: unknown }).from;
-  if (!from || typeof from !== "object" || !("pathname" in from)) return "/";
-  const pathname = String((from as { pathname: unknown }).pathname);
-  const search = "search" in from ? String((from as { search?: unknown }).search ?? "") : "";
-  return `${pathname}${search}`;
 }
 
 export default function App() {
@@ -77,8 +74,9 @@ export default function App() {
       const { data } = await supabaseClient.auth.getSession();
       const authSession = data.session;
       if (!active) return;
-      if (!authSession) { setReady(true); return; }
       try {
+        await hydratePublicApplicationServices();
+        if (!authSession) return;
         const [profile] = await Promise.all([hydrateApplicationServices(authSession.user.id), workflowPersistence.hydrate()]);
         if (!active) return;
         const name = profile.displayName || authSession.user.email?.split("@")[0] || "学习者";
@@ -93,7 +91,10 @@ export default function App() {
     }
     void restore();
     const { data } = supabaseClient.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT" && active) setSession(null);
+      if (event === "SIGNED_OUT" && active) {
+        setSession(null);
+        void hydratePublicApplicationServices().catch((error) => { console.error("Public catalog rehydration failed", error); setStartupError("公开学习内容加载失败，请重试。"); });
+      }
     });
     return () => { active = false; data.subscription.unsubscribe(); };
   }, [workflowPersistence]);
@@ -135,7 +136,7 @@ export default function App() {
     ]);
     await supabaseClient.auth.signOut();
     setSession(null);
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
   }
 
   async function signIn(input: { email: string; password: string }) {
@@ -156,7 +157,7 @@ export default function App() {
     const name = profile.displayName || data.user.email?.split("@")[0] || "学习者";
     setSession({ userId: data.user.id, name, email: data.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: data.user.created_at });
     setWorkflowVersion((version) => version + 1);
-    navigate(getAuthRedirect(location.state), { replace: true });
+    navigate(resolveAuthRedirect(location.state), { replace: true });
   }
 
   async function signUp(input: { name: string; email: string; password: string }) {
@@ -172,6 +173,7 @@ export default function App() {
     setStartupError("");
     try {
       const { data } = await supabaseClient.auth.getSession();
+      await hydratePublicApplicationServices();
       if (!data.session) { setSession(null); return; }
       const [profile] = await Promise.all([hydrateApplicationServices(data.session.user.id), workflowPersistence.hydrate()]);
       const name = profile.displayName || data.session.user.email?.split("@")[0] || "学习者";
@@ -186,7 +188,7 @@ export default function App() {
   }
 
   function protectedElement(element: ReactNode) {
-    return session ? element : <Navigate to="/login" replace state={{ from: location }} />;
+    return session ? element : <Navigate to="/login" replace state={authGateState(location)} />;
   }
 
   const navigationContextValue = {
@@ -217,34 +219,36 @@ export default function App() {
   return (
     <AuthProvider value={{ session, signIn, signUp, logout }}>
       <NavigationProvider value={navigationContextValue}>
+        <AssistantRuntimeBoundary session={session}>
         <Routes>
-          <RouterRoute path="/login" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
-          <RouterRoute path="/register" element={session ? <Navigate to={getAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
-          <RouterRoute path="/" element={protectedElement(session ? <LearningPage session={session} onLogout={logout} /> : null)} />
-          <RouterRoute path="/explore" element={protectedElement(session ? <ExplorePage session={session} onLogout={logout} resolver={demoLearningIntentResolver} /> : null)} />
-          <RouterRoute path="/learn/micro/:knowledgeId" element={protectedElement(session ? <MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} /> : null)} />
+          <RouterRoute path="/login" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
+          <RouterRoute path="/register" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
+          <RouterRoute path="/" element={session ? <LearningPage session={session} onLogout={logout} /> : <PublicHomePage />} />
+          <RouterRoute path="/explore" element={<ExplorePage session={session} onLogout={logout} />} />
+          <RouterRoute path="/learn/micro/:knowledgeId" element={<MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} />} />
           <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="canvas" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />
           <RouterRoute path="/workflows/:workflowId" element={protectedElement(editor)} />
-          <RouterRoute path="/courses" element={protectedElement(session ? <CourseCenterPage session={session} onLogout={logout} /> : null)} />
-          <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} /> : null)} />
-          <RouterRoute path="/teaching" element={canManageCourses(session) ? protectedElement(session ? <CourseManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/courses" replace />} />
-          <RouterRoute path="/teaching/create" element={canManageCourses(session) ? protectedElement(session ? <ManualCourseCreationPage session={session} onLogout={logout} /> : null) : <Navigate to="/courses" replace />} />
+          <RouterRoute path="/courses" element={<CourseCenterPage session={session} onLogout={logout} />} />
+          <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} entryMode="learner" /> : null)} />
+          <RouterRoute path="/teaching" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseManagementPage session={session} onLogout={logout} /> : <Navigate to="/courses" replace />} />
+          <RouterRoute path="/teaching/create" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} entryMode="teacher" /> : <Navigate to="/courses" replace />} />
           <RouterRoute path="/course-management" element={<LegacyRedirect />} />
-          <RouterRoute path="/courses/:courseId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} microLearningProvider={applicationServices.microLearningRepository} /> : null)} />
-          <RouterRoute path="/courses/:courseId/assignments/:assignmentId" element={protectedElement(session ? <AssignmentExperiencePage session={session} onLogout={logout} /> : null)} />
-          <RouterRoute path="/courses/:courseId/materials/:materialId" element={protectedElement(session ? <LessonPage session={session} onLogout={logout} lessonAssistantProvider={demoLessonAssistantProvider} /> : null)} />
-          <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={protectedElement(session ? <CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} microLearningProvider={applicationServices.microLearningRepository} /> : null)} />
-          <RouterRoute path="/tasks/*" element={<Navigate to="/" replace />} />
-          <RouterRoute path="/system" element={canManageKnowledgeDomains(session) ? protectedElement(session ? <DomainManagementPage session={session} onLogout={logout} /> : null) : <Navigate to="/" replace />} />
+          <RouterRoute path="/courses/:courseId" element={<CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} microLearningProvider={applicationServices.microLearningRepository} />} />
+          <RouterRoute path="/courses/:courseId/assignments/:assignmentId" element={<AssignmentExperiencePage session={session} onLogout={logout} />} />
+          <RouterRoute path="/courses/:courseId/materials/:materialId" element={<LessonPage session={session} onLogout={logout} lessonAssistantProvider={demoLessonAssistantProvider} />} />
+          <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={<CourseGraphPage session={session} onLogout={logout} courseDesignAssistantProvider={demoCourseDesignAssistantProvider} microLearningProvider={applicationServices.microLearningRepository} />} />
+          <RouterRoute path="/tasks/*" element={protectedElement(<Navigate to="/" replace />)} />
+          <RouterRoute path="/system" element={!session ? protectedElement(null) : canManageKnowledgeDomains(session) ? <DomainManagementPage session={session} onLogout={logout} /> : <Navigate to="/" replace />} />
           <RouterRoute path="/system/domains" element={<Navigate to="/system" replace />} />
           <RouterRoute path="/admin/domains" element={<LegacyRedirect />} />
-          <RouterRoute path="/profile" element={<LegacyRedirect />} />
-          <RouterRoute path="/profile/*" element={<LegacyRedirect />} />
-          <RouterRoute path="/settings/*" element={<Navigate to="/" replace />} />
-          <RouterRoute path="/notifications/*" element={<Navigate to="/" replace />} />
-          <RouterRoute path="/messages/*" element={<Navigate to="/" replace />} />
+          <RouterRoute path="/profile" element={protectedElement(<LegacyRedirect />)} />
+          <RouterRoute path="/profile/*" element={protectedElement(<LegacyRedirect />)} />
+          <RouterRoute path="/settings/*" element={protectedElement(<Navigate to="/" replace />)} />
+          <RouterRoute path="/notifications/*" element={protectedElement(<Navigate to="/" replace />)} />
+          <RouterRoute path="/messages/*" element={protectedElement(session ? <AssistantMessagesPage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </AssistantRuntimeBoundary>
       </NavigationProvider>
     </AuthProvider>
   );

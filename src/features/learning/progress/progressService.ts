@@ -16,6 +16,14 @@ export function useUserCourseState(userId: string, courseId: string): UserCourse
   );
 }
 
+export function useOptionalUserCourseState(userId: string | undefined, courseId: string): UserCourseState | undefined {
+  return useSyncExternalStore(
+    (listener) => userId ? learningProgressRepository.subscribe(listener) : () => undefined,
+    () => userId ? learningProgressRepository.getCourseState(userId, courseId) : undefined,
+    () => userId ? learningProgressRepository.getCourseState(userId, courseId) : undefined
+  );
+}
+
 export function updateAssignmentState(userId: string, courseId: string, assignmentId: string, state: UserAssignmentState) {
   learningProgressRepository.updateAssignmentState(userId, courseId, assignmentId, state);
 }

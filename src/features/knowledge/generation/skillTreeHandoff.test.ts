@@ -29,7 +29,7 @@ describe("real Course Skill Tree handoff before Phase 4.3 Assignments", () => {
     expect(projected.knowledgeNodes.every((node) => node.assignmentContexts.length === 0 && node.assignmentCount === 0)).toBe(true);
   });
 
-  it("keeps the complete ready invariant strict", () => {
-    expect(() => validateCourseRuntime({ ...runtime, course: { ...runtime.course, generationStatus: "ready" } }, repository, access)).toThrow(/has no AssignmentCoverage/);
+  it("accepts the same route as ready before optional Assignment generation", () => {
+    expect(validateCourseRuntime({ ...runtime, course: { ...runtime.course, generationStatus: "ready" } }, repository, access)).toBe(true);
   });
 });

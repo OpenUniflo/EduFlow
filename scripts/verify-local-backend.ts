@@ -12,6 +12,7 @@ import learningHandler from "../api/_handlers/learning";
 import workflowsHandler from "../api/workflows";
 import materialsHandler from "../api/materials";
 import domainsHandler from "../api/domains";
+import assistantHandler from "../api/assistant";
 import { assertLocalSupabaseUrl } from "./local-supabase";
 
 type Handler = (request: VercelRequest, response: VercelResponse) => Promise<void> | void;
@@ -83,11 +84,29 @@ try {
   const [adminUser, ordinaryUser] = users;
 
   assertStatus(await invoke(healthHandler, "GET"), 200, "health");
-  assertStatus(await invoke(knowledgeHandler, "GET"), 401, "anonymous knowledge denial");
+  const publicKnowledge = await invoke(knowledgeHandler, "GET");
+  assertStatus(publicKnowledge, 200, "anonymous public Knowledge read");
+  assert.ok(publicKnowledge.body.graph.nodes.length > 0);
+  assert.ok(publicKnowledge.body.graph.nodes.every((node: any) => node.scope === "global" && node.status === "active"));
+  assert.equal(publicKnowledge.body.profile, null);
+  assert.deepEqual(publicKnowledge.body.governance.candidates, []);
+  assert.deepEqual(publicKnowledge.body.governance.proposals, []);
+  const publicCourses = await invoke(coursesHandler, "GET");
+  assertStatus(publicCourses, 200, "anonymous Published Course read");
+  assert.ok(publicCourses.body.courses.length > 0);
+  assert.ok(publicCourses.body.courses.every((item: any) => item.course.lifecycle === "published"));
+  const publicMicro = await invoke(microHandler, "GET");
+  assertStatus(publicMicro, 200, "anonymous published Micro read");
+  assert.ok(publicMicro.body.paths.length > 0);
+  assert.deepEqual(publicMicro.body.pathProgress, []);
+  assertStatus(await invoke(progressHandler, "GET"), 401, "anonymous progress denial");
+  assertStatus(await invoke(learningHandler, "GET"), 401, "anonymous learner state denial");
+  assertStatus(await invoke(courseAuthoringHandler, "GET", undefined, undefined, { courseId: "agentic-ai" }), 401, "anonymous authoring denial");
+  assertStatus(await invoke(assistantHandler, "GET"), 401, "anonymous Assistant denial");
   const knowledge = await invoke(knowledgeHandler, "GET", adminUser.token);
   assertStatus(knowledge, 200, "knowledge read");
-  assert.equal(knowledge.body.graph.nodes.length, 152);
-  assert.equal(knowledge.body.graph.edges.length, 220);
+  assert.ok(knowledge.body.graph.nodes.length >= publicKnowledge.body.graph.nodes.length);
+  assert.ok(knowledge.body.graph.edges.length >= publicKnowledge.body.graph.edges.length);
   assert.ok(knowledge.body.governance.domains.length > 0);
 
   const capabilityUpdate = await server.from("profiles").update({ capabilities: ["global-domain-admin"] }).eq("id", adminUser.user.id);
@@ -95,24 +114,113 @@ try {
 
   const courses = await invoke(coursesHandler, "GET", adminUser.token);
   assertStatus(courses, 200, "course read");
-  assert.deepEqual(courses.body.courses.map((item: any) => item.course.id).sort(), ["agentic-ai", "agentic-ai-golden", "python-engineering"]);
+  assert.deepEqual(courses.body.courses.map((item: any) => item.course.id).sort(), ["agentic-ai", "agentic-ai-golden", "cds525-deep-learning", "python-engineering"]);
   const golden = courses.body.courses.find((item: any) => item.course.id === "agentic-ai-golden");
   assert.ok(golden, "Golden Course must be available through the API");
   assert.equal(golden.chapters.length, 6);
   assert.equal(golden.assignments.length, 37);
   assert.deepEqual(new Set(golden.assignments.map((item: any) => item.experience?.type)), new Set(["answer", "code", "trace", "workflow"]));
   assertStatus(await invoke(coursesHandler, "GET", adminUser.token, undefined, { id: "missing-course" }), 404, "unknown course denial");
-  const signedPdf = courses.body.courses.flatMap((item: any) => item.materials).find((item: any) => item.source?.kind === "pdf")?.source?.url;
-  assert.ok(signedPdf);
-  const pdfResponse = await fetch(signedPdf);
+  const pdfMaterial = courses.body.courses.flatMap((item: any) => item.materials).find((item: any) => item.source?.kind === "pdf");
+  assert.ok(pdfMaterial);
+  assert.equal(pdfMaterial.source.url, undefined, "managed Course Runtime must not contain a temporary signed URL");
+  const source = await invoke(materialsHandler, "GET", adminUser.token, undefined, { courseId: pdfMaterial.courseId, materialId: pdfMaterial.id });
+  assertStatus(source, 200, "just-in-time PDF source resolution");
+  assert.match(String(source.headers["Cache-Control"]), /no-store/);
+  const pdfResponse = await fetch(source.body.sourceUrl);
   assert.equal(pdfResponse.status, 200);
   assert.equal(new TextDecoder().decode((await pdfResponse.arrayBuffer()).slice(0, 5)), "%PDF-");
+
+  // LLM language understanding proposes candidates; product logic revalidates
+  // them and persists every Search/Brief result in the owning timeline.
+  const goalText = "我想做一个能看我自己的资料，然后根据资料回答问题的东西。";
+  const assistantContext = { workspace: "explore", experienceMode: "learn" };
+  let goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", goalText, context: assistantContext });
+  assertStatus(goalPlan, 200, "Assistant Goal planning");
+  if (goalPlan.body.status === "clarify") {
+    goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", sessionId: goalPlan.body.sessionId, clarificationMessageId: goalPlan.body.messageId, goalText: "明确目标：学习 RAG、Reranking 和 Citation，用它们检索私有资料并给出有依据的回答。", context: assistantContext });
+    assertStatus(goalPlan, 200, "Assistant Goal clarification follow-up");
+  }
+  if (goalPlan.body.status === "clarify") {
+    goalPlan = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "plan-goal", sessionId: goalPlan.body.sessionId, clarificationMessageId: goalPlan.body.messageId, goalText: "是的，先只保留直接完成检索、重排和引用这三个核心成果的学习目标；准备步骤由系统作为必要基础处理。", context: assistantContext });
+    assertStatus(goalPlan, 200, "Assistant Goal semantic-scope follow-up");
+  }
+  assert.equal(goalPlan.body.plan.resolution.status, "ready");
+  assert.ok(goalPlan.body.plan.resolution.targetKnowledge.length > 0);
+  assert.ok(goalPlan.body.plan.resolution.targetKnowledge.every((item: any) => knowledge.body.graph.nodes.some((node: any) => node.id === item.id)), "Goal targets must be existing visible Knowledge IDs");
+  assert.equal(goalPlan.body.plan.prerequisiteCycleDetected, false);
+  const candidate = goalPlan.body.plan.matches[0];
+  assert.ok(candidate, "Goal planning must expose at least one readable Course candidate");
+  const personalBefore = await server.from("courses").select("id").eq("course_type", "personal");
+  assert.ifError(personalBefore.error);
+  const existingSelection = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "use-existing-course", planningMessageId: goalPlan.body.messageId, courseId: candidate.courseId, context: assistantContext });
+  assertStatus(existingSelection, 200, "explicit existing Course selection");
+  assert.equal(existingSelection.body.courseId, candidate.courseId, "existing Course identity must be reused regardless of advisory match level");
+  const personalAfterExisting = await server.from("courses").select("id").eq("course_type", "personal");
+  assert.equal(personalAfterExisting.data?.length, personalBefore.data?.length, "existing Course selection must not create a Personal Course");
+
+  const refined = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "refine-goal", planningMessageId: goalPlan.body.messageId, refinement: "这些课程太理论了，我更想实际做东西。", context: assistantContext });
+  assertStatus(refined, 200, "Assistant Goal refinement");
+  assert.notEqual(refined.body.messageId, goalPlan.body.messageId, "refinement must append a new timeline result");
+  const sourceBrief = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "prepare-course-brief", planningMessageId: goalPlan.body.messageId, sourceCourseId: candidate.courseId, requestedAdjustments: "保留能做项目的部分", referenceMaterialIntent: "none", context: assistantContext });
+  assertStatus(sourceBrief, 201, "Course Creation Brief from existing Course");
+  assert.equal(sourceBrief.body.brief.sourceCourseId, candidate.courseId);
+  const personalBrief = await invoke(assistantHandler, "POST", ordinaryUser.token, { action: "prepare-course-brief", planningMessageId: refined.body.messageId, referenceMaterialIntent: "upload_in_creator", context: assistantContext });
+  assertStatus(personalBrief, 201, "personalized route Course Creation Brief");
+  assert.equal(personalBrief.body.brief.sourceCourseId, undefined);
+  const personalAfterBriefs = await server.from("courses").select("id").eq("course_type", "personal");
+  assert.equal(personalAfterBriefs.data?.length, personalBefore.data?.length, "Brief preparation must not create a Personal Course");
+  const timelineRows = await server.from("assistant_messages").select("id,session_id,structured_content").eq("session_id", goalPlan.body.sessionId).not("structured_content", "is", null).order("created_at");
+  assert.ifError(timelineRows.error);
+  assert.deepEqual(timelineRows.data?.map((row: any) => row.structured_content.type), ["course_search", "course_search", "course_creation_brief", "course_creation_brief"]);
+  assertStatus(await invoke(assistantHandler, "GET", ordinaryUser.token, undefined, { messageId: sourceBrief.body.messageId }), 200, "Brief owner reload");
+  assertStatus(await invoke(assistantHandler, "GET", adminUser.token, undefined, { messageId: sourceBrief.body.messageId }), 404, "other-user Brief denial");
+
+  const draftTargetIds = personalBrief.body.brief.targetKnowledge.map((item: any) => item.id);
+  const draftPrerequisiteIds = refined.body.plan.prerequisiteKnowledge.map((item: any) => item.id).filter((id: string) => !draftTargetIds.includes(id));
+  const draftKnowledgeIds = [...draftPrerequisiteIds, ...draftTargetIds];
+  const draftCreatorBody = {
+    creationBriefMessageId: personalBrief.body.messageId,
+    requirements: { goal: personalBrief.body.brief.goal, learnerFoundation: "会一点 Python", timeConstraint: "两周", preferences: ["实践优先"] },
+    scope: { targetKnowledgeIds: draftTargetIds, prerequisiteKnowledgeIds: draftPrerequisiteIds, optionalKnowledgeIds: [] },
+    curriculum: { chapters: [{ id: "creator-route", title: "目标路线", knowledgeIds: draftKnowledgeIds }] },
+    creatorMetadata: { desiredMaterialKnowledgeIds: [], desiredMicroKnowledgeIds: [], desiredAssignmentKnowledgeIds: draftTargetIds }
+  };
+  const knowledgeStateBeforeDraft = await server.from("user_knowledge_states").select("node_id").eq("user_id", ordinaryUser.user.id);
+  assert.ifError(knowledgeStateBeforeDraft.error);
+  const firstDraftSave = await invoke(coursesHandler, "POST", ordinaryUser.token, draftCreatorBody);
+  assertStatus(firstDraftSave, 201, "first Personal Draft save");
+  const secondDraftSave = await invoke(coursesHandler, "POST", ordinaryUser.token, draftCreatorBody);
+  assertStatus(secondDraftSave, 201, "idempotent Personal Draft second save");
+  const changedDraftSave = await invoke(coursesHandler, "POST", ordinaryUser.token, {
+    ...draftCreatorBody,
+    curriculum: { chapters: [{ id: "creator-route", title: "实践优先目标路线", knowledgeIds: draftKnowledgeIds }] }
+  });
+  assertStatus(changedDraftSave, 201, "Personal Draft structural resave");
+  assert.equal(firstDraftSave.body.courseId, secondDraftSave.body.courseId);
+  assert.equal(firstDraftSave.body.courseId, changedDraftSave.body.courseId);
+  assertStatus(await invoke(coursesHandler, "GET", ordinaryUser.token, undefined, { id: firstDraftSave.body.courseId }), 200, "Personal Draft owner preview");
+  assertStatus(await invoke(coursesHandler, "GET", adminUser.token, undefined, { id: firstDraftSave.body.courseId }), 404, "Personal Draft admin denial");
+  const oneCoursePerBrief = await server.from("courses").select("id,lifecycle,creator_metadata").eq("creation_brief_message_id", personalBrief.body.messageId);
+  assert.ifError(oneCoursePerBrief.error); assert.equal(oneCoursePerBrief.data?.length, 1); assert.deepEqual(oneCoursePerBrief.data?.[0].creator_metadata?.desiredAssignmentKnowledgeIds, draftTargetIds);
+  const publishedDraft = await invoke(coursesHandler, "PATCH", ordinaryUser.token, { courseId: firstDraftSave.body.courseId, lifecycle: "published" });
+  assertStatus(publishedDraft, 200, "Personal Draft explicit publish");
+  const saveAfterPublish = await invoke(coursesHandler, "POST", ordinaryUser.token, draftCreatorBody);
+  assertStatus(saveAfterPublish, 201, "published Brief idempotent reopen");
+  assert.equal(saveAfterPublish.body.courseId, firstDraftSave.body.courseId); assert.equal(saveAfterPublish.body.lifecycle, "published");
+  const membershipAfterPublish = await server.from("user_course_states").select("is_active,recent_lesson_id").eq("user_id", ordinaryUser.user.id).eq("course_id", firstDraftSave.body.courseId).single();
+  assert.ifError(membershipAfterPublish.error); assert.equal(membershipAfterPublish.data.is_active, true); assert.equal(membershipAfterPublish.data.recent_lesson_id, null);
+  const assignmentStateAfterPublish = await server.from("user_assignment_states").select("assignment_id").eq("user_id", ordinaryUser.user.id).eq("course_id", firstDraftSave.body.courseId);
+  const materialStateAfterPublish = await server.from("user_material_states").select("material_id").eq("user_id", ordinaryUser.user.id).eq("course_id", firstDraftSave.body.courseId);
+  assert.ifError(assignmentStateAfterPublish.error); assert.ifError(materialStateAfterPublish.error); assert.equal(assignmentStateAfterPublish.data?.length, 0); assert.equal(materialStateAfterPublish.data?.length, 0);
+  const knowledgeStateAfterPublish = await server.from("user_knowledge_states").select("node_id").eq("user_id", ordinaryUser.user.id);
+  assert.ifError(knowledgeStateAfterPublish.error); assert.equal(knowledgeStateAfterPublish.data?.length, knowledgeStateBeforeDraft.data?.length, "Course publish must not manufacture Knowledge progress");
 
   // Authoring drafts are server-owned, isolated from learners, versioned, and
   // only materialize canonical Course rows during Publish.
   const teacherRole = await server.from("profiles").update({ role: "teacher" }).eq("id", adminUser.user.id);
   assert.ifError(teacherRole.error);
-  const manualCourse = await invoke(coursesHandler, "POST", adminUser.token, { title: `Manual ${suffix}`, description: "Created without AI", targetOutcome: "Produce a verifiable manual-course outcome" });
+  const manualCourse = await invoke(coursesHandler, "POST", adminUser.token, { title: `Manual ${suffix}`, description: "Created without AI" });
   assertStatus(manualCourse, 201, "manual course creation");
   const manualCourseId = manualCourse.body.courseId; authoredCourseId = manualCourseId;
   const teacherCourses = await invoke(coursesHandler, "GET", adminUser.token);
@@ -129,11 +237,26 @@ try {
   const learnerBeforePublish = await invoke(coursesHandler, "GET", ordinaryUser.token);
   assertStatus(learnerBeforePublish, 200, "learner course read before publish"); assert.ok(!learnerBeforePublish.body.courses.some((item: any) => item.course.id === manualCourseId));
   const published = await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: 1 }, { courseId: manualCourseId });
-  assertStatus(published, 200, "authoring draft publish");
-  const noDraft = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: manualCourseId });
-  assertStatus(noDraft, 200, "published draft cleared"); assert.equal(noDraft.body.draft, null);
+  assertStatus(published, 422, "incomplete authoring draft publish denial");
+  const retainedDraft = await invoke(courseAuthoringHandler, "GET", adminUser.token, undefined, { courseId: manualCourseId });
+  assertStatus(retainedDraft, 200, "rejected draft retained"); assert.equal(retainedDraft.body.draft.revision, 1);
   const learnerAfterPublish = await invoke(coursesHandler, "GET", ordinaryUser.token);
-  assertStatus(learnerAfterPublish, 200, "learner course read after publish"); assert.ok(learnerAfterPublish.body.courses.some((item: any) => item.course.id === manualCourseId));
+  assertStatus(learnerAfterPublish, 200, "learner course read after rejected publish"); assert.ok(!learnerAfterPublish.body.courses.some((item: any) => item.course.id === manualCourseId));
+
+  const routeKnowledgeId = golden.curriculumCoverages[0].nodeId;
+  const danglingPreview = { ...manualRuntime, curriculumCoverages: [{ id: `${manualCourseId}:coverage:dangling`, courseId: manualCourseId, lessonId: "another-course:lesson", nodeId: routeKnowledgeId, role: "introduce", order: 0 }] };
+  const danglingSave = await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: draftState, previewRuntime: danglingPreview, expectedRevision: 1 }, { courseId: manualCourseId });
+  assertStatus(danglingSave, 200, "dangling authoring preview save");
+  assertStatus(await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: danglingSave.body.revision }, { courseId: manualCourseId }), 500, "dangling Course-owned reference publish denial");
+
+  const routeOnlyPreview = { ...manualRuntime, curriculumCoverages: [{ id: `${manualCourseId}:coverage:1`, courseId: manualCourseId, lessonId: manualRuntime.lessons[0].id, nodeId: routeKnowledgeId, role: "introduce", order: 0 }] };
+  const routeOnlySave = await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: draftState, previewRuntime: routeOnlyPreview, expectedRevision: danglingSave.body.revision }, { courseId: manualCourseId });
+  assertStatus(routeOnlySave, 200, "route-only authoring preview save");
+  const routeOnlyPublish = await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: routeOnlySave.body.revision }, { courseId: manualCourseId });
+  assertStatus(routeOnlyPublish, 200, "valid route without targetOutcome publish");
+  const publishedRouteOnly = await invoke(coursesHandler, "GET", ordinaryUser.token, undefined, { id: manualCourseId });
+  assertStatus(publishedRouteOnly, 200, "learner reads route-only published Course");
+  assert.equal(publishedRouteOnly.body.course.course.targetOutcome, undefined);
 
   // A published Course keeps its existing learner projection until a versioned
   // authoring draft is published.  The same publish transaction materializes
@@ -374,7 +497,7 @@ try {
   assertStatus(await invoke(domainsHandler, "PUT", ordinaryUser.token, knowledge.body.governance), 403, "non-admin Domain mutation denial");
   assertStatus(await invoke(domainsHandler, "PUT", adminUser.token, knowledge.body.governance), 200, "admin Domain mutation");
 
-  console.log("Local backend verification passed: Auth, Health, Knowledge, Courses, Micro progress, learning state, evidence, signed PDF, RLS, Workflows, upload, and authorization.");
+  console.log("Local backend verification passed: Auth, Health, Knowledge, Goal timeline/Briefs, Course visibility, Micro progress, learning state, evidence, signed PDF, RLS, Workflows, upload, and authorization.");
 } finally {
   if (authoredCourseId) await server.from("courses").delete().eq("id", authoredCourseId);
   if (uploadedMaterialId) await server.from("materials").delete().eq("course_id", "python-engineering").eq("id", uploadedMaterialId);

@@ -7,13 +7,17 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
   private paths: MicroLearningPath[] = [];
   private pathProgress = new Map<string, MicroPathProgress>();
   private unitProgress = new Map<string, MicroUnitProgress>();
+  private guestCompletedSteps = new Map<string, Set<string>>();
+  private userId: string | undefined;
   private listeners = new Set<() => void>();
 
-  async hydrate(_userId: string) {
+  async hydrate(userId?: string) {
+    this.userId = userId;
     const result = await apiRequest<Payload>("/api/micro");
     this.paths = result.paths;
     this.pathProgress = new Map(result.pathProgress.map((progress) => [progress.pathId, progress]));
     this.unitProgress = new Map(result.unitProgress.map((progress) => [progress.unitId, progress]));
+    if (userId) this.guestCompletedSteps.clear();
     this.emit();
   }
 
@@ -33,6 +37,13 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
   getUnitProgress(unitId: string) { return this.unitProgress.get(unitId); }
 
   async start(pathId: string, contextCourseId?: string) {
+    if (!this.userId) {
+      const path = this.paths.find((item) => item.id === pathId);
+      const firstUnit = path?.units[0]; const firstStep = firstUnit?.steps[0]; const now = new Date().toISOString();
+      this.pathProgress.set(pathId, { pathId, status: "in_progress", currentUnitId: firstUnit?.id, currentStepId: firstStep?.id, startedAt: now, updatedAt: now });
+      this.emit();
+      return;
+    }
     const result = await apiRequest<{ progress: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "start", pathId, contextCourseId }) });
     this.pathProgress.set(pathId, result.progress);
     this.emit();
@@ -44,8 +55,24 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
 
   async completeStep(pathId: string, unitId: string, stepId: string, submission?: MicroLearningSubmission) {
     const result = await apiRequest<{ correct: boolean; completed: boolean; pathProgress?: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "complete-step", pathId, unitId, stepId, submission }) });
+    if (!this.userId) {
+      if (!result.correct) return { correct: false, completed: false };
+      const path = this.paths.find((item) => item.id === pathId); const unit = path?.units.find((item) => item.id === unitId);
+      if (!path || !unit) return { correct: true, completed: false };
+      const completedSteps = this.guestCompletedSteps.get(unitId) ?? new Set<string>(); completedSteps.add(stepId); this.guestCompletedSteps.set(unitId, completedSteps);
+      const unitCompleted = unit.steps.every((step) => completedSteps.has(step.id));
+      const nextStep = unit.steps.find((step) => !completedSteps.has(step.id));
+      const now = new Date().toISOString(); const previous = this.pathProgress.get(pathId);
+      this.unitProgress.set(unitId, { unitId, pathId, status: unitCompleted ? "completed" : "in_progress", currentStepId: nextStep?.id, completedStepIds: [...completedSteps], startedAt: previous?.startedAt ?? now, completedAt: unitCompleted ? now : undefined, updatedAt: now });
+      const completedUnitIds = new Set([...this.unitProgress.values()].filter((item) => item.pathId === pathId && item.status === "completed").map((item) => item.unitId));
+      const requiredUnits = path.units.filter((item) => item.required); const pathCompleted = requiredUnits.length > 0 && requiredUnits.every((item) => completedUnitIds.has(item.id));
+      const nextUnit = path.units.find((item) => !completedUnitIds.has(item.id));
+      this.pathProgress.set(pathId, { pathId, status: pathCompleted ? "completed" : "in_progress", currentUnitId: pathCompleted ? undefined : (unitCompleted ? nextUnit?.id : unitId), currentStepId: pathCompleted ? undefined : (unitCompleted ? nextUnit?.steps[0]?.id : nextStep?.id), startedAt: previous?.startedAt ?? now, completedAt: pathCompleted ? now : undefined, updatedAt: now });
+      this.emit();
+      return { correct: true, completed: pathCompleted };
+    }
     if (result.pathProgress) this.pathProgress.set(pathId, result.pathProgress);
-    await this.hydrate("");
+    await this.hydrate(this.userId);
     return { correct: result.correct, completed: result.completed };
   }
 

@@ -20,6 +20,12 @@ Learning state is mutable, user-owned data layered over immutable curriculum def
 
 `UserKnowledgeState` remains separate and represents learning/mastery evidence about a KnowledgeNode. Course or Assignment completion does not automatically set mastery to 100%.
 
+Browsing a Knowledge detail, selecting a Course context, opening a Drawer, or viewing a Course route never writes `UserKnowledgeState`. There is no generic “start Knowledge” mutation. A state transition begins only through a real learning activity: starting a Course-scoped Material, starting a resolved Micro path, or starting a real CourseAssignment. Material start validates its Course ownership and MaterialKnowledgeCoverage; Micro start follows the actual Micro runtime; Assignment start validates the stable CourseAssignment identity.
+
+Successful Micro path completion may advance `learning -> learned` and persists evidence, but does not imply `mastered`. Course route presentation keeps `learned` visibly distinct from both “进行中” and “已掌握”. Factual prerequisite reachability continues to require mastery under the current policy, so completing one Micro does not silently unlock dependents that require mastered evidence.
+
+Reopening a completed Micro for active review is presentation-local. It must not reset or rewrite progress, duplicate completion Evidence, change completion timestamps, or downgrade `learned`/`mastered`; the normal first-completion path remains the only persistence path.
+
 ## 6. Repository
 
 `LearningProgressRepository` loads, saves, and subscribes to states by user and course. Application composition uses `ApiLearningProgressRepository`, backed by `/api/progress` and owner-scoped PostgreSQL rows. The LocalStorage adapter receives a `UserCourseStateFactory` and remains only for Demo/test compatibility; it does not import Demo fixtures.
@@ -47,6 +53,8 @@ Chapter and course summaries aggregate unique Assignment IDs from scoped states.
 ## 11. Recent Learning
 
 Recent courses are ordered from user-course activity timestamps. The UI does not use a hard-coded featured course as the recent item.
+
+When no Material/Assignment `recentLessonId` exists, the recent Course card may display the most recently updated real Knowledge state within that Course. It must not say “尚未开始” after a Course-scoped Micro has produced durable `learning` or `learned` state.
 
 ## 12. Persistence Evolution
 

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createUserSupabase } from "../_lib/supabase.js";
+import { createOptionalUserSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 import { dataOrThrow } from "../_lib/query.js";
 import { recomputeMastery } from "../_lib/mastery.js";
@@ -18,14 +18,14 @@ function mapProgress(row: Row) {
 }
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
-  const { client, user } = await createUserSupabase(request);
+  const { client, user } = await createOptionalUserSupabase(request);
   if (request.method === "GET") {
     const [pathsResult, unitsResult, stepsResult, pathProgressResult, unitProgressResult] = await Promise.all([
       client.from("micro_learning_paths").select("*").eq("status", "published").order("id"),
       client.from("micro_units").select("*").order("path_id").order("position"),
       client.from("micro_steps").select("*").order("unit_id").order("position"),
-      client.from("user_micro_path_progress").select("*").eq("user_id", user.id),
-      client.from("user_micro_unit_progress").select("*").eq("user_id", user.id)
+      user ? client.from("user_micro_path_progress").select("*").eq("user_id", user.id) : Promise.resolve({ data: [], error: null }),
+      user ? client.from("user_micro_unit_progress").select("*").eq("user_id", user.id) : Promise.resolve({ data: [], error: null })
     ]);
     const paths = dataOrThrow(pathsResult.data as Row[] | null, pathsResult.error, "Micro paths query");
     const units = dataOrThrow(unitsResult.data as Row[] | null, unitsResult.error, "Micro units query");
@@ -82,15 +82,19 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (body.contextCourseId) {
       await requireCourseKnowledge(client, body.contextCourseId, text(path, "knowledge_id"));
       if (pathCourseId && pathCourseId !== body.contextCourseId) throw new ApiError(400, "micro_context_mismatch", "Micro path does not belong to the selected Course context");
-      await activateCourse(client, user.id, body.contextCourseId);
+      if (user) await activateCourse(client, user.id, body.contextCourseId);
     } else if (pathCourseId) {
       await requireCourseKnowledge(client, pathCourseId, text(path, "knowledge_id"));
-      await activateCourse(client, user.id, pathCourseId);
+      if (user) await activateCourse(client, user.id, pathCourseId);
     }
     const firstUnitResult = await client.from("micro_units").select("*").eq("path_id", body.pathId).order("position").limit(1).maybeSingle();
     const firstUnit = dataOrThrow(firstUnitResult.data as Row | null, firstUnitResult.error, "Micro first unit lookup");
     const firstStepResult = firstUnit ? await client.from("micro_steps").select("id").eq("unit_id", text(firstUnit, "id")).order("position").limit(1).maybeSingle() : null;
     const firstStep = firstStepResult ? dataOrThrow(firstStepResult.data as Row | null, firstStepResult.error, "Micro first step lookup") : null;
+    if (!user) {
+      json(response, 200, { progress: { pathId: body.pathId, status: "in_progress", currentUnitId: firstUnit ? text(firstUnit, "id") : undefined, currentStepId: firstStep ? text(firstStep, "id") : undefined, startedAt: now, updatedAt: now } });
+      return;
+    }
     const progress = { user_id: user.id, path_id: body.pathId, status: "in_progress", current_unit_id: firstUnit ? text(firstUnit, "id") : null, current_step_id: firstStep ? text(firstStep, "id") : null, started_at: now, updated_at: now };
     const write = await client.from("user_micro_path_progress").upsert(progress, { onConflict: "user_id,path_id", ignoreDuplicates: true });
     dataOrThrow(write.data, write.error, "Micro start");
@@ -126,6 +130,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (!h5pCompletionPasses(completion,policy)) { json(response, 200, { correct: false, completed: false }); return; }
   } else if (!nativeInteractionCorrect(interaction, body.submission === undefined ? body.answer : body.submission as NativeAnswer)) { json(response, 200, { correct: false, completed: false }); return; }
   const allSteps = dataOrThrow(allStepsResult.data as Row[] | null, allStepsResult.error, "Micro unit steps lookup");
+  if (!user) { json(response, 200, { correct: true, completed: false }); return; }
   const existingResult = await client.from("user_micro_unit_progress").select("*").eq("user_id", user.id).eq("unit_id", body.unitId).maybeSingle();
   const existing = dataOrThrow(existingResult.data as Row | null, existingResult.error, "Micro unit progress lookup");
   const completed = new Set<string>(Array.isArray(existing?.completed_step_ids) ? existing.completed_step_ids.map(String) : []);

@@ -7,7 +7,7 @@ export type KnowledgeMaterialResource = KnowledgeMaterialEntry & { courseId: str
 export type KnowledgeAssignmentResource = { courseId: string; courseTitle: string; assignmentId: string; title: string; status: string };
 export type KnowledgeMicroResource = { available: boolean; path: MicroLearningPath | null; source: "course" | "global" | "none"; progressStatus: MicroPathProgress["status"] };
 export type StandaloneKnowledgeLearningContext = { kind: "standalone"; id: "standalone"; title: "独立学习"; isActive: false; micro: KnowledgeMicroResource; materials: []; assignments: [] };
-export type CourseKnowledgeLearningContext = { kind: "course"; id: string; courseId: string; courseTitle: string; isActive: boolean; chapterTitle?: string; lessonTitle?: string; micro: KnowledgeMicroResource; materials: KnowledgeMaterialResource[]; assignments: KnowledgeAssignmentResource[] };
+export type CourseKnowledgeLearningContext = { kind: "course"; id: string; courseId: string; courseTitle: string; courseType: "standard" | "personal"; updatedAt?: string; sourceGoal?: string; isActive: boolean; chapterTitle?: string; lessonTitle?: string; micro: KnowledgeMicroResource; materials: KnowledgeMaterialResource[]; assignments: KnowledgeAssignmentResource[] };
 export type KnowledgeLearningContext = StandaloneKnowledgeLearningContext | CourseKnowledgeLearningContext;
 export type KnowledgeLearningResources = { knowledgeId: string; standalone: StandaloneKnowledgeLearningContext; courseContexts: CourseKnowledgeLearningContext[] };
 
@@ -31,7 +31,7 @@ export function projectKnowledgeLearningResources(input: { knowledgeId: string; 
       const assignment = runtime.assignments.find((candidate) => candidate.id === item.assignmentId);
       return assignment ? [{ courseId: runtime.course.id, courseTitle: runtime.course.title, assignmentId: assignment.id, title: assignment.title, status: state?.assignmentStates[assignment.id]?.status ?? "not_started", order: assignment.order }] : [];
     }).sort((left, right) => (assignmentPriority[left.status] ?? 99) - (assignmentPriority[right.status] ?? 99) || left.order - right.order || left.assignmentId.localeCompare(right.assignmentId)).map(({ order: _order, ...assignment }) => assignment);
-    return { kind: "course", id: runtime.course.id, courseId: runtime.course.id, courseTitle: runtime.course.title, isActive: state?.isActive === true, chapterTitle: chapter?.title, lessonTitle: lesson?.title, micro: micro(input.microRepository, input.knowledgeId, runtime.course.id), materials, assignments };
+    return { kind: "course", id: runtime.course.id, courseId: runtime.course.id, courseTitle: runtime.course.title, courseType: runtime.course.courseType ?? "standard", updatedAt: runtime.course.updatedAt, sourceGoal: runtime.course.targetOutcome, isActive: state?.isActive === true, chapterTitle: chapter?.title, lessonTitle: lesson?.title, micro: micro(input.microRepository, input.knowledgeId, runtime.course.id), materials, assignments };
   });
   return { knowledgeId: input.knowledgeId, standalone: { kind: "standalone", id: "standalone", title: "独立学习", isActive: false, micro: micro(input.microRepository, input.knowledgeId), materials: [], assignments: [] }, courseContexts };
 }

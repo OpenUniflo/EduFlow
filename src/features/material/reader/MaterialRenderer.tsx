@@ -16,7 +16,7 @@ export function MaterialRenderer({ material, activeSegmentId, zoom, navigationRe
     const segments = sortMaterialSegments(material);
     const segmentByPage = new Map(segments.map((segment) => [segment.page ?? segment.order, segment.id]));
     const activeSegment = segments.find((segment) => segment.id === activeSegmentId);
-    return <PdfMaterialViewer sourceUrl={material.source.url} sourcePageCount={material.source.pageCount} segments={segments} activePage={activeSegment?.page ?? activeSegment?.order ?? 1} zoom={zoom} navigationRequest={navigationRequest} onVisiblePageChange={(page) => {
+    return <PdfMaterialViewer courseId={material.courseId} materialId={material.id} staticSourceUrl={material.source.url} sourcePageCount={material.source.pageCount} segments={segments} activePage={activeSegment?.page ?? activeSegment?.order ?? 1} zoom={zoom} navigationRequest={navigationRequest} onVisiblePageChange={(page) => {
       const segmentId = segmentByPage.get(page);
       if (segmentId) onVisibleSegmentChange(segmentId);
     }} onNavigationSettled={onNavigationSettled} />;

@@ -39,4 +39,10 @@ describe("Knowledge learning resources", () => {
     const result = projectKnowledgeLearningResources({ knowledgeId: "knowledge", runtimes: [runtime("a"), runtime("b")], courseStates: [state("a", true), state("b", true)], microRepository: repository(() => null) });
     expect(defaultKnowledgeContextId(result)).toBe("standalone");
   });
+  it("preserves Personal Course lifecycle metadata for readable duplicate identification", () => {
+    const personal = runtime("personal");
+    personal.course = { ...personal.course, courseType: "personal", updatedAt: "2026-08-28T09:30:00Z", targetOutcome: "交付一个可运行的图像分类器" };
+    const result = projectKnowledgeLearningResources({ knowledgeId: "knowledge", runtimes: [personal], courseStates: [state("personal")], microRepository: repository(() => null) });
+    expect(result.courseContexts[0]).toMatchObject({ courseType: "personal", updatedAt: "2026-08-28T09:30:00Z", sourceGoal: "交付一个可运行的图像分类器" });
+  });
 });

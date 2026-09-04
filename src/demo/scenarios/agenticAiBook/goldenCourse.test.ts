@@ -4,6 +4,7 @@ import { demoWorkflowTemplates } from "@/demo/workflows/demoWorkflowTemplates";
 import { InMemoryKnowledgeRepository } from "@/features/knowledge/repository/InMemoryKnowledgeRepository";
 import { globalKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { validateCourseRuntime } from "@/features/course/runtime/courseRuntime";
+import { auditCourseAssetCoverage, courseAssetCoverageLabel } from "@/features/course/runtime/courseAssetCoverage";
 import { goldenAgenticAiRuntime, validateGoldenAgenticAiRuntime } from "./goldenCourse.seed";
 import { demoUserCourseStateSeed } from "@/demo/users/demoUserCourseState.seed";
 
@@ -21,6 +22,12 @@ describe("Agentic AI Golden Course fixture", () => {
     expect(goldenAgenticAiRuntime.finalProjectOutcomeCompositions).toHaveLength(6);
     expect(new Set(goldenAgenticAiRuntime.assignments.map((item) => item.experience?.type))).toEqual(new Set(["answer", "code", "trace", "workflow"]));
     expect(goldenAgenticAiRuntime.assignmentDependencies.some((item) => item.sourceAssignmentId === "golden-knowledge-assignment-WF03" && item.targetAssignmentId === "golden-knowledge-assignment-W13")).toBe(true);
+  });
+  it("reports real Golden asset coverage instead of a fixed completeness claim", () => {
+    const audit = auditCourseAssetCoverage(goldenAgenticAiRuntime);
+    expect(audit.assignments).toMatchObject({ coveredKnowledgeCount: 31, missingKnowledgeCount: 0 });
+    expect(audit.materials).toMatchObject({ coveredKnowledgeCount: 5, missingKnowledgeCount: 26 });
+    expect(courseAssetCoverageLabel(audit)).toBe("学习资产待补充");
   });
   it("injects late-project learning state without changing Course definitions", () => {
     const state = demoUserCourseStateSeed("student", goldenAgenticAiRuntime.course.id);

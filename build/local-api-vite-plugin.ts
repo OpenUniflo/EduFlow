@@ -10,6 +10,7 @@ import materialsHandler from "../api/materials";
 import domainsHandler from "../api/domains";
 import knowledgeGenerationHandler from "../api/knowledge-generation";
 import courseIntentHandler from "../api/course-intent";
+import assistantHandler from "../api/assistant";
 
 const handlers = new Map([
   ["/api/health", healthHandler],
@@ -23,7 +24,8 @@ const handlers = new Map([
   ["/api/materials", materialsHandler],
   ["/api/domains", domainsHandler],
   ["/api/knowledge-generation", knowledgeGenerationHandler],
-  ["/api/course-intent", courseIntentHandler]
+  ["/api/course-intent", courseIntentHandler],
+  ["/api/assistant", assistantHandler]
 ]);
 
 /** Public client paths must match the resource injected by the Vercel rewrite. */

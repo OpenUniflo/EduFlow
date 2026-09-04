@@ -283,13 +283,13 @@ curriculumChapters.filter((chapter) => chapter.order > 1 && !incidentChapterIds.
 const aggregatedChapterEdges = Array.from(chapterEdgeByPair.values()).sort((left, right) => left.source.localeCompare(right.source) || left.target.localeCompare(right.target));
 assertDirectedAcyclic(curriculumChapters.map((chapter) => chapter.id), aggregatedChapterEdges);
 export const courseChapterEdges: CourseChapterEdge[] = transitiveReduction(curriculumChapters.map((chapter) => chapter.id), aggregatedChapterEdges);
-export const courseChapters: CourseChapterProjection[] = curriculumChapters.map((chapter) => {
+export const courseChapters: CourseChapterProjection[] = curriculumChapters.map((chapter, chapterIndex) => {
   const chapterLessonIds = new Set(curriculumLessons.filter((lesson) => lesson.chapterId === chapter.id).map((lesson) => lesson.id));
   const chapterNodeIds = new Set(curriculumCoverages.filter((coverage) => chapterLessonIds.has(coverage.lessonId)).map((coverage) => coverage.nodeId));
   const summary = summarizeAssignmentIds(assignmentCoverages.filter((coverage) => chapterNodeIds.has(coverage.nodeId)).map((coverage) => coverage.assignmentId));
   const chapterNodes = courseSkillTreeNodes.filter((node) => node.chapterId === chapter.id);
   const knowledgeProgress = chapterNodes.length ? Math.round(chapterNodes.reduce((sum, node) => sum + node.knowledgeProgress, 0) / chapterNodes.length) : 0;
-  return { ...chapter, lessonCount: chapterLessonIds.size, knowledgeProgress, knowledgeEvidenceCount: chapterNodes.filter((node) => node.hasKnowledgeEvidence).length, assignmentSummary: { chapterId: chapter.id, ...summary, outcome: chapter.outcome } };
+  return { ...chapter, displayNumber: chapterIndex + 1, lessonCount: chapterLessonIds.size, knowledgeProgress, knowledgeEvidenceCount: chapterNodes.filter((node) => node.hasKnowledgeEvidence).length, assignmentSummary: { chapterId: chapter.id, ...summary, outcome: chapter.outcome } };
 });
 
 const courseAssignmentAggregate = summarizeAssignmentIds(courseAssignments.map((assignment) => assignment.id));

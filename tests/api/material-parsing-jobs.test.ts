@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsingJobRetryPatch, toMaterialParsingJob } from "./material-parsing-jobs";
+import { parsingJobRetryPatch, toMaterialParsingJob } from "../../api/material-parsing-jobs";
 
 describe("toMaterialParsingJob", () => {
   it("maps database columns to the public camelCase contract", () => {

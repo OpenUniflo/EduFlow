@@ -1,23 +1,18 @@
 import type { UserCapability, UserRole } from "@/features/auth/types";
+import type { AssistantContextSnapshot, AssistantWorkspace } from "./assistantContract";
 
-export type AssistantWorkspace = "learning" | "explore" | "courses" | "canvas" | "teaching" | "system" | "material";
+export type { AssistantWorkspace } from "./assistantContract";
 export type AssistantExperienceMode = "learn" | "design";
 
-export type AssistantContext = {
-  workspace: AssistantWorkspace;
-  experienceMode: AssistantExperienceMode;
+export type AssistantContext = AssistantContextSnapshot & {
   userRole: UserRole;
   capabilities: UserCapability[];
-  courseId?: string;
-  chapterId?: string;
-  knowledgeId?: string;
-  materialId?: string;
-  segmentId?: string;
-  assignmentId?: string;
-  workflowId?: string;
-  runId?: string;
-  selectedObject?: string;
 };
+
+export function snapshotAssistantContext(context: AssistantContext): AssistantContextSnapshot {
+  const { userRole: _userRole, capabilities: _capabilities, ...snapshot } = context;
+  return snapshot;
+}
 
 export type AssistantCapabilities = {
   canExplain: boolean;

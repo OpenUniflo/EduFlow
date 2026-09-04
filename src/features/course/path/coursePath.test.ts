@@ -15,7 +15,14 @@ describe("Course Path", () => {
   it("shares durable knowledge state and advances availability after mastery", () => {
     expect(buildCoursePath(graph, [{nodeId:"a",status:"mastered"},{nodeId:"b",status:"learning"}] as any).map((item) => item.state)).toEqual(["completed","underway","blocked"]);
   });
-  it.each(["learning", "learned", "practicing"])("maps %s to underway", (status) => {
+  it.each(["learning", "practicing"])("maps %s to underway", (status) => {
     expect(buildCoursePath(graph, [{ nodeId: "a", status }] as any)[0].state).toBe("underway");
+  });
+  it("keeps learned distinct from mastery after a completed learning activity", () => {
+    expect(buildCoursePath(graph, [{ nodeId: "a", status: "learned" }] as any)[0].state).toBe("learned");
+  });
+  it("uses the same prerequisite reachability as the runtime graph", () => {
+    expect(buildCoursePath(graph, [{ nodeId: "a", status: "learning" }] as any)[1].state).toBe("blocked");
+    expect(buildCoursePath(graph, [{ nodeId: "a", status: "mastered" }] as any)[1].state).toBe("available");
   });
 });

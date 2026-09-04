@@ -13,6 +13,12 @@ type MaterialMetadata = {
   segments?: Array<Record<string, unknown>>;
 };
 
+export async function getMaterialSourceUrl(courseId: string, materialId: string) {
+  const query = new URLSearchParams({ courseId, materialId });
+  const result = await apiRequest<{ sourceUrl: string; expiresIn: number }>(`/api/materials?${query}`);
+  return result.sourceUrl;
+}
+
 export class ApiMaterialStorageService {
   async upload(file: File, metadata: MaterialMetadata) {
     const signed = await apiRequest<{ path: string; token: string }>("/api/materials", {

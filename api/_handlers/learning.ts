@@ -36,16 +36,19 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     return;
   }
   if (request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
-  const body = request.body as { action?: "start-knowledge" | "start-assignment" | "submit-assignment" | "accept-assignment"; nodeId?: string; courseId?: string; assignmentId?: string; learnerUserId?: string; deterministicAccepted?: boolean };
+  const body = request.body as { action?: "start-material" | "start-assignment" | "submit-assignment" | "accept-assignment"; nodeId?: string; courseId?: string; materialId?: string; assignmentId?: string; learnerUserId?: string; deterministicAccepted?: boolean };
   if (!body.action) throw new ApiError(400, "invalid_learning_action", "An action is required");
-  if (body.action === "start-knowledge") {
-    if (!body.nodeId) throw new ApiError(400, "invalid_learning_action", "nodeId is required");
-    const node = await client.from("knowledge_nodes").select("id").eq("id", body.nodeId).eq("status", "active").maybeSingle();
-    if (!dataOrThrow(node.data as Row | null, node.error, "Knowledge lookup")) throw new ApiError(404, "knowledge_not_found", "Knowledge is unavailable");
-    if (body.courseId) {
-      await requireCourseKnowledge(client, body.courseId, body.nodeId);
-      await activateCourse(client, user.id, body.courseId);
-    }
+  if (body.action === "start-material") {
+    if (!body.nodeId || !body.courseId || !body.materialId) throw new ApiError(400, "invalid_learning_action", "nodeId, courseId and materialId are required");
+    await requireCourseKnowledge(client, body.courseId, body.nodeId);
+    const [materialResult, coverageResult] = await Promise.all([
+      client.from("materials").select("id").eq("course_id", body.courseId).eq("id", body.materialId).maybeSingle(),
+      client.from("material_knowledge_coverages").select("id").eq("course_id", body.courseId).eq("material_id", body.materialId).eq("node_id", body.nodeId).limit(1)
+    ]);
+    const material = dataOrThrow(materialResult.data as Row | null, materialResult.error, "Material learning lookup");
+    const coverage = dataOrThrow(coverageResult.data as Row[] | null, coverageResult.error, "Material Knowledge coverage lookup");
+    if (!material || !coverage.length) throw new ApiError(404, "material_learning_unavailable", "This Material is not available for the selected learning content");
+    await activateCourse(client, user.id, body.courseId);
     await updateKnowledgeAtLeast(client, user.id, body.nodeId, "learning");
     json(response, 200, { status: "learning" }); return;
   }

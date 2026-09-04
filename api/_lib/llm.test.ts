@@ -28,10 +28,28 @@ describe("DeepSeek JSON generation adapter", () => {
   });
 
   it("rejects provider failures without leaking the key or upstream body", async () => {
-    const client = new OpenAICompatibleJsonGenerationClient(config, async () => new Response(`secret ${config.llmApiKey}`, { status: 401 }));
+    const request = vi.fn<typeof fetch>(async () => new Response(`secret ${config.llmApiKey}`, { status: 401 }));
+    const client = new OpenAICompatibleJsonGenerationClient(config, request);
     const error = await client.generateJson(input).then(() => new Error("expected failure"), (caught: unknown) => caught as Error);
     expect(error.message).toBe("LLM request failed: provider=deepseek, model=deepseek-v4-flash, HTTP 401");
     expect(error.message).not.toContain(config.llmApiKey);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a transient network failure and succeeds", async () => {
+    const request = vi.fn<typeof fetch>()
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce(response('{"candidates":[]}'));
+    await expect(new OpenAICompatibleJsonGenerationClient(config, request).generateJson(input)).resolves.toMatchObject({ value: { candidates: [] } });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a transient provider failure and succeeds", async () => {
+    const request = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(response('{"candidates":[]}'));
+    await expect(new OpenAICompatibleJsonGenerationClient(config, request).generateJson(input)).resolves.toMatchObject({ value: { candidates: [] } });
+    expect(request).toHaveBeenCalledTimes(2);
   });
 
   it("rejects network failures and timeout", async () => {

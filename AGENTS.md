@@ -6,13 +6,60 @@
 - `package-lock.json`, `yarn.lock`, and other competing lockfiles MUST NOT be committed.
 - Before pushing dependency changes, `pnpm install --frozen-lockfile` MUST succeed.
 
+## Infrastructure Reuse
+
+- Generic infrastructure SHOULD prefer mature, maintained, technology-compatible open-source components or official SDKs when they materially reduce protocol and maintenance code. EduFlow MUST retain ownership of product context, permissions, tools, policy, and learning-domain semantics behind thin adapters.
+- Do not reimplement mature LLM streaming, reasoning/tool-call message protocols, generic schema validation, authentication, database/storage, or routing infrastructure merely to avoid dependencies. A dependency MUST still justify its deployment, bundle, lockfile, vendor, and architectural cost; do not introduce a heavy framework for a small problem.
+
+## Global EduFlow Assistant
+
+- Learner-facing Assistant/chat surfaces MUST use the one Global Assistant runtime. Pages provide explicit `AssistantContext` identities and MUST NOT introduce page-specific learner LLM runtimes.
+- Contextual Assistant and Full Chat share the authenticated session/message model, server execution boundary, tool registry, model adapter, and policy. Each historical message persists only a small identity snapshot; the browser MUST NOT send complete product entities as authoritative context.
+- Assistant entity and learner-state access MUST be revalidated server-side through authenticated product data. Browser-supplied user IDs, roles, capabilities, or context payloads are never authority.
+- The LLM is not Navigation authority and MUST NOT manufacture a formal personalized Next Action before the deterministic Navigation Engine exists. CurriculumSequence, AssignmentDependency, KnowledgeEdge, Course progress, and Learner Knowledge state MUST retain their distinct meanings in Assistant tool output and answers.
+- Specialized authoring, mutation, generation, and evaluation providers MAY remain separate, but Learn-mode explanation and retrieval use the Global Assistant runtime.
+
+## Goal-driven Course Selection
+
+- Product/domain state MUST NOT be encoded by concatenating user-facing prose. Goal, preference, constraint, scope adjustment, outcome change, and UI action MUST remain structurally distinct when they affect product behavior.
+- Natural-language keyword lists, regexes, or hand-maintained domain glossaries MUST NOT be authoritative for learning-domain decisions when the Assistant can return a structured semantic result. Product code validates structured identities and factual constraints instead of reinterpreting prose.
+- Explicit UI actions SHOULD own deterministic workflow navigation when available; the Assistant MUST NOT require phrase matching for actions already represented by product controls.
+- A learner Goal is a planning request unless a current product consumer requires an independent Goal lifecycle. Goal resolution MAY use an LLM as a language adapter, but every suggested Knowledge identity MUST be revalidated against visible active Knowledge; deterministic product logic owns prerequisite closure, Course matching, gaps, and persistence.
+- Prerequisite closure MUST use only factual `prerequisite` KnowledgeEdges, remain deterministic, deduplicated, and cycle-safe, and keep target Knowledge distinct from prerequisites. Course matching MUST be based on real Knowledge coverage, expose understandable coverage/gaps, and prefer a suitable existing Course identity before Personal Course creation.
+- `CourseTargetKnowledge` is the structured Course destination and MUST remain distinct from optional human-readable `targetOutcome`. Standard and Personal Courses share the Course domain, repository, graph projection, and routes.
+- A Personal Course is learner-owned and owner-visible only. Course Creator MAY persist it as an owner-private `draft`; it becomes learner-usable only after explicit Publish and full route validation. It MAY project a minimal curriculum from an existing Course or shared Knowledge, but MUST NOT copy KnowledgeNode or KnowledgeEdge facts and MUST NOT require fabricated Material, Micro, Assignment, Outcome, or FinalProject assets.
+- Selecting an existing Course and creating a Personal Course are explicit authenticated learner actions. The LLM tool loop MUST NOT perform the Personal Course write, and Goal planning MUST NOT manufacture a formal Next Action before the Navigation Engine exists.
+- Learner-facing Course Search results and Course Creation Briefs MUST be persisted at their conversation position as structured Assistant timeline content. A session MAY contain multiple independent planning results and MUST NOT use one global mutable Goal Plan as historical UI authority.
+- Course match levels and coverage metrics are advisory ranking/explanation signals. They MUST NOT remove the learner's ability to use a displayed Course, create from it, continue searching, or prepare a personalized Course route.
+- Goal Planner MUST hand creation to the Course creation domain through a recoverable Course Creation Brief. The Assistant tool loop MUST NOT silently create a Personal Course, and novice-language acceptance MUST NOT be satisfied with test-specific phrase mappings or Knowledge/Course fixtures.
+
+## Course Creator Pipeline
+
+- Course creation uses one fixed staged pipeline: Requirements -> Knowledge Scope -> Curriculum Structure -> Learning Assets -> persisted Course Draft -> Learner Preview / explicit Publish. Reference Courses, Materials, Knowledge, learner context, and Golden scenarios are optional inputs and MUST NOT select separate creation modes or bypass stage confirmation.
+- Reference Material is optional and MUST NOT be required for Course creation, Knowledge scope, curriculum, or structural validity. Unsupported arbitrary Material parsing MUST remain explicit rather than fabricating Knowledge or asset mappings.
+- Course Creator AI uses the one visible EduFlow Assistant identity. AI and manual edits MUST converge on Proposal -> visual Preview/Diff -> deterministic validation -> explicit user confirmation -> Apply. The model MUST NOT directly mutate Course authority data or Publish.
+- Course Creator prerequisite labels and edges come only from factual Knowledge Graph `prerequisite` relations. Reference Course curriculum order MAY guide teaching order but MUST NOT create or alter KnowledgeEdge facts.
+- A user-facing personalized route produced by Course Creator is a Personal/goal-specific Course. It is not the dynamic learner-specific Learning Path, NavigationDecision, eligible frontier, or Next Action owned by the future Navigation Engine.
+
+## Anonymous Viewing and Progressive Auth
+
+- Anonymous users MAY browse only published/public learning definitions: active Global Knowledge and factual edges, published Courses and their curriculum graph, public Materials, published Micro paths, and public Assignments.
+- Public catalog hydration and authenticated learner-state hydration MUST remain separate. Anonymous browsing MUST NOT invent a guest user, placeholder learner state, progress, membership, evidence, submission, or score.
+- Guest Micro and Assignment interactions MAY keep ephemeral state in the current browser page and return immediate deterministic feedback, but MUST NOT create durable learner records. Durable progress, My Courses, personal views, messages, settings, admin, and authoring require authentication and preserve an explicit `returnTo` destination.
+- The Global Assistant is authenticated-only. Anonymous pages render a locked explanation and sign-in action without mounting a conversation or starting an Assistant session; every unauthenticated Assistant API request MUST return `401`.
+- Public database access MUST be expressed through narrow `anon` RLS policies and the publishable client. Service-role bypass MUST NOT be used as the public catalog read path, and private governance, drafts, profiles, learner state, and Assistant data remain inaccessible to `anon`.
+
 ## Hosted Deployment Discipline
 
 - A READY frontend deployment does not imply that its target Hosted Supabase schema matches repository migrations.
 - Before Hosted Preview acceptance, identify the environment's Supabase project, compare migration history, apply pending migrations incrementally, synchronize only hosted-safe required fixtures, and smoke authenticated APIs before browser validation.
 - Shared Hosted databases MUST NOT be reset or migrated automatically by every Preview build.
 - Runtime Micro content authority is the database; Demo providers are fixtures/adapters only.
-- Physical serverless entrypoints SHOULD remain consolidated, and deployment limits MUST be checked before adding a top-level API function.
+- The current deployment target is Vercel Hobby, with at most 12 Serverless Functions per deployment. This is a deployment constraint, not a Course or other domain-model rule.
+- Every top-level deployable file under `api/` consumes Function budget. Tests MUST NOT live where Vercel discovers them as production Function entrypoints; shared libraries, handlers, and tests belong in non-entrypoint locations.
+- Before adding a Function, inspect the generated Vercel output and remaining budget. Keep capacity available for the roadmap's #19 Assistant boundary; do not wait for a quota-failed Preview to discover exhaustion.
+- Prefer an existing semantically clear multiplexer/handler boundary over another thin wrapper. Do not create unbounded wrapper Functions, but also do not force unrelated domains into one oversized handler merely to reduce the count.
+- Rewrites change routing only; they MUST NOT be treated as proof that the underlying Function count decreased. Preview acceptance requires a real Vercel deployment and generated Function-count evidence.
 
 ## Micro Learning Runtime
 
@@ -115,16 +162,23 @@
 - Chapter edges aggregate prerequisite/enables counts per ordered chapter pair and undergo transitive reduction. CurriculumSequence may constrain or minimally connect the projection but MUST NOT become a KnowledgeEdge.
 - CurriculumCoverage and AssignmentCoverage remain N:M. Lesson or chapter fields MUST NOT be written into KnowledgeNode.
 
+## Course Foundation Invariants
+
+- A structurally valid Course is a learning-route container composed from Course, CourseCurriculum, the current required Chapter/Lesson structure, CurriculumCoverage, and shared active KnowledgeNode/KnowledgeEdge facts.
+- Material, MaterialSegment, MaterialKnowledgeCoverage, Micro content, CourseAssignment, AssignmentCoverage, AssignmentDependency, ChapterOutcome, FinalProject, and WorkflowTemplate are optional attached assets and MUST NOT be required for Course structural validity.
+- Structural validation is blocking and validates the required route plus every optional asset record that exists. Asset coverage audit is non-blocking and reports missing resources without manufacturing fallback content.
+- Course Graph remains a projection of curriculum coverage and shared Knowledge facts. A persisted CourseGraph table or parallel graph ontology MUST NOT be introduced for asset completeness.
+
 ## Course Assignment Invariants
 
-- Every course KnowledgeNode MUST have at least one AssignmentCoverage.
+- A Course may be structurally valid with no CourseAssignment or AssignmentCoverage. Missing Assignment coverage is a non-blocking asset gap reported by the Course asset coverage audit.
 - Assignment is curriculum data and MUST NOT be represented as a KnowledgeNode or KnowledgeRelation.
 - The user-facing UI term remains "实训树"; the domain model uses Assignment.
 - Assignments are not limited to workflow-canvas tasks. Workflow canvas is an optional execution environment selected by `Assignment.mode`.
 - AssignmentCoverage is N:M. One Assignment may cover multiple KnowledgeNodes, and one KnowledgeNode may be covered by multiple Assignments.
 - Knowledge and Assignment companion cards occupy one stable graph footprint.
 - Switching 技能树 / 实训树 is presentation-only and MUST NOT trigger ELK, fitView, coordinate changes, or viewport reset.
-- Missing AssignmentCoverage is a course-data invariant failure and MUST NOT be silently replaced with generated fallback UI text.
+- When CourseAssignment or AssignmentCoverage records exist, their ownership, references, cardinality, ordering, and dependency DAG MUST remain structurally valid. Missing coverage MUST NOT be replaced with generated fallback Assignment content.
 - Assignment progress is distinct from Knowledge mastery.
 - Assignment outputs may contribute to larger chapter/course outcomes without becoming KnowledgeNodes.
 - Assignment completion may produce KnowledgeEvidence in a future evidence pipeline, but completion MUST NOT automatically set mastery.
@@ -132,7 +186,7 @@
 - AssignmentDependency is a course-owned direct teaching/execution prerequisite between Assignments. It MUST use stable Assignment IDs, remain acyclic, and MUST NOT be mechanically copied from KnowledgeEdge.
 - ChapterOutcome and FinalProject composition MUST use stable course-owned identities and explicit Assignment-to-Outcome and Outcome-to-FinalProject relations; titles and projectContribution text are presentation content, not relationship identity.
 - Goal-constrained Assignment planning MUST combine the persisted Course target outcome with existing Course Knowledge and its factual DAG; planning Steps MUST reference only real active Course Knowledge IDs and MUST NOT invent Knowledge.
-- Every planning Step contains at least one Knowledge ID, all Course Knowledge remains covered by AssignmentCoverage, and one MVP planning Step produces exactly one CourseAssignment. An integrated Assignment MAY cover multiple KnowledgeNodes.
+- When the optional goal-constrained Assignment planning pipeline runs, every planning Step contains at least one Knowledge ID, the generated mapping covers all Course Knowledge, and one MVP planning Step produces exactly one CourseAssignment. An integrated Assignment MAY cover multiple KnowledgeNodes. This mapping-output invariant MUST NOT become a minimum Course structural requirement.
 
 ## Layout and Validation
 
@@ -166,6 +220,9 @@
 ## Course Authoring Drafts
 
 - Persisted Course authoring drafts are server-side, teacher/admin-only, and are never learner-visible.
+- A Draft Course is a valid editing container and MAY temporarily have zero CurriculumCoverage, Course Knowledge, Material, Micro, Assignment, Outcome, FinalProject, or targetOutcome. Missing minimum-route content is incompleteness, not corruption.
+- Draft repository hydration MUST still validate every existing owned entity, reference, ownership boundary, and ordering invariant; `draft` MUST NOT suppress dangling or cross-Course data failures.
+- A Course MUST pass the full minimum route validation before its lifecycle becomes `published` and learner-usable. Published and archived runtimes retain strict structural validation during repository hydration.
 - Editing a published Course changes only its draft projection until validated Publish succeeds.
 - Preview is derived from the published base plus the current persisted authoring draft; browser localStorage is not authoring content authority.
 - Publish must materialize the validated draft transactionally into canonical Course data and clear the applied draft.

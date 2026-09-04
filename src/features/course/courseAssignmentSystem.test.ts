@@ -262,7 +262,9 @@ describe("Material and progress generalization", () => {
         expect(material.source?.kind).toBe("pdf");
         expect(material.segments).toHaveLength(material.source!.pageCount);
         expect(material.segments.map((segment) => segment.page)).toEqual(Array.from({ length: material.source!.pageCount }, (_, index) => index + 1));
-        const file = join(process.cwd(), "public", material.source!.url.replace(/^\//, ""));
+        const sourceUrl = material.source!.url;
+        expect(sourceUrl).toBeDefined();
+        const file = join(process.cwd(), "public", sourceUrl!.replace(/^\//, ""));
         const bytes = readFileSync(file).toString("latin1");
         expect((bytes.match(/\/Type\s*\/Page\b/g) ?? []).length).toBe(material.source!.pageCount);
       }

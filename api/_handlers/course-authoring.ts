@@ -43,15 +43,28 @@ async function requireTeacher(request: VercelRequest) {
 function assertDraftShape(courseId: string, state: unknown, previewRuntime: unknown) {
   if (!state || typeof state !== "object" || Array.isArray(state) || !previewRuntime || typeof previewRuntime !== "object" || Array.isArray(previewRuntime)) throw new ApiError(400, "invalid_authoring_draft", "A draft state and preview runtime are required");
   const draft = state as Record<string, unknown>;
-  const preview = previewRuntime as { course?: { id?: unknown; targetOutcome?: unknown }; chapters?: unknown; lessons?: unknown };
+  const preview = previewRuntime as { course?: { id?: unknown }; chapters?: unknown; lessons?: unknown };
   if (draft.courseId !== courseId || draft.schemaVersion !== 2 || preview.course?.id !== courseId) throw new ApiError(400, "invalid_authoring_draft", "Draft identity does not match the Course");
   if (!Array.isArray(preview.chapters) || !Array.isArray(preview.lessons)) throw new ApiError(400, "invalid_authoring_preview", "Preview runtime is incomplete");
-  if (!String(preview.course?.targetOutcome ?? "").trim()) throw new ApiError(400, "course_target_outcome_required", "A Course target outcome is required before publishing");
 }
 
-async function assertPublishedH5PReferences(server:ReturnType<typeof createServerSupabase>,courseId:string) {
+async function readAuthoringDraftPayload(server:ReturnType<typeof createServerSupabase>,courseId:string) {
   const result=await server.from("course_authoring_drafts").select("payload").eq("course_id",courseId).maybeSingle();
-  const row=dataOrThrow(result.data as Row|null,result.error,"Authoring H5P draft lookup"); const payload=row?.payload as Record<string,unknown>|undefined; const state=payload?.state as Record<string,unknown>|undefined;
+  const row=dataOrThrow(result.data as Row|null,result.error,"Authoring draft publish lookup");
+  if(!row)throw new ApiError(404,"authoring_draft_not_found","The requested Course draft does not exist");
+  return row.payload as Record<string,unknown>;
+}
+
+function assertPublishablePreview(payload:Record<string,unknown>) {
+  const runtime=payload.previewRuntime as Record<string,unknown>|undefined;
+  const chapters=runtime?.chapters; const lessons=runtime?.lessons; const coverages=runtime?.curriculumCoverages;
+  if(!Array.isArray(chapters)||!chapters.length||!Array.isArray(lessons)||!lessons.length||!Array.isArray(coverages)||!coverages.length) {
+    throw new ApiError(422,"course_learning_route_required","A Published Course requires a Chapter, Lesson, and Knowledge route");
+  }
+}
+
+async function assertPublishedH5PReferences(server:ReturnType<typeof createServerSupabase>,payload:Record<string,unknown>) {
+  const state=payload.state as Record<string,unknown>|undefined;
   if(state?.microPathsEdited!==true)return;
   const refs=new Set<string>();
   for(const path of Array.isArray(state.microPaths)?state.microPaths:[])for(const unit of Array.isArray((path as Row).units)?(path as Row).units as unknown[]:[])for(const step of Array.isArray((unit as Row).steps)?(unit as Row).steps as unknown[]:[]) {
@@ -106,7 +119,9 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   if (request.method === "POST") {
     const expectedRevision = Number((request.body as { expectedRevision?: unknown }).expectedRevision);
     if (!Number.isInteger(expectedRevision) || expectedRevision < 1) throw new ApiError(400, "invalid_authoring_revision", "A saved draft revision is required");
-    await assertPublishedH5PReferences(server,courseId);
+    const payload=await readAuthoringDraftPayload(server,courseId);
+    assertPublishablePreview(payload);
+    await assertPublishedH5PReferences(server,payload);
     const result = await server.rpc("publish_course_authoring_draft", { p_course_id: courseId, p_expected_revision: expectedRevision });
     const rows = rpcRows(result, "Course publish");
     if (!rows[0]) throw new ApiError(500, "course_publish_failed", "Course was not published");
