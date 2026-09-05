@@ -628,3 +628,76 @@ This recheck was performed independently against a newly reset Local Supabase da
 - `git diff --check`: PASS.
 
 No Local Acceptance blocker remains. This acceptance does not authorize commit, push, or deployment.
+
+## Micro Learning V2 — 2026-09-05 goal round
+
+Scope: course-independent Teaching/Interaction/Motion, Drag/Spatial, Flow/Execution, Simulation, Matrix/Data Transformation and Timeline capabilities; four source-backed native references only in `ai-agents-in-depth` and `cds525-deep-learning`; existing CDS K001 H5P compatibility repair. Historical Golden content is retained only for regression. Implementation owns code; Solution Reviewer owns architecture review; independent Acceptance Agent alone owns product PASS.
+
+### Baseline and findings
+
+- Branch `feat/gold-course-learning-loop`; initial HEAD `2e7acb48fa85163294ae62a01054fc89cc4ea686`; worktree clean with no preexisting user modifications.
+- TypeScript PASS, full lint PASS, 77 test files / 480 tests PASS, production build PASS (8.94 s). Existing main bundle 4,448.11 kB / gzip 1,304.21 kB, existing large-chunk warning. Reviewer baseline Local schema lint PASS, no schema errors.
+- Existing architecture: canonical Path → Unit → Step in normalized database tables; Native content/validation/grading shared by browser and API, independent SQL JSONB constraint, server completion RPC and existing evidence/state/navigation boundary. Existing Step kinds already express teaching stages; no new progress table required.
+- Existing libraries: React 19, React Flow 12, h5p-standalone; no direct Motion/dnd-kit/visx/D3/TensorFlow. Reuse React Flow, add pinned stable dnd-kit/core+sortable+utilities and Motion only.
+- Actual local migration history initially through `20260905051000`; official Course coverage counts 117 / 90. The three old reference paths each contained two questions. CTX01 had no published Micro.
+- Acceptance baseline P0: K012 opened directly into slider/value/percentage, no explanation or derived trajectory; K021 opened directly into four number inputs/sum/symmetry, no corpus or cell meaning; RT01 opened into four trace answer buttons, no worked execution; CTX01 had no published path. P1 RT01 wrong answer only said to choose the earliest invalidating step, without concrete causal feedback.
+- Allowed-course H5P descriptor existed as draft, while K001 had been migrated to native Categorize. Historical published Golden H5P is not a final acceptance substitute. Local learner credentials failed initially; the established Local-only bootstrap restored test identity without database reset or credential disclosure.
+
+### Reviewed solution and implementation
+
+Solution Reviewer independently inspected real Knowledge identities, curriculum/Material mappings and source pages. Approved RT01 and CTX01 from original Agent book pp.39–47, K012 from Lecture 2 p.50, and K021 from Lecture 3 pp.25–26. CTX01 is the existing active Message Context node; it now includes a worked context flow before role classification and single-tool ordering. No invented Knowledge facts, mandatory verifier node, Course renderer branches, or course-owned LLM runtime were introduced.
+
+Approved minimum schema change: three additional native JSONB variants (`flow-execution`, `simulation`, `data-transform`), retaining existing teaching kinds and all legacy interaction capabilities. New shared Zod schemas/reducers/calculations/grader own semantics; React Flow/dnd-kit/Motion own mature rendering/manipulation infrastructure. Small SVG and table visualizations avoid unnecessary ML/chart frameworks. Research-only teaching-project patterns and dependency licenses are recorded in `docs/MICRO_LEARNING_AND_EVIDENCE.md`; no external project code/assets were copied.
+
+Implemented four full paths (6 / 7 / 6 / 6 Steps), with Hook/Explain, worked demonstration/exploration, insight, changed-scenario practice, causal feedback and summary. Learning-rate target grades actual loss under changed curvature. Corpus events generate matrix counts with incorrect cell rejection. Flow supports connect/disconnect, current-node/message state, failure, Step/Play/Pause/Reset; category and ordering use direct drag with keyboard alternatives and rollback. Shared learner/authoring rendering and actual Step identities prevent blank/stale previews.
+
+Forward migration `20260905083836_micro_learning_v2.sql` extends JSONB validation and upserts stable reference identities. The generator emits readable JSON SQL; only known reference Step positions are temporarily offset. Original completed paths/evidence are preserved; in-progress presentation resumes the earliest uncompleted teaching Step. No new mastery, progress, Attempt, PerformanceResult or Navigation authority exists. Existing sync replays the same migration and maintains reviewed fingerprints.
+
+H5P uses player-owned responsive height with no forced 320/400 px iframe minimum, isolated async mount cleanup, exact active root xAPI IRI validation and a retry submission action. The existing CDS K001 builder/importer was reused, ZIP timestamps made deterministic, 420 validated package files imported locally, and the intended K001 H5P Step restored through the migration. Two independent package builds were byte-identical, SHA-256 `9e90b4d9171940ab9be477c10b7a3d4b85a44f5869ab3c05329913e528e3de96`.
+
+### Verification and review ledger
+
+- Implementation full checks after reviewed core/UI fixes: TypeScript PASS; full lint PASS; 79 files / 493 tests PASS. Meaningful tests cover real gradient/loss, altered curvature, flow transitions/required connections/failures, directional corpus events, event-to-cell counts, malformed definitions, exact H5P root events, timeline pause/reset/cancelled late callbacks, and revised in-progress resume.
+- First full run caught the new reference test incorrectly importing Demo from Shared. The test was moved to top-level `tests/`; the existing architecture guard was preserved. Duplicate test imports were fixed; no failing test was deleted or weakened.
+- Local Micro V2 verifier PASS: 19 SQL/TypeScript malformed/valid definition probes and exact idempotent four-reference replay. Includes missing/null shape, wrong scalar types, overlong labels, invalid window, unsupported numeric overflow. Reviewer post-migration schema lint PASS.
+- `pnpm install --frozen-lockfile` PASS. Existing learning-loop regression verifier PASS (immutable failed/retry attempts and deterministic remediation/next decisions). Historical regression is not product acceptance for these references.
+- Reviewer independent pure slice: initially 3 files / 18 tests PASS; subsequent mechanisms/native/H5P/server slice 4 files / 22 tests PASS. These are technical checks, not product PASS.
+- Reviewer independently compared canonical SHA-256 for 20 non-Micro definition tables (17 official Course-definition tables and 3 shared Knowledge/revision/fact tables): all UNCHANGED after migration/bootstrap.
+- Reviewer exact verdict: **“SOLUTION REVIEW: current product architecture/code APPROVED FOR LOCAL ACCEPTANCE (not final product PASS).”** Final reviewed corrections included Flow disabled deletion, actual edge selection/removal, invalid drag rollback, namespaced zones, reduced motion, preview identity/index reset, readable SQL/scalar bounds, and exact H5P root event handling. `git diff --check` PASS.
+- Initial V2 production build PASS (9.63 s): main gzip 1,383.92 kB, +79.71 kB over baseline; lazy mechanism renderer gzip 4.50 kB. Existing large-chunk and vendored H5P CSS warnings retained. Final production build after the last reviewed fixes PASS (10.73 s): main gzip 1,384.00 kB; lazy mechanism renderer gzip 4.54 kB. Existing backend verifier PASS: Auth, Health, Knowledge, Goal timeline/Briefs, Course visibility, Micro progress, learning state/evidence, signed PDF, RLS, Workflows, upload and authorization.
+
+Independent Local product/UX/instructional/student acceptance: **PENDING**. Remote acceptance: **NOT RUN**. No commit/push or final product PASS has occurred in this round.
+
+### Independent local acceptance — first findings and reviewed repair
+
+Acceptance reported P1: Flow retained desktop zoom after narrowing to 390 px; category pointer drops on a header could land in its neighbor; complex Micro content shifted left of the centered header; the fixed Assistant overlapped the narrow Check CTA. K012 also labeled the computed next update as the current update.
+
+Root causes and minimum fixes: React Flow now fits only when its container dimensions change and offers an explicit Fit action while preserving execution; Categorize now uses dnd-kit's pointer collision instead of dragged-rectangle intersection; the complex-content grid again centers horizontally and aligns vertically from the top; the narrow footer reserves space for the existing Assistant; the numeric label now says “下一步更新 Δθ”. Solution Reviewer approved this patch for independent retest. No lesson data, progress, or database records changed. After the viewport helper typing change: TypeScript PASS, full lint PASS, 79 files / 493 tests PASS, production build PASS (9.52 s), and diff whitespace check PASS. Product verdict remains pending independent retest.
+
+### Native Reference acceptance verdict and H5P revision repair
+
+Independent Acceptance Agent verdict: **all four Reference novice / misconception / stress PASS after reviewed P1 fixes**. This is the native subset verdict; overall Local acceptance remained FAIL while the H5P compatibility gate was outstanding.
+
+- RT01: weather demonstration → stock repair, actual Backspace edge deletion and handle connection; missing return stops at 3/5 with causal explanation, corrected trace reaches 5/5.
+- CTX01: role mapping and call-ID chain taught; causal wrong-role feedback; five precise header-target pointer drops correct; pointer ordering shows insertion/displacement; keyboard Space/arrow/Space and Esc verified; outside drop rolls back.
+- K012: real values independently observed at four updates: η=.02 gives θ3.3974/Loss11.5422; .3 gives θ.1024/Loss.0105; .8 gives θ.5184/Loss.2687; 1.2 gives θ15.3664/Loss236.1262. Changed-curvature .8 diverges (Loss 5.29e9), .3 succeeds. Numeric delta label clarified as the next update.
+- K021: 14-event corpus matrix independently matches all six neighbor pairs (I–love twice, other pairs once, symmetric); reversed/non-neighbor operations leave counts unchanged; four-event I/enjoy/AI transfer passes.
+- Each native path completed, refreshed, returned to its correct Course, and replayed. DB held exactly one completion evidence per path and all four Knowledge states at `learned`; completion timestamps remained unchanged on replay. Native console errors: zero. Desktop 1440 and narrow 390 had no horizontal page overflow. Narrow Flow nodes x43..332 and execution 2/5 survived resize/Fit; Check x195..289 was separate from Assistant x323..375.
+
+Independent H5P P1 failure: 407 px cards were spaced only 235 px apart, with 179 px height but 84 px row spacing, producing overlap/clipping. Reviewer and Implementation both inspected the actual H5P.DragQuestion 1.14 code: `x/y` are percentages, `width/height` are em, and font size scales from authored width at 16 px. The old builder treated both as percentages.
+
+Reviewed minimum repair: card width 13 em and height 3.575 em; zones 20.5 em wide with 42%-equivalent vertical room; native auto-align/fullscreen, no duplicate internal title/background words, and authored 1.4 em card text for narrow legibility. Category's drop overlay also respects reduced motion. New guarded migration `20260905092253_cds_h5p_geometry_v2.sql` advances only revisions below 2 to new `/2` storage; stable content/Step identity, progress, and original `/1` assets remain. Imported revision 2 checksum: `bbc374d7fe8a16b0ef375faad7e6d565f540170d00416d8941343b9933e4d2ed`.
+
+Reviewer approved the geometry source and immutable-revision guard for independent visual/completion retest. Post-fix TypeScript/full lint/79 files and 493 tests PASS. Local verifier repeated 19 parity probes and four-reference replay PASS; H5P revision/checksum/status replay stability PASS; schema lint PASS. No reset occurred. H5P independent retest and overall Local PASS remain pending.
+
+Reviewer final Local Vercel output generation PASS (build only, no deployment): full TypeScript + Vite production build 9.72 s; main gzip 1,384.01 kB and lazy mechanism gzip 4.66 kB. Fresh `.vercel/output/functions` contains exactly 12 `.func/.vc-config.json` entrypoints: assistant, course-intent, course-mapping, course, domains, health, knowledge-generation, knowledge, learner, material-parsing-jobs, materials and workflows. No new Function was added. Reviewer log: `/tmp/eduflow-micro-v2-review/vercel-build.log`.
+
+Reviewer final source verdict: **“FINAL SOLUTION REVIEW current source APPROVED: course-independent contracts/calculations/renderers, existing progress/evidence boundary, source-backed4refs, minimal library reuse, guarded H5P rev2, docs/license inventory and final generated12functions.”** This is Architecture/code-review PASS only; independent H5P and overall Local product acceptance remain required. The corrected revision-2 package was built twice independently with the same `bbc374d7fe8a16b0ef375faad7e6d565f540170d00416d8941343b9933e4d2ed` checksum.
+
+### FINAL independent LOCAL ACCEPTANCE PASS
+
+Acceptance Agent exact verdict: **“FINAL independent LOCAL ACCEPTANCE PASS.”** This supersedes the pending/FAIL intermediate statuses above; the Implementation Agent did not award the verdict.
+
+All four native References retain the novice, misconception and operation-stress PASS evidence above. H5P revision 2 passed desktop/narrow initial and placed-card layout. An incorrect/partial 1/6 did not complete the Step. Retry followed by six actual pointer drops at 390 px produced 6/6, the real H5P completion event, formal Step completion, remaining native content/Summary and completed Path. Successful result resubmission, refresh, correct Course return and full keyboard Space/drop replay at 6/6 were independently verified. DB held all five tested Knowledge nodes (`RT01`, `CTX01`, `CDS525-K012`, `CDS525-K021`, compatibility `CDS525-K001`) at `learned` with exactly one completion evidence each. Latest browser console errors: zero.
+
+Acceptance evidence was relocated outside the repository to `/tmp/eduflow-micro-v2-acceptance`; no unnecessary binary evidence is included in the change. Final Architecture/code review is approved as recorded above. Remote acceptance: **NOT RUN — pending authorized commit/push and actual Preview/Hosted rollout**. No merge to Prototype is authorized or performed.

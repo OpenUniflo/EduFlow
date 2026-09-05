@@ -127,3 +127,9 @@ export function resolveMicroLearningReturnTarget(state:unknown, courseId?:string
   const returnTo=state&&typeof state==="object"&&"returnTo" in state?(state as {returnTo?:unknown}).returnTo:undefined;
   return safeInternalPath(returnTo)??(courseId?`/courses/${encodeURIComponent(courseId)}`:"/");
 }
+
+/** A revised published Unit may insert teaching before a historical cursor. */
+export function resolveMicroResumeStep(unit: MicroUnit, progress: MicroUnitProgress | undefined, currentStepId?: string) {
+  const completed = new Set(progress?.completedStepIds ?? []);
+  return unit.steps.find((step) => !completed.has(step.id)) ?? unit.steps.find((step) => step.id === currentStepId) ?? unit.steps[0];
+}

@@ -1,7 +1,8 @@
-export type NativeMicroAnswer = string | string[] | number[];
+import { mechanismSchema, mechanismFeedback, type MicroMechanism, type MechanismAnswer } from "./microMechanisms";
+export type NativeMicroAnswer = string | string[] | number[] | MechanismAnswer;
 export type InteractionMode = "explore" | "challenge";
 
-export type NativeMicroInteraction =
+export type NativeMicroInteraction = MicroMechanism
   | { type: "choice"; options: string[]; correctIndex: number }
   | { type: "multiple-choice"; options: string[]; correctIndexes: number[] }
   | { type: "fill-blank"; answers: string[]; caseSensitive?: boolean }
@@ -20,6 +21,10 @@ const exactStrings = (actual: string[], expected: string[]) => actual.length ===
 const exactSet = (actual: string[], expected: string[]) => actual.length === expected.length && [...new Set(actual)].sort().every((item, index) => item === [...expected].sort()[index]);
 
 export function validateNativeMicroInteraction(interaction: NativeMicroInteraction): string[] {
+  try { return validateInteraction(interaction); } catch { return ["Malformed interaction definition."]; }
+}
+function validateInteraction(interaction: NativeMicroInteraction): string[] {
+  if (interaction.type === "flow-execution" || interaction.type === "simulation" || interaction.type === "data-transform") { const result = mechanismSchema.safeParse(interaction); return result.success ? [] : result.error.issues.map((issue) => issue.message); }
   if (interaction.type === "choice") return interaction.options.length >= 2 && unique(interaction.options) && Number.isInteger(interaction.correctIndex) && interaction.correctIndex >= 0 && interaction.correctIndex < interaction.options.length ? [] : ["Choice requires unique options and a valid answer."];
   if (interaction.type === "multiple-choice") return interaction.options.length >= 2 && unique(interaction.options) && interaction.correctIndexes.length > 0 && unique(interaction.correctIndexes) && interaction.correctIndexes.every((index) => Number.isInteger(index) && index >= 0 && index < interaction.options.length) ? [] : ["Multiple Choice requires unique options and valid answers."];
   if (interaction.type === "fill-blank") return interaction.answers.length > 0 && interaction.answers.every((answer) => answer.trim()) ? [] : ["Fill Blank requires an accepted answer."];
@@ -43,6 +48,8 @@ export function validateNativeMicroInteraction(interaction: NativeMicroInteracti
 }
 
 export function isNativeMicroInteractionCorrect(interaction: NativeMicroInteraction, answer: unknown) {
+  if (validateNativeMicroInteraction(interaction).length) return false;
+  if (interaction.type === "flow-execution" || interaction.type === "simulation" || interaction.type === "data-transform") return mechanismFeedback(interaction, answer).correct;
   if (interaction.type === "choice") return typeof answer === "string" && answer === interaction.options[interaction.correctIndex];
   if (interaction.type === "multiple-choice") return numberArray(answer) && exactSet(answer.map(String), interaction.correctIndexes.map(String));
   if (interaction.type === "fill-blank") { if (typeof answer !== "string") return false; const normalize = (value: string) => interaction.caseSensitive ? value.trim() : value.trim().toLocaleLowerCase(); return interaction.answers.some((candidate) => normalize(candidate) === normalize(answer)); }

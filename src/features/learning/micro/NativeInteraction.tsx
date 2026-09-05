@@ -1,0 +1,31 @@
+import { lazy, Suspense } from "react";
+import { ArrowRight } from "lucide-react";
+import { CategorizeInteraction, OrderingInteraction } from "./runtime/SpatialInteraction";
+import type { MicroInteraction, MicroLearningAnswer, MicroStep } from "./microLearning";
+const Mechanism=lazy(()=>import("./runtime/MechanismInteraction"));
+const MiniWorkflow=lazy(()=>import("./MiniWorkflowInteraction"));
+const rotate=<T,>(items:T[])=>items.length>1?[...items.slice(1),items[0]]:items;
+export function initialAnswer(interaction?:MicroInteraction):MicroLearningAnswer {
+  if(!interaction)return "";
+  if(interaction.type==="multiple-choice"||interaction.type==="categorize"||interaction.type==="structure-builder")return [];
+  if(interaction.type==="ordering")return rotate(interaction.items);
+  if(interaction.type==="mini-workflow")return rotate(interaction.nodes);
+  if(interaction.type==="parameter-lab")return [interaction.parameter.initial];
+  if(interaction.type==="matrix-tensor")return [...interaction.initialValues];
+  return "";
+}
+export function NativeInteraction({step,answer,completed,onAnswer}:{step:MicroStep;answer:MicroLearningAnswer;completed:boolean;onAnswer(value:MicroLearningAnswer):void}) {
+  const interaction=step.interaction!;
+  if(interaction.type==="choice")return <div className="micro-interaction choice">{interaction.options.map((option)=><button key={option} disabled={completed} className={answer===option?"selected":""} onClick={()=>onAnswer(option)}>{option}</button>)}</div>;
+  if(interaction.type==="multiple-choice") { const selected=Array.isArray(answer)&&answer.every((item)=>typeof item==="number")?answer as number[]:[];return <div className="micro-interaction multiple-choice" role="group" aria-label="多选题">{interaction.options.map((option,index)=><button key={option} role="checkbox" aria-checked={selected.includes(index)} disabled={completed} className={selected.includes(index)?"selected":""} onClick={()=>onAnswer(selected.includes(index)?selected.filter((item)=>item!==index):[...selected,index])}><span>{selected.includes(index)?"✓":""}</span>{option}</button>)}</div>; }
+  if(interaction.type==="fill-blank")return <label className="micro-fill-blank"><span>填写答案</span><input disabled={completed} value={typeof answer==="string"?answer:""} onChange={(event)=>onAnswer(event.target.value)} autoComplete="off"/></label>;
+  if(interaction.type==="trace")return <div className="micro-interaction trace">{interaction.steps.map((item,index)=><button key={item.id} disabled={completed} className={answer===item.id?"selected":""} onClick={()=>onAnswer(item.id)}><span>{index+1}</span>{item.label}</button>)}</div>;
+  if(interaction.type==="flow-execution"||interaction.type==="simulation"||interaction.type==="data-transform")return <Suspense fallback={<p>正在加载互动机制…</p>}><Mechanism definition={interaction} disabled={completed} onAnswer={onAnswer}/></Suspense>;
+  if(interaction.type==="categorize") { const value=Array.isArray(answer)&&answer.every((item)=>typeof item==="string")?answer as string[]:[];return <CategorizeInteraction definition={interaction} value={value} disabled={completed} onChange={onAnswer}/>; }
+  if(interaction.type==="ordering") { const value=Array.isArray(answer)&&answer.every((item)=>typeof item==="string")?answer as string[]:rotate(interaction.items);return <OrderingInteraction value={value} disabled={completed} onChange={onAnswer}/>; }
+  if(interaction.type==="mini-workflow") { const value=Array.isArray(answer)&&answer.every((item)=>typeof item==="string")?answer as string[]:rotate(interaction.nodes);return <Suspense fallback={<p>正在加载 Workflow 互动…</p>}><MiniWorkflow items={interaction.nodes} value={value} disabled={completed} onChange={onAnswer} onReset={()=>onAnswer(rotate(interaction.nodes))}/></Suspense>; }
+  if(interaction.type==="structure-builder") { const selected=Array.isArray(answer)&&answer.every((item)=>typeof item==="string")?answer as string[]:[];return <div className="micro-structure-builder"><div>{interaction.nodes.map((node)=><span key={node}>{node}</span>)}</div>{interaction.edges.map((edge)=><button type="button" key={edge.id} disabled={completed} className={selected.includes(edge.id)?"selected":""} aria-pressed={selected.includes(edge.id)} onClick={()=>onAnswer(selected.includes(edge.id)?selected.filter((id)=>id!==edge.id):[...selected,edge.id])}>{edge.from}<ArrowRight size={14}/>{edge.to}</button>)}</div>; }
+  if(interaction.type==="parameter-lab") { const value=Array.isArray(answer)&&typeof answer[0]==="number"?answer[0]:interaction.parameter.initial;const ratio=(value-interaction.parameter.min)/(interaction.parameter.max-interaction.parameter.min);return <label className="micro-parameter-lab"><span>{interaction.parameter.label}</span><strong>{value}</strong><input type="range" disabled={completed} min={interaction.parameter.min} max={interaction.parameter.max} step={interaction.parameter.step} value={value} onChange={(event)=>onAnswer([Number(event.target.value)])}/><small>{interaction.mode==="explore"?`当前步长处于范围的 ${Math.round(ratio*100)}%；移动滑块后才可记录观察。`:`Challenge：目标区间 ${interaction.target?.min}–${interaction.target?.max}`}</small></label>; }
+  if(interaction.type==="matrix-tensor") { const size=interaction.rows*interaction.columns;const value=Array.isArray(answer)&&answer.every((item)=>typeof item==="number")?answer as number[]:[...interaction.initialValues];const sum=value.reduce((total,item)=>total+item,0);const symmetric=interaction.rows===interaction.columns&&value.every((item,index)=>item===value[(index%interaction.columns)*interaction.columns+Math.floor(index/interaction.columns)]);return <div className="micro-matrix-tensor"><div style={{gridTemplateColumns:`repeat(${interaction.columns},minmax(52px,1fr))`}}>{Array.from({length:size},(_,index)=><input key={index} aria-label={`矩阵元素 ${index+1}`} type="number" disabled={completed} value={value[index]??0} onChange={(event)=>{const next=[...value];next[index]=Number(event.target.value);onAnswer(next);}}/>)}</div><div><span>{interaction.rows} × {interaction.columns} · 元素和 {sum} · {symmetric?"对称":"非对称"}</span><small>{interaction.mode==="explore"?"修改任一元素后，结构指标会立即更新。":"Challenge：还原目标 Tensor。"}</small></div></div>; }
+  return null;
+}

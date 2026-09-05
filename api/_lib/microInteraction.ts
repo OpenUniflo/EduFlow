@@ -1,6 +1,6 @@
-import { isNativeMicroInteractionCorrect, type NativeMicroInteraction } from "../../src/shared/learning/nativeMicroInteraction.js";
+import { isNativeMicroInteractionCorrect, type NativeMicroAnswer, type NativeMicroInteraction } from "../../src/shared/learning/nativeMicroInteraction.js";
 
-export type NativeAnswer = string|string[]|number[]|undefined;
+export type NativeAnswer = NativeMicroAnswer|undefined;
 export type H5PCompletion = { kind:"h5p-result"; contentRef:string; eventId:string; result:{ completed:boolean; success?:boolean; score?:number; maxScore?:number } };
 
 const record = (value:unknown):Record<string,unknown>|null => value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:null;

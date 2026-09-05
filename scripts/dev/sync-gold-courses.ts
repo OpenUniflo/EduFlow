@@ -18,7 +18,7 @@ const BOOK = {
   localPath: "docs/local/AI-Agents-in-Depth-zh-CN.pdf",
   pageCount: 307
 } as const;
-const FINALIZED_FINGERPRINTS:Record<string,string>={"ai-agents-in-depth":"2ad5e5819a09e89767a80e15714ddf998796173cba2859ebe898f1264661c4d0","cds525-deep-learning":"344f304b33b909a6c2b58ca80334f45a45a3b268c25d6c8af8810a603f99af2b"};
+const FINALIZED_FINGERPRINTS:Record<string,string>={"ai-agents-in-depth":"f7ab815c3cc9f95af394d3a39e20d511dfdfc78810b1d253c7647e9160f5b524","cds525-deep-learning":"3b889d0b5ced962bba26ef5ffc68317be2f2e128da45486f93020e40712564eb"};
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type Row = Record<string, unknown>;
@@ -254,10 +254,18 @@ async function finalizeGoldContent(){
   // Migrations run before seed.sql on a clean reset. Replay guarded, idempotent
   // content migrations after the Course fixtures exist so local reset + sync
   // produces the same Golden H5P regression content as an upgraded database.
-  for(const file of ["supabase/migrations/20260820151000_sync_golden_micro_interactive.sql","supabase/migrations/20260905020000_agent_book_primary_material.sql","supabase/migrations/20260905030000_native_micro_primitives.sql"]){runLocalSql(await readFile(file,"utf8"),`Finalize ${file}`);}
+  for(const file of ["supabase/migrations/20260820151000_sync_golden_micro_interactive.sql","supabase/migrations/20260905020000_agent_book_primary_material.sql","supabase/migrations/20260905030000_native_micro_primitives.sql","supabase/migrations/20260905083836_micro_learning_v2.sql","supabase/migrations/20260905092253_cds_h5p_geometry_v2.sql"]){runLocalSql(await readFile(file,"utf8"),`Finalize ${file}`);}
   runLocalSql("update public.course_assignments set experience=jsonb_build_object('type','trace','knowledgeNodeId','R10','faultyStepId','skip-observation','traceSteps',jsonb_build_array(jsonb_build_object('id','observe','label','Observe user goal','status','ok'),jsonb_build_object('id','act','label','Call search tool','status','ok'),jsonb_build_object('id','skip-observation','label','Generate final answer before reading tool result','status','error'),jsonb_build_object('id','verify','label','Verify evidence','status','warning'))) where course_id='ai-agents-in-depth' and id='book-v1-node-r10';","Finalize Agent Assignment evaluator");
 }
-async function ensureGoldenH5P(client: SupabaseClient) {
+async function ensureH5PFixtures(client: SupabaseClient) {
+  const cdsId="cds525-h5p-k001-rule-vs-learning";
+  const cds=await client.from("h5p_contents").select("status,package_sha256").eq("id",cdsId).maybeSingle();
+  if(cds.error)throw new Error(`CDS H5P metadata: ${cds.error.message}`);
+  if(cds.data?.status!=="published"||!cds.data.package_sha256){
+    const output=await mkdtemp(join(tmpdir(),"eduflow-cds-h5p-"));
+    try { runNodeScript(["scripts/build-cds525-h5p.ts",output],"Build CDS H5P package"); runNodeScript(["scripts/import-h5p.ts","--content-id",cdsId,"--package",join(output,`${cdsId}.h5p`)],"Import CDS H5P package"); }
+    finally { await rm(output,{recursive:true,force:true}); }
+  }
   const ids = ["golden-h5p-agent-drag-words", "golden-h5p-agent-fill-blanks", "golden-h5p-workflow-drag-drop", "golden-h5p-recovery-question-set"];
   const result = await client.from("h5p_contents").select("id,status,package_sha256").in("id", ids);
   if (result.error) throw new Error(`Golden H5P metadata read failed: ${result.error.message}`);
@@ -301,7 +309,7 @@ async function main() {
   else await replaceDefinitionsAtomically(client, runtimes);
   await syncAssets(client, collected.assets);
   await finalizeGoldContent();
-  await ensureGoldenH5P(client);
+  await ensureH5PFixtures(client);
   console.log(JSON.stringify({ status: "PASS", courses: COURSE_IDS, assets: collected.assets.length }));
 }
 
