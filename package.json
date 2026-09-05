@@ -23,6 +23,7 @@
     "verify:backend:local": "node --env-file=.env.local --import tsx scripts/verify-local-backend.ts",
     "verify:material-rls:local": "node --env-file=.env.local --import tsx scripts/verify-material-rls.ts",
     "verify:learning-loop:local": "node --env-file=.env.local --import tsx scripts/verify-learning-loop.ts",
+    "verify:micro:generated": "node scripts/verify-generated-micro.mjs",
     "verify:embedding": "node --env-file=.env.local --import tsx scripts/verify-embedding.ts",
     "verify:embedding:local": "node --env-file=.env.local --import tsx scripts/verify-embedding-pgvector.ts",
     "verify:knowledge-generation:local": "node --env-file=.env.local --import tsx scripts/verify-knowledge-generation-persistence.ts",

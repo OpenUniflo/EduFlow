@@ -1,4 +1,4 @@
-import { mechanismSchema, mechanismFeedback, type MicroMechanism, type MechanismAnswer } from "./microMechanisms";
+import { mechanismSchema, mechanismFeedback, type MicroMechanism, type MechanismAnswer } from "./microMechanisms.js";
 export type NativeMicroAnswer = string | string[] | number[] | MechanismAnswer;
 export type InteractionMode = "explore" | "challenge";
 
