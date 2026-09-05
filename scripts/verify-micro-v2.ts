@@ -21,6 +21,7 @@ const ids=microV2References.map((path)=>`'${path.id}'`).join(",");
 const fingerprint=()=>sql(`select md5(coalesce(jsonb_agg(to_jsonb(s) order by s.id)::text,'')) from micro_steps s join micro_units u on u.id=s.unit_id where u.path_id in (${ids});`);
 const before=fingerprint();
 sql(await readFile("supabase/migrations/20260905083836_micro_learning_v2.sql","utf8"));
+sql(await readFile("supabase/migrations/20260905162819_micro_v2_teaching_content.sql","utf8"));
 if(before!==fingerprint())throw new Error("Reference replay changed persisted definitions");
 console.log(`Micro V2 Local verifier: ${cases.length+1} TS/SQL parity probes and idempotent four-reference replay passed.`);
 

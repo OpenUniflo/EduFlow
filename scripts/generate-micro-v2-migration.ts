@@ -5,6 +5,21 @@ const target = process.argv[2];
 if (!target) throw new Error("Supply the CLI-created migration path.");
 const literal = (value: unknown) => value == null ? "null" : typeof value === "number" || typeof value === "boolean" ? String(value) : `'${String(value).replace(/'/g,"''")}'`;
 const json = (value: unknown) => value == null ? "null" : `${literal(JSON.stringify(value,null,2))}::jsonb`;
+if (process.argv.includes("--content-only")) {
+  const statements = ["-- Teaching content only: no schema, identity, ordering, progress or evidence changes.", "do $$ begin", "if not exists(select 1 from courses where id='ai-agents-in-depth') or not exists(select 1 from courses where id='cds525-deep-learning') then return; end if;"];
+  for (const path of microV2References) {
+    statements.push(`if not exists(select 1 from micro_learning_paths where id=${literal(path.id)} and course_id=${literal(path.courseId)} and knowledge_id=${literal(path.knowledgeId)}) then raise exception 'Missing official Reference path'; end if;`);
+    for (const unit of path.units) for (const step of unit.steps) {
+      if (step.interaction && step.interaction.type !== "h5p" && validateNativeMicroInteraction(step.interaction).length) throw new Error(`Invalid reference ${step.id}`);
+      statements.push(`update micro_steps set content=${literal(step.body)},interaction=${json(step.interaction)},success_feedback=${literal(step.successFeedback)},retry_feedback=${literal(step.retryFeedback)} where id=${literal(step.id)} and unit_id=${literal(unit.id)}; if not found then raise exception 'Missing official Reference Step'; end if;`);
+    }
+    statements.push(`update micro_learning_paths set revision=greatest(revision,3) where id=${literal(path.id)};`);
+  }
+  statements.push("end $$;");
+  await writeFile(target, statements.join("\n\n") + "\n");
+  console.log("Generated content-only Reference update.");
+  process.exit(0);
+}
 const prior = await readFile("supabase/migrations/20260905030000_native_micro_primitives.sql", "utf8");
 const legacy = prior.slice(0, prior.indexOf("$$;") + 3).replace("public.validate_micro_interaction(candidate", "public.validate_micro_interaction_v1(candidate");
 const validator = await readFile("scripts/micro-v2-validator.sql", "utf8");

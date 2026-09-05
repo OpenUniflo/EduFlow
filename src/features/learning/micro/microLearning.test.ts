@@ -8,6 +8,7 @@ import {
   isMicroInteractionCorrect,
   resolveMicroLearningReturnTarget,
   firstMicroReviewStep,
+  previousMicroReviewStep,
   nextMicroReviewStep,
   isMicroReviewSubmissionCorrect,
   type MicroLearningPath,
@@ -20,6 +21,8 @@ describe("Micro Learning navigation", () => {
       {id:"optional",pathId:"path",title:"Optional",position:0,estimatedMinutes:1,required:false,steps:[{id:"skip",kind:"summary",title:"Skip",body:"Skip"}]},
       {id:"required",pathId:"path",title:"Required",position:1,estimatedMinutes:1,required:true,steps:[{id:"first",kind:"interaction",title:"First",body:"First",interaction:{type:"choice",options:["yes","no"],correctIndex:0}},{id:"last",kind:"summary",title:"Last",body:"Last"}]}
     ]};
+    expect(previousMicroReviewStep(path,{unitId:"required",stepId:"first"})).toBeNull();
+    expect(previousMicroReviewStep(path,{unitId:"required",stepId:"last"})).toEqual({unitId:"required",stepId:"first"});
     expect(firstMicroReviewStep(path)).toEqual({unitId:"required",stepId:"first"});
     expect(nextMicroReviewStep(path,{unitId:"required",stepId:"first"})).toEqual({unitId:"required",stepId:"last"});
     expect(nextMicroReviewStep(path,{unitId:"required",stepId:"last"})).toBeNull();
@@ -100,21 +103,21 @@ describe("Micro Learning assessment integrity", () => {
 
   it("keeps Assistant actions separate from grading and persisted progress writes", () => {
     const source = readFileSync(join(process.cwd(), "src/features/learning/micro/MicroLearningExperience.tsx"), "utf8");
-    const assistant = source.slice(source.indexOf("<EduFlowAssistant"));
+    const assistant = source.slice(source.indexOf("<EduFlowAssistant"),source.indexOf("function MicroStepPanel"));
     expect(assistant).toContain("microPathId:path.id");
     expect(assistant).toContain("microStepId:step.id");
     expect(assistant).not.toMatch(/setGradingFeedback|completeCurrent\(/);
-    expect(source).toContain("repository.completeStep(path.id, unit.id, step.id");
+    expect(source).toContain("repository.completeStep(path.id,unitId,stepId");
     expect(source).toContain("refreshLearnerState(session.userId)");
   });
 
   it("keeps completed-path review local and leaves first completion persistence unchanged", () => {
     const source = readFileSync(join(process.cwd(), "src/features/learning/micro/MicroLearningExperience.tsx"), "utf8");
-    const reviewBranch=source.slice(source.indexOf("if(reviewCursor)"),source.indexOf("setBusy(true)",source.indexOf("if(reviewCursor)")));
+    const reviewBranch=source.slice(source.indexOf("if(review){"),source.indexOf("inFlight.current=true"));
     expect(reviewBranch).toContain("isMicroReviewSubmissionCorrect");
     expect(reviewBranch).not.toContain("repository.completeStep");
     expect(reviewBranch).not.toContain("refreshLearnerState");
-    expect(source).toContain("repository.completeStep(path.id, unit.id, step.id");
+    expect(source).toContain("repository.completeStep(path.id,unitId,stepId");
     expect(source).toContain("主动复习不会清空进度、重复完成证据或降低学习状态");
   });
 

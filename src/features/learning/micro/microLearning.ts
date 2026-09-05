@@ -36,6 +36,11 @@ export function nextMicroReviewStep(path:MicroLearningPath,current:MicroReviewCu
   return index>=0?steps[index+1]??null:null;
 }
 
+export function previousMicroReviewStep(path:MicroLearningPath,current:MicroReviewCursor) {
+  const steps=microReviewSteps(path); const index=steps.findIndex((item)=>item.unitId===current.unitId&&item.stepId===current.stepId);
+  return index>0?steps[index-1]:null;
+}
+
 export function isMicroReviewSubmissionCorrect(interaction:MicroInteraction|undefined,submission:MicroLearningSubmission|undefined) {
   if(!interaction)return true;
   if(interaction.type!=="h5p")return isMicroInteractionCorrect(interaction,(submission??"") as MicroLearningAnswer);

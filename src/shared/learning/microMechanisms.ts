@@ -2,11 +2,15 @@ import { z } from "zod";
 
 const text = z.string().min(1).max(2000).refine((value)=>value.trim().length>0);
 const finite = z.number().finite();
+const teaching = z.object({
+  explanation: text.optional(),
+  feedback: z.record(z.string().min(1).max(80), text).optional(),
+}).optional();
 const mode = z.enum(["explore", "challenge"]);
 const unique = (values: string[]) => new Set(values).size === values.length;
 const edge = z.object({ id: text, from: text, to: text, label: text });
 export const flowSchema = z.object({
-  type: z.literal("flow-execution"), mode,
+  type: z.literal("flow-execution"), mode, teaching,
   nodes: z.array(z.object({ id: text, label: text, x: finite, y: finite })).min(2).max(16),
   edges: z.array(edge).min(1).max(40), initialEdgeIds: z.array(text),
   events: z.array(z.object({ nodeId: text, edgeId: text.optional(), title: text, message: text, explanation: text })).min(2).max(40),
@@ -20,7 +24,7 @@ export const flowSchema = z.object({
   });
 });
 export const simulationSchema = z.object({
-  type: z.literal("simulation"), mode,
+  type: z.literal("simulation"), mode, teaching,
   parameter: z.object({ label: text, min: finite.nonnegative(), max: finite.positive(), step: finite.positive(), initial: finite }),
   model: z.object({ kind: z.literal("quadratic-descent"), curvature: finite.positive().max(100), optimum: finite.min(-100).max(100), initial: finite.min(-100).max(100), steps: z.number().int().min(2).max(60) }),
   target: z.object({ maxLoss: finite.positive(), maxGrowth: finite.min(1) }),
@@ -29,7 +33,7 @@ export const simulationSchema = z.object({
   if (Math.log(Math.max(1, Math.abs(1 - max * simulation.model.curvature))) * simulation.model.steps > 300 || min >= max || initial < min || initial > max || max > 10 || simulation.model.initial === simulation.model.optimum) ctx.addIssue({ code: "custom", message: "Simulation requires a bounded parameter range and a nontrivial initial state." });
 });
 export const transformationSchema = z.object({
-  type: z.literal("data-transform"), mode,
+  type: z.literal("data-transform"), mode, teaching,
   corpus: z.array(z.array(text).min(2).max(20)).min(1).max(8),
   vocabulary: z.array(text).min(2).max(8), window: z.number().int().min(1).max(3),
 }).superRefine((data, ctx) => {
@@ -69,41 +73,50 @@ export function transformationCells(definition: TransformationDefinition, count:
   for (const event of transformationEvents(definition).slice(0, count)) cells[event.cell] += 1;
   return cells;
 }
+export type MechanismFeedback = { correct: boolean; reason: string; message: string; edgeId?: string; executed?: number; cell?: number; expected?: number; actual?: number; state?: ReturnType<typeof simulationTrajectory> };
+
+/** Generic operational fallback; knowledge-specific explanations belong to the definition. */
+export function mechanismMessage(definition: MicroMechanism, result: MechanismFeedback) {
+  return definition.teaching?.feedback?.[result.reason] ?? result.message;
+}
 export function flowAdvance(definition: FlowDefinition, edgeIds: string[], executed: number) {
   const event = definition.events[executed];
-  if (!event) return { executed, error: null };
-  if (event.edgeId && !edgeIds.includes(event.edgeId)) {
-    const edge = definition.edges.find((item) => item.id === event.edgeId)!;
-    return { executed, error: `执行停在缺失的 ${edge.label}：${event.explanation}` };
+  if (event?.edgeId && !edgeIds.includes(event.edgeId)) {
+    return { executed, reason: "missing-required-edge", edgeId: event.edgeId, error: `缺少连接：${definition.edges.find((edge) => edge.id === event.edgeId)!.label}` };
   }
-  return { executed: executed + 1, error: null };
+  return { executed: event ? executed + 1 : executed, reason: event ? "advanced" : "completed", error: null };
 }
 
-export function mechanismFeedback(definition: MicroMechanism, input: unknown): { correct: boolean; message: string } {
+export function mechanismFeedback(definition: MicroMechanism, input: unknown): MechanismFeedback {
   const parsed = mechanismAnswerSchema.safeParse(input);
-  if (!parsed.success) return { correct: false, message: "请先操作机制并执行观察。" };
+  if (!parsed.success) return { correct: false, reason: "not-started", message: "请先操作并执行观察。" };
   const answer = parsed.data;
   if (definition.type === "flow-execution" && answer.kind === "flow") {
-    if (!unique(answer.edgeIds) || answer.edgeIds.some((id) => !definition.edges.some((edge) => edge.id === id))) return { correct: false, message: "连接必须来自当前流程中的有效节点。" };
+    if (!unique(answer.edgeIds) || answer.edgeIds.some((id) => !definition.edges.some((edge) => edge.id === id))) return { correct: false, reason: "invalid-edge", message: "连接无效。" };
     const extra = definition.edges.find((edge) => answer.edgeIds.includes(edge.id) && !definition.correctEdgeIds.includes(edge.id));
-    if (extra && definition.mode === "challenge") return { correct: false, message: `检查「${extra.label}」：它跳过了当前示例要求的数据回传。断开它，再按刚才观察到的过程连接。` };
-    if (definition.mode === "challenge" && definition.correctEdgeIds.some((id) => !answer.edgeIds.includes(id))) return { correct: false, message: "还有必要的数据连接缺失；按完整执行过程补齐，再运行。" };
-    for (let index = 0; index < definition.events.length; index += 1) { const next = flowAdvance(definition, answer.edgeIds, index); if (next.error) return { correct: false, message: next.error }; }
-    return answer.executed === definition.events.length ? { correct: true, message: definition.events[definition.events.length - 1].explanation } : { correct: false, message: "连接后请执行完整流程，观察每次消息和状态变化。" };
+    if (extra && definition.mode === "challenge") return { correct: false, reason: "unexpected-edge", edgeId: extra.id, message: `存在额外连接：${extra.label}` };
+    const missing = definition.correctEdgeIds.find((id) => !answer.edgeIds.includes(id));
+    if (definition.mode === "challenge" && missing) return { correct: false, reason: "missing-required-edge", edgeId: missing, executed: answer.executed, message: "缺少必要连接。" };
+    for (let index = 0; index < definition.events.length; index += 1) {
+      const next = flowAdvance(definition, answer.edgeIds, index);
+      if (next.error) return { correct: false, reason: next.reason, edgeId: next.edgeId, executed: index, message: next.error };
+    }
+    const correct = answer.executed === definition.events.length;
+    return { correct, reason: correct ? "completed" : "incomplete", executed: answer.executed, message: correct ? "执行完成。" : "请执行完整流程。" };
   }
   if (definition.type === "simulation" && answer.kind === "simulation") {
-    if (answer.parameter < definition.parameter.min || answer.parameter > definition.parameter.max || answer.executed !== definition.model.steps + 1) return { correct: false, message: "请在范围内调整参数，并执行到最后一次更新后再比较结果。" };
-    const result = simulationTrajectory(definition, answer.parameter);
-    const messages = { slow: "更新幅度太小：每一步只消除少量误差，给定次数后仍未达到目标。适度增加步长，再比较轨迹。", oscillating: "参数反复跨过最小值：更新幅度超过当前误差。减小步长，观察摆动是否衰减。", diverging: "更新幅度过大：跨过最小值后误差反而放大，Loss 越来越高。减小步长，重新执行。", converged: "Loss 达到目标；更新幅度随梯度减小，参数趋近最小值。" };
-    const correct = definition.mode === "explore" || (result.finalLoss <= definition.target.maxLoss && result.maxLoss <= result.trajectory[0].loss * definition.target.maxGrowth);
-    return { correct, message: messages[result.behavior] };
+    if (answer.parameter < definition.parameter.min || answer.parameter > definition.parameter.max || answer.executed !== definition.model.steps + 1) return { correct: false, reason: "incomplete", executed: answer.executed, message: "请在参数范围内执行完整轨迹。" };
+    const state = simulationTrajectory(definition, answer.parameter);
+    const correct = definition.mode === "explore" || (state.finalLoss <= definition.target.maxLoss && state.maxLoss <= state.trajectory[0].loss * definition.target.maxGrowth);
+    return { correct, reason: state.behavior, state, message: `状态：${state.behavior}；最终 Loss：${state.finalLoss.toPrecision(4)}` };
   }
   if (definition.type === "data-transform" && answer.kind === "transformation") {
     const events = transformationEvents(definition), expected = transformationCells(definition, events.length);
-    const correct = answer.executed === events.length && answer.cells.length === expected.length && answer.cells.every((value, index) => value === expected[index]);
-    return { correct, message: correct ? "每个数字都来自同一句中窗口内的一次中心词→上下文词事件；行向量记录了这个词的邻居分布。" : "按中心词定位行、上下文词定位列。每个窗口事件只计数一次，不能跨句或凭印象补数。" };
+    const cell = expected.findIndex((value,index) => answer.cells[index] !== value);
+    const correct = answer.executed === events.length && answer.cells.length === expected.length && cell === -1;
+    return { correct, reason: correct ? "completed" : cell >= 0 ? "wrong-matrix-cell" : "incomplete", executed: answer.executed, ...(cell >= 0 ? {cell, expected: expected[cell], actual: answer.cells[cell]} : {}), message: correct ? "计数完成。" : "计数尚未符合当前事件集合。" };
   }
-  return { correct: false, message: "操作结果与当前机制不匹配，请重置后重试。" };
+  return { correct: false, reason: "incompatible-answer", message: "操作结果与当前机制不匹配，请重置后重试。" };
 }
 
 export type TimelineState = { cursor: number; playing: boolean };
