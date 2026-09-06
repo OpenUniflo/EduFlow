@@ -1,0 +1,1109 @@
+-- Generated Lesson 1 teaching content. No schema, Knowledge, curriculum order, Assignment or learner-state changes.
+
+begin;
+
+do $$ begin
+
+if not exists(select 1 from courses where id='ai-agents-in-depth') then return; end if;
+
+if (select array_agg(node_id order by display_order) from curriculum_coverages where course_id='ai-agents-in-depth' and lesson_id='aiad-lesson-01') is distinct from array['A02','AGC01','R10','AGC02','AGC03','H02','WF05','S01','S02','S03']::text[] then raise exception 'Lesson 1 identity/order changed; re-audit before rollout'; end if;
+
+if not exists(select 1 from knowledge_nodes where id='A02' and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;
+
+if exists(select 1 from micro_learning_paths where id='aiad-l1-a02' and (course_id is distinct from 'ai-agents-in-depth' or knowledge_id<>'A02')) then raise exception 'Micro Path identity conflict'; end if;
+
+insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values('aiad-l1-a02','A02','ai-agents-in-depth','course','Agent：从回答到行动','分清模型、上下文、工具、任务状态与运行层，并把环境放在正确边界。','learn',7,true,'published',1) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;
+
+if exists(select 1 from micro_units where id='aiad-l1-a02-unit' and (path_id<>'aiad-l1-a02' or position<>0)) then raise exception 'Micro Unit identity/order conflict'; end if;
+
+insert into micro_units(id,path_id,title,position,estimated_minutes,required) values('aiad-l1-a02-unit','aiad-l1-a02','Agent：从回答到行动',0,7,true) on conflict(id) do update set title=excluded.title,estimated_minutes=excluded.estimated_minutes;
+
+if exists(select 1 from micro_steps where id='aiad-l1-a02-s1' and (unit_id<>'aiad-l1-a02-unit' or position<>0)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-a02-s1','aiad-l1-a02-unit',0,'explanation','先从你用过的聊天开始','你可能让 ChatGPT 给过建议。这里比较的是两种任务方式：只生成一段“怎么做”的建议；或实际查资料、执行操作，并根据结果继续。ChatGPT 产品也可能提供后者，区别不在产品名字。
+
+本节带你认识 Agent 的组成、反馈循环、工作流取舍与安全边界。你不需要先会编程；学完要能解释它如何做事，不代表已经能独立开发系统。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-a02-s2' and (unit_id<>'aiad-l1-a02-unit' or position<>1)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-a02-s2','aiad-l1-a02-unit',1,'explanation','Agent 先看，再决定，再行动','Agent（智能体）会依据收到的信息决定下一步行动，再看行动带来的结果。以找航班为例：看到出行需求 → 决定查航班 → 得到查询结果 → 再决定是否换条件。
+
+环境（Environment）是它交互的外部世界，例如航班数据库或用户。Agent 得到的只是观察，例如查询返回的几个航班，并非整个环境。以上为教材场景的教学改编。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-a02-s3' and (unit_id<>'aiad-l1-a02-unit' or position<>2)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-a02-s3','aiad-l1-a02-unit',2,'explanation','先认识三个协作角色','模型（Model；这里是能理解和生成语言的大语言模型 LLM）负责理解需求、决定下一步。
+上下文（Context）是这次决策实际交给模型的信息，例如出行需求和刚查到的航班。
+工具（Tool）是读取或改变外部世界的接口，例如查询航班的接口。航班数据库本身仍属于环境。
+
+模型说“我要查询”，不等于查询已经执行。
+
+下面单步观察同一航班任务：节点标出 Agent 内外；下方每一步说明决定、执行与信息回传。向下滚动可看到“单步 Step”和事件说明。','{
+  "type": "flow-execution",
+  "mode": "explore",
+  "teaching": {
+    "explanation": "图把Agent内部的模型、上下文与工具接口，同外部环境分开标注。箭头表示信息和执行交接；不是把数据库装进模型。单步观察每个角色在同一查询任务中的作用。"
+  },
+  "nodes": [
+    {
+      "id": "context",
+      "label": "Agent内：上下文",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "model",
+      "label": "Agent内：模型",
+      "x": 190,
+      "y": 0
+    },
+    {
+      "id": "tool",
+      "label": "Agent内：工具接口",
+      "x": 0,
+      "y": 120
+    },
+    {
+      "id": "env",
+      "label": "Agent外：环境",
+      "x": 190,
+      "y": 120
+    }
+  ],
+  "edges": [
+    {
+      "id": "read",
+      "from": "context",
+      "to": "model",
+      "label": "本次决策信息"
+    },
+    {
+      "id": "decide",
+      "from": "model",
+      "to": "tool",
+      "label": "选择查询操作"
+    },
+    {
+      "id": "query",
+      "from": "tool",
+      "to": "env",
+      "label": "系统实际执行查询"
+    },
+    {
+      "id": "result",
+      "from": "env",
+      "to": "context",
+      "label": "系统把结果纳入上下文"
+    }
+  ],
+  "initialEdgeIds": [
+    "read",
+    "decide",
+    "query",
+    "result"
+  ],
+  "correctEdgeIds": [
+    "read",
+    "decide",
+    "query",
+    "result"
+  ],
+  "events": [
+    {
+      "nodeId": "context",
+      "title": "1 · 当前信息",
+      "message": "用户需要周三去上海的航班。",
+      "explanation": "这是模型现在能读到的任务信息。"
+    },
+    {
+      "nodeId": "model",
+      "edgeId": "read",
+      "title": "2 · 作决定",
+      "message": "模型决定查询周三航班。",
+      "explanation": "模型产生下一步决定，还没有查询结果。"
+    },
+    {
+      "nodeId": "tool",
+      "edgeId": "decide",
+      "title": "3 · 接上操作",
+      "message": "系统通过查询接口访问航班数据。",
+      "explanation": "工具是接口，系统要实际执行查询。"
+    },
+    {
+      "nodeId": "env",
+      "edgeId": "query",
+      "title": "4 · 外部事实",
+      "message": "航班系统返回可选航班列表。",
+      "explanation": "真实航班记录仍在Agent之外。"
+    },
+    {
+      "nodeId": "context",
+      "edgeId": "result",
+      "title": "5 · 新信息回来",
+      "message": "返回的列表被组织进上下文，供下一次决定使用。",
+      "explanation": "模型没有读取整个数据库；它收到的是这次查询带回的信息。"
+    }
+  ]
+}'::jsonb,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-a02-s4' and (unit_id<>'aiad-l1-a02-unit' or position<>3)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-a02-s4','aiad-l1-a02-unit',3,'explanation','谁把这些角色连起来？','是谁实际发起查询，再把结果放回上下文？是支撑任务运行的程序，本节称为运行层（Runtime）。
+
+教材用 Harness 指 Agent 内环绕模型的运行与治理层。“治理”在这里只是控制和检查操作。运行层描述执行职责，Harness 还强调权限、验证和纠正；它们不是两个互不相干的 Agent。后面的 Harness Micro 专门解释这些治理职责。
+
+刚才图里的查询执行、结果组织，都由这一层承担。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-a02-s4-bridge' and (unit_id<>'aiad-l1-a02-unit' or position<>4)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-a02-s4-bridge','aiad-l1-a02-unit',4,'explanation','把关系放回同一个任务','任务状态（State）记录“进行到哪了”，例如“已查询，等待用户选日期”。运行层维护它，并把决策需要的部分放进上下文。
+
+环境状态是航班数据库里的真实航班记录。任务记录写着“已预订”，不代表数据库真的有订单。
+
+现在的关系是：
+Agent 内：Model 决策；Harness 支撑运行与检查。
+Harness 管理上下文、工具接口和任务状态。
+Agent 外：Environment 保存真实航班等事实。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-a02-s5' and (unit_id<>'aiad-l1-a02-unit' or position<>5)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-a02-s5','aiad-l1-a02-unit',5,'summary','合上页面，你能画出什么？','沿刚才的图，用自己的话指出：哪一个是决策？哪一步真的访问环境？新结果放在哪里？
+
+Agent 内：模型作决定；Harness 组织信息、工具与任务状态。
+Agent 外：环境保存真实对象与变化。
+
+下一项问：系统给了哪些信息和操作范围？
+来源：教材 PDF15–16、27。
+
+教材：用顶部“返回”回到课程，选中本知识，再点“查看课件详情”；页码按教材阅读器的 PDF 页数。
+继续本节：在课程图选“Observation and Action Spaces”，点“快速学习”。若是路线列表，先切换“查看课程图”。若只看到章节，双击“第1章”展开知识点，再选择下一项；也可搜索名称后展开章节。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-A02-15' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-15' or node_id<>'A02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-A02-15','ai-agents-in-depth-book','page-15','A02','introduce') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-A02-16' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-16' or node_id<>'A02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-A02-16','ai-agents-in-depth-book','page-16','A02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-A02-27' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-27' or node_id<>'A02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-A02-27','ai-agents-in-depth-book','page-27','A02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if not exists(select 1 from knowledge_nodes where id='AGC01' and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;
+
+if exists(select 1 from micro_learning_paths where id='aiad-l1-agc01' and (course_id is distinct from 'ai-agents-in-depth' or knowledge_id<>'AGC01')) then raise exception 'Micro Path identity conflict'; end if;
+
+insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values('aiad-l1-agc01','AGC01','ai-agents-in-depth','course','观察与动作：知道办法不等于做得到','区分可获得的观察与允许的动作，判断任务缺少哪一种接口。','learn',5,true,'published',1) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;
+
+if exists(select 1 from micro_units where id='aiad-l1-agc01-unit' and (path_id<>'aiad-l1-agc01' or position<>0)) then raise exception 'Micro Unit identity/order conflict'; end if;
+
+insert into micro_units(id,path_id,title,position,estimated_minutes,required) values('aiad-l1-agc01-unit','aiad-l1-agc01','观察与动作：知道办法不等于做得到',0,5,true) on conflict(id) do update set title=excluded.title,estimated_minutes=excluded.estimated_minutes;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc01-s1' and (unit_id<>'aiad-l1-agc01-unit' or position<>0)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc01-s1','aiad-l1-agc01-unit',0,'explanation','为什么懂订票，却只能给建议？','上一项分清了模型与环境。现在假设模型理解订票步骤，但系统只给它文字需求，既不能查航班，也不能提交预订。再聪明，它也只能写建议。问题出在与环境连接的接口。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc01-s2' and (unit_id<>'aiad-l1-agc01-unit' or position<>1)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc01-s2','aiad-l1-agc01-unit',1,'explanation','两个“空间”是两份范围','观察空间：这个 Agent 可能获得哪些环境信息，例如航班列表、用户对日期的回答。一次查回的列表只是其中一次观察。
+动作空间：允许它发出哪些操作，例如查询、询问用户、提交预订。工具接口规定这些操作能否执行。
+
+上下文是当前已组织给模型的信息，不等于全部可能的观察；模型想到的办法，也不等于被允许的动作。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc01-s3' and (unit_id<>'aiad-l1-agc01-unit' or position<>2)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc01-s3','aiad-l1-agc01-unit',2,'explanation','同一个模型，两种卡点','教学改编：
+甲能查航班，但没有提交预订的接口。它能比较航班，不能真的完成预订。
+乙有查询接口，却没有把返回结果交给模型。模型缺少本次航班观察，不能据此作选择。
+
+甲缺可执行动作，乙缺进入上下文的观察。扩展接口可以改善能力，也要与任务需要相称。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc01-s4' and (unit_id<>'aiad-l1-agc01-unit' or position<>3)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc01-s4','aiad-l1-agc01-unit',3,'interaction','检查一下：还缺哪一块？','系统已把航班列表交给模型；模型选好航班，但没有预订接口。为什么不能宣称预订完成？','{
+  "type": "choice",
+  "options": [
+    "它缺少能实际提交预订的动作接口；选好航班只是决定",
+    "它缺少本次航班观察；应先把已有列表再发送一遍",
+    "它缺少最终回复润色；先把“已预订”表达清楚"
+  ],
+  "correctIndex": 0
+}'::jsonb,'选好是模型决策；预订是对环境的操作，需要相应接口与真实执行。','先分清现在已有的观察与尚未具备的动作。看见航班不会自动生成订单。') on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc01-s5' and (unit_id<>'aiad-l1-agc01-unit' or position<>4)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc01-s5','aiad-l1-agc01-unit',4,'summary','看得见与做得到','能获得的信息决定决策依据，允许的动作决定能怎样影响环境。二者通过接口连接模型与世界。
+
+下一项把这些角色放进一次循环：为什么做完还要再看？
+来源：教材 PDF16–17。
+
+教材：用顶部“返回”回到课程，选中本知识，再点“查看课件详情”；页码按教材阅读器的 PDF 页数。
+继续本节：在课程图选“ReAct”，点“快速学习”。若是路线列表，先切换“查看课程图”。若只看到章节，双击“第1章”展开知识点，再选择下一项；也可搜索名称后展开章节。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-AGC01-16' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-16' or node_id<>'AGC01')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-AGC01-16','ai-agents-in-depth-book','page-16','AGC01','introduce') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-AGC01-17' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-17' or node_id<>'AGC01')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-AGC01-17','ai-agents-in-depth-book','page-17','AGC01','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if not exists(select 1 from knowledge_nodes where id='R10' and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;
+
+if exists(select 1 from micro_learning_paths where id='aiad-l1-r10' and (course_id is distinct from 'ai-agents-in-depth' or knowledge_id<>'R10')) then raise exception 'Micro Path identity conflict'; end if;
+
+insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values('aiad-l1-r10','R10','ai-agents-in-depth','course','ReAct：结果怎样改变下一步','沿思考、行动、观察解释反馈的作用，识别停止与盲目重复。','learn',7,true,'published',1) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;
+
+if exists(select 1 from micro_units where id='aiad-l1-r10-unit' and (path_id<>'aiad-l1-r10' or position<>0)) then raise exception 'Micro Unit identity/order conflict'; end if;
+
+insert into micro_units(id,path_id,title,position,estimated_minutes,required) values('aiad-l1-r10-unit','aiad-l1-r10','ReAct：结果怎样改变下一步',0,7,true) on conflict(id) do update set title=excluded.title,estimated_minutes=excluded.estimated_minutes;
+
+if exists(select 1 from micro_steps where id='aiad-l1-r10-s1' and (unit_id<>'aiad-l1-r10-unit' or position<>0)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-r10-s1','aiad-l1-r10-unit',0,'explanation','有了工具，为什么还要循环？','你已知道观察与动作。若查询返回“没有直飞”，最初的计划就需要调整。一次决定无法提前知道所有结果，因此要把新观察交回模型。
+
+ReAct 指思考（Reason）、行动（Act）、观察（Observation）交替进行。Loop 就是循环：看结果，再决定下一步。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-r10-s2' and (unit_id<>'aiad-l1-r10-unit' or position<>1)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-r10-s2','aiad-l1-r10-unit',1,'explanation','看两轮：结果怎样改变查询','教学改编：用户希望周三直飞，并已允许没有时查看周四。这里只观看预设轨迹。单步看第一轮“无直飞”怎样改变第二轮查询；再看第二轮怎样停止。没有调用真实服务。','{
+  "type": "flow-execution",
+  "mode": "explore",
+  "teaching": {
+    "explanation": "看模型怎样利用新结果改变下一步。连线表示信息或执行交接；播放是预设教学轨迹，不调用真实工具。断开结果回传后，演示会停在缺信息的位置。",
+    "feedback": {
+      "missing-required-edge": "结果没有交回，模型就不能依据这次真实观察继续判断。重新连接回传边，再执行。"
+    }
+  },
+  "nodes": [
+    {
+      "id": "model",
+      "label": "模型：思考",
+      "x": 0,
+      "y": 110
+    },
+    {
+      "id": "execute",
+      "label": "运行层：执行工具",
+      "x": 190,
+      "y": 110
+    },
+    {
+      "id": "world",
+      "label": "环境：航班数据",
+      "x": 0,
+      "y": 230
+    },
+    {
+      "id": "collect",
+      "label": "运行层：组织结果",
+      "x": 190,
+      "y": 230
+    },
+    {
+      "id": "answer",
+      "label": "回复用户",
+      "x": 190,
+      "y": 0
+    }
+  ],
+  "edges": [
+    {
+      "id": "act",
+      "from": "model",
+      "to": "execute",
+      "label": "决定查询"
+    },
+    {
+      "id": "observe",
+      "from": "execute",
+      "to": "world",
+      "label": "实际查询"
+    },
+    {
+      "id": "collect",
+      "from": "world",
+      "to": "collect",
+      "label": "取得查询结果"
+    },
+    {
+      "id": "return",
+      "from": "collect",
+      "to": "model",
+      "label": "结果进入上下文"
+    },
+    {
+      "id": "finish",
+      "from": "model",
+      "to": "answer",
+      "label": "信息足够，回复"
+    }
+  ],
+  "initialEdgeIds": [
+    "act",
+    "observe",
+    "collect",
+    "return",
+    "finish"
+  ],
+  "correctEdgeIds": [
+    "act",
+    "observe",
+    "collect",
+    "return",
+    "finish"
+  ],
+  "events": [
+    {
+      "nodeId": "model",
+      "title": "1 · 想：先查周三",
+      "message": "任务：找周三直飞；若没有，允许查周四。模型决定先查周三。",
+      "explanation": "用户已经允许日期调整。这里的文字只是教学中的决策说明。"
+    },
+    {
+      "nodeId": "execute",
+      "edgeId": "act",
+      "title": "2 · 做：查询周三",
+      "message": "运行层通过工具发起查询。",
+      "explanation": "模型选择操作，运行层实际执行。"
+    },
+    {
+      "nodeId": "world",
+      "edgeId": "observe",
+      "title": "3 · 看：没有直飞",
+      "message": "示意结果：周三没有直飞。",
+      "explanation": "本次环境观察否定了第一种方案。"
+    },
+    {
+      "nodeId": "collect",
+      "edgeId": "collect",
+      "title": "4 · 把结果带回",
+      "message": "运行层把“周三没有直飞”加入上下文。",
+      "explanation": "工具查到了什么，必须组织给模型，才会成为下次判断依据。"
+    },
+    {
+      "nodeId": "model",
+      "edgeId": "return",
+      "title": "5 · 再想：查询周四",
+      "message": "模型看到结果，结合用户许可决定改查周四。",
+      "explanation": "新观察改变下一步；不是盲目重复周三查询。"
+    },
+    {
+      "nodeId": "execute",
+      "edgeId": "act",
+      "title": "6 · 再做：查询周四",
+      "message": "运行层执行第二次查询。",
+      "explanation": "循环复用相同职责，但这次查询条件变了。"
+    },
+    {
+      "nodeId": "world",
+      "edgeId": "observe",
+      "title": "7 · 再看：有一个方案",
+      "message": "示意结果：周四有一个直飞航班。",
+      "explanation": "这是第二次查询的观察。"
+    },
+    {
+      "nodeId": "collect",
+      "edgeId": "collect",
+      "title": "8 · 第二次结果回传",
+      "message": "运行层把周四方案加入上下文。",
+      "explanation": "模型能把前后两次观察连起来。"
+    },
+    {
+      "nodeId": "model",
+      "edgeId": "return",
+      "title": "9 · 决定：已有可选方案",
+      "message": "模型准备向用户介绍周四方案。",
+      "explanation": "本任务是找方案，尚未请求付款或预订。"
+    },
+    {
+      "nodeId": "answer",
+      "edgeId": "finish",
+      "title": "10 · 停止查询，返回方案",
+      "message": "周三无直飞；周四有一个直飞方案，供你选择。",
+      "explanation": "查找任务得到当前结果，停止查询不等于已经订票。"
+    }
+  ]
+}'::jsonb,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-r10-s3' and (unit_id<>'aiad-l1-r10-unit' or position<>2)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-r10-s3','aiad-l1-r10-unit',2,'interaction','自己走一遍反馈链','这次做缺失反馈的对比：选中“结果进入上下文”连线并删除，从头执行，观察停在哪里。然后从“运行层：组织结果”的输出连接点拖回模型的输入连接点，恢复回传边，再完整执行两轮。
+
+演示的卡点说明缺少本次信息；不是宣称所有真实系统都会以同一种方式报错。','{
+  "type": "flow-execution",
+  "mode": "explore",
+  "teaching": {
+    "explanation": "看模型怎样利用新结果改变下一步。连线表示信息或执行交接；播放是预设教学轨迹，不调用真实工具。断开结果回传后，演示会停在缺信息的位置。",
+    "feedback": {
+      "missing-required-edge": "结果没有交回，模型就不能依据这次真实观察继续判断。重新连接回传边，再执行。"
+    }
+  },
+  "nodes": [
+    {
+      "id": "model",
+      "label": "模型：思考",
+      "x": 0,
+      "y": 110
+    },
+    {
+      "id": "execute",
+      "label": "运行层：执行工具",
+      "x": 190,
+      "y": 110
+    },
+    {
+      "id": "world",
+      "label": "环境：航班数据",
+      "x": 0,
+      "y": 230
+    },
+    {
+      "id": "collect",
+      "label": "运行层：组织结果",
+      "x": 190,
+      "y": 230
+    },
+    {
+      "id": "answer",
+      "label": "回复用户",
+      "x": 190,
+      "y": 0
+    }
+  ],
+  "edges": [
+    {
+      "id": "act",
+      "from": "model",
+      "to": "execute",
+      "label": "决定查询"
+    },
+    {
+      "id": "observe",
+      "from": "execute",
+      "to": "world",
+      "label": "实际查询"
+    },
+    {
+      "id": "collect",
+      "from": "world",
+      "to": "collect",
+      "label": "取得查询结果"
+    },
+    {
+      "id": "return",
+      "from": "collect",
+      "to": "model",
+      "label": "结果进入上下文"
+    },
+    {
+      "id": "finish",
+      "from": "model",
+      "to": "answer",
+      "label": "信息足够，回复"
+    }
+  ],
+  "initialEdgeIds": [
+    "act",
+    "observe",
+    "collect",
+    "return",
+    "finish"
+  ],
+  "correctEdgeIds": [
+    "act",
+    "observe",
+    "collect",
+    "return",
+    "finish"
+  ],
+  "events": [
+    {
+      "nodeId": "model",
+      "title": "1 · 想：先查周三",
+      "message": "任务：找周三直飞；若没有，允许查周四。模型决定先查周三。",
+      "explanation": "用户已经允许日期调整。这里的文字只是教学中的决策说明。"
+    },
+    {
+      "nodeId": "execute",
+      "edgeId": "act",
+      "title": "2 · 做：查询周三",
+      "message": "运行层通过工具发起查询。",
+      "explanation": "模型选择操作，运行层实际执行。"
+    },
+    {
+      "nodeId": "world",
+      "edgeId": "observe",
+      "title": "3 · 看：没有直飞",
+      "message": "示意结果：周三没有直飞。",
+      "explanation": "本次环境观察否定了第一种方案。"
+    },
+    {
+      "nodeId": "collect",
+      "edgeId": "collect",
+      "title": "4 · 把结果带回",
+      "message": "运行层把“周三没有直飞”加入上下文。",
+      "explanation": "工具查到了什么，必须组织给模型，才会成为下次判断依据。"
+    },
+    {
+      "nodeId": "model",
+      "edgeId": "return",
+      "title": "5 · 再想：查询周四",
+      "message": "模型看到结果，结合用户许可决定改查周四。",
+      "explanation": "新观察改变下一步；不是盲目重复周三查询。"
+    },
+    {
+      "nodeId": "execute",
+      "edgeId": "act",
+      "title": "6 · 再做：查询周四",
+      "message": "运行层执行第二次查询。",
+      "explanation": "循环复用相同职责，但这次查询条件变了。"
+    },
+    {
+      "nodeId": "world",
+      "edgeId": "observe",
+      "title": "7 · 再看：有一个方案",
+      "message": "示意结果：周四有一个直飞航班。",
+      "explanation": "这是第二次查询的观察。"
+    },
+    {
+      "nodeId": "collect",
+      "edgeId": "collect",
+      "title": "8 · 第二次结果回传",
+      "message": "运行层把周四方案加入上下文。",
+      "explanation": "模型能把前后两次观察连起来。"
+    },
+    {
+      "nodeId": "model",
+      "edgeId": "return",
+      "title": "9 · 决定：已有可选方案",
+      "message": "模型准备向用户介绍周四方案。",
+      "explanation": "本任务是找方案，尚未请求付款或预订。"
+    },
+    {
+      "nodeId": "answer",
+      "edgeId": "finish",
+      "title": "10 · 停止查询，返回方案",
+      "message": "周三无直飞；周四有一个直飞方案，供你选择。",
+      "explanation": "查找任务得到当前结果，停止查询不等于已经订票。"
+    }
+  ]
+}'::jsonb,'你已经把行动后的新观察交回模型，并看到它调整下一步。','检查观察是否交回模型，并执行到回复。想到了要查询，不代表已得到结果。') on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-r10-s4' and (unit_id<>'aiad-l1-r10-unit' or position<>3)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-r10-s4','aiad-l1-r10-unit',3,'feedback','循环不是永远调用工具','信息足够时可以回复；需要用户选择时可以暂停。任务完成、不可恢复的错误或达到预设轮数上限，都可能使系统停止。
+
+停止不一定是成功。“没有找到直飞，请选择其他日期”是如实交还选择，不是预订完成。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-r10-s5' and (unit_id<>'aiad-l1-r10-unit' or position<>4)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-r10-s5','aiad-l1-r10-unit',4,'summary','能复述这一圈吗？','模型依据上下文决定 → 运行层执行工具 → 环境返回观察 → 新结果进入上下文 → 模型再决定。
+
+反馈让下一步有新依据；没有结果回传，重复行动也不会补足这条信息链。下一项解释运行层怎样把这圈组织得更可靠。
+来源：教材 PDF22–23、31。
+
+教材：用顶部“返回”回到课程，选中本知识，再点“查看课件详情”；页码按教材阅读器的 PDF 页数。
+继续本节：在课程图选“Agent Harness”，点“快速学习”。若是路线列表，先切换“查看课程图”。若只看到章节，双击“第1章”展开知识点，再选择下一项；也可搜索名称后展开章节。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-R10-22' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-22' or node_id<>'R10')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-R10-22','ai-agents-in-depth-book','page-22','R10','introduce') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-R10-23' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-23' or node_id<>'R10')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-R10-23','ai-agents-in-depth-book','page-23','R10','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-R10-31' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-31' or node_id<>'R10')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-R10-31','ai-agents-in-depth-book','page-31','R10','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if not exists(select 1 from knowledge_nodes where id='AGC02' and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;
+
+if exists(select 1 from micro_learning_paths where id='aiad-l1-agc02' and (course_id is distinct from 'ai-agents-in-depth' or knowledge_id<>'AGC02')) then raise exception 'Micro Path identity conflict'; end if;
+
+insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values('aiad-l1-agc02','AGC02','ai-agents-in-depth','course','Harness：让“想做”可靠地变成“做了”','区分模型决策与上下文、工具、约束、验证、纠正等运行治理职责。','learn',7,true,'published',1) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;
+
+if exists(select 1 from micro_units where id='aiad-l1-agc02-unit' and (path_id<>'aiad-l1-agc02' or position<>0)) then raise exception 'Micro Unit identity/order conflict'; end if;
+
+insert into micro_units(id,path_id,title,position,estimated_minutes,required) values('aiad-l1-agc02-unit','aiad-l1-agc02','Harness：让“想做”可靠地变成“做了”',0,7,true) on conflict(id) do update set title=excluded.title,estimated_minutes=excluded.estimated_minutes;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc02-s1' and (unit_id<>'aiad-l1-agc02-unit' or position<>0)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc02-s1','aiad-l1-agc02-unit',0,'explanation','能转一圈，还可能出什么错？','上一项已经把反馈交回模型。但如果模型选错工具、系统允许了越权操作，或结果其实没完成，循环照样可能出错。Harness 要支撑运行，也要把这些边界管起来。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc02-s2' and (unit_id<>'aiad-l1-agc02-unit' or position<>1)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc02-s2','aiad-l1-agc02-unit',1,'explanation','先让任务运行起来','Harness 是 Agent 内环绕模型的运行与治理层：
+上下文管理：把任务说明、结果和当前进展组织给模型。
+工具接口：让模型知道有哪些操作，并把行动交给相应实现。
+
+运行层维护循环和任务状态，例如“查完了，正在等待选择”。这里先理解职责；怎样保存状态、组织具体消息，是下一节内容。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc02-s3' and (unit_id<>'aiad-l1-agc02-unit' or position<>2)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc02-s3','aiad-l1-agc02-unit',2,'explanation','再问三件事：允许吗、做对吗、怎么办？','约束：这次操作允许执行吗？例如超出授权范围就拦住。
+验证：结果真的符合要求吗？例如查实际订单状态，而非只听一句“完成了”。
+纠正：检查不通过后怎么办？例如返回失败原因，撤销可以安全撤销的修改，或交给人工。
+
+这些机制帮助降低错误，不保证永不出错；也不是每次都必须重试。以上是教材机制的教学改编。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc02-s4' and (unit_id<>'aiad-l1-agc02-unit' or position<>3)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc02-s4','aiad-l1-agc02-unit',3,'explanation','不要把整个世界都叫 Harness','航班数据库的真实记录属于环境；连接它的接口与权限检查属于 Harness。即使它们部署在同一台电脑上，这个概念边界也不变。
+
+框架（Framework）是可复用的开发库或组件，可以帮助实现这些职责。“用了某个框架”并不自动证明所有边界都处理好了。
+
+编排是 Harness 内组织步骤与信息流转的职责；护栏是约束与检查的具体手段。它们描述不同职责，不是必须另外添加的两套系统。后面会用同一任务展开。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc02-s5' and (unit_id<>'aiad-l1-agc02-unit' or position<>4)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc02-s5','aiad-l1-agc02-unit',4,'interaction','是谁应该解决这个问题？','模型能选出航班，但任何请求都能绕过预订权限检查。只把“请遵守权限”写进提示，够吗？','{
+  "type": "choice",
+  "options": [
+    "先给模型补一段更明确的权限说明，靠模型每次主动遵守",
+    "在运行层真正检查权限，同时给模型清楚的规则和拒绝原因",
+    "只在最终回复中删掉越权相关的文字"
+  ],
+  "correctIndex": 1
+}'::jsonb,'约束必须落实在运行中的操作边界；模型的承诺不能代替权限检查。','模型负责判断下一步；能否执行还要经过实际的运行控制。') on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc02-s6' and (unit_id<>'aiad-l1-agc02-unit' or position<>5)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc02-s6','aiad-l1-agc02-unit',5,'summary','两层职责不要混在一起','Model 负责决策；Harness 用上下文与工具支撑行动，用约束、验证与纠正治理行动。任务状态帮助接续运行，环境保存外部事实。
+
+下一项再讨论模型选型：先分清问题属于哪一层，才知道换模型是否有帮助。
+来源：教材 PDF26–28。
+
+教材：用顶部“返回”回到课程，选中本知识，再点“查看课件详情”；页码按教材阅读器的 PDF 页数。
+继续本节：在课程图选“Agent Model Selection”，点“快速学习”。若是路线列表，先切换“查看课程图”。若只看到章节，双击“第1章”展开知识点，再选择下一项；也可搜索名称后展开章节。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-AGC02-27' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-27' or node_id<>'AGC02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-AGC02-27','ai-agents-in-depth-book','page-27','AGC02','introduce') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-AGC02-26' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-26' or node_id<>'AGC02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-AGC02-26','ai-agents-in-depth-book','page-26','AGC02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-AGC02-28' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-28' or node_id<>'AGC02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-AGC02-28','ai-agents-in-depth-book','page-28','AGC02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-AGC02-32' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-32' or node_id<>'AGC02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-AGC02-32','ai-agents-in-depth-book','page-32','AGC02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-AGC02-33' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-33' or node_id<>'AGC02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-AGC02-33','ai-agents-in-depth-book','page-33','AGC02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if not exists(select 1 from knowledge_nodes where id='AGC03' and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;
+
+if exists(select 1 from micro_learning_paths where id='aiad-l1-agc03' and (course_id is distinct from 'ai-agents-in-depth' or knowledge_id<>'AGC03')) then raise exception 'Micro Path identity conflict'; end if;
+
+insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values('aiad-l1-agc03','AGC03','ai-agents-in-depth','course','选模型：先看自己的任务','按任务能力、工具表现、成本、速度与实际可用边界作基本取舍。','learn',5,true,'published',1) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;
+
+if exists(select 1 from micro_units where id='aiad-l1-agc03-unit' and (path_id<>'aiad-l1-agc03' or position<>0)) then raise exception 'Micro Unit identity/order conflict'; end if;
+
+insert into micro_units(id,path_id,title,position,estimated_minutes,required) values('aiad-l1-agc03-unit','aiad-l1-agc03','选模型：先看自己的任务',0,5,true) on conflict(id) do update set title=excluded.title,estimated_minutes=excluded.estimated_minutes;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc03-s1' and (unit_id<>'aiad-l1-agc03-unit' or position<>0)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc03-s1','aiad-l1-agc03-unit',0,'explanation','排行榜第一，就一定适合吗？','前面练习过模型与运行层的职责区别。选模型也要回到实际任务：需要理解什么、决定什么、使用哪些工具？一个总榜分数不能回答所有这些问题。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc03-s2' and (unit_id<>'aiad-l1-agc03-unit' or position<>1)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc03-s2','aiad-l1-agc03-unit',1,'explanation','用同一个真实任务比较','能力：能否处理本任务，并正确选择工具？如果任务要读图，还需相应图像理解能力。
+成本与速度：多轮任务会反复等待模型；每轮都慢一点，总等待就会累积。
+实际可用性：模型是否因其规则拒绝本来需要处理的任务、产品接口是否开放所需能力、使用规则是否允许，也会影响任务能否完成。
+
+这里学习比较方法，不推荐具体型号。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc03-s3' and (unit_id<>'aiad-l1-agc03-unit' or position<>2)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc03-s3','aiad-l1-agc03-unit',2,'explanation','别混淆两种失败','教学改编：两个候选模型用同一航班查询任务。甲便宜，但经常选错查询条件；乙更贵，却较可靠。需要比较任务结果是否值得多出的成本。
+
+另一个已查明的问题：系统根本没开放查询接口，因此两个模型都无法发起查询。此时先解决接口，再比较模型。模型分数无法替代任务内检查。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc03-s4' and (unit_id<>'aiad-l1-agc03-unit' or position<>3)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc03-s4','aiad-l1-agc03-unit',3,'interaction','你会先做哪一步？','某模型总榜更高，团队想直接替换。当前任务要多轮查航班并解释结果。哪种依据更充分？','{
+  "type": "choice",
+  "options": [
+    "保留旧模型，因为替换有成本，之后不再评估",
+    "先在同样任务与接口下比较结果、工具表现、成本和等待，再作取舍",
+    "只选回复更快的模型，多轮任务中速度足以代表整体效果"
+  ],
+  "correctIndex": 1
+}'::jsonb,'让候选面对实际任务，才能发现总榜没有覆盖的限制与代价。','分数只是一个信号；这项任务的接口、表现和代价才是选型依据。') on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-agc03-s5' and (unit_id<>'aiad-l1-agc03-unit' or position<>4)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-agc03-s5','aiad-l1-agc03-unit',4,'summary','选择是一组取舍','先说清任务要求，再比较模型在该任务的能力、工具表现、成本、速度和可用边界。不要把缺接口归咎于模型。
+
+接下来比较另一种选择：步骤由程序预设，还是由模型根据结果决定？
+来源：教材 PDF29–30。
+
+教材：用顶部“返回”回到课程，选中本知识，再点“查看课件详情”；页码按教材阅读器的 PDF 页数。
+继续本节：在课程图选“Workflow”，点“快速学习”。若是路线列表，先切换“查看课程图”。若只看到章节，双击“第1章”展开知识点，再选择下一项；也可搜索名称后展开章节。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-AGC03-29' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-29' or node_id<>'AGC03')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-AGC03-29','ai-agents-in-depth-book','page-29','AGC03','introduce') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-AGC03-30' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-30' or node_id<>'AGC03')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-AGC03-30','ai-agents-in-depth-book','page-30','AGC03','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if not exists(select 1 from knowledge_nodes where id='H02' and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;
+
+if exists(select 1 from micro_learning_paths where id='aiad-l1-h02' and (course_id is distinct from 'ai-agents-in-depth' or knowledge_id<>'H02')) then raise exception 'Micro Path identity conflict'; end if;
+
+insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values('aiad-l1-h02','H02','ai-agents-in-depth','course','Workflow：谁决定下一步？','理解固定工作流的控制关系及其与自主执行的取舍。','learn',5,true,'published',1) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;
+
+if exists(select 1 from micro_units where id='aiad-l1-h02-unit' and (path_id<>'aiad-l1-h02' or position<>0)) then raise exception 'Micro Unit identity/order conflict'; end if;
+
+insert into micro_units(id,path_id,title,position,estimated_minutes,required) values('aiad-l1-h02-unit','aiad-l1-h02','Workflow：谁决定下一步？',0,5,true) on conflict(id) do update set title=excluded.title,estimated_minutes=excluded.estimated_minutes;
+
+if exists(select 1 from micro_steps where id='aiad-l1-h02-s1' and (unit_id<>'aiad-l1-h02-unit' or position<>0)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-h02-s1','aiad-l1-h02-unit',0,'explanation','有些顺序不能随意改变','选好模型后，还要决定怎样组织步骤。教材的订票示例规定：核实身份 → 搜索航班 → 完成付款 → 确认预订。这里的顺序是该示例的业务规则，不是所有订票系统的通用事实。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-h02-s2' and (unit_id<>'aiad-l1-h02-unit' or position<>1)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-h02-s2','aiad-l1-h02-unit',1,'explanation','固定的是控制路径','Workflow（工作流）由显式步骤与预设控制关系组成。程序规定下一步走哪里；某个步骤内部仍可用模型理解需求或生成文字。
+
+确定的是流程控制，不是保证模型每次生成完全相同的文字。遇到异常，可以走事先定义的处理分支或交给人工。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-h02-s3' and (unit_id<>'aiad-l1-h02-unit' or position<>2)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-h02-s3','aiad-l1-h02-unit',2,'explanation','换需求时，两种路线怎样不同？','教学改编：两种系统都收到“周三没有直飞”的反馈。
+固定工作流：程序早已规定“没有直飞就查次日”，按这个分支继续。
+自主执行：模型根据任务范围和新结果决定，是换日期、问用户，还是寻找其他方案。
+
+两者都能处理反馈。区别是下一条处理路径由预先写好的控制关系选定，还是由模型现场决定。仅看到了两次查询，还不能判断是哪一种。自主性增加了可选步骤，也增加了需要付出的调用成本和出错机会。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-h02-s4' and (unit_id<>'aiad-l1-h02-unit' or position<>3)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-h02-s4','aiad-l1-h02-unit',3,'interaction','模型出现了，就不是工作流了吗？','程序预先规定“周三无直飞，就查询周四”，模型只负责理解目的地。收到“无直飞”后换日期，能否据此认定这是自主执行？','{
+  "type": "choice",
+  "options": [
+    "能，因为查询条件随反馈变化了",
+    "不能；本例下一步由已写好的分支选定，变化本身不能证明是模型现场决定"
+  ],
+  "correctIndex": 1
+}'::jsonb,'节点内部用模型，与节点之间谁决定顺序，是两个问题。','看控制权：下一步由预设程序还是根据反馈动态决定？不要仅看有没有模型。') on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-h02-s5' and (unit_id<>'aiad-l1-h02-unit' or position<>4)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-h02-s5','aiad-l1-h02-unit',4,'summary','固定与自主如何选？','步骤可清楚预设、关键顺序必须守住时，工作流有价值；需要模型根据反馈决定未预先写定的下一步时，自主执行可能更合适。两者都需要处理错误。
+
+下一项把两者放到一个任务中，看看怎样分工。
+来源：教材 PDF30–32。
+
+教材：用顶部“返回”回到课程，选中本知识，再点“查看课件详情”；页码按教材阅读器的 PDF 页数。
+继续本节：在课程图选“Agentic Workflow”，点“快速学习”。若是路线列表，先切换“查看课程图”。若只看到章节，双击“第1章”展开知识点，再选择下一项；也可搜索名称后展开章节。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-H02-30' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-30' or node_id<>'H02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-H02-30','ai-agents-in-depth-book','page-30','H02','introduce') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-H02-31' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-31' or node_id<>'H02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-H02-31','ai-agents-in-depth-book','page-31','H02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-H02-32' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-32' or node_id<>'H02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-H02-32','ai-agents-in-depth-book','page-32','H02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if not exists(select 1 from knowledge_nodes where id='WF05' and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;
+
+if exists(select 1 from micro_learning_paths where id='aiad-l1-wf05' and (course_id is distinct from 'ai-agents-in-depth' or knowledge_id<>'WF05')) then raise exception 'Micro Path identity conflict'; end if;
+
+insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values('aiad-l1-wf05','WF05','ai-agents-in-depth','course','Agentic Workflow：把灵活性放在边界内','说明确定性步骤、Agent决策、结果检查与审批怎样组合。','learn',5,true,'published',1) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;
+
+if exists(select 1 from micro_units where id='aiad-l1-wf05-unit' and (path_id<>'aiad-l1-wf05' or position<>0)) then raise exception 'Micro Unit identity/order conflict'; end if;
+
+insert into micro_units(id,path_id,title,position,estimated_minutes,required) values('aiad-l1-wf05-unit','aiad-l1-wf05','Agentic Workflow：把灵活性放在边界内',0,5,true) on conflict(id) do update set title=excluded.title,estimated_minutes=excluded.estimated_minutes;
+
+if exists(select 1 from micro_steps where id='aiad-l1-wf05-s1' and (unit_id<>'aiad-l1-wf05-unit' or position<>0)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-wf05-s1','aiad-l1-wf05-unit',0,'explanation','既要灵活，也有不能跳过的关口','工作流可固定关键关口，也可在其中安排需要模型灵活判断的部分。Agentic Workflow 就是这种混合组织；本节还关注相应的检查和审批。
+
+编排（Orchestration）是 Harness 中“怎样组织步骤与信息”的职责；编排者是承担它的程序或组件，不必再加一个模型。确定性步骤在这里指预设规则控制的步骤。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-wf05-s2' and (unit_id<>'aiad-l1-wf05-unit' or position<>1)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-wf05-s2','aiad-l1-wf05-unit',1,'explanation','一个混合流程：寻找方案与确认分开','跨节教学改编：
+固定关口：核实身份和任务范围。
+灵活部分：Agent 根据航班结果调整查询、与用户讨论方案。
+审批关口：涉及付款时，按规则请用户确认。
+结果检查：检查是否真的生成预订，再向用户报告。
+
+这段是教材混合模式、人工干预和结果检查原则的组合示例，不是原书完整流程照录。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-wf05-s3' and (unit_id<>'aiad-l1-wf05-unit' or position<>2)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-wf05-s3','aiad-l1-wf05-unit',2,'explanation','说完成，与真完成，是两件事','评估在此指检查动作和结果是否符合目标。前面 Harness 的验证就是运行中进行检查；这里还把执行过程一起纳入检查。
+
+教学改编：Agent 回复“已经预订”，实际订单却没创建。只读回复会误判；查询实际结果才发现没有完成。反过来，也要检查过程是否越过权限或审批。
+
+审批发生在需要确认的关键操作前；事后发现错误，不能倒过来代替事前批准。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-wf05-s4' and (unit_id<>'aiad-l1-wf05-unit' or position<>3)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-wf05-s4','aiad-l1-wf05-unit',3,'interaction','哪一步不能交给一句承诺？','Agent 已找到一个合适航班，但本流程要求付款前由用户确认。应当怎样继续？','{
+  "type": "choice",
+  "options": [
+    "让模型确认这确实是合适方案后直接付款，最终再请用户核对",
+    "按流程取得用户确认再允许付款，执行后另查实际结果",
+    "先付款但暂不发送完成回复，等用户确认才报告"
+  ],
+  "correctIndex": 1
+}'::jsonb,'灵活的是查找方案，审批关口仍由流程强制执行；结果验证是另一件事。','找到合适方案不是获得付款授权。区分动态决策、批准与实际结果。') on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-wf05-s5' and (unit_id<>'aiad-l1-wf05-unit' or position<>4)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-wf05-s5','aiad-l1-wf05-unit',4,'summary','不是在两种模式之间二选一','可预设的规则交给明确流程，需要灵活判断的部分交给 Agent。关键操作守住审批，完成声明要对照真实结果。
+
+下一项把这些安全检查放回输入、执行和输出的边界。
+来源：教材混合模式 PDF31–32、人工干预33–34、过程与结果173。
+
+教材：用顶部“返回”回到课程，选中本知识，再点“查看课件详情”；页码按教材阅读器的 PDF 页数。
+继续本节：在课程图选“Guardrail”，点“快速学习”。若是路线列表，先切换“查看课程图”。若只看到章节，双击“第1章”展开知识点，再选择下一项；也可搜索名称后展开章节。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-WF05-31' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-31' or node_id<>'WF05')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-WF05-31','ai-agents-in-depth-book','page-31','WF05','introduce') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-WF05-33' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-33' or node_id<>'WF05')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-WF05-33','ai-agents-in-depth-book','page-33','WF05','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-WF05-34' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-34' or node_id<>'WF05')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-WF05-34','ai-agents-in-depth-book','page-34','WF05','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-WF05-173' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-173' or node_id<>'WF05')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-WF05-173','ai-agents-in-depth-book','page-173','WF05','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-WF05-28' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-28' or node_id<>'WF05')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-WF05-28','ai-agents-in-depth-book','page-28','WF05','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-WF05-32' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-32' or node_id<>'WF05')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-WF05-32','ai-agents-in-depth-book','page-32','WF05','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if not exists(select 1 from knowledge_nodes where id='S01' and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;
+
+if exists(select 1 from micro_learning_paths where id='aiad-l1-s01' and (course_id is distinct from 'ai-agents-in-depth' or knowledge_id<>'S01')) then raise exception 'Micro Path identity conflict'; end if;
+
+insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values('aiad-l1-s01','S01','ai-agents-in-depth','course','Guardrail：检查应放在哪里？','区分输入、执行和输出检查，并理解分层与人工接手的必要性。','learn',5,true,'published',1) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;
+
+if exists(select 1 from micro_units where id='aiad-l1-s01-unit' and (path_id<>'aiad-l1-s01' or position<>0)) then raise exception 'Micro Unit identity/order conflict'; end if;
+
+insert into micro_units(id,path_id,title,position,estimated_minutes,required) values('aiad-l1-s01-unit','aiad-l1-s01','Guardrail：检查应放在哪里？',0,5,true) on conflict(id) do update set title=excluded.title,estimated_minutes=excluded.estimated_minutes;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s01-s1' and (unit_id<>'aiad-l1-s01-unit' or position<>0)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s01-s1','aiad-l1-s01-unit',0,'explanation','只检查最后一句话，来得及吗？','前面看到，Agent 能通过工具造成真实影响。如果在错误付款后才检查回复文字，错误操作已经发生。Guardrail（护栏）是在不同边界实施的安全规则与检查。
+
+它是 Harness 中约束、验证与纠正的落实方式，不是模型旁边又多出一个必须独立部署的角色。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s01-s2' and (unit_id<>'aiad-l1-s01-unit' or position<>1)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s01-s2','aiad-l1-s01-unit',1,'explanation','三道边界，各管不同问题','输入侧：请求进入前，检查是否属于允许处理的范围。
+执行侧：工具操作前，检查权限和风险；高风险操作可能需要人工确认。
+输出侧：回复给用户前，检查是否暴露不应公开的信息。
+
+一层检查不能替代其他层；拒绝越权操作，也不等于输出必然正确。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s01-s3' and (unit_id<>'aiad-l1-s01-unit' or position<>2)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s01-s3','aiad-l1-s01-unit',2,'explanation','把检查放在出事之前','教学改编：收到请求 → 判断是否允许处理；准备付款 → 核对权限并请用户确认；形成回复 → 检查是否含不必要的个人信息。
+
+护栏也可能误拒绝合法任务，因此要同时检查“该拦的是否拦住”和“允许的是否能完成”。失败次数超过上限或无法处理时，可以交给人工。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s01-s4' and (unit_id<>'aiad-l1-s01-unit' or position<>3)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s01-s4','aiad-l1-s01-unit',3,'interaction','把三种检查放回边界','按“何时执行、要拦什么”拖动分类。先前的示例已经解释这些位置。','{
+  "type": "categorize",
+  "items": [
+    {
+      "id": "input",
+      "label": "收到请求时检查是否超出服务范围"
+    },
+    {
+      "id": "action",
+      "label": "付款执行前核对权限并要求确认"
+    },
+    {
+      "id": "output",
+      "label": "回复发出前移除不必要的手机号"
+    }
+  ],
+  "categories": [
+    "输入侧",
+    "执行侧",
+    "输出侧"
+  ],
+  "correctCategories": [
+    "输入侧",
+    "执行侧",
+    "输出侧"
+  ]
+}'::jsonb,'不同边界有不同检查对象；只做最后一层，无法撤销已经发生的操作。','看检查的时机：收到请求、执行工具、发送回复。付款确认需要发生在付款之前。') on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s01-s5' and (unit_id<>'aiad-l1-s01-unit' or position<>4)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s01-s5','aiad-l1-s01-unit',4,'summary','护栏是分层控制，不是安全保证','输入、执行、输出分别检查；高风险或持续失败时交给人工。既要减少危险放行，也要发现合法请求被误拒绝。
+
+下一项看执行侧的一种具体控制：把代码的影响限制在隔离环境里。
+来源：教材 PDF33–34。
+
+教材：用顶部“返回”回到课程，选中本知识，再点“查看课件详情”；页码按教材阅读器的 PDF 页数。
+继续本节：在课程图选“Sandbox”，点“快速学习”。若是路线列表，先切换“查看课程图”。若只看到章节，双击“第1章”展开知识点，再选择下一项；也可搜索名称后展开章节。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-S01-33' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-33' or node_id<>'S01')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-S01-33','ai-agents-in-depth-book','page-33','S01','introduce') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-S01-34' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-34' or node_id<>'S01')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-S01-34','ai-agents-in-depth-book','page-34','S01','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if not exists(select 1 from knowledge_nodes where id='S02' and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;
+
+if exists(select 1 from micro_learning_paths where id='aiad-l1-s02' and (course_id is distinct from 'ai-agents-in-depth' or knowledge_id<>'S02')) then raise exception 'Micro Path identity conflict'; end if;
+
+insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values('aiad-l1-s02','S02','ai-agents-in-depth','course','Sandbox：把副作用限制在范围内','理解隔离如何限制代码影响，并区分隔离与结果正确。','learn',5,true,'published',1) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;
+
+if exists(select 1 from micro_units where id='aiad-l1-s02-unit' and (path_id<>'aiad-l1-s02' or position<>0)) then raise exception 'Micro Unit identity/order conflict'; end if;
+
+insert into micro_units(id,path_id,title,position,estimated_minutes,required) values('aiad-l1-s02-unit','aiad-l1-s02','Sandbox：把副作用限制在范围内',0,5,true) on conflict(id) do update set title=excluded.title,estimated_minutes=excluded.estimated_minutes;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s02-s1' and (unit_id<>'aiad-l1-s02-unit' or position<>0)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s02-s1','aiad-l1-s02-unit',0,'explanation','工具执行错了，会碰到什么？','从航班换一个同样需要工具的任务：处理表格。模型可以提出一段处理代码，系统通过代码工具运行它。代码就是交给计算机执行的指令，例如读取表格、计算总数、写出新文件。
+
+副作用是对外部状态的改变，例如文件被改写。如果工具可以碰到所有文件，一次错误就可能影响任务之外的东西。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s02-s2' and (unit_id<>'aiad-l1-s02-unit' or position<>1)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s02-s2','aiad-l1-s02-unit',1,'explanation','沙盒隔离的是什么？','Sandbox（沙盒）是限制执行影响的隔离环境。系统控制代码能接触的文件、能连接的外部服务，以及可用内存和执行时间等上限。
+
+隔离和权限配置属于运行治理；沙盒里随操作变化的文件和正在运行的程序仍属于环境。沙盒不是把外部世界放进模型。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s02-s3' and (unit_id<>'aiad-l1-s02-unit' or position<>2)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s02-s3','aiad-l1-s02-unit',2,'explanation','隔离前后，观察影响范围','教学改编：任务只需要处理一份表格。
+没有限制：程序可能碰到任务外的文件和网络。
+设置隔离：只提供任务文件与工作区，限制网络和执行时间。即使程序出错，允许影响的范围也更小。
+
+隔离不会自动让表格计算正确。仍需验证结果；如果允许过多文件或对外通道，也仍有风险。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s02-s4' and (unit_id<>'aiad-l1-s02-unit' or position<>3)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s02-s4','aiad-l1-s02-unit',3,'explanation','同一任务里，隔离与权限怎样配合？','教学改编：任务只需读取一份报告并在页面内总结。
+最小权限：决定只允许读这份报告，不授予删除或发邮件能力。
+沙盒：执行环境只提供允许接触的文件，并限制外部网络和资源。
+护栏：在请求、具体操作和回复等边界检查是否符合规则。
+
+它们不是互斥分类：权限规定允许范围，隔离帮助落实和限制影响，边界检查则在运行过程中核对。下一项继续练习怎样确定“够用”的范围。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s02-s5' and (unit_id<>'aiad-l1-s02-unit' or position<>4)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s02-s5','aiad-l1-s02-unit',4,'summary','隔离回答的是“能影响哪里”','沙盒限制代码接触的环境与资源，降低副作用范围；结果是否正确仍要另行检查。
+
+即使有沙盒，也要问给它哪些权限才够用。下一项用最小权限收束这一节。
+来源：教材 PDF121的执行隔离、PDF27的边界、PDF19的受限代码工具。
+
+教材：用顶部“返回”回到课程，选中本知识，再点“查看课件详情”；页码按教材阅读器的 PDF 页数。
+继续本节：在课程图选“Least Privilege”，点“快速学习”。若是路线列表，先切换“查看课程图”。若只看到章节，双击“第1章”展开知识点，再选择下一项；也可搜索名称后展开章节。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-S02-121' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-121' or node_id<>'S02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-S02-121','ai-agents-in-depth-book','page-121','S02','introduce') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-S02-27' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-27' or node_id<>'S02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-S02-27','ai-agents-in-depth-book','page-27','S02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-S02-19' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-19' or node_id<>'S02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-S02-19','ai-agents-in-depth-book','page-19','S02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-S02-115' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-115' or node_id<>'S02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-S02-115','ai-agents-in-depth-book','page-115','S02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-S02-33' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-33' or node_id<>'S02')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-S02-33','ai-agents-in-depth-book','page-33','S02','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+if not exists(select 1 from knowledge_nodes where id='S03' and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;
+
+if exists(select 1 from micro_learning_paths where id='aiad-l1-s03' and (course_id is distinct from 'ai-agents-in-depth' or knowledge_id<>'S03')) then raise exception 'Micro Path identity conflict'; end if;
+
+insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values('aiad-l1-s03','S03','ai-agents-in-depth','course','最小权限：够用，而不过量','选择完成任务必需的最小访问范围，并串起本节的Agent心智模型。','learn',5,true,'published',1) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;
+
+if exists(select 1 from micro_units where id='aiad-l1-s03-unit' and (path_id<>'aiad-l1-s03' or position<>0)) then raise exception 'Micro Unit identity/order conflict'; end if;
+
+insert into micro_units(id,path_id,title,position,estimated_minutes,required) values('aiad-l1-s03-unit','aiad-l1-s03','最小权限：够用，而不过量',0,5,true) on conflict(id) do update set title=excluded.title,estimated_minutes=excluded.estimated_minutes;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s03-s1' and (unit_id<>'aiad-l1-s03-unit' or position<>0)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s03-s1','aiad-l1-s03-unit',0,'explanation','隔离好了，还要给多少权限？','上一项用沙盒缩小影响范围。但如果把全部私有文件和网络访问都开放进去，很多风险仍然存在。Least Privilege（最小权限）要求只授予当前任务真正需要的最小范围。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s03-s2' and (unit_id<>'aiad-l1-s03-unit' or position<>1)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s03-s2','aiad-l1-s03-unit',1,'explanation','先列任务，再列权限','教学改编：任务是“读取指定报告并在页面内总结”。需要读取那份报告；不需要删除文件，也不需要把报告发邮件。
+
+如果任务改为“修改指定草稿”，就可能需要该草稿的写权限。最小权限不是永远只读或完全不给权限，而是随着明确任务判断够用的最小范围。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s03-s3' and (unit_id<>'aiad-l1-s03-unit' or position<>2)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s03-s3','aiad-l1-s03-unit',2,'interaction','选一份够用的权限','新任务变为“修改指定草稿并保留修改结果”，不需要发送邮件。哪份授权最符合任务？','{
+  "type": "choice",
+  "options": [
+    "只读指定草稿；权限越少越好，即使不能保存修改",
+    "读写指定草稿与必要的工作区，不开放无关删除与邮件能力",
+    "开放所有文档读写，方便它自行决定处理范围"
+  ],
+  "correctIndex": 1
+}'::jsonb,'修改任务需要必要的写入能力；只读不够，全目录权限又过量。够用的范围取决于具体任务。','先看新任务要保存修改，因此需要写入；再看操作对象只有指定草稿，不能据此扩大到所有文件。') on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s03-s4' and (unit_id<>'aiad-l1-s03-unit' or position<>3)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s03-s4','aiad-l1-s03-unit',3,'feedback','三种控制互相配合','最小权限问“这次需要哪些能力”；沙盒问“执行能影响哪些环境与资源”；护栏在输入、执行和输出边界做检查。
+
+教材还要求限制凭证范围和有效期。凭证就是访问服务时证明权限的信息，可把它理解为有范围与有效期的电子通行证；不要把能操作所有内容的个人凭证直接交给工具。这里理解原则，具体实现留在工具章节。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from micro_steps where id='aiad-l1-s03-s5' and (unit_id<>'aiad-l1-s03-unit' or position<>4)) then raise exception 'Micro Step identity/order conflict'; end if;
+
+insert into micro_steps(id,unit_id,position,kind,title,content,interaction,success_feedback,retry_feedback) values('aiad-l1-s03-s5','aiad-l1-s03-unit',4,'summary','从一个简单任务复述整节','先不看前文，口述两个小任务：
+1. 查询航班返回“没有直飞”后，谁接收结果，怎样决定下一步？为什么还不能说已预订？
+2. 修改指定草稿需要什么权限？有沙盒后，为什么仍要检查修改结果？
+
+可返回各项 Summary 核对：决策不等于执行，反馈提供新依据，权限与隔离降低影响范围，检查验证实际结果。
+
+完成学习活动不等于已经能独立开发系统，也不是能力掌握证明。下一节再展开上下文、状态与 Agent Loop 的具体组织方式。
+来源：教材 PDF115、152。
+
+教材：用顶部“返回”回到课程，选中本知识，再点“查看课件详情”；页码按教材阅读器的 PDF 页数。',null,null,null) on conflict(id) do update set kind=excluded.kind,title=excluded.title,content=excluded.content,interaction=excluded.interaction,success_feedback=excluded.success_feedback,retry_feedback=excluded.retry_feedback;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-S03-115' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-115' or node_id<>'S03')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-S03-115','ai-agents-in-depth-book','page-115','S03','introduce') on conflict(course_id,id) do update set role=excluded.role;
+
+if exists(select 1 from material_knowledge_coverages where course_id='ai-agents-in-depth' and id='book-audit-S03-152' and (material_id<>'ai-agents-in-depth-book' or segment_id<>'page-152' or node_id<>'S03')) then raise exception 'Source mapping identity conflict'; end if;
+
+insert into material_knowledge_coverages(course_id,id,material_id,segment_id,node_id,role) values('ai-agents-in-depth','book-audit-S03-152','ai-agents-in-depth-book','page-152','S03','explain') on conflict(course_id,id) do update set role=excluded.role;
+
+end $$;
+
+commit;

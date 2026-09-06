@@ -765,3 +765,158 @@ The supplied ordinary Hosted account replayed all 25 Steps across RT01/CTX01/K01
 Final read-only snapshots `remote-before.json` and `remote-final.json` have identical database rows for Path/Unit Progress, Evidence and Knowledge States, including historical timestamps. K001 remains `practicing`; RT01/CTX01/K012/K021 remain `learned`. No duplicate evidence or mastery claim. Vercel logs for this deployment over the final 30-minute window contain zero HTTP 500 responses. Private snapshots/logs/screenshots remain under `/tmp/eduflow-micro-v2-baseline`, outside Git.
 
 **Final verdict: Local PASS / Remote PASS.** Issue #31's seven acceptance criteria are satisfied; **ready to close, still OPEN** (no unrequested closure/comment). The following closeout commit changes this ledger only and preserves the fully accepted runtime. Branch remains `feat/gold-course-learning-loop`; no merge to prototype. Non-blocking observations: existing large bundle and H5P vendor CSS build warnings; the earlier isolated local Workflow 500 returned 200 on explicit authenticated recheck, its transient cause remains UNKNOWN, and no unrelated code was changed.
+
+## Lesson 1 Content Acceptance — 2026-09-06
+
+### Baseline / Instructional Audit (before content authoring)
+
+Status: IN PROGRESS. No Teacher/Student/Technical PASS claimed.
+
+- Branch: feat/gold-course-learning-loop; starting/local/remote HEAD: 3b6d7d827469379714b8bf946711ac0446bcdb63. Clean initial worktree; no user uncommitted changes. origin/prototype f91ac063baf6d872020e2669e7e57b03ac1e6231; ahead 6 / behind 0. No merge.
+- Read-only Local DB snapshot: /tmp/eduflow-lesson1/baseline-content.json (content definitions only). Original book: docs/local/AI-Agents-in-Depth-zh-CN.pdf, 307 actual PDF pages; page text /tmp/eduflow-lesson1/book.txt. Actual MaterialSegment.page is the navigation authority.
+- Published Course ai-agents-in-depth; Lesson aiad-lesson-01, Agent 架构与运行基础. Ten active Global Knowledge identities retain original definitions/revisions/metadata. No matching Course Micro paths; the H02 path in agentic-ai-golden belongs to another Course and is not reused as official content.
+- MicroLearningPath has one knowledge_id. Plan: ten Paths, each one main cognitive objective; no cardinality/schema change. Existing four Reference Paths remain regression-only.
+- curriculum_lessons has no instructional Outcome field. Store the reviewed instructional Outcome in authored teaching content and this ledger, without creating schema or changing competency/Assignment outcomes.
+
+| Knowledge / current title | Current formal definition | Position | Factual incoming prerequisite | Factual downstream prerequisite | Actual mapped MaterialSegment / PDF page | Conceptual type / instructional role | Learner prerequisite / decision |
+|---|---|---:|---|---|---|---|---|
+| A02 LLM Agent Architecture | 解释现代 LLM Agent 中模型、上下文、工具、状态与运行时如何协作，以及各层之间的职责边界。 | 0 | A01 | R01, AGC01, AGC03, CODE01, CODE02, CODE03, CODE04, CTX01, EVAL01 | page-15 / 15 | architecture: 整体边界：Model、Harness与Environment | 用教材15–16桥接A01；不要求已有编程知识；独立Path，衔接前后内容 |
+| AGC01 Observation and Action Spaces | 描述 Agent 能从环境获得哪些观察、能够采取哪些动作，以及两者如何构成模型与外部世界之间的接口。 | 1 | A02 | CU01, CU04, MM01, R10, ROB01 | page-16 / 16 | distinction: 看得见什么、做得到什么 | A02角色边界；独立Path，衔接前后内容 |
+| R10 ReAct | 交替执行 Reason、Act 与 Observation，使模型推理、环境动作和反馈形成循环。 | 2 | AGC01 | AGC02 | page-22 / 22 | process: 反馈为何影响下一步 | AGC01观察与动作；独立Path，衔接前后内容 |
+| AGC02 Agent Harness | 围绕模型构建的工程运行层，用于组织上下文、工具、状态、执行循环与控制机制，使 Agent 能稳定完成任务。 | 3 | R10 | None recorded | page-26 / 26 | architecture: 把循环组织成可靠工程运行 | R10完整循环；独立Path，衔接前后内容 |
+| AGC03 Agent Model Selection | 依据任务能力需求、行为特征、成本与工程约束选择适合 Agent 的基础模型。 | 4 | A02 | None recorded | page-29 / 29 | judgment: 按真实任务比较模型 | A02模型职责；借AGC02分清接口问题；独立Path，衔接前后内容 |
+| H02 Workflow | 理解由显式步骤和控制关系组成的工作流。 | 5 | None recorded | None recorded | page-30 / 30 | process: 固定步骤与动态路径的取舍 | 前面已理解Agent可根据反馈改变步骤；独立Path，衔接前后内容 |
+| WF05 Agentic Workflow | 组合确定性步骤、Agent 决策、评估与审批。 | 6 | None recorded | MAC01 | page-30 / 30; page-172 / 172 | synthesis: 固定流程包住自主决策、检查与审批 | H02工作流；A02决策职责；此为教学理由，非新prerequisite；独立Path，衔接前后内容 |
+| S01 Guardrail | 在输入、输出和动作边界实施安全规则。 | 7 | None recorded | EVAL04 | page-33 / 33 | judgment: 在输入、执行、输出边界分层检查 | 已知道工具能造成真实影响；独立Path，衔接前后内容 |
+| S02 Sandbox | 在隔离环境限制代码与工具副作用。 | 8 | None recorded | None recorded | page-27 / 27; page-118 / 118 | causal mechanism: 用隔离限制代码副作用 | S01分层防护；独立Path，衔接前后内容 |
+| S03 Least Privilege | 仅授予完成任务所需的最小权限。 | 9 | None recorded | None recorded | page-115 / 115; page-152 / 152 | judgment: 只给任务必需的权限并回顾整课 | S02隔离与S01边界检查；独立Path，衔接前后内容 |
+
+### Proposed Outcome and teaching sequence
+
+Current: no independent persisted Lesson instructional Outcome. Course target concerns designing, implementing and evaluating an extensible Agent platform across the full Course; it is not the Lesson 1 acceptance bar.
+
+Proposed: 学完本节，你能用自己的话解释 Agent 如何借助观察和工具完成任务，分清模型、上下文、任务状态、运行层与环境的职责；能沿一次“思考—行动—观察”过程解释反馈为何必要，比较固定工作流与自主决策，说明选模型及分层安全控制的基本取舍。完成本节是学习活动，不代表已经具备独立开发或能力认证。
+
+Retain current A02 → AGC01 → R10 → AGC02 → AGC03 → H02 → WF05 → S01 → S02 → S03. The first four follow real prerequisite edges. AGC03 follows Harness to prevent attributing missing interfaces to model weakness. H02 establishes explicit control before WF05 combines it with adaptive decisions (the existing H02→WF05 edge is enables). S01 establishes checks; S02 and S03 distinguish isolation from narrowly scoped permission. No Global edges change for pedagogy.
+
+Dependency gap: A01→A02 exists but A01 is outside this Course. Bridge the observation/decision/action idea from PDF15–16 in A02; do not erase or fabricate graph facts. Lesson 2 owns CTX01/RT01, message roles/protocol, context cache/compression and explicit state management. Lesson 1 teaches responsibilities only, with no API fields or implementation assessment.
+
+### Grounding investigation
+
+Source summaries: A02 PDF15–16 distinguishes Agent/Environment and Model/Harness; AGC01 PDF16–17 distinguishes observed information and permitted action interfaces; R10 PDF22–24 interleaves reasoning, action and observed results; AGC02 PDF26–29 gives context/tools/constraints/verification/correction; AGC03 selection begins PDF29 and continues PDF30; H02 PDF30–32 compares predetermined routes, autonomy and mixed systems; WF05 PDF31–33 supports mixing and approvals, PDF173 distinguishes claimed completion from actual result; S01 PDF33–34 describes three check boundaries and escalation; S02 PDF27 distinguishes sandbox governance from environment, PDF121 explicitly explains isolation; S03 PDF115 gives least-privilege credentials, PDF152 limits files/network.
+
+Mapping precision findings to review: AGC03's existing audit ends PDF29 although selection continues on 30. S02 primary page27 gives architectural mention; its second mapping page118 opens execution safety but explicit sandbox explanation is page121. WF05 page172 is primarily evaluation metrics; direct process/result distinction is on173 and mixed orchestration is on31. Preserve accurate existing mappings, propose precise supporting mappings rather than fabricating sources. Old Knowledge provenance page ranges differ from the reviewed Material mapping; do not revive obsolete page locators. No external supplements planned.
+
+Runtime feasibility: explanation/feedback/summary bodies, existing read-only Flow demonstration, Flow exploration, Choice and Categorize cover the goals. No new Runtime is currently justified. Formal content and DB writes wait for independent Teacher and Student draft PASS.
+
+### Independent draft review round 1 and Author revision
+
+Teacher (`teacher_reviewer`, read-only) read all ten definitions and 51 draft screens against the original PDF. Verdict: BLOCKER 0 / P1 1 / P2 2; DOMAIN CORRECTNESS FAIL pending T-L1-001. Student (`student_reviewer`, fresh context, read-only) received learner-visible screens/options only, without answer keys or Author/Teacher notes. It returned a seven-field Before/New/Unknown/Causal/Visual/Confusion/Recall record for every one of the 51 screens, and did not claim browser acceptance or complete understanding.
+
+| Finding | Severity | Evidence / why it matters | Author minimum revision for round 2 |
+|---|---|---|---|
+| T-L1-001 | P1 | AGC03 inferred missing interface solely from two models failing to find flights; unsupported causal diagnosis | State explicitly that the missing interface was independently established; shared failure alone is not the diagnosis |
+| T-L1-002 | P2 | R10 repeated the identical five-event viewing task | Separate read-only demonstration from broken-return exploration; show two rounds with different observations |
+| T-L1-003 | P2 | A02 architecture was only a list of terms before asking learner to draw it | Reuse existing Flow for an Agent-inside/Environment-outside role demonstration |
+| STU-01 | P1 | A02 introduced about twelve terms before their relations were stable | Same flight example, first role diagram, separate Runtime and State screens, short boundary recap |
+| STU-02 | P1 | Runtime, Harness, orchestration and guardrails seemed like competing boxes doing the same job | Explicitly describe execution vs broader governance, orchestration as a responsibility, guardrails as concrete controls; relationships may overlap |
+| STU-03 | P1 | Weak distractors such as changing a database name or counting words allowed guessing without understanding | Replace with plausible mistakes about information vs action, prompts vs enforcement, speed vs task fit; S03 transfers to editing a draft |
+| STU-04 | P2 | One query then pause did not clearly demonstrate another loop iteration | Two real teaching rounds: first no flight, permitted next-day search, new observation, report without claiming booking |
+| STU-05 | P2 | Environment-to-model arrow hid Runtime result organization | Add explicit result-organization node before returning to model |
+| STU-06 | P2 | Sudden code task, processes, Python/venv/dependencies exceeded novice prerequisites | Bridge table task and computer instructions; use plain resource examples; remove venv from required teaching |
+| STU-07 | P2 | Sandbox and least privilege both limited file access but relationship was unclear | One read-report example explains policy scope, environment isolation and boundary checks as complementary controls |
+| STU-08 | P2 | Both fixed and autonomous routes could react to feedback | Same no-flight observation: predefined next-day branch versus model selecting a next strategy; change alone does not establish autonomy |
+| STU-09 | P2 | Important relationships had no visible support | Add architecture Flow, explicit return-stage loop, concise mixed-route and isolation comparisons using existing presentation; no decorative interaction quota |
+| STU-10 | P2 | Broad self-recall questions and “you can now distinguish” overstated demonstrated ability | Softer learning language, two concrete closing self-recall tasks, independent closed-book acceptance remains necessary |
+| STU-11 | FOLLOW-UP | Unnecessary scorer/mastery/rollback jargon interrupted novice reading (Student called this P3) | Remove scorer and English mastery; explain safe reversal, credentials and concrete refusal cases |
+| STU-12 | FOLLOW-UP | Repeated source/adaptation notes interrupted story (Student called this P3) | Keep required adaptation labels; remove Material ID noise from learner Summary while retaining exact source metadata and PDF pages |
+
+Author accepted all conceptual findings; no disagreement hidden. STU-09 does not require every explanation to be animated: relationships get existing Flow or concise comparisons, pure definitions stay text. T-L1-002 does not require a new simulation: the second screen's new task is the missing-feedback comparison. Reviewer closure is pending; Author does not award PASS.
+
+Round-2 draft: `/tmp/eduflow-lesson1/draft-v2.json`, 10 Paths / 52 screens. Learner-only view: `/tmp/eduflow-lesson1/student-draft-v2.json`. Draft files are temporary, not database content authority. Actual PDF16 architecture was rendered and visually checked; its inner/outer boundary supports the role diagram. Runtime/schema/user data remain unchanged.
+
+### Existing page feasibility / navigation boundary
+
+Real anonymous browser on Local opened the course's default route, then “查看课程图”, searched and selected Observation and Action Spaces and used “查看课件详情”. It reached the actual original PDF at `/courses/ai-agents-in-depth/materials/ai-agents-in-depth-book?segment=page-16`, with the complete 307-page renderer and no loading state remaining. This is preflight evidence, not final Student acceptance.
+
+Existing default course-path presentation disables prerequisite-gated nodes until mastery; Micro completion reaches learned. Existing Course graph selection and the ordinary “快速学习” action provide a separate visible entry without changing progress or bypassing an API permission check. The draft gives return-to-course/graph/search/select/Quick Learn guidance and retains the current navigation/mastery policy. Final acceptance must prove an ordinary learner can use that UI route continuously; it must not use route mocks, direct DB completion or Assignment work to force eligibility. Material source access uses the current Course drawer and real page mapping; no unsupported Markdown-link renderer is introduced.
+
+### Teacher / Student draft acceptance and closed-book result
+
+Teacher round 2 read all 52 screens: **DOMAIN CORRECTNESS PASS; INSTRUCTIONAL SEQUENCE PASS; MATERIAL GROUNDING PASS**. The final P2 checks were independently closed: H02 summary now distinguishes model-decided, not merely changing, paths; source punctuation was cleaned; S02's combined-controls recap carries PDF115/33 supporting sources. Teacher final open BLOCKER/P1/P2 = 0/0/0.
+
+Student round 2 reread every screen, not only edits, and again returned the seven-field record for all 52. Its main changed understanding: the architecture can now be followed along one flight example; Runtime/Harness/companion responsibilities are not competing boxes; two queries with different feedback genuinely explain a loop; predefined branches can respond to feedback without being autonomous; isolation and permission cooperate instead of being exclusive categories. STU-01/03/09/10/11/12 retain only light terminology, visual-support or near-example-check limitations; no core conceptual blocker remained. No claim was made that reading source JSON proved browser interaction or navigation.
+
+Student then stopped using tools and rereading content and answered nine independently supplied Teacher questions. Student's verdict: **simulated Student PASS**. Teacher independently graded the answers **9 correct / 0 partial / 0 incorrect**, with no core incorrect mental model.
+
+| Closed-book question | Student answer summary | Teacher judgment / reason |
+|---|---|---|
+| Advice versus an acting Agent | Advice has not executed; actual tools act and return observations; one product may support both | correct: distinguishes task behavior from product name |
+| Six roles and a claimed booking | Model decides; context supplies current information; interfaces connect actions; Harness executes/checks; task state records progress; environment holds actual orders | correct: state claim is not independent proof of an order |
+| Has flight list but no booking interface | Missing action ability; resending the list does not add a submit interface | correct: observation and action distinguished causally |
+| Two query rounds, missing return and stopping | Each result is organized by Runtime; first result plus permission changes the second query; no return means missing current evidence; stopping may mean success, waiting, error or limit | correct: feedback and stopping do not manufacture completion |
+| Same changing dates, different control | Prewritten branch differs from model choosing the next strategy; visible change alone is insufficient | correct: control-source criterion preserved |
+| Mixed flow with required approval | Best-solution judgment is not user authorization; confirm before paying, verify external result and required process afterward | correct: approval/execution/validation are distinct |
+| Model replacement | Same task/interfaces; compare reliability, tool choices, costs, latency and allowed availability; confirmed missing interface cannot be repaired by model replacement | correct: avoids unsupported diagnosis from common failure |
+| Three check boundaries | Input service range, execution authorization, output unnecessary personal data; later redaction cannot undo prior action; test false rejection too | correct: timing and legitimate-task trade-off explained |
+| Read-report versus edit-draft permission | Read-only for reading; bounded read/write for saving edits; no unrelated mail/full-directory authority; sandbox limits effects, not correctness | correct: minimum sufficient permission, no isolation-as-correctness misconception |
+
+These are simulated learning/closed-book judgments, not evidence from a human participant. Real ordinary-user browser Local/Remote acceptance remains a separate gate.
+
+### Formal content and Local rollout
+
+Source `data/gold-courses/ai-agents-in-depth-lesson1.json` is byte-identical to the approved draft (SHA256 `d9d44116272fb593d8fd1eaabc2c1ca207a508bf1f2cde8b4cceccacfb49b0c7`). It contains 10 Paths, 10 Units and 52 Steps. Runtime authority is the database/API, never a client import of this file. Primary and supporting MaterialSegment identities remain offline grounding metadata.
+
+Existing `generate-micro-v2-migration --content-only` updates only four existing Reference Paths; it cannot create these ten Paths. The minimal offline `scripts/dev/generate-agent-lesson1-migration.ts` generates content-only SQL and reuses the existing native interaction validator. It adds no runtime/renderer/API/schema behavior. It is initial content publication tooling, not a new general authoring or revision-management system.
+
+CLI-created migration: `20260906161347_agent_lesson1_teaching_content.sql`. Teacher's independent SQL review PASS: DML only targets micro_learning_paths, micro_units, micro_steps and material_knowledge_coverages. No table/function creation, schema alteration, RLS, Knowledge, curriculum order, Assignment, evidence, progress or learner-state writes. Anonymous DO supplies guarded control flow only. Ten-path Course/Knowledge identity and existing Path/Unit/Step ownership/order checks prevent accidental reassignment.
+
+Grounding: 33 mapping upserts reference 19 verified actual PDF pages; 23 are new relations, ten are existing identities, seven existing primary roles change explain→introduce while retaining ID/location. S02 primary is PDF121, AGC02 primary27 and WF05 primary31; earlier contextual relations remain. Native primary-segment role priority is reused. The TSV audit is synchronized for these primary locators and AGC03's actual PDF29–30 selection range. It is not a Lesson-owned Material split. No external supplement was used. Original textbook is attributed to 李博杰, v1.4, 2026-08-13; this change adds original explanatory paraphrases/marked teaching adaptations, not redistributed PDF/image assets or a claim to relicense the book.
+
+Local applied only this pending migration. Full before/after read-only snapshots of user_micro_path_progress, user_micro_unit_progress, knowledge_evidence and user_knowledge_states are byte-identical: `/tmp/eduflow-lesson1/local-before-rollout.json` and `local-after-rollout.json`. Real `/api/micro` returned 200; every field in all ten published Paths/52 Steps exactly matches approved content. Local browser/remaining automated acceptance pending.
+
+### Local technical verification and browser-driven content revision
+
+Independent Teacher queried the live Local DB and API: 10 Paths/10 Units/52 Steps match every authored field; all ten Knowledge rows and the entire Course's CurriculumCoverage rows match baseline exactly. Lesson 1 has 36 valid source relations (33 declared by this publication plus three preserved old mappings); duplicate identity/fact, dangling Material source and orphan Step counts are zero. Anonymous API progress collections are empty.
+
+Typecheck, lint, 80 test files/499 tests, production build, `verify-micro-v2` (23 SQL/TypeScript parity probes, four-reference replay and H5P revision/checksum stability), and the authenticated Local learning-loop verifier PASS. Fresh Vercel generated build and generated Micro native-Node verifier PASS; enumerated `.vc-config.json` files show exactly 12 Functions. Existing bundle-size/vendor H5P warnings remain; no runtime or dependency change is introduced here.
+
+Student's actual browser run found two content issues: A02/R10 labels were too small at 390 px, and Summary navigation omitted the chapter-expansion action when search focused a collapsed chapter. Teacher approved a bounded content revision: compact authored coordinates for the three existing Flow screens, A02 observation wording tied to visible event text rather than promising readable arrow labels, and nine Summaries explicitly separating switch-to-graph from double-click-to-expand actions. No nodes, factual edges, execution events, answers, IDs, order or sources changed. Student's visual/operation retest is still required; coordinate changes alone do not establish PASS.
+
+The initial approved-draft hash above identifies v2. The final source includes this reviewed browser revision and is regenerated through the same unpublished content migration. Separate wall-clock snapshots during this revision captured the Student's normal AGC02 start (one Path row changed, one Unit row added); Evidence and Knowledge States were identical. A repeatable-read transaction then replayed the content SQL between two complete four-table snapshots: byte-identical, proving the migration itself did not change learning history. Evidence is `/tmp/eduflow-lesson1/atomic-replay-history.jsonl`; no learner reset occurred.
+
+Existing runtime observations are retained separately: explanation screens display the generic “判断正确” intermediate feedback despite no question; completion recommends Assignment, so continuous Lesson 1 learning relies on explicit return-to-Course/graph instructions. This round does not change feedback, Navigation or mastery authority.
+
+Teacher and Author then inspected the actual fixed left-target/right-source Flow renderer. A same-height reverse edge in the first compact attempt could pass through nodes. Final authored coordinates make both rows run left-to-right and give return edges vertical separation. Author's real 390 px preflight shows A02 Fit scale 0.91 and R10 0.79, compared with roughly 0.4 initially; labels and full curves are visible. Student will independently retest active execution and reconnection. Final candidate source SHA256: `3f864642a0f2b56b6b22cb33c07f7f97842d1f7bc6aae770ee0177757ee38c13`; SQL SHA256: `e22b53377ecc462afe2d9f513d0e28cb0b32f57fc3db0015670e5a8f4cfb83e1`.
+
+Author's actual browser runtime regression completed RT01/K012/K021 (18 Steps) and CTX01 (seven Steps): mechanism execution, five-role classification, rejection of an incorrect ordering followed by keyboard correction, completion, backward/Summary review PASS; review requests wrote no progress. H5P K001 returned 0/6 without Step completion, then real keyboard placements reached 6/6 and emitted the completion result; remaining native Steps and Summary completed, and review reopened the same supported adapter. No mock, database completion shortcut, learner reset or CDS content change was used. Browser console logs contain no error entries. Temporary tooling failures from incorrect role selectors/over-fast keyboard automation were corrected using the visible UI; they were not product failures or evidence of completion.
+
+Hosted readiness is read-only so far: linked Supabase is `uyljtdbvlivxniililay`, matching the actual feature Preview's bundled public client URL. Its migration history matches all prior repository migrations; only `20260906161347` is pending. A read-only baseline has 16 Path Progress, 19 Unit Progress, 16 Evidence and 44 Knowledge State rows. A fresh before/after snapshot will surround the authorized rollout after Local Student PASS.
+
+### Local Student and final Teacher acceptance — PASS
+
+The independent ordinary-user headed Chromium session learned all ten Paths/52 screens via actual Course UI, without mocks, answer keys, direct completion calls, Assignment or database shortcuts. First entry to last completion was 2026-09-07 00:19:04–00:39:17 Asia/Shanghai. Per-Micro wall-clock times, including screenshots/tool waits: A02 3:08; AGC01 1:04; R10 2:35; AGC02 1:19; AGC03 0:47; H02 2:18; WF05 0:49; S01 1:35; S02 0:53; S03 0:54. Navigation/source opening and final revision review are additional. These are simulated agent-session measurements, not human reading-time estimates.
+
+Every screen was read and observed at 1440/390, with desktop/mobile contact sheets and 64 paired layout observations. No page horizontal overflow was found; long pages scroll and footers operate. Latest A02/R10 were revisited using normal review: readable full graphs, no edges through node text or clipping, active playback and 390 px endpoint dragging PASS. R10 deletion stops at 4/10; restored feedback reaches 10/10. S01 passed desktop drag and mobile click classification. New Summary instructions actually reached the next Knowledge through chapter expansion. A02's Material action opened PDF15/307; Author also independently verified AGC01 opens PDF16/307.
+
+Student final verdict: **Local Student Acceptance PASS** for Lesson 1 Micro, not whole-product or independent engineering mastery. Evidence: `/tmp/eduflow-lesson1/student-local/acceptance-report.md`, per-screen screenshots/text, latest graph/drag screenshots and `observed-layout-audit.json`. Student reports zero console errors and six React Flow container-size warnings. Existing graph-close button occlusion had an Escape workaround; the cause of those warnings/occlusion was not investigated as new feature work. Fixed feedback, Assignment-first completion CTA and route-list prerequisite messaging remain explicit non-blocking follow-ups.
+
+After the actual page run, Student answered nine questions without rereading the Course. Teacher independently graded the answers supplied in Student's final message (subsequently requested for the evidence report):
+
+| Question | Actual post-browser answer summary | Teacher grade |
+| --- | --- | --- |
+| Advice versus Agent | Actual execution and returned feedback distinguish the behavior; product name does not | correct |
+| Roles and a booking claim | Model decides, context informs, interface connects, Runtime executes/returns, Harness governs; state records progress, environment holds real orders | correct |
+| Flight list but no booking API | Missing action capability; repeated observations do not create an interface | correct |
+| Two rounds and stopping | No-flight result returns through Runtime, permission supports another date, second result returns; waiting/error/limit stopping is not success | correct |
+| Fixed branch versus autonomy | Who selects the next route matters; a changed query alone proves neither | correct |
+| Approval and verification | Best solution does not authorize payment; check real orders and required approval | correct |
+| Model comparison | Same task/interfaces, reliability/tool behavior/cost/speed/availability; model replacement cannot create a missing interface | correct |
+| Guardrail timing | Input scope, pre-execution authorization, output privacy; late checks cannot undo actions and false rejection matters | correct |
+| Least privilege and sandbox | Read for summary, bounded read/write for edits; isolation limits effects but cannot ensure a correct edit | correct |
+
+Teacher final: **9 correct / 0 partial / 0 incorrect; real post-learning Closed-book PASS. Domain Correctness PASS / Instructional Sequence PASS / Material Grounding PASS. Local teaching acceptance PASS.** This is separate from the earlier draft-only closed-book round. A read-only database check confirms ten completed Lesson 1 Paths, ten unique completion Evidence records and ten `learned` Knowledge states; none was promoted to `mastered` by this work.
+
+The WF05 TSV source range now includes verified PDF28 and34 in addition to the original range; PDF172 remains retained evaluation context, while PDF173 directly supports process/result comparison. Existing production documentation records only rules supported by this Lesson's reviews and actual UI evidence. No new Runtime, schema, Practice, Assignment, Workflow, dependency or Function was introduced. Remote acceptance remains **NOT RUN**, gated on this commit/push, identical Hosted SQL and exact Preview acceptance.
+
+Final Local evidence-gap closure: Student initially disclosed that Why?/Micro Back and zero-write review had not been specifically instrumented. A dedicated ordinary-user A02 review then opened the authored Why explanation on Step 3, moved Back/Next and returned to current progress, still completed at 6/6. Request listener observed zero start/complete and zero non-read requests (only two navigation GETs). Root independently compared complete four-table snapshots before/after this exercise: byte-identical. Evidence is `student-local/why-back-network.txt` and `local-{before,after}-final-review.json` under the private temporary evidence directory. Local's required review/Why gate is now verified rather than inferred.

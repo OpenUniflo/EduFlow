@@ -2,12 +2,12 @@ knowledge_id	classification	printed_ranges	pdf_ranges	deep_link_pdf_page	evidenc
 A02	DIRECT	7-14	15-22	15	1.1 Agent formula and architecture
 AGC01	DIRECT	8-9	16-17	16	1.1.1 observation and action spaces
 R10	DIRECT	14-17	22-25	22	1.1.5 ReAct loop
-AGC02	DIRECT	18-26	26-34	26	1.2 Harness engineering
-AGC03	DIRECT	21	29	29	1.2.4 model selection
+AGC02	DIRECT	18-26	26-34	27	1.2 Harness engineering
+AGC03	DIRECT	21-22	29-30	29	1.2.4 model selection
 H02	DIRECT	22-24	30-32	30	1.2.5 workflow and autonomy
-WF05	CROSS_SECTION	22-25;164-165	30-33;172-173	30	orchestration plus evaluation and guardrails
+WF05	CROSS_SECTION	20;22-26;164-165	28;30-34;172-173	31	orchestration plus evaluation and guardrails
 S01	DIRECT	25-26	33-34	33	1.2.6 guardrails and safety
-S02	DIRECT	19;110-113	27;118-121	27	Harness sandbox and execution-tool isolation
+S02	DIRECT	19;110-113	27;118-121	121	Harness sandbox and execution-tool isolation
 S03	DIRECT	107;144	115;152	115	tool and Coding Agent least-privilege boundaries
 CTX01	DIRECT	31-39	39-47	39	2.2 API message context
 RT01	DIRECT	32-39	40-47	40	2.2.3-2.2.4 core Agent loop
