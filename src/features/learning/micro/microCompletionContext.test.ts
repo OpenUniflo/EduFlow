@@ -31,6 +31,11 @@ describe("Micro optional completion context", () => {
     expect(resolveMicroCompletionContext({ ...input, runtime: undefined })).toEqual([]);
     expect(resolveMicroCompletionContext({ ...input, knowledgeId: "unrelated" })).toEqual([]);
   });
+  it("continues into the exact Material Segment when Navigation selects Material teaching", () => {
+    const materialRuntime = { ...runtime, materialKnowledgeCoverages: [...runtime.materialKnowledgeCoverages, { ...runtime.materialKnowledgeCoverages[1], id: "next-material", nodeId: "next" }] };
+    const materialDecision = { ...decision, nextAction: { ...decision.nextAction, resourceKind: "material" as const, resourceId: "book" } };
+    expect(resolveMicroCompletionContext({ ...input, runtime: materialRuntime, decision: materialDecision }).at(-1)).toEqual({ kind: "next", title: "Next Knowledge", href: "/courses/route-only-course/materials/book?segment=page-15" });
+  });
   it("omits absent assets, unavailable Micro, and completed or foreign decisions", () => {
     expect(resolveMicroCompletionContext({ ...input, runtime: routeOnlyRuntime, decision: null })).toEqual([]);
     expect(resolveMicroCompletionContext({ ...input, hasMicro: () => false }).some((action) => action.kind === "next")).toBe(false);

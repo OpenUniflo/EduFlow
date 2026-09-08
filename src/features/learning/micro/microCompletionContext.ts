@@ -23,10 +23,13 @@ export function resolveMicroCompletionContext(input: {
     kind: "practice", title: assignment.title, href: `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignment.id)}`
   })));
   const next = decision?.courseId === courseId ? decision.nextAction : undefined;
-  if (next?.nodeId && next.nodeId !== knowledgeId && next.resourceKind === "micro" && input.hasMicro(next.nodeId)
+  if (next?.nodeId && next.nodeId !== knowledgeId
     && runtime.curriculumCoverages.some((coverage) => coverage.nodeId === next.nodeId)) {
-    actions.push({ kind: "next", title: decision?.path.find((item) => item.nodeId === next.nodeId)?.title ?? "继续下一项",
-      href: `/learn/micro/${encodeURIComponent(next.nodeId)}?${new URLSearchParams({ courseId })}` });
+    const material = next.resourceKind === "material" ? resolveKnowledgeMaterialEntries(runtime, next.nodeId).find((entry) => entry.materialId === next.resourceId) : undefined;
+    const href = next.resourceKind === "micro" && input.hasMicro(next.nodeId)
+      ? `/learn/micro/${encodeURIComponent(next.nodeId)}?${new URLSearchParams({ courseId })}`
+      : material ? buildMaterialDeepLink({ courseId, materialId: material.materialId, segmentId: material.segmentId }) : undefined;
+    if (href) actions.push({ kind: "next", title: decision?.path.find((item) => item.nodeId === next.nodeId)?.title ?? "继续下一项", href });
   }
   return actions;
 }
