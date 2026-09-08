@@ -16,6 +16,13 @@ if (ids.length !== 10 || new Set(ids).size !== 10 || paths.some((path) => path.c
 const sql = ["-- Generated Lesson 1 teaching content. No schema, Knowledge, curriculum order, Assignment or learner-state changes.", "begin;", "do $$ begin", `if not exists(select 1 from courses where id=${literal(course)}) then return; end if;`,
   `if (select array_agg(node_id order by display_order) from curriculum_coverages where course_id=${literal(course)} and lesson_id='aiad-lesson-01') is distinct from array[${ids.map(literal).join(",")}]::text[] then raise exception 'Lesson 1 identity/order changed; re-audit before rollout'; end if;`];
 for (const path of paths) {
+  if (process.argv.includes("--navigation-only")) {
+    for (const unit of path.units) for (const step of unit.steps.filter((item) => item.kind === "summary")) {
+      sql.push(`update micro_steps set content=${literal(step.body)} where id=${literal(step.id)} and unit_id=${literal(unit.id)} and exists(select 1 from micro_units u join micro_learning_paths p on p.id=u.path_id where u.id=${literal(unit.id)} and p.id=${literal(path.id)} and p.course_id=${literal(course)} and p.knowledge_id=${literal(path.knowledgeId)});`);
+      sql.push("if not found then raise exception 'Reviewed Summary identity missing; re-audit before rollout'; end if;");
+    }
+    continue;
+  }
   sql.push(`if not exists(select 1 from knowledge_nodes where id=${literal(path.knowledgeId)} and status='active') then raise exception 'Inactive reviewed Knowledge'; end if;`);
   sql.push(`if exists(select 1 from micro_learning_paths where id=${literal(path.id)} and (course_id is distinct from ${literal(course)} or knowledge_id<>${literal(path.knowledgeId)})) then raise exception 'Micro Path identity conflict'; end if;`);
   sql.push(`insert into micro_learning_paths(id,knowledge_id,course_id,scope,title,description,mode,estimated_minutes,required,status,revision) values(${[path.id,path.knowledgeId,course,path.scope,path.title,path.description,path.mode,path.estimatedMinutes,path.required,path.status,1].map(literal).join(",")}) on conflict(id) do update set title=excluded.title,description=excluded.description,estimated_minutes=excluded.estimated_minutes,status=excluded.status;`);

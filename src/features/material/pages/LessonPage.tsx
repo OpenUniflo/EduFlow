@@ -1,6 +1,7 @@
+import { resolveMicroLearningReturnTarget } from "@/features/learning/micro/microLearning";
 import { ArrowLeft, ArrowRight, Check, Send, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
@@ -37,6 +38,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   draftState?: CourseAuthoringDraftState | null;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const governance = useDomainGovernance();
   const requestedSegmentId = searchParams.get("segment");
@@ -57,8 +59,8 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   const replaceSegmentQuery = useCallback((segmentId: string) => {
     const next = new URLSearchParams(searchParams);
     next.set("segment", segmentId);
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+    setSearchParams(next, { replace: true, state: location.state });
+  }, [location.state, searchParams, setSearchParams]);
 
   const reader = useMaterialReaderState({ material: renderedMaterial, requestedSegmentId, recentSegmentId: savedState?.recentSegmentId, onReplaceSegment: replaceSegmentQuery });
   const access = useMemo(() => session ? userKnowledgeAccess(session.userId) : globalKnowledgeAccess, [session]);
@@ -128,7 +130,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   return <main className={`atlas-lesson-page material-reader-current ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`} data-experience={experience}>
     <GlobalNav active={designEnabled ? "teaching" : "courses"} session={session} onLogout={onLogout} />
     <header className="atlas-lesson-header">
-      <div className="atlas-lesson-header-left"><button className="atlas-lesson-back" onClick={() => navigate(`/courses/${runtime.course.id}`)} aria-label="返回课程技能树"><ArrowLeft size={16} /></button><div className="atlas-lesson-breadcrumb"><button onClick={() => navigate(`/courses/${runtime.course.id}`)}>{runtime.course.title}</button><span>/</span><span>{lesson?.title ?? material.title}</span></div></div>
+      <div className="atlas-lesson-header-left"><button className="atlas-lesson-back" onClick={() => navigate(resolveMicroLearningReturnTarget(location.state, runtime.course.id), { state: location.state?.returnState })} aria-label={location.state?.returnTo ? "返回学习来源" : "返回课程技能树"}><ArrowLeft size={16} /></button><div className="atlas-lesson-breadcrumb"><button onClick={() => navigate(`/courses/${runtime.course.id}`)}>{runtime.course.title}</button><span>/</span><span>{lesson?.title ?? material.title}</span></div></div>
       <div className="atlas-lesson-title"><strong>{material.title}</strong><small>{material.type === "pdf" ? "Original PDF" : material.type} · {draftSegments.length} 个内容段 · {material.duration ?? "自定进度"}</small></div>
       {canDesignCourse(session) ? <ExperienceModeToggle value={experience} onChange={setExperience} /> : null}
     </header>

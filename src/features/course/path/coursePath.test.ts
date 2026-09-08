@@ -1,3 +1,6 @@
+import { computeNavigationPlan } from "../../../../api/_lib/navigationEngine";
+import { evaluatePrerequisiteReachability } from "../runtime/courseUnlockPolicy";
+import type { UserKnowledgeRecord } from "@/features/profile/types";
 import { describe, expect, it } from "vitest";
 import { buildCoursePath } from "./coursePath";
 import type { CourseGraphData } from "../runtime/courseRuntime";
@@ -25,4 +28,19 @@ describe("Course Path", () => {
     expect(buildCoursePath(graph, [{ nodeId: "a", status: "learning" }] as any)[1].state).toBe("blocked");
     expect(buildCoursePath(graph, [{ nodeId: "a", status: "mastered" }] as any)[1].state).toBe("available");
   });
+});
+
+// Exercise consumers together: presentation labels may differ, eligibility must not.
+it.each(["explore", "learning", "learned", "practicing", "mastered"] as const)("Graph/Path/Navigation prerequisite parity for %s", (status) => {
+  const satisfied = ["learned", "practicing", "mastered"].includes(status);
+  const records = [{ nodeId: "a", status }] as UserKnowledgeRecord[];
+  const path = buildCoursePath(graph, records);
+  const plan = computeNavigationPlan({ courseId: "course", targetNodeIds: [], nodes: graph.knowledgeNodes.map((node)=>({id:node.id,title:node.title,lessonOrder:node.primaryCoverage.lessonOrder,coverageOrder:node.primaryCoverage.order})), prerequisiteEdges: graph.knowledgeEdges, knowledgeStatuses: { a: status }, microPaths: [], completedMicroPathIds: [], assignments: [], assignmentOutcomes: {}, materials: [] });
+  expect(evaluatePrerequisiteReachability(undefined,[status])).toBe(satisfied ? "available" : "locked");
+  expect(path[1].state).toBe(satisfied ? "available" : "blocked");
+  expect(plan.path[1].state).toBe(satisfied ? "eligible" : "blocked");
+});
+it("does not gate a Course Path on an external prerequisite", () => {
+  const external = { ...graph, knowledgeEdges: [{ ...graph.knowledgeEdges[0], id:"external-a",source:"external",target:"a" }] };
+  expect(buildCoursePath(external, [])[0]).toMatchObject({state:"available",blockedBy:[]});
 });

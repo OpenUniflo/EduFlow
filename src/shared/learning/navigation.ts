@@ -1,10 +1,10 @@
-export const NAVIGATION_POLICY_VERSION = "course-rule-v1" as const;
-export type NavigationKnowledgeStatus = "mastered" | "learning" | "learned" | "practicing";
+export const NAVIGATION_POLICY_VERSION = "course-rule-v2" as const;
+export type NavigationKnowledgeStatus = "explore" | "mastered" | "learning" | "learned" | "practicing";
 export type NavigationActionKind = "skip" | "remediation" | "review" | "practice" | "next";
 export type NavigationResourceKind = "micro" | "material" | "assignment" | "course";
 export type NavigationAsset = { id: string; nodeId: string; order: number; required?: boolean };
 export type NavigationNode = { id: string; title: string; lessonOrder: number; coverageOrder: number };
-export type NavigationPathItem = { nodeId: string; title: string; state: "skipped" | "underway" | "eligible" | "blocked"; blockedBy: string[] };
+export type NavigationPathItem = { nodeId: string; title: string; state: "skipped" | "learned" | "underway" | "eligible" | "blocked"; blockedBy: string[] };
 export type NavigationNextAction = { kind: NavigationActionKind; nodeId?: string; resourceKind: NavigationResourceKind; resourceId?: string; reasonCode: string; reason: string };
 export type NavigationPlan = { policyVersion: typeof NAVIGATION_POLICY_VERSION; courseId: string; path: NavigationPathItem[]; skippedNodeIds: string[]; nextAction: NavigationNextAction };
 export type NavigationDecision = NavigationPlan & { decisionId: string; decidedAt: string };

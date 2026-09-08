@@ -18,27 +18,34 @@ describe("deterministic Navigation Engine", () => {
     expect(plan.skippedNodeIds).toEqual(["a"]);
     expect(plan.nextAction).toMatchObject({ kind: "next", nodeId: "b" });
   });
-  it("changes fail into remediation and pass into the next route action", () => {
-    const learned = { ...base, knowledgeStatuses: { a: "learned" as const }, completedMicroPathIds: ["micro-a"] };
-    expect(computeNavigationPlan({ ...learned, assignmentOutcomes: { "practice-a": "failed" } }).nextAction).toMatchObject({ kind: "remediation", resourceId: "micro-a" });
-    const passed = computeNavigationPlan({ ...learned, knowledgeStatuses: { a: "mastered" }, assignmentOutcomes: { "practice-a": "passed" } });
-    expect(passed.nextAction).toMatchObject({ nodeId: "b", kind: "next" });
+  it.each(["learned", "practicing"] as const)("continues after %s despite failed or pending Practice", (status) => {
+    for (const outcome of ["failed", "pending", "passed"] as const) {
+      const plan = computeNavigationPlan({ ...base, knowledgeStatuses: { a: status }, completedMicroPathIds: ["micro-a"], assignmentOutcomes: { "practice-a": outcome } });
+      expect(plan.nextAction).toMatchObject({ kind: "next", nodeId: "b" });
+      expect(plan.path[0].state).toBe("learned");
+      expect(plan.skippedNodeIds).not.toContain("a");
+    }
   });
-  it("prioritizes a real failed Practice when a Knowledge has several Assignments", () => {
-    const plan = computeNavigationPlan({ ...base, knowledgeStatuses: { a: "practicing" }, assignments: [{ id: "another", nodeId: "a", order: 1, required: true }, ...base.assignments], assignmentOutcomes: { "practice-a": "failed" } });
-    expect(plan.nextAction).toMatchObject({ kind: "remediation", nodeId: "a" });
+  it("resumes incomplete required Micro before optional Practice", () => {
+    expect(computeNavigationPlan({ ...base, knowledgeStatuses: { a: "practicing" }, assignmentOutcomes: { "practice-a": "failed" } }).nextAction).toMatchObject({ resourceId: "micro-a", reasonCode: "resume_required_micro" });
   });
-  it("prioritizes remediation over another underway Knowledge", () => {
-    const input = { ...base, knowledgeStatuses: { a: "practicing" as const, b: "practicing" as const }, assignments: [...base.assignments, { id: "practice-b", nodeId: "b", order: 1, required: true }], assignmentOutcomes: { "practice-b": "failed" as const } };
-    expect(computeNavigationPlan(input).nextAction).toMatchObject({ kind: "remediation", nodeId: "b" });
+  it("ignores external prerequisites without fabricating facts", () => {
+    const input = { ...base, nodes: [base.nodes[1]] };
+    expect(computeNavigationPlan(input).path).toMatchObject([{ nodeId: "b", state: "eligible", blockedBy: [] }]);
+    expect(input.prerequisiteEdges).toEqual(base.prerequisiteEdges);
   });
-  it("gives two learner states different reasonable actions", () => {
-    expect(computeNavigationPlan(base).nextAction.resourceId).toBe("micro-a");
-    expect(computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned" }, completedMicroPathIds: ["micro-a"] }).nextAction.resourceId).toBe("practice-a");
+  it("ends the teaching route without claiming mastery", () => {
+    const plan = computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned", b: "practicing" }, completedMicroPathIds: ["micro-a"] });
+    expect(plan.nextAction).toMatchObject({ resourceKind: "course", reasonCode: "course_route_complete" });
+    expect(plan.nextAction.nodeId).toBeUndefined();
+    expect(plan.policyVersion).toBe("course-rule-v2");
   });
-  it("does not declare a prerequisite-blocked target complete",()=>{
-    const plan=computeNavigationPlan({...base,targetNodeIds:["b"],nodes:[base.nodes[1]],prerequisiteEdges:base.prerequisiteEdges});
-    expect(plan.nextAction).toMatchObject({kind:"remediation",reasonCode:"prerequisite_mastery_required"});
+  it("does not force optional Micro after the Knowledge is learned", () => {
+    expect(computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned" }, microPaths: [{ id: "optional", nodeId: "a", order: 0 }] }).nextAction.nodeId).toBe("b");
+  });
+  it("selects the next incomplete required path when several exist", () => {
+    const plan = computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned" }, completedMicroPathIds: ["micro-a"], microPaths: [...base.microPaths, { id: "micro-a2", nodeId: "a", order: 1, required: true }] });
+    expect(plan.nextAction.resourceId).toBe("micro-a2");
   });
   it("prefers required assets before optional assets regardless of display order",()=>{
     const plan=computeNavigationPlan({...base,microPaths:[{id:"optional",nodeId:"a",order:0,required:false},{id:"required",nodeId:"a",order:2,required:true}]});

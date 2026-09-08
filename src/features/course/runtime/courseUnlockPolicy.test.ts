@@ -7,7 +7,7 @@ describe("shared Course prerequisite eligibility", () => {
     expect(evaluatePrerequisiteReachability(undefined, [undefined])).toBe("locked");
     expect(evaluatePrerequisiteReachability(undefined, ["learning"])).toBe("locked");
     expect(evaluatePrerequisiteReachability(undefined, ["mastered"])).toBe("available");
-    expect(evaluatePrerequisiteReachability("learning", [undefined])).toBe("learning");
+    expect(evaluatePrerequisiteReachability("learning", [undefined])).toBe("locked");
     expect(evaluatePrerequisiteReachability("mastered", [undefined])).toBe("completed");
   });
 });

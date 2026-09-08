@@ -6979,3 +6979,5 @@ body:has(.micro-learning-page) { min-width: 0; overflow: auto; }
 .micro-learning-header{background:#fbfbfc}
 .micro-mechanism[data-demonstration=true] .micro-count-matrix button:disabled{opacity:1}
 @media(max-width:620px){.micro-card>footer{background:#fbfbfc}}
+
+.micro-completion-context{display:grid;width:100%;gap:10px;margin-top:24px;text-align:left}.micro-completion-context h2{margin:0 0 4px;font-size:17px}.micro-completion-context>button{display:flex;width:100%;min-width:0;gap:12px;justify-content:space-between;text-align:left;padding:14px}.micro-completion-context button span{display:grid;min-width:0;gap:5px;font-size:11px}.micro-completion-context button strong{font-size:14px;overflow-wrap:anywhere}.micro-completion-context button svg{flex-shrink:0}.micro-completion-footer{flex-wrap:wrap;justify-content:center}

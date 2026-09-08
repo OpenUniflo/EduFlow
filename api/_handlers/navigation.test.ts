@@ -153,6 +153,6 @@ describe("Navigation authority pagination", () => {
     const recorder = responseRecorder();
     await handler({ method: "GET", query: { courseId: "course" }, headers: { authorization: "Bearer valid" } } as unknown as VercelRequest, recorder.response);
     expect(recorder.statusCode()).toBe(200);
-    expect(recorder.body()).toMatchObject({ nextAction: { kind: "next", reasonCode: "knowledge_route_available" } });
+    expect(recorder.body()).toMatchObject({ nextAction: { kind: "next", reasonCode: "course_route_complete" } });
   });
 });

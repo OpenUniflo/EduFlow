@@ -182,7 +182,9 @@ The Global Assistant is the authoritative Goal Planner UX. Planning and Brief pr
 
 ## 5. Navigation Engine
 
-The V1 Navigation Engine is rule-based and deterministic.
+The Navigation Engine is rule-based and deterministic. `course-rule-v2` separates instructional continuation from mastery/competency validation. Teaching prerequisites are satisfied by `learned | practicing | mastered`; `explore | learning` are not satisfied. Course Graph, Path and Navigation share the teaching policy and include only Course-local factual prerequisites in the gate. No entry-requirement schema is introduced.
+
+Mastered Knowledge is skipped; learned/practicing Knowledge with completed required Micro can advance. An incomplete required Micro remains the teaching action. Failed or pending Practice does not override instructional continuation; Practice and future competency remediation remain separate optional work under #22. New decisions use v2 and retain existing canonical input hashing/idempotency; historical v1 decisions are neither edited nor backfilled. Standard Course target fallback remains unchanged and deferred under #21/#32.
 
 Inputs conceptually include:
 

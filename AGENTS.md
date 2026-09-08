@@ -504,7 +504,7 @@
 - KnowledgeEvidence is user-owned, source-identified, and idempotent. Supported MVP evidence is completed Micro paths, accepted Assignments, and passed Workflows.
 - Mastery requires a completed required Learn Path plus every explicitly required Assignment accepted. A Knowledge without an explicit required Assignment remains `learned` after its required Learn Path.
 - Course progress and UserKnowledgeState are separate projections. PersonalLearningPlan is removed; systematic multi-Knowledge learning belongs to a Course, while MicroLearningPath is a within-Knowledge experience.
-- Deterministic Navigation ranks Course candidates by explicit curriculum order, gates eligibility only with factual prerequisite mastery, prioritizes failed Practice remediation, and persists a versioned explained NavigationDecision for each canonical learner-state input. The LLM is not Navigation authority.
+- Deterministic Navigation ranks Course candidates by explicit curriculum order, gates teaching eligibility only with Course-local factual prerequisites satisfied by `learned | practicing | mastered` (`explore | learning` do not satisfy), keeps Practice/remediation optional to instructional continuation, and persists a versioned explained NavigationDecision for each canonical learner-state input. The LLM is not Navigation authority.
 
 ## Learner Entry and Today Invariants
 
@@ -580,3 +580,11 @@
 - Backend persistence adapters MUST recover serial write sequencing after a rejected request. A failed write remains caller-visible through `flush()`, but MUST NOT permanently prevent later queued writes from executing.
 - Workflow Run History is bounded to the newest 20 Runs per `(owner_user_id, workflow_id)` in both application state and backend persistence. The API MUST physically prune obsolete rows without affecting another Workflow or user.
 - `DemoWorkflowRuntime` remains the execution adapter until a future runtime round. Backend persistence MUST NOT introduce Course or Assignment dependencies into the Workflow Runtime contract.
+
+## Micro Completion Context
+
+- Micro completion reaches `learned`, never Micro-alone `mastered`. Existing stronger mastery evidence remains distinct.
+- Course Graph, Course Path and Navigation MUST share teaching prerequisite semantics. Only factual prerequisites with both endpoints in the Course route gate that route; external facts remain facts without a hidden entry gate.
+- Micro body owns teaching and Summary; the system shell owns optional Material, Practice, Next Knowledge and Course/source actions. Absent capabilities are omitted, not empty cards.
+- Completion Next uses the Navigation Knowledge identity and preserves optional Course context. Material uses real coverage/Segment and returns to the original Micro completion. Review MUST NOT write formal completion or downgrade progress/state.
+- Historical Micro scope/course fields are compatibility data, not two learner-facing products. Physical cleanup remains deferred to #32.
