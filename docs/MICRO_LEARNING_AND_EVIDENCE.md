@@ -1,5 +1,7 @@
 # Micro Learning and Evidence
 
+Authoring follows the canonical [Teaching Pattern Library V1](TEACHING_PATTERN_LIBRARY.md): instructional need → pattern → cognitive strategy → existing runtime → feedback → validation. Patterns are not runtime types. Micro defaults to bounded interactions without long-text input; teaching and Summary remain separate from system navigation. Use that specification for selection rules, anti-patterns, scientific rationale and addition gates.
+
 EduFlow's learner loop is persisted and data driven:
 
 `Knowledge -> MicroLearningPath -> MicroUnit -> MicroStep -> Evidence -> UserKnowledgeState`
@@ -111,3 +113,7 @@ One Micro Experience supports optional Course context. Historical `scope`, `cour
 Next Micro uses `/learn/micro/:knowledgeId` with optional `courseId`, never a hardcoded next Path identity. Material links reuse coverage-role priority and exact Segment resolution. Reader `location.state.returnTo` returns to the originating Micro; `returnState` preserves that Micro's source, and Segment query replacements preserve location state. Completion/reopen reads persisted progress; Review stays local and does not repeat formal evidence.
 
 The Lesson 1 cleanup removes only ten Summary navigation suffixes. Generator `--content-only --navigation-only` updates those existing Step bodies, checks ownership and curriculum order, and does not alter schema, Knowledge, curriculum, other teaching fields or learner history.
+
+Teaching Pattern V1 audits A02/R10/S03 and CDS525-K012/K021. The three Agent paths receive content composition revisions; the two CDS teaching paths remain positive controls. Generate existing Agent revisions with `scripts/dev/generate-agent-lesson1-migration.ts <CLI-created migration> --content-only --revise-existing --knowledge=A02,R10,S03 --revision=2`. This mode validates native content and existing identity/ownership/order/revision, updates Steps and advances only the selected Path revisions. It neither inserts/reorders Steps nor edits learner history. The migration's separately reviewed source-audit DML adds K021's existing Lecture 3 p26 as supporting coverage; preserve that appendix when regenerating the Agent section. Runtime reads remain database-backed. Local content replay must apply this forward revision after initial Lesson 1 publication and navigation cleanup; never run destructive course sync on an existing learner database to deliver a content edit.
+
+The independent novice clarity recheck required one subsequent R10-only revision: use `--knowledge=R10 --revision=3` after revision 2. Its forward migration distinguishes preparing an observation from delivering it into the next model request. Apply both Teaching Pattern migrations in chronological order; do not regenerate or modify already-applied revision history. K012/K021 teaching definitions remain unchanged.

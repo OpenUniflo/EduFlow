@@ -83,7 +83,8 @@ function MicroStepPanel({path,unitId,step,repository,session,review,active,busy,
     try{setGrading(await onComplete?.(value)?"success":"retry");}catch{setGrading("error");}finally{inFlight.current=false;}
   };
   const concreteFeedback=mechanism&&result?mechanismMessage(mechanism,result):interaction?.type==="categorize"&&Array.isArray(answer)?interaction.items.flatMap((item,index)=>answer[index]!==interaction.correctCategories[index]?[`「${item.label}」应归入「${interaction.correctCategories[index]}」。`]:[]).join(" "):interaction?.type==="ordering"&&Array.isArray(answer)?`第 ${interaction.correctOrder.findIndex((item,index)=>item!==answer[index])+1} 个位置不符合顺序。`:undefined;
-  const feedback=grading==="success"?(step.successFeedback??(review?"判断正确；复习结果不会改写原进度。":session?"判断正确，进度已保存。":"判断正确；本次匿名体验不会保存进度。")):grading==="retry"?(concreteFeedback||step.retryFeedback||"答案尚未满足完成条件，请重试。"):grading==="error"?"保存失败，进度没有被推进。请重试。":null;
+  const acknowledgment=interaction?"判断正确":"已阅读本页";
+  const feedback=grading==="success"?(step.successFeedback??(review?`${acknowledgment}；复习结果不会改写原进度。`:session?`${acknowledgment}，进度已保存。`:`${acknowledgment}；本次匿名体验不会保存进度。`)):grading==="retry"?(concreteFeedback||step.retryFeedback||"答案尚未满足完成条件，请重试。"):grading==="error"?"保存失败，进度没有被推进。请重试。":null;
   const demonstration=step.kind==="explanation"||step.kind==="summary";
   return <article className={`micro-card micro-step-${grading??"active"}`}><span className="atlas-kicker">{review?"REVIEW · ":""}UNIT {(path.units.find((unit)=>unit.id===unitId)?.position??0)+1} · {step.kind.toUpperCase()}</span><h1>{step.title}</h1><MicroBody body={step.body}/>
     {review?<div className="micro-review-banner"><span>回看中 · 正式进度保持不变</span><button type="button" onClick={onReturn}>返回当前进度</button></div>:null}

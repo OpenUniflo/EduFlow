@@ -15,6 +15,25 @@ const ids = paths.map((path) => path.knowledgeId);
 if (ids.length !== 10 || new Set(ids).size !== 10 || paths.some((path) => path.courseId !== course || path.scope !== "course" || path.status !== "published" || path.mode !== "learn")) throw new Error("Expected the ten reviewed Lesson 1 Course Learn paths.");
 const sql = ["-- Generated Lesson 1 teaching content. No schema, Knowledge, curriculum order, Assignment or learner-state changes.", "begin;", "do $$ begin", `if not exists(select 1 from courses where id=${literal(course)}) then return; end if;`,
   `if (select array_agg(node_id order by display_order) from curriculum_coverages where course_id=${literal(course)} and lesson_id='aiad-lesson-01') is distinct from array[${ids.map(literal).join(",")}]::text[] then raise exception 'Lesson 1 identity/order changed; re-audit before rollout'; end if;`];
+// Forward revisions update existing definitions only. Never replay initial publication to revise a live Path.
+if (process.argv.includes("--revise-existing")) {
+  const selected = process.argv.find((arg) => arg.startsWith("--knowledge="))?.slice(12).split(",") ?? [];
+  const revision = Number(process.argv.find((arg) => arg.startsWith("--revision="))?.slice(11));
+  if (!Number.isInteger(revision) || revision < 2 || !selected.length || new Set(selected).size !== selected.length || selected.some((id) => !ids.includes(id))) throw new Error("Provide unique existing --knowledge= IDs and a forward --revision= integer.");
+  for (const path of paths.filter((item) => selected.includes(item.knowledgeId))) {
+    sql.push(`if not exists(select 1 from micro_learning_paths where id=${literal(path.id)} and course_id=${literal(course)} and knowledge_id=${literal(path.knowledgeId)} and revision in (${revision - 1},${revision})) then raise exception 'Path identity/revision mismatch; re-audit before rollout'; end if;`);
+    for (const unit of path.units) for (const [position, step] of unit.steps.entries()) {
+      if (step.interaction && (step.interaction.type === "h5p" || validateNativeMicroInteraction(step.interaction).length)) throw new Error(`Invalid revised Step ${step.id}`);
+      sql.push(`update micro_steps set kind=${literal(step.kind)},title=${literal(step.title)},content=${literal(step.body)},interaction=${json(step.interaction)},success_feedback=${literal(step.successFeedback)},retry_feedback=${literal(step.retryFeedback)} where id=${literal(step.id)} and unit_id=${literal(unit.id)} and position=${position} and exists(select 1 from micro_units where id=${literal(unit.id)} and path_id=${literal(path.id)} and position=${unit.position});`);
+      sql.push("if not found then raise exception 'Step identity/ownership/order mismatch'; end if;");
+    }
+    sql.push(`update micro_learning_paths set revision=${revision} where id=${literal(path.id)} and revision=${revision - 1};`);
+  }
+  sql.push("end $$;", "commit;");
+  await writeFile(target, sql.join("\n\n") + "\n");
+  console.log(`Generated existing-Path revision ${revision} for ${selected.length} Paths.`);
+  process.exit(0);
+}
 for (const path of paths) {
   if (process.argv.includes("--navigation-only")) {
     for (const unit of path.units) for (const step of unit.steps.filter((item) => item.kind === "summary")) {

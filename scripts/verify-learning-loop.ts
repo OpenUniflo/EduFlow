@@ -38,13 +38,18 @@ try {
   assert.equal(duplicate.attemptId, failed.attemptId); assert.equal(duplicate.resultId, failed.resultId); assert.equal(duplicate.outcome, "failed"); assert.equal(duplicate.duplicate, true);
   await invoke(learningHandler, "POST", token, { action: "submit-assignment", courseId, assignmentId, idempotencyKey: key, response: { kind: "trace", selectedStepId: "skip-observation" } }, {}, 409);
   const remediation = await invoke(navigationHandler, "GET", token, undefined, { courseId });
-  assert.equal(remediation.nextAction.kind, "remediation"); assert.equal(remediation.nextAction.nodeId, "R10");
+  // course-rule-v2 keeps Practice optional; failed Attempts must not replace teaching continuation.
+  assert.equal(remediation.policyVersion, "course-rule-v2");
+  assert.equal(remediation.nextAction.kind, "review");
+  assert.equal(remediation.nextAction.resourceKind, "micro");
+  assert.equal(remediation.nextAction.reasonCode, "resume_required_micro");
   const sameDecision = await invoke(navigationHandler, "GET", token, undefined, { courseId });
   assert.equal(sameDecision.decisionId, remediation.decisionId, "identical state must reuse its persisted NavigationDecision");
   const passed = await invoke(learningHandler, "POST", token, { action: "submit-assignment", courseId, assignmentId, idempotencyKey: `retry-${suffix}`, response: { kind: "trace", selectedStepId: "skip-observation" } });
   assert.equal(passed.outcome, "passed"); assert.equal(passed.status, "accepted");
   const afterPass = await invoke(navigationHandler, "GET", token, undefined, { courseId });
   assert.notEqual(afterPass.decisionId, remediation.decisionId); assert.notEqual(afterPass.nextAction.kind, "remediation");
+  assert.deepEqual(afterPass.nextAction, remediation.nextAction, "Assignment acceptance must not replace the incomplete teaching route");
   const attempts = await server.from("learning_attempts").select("id,attempt_number,response").eq("user_id", userId).eq("course_id", courseId).eq("assignment_id", assignmentId).order("attempt_number"); assert.ifError(attempts.error);
   const results = await server.from("performance_results").select("id,outcome").eq("user_id", userId).eq("course_id", courseId).eq("assignment_id", assignmentId).order("evaluated_at"); assert.ifError(results.error);
   assert.deepEqual(attempts.data?.map((row) => row.attempt_number), [1, 2]); assert.deepEqual(results.data?.map((row) => row.outcome), ["failed", "passed"]);
