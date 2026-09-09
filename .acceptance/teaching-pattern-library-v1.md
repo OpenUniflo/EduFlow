@@ -56,3 +56,24 @@ Student's remaining minor wording observation (passive page says “判断正确
 The acknowledgment change passed independent Technical recheck: authored feedback retains precedence and grading/persistence/review/anonymous behavior is unchanged. Full 81-file / 512-test suite, typecheck, lint and build passed again. Student quick recheck and final Vercel generation completion precede the implementation commit.
 
 Student quick recheck PASS: fresh K012 hook now acknowledges reading truthfully; no remaining Student findings. Final Vercel generated build and native-Node generated verification passed, with 12 Functions. Teaching PASS, Student PASS, Technical PASS and Local PASS authorize implementation commit/push; Hosted acceptance still pending.
+
+
+## Hosted rollout and final acceptance
+
+Implementation `2c6219375fa96be1d2d06fea32c5f91f3e0ac2f5` committed and pushed after all four local gates passed. Exact Preview: https://edu-flow-1g5036n5f-july-nanas-projects.vercel.app — READY, actual deployment build outputs contain 12 lambdas (not inferred from rewrites). Frontend embeds the intended Hosted project `uyljtdbvlivxniililay`.
+
+Applied only this round's forward DML migrations `20260909103010` then `20260909104256` through linked migration up. Hosted now matches Local: 45 migrations, zero pending. No reset, seed, schema DDL or historical-migration edits. Agent A02/S03 revisions are 2, R10 is 3; CDS positive controls remain revision3. All formal reference IDs/ownership/Step positions, Knowledge and Materials remain unchanged; verified source mappings increase 22→23 only through the K021 existing-page26 supporting mapping. All 52 Lesson1 Step bodies match canonical source through authenticated `/api/micro`.
+
+Immediately before/after rollout, complete four-table Hosted learner snapshots are equal, including timestamps and payloads: Path40 / Unit42 / Evidence39 / Knowledge states66. Hashes of all Knowledge, factual edges, Courses, Chapters, Lessons, curriculum coverage/sequence and Materials are equal. Full history remains exactly equal after all anonymous interactions and ordinary-account completed review; no duplicate evidence, downgrade, mastery upgrade or completion reset.
+
+Authenticated ordinary-account smoke: root200; login200; health/courses/knowledge/micro/progress/navigation all200. Navigation remains deterministic `course-rule-v2`. Credentials and session state stay private outside the repository.
+
+Remote actual browser acceptance: all five References / 28 Steps completed anonymously; Explain, mechanism, answer/retry feedback, Summary and completion observed at 1440 and390, with 119 report records and zero page errors/overflow. R10 missing-return failure/repair and S03 permission correction rechecked. All five completed reviews have zero application writes. Reviewed representative screenshots for all five; labels, matrices, categorization and sticky actions remain usable, with no long-text input or obstructing Assistant.
+
+Ordinary-account A02 already-completed review traversed the existing Steps, back navigation, return and reload: zero application writes/page errors; persisted completion, Chat Template Next, PDF15 Material, optional Practice and Course return remain present. Complete Hosted snapshots match before/after. Test harness initially used unavailable `URL` in the CLI sandbox listener (confirmed undefined), closing the test session; replaced with a literal origin prefix. Another harness comparison ran before asynchronous Next hydration; explicitly waiting for Next resolves it. No product fix was required and these failed harness attempts are not counted as PASS.
+
+## Final verdict
+
+**PASS WITH NON-BLOCKING DEFERRED ITEMS.** Teaching PASS; Student PASS; Technical PASS; Local PASS; Hosted/Preview PASS. V1 can freeze and guide Lesson2 content production. Existing runtimes are sufficient; new framework0, dependency0, runtime type0, component system0, schema DDL0. Stop platform changes for this round; Lesson2 content itself is not produced here. Evidence is simulated novice acceptance, not a human efficacy study.
+
+Existing large-bundle and vendored H5P CSS warnings remain non-blocking. Existing unrelated #17/#21/#22/#23/#32 scope stays deferred. No prototype merge or history rewrite. Final closeout is docs-only, followed by feature-branch push and exact final-commit deployment smoke; implementation Preview above is the full browser acceptance target.
