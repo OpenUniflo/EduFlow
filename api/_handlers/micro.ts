@@ -1,3 +1,4 @@
+import { decodeLearningContent } from "../../src/shared/content/richText.js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createOptionalUserSupabase, createServerSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
@@ -36,7 +37,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
         id: text(path, "id"), knowledgeId: text(path, "knowledge_id"), courseId: optionalText(path, "course_id"), scope: text(path, "scope"), title: text(path, "title"), description: optionalText(path, "description"), mode: text(path, "mode"), estimatedMinutes: Number(value(path, "estimated_minutes")), required: Boolean(value(path, "required")), status: text(path, "status"),
         units: units.filter((unit) => text(unit, "path_id") === text(path, "id")).map((unit) => ({
           id: text(unit, "id"), pathId: text(unit, "path_id"), title: text(unit, "title"), description: optionalText(unit, "description"), position: Number(value(unit, "position")), estimatedMinutes: Number(value(unit, "estimated_minutes")), required: Boolean(value(unit, "required")),
-          steps: steps.filter((step) => text(step, "unit_id") === text(unit, "id")).map((step) => ({ id: text(step, "id"), kind: text(step, "kind"), title: text(step, "title"), body: text(step, "content"), interaction: value(step, "interaction") ?? undefined, successFeedback: optionalText(step, "success_feedback"), retryFeedback: optionalText(step, "retry_feedback"), transition: value(step, "transition") ?? undefined }))
+          steps: steps.filter((step) => text(step, "unit_id") === text(unit, "id")).map((step) => ({ id: text(step, "id"), kind: text(step, "kind"), title: text(step, "title"), body: decodeLearningContent(value(step, "content")), interaction: value(step, "interaction") ?? undefined, successFeedback: decodeLearningContent(value(step, "success_feedback")) ?? undefined, retryFeedback: decodeLearningContent(value(step, "retry_feedback")) ?? undefined, transition: value(step, "transition") ?? undefined }))
         }))
       })),
       pathProgress: pathProgress.map(mapProgress),

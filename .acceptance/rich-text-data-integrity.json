@@ -1,0 +1,364 @@
+{
+  "project": "uyljtdbvlivxniililay",
+  "migration": "20260909140829",
+  "comparison": [
+    {
+      "table": "assignment_coverages",
+      "beforeRows": 402,
+      "afterRows": 402,
+      "beforeHash": "8616cd06473238effb598f19f78d0271",
+      "afterHash": "8616cd06473238effb598f19f78d0271"
+    },
+    {
+      "table": "assignment_dependencies",
+      "beforeRows": 522,
+      "afterRows": 522,
+      "beforeHash": "0bd0edb660eec81ab2181f0c39fd10d9",
+      "afterHash": "0bd0edb660eec81ab2181f0c39fd10d9"
+    },
+    {
+      "table": "assignment_outcome_compositions",
+      "beforeRows": 228,
+      "afterRows": 228,
+      "beforeHash": "d2b847f5cfebd2a9b41f2108dfbfe536",
+      "afterHash": "d2b847f5cfebd2a9b41f2108dfbfe536"
+    },
+    {
+      "table": "assistant_messages",
+      "beforeRows": 188,
+      "afterRows": 188,
+      "beforeHash": "c3afc8bb246aeea416f66f9f84aaaac9",
+      "afterHash": "c3afc8bb246aeea416f66f9f84aaaac9"
+    },
+    {
+      "table": "assistant_sessions",
+      "beforeRows": 41,
+      "afterRows": 41,
+      "beforeHash": "236e31b7abd069471c8f1a49fd6a51aa",
+      "afterHash": "236e31b7abd069471c8f1a49fd6a51aa"
+    },
+    {
+      "table": "chapter_outcomes",
+      "beforeRows": 21,
+      "afterRows": 21,
+      "beforeHash": "d5551ec1b5f32add5aa657a64a2c255b",
+      "afterHash": "d5551ec1b5f32add5aa657a64a2c255b"
+    },
+    {
+      "table": "course_assignments",
+      "beforeRows": 301,
+      "afterRows": 301,
+      "beforeHash": "b2ae1a25bfffc5d525502a6b159620e9",
+      "afterHash": "b2ae1a25bfffc5d525502a6b159620e9"
+    },
+    {
+      "table": "course_authoring_drafts",
+      "beforeRows": 1,
+      "afterRows": 1,
+      "beforeHash": "15e1711fb2d84c03af3c524bac1f5b14",
+      "afterHash": "15e1711fb2d84c03af3c524bac1f5b14"
+    },
+    {
+      "table": "course_curricula",
+      "beforeRows": 18,
+      "afterRows": 18,
+      "beforeHash": "caa634a165040d1bdeea4ba78b7bb6ad",
+      "afterHash": "caa634a165040d1bdeea4ba78b7bb6ad"
+    },
+    {
+      "table": "course_mapping_runs",
+      "beforeRows": 0,
+      "afterRows": 0,
+      "beforeHash": "d41d8cd98f00b204e9800998ecf8427e",
+      "afterHash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table": "course_target_knowledge",
+      "beforeRows": 41,
+      "afterRows": 41,
+      "beforeHash": "597423f29d18e4221f0a7a656d2dcc1b",
+      "afterHash": "597423f29d18e4221f0a7a656d2dcc1b"
+    },
+    {
+      "table": "courses",
+      "beforeRows": 18,
+      "afterRows": 18,
+      "beforeHash": "b18c1c9a19455ebae4dc9e15748907f1",
+      "afterHash": "b18c1c9a19455ebae4dc9e15748907f1"
+    },
+    {
+      "table": "curriculum_chapters",
+      "beforeRows": 58,
+      "afterRows": 58,
+      "beforeHash": "60a99d2a920a3b67fcde58da6b31a609",
+      "afterHash": "60a99d2a920a3b67fcde58da6b31a609"
+    },
+    {
+      "table": "curriculum_coverages",
+      "beforeRows": 474,
+      "afterRows": 474,
+      "beforeHash": "da46cfe115c27abb742c801c9da84903",
+      "afterHash": "da46cfe115c27abb742c801c9da84903"
+    },
+    {
+      "table": "curriculum_lessons",
+      "beforeRows": 90,
+      "afterRows": 90,
+      "beforeHash": "427d354af385eeabfbdffe1725401eda",
+      "afterHash": "427d354af385eeabfbdffe1725401eda"
+    },
+    {
+      "table": "curriculum_sequences",
+      "beforeRows": 47,
+      "afterRows": 47,
+      "beforeHash": "f3c4cdc84e3a844680cdf9fc601ddafe",
+      "afterHash": "f3c4cdc84e3a844680cdf9fc601ddafe"
+    },
+    {
+      "table": "domain_assignment_candidates",
+      "beforeRows": 0,
+      "afterRows": 0,
+      "beforeHash": "d41d8cd98f00b204e9800998ecf8427e",
+      "afterHash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table": "domain_assignments",
+      "beforeRows": 201,
+      "afterRows": 201,
+      "beforeHash": "ad4fcd860b142ac45dc77408ec530c17",
+      "afterHash": "ad4fcd860b142ac45dc77408ec530c17"
+    },
+    {
+      "table": "domain_governance_metadata",
+      "beforeRows": 1,
+      "afterRows": 1,
+      "beforeHash": "d99625c305d95cbaee86e49cb86f0d7a",
+      "afterHash": "d99625c305d95cbaee86e49cb86f0d7a"
+    },
+    {
+      "table": "domain_proposals",
+      "beforeRows": 0,
+      "afterRows": 0,
+      "beforeHash": "d41d8cd98f00b204e9800998ecf8427e",
+      "afterHash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table": "final_project_outcome_compositions",
+      "beforeRows": 21,
+      "afterRows": 21,
+      "beforeHash": "1a3acb8e44161c4da15411e3c3fc5935",
+      "afterHash": "1a3acb8e44161c4da15411e3c3fc5935"
+    },
+    {
+      "table": "final_projects",
+      "beforeRows": 3,
+      "afterRows": 3,
+      "beforeHash": "d51739af78bb25b28d81d5e7dea52755",
+      "afterHash": "d51739af78bb25b28d81d5e7dea52755"
+    },
+    {
+      "table": "h5p_contents",
+      "beforeRows": 5,
+      "afterRows": 5,
+      "beforeHash": "eedd6a5c82e774f38fde9df82ba60b9b",
+      "afterHash": "eedd6a5c82e774f38fde9df82ba60b9b"
+    },
+    {
+      "table": "knowledge_domains",
+      "beforeRows": 7,
+      "afterRows": 7,
+      "beforeHash": "80034cc820c7f91f1958474cc38dcb6e",
+      "afterHash": "80034cc820c7f91f1958474cc38dcb6e"
+    },
+    {
+      "table": "knowledge_edges",
+      "beforeRows": 454,
+      "afterRows": 454,
+      "beforeHash": "d1574d9d4b197ac4763157dfa8a3644a",
+      "afterHash": "d1574d9d4b197ac4763157dfa8a3644a"
+    },
+    {
+      "table": "knowledge_evidence",
+      "beforeRows": 40,
+      "afterRows": 40,
+      "beforeHash": "dc596715109084808c2b1193432fef00",
+      "afterHash": "dc596715109084808c2b1193432fef00"
+    },
+    {
+      "table": "knowledge_generation_runs",
+      "beforeRows": 0,
+      "afterRows": 0,
+      "beforeHash": "d41d8cd98f00b204e9800998ecf8427e",
+      "afterHash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table": "knowledge_node_revisions",
+      "beforeRows": 342,
+      "afterRows": 342,
+      "beforeHash": "723d199f3859fd457109bce0efbec4ea",
+      "afterHash": "723d199f3859fd457109bce0efbec4ea"
+    },
+    {
+      "table": "knowledge_nodes",
+      "beforeRows": 332,
+      "afterRows": 332,
+      "beforeHash": "892afbd481b58ed8cbde86af2e9ef74a",
+      "afterHash": "892afbd481b58ed8cbde86af2e9ef74a"
+    },
+    {
+      "table": "learning_attempts",
+      "beforeRows": 2,
+      "afterRows": 2,
+      "beforeHash": "1bebd3521dd8a56b868812cb480386cf",
+      "afterHash": "1bebd3521dd8a56b868812cb480386cf"
+    },
+    {
+      "table": "learning_events",
+      "beforeRows": 4,
+      "afterRows": 4,
+      "beforeHash": "518a0da3f60b218479586c2ccabe8a51",
+      "afterHash": "518a0da3f60b218479586c2ccabe8a51"
+    },
+    {
+      "table": "material_knowledge_coverages",
+      "beforeRows": 365,
+      "afterRows": 365,
+      "beforeHash": "db5b156f9667c6b5d640efb39e69ca71",
+      "afterHash": "db5b156f9667c6b5d640efb39e69ca71"
+    },
+    {
+      "table": "material_parsing_jobs",
+      "beforeRows": 12,
+      "afterRows": 12,
+      "beforeHash": "b30e1c1f6345d4358ee1adee69f3757a",
+      "afterHash": "b30e1c1f6345d4358ee1adee69f3757a"
+    },
+    {
+      "table": "material_segments",
+      "beforeRows": 1203,
+      "afterRows": 1203,
+      "beforeHash": "b2bf5414ff0438fa8509e41fcea5c0f6",
+      "afterHash": "b2bf5414ff0438fa8509e41fcea5c0f6"
+    },
+    {
+      "table": "materials",
+      "beforeRows": 21,
+      "afterRows": 21,
+      "beforeHash": "ddb140a23adfe9075bcbe368586025c9",
+      "afterHash": "ddb140a23adfe9075bcbe368586025c9"
+    },
+    {
+      "table": "micro_learning_paths",
+      "beforeRows": 19,
+      "afterRows": 19,
+      "beforeHash": "9b73565fe00439bd97ecaa9f20c362ea",
+      "afterHash": "e6fe131a2b5e36976cbae6656879cd70"
+    },
+    {
+      "table": "micro_steps",
+      "beforeRows": 103,
+      "afterRows": 103,
+      "beforeHash": "22b8ce23c0a630238d8ed27118781887",
+      "afterHash": "d11dded2052839c7dc4ed2764823c14a"
+    },
+    {
+      "table": "micro_units",
+      "beforeRows": 24,
+      "afterRows": 24,
+      "beforeHash": "abae857b3fbedc40d8b3ce658d68f17d",
+      "afterHash": "abae857b3fbedc40d8b3ce658d68f17d"
+    },
+    {
+      "table": "navigation_decisions",
+      "beforeRows": 41,
+      "afterRows": 41,
+      "beforeHash": "bcda57e30ee961720f064cf5d4a92f77",
+      "afterHash": "bcda57e30ee961720f064cf5d4a92f77"
+    },
+    {
+      "table": "performance_results",
+      "beforeRows": 2,
+      "afterRows": 2,
+      "beforeHash": "2609439a500ed8dc1b0e9bb3292173cc",
+      "afterHash": "2609439a500ed8dc1b0e9bb3292173cc"
+    },
+    {
+      "table": "profiles",
+      "beforeRows": 4,
+      "afterRows": 4,
+      "beforeHash": "2b0bd9547f1804571cf51391682785d6",
+      "afterHash": "2b0bd9547f1804571cf51391682785d6"
+    },
+    {
+      "table": "user_assignment_states",
+      "beforeRows": 8,
+      "afterRows": 8,
+      "beforeHash": "218a10136950a9a543d930f152b74376",
+      "afterHash": "218a10136950a9a543d930f152b74376"
+    },
+    {
+      "table": "user_course_states",
+      "beforeRows": 23,
+      "afterRows": 23,
+      "beforeHash": "4ca7ce318526a564838aacec12ebe501",
+      "afterHash": "4ca7ce318526a564838aacec12ebe501"
+    },
+    {
+      "table": "user_knowledge_states",
+      "beforeRows": 67,
+      "afterRows": 67,
+      "beforeHash": "27f9f86528ee4495ee5540683a705b74",
+      "afterHash": "27f9f86528ee4495ee5540683a705b74"
+    },
+    {
+      "table": "user_material_states",
+      "beforeRows": 24,
+      "afterRows": 24,
+      "beforeHash": "4274b827f2d290acd229a8be8f8672cc",
+      "afterHash": "4274b827f2d290acd229a8be8f8672cc"
+    },
+    {
+      "table": "user_micro_path_progress",
+      "beforeRows": 41,
+      "afterRows": 41,
+      "beforeHash": "eca013248101f824fd3ee1a1a11ca094",
+      "afterHash": "eca013248101f824fd3ee1a1a11ca094"
+    },
+    {
+      "table": "user_micro_unit_progress",
+      "beforeRows": 43,
+      "afterRows": 43,
+      "beforeHash": "af514e672aadf318659e88f9fc482eb0",
+      "afterHash": "af514e672aadf318659e88f9fc482eb0"
+    },
+    {
+      "table": "user_workflow_definitions",
+      "beforeRows": 0,
+      "afterRows": 0,
+      "beforeHash": "d41d8cd98f00b204e9800998ecf8427e",
+      "afterHash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "table": "user_workflow_state",
+      "beforeRows": 2,
+      "afterRows": 2,
+      "beforeHash": "84c1c130ef0bda8cb01a2263954628dc",
+      "afterHash": "84c1c130ef0bda8cb01a2263954628dc"
+    },
+    {
+      "table": "workflow_runs",
+      "beforeRows": 1,
+      "afterRows": 1,
+      "beforeHash": "c82d59404aee9dddc6cb631c46e7dfd7",
+      "afterHash": "c82d59404aee9dddc6cb631c46e7dfd7"
+    },
+    {
+      "table": "workflow_templates",
+      "beforeRows": 20,
+      "afterRows": 20,
+      "beforeHash": "d710d8c68e983592081c8602c565b5b7",
+      "afterHash": "d710d8c68e983592081c8602c565b5b7"
+    }
+  ],
+  "unrelatedMicroReconstructionMatched": true
+}

@@ -1,3 +1,4 @@
+import type { LearningContent } from "@/shared/content/richText";
 import { isNativeMicroInteractionCorrect, validateNativeMicroInteraction, type NativeMicroAnswer, type NativeMicroInteraction } from "@/shared/learning/nativeMicroInteraction";
 
 export type MicroInteraction = NativeMicroInteraction
@@ -52,10 +53,10 @@ export type MicroStep = {
   id:string;
   kind:"challenge"|"feedback"|"explanation"|"interaction"|"application"|"check"|"summary";
   title:string;
-  body:string;
+  body:LearningContent;
   interaction?:MicroInteraction;
-  successFeedback?:string;
-  retryFeedback?:string;
+  successFeedback?:LearningContent;
+  retryFeedback?:LearningContent;
   transition?: { nextStepId?:string; retryStepId?:string };
 };
 

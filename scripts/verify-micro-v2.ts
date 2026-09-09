@@ -20,10 +20,16 @@ if(sql(`select validate_micro_interaction('{"type":"simulation","mode":"explore"
 const ids=microV2References.map((path)=>`'${path.id}'`).join(",");
 const fingerprint=()=>sql(`select md5(coalesce(jsonb_agg(to_jsonb(s) order by s.id)::text,'')) from micro_steps s join micro_units u on u.id=s.unit_id where u.path_id in (${ids});`);
 const before=fingerprint();
-sql(await readFile("supabase/migrations/20260905083836_micro_learning_v2.sql","utf8"));
-sql(await readFile("supabase/migrations/20260905162819_micro_v2_teaching_content.sql","utf8"));
-if(before!==fingerprint())throw new Error("Reference replay changed persisted definitions");
-console.log(`Micro V2 Local verifier: ${cases.length+1} TS/SQL parity probes and idempotent four-reference replay passed.`);
+// Historical content migrations are not forward editors. Verify their replay in an
+// isolated transaction and roll it back, preserving every newer content revision.
+const historical = (await Promise.all([
+  "supabase/migrations/20260905083836_micro_learning_v2.sql",
+  "supabase/migrations/20260905162819_micro_v2_teaching_content.sql",
+].map(path=>readFile(path,"utf8")))).join("\n");
+const digest = `select md5(coalesce(jsonb_agg(to_jsonb(s) order by s.id)::text,'')) from micro_steps s join micro_units u on u.id=s.unit_id where u.path_id in (${ids})`;
+sql(`begin;\n${historical}\ncreate temporary table replay_baseline as ${digest};\n${historical}\ndo $$ begin if (${digest}) is distinct from (select md5 from replay_baseline) then raise exception 'Historical replay is not idempotent'; end if; end $$;\nrollback;`);
+if(before!==fingerprint())throw new Error("Rolled-back Reference replay changed persisted definitions");
+console.log(`Micro V2 Local verifier: ${cases.length+1} TS/SQL parity probes, isolated historical replay and preservation of current revisions passed.`);
 
 const h5pFingerprint=()=>sql("select md5(to_jsonb(h)::text) from h5p_contents h where id='cds525-h5p-k001-rule-vs-learning';");
 const beforeH5p=h5pFingerprint();sql(await readFile("supabase/migrations/20260905092253_cds_h5p_geometry_v2.sql","utf8"));if(beforeH5p!==h5pFingerprint())throw new Error("H5P revision replay changed imported metadata");console.log("H5P revision/checksum replay stability passed.");

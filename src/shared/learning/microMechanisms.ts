@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { richTextSchema } from "../content/richText.js";
 
 const text = z.string().min(1).max(2000).refine((value)=>value.trim().length>0);
 const finite = z.number().finite();
 const teaching = z.object({
-  explanation: text.optional(),
-  feedback: z.record(z.string().min(1).max(80), text).optional(),
+  explanation: z.union([text, richTextSchema]).optional(),
+  feedback: z.record(z.string().min(1).max(80), z.union([text, richTextSchema])).optional(),
 }).optional();
 const mode = z.enum(["explore", "challenge"]);
 const unique = (values: string[]) => new Set(values).size === values.length;
