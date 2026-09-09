@@ -1,0 +1,549 @@
+{
+  "project": "uyljtdbvlivxniililay",
+  "migration": "20260909194539_student_facing_agent_content",
+  "baselineHead": "700853d86a90188ad5bf7c2e950729f87ab3e9cb",
+  "target": {
+    "courseId": "ai-agents-in-depth",
+    "paths": 12,
+    "steps": 65,
+    "changedBodies": 36,
+    "unchangedBodies": 29,
+    "unchangedStepFields": "All fields except content, including interaction and feedback",
+    "pathChanges": "revision only"
+  },
+  "protectedBefore": [
+    {
+      "name": "assignment_coverages",
+      "count": 402,
+      "hash": "30f52ab608a6d22cdf4d04ae14cfe26e"
+    },
+    {
+      "name": "assignment_dependencies",
+      "count": 522,
+      "hash": "d3a229f6944039bfe023da2daad9f79c"
+    },
+    {
+      "name": "assignment_outcome_compositions",
+      "count": 228,
+      "hash": "07d33fd763566576df82115c0dc06aa6"
+    },
+    {
+      "name": "assistant_messages",
+      "count": 188,
+      "hash": "309d723f880b24349aba0e9403b30966"
+    },
+    {
+      "name": "assistant_sessions",
+      "count": 41,
+      "hash": "1b4daa56b212bc904cc612756b074238"
+    },
+    {
+      "name": "chapter_outcomes",
+      "count": 21,
+      "hash": "88d65698fa26b81bf5fae9621d7508b0"
+    },
+    {
+      "name": "course_assignments",
+      "count": 301,
+      "hash": "d9cbdf64642b90050f961101e9a9b4d6"
+    },
+    {
+      "name": "course_authoring_drafts",
+      "count": 1,
+      "hash": "15e1711fb2d84c03af3c524bac1f5b14"
+    },
+    {
+      "name": "course_curricula",
+      "count": 18,
+      "hash": "d488ee2d2f86a5db2ece1ee0a779c13e"
+    },
+    {
+      "name": "course_mapping_runs",
+      "count": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "course_target_knowledge",
+      "count": 41,
+      "hash": "8b0f88eef06aa69b27754e46702e4732"
+    },
+    {
+      "name": "courses",
+      "count": 18,
+      "hash": "bdf505649b12905eb2afd2f130ad9c84"
+    },
+    {
+      "name": "curriculum_chapters",
+      "count": 58,
+      "hash": "a22f39f03c7da355729daed5312c2f55"
+    },
+    {
+      "name": "curriculum_coverages",
+      "count": 474,
+      "hash": "26281be1b683817930d311bb0184756d"
+    },
+    {
+      "name": "curriculum_lessons",
+      "count": 90,
+      "hash": "e4ccc70dd0079c8213a513a328829054"
+    },
+    {
+      "name": "curriculum_sequences",
+      "count": 47,
+      "hash": "4a79cdc3f5701180e4077911bc4a9e04"
+    },
+    {
+      "name": "domain_assignment_candidates",
+      "count": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "domain_assignments",
+      "count": 201,
+      "hash": "cee06ee9b191eb843e5d3d8f025024c2"
+    },
+    {
+      "name": "domain_governance_metadata",
+      "count": 1,
+      "hash": "d99625c305d95cbaee86e49cb86f0d7a"
+    },
+    {
+      "name": "domain_proposals",
+      "count": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "final_project_outcome_compositions",
+      "count": 21,
+      "hash": "47d154cae209c03c4a0e21c4c0403578"
+    },
+    {
+      "name": "final_projects",
+      "count": 3,
+      "hash": "7bebd81a1b1671b533c6b0767d594d51"
+    },
+    {
+      "name": "h5p_contents",
+      "count": 5,
+      "hash": "7f214bf94973b4e7bfd667cca771171e"
+    },
+    {
+      "name": "knowledge_domains",
+      "count": 7,
+      "hash": "6288b5b0b20d933a87b1aa81b48876e7"
+    },
+    {
+      "name": "knowledge_edges",
+      "count": 454,
+      "hash": "4517d321c88bba887a5e1f72ed229e3e"
+    },
+    {
+      "name": "knowledge_evidence",
+      "count": 41,
+      "hash": "c9ae4b885be7f14bad70bd6a6916db89"
+    },
+    {
+      "name": "knowledge_generation_runs",
+      "count": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "knowledge_node_revisions",
+      "count": 342,
+      "hash": "df0262cf4f6dda3d2c1bbe32b4a6eb38"
+    },
+    {
+      "name": "knowledge_nodes",
+      "count": 332,
+      "hash": "ba6de6925abb221bc9c889945dccd111"
+    },
+    {
+      "name": "learning_attempts",
+      "count": 2,
+      "hash": "3e4e2d2cf74d1760670028bb799568cb"
+    },
+    {
+      "name": "learning_events",
+      "count": 4,
+      "hash": "dadc0129ab425d1e4ea42d18f64ce448"
+    },
+    {
+      "name": "material_knowledge_coverages",
+      "count": 365,
+      "hash": "6021a18e94cfe9f9a78965f3df12bd59"
+    },
+    {
+      "name": "material_parsing_jobs",
+      "count": 12,
+      "hash": "94e75fe5c4f46554612d8536e966c9c4"
+    },
+    {
+      "name": "material_segments",
+      "count": 1203,
+      "hash": "9b25c351587fd50d2b8b5f2f7c2cfa5b"
+    },
+    {
+      "name": "materials",
+      "count": 21,
+      "hash": "2694be47504b6f54be9cd74d01d0dfa7"
+    },
+    {
+      "name": "micro_units",
+      "count": 24,
+      "hash": "dd0c2caad2eeff7d989399106340b068"
+    },
+    {
+      "name": "navigation_decisions",
+      "count": 43,
+      "hash": "93e6a0c67299d7d206d4c0b5bde32266"
+    },
+    {
+      "name": "performance_results",
+      "count": 2,
+      "hash": "c744daebec42c9aa543b65424f844643"
+    },
+    {
+      "name": "profiles",
+      "count": 4,
+      "hash": "4d632b328f7b4ca4608aa731f77b7bdc"
+    },
+    {
+      "name": "user_assignment_states",
+      "count": 9,
+      "hash": "2605a9274c8c46b2f78441f599783463"
+    },
+    {
+      "name": "user_course_states",
+      "count": 23,
+      "hash": "7e5752d3408d498f8ea4ccc812929057"
+    },
+    {
+      "name": "user_knowledge_states",
+      "count": 67,
+      "hash": "c34070a3cf96f2ed6aae092db509249e"
+    },
+    {
+      "name": "user_material_states",
+      "count": 24,
+      "hash": "5fcdb43d341d3f4ece3fbecd116e0af1"
+    },
+    {
+      "name": "user_micro_path_progress",
+      "count": 41,
+      "hash": "9a70fdb887e749ff3d556375f9dea414"
+    },
+    {
+      "name": "user_micro_unit_progress",
+      "count": 44,
+      "hash": "1d4a74ec9c2063b90b40b66f42a9453b"
+    },
+    {
+      "name": "user_workflow_definitions",
+      "count": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "user_workflow_state",
+      "count": 2,
+      "hash": "bda8c055e487c9899e204f263efc7ad2"
+    },
+    {
+      "name": "workflow_runs",
+      "count": 1,
+      "hash": "c82d59404aee9dddc6cb631c46e7dfd7"
+    },
+    {
+      "name": "workflow_templates",
+      "count": 20,
+      "hash": "b3996b9e99147fac4e1316818dccb6c9"
+    },
+    {
+      "name": "other_paths",
+      "count": 7,
+      "hash": "543636e2db5cab36116105e94218c684"
+    },
+    {
+      "name": "other_steps",
+      "count": 38,
+      "hash": "0267168710ed29745352da36240e4770"
+    },
+    {
+      "name": "target_path_structure",
+      "count": 12,
+      "hash": "50317cd51d38965ee038ec6f2006d747"
+    },
+    {
+      "name": "target_step_structure",
+      "count": 65,
+      "hash": "0ba4be63439e00cc95c7f4dd707f3fdb"
+    }
+  ],
+  "protectedAfter": [
+    {
+      "name": "assignment_coverages",
+      "count": 402,
+      "hash": "30f52ab608a6d22cdf4d04ae14cfe26e"
+    },
+    {
+      "name": "assignment_dependencies",
+      "count": 522,
+      "hash": "d3a229f6944039bfe023da2daad9f79c"
+    },
+    {
+      "name": "assignment_outcome_compositions",
+      "count": 228,
+      "hash": "07d33fd763566576df82115c0dc06aa6"
+    },
+    {
+      "name": "assistant_messages",
+      "count": 188,
+      "hash": "309d723f880b24349aba0e9403b30966"
+    },
+    {
+      "name": "assistant_sessions",
+      "count": 41,
+      "hash": "1b4daa56b212bc904cc612756b074238"
+    },
+    {
+      "name": "chapter_outcomes",
+      "count": 21,
+      "hash": "88d65698fa26b81bf5fae9621d7508b0"
+    },
+    {
+      "name": "course_assignments",
+      "count": 301,
+      "hash": "d9cbdf64642b90050f961101e9a9b4d6"
+    },
+    {
+      "name": "course_authoring_drafts",
+      "count": 1,
+      "hash": "15e1711fb2d84c03af3c524bac1f5b14"
+    },
+    {
+      "name": "course_curricula",
+      "count": 18,
+      "hash": "d488ee2d2f86a5db2ece1ee0a779c13e"
+    },
+    {
+      "name": "course_mapping_runs",
+      "count": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "course_target_knowledge",
+      "count": 41,
+      "hash": "8b0f88eef06aa69b27754e46702e4732"
+    },
+    {
+      "name": "courses",
+      "count": 18,
+      "hash": "bdf505649b12905eb2afd2f130ad9c84"
+    },
+    {
+      "name": "curriculum_chapters",
+      "count": 58,
+      "hash": "a22f39f03c7da355729daed5312c2f55"
+    },
+    {
+      "name": "curriculum_coverages",
+      "count": 474,
+      "hash": "26281be1b683817930d311bb0184756d"
+    },
+    {
+      "name": "curriculum_lessons",
+      "count": 90,
+      "hash": "e4ccc70dd0079c8213a513a328829054"
+    },
+    {
+      "name": "curriculum_sequences",
+      "count": 47,
+      "hash": "4a79cdc3f5701180e4077911bc4a9e04"
+    },
+    {
+      "name": "domain_assignment_candidates",
+      "count": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "domain_assignments",
+      "count": 201,
+      "hash": "cee06ee9b191eb843e5d3d8f025024c2"
+    },
+    {
+      "name": "domain_governance_metadata",
+      "count": 1,
+      "hash": "d99625c305d95cbaee86e49cb86f0d7a"
+    },
+    {
+      "name": "domain_proposals",
+      "count": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "final_project_outcome_compositions",
+      "count": 21,
+      "hash": "47d154cae209c03c4a0e21c4c0403578"
+    },
+    {
+      "name": "final_projects",
+      "count": 3,
+      "hash": "7bebd81a1b1671b533c6b0767d594d51"
+    },
+    {
+      "name": "h5p_contents",
+      "count": 5,
+      "hash": "7f214bf94973b4e7bfd667cca771171e"
+    },
+    {
+      "name": "knowledge_domains",
+      "count": 7,
+      "hash": "6288b5b0b20d933a87b1aa81b48876e7"
+    },
+    {
+      "name": "knowledge_edges",
+      "count": 454,
+      "hash": "4517d321c88bba887a5e1f72ed229e3e"
+    },
+    {
+      "name": "knowledge_evidence",
+      "count": 41,
+      "hash": "c9ae4b885be7f14bad70bd6a6916db89"
+    },
+    {
+      "name": "knowledge_generation_runs",
+      "count": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "knowledge_node_revisions",
+      "count": 342,
+      "hash": "df0262cf4f6dda3d2c1bbe32b4a6eb38"
+    },
+    {
+      "name": "knowledge_nodes",
+      "count": 332,
+      "hash": "ba6de6925abb221bc9c889945dccd111"
+    },
+    {
+      "name": "learning_attempts",
+      "count": 2,
+      "hash": "3e4e2d2cf74d1760670028bb799568cb"
+    },
+    {
+      "name": "learning_events",
+      "count": 4,
+      "hash": "dadc0129ab425d1e4ea42d18f64ce448"
+    },
+    {
+      "name": "material_knowledge_coverages",
+      "count": 365,
+      "hash": "6021a18e94cfe9f9a78965f3df12bd59"
+    },
+    {
+      "name": "material_parsing_jobs",
+      "count": 12,
+      "hash": "94e75fe5c4f46554612d8536e966c9c4"
+    },
+    {
+      "name": "material_segments",
+      "count": 1203,
+      "hash": "9b25c351587fd50d2b8b5f2f7c2cfa5b"
+    },
+    {
+      "name": "materials",
+      "count": 21,
+      "hash": "2694be47504b6f54be9cd74d01d0dfa7"
+    },
+    {
+      "name": "micro_units",
+      "count": 24,
+      "hash": "dd0c2caad2eeff7d989399106340b068"
+    },
+    {
+      "name": "navigation_decisions",
+      "count": 43,
+      "hash": "93e6a0c67299d7d206d4c0b5bde32266"
+    },
+    {
+      "name": "performance_results",
+      "count": 2,
+      "hash": "c744daebec42c9aa543b65424f844643"
+    },
+    {
+      "name": "profiles",
+      "count": 4,
+      "hash": "4d632b328f7b4ca4608aa731f77b7bdc"
+    },
+    {
+      "name": "user_assignment_states",
+      "count": 9,
+      "hash": "2605a9274c8c46b2f78441f599783463"
+    },
+    {
+      "name": "user_course_states",
+      "count": 23,
+      "hash": "7e5752d3408d498f8ea4ccc812929057"
+    },
+    {
+      "name": "user_knowledge_states",
+      "count": 67,
+      "hash": "c34070a3cf96f2ed6aae092db509249e"
+    },
+    {
+      "name": "user_material_states",
+      "count": 24,
+      "hash": "5fcdb43d341d3f4ece3fbecd116e0af1"
+    },
+    {
+      "name": "user_micro_path_progress",
+      "count": 41,
+      "hash": "9a70fdb887e749ff3d556375f9dea414"
+    },
+    {
+      "name": "user_micro_unit_progress",
+      "count": 44,
+      "hash": "1d4a74ec9c2063b90b40b66f42a9453b"
+    },
+    {
+      "name": "user_workflow_definitions",
+      "count": 0,
+      "hash": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    {
+      "name": "user_workflow_state",
+      "count": 2,
+      "hash": "bda8c055e487c9899e204f263efc7ad2"
+    },
+    {
+      "name": "workflow_runs",
+      "count": 1,
+      "hash": "c82d59404aee9dddc6cb631c46e7dfd7"
+    },
+    {
+      "name": "workflow_templates",
+      "count": 20,
+      "hash": "b3996b9e99147fac4e1316818dccb6c9"
+    },
+    {
+      "name": "other_paths",
+      "count": 7,
+      "hash": "543636e2db5cab36116105e94218c684"
+    },
+    {
+      "name": "other_steps",
+      "count": 38,
+      "hash": "0267168710ed29745352da36240e4770"
+    },
+    {
+      "name": "target_path_structure",
+      "count": 12,
+      "hash": "50317cd51d38965ee038ec6f2006d747"
+    },
+    {
+      "name": "target_step_structure",
+      "count": 65,
+      "hash": "0ba4be63439e00cc95c7f4dd707f3fdb"
+    }
+  ],
+  "changes": []
+}

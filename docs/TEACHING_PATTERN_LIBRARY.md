@@ -58,6 +58,24 @@ Feedback must identify a relationship, step, condition or mechanism. Wrong selec
 
 An Explain/Demo should have enough of: core question, concise conclusion, concrete example, visible relation/change/process, and takeaway to serve its need. The diagram must carry meaning at 390 px, with accessible alternatives to drag, readable wrapping, visible primary action and no Assistant obstruction. Do not require the learner to decipher graph geometry to obtain essential meaning: adjacent event captions must name the relation.
 
+## Student-Facing Content Rule
+
+This global EduFlow course-content contract covers Micro titles, body/Summary, success/retry feedback, mechanism explanations/reason feedback, interaction instructions/options, event explanations and captions. Review every student-visible field, not only `micro_steps.content`.
+
+**Micro Body = Teaching; Material/Provenance = Source; Course Shell = Navigation; Learning State = Completion/Mastery.**
+
+Student content may explain concepts, examples, comparisons, processes, observable tasks, feedback and knowledge summaries. Keep factual limits needed to understand the demonstration: “这里播放的是预设轨迹，不调用真实服务”, “这是示意数据，并非实时天气查询”, and example-specific restrictions. Removing attribution must never turn an example into a universal claim.
+
+Remove source locators and audit metadata from student prose: “来源：”, textbook/PDF pages, original-book chapters, MaterialSegment identities, provenance and authoring/audit records. Retain source and mapping data in Material, MaterialSegment, MaterialKnowledgeCoverage, provenance records and authoring/audit documents. A future student reference entry belongs to a separate “参考资料 / 查看教材” system surface.
+
+Replace production notes such as “教学改编”, “跨节教学改编”, “本例根据教材改写” or “为便于教学” with the learning scenario: “设想两个候选模型处理同一航班任务”. State knowledge directly instead of appealing to textbook authority: “教材也要求凭证范围与有效期受限” becomes “凭证应限制作用范围和有效期”. Preserve definition scope when needed: “这里的 Harness 指……”. A particular booking example becomes “在这个订票示例中，流程依次为……”, never “所有订票流程都必须……”.
+
+Do not embed Course routes or Next Action in content: “下一项 / 下一知识点 / 下一节 / 接下来学习 / 后续课程 / 回到课程 / 继续下一步”, or assumptions about preceding course items. Shell controls own navigation. A mechanism's “模型根据 Observation 决定下一步 Action” and instructions for the current interaction remain teaching.
+
+Keep completion/mastery semantics in product contracts and learning-state code. Do not teach “学习活动完成不是掌握证明” as Knowledge content. The internal rule Micro completion ≠ mastery remains unchanged; summaries explain knowledge without unsupported learner capability claims.
+
+Semantic review must distinguish **Removed — Provenance**, **Rewritten — Authoring Metadata**, **Removed — Route Coupling**, **Removed — Product State**, and **Retained — Necessary Caveat**. Keywords only locate candidates: “来源” can legitimately describe message origin, and a course may study a textbook itself. A narrow reviewed-Course regression test is not a global semantic validator or Publish gate. Preserve interaction answers, behavior, factual boundaries and source lineage.
+
 ## Authoring and addition gates
 
 Authors and AI must follow Proposal → visual Preview/Diff → deterministic validation → explicit confirmation → Apply/Publish. Pattern selection grants no publish, navigation, mastery or mutation authority. Micro teaches and summarizes; the system shell owns optional Material/Practice/Next/Course/Return. One Knowledge-anchored Micro experience remains; historical scope fields are compatibility data. Completion contributes learned, not Micro-alone mastered; completed review writes nothing.

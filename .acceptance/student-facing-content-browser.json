@@ -1,0 +1,888 @@
+{
+  "preview": "https://edu-flow-ht7yk8dro-july-nanas-projects.vercel.app",
+  "deploymentId": "dpl_5mh3L78eeGyjSukFA5QQaAwi5Aah",
+  "status": "READY",
+  "functions": [
+    "api/assistant",
+    "api/course",
+    "api/course-intent",
+    "api/course-mapping",
+    "api/domains",
+    "api/health",
+    "api/knowledge",
+    "api/knowledge-generation",
+    "api/learner",
+    "api/material-parsing-jobs",
+    "api/materials",
+    "api/workflows"
+  ],
+  "authenticated": true,
+  "mode": "existing completed-user review",
+  "totalViewportChecks": 130,
+  "results": [
+    {
+      "knowledge": "S03",
+      "steps": [
+        {
+          "id": "aiad-l1-s03-s1",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s03-s1",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s03-s2",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s03-s2",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s03-s3",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s03-s3",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s03-s4",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s03-s4",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s03-s5",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s03-s5",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "CTX01",
+      "steps": [
+        {
+          "id": "aiad-ctx01-hook",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-hook",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-explain",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-explain",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-demo",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-demo",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-categorize",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-categorize",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-insight",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-insight",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-order",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-order",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-summary",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-ctx01-summary",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "RT01",
+      "steps": [
+        {
+          "id": "aiad-rt01-trace",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-trace",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-explain",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-explain",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-demo",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-demo",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-insight",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-insight",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-structure",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-structure",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-summary",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-rt01-summary",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "AGC01",
+      "steps": [
+        {
+          "id": "aiad-l1-agc01-s1",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc01-s1",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc01-s2",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc01-s2",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc01-s3",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc01-s3",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc01-s4",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc01-s4",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc01-s5",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc01-s5",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "AGC02",
+      "steps": [
+        {
+          "id": "aiad-l1-agc02-s1",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s1",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s2",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s2",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s3",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s3",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s4",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s4",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s5",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s5",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s6",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc02-s6",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "H02",
+      "steps": [
+        {
+          "id": "aiad-l1-h02-s1",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-h02-s1",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-h02-s2",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-h02-s2",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-h02-s3",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-h02-s3",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-h02-s4",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-h02-s4",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-h02-s5",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-h02-s5",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "A02",
+      "steps": [
+        {
+          "id": "aiad-l1-a02-s1",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s1",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s2",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s2",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s3",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s3",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s4",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s4",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s4-bridge",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s4-bridge",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s5",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-a02-s5",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "R10",
+      "steps": [
+        {
+          "id": "aiad-l1-r10-s1",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-r10-s1",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-r10-s2",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-r10-s2",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-r10-s3",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-r10-s3",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-r10-s4",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-r10-s4",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-r10-s5",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-r10-s5",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "S01",
+      "steps": [
+        {
+          "id": "aiad-l1-s01-s1",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s01-s1",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s01-s2",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s01-s2",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s01-s3",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s01-s3",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s01-s4",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s01-s4",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s01-s5",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s01-s5",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "S02",
+      "steps": [
+        {
+          "id": "aiad-l1-s02-s1",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s02-s1",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s02-s2",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s02-s2",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s02-s3",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s02-s3",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s02-s4",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s02-s4",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s02-s5",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-s02-s5",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "WF05",
+      "steps": [
+        {
+          "id": "aiad-l1-wf05-s1",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-wf05-s1",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-wf05-s2",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-wf05-s2",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-wf05-s3",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-wf05-s3",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-wf05-s4",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-wf05-s4",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-wf05-s5",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-wf05-s5",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    },
+    {
+      "knowledge": "AGC03",
+      "steps": [
+        {
+          "id": "aiad-l1-agc03-s1",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc03-s1",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc03-s2",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc03-s2",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc03-s3",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc03-s3",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc03-s4",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc03-s4",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc03-s5",
+          "width": 1440,
+          "overflow": false,
+          "cta": true
+        },
+        {
+          "id": "aiad-l1-agc03-s5",
+          "width": 390,
+          "overflow": false,
+          "cta": true
+        }
+      ],
+      "errors": [],
+      "writes": []
+    }
+  ]
+}

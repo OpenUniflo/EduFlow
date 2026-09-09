@@ -2,8 +2,8 @@
   {
     "id": "aiad-ctx01-message-context",
     "knowledgeId": "CTX01",
-    "fromRevision": 3,
-    "revision": 4,
+    "fromRevision": 4,
+    "revision": 5,
     "units": [
       {
         "id": "aiad-ctx01-message-context-unit",
@@ -1563,7 +1563,7 @@
                     },
                     {
                       "type": "text",
-                      "text": "需要收到完整相关上下文。来源：原书第 2 章，PDF 第 39–47 页。"
+                      "text": "需要收到完整相关上下文。"
                     }
                   ]
                 }
@@ -1580,8 +1580,8 @@
   {
     "id": "aiad-l1-a02",
     "knowledgeId": "A02",
-    "fromRevision": 2,
-    "revision": 3,
+    "fromRevision": 3,
+    "revision": 4,
     "units": [
       {
         "id": "aiad-l1-a02-unit",
@@ -1609,7 +1609,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "本节带你认识 Agent 的组成、反馈循环、工作流取舍与安全边界。你不需要先会编程；学完要能解释它如何做事，不代表已经能独立开发系统。"
+                      "text": "这里从 Agent 的组成与信息交接开始，不需要先会编程。"
                     }
                   ]
                 }
@@ -1689,7 +1689,7 @@
                     },
                     {
                       "type": "text",
-                      "text": "。以上为教材场景的教学改编。"
+                      "text": "。"
                     }
                   ]
                 }
@@ -2172,20 +2172,15 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "是谁把“查过什么”变成下一次决策能用的信息？运行层（Runtime）负责支撑任务运行。教材用 "
+                      "text": "是谁把“查过什么”变成下一次决策能用的信息？运行层（Runtime）负责支撑任务运行。"
                     },
                     {
                       "type": "text",
-                      "text": "Harness",
-                      "marks": [
-                        {
-                          "type": "bold"
-                        }
-                      ]
+                      "text": "这里的 Harness 指"
                     },
                     {
                       "type": "text",
-                      "text": " 指 Agent 内环绕"
+                      "text": " Agent 内环绕"
                     },
                     {
                       "type": "text",
@@ -2987,21 +2982,7 @@
                             },
                             {
                               "type": "text",
-                              "text": "，才可能改变决定。下一项介绍系统开放的信息与操作范围。"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "type": "listItem",
-                      "content": [
-                        {
-                          "type": "paragraph",
-                          "content": [
-                            {
-                              "type": "text",
-                              "text": "来源：教材 PDF15–16、27。"
+                              "text": "，才可能改变决定。"
                             }
                           ]
                         }
@@ -3048,8 +3029,8 @@
   {
     "id": "aiad-l1-agc01",
     "knowledgeId": "AGC01",
-    "fromRevision": 1,
-    "revision": 2,
+    "fromRevision": 2,
+    "revision": 3,
     "units": [
       {
         "id": "aiad-l1-agc01-unit",
@@ -3068,7 +3049,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "上一项分清了模型与环境。现在假设模型理解订票步骤，但系统只给它文字需求，既不能查航班，也不能提交预订。再聪明，它也只能写建议。问题出在与环境连接的接口。"
+                      "text": "假设"
+                    },
+                    {
+                      "type": "text",
+                      "text": "模型理解订票步骤，但系统只给它文字需求，既不能查航班，也不能提交预订。再聪明，它也只能写建议。问题出在与环境连接的接口。"
                     }
                   ]
                 }
@@ -3213,7 +3198,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "教学改编："
+                      "text": "同一订票任务中的两种情况："
                     }
                   ]
                 },
@@ -3426,33 +3411,6 @@
                       "text": "决定能怎样影响环境。二者通过接口连接模型与世界。"
                     }
                   ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "下一项把这些角色放进一次循环：为什么做完还要再看？"
-                    }
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "来源：教材 PDF16–17。",
-                      "marks": [
-                        {
-                          "type": "textStyle",
-                          "attrs": {
-                            "fontSize": "0.875em",
-                            "color": "var(--atlas-muted)"
-                          }
-                        }
-                      ]
-                    }
-                  ]
                 }
               ]
             },
@@ -3467,8 +3425,8 @@
   {
     "id": "aiad-l1-agc02",
     "knowledgeId": "AGC02",
-    "fromRevision": 1,
-    "revision": 2,
+    "fromRevision": 2,
+    "revision": 3,
     "units": [
       {
         "id": "aiad-l1-agc02-unit",
@@ -3487,7 +3445,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "上一项已经把反馈交回模型。但如果模型选错工具、系统允许了越权操作，或结果其实没完成，循环照样可能出错。"
+                      "text": "即使反馈已经交回模型，如果"
+                    },
+                    {
+                      "type": "text",
+                      "text": "模型选错工具、系统允许了越权操作，或结果其实没完成，循环照样可能出错。"
                     },
                     {
                       "type": "text",
@@ -3605,7 +3567,7 @@
                     },
                     {
                       "type": "text",
-                      "text": "，例如“查完了，正在等待选择”。这里先理解职责；怎样保存状态、组织具体消息，是下一节内容。"
+                      "text": "，例如“查完了，正在等待选择”。"
                     }
                   ]
                 }
@@ -3702,7 +3664,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "这些机制帮助降低错误，不保证永不出错；也不是每次都必须重试。以上是教材机制的教学改编。"
+                      "text": "这些机制帮助降低错误，不保证永不出错；也不是每次都必须重试。"
                     }
                   ]
                 }
@@ -3782,7 +3744,7 @@
                     },
                     {
                       "type": "text",
-                      "text": "与检查的具体手段。它们描述不同职责，不是必须另外添加的两套系统。后面会用同一任务展开。"
+                      "text": "与检查的具体手段。它们描述不同职责，不是必须另外添加的两套系统。"
                     }
                   ]
                 }
@@ -3966,25 +3928,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "下一项再讨论模型选型：先分清问题属于哪一层，才知道换模型是否有帮助。"
-                    }
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "来源：教材 PDF26–28。",
-                      "marks": [
-                        {
-                          "type": "textStyle",
-                          "attrs": {
-                            "fontSize": "0.875em",
-                            "color": "var(--atlas-muted)"
-                          }
-                        }
-                      ]
+                      "text": "先分清问题属于哪一层，才知道换模型是否有帮助。"
                     }
                   ]
                 }
@@ -4001,8 +3945,8 @@
   {
     "id": "aiad-l1-agc03",
     "knowledgeId": "AGC03",
-    "fromRevision": 1,
-    "revision": 2,
+    "fromRevision": 2,
+    "revision": 3,
     "units": [
       {
         "id": "aiad-l1-agc03-unit",
@@ -4021,7 +3965,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "前面练习过模型与运行层的职责区别。选模型也要回到实际任务：需要理解什么、决定什么、使用哪些工具？一个总榜分数不能回答所有这些问题。"
+                      "text": "选模型要"
+                    },
+                    {
+                      "type": "text",
+                      "text": "回到实际任务：需要理解什么、决定什么、使用哪些工具？一个总榜分数不能回答所有这些问题。"
                     }
                   ]
                 }
@@ -4193,7 +4141,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "教学改编：两个候选模型用同一航班查询任务。甲便宜，但经常选错查询条件；乙更贵，却较可靠。需要比较"
+                      "text": "设想两个候选模型"
+                    },
+                    {
+                      "type": "text",
+                      "text": "用同一航班查询任务。甲便宜，但经常选错查询条件；乙更贵，却较可靠。需要比较"
                     },
                     {
                       "type": "text",
@@ -4414,33 +4366,6 @@
                       "text": "归咎于模型。"
                     }
                   ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "接下来比较另一种选择：步骤由程序预设，还是由模型根据结果决定？"
-                    }
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "来源：教材 PDF29–30。",
-                      "marks": [
-                        {
-                          "type": "textStyle",
-                          "attrs": {
-                            "fontSize": "0.875em",
-                            "color": "var(--atlas-muted)"
-                          }
-                        }
-                      ]
-                    }
-                  ]
                 }
               ]
             },
@@ -4455,8 +4380,8 @@
   {
     "id": "aiad-l1-h02",
     "knowledgeId": "H02",
-    "fromRevision": 1,
-    "revision": 2,
+    "fromRevision": 2,
+    "revision": 3,
     "units": [
       {
         "id": "aiad-l1-h02-unit",
@@ -4475,7 +4400,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "选好模型后，还要决定怎样组织步骤。教材的订票示例规定：核实身份 → 搜索航班 → 完成付款 → 确认预订。这里的顺序是该示例的业务规则，不是所有订票系统的通用事实。"
+                      "text": "在这个订票示例中，流程依次为："
+                    },
+                    {
+                      "type": "text",
+                      "text": "核实身份 → 搜索航班 → 完成付款 → 确认预订。这里的顺序是该示例的业务规则，不是所有订票系统的通用事实。"
                     }
                   ]
                 }
@@ -4558,7 +4487,11 @@
                           "content": [
                             {
                               "type": "text",
-                              "text": "教学改编：两种系统都收到“周三没有直飞”的反馈。"
+                              "text": "设想两种系统"
+                            },
+                            {
+                              "type": "text",
+                              "text": "都收到“周三没有直飞”的反馈。"
                             }
                           ]
                         }
@@ -4750,33 +4683,6 @@
                       "text": "可能更合适。两者都需要处理错误。"
                     }
                   ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "下一项把两者放到一个任务中，看看怎样分工。"
-                    }
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "来源：教材 PDF30–32。",
-                      "marks": [
-                        {
-                          "type": "textStyle",
-                          "attrs": {
-                            "fontSize": "0.875em",
-                            "color": "var(--atlas-muted)"
-                          }
-                        }
-                      ]
-                    }
-                  ]
                 }
               ]
             },
@@ -4791,8 +4697,8 @@
   {
     "id": "aiad-l1-r10",
     "knowledgeId": "R10",
-    "fromRevision": 3,
-    "revision": 4,
+    "fromRevision": 4,
+    "revision": 5,
     "units": [
       {
         "id": "aiad-l1-r10-unit",
@@ -4811,7 +4717,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "前一项介绍了观察与动作。若查询返回“没有直飞”，最初的计划就需要调整。一次决定无法提前知道所有结果，因此要把"
+                      "text": "若查询返回“没有直飞”，最初的计划就需要调整。一次决定无法提前知道所有结果，因此要把"
                     },
                     {
                       "type": "text",
@@ -4939,7 +4845,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "教学改编：用户想找周三直飞，并已允许没有时查看周四。单步执行轨迹：第 4 步把“周三无直飞”送入上下文；下一步展示模型如何结合这条观察与用户许可改查周四。"
+                      "text": "在这个示例中，用户"
+                    },
+                    {
+                      "type": "text",
+                      "text": "想找周三直飞，并已允许没有时查看周四。单步执行轨迹：第 4 步把“周三无直飞”送入上下文；下一步展示模型如何结合这条观察与用户许可改查周四。"
                     }
                   ]
                 },
@@ -5778,20 +5688,6 @@
                           ]
                         }
                       ]
-                    },
-                    {
-                      "type": "listItem",
-                      "content": [
-                        {
-                          "type": "paragraph",
-                          "content": [
-                            {
-                              "type": "text",
-                              "text": "来源：教材 PDF22–23、31。"
-                            }
-                          ]
-                        }
-                      ]
                     }
                   ]
                 }
@@ -5821,8 +5717,8 @@
   {
     "id": "aiad-l1-s01",
     "knowledgeId": "S01",
-    "fromRevision": 1,
-    "revision": 2,
+    "fromRevision": 2,
+    "revision": 3,
     "units": [
       {
         "id": "aiad-l1-s01-unit",
@@ -5841,7 +5737,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "前面看到，Agent 能通过工具造成真实影响。如果在错误付款后才检查回复文字，错误操作已经发生。"
+                      "text": "Agent"
+                    },
+                    {
+                      "type": "text",
+                      "text": " 能通过工具造成真实影响。如果在错误付款后才检查回复文字，错误操作已经发生。"
                     },
                     {
                       "type": "text",
@@ -5996,7 +5896,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "教学改编：收到请求 → 判断是否允许处理；准备付款 → 核对权限并请用户确认；形成回复 → 检查是否含不必要的个人信息。"
+                      "text": "以订票任务为例："
+                    },
+                    {
+                      "type": "text",
+                      "text": "收到请求 → 判断是否允许处理；准备付款 → 核对权限并请用户确认；形成回复 → 检查是否含不必要的个人信息。"
                     }
                   ]
                 },
@@ -6127,46 +6031,6 @@
                       "text": "输入、执行、输出分别检查；高风险或持续失败时交给人工。既要减少危险放行，也要发现合法请求被误拒绝。"
                     }
                   ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "下一项看"
-                    },
-                    {
-                      "type": "text",
-                      "text": "执行侧",
-                      "marks": [
-                        {
-                          "type": "bold"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "text": "的一种具体控制：把代码的影响限制在隔离环境里。"
-                    }
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "来源：教材 PDF33–34。",
-                      "marks": [
-                        {
-                          "type": "textStyle",
-                          "attrs": {
-                            "fontSize": "0.875em",
-                            "color": "var(--atlas-muted)"
-                          }
-                        }
-                      ]
-                    }
-                  ]
                 }
               ]
             },
@@ -6181,8 +6045,8 @@
   {
     "id": "aiad-l1-s02",
     "knowledgeId": "S02",
-    "fromRevision": 1,
-    "revision": 2,
+    "fromRevision": 2,
+    "revision": 3,
     "units": [
       {
         "id": "aiad-l1-s02-unit",
@@ -6354,7 +6218,11 @@
                           "content": [
                             {
                               "type": "text",
-                              "text": "教学改编：任务只需要处理一份表格。"
+                              "text": "设想任务"
+                            },
+                            {
+                              "type": "text",
+                              "text": "只需要处理一份表格。"
                             }
                           ]
                         }
@@ -6676,64 +6544,7 @@
                     },
                     {
                       "type": "text",
-                      "text": "才够用。下一项用最小"
-                    },
-                    {
-                      "type": "text",
-                      "text": "权限",
-                      "marks": [
-                        {
-                          "type": "bold"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "text": "收束这一节。"
-                    }
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "来源：教材 PDF121的执行",
-                      "marks": [
-                        {
-                          "type": "textStyle",
-                          "attrs": {
-                            "fontSize": "0.875em",
-                            "color": "var(--atlas-muted)"
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "text": "隔离",
-                      "marks": [
-                        {
-                          "type": "textStyle",
-                          "attrs": {
-                            "fontSize": "0.875em",
-                            "color": "var(--atlas-muted)"
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "text": "、PDF27的边界、PDF19的受限代码工具。",
-                      "marks": [
-                        {
-                          "type": "textStyle",
-                          "attrs": {
-                            "fontSize": "0.875em",
-                            "color": "var(--atlas-muted)"
-                          }
-                        }
-                      ]
+                      "text": "才够用。"
                     }
                   ]
                 }
@@ -6750,8 +6561,8 @@
   {
     "id": "aiad-l1-s03",
     "knowledgeId": "S03",
-    "fromRevision": 2,
-    "revision": 3,
+    "fromRevision": 3,
+    "revision": 4,
     "units": [
       {
         "id": "aiad-l1-s03-unit",
@@ -6770,20 +6581,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "上一项用"
+                      "text": "沙盒可以缩小影响范围。但如果"
                     },
                     {
                       "type": "text",
-                      "text": "沙盒",
-                      "marks": [
-                        {
-                          "type": "bold"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "text": "缩小影响范围。但如果把全部私有文件和网络访问都开放进去，很多风险仍然存在。"
+                      "text": "把全部私有文件和网络访问都开放进去，很多风险仍然存在。"
                     },
                     {
                       "type": "text",
@@ -6845,7 +6647,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "教学改编：任务是“读取指定报告并在页面内总结”。需要读那份报告；删除原报告、读取无关私有文件或发邮件都不是当前任务要求。"
+                      "text": "设想任务是"
+                    },
+                    {
+                      "type": "text",
+                      "text": "“读取指定报告并在页面内总结”。需要读那份报告；删除原报告、读取无关私有文件或发邮件都不是当前任务要求。"
                     }
                   ]
                 },
@@ -7082,7 +6888,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "教材也要求凭证范围与有效期受限；凭证可理解为有范围和有效期的电子通行证，不应直接复用高权限的个人凭证。"
+                      "text": "凭证应限制作用范围和有效期"
+                    },
+                    {
+                      "type": "text",
+                      "text": "；凭证可理解为有范围和有效期的电子通行证，不应直接复用高权限的个人凭证。"
                     }
                   ]
                 }
@@ -7236,39 +7046,6 @@
                       ]
                     }
                   ]
-                },
-                {
-                  "type": "bulletList",
-                  "content": [
-                    {
-                      "type": "listItem",
-                      "content": [
-                        {
-                          "type": "paragraph",
-                          "content": [
-                            {
-                              "type": "text",
-                              "text": "学习活动完成不是独立开发能力或掌握证明。下一节展开上下文、状态与 Agent Loop 的具体组织方式。"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "type": "listItem",
-                      "content": [
-                        {
-                          "type": "paragraph",
-                          "content": [
-                            {
-                              "type": "text",
-                              "text": "来源：教材 PDF115、152。"
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
                 }
               ]
             },
@@ -7309,8 +7086,8 @@
   {
     "id": "aiad-l1-wf05",
     "knowledgeId": "WF05",
-    "fromRevision": 1,
-    "revision": 2,
+    "fromRevision": 2,
+    "revision": 3,
     "units": [
       {
         "id": "aiad-l1-wf05-unit",
@@ -7329,20 +7106,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "工作流可固定关键关口，也可在其中安排需要模型灵活判断的部分。Agentic Workflow 就是这种混合组织；本节还关注相应的检查和"
+                      "text": "工作流可固定关键关口，也可在其中安排需要模型灵活判断的部分。Agentic Workflow 就是这种混合组织；"
                     },
                     {
                       "type": "text",
-                      "text": "审批",
-                      "marks": [
-                        {
-                          "type": "bold"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "text": "。"
+                      "text": "相应的检查和审批仍需落实。"
                     }
                   ]
                 },
@@ -7374,7 +7142,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "跨节教学改编："
+                      "text": "在这个订票示例中："
                     }
                   ]
                 },
@@ -7480,20 +7248,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "这段是教材混合模式、人工干预和"
-                    },
-                    {
-                      "type": "text",
-                      "text": "结果检查",
-                      "marks": [
-                        {
-                          "type": "bold"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "text": "原则的组合示例，不是原书完整流程照录。"
+                      "text": "这个示例把灵活查询放在固定检查与审批之间；具体关口取决于任务规则。"
                     }
                   ]
                 }
@@ -7516,7 +7271,15 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "评估在此指检查动作和结果是否符合目标。前面 Harness 的验证就是运行中进行检查；这里还把执行过程一起纳入检查。"
+                      "text": "评估在此指检查动作和结果是否符合目标。"
+                    },
+                    {
+                      "type": "text",
+                      "text": "Harness 的验证是在运行中进行检查；"
+                    },
+                    {
+                      "type": "text",
+                      "text": "这里还把执行过程一起纳入检查。"
                     }
                   ]
                 },
@@ -7525,7 +7288,11 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "教学改编：Agent 回复“已经预订”，实际订单却没创建。只读回复会误判；查询实际结果才发现没有完成。反过来，也要检查过程是否越过权限或"
+                      "text": "设想 Agent"
+                    },
+                    {
+                      "type": "text",
+                      "text": " 回复“已经预订”，实际订单却没创建。只读回复会误判；查询实际结果才发现没有完成。反过来，也要检查过程是否越过权限或"
                     },
                     {
                       "type": "text",
@@ -7690,33 +7457,6 @@
                       "text": "，完成声明要对照真实结果。"
                     }
                   ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "下一项把这些安全检查放回输入、执行和输出的边界。"
-                    }
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "content": [
-                    {
-                      "type": "text",
-                      "text": "来源：教材混合模式 PDF31–32、人工干预33–34、过程与结果173。",
-                      "marks": [
-                        {
-                          "type": "textStyle",
-                          "attrs": {
-                            "fontSize": "0.875em",
-                            "color": "var(--atlas-muted)"
-                          }
-                        }
-                      ]
-                    }
-                  ]
                 }
               ]
             },
@@ -7731,8 +7471,8 @@
   {
     "id": "aiad-rt01-agent-loop",
     "knowledgeId": "RT01",
-    "fromRevision": 3,
-    "revision": 4,
+    "fromRevision": 4,
+    "revision": 5,
     "units": [
       {
         "id": "aiad-rt01-agent-loop-unit",
@@ -9376,7 +9116,7 @@
                   "content": [
                     {
                       "type": "text",
-                      "text": "换成搜索、库存或数据库查询时，仍应检查这条信息链是否完整。来源：课程原书第 2 章，PDF 第 40–47 页。"
+                      "text": "换成搜索、库存或数据库查询时，仍应检查这条信息链是否完整。"
                     }
                   ]
                 }
