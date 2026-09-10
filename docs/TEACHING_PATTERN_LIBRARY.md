@@ -1,6 +1,6 @@
 # Teaching Pattern Library V1
 
-Status: **V1 frozen, 2026-09-09** after independent Teaching, simulated novice Student, Technical, Local and exact Hosted Preview acceptance. Ready for Lesson 2 authoring under this contract; no further platform expansion is required for the validated patterns. Canonical specification for Micro authors and AI authoring; acceptance is recorded in `.acceptance/teaching-pattern-library-v1.md`.
+Status: **Teaching Pattern taxonomy V1 frozen, 2026-09-09** after independent Teaching, simulated novice Student, Technical, Local and exact Hosted Preview acceptance. The validated six-pattern taxonomy remains frozen and ready for Lesson 2 authoring; later content-contract amendments do not reopen or expand the taxonomy. Canonical specification for Micro authors and AI authoring. Taxonomy acceptance is recorded in `.acceptance/teaching-pattern-library-v1.md`; Observable Learner Action and shared Rich Text acceptance are recorded in `.acceptance/rich-text-closeout.md`; Student-Facing Content acceptance is recorded in `.acceptance/student-facing-content-closeout.md`.
 
 These six patterns are EduFlow's engineering classification based on learning-science principles, not an academic claim that digital microlearning has exactly six required modes. **Teaching Pattern ≠ Runtime Type ≠ UI Component.** Patterns describe an instructional need; a strategy describes the learner's cognitive action; a runtime renders and evaluates bounded content. No pattern enum, Course-specific component, new ontology or grading authority is implied.
 
