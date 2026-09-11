@@ -6951,8 +6951,8 @@ body:has(.micro-learning-page) { min-width: 0; overflow: auto; }
 .micro-completion-context{display:grid;width:100%;gap:10px;margin-top:24px;text-align:left}.micro-completion-context h2{margin:0 0 4px;font-size:17px}.micro-completion-context>button{display:flex;width:100%;min-width:0;gap:12px;justify-content:space-between;text-align:left;padding:14px}.micro-completion-context button span{display:grid;min-width:0;gap:5px;font-size:11px}.micro-completion-context button strong{font-size:14px;overflow-wrap:anywhere}.micro-completion-context button svg{flex-shrink:0}.micro-completion-footer{flex-wrap:wrap;justify-content:center}
 
 /* Student sequence projection: independent from Course graph geometry. */
-.course-navigator { height: 100%; overflow-y: auto; padding: 158px 32px 80px; background: #f8f9fb; }
-.navigator-columns { display: grid; grid-template-columns: minmax(250px,3fr) minmax(0,7fr); gap: clamp(28px,5vw,76px); max-width: 1160px; margin: auto; align-items: start; }
+.course-navigator { height: 100%; overflow-y: auto; padding: 0 32px 80px; background: #f8f9fb; }
+.navigator-columns { display: grid; grid-template-columns: minmax(250px,3fr) minmax(0,7fr); gap: clamp(28px,5vw,76px); max-width: 1160px; margin: auto; padding-top: 158px; align-items: start; }
 .navigator-queue { position: sticky; top: 148px; min-width: 0; padding-top: 8px; }
 .navigator-next { padding: 25px; border-radius: 22px; background: white; box-shadow: 0 8px 32px #26375408; }
 .navigator-next h2 { margin: 12px 0; font-size: 24px; line-height: 1.35; overflow-wrap: anywhere; letter-spacing: -.035em; }
@@ -6998,8 +6998,8 @@ body:has(.micro-learning-page) { min-width: 0; overflow: auto; }
 .navigator-practice-detail { width: min(580px,100%); max-height: 85vh; overflow-y: auto; padding: 28px; border-radius: 22px; background: white; }
 .navigator-practice-detail p,.navigator-practice-detail li { font-size: 14px; line-height: 1.8; }
 @media (max-width: 900px) {
-  .course-navigator { padding: 148px 20px 80px; }
-  .navigator-columns { grid-template-columns: 1fr; gap: 24px; max-width: 620px; }
+  .course-navigator { padding: 0 20px 80px; }
+  .navigator-columns { grid-template-columns: 1fr; gap: 24px; max-width: 620px; padding-top: 148px; }
   .navigator-queue { position: static; }
   .navigator-path-heading { margin-bottom: 28px; }
   .navigator-next h2 { font-size: 22px; }
@@ -7010,3 +7010,8 @@ body:has(.micro-learning-page) { min-width: 0; overflow: auto; }
 .navigator-practice-detail::backdrop { background: #17223655; }
 
 .navigator-locate { border: 0; padding: 10px 0; background: transparent; color: #5869b8; font-size: 12px; }
+
+@media (min-width: 901px) {
+  .navigator-queue { max-height: calc(100dvh - 175px); overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; }
+}
+.atlas-graph-page[data-presentation="path"][data-experience="learn"] .atlas-detail-drawer .atlas-primary { color: #5869b8; background: #edf0f8; box-shadow: none; }

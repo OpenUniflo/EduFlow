@@ -23,18 +23,21 @@ Baseline: `origin/prototype` at `9fa8c0007a5ad3e2ab37263503c70319fade4419`. Init
 - `pnpm typecheck`: PASS.
 - `pnpm lint`: PASS.
 - `pnpm test`: PASS — 84 files / 534 tests, including 14 new projection cases.
-- `pnpm build`: PASS. Existing large-chunk advisory remains; no new dependency or splitting overhaul.
+- `pnpm build`: PASS. Build emits a large-chunk advisory; no new dependency or splitting overhaul.
 - `pnpm verify:learning-loop:local`: PASS — real local attempted/accepted state machine and versioned NavigationDecision checks.
 - `scripts/acceptance/course-navigator.browser.mjs`: PASS, authenticated Local Supabase catalog with memory-only fixture states. A/B Micro current and completion progression; C/D four retained practices independent of Micro; submitted visible without recommendation; E supported Practice single CTA; F/G chapters, 1440/390, reduced motion; API failure/retry; native dialog Escape and restored focus.
 - Screenshot artifacts are under `output/playwright/` (local review artifacts, not source fixtures).
 - Hosted migration history: linked project `uyljtdbvlivxniililay`; 47/47 repository migrations match. No migration or fixture synchronization required by this UI-only change.
-- Hosted Preview and existing Micro browser regression: pending final delivery verification.
+- Existing `scripts/acceptance/micro-review.browser.mjs`: PASS on Local Supabase. RT01, CDS525-K012 and CDS525-K021 each complete all six steps; review produces zero progress writes.
+- Hosted code Preview `https://edu-flow-faa0g8dwk-july-nanas-projects.vercel.app`: READY; actual Vercel `lambdaRuntimeStats` reports 12 Node.js Functions. Public client config points to the same linked Supabase project. `/api/courses`, `/api/micro`, `/api/progress`, `/api/navigation` all return 200 for the authorized ordinary learner. Golden chapter has 10 Knowledge / 10 Micro / 10 Assignments; 117 route nodes, exactly one current marker, 11 real pending practices. 1440px and 390px screenshots checked; mobile scrollWidth equals clientWidth (390).
+- Final visual refinement: initial queue and path both start at y=158; after scrolling, queue stays at y=148 clear of navigation. Expanded backlog has its own bounded scroll. Knowledge drawer actions are visually secondary.
+- Initial uncached Hosted JS download took about 43 seconds in this test network; a 30-second browser wait timed out before eventual successful load. No application console errors followed. Bundle/loading optimization is deferred, not hidden by a fake ready state.
 
 ## Acceptance matrix
 
 | AC | Status | Evidence |
 | --- | --- | --- |
-| 01 | PASS (local) | A single named action and start control in the queue |
+| 01 | PASS | A single named action and start control in the queue |
 | 02 | PASS | Browser asserts one primary; backlog has none |
 | 03 | PASS | Four-debt and begun-debt regression; real 12-item backlog |
 | 04 | PASS | Exactly one ready nextPractice; route/dependency tests |
@@ -43,14 +46,14 @@ Baseline: `origin/prototype` at `9fa8c0007a5ad3e2ab37263503c70319fade4419`. Init
 | 07 | PASS | Deterministic snake SVG, linear sequence, chapter separators |
 | 08 | PASS | Completed/current/available/locked mapping and appearance |
 | 09 | PASS | Server node identity gives the sole current marker; locate action |
-| 10 | PASS (local) | Golden first chapter 10 Knowledge / 10 Micro / 10 Assignments |
-| 11 | PENDING | Existing Micro browser regression |
+| 10 | PASS | Golden first chapter 10 Knowledge / 10 Micro / 10 Assignments |
+| 11 | PASS | Existing three-path real Micro browser regression; zero review writes |
 | 12 | PASS (fixture/local API) | Refresh snapshot advances node and Next Action; learning-loop verifier |
-| 13 | PASS (local) | 1440px / 390px, no horizontal overflow, focus and reduced motion |
+| 13 | PASS | 1440px / 390px, no horizontal overflow, focus and reduced motion |
 | 14 | PASS | No dependency or lockfile changes |
 | 15 | PASS | No Workflow runtime, ML, evaluation or tracking expansion |
 | 16 | PASS | Full typecheck/lint/tests/build and local learning-loop verifier |
-| 17 | PENDING | Push and Preview completion |
+| 17 | PASS | Branch pushed, real Preview READY, prototype untouched |
 
 ## Deliberate limits
 

@@ -543,7 +543,7 @@ export function CourseGraphPage({ session, onLogout, courseDesignAssistantProvid
   }
 
   return (
-    <main className="atlas-graph-page" data-experience={experience}>
+    <main className="atlas-graph-page" data-experience={experience} data-presentation={presentation}>
       <GlobalNav active={experience === "design" ? "teaching" : "courses"} session={session} onLogout={onLogout} />
       <header className="atlas-skill-course-island">
         <div className="atlas-skill-header-left"><button onClick={() => view === "overview" ? navigate(overviewReturnTarget) : changeView("overview")} aria-label={teacherCreatorPreview?"返回课程创建":authoringRoute ? "返回教学管理" : "返回课程中心"}><ArrowLeft size={18} /></button><span className="atlas-skill-divider" /><div className="atlas-skill-title"><span>{runtime.course.title}</span><strong>{presentation === "path" ? "课程路线" : view === "overview" ? "课程篇章总览" : view === "focused" ? "聚焦篇章" : `完整课程${mode === "knowledge" ? "技能树" : "实训树"}`}</strong>{view === "focused" && presentation === "graph" ? <small>/ {courseChapters.find((item) => item.id === focusedChapterId)?.title}</small> : null}</div>{personalDraftPreview && runtime.course.creationBriefMessageId ? <button className="atlas-skill-focus" onClick={() => window.location.assign(`/courses/create?briefId=${encodeURIComponent(runtime.course.creationBriefMessageId!)}`)}>返回课程创建</button> : teacherCreatorPreview?<button className="atlas-skill-focus" onClick={()=>window.location.assign(overviewReturnTarget)}>返回课程创建</button>:null}</div>
