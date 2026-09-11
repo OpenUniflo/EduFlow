@@ -1,11 +1,35 @@
-import { BookOpen, Check, Circle, Clock3, Lock, Play, Workflow } from "lucide-react";
-import type { CourseGraphData } from "../runtime/courseRuntime";
-import type { UserKnowledgeRecord } from "@/features/profile/types";
-import { buildCoursePath } from "./coursePath";
+import { Check, Circle, Lock, Play } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
+import type { CSSProperties } from 'react';
+import { pathX, type CourseNavigatorModel } from './courseNavigatorProjection';
 
-export function CoursePathView({ graph, userKnowledge, onSelect, microMinutes }: { graph: CourseGraphData; userKnowledge: UserKnowledgeRecord[]; onSelect(nodeId: string): void; microMinutes?(nodeId:string):number|undefined }) {
-  const path = buildCoursePath(graph, userKnowledge);
-  const labels = { completed:"已掌握", learned:"已学完", underway:"进行中", available:"已解锁", blocked:"前置未满足" };
-  const grouped = graph.chapters.map((chapter)=>({chapter,items:path.filter((item)=>item.node.chapterId===chapter.id)})).filter((group)=>group.items.length);
-  return <section className="course-path" aria-label="课程路线"><header className="course-path-header"><span className="atlas-kicker">课程路线</span><h2>沿课程路线向下学习</h2><p>课程顺序用于展示学习路线；是否已解锁由真实的先修知识和学习进度决定。</p></header><div className="course-path-chapters">{grouped.map(({chapter,items},chapterIndex)=><section className="course-path-chapter" key={chapter.id}><header><span>第 {chapterIndex+1} 章</span><h3>{chapter.title}</h3><small>{items.length} 个知识点</small></header><div className="course-path-track">{items.map((item,index)=>{const minutes=microMinutes?.(item.node.id);return <button type="button" className={`course-path-node ${item.state} offset-${index%3}`} key={item.node.id} disabled={item.state==="blocked"} onClick={()=>onSelect(item.node.id)}><i>{item.state==="completed"||item.state==="learned"?<Check size={17}/>:item.state==="blocked"?<Lock size={15}/>:item.state==="underway"?<Play size={15}/>:<Circle size={14}/>}</i><span><small>{labels[item.state]} · 第 {item.node.lesson} 课</small><strong>{item.node.title}</strong><em>{item.blockedBy.length?`需要先完成：${item.blockedBy.join("、")}`:<>{minutes?<><Clock3 size={12}/>{minutes} 分钟</>:null}{item.node.materialContexts.length?<><BookOpen size={12}/>{item.node.materialContexts.length} 份材料</>:null}{item.node.assignmentCount?<><Workflow size={12}/>{item.node.assignmentCount} 项实训</>:null}{!minutes&&!item.node.materialContexts.length&&!item.node.assignmentCount?"暂无可执行的学习活动":null}</>}</em></span></button>})}</div></section>)}</div></section>;
+export function CoursePathView({ model, onSelect }: { model: CourseNavigatorModel; onSelect(nodeId: string): void }) {
+  const reduced = useReducedMotion();
+  let offset = 0;
+  return <section className="navigator-path" aria-label="学习路线">
+    <header className="navigator-path-heading"><span className="atlas-kicker">你的学习路线</span><h2>一步一步，走向理解</h2><p>沿着路线前进，已学内容与待完成实训会为你保留。</p>{model.route.some(item => item.state === 'current') ? <button className="navigator-locate" onClick={() => document.querySelector('.navigator-stop.current')?.scrollIntoView({ behavior: reduced ? 'instant' : 'smooth', block: 'center' })}>定位当前步骤 ↓</button> : null}</header>
+    {!model.route.length ? <p role="status">暂时没有可展示的课程路线。</p> : null}
+    {model.sections.map((section, sectionIndex) => {
+      const start = offset; offset += section.items.length;
+      return <section className="navigator-chapter" key={`${section.id}-${sectionIndex}`}>
+        <header><small>第 {sectionIndex + 1} 章</small><h3>{section.title}</h3></header>
+        <ol className="navigator-track">
+          {section.items.map((item, index) => {
+            const x = pathX(start + index); const nextX = pathX(start + index + 1);
+            const label = item.state === 'completed' ? item.mastered ? '已掌握' : '已学完' : item.state === 'current' ? '推荐下一步' : item.state === 'locked' ? '前置未满足' : '可学习';
+            return <motion.li layout={!reduced} initial={false} transition={{ duration: reduced ? 0 : .24 }} className={`navigator-stop ${item.state}`} key={item.node.id} style={{ '--path-x': `${x}%` } as CSSProperties}>
+              {index < section.items.length - 1 ? <svg className="navigator-connector" viewBox="0 0 100 180" preserveAspectRatio="none" aria-hidden="true"><path d={`M ${x} 36 C ${x} 125, ${nextX} 125, ${nextX} 216`} vectorEffect="non-scaling-stroke" /></svg> : null}
+              <button className="navigator-node" type="button" aria-current={item.state === 'current' ? 'step' : undefined} aria-label={`${item.node.title}，${label}`} aria-disabled={item.state === 'locked'} onClick={() => onSelect(item.node.id)} title={item.blockedBy.length ? `先完成：${item.blockedBy.join('、')}` : item.node.title}>
+                <motion.span key={item.state} initial={reduced ? false : { opacity: .5, scale: .9 }} animate={{ opacity: 1, scale: 1 }}>
+                  {item.state === 'completed' ? <Check size={25} /> : item.state === 'locked' ? <Lock size={21} /> : item.state === 'current' ? <Play size={24} /> : <Circle size={21} />}
+                </motion.span>
+              </button>
+              <div className="navigator-node-copy"><small>{label}</small><strong>{item.node.title}</strong>{item.state === 'current' && model.nextAction ? <em>当前动作：{model.nextAction.label}</em> : null}</div>
+            </motion.li>;
+          })}
+        </ol>
+      </section>;
+    })}
+    {model.complete ? <p className="navigator-finish">✓ 教学路线已学完 · 实训进度单独保留</p> : null}
+  </section>;
 }

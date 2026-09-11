@@ -90,3 +90,17 @@ Each input state is hashed canonically and persisted as one `NavigationDecision`
 For PDF Material, `recentSegmentId` identifies the current PDF page/Segment only. `viewedSegmentIds` is the unique set of pages that actually became active at the reading anchor. Completion progress is `viewed / total`, not the numeric page position.
 
 A direct jump from page 1 to page 20 records the pages genuinely made active; it does not mark pages 2 through 19. Persistence remains debounced and is routed through LearningProgressRepository. PDF page position, Material completion, Assignment completion, and Knowledge mastery remain four independent concepts.
+
+## Course Adaptive Learning Navigator MVP
+
+The default learner Course page uses `CourseNavigator`: a left action queue and a single, vertical, gently alternating Knowledge sequence. The existing graph view remains available and its renderer, geometry, authoring and selection contracts are unchanged.
+
+- Authenticated Next Action and sequence identities come from the existing `/api/navigation` decision. The browser does not rank a second global action. Anonymous browsing uses curriculum/prerequisite presentation only and has no personal queue or navigation request.
+- Only the queue's Next Action has a primary start button. Path nodes open existing Knowledge details; their completed/current/available/locked appearance is a presentation projection. `learned` is labelled 已学完 and `mastered` 已掌握. Micro completion does not manufacture mastery.
+- Practice debt derives from real Course Assignment coverage and durable Assignment states. All covered Knowledge must meet teaching prerequisites before a new debt becomes ready. Begun/submitted debts remain visible if route scope changes. Accepted and legacy completed items are excluded; submitted remains visible and never becomes `nextPractice`.
+- Explicit Assignment dependencies must be accepted/completed before `nextPractice`. Among ready items, order by the latest covered Knowledge position in the navigation sequence, then Assignment display order, then stable identity. There is no persisted debt timestamp in the current read model, so this MVP makes no oldest-debt claim and adds no schema.
+- `nextPractice` means the first ready pending practice, independently of `nextAction`. A task definition can appear in the backlog without implying a runtime. Details are read-only; no start, submission or acceptance is manufactured. The existing answer/code/trace surface may execute if Navigation selects it; Workflow simulation is not promoted to an executable recommendation. The current server policy does not actively select Practice.
+- The queue reloads Navigation when the hydrated Course state changes, including after the existing Micro completion refresh and return. Invalid/error responses show a retry state; the curriculum can still be browsed without presenting a fabricated recommendation or success.
+- Desktop queue/path ratio is approximately 30/70. At 900px and below the queue precedes the path. SVG connectors and fixed index-derived offsets express sequence, not KnowledgeEdge facts. Motion respects reduced motion; native task dialogs support focus containment, Escape and focus restoration. No graph/animation dependency is added.
+
+Acceptance and real-data evidence: [Adaptive Navigator MVP](acceptance/ADAPTIVE_NAVIGATOR_MVP.md).
