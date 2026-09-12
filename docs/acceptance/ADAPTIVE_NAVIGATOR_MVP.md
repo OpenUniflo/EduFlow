@@ -1,60 +1,70 @@
-# Adaptive Learning Navigator MVP — acceptance
+# Adaptive Learning Navigator — learning-only correction
 
-Baseline: `origin/prototype` at `9fa8c0007a5ad3e2ab37263503c70319fade4419`. Initial working tree clean. Branch: `feat/adaptive-learning-navigator-mvp`. No dependency, schema, Function or Course content changes.
+## Baseline and stage gates
 
-## Stages and success criteria
+Continue `feat/adaptive-learning-navigator-mvp` at `970efcdc044c4cea7fbd7b15dbefb371bd3159f2`; initial tree clean and HEAD identical to origin branch. Local and remote prototype remain `9fa8c0007a5ad3e2ab37263503c70319fade4419`. No branch creation, merge, dependency or schema change.
 
-1. Confirm existing boundaries: CourseGraphPage / CoursePathView; API Navigation Engine; progress repository; published Micro repository; Assignment lifecycle. Reuse confirmed, no second engine.
-2. Projection: one server-selected action, persistent derived backlog, separate nextPractice, explicit dependencies, submitted/accepted handling, navigation sequence and state mapping. Fourteen Vitest cases pass.
-3. Interaction: 1440px desktop / 390px mobile snake path, clear chapter transitions, one primary CTA, read-only task detail, keyboard focus, reduced motion and visible request errors. Local browser A–G pass using real catalog plus in-memory learner fixtures; no fixture state is persisted.
-4. Regression and delivery: full commands pass; real Hosted Preview verification after push is recorded below. Never deploy to production or merge prototype.
+1. Diagnose the actual API, persisted learner state, resource availability and generation capabilities before edits. Confirmed below.
+2. Change the existing policy and projection only: learning-only action, no resource labels, truthful completion/unavailability, independent backlog, inspectable locks. Unit checks PASS.
+3. Validate real local flows and in-memory edge cases, without Hosted progress changes. Navigator fixtures, supporting Material access, and real A02 completion/return PASS; all ten first-chapter paths reviewed through their actual UI.
+4. Run full commands, push the same branch, wait for the exact Preview and verify Hosted data/UI before final acceptance.
 
-## Architecture evidence
+## Root cause and capability audit
 
-- Course page: `src/features/course/pages/CourseGraphPage.tsx`, default path presentation. Graph/editor preserved.
-- Navigation: `ApiLearnerStateService.getNavigation` → `/api/navigation` → `api/_handlers/navigation.ts` → `api/_lib/navigationEngine.ts` (`course-rule-v2`). Current policy yields Micro, Material, or course/no-action explanations; supported Practice rendering is fixture-tested, not claimed as a current server recommendation.
-- Learner state: `/api/progress` hydrates UserKnowledgeRepository and ApiLearningProgressRepository. `useOptionalUserCourseState` observes refreshed snapshots.
-- Assignment state: `UserCourseState.assignmentStates`, backed by `user_assignment_states`; accepted/completed is terminal for backlog, submitted awaits review. No debt timestamp exists in the current read model.
-- Micro: existing published MicroLearningRepository and `createMicroLearningNavigation`, unchanged completion and evidence flows.
-- Golden local Course `ai-agents-in-depth`: first chapter Agent 架构与运行基础 has 10 Knowledge, 10 published available Micro, 10 Assignments. The existing local learner has 12 pending practices and a Material Next Action. No Course content was edited.
+`CourseGraphPage` passes `ApiLearnerStateService.getNavigation` to CourseNavigator. `/api/navigation` reads course/global published learning paths and all MaterialKnowledgeCoverage mappings. The old adapter ignores Material coverage roles when constructing Navigation assets; it has no required-learning-vs-reference discriminator. `course-rule-v2` first picks an underway or eligible Knowledge by existing curriculum/prerequisite policy, then falls back to its Material whenever no unfinished Micro exists. Projection turns that into 学习材料 / 阅读材料. Practice was not selected by this server policy, but the old projection still accepted an Assignment decision.
 
-## Verification
+On this round's live ordinary learner read, the current node is **Chat Template (CTX02)**, not Sparse Retrieval. Both CTX02 and **Sparse Retrieval (RAG02)** have no published Micro and one Material mapping, and both are eligible. Prior nodes through Agent Loop have learned state. A later Failure Recovery node has an available Micro, but this does not authorize skipping the current curriculum frontier. No visible RAG02 decision was found in this learner's history, so the precise earlier learner state cannot be reconstructed. The code/data fallback mechanism is proven; a historical jump is not claimed as independently observed. Underway Knowledge is prioritized by the existing engine, which can also explain a later-node resume when such state exists.
+
+There is **no actual learner-personalized learning creation runtime**. `scripts/dev/generate-agent-lesson1-migration.ts` is offline content tooling, not a learner API. Course Creator's `desiredAssets` proposal explicitly plans assets without creating them (`api/_lib/courseCreatorProposal.ts`). `api/_handlers/course-authoring.ts` requires teacher/admin and draft/publish confirmation. Reusing those as an immediate learner generator would require new ownership, execution and publication semantics; no fake creation CTA or state is added.
+
+## Current contract
+
+- Existing Engine becomes `course-rule-v3`, separating persisted decisions from v2. It selects an available current learning path or a truthful no-action reason. Material and Assignment inputs remain compatible; neither becomes the selected learning resource.
+- Material-only current nodes produce `learning_content_unavailable`; the engine does not scan ahead, change prerequisites, mark learned/mastered, or imply route completion. Empty routes are also not complete.
+- Course Navigator exposes theme, learner-language reason, real matched-path duration, 开始学习, and launch identity. No resourceKind/reasonCode/label leaks into presentation. Legacy Material and Assignment decisions are rejected by projection.
+- Learning complete with outstanding Assignments: 当前学习内容已完成 plus the real outstanding count; no CTA. All learning and all Assignments accepted/completed: 课程已完成 and 实训全部完成 ✓. Missing/blocked assets: 当前没有可继续的学习内容, without a false completion claim.
+- Backlog semantics, deterministic ordering, submitted waiting status, accepted/completed exclusion and the separate nextPractice remain. No scheduler or practice promotion is added.
+- Locked path nodes are labelled 尚未解锁，可查看详情 without aria-disabled. Micro starts are disabled and guarded in the handler; Assignment starts from the locked detail are disabled. Material is still inspectable, with no start-material mutation from the locked detail. The path detail drawer sits above the Course view switch so its close button remains usable.
+- Course layout/Motion, Learning home, Micro interaction runtime and Course content are unchanged.
+
+## Validation evidence
 
 - `pnpm typecheck`: PASS.
 - `pnpm lint`: PASS.
-- `pnpm test`: PASS — 84 files / 534 tests, including 14 new projection cases.
-- `pnpm build`: PASS. Build emits a large-chunk advisory; no new dependency or splitting overhaul.
-- `pnpm verify:learning-loop:local`: PASS — real local attempted/accepted state machine and versioned NavigationDecision checks.
-- `scripts/acceptance/course-navigator.browser.mjs`: PASS, authenticated Local Supabase catalog with memory-only fixture states. A/B Micro current and completion progression; C/D four retained practices independent of Micro; submitted visible without recommendation; E supported Practice single CTA; F/G chapters, 1440/390, reduced motion; API failure/retry; native dialog Escape and restored focus.
-- Screenshot artifacts are under `output/playwright/` (local review artifacts, not source fixtures).
-- Hosted migration history: linked project `uyljtdbvlivxniililay`; 47/47 repository migrations match. No migration or fixture synchronization required by this UI-only change.
-- Existing `scripts/acceptance/micro-review.browser.mjs`: PASS on Local Supabase. RT01, CDS525-K012 and CDS525-K021 each complete all six steps; review produces zero progress writes.
-- Hosted code Preview `https://edu-flow-faa0g8dwk-july-nanas-projects.vercel.app`: READY; actual Vercel `lambdaRuntimeStats` reports 12 Node.js Functions. Public client config points to the same linked Supabase project. `/api/courses`, `/api/micro`, `/api/progress`, `/api/navigation` all return 200 for the authorized ordinary learner. Golden chapter has 10 Knowledge / 10 Micro / 10 Assignments; 117 route nodes, exactly one current marker, 11 real pending practices. 1440px and 390px screenshots checked; mobile scrollWidth equals clientWidth (390).
-- Final visual refinement: initial queue and path both start at y=158; after scrolling, queue stays at y=148 clear of navigation. Expanded backlog has its own bounded scroll. Knowledge drawer actions are visually secondary.
-- Initial uncached Hosted JS download took about 43 seconds in this test network; a 30-second browser wait timed out before eventual successful load. No application console errors followed. Bundle/loading optimization is deferred, not hidden by a fake ready state.
+- `pnpm test`: PASS — 84 files / 542 tests.
+- `pnpm build`: PASS; large-bundle advisory remains, not a skipped failure.
+- `pnpm verify:learning-loop:local`: PASS under v3.
+- `scripts/acceptance/course-navigator.browser.mjs` default export: PASS. Existing/resumed same-card learning; no internal labels; real duration; Material never primary; Practice never primary; four retained debts; submitted; both complete states; locked details/disabled starts; 1440/390; reduced motion; request error/retry; real Material PDF opens through Knowledge detail in an anonymous context.
+- `verifyNavigatorCompletion` in that same browser file: PASS using a fresh local-only acceptance learner. Real UI starts A02, performs each interaction, submits through the normal API, returns to Course, confirms durable `learned` and next identity AGC01 under v3. No Hosted write fixture is used.
+- `verifyGoldenChapterReview` in the existing Micro browser file: PASS locally for all ten actual first-chapter paths, 52 total steps, return-to-Course after every path, zero review writes. It requires real completed paths and never injects completion.
+- The existing three-path Micro exercise/review regression: PASS locally for RT01, CDS525-K012 and CDS525-K021, including actual challenge completion and zero review writes.
+- Hosted verification is pending push of this correction. Previous-round Preview evidence is not used to claim this round's policy passed.
 
 ## Acceptance matrix
 
 | AC | Status | Evidence |
-| --- | --- | --- |
-| 01 | PASS | A single named action and start control in the queue |
-| 02 | PASS | Browser asserts one primary; backlog has none |
-| 03 | PASS | Four-debt and begun-debt regression; real 12-item backlog |
-| 04 | PASS | Exactly one ready nextPractice; route/dependency tests |
-| 05 | PASS | Distinct Micro action and Practice recommendation in A/C/D |
-| 06 | PASS | Compact circular nodes, no Knowledge card list |
-| 07 | PASS | Deterministic snake SVG, linear sequence, chapter separators |
-| 08 | PASS | Completed/current/available/locked mapping and appearance |
-| 09 | PASS | Server node identity gives the sole current marker; locate action |
-| 10 | PASS | Golden first chapter 10 Knowledge / 10 Micro / 10 Assignments |
-| 11 | PASS | Existing three-path real Micro browser regression; zero review writes |
-| 12 | PASS (fixture/local API) | Refresh snapshot advances node and Next Action; learning-loop verifier |
-| 13 | PASS | 1440px / 390px, no horizontal overflow, focus and reduced motion |
-| 14 | PASS | No dependency or lockfile changes |
-| 15 | PASS | No Workflow runtime, ML, evaluation or tracking expansion |
-| 16 | PASS | Full typecheck/lint/tests/build and local learning-loop verifier |
-| 17 | PASS | Branch pushed, real Preview READY, prototype untouched |
+|---|---|---|
+| 01 | PASS local | v3 engine and legacy Material projection rejection |
+| 02 | PASS local | card and route no resource labels; browser assertion |
+| 03 | PASS local | title/reason/real duration/one learning CTA |
+| 04 | PASS local | existing and resume both 开始学习 |
+| 05 | PARTIAL / deferred | no real creation runtime, so no creation CTA is claimed |
+| 06 | PASS | capability audit; no synthetic generating/success states |
+| 07 | PASS | Assignment decisions rejected; server remains learning-only |
+| 08 | PASS | deterministic nextPractice and four-debt/submitted/accepted tests |
+| 09 | PASS local | learning complete plus unfinished practice count, no CTA |
+| 10 | PASS local | full completion requires all assignments accepted/completed |
+| 11 | PASS | missing/empty/unlearned routes never imply completion |
+| 12 | PASS local | real supporting PDF opened from Knowledge detail |
+| 13 | PASS local | all ten Golden paths and 52 review steps; existing challenge regression |
+| 14 | PASS local | real A02 completion returns and advances to AGC01 |
+| 15 | PASS local | inspectable aria semantics; locked detail cannot start |
+| 16 | PASS local | desktop/mobile screenshots, no overflow, working close button |
+| 17 | PASS | no dependency/lockfile changes |
+| 18 | PASS | no schema/migration changes |
+| 19 | PASS local | full checks and browser flows above |
+| 20 | PENDING | push and exact Hosted Preview verification |
 
-## Deliberate limits
+## Deferred
 
-No historical practice-debt time is invented. Sorting uses actual route and Assignment ordering. No new spaced-review/Quiz capability is implied. Current Navigation can stop on a material-only Knowledge without a completion mechanism that advances it to learned; changing that server policy is outside this presentation round. Full Workflow execution, richer Assignment environments, and ML ranking remain out of scope. Learning home is unchanged.
+Actual learner-specific content creation needs a real authorized creation/persistence/launch flow. Missing Course learning content is intentionally visible, not repaired by generating Agent content or changing learner state. Automatic practice scheduling, Material redesign, broader runtime/authoring work and bundle optimization remain outside this round.

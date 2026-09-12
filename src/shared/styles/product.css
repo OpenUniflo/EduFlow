@@ -7015,3 +7015,5 @@ body:has(.micro-learning-page) { min-width: 0; overflow: auto; }
   .navigator-queue { max-height: calc(100dvh - 175px); overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; }
 }
 .atlas-graph-page[data-presentation="path"][data-experience="learn"] .atlas-detail-drawer .atlas-primary { color: #5869b8; background: #edf0f8; box-shadow: none; }
+/* Inspectable path details must sit above the Course view switch. */
+.atlas-graph-page[data-presentation="path"] .atlas-detail-drawer { z-index: 66; }

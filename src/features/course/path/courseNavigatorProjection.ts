@@ -1,15 +1,16 @@
 import type { NavigationDecision } from '@/shared/learning/navigation';
 import type { UserKnowledgeRecord } from '@/features/profile/types';
-import type { CourseAssignment, UserCourseState } from '../types';
+import type { UserCourseState } from '../types';
 import type { CourseGraphData, CourseRuntimeData } from '../runtime/courseRuntime';
 import { buildCoursePath } from './coursePath';
 import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequisites';
 
+export type NavigatorLearningContent = { nodeId: string; pathId: string; estimatedMinutes?: number };
 export type NavigatorState = 'completed' | 'current' | 'available' | 'locked';
 export function pathX(index: number) { return 50 + Math.round(18 * Math.sin(index * Math.PI / 2)); }
-export function buildCourseNavigator({ graph, runtime, knowledge, courseState, decision }: {
+export function buildCourseNavigator({ graph, runtime, knowledge, courseState, decision, learningContent = [] }: {
   graph: CourseGraphData; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[];
-  courseState?: UserCourseState; decision?: NavigationDecision | null;
+  courseState?: UserCourseState; decision?: NavigationDecision | null; learningContent?: NavigatorLearningContent[];
 }) {
   const validDecision = decision?.courseId === runtime.course.id ? decision : null;
   const fallback = buildCoursePath(graph, knowledge);
@@ -40,15 +41,21 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
     return [{ assignment, status, ready: eligible && dependenciesReady && status !== 'submitted', rank: Math.max(-1, ...ids.map(id => ranks.get(id) ?? Number.MAX_SAFE_INTEGER)) }];
   }).sort((a, b) => a.rank - b.rank || a.assignment.order - b.assignment.order || a.assignment.id.localeCompare(b.assignment.id));
   const nextPractice = pendingPractices.find(item => item.ready) ?? null;
-  const assignment = action?.resourceKind === 'assignment' ? runtime.assignments.find(item => item.id === action.resourceId) : undefined;
-  const executablePractice = assignment && pendingPractices.some(item => item.assignment.id === assignment.id && item.ready) && canExecutePractice(assignment);
-  const nextAction = action && action.resourceKind !== 'course' && (action.resourceKind !== 'assignment' || executablePractice) ? {
-    ...action,
-    reason: action.reasonCode === 'begin_required_micro' ? '从这一小节开始，逐步理解新的知识。' : action.reasonCode === 'resume_required_micro' ? '接着上次的进度，完成这一节微学习。' : action.reasonCode === 'material_learning_available' ? '先阅读这份相关材料，继续理解当前知识。' : action.reason,
-    title: assignment?.title ?? route.find(item => item.node.id === action.nodeId)?.node.title ?? '',
-    label: action.resourceKind === 'micro' ? '微学习' : action.resourceKind === 'material' ? '学习材料' : '实训',
-    cta: action.resourceKind === 'micro' ? '开始学习' : action.resourceKind === 'material' ? '阅读材料' : '开始实训',
+  const learning = action?.resourceKind === 'micro' ? learningContent.find(item => item.nodeId === action.nodeId && item.pathId === action.resourceId) : undefined;
+  const current = route.find(item => item.node.id === action?.nodeId);
+  const nextAction = learning && current && current.state !== 'locked' ? {
+    title: current.node.title,
+    reason: action?.reasonCode === 'resume_required_micro' ? '继续上次未完成的学习。' : '你已经完成前置内容，可以继续这一部分。',
+    estimatedMinutes: learning.estimatedMinutes && Number.isFinite(learning.estimatedMinutes) && learning.estimatedMinutes > 0 ? learning.estimatedMinutes : undefined,
+    cta: '开始学习',
+    action: { knowledgeId: learning.nodeId, pathId: learning.pathId },
   } : null;
+  const complete = action?.reasonCode === 'course_route_complete' && source.length > 0 && source.every(item => item.navigationState === 'learned' || item.navigationState === 'skipped');
+  const remainingPracticeCount = runtime.assignments.filter(item => !accepted(item.id)).length;
+  const courseComplete = complete && remainingPracticeCount === 0;
+  const emptyState = courseComplete ? { title: '课程已完成', reason: '你已经完成当前课程的全部学习内容与实训。' }
+    : complete ? { title: '当前学习内容已完成', reason: `你已经完成当前课程的学习内容。还有 ${remainingPracticeCount} 项实训待完成，可以从下方继续。` }
+    : { title: '当前没有可继续的学习内容', reason: `${action?.reasonCode === 'teaching_prerequisite_required' ? '请先完成前置内容，解锁后再继续这一部分。' : '这一学习节点尚未准备可执行学习内容。'}${pendingPractices.length ? `已有的 ${pendingPractices.length} 项实训仍保留在下方。` : ''}` };
   // Preserve navigation sequence; chapter headers mark transitions without reordering it.
   const sections: Array<{ id: string; title: string; items: typeof route }> = [];
   route.forEach(item => {
@@ -60,10 +67,7 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
     }
     section.items.push(item);
   });
-  return { route, sections, pendingPractices, nextPractice, nextAction, complete: action?.reasonCode === 'course_route_complete', notice: action?.reason ?? null };
+  return { route, sections, pendingPractices, nextPractice, nextAction, complete, courseComplete, emptyState };
 }
 
-export function canExecutePractice(assignment: CourseAssignment) {
-  return assignment.mode !== 'workflow' && assignment.experience?.type !== 'workflow';
-}
 export type CourseNavigatorModel = ReturnType<typeof buildCourseNavigator>;

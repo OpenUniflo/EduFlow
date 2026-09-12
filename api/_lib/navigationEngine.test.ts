@@ -38,7 +38,7 @@ describe("deterministic Navigation Engine", () => {
     const plan = computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned", b: "practicing" }, completedMicroPathIds: ["micro-a"] });
     expect(plan.nextAction).toMatchObject({ resourceKind: "course", reasonCode: "course_route_complete" });
     expect(plan.nextAction.nodeId).toBeUndefined();
-    expect(plan.policyVersion).toBe("course-rule-v2");
+    expect(plan.policyVersion).toBe("course-rule-v3");
   });
   it("does not force optional Micro after the Knowledge is learned", () => {
     expect(computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned" }, microPaths: [{ id: "optional", nodeId: "a", order: 0 }] }).nextAction.nodeId).toBe("b");
@@ -50,5 +50,28 @@ describe("deterministic Navigation Engine", () => {
   it("prefers required assets before optional assets regardless of display order",()=>{
     const plan=computeNavigationPlan({...base,microPaths:[{id:"optional",nodeId:"a",order:0,required:false},{id:"required",nodeId:"a",order:2,required:true}]});
     expect(plan.nextAction.resourceId).toBe("required");
+  });
+});
+
+
+describe('learning-only Navigation contract', () => {
+  it('keeps a material-only frontier unavailable without jumping to a later Micro', () => {
+    const input = { ...base, microPaths: [{ id: 'micro-b', nodeId: 'b', required: true, order: 0 }], materials: [{ id: 'reference-a', nodeId: 'a', order: 0 }] };
+    const plan = computeNavigationPlan(input);
+    expect(plan.nextAction).toMatchObject({ nodeId: 'a', resourceKind: 'course', reasonCode: 'learning_content_unavailable' });
+    expect(plan.path.map(item => item.state)).toEqual(['eligible','blocked']);
+    expect(input.knowledgeStatuses).toEqual({});
+  });
+  it('does not scan ahead past missing curriculum content even if a later node is eligible', () => {
+    const plan = computeNavigationPlan({ ...base, targetNodeIds: ['a','b'], prerequisiteEdges: [], microPaths: [{ id: 'micro-b', nodeId: 'b', order: 0 }] });
+    expect(plan.nextAction).toMatchObject({ nodeId: 'a', reasonCode: 'learning_content_unavailable' });
+    expect(plan.path.map(item => item.nodeId)).toEqual(['a','b']);
+  });
+  it('does not promote practice when learning is missing or finished', () => {
+    expect(computeNavigationPlan({ ...base, microPaths: [] }).nextAction.resourceKind).toBe('course');
+    expect(computeNavigationPlan({ ...base, knowledgeStatuses: { a: 'mastered', b: 'mastered' } }).nextAction.reasonCode).toBe('course_route_complete');
+  });
+  it('does not call an empty route complete', () => {
+    expect(computeNavigationPlan({ ...base, nodes: [] }).nextAction.reasonCode).toBe('course_route_empty');
   });
 });

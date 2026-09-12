@@ -38,8 +38,8 @@ try {
   assert.equal(duplicate.attemptId, failed.attemptId); assert.equal(duplicate.resultId, failed.resultId); assert.equal(duplicate.outcome, "failed"); assert.equal(duplicate.duplicate, true);
   await invoke(learningHandler, "POST", token, { action: "submit-assignment", courseId, assignmentId, idempotencyKey: key, response: { kind: "trace", selectedStepId: "skip-observation" } }, {}, 409);
   const remediation = await invoke(navigationHandler, "GET", token, undefined, { courseId });
-  // course-rule-v2 keeps Practice optional; failed Attempts must not replace teaching continuation.
-  assert.equal(remediation.policyVersion, "course-rule-v2");
+  // course-rule-v3 keeps Practice optional; failed Attempts must not replace teaching continuation.
+  assert.equal(remediation.policyVersion, "course-rule-v3");
   assert.equal(remediation.nextAction.kind, "review");
   assert.equal(remediation.nextAction.resourceKind, "micro");
   assert.equal(remediation.nextAction.reasonCode, "resume_required_micro");

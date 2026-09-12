@@ -11,14 +11,14 @@ const id = 'route-knowledge';
 const assignment = (name: string, order: number): CourseAssignment => ({ id: name, courseId: routeOnlyRuntime.course.id, title: name, order, description: 'Task', requirements: [], expectedOutput: 'Output', acceptanceCriteria: [], mode: 'instruction' });
 const runtime = { ...routeOnlyRuntime, assignments: [assignment('second', 2), assignment('first', 1), assignment('third', 3), assignment('fourth', 4)], assignmentCoverages: ['first','second','third','fourth'].map(name => ({ id: name, assignmentId: name, nodeId: id, role: 'practice' as const })) };
 const knowledge = [{ nodeId: id, status: 'learned' }] as UserKnowledgeRecord[];
-const decision: NavigationDecision = { decisionId: 'd', decidedAt: '', policyVersion: 'course-rule-v2', courseId: runtime.course.id, path: [{ nodeId: id, title: 'Route', state: 'underway', blockedBy: [] }], skippedNodeIds: [], nextAction: { kind: 'next', resourceKind: 'micro', resourceId: 'micro', nodeId: id, reasonCode: 'begin_required_micro', reason: 'Learn' } };
+const decision: NavigationDecision = { decisionId: 'd', decidedAt: '', policyVersion: 'course-rule-v3', courseId: runtime.course.id, path: [{ nodeId: id, title: 'Route', state: 'underway', blockedBy: [] }], skippedNodeIds: [], nextAction: { kind: 'next', resourceKind: 'micro', resourceId: 'micro', nodeId: id, reasonCode: 'begin_required_micro', reason: 'Learn' } };
 const state = (statuses: Record<string, string>) => ({ assignmentStates: Object.fromEntries(Object.entries(statuses).map(([assignmentId, status]) => [assignmentId, { assignmentId, status }])) }) as UserCourseState;
-const project = (options: Partial<Parameters<typeof buildCourseNavigator>[0]> = {}) => buildCourseNavigator({ graph, runtime, knowledge, decision, ...options });
+const project = (options: Partial<Parameters<typeof buildCourseNavigator>[0]> = {}) => buildCourseNavigator({ graph, runtime, knowledge, decision, learningContent: [{ nodeId: id, pathId: 'micro', estimatedMinutes: 8 }], ...options });
 
 describe('Course navigator projection', () => {
   it('keeps nextAction separate from the ordered nextPractice and retains every debt', () => {
     const result = project();
-    expect(result.nextAction).toMatchObject({ resourceId: 'micro', label: '微学习' });
+    expect(result.nextAction).toMatchObject({ action: { knowledgeId: id, pathId: 'micro' }, cta: '开始学习', estimatedMinutes: 8 });
     expect(result.nextPractice?.assignment.id).toBe('first');
     expect(result.pendingPractices.map(item => item.assignment.id)).toEqual(['first','second','third','fourth']);
     expect(result.route[0].state).toBe('current');
@@ -51,11 +51,34 @@ describe('Course navigator projection', () => {
     expect(result.nextAction).toBeNull();
     expect(result.pendingPractices).toHaveLength(4);
   });
-  it('honors executable practice decisions without promoting Workflow simulation', () => {
-    const practice = { ...decision, nextAction: { ...decision.nextAction, resourceKind: 'assignment' as const, resourceId: 'first' } };
-    expect(project({ decision: practice }).nextAction?.cta).toBe('开始实训');
-    expect(project({ decision: practice, courseState: state({ first: 'submitted' }) }).nextAction).toBeNull();
-    expect(project({ decision: practice, runtime: { ...runtime, assignments: runtime.assignments.map(item => ({ ...item, mode: 'workflow' })) } }).nextAction).toBeNull();
+  it.each(['material', 'assignment'] as const)('never promotes a legacy %s action', resourceKind => {
+    const result = project({ decision: { ...decision, nextAction: { ...decision.nextAction, resourceKind, resourceId: 'first' } } });
+    expect(result.nextAction).toBeNull();
+    expect(result.pendingPractices).toHaveLength(4);
+    expect(result.nextPractice?.assignment.id).toBe('first');
+    expect(result.complete).toBe(false);
+  });
+  it('exposes only learner presentation and a launch identity, never raw resource metadata', () => {
+    const result = project({ decision: { ...decision, nextAction: { ...decision.nextAction, reasonCode: 'resume_required_micro', reason: 'Internal Micro Review policy', kind: 'review' } } });
+    expect(result.nextAction).toEqual({ title: 'Route Knowledge', reason: '继续上次未完成的学习。', estimatedMinutes: 8, cta: '开始学习', action: { knowledgeId: id, pathId: 'micro' } });
+    expect(project({ learningContent: [] }).nextAction).toBeNull();
+    expect(project({ learningContent: [{ nodeId: id, pathId: 'micro' }] }).nextAction?.estimatedMinutes).toBeUndefined();
+  });
+  it('distinguishes completed learning with practice debt from a fully complete course', () => {
+    const completed: NavigationDecision = { ...decision, path: [{ ...decision.path[0], state: 'learned' }], nextAction: { kind: 'next', resourceKind: 'course', reasonCode: 'course_route_complete', reason: 'Done' } };
+    const pending = project({ decision: completed });
+    expect(pending.emptyState.title).toBe('当前学习内容已完成');
+    expect(pending.emptyState.reason).toContain('4 项实训');
+    expect(pending.courseComplete).toBe(false);
+    expect(project({ decision: completed, courseState: state({ first: 'accepted', second: 'completed', third: 'accepted', fourth: 'accepted' }) }).emptyState.title).toBe('课程已完成');
+    expect(project({ decision: completed, courseState: state({ first: 'submitted', second: 'accepted', third: 'accepted', fourth: 'accepted' }) }).courseComplete).toBe(false);
+  });
+  it('never mistakes missing assets, empty routes or contradictory completion for success', () => {
+    const missing = { ...decision, nextAction: { kind: 'next' as const, resourceKind: 'course' as const, nodeId: id, reasonCode: 'learning_content_unavailable', reason: 'Missing' } };
+    expect(project({ decision: missing }).emptyState.title).toBe('当前没有可继续的学习内容');
+    expect(project({ decision: missing }).emptyState.reason).toContain('4 项实训仍保留在下方');
+    expect(project({ decision: { ...missing, nextAction: { ...missing.nextAction, reasonCode: 'course_route_complete' } } }).complete).toBe(false);
+    expect(project({ decision: { ...missing, path: [], nextAction: { ...missing.nextAction, reasonCode: 'course_route_complete' } } }).complete).toBe(false);
   });
   it('handles no decision, empty assets and foreign course decisions', () => {
     expect(project({ runtime: routeOnlyRuntime, decision: null }).pendingPractices).toEqual([]);

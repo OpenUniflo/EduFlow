@@ -57,3 +57,47 @@ export default async function verifyMicroReview(page, baseURL = "http://localhos
  page.off('request',listener);return report;
 }
 
+
+// Checks every real first-chapter path through the existing completed-path review UI.
+// Requires an ordinary learner who has completed these paths; never manufactures completion.
+export async function verifyGoldenChapterReview(page, baseURL, courseId = 'ai-agents-in-depth') {
+  await page.goto(`${baseURL}/courses/${courseId}`);
+  await page.locator('.navigator-path').waitFor();
+  const paths = await page.evaluate(async courseId => {
+    const key = Object.keys(localStorage).find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
+    const session = key && JSON.parse(localStorage.getItem(key));
+    if (!session?.access_token) throw Error('Authenticated review account required');
+    const headers = { Authorization: `Bearer ${session.access_token}` };
+    const [catalog, micro] = await Promise.all(['/api/courses', '/api/micro'].map(url => fetch(url, { headers }).then(response => { if (!response.ok) throw Error('Catalog unavailable'); return response.json(); })));
+    const runtime = catalog.courses.find(item => item.course.id === courseId);
+    const chapter = [...runtime.chapters].sort((a,b) => a.order-b.order)[0];
+    const lessons = new Set(runtime.lessons.filter(item => item.chapterId === chapter.id).map(item => item.id));
+    const ids = [...new Set(runtime.curriculumCoverages.filter(item => lessons.has(item.lessonId)).map(item => item.nodeId))];
+    return ids.map(id => {
+      const path = micro.paths.find(item => item.knowledgeId === id && item.courseId === courseId && item.mode === 'learn') ?? micro.paths.find(item => item.knowledgeId === id && item.scope === 'global' && item.mode === 'learn');
+      if (!path || !micro.pathProgress.some(item => item.pathId === path.id && item.status === 'completed')) throw Error(`Real completed path missing for ${id}`);
+      return { nodeId: id, steps: path.units.flatMap(unit => unit.steps).map(step => ({ title: step.title, interaction: step.interaction?.type })) };
+    });
+  }, courseId);
+  const writes = []; const listener = request => { if (request.method() === 'POST' && /\/api\/(micro|learning|progress)/.test(request.url())) writes.push(request.url()); };
+  page.on('request', listener);
+  const report = [];
+  try {
+    for (const path of paths) {
+      await page.goto(`${baseURL}/learn/micro/${encodeURIComponent(path.nodeId)}?courseId=${encodeURIComponent(courseId)}`);
+      await page.getByRole('button', { name: '重新复习', exact: true }).click();
+      for (let i=0; i<path.steps.length; i++) {
+        const article = page.locator('article:visible');
+        await article.getByRole('heading', { name: path.steps[i].title, exact: true }).waitFor();
+        await article.getByText('正在加载互动机制…', { exact: true }).waitFor({ state: 'hidden' });
+        if (await article.getByText('互动机制暂时无法加载', { exact: false }).count()) throw Error('Interaction failed to load');
+        await article.getByRole('button', { name: '下一步', exact: true }).click();
+      }
+      await page.getByRole('button', { name: '返回课程', exact: true }).click();
+      await page.locator('.navigator-next h2').waitFor();
+      report.push({ nodeId: path.nodeId, reviewedSteps: path.steps.length, returnedToCourse: true });
+    }
+    if (writes.length) throw Error('Completed-path review wrote learner progress');
+    return { paths: report, reviewWrites: writes.length };
+  } finally { page.off('request', listener); }
+}
