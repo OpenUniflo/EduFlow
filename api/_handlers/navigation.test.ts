@@ -125,7 +125,7 @@ describe("Navigation authority pagination", () => {
     const second = responseRecorder();
     await handler(request, second.response);
     expect(first.statusCode()).toBe(200);
-    expect(first.body()).toMatchObject({ decisionId: "decision-1", nextAction: { kind: "next", nodeId: "source-1200", reasonCode: "knowledge_route_available" } });
+    expect(first.body()).toMatchObject({ decisionId: "decision-1", nextAction: { kind: "next", nodeId: "source-1200", reasonCode: "learning_content_unavailable" } });
     expect(second.body()).toMatchObject({ decisionId: "decision-1" });
     expect(requirePublishedCourse).toHaveBeenCalledWith(userClient, "course");
   });

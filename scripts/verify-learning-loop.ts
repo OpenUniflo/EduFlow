@@ -30,6 +30,26 @@ try {
   const microComplete=await invoke(microHandler,"POST",token,{action:"complete-step",pathId:"aiad-rt01-agent-loop",unitId:"aiad-rt01-agent-loop-unit",stepId:"aiad-rt01-trace",submission:"skip"});
   assert.equal(microComplete.correct,true);
   const membership=await server.from("user_course_states").select("is_active").eq("user_id",userId).eq("course_id",courseId).single();assert.ifError(membership.error);assert.equal(membership.data?.is_active,true,"direct Course Micro completion must activate membership");
+  // Direct URL/API must not create any Assignment or Knowledge state before readiness.
+  const snapshot = async () => {
+    const tables = ["user_knowledge_states","user_course_states","user_assignment_states","learning_attempts","performance_results","knowledge_evidence","learning_events"];
+    return Promise.all(tables.map(async table => { const result=await server.from(table).select("*").eq("user_id",userId);assert.ifError(result.error);return result.data; }));
+  };
+  const beforeBlocked = await snapshot();
+  await invoke(learningHandler,"POST",token,{action:"start-assignment",courseId,assignmentId},{},403);
+  await invoke(learningHandler,"POST",token,{action:"submit-assignment",courseId,assignmentId,idempotencyKey:`blocked-${suffix}`,response:{kind:"trace",selectedStepId:"skip-observation"}},{},403);
+  assert.deepEqual(await snapshot(),beforeBlocked,"illegal requests must not mutate learner data");
+  // This local-only integration fixture supplies actual coverage/dependency identities.
+  const coverage=await server.from("assignment_coverages").select("node_id").eq("course_id",courseId).eq("assignment_id",assignmentId);assert.ifError(coverage.error);
+  const readyKnowledge=await server.from("user_knowledge_states").upsert(coverage.data!.map(item=>({user_id:userId,node_id:item.node_id,status:"learned"})));assert.ifError(readyKnowledge.error);
+  const dependencies=await server.from("assignment_dependencies").select("source_assignment_id").eq("course_id",courseId).eq("target_assignment_id",assignmentId).eq("strength","hard");assert.ifError(dependencies.error);
+  if(dependencies.data!.length){
+    const beforeDependency=await snapshot();await invoke(learningHandler,"POST",token,{action:"start-assignment",courseId,assignmentId},{},403);assert.deepEqual(await snapshot(),beforeDependency);
+    const readyDependencies=await server.from("user_assignment_states").upsert(dependencies.data!.map(item=>({user_id:userId,course_id:courseId,assignment_id:item.source_assignment_id,status:"accepted",progress:100})));assert.ifError(readyDependencies.error);
+  }
+  const beforeDirectSubmit=await snapshot();
+  await invoke(learningHandler,"POST",token,{action:"submit-assignment",courseId,assignmentId,idempotencyKey:`unstarted-${suffix}`,response:{kind:"trace",selectedStepId:"skip-observation"}},{},409);
+  assert.deepEqual(await snapshot(),beforeDirectSubmit);
   await invoke(learningHandler, "POST", token, { action: "start-assignment", courseId, assignmentId });
   const key = `attempt-${suffix}`;
   const failed = await invoke(learningHandler, "POST", token, { action: "submit-assignment", courseId, assignmentId, idempotencyKey: key, response: { kind: "trace", selectedStepId: "verify" } });
@@ -38,15 +58,22 @@ try {
   assert.equal(duplicate.attemptId, failed.attemptId); assert.equal(duplicate.resultId, failed.resultId); assert.equal(duplicate.outcome, "failed"); assert.equal(duplicate.duplicate, true);
   await invoke(learningHandler, "POST", token, { action: "submit-assignment", courseId, assignmentId, idempotencyKey: key, response: { kind: "trace", selectedStepId: "skip-observation" } }, {}, 409);
   const remediation = await invoke(navigationHandler, "GET", token, undefined, { courseId });
-  // course-rule-v2 keeps Practice optional; failed Attempts must not replace teaching continuation.
-  assert.equal(remediation.policyVersion, "course-rule-v2");
-  assert.equal(remediation.nextAction.kind, "review");
+  // course-rule-v4 keeps Practice optional; failed Attempts must not replace teaching continuation.
+  assert.equal(remediation.policyVersion, "course-rule-v4");
+  assert.equal(remediation.nextAction.kind, "next");
   assert.equal(remediation.nextAction.resourceKind, "micro");
-  assert.equal(remediation.nextAction.reasonCode, "resume_required_micro");
+  assert.equal(remediation.nextAction.reasonCode, "begin_required_micro");
+  assert.equal(remediation.nextAction.nodeId, "A02", "historical later learning must not preempt cold route frontier");
   const sameDecision = await invoke(navigationHandler, "GET", token, undefined, { courseId });
   assert.equal(sameDecision.decisionId, remediation.decisionId, "identical state must reuse its persisted NavigationDecision");
   const passed = await invoke(learningHandler, "POST", token, { action: "submit-assignment", courseId, assignmentId, idempotencyKey: `retry-${suffix}`, response: { kind: "trace", selectedStepId: "skip-observation" } });
   assert.equal(passed.outcome, "passed"); assert.equal(passed.status, "accepted");
+  const beforeAcceptedRestart=await snapshot();
+  await invoke(learningHandler,"POST",token,{action:"start-assignment",courseId,assignmentId},{},409);
+  await invoke(learningHandler,"POST",token,{action:"submit-assignment",courseId,assignmentId,idempotencyKey:`accepted-new-${suffix}`,response:{kind:"trace",selectedStepId:"skip-observation"}},{},409);
+  assert.deepEqual(await snapshot(),beforeAcceptedRestart);
+  const passedRetry=await invoke(learningHandler,"POST",token,{action:"submit-assignment",courseId,assignmentId,idempotencyKey:`retry-${suffix}`,response:{kind:"trace",selectedStepId:"skip-observation"}});
+  assert.equal(passedRetry.duplicate,true);assert.deepEqual(await snapshot(),beforeAcceptedRestart);
   const afterPass = await invoke(navigationHandler, "GET", token, undefined, { courseId });
   assert.notEqual(afterPass.decisionId, remediation.decisionId); assert.notEqual(afterPass.nextAction.kind, "remediation");
   assert.deepEqual(afterPass.nextAction, remediation.nextAction, "Assignment acceptance must not replace the incomplete teaching route");

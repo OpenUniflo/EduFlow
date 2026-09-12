@@ -26,6 +26,6 @@ describe("Course-scoped learner action membership", () => {
     expect(progress).toContain("is_active: true, recent_lesson_id");
     expect(progress).toContain("update({ is_active: false");
     expect(progress).not.toMatch(/deactivate-course[\s\S]{0,500}\.delete\(/);
-    expect(learning).toContain("is_active: true, updated_at: now");
+    expect(learning).toContain("await activateCourse(client, user.id, body.courseId)");
   });
 });

@@ -1,4 +1,4 @@
-export const NAVIGATION_POLICY_VERSION = "course-rule-v2" as const;
+export const NAVIGATION_POLICY_VERSION = "course-rule-v4" as const;
 export type NavigationKnowledgeStatus = "explore" | "mastered" | "learning" | "learned" | "practicing";
 export type NavigationActionKind = "skip" | "remediation" | "review" | "practice" | "next";
 export type NavigationResourceKind = "micro" | "material" | "assignment" | "course";

@@ -5,8 +5,8 @@ import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
 import type { AssignmentExperience } from "@/features/course/types";
-import { evaluateTraceSelection } from "@/features/course/assignmentExperience";
-import { workflowLaunchUrl } from "@/features/learning/progress/progressService";
+import { courseAssignmentEligibility, evaluateTraceSelection } from "@/features/course/assignmentExperience";
+import { useOptionalUserCourseState, workflowLaunchUrl } from "@/features/learning/progress/progressService";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
 import { authGateState } from "@/features/auth/authRedirect";
@@ -43,6 +43,11 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
   const { courseId = "", assignmentId = "" } = useParams();
   const runtime = applicationServices.courseRepository.getCourse(courseId);
   const assignment = runtime?.assignments.find((item) => item.id === assignmentId);
+  const courseState = useOptionalUserCourseState(session?.userId, courseId);
+  const eligibility = runtime && assignment ? courseAssignmentEligibility(runtime, assignment.id, session ? applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId) : [], courseState) : null;
+  const [startConfirmed, setStartConfirmed] = useState(false);
+  const [resultLoaded, setResultLoaded] = useState(false);
+  const [needsRevision, setNeedsRevision] = useState(false);
   const submissionKey=useRef(crypto.randomUUID());
   const [submitted, setSubmitted] = useState(false); const [accepted, setAccepted] = useState(false); const [busy, setBusy] = useState(false); const [navigationDecision, setNavigationDecision] = useState<NavigationDecision | null>(null); const [feedback,setFeedback]=useState<string|null>(null); const [requestError,setRequestError]=useState<string|null>(null);
   const knowledgeById = useMemo(() => new Map(applicationServices.knowledgeRepository.getVisibleGraph(session?userKnowledgeAccess(session.userId):globalKnowledgeAccess).nodes.map((node) => [node.id, node])), [session]);
@@ -54,10 +59,17 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
     const source = runtime.assignments.find((item) => item.id === dependency.sourceAssignmentId);
     return source ? [source] : [];
   });
-  useEffect(() => { if (runtime && assignment && session) { setRequestError(null);void applicationServices.learnerStateService.startAssignment(courseId, stableAssignmentId).then(() => refreshLearnerState(session.userId)).catch(()=>setRequestError("无法启动本次实训，请检查网络后重试。")); } }, [assignment, courseId, runtime, session, stableAssignmentId]);
-  useEffect(()=>{if(!session)return;let live=true;setRequestError(null);void applicationServices.learnerStateService.getAssignmentResult(courseId,stableAssignmentId).then(({result})=>{if(!live||!result)return;setSubmitted(true);setAccepted(result.accepted);setFeedback(result.feedback.message);return applicationServices.learnerStateService.getNavigation(courseId).then((decision)=>{if(live)setNavigationDecision(decision);});}).catch(()=>{if(live)setRequestError("已保存的结果或下一步暂时无法加载，请重试。");});return()=>{live=false;};},[courseId,session,stableAssignmentId]);
+  useEffect(() => {
+    if (!session || !eligibility?.canStart) return;
+    let live = true; setStartConfirmed(false); setRequestError(null);
+    void applicationServices.learnerStateService.startAssignment(courseId, stableAssignmentId)
+      .then(async () => { await refreshLearnerState(session.userId); if (live) setStartConfirmed(true); })
+      .catch(() => { if (live) setRequestError("无法启动实训，学习条件可能已变化，请返回课程后重试。"); });
+    return () => { live = false; };
+  }, [courseId, session, stableAssignmentId, eligibility?.canStart]);
+  useEffect(()=>{if(!session)return;let live=true;setResultLoaded(false);setRequestError(null);void applicationServices.learnerStateService.getAssignmentResult(courseId,stableAssignmentId).then(({result})=>{if(!live||!result)return;setSubmitted(result.outcome !== "failed");setNeedsRevision(result.outcome === "failed");setAccepted(result.accepted);setFeedback(result.feedback.message);return applicationServices.learnerStateService.getNavigation(courseId).then((decision)=>{if(live)setNavigationDecision(decision);});}).catch(()=>{if(live)setRequestError("已保存的结果或下一步暂时无法加载，请重试。");}).finally(()=>{if(live)setResultLoaded(true);});return()=>{live=false;};},[courseId,session,stableAssignmentId]);
   async function submit(response: AssignmentResponse) {
-    if (busy) return; setBusy(true);setRequestError(null);
+    if (busy || (session && (!startConfirmed || !eligibility?.canSubmit))) return; setBusy(true);setRequestError(null);
     try {
       if (!session) {
         setSubmitted(true);
@@ -67,6 +79,7 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
       const result = await applicationServices.learnerStateService.submitAssignment(courseId, stableAssignmentId, response,submissionKey.current);
       setSubmitted(true);
       setAccepted(result.accepted);
+      setNeedsRevision(result.outcome === "failed");
       setFeedback(result.feedback.message);
       await refreshLearnerState(session.userId);
       try { setNavigationDecision(await applicationServices.learnerStateService.getNavigation(courseId)); } catch { setRequestError("提交结果已保存，但下一步暂时无法加载。你可以稍后重试或返回课程。"); }
@@ -94,7 +107,7 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
         <section><h3>验收标准</h3>{assignment.acceptanceCriteria.map((item) => <span key={item}>✓ {item}</span>)}</section>
       </aside>
       <article className="assignment-experience-card glass-v2">
-        {requestError?<div className="assignment-trace-feedback incorrect" role="alert"><strong>暂时无法完成请求</strong><span>{requestError}</span></div>:null}{submitted ? <div className={`assignment-submitted ${accepted ? "passed" : "not-passed"}`}><Check size={34} /><h2>{session?(accepted ? "本次实训已通过确定性验收" : "本次提交已记录"):"本次匿名体验已完成"}</h2><p>{session?(feedback??(accepted ? "已写入有效实践证据；是否 mastered 仍由完整掌握策略决定。" : "正式 Attempt 与待评阅或未通过的 PerformanceResult 已保存；提交不等于通过或 mastery。")):"答案、文件选择与反馈只存在于当前页面，没有正式提交、成绩或 learner state 写入。"}</p>{navigationDecision ? <section className="assignment-next-action"><small>NEXT ACTION · {navigationDecision.policyVersion}</small><strong>{navigationDecision.nextAction.kind === "remediation" ? "先复习，再重试" : navigationDecision.nextAction.kind === "practice" ? "继续实训" : "继续学习路线"}</strong><span>{navigationDecision.nextAction.reason}</span><button className="atlas-primary" onClick={() => navigate(nextActionHref)}>前往下一步 <ArrowRight size={15} /></button></section> : null}{session && !accepted ? <button className="atlas-secondary" onClick={() => { submissionKey.current=crypto.randomUUID();setSubmitted(false); setNavigationDecision(null);setRequestError(null); }}>重新作答</button> : null}</div> : experience.type === "answer" ? <AnswerExperience guest={!session} prompt={experience.prompt} onSubmit={(response) => void submit(response)} /> : experience.type === "code" ? <CodeExperience guest={!session} experience={experience} onSubmit={(response) => void submit(response)} /> : experience.type === "trace" ? <TraceExperience guest={!session} experience={experience} onSubmit={(response) => void submit(response)} /> : <section className="assignment-experience-body"><h2>画布</h2><p>{experience.prompt}</p><div className="assignment-workflow-preview"><Network size={34} /><strong>继承型工作流已准备</strong><span>画布将从现有 Planner、Workers 与 Merge 结构开始。</span></div><button className="atlas-primary" onClick={() => session?navigate(workflowLaunchUrl({courseId,assignmentId:assignment.id,workflowTemplateId:assignment.workflowTemplateId!})):navigate("/login",{state:authGateState(location)})}>{session?"进入画布":"登录后进入画布"} <ArrowRight size={15} /></button></section>}
+        {requestError?<div className="assignment-trace-feedback incorrect" role="alert"><strong>暂时无法完成请求</strong><span>{requestError}</span></div>:null}{session && eligibility?.reason && !eligibility.viewOnly ? <section role="status"><h2>暂时不能开始实训</h2><p>{eligibility.reason}</p></section> : session && eligibility?.viewOnly && !submitted ? <p role="status">{resultLoaded ? "当前没有可显示的详细结果，请返回课程查看任务状态。" : "正在读取已保存的提交…"}</p> : session && !eligibility?.viewOnly && !startConfirmed ? <p role="status">正在确认实训条件…</p> : submitted ? <div className={`assignment-submitted ${accepted ? "passed" : "not-passed"}`}><Check size={34} /><h2>{session?(accepted ? "本次实训已通过确定性验收" : "本次提交已记录"):"本次匿名体验已完成"}</h2><p>{session?(feedback??(accepted ? "已写入有效实践证据；是否 mastered 仍由完整掌握策略决定。" : "正式 Attempt 与待评阅或未通过的 PerformanceResult 已保存；提交不等于通过或 mastery。")):"答案、文件选择与反馈只存在于当前页面，没有正式提交、成绩或 learner state 写入。"}</p>{navigationDecision ? <section className="assignment-next-action"><small>NEXT ACTION · {navigationDecision.policyVersion}</small><strong>{navigationDecision.nextAction.kind === "remediation" ? "先复习，再重试" : navigationDecision.nextAction.kind === "practice" ? "继续实训" : "继续学习路线"}</strong><span>{navigationDecision.nextAction.reason}</span><button className="atlas-primary" onClick={() => navigate(nextActionHref)}>前往下一步 <ArrowRight size={15} /></button></section> : null}{session && needsRevision && eligibility?.canSubmit && !accepted ? <button className="atlas-secondary" onClick={() => { submissionKey.current=crypto.randomUUID();setSubmitted(false); setNavigationDecision(null);setRequestError(null); }}>继续修改</button> : null}</div> : experience.type === "answer" ? <AnswerExperience guest={!session} prompt={experience.prompt} onSubmit={(response) => void submit(response)} /> : experience.type === "code" ? <CodeExperience guest={!session} experience={experience} onSubmit={(response) => void submit(response)} /> : experience.type === "trace" ? <TraceExperience guest={!session} experience={experience} onSubmit={(response) => void submit(response)} /> : <section className="assignment-experience-body"><h2>画布</h2><p>{experience.prompt}</p><div className="assignment-workflow-preview"><Network size={34} /><strong>继承型工作流已准备</strong><span>画布将从现有 Planner、Workers 与 Merge 结构开始。</span></div><button className="atlas-primary" onClick={() => session?navigate(workflowLaunchUrl({courseId,assignmentId:assignment.id,workflowTemplateId:assignment.workflowTemplateId!})):navigate("/login",{state:authGateState(location)})}>{session?"进入画布":"登录后进入画布"} <ArrowRight size={15} /></button></section>}
       </article>
     </div>
     <EduFlowAssistant context={session?{workspace:"courses",experienceMode:"learn",userRole:session.role,capabilities:session.capabilities,courseId,knowledgeId:coverages[0]?.nodeId,assignmentId}:undefined} locked={!session} contextLabel={assignment.title}/>

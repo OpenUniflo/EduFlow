@@ -6,6 +6,8 @@ import { updateKnowledgeAtLeast } from "../_lib/mastery.js";
 import { activateCourse, requireCourseKnowledge, requirePublishedCourse } from "../_lib/courseMembership.js";
 import { evaluateAssignmentResponse, parseAssignmentResponse } from "../_lib/assignmentEvaluator.js";
 
+import { readAssignmentEligibility } from "../_lib/assignmentEligibility.js";
+
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
 async function requireTeacher(userId: string) {
@@ -79,14 +81,12 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const assignment = dataOrThrow(assignmentResult.data as Row | null, assignmentResult.error, "Assignment lookup");
   if (!assignment) throw new ApiError(404, "assignment_not_found", "Assignment is unavailable");
   await requirePublishedCourse(client, body.courseId);
+  const { previous, coverage, eligibility } = await readAssignmentEligibility(client, user.id, body.courseId, body.assignmentId);
+  if (eligibility.reason) throw new ApiError(403, "assignment_prerequisite_required", eligibility.reason);
   const now = new Date().toISOString();
-  const course = await client.from("user_course_states").upsert({ user_id: user.id, course_id: body.courseId, is_active: true, updated_at: now });
-  dataOrThrow(course.data, course.error, "Course state initialization");
-  const coverageResult = await client.from("assignment_coverages").select("node_id").eq("course_id", body.courseId).eq("assignment_id", body.assignmentId);
-  const coverage = dataOrThrow(coverageResult.data as Row[] | null, coverageResult.error, "Assignment coverage lookup");
   if (body.action === "start-assignment") {
-    const previousResult = await client.from("user_assignment_states").select("status,started_at").eq("user_id", user.id).eq("course_id", body.courseId).eq("assignment_id", body.assignmentId).maybeSingle();
-    const previous = dataOrThrow(previousResult.data as Row | null, previousResult.error, "Assignment state lookup");
+    if (!eligibility.canStart) throw new ApiError(409, "assignment_state_conflict", "This Assignment is submitted or complete; view its saved result instead");
+    await activateCourse(client, user.id, body.courseId);
     if (!previous || ["not_started", "needs_revision"].includes(text(previous, "status"))) {
       const write = await client.from("user_assignment_states").upsert({ user_id: user.id, course_id: body.courseId, assignment_id: body.assignmentId, status: "started", progress: 1, started_at: previous?.started_at ?? now, updated_at: now });
       dataOrThrow(write.data, write.error, "Assignment start");
@@ -96,6 +96,13 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   }
   const submission = parseAssignmentResponse(body.response);
   if (!submission || !body.idempotencyKey) throw new ApiError(400, "invalid_assignment_response", "A valid response and idempotency key are required");
+  // A retry of a saved attempt remains idempotent, even after its state became submitted/accepted.
+  // The existing RPC checks response equality and does not create another attempt for that key.
+  if (!eligibility.canSubmit) {
+    const retryResult = await client.from("learning_attempts").select("id").eq("user_id", user.id).eq("course_id", body.courseId).eq("assignment_id", body.assignmentId).eq("idempotency_key", body.idempotencyKey).maybeSingle();
+    const retry = dataOrThrow(retryResult.data as Row | null, retryResult.error, "Assignment retry lookup");
+    if (!retry) throw new ApiError(409, "assignment_not_started", "Start an eligible Assignment before submitting; submitted or completed work cannot be resubmitted");
+  }
   const evaluation = evaluateAssignmentResponse(assignment, submission);
   const recorded = await createServerSupabase().rpc("record_assignment_attempt", {
     p_learner_user_id: user.id, p_course_id: body.courseId, p_assignment_id: body.assignmentId, p_idempotency_key: body.idempotencyKey,
