@@ -33,8 +33,46 @@ Cleared: learning_events, knowledge_evidence, performance_results, learning_atte
 
 Preserved: Auth accounts, Profiles including roles/capabilities, all course/Knowledge/Micro/Material/Assignment assets and ownership, all authoring data, Assistant sessions/messages, user workflow definitions and editor settings. Those authoring/settings records do not drive navigation, course progress or evidence. No separate public learning_sessions table exists; Auth and Assistant sessions are preserved.
 
-Hosted reset, counts/checksums, clean-account browser acceptance and exact READY Preview are pending execution after the code verification gate. No claim of Hosted completion is made yet.
+Hosted reset completed after local gates and the first READY Preview. All 12 tables were zero inside the transaction and in an independent committed-state read; every protected table retained its count and checksum. Auth accounts 4 -> 4; Profiles 4 -> 4; role distribution remains 3 students / 1 admin. No credentials or learner rows are stored in this document. Cold-account Hosted acceptance is still pending the ESM deployment correction below.
 
 ## Known content boundary
 
 CTX02 and other real missing Micro assets remain unavailable at the frontier. No personalized generator, fake creation CTA, duration or state, practice scheduler, Material fallback, Workflow rewrite, course redesign or bundle work was added. Build's existing large-chunk advisory remains non-blocking.
+
+
+## Reset evidence
+
+| Table | Before | Immediately after reset |
+|---|---:|---:|
+| knowledge_evidence | 42 | 0 |
+| learning_attempts | 2 | 0 |
+| learning_events | 4 | 0 |
+| navigation_decisions | 47 | 0 |
+| performance_results | 2 | 0 |
+| user_assignment_states | 9 | 0 |
+| user_course_states | 23 | 0 |
+| user_knowledge_states | 67 | 0 |
+| user_material_states | 24 | 0 |
+| user_micro_path_progress | 42 | 0 |
+| user_micro_unit_progress | 45 | 0 |
+| workflow_runs | 1 | 0 |
+
+All other 40 tables, including full Auth/Profile rows and ALL teaching/authoring/chat records, had identical before/after checksums. The two target Course asset counts below were independently re-read after commit and matched exactly.
+
+| Asset | Agent before/after | CDS525 before/after |
+|---|---:|---:|
+| assignmentCoverages | 117 / 117 | 90 / 90 |
+| assignmentDependencies | 304 / 304 | 204 / 204 |
+| assignments | 127 / 127 | 97 / 97 |
+| chapters | 9 / 9 | 6 / 6 |
+| curriculumCoverages | 117 / 117 | 90 / 90 |
+| edges | 136 / 136 | 115 / 115 |
+| knowledge | 117 / 117 | 90 / 90 |
+| lessons | 9 / 9 | 26 / 26 |
+| materialCoverages | 148 / 148 | 91 / 91 |
+| materials | 2 / 2 | 12 / 12 |
+| micro | 12 / 12 | 3 / 3 |
+
+## Hosted deployment correction
+
+The first code Preview was READY but `/api/learning` failed on Node ESM module resolution: the new shared module imported teachingPrerequisites without a `.js` extension. Real Vercel logs and independently emitted JavaScript reproduced ERR_MODULE_NOT_FOUND. The import now uses `.js`; the emitted module loads in Node, and full checks are rerun. This is why READY alone is not accepted as functional verification. No learner writes occurred during those failed requests. Final Preview/API/browser results follow after verification.

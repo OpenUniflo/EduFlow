@@ -1,4 +1,4 @@
-import { satisfiesTeachingPrerequisite } from './teachingPrerequisites';
+import { satisfiesTeachingPrerequisite } from './teachingPrerequisites.js';
 
 /** Same instructional rule in UI and API; server-supplied facts are authoritative. */
 export function assignmentEligibility(input: {
