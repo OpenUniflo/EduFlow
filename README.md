@@ -1,6 +1,6 @@
 # EduFlow
 
-EduFlow is an AI-assisted teaching platform that turns course materials into a shared knowledge graph, course skill and assignment views, executable practice workflows, and eventually evidence-backed learning state.
+EduFlow is an AI-assisted teaching platform that turns course materials into a shared knowledge graph, course skill and assignment views, executable practice workflows, and evidence-backed learning state.
 
 ## Product Loop
 
@@ -112,7 +112,8 @@ Start with:
 - [`docs/COURSE_DATA_SYSTEM.md`](docs/COURSE_DATA_SYSTEM.md) — curriculum and course runtime model.
 - [`docs/COURSE_ASSIGNMENT_SYSTEM.md`](docs/COURSE_ASSIGNMENT_SYSTEM.md) — Assignment and course-practice mapping.
 - [`docs/MATERIAL_SYSTEM.md`](docs/MATERIAL_SYSTEM.md) — Material and knowledge coverage model.
-- [`docs/USER_LEARNING_STATE.md`](docs/USER_LEARNING_STATE.md) — mutable user learning state boundaries.
+- [`docs/USER_LEARNING_STATE.md`](docs/USER_LEARNING_STATE.md) — progression, versioned Criterion State, and Fixed/Rule recommendation boundaries.
+- [Learning Data & Recommendation acceptance](.acceptance/learning-data-recommendation-foundation.md) — real Micro State–Action–Outcome proof; run `pnpm verify:learning-data:local` against Local Supabase.
 - [`docs/WORKFLOW_ARCHITECTURE.md`](docs/WORKFLOW_ARCHITECTURE.md) — Workflow domain, editor, runtime, and persistence boundaries.
 - [`docs/ROUND4_CORE_TEACHING_LOOP.md`](docs/ROUND4_CORE_TEACHING_LOOP.md) — current development-round scope and exit contract.
 

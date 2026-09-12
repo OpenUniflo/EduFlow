@@ -315,6 +315,9 @@ try {
   const preservedPath = authoringBaseMicro.body.baseMicroPaths[0];
   const preservedUnit = preservedPath.units[0];
   const preservedStep = preservedUnit.steps[0];
+  const criterionNode = await server.from("knowledge_nodes").select("current_revision_id").eq("id",authoredKnowledgeId).single(); assert.ifError(criterionNode.error);
+  assert.ifError((await server.from("mastery_criteria").insert({ id: `verify-publish-${suffix}`,version:1,knowledge_id:authoredKnowledgeId,knowledge_revision_id:criterionNode.data!.current_revision_id,title:"Publish mapping integrity",description:"Local integration fixture",cognitive_level:"understand",criterion_type:"conceptual",display_order:0 })).error);
+  assert.ifError((await server.from("micro_step_criteria").insert({ step_id:preservedStep.id,criterion_id:`verify-publish-${suffix}`,criterion_version:1,purpose:"instruction" })).error);
   assert.ifError((await server.from("user_course_states").upsert({ user_id: adminUser.user.id, course_id: authoringCourseId, recent_lesson_id: publishedBase.lessons[0].id })).error);
   assert.ifError((await server.from("user_assignment_states").upsert({ user_id: adminUser.user.id, course_id: authoringCourseId, assignment_id: preservedAssignment.id, status: "started", progress: 25 })).error);
   assert.ifError((await server.from("user_material_states").upsert({ user_id: adminUser.user.id, course_id: authoringCourseId, material_id: preservedMaterial.id, recent_segment_id: preservedSegment.id, viewed_segment_ids: [preservedSegment.id], completed_segment_ids: [], progress: 25 })).error);
@@ -327,6 +330,8 @@ try {
   assertStatus(authoringPreview, 200, "authored draft preview read"); assert.ok(authoringPreview.body.draft.state.microPaths.some((item: any) => item.id === authoredPathId)); assert.ok(authoringPreview.body.draft.previewRuntime.assignments.some((item: any) => item.id === authoredAssignmentId));
   const authoredPublish = await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: authoredSave.body.revision }, { courseId: authoringCourseId });
   assertStatus(authoredPublish, 200, "authored Micro and Assignment publish");
+  const preservedCriterion = await server.from("micro_step_criteria").select("step_id").eq("criterion_id",`verify-publish-${suffix}`).single(); assert.ifError(preservedCriterion.error);
+  assert.equal(preservedCriterion.data!.step_id,preservedStep.id,"unchanged stable Step mapping must survive Course Publish");
   assert.equal((await server.from("user_assignment_states").select("status").eq("user_id", adminUser.user.id).eq("course_id", authoringCourseId).eq("assignment_id", preservedAssignment.id).single()).data?.status, "started", "stable Assignment state must survive republish");
   assert.equal((await server.from("user_material_states").select("recent_segment_id").eq("user_id", adminUser.user.id).eq("course_id", authoringCourseId).eq("material_id", preservedMaterial.id).single()).data?.recent_segment_id, preservedSegment.id, "stable Material state must survive republish");
   assert.equal((await server.from("user_micro_path_progress").select("status").eq("user_id", adminUser.user.id).eq("path_id", preservedPath.id).single()).data?.status, "in_progress", "stable Micro progress must survive republish");
@@ -389,10 +394,22 @@ try {
   assert.equal(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.status, "learned");
   assert.ok(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.evidence?.some((item: any) => item.type === "micro_path_completed"));
 
+  // Explicit local integration preconditions. Baseline verifier previously assumed
+  // unrelated Knowledge was ready; production correctly rejects it. These fixtures
+  // are not performance Evidence and are not used by the real learning-data Golden.
+  const prepareAssignment = async (userId:string,courseId:string,assignmentId:string) => {
+    const coverage=await server.from("assignment_coverages").select("node_id").eq("course_id",courseId).eq("assignment_id",assignmentId);assert.ifError(coverage.error);
+    assert.ifError((await server.from("user_knowledge_states").upsert(coverage.data!.map(row=>({user_id:userId,node_id:row.node_id,status:"learned"})))).error);
+    const dependencies=await server.from("assignment_dependencies").select("source_assignment_id").eq("course_id",courseId).eq("target_assignment_id",assignmentId).eq("strength","hard");assert.ifError(dependencies.error);
+    if(dependencies.data!.length)assert.ifError((await server.from("user_assignment_states").upsert(dependencies.data!.map(row=>({user_id:userId,course_id:courseId,assignment_id:row.source_assignment_id,status:"accepted",progress:100})))).error);
+  };
+  assertStatus(await invoke(learningHandler,"POST",adminUser.token,{action:"start-assignment",courseId:"agentic-ai-golden",assignmentId:"golden-knowledge-assignment-RT14"}),403,"unready Assignment remains blocked");
+  await prepareAssignment(adminUser.user.id,"agentic-ai-golden","golden-knowledge-assignment-RT14");
   assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "start-assignment", courseId: "agentic-ai-golden", assignmentId: "golden-knowledge-assignment-RT14" }), 200, "Assignment start");
   const deterministicSubmit = await invoke(learningHandler, "POST", adminUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: "golden-knowledge-assignment-RT14", response: { kind: "trace", selectedStepId: "cancel" }, idempotencyKey: `verify-rt14-${suffix}` });
   assertStatus(deterministicSubmit, 200, "deterministic Assignment acceptance"); assert.equal(deterministicSubmit.body.status, "accepted");
   const manualAssignmentId = "golden-knowledge-assignment-AG01";
+  await prepareAssignment(ordinaryUser.user.id,"agentic-ai-golden",manualAssignmentId);
   assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "start-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId }), 200, "learner Assignment start for manual acceptance");
   const submittedAssignment = await invoke(learningHandler, "POST", ordinaryUser.token, { action: "submit-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId, response: { kind: "answer", text: "Verifier evidence for manual review." }, idempotencyKey: `verify-manual-${suffix}` });
   assertStatus(submittedAssignment, 200, "learner Assignment submission for manual acceptance"); assert.equal(submittedAssignment.body.status, "submitted");
@@ -405,6 +422,7 @@ try {
   const acceptedQueue = await invoke(learningHandler, "GET", adminUser.token, undefined, { courseId: "agentic-ai-golden" });
   assert.ok(acceptedQueue.body.submissions.some((item: any) => item.assignmentId === manualAssignmentId && item.status === "accepted"));
   assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "accept-assignment", courseId: "agentic-ai-golden", assignmentId: manualAssignmentId, learnerUserId: ordinaryUser.user.id }), 409, "duplicate manual Assignment acceptance denial");
+  await prepareAssignment(ordinaryUser.user.id,authoringCourseId,authoredAssignmentId);
   assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "start-assignment", courseId: authoringCourseId, assignmentId: authoredAssignmentId }), 200, "second required Assignment start");
   assertStatus(await invoke(learningHandler, "POST", ordinaryUser.token, { action: "submit-assignment", courseId: authoringCourseId, assignmentId: authoredAssignmentId, response: { kind: "answer", text: "Verifier authored Assignment evidence." }, idempotencyKey: `verify-authored-${suffix}` }), 200, "second required Assignment submission");
   assertStatus(await invoke(learningHandler, "POST", adminUser.token, { action: "accept-assignment", courseId: authoringCourseId, assignmentId: authoredAssignmentId, learnerUserId: ordinaryUser.user.id }), 200, "second required Assignment acceptance");
@@ -528,6 +546,8 @@ try {
 
   console.log("Local backend verification passed: Auth, Health, Knowledge, Goal timeline/Briefs, Course visibility, Micro progress, learning state, evidence, signed PDF, RLS, Workflows, upload, and authorization.");
 } finally {
+  await server.from("micro_step_criteria").delete().eq("criterion_id",`verify-publish-${suffix}`);
+  await server.from("mastery_criteria").delete().eq("id",`verify-publish-${suffix}`);
   if (authoredCourseId) await server.from("courses").delete().eq("id", authoredCourseId);
   if (uploadedMaterialId) await server.from("materials").delete().eq("course_id", "python-engineering").eq("id", uploadedMaterialId);
   if (uploadedPath) await server.storage.from("course-materials").remove([uploadedPath]);

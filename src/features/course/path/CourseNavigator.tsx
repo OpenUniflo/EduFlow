@@ -16,11 +16,12 @@ const navigationResponse = z.object({
   nextAction: z.object({ kind: z.enum(['skip','remediation','review','practice','next']), resourceKind: z.enum(['micro','material','assignment','course']), nodeId: z.string().optional(), resourceId: z.string().optional(), reason: z.string(), reasonCode: z.string() }),
 });
 
-export function CourseNavigator({ graph, runtime, knowledge, courseState, authenticated, loadNavigation, onSelect, onAction, onSignIn, learningContent }: {
+export function CourseNavigator({ graph, runtime, knowledge, courseState, authenticated, loadNavigation, onSelect, onAction, onSignIn, learningContent, resolveLearningContent }: {
   graph: CourseGraphData; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[]; courseState?: UserCourseState;
   authenticated: boolean; loadNavigation(courseId: string): Promise<NavigationDecision>;
-  onSelect(id: string): void; onAction(action: NonNullable<ReturnType<typeof buildCourseNavigator>['nextAction']>): void;
+  onSelect(id: string): void; onAction(action: NonNullable<ReturnType<typeof buildCourseNavigator>['nextAction']>, decisionId?: string): void;
   onSignIn(): void; learningContent: NavigatorLearningContent[];
+  resolveLearningContent?(nodeId: string, pathId: string): NavigatorLearningContent | undefined;
 }) {
   const navigate = useNavigate();
   const reduced = useReducedMotion();
@@ -43,7 +44,12 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
     });
     return () => { active = false; };
   }, [authenticated, runtime.course.id, courseState, loadNavigation, retry]);
-  const model = useMemo(() => buildCourseNavigator({ graph, runtime, knowledge, courseState, decision: result.decision, learningContent }), [graph, runtime, knowledge, courseState, result.decision, learningContent]);
+  const model = useMemo(() => {
+    const selected = result.decision?.nextAction;
+    const exact = selected?.resourceKind === 'micro' && selected.nodeId && selected.resourceId
+      ? resolveLearningContent?.(selected.nodeId, selected.resourceId) : undefined;
+    return buildCourseNavigator({ graph, runtime, knowledge, courseState, decision: result.decision, learningContent: exact ? [...learningContent, exact] : learningContent });
+  }, [graph, runtime, knowledge, courseState, result.decision, learningContent, resolveLearningContent]);
   const action = model.nextAction;
   const minutes = action?.estimatedMinutes;
   const next = model.nextPractice;
@@ -54,7 +60,7 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
     <aside className="navigator-queue" aria-label="课程行动队列">
       <motion.section className="navigator-next" key={action?.action.pathId ?? result.error ?? 'empty'} initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .2 }} aria-label="下一步" aria-live="polite">
         <span className="atlas-kicker">下一步</span>
-        {!authenticated ? <><h2>登录后继续你的路线</h2><p>为你保留学习进度与实训待办。</p><button className="atlas-primary" onClick={onSignIn}>登录开始学习 <ArrowRight size={16} /></button></> : result.loading ? <p role="status">正在安排下一步…</p> : result.error ? <><p role="alert">{result.error}</p><button className="atlas-secondary" onClick={() => setRetry(value => value + 1)}>重试</button></> : action ? <><h2>{action.title}</h2><p>{action.reason}</p>{minutes ? <small><Clock3 size={12} /> {minutes} 分钟</small> : null}<button className="atlas-primary" onClick={() => onAction(action)}>{action.cta} <ArrowRight size={16} /></button></> : <><h2>{model.emptyState.title}</h2><p>{model.emptyState.reason}</p></>}
+        {!authenticated ? <><h2>登录后继续你的路线</h2><p>为你保留学习进度与实训待办。</p><button className="atlas-primary" onClick={onSignIn}>登录开始学习 <ArrowRight size={16} /></button></> : result.loading ? <p role="status">正在安排下一步…</p> : result.error ? <><p role="alert">{result.error}</p><button className="atlas-secondary" onClick={() => setRetry(value => value + 1)}>重试</button></> : action ? <><h2>{action.title}</h2><p>{action.reason}</p>{minutes ? <small><Clock3 size={12} /> {minutes} 分钟</small> : null}<button className="atlas-primary" onClick={() => onAction(action, result.decision?.decisionId)}>{action.cta} <ArrowRight size={16} /></button></> : <><h2>{model.emptyState.title}</h2><p>{model.emptyState.reason}</p></>}
       </motion.section>
       <section className="navigator-backlog" aria-label="实训待办"><h2>实训待办 <span>· {authenticated ? model.pendingPractices.length : '—'}</span></h2>
         {!authenticated ? <p>登录后查看你的实训待办。</p> : !model.pendingPractices.length ? <p>{model.courseComplete ? '实训全部完成 ✓' : '暂无实训待办。达到学习条件后，相关任务会出现在这里。'}</p> : <>

@@ -63,7 +63,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const coverage = dataOrThrow(coverageResult.data as Row[] | null, coverageResult.error, "Material Knowledge coverage lookup");
     if (!material || !coverage.length) throw new ApiError(404, "material_learning_unavailable", "This Material is not available for the selected learning content");
     await activateCourse(client, user.id, body.courseId);
-    await updateKnowledgeAtLeast(client, user.id, body.nodeId, "learning");
+    await updateKnowledgeAtLeast(createServerSupabase(), user.id, body.nodeId, "learning");
     json(response, 200, { status: "learning" }); return;
   }
   if (!body.courseId || !body.assignmentId) throw new ApiError(400, "invalid_learning_action", "courseId and assignmentId are required");
@@ -88,10 +88,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (!eligibility.canStart) throw new ApiError(409, "assignment_state_conflict", "This Assignment is submitted or complete; view its saved result instead");
     await activateCourse(client, user.id, body.courseId);
     if (!previous || ["not_started", "needs_revision"].includes(text(previous, "status"))) {
-      const write = await client.from("user_assignment_states").upsert({ user_id: user.id, course_id: body.courseId, assignment_id: body.assignmentId, status: "started", progress: 1, started_at: previous?.started_at ?? now, updated_at: now });
+      const write = await createServerSupabase().from("user_assignment_states").upsert({ user_id: user.id, course_id: body.courseId, assignment_id: body.assignmentId, status: "started", progress: 1, started_at: previous?.started_at ?? now, updated_at: now });
       dataOrThrow(write.data, write.error, "Assignment start");
     }
-    await Promise.all(coverage.map((item) => updateKnowledgeAtLeast(client, user.id, text(item, "node_id"), "practicing")));
+    await Promise.all(coverage.map((item) => updateKnowledgeAtLeast(createServerSupabase(), user.id, text(item, "node_id"), "practicing")));
     json(response, 200, { status: "started" }); return;
   }
   const submission = parseAssignmentResponse(body.response);

@@ -12,7 +12,7 @@ describe('shared Assignment eligibility', () => {
     for (const status of [undefined,'learning','explore']) expect(assignmentEligibility({...ready,knowledgeStatuses:[status]}).canStart).toBe(false);
     for (const status of ['learned','practicing','mastered']) expect(assignmentEligibility({...ready,knowledgeStatuses:[status]}).canStart).toBe(true);
   });
-  it('requires every hard dependency accepted', () => expect(assignmentEligibility({...ready,hardDependencyStatuses:['accepted','submitted']}).canStart).toBe(false));
+  it.each(['submitted', 'completed'])('requires acceptance, not a %s report', report => expect(assignmentEligibility({...ready,hardDependencyStatuses:['accepted',report]}).canStart).toBe(false));
   it('rejects missing coverage and unpublished courses', () => {
     expect(assignmentEligibility({...ready,knowledgeStatuses:[]}).canStart).toBe(false);
     expect(assignmentEligibility({...ready,coverageValid:false}).canStart).toBe(false);

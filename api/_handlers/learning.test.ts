@@ -28,7 +28,7 @@ describe('Assignment API guard before all mutations', () => {
   beforeEach(() => {
     writes=[]; tables={courses:[{id:'course',lifecycle:'published'}],course_assignments:[{id:'task',course_id:'course'}],assignment_coverages:[{course_id:'course',assignment_id:'task',node_id:'node'}],curriculum_coverages:[{course_id:'course',node_id:'node'}],user_knowledge_states:[{user_id:'learner',node_id:'node',status:'learned'}]};
     mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});
-    mocks.server.mockReturnValue({rpc:vi.fn(()=>{writes.push('rpc');throw Error('Unexpected submission');})});
+    mocks.server.mockReturnValue({from:query,rpc:vi.fn(()=>{writes.push('rpc');throw Error('Unexpected submission');})});
   });
   it.each(['not_started','started','needs_revision'])('allows ready %s', async status => {
     tables.user_assignment_states=[{user_id:'learner',course_id:'course',assignment_id:'task',status}];

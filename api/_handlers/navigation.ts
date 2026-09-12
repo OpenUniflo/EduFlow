@@ -4,7 +4,9 @@ import { createServerSupabase, createUserSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 import { dataOrThrow } from "../_lib/query.js";
 import { requirePublishedCourse } from "../_lib/courseMembership.js";
-import { computeNavigationPlan } from "../_lib/navigationEngine.js";
+import { recommend, resolveRecommendationPolicy } from "../_lib/recommendation.js";
+import { readLearningData, readPathCriterionMappings } from "../_lib/learningData.js";
+import { CRITERION_ESTIMATOR_VERSION } from "../../src/shared/learning/criterionState.js";
 import type { NavigationAsset, NavigationEngineInput, NavigationKnowledgeStatus } from "../../src/shared/learning/navigation.js";
 
 type Row = Record<string, unknown>;
@@ -44,11 +46,24 @@ export async function fetchNavigationRowsByChunks(values: string[], queryForChun
 }
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
-  if (request.method !== "GET") return methodNotAllowed(response, ["GET"]);
+  if (request.method !== "GET" && request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
   const { client, user } = await createUserSupabase(request);
   const courseId = typeof request.query.courseId === "string" ? request.query.courseId : "";
   if (!courseId) throw new ApiError(400, "course_id_required", "courseId is required");
   await requirePublishedCourse(client, courseId);
+  const server = createServerSupabase();
+  if (request.method === "POST") {
+    const profileResult = await server.from("profiles").select("role").eq("id", user.id).single();
+    const profile = dataOrThrow(profileResult.data as Row | null, profileResult.error, "Policy administrator lookup");
+    if (profile?.role !== "admin") throw new ApiError(403, "forbidden", "Administrator role required");
+    const key = request.body?.policyKey;
+    if (key !== "fixed" && key !== "rule_v1") throw new ApiError(400, "unsupported_policy", "Supported policies: fixed, rule_v1");
+    const result = await server.from("course_recommendation_policies").upsert({ course_id: courseId, policy_key: key, updated_by: user.id, updated_at: new Date().toISOString() });
+    dataOrThrow(result.data, result.error, "Recommendation policy configuration");
+    const policy = resolveRecommendationPolicy(key);
+    json(response, 200, { policyKey: policy.key, policyVersion: policy.version });
+    return;
+  }
 
   const [coverages, lessons, targets, courseMicro, assignmentRows, assignmentCoverageRows, materialsRows, materialCoverageRows] = await Promise.all([
     fetchAllNavigationRows(client.from("curriculum_coverages").select("id,node_id,lesson_id,display_order").eq("course_id", courseId).order("lesson_id").order("display_order").order("id"), "Navigation coverage lookup"),
@@ -65,7 +80,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const nodeIds = [...courseNodeIds].sort();
   const assignmentIds = assignmentRows.map((row) => text(row, "id"));
   const [nodes, edges, states, globalMicro, resultHistory] = await Promise.all([
-    fetchNavigationRowsByChunks(nodeIds, (chunk) => client.from("knowledge_nodes").select("id,current_revision_id").in("id", chunk).order("id"), "Navigation Knowledge lookup"),
+    fetchNavigationRowsByChunks(nodeIds, (chunk) => client.from("knowledge_nodes").select("id,current_revision_id").eq("status", "active").in("id", chunk).order("id"), "Navigation Knowledge lookup"),
     fetchNavigationRowsByChunks(nodeIds, (chunk) => client.from("knowledge_edges").select("id,source_node_id,target_node_id,relation").eq("relation", "prerequisite").eq("lifecycle_status", "active").in("target_node_id", chunk).order("target_node_id").order("source_node_id").order("id"), "Navigation prerequisite lookup"),
     fetchNavigationRowsByChunks(nodeIds, (chunk) => client.from("user_knowledge_states").select("node_id,status").eq("user_id", user.id).in("node_id", chunk).order("node_id"), "Navigation Knowledge state lookup"),
     fetchNavigationRowsByChunks(nodeIds, (chunk) => client.from("micro_learning_paths").select("id,knowledge_id,required").is("course_id", null).eq("scope", "global").eq("status", "published").eq("mode", "learn").in("knowledge_id", chunk).order("knowledge_id").order("id"), "Global Micro navigation lookup"),
@@ -111,7 +126,17 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     assignmentOutcomes: outcomes,
     materials: (()=>{const order=new Map(materialsRows.map((row)=>[text(row,"id"),Number(row.display_order)]));return materialCoverageRows.map((row) => ({ id: text(row, "material_id"), nodeId: text(row, "node_id"),order:order.get(text(row,"material_id"))??0 }));})()
   };
-  const plan = computeNavigationPlan(input);
+  const [learningData, mappings, policyResult] = await Promise.all([
+    readLearningData(client, user.id, nodeIds),
+    readPathCriterionMappings(client, microPaths.map(path => path.id)),
+    server.from("course_recommendation_policies").select("policy_key").eq("course_id", courseId).maybeSingle(),
+  ]);
+  const setting = dataOrThrow(policyResult.data as Row | null, policyResult.error, "Recommendation policy lookup");
+  const recommendation = recommend(input, learningData.states, mappings, setting?.policy_key);
+  const { policy, candidates, selection } = recommendation;
+  const plan = { ...recommendation.baseline, nextAction: selection.selectedAction
+    ? { ...selection.selectedAction.navigationAction, reasonCode: selection.reasonCode, reason: selection.reason }
+    : recommendation.baseline.nextAction };
   const canonicalInput = {
     ...input,
     targetNodeIds:[...input.targetNodeIds].sort(),
@@ -124,11 +149,13 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     assignmentOutcomes: Object.fromEntries(Object.entries(input.assignmentOutcomes).sort(([left], [right]) => left.localeCompare(right))),
     materials: [...input.materials].sort((left, right) => `${left.nodeId}:${left.id}`.localeCompare(`${right.nodeId}:${right.id}`))
   };
-  const inputHash = createHash("sha256").update(JSON.stringify(canonicalInput)).digest("hex");
-  const server = createServerSupabase();
-  const write = await server.from("navigation_decisions").upsert({ user_id: user.id, course_id: courseId, policy_version: plan.policyVersion, input_hash: inputHash, path: plan.path, next_action: plan.nextAction, reason_code: plan.nextAction.reasonCode }, { onConflict: "user_id,course_id,policy_version,input_hash", ignoreDuplicates: true });
+  const inputHash = createHash("sha256").update(JSON.stringify({ input: canonicalInput, states: learningData.states, evidenceCutoff: learningData.cutoff, candidates, policy: policy.key, policyVersion: policy.version })).digest("hex");
+  const write = await server.from("navigation_decisions").upsert({ user_id: user.id, course_id: courseId, policy_version: plan.policyVersion, input_hash: inputHash, path: plan.path, next_action: plan.nextAction, reason_code: plan.nextAction.reasonCode,
+    recommendation_policy: policy.key, recommendation_version: policy.version, candidate_set: candidates,
+    selected_action: selection.selectedAction, state_snapshot: learningData.states, state_hash: learningData.stateHash,
+    evidence_cutoff: learningData.cutoff, estimator_version: CRITERION_ESTIMATOR_VERSION }, { onConflict: "user_id,course_id,policy_version,input_hash", ignoreDuplicates: true });
   dataOrThrow(write.data, write.error, "NavigationDecision write");
   const decisionResult = await server.from("navigation_decisions").select("id,decided_at").eq("user_id", user.id).eq("course_id", courseId).eq("policy_version", plan.policyVersion).eq("input_hash", inputHash).single();
   const decision = dataOrThrow(decisionResult.data as Row | null, decisionResult.error, "NavigationDecision readback");
-  json(response, 200, { decisionId: text(decision, "id"), decidedAt: text(decision, "decided_at"), ...plan });
+  json(response, 200, { decisionId: text(decision, "id"), decidedAt: text(decision, "decided_at"), ...plan, recommendationPolicy: policy.key, recommendationVersion: policy.version, candidates, selectedAction: selection.selectedAction, criterionStates: learningData.states, stateHash: learningData.stateHash, evidenceCutoff: learningData.cutoff });
 });

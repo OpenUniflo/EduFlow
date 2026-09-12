@@ -172,3 +172,21 @@ No automatic migration of old LocalStorage sessions, progress, or Workflow paylo
 ## Deliberate non-goals
 
 This backend does not run Docling inside Vercel Functions, automatically schedule parser workers, create a Course with AI, run LangGraph/tools, evaluate evidence, infer mastery, stream execution, or provide tenant governance. CourseIntent analysis now supports the existing conversation surface, but the production `CourseCreationService` still reports that full AI Course creation is unavailable rather than manufacturing Demo data. Future authoring pause/review/resume orchestration is distinct from learner Workflow execution.
+
+## Learning Data / Recommendation persistence decisions
+
+The foundation extends the existing API Micro and Navigation handlers; there are no new deployable Function entrypoints or dependencies.
+
+| Decision | Reuse option / limitation | Selected design / cost |
+| --- | --- | --- |
+| Criterion identity | Existing Knowledge/revision `mastery_criteria` JSON arrays preserve authored prose but have no independently versioned IDs or mappings. | `mastery_criteria` normalizes operational criteria with Knowledge/revision provenance. Existing prose and Knowledge authoring remain intact. |
+| Micro attempt | `learning_attempts` and `learning_events` require Course + Assignment; progress rows overwrite current status and cannot preserve failed attempts. | One `micro_step_attempts` fact table; it is also Evidence. No duplicate performance/event authority. |
+| Evidence structure | Response shapes differ by native adapter; generic JSON-only events weaken identity/query constraints. | Typed identity/outcome/sequence columns and JSON response + frozen N criterion references. |
+| Learner state | A materialized state table accelerates reads but introduces mutable authority and update races. | Deterministic TypeScript projection from paginated immutable facts; persist only bounded state summaries in decisions. Revisit materialization when measured load warrants it. |
+| Decision authority | A second recommendation table would duplicate navigation attribution. | Add policy/candidate/selection/state fields to `navigation_decisions`; old rows remain explicitly unavailable (`NULL`) for new fields. |
+| Course policy | Embedding configuration in Course authoring data can be reset by Publish. | One small Course-keyed server-only policy table; admin API mutation, no flag framework. |
+| Snapshots | Entire entities or historical response copies would duplicate canonical data. | Stable identities, necessary state, versions, hashes and bounded evidence references; replay full facts by cutoff. |
+
+New definitions/mappings use visible Knowledge and Micro RLS. Attempts expose owner SELECT only; client roles have no write grants. Policy config has no client grant or policy; API verifies administrator role before a service write. New RPCs revoke PUBLIC/anon/authenticated execution. Content-to-Criterion and Criterion-to-Knowledge-revision ownership are validated; definition versions are immutable. User deletion still removes that user's private facts, while content republishing preserves historical source identity. No migration manufactures historical Evidence or requires a database reset.
+
+The authority migration also closes existing browser writes to progression, Micro progress and completion Evidence; otherwise forged coarse state could bypass Candidate prerequisites. Existing authenticated handlers now perform their already-validated writes using the server client. Accepted Assignment evaluation is protected while non-evaluative progress remains separate. Shared Hosted rollout must coordinate compatible server writers before applying this privilege restriction; the old deployed user-JWT writer must not be left running against the restricted schema. Apply the additive schema/fixture migrations incrementally, deploy compatible API writers, then apply the authority restriction and smoke both auth roles. No Preview build runs migrations automatically.
