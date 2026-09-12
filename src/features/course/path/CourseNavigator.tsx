@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom';
+import { courseAssignmentEligibility } from '../assignmentExperience';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { z } from 'zod';
@@ -20,12 +22,14 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
   onSelect(id: string): void; onAction(action: NonNullable<ReturnType<typeof buildCourseNavigator>['nextAction']>): void;
   onSignIn(): void; learningContent: NavigatorLearningContent[];
 }) {
+  const navigate = useNavigate();
   const reduced = useReducedMotion();
   const [result, setResult] = useState<{ decision?: NavigationDecision; error?: string; loading: boolean }>({ loading: authenticated });
   const [retry, setRetry] = useState(0);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [detail, setDetail] = useState<CourseAssignment | null>(null);
   useEffect(() => { if (detail) dialogRef.current?.showModal(); }, [detail]);
+  const detailEligibility = detail ? courseAssignmentEligibility(runtime, detail.id, knowledge, courseState) : null;
   // The hydrated course snapshot changes after Micro / Assignment completion.
   useEffect(() => {
     if (!authenticated) { setResult({ loading: false }); return; }
@@ -62,6 +66,6 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
     </aside>
     <CoursePathView model={model} onSelect={onSelect} />
     </div>
-    {detail ? <dialog ref={dialogRef} className="navigator-practice-detail" aria-label={detail.title} onClose={() => setDetail(null)}><button autoFocus className="atlas-secondary" onClick={() => setDetail(null)}>关闭任务详情</button><h2>{detail.title}</h2><p>{detail.description}</p><h3>任务要求</h3><ul>{detail.requirements.map((text, index) => <li key={index}>{text}</li>)}</ul><h3>交付成果</h3><p>{detail.expectedOutput}</p><h3>验收标准</h3><ul>{detail.acceptanceCriteria.map((text, index) => <li key={index}>{text}</li>)}</ul><p>任务记录已保留；下一步学习安排以行动队列为准。</p></dialog> : null}
+    {detail ? <dialog ref={dialogRef} className="navigator-practice-detail" aria-label={detail.title} onClose={() => setDetail(null)}><button autoFocus className="atlas-secondary" onClick={() => setDetail(null)}>关闭任务详情</button><h2>{detail.title}</h2><p>{detail.description}</p><h3>任务要求</h3><ul>{detail.requirements.map((text, index) => <li key={index}>{text}</li>)}</ul><h3>交付成果</h3><p>{detail.expectedOutput}</p><h3>验收标准</h3><ul>{detail.acceptanceCriteria.map((text, index) => <li key={index}>{text}</li>)}</ul><p>任务记录已保留；下一步学习安排以行动队列为准。</p>{detailEligibility?.reason && !detailEligibility.viewOnly ? <p role="status">{detailEligibility.reason}</p> : null}<button className="atlas-secondary" disabled={!detailEligibility?.canStart && !detailEligibility?.viewOnly} onClick={() => navigate(`/courses/${encodeURIComponent(runtime.course.id)}/assignments/${encodeURIComponent(detail.id)}`)}>{detailEligibility?.cta}</button></dialog> : null}
   </div>;
 }

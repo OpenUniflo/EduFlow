@@ -11,7 +11,7 @@ const id = 'route-knowledge';
 const assignment = (name: string, order: number): CourseAssignment => ({ id: name, courseId: routeOnlyRuntime.course.id, title: name, order, description: 'Task', requirements: [], expectedOutput: 'Output', acceptanceCriteria: [], mode: 'instruction' });
 const runtime = { ...routeOnlyRuntime, assignments: [assignment('second', 2), assignment('first', 1), assignment('third', 3), assignment('fourth', 4)], assignmentCoverages: ['first','second','third','fourth'].map(name => ({ id: name, assignmentId: name, nodeId: id, role: 'practice' as const })) };
 const knowledge = [{ nodeId: id, status: 'learned' }] as UserKnowledgeRecord[];
-const decision: NavigationDecision = { decisionId: 'd', decidedAt: '', policyVersion: 'course-rule-v3', courseId: runtime.course.id, path: [{ nodeId: id, title: 'Route', state: 'underway', blockedBy: [] }], skippedNodeIds: [], nextAction: { kind: 'next', resourceKind: 'micro', resourceId: 'micro', nodeId: id, reasonCode: 'begin_required_micro', reason: 'Learn' } };
+const decision: NavigationDecision = { decisionId: 'd', decidedAt: '', policyVersion: 'course-rule-v4', courseId: runtime.course.id, path: [{ nodeId: id, title: 'Route', state: 'underway', blockedBy: [] }], skippedNodeIds: [], nextAction: { kind: 'next', resourceKind: 'micro', resourceId: 'micro', nodeId: id, reasonCode: 'begin_required_micro', reason: 'Learn' } };
 const state = (statuses: Record<string, string>) => ({ assignmentStates: Object.fromEntries(Object.entries(statuses).map(([assignmentId, status]) => [assignmentId, { assignmentId, status }])) }) as UserCourseState;
 const project = (options: Partial<Parameters<typeof buildCourseNavigator>[0]> = {}) => buildCourseNavigator({ graph, runtime, knowledge, decision, learningContent: [{ nodeId: id, pathId: 'micro', estimatedMinutes: 8 }], ...options });
 
@@ -34,6 +34,10 @@ describe('Course navigator projection', () => {
     const dependent = { ...runtime, assignmentDependencies: [{ id: 'dependency', courseId: runtime.course.id, sourceAssignmentId: 'fourth', targetAssignmentId: 'first', strength: 'hard' as const }] };
     expect(project({ runtime: dependent }).nextPractice?.assignment.id).toBe('second');
     expect(project({ runtime: dependent, courseState: state({ fourth: 'accepted' }) }).nextPractice?.assignment.id).toBe('first');
+  });
+  it('keeps soft Assignment guidance non-blocking', () => {
+    const guided = {...runtime,assignmentDependencies:[{id:'soft',courseId:runtime.course.id,sourceAssignmentId:'fourth',targetAssignmentId:'first',strength:'soft' as const}]};
+    expect(project({runtime:guided}).nextPractice?.assignment.id).toBe('first');
   });
   it('retains started debt after route changes, without declaring it ready', () => {
     const result = project({ knowledge: [], decision: { ...decision, path: [] }, courseState: state({ first: 'started' }) });

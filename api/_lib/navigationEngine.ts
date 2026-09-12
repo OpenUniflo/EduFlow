@@ -24,7 +24,8 @@ export function computeNavigationPlan(input: NavigationEngineInput): NavigationP
     return { nodeId: node.id, title: node.title, state: input.knowledgeStatuses[node.id] && input.knowledgeStatuses[node.id] !== "explore" ? "underway" : "eligible", blockedBy: [] };
   });
   const skippedNodeIds = path.filter((item) => item.state === "skipped").map((item) => item.nodeId);
-  const current = path.find((item) => item.state === "underway") ?? path.find((item) => item.state === "eligible") ?? path.find((item)=>item.state==="blocked");
+  // Curriculum frontier wins over later historical underway state.
+  const current = path.find((item) => item.state !== "learned" && item.state !== "skipped");
   if (!current) return { policyVersion: NAVIGATION_POLICY_VERSION, courseId: input.courseId, path, skippedNodeIds, nextAction: { kind: "next", resourceKind: "course", reasonCode: path.length ? "course_route_complete" : "course_route_empty", reason: path.length ? "当前课程学习内容已完成。" : "当前课程尚未准备学习路线。" } };
 
   if(current.state==="blocked")return {policyVersion:NAVIGATION_POLICY_VERSION,courseId:input.courseId,path,skippedNodeIds,nextAction:{kind:"remediation",nodeId:current.nodeId,resourceKind:"course",reasonCode:"teaching_prerequisite_required",reason:`先完成前置 Knowledge：${current.blockedBy.join("、")}。`}};

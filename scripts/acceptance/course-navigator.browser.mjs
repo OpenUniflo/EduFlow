@@ -135,14 +135,24 @@ export default async function verifyCourseNavigator(page, baseURL = 'http://loca
 
 // Run against a fresh LOCAL acceptance learner; drives real UI submissions and return.
 export async function verifyNavigatorCompletion(page, baseURL = 'http://localhost:5174', courseId = 'ai-agents-in-depth') {
-  if (!/^http:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(baseURL)) throw Error('Completion write acceptance is local-only');
+  // Writes real progress: use only a deliberately clean acceptance learner.
   await page.goto(`${baseURL}/courses/${courseId}`);
   await page.getByRole('button', { name: '开始学习', exact: true }).waitFor();
   const path = await page.evaluate(async courseId => {
-    const { applicationServices: services } = await import('/src/app/services/applicationServices.ts');
-    const decision = await services.learnerStateService.getNavigation(courseId);
-    return services.microLearningRepository.getPath(decision.nextAction.nodeId, { courseId, mode: 'learn' });
+    const key = Object.keys(localStorage).find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
+    const session = key && JSON.parse(localStorage.getItem(key));
+    const headers = { Authorization: `Bearer ${session.access_token}` };
+    const read = async url => { const r=await fetch(url,{headers});if(!r.ok)throw Error(`Read failed: ${r.status}`);return r.json(); };
+    const [decision,micro,progress] = await Promise.all([read(`/api/navigation?courseId=${courseId}`),read('/api/micro'),read('/api/progress')]);
+    if (progress.userKnowledge.length || micro.pathProgress.length) throw Error('Cold start requires empty learning history');
+    const first=decision.path[0];
+    if(first.state!=='eligible'||decision.nextAction.nodeId!==first.nodeId)throw Error('Incorrect cold frontier');
+    const path=micro.paths.find(path=>path.id===decision.nextAction.resourceId);
+    if(!path)throw Error('No executable cold path');
+    return { ...path, frontierTitle: first.title, expectedNextId: decision.path[1]?.nodeId };
   }, courseId);
+  if(await page.locator('.navigator-next h2').innerText()!==path.frontierTitle)throw Error('Queue frontier title mismatch');
+  if(await page.locator('.navigator-stop.current strong').innerText()!==path.frontierTitle)throw Error('Route current does not match queue');
   await page.getByRole('button', { name: '开始学习', exact: true }).click();
   for (const step of path.units.flatMap(unit => unit.steps)) {
     const article = page.locator('article:visible');
@@ -169,13 +179,13 @@ export async function verifyNavigatorCompletion(page, baseURL = 'http://localhos
   await page.getByRole('button', { name: '返回课程', exact: true }).click();
   await page.getByRole('button', { name: '开始学习', exact: true }).waitFor();
   const result = await page.evaluate(async ({ courseId, nodeId }) => {
-    const { applicationServices: services } = await import('/src/app/services/applicationServices.ts');
-    const { apiRequest } = await import('/src/shared/api/apiClient.ts');
-    const decision = await services.learnerStateService.getNavigation(courseId);
-    const progress = await apiRequest('/api/progress');
+    const key = Object.keys(localStorage).find(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
+    const session=JSON.parse(localStorage.getItem(key)); const headers={Authorization:`Bearer ${session.access_token}`};
+    const decision=await fetch(`/api/navigation?courseId=${courseId}`,{headers}).then(r=>r.json());
+    const progress=await fetch('/api/progress',{headers}).then(r=>r.json());
     return { status: progress.userKnowledge.find(item => item.nodeId === nodeId)?.status, nextNodeId: decision.nextAction.nodeId, completedNodeId: nodeId, policy: decision.policyVersion };
   }, { courseId, nodeId: path.knowledgeId });
-  if (result.status !== 'learned' || result.nextNodeId === result.completedNodeId) throw Error('Completion did not advance durable learning and Navigation');
+  if (result.status !== 'learned' || result.nextNodeId !== path.expectedNextId) throw Error('Completion did not advance durable learning and Navigation');
   if (!await page.locator('.navigator-stop.completed').count()) throw Error('Course did not refresh completed presentation');
   return result;
 }

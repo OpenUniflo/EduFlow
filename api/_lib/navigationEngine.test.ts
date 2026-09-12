@@ -38,7 +38,7 @@ describe("deterministic Navigation Engine", () => {
     const plan = computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned", b: "practicing" }, completedMicroPathIds: ["micro-a"] });
     expect(plan.nextAction).toMatchObject({ resourceKind: "course", reasonCode: "course_route_complete" });
     expect(plan.nextAction.nodeId).toBeUndefined();
-    expect(plan.policyVersion).toBe("course-rule-v3");
+    expect(plan.policyVersion).toBe("course-rule-v4");
   });
   it("does not force optional Micro after the Knowledge is learned", () => {
     expect(computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned" }, microPaths: [{ id: "optional", nodeId: "a", order: 0 }] }).nextAction.nodeId).toBe("b");
@@ -74,4 +74,19 @@ describe('learning-only Navigation contract', () => {
   it('does not call an empty route complete', () => {
     expect(computeNavigationPlan({ ...base, nodes: [] }).nextAction.reasonCode).toBe('course_route_empty');
   });
+});
+
+
+describe('curriculum route frontier', () => {
+  const route: NavigationEngineInput = { ...base, targetNodeIds: ['a','b','c','z'], nodes: ['a','b','c','z'].map((id, lessonOrder) => ({ id, title: id, lessonOrder, coverageOrder: 0 })), prerequisiteEdges: [], microPaths: ['a','b','c','z'].map(id => ({id: `micro-${id}`, nodeId: id, order: 0, required: true})), completedMicroPathIds: ['micro-a'], knowledgeStatuses: { a: 'learned', z: 'learning' } };
+  it('does not let later historical underway preempt the first unfinished node', () => {
+    const plan = computeNavigationPlan(route);
+    expect(plan.path.map(item => item.state)).toEqual(['learned','eligible','eligible','underway']);
+    expect(plan.nextAction).toMatchObject({nodeId:'b', resourceId:'micro-b', reasonCode:'begin_required_micro'});
+    expect(route.knowledgeStatuses.z).toBe('learning');
+  });
+  it('keeps a missing frontier ahead of historical underway with available Micro', () => expect(computeNavigationPlan({...route,microPaths:route.microPaths.filter(item=>item.nodeId!=='b')}).nextAction).toMatchObject({nodeId:'b',reasonCode:'learning_content_unavailable'}));
+  it('resumes the frontier itself', () => expect(computeNavigationPlan({...route,knowledgeStatuses:{...route.knowledgeStatuses,b:'learning'}}).nextAction).toMatchObject({nodeId:'b',reasonCode:'resume_required_micro'}));
+  it('does not skip a blocked frontier for later eligible or underway nodes', () => expect(computeNavigationPlan({...route,prerequisiteEdges:[{source:'c',target:'b'}]}).nextAction).toMatchObject({nodeId:'b',reasonCode:'teaching_prerequisite_required'}));
+  it('cold starts without any history', () => expect(computeNavigationPlan({...route,knowledgeStatuses:{},completedMicroPathIds:[]}).nextAction).toMatchObject({nodeId:'a',resourceId:'micro-a'}));
 });

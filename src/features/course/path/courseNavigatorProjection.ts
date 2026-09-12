@@ -3,7 +3,7 @@ import type { UserKnowledgeRecord } from '@/features/profile/types';
 import type { UserCourseState } from '../types';
 import type { CourseGraphData, CourseRuntimeData } from '../runtime/courseRuntime';
 import { buildCoursePath } from './coursePath';
-import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequisites';
+import { courseAssignmentEligibility } from '../assignmentExperience';
 
 export type NavigatorLearningContent = { nodeId: string; pathId: string; estimatedMinutes?: number };
 export type NavigatorState = 'completed' | 'current' | 'available' | 'locked';
@@ -27,18 +27,17 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
     return { ...item, state, mastered: item.navigationState === 'skipped' || item.node.status === 'completed' };
   });
   const ranks = new Map(route.map((item, index) => [item.node.id, index]));
-  const statuses = new Map(knowledge.map(item => [item.nodeId, item.status]));
   const accepted = (id: string) => ['accepted', 'completed'].includes(courseState?.assignmentStates[id]?.status ?? '');
   const pendingPractices = runtime.assignments.flatMap(assignment => {
     if (accepted(assignment.id)) return [];
     const ids = runtime.assignmentCoverages.filter(c => c.assignmentId === assignment.id).map(c => c.nodeId);
     const status = courseState?.assignmentStates[assignment.id]?.status ?? 'not_started';
     const started = !['not_started', 'not-started'].includes(status);
-    const eligible = ids.length > 0 && ids.every(id => ranks.has(id) && satisfiesTeachingPrerequisite(statuses.get(id)));
+    const eligibility = courseAssignmentEligibility(runtime, assignment.id, knowledge, courseState);
+    const eligible = eligibility.knowledgeReady;
     // Once begun, a debt remains visible even if today's route/scope changes.
     if (!eligible && !started) return [];
-    const dependenciesReady = runtime.assignmentDependencies.filter(d => d.targetAssignmentId === assignment.id).every(d => accepted(d.sourceAssignmentId));
-    return [{ assignment, status, ready: eligible && dependenciesReady && status !== 'submitted', rank: Math.max(-1, ...ids.map(id => ranks.get(id) ?? Number.MAX_SAFE_INTEGER)) }];
+    return [{ assignment, status, eligibility, ready: eligibility.canStart, rank: Math.max(-1, ...ids.map(id => ranks.get(id) ?? Number.MAX_SAFE_INTEGER)) }];
   }).sort((a, b) => a.rank - b.rank || a.assignment.order - b.assignment.order || a.assignment.id.localeCompare(b.assignment.id));
   const nextPractice = pendingPractices.find(item => item.ready) ?? null;
   const learning = action?.resourceKind === 'micro' ? learningContent.find(item => item.nodeId === action.nodeId && item.pathId === action.resourceId) : undefined;
