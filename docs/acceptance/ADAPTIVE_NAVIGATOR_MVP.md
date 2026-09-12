@@ -36,35 +36,59 @@ There is **no actual learner-personalized learning creation runtime**. `scripts/
 - `pnpm verify:learning-loop:local`: PASS under v3.
 - `scripts/acceptance/course-navigator.browser.mjs` default export: PASS. Existing/resumed same-card learning; no internal labels; real duration; Material never primary; Practice never primary; four retained debts; submitted; both complete states; locked details/disabled starts; 1440/390; reduced motion; request error/retry; real Material PDF opens through Knowledge detail in an anonymous context.
 - `verifyNavigatorCompletion` in that same browser file: PASS using a fresh local-only acceptance learner. Real UI starts A02, performs each interaction, submits through the normal API, returns to Course, confirms durable `learned` and next identity AGC01 under v3. No Hosted write fixture is used.
-- `verifyGoldenChapterReview` in the existing Micro browser file: PASS locally for all ten actual first-chapter paths, 52 total steps, return-to-Course after every path, zero review writes. It requires real completed paths and never injects completion.
-- The existing three-path Micro exercise/review regression: PASS locally for RT01, CDS525-K012 and CDS525-K021, including actual challenge completion and zero review writes.
-- Hosted verification is pending push of this correction. Previous-round Preview evidence is not used to claim this round's policy passed.
+- `verifyGoldenChapterReview` in the existing Micro browser file: PASSly for all ten actual first-chapter paths, 52 total steps, return-to-Course after every path, zero review writes. It requires real completed paths and never injects completion.
+- The existing three-path Micro exercise/review regression: PASSly for RT01, CDS525-K012 and CDS525-K021, including actual challenge completion and zero review writes.
+- Hosted correction Preview `https://edu-flow-d67aav1h6-july-nanas-projects.vercel.app` is READY at `abb14bbf64b15fbba1ab83182789f4595dd26ace`. Authenticated API returns v3 / CTX02 / learning_content_unavailable. All ten first-chapter paths and 52 review steps return successfully with zero progress writes. Desktop 1440 and mobile 390 show truthful no-content state and 11 retained practices, no horizontal overflow or page runtime errors. Actual deployment build output contains 12 lambda entries. Hosted Supabase `uyljtdbvlivxniililay` has all 47 local migrations applied; no fixture or schema update was needed. The final documentation-only commit is checked again before the final report.
 
 ## Acceptance matrix
 
 | AC | Status | Evidence |
 |---|---|---|
-| 01 | PASS local | v3 engine and legacy Material projection rejection |
-| 02 | PASS local | card and route no resource labels; browser assertion |
-| 03 | PASS local | title/reason/real duration/one learning CTA |
-| 04 | PASS local | existing and resume both 开始学习 |
+| 01 | PASS | v3 engine and legacy Material projection rejection |
+| 02 | PASS | card and route no resource labels; browser assertion |
+| 03 | PASS | title/reason/real duration/one learning CTA |
+| 04 | PASS | existing and resume both 开始学习 |
 | 05 | PARTIAL / deferred | no real creation runtime, so no creation CTA is claimed |
 | 06 | PASS | capability audit; no synthetic generating/success states |
 | 07 | PASS | Assignment decisions rejected; server remains learning-only |
 | 08 | PASS | deterministic nextPractice and four-debt/submitted/accepted tests |
-| 09 | PASS local | learning complete plus unfinished practice count, no CTA |
-| 10 | PASS local | full completion requires all assignments accepted/completed |
+| 09 | PASS | learning complete plus unfinished practice count, no CTA |
+| 10 | PASS | full completion requires all assignments accepted/completed |
 | 11 | PASS | missing/empty/unlearned routes never imply completion |
-| 12 | PASS local | real supporting PDF opened from Knowledge detail |
-| 13 | PASS local | all ten Golden paths and 52 review steps; existing challenge regression |
-| 14 | PASS local | real A02 completion returns and advances to AGC01 |
-| 15 | PASS local | inspectable aria semantics; locked detail cannot start |
-| 16 | PASS local | desktop/mobile screenshots, no overflow, working close button |
+| 12 | PASS | real supporting PDF opened from Knowledge detail |
+| 13 | PASS | all ten Golden paths and 52 review steps; existing challenge regression |
+| 14 | PASS | real A02 completion returns and advances to AGC01 |
+| 15 | PASS | inspectable aria semantics; locked detail cannot start |
+| 16 | PASS | desktop/mobile screenshots, no overflow, working close button |
 | 17 | PASS | no dependency/lockfile changes |
 | 18 | PASS | no schema/migration changes |
-| 19 | PASS local | full checks and browser flows above |
-| 20 | PENDING | push and exact Hosted Preview verification |
+| 19 | PASS | full checks and browser flows above |
+| 20 | PASS | same branch pushed; READY correction Preview, authenticated API/UI and 12 generated functions |
 
 ## Deferred
 
 Actual learner-specific content creation needs a real authorized creation/persistence/launch flow. Missing Course learning content is intentionally visible, not repaired by generating Agent content or changing learner state. Automatic practice scheduling, Material redesign, broader runtime/authoring work and bundle optimization remain outside this round.
+
+## Original MVP goal AC01–AC17
+
+The reattached original objective is also covered; the later learning-only correction keeps practice separate rather than introducing practice execution.
+
+| AC | Status | Evidence |
+|---|---|---|
+| 01 | PASS | one current learning recommendation; honest missing-content message |
+| 02 | PASS | one strong learning CTA; backlog uses secondary detail controls |
+| 03 | PASS | all eligible unfinished practice retained, including submitted waiting items |
+| 04 | PASS | deterministic nextPractice respects coverage, dependency and state |
+| 05 | PASS | nextPractice remains distinct from learning-only nextAction |
+| 06 | PASS | compact circular path nodes replace Knowledge directory cards |
+| 07 | PASS | deterministic single snake sequence with chapter sections |
+| 08 | PASS | completed/current/available/locked projection and browser tests |
+| 09 | PASS | current Knowledge identity links queue and highlighted route node |
+| 10 | PASS | repository-driven first chapter: ten real paths, no production fixtures |
+| 11 | PASS | ten paths / 52 steps plus existing three-path challenge regression |
+| 12 | PASS | real local completion persisted learned and advanced the next action |
+| 13 | PASS | 1440/390, dialog bounds, stable connectors, keyboard/reduced-motion checks |
+| 14 | PASS | no dependency changes |
+| 15 | PASS | no new Assignment/Workflow runtime, event pipeline or learner model |
+| 16 | PASS | typecheck, lint, 542 tests, build, local learning loop and browser acceptance |
+| 17 | PASS | same feature branch pushed; prototype unchanged; READY Preview above |
