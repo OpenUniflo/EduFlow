@@ -16,6 +16,12 @@ const state = (statuses: Record<string, string>) => ({ assignmentStates: Object.
 const project = (options: Partial<Parameters<typeof buildCourseNavigator>[0]> = {}) => buildCourseNavigator({ graph, runtime, knowledge, decision, learningContent: [{ nodeId: id, pathId: 'micro', estimatedMinutes: 8 }], ...options });
 
 describe('Course navigator projection', () => {
+  it('maps only actual Decision reasons and preserves unrecognized server explanations', () => {
+    expect(project().nextAction?.reason).toBe('按当前课程顺序继续学习。');
+    const withReason = (reasonCode: string, reason: string) => project({ decision: { ...decision, nextAction: { ...decision.nextAction, reasonCode, reason } } });
+    expect(withReason('criterion_insufficient', 'Server reason').nextAction?.reason).toBe('你最近在这一能力检查中未通过，先补强相关内容。');
+    expect(withReason('future_reason', 'A factual server explanation').nextAction?.reason).toBe('A factual server explanation');
+  });
   it('keeps nextAction separate from the ordered nextPractice and retains every debt', () => {
     const result = project();
     expect(result.nextAction).toMatchObject({ action: { knowledgeId: id, pathId: 'micro' }, cta: '开始学习', estimatedMinutes: 8 });
@@ -64,7 +70,7 @@ describe('Course navigator projection', () => {
   });
   it('exposes only learner presentation and a launch identity, never raw resource metadata', () => {
     const result = project({ decision: { ...decision, nextAction: { ...decision.nextAction, reasonCode: 'resume_required_micro', reason: 'Internal Micro Review policy', kind: 'review' } } });
-    expect(result.nextAction).toEqual({ title: 'Route Knowledge', reason: '继续上次未完成的学习。', estimatedMinutes: 8, cta: '开始学习', action: { knowledgeId: id, pathId: 'micro' } });
+    expect(result.nextAction).toEqual({ title: 'Route Knowledge', reason: '按当前课程顺序，继续上次未完成的学习。', estimatedMinutes: 8, cta: '开始学习', action: { knowledgeId: id, pathId: 'micro' } });
     expect(project({ learningContent: [] }).nextAction).toBeNull();
     expect(project({ learningContent: [{ nodeId: id, pathId: 'micro' }] }).nextAction?.estimatedMinutes).toBeUndefined();
   });

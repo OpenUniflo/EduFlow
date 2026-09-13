@@ -16,9 +16,9 @@ const navigationResponse = z.object({
   nextAction: z.object({ kind: z.enum(['skip','remediation','review','practice','next']), resourceKind: z.enum(['micro','material','assignment','course']), nodeId: z.string().optional(), resourceId: z.string().optional(), reason: z.string(), reasonCode: z.string() }),
 });
 
-export function CourseNavigator({ graph, runtime, knowledge, courseState, authenticated, loadNavigation, onSelect, onAction, onSignIn, learningContent, resolveLearningContent }: {
+export function CourseNavigator({ graph, runtime, knowledge, courseState, authenticated, loadNavigation, onSelect, onAction, onSignIn, learningContent, resolveLearningContent, showPolicy = false }: {
   graph: CourseGraphData; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[]; courseState?: UserCourseState;
-  authenticated: boolean; loadNavigation(courseId: string): Promise<NavigationDecision>;
+  showPolicy?: boolean; authenticated: boolean; loadNavigation(courseId: string): Promise<NavigationDecision>;
   onSelect(id: string): void; onAction(action: NonNullable<ReturnType<typeof buildCourseNavigator>['nextAction']>, decisionId?: string): void;
   onSignIn(): void; learningContent: NavigatorLearningContent[];
   resolveLearningContent?(nodeId: string, pathId: string): NavigatorLearningContent | undefined;
@@ -58,8 +58,9 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
   }
   return <div className="course-navigator"><div className="navigator-columns">
     <aside className="navigator-queue" aria-label="课程行动队列">
-      <motion.section className="navigator-next" key={action?.action.pathId ?? result.error ?? 'empty'} initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .2 }} aria-label="下一步" aria-live="polite">
-        <span className="atlas-kicker">下一步</span>
+      <motion.section className="navigator-next" key={action?.action.pathId ?? result.error ?? 'empty'} initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .2 }} aria-label="推荐下一步" aria-live="polite">
+        <span className="atlas-kicker">推荐下一步</span>
+        {showPolicy && result.decision?.recommendationPolicy ? <small>当前推荐策略 · {result.decision.recommendationPolicy === 'fixed' ? 'Fixed' : 'Rule'}</small> : null}
         {!authenticated ? <><h2>登录后继续你的路线</h2><p>为你保留学习进度与实训待办。</p><button className="atlas-primary" onClick={onSignIn}>登录开始学习 <ArrowRight size={16} /></button></> : result.loading ? <p role="status">正在安排下一步…</p> : result.error ? <><p role="alert">{result.error}</p><button className="atlas-secondary" onClick={() => setRetry(value => value + 1)}>重试</button></> : action ? <><h2>{action.title}</h2><p>{action.reason}</p>{minutes ? <small><Clock3 size={12} /> {minutes} 分钟</small> : null}<button className="atlas-primary" onClick={() => onAction(action, result.decision?.decisionId)}>{action.cta} <ArrowRight size={16} /></button></> : <><h2>{model.emptyState.title}</h2><p>{model.emptyState.reason}</p></>}
       </motion.section>
       <section className="navigator-backlog" aria-label="实训待办"><h2>实训待办 <span>· {authenticated ? model.pendingPractices.length : '—'}</span></h2>

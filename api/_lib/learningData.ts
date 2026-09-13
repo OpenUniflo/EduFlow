@@ -14,25 +14,33 @@ export function microCriterionEvidence(attempts: readonly Row[]): CriterionEvide
 }
 
 export async function readLearningData(client: SupabaseClient, userId: string, nodeIds?: string[], throughSequence?: number, references?: CriterionReference[]) {
-  const criteria = (await allRows(client.from('mastery_criteria').select('*').order('id').order('version'), 'Mastery Criterion lookup'))
-    .filter(row => references ? references.some(ref => ref.criterionId === row.id && ref.version === row.version) : row.status === 'active')
-    .filter(row => !nodeIds || nodeIds.includes(String(row.knowledge_id)));
-  // Page by sequence; capture the high-water mark before scanning to exclude newer writes.
-  const latestResult = await client.from('micro_step_attempts').select('sequence').eq('user_id', userId).order('sequence', { ascending: false }).limit(1).maybeSingle();
-  const latest = dataOrThrow(latestResult.data as Row | null, latestResult.error, 'Evidence cutoff lookup');
-  const cutoff = Math.min(throughSequence ?? Number(latest?.sequence ?? 0), Number(latest?.sequence ?? 0));
-  const attempts: Row[] = [];
-  for (let from = 0; ; from += 500) {
-    const result = await client.from('micro_step_attempts').select('*').eq('user_id', userId).lte('sequence', cutoff).order('sequence').range(from, from + 499);
-    const page = dataOrThrow(result.data as Row[] | null, result.error, 'Criterion Evidence lookup');
-    attempts.push(...page);
-    if (page.length < 500) break;
+  // Knowledge is shared across Courses: scope by relevant Knowledge, not source course_id.
+  // Chunk identities to bound PostgREST URLs; historical replay intentionally keeps its own saved refs.
+  const groups = nodeIds === undefined ? [undefined] : Array.from({ length: Math.ceil(new Set(nodeIds).size / 100) }, (_, index) => [...new Set(nodeIds)].sort().slice(index * 100, index * 100 + 100));
+  const criteria: Row[] = [];
+  const scoped = (table: string, select: string, ids: string[] | undefined) => {
+    const query = client.from(table).select(select);
+    return ids === undefined ? query : query.in('knowledge_id', ids);
+  };
+  for (const ids of groups) criteria.push(...await allRows(scoped('mastery_criteria', '*', ids).order('id').order('version'), 'Mastery Criterion lookup'));
+  const relevantCriteria = criteria.filter(row => references ? references.some(ref => ref.criterionId === row.id && ref.version === row.version) : row.status === 'active')
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)) || Number(a.version) - Number(b.version));
+  const latestSequences: number[] = [];
+  for (const ids of groups) {
+    const result = await scoped('micro_step_attempts', 'sequence', ids).eq('user_id', userId).order('sequence', { ascending: false }).limit(1).maybeSingle();
+    const latest = dataOrThrow(result.data as Row | null, result.error, 'Evidence cutoff lookup');
+    latestSequences.push(Number(latest?.sequence ?? 0));
   }
+  const latestSequence = Math.max(0, ...latestSequences);
+  const cutoff = Math.min(throughSequence ?? latestSequence, latestSequence);
+  const attempts: Row[] = [];
+  for (const ids of groups) attempts.push(...await allRows(scoped('micro_step_attempts', '*', ids).eq('user_id', userId).lte('sequence', cutoff).order('sequence'), 'Criterion Evidence lookup'));
+  attempts.sort((a,b) => Number(a.sequence) - Number(b.sequence));
   const evidence = microCriterionEvidence(attempts);
   // Historical identities belong to the caller's saved Decision, even if today's catalog hides an archived Knowledge.
-  const stateReferences = references ?? criteria.map(row => ({ criterionId: String(row.id), version: Number(row.version) }));
+  const stateReferences = references ?? relevantCriteria.map(row => ({ criterionId: String(row.id), version: Number(row.version) }));
   const states = stateReferences.map(ref => estimateCriterionState(ref, evidence));
-  const definitions: MasteryCriterion[] = criteria.map(row => ({ id: String(row.id), version: Number(row.version), knowledgeId: String(row.knowledge_id), knowledgeRevisionId: String(row.knowledge_revision_id),
+  const definitions: MasteryCriterion[] = relevantCriteria.map(row => ({ id: String(row.id), version: Number(row.version), knowledgeId: String(row.knowledge_id), knowledgeRevisionId: String(row.knowledge_revision_id),
     title: String(row.title), description: String(row.description), cognitiveLevel: row.cognitive_level as MasteryCriterion['cognitiveLevel'],
     criterionType: row.criterion_type as MasteryCriterion['criterionType'], required: Boolean(row.required), displayOrder: Number(row.display_order), status: row.status as MasteryCriterion['status'] }));
   return { criteria: definitions, states, attempts, cutoff, stateHash: learningDataHash(states) };

@@ -1,6 +1,6 @@
 # Learning Data & Recommendation Foundation acceptance
 
-Status: PASS for implementation, Local Supabase integration, real browser flow and build verification. Hosted deployment is not performed or claimed; see rollout boundary below. Delivery branch: `feat/learning-data-recommendation-foundation` (no merge).
+Status: PASS for implementation, Local Supabase integration, real browser flow and build verification. The branch push automatically created a Vercel Preview; this first implementation report did not validate its Hosted runtime. See the subsequent Hosted closeout record. Delivery branch: `feat/learning-data-recommendation-foundation` (no merge).
 
 ## Baseline and confirmed architecture
 
@@ -56,7 +56,7 @@ Browser receipt: Decision `e0fc207f-4073-4154-b207-a9e9f3e970ec`, correct Eviden
 
 ## Hosted rollout boundary
 
-No Hosted Preview was opened/deployed and no shared Hosted migrations or fixtures were changed. Baseline linked project `uyljtdbvlivxniililay` matched 47 migrations; the four new migrations were tested locally only. Hosted validation was conditional in the objective, so it is not claimed as a completed test. A shared rollout must apply additive migrations, deploy compatible validated server writers, then apply privilege restriction and smoke auth/API/browser behavior. Applying the final restriction while the old user-JWT writers remain deployed would break them. No reset or automatic Preview migration has been added.
+The branch push automatically created READY Preview `dpl_BUcCGqqBeXDrWKjowZ8VCPJeEhYo` for `f8a84d20b5604432c3c44a9b5608be90cf70dea5`. At the end of that implementation round, its Hosted application had not been validated and no shared Hosted migrations or fixtures had been changed. Baseline linked project `uyljtdbvlivxniililay` matched 47 migrations; the four new migrations were tested locally only. Hosted validation was conditional in the objective, so it is not claimed as a completed test. A shared rollout must apply additive migrations, deploy compatible validated server writers, then apply privilege restriction and smoke auth/API/browser behavior. Applying the final restriction while the old user-JWT writers remain deployed would break them. No reset or automatic Preview migration has been added.
 
 ## Success criteria evidence
 
@@ -71,3 +71,5 @@ No Hosted Preview was opened/deployed and no shared Hosted migrations or fixture
 | G Testing | All required commands plus new integration and local generated Function count pass. |
 
 Deferred intentionally: complex Assignment/Workflow training and evaluation, independence/transfer/retention evidence loops, Expected Gain/Time, Model Ranking, ML/RL/Bandit and experimentation platforms. The estimator is an explainable engineering baseline, not a psychometrically calibrated ability measure.
+
+Subsequent staged rollout and acceptance are recorded in [Hosted closeout](learning-data-hosted-closeout.md).
