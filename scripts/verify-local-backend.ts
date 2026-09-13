@@ -287,6 +287,14 @@ try {
   const baselineSave = await invoke(courseAuthoringHandler, "PUT", adminUser.token, { state: baselineState, previewRuntime: baselineRuntime, expectedRevision: 0 }, { courseId: authoringCourseId });
   assertStatus(baselineSave, 200, "temporary authoring baseline save");
   assertStatus(await invoke(courseAuthoringHandler, "POST", adminUser.token, { expectedRevision: baselineSave.body.revision }, { courseId: authoringCourseId }), 200, "temporary authoring baseline publish");
+  // Exercise a persisted PDF source and real Assignment history across unchanged identities.
+  const preservedPdfPath = `verify-preserved-${suffix}.pdf`;
+  assert.ifError((await server.storage.from("course-materials").upload(preservedPdfPath, await readFile("supabase/course-materials/shared/python-engineering/lesson-02.pdf"), { contentType: "application/pdf" })).error);
+  assert.ifError((await server.from("materials").update({ material_type: "pdf", storage_path: preservedPdfPath, page_count: 8, uploaded_by: adminUser.user.id }).eq("course_id",authoringCourseId).eq("id",baselineMaterialId)).error);
+  assert.ifError((await server.from("user_knowledge_states").upsert({ user_id:adminUser.user.id,node_id:authoredKnowledgeId,status:"learned" })).error);
+  assertStatus(await invoke(learningHandler,"POST",adminUser.token,{action:"start-assignment",courseId:authoringCourseId,assignmentId:baselineAssignmentId}),200,"baseline Assignment start before republish");
+  assertStatus(await invoke(learningHandler,"POST",adminUser.token,{action:"submit-assignment",courseId:authoringCourseId,assignmentId:baselineAssignmentId,idempotencyKey:`preserve-${suffix}`,response:{kind:"answer",text:"Evidence for the defined boundary."}}),200,"baseline Assignment submission before republish");
+  const baselineAttempts=await server.from("learning_attempts").select("*").eq("course_id",authoringCourseId);assert.ifError(baselineAttempts.error);assert.equal(baselineAttempts.data!.length,1);
   const publishedBaseResponse = await invoke(coursesHandler, "GET", adminUser.token, undefined, { id: authoringCourseId });
   assertStatus(publishedBaseResponse, 200, "temporary published authoring baseline read");
   const publishedBase = publishedBaseResponse.body.course;
@@ -319,7 +327,6 @@ try {
   assert.ifError((await server.from("mastery_criteria").insert({ id: `verify-publish-${suffix}`,version:1,knowledge_id:authoredKnowledgeId,knowledge_revision_id:criterionNode.data!.current_revision_id,title:"Publish mapping integrity",description:"Local integration fixture",cognitive_level:"understand",criterion_type:"conceptual",display_order:0 })).error);
   assert.ifError((await server.from("micro_step_criteria").insert({ step_id:preservedStep.id,criterion_id:`verify-publish-${suffix}`,criterion_version:1,purpose:"instruction" })).error);
   assert.ifError((await server.from("user_course_states").upsert({ user_id: adminUser.user.id, course_id: authoringCourseId, recent_lesson_id: publishedBase.lessons[0].id })).error);
-  assert.ifError((await server.from("user_assignment_states").upsert({ user_id: adminUser.user.id, course_id: authoringCourseId, assignment_id: preservedAssignment.id, status: "started", progress: 25 })).error);
   assert.ifError((await server.from("user_material_states").upsert({ user_id: adminUser.user.id, course_id: authoringCourseId, material_id: preservedMaterial.id, recent_segment_id: preservedSegment.id, viewed_segment_ids: [preservedSegment.id], completed_segment_ids: [], progress: 25 })).error);
   assert.ifError((await server.from("user_micro_path_progress").upsert({ user_id: adminUser.user.id, path_id: preservedPath.id, status: "in_progress", current_unit_id: preservedUnit.id, current_step_id: preservedStep.id, started_at: new Date().toISOString() })).error);
   const learnerOldPublished = await invoke(coursesHandler, "GET", ordinaryUser.token);
@@ -332,7 +339,10 @@ try {
   assertStatus(authoredPublish, 200, "authored Micro and Assignment publish");
   const preservedCriterion = await server.from("micro_step_criteria").select("step_id").eq("criterion_id",`verify-publish-${suffix}`).single(); assert.ifError(preservedCriterion.error);
   assert.equal(preservedCriterion.data!.step_id,preservedStep.id,"unchanged stable Step mapping must survive Course Publish");
-  assert.equal((await server.from("user_assignment_states").select("status").eq("user_id", adminUser.user.id).eq("course_id", authoringCourseId).eq("assignment_id", preservedAssignment.id).single()).data?.status, "started", "stable Assignment state must survive republish");
+  assert.equal((await server.from("user_assignment_states").select("status").eq("user_id", adminUser.user.id).eq("course_id", authoringCourseId).eq("assignment_id", preservedAssignment.id).single()).data?.status, "submitted", "stable Assignment state must survive republish");
+  const preservedSource=await server.from("materials").select("storage_path,page_count,uploaded_by").eq("course_id",authoringCourseId).eq("id",preservedMaterial.id).single();assert.ifError(preservedSource.error);
+  assert.deepEqual(preservedSource.data,{storage_path:preservedPdfPath,page_count:8,uploaded_by:adminUser.user.id});
+  const preservedAttempts=await server.from("learning_attempts").select("*").eq("course_id",authoringCourseId);assert.ifError(preservedAttempts.error);assert.deepEqual(preservedAttempts.data,baselineAttempts.data);
   assert.equal((await server.from("user_material_states").select("recent_segment_id").eq("user_id", adminUser.user.id).eq("course_id", authoringCourseId).eq("material_id", preservedMaterial.id).single()).data?.recent_segment_id, preservedSegment.id, "stable Material state must survive republish");
   assert.equal((await server.from("user_micro_path_progress").select("status").eq("user_id", adminUser.user.id).eq("path_id", preservedPath.id).single()).data?.status, "in_progress", "stable Micro progress must survive republish");
   const learnerNewPublished = await invoke(coursesHandler, "GET", ordinaryUser.token);
@@ -391,7 +401,7 @@ try {
   const evidenceCount=await server.from("knowledge_evidence").select("id",{count:"exact",head:true}).eq("user_id",adminUser.user.id).eq("event_type","micro_path_completed").eq("source_entity_id",agentPath.id);assert.ifError(evidenceCount.error);assert.equal(evidenceCount.count,1,"duplicate H5P completion must not duplicate Evidence");
   const startedKnowledge = await invoke(progressHandler, "GET", adminUser.token);
   assertStatus(startedKnowledge, 200, "Learning state after Micro");
-  assert.equal(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.status, "learned");
+  assert.equal(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.status, "practicing", "Micro completion preserves the earlier submitted Assignment stage without manufacturing mastery");
   assert.ok(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === "AG01")?.evidence?.some((item: any) => item.type === "micro_path_completed"));
 
   // Explicit local integration preconditions. Baseline verifier previously assumed
@@ -550,6 +560,7 @@ try {
   await server.from("mastery_criteria").delete().eq("id",`verify-publish-${suffix}`);
   if (authoredCourseId) await server.from("courses").delete().eq("id", authoredCourseId);
   if (uploadedMaterialId) await server.from("materials").delete().eq("course_id", "python-engineering").eq("id", uploadedMaterialId);
+  await server.storage.from("course-materials").remove([`verify-preserved-${suffix}.pdf`]);
   if (uploadedPath) await server.storage.from("course-materials").remove([uploadedPath]);
   for (const userId of createdUserIds) await server.auth.admin.deleteUser(userId);
 }

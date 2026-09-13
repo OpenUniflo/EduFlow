@@ -24,6 +24,18 @@ Applied exactly migrations `20260912182544`, `20260912183344`, `20260912183901` 
 
 Both authorized accounts logged in successfully; profile roles are admin/student with empty extra capabilities. Historical A02 completion existed, so no history was deleted; AGC01 had no Criterion Evidence. On the real initial Preview, admin Decision `c92d83c6-e979-4d4a-a55e-d97269c3a542` selected `aiad-l1-agc01`. Five real Step submissions produced sequences 1–5; correct Criterion Evidence `6d64afb3-a157-418c-8072-e30c26823a6f` at sequence 4 changed `criterion-agent-action-space` from unknown to developing / unknown / low. Historical replay reproduced the unchanged original snapshot after these new facts. Learner policy mutation returned 403, anonymous learner-data 401, cross-user Decision replay 404.
 
+## Compatibility repair and real Publish
+
+Preview commit `8a0d63c711f017b763bd5a9c6463669f22e6d7cb` deployed READY at `edu-flow-97pd6mn2q-july-nanas-projects.vercel.app` with 12 Functions. Ordinary-user browser login, recommendation CTA, AGC01 completion and return-to-Course refresh were exercised; the next Fixed action became ReAct.
+
+A no-content-change Publish of the existing Gold Course failed with SQL 23514: the baseline Publish function deleted/reinserted PDF Materials without their stored source fields. The transaction rolled back and retained its revision-1 draft. Inspection also found unconditional Assignment deletion would cascade existing attempts, and the wrapper deleted stable workflow runs. Migration `20260913062043` preserves retained Material/Assignment identities through upserts, keeps canonical PDF source metadata, shifts order values before swaps, and deletes workflow runs only for removed Assignments. It does not fabricate sources for newly created PDFs or change explicit deletion semantics.
+
+After a reviewed staged dry run, applied only compatible follow-ups `20260913061042` and `20260913062043`; authority migration `20260912184908` remains pending. Hosted has 52 migrations. Retried the same unchanged revision-1 draft through the real Preview API: 200, draft cleared. Verified 2 Material sources including creation identity, 1 existing Assignment attempt (all fields), 8 Criterion mappings, 12 Paths and 65 Steps retained. No Hosted fixture or learner history reset was used.
+
+Expanded the local backend verifier with a stored PDF and a real Assignment submission before republishing. PDF source, immutable attempt, submitted Assignment state, Criterion mapping, Material state and Micro progress survive. The later Micro assertion now expects practicing, reflecting that real earlier Assignment, rather than lowering it to learned. Backend verification passes.
+
+After the repair: typecheck, lint, all 89 test files / 587 tests, production build, learning-loop verifier, learning-data verifier, Knowledge/client-secret audits and generated Micro verification pass. Hosted DB lint reports no errors. Advisors report 38 INFO, 4 WARN, 0 ERROR; the two missing Foundation FK indexes are resolved. Remaining WARNs concern the pre-existing can_read_course definer helper (anon/auth), Auth leaked-password protection configuration, and existing draft SELECT policies. These are not reported as new Foundation defects.
+
 ## Remaining acceptance gates
 
 Updated Preview, real learner browser/Fixed–Rule loop, Production compatibility authorization, final authority migration, post-restriction security/write regression, real Hosted Publish, final advisors, deployment/commit evidence and final clean push are still required.
