@@ -36,6 +36,20 @@ Expanded the local backend verifier with a stored PDF and a real Assignment subm
 
 After the repair: typecheck, lint, all 89 test files / 587 tests, production build, learning-loop verifier, learning-data verifier, Knowledge/client-secret audits and generated Micro verification pass. Hosted DB lint reports no errors. Advisors report 38 INFO, 4 WARN, 0 ERROR; the two missing Foundation FK indexes are resolved. Remaining WARNs concern the pre-existing can_read_course definer helper (anon/auth), Auth leaked-password protection configuration, and existing draft SELECT policies. These are not reported as new Foundation defects.
 
-## Remaining acceptance gates
+## Hosted learner Golden and replay
 
-Updated Preview, real learner browser/Fixed–Rule loop, Production compatibility authorization, final authority migration, post-restriction security/write regression, real Hosted Publish, final advisors, deployment/commit evidence and final clean push are still required.
+The ordinary user followed the displayed recommendation into AGC01, completed its real choice interaction, and returned to a refreshed Course recommendation for ReAct. They selected the legal later Agent Model Selection route through the Course drawer and answered its check incorrectly. Attempt `362596cc-ef6c-4bc6-b074-6a8174cd7d25`, sequence 14, supports insufficient / unknown / low for criterion-agent-model-selection.
+
+Fixed Decision `e492324e-d99c-4eb0-a508-fdd5b2f4c25e` selected `aiad-l1-r10`. After the authenticated admin API switched the Course to rule_v1, Decision `95c84bb4-0ea0-4d2b-9b2b-fa970e8ff76c` selected `aiad-l1-agc03` with criterion_insufficient. Both Decisions contain exactly the same 9 candidates; deep equality was checked. The learner browser displayed the changed title and “你最近在这一能力检查中未通过，先补强相关内容。”
+
+The learner clicked that recommendation and answered correctly. Attempt `edacdbe3-ebfa-4d4f-8246-e54391de784d`, sequence 15, references the Rule Decision and moved the state to developing / improving / low, supported by the two immutable evidence IDs. The next recommendation returned to ReAct. Replaying the original Rule Decision after the new evidence reproduces its saved state exactly. Finishing the path and answering again in explicit Review left the entire Learning Data response unchanged (11 learner attempts).
+
+Rule also omitted the real blocked Agent Harness path `aiad-l1-agc02`; attempting to start it returned 403 teaching_prerequisite_required with no Learning Data change. This Hosted account did not have insufficient Evidence on that blocked Knowledge; the combined insufficient-plus-blocked condition is covered by deterministic local policy tests, not falsely claimed as a Hosted observation.
+
+On the latest code Preview, anonymous Assistant and Learning Data return 401, learner policy mutation returns 403, another user's Decision replay returns 404, and own-JWT queries for another user's micro_step_attempts return no rows. Admin browser shows “当前推荐策略 · Rule”; the learner does not see admin configuration. Both browser sessions report no runtime errors. Course policy currently remains rule_v1, as exercised in the acceptance.
+
+## Deployment and remaining gates
+
+Code commit `fdbae9b70fd86bcc444de462f422a32cb67496f8` is pushed and READY at `https://edu-flow-gis2m6v28-july-nanas-projects.vercel.app` (`dpl_7qbCDV5nUsjLbLvMebvcUAmqjjV6`), branch feat/learning-data-recommendation-foundation, Preview target, 12 generated Node Functions. Authenticated API reproduces the same Rule Decision there; the admin browser login and policy display were checked on this deployment. No prototype merge occurred.
+
+Overall status remains PARTIAL, not Hosted PASS. Production still uses the older prototype writers against this shared Supabase project. The requested Production compatibility authorization is pending; do not apply the authority restriction first. Remaining sequence: approve/promote the tested compatible version without merging prototype; dry-run/apply missing `20260912184908` with --include-all because later compatible migrations are already present; confirm all 53 history entries; run post-restriction direct-write denial and real Micro/Knowledge/Assignment/manual-evaluation regressions, then final advisors and deployment smoke. Existing local authority regression is PASS but does not substitute for those Hosted checks. Hosted full H5P/Workflow/Personal-Course regression must also be completed; local coverage is PASS. No unfinished test draft remains and no test credentials are in the repository.
