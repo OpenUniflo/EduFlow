@@ -593,3 +593,14 @@
 - Micro body owns teaching and Summary; the system shell owns optional Material, Practice, Next Knowledge and Course/source actions. Absent capabilities are omitted, not empty cards.
 - Completion Next uses the Navigation Knowledge identity and preserves optional Course context. Material uses real coverage/Segment and returns to the original Micro completion. Review MUST NOT write formal completion or downgrade progress/state.
 - Historical Micro scope/course fields are compatibility data, not two learner-facing products. Physical cleanup remains deferred to #32.
+
+## Learning Data and Recommendation Foundation
+
+- Progression Stage (`explore`, `learning`, `learned`, `practicing`, `mastered`) MUST remain separate from criterion-level Learner State. Criterion attainment MUST NOT change existing mastery authority.
+- Existing Knowledge mastery-criteria prose is authored definition context. Operational Criterion identities MUST reference real Knowledge and its revision, be versioned, and MUST NOT be inferred from prose at runtime.
+- Evidence records what occurred; Learner State is a versioned deterministic projection. Unknown MUST NOT mean failed, one successful check MUST NOT imply stable ability, and confidence denotes evidence support.
+- Formal Micro attempts MUST retain failed as well as successful observations, stable source identities, evaluated-content identity, idempotency and frozen Criterion versions. Instruction/exploration completion and client H5P reports MUST NOT manufacture criterion-performance evidence.
+- Candidate generation MUST precede recommendation policy. Ownership, publish state, real assets, completion and factual instructional prerequisites are hard constraints; policy MUST NOT reintroduce filtered actions.
+- Fixed and Rule MUST share action/selection contracts and the existing NavigationDecision authority. Model policy remains unsupported until independently implemented and validated; LLM output is not recommendation authority.
+- State–Action–Outcome lineage MUST use explicit validated decision attribution, bounded state summaries, version/hash/cutoff and immutable observations. Manual actions MUST NOT be attributed to a guessed previous recommendation.
+- Course policy is server configuration. Browsers and learners MUST NOT select production policy, write authoritative criterion state, or provide authoritative evaluations. Review remains presentation-local.

@@ -10,6 +10,7 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
   private guestCompletedSteps = new Map<string, Set<string>>();
   private userId: string | undefined;
   private listeners = new Set<() => void>();
+  private pendingAttempts = new Map<string, string>();
 
   async hydrate(userId?: string) {
     this.userId = userId;
@@ -21,8 +22,9 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
     this.emit();
   }
 
-  getPath(knowledgeId: string, context: { courseId?: string; mode?: MicroLearningPath["mode"] } = {}) {
+  getPath(knowledgeId: string, context: { courseId?: string; mode?: MicroLearningPath["mode"]; pathId?: string } = {}) {
     const compatible = this.paths.filter((path) => path.knowledgeId === knowledgeId && (!context.mode || path.mode === context.mode));
+    if (context.pathId) return compatible.find(path => path.id === context.pathId && (path.courseId === context.courseId || (!path.courseId && path.scope === "global"))) ?? null;
     return compatible.find((path) => path.courseId === context.courseId) ?? compatible.find((path) => path.scope === "global") ?? null;
   }
 
@@ -41,6 +43,7 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
     this.pathProgress.clear();
     this.unitProgress.clear();
     this.guestCompletedSteps.clear();
+    this.pendingAttempts.clear();
     this.emit();
   }
 
@@ -61,8 +64,13 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
     return apiRequest<H5PContentDescriptor>("/api/micro",{method:"POST",body:JSON.stringify({action:"resolve-h5p",pathId,unitId,stepId,contentRef})});
   }
 
-  async completeStep(pathId: string, unitId: string, stepId: string, submission?: MicroLearningSubmission,contextCourseId?:string) {
-    const result = await apiRequest<{ correct: boolean; completed: boolean; pathProgress?: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "complete-step", pathId, unitId, stepId, submission,contextCourseId }) });
+  async completeStep(pathId: string, unitId: string, stepId: string, submission?: MicroLearningSubmission,contextCourseId?:string,metadata?:{decisionId?:string;clientDurationMs?:number}) {
+    const identity = JSON.stringify([this.userId,pathId,unitId,stepId,submission,contextCourseId,metadata?.decisionId]);
+    const idempotencyKey = this.pendingAttempts.get(identity) ?? crypto.randomUUID();
+    this.pendingAttempts.set(identity,idempotencyKey);
+    const result = await apiRequest<{ correct: boolean; completed: boolean; pathProgress?: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "complete-step", pathId, unitId, stepId, submission,contextCourseId,idempotencyKey,...metadata }) });
+    // An answered retry is new work; a network failure retains this exact identity.
+    this.pendingAttempts.delete(identity);
     if (!this.userId) {
       if (!result.correct) return { correct: false, completed: false };
       const path = this.paths.find((item) => item.id === pathId); const unit = path?.units.find((item) => item.id === unitId);

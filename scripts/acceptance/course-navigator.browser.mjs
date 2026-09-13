@@ -39,7 +39,7 @@ export default async function verifyCourseNavigator(page, baseURL = 'http://loca
     assert((await page.locator('.navigator-next').innerText()).includes(String(micro[0].path.estimatedMinutes)), 'A: real duration');
     report.push('A: unified existing learning card, duration and current identity');
     setMicro(micro[1], [micro[0].nodeId]); decision.nextAction.reasonCode = 'resume_required_micro'; decision.nextAction.kind = 'review'; await hydrate([micro[0].nodeId]);
-    await page.getByText('继续上次未完成的学习。', { exact: true }).waitFor();
+    await page.getByText('按当前课程顺序，继续上次未完成的学习。', { exact: true }).waitFor();
     await page.waitForFunction(() => document.querySelector('.navigator-stop.completed'));
     assert(await page.locator('.navigator-stop.completed').count() === 1, 'B: completion progression');
     report.push('B: fresh state advances completion and current');

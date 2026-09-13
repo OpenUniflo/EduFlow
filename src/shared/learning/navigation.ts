@@ -7,7 +7,7 @@ export type NavigationNode = { id: string; title: string; lessonOrder: number; c
 export type NavigationPathItem = { nodeId: string; title: string; state: "skipped" | "learned" | "underway" | "eligible" | "blocked"; blockedBy: string[] };
 export type NavigationNextAction = { kind: NavigationActionKind; nodeId?: string; resourceKind: NavigationResourceKind; resourceId?: string; reasonCode: string; reason: string };
 export type NavigationPlan = { policyVersion: typeof NAVIGATION_POLICY_VERSION; courseId: string; path: NavigationPathItem[]; skippedNodeIds: string[]; nextAction: NavigationNextAction };
-export type NavigationDecision = NavigationPlan & { decisionId: string; decidedAt: string };
+export type NavigationDecision = NavigationPlan & { decisionId: string; decidedAt: string; recommendationPolicy?: "fixed" | "rule_v1"; recommendationVersion?: string };
 export type NavigationEngineInput = {
   courseId: string;
   targetNodeIds: string[];

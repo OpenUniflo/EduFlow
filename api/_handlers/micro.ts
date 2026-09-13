@@ -1,9 +1,12 @@
+import { z } from "zod";
+import { learningDataHash, readLearningData } from "../_lib/learningData.js";
+import { CRITERION_ESTIMATOR_VERSION, type CriterionReference } from "../../src/shared/learning/criterionState.js";
 import { decodeLearningContent } from "../../src/shared/content/richText.js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createOptionalUserSupabase, createServerSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 import { dataOrThrow } from "../_lib/query.js";
-import { activateCourse, requireCourseKnowledge } from "../_lib/courseMembership.js";
+import { activateCourse, requireCourseKnowledge, requireMicroTeachingEligibility } from "../_lib/courseMembership.js";
 import { h5pCompletionPasses, nativeInteractionCorrect, parseH5PCompletion, type NativeAnswer } from "../_lib/microInteraction.js";
 
 type Row = Record<string, unknown>;
@@ -19,6 +22,25 @@ function mapProgress(row: Row) {
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   const { client, user } = await createOptionalUserSupabase(request);
+  if (request.method === "GET" && request.query.view === "learning-data") {
+    if (!user) throw new ApiError(401, "unauthorized", "A valid session is required");
+    const cutoff = request.query.throughSequence === undefined ? undefined : Number(request.query.throughSequence);
+    if (cutoff !== undefined && (!Number.isSafeInteger(cutoff) || cutoff < 0)) throw new ApiError(400, "invalid_cutoff", "Invalid evidence cutoff");
+    if (request.query.decisionId !== undefined) {
+      const parsed = z.uuid().safeParse(request.query.decisionId);
+      if (!parsed.success) throw new ApiError(400,"invalid_decision_id","Invalid decision identity");
+      const result=await client.from("navigation_decisions").select("*").eq("id",parsed.data).eq("user_id",user.id).maybeSingle();
+      const decision=dataOrThrow(result.data as Row|null,result.error,"Historical decision lookup");
+      if (!decision) throw new ApiError(404,"decision_not_found","Decision unavailable");
+      if (decision.estimator_version!==CRITERION_ESTIMATOR_VERSION||!Array.isArray(decision.state_snapshot)) throw new ApiError(422,"unsupported_state_version","Decision has no supported historical state");
+      const refs=(decision.state_snapshot as CriterionReference[]).map(item=>({criterionId:item.criterionId,version:item.version}));
+      const replay=await readLearningData(client,user.id,undefined,cutoff??Number(decision.evidence_cutoff),refs);
+      if (cutoff===undefined && replay.stateHash!==decision.state_hash) throw new ApiError(409,"state_replay_mismatch","Historical evidence does not reproduce the saved state");
+      json(response,200,{...replay,decision});return;
+    }
+    json(response, 200, await readLearningData(client, user.id, undefined, cutoff));
+    return;
+  }
   if (request.method === "GET") {
     const [pathsResult, unitsResult, stepsResult, pathProgressResult, unitProgressResult] = await Promise.all([
       client.from("micro_learning_paths").select("*").eq("status", "published").order("id"),
@@ -46,7 +68,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     return;
   }
   if (request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
-  const body = request.body as { action?: string; pathId?: string; unitId?: string; stepId?: string; submission?: unknown; answer?: NativeAnswer; contentRef?: string; contextCourseId?: string };
+  const body = request.body as { action?: string; pathId?: string; unitId?: string; stepId?: string; submission?: unknown; answer?: NativeAnswer; contentRef?: string; contextCourseId?: string; idempotencyKey?: string; decisionId?: string; clientDurationMs?: number };
   if (!body.action) throw new ApiError(400, "invalid_micro_action", "action is required");
   if(body.action==="resolve-h5p-content") {
     if(!body.contentRef)throw new ApiError(400,"invalid_h5p_request","contentRef is required");
@@ -79,6 +101,8 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   }
   if (body.action === "start") {
     const pathCourseId = optionalText(path, "course_id");
+    const effectiveCourse = body.contextCourseId ?? pathCourseId;
+    if (user && effectiveCourse) await requireMicroTeachingEligibility(client, user.id, effectiveCourse, text(path, "knowledge_id"));
     if (body.contextCourseId) {
       await requireCourseKnowledge(client, body.contextCourseId, text(path, "knowledge_id"));
       if (pathCourseId && pathCourseId !== body.contextCourseId) throw new ApiError(400, "micro_context_mismatch", "Micro path does not belong to the selected Course context");
@@ -96,12 +120,12 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       return;
     }
     const progress = { user_id: user.id, path_id: body.pathId, status: "in_progress", current_unit_id: firstUnit ? text(firstUnit, "id") : null, current_step_id: firstStep ? text(firstStep, "id") : null, started_at: now, updated_at: now };
-    const write = await client.from("user_micro_path_progress").upsert(progress, { onConflict: "user_id,path_id", ignoreDuplicates: true });
+    const write = await createServerSupabase().from("user_micro_path_progress").upsert(progress, { onConflict: "user_id,path_id", ignoreDuplicates: true });
     dataOrThrow(write.data, write.error, "Micro start");
     const knowledge = await client.from("user_knowledge_states").select("status").eq("user_id", user.id).eq("node_id", text(path, "knowledge_id")).maybeSingle();
     const existing = dataOrThrow(knowledge.data as Row | null, knowledge.error, "Knowledge state lookup");
     if (!existing || ["explore", "learning"].includes(text(existing, "status"))) {
-      const stateWrite = await client.from("user_knowledge_states").upsert({ user_id: user.id, node_id: text(path, "knowledge_id"), status: "learning", updated_at: now });
+      const stateWrite = await createServerSupabase().from("user_knowledge_states").upsert({ user_id: user.id, node_id: text(path, "knowledge_id"), status: "learning", updated_at: now });
       dataOrThrow(stateWrite.data, stateWrite.error, "Knowledge start");
     }
     json(response, 200, { progress: { pathId: body.pathId, status: "in_progress", currentUnitId: firstUnit ? text(firstUnit, "id") : undefined, currentStepId: firstStep ? text(firstStep, "id") : undefined, startedAt: now, updatedAt: now } });
@@ -116,15 +140,13 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const step = dataOrThrow(stepResult.data as Row | null, stepResult.error, "Micro step lookup");
   if (!unit || !step) throw new ApiError(404, "micro_step_not_found", "Micro step is unavailable");
   const pathCourseId=optionalText(path,"course_id");
-  if(body.contextCourseId){
-    await requireCourseKnowledge(client,body.contextCourseId,text(path,"knowledge_id"));
-    if(pathCourseId&&pathCourseId!==body.contextCourseId)throw new ApiError(400,"micro_context_mismatch","Micro path does not belong to the selected Course context");
-    if(user)await activateCourse(client,user.id,body.contextCourseId);
-  }else if(pathCourseId){
-    await requireCourseKnowledge(client,pathCourseId,text(path,"knowledge_id"));
-    if(user)await activateCourse(client,user.id,pathCourseId);
+  const effectiveCourseId = body.contextCourseId ?? pathCourseId;
+  if (effectiveCourseId) {
+    await requireCourseKnowledge(client, effectiveCourseId, text(path, "knowledge_id"));
+    if(pathCourseId && pathCourseId !== effectiveCourseId) throw new ApiError(400, "micro_context_mismatch", "Micro path does not belong to the selected Course");
   }
   const interaction = object(value(step, "interaction"));
+  let correct = true;
   if (interaction?.type === "h5p") {
     const completion = parseH5PCompletion(body.submission);
     if (!completion) throw new ApiError(400, "invalid_h5p_completion", "H5P completion payload is invalid");
@@ -134,12 +156,33 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (!content) throw new ApiError(404, "h5p_content_unavailable", "H5P content is unavailable");
     const policy = (interaction.completionPolicy ?? value(content,"completion_policy")) as "completed"|"passed";
     if (interaction.completionPolicy && interaction.completionPolicy !== value(content,"completion_policy")) throw new ApiError(409, "h5p_policy_mismatch", "H5P completion policy does not match published content");
-    if (!h5pCompletionPasses(completion,policy)) { json(response, 200, { correct: false, completed: false }); return; }
-  } else if (!nativeInteractionCorrect(interaction, body.submission === undefined ? body.answer : body.submission as NativeAnswer)) { json(response, 200, { correct: false, completed: false }); return; }
-  if (!user) { json(response, 200, { correct: true, completed: false }); return; }
-  const recorded = await createServerSupabase().rpc("record_micro_step_completion", { p_user_id: user.id, p_path_id: body.pathId, p_unit_id: body.unitId, p_step_id: body.stepId,p_context_course_id:body.contextCourseId??null });
-  const result = dataOrThrow(recorded.data as Row[] | null, recorded.error, "Atomic Micro completion")[0];
-  if (!result) throw new Error("Micro completion returned no progress");
-  const pathCompleted = Boolean(value(result,"path_completed"));
-  json(response, 200, { correct: true, completed: pathCompleted, pathProgress: { pathId: body.pathId, status: pathCompleted ? "completed" : "in_progress", currentUnitId: optionalText(result,"current_unit_id"), currentStepId: optionalText(result,"current_step_id"), startedAt: text(result,"started_at"), completedAt: optionalText(result,"completed_at"), updatedAt: text(result,"updated_at") } });
+    correct = h5pCompletionPasses(completion,policy);
+  } else correct = nativeInteractionCorrect(interaction, body.submission === undefined ? body.answer : body.submission as NativeAnswer);
+  if (!user) { json(response, 200, { correct, completed: false }); return; }
+  const metadata = z.object({ idempotencyKey: z.string().min(8).max(160).optional(), decisionId: z.uuid().optional(),
+    clientDurationMs: z.number().int().min(0).max(86400000).optional() }).safeParse(body);
+  if (!metadata.success) throw new ApiError(400, "invalid_attempt_metadata", "Invalid attempt metadata");
+  const submission = body.submission === undefined ? body.answer ?? null : body.submission;
+  if (JSON.stringify(submission).length > 65536) throw new ApiError(400, "response_too_large", "Micro response is too large");
+  const instruction = !interaction || interaction.mode === "explore" || step.kind === "explanation" || step.kind === "summary";
+  const outcome = interaction?.type === "h5p" ? "reported_completion" : instruction ? "observed" : correct ? "correct" : "incorrect";
+  const recorded = await createServerSupabase().rpc("record_micro_step_attempt", {
+    p_user_id: user.id, p_path_id: body.pathId, p_unit_id: body.unitId, p_step_id: body.stepId,
+    p_context_course_id: effectiveCourseId ?? null,
+    p_key: metadata.data.idempotencyKey ?? `legacy-${learningDataHash([body.pathId,body.unitId,body.stepId,effectiveCourseId,submission])}`,
+    p_response: submission, p_correct: correct, p_outcome: outcome,
+    p_step_hash: learningDataHash({ interaction, kind: step.kind, revision: path.revision }),
+    p_expected_step: { interaction, kind: step.kind, revision: path.revision },
+    p_duration: metadata.data.clientDurationMs ?? null, p_decision_id: metadata.data.decisionId ?? null,
+  });
+  if (recorded.error?.code === "40001") throw new ApiError(409, "micro_content_changed", "Learning content changed; reload before submitting");
+  if (recorded.error?.code === "23505") throw new ApiError(409, "micro_idempotency_conflict", "Attempt key was already used with different work");
+  if (recorded.error?.code === "42501") throw new ApiError(403, "micro_action_ineligible", "Learning prerequisites or recommendation context do not permit this action");
+  const result = dataOrThrow(recorded.data as Row | null, recorded.error, "Atomic Micro attempt");
+  if (!result) throw new Error("Micro attempt returned no result");
+  const progress = object(result.progress);
+  const attempt = object(result.attempt);
+  json(response, 200, { correct: attempt ? Boolean(attempt.completion_accepted) : correct,
+    completed: progress?.status === "completed", attemptId: attempt?.id, evidenceSequence: attempt?.sequence,
+    duplicate: result.duplicate, pathProgress: progress ? mapProgress(progress) : undefined });
 });

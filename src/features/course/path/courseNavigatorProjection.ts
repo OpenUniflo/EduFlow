@@ -44,7 +44,9 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
   const current = route.find(item => item.node.id === action?.nodeId);
   const nextAction = learning && current && current.state !== 'locked' ? {
     title: current.node.title,
-    reason: action?.reasonCode === 'resume_required_micro' ? '继续上次未完成的学习。' : '你已经完成前置内容，可以继续这一部分。',
+    reason: action?.reasonCode === 'criterion_insufficient' ? '你最近在这一能力检查中未通过，先补强相关内容。'
+      : action?.reasonCode === 'resume_required_micro' ? '按当前课程顺序，继续上次未完成的学习。'
+      : action?.reasonCode === 'begin_required_micro' ? '按当前课程顺序继续学习。' : action?.reason ?? '',
     estimatedMinutes: learning.estimatedMinutes && Number.isFinite(learning.estimatedMinutes) && learning.estimatedMinutes > 0 ? learning.estimatedMinutes : undefined,
     cta: '开始学习',
     action: { knowledgeId: learning.nodeId, pathId: learning.pathId },

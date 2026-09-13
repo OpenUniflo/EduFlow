@@ -26,6 +26,9 @@ function query(rows: Row[], navigationDecisions?: Row[]) {
   const result = (from = 0, to = 999) => Promise.resolve({ data: materialize().slice(from, to + 1), error: null });
   const builder = {
     select: () => builder,
+    limit: () => builder,
+    lte: (key: string, value: number) => { selected = selected.filter(row => Number(row[key]) <= value); return builder; },
+    maybeSingle: () => result().then(({ data, error }) => ({ data: data[0] ?? null, error })),
     eq: (key: string, value: unknown) => { selected = selected.filter((row) => row[key] === value); return builder; },
     is: (key: string, value: unknown) => { selected = selected.filter((row) => row[key] === value); return builder; },
     in: (key: string, values: unknown[]) => { selected = selected.filter((row) => values.includes(row[key])); return builder; },
@@ -57,7 +60,7 @@ function responseRecorder() {
 
 function clients(tableRows: Record<string, Row[]>) {
   const navigationDecisions: Row[] = [];
-  const userClient = { from: (table: string) => query(tableRows[table] ?? []) };
+  const userClient = { from: (table: string) => query((tableRows[table] ?? []).map(row => table === "knowledge_nodes" ? { status: "active", ...row } : row)) };
   const serverClient = { from: (table: string) => query(table === "navigation_decisions" ? navigationDecisions : (tableRows[table] ?? []), navigationDecisions) };
   createUserSupabase.mockResolvedValue({ client: userClient, user: { id: "learner" }, token: "bearer" });
   createServerSupabase.mockReturnValue(serverClient);

@@ -100,12 +100,12 @@ export interface MicroLearningProvider {
 
 export interface MicroLearningRepository extends MicroLearningProvider {
   hydrate(userId:string):Promise<void>;
-  getPath(knowledgeId:string, context?:{courseId?:string; mode?:MicroLearningPath["mode"]}):MicroLearningPath|null;
+  getPath(knowledgeId:string, context?:{courseId?:string; mode?:MicroLearningPath["mode"];pathId?:string}):MicroLearningPath|null;
   getPathProgress(pathId:string):MicroPathProgress|undefined;
   getUnitProgress(unitId:string):MicroUnitProgress|undefined;
   start(pathId:string, contextCourseId?:string):Promise<void>;
   resolveH5PContent(pathId:string,unitId:string,stepId:string,contentRef:string):Promise<H5PContentDescriptor>;
-  completeStep(pathId:string, unitId:string, stepId:string, submission?:MicroLearningSubmission,contextCourseId?:string):Promise<{correct:boolean; completed:boolean}>;
+  completeStep(pathId:string, unitId:string, stepId:string, submission?:MicroLearningSubmission,contextCourseId?:string,metadata?:{decisionId?:string;clientDurationMs?:number}):Promise<{correct:boolean; completed:boolean}>;
   subscribe(listener:()=>void):()=>void;
 }
 

@@ -63,7 +63,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     await requirePublishedCourse(client, state.courseId);
     const courseResult = await client.from("user_course_states").upsert({ user_id: user.id, course_id: state.courseId, is_active: true, recent_lesson_id: state.recentLessonId ?? null, updated_at: updatedAt });
     dataOrThrow(courseResult.data, courseResult.error, "UserCourseState update");
-    const assignmentRows = Object.values(state.assignmentStates).map((item) => ({
+    const canonicalResult = await client.from("user_assignment_states").select("*").eq("user_id",user.id).eq("course_id",state.courseId);
+    const canonicalAssignments = dataOrThrow(canonicalResult.data as Row[] | null,canonicalResult.error,"Canonical Assignment state lookup");
+    const acceptedIds = new Set(canonicalAssignments.filter(row=>row.status==="accepted").map(row=>String(row.assignment_id)));
+    const assignmentRows = Object.values(state.assignmentStates).filter(item=>item.status!=="accepted"&&!acceptedIds.has(String(item.assignmentId))).map((item) => ({
       user_id: user.id, course_id: state.courseId, assignment_id: String(item.assignmentId), status: String(item.status),
       progress: item.progress == null ? null : Number(item.progress), updated_at: updatedAt
     }));
@@ -80,7 +83,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const result = await client.from("user_material_states").upsert(materialRows);
       dataOrThrow(result.data, result.error, "UserMaterialState update");
     }
-    json(response, 200, { state: { ...state, userId: user.id, isActive: true, updatedAt } });
+    const savedResult=await client.from("user_assignment_states").select("assignment_id,status,progress").eq("user_id",user.id).eq("course_id",state.courseId);
+    const savedAssignments=dataOrThrow(savedResult.data as Row[]|null,savedResult.error,"Saved Assignment state lookup");
+    const assignmentStates=Object.fromEntries(savedAssignments.map(row=>[String(row.assignment_id),{assignmentId:String(row.assignment_id),status:String(row.status),progress:row.progress}]));
+    json(response, 200, { state: { ...state, assignmentStates, userId: user.id, isActive: true, updatedAt } });
     return;
   }
   return methodNotAllowed(response, ["GET", "POST", "PUT"]);

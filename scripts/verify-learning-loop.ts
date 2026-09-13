@@ -45,6 +45,8 @@ try {
   const dependencies=await server.from("assignment_dependencies").select("source_assignment_id").eq("course_id",courseId).eq("target_assignment_id",assignmentId).eq("strength","hard");assert.ifError(dependencies.error);
   if(dependencies.data!.length){
     const beforeDependency=await snapshot();await invoke(learningHandler,"POST",token,{action:"start-assignment",courseId,assignmentId},{},403);assert.deepEqual(await snapshot(),beforeDependency);
+    const reported = await browser.from("user_assignment_states").upsert(dependencies.data!.map(item=>({user_id:userId,course_id:courseId,assignment_id:item.source_assignment_id,status:"completed",progress:100})));assert.ok(reported.error,"Legacy completed reports are not canonical acceptance");
+    await invoke(learningHandler,"POST",token,{action:"start-assignment",courseId,assignmentId},{},403);
     const readyDependencies=await server.from("user_assignment_states").upsert(dependencies.data!.map(item=>({user_id:userId,course_id:courseId,assignment_id:item.source_assignment_id,status:"accepted",progress:100})));assert.ifError(readyDependencies.error);
   }
   const beforeDirectSubmit=await snapshot();
