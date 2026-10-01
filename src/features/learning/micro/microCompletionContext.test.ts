@@ -48,3 +48,24 @@ describe("Micro optional completion context", () => {
     expect(resolveMicroLearningReturnTarget({ returnTo: "https://other.example" }, runtime.course.id)).toBe("/courses/route-only-course");
   });
 });
+
+
+it("continues across server-computed bridges without adding material or assignment context", () => {
+  const bridgeDecision: NavigationDecision = { ...decision, path: [
+    { nodeId: 'bridge-one', title: 'Bridge one', state: 'learned', blockedBy: [] },
+    { nodeId: 'bridge-two', title: 'Bridge two', state: 'eligible', blockedBy: [] },
+  ], nextAction: { ...decision.nextAction, nodeId: 'bridge-two' } };
+  expect(resolveMicroCompletionContext({ ...input, knowledgeId: 'bridge-one', decision: bridgeDecision })).toEqual([
+    { kind: 'next', title: 'Bridge two', href: '/learn/micro/bridge-two?courseId=route-only-course' },
+  ]);
+});
+
+it("continues from Course Knowledge to a server-computed bridge", () => {
+  const bridgeDecision: NavigationDecision = { ...decision, path: [
+    { nodeId: 'route-knowledge', title: 'Course Knowledge', state: 'learned', blockedBy: [] },
+    { nodeId: 'bridge-next', title: 'Bridge next', state: 'eligible', blockedBy: [] },
+  ], nextAction: { ...decision.nextAction, nodeId: 'bridge-next' } };
+  expect(resolveMicroCompletionContext({ ...input, decision: bridgeDecision }).find(action => action.kind === 'next')).toEqual(
+    { kind: 'next', title: 'Bridge next', href: '/learn/micro/bridge-next?courseId=route-only-course' },
+  );
+});

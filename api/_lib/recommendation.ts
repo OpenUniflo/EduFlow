@@ -30,7 +30,7 @@ export function generateCandidates(input: NavigationEngineInput, criterionIdsByP
 }
 
 export const FixedPolicy: RecommendationPolicy = {
-  key: 'fixed', version: 'fixed-course-rule-v4-v1',
+  key: 'fixed', version: 'fixed-course-rule-v5-v1',
   recommend({ baseline }, candidates) {
     const selectedAction = candidates.find(candidate => candidate.resourceId === baseline.nextAction.resourceId
       && candidate.knowledgeId === baseline.nextAction.nodeId) ?? null;

@@ -31,6 +31,7 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
   const [detail, setDetail] = useState<CourseAssignment | null>(null);
   useEffect(() => { if (detail) dialogRef.current?.showModal(); }, [detail]);
   const detailEligibility = detail ? courseAssignmentEligibility(runtime, detail.id, knowledge, courseState) : null;
+  const knowledgeKey = JSON.stringify(knowledge.map(item => [item.nodeId, item.status, item.updatedAt]).sort(([a], [b]) => String(a).localeCompare(String(b))));
   // The hydrated course snapshot changes after Micro / Assignment completion.
   useEffect(() => {
     if (!authenticated) { setResult({ loading: false }); return; }
@@ -43,7 +44,7 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
       if (active) setResult({ loading: false, error: '暂时无法加载下一步，请重试。' });
     });
     return () => { active = false; };
-  }, [authenticated, runtime.course.id, courseState, loadNavigation, retry]);
+  }, [authenticated, runtime.course.id, courseState, knowledgeKey, loadNavigation, retry]);
   const model = useMemo(() => {
     const selected = result.decision?.nextAction;
     const exact = selected?.resourceKind === 'micro' && selected.nodeId && selected.resourceId

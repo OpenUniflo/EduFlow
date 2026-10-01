@@ -12,7 +12,7 @@ export function CoursePathView({ model, onSelect }: { model: CourseNavigatorMode
     {model.sections.map((section, sectionIndex) => {
       const start = offset; offset += section.items.length;
       return <section className="navigator-chapter" key={`${section.id}-${sectionIndex}`}>
-        <header><small>第 {sectionIndex + 1} 章</small><h3>{section.title}</h3></header>
+        <header><small>{section.bridge ? '课程外能力' : '课程篇章'}</small><h3>{section.title}</h3></header>
         <ol className="navigator-track">
           {section.items.map((item, index) => {
             const x = pathX(start + index); const nextX = pathX(start + index + 1);

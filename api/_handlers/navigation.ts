@@ -1,3 +1,4 @@
+import { readPersonalCourseRoute } from "../_lib/personalCourseRoute.js";
 import { createHash } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createServerSupabase, createUserSupabase } from "../_lib/supabase.js";
@@ -65,34 +66,26 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     return;
   }
 
-  const [coverages, lessons, targets, courseMicro, assignmentRows, assignmentCoverageRows, materialsRows, materialCoverageRows] = await Promise.all([
-    fetchAllNavigationRows(client.from("curriculum_coverages").select("id,node_id,lesson_id,display_order").eq("course_id", courseId).order("lesson_id").order("display_order").order("id"), "Navigation coverage lookup"),
-    fetchAllNavigationRows(client.from("curriculum_lessons").select("id,display_order").eq("course_id", courseId).order("display_order").order("id"), "Navigation lesson lookup"),
-    fetchAllNavigationRows(client.from("course_target_knowledge").select("knowledge_id,required").eq("course_id",courseId).eq("required",true).order("knowledge_id"), "Navigation Course targets lookup"),
+  const [personal, courseMicro, assignmentRows, assignmentCoverageRows, materialsRows, materialCoverageRows] = await Promise.all([
+    readPersonalCourseRoute(client, user.id, courseId),
     fetchAllNavigationRows(client.from("micro_learning_paths").select("id,knowledge_id,required").eq("course_id", courseId).eq("status", "published").eq("mode", "learn").order("knowledge_id").order("id"), "Course Micro navigation lookup"),
     fetchAllNavigationRows(client.from("course_assignments").select("id,display_order").eq("course_id", courseId).order("display_order").order("id"), "Navigation Assignment lookup"),
     fetchAllNavigationRows(client.from("assignment_coverages").select("id,assignment_id,node_id,required").eq("course_id", courseId).order("assignment_id").order("node_id").order("id"), "Navigation Assignment coverage lookup"),
     fetchAllNavigationRows(client.from("materials").select("id,display_order").eq("course_id",courseId).order("display_order").order("id"), "Navigation Materials order lookup"),
     fetchAllNavigationRows(client.from("material_knowledge_coverages").select("id,material_id,node_id").eq("course_id", courseId).order("material_id").order("node_id").order("id"), "Navigation Material lookup")
   ]);
-  const courseNodeIds = new Set(coverages.map((row) => text(row, "node_id")));
+  const { route, nodes, states } = personal;
+  const courseNodeIds = new Set(route.orderedNodeIds);
   if (!courseNodeIds.size) throw new ApiError(422, "course_route_empty", "Course has no Knowledge route");
-  const nodeIds = [...courseNodeIds].sort();
+  const nodeIds = route.orderedNodeIds;
   const assignmentIds = assignmentRows.map((row) => text(row, "id"));
-  const [nodes, edges, states, globalMicro, resultHistory] = await Promise.all([
-    fetchNavigationRowsByChunks(nodeIds, (chunk) => client.from("knowledge_nodes").select("id,current_revision_id").eq("status", "active").in("id", chunk).order("id"), "Navigation Knowledge lookup"),
-    fetchNavigationRowsByChunks(nodeIds, (chunk) => client.from("knowledge_edges").select("id,source_node_id,target_node_id,relation").eq("relation", "prerequisite").eq("lifecycle_status", "active").in("target_node_id", chunk).order("target_node_id").order("source_node_id").order("id"), "Navigation prerequisite lookup"),
-    fetchNavigationRowsByChunks(nodeIds, (chunk) => client.from("user_knowledge_states").select("node_id,status").eq("user_id", user.id).in("node_id", chunk).order("node_id"), "Navigation Knowledge state lookup"),
+  const [globalMicro, resultHistory] = await Promise.all([
     fetchNavigationRowsByChunks(nodeIds, (chunk) => client.from("micro_learning_paths").select("id,knowledge_id,required").is("course_id", null).eq("scope", "global").eq("status", "published").eq("mode", "learn").in("knowledge_id", chunk).order("knowledge_id").order("id"), "Global Micro navigation lookup"),
     fetchNavigationRowsByChunks(assignmentIds, (chunk) => client.from("performance_results").select("id,assignment_id,outcome,evaluated_at,version").eq("user_id", user.id).eq("course_id", courseId).in("assignment_id", chunk).order("evaluated_at", { ascending: false }).order("version", { ascending: false }).order("id", { ascending: false }), "Navigation PerformanceResult lookup")
   ]);
   const revisionIds = nodes.map((row) => text(row, "current_revision_id"));
   const revisions = await fetchNavigationRowsByChunks(revisionIds, (chunk) => client.from("knowledge_node_revisions").select("id,title").in("id", chunk).order("id"), "Navigation Knowledge title lookup");
   const titleByRevision = new Map(revisions.map((row) => [text(row, "id"), text(row, "title")]));
-  const lessonOrder = new Map(lessons.map((row) => [text(row, "id"), Number(row.display_order)]));
-  const primaryCoverage = new Map<string, Row>();
-  [...coverages].sort((left, right) => (lessonOrder.get(text(left, "lesson_id")) ?? 0) - (lessonOrder.get(text(right, "lesson_id")) ?? 0) || Number(left.display_order) - Number(right.display_order)).forEach((row) => { if (!primaryCoverage.has(text(row, "node_id"))) primaryCoverage.set(text(row, "node_id"), row); });
-
   const courseMicroNodeIds = new Set(courseMicro.map((row) => text(row, "knowledge_id")));
   const preferredMicroRows:Array<Row&{navigation_order:number}> = [...courseMicro.map((row):Row&{navigation_order:number}=>({...row,navigation_order:0})), ...globalMicro.filter((row) => courseNodeIds.has(text(row, "knowledge_id")) && !courseMicroNodeIds.has(text(row, "knowledge_id"))).map((row):Row&{navigation_order:number}=>({...row,navigation_order:1}))];
   const microPaths = preferredMicroRows.map((row): NavigationAsset => ({ id: text(row, "id"), nodeId: text(row, "knowledge_id"), order:row.navigation_order, required: Boolean(row.required) }));
@@ -116,9 +109,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   resultHistory.forEach((row) => { const id = text(row, "assignment_id"); if (!outcomes[id]) outcomes[id] = text(row, "outcome") as "passed" | "failed" | "pending"; });
   const input: NavigationEngineInput = {
     courseId,
-    targetNodeIds:targets.map((row)=>text(row,"knowledge_id")),
-    nodes: nodes.map((row) => { const coverage = primaryCoverage.get(text(row, "id"))!; return { id: text(row, "id"), title: titleByRevision.get(text(row, "current_revision_id")) ?? text(row, "id"), lessonOrder: lessonOrder.get(text(coverage, "lesson_id")) ?? 0, coverageOrder: Number(coverage.display_order) }; }),
-    prerequisiteEdges: edges.map((row) => ({ source: text(row, "source_node_id"), target: text(row, "target_node_id") })),
+    targetNodeIds: route.courseKnowledgeIds,
+    personalRoute: { orderedNodeIds: route.orderedNodeIds, bridgeKnowledgeIds: route.bridgeKnowledgeIds },
+    nodes: nodes.map(row => ({ id: text(row, "id"), title: titleByRevision.get(text(row, "current_revision_id")) ?? text(row, "id"), lessonOrder: 0, coverageOrder: 0 })),
+    prerequisiteEdges: route.prerequisiteEdges,
     knowledgeStatuses: Object.fromEntries(states.map((row) => [text(row, "node_id"), text(row, "status") as NavigationKnowledgeStatus])),
     microPaths,
     completedMicroPathIds: completedMicroRows.map((row) => text(row, "path_id")),

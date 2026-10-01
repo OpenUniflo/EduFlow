@@ -1,6 +1,6 @@
 # EduFlow｜项目能力模型 V1 开发规格
 
-> 状态：开发前冻结稿  
+> 状态：V1 实现规格（验收状态见下文）
 > 目标分支：`prototype` 基础上开发  
 > 前端名称：**项目能力模型**  
 > 本文只定义 V1，不提前实现软偏好、最优路径、人工路线约束或新的知识本体语义。
@@ -884,3 +884,18 @@ P7 完整回归与验收
 ## 19. 一句话冻结定义
 
 > **项目能力模型是在当前用户可见的共享 Knowledge Graph 上，把用户已具备能力、当前课程要求的全部能力，以及两者之间真实存在的 prerequisite 连接投影为一个项目相关能力空间；系统再基于该空间生成不污染共享 Course 的个人课程路线，并由现有 Navigation 基于实时状态决定下一步行动。**
+
+
+## 20. V1 实现契约与验收边界
+
+共享计算核心为 `src/shared/learning/personalCourseRoute.ts`，只接收可见 active node IDs、真实 prerequisite DTO、满足共享教学条件的 current IDs、Course coverage 顺序。Feature adapter 与服务端使用同一个核心。可达性包含起点自身，因此 Current 与 Course/Bridge 角色可重叠；Bridge 是模型中全部 Course 外节点，包括当前能力起点。
+
+教学门槛保持 route-local：只以个人路线内部的 prerequisite 作为 AND 前置；不额外补入交集之外的祖先，也不让它们成为不可见门槛。断连时保留课程集合与课程顺序优先级，真实 prerequisite 拓扑约束优先。重复 coverage 用最早 lesson/coverage 排序位置；这与详情的 introduce-first 主篇章选择是不同投影用途。
+
+`NavigationEngineInput.personalRoute` 是服务端计算输入，保留全部节点及确定性拓扑顺序，避免旧 target closure 丢弃课程能力。Navigation policy 为 `course-rule-v5`。CourseNavigator 对服务端路径中的 Course 外节点使用“补充前置能力”展示，不制造 Chapter、Lesson 或 Coverage。
+
+服务端 `requirePersonalCourseRouteKnowledge` 区分原 coverage 与重新计算的 bridge。Micro start/complete 均验证；迁移 `20261001162633_personal_course_route_micro.sql` 仅扩展 service-role-only RPC 完成边界，旧签名继续可用。该必要迁移是第 3.3 节的最小运行边界例外，不建立持久化路线模型。
+
+项目模型沿用 KnowledgeAtlasScene，三种角色环槽只更新显隐，Domain hue 保持不变。相同 node/prerequisite edge 集合的状态更新不改变结构 key。用户 Knowledge repository 更新会重算模型并触发 Navigation refresh。
+
+本地检查命令：`pnpm install --frozen-lockfile`、`pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`、`pnpm verify:backend:local`、`node --env-file=.env.local --import tsx scripts/verify-personal-route.ts`。Hosted 验收必须另外核对 migration history、部署 commit、真实课程浏览器学习闭环、安全攻击与用户隔离。READY 不代表验收完成。

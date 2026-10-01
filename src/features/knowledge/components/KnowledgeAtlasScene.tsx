@@ -32,7 +32,7 @@ export type KnowledgeAtlasSceneHandle = {
 export type KnowledgeAtlasSceneProps = {
   nodes: AtlasSceneNode[];
   edges: AtlasSceneEdge[];
-  variant: "global" | "personal";
+  variant: "global" | "personal" | "project";
   selectedId?: string | null;
   searchMatchId?: string | null;
   currentLearningId?: string | null;
@@ -49,6 +49,7 @@ type NodeVisual = {
   hitTarget: Mesh<SphereGeometry, MeshBasicMaterial>;
   glow: Sprite;
   ring?: Mesh<RingGeometry, MeshBasicMaterial>;
+  roleRings?: Mesh<RingGeometry, MeshBasicMaterial>[];
   materials: Material[];
 };
 
@@ -112,9 +113,9 @@ function makeGlowTexture(color: string) {
   return new CanvasTexture(canvas);
 }
 
-function baseRadius(node: AtlasSceneNode, variant: "global" | "personal") {
+function baseRadius(node: AtlasSceneNode, variant: "global" | "personal" | "project") {
   const importanceRadius = 3.4 + Math.max(0, Math.min(1, node.visualImportance)) * 3.6;
-  if (node.status === "explore") return Math.max(3.2, importanceRadius * 0.76);
+  if (variant !== "project" && node.status === "explore") return Math.max(3.2, importanceRadius * 0.76);
   return variant === "global" ? importanceRadius : 3.6 + Math.max(0, Math.min(1, node.visualImportance)) * 2.6;
 }
 
@@ -218,7 +219,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     const hovered = node.id === presentation.hoveredId;
     const neighbor = Boolean(presentation.focusIds?.has(node.id) && !selected);
     const unrelated = Boolean(presentation.focusTargetId && !presentation.focusIds?.has(node.id));
-    const defaultOpacity = node.status === "explore" ? 0.38 : 0.82;
+    const defaultOpacity = node.capabilityRoles ? 0.82 : node.status === "explore" ? 0.38 : 0.82;
     const opacity = selected || hovered ? 1 : neighbor ? 0.9 : unrelated ? (node.status === "explore" ? 0.07 : 0.1) : defaultOpacity;
     visual.sphere.scale.setScalar(selected ? 1.3 : hovered ? 1.12 : 1);
     visual.sphere.material.color.set(node.color);
@@ -230,6 +231,10 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     glowMaterial.map = resources.glow(node.color);
     glowMaterial.needsUpdate = true;
     glowMaterial.opacity = selected ? 0.46 : hovered ? 0.3 : neighbor ? 0.14 : unrelated ? 0.008 : node.status === "explore" ? 0.04 : 0.1;
+    visual.roleRings?.forEach((ring, index) => {
+      ring.visible = Boolean(index === 0 ? node.capabilityRoles?.current : index === 1 ? node.capabilityRoles?.course : node.capabilityRoles?.bridge);
+      ring.material.opacity = unrelated ? 0.08 : 0.8;
+    });
     if (visual.ring) visual.ring.material.opacity = unrelated ? 0.06 : selected ? 1 : neighbor ? 0.9 : 0.82;
   }, [resources]);
 
@@ -463,7 +468,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     group.add(glow);
     const materials: Material[] = [sphereMaterial, hitMaterial, glowMaterial];
     let ring: NodeVisual["ring"];
-    if (item.status === "mastered" || item.status === "learning") {
+    if (variant !== "project" && (item.status === "mastered" || item.status === "learning")) {
       const ringMaterial = new MeshBasicMaterial({
         color: item.status === "mastered" ? "#55ae89" : "#6f89ef",
         transparent: true,
@@ -476,7 +481,14 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       group.add(ring);
       materials.push(ringMaterial);
     }
-    const visual = { group, sphere, hitTarget, glow, ring, materials };
+    // Allocate every role slot once; state changes only toggle presentation on cached objects.
+    const roleRings = variant === "project" ? [0, 1, 2].map(index => {
+      const material = new MeshBasicMaterial({ color: "#334155", transparent: true, opacity: .8, side: DoubleSide, depthWrite: false });
+      const marker = new Mesh(resources.ring(radius * (1 + index * .28)), material);
+      marker.rotation.x = index === 0 ? Math.PI / 2.8 : index === 1 ? 0 : Math.PI / 2;
+      group.add(marker); materials.push(material); return marker;
+    }) : undefined;
+    const visual = { group, sphere, hitTarget, glow, ring, roleRings, materials };
     visualByIdRef.current.set(item.id, visual);
     applyNodeAppearance(item, visual);
     return group;

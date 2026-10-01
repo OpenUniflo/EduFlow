@@ -38,7 +38,7 @@ describe("deterministic Navigation Engine", () => {
     const plan = computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned", b: "practicing" }, completedMicroPathIds: ["micro-a"] });
     expect(plan.nextAction).toMatchObject({ resourceKind: "course", reasonCode: "course_route_complete" });
     expect(plan.nextAction.nodeId).toBeUndefined();
-    expect(plan.policyVersion).toBe("course-rule-v4");
+    expect(plan.policyVersion).toBe("course-rule-v5");
   });
   it("does not force optional Micro after the Knowledge is learned", () => {
     expect(computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned" }, microPaths: [{ id: "optional", nodeId: "a", order: 0 }] }).nextAction.nodeId).toBe("b");
@@ -89,4 +89,26 @@ describe('curriculum route frontier', () => {
   it('resumes the frontier itself', () => expect(computeNavigationPlan({...route,knowledgeStatuses:{...route.knowledgeStatuses,b:'learning'}}).nextAction).toMatchObject({nodeId:'b',reasonCode:'resume_required_micro'}));
   it('does not skip a blocked frontier for later eligible or underway nodes', () => expect(computeNavigationPlan({...route,prerequisiteEdges:[{source:'c',target:'b'}]}).nextAction).toMatchObject({nodeId:'b',reasonCode:'teaching_prerequisite_required'}));
   it('cold starts without any history', () => expect(computeNavigationPlan({...route,knowledgeStatuses:{},completedMicroPathIds:[]}).nextAction).toMatchObject({nodeId:'a',resourceId:'micro-a'}));
+});
+
+describe('computed personal route input', () => {
+  const input: NavigationEngineInput = {
+    ...base, targetNodeIds: ['z'],
+    nodes: ['z', 'other', 'bridge', 'current'].map((id, lessonOrder) => ({ id, title: id, lessonOrder, coverageOrder: 0 })),
+    personalRoute: { orderedNodeIds: ['current', 'bridge', 'z', 'other'], bridgeKnowledgeIds: ['current', 'bridge'] },
+    prerequisiteEdges: [{ source: 'current', target: 'bridge' }, { source: 'bridge', target: 'z' }],
+    knowledgeStatuses: { current: 'mastered' }, microPaths: [], assignments: [],
+  };
+  it('preserves computed topology over conflicting curriculum ranks and keeps every Course node', () => {
+    const plan = computeNavigationPlan(input);
+    expect(plan.path.map(item => item.nodeId)).toEqual(input.personalRoute!.orderedNodeIds);
+    expect(plan.nextAction).toMatchObject({ nodeId: 'bridge', reasonCode: 'learning_content_unavailable' });
+    expect(plan.path.find(item => item.nodeId === 'z')).toMatchObject({ state: 'blocked', blockedBy: ['bridge'] });
+  });
+  it('advances after a cross-Course Knowledge refresh without manufacturing completion', () => {
+    const plan = computeNavigationPlan({ ...input, knowledgeStatuses: { current: 'mastered', bridge: 'learned' } });
+    expect(plan.nextAction.nodeId).toBe('z');
+    expect(plan.path[1].state).toBe('learned');
+    expect(input.knowledgeStatuses.bridge).toBeUndefined();
+  });
 });

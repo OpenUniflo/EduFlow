@@ -104,11 +104,11 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const effectiveCourse = body.contextCourseId ?? pathCourseId;
     if (user && effectiveCourse) await requireMicroTeachingEligibility(client, user.id, effectiveCourse, text(path, "knowledge_id"));
     if (body.contextCourseId) {
-      await requireCourseKnowledge(client, body.contextCourseId, text(path, "knowledge_id"));
+      if (!user) await requireCourseKnowledge(client, body.contextCourseId, text(path, "knowledge_id"));
       if (pathCourseId && pathCourseId !== body.contextCourseId) throw new ApiError(400, "micro_context_mismatch", "Micro path does not belong to the selected Course context");
       if (user) await activateCourse(client, user.id, body.contextCourseId);
     } else if (pathCourseId) {
-      await requireCourseKnowledge(client, pathCourseId, text(path, "knowledge_id"));
+      if (!user) await requireCourseKnowledge(client, pathCourseId, text(path, "knowledge_id"));
       if (user) await activateCourse(client, user.id, pathCourseId);
     }
     const firstUnitResult = await client.from("micro_units").select("*").eq("path_id", body.pathId).order("position").limit(1).maybeSingle();
@@ -141,8 +141,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   if (!unit || !step) throw new ApiError(404, "micro_step_not_found", "Micro step is unavailable");
   const pathCourseId=optionalText(path,"course_id");
   const effectiveCourseId = body.contextCourseId ?? pathCourseId;
+  let authorizedRouteNodeIds: string[] | null = null;
   if (effectiveCourseId) {
-    await requireCourseKnowledge(client, effectiveCourseId, text(path, "knowledge_id"));
+    if (user) authorizedRouteNodeIds = (await requireMicroTeachingEligibility(client, user.id, effectiveCourseId, text(path, "knowledge_id"))).orderedNodeIds;
+    else await requireCourseKnowledge(client, effectiveCourseId, text(path, "knowledge_id"));
     if(pathCourseId && pathCourseId !== effectiveCourseId) throw new ApiError(400, "micro_context_mismatch", "Micro path does not belong to the selected Course");
   }
   const interaction = object(value(step, "interaction"));
@@ -166,7 +168,8 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   if (JSON.stringify(submission).length > 65536) throw new ApiError(400, "response_too_large", "Micro response is too large");
   const instruction = !interaction || interaction.mode === "explore" || step.kind === "explanation" || step.kind === "summary";
   const outcome = interaction?.type === "h5p" ? "reported_completion" : instruction ? "observed" : correct ? "correct" : "incorrect";
-  const recorded = await createServerSupabase().rpc("record_micro_step_attempt", {
+  const recorded = await createServerSupabase().rpc("record_micro_step_attempt_for_route", {
+    p_route_node_ids: authorizedRouteNodeIds,
     p_user_id: user.id, p_path_id: body.pathId, p_unit_id: body.unitId, p_step_id: body.stepId,
     p_context_course_id: effectiveCourseId ?? null,
     p_key: metadata.data.idempotencyKey ?? `legacy-${learningDataHash([body.pathId,body.unitId,body.stepId,effectiveCourseId,submission])}`,

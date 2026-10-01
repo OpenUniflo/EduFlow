@@ -15,10 +15,15 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
   const validDecision = decision?.courseId === runtime.course.id ? decision : null;
   const fallback = buildCoursePath(graph, knowledge);
   const byId = new Map(fallback.map(item => [item.node.id, item]));
-  const source = validDecision ? validDecision.path.flatMap(item => {
+  const source: Array<{
+    node: { id: string; title: string; chapterId?: string; status?: string };
+    state: typeof fallback[number]['state']; blockedBy: string[];
+    navigationState?: NavigationDecision['path'][number]['state']; bridge: boolean;
+  }> = validDecision ? validDecision.path.map(item => {
     const local = byId.get(item.nodeId);
-    return local ? [{ ...local, navigationState: item.state, blockedBy: item.blockedBy }] : [];
-  }) : fallback.map(item => ({ ...item, navigationState: undefined }));
+    return { node: local?.node ?? { id: item.nodeId, title: item.title },
+      state: local?.state ?? 'available', navigationState: item.state, blockedBy: item.blockedBy, bridge: !local };
+  }) : fallback.map(item => ({ ...item, navigationState: undefined, bridge: false }));
   const action = validDecision?.nextAction;
   const route = source.map(item => {
     const completed = item.navigationState ? ['skipped', 'learned'].includes(item.navigationState) : ['completed', 'learned'].includes(item.state);
@@ -58,12 +63,12 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
     : complete ? { title: '当前学习内容已完成', reason: `你已经完成当前课程的学习内容。还有 ${remainingPracticeCount} 项实训待完成，可以从下方继续。` }
     : { title: '当前没有可继续的学习内容', reason: `${action?.reasonCode === 'teaching_prerequisite_required' ? '请先完成前置内容，解锁后再继续这一部分。' : '这一学习节点尚未准备可执行学习内容。'}${pendingPractices.length ? `已有的 ${pendingPractices.length} 项实训仍保留在下方。` : ''}` };
   // Preserve navigation sequence; chapter headers mark transitions without reordering it.
-  const sections: Array<{ id: string; title: string; items: typeof route }> = [];
+  const sections: Array<{ id: string; title: string; bridge: boolean; items: typeof route }> = [];
   route.forEach(item => {
-    const chapterId = item.node.chapterId;
+    const chapterId = item.node.chapterId ?? 'supplemental-prerequisites';
     let section = sections[sections.length - 1];
     if (!section || section.id !== chapterId) {
-      section = { id: chapterId, title: graph.chapters.find(chapter => chapter.id === chapterId)?.title ?? '课程路线', items: [] };
+      section = { id: chapterId, bridge: item.bridge, title: item.bridge ? '补充前置能力' : graph.chapters.find(chapter => chapter.id === chapterId)?.title ?? '课程路线', items: [] };
       sections.push(section);
     }
     section.items.push(item);

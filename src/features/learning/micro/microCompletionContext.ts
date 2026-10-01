@@ -12,7 +12,11 @@ export function resolveMicroCompletionContext(input: {
   hasMicro(knowledgeId: string): boolean;
 }): MicroCompletionAction[] {
   const { runtime, knowledgeId, decision } = input;
-  if (!runtime || !runtime.curriculumCoverages.some((coverage) => coverage.nodeId === knowledgeId)) return [];
+  if (!runtime) return [];
+  const routeDecision = decision?.courseId === runtime.course.id ? decision : undefined;
+  const inContext = (id: string) => runtime.curriculumCoverages.some(coverage => coverage.nodeId === id)
+    || Boolean(routeDecision?.path.some(item => item.nodeId === id));
+  if (!inContext(knowledgeId)) return [];
   const courseId = runtime.course.id;
   const actions: MicroCompletionAction[] = resolveKnowledgeMaterialEntries(runtime, knowledgeId).map((entry) => ({
     kind: "material", title: entry.segmentTitle ? `${entry.materialTitle} · ${entry.segmentTitle}` : entry.materialTitle,
@@ -24,7 +28,7 @@ export function resolveMicroCompletionContext(input: {
   })));
   const next = decision?.courseId === courseId ? decision.nextAction : undefined;
   if (next?.nodeId && next.nodeId !== knowledgeId
-    && runtime.curriculumCoverages.some((coverage) => coverage.nodeId === next.nodeId)) {
+    && inContext(next.nodeId)) {
     const material = next.resourceKind === "material" ? resolveKnowledgeMaterialEntries(runtime, next.nodeId).find((entry) => entry.materialId === next.resourceId) : undefined;
     const href = next.resourceKind === "micro" && input.hasMicro(next.nodeId)
       ? `/learn/micro/${encodeURIComponent(next.nodeId)}?${new URLSearchParams({ courseId })}`

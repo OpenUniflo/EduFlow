@@ -7,7 +7,10 @@ const assetsForNode=(assets:NavigationAsset[],nodeId:string)=>{const matching=as
 
 /** Instructional policy: curriculum ranks candidates; Course-local teaching prerequisites gate eligibility. */
 export function computeNavigationPlan(input: NavigationEngineInput): NavigationPlan {
-  const ordered = [...input.nodes].sort(byRoute);
+  const rank = new Map(input.personalRoute?.orderedNodeIds.map((id, index) => [id, index]));
+  const ordered = [...input.nodes].sort(input.personalRoute
+    ? (a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity) || byRoute(a, b)
+    : byRoute);
   const titleById = new Map(ordered.map((node) => [node.id, node.title]));
   const prerequisiteIds = new Map<string, string[]>();
   const courseNodeIds=new Set(ordered.map((node)=>node.id));
@@ -15,7 +18,7 @@ export function computeNavigationPlan(input: NavigationEngineInput): NavigationP
   const outgoing=new Set(input.prerequisiteEdges.filter((edge)=>courseNodeIds.has(edge.source)&&courseNodeIds.has(edge.target)).map((edge)=>edge.source));
   const targets=(input.targetNodeIds.length?input.targetNodeIds:ordered.filter((node)=>!outgoing.has(node.id)).map((node)=>node.id)).filter((id)=>courseNodeIds.has(id));
   const relevant=new Set<string>(); const visit=(id:string)=>{if(relevant.has(id)||!courseNodeIds.has(id))return;relevant.add(id);(prerequisiteIds.get(id)??[]).forEach(visit);};targets.forEach(visit);
-  const path = ordered.filter((node)=>relevant.has(node.id)).map((node): NavigationPathItem => {
+  const path = ordered.filter((node)=>input.personalRoute || relevant.has(node.id)).map((node): NavigationPathItem => {
     if (input.knowledgeStatuses[node.id] === "mastered") return { nodeId: node.id, title: node.title, state: "skipped", blockedBy: [] };
     const incompleteMicro = assetsForNode(input.microPaths, node.id).some((asset) => asset.required && !input.completedMicroPathIds.includes(asset.id));
     if (satisfiesTeachingPrerequisite(input.knowledgeStatuses[node.id]) && !incompleteMicro) return { nodeId: node.id, title: node.title, state: "learned", blockedBy: [] };

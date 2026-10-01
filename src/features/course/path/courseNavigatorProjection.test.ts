@@ -11,7 +11,7 @@ const id = 'route-knowledge';
 const assignment = (name: string, order: number): CourseAssignment => ({ id: name, courseId: routeOnlyRuntime.course.id, title: name, order, description: 'Task', requirements: [], expectedOutput: 'Output', acceptanceCriteria: [], mode: 'instruction' });
 const runtime = { ...routeOnlyRuntime, assignments: [assignment('second', 2), assignment('first', 1), assignment('third', 3), assignment('fourth', 4)], assignmentCoverages: ['first','second','third','fourth'].map(name => ({ id: name, assignmentId: name, nodeId: id, role: 'practice' as const })) };
 const knowledge = [{ nodeId: id, status: 'learned' }] as UserKnowledgeRecord[];
-const decision: NavigationDecision = { decisionId: 'd', decidedAt: '', policyVersion: 'course-rule-v4', courseId: runtime.course.id, path: [{ nodeId: id, title: 'Route', state: 'underway', blockedBy: [] }], skippedNodeIds: [], nextAction: { kind: 'next', resourceKind: 'micro', resourceId: 'micro', nodeId: id, reasonCode: 'begin_required_micro', reason: 'Learn' } };
+const decision: NavigationDecision = { decisionId: 'd', decidedAt: '', policyVersion: 'course-rule-v5', courseId: runtime.course.id, path: [{ nodeId: id, title: 'Route', state: 'underway', blockedBy: [] }], skippedNodeIds: [], nextAction: { kind: 'next', resourceKind: 'micro', resourceId: 'micro', nodeId: id, reasonCode: 'begin_required_micro', reason: 'Learn' } };
 const state = (statuses: Record<string, string>) => ({ assignmentStates: Object.fromEntries(Object.entries(statuses).map(([assignmentId, status]) => [assignmentId, { assignmentId, status }])) }) as UserCourseState;
 const project = (options: Partial<Parameters<typeof buildCourseNavigator>[0]> = {}) => buildCourseNavigator({ graph, runtime, knowledge, decision, learningContent: [{ nodeId: id, pathId: 'micro', estimatedMinutes: 8 }], ...options });
 
@@ -106,5 +106,16 @@ describe('Course navigator projection', () => {
     expect(positions).toEqual(Array.from({ length: 80 }, (_, index) => pathX(index)));
     expect(positions.slice(0,5)).toEqual([50,68,50,32,50]);
     expect(positions.every(x => x >= 32 && x <= 68)).toBe(true);
+  });
+});
+
+describe('personal route bridge presentation', () => {
+  it('keeps server route bridges without fabricating curriculum context and launches the exact asset', () => {
+    const bridgeDecision: NavigationDecision = { ...decision, path: [{ nodeId: 'bridge', title: 'Bridge', state: 'eligible', blockedBy: [] }, ...decision.path], nextAction: { ...decision.nextAction, nodeId: 'bridge', resourceId: 'bridge-micro' } };
+    const model = project({ decision: bridgeDecision, learningContent: [{ nodeId: 'bridge', pathId: 'bridge-micro' }] });
+    expect(model.route.map(item => item.node.id)).toEqual(['bridge', id]);
+    expect(model.route[0].node).toEqual({ id: 'bridge', title: 'Bridge' });
+    expect(model.sections[0]).toMatchObject({ bridge: true, title: '补充前置能力' });
+    expect(model.nextAction?.action).toEqual({ knowledgeId: 'bridge', pathId: 'bridge-micro' });
   });
 });

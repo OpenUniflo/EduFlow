@@ -338,3 +338,16 @@ Pure projections consume explicit `KnowledgeGraph`, `CourseRuntimeData`, `Domain
 Course ingestion may embed source sections and generated User Knowledge candidates inside one generation run to retrieve suspicious duplicate pairs, coverage-review neighbors, candidate-admission neighbors, and plausible relation pairs. Those vectors are ephemeral retrieval aids: cosine similarity is neither Knowledge identity authority nor KnowledgeRelation authority. Duplicate merge requires scoped equivalence judgment; a bounded local admission gate decides whether recovered candidates warrant independent Knowledge identity without regenerating the ontology; relation creation requires bounded precision-first pair classification; and the graph validator remains final authority.
 
 This mechanism does not search, map, merge, promote, replace, or align against Global or Tenant Knowledge, does not persist candidate vectors, and does not alter Knowledge Architecture scope or ownership rules. Gold data and Gold embeddings exist only in evaluation and never enter production retrieval.
+
+
+## 48. Project Capability Model and Computed Personal Course Route
+
+The Course page exposes three first-level views: Course Route, Course Graph, and Project Capability Model. The last is a read-only projection of the authenticated user's visible active shared graph, current capabilities from `satisfiesTeachingPrerequisite`, and all active CurriculumCoverage identities. It never creates Knowledge, edges, curriculum coverage, a Project store, or a persisted personal route.
+
+Only factual prerequisite edges participate (hard and soft both constrain order). Forward(Current) intersect Backward(Course), including zero-length reachability, is united with every Course node. Non-Course members are bridges; a node may be both current and bridge or current and Course. Disconnected Course nodes remain. Unrelated current nodes and unreachable global ancestors are absent. Every supplied active prerequisite cycle fails explicitly.
+
+The shared minimal-ID pure core owns deterministic topological ordering. Course ranks use earliest lesson order, coverage order, and Knowledge identity; bridge ranks use earliest reachable downstream Course order and their own identity. Feature/server adapters supply scope-filtered data; shared code imports no feature contracts.
+
+AND prerequisites gate both endpoints inside the computed route. Outside-model ancestors remain facts but are not silently added or made hidden entry gates, preserving the existing route-local teaching boundary. The Course Graph remains a curriculum-only structural view. Navigation's `personalRoute` input retains all projected nodes and explicit order while preserving existing completion/remediation/content-unavailable behavior. The browser projection is never authorization authority.
+
+Project Atlas reuses KnowledgeAtlasScene with stable role slots, Domain hue and structure-only keys. A learner repository refresh recomputes the model and reloads Navigation even when the current Course progress itself did not change. State/Domain/selection changes do not rebuild the same structural force graph.
