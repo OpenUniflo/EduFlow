@@ -8,7 +8,7 @@ export function CoursePathView({ model, onSelect }: { model: CourseNavigatorMode
   let offset = 0;
   return <section className="navigator-path" aria-label="学习路线">
     <header className="navigator-path-heading"><span className="atlas-kicker">你的学习路线</span><h2>一步一步，走向理解</h2><p>沿着路线前进，已学内容与待完成实训会为你保留。</p>{model.route.some(item => item.state === 'current') ? <button className="navigator-locate" onClick={() => document.querySelector('.navigator-stop.current')?.scrollIntoView({ behavior: reduced ? 'instant' : 'smooth', block: 'center' })}>定位当前步骤 ↓</button> : null}</header>
-    {!model.route.length ? <p role="status">暂时没有可展示的课程路线。</p> : null}
+    {!model.route.length ? <p role="status">当前路线没有待达成项目目标。</p> : null}
     {model.sections.map((section, sectionIndex) => {
       const start = offset; offset += section.items.length;
       return <section className="navigator-chapter" key={`${section.id}-${sectionIndex}`}>

@@ -25,3 +25,17 @@
   .project-capability-detail { top: auto; bottom: 76px; left: 12px; right: 12px; width: auto; max-height: 32vh; padding: 18px; }
   .project-capability-controls { left: auto; right: 18px; }
 }
+.project-capability-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.route-planning { margin-top: 16px; border-top: 1px solid #dbe3ee; padding-top: 14px; }
+.route-planning h3, .project-capability-detail h3 { font-size: 13px; margin: 16px 0 8px; }
+.route-version-label { font-size: 12px; font-weight: 650; color: #334155; margin-bottom: 8px; }
+.route-planning button, .route-planning-actions button { border: 1px solid #d7dfeb; border-radius: 9px; padding: 7px 10px; color: #334155; background: #ffffffc9; font: inherit; font-size: 12px; cursor: pointer; }
+.route-planning button:disabled, .route-planning-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.route-planning-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.route-planning button[aria-pressed="true"], .route-planning-actions button[aria-pressed="true"] { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
+.route-planning details { font-size: 12px; margin: 10px 0; }
+.route-planning ol, .route-planning ul { padding-left: 22px; max-height: 190px; overflow: auto; }
+.route-conflicts { border-left: 3px solid #dc7f62; background: #fff4ee; padding: 1px 10px; margin: 10px 0; border-radius: 4px; }
+.route-history-row { display: block; width: 100%; text-align: left; margin-top: 6px; }
+.route-history-row small { display: block; font-size: 10px; color: #64748b; margin-top: 4px; }
+.route-history-snapshot { border-top: 1px solid #dbe3ee; margin-top: 12px; }

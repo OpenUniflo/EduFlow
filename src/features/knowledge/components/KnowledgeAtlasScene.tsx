@@ -49,7 +49,6 @@ type NodeVisual = {
   hitTarget: Mesh<SphereGeometry, MeshBasicMaterial>;
   glow: Sprite;
   ring?: Mesh<RingGeometry, MeshBasicMaterial>;
-  roleRings?: Mesh<RingGeometry, MeshBasicMaterial>[];
   materials: Material[];
 };
 
@@ -231,10 +230,6 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     glowMaterial.map = resources.glow(node.color);
     glowMaterial.needsUpdate = true;
     glowMaterial.opacity = selected ? 0.46 : hovered ? 0.3 : neighbor ? 0.14 : unrelated ? 0.008 : node.status === "explore" ? 0.04 : 0.1;
-    visual.roleRings?.forEach((ring, index) => {
-      ring.visible = Boolean(index === 0 ? node.capabilityRoles?.current : index === 1 ? node.capabilityRoles?.course : node.capabilityRoles?.bridge);
-      ring.material.opacity = unrelated ? 0.08 : 0.8;
-    });
     if (visual.ring) visual.ring.material.opacity = unrelated ? 0.06 : selected ? 1 : neighbor ? 0.9 : 0.82;
   }, [resources]);
 
@@ -481,14 +476,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       group.add(ring);
       materials.push(ringMaterial);
     }
-    // Allocate every role slot once; state changes only toggle presentation on cached objects.
-    const roleRings = variant === "project" ? [0, 1, 2].map(index => {
-      const material = new MeshBasicMaterial({ color: "#334155", transparent: true, opacity: .8, side: DoubleSide, depthWrite: false });
-      const marker = new Mesh(resources.ring(radius * (1 + index * .28)), material);
-      marker.rotation.x = index === 0 ? Math.PI / 2.8 : index === 1 ? 0 : Math.PI / 2;
-      group.add(marker); materials.push(material); return marker;
-    }) : undefined;
-    const visual = { group, sphere, hitTarget, glow, ring, roleRings, materials };
+    const visual = { group, sphere, hitTarget, glow, ring, materials };
     visualByIdRef.current.set(item.id, visual);
     applyNodeAppearance(item, visual);
     return group;

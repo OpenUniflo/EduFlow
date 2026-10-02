@@ -36,7 +36,16 @@ describe('Project capability feature adapter', () => {
     const after = projectCapabilityAtlas(input, buildProjectCapabilityModel(input, routeOnlyRuntime, updated), governance, updated);
     expect(atlasStructureKey(before.nodes, before.edges, 'project')).toBe(atlasStructureKey(after.nodes, after.edges, 'project'));
     expect(after.nodes.find(node => node.id === 'bridge')?.capabilityRoles).toEqual({ current: true, course: false, bridge: true });
-    expect(before.nodes.map(node => node.color)).toEqual(after.nodes.map(node => node.color));
+    expect(before.nodes.find(node => node.id === 'bridge')?.color).toBe('#94a3b8');
+    expect(after.nodes.find(node => node.id === 'bridge')?.color).toBe('#3b82f6');
+    expect(after.nodes.find(node => node.id === target)?.color).toBe('#22c55e');
     expect(before.nodes.map(node => node.visualImportance)).toEqual(after.nodes.map(node => node.visualImportance));
   });
+});
+
+
+it.each(['learned', 'practicing', 'mastered'] as const)('an acquired target is blue but still a target: %s', status => {
+  const input = graph([]); const records = [{ nodeId: target, status }];
+  const projection = projectCapabilityAtlas(input, buildProjectCapabilityModel(input, routeOnlyRuntime, records), governance, records);
+  expect(projection.nodes.find(node => node.id === target)).toMatchObject({ color: '#3b82f6', capabilityRoles: { current: true, course: true, bridge: false } });
 });

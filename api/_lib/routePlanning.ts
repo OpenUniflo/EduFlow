@@ -50,7 +50,7 @@ export async function readVersion(client: SupabaseClient, userId: string, course
 export async function persistRoute(userId: string, courseId: string, data: Awaited<ReturnType<typeof readRouteInput>>, constraints: RouteConstraints, route: SelectedRoute | null, baseVersionId: string | null, source: RouteVersion['source'], restoredFromVersionId: string | null = null, initialConflicts: RouteConflict[] = []) {
   if (!route && source !== 'initial') throw new ApiError(422, 'route_constraints_conflict', 'Only initial history can record an unplannable default.');
   const snapshot = route ?? { selectedNodeIds: [], orderedNodeIds: [], prerequisiteEdges: [], effectiveTargetNodeIds: [...new Set(data.input.courseOrder.map(row => row.nodeId).filter(id => data.input.nodeIds.includes(id)))].sort(), currentKnowledgeIds: [], bridgeKnowledgeIds: [] };
-  const selected = new Set(route?.selectedNodeIds ?? snapshot.effectiveTargetNodeIds);
+  const selected = new Set([...(route?.selectedNodeIds ?? snapshot.effectiveTargetNodeIds), ...constraints.includeNodeIds, ...constraints.excludeNodeIds, ...snapshot.effectiveTargetNodeIds]);
   const result = await createServerSupabase().rpc('adopt_personal_course_route', {
     p_user_id: userId, p_course_id: courseId, p_base_version_id: baseVersionId, p_source: source,
     p_include_node_ids: [...new Set(constraints.includeNodeIds)].sort(), p_exclude_node_ids: [...new Set(constraints.excludeNodeIds)].sort(),

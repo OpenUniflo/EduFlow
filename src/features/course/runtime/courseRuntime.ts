@@ -298,7 +298,7 @@ export function buildCourseGraphData(runtime: CourseRuntimeData, userState: User
       assignmentIds: assignmentStateSummary.assignmentIds,
       status: unlockPolicy({
         knowledge, lesson, lessons: runtime.lessons, sequences: runtime.curriculumSequences, userCourseState: userState, userKnowledge: knowledgeState,
-        prerequisiteKnowledge: knowledgeEdges.filter((edge) => edge.relation === "prerequisite" && edge.target === nodeId).flatMap((edge) => {
+        prerequisiteKnowledge: knowledgeEdges.filter((edge) => edge.relation === "prerequisite" && edge.strength === "hard" && edge.target === nodeId).flatMap((edge) => {
           const record = userKnowledgeById.get(edge.source);
           return record ? [record] : [{ nodeId: edge.source, status: "explore" as const, mastery: 0 } as UserKnowledgeRecord];
         })

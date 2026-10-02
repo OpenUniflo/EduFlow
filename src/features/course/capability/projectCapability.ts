@@ -16,7 +16,6 @@ export function buildProjectCapabilityModel(graph: KnowledgeGraph, runtime: Cour
 }
 
 import { resolveNodeDomain } from '@/features/knowledge/domain/domainResolution';
-import { UNCLASSIFIED_DOMAIN_COLOR } from '@/features/knowledge/domain/domainColors';
 import type { DomainGovernanceState } from '@/features/knowledge/domain/DomainGovernanceRepository';
 import type { AtlasSceneProjection } from '@/features/knowledge/projections/atlasProjections';
 
@@ -34,7 +33,7 @@ export function projectCapabilityAtlas(graph: KnowledgeGraph, model: CapabilityM
     nodes: graph.nodes.filter(node => members.has(node.id)).sort((a, b) => a.id.localeCompare(b.id)).map(node => {
       const { domain } = resolveNodeDomain(node.id, governance);
       return { id: node.id, title: node.title, description: node.description, knowledge: node,
-        color: domain?.canonicalColor ?? UNCLASSIFIED_DOMAIN_COLOR, domainTitle: domain?.name ?? '未分类', domainId: domain?.id,
+        color: current.has(node.id) ? '#3b82f6' : course.has(node.id) ? '#22c55e' : '#94a3b8', domainTitle: domain?.name ?? '未分类', domainId: domain?.id,
         status: states.get(node.id) ?? 'explore', isCore: true, progress: 0, visualImportance: (degree.get(node.id) ?? 0) / max,
         courseContexts: [], capabilityRoles: { current: current.has(node.id), course: course.has(node.id), bridge: !course.has(node.id) } };
     }), edges,

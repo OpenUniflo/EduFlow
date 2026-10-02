@@ -59,7 +59,7 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
   const complete = action?.reasonCode === 'course_route_complete' && source.length > 0 && source.every(item => item.navigationState === 'learned' || item.navigationState === 'skipped');
   const remainingPracticeCount = runtime.assignments.filter(item => !accepted(item.id)).length;
   const courseComplete = complete && remainingPracticeCount === 0;
-  const emptyState = courseComplete ? { title: '课程已完成', reason: '你已经完成当前课程的全部学习内容与实训。' }
+  const emptyState = action?.reasonCode === 'course_route_empty' ? { title: '当前路线没有待达成项目目标', reason: '可以在项目能力模型中调整路线；已完成的学习和实训记录仍然保留。' } : courseComplete ? { title: '课程已完成', reason: '你已经完成当前课程的全部学习内容与实训。' }
     : complete ? { title: '当前学习内容已完成', reason: `你已经完成当前课程的学习内容。还有 ${remainingPracticeCount} 项实训待完成，可以从下方继续。` }
     : { title: '当前没有可继续的学习内容', reason: `${action?.reasonCode === 'teaching_prerequisite_required' ? '请先完成前置内容，解锁后再继续这一部分。' : '这一学习节点尚未准备可执行学习内容。'}${pendingPractices.length ? `已有的 ${pendingPractices.length} 项实训仍保留在下方。` : ''}` };
   // Preserve navigation sequence; chapter headers mark transitions without reordering it.

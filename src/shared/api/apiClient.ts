@@ -1,9 +1,9 @@
 import { supabaseClient } from "./supabaseClient";
 
-type ApiErrorBody = { error?: { code?: string; message?: string } };
+type ApiErrorBody = { error?: { code?: string; message?: string; details?: unknown } };
 
 export class ApiRequestError extends Error {
-  constructor(readonly code: string | undefined, message: string, readonly status: number) {
+  constructor(readonly code: string | undefined, message: string, readonly status: number, readonly details?: unknown) {
     super(message);
     this.name = "ApiRequestError";
   }
@@ -33,7 +33,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   const body = await response.json().catch(() => ({})) as T & ApiErrorBody;
   if (!response.ok) {
     if (response.status === 401 && token) await clearExpiredLocalSession(token);
-    throw new ApiRequestError(body.error?.code, body.error?.message ?? `API request failed (${response.status})`, response.status);
+    throw new ApiRequestError(body.error?.code, body.error?.message ?? `API request failed (${response.status})`, response.status, body.error?.details);
   }
   return body;
 }
