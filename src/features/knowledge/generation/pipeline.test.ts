@@ -344,7 +344,7 @@ describe("deterministic mocked pipeline", () => {
     expect(coverageAuditPrompt([]).system.toLowerCase()).toContain("json");
   });
 
-  it("publishes valid prerequisites while suppressing unsupported, topical-only, and weak associative relations", async () => {
+  it("preserves classified enables and direction without publishing topical related or document-order prerequisites", async () => {
     const candidates = ["a", "b", "c", "d", "e"].map((id) => candidate(id, id.toUpperCase()));
     const pairs: CandidatePair[] = [
       { id: "valid-prerequisite", leftCandidateId: "a", rightCandidateId: "b", signals: ["shared-provenance"] },
@@ -357,15 +357,16 @@ describe("deterministic mocked pipeline", () => {
         ["valid-prerequisite", { label: "a_prerequisite_b", strength: "hard", reason: "explicit dependency", evidenceChunkIds: ["chunk-1"] }],
         ["unsupported-prerequisite", { label: "a_prerequisite_b", strength: "soft", reason: "The source introduces A before discussing C.", evidenceChunkIds: ["chunk-1"] }],
         ["topical-related", { label: "related", strength: 0.8, reason: "same topic", evidenceChunkIds: ["chunk-1"] }],
-        ["weak-enables", { label: "a_enables_b", strength: 0.4, reason: "weak support", evidenceChunkIds: ["chunk-1"] }]
+        ["weak-enables", { label: "b_enables_a", strength: 0.82, reason: "E supplies the execution input consumed by A", evidenceChunkIds: ["chunk-1"] }]
       ]);
       const requested = Array.from(request.user.matchAll(/"pairId":"([^"]+)"/g), (match) => match[1]);
       return { value: { pairs: requested.map((pairId) => ({ pairId, ...output.get(pairId) })) }, metadata: { stage: request.stage, provider: "fake", model: "fake", promptVersion: request.promptVersion, schemaVersion: request.schemaVersion, requestId: "relations", generatedAt: "2026-08-14T00:00:00.000Z" } };
     } };
     const result = await classifyRelations(candidates, material.chunks, pairs, client);
-    expect(result.relations).toHaveLength(1);
+    expect(result.relations).toHaveLength(2);
+    expect(result.relations[1]).toMatchObject({ sourceCandidateId: "e", targetCandidateId: "a", relation: "enables", strength: 0.82, reason: "E supplies the execution input consumed by A" });
     expect(result.relations[0]).toMatchObject({ sourceCandidateId: "a", targetCandidateId: "b", relation: "prerequisite", strength: "hard" });
-    expect(result).toMatchObject({ classifiedRelationCount: 4, suppressedDocumentOrderPrerequisiteCount: 1, suppressedEnablesCount: 1, suppressedRelatedCount: 1 });
+    expect(result).toMatchObject({ classifiedRelationCount: 4, suppressedDocumentOrderPrerequisiteCount: 1, suppressedEnablesCount: 0, suppressedRelatedCount: 1 });
   });
 
   it("does not publish related facts from the conservative MVP automatic generator", async () => {
@@ -382,6 +383,7 @@ describe("deterministic mocked pipeline", () => {
     const twoCandidateMaterial = { ...material };
     const result = await runKnowledgeGenerationPipeline({ courseId: "course", ownerId: "user", material: twoCandidateMaterial }, client, embedder);
     expect(result.relations).toHaveLength(0);
-    expect(result.diagnostics).toMatchObject({ classifiedRelationCount: 1, suppressedRelatedCount: 1 });
+    expect(result.diagnostics).toMatchObject({ classifiedRelationCount: 1, suppressedRelatedCount: 1, projectStructureAudit: { isolatedTargetIds: ["candidate-001", "candidate-002"] } });
+    expect(result.executions[result.executions.length - 1]?.validationWarnings?.join(" ")).toContain("do not manufacture edges");
   });
 });

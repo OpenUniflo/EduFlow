@@ -35,7 +35,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     await repository.persist(prepared.runId, result);
     json(response, 201, {
       run: { id: prepared.runId, status: "completed", provider: env.llmProvider, model: env.llmModel, promptVersion: KNOWLEDGE_GENERATION_PROMPT_VERSION },
-      result: { courseId: result.courseId, materialId: result.sourceMaterialId, candidateCount: result.candidates.length, duplicateCount: result.duplicateCount, relationCount: result.relations.length, chapterCount: result.curriculum.chapters.length }
+      result: { courseId: result.courseId, materialId: result.sourceMaterialId, candidateCount: result.candidates.length, duplicateCount: result.duplicateCount, relationCount: result.relations.length, chapterCount: result.curriculum.chapters.length, projectStructureAudit: result.diagnostics.projectStructureAudit }
     });
   } catch (error) {
     await repository.fail(prepared.runId, error);

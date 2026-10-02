@@ -18,7 +18,7 @@ export function mapRouteVersion(row: Row): RouteVersion {
 export async function readRouteInput(client: SupabaseClient, userId: string, courseId: string) {
   const [nodes, edges, states, coverages, lessons] = await Promise.all([
     allRows(client.from('knowledge_nodes').select('id,current_revision_id,title').eq('status', 'active').order('id'), 'Route visible Knowledge'),
-    allRows(client.from('knowledge_edges').select('id,source_node_id,target_node_id,prerequisite_strength').eq('relation', 'prerequisite').eq('lifecycle_status', 'active').order('id'), 'Route factual prerequisites'),
+    allRows(client.from('knowledge_edges').select('id,source_node_id,target_node_id,relation,prerequisite_strength,associative_strength').in('relation', ['prerequisite', 'enables']).eq('lifecycle_status', 'active').order('id'), 'Route factual prerequisites'),
     allRows(client.from('user_knowledge_states').select('node_id,status').eq('user_id', userId).order('node_id'), 'Route current capabilities'),
     allRows(client.from('curriculum_coverages').select('id,node_id,lesson_id,display_order').eq('course_id', courseId).order('id'), 'Route Course coverage'),
     allRows(client.from('curriculum_lessons').select('id,display_order').eq('course_id', courseId).order('id'), 'Route Course order'),
@@ -26,9 +26,14 @@ export async function readRouteInput(client: SupabaseClient, userId: string, cou
   const lessonOrder = new Map(lessons.map(row => [String(row.id), Number(row.display_order)]));
   const input: RoutePlanningInput = {
     nodeIds: nodes.map(row => String(row.id)),
-    prerequisiteEdges: edges.map(row => {
+    prerequisiteEdges: edges.filter(row => row.relation === 'prerequisite').map(row => {
       if (row.prerequisite_strength !== 'hard' && row.prerequisite_strength !== 'soft') throw new ApiError(422, 'invalid_prerequisite_strength', 'Knowledge prerequisite strength is invalid');
       return { id: String(row.id), source: String(row.source_node_id), target: String(row.target_node_id), strength: row.prerequisite_strength };
+    }),
+    enablesEdges: edges.filter(row => row.relation === 'enables').map(row => {
+      const strength = Number(row.associative_strength);
+      if (row.associative_strength == null || !Number.isFinite(strength) || strength < 0 || strength > 1) throw new ApiError(422, 'invalid_enables_strength', 'Knowledge enables strength is invalid');
+      return { id: String(row.id), source: String(row.source_node_id), target: String(row.target_node_id), relation: 'enables', strength };
     }),
     currentNodeIds: states.filter(row => satisfiesTeachingPrerequisite(String(row.status))).map(row => String(row.node_id)),
     courseOrder: coverages.map(row => ({ nodeId: String(row.node_id), lessonOrder: lessonOrder.get(String(row.lesson_id)) ?? Number.MAX_SAFE_INTEGER, coverageOrder: Number(row.display_order) })),

@@ -1,0 +1,22 @@
+import { expect, it, vi } from 'vitest';
+import { Mesh, ShaderMaterial, Vector3 } from 'three';
+import { createProjectLaser } from './projectLaser';
+it('renders continuous layered cylinders, animates only a shared uniform and disposes GPU assets', () => {
+  const laser = createProjectLaser(); const object = laser.object('edge');
+  expect(object.visible).toBe(false);
+  expect(object.children).toHaveLength(2);
+  const beam = object.children[1] as Mesh;
+  const material = beam.material as ShaderMaterial;
+  expect(beam.geometry.type).toBe('CylinderGeometry');
+  const disposeGeometry = vi.spyOn(beam.geometry, 'dispose'), disposeMaterial = vi.spyOn(material, 'dispose');
+  laser.position(object, {x: 1,y: 2,z: 3}, {x: 11,y: 2,z: 3});
+  expect(object.scale.y).toBe(10);
+  expect(new Vector3(0,1,0).applyQuaternion(object.quaternion).x).toBeCloseTo(1);
+  const position = object.position.clone();
+  laser.select(new Set(['edge'])); laser.tick(1000);
+  expect(object.visible).toBe(true); expect(material.uniforms.time.value).toBe(1);
+  laser.tick(2000); expect(material.uniforms.time.value).toBe(2);
+  expect(object.position).toEqual(position); expect(laser.object('edge')).toBe(object);
+  laser.select(undefined); expect(object.visible).toBe(false);
+  laser.dispose(); expect(disposeGeometry).toHaveBeenCalledOnce(); expect(disposeMaterial).toHaveBeenCalledOnce();
+});

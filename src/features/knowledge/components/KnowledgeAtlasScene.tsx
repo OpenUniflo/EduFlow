@@ -16,6 +16,7 @@ import {
   type Material,
   type Texture
 } from "three";
+import { createProjectLaser } from "./projectLaser";
 import { computeDownstreamSubgraph } from "../atlasDownstream";
 import type { AtlasSceneEdge, AtlasSceneNode } from "../projections/atlasProjections";
 import { atlasStructureKey, canonicalAtlasCamera, freezeAtlasNodePositions, resetAtlasCamera } from "../atlasCamera";
@@ -189,6 +190,8 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     };
   }, []);
 
+  const laser = useMemo(() => createProjectLaser(), []);
+
   const structureKey = useMemo(() => atlasStructureKey(nodes, edges, variant), [edges, nodes, variant]);
   // Presentation-only fields intentionally do not participate in structural graph identity.
   const renderNodes = useMemo<RenderNode[]>(() => nodes.map((node) => ({ ...node })), [structureKey]);
@@ -198,7 +201,13 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const renderNodeById = useMemo(() => new Map(renderNodes.map((node) => [node.id, node])), [renderNodes]);
   const focusTargetId = selectedId ?? searchMatchId ?? null;
   const downstream = useMemo(() => variant === "project" && focusTargetId
-    ? computeDownstreamSubgraph(focusTargetId, edges) : null, [variant, focusTargetId, edges]);
+    ? computeDownstreamSubgraph(focusTargetId, edges) : null, [variant, focusTargetId, structureKey]);
+  useEffect(() => { laser.select(downstream?.edgeIds); }, [laser, downstream]);
+  useEffect(() => { laser.retain(new Set(renderEdges.map(edge => edge.id))); }, [laser, renderEdges]);
+  const linkThreeObject = useCallback((edge: RenderEdge) => laser.object(edge.id), [laser]);
+  const linkPositionUpdate = useCallback((object: import('three').Object3D, { start, end }: { start: { x: number; y: number; z: number }; end: { x: number; y: number; z: number } }) => {
+    laser.position(object, start, end);
+  }, [laser]);
   const focusIds = useMemo(() => {
     if (downstream) return downstream.nodeIds;
     if (!focusTargetId) return null;
@@ -341,10 +350,11 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
         visualByIdRef.current.forEach(disposeVisual);
         visualByIdRef.current.clear();
         resources.dispose();
+        laser.dispose();
         disposeTimerRef.current = null;
       }, 0);
     };
-  }, [disposeVisual, resources]);
+  }, [disposeVisual, resources, laser]);
 
   const focusNode = useCallback((nodeId: string) => {
     const graph = graphRef.current;
@@ -423,6 +433,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     let frame = 0;
     let previous = 0;
     const tick = (time: number) => {
+      if (variant === "project") laser.tick(time);
       if (time - previous > 80) {
         previous = time;
         updateLabels();
@@ -431,7 +442,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [updateLabels]);
+  }, [updateLabels, laser, variant]);
 
   const nodeThreeObject = useCallback((node: NodeObject<AtlasSceneNode>) => {
     const item = node as RenderNode;
@@ -521,6 +532,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
           const target = endpointId(edge.target);
           const incident = downstream ? downstream.edgeIds.has(edge.id) : Boolean(focusTargetId && (focusTargetId === source || focusTargetId === target));
           const hoverIncident = Boolean(hoveredId && (hoveredId === source || hoveredId === target));
+          if (incident && downstream) return "rgba(245,158,11,0.12)";
           if (incident) return alphaColor(nodeById.get(focusTargetId ?? "")?.color ?? "#8392A8", 0.84);
           if (hoverIncident && !downstream) return alphaColor(nodeById.get(hoveredId ?? "")?.color ?? "#8392A8", 0.48);
           if (focusTargetId) return "rgba(92,112,145,0.018)";
@@ -529,17 +541,17 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
         linkWidth={(edge) => {
           const source = endpointId(edge.source);
           const target = endpointId(edge.target);
-          if (downstream ? downstream.edgeIds.has(edge.id) : focusTargetId && (focusTargetId === source || focusTargetId === target)) return 1.45;
+          if (downstream?.edgeIds.has(edge.id)) return 0.2;
+          if (!downstream && focusTargetId && (focusTargetId === source || focusTargetId === target)) return 1.45;
           if (!downstream && hoveredId && (hoveredId === source || hoveredId === target)) return 0.82;
           return focusTargetId ? 0.08 : 0.48;
         }}
         linkOpacity={1}
         linkDirectionalArrowLength={0}
-        linkDirectionalParticles={edge => downstream?.edgeIds.has(edge.id) ? 3 : 0}
-        linkDirectionalParticleSpeed={0.008}
-        linkDirectionalParticleWidth={2.6}
-        linkDirectionalParticleColor={() => "#f59e0b"}
-        linkDirectionalParticleResolution={6}
+        linkDirectionalParticles={0}
+        linkThreeObject={variant === "project" ? linkThreeObject : undefined}
+        linkThreeObjectExtend={variant === "project"}
+        linkPositionUpdate={variant === "project" ? linkPositionUpdate : undefined}
         enableNodeDrag={false}
         enableNavigationControls
         controlType="orbit"

@@ -10,6 +10,7 @@ export function buildProjectCapabilityModel(graph: KnowledgeGraph, runtime: Cour
   return buildCapabilityModel({
     nodeIds: graph.nodes.filter(node => node.status === 'active').map(node => node.id),
     prerequisiteEdges: graph.edges.filter(edge => edge.relation === 'prerequisite'),
+    enablesEdges: graph.edges.flatMap(edge => edge.relation === 'enables' ? [{ id: edge.id, source: edge.source, target: edge.target, relation: 'enables' as const, strength: edge.strength }] : []),
     currentNodeIds: knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId),
     courseOrder: runtime.curriculumCoverages.map(coverage => ({ nodeId: coverage.nodeId, lessonOrder: lessonOrder.get(coverage.lessonId) ?? Number.MAX_SAFE_INTEGER, coverageOrder: coverage.order })),
   });
@@ -24,7 +25,7 @@ export function projectCapabilityAtlas(graph: KnowledgeGraph, model: CapabilityM
   const current = new Set(model.currentKnowledgeIds);
   const course = new Set(model.courseKnowledgeIds);
   const states = new Map(knowledge.map(record => [record.nodeId, record.status]));
-  const edgeIds = new Set(model.prerequisiteEdges.map(edge => edge.id));
+  const edgeIds = new Set(model.supportEdges.map(edge => edge.id));
   const edges = graph.edges.filter(edge => edgeIds.has(edge.id));
   const degree = new Map<string, number>();
   edges.forEach(edge => { for (const id of [edge.source, edge.target]) degree.set(id, (degree.get(id) ?? 0) + 1); });

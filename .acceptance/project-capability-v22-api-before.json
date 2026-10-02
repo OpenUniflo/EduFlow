@@ -1,0 +1,256 @@
+{
+  "preview": "https://edu-flow-3vs57wjjs-july-nanas-projects.vercel.app",
+  "capturedAt": "2026-10-02T14:14:14.199Z",
+  "evidence": [
+    {
+      "role": "LEARNER",
+      "projectTargetCount": 116,
+      "prerequisiteEdgeCount": 117,
+      "enablesEdgeCount": 30,
+      "relatedEdgeCount": 0,
+      "isolatedTargetIds": [],
+      "degreeOneTargetIds": [
+        "AGC02",
+        "AGC03",
+        "CODE01",
+        "CODE03",
+        "CODE05",
+        "CTX07",
+        "CTX08",
+        "CTX10",
+        "CU05",
+        "E05",
+        "EVAL02",
+        "EVAL03",
+        "EVAL05",
+        "EVAL09",
+        "H02",
+        "K04",
+        "MA04",
+        "MA06",
+        "MAC02",
+        "MAC05",
+        "MAC06",
+        "MAC07",
+        "MEM02",
+        "MEM04",
+        "MM02",
+        "MM03",
+        "MM05",
+        "MM06",
+        "RAG05",
+        "ROB01",
+        "RT06",
+        "S02",
+        "S03",
+        "TOOL01",
+        "TOOL02",
+        "TOOL03",
+        "TOOL05",
+        "TOOL06",
+        "TOOL07",
+        "TRAIN03",
+        "TRAIN04",
+        "TRAIN05",
+        "TRAIN06",
+        "TRAIN09"
+      ],
+      "componentCount": 3,
+      "componentSizes": [
+        118,
+        3,
+        2
+      ],
+      "blue": 7,
+      "green": 109,
+      "gray": [
+        "T15",
+        "BR01",
+        "R01",
+        "T03",
+        "T06",
+        "T07",
+        "T08"
+      ],
+      "blueTargets": [
+        "A02",
+        "AGC01",
+        "AGC02",
+        "AGC03",
+        "H02",
+        "R10",
+        "WF05"
+      ],
+      "activeVersion": 8,
+      "historicalDigests": [
+        {
+          "id": "8cd78213-9ab5-4098-8725-4978e8b69b7a",
+          "version": 1,
+          "sha256": "381ae534ce962c3ebcf46aab2a7f448dcfe60a351dfb2e1623597ca3707dba3b"
+        },
+        {
+          "id": "19c8c417-fa45-46a7-8607-3be55970ca20",
+          "version": 2,
+          "sha256": "590fb05baf688ea3f153d4d433ecebfdd59ec58cc442a547b37ba10b1ce526d5"
+        },
+        {
+          "id": "747dfc56-2603-4107-bb32-175d9ca56c8f",
+          "version": 3,
+          "sha256": "20b6a92fa2459963cc2771255a6b61c86aa6826159a6667d0e784010b564bd4b"
+        },
+        {
+          "id": "36f63971-246e-4e4f-b936-1d1075e1b05d",
+          "version": 4,
+          "sha256": "de4e862f501fcc1e5b1b8f9d2a3936f066472fc222df8ac824f803bce00f4c84"
+        },
+        {
+          "id": "b4794800-0a9f-4cf0-9bb3-111a48b9032e",
+          "version": 5,
+          "sha256": "1a83a2a48b14c17502e4b63d47250a4a0749289e2eea913ce1e0539902f4eaa2"
+        },
+        {
+          "id": "38c8eeef-55cd-4a18-b2c2-9329fadf8067",
+          "version": 6,
+          "sha256": "4ad3aa8ed06197fa0aaa2464914fe32bd9981332385e434cd8bb9bee694b3f53"
+        },
+        {
+          "id": "a3f87fb3-dc56-441b-a3cd-fd6d0319af7c",
+          "version": 7,
+          "sha256": "2c36c1aa94a8ca4730c08d85e1f15af93f757d9277b2193eae29e08fdffe17c8"
+        },
+        {
+          "id": "1949903a-06d8-46ff-9428-135445100ab4",
+          "version": 8,
+          "sha256": "03102565677382e7612151e58388903cd72f3ab73385fd2ffebfb1491355e65a"
+        }
+      ],
+      "excludeEnablesSourcePassed": true
+    },
+    {
+      "role": "ADMIN",
+      "projectTargetCount": 116,
+      "prerequisiteEdgeCount": 117,
+      "enablesEdgeCount": 30,
+      "relatedEdgeCount": 0,
+      "isolatedTargetIds": [],
+      "degreeOneTargetIds": [
+        "AGC02",
+        "AGC03",
+        "CODE01",
+        "CODE03",
+        "CODE05",
+        "CTX07",
+        "CTX08",
+        "CTX10",
+        "CU05",
+        "E05",
+        "EVAL02",
+        "EVAL03",
+        "EVAL05",
+        "EVAL09",
+        "H02",
+        "K04",
+        "MA04",
+        "MA06",
+        "MAC02",
+        "MAC05",
+        "MAC06",
+        "MAC07",
+        "MEM02",
+        "MEM04",
+        "MM02",
+        "MM03",
+        "MM05",
+        "MM06",
+        "RAG05",
+        "ROB01",
+        "RT06",
+        "S02",
+        "S03",
+        "TOOL01",
+        "TOOL02",
+        "TOOL03",
+        "TOOL05",
+        "TOOL06",
+        "TOOL07",
+        "TRAIN03",
+        "TRAIN04",
+        "TRAIN05",
+        "TRAIN06",
+        "TRAIN09"
+      ],
+      "componentCount": 3,
+      "componentSizes": [
+        118,
+        3,
+        2
+      ],
+      "blue": 4,
+      "green": 112,
+      "gray": [
+        "T15",
+        "BR01",
+        "R01",
+        "T03",
+        "T06",
+        "T07",
+        "T08"
+      ],
+      "blueTargets": [
+        "A02",
+        "AGC01",
+        "AGC03",
+        "R10"
+      ],
+      "activeVersion": 9,
+      "historicalDigests": [
+        {
+          "id": "24e9267f-8655-4dec-871e-6792ed4a47b8",
+          "version": 1,
+          "sha256": "de372a93d57da2483afcf476256bdd738f2d5af9d1480a0802c9fa3025b4f38b"
+        },
+        {
+          "id": "dd0b6e53-9593-46e2-b439-c68b2344e4b9",
+          "version": 2,
+          "sha256": "512b0f25034b1e099b52056bea01587e183b95adb60f1810c53f0167c4168a72"
+        },
+        {
+          "id": "c6f8bb19-0631-484c-8002-0bed0fdc96d4",
+          "version": 3,
+          "sha256": "7afdf6817c56974859efb6a77f3430e0f2ed42b1fc9c7c0d424969e9d36a4ce8"
+        },
+        {
+          "id": "f65c4fd5-bcf3-463e-92e0-01a0304d6c45",
+          "version": 4,
+          "sha256": "64f01818d170bdaa834fd447283fdb9e7e9ebe2ce4f6b5da11b21788aa7c357b"
+        },
+        {
+          "id": "cf36dc0a-1a98-4a82-ba01-98fe8fdc9eed",
+          "version": 5,
+          "sha256": "333c357bb45a0d00f424b5ae350864865c03b49cae16ff06bbea5d08628ba909"
+        },
+        {
+          "id": "47794669-58e6-4c9d-beac-03b2f30bed56",
+          "version": 6,
+          "sha256": "ef639ebbc809cf7ac2f0e111746a473a7767664014e7d94a0214993350f7c376"
+        },
+        {
+          "id": "ccec265f-bfa9-44a6-b7c3-c14c205374d7",
+          "version": 7,
+          "sha256": "f3bcc3e3c874027fe0b01e44210bae50dd1cccd00c2749128dba997bb1f021bf"
+        },
+        {
+          "id": "4a542eba-397a-4935-8f71-7a84a7d105c2",
+          "version": 8,
+          "sha256": "d185e4d25d9a832749b29b568ad954849565ddab8f686ff91f4a720c2420303d"
+        },
+        {
+          "id": "bd9e1502-5175-473c-85a1-a85632dff183",
+          "version": 9,
+          "sha256": "b6a0c736cfe1a1c6555a2bf0d0d74c1b3724441ccc75b45b22e6d8f1abec7850"
+        }
+      ],
+      "excludeEnablesSourcePassed": true
+    }
+  ]
+}

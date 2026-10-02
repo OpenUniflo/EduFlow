@@ -61,11 +61,16 @@ assert.equal(nav.body.recommendationVersion, nav.body.recommendationPolicy === '
 // Reopen validates admission, not a new-learning claim; keep all prior completion/evidence.
 const softState = await request(admin.token, `/rest/v1/user_knowledge_states?user_id=eq.${admin.userId}&node_id=eq.A01&select=status`, undefined, true);
 assert.ok(!softState.body.some((row: any) => ['learned','practicing','mastered'].includes(row.status)));
-const softRoute = await request(admin.token, route, { action: 'adopt', baseVersionId: restored.body.activeVersion.id, includeNodeIds: ['A01'], excludeNodeIds: [] });
-check('include unmet real soft source', softRoute, 200);
-assert.ok(softRoute.body.plan.route.prerequisiteEdges.some((edge: any) => edge.source === 'A01' && edge.target === 'A02' && edge.strength === 'soft'));
-check('unmet selected soft source allows existing Micro reopen', await request(admin.token, '/api/micro', { action: 'start', pathId: 'aiad-l1-a02', contextCourseId: course }), 200);
-check('administrator constraints restored after soft admission test', await request(admin.token, route, { action: 'restore', baseVersionId: softRoute.body.activeVersion.id, versionId: administrator.body.activeVersion.id }), 200);
+if (administrator.body.model.orderedNodeIds.includes('A01')) {
+  const softRoute = await request(admin.token, route, { action: 'adopt', baseVersionId: restored.body.activeVersion.id, includeNodeIds: ['A01'], excludeNodeIds: [] });
+  check('include unmet real soft source', softRoute, 200);
+  assert.ok(softRoute.body.plan.route.prerequisiteEdges.some((edge: any) => edge.source === 'A01' && edge.target === 'A02' && edge.strength === 'soft'));
+  check('unmet selected soft source allows existing Micro reopen', await request(admin.token, '/api/micro', { action: 'start', pathId: 'aiad-l1-a02', contextCourseId: course }), 200);
+  check('administrator constraints restored after soft admission test', await request(admin.token, route, { action: 'restore', baseVersionId: softRoute.body.activeVersion.id, versionId: administrator.body.activeVersion.id }), 200);
+} else {
+  check('V2.1 historical-only Include stays outside current gap', await request(admin.token, route, { action: 'adopt', baseVersionId: restored.body.activeVersion.id, includeNodeIds: ['A01'], excludeNodeIds: [] }), 422);
+  check('unmet external soft source does not block existing Micro reopen', await request(admin.token, '/api/micro', { action: 'start', pathId: 'aiad-l1-a02', contextCourseId: course }), 200);
+}
 const record = { preview, capturedAt: new Date().toISOString(), scope: 'Hosted HTTP + authenticated REST; administrator route adjustments restored; already-completed A02 reopened for soft admission; no catalog or evidence writes', results };
-writeFileSync('.acceptance/project-capability-v2-hosted-api.json', JSON.stringify(record, null, 2) + '\n');
+writeFileSync(process.env.ACCEPTANCE_REPORT_PATH ?? '.acceptance/project-capability-v2-hosted-api.json', JSON.stringify(record, null, 2) + '\n');
 console.log(JSON.stringify({ passed: results.length, preview }));

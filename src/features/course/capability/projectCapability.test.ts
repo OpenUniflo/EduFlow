@@ -9,9 +9,18 @@ const graph = (edges: KnowledgeEdge[]): KnowledgeGraph => ({ nodes: [node('curre
 const edge = (source: string, destination: string): KnowledgeEdge => ({ id: `${source}>${destination}`, source, target: destination, relation: 'prerequisite', strength: 'soft', reason: 'Test' });
 const governance = { domains: [], assignments: [], candidates: [], proposals: [], revision: 1 };
 describe('Project capability feature adapter', () => {
-  it.each(['enables', 'related'] as const)('never computes membership from %s', relation => {
+  it.each(['related'] as const)('never computes membership from %s', relation => {
     const input = graph([{ ...edge('current', target), relation, strength: .8 }]);
     expect(buildProjectCapabilityModel(input, routeOnlyRuntime, [{ nodeId: 'current', status: 'mastered' }]).orderedNodeIds).toEqual([target]);
+  });
+  it('preserves enables semantics in candidates and scene while excluding related', () => {
+    const input = graph([{ ...edge('current', 'bridge'), relation: 'enables', strength: .8 }, { ...edge('bridge', target), relation: 'enables', strength: .9 }, { ...edge('current', target), relation: 'related', strength: .7 }]);
+    const states = [{ nodeId: 'current', status: 'mastered' as const }];
+    const model = buildProjectCapabilityModel(input, routeOnlyRuntime, states);
+    expect([...model.orderedNodeIds].sort()).toEqual(['bridge', 'current', target]);
+    const scene = projectCapabilityAtlas(input, model, governance, states);
+    expect(scene.edges.map(edge => edge.relation)).toEqual(['enables', 'enables']);
+    expect(scene.nodes.find(node => node.id === 'bridge')?.color).toBe('#94a3b8');
   });
   it('ignores inactive current and Course nodes', () => {
     const input = graph([edge('current', target)]);

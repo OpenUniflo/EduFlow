@@ -1,15 +1,18 @@
 /** Pure V2 planning. Adapters supply authenticated visible identities and facts. */
 export type RoutePrerequisite = { id: string; source: string; target: string; strength: 'hard' | 'soft' };
+export type CapabilityEnable = { id: string; source: string; target: string; relation: 'enables'; strength: number };
+export type CapabilityRelation = (RoutePrerequisite & { relation: 'prerequisite' }) | CapabilityEnable;
 export type CourseKnowledgeOrder = { nodeId: string; lessonOrder: number; coverageOrder: number };
 export type RoutePlanningInput = {
   nodeIds: readonly string[];
   prerequisiteEdges: readonly RoutePrerequisite[];
+  enablesEdges?: readonly CapabilityEnable[];
   currentNodeIds: readonly string[];
   courseOrder: readonly CourseKnowledgeOrder[];
 };
 export type RouteConstraints = { includeNodeIds: readonly string[]; excludeNodeIds: readonly string[] };
 export type CapabilityModel = {
-  orderedNodeIds: string[]; prerequisiteEdges: RoutePrerequisite[];
+  orderedNodeIds: string[]; prerequisiteEdges: RoutePrerequisite[]; supportEdges: CapabilityRelation[];
   courseKnowledgeIds: string[]; currentKnowledgeIds: string[]; bridgeKnowledgeIds: string[];
   actionableNodeIds: string[]; connectedCourseKnowledgeIds: string[]; disconnectedCourseKnowledgeIds: string[];
 };
@@ -94,16 +97,27 @@ function prepare(input: RoutePlanningInput) {
   return { ids, edges, incoming, order, course, current, compare, actionable };
 }
 
-function capability(data: ReturnType<typeof prepare>): CapabilityModel {
-  const { course, incoming, order, edges, current, actionable, compare } = data;
-  // A gap starts at real acquired capabilities. Every hard branch must have such
-  // support; a soft edge can connect a candidate but never becomes an AND gate.
-  const supported = new Set(current);
-  for (const id of order) {
-    if (current.has(id)) continue;
-    const parents = incoming.get(id)!;
-    if (parents.some(edge => supported.has(edge.source))
-      && parents.every(edge => edge.strength !== 'hard' || supported.has(edge.source))) supported.add(id);
+function capability(data: ReturnType<typeof prepare>, enables: readonly CapabilityEnable[] = []): CapabilityModel {
+  const { course, edges, current, actionable, compare, ids } = data;
+  const supportEdges: CapabilityRelation[] = [
+    ...edges.map(edge => ({ ...edge, relation: 'prerequisite' as const })),
+    ...enables.filter(edge => ids.has(edge.target)).map(edge => ({ ...edge })),
+  ].sort((a, b) => compareId(a.id, b.id));
+  const incoming = new Map([...ids].map(id => [id, [] as CapabilityRelation[]]));
+  const outgoing = new Map([...ids].map(id => [id, [] as CapabilityRelation[]]));
+  const hardRemaining = new Map([...ids].map(id => [id, 0]));
+  for (const edge of supportEdges) {
+    incoming.get(edge.target)!.push(edge); outgoing.get(edge.source)?.push(edge);
+    if (edge.relation === 'prerequisite' && edge.strength === 'hard') hardRemaining.set(edge.target, hardRemaining.get(edge.target)! + 1);
+  }
+  // Least fixed point over actual acquired boundaries. Enables cycles are valid;
+  // they cannot bootstrap themselves or bypass even one unsupported hard parent.
+  const supported = new Set(current); const frontier = [...current];
+  for (let i = 0; i < frontier.length; i++) for (const edge of outgoing.get(frontier[i])!) {
+    if (edge.relation === 'prerequisite' && edge.strength === 'hard') hardRemaining.set(edge.target, hardRemaining.get(edge.target)! - 1);
+    if (!supported.has(edge.target) && hardRemaining.get(edge.target) === 0) {
+      supported.add(edge.target); frontier.push(edge.target);
+    }
   }
   const members = new Set(course.keys());
   const visited = new Set([...course.keys()].filter(id => !current.has(id) && supported.has(id)));
@@ -118,10 +132,11 @@ function capability(data: ReturnType<typeof prepare>): CapabilityModel {
   // Keep real facts between admitted members; acquired color is not an edge filter.
   // Even unanchored targets retain their real target-to-target relations.
   const gapEdges = edges.filter(edge => members.has(edge.source) && members.has(edge.target));
+  const retainedSupport = supportEdges.filter(edge => members.has(edge.source) && members.has(edge.target));
   const orderedNodeIds = topological(members, gapEdges, compare);
   const courseKnowledgeIds = unique(course.keys());
   return {
-    orderedNodeIds, prerequisiteEdges: gapEdges,
+    orderedNodeIds, prerequisiteEdges: gapEdges, supportEdges: retainedSupport,
     courseKnowledgeIds, currentKnowledgeIds: orderedNodeIds.filter(id => current.has(id)),
     bridgeKnowledgeIds: orderedNodeIds.filter(id => !course.has(id)),
     actionableNodeIds: unique([...actionable].filter(id => members.has(id))),
@@ -129,7 +144,7 @@ function capability(data: ReturnType<typeof prepare>): CapabilityModel {
     disconnectedCourseKnowledgeIds: courseKnowledgeIds.filter(id => !supported.has(id)),
   };
 }
-export function buildCapabilityModel(input: RoutePlanningInput): CapabilityModel { return capability(prepare(input)); }
+export function buildCapabilityModel(input: RoutePlanningInput): CapabilityModel { return capability(prepare(input), input.enablesEdges); }
 
 /** Union hard closure, with acquired boundaries; selected soft edges explain order only. */
 export function planCourseRoute(input: RoutePlanningInput, constraints: RouteConstraints = { includeNodeIds: [], excludeNodeIds: [] }): RoutePlan {
@@ -138,7 +153,7 @@ export function planCourseRoute(input: RoutePlanningInput, constraints: RouteCon
     if (error instanceof PrerequisiteCycleError) return { valid: false, route: null, conflicts: [{ kind: 'prerequisite_cycle', constraint: 'knowledge_graph' }] };
     throw error;
   }
-  const model = capability(data);
+  const model = capability(data, input.enablesEdges);
   const candidates = new Set(model.orderedNodeIds);
   const includes = unique(constraints.includeNodeIds); const excludes = new Set(constraints.excludeNodeIds);
   const conflicts: RouteConflict[] = [];
@@ -179,8 +194,8 @@ export function planCourseRoute(input: RoutePlanningInput, constraints: RouteCon
 
 /** Canonical structure only. No acquired-state-dependent projection is hashed. */
 export function routeStructure(input: RoutePlanningInput, constraints: RouteConstraints) {
-  const incoming = new Map<string, RoutePrerequisite[]>();
-  for (const edge of input.prerequisiteEdges) {
+  const incoming = new Map<string, (RoutePrerequisite | CapabilityEnable)[]>();
+  for (const edge of [...input.prerequisiteEdges, ...(input.enablesEdges ?? [])]) {
     if (!incoming.has(edge.target)) incoming.set(edge.target, []);
     incoming.get(edge.target)!.push(edge);
   }
@@ -190,6 +205,7 @@ export function routeStructure(input: RoutePlanningInput, constraints: RouteCons
   return {
     nodeIds: unique(input.nodeIds.filter(id => members.has(id))),
     prerequisiteEdges: input.prerequisiteEdges.filter(edge => members.has(edge.target)).map(edge => ({ ...edge })).sort((a, b) => compareId(a.id, b.id)),
+    ...(input.enablesEdges?.length ? { enablesEdges: input.enablesEdges.filter(edge => members.has(edge.target)).map(edge => ({ ...edge })).sort((a, b) => compareId(a.id, b.id)) } : {}),
     courseOrder: [...input.courseOrder].map(row => ({ ...row })).sort(compareOrder),
   };
 }

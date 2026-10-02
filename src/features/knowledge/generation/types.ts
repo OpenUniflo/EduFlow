@@ -74,6 +74,7 @@ export type CandidatePair = {
 };
 
 export type GenerationDiagnostics = {
+  projectStructureAudit?: ReturnType<typeof import('@/shared/learning/projectStructureAudit').auditProjectStructure>;
   embeddingRequestCount: number;
   extractedCandidateCount: number;
   afterExactDedupCount: number;

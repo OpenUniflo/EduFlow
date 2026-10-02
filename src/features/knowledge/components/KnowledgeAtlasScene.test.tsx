@@ -35,20 +35,23 @@ beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', vi.fn()); vi.stubGlobal('cancelAnimationFrame', vi.fn());
 });
 it('blue, gray and green clicks replace directed pulses; background and leaves clear them', () => {
-  let props = render(); const structure = props.graphData;
-  expect(edges.map(props.linkDirectionalParticles)).toEqual([0, 0, 0]);
+  let props = render(); const structure = props.graphData; const linkFactory = props.linkThreeObject;
+  expect(props.linkDirectionalParticles).toBe(0);
+  expect(edges.map(edge => props.linkThreeObject(edge).visible ? 1 : 0)).toEqual([0, 0, 0]);
   props.onNodeClick(nodes[0]); props = render();
-  expect(edges.map(props.linkDirectionalParticles)).toEqual([3, 3, 3]);
+  expect(edges.map(edge => props.linkThreeObject(edge).visible ? 1 : 0)).toEqual([1, 1, 1]);
   props.onNodeClick(nodes[1]); props = render();
-  expect(edges.map(props.linkDirectionalParticles)).toEqual([0, 3, 3]);
+  expect(edges.map(edge => props.linkThreeObject(edge).visible ? 1 : 0)).toEqual([0, 1, 1]);
   props.onNodeHover(nodes[1]); props = render();
   expect(props.linkWidth(edges[0])).toBe(0.08);
   expect(props.linkColor(edges[0])).toBe('rgba(92,112,145,0.018)');
-  expect(props.linkWidth(edges[1])).toBe(1.45);
+  expect(props.linkWidth(edges[1])).toBe(0.2);
+  expect(props.linkColor(edges[1])).toBe("rgba(245,158,11,0.12)");
   props.onNodeClick(nodes[2]); props = render();
-  expect(edges.map(props.linkDirectionalParticles)).toEqual([0, 0, 0]);
+  expect(edges.map(edge => props.linkThreeObject(edge).visible ? 1 : 0)).toEqual([0, 0, 0]);
   props.onBackgroundClick(); props = render();
-  expect(selected).toBeNull(); expect(edges.map(props.linkDirectionalParticles)).toEqual([0, 0, 0]);
+  expect(selected).toBeNull(); expect(edges.map(edge => props.linkThreeObject(edge).visible ? 1 : 0)).toEqual([0, 0, 0]);
+  expect(props.linkThreeObject).toBe(linkFactory);
   expect(props.graphData).toBe(structure);
   expect(props.graphData.nodes).toBe(structure.nodes); expect(props.graphData.links).toBe(structure.links);
   expect(graph.d3ReheatSimulation).toHaveBeenCalledTimes(1);
@@ -56,6 +59,6 @@ it('blue, gray and green clicks replace directed pulses; background and leaves c
 });
 it('does not add pulses to the existing Global and Personal variants', () => {
   selected = 'A';
-  expect(edges.map(render('global').linkDirectionalParticles)).toEqual([0, 0, 0]);
-  expect(edges.map(render('personal').linkDirectionalParticles)).toEqual([0, 0, 0]);
+  expect(render('global').linkThreeObject).toBeUndefined();
+  expect(render('personal').linkThreeObject).toBeUndefined();
 });

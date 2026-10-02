@@ -12,7 +12,7 @@ const url = assertLocalSupabaseUrl(process.env.SUPABASE_URL!);
 const server = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
 const prefix = `route-acceptance-${randomUUID()}`;
 const courseId = `${prefix}-course`;
-const ids = ['a', 'b', 'z', 'unrelated', 'soft', 'soft-hard'].map(id => `${prefix}-${id}`);
+const ids = ['a', 'b', 'z', 'unrelated', 'soft', 'soft-hard', 'enabled'].map(id => `${prefix}-${id}`);
 const users: Array<{ id: string; token: string; client: SupabaseClient }> = [];
 async function invoke(handler: typeof micro, token: string, body?: Record<string, unknown>) {
   let status = 200;
@@ -36,6 +36,7 @@ try {
   `).join('')} commit;`, stdio: ['pipe', 'pipe', 'pipe'] });
   await write('knowledge_edges', [0, 1].map(i => ({ id: `${prefix}-edge-${i}`, source_node_id: ids[i], target_node_id: ids[i + 1], relation: 'prerequisite', reason: 'Local acceptance prerequisite', prerequisite_strength: 'hard' })));
   await write('knowledge_edges', [{ id: `${prefix}-optional`, source_node_id: ids[4], target_node_id: ids[2], relation: 'prerequisite', reason: 'Optional local fact', prerequisite_strength: 'soft' }, { id: `${prefix}-optional-hard`, source_node_id: ids[5], target_node_id: ids[4], relation: 'prerequisite', reason: 'Required local fact', prerequisite_strength: 'hard' }]);
+  await write('knowledge_edges', [[ids[0], ids[5]], [ids[0], ids[6]], [ids[6], ids[2]], [ids[3], ids[1]], [ids[1], ids[0]]].map(([source, target], i) => ({ id: `${prefix}-enables-${i}`, source_node_id: source, target_node_id: target, relation: 'enables', reason: 'Explicit local execution support, not a learning prerequisite', associative_strength: .8 })));
   await write('courses', { id: courseId, title: 'Local route acceptance', description: 'Temporary local acceptance only', revision: '1' });
   await write('course_curricula', { course_id: courseId, id: 'curriculum', generation_mode: 'manual' });
   await write('curriculum_chapters', { course_id: courseId, id: 'chapter', title: 'Chapter', description: '', display_order: 0, color: '#445566', outcome: '' });
@@ -73,6 +74,17 @@ try {
   const first = await invoke(navigation, users[0].token);
   assert.equal(first.status, 200); assert.deepEqual(first.result.path.map((item: { nodeId: string }) => item.nodeId), ids.slice(0, 3));
   assert.equal(first.result.nextAction.nodeId, ids[1]);
+  const supported = await invoke(routePlan, users[0].token);
+  assert.ok(supported.result.model.bridgeKnowledgeIds.includes(ids[6]));
+  assert.ok(supported.result.model.supportEdges.some((edge: { relation: string }) => edge.relation === 'enables'));
+  assert.ok(!supported.result.plan.route.selectedNodeIds.includes(ids[6]));
+  const enabledInclude = await invoke(routePlan, users[0].token, { action: 'preview', includeNodeIds: [ids[6]], excludeNodeIds: [ids[3]] });
+  assert.equal(enabledInclude.result.plan.valid, true);
+  assert.ok(enabledInclude.result.plan.route.selectedNodeIds.includes(ids[6]));
+  assert.ok(!enabledInclude.result.plan.route.selectedNodeIds.includes(ids[3]));
+  const enabledExclude = await invoke(routePlan, users[0].token, { action: 'preview', includeNodeIds: [], excludeNodeIds: [ids[6]] });
+  assert.equal(enabledExclude.result.plan.valid, true);
+  assert.equal((await invoke(routePlan, users[0].token)).result.activeVersion.id, supported.result.activeVersion.id);
   const other = await invoke(navigation, users[1].token);
   assert.equal(other.status, 200); assert.deepEqual(other.result.path.map((item: { nodeId: string }) => item.nodeId), ids.slice(0, 3));
   for (const action of ['start', 'complete-step']) {
@@ -92,7 +104,6 @@ try {
   const completed = await invoke(micro, users[0].token, body(ids[1]));
   assert.equal(completed.status, 200, JSON.stringify(completed.result)); assert.equal(completed.result.completed, true);
   const next = await invoke(navigation, users[0].token); assert.equal(next.result.nextAction.nodeId, ids[2]);
-  assert.equal((await invoke(micro, users[0].token, body(ids[2]))).status, 200);
   const rows = await server.from('curriculum_coverages').select('node_id').eq('course_id', courseId); assert.deepEqual(rows.data, [{ node_id: ids[2] }]);
   const own = await users[0].client.from('user_knowledge_states').select('status').eq('node_id', ids[1]); assert.deepEqual(own.data, [{ status: 'learned' }]);
   const isolated = await users[1].client.from('user_knowledge_states').select('*').eq('node_id', ids[1]); assert.deepEqual(isolated.data, []);
@@ -130,6 +141,10 @@ try {
   assert.equal(v3.versionNumber, 3); assert.equal(v3.source, 'restore'); assert.equal(v3.restoredFromVersionId, v1.id);
   assert.equal(JSON.stringify((await history()).data!.slice(0, 2)), oldSnapshots);
   assert.equal((await invoke(micro, users[0].token, { ...body(ids[4]), action: 'start' })).status, 400);
+  // Keep an unfinished target while testing V2.1 current-gap Include. Complete it
+  // after restoring empty constraints, then prove learning creates no version.
+  assert.equal((await invoke(micro, users[0].token, body(ids[2]))).status, 200);
+  assert.equal((await invoke(routePlan, users[0].token)).result.activeVersion.id, v3.id);
   const v4 = await invoke(routePlan, users[0].token, { action: 'adopt', baseVersionId: v3.id, includeNodeIds: [], excludeNodeIds: [ids[2], ids[4]] });
   assert.equal(v4.status, 200, JSON.stringify(v4.result));
   assert.equal(v4.result.activeVersion.versionNumber, 4);

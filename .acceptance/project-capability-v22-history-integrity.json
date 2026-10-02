@@ -1,0 +1,19 @@
+{
+  "preview": "https://edu-flow-202fg6llh-july-nanas-projects.vercel.app",
+  "results": [
+    {
+      "role": "LEARNER",
+      "priorSnapshotsUnchanged": 8,
+      "initialVersion": 8,
+      "finalRestoredVersion": 11,
+      "learningStatusesUnchanged": true
+    },
+    {
+      "role": "ADMIN",
+      "priorSnapshotsUnchanged": 9,
+      "initialVersion": 9,
+      "finalRestoredVersion": 15,
+      "learningStatusesUnchanged": true
+    }
+  ]
+}
