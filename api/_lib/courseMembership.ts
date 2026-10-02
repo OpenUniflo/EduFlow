@@ -28,24 +28,19 @@ export async function activateCourse(client: SupabaseClient, userId: string, cou
   return updatedAt;
 }
 
-/** Original coverage and computed bridge are distinct authorization paths. Client flags are never read. */
+/** Course-context learning is authorized only by the current selected route. */
 export async function requirePersonalCourseRouteKnowledge(client: SupabaseClient, userId: string, courseId: string, nodeId: string) {
   await requirePublishedCourse(client, courseId);
   const personal = await readPersonalCourseRoute(client, userId, courseId);
-  if (personal.route.courseKnowledgeIds.includes(nodeId)) {
-    await requireCourseKnowledge(client, courseId, nodeId);
-  } else if (!personal.route.bridgeKnowledgeIds.includes(nodeId)) {
-    throw new ApiError(400, "knowledge_not_in_course", "Knowledge is neither Course coverage nor a current personal route bridge");
-  }
+  if (!personal.route.selectedNodeIds.includes(nodeId)) throw new ApiError(400, "knowledge_not_in_course", "Knowledge is not in the active personal route");
   return personal;
 }
 
-/** All route-local factual prerequisites are AND gates, including hard and soft. */
+/** Only hard prerequisites gate learning; acquired nodes remain reviewable. */
 export async function requireMicroTeachingEligibility(client: SupabaseClient, userId: string, courseId: string, nodeId: string) {
   const personal = await requirePersonalCourseRouteKnowledge(client, userId, courseId, nodeId);
   const statuses = new Map(personal.states.map(row => [String(row.node_id), String(row.status)]));
-  if (satisfiesTeachingPrerequisite(statuses.get(nodeId))) return personal.route;
-  const unmet = personal.route.prerequisiteEdges.some(edge => edge.target === nodeId && !satisfiesTeachingPrerequisite(statuses.get(edge.source)));
-  if (unmet) throw new ApiError(403, 'teaching_prerequisite_required', 'Complete the personal route teaching prerequisites before starting this Micro');
-  return personal.route;
+  const unmet = !satisfiesTeachingPrerequisite(statuses.get(nodeId)) && personal.route.prerequisiteEdges.some(edge => edge.strength === 'hard' && edge.target === nodeId && !satisfiesTeachingPrerequisite(statuses.get(edge.source)));
+  if (unmet) throw new ApiError(403, 'teaching_prerequisite_required', 'Complete the hard prerequisites before starting this Micro');
+  return { ...personal.route, activeVersionId: personal.activeVersionId };
 }

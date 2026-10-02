@@ -59,6 +59,8 @@ function responseRecorder() {
 }
 
 function clients(tableRows: Record<string, Row[]>) {
+  tableRows.personal_course_routes = [{ user_id: 'learner', course_id: 'course', active_version_id: 'version-1' }];
+  tableRows.personal_course_route_versions = [{ id: 'version-1', user_id: 'learner', course_id: 'course', route_id: 'route', version_number: 1, source: 'initial', include_node_ids: [], exclude_node_ids: [], snapshot: {}, structure_fingerprint: 'fixture', created_at: '2026-10-02' }];
   const navigationDecisions: Row[] = [];
   const userClient = { from: (table: string) => query((tableRows[table] ?? []).map(row => table === "knowledge_nodes" ? { status: "active", ...row } : row)) };
   const serverClient = { from: (table: string) => query(table === "navigation_decisions" ? navigationDecisions : (tableRows[table] ?? []), navigationDecisions) };
@@ -118,7 +120,7 @@ describe("Navigation authority pagination", () => {
       micro_learning_paths: [], course_assignments: [], assignment_coverages: [], materials: [], material_knowledge_coverages: [], performance_results: [], user_micro_path_progress: [],
       knowledge_nodes: nodeIds.map((id) => ({ id, current_revision_id: `revision-${id}` })),
       knowledge_node_revisions: nodeIds.map((id) => ({ id: `revision-${id}`, title: id })),
-      knowledge_edges: sourceIds.map((source, index) => ({ id: `edge-${String(index).padStart(4, "0")}`, source_node_id: source, target_node_id: "target", relation: "prerequisite", lifecycle_status: "active" })),
+      knowledge_edges: sourceIds.map((source, index) => ({ id: `edge-${String(index).padStart(4, "0")}`, source_node_id: source, target_node_id: "target", relation: "prerequisite", prerequisite_strength: "hard", lifecycle_status: "active" })),
       user_knowledge_states: sourceIds.slice(0, 1_200).map((nodeId) => ({ user_id: "learner", node_id: nodeId, status: "mastered" }))
     };
     const { userClient } = clients(tableRows);

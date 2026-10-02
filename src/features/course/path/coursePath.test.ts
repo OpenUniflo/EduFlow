@@ -35,7 +35,7 @@ it.each(["explore", "learning", "learned", "practicing", "mastered"] as const)("
   const satisfied = ["learned", "practicing", "mastered"].includes(status);
   const records = [{ nodeId: "a", status }] as UserKnowledgeRecord[];
   const path = buildCoursePath(graph, records);
-  const plan = computeNavigationPlan({ courseId: "course", targetNodeIds: [], nodes: graph.knowledgeNodes.map((node)=>({id:node.id,title:node.title,lessonOrder:node.primaryCoverage.lessonOrder,coverageOrder:node.primaryCoverage.order})), prerequisiteEdges: graph.knowledgeEdges, knowledgeStatuses: { a: status }, microPaths: [], completedMicroPathIds: [], assignments: [], assignmentOutcomes: {}, materials: [] });
+  const plan = computeNavigationPlan({ courseId: "course", targetNodeIds: [], nodes: graph.knowledgeNodes.map((node)=>({id:node.id,title:node.title,lessonOrder:node.primaryCoverage.lessonOrder,coverageOrder:node.primaryCoverage.order})), prerequisiteEdges: graph.knowledgeEdges.filter(edge => edge.relation === 'prerequisite'), knowledgeStatuses: { a: status }, microPaths: [], completedMicroPathIds: [], assignments: [], assignmentOutcomes: {}, materials: [] });
   expect(evaluatePrerequisiteReachability(undefined,[status])).toBe(satisfied ? "available" : "locked");
   expect(path[1].state).toBe(satisfied ? "available" : "blocked");
   expect(plan.path[1].state).toBe(satisfied ? "eligible" : "blocked");

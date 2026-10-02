@@ -1,4 +1,4 @@
-import { buildPersonalCourseRoute, type PersonalCourseRoute } from '@/shared/learning/personalCourseRoute';
+import { buildCapabilityModel, type CapabilityModel } from '@/shared/learning/routePlanning';
 import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequisites';
 import type { KnowledgeGraph } from '@/features/knowledge/types';
 import type { UserKnowledgeRecord } from '@/features/profile/types';
@@ -7,7 +7,7 @@ import type { CourseRuntimeData } from '../runtime/courseRuntime';
 /** Feature adapter; the shared core knows no Course, Knowledge, or user-state types. */
 export function buildProjectCapabilityModel(graph: KnowledgeGraph, runtime: CourseRuntimeData, knowledge: UserKnowledgeRecord[]) {
   const lessonOrder = new Map(runtime.lessons.map(lesson => [lesson.id, lesson.order]));
-  return buildPersonalCourseRoute({
+  return buildCapabilityModel({
     nodeIds: graph.nodes.filter(node => node.status === 'active').map(node => node.id),
     prerequisiteEdges: graph.edges.filter(edge => edge.relation === 'prerequisite'),
     currentNodeIds: knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId),
@@ -20,7 +20,7 @@ import { UNCLASSIFIED_DOMAIN_COLOR } from '@/features/knowledge/domain/domainCol
 import type { DomainGovernanceState } from '@/features/knowledge/domain/DomainGovernanceRepository';
 import type { AtlasSceneProjection } from '@/features/knowledge/projections/atlasProjections';
 
-export function projectCapabilityAtlas(graph: KnowledgeGraph, model: PersonalCourseRoute, governance: DomainGovernanceState, knowledge: UserKnowledgeRecord[]): AtlasSceneProjection {
+export function projectCapabilityAtlas(graph: KnowledgeGraph, model: CapabilityModel, governance: DomainGovernanceState, knowledge: UserKnowledgeRecord[]): AtlasSceneProjection {
   const members = new Set(model.orderedNodeIds);
   const current = new Set(model.currentKnowledgeIds);
   const course = new Set(model.courseKnowledgeIds);

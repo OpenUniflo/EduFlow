@@ -5,13 +5,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import micro from '../api/_handlers/micro';
 import navigation from '../api/_handlers/navigation';
+import routePlan from '../api/_handlers/route-plan';
 import { assertLocalSupabaseUrl } from './local-supabase';
 
 const url = assertLocalSupabaseUrl(process.env.SUPABASE_URL!);
 const server = createClient(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
 const prefix = `route-acceptance-${randomUUID()}`;
 const courseId = `${prefix}-course`;
-const ids = ['a', 'b', 'z', 'unrelated'].map(id => `${prefix}-${id}`);
+const ids = ['a', 'b', 'z', 'unrelated', 'soft', 'soft-hard'].map(id => `${prefix}-${id}`);
 const users: Array<{ id: string; token: string; client: SupabaseClient }> = [];
 async function invoke(handler: typeof micro, token: string, body?: Record<string, unknown>) {
   let status = 200;
@@ -34,6 +35,7 @@ try {
     insert into knowledge_node_revisions(id,node_id,title,description,node_type,version) values ('${id}-r1','${id}','${id}','Local acceptance','conceptual',1);
   `).join('')} commit;`, stdio: ['pipe', 'pipe', 'pipe'] });
   await write('knowledge_edges', [0, 1].map(i => ({ id: `${prefix}-edge-${i}`, source_node_id: ids[i], target_node_id: ids[i + 1], relation: 'prerequisite', reason: 'Local acceptance prerequisite', prerequisite_strength: 'hard' })));
+  await write('knowledge_edges', [{ id: `${prefix}-optional`, source_node_id: ids[4], target_node_id: ids[2], relation: 'prerequisite', reason: 'Optional local fact', prerequisite_strength: 'soft' }, { id: `${prefix}-optional-hard`, source_node_id: ids[5], target_node_id: ids[4], relation: 'prerequisite', reason: 'Required local fact', prerequisite_strength: 'hard' }]);
   await write('courses', { id: courseId, title: 'Local route acceptance', description: 'Temporary local acceptance only', revision: '1' });
   await write('course_curricula', { course_id: courseId, id: 'curriculum', generation_mode: 'manual' });
   await write('curriculum_chapters', { course_id: courseId, id: 'chapter', title: 'Chapter', description: '', display_order: 0, color: '#445566', outcome: '' });
@@ -44,6 +46,27 @@ try {
     await write('micro_units', { id: `${id}-unit`, path_id: `${id}-path`, title: id, position: 0, estimated_minutes: 1 });
     await write('micro_steps', { id: `${id}-step`, unit_id: `${id}-unit`, position: 0, kind: 'explanation', title: id, content: 'Local acceptance instruction' });
   }
+  // A supplied unavailable hard source must preserve an explicit failed default V1.
+  await server.from('knowledge_nodes').update({ status: 'deprecated' }).eq('id', ids[1]);
+  const failedInitial = await invoke(routePlan, users[1].token);
+  assert.equal(failedInitial.status, 200);
+  assert.equal(failedInitial.result.plan.valid, false);
+  assert.equal(failedInitial.result.activeVersion.snapshot.valid, false);
+  assert.ok(failedInitial.result.activeVersion.snapshot.conflicts.length);
+  const failedId = failedInitial.result.activeVersion.id;
+  assert.equal((await invoke(routePlan, users[1].token)).result.activeVersion.id, failedId);
+  const repairPreview = await invoke(routePlan, users[1].token, { action: 'preview', includeNodeIds: [], excludeNodeIds: [ids[2]] });
+  assert.equal(repairPreview.result.plan.valid, true);
+  const repaired = await invoke(routePlan, users[1].token, { action: 'adopt', baseVersionId: failedId, includeNodeIds: [], excludeNodeIds: [ids[2]] });
+  assert.equal(repaired.status, 200); assert.equal(repaired.result.activeVersion.versionNumber, 2);
+  await server.from('knowledge_nodes').update({ status: 'active' }).eq('id', ids[1]);
+  const restoredDefault = await invoke(routePlan, users[1].token, { action: 'restore', baseVersionId: repaired.result.activeVersion.id, versionId: failedId });
+  assert.equal(restoredDefault.status, 200); assert.equal(restoredDefault.result.activeVersion.versionNumber, 3);
+  assert.equal(restoredDefault.result.activeVersion.snapshot.valid, true);
+  const oldFailed = await server.from('personal_course_route_versions').select('snapshot').eq('id', failedId).single();
+  assert.equal(oldFailed.data!.snapshot.valid, false);
+  const initialRace = await Promise.all([invoke(routePlan, users[0].token), invoke(routePlan, users[0].token)]);
+  assert.equal(initialRace[0].result.activeVersion.id, initialRace[1].result.activeVersion.id);
   // Current capability comes from the formal standalone Micro completion path, not a state UPDATE.
   const body = (id: string, course = true) => ({ action: 'complete-step', pathId: `${id}-path`, unitId: `${id}-unit`, stepId: `${id}-step`, ...(course ? { contextCourseId: courseId } : {}), idempotencyKey: `${id}-attempt` });
   assert.equal((await invoke(micro, users[0].token, body(ids[0], false))).status, 200);
@@ -51,13 +74,18 @@ try {
   assert.equal(first.status, 200); assert.deepEqual(first.result.path.map((item: { nodeId: string }) => item.nodeId), ids.slice(0, 3));
   assert.equal(first.result.nextAction.nodeId, ids[1]);
   const other = await invoke(navigation, users[1].token);
-  assert.equal(other.status, 200); assert.deepEqual(other.result.path.map((item: { nodeId: string }) => item.nodeId), [ids[2]]);
+  assert.equal(other.status, 200); assert.deepEqual(other.result.path.map((item: { nodeId: string }) => item.nodeId), ids.slice(0, 3));
   for (const action of ['start', 'complete-step']) {
     const forged = await invoke(micro, users[0].token, { ...body(ids[3]), action, bridge: true, routeNodeIds: ids, userId: users[1].id });
     assert.equal(forged.status, 400, JSON.stringify(forged.result));
     const crossUser = await invoke(micro, users[1].token, { ...body(ids[1]), action });
-    assert.equal(crossUser.status, 400);
+    assert.equal(crossUser.status, 403);
   }
+  const hardConflict = await invoke(routePlan, users[0].token, { action: 'preview', includeNodeIds: [], excludeNodeIds: [ids[0]] });
+  assert.equal(hardConflict.result.plan.valid, false);
+  assert.equal(hardConflict.result.plan.conflicts[0].nodeId, ids[0]);
+  const softSkipped = await invoke(routePlan, users[0].token, { action: 'preview', includeNodeIds: [], excludeNodeIds: [ids[4]] });
+  assert.equal(softSkipped.result.plan.valid, true);
   const blocked = await invoke(micro, users[0].token, { ...body(ids[2]), action: 'start' });
   assert.equal(blocked.status, 403);
   assert.equal((await invoke(micro, users[0].token, { ...body(ids[1]), action: 'start' })).status, 200);
@@ -70,9 +98,56 @@ try {
   const isolated = await users[1].client.from('user_knowledge_states').select('*').eq('node_id', ids[1]); assert.deepEqual(isolated.data, []);
   const rpcArgs = { p_user_id: users[1].id, p_path_id: `${ids[1]}-path`, p_unit_id: `${ids[1]}-unit`, p_step_id: `${ids[1]}-step`, p_context_course_id: courseId, p_key: 'forged-attempt', p_response: null, p_correct: true, p_outcome: 'observed', p_step_hash: 'forged', p_duration: null, p_decision_id: null, p_expected_step: {}, p_route_node_ids: ids };
   for (const client of [users[0].client, createClient(url, process.env.VITE_SUPABASE_PUBLISHABLE_KEY!)]) {
-    const rpc = await client.rpc('record_micro_step_attempt_for_route', rpcArgs); assert.ok(rpc.error); assert.equal(rpc.error.code, '42501');
+    const rpc = await client.rpc('record_micro_step_attempt_v2', { ...rpcArgs, p_expected_version_id: null }); assert.ok(rpc.error); assert.equal(rpc.error.code, '42501');
   }
-  console.log('Personal route local acceptance passed: formal Current → bridge start/complete → Course complete; Navigation refresh; forged membership rejection; two-user isolation; unchanged coverage; anon/authenticated RPC denial.');
+  const view = await invoke(routePlan, users[0].token);
+  assert.equal(view.status, 200, JSON.stringify(view.result));
+  const v1 = view.result.activeVersion;
+  assert.equal(v1.versionNumber, 1);
+  assert.equal((await invoke(routePlan, users[0].token)).result.activeVersion.id, v1.id);
+  const history = () => server.from('personal_course_route_versions').select('*').eq('user_id', users[0].id).eq('course_id', courseId).order('version_number');
+  const preview = await invoke(routePlan, users[0].token, { action: 'preview', includeNodeIds: [ids[4]], excludeNodeIds: [] });
+  assert.equal(preview.result.plan.valid, true);
+  assert.ok(preview.result.plan.route.selectedNodeIds.includes(ids[5]));
+  assert.equal((await history()).data!.length, 1);
+  const overlap = await invoke(routePlan, users[0].token, { action: 'preview', includeNodeIds: [ids[4]], excludeNodeIds: [ids[4]] });
+  assert.equal(overlap.result.plan.valid, false);
+  for (const field of ['selectedNodeIds', 'orderedNodeIds', 'bridgeNodeIds', 'userId']) {
+    assert.equal((await invoke(routePlan, users[0].token, { action: 'adopt', baseVersionId: v1.id, includeNodeIds: [], excludeNodeIds: [], [field]: ids })).status, 400);
+  }
+  assert.equal((await invoke(routePlan, users[0].token, { action: 'adopt', baseVersionId: v1.id, includeNodeIds: [ids[3]], excludeNodeIds: [] })).status, 422);
+  const adopt = { action: 'adopt', baseVersionId: v1.id, includeNodeIds: [ids[4]], excludeNodeIds: [] };
+  const racing = await Promise.all([invoke(routePlan, users[0].token, adopt), invoke(routePlan, users[0].token, adopt)]);
+  assert.deepEqual(racing.map(r => r.status).sort(), [200, 409], JSON.stringify(racing.map(r => ({ status: r.status, error: r.result.error }))));
+  const v2 = racing.find(r => r.status === 200)!.result.activeVersion;
+  assert.equal(v2.versionNumber, 2); assert.equal(v2.parentVersionId, v1.id);
+  const afterAdopt = await invoke(navigation, users[0].token);
+  assert.ok(afterAdopt.result.path.some((r: { nodeId: string }) => r.nodeId === ids[5]));
+  const oldSnapshots = JSON.stringify((await history()).data);
+  const restore = await invoke(routePlan, users[0].token, { action: 'restore', baseVersionId: v2.id, versionId: v1.id });
+  assert.equal(restore.status, 200, JSON.stringify(restore.result));
+  const v3 = restore.result.activeVersion;
+  assert.equal(v3.versionNumber, 3); assert.equal(v3.source, 'restore'); assert.equal(v3.restoredFromVersionId, v1.id);
+  assert.equal(JSON.stringify((await history()).data!.slice(0, 2)), oldSnapshots);
+  assert.equal((await invoke(micro, users[0].token, { ...body(ids[4]), action: 'start' })).status, 400);
+  const v4 = await invoke(routePlan, users[0].token, { action: 'adopt', baseVersionId: v3.id, includeNodeIds: [], excludeNodeIds: [ids[2], ids[4]] });
+  assert.equal(v4.status, 200, JSON.stringify(v4.result));
+  assert.equal(v4.result.activeVersion.versionNumber, 4);
+  const emptyNav = await invoke(navigation, users[0].token);
+  assert.equal(emptyNav.status, 200); assert.deepEqual(emptyNav.result.path, []);
+  assert.equal((await invoke(micro, users[0].token, { ...body(ids[2]), action: 'start' })).status, 400);
+  const staleMicro = await server.rpc('start_micro_for_route_v2', { p_user_id: users[0].id, p_path_id: `${ids[2]}-path`, p_context_course_id: courseId, p_expected_version_id: v1.id, p_route_node_ids: ids });
+  assert.equal(staleMicro.error?.code, 'PT409');
+  const ownVersions = await users[1].client.from('personal_course_route_versions').select('*').eq('user_id', users[0].id);
+  assert.deepEqual(ownVersions.data, []);
+  const forgedApply = await users[0].client.rpc('adopt_personal_course_route', { p_user_id: users[1].id, p_course_id: courseId, p_base_version_id: null, p_source: 'initial', p_include_node_ids: [], p_exclude_node_ids: [], p_snapshot: {}, p_structure_fingerprint: 'forged', p_restored_from_version_id: null });
+  assert.equal(forgedApply.error?.code, '42501');
+  const mutate = await server.from('personal_course_route_versions').update({ snapshot: {} }).eq('id', v1.id);
+  assert.equal(mutate.error?.code, '42501');
+  const state = await server.from('user_knowledge_states').select('status').eq('user_id', users[0].id).eq('node_id', ids[2]).single();
+  assert.ok(['learned','practicing','mastered'].includes(state.data!.status));
+  console.log('V2 local acceptance passed: hard-only route/Micro, optional Include hard closure, immutable versions, Preview no write, concurrency 409, restore new version, empty goals, excluded member and stale Micro rejection, user isolation/RPC denial, unchanged learning and coverage.');
+
 } finally {
   for (const user of users) await server.auth.admin.deleteUser(user.id);
   await server.from('courses').delete().eq('id', courseId);

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildPersonalCourseRoute, PrerequisiteCycleError, type PersonalCourseRouteInput } from './personalCourseRoute';
+import { buildCapabilityModel as buildPersonalCourseRoute, PrerequisiteCycleError, type RoutePlanningInput as PersonalCourseRouteInput } from './routePlanning';
 import { satisfiesTeachingPrerequisite } from './teachingPrerequisites';
 const input = (pairs: string[], course: string[], current = ['A']): PersonalCourseRouteInput => ({
   nodeIds: [...new Set([...pairs.flatMap(pair => pair.split('>')), ...course, ...current])],
-  prerequisiteEdges: pairs.map(pair => { const [source, target] = pair.split('>'); return { id: pair, source, target }; }),
+  prerequisiteEdges: pairs.map(pair => { const [source, target] = pair.split('>'); return { id: pair, source, target, strength: 'hard' }; }),
   currentNodeIds: current,
   courseOrder: course.map((nodeId, index) => ({ nodeId, lessonOrder: index, coverageOrder: 0 })),
 });
-describe('personal Course route', () => {
+describe('V2 candidate model regressions from V1', () => {
   it('includes the entire connected space without changing curriculum', () => {
     const data = input(['A>B', 'B>C', 'C>Z'], ['Z']);
     const original = structuredClone(data);
@@ -22,16 +22,16 @@ describe('personal Course route', () => {
     expect(route.orderedNodeIds).toEqual(['A', 'B', 'C', 'D', 'Y']);
     expect(route.prerequisiteEdges).toHaveLength(5);
   });
-  it('disconnected input uses only Course nodes and real internal edges', () => {
+  it('disconnected current state admits actionable roots with real internal edges', () => {
     const route = buildPersonalCourseRoute(input(['A>B', 'X>Y', 'Q>X'], ['X', 'Y']));
-    expect(route.orderedNodeIds).toEqual(['X', 'Y']);
-    expect(route.prerequisiteEdges.map(edge => edge.id)).toEqual(['X>Y']);
-    expect(route.bridgeKnowledgeIds).toEqual([]);
+    expect(route.orderedNodeIds).toEqual(['Q', 'X', 'Y']);
+    expect(route.prerequisiteEdges.map(edge => edge.id)).toEqual(['Q>X', 'X>Y']);
+    expect(route.bridgeKnowledgeIds).toEqual(['Q']);
   });
   it('retains disconnected Course targets beside connected targets', () => {
     const route = buildPersonalCourseRoute(input(['A>B', 'B>X'], ['X', 'Y']));
     expect(route.orderedNodeIds).toEqual(['A', 'B', 'X', 'Y']);
-    expect(route.disconnectedCourseKnowledgeIds).toEqual(['Y']);
+    expect(route.disconnectedCourseKnowledgeIds).toEqual([]);
   });
   it('keeps satisfied bridges and overlapping current/course roles', () => {
     const route = buildPersonalCourseRoute(input(['A>B', 'B>Z'], ['Z'], ['A', 'B', 'Z']));
@@ -51,7 +51,7 @@ describe('personal Course route', () => {
   it('keeps users independent and responds to cross-Course state updates', () => {
     const data = input(['A>B', 'B>Z'], ['Z']);
     const before = buildPersonalCourseRoute({ ...data, currentNodeIds: [] });
-    expect(before.orderedNodeIds).toEqual(['Z']);
+    expect(before.orderedNodeIds).toEqual(['A', 'B', 'Z']);
     expect(buildPersonalCourseRoute(data).orderedNodeIds).toEqual(['A', 'B', 'Z']);
     expect(buildPersonalCourseRoute({ ...data, currentNodeIds: [] })).toEqual(before);
   });

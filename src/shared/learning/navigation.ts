@@ -1,4 +1,4 @@
-export const NAVIGATION_POLICY_VERSION = "course-rule-v5" as const;
+export const NAVIGATION_POLICY_VERSION = "course-rule-v6" as const;
 export type NavigationKnowledgeStatus = "explore" | "mastered" | "learning" | "learned" | "practicing";
 export type NavigationActionKind = "skip" | "remediation" | "review" | "practice" | "next";
 export type NavigationResourceKind = "micro" | "material" | "assignment" | "course";
@@ -14,7 +14,7 @@ export type NavigationEngineInput = {
   /** Server-computed complete route; absent for legacy/default callers. */
   personalRoute?: { orderedNodeIds: string[]; bridgeKnowledgeIds: string[] };
   nodes: NavigationNode[];
-  prerequisiteEdges: Array<{ source: string; target: string }>;
+  prerequisiteEdges: Array<{ source: string; target: string; strength?: "hard" | "soft" }>;
   knowledgeStatuses: Record<string, NavigationKnowledgeStatus | undefined>;
   microPaths: NavigationAsset[];
   completedMicroPathIds: string[];

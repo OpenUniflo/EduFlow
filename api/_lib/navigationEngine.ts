@@ -14,7 +14,7 @@ export function computeNavigationPlan(input: NavigationEngineInput): NavigationP
   const titleById = new Map(ordered.map((node) => [node.id, node.title]));
   const prerequisiteIds = new Map<string, string[]>();
   const courseNodeIds=new Set(ordered.map((node)=>node.id));
-  input.prerequisiteEdges.filter((edge)=>courseNodeIds.has(edge.source)&&courseNodeIds.has(edge.target)).forEach((edge) => prerequisiteIds.set(edge.target, [...(prerequisiteIds.get(edge.target) ?? []), edge.source].sort()));
+  input.prerequisiteEdges.filter((edge)=>edge.strength !== "soft" && courseNodeIds.has(edge.source)&&courseNodeIds.has(edge.target)).forEach((edge) => prerequisiteIds.set(edge.target, [...(prerequisiteIds.get(edge.target) ?? []), edge.source].sort()));
   const outgoing=new Set(input.prerequisiteEdges.filter((edge)=>courseNodeIds.has(edge.source)&&courseNodeIds.has(edge.target)).map((edge)=>edge.source));
   const targets=(input.targetNodeIds.length?input.targetNodeIds:ordered.filter((node)=>!outgoing.has(node.id)).map((node)=>node.id)).filter((id)=>courseNodeIds.has(id));
   const relevant=new Set<string>(); const visit=(id:string)=>{if(relevant.has(id)||!courseNodeIds.has(id))return;relevant.add(id);(prerequisiteIds.get(id)??[]).forEach(visit);};targets.forEach(visit);
@@ -29,7 +29,7 @@ export function computeNavigationPlan(input: NavigationEngineInput): NavigationP
   const skippedNodeIds = path.filter((item) => item.state === "skipped").map((item) => item.nodeId);
   // Curriculum frontier wins over later historical underway state.
   const current = path.find((item) => item.state !== "learned" && item.state !== "skipped");
-  if (!current) return { policyVersion: NAVIGATION_POLICY_VERSION, courseId: input.courseId, path, skippedNodeIds, nextAction: { kind: "next", resourceKind: "course", reasonCode: path.length ? "course_route_complete" : "course_route_empty", reason: path.length ? "当前课程学习内容已完成。" : "当前课程尚未准备学习路线。" } };
+  if (!current) return { policyVersion: NAVIGATION_POLICY_VERSION, courseId: input.courseId, path, skippedNodeIds, nextAction: { kind: "next", resourceKind: "course", reasonCode: path.length ? "course_route_complete" : "course_route_empty", reason: path.length ? "当前课程学习内容已完成。" : "当前路线没有待达成项目目标。" } };
 
   if(current.state==="blocked")return {policyVersion:NAVIGATION_POLICY_VERSION,courseId:input.courseId,path,skippedNodeIds,nextAction:{kind:"remediation",nodeId:current.nodeId,resourceKind:"course",reasonCode:"teaching_prerequisite_required",reason:`先完成前置 Knowledge：${current.blockedBy.join("、")}。`}};
 

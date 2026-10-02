@@ -76,7 +76,6 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   ]);
   const { route, nodes, states } = personal;
   const courseNodeIds = new Set(route.orderedNodeIds);
-  if (!courseNodeIds.size) throw new ApiError(422, "course_route_empty", "Course has no Knowledge route");
   const nodeIds = route.orderedNodeIds;
   const assignmentIds = assignmentRows.map((row) => text(row, "id"));
   const [globalMicro, resultHistory] = await Promise.all([
@@ -109,7 +108,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   resultHistory.forEach((row) => { const id = text(row, "assignment_id"); if (!outcomes[id]) outcomes[id] = text(row, "outcome") as "passed" | "failed" | "pending"; });
   const input: NavigationEngineInput = {
     courseId,
-    targetNodeIds: route.courseKnowledgeIds,
+    targetNodeIds: route.effectiveTargetNodeIds,
     personalRoute: { orderedNodeIds: route.orderedNodeIds, bridgeKnowledgeIds: route.bridgeKnowledgeIds },
     nodes: nodes.map(row => ({ id: text(row, "id"), title: titleByRevision.get(text(row, "current_revision_id")) ?? text(row, "id"), lessonOrder: 0, coverageOrder: 0 })),
     prerequisiteEdges: route.prerequisiteEdges,

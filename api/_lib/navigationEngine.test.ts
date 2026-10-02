@@ -38,7 +38,7 @@ describe("deterministic Navigation Engine", () => {
     const plan = computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned", b: "practicing" }, completedMicroPathIds: ["micro-a"] });
     expect(plan.nextAction).toMatchObject({ resourceKind: "course", reasonCode: "course_route_complete" });
     expect(plan.nextAction.nodeId).toBeUndefined();
-    expect(plan.policyVersion).toBe("course-rule-v5");
+    expect(plan.policyVersion).toBe("course-rule-v6");
   });
   it("does not force optional Micro after the Knowledge is learned", () => {
     expect(computeNavigationPlan({ ...base, knowledgeStatuses: { a: "learned" }, microPaths: [{ id: "optional", nodeId: "a", order: 0 }] }).nextAction.nodeId).toBe("b");
@@ -110,5 +110,13 @@ describe('computed personal route input', () => {
     expect(plan.nextAction.nodeId).toBe('z');
     expect(plan.path[1].state).toBe('learned');
     expect(input.knowledgeStatuses.bridge).toBeUndefined();
+  });
+});
+
+describe('V2 prerequisite strength', () => {
+  it('soft never contributes blockedBy while every missing hard prerequisite does', () => {
+    const input: NavigationEngineInput = { courseId: 'v2', targetNodeIds: ['T'], personalRoute: { orderedNodeIds: ['A', 'S', 'T'], bridgeKnowledgeIds: ['A', 'S'] }, nodes: ['A', 'S', 'T'].map(id => ({ id, title: id, lessonOrder: 0, coverageOrder: 0 })), prerequisiteEdges: [{ source: 'A', target: 'T', strength: 'hard' }, { source: 'S', target: 'T', strength: 'soft' }], knowledgeStatuses: {}, microPaths: [], completedMicroPathIds: [], assignments: [], assignmentOutcomes: {}, materials: [] };
+    expect(computeNavigationPlan(input).path.find(item => item.nodeId === 'T')?.blockedBy).toEqual(['A']);
+    expect(computeNavigationPlan({ ...input, knowledgeStatuses: { A: 'learned' } }).path.find(item => item.nodeId === 'T')).toMatchObject({ state: 'eligible', blockedBy: [] });
   });
 });

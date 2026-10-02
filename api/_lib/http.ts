@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 export type ApiHandler = (request: VercelRequest, response: VercelResponse) => Promise<void> | void;
 
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string) {
+  constructor(readonly status: number, readonly code: string, message: string, readonly details?: unknown) {
     super(message);
   }
 }
@@ -23,7 +23,7 @@ export function handleApi(handler: ApiHandler): ApiHandler {
       await handler(request, response);
     } catch (error) {
       if (error instanceof ApiError) {
-        json(response, error.status, { error: { code: error.code, message: error.message } });
+        json(response, error.status, { error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) } });
         return;
       }
       console.error("API request failed", error instanceof Error ? error.message : "Unknown error");
