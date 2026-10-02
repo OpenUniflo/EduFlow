@@ -12,7 +12,7 @@ export function generateCandidates(input: NavigationEngineInput, criterionIdsByP
   const courseNodes = new Set(input.nodes.map(node => node.id));
   return baseline.path.flatMap(node => {
     if (node.state !== 'eligible' && node.state !== 'underway') return [];
-    if (input.prerequisiteEdges.some(edge => edge.target === node.nodeId && courseNodes.has(edge.source)
+    if (input.prerequisiteEdges.some(edge => edge.strength !== 'soft' && edge.target === node.nodeId && courseNodes.has(edge.source)
       && !satisfiesTeachingPrerequisite(input.knowledgeStatuses[edge.source]))) return [];
     const matching = input.microPaths.filter(path => path.nodeId === node.nodeId);
     const required = matching.filter(path => path.required);
@@ -30,7 +30,7 @@ export function generateCandidates(input: NavigationEngineInput, criterionIdsByP
 }
 
 export const FixedPolicy: RecommendationPolicy = {
-  key: 'fixed', version: 'fixed-course-rule-v5-v1',
+  key: 'fixed', version: 'fixed-course-rule-v6-v1',
   recommend({ baseline }, candidates) {
     const selectedAction = candidates.find(candidate => candidate.resourceId === baseline.nextAction.resourceId
       && candidate.knowledgeId === baseline.nextAction.nodeId) ?? null;
@@ -38,7 +38,7 @@ export const FixedPolicy: RecommendationPolicy = {
   },
 };
 export const RulePolicy: RecommendationPolicy = {
-  key: 'rule_v1', version: 'rule-v1',
+  key: 'rule_v1', version: 'rule-v1-hard-only-v2',
   recommend(context, candidates) {
     // A recorded failed observation is useful even when its support is still low.
     // Unknown never enters this set; there is no probabilistic or weighted score.

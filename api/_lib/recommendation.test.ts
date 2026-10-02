@@ -12,7 +12,7 @@ const input = (): NavigationEngineInput => ({ courseId: 'course', targetNodeIds:
 const mapping = new Map([['path-b', ['criterion-b']], ['path-c', ['criterion-c']]]);
 const insufficient = (id: string) => estimateCriterionState({ criterionId: id, version: 1 }, [{ criterionId: id, version: 1, id: 'fact', sequence: 1, outcome: 'incorrect', sourceKind: 'actual-observation', sourceId: 'attempt' }]);
 describe('recommendation boundary', () => {
-  it('keeps Fixed on the course-rule-v4 frontier and permits real state to reorder the same legal set', () => {
+  it('keeps Fixed on the course-rule-v6 frontier and permits real state to reorder the same legal set', () => {
     const baseline = computeNavigationPlan(input());
     const candidates = generateCandidates(input(), mapping);
     expect(candidates.map(c => c.resourceId)).toEqual(['path-a', 'path-b']);
@@ -52,4 +52,19 @@ describe('recommendation boundary', () => {
     expect(result.selection.selectedAction).toBeNull();
     expect(result.baseline.nextAction.resourceKind).toBe('course');
   });
+});
+
+it.each(['hard', 'soft'] as const)('recommendation candidate admission respects %s prerequisites', strength => {
+  const data = input(); data.prerequisiteEdges = [{ source: 'a', target: 'c', strength }];
+  const result = recommend(data, [insufficient('criterion-c')], mapping, 'rule_v1');
+  expect(result.candidates.map(candidate => candidate.resourceId)).toEqual(strength === 'soft' ? ['path-a', 'path-b', 'path-c'] : ['path-a', 'path-b']);
+  expect(result.selection.selectedAction?.resourceId).toBe(strength === 'soft' ? 'path-c' : 'path-a');
+  expect(result.baseline.path.find(node => node.nodeId === 'c')?.state).toBe(strength === 'soft' ? 'eligible' : 'blocked');
+});
+it('Fixed resumes historical learning despite an unmet soft prerequisite', () => {
+  const data = input(); data.knowledgeStatuses = { a: 'learned' };
+  data.prerequisiteEdges = [{ source: 'b', target: 'a', strength: 'soft' }];
+  const result = recommend(data, [], mapping, 'fixed');
+  expect(result.selection.selectedAction?.resourceId).toBe('path-a');
+  expect(result.baseline.nextAction.resourceKind).toBe('micro');
 });
