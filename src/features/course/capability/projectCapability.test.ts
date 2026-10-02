@@ -29,7 +29,7 @@ describe('Project capability feature adapter', () => {
     expect(buildProjectCapabilityModel(graph([]), runtime, []).orderedNodeIds).toEqual([target, 'bridge']);
   });
   it('keeps status/role changes out of scene structural identity', () => {
-    const input = graph([edge('current', 'bridge'), edge('bridge', target)]);
+    const input = graph([edge('current', 'bridge'), edge('bridge', target), edge('current', target)]);
     const initial = [{ nodeId: 'current', status: 'mastered' as const }];
     const updated = [...initial, { nodeId: 'bridge', status: 'mastered' as const }];
     const before = projectCapabilityAtlas(input, buildProjectCapabilityModel(input, routeOnlyRuntime, initial), governance, initial);

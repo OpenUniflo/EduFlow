@@ -16,6 +16,7 @@ import {
   type Material,
   type Texture
 } from "three";
+import { computeDownstreamSubgraph } from "../atlasDownstream";
 import type { AtlasSceneEdge, AtlasSceneNode } from "../projections/atlasProjections";
 import { atlasStructureKey, canonicalAtlasCamera, freezeAtlasNodePositions, resetAtlasCamera } from "../atlasCamera";
 
@@ -196,7 +197,10 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const renderNodeById = useMemo(() => new Map(renderNodes.map((node) => [node.id, node])), [renderNodes]);
   const focusTargetId = selectedId ?? searchMatchId ?? null;
+  const downstream = useMemo(() => variant === "project" && focusTargetId
+    ? computeDownstreamSubgraph(focusTargetId, edges) : null, [variant, focusTargetId, edges]);
   const focusIds = useMemo(() => {
+    if (downstream) return downstream.nodeIds;
     if (!focusTargetId) return null;
     const ids = new Set([focusTargetId]);
     renderEdges.forEach((edge) => {
@@ -206,7 +210,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       if (target === focusTargetId) ids.add(source);
     });
     return ids;
-  }, [focusTargetId, renderEdges]);
+  }, [focusTargetId, renderEdges, downstream]);
 
   presentationRef.current = { focusTargetId, hoveredId, focusIds };
 
@@ -368,7 +372,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   }, [focusIds, renderNodeById, variant]);
 
   useEffect(() => {
-    if (!focusTargetId) return;
+    if (!focusTargetId || variant === "project") return;
     let attempts = 0;
     let timer = 0;
     const tryFocus = () => {
@@ -378,7 +382,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     };
     tryFocus();
     return () => window.clearTimeout(timer);
-  }, [focusNode, focusTargetId]);
+  }, [focusNode, focusTargetId, variant]);
 
   const updateLabels = useCallback(() => {
     const graph = graphRef.current;
@@ -515,22 +519,27 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
         linkColor={(edge) => {
           const source = endpointId(edge.source);
           const target = endpointId(edge.target);
-          const incident = Boolean(focusTargetId && (focusTargetId === source || focusTargetId === target));
+          const incident = downstream ? downstream.edgeIds.has(edge.id) : Boolean(focusTargetId && (focusTargetId === source || focusTargetId === target));
           const hoverIncident = Boolean(hoveredId && (hoveredId === source || hoveredId === target));
           if (incident) return alphaColor(nodeById.get(focusTargetId ?? "")?.color ?? "#8392A8", 0.84);
-          if (hoverIncident) return alphaColor(nodeById.get(hoveredId ?? "")?.color ?? "#8392A8", 0.48);
+          if (hoverIncident && !downstream) return alphaColor(nodeById.get(hoveredId ?? "")?.color ?? "#8392A8", 0.48);
           if (focusTargetId) return "rgba(92,112,145,0.018)";
           return variant === "global" ? "rgba(131,146,168,0.18)" : "rgba(131,146,168,0.17)";
         }}
         linkWidth={(edge) => {
           const source = endpointId(edge.source);
           const target = endpointId(edge.target);
-          if (focusTargetId && (focusTargetId === source || focusTargetId === target)) return 1.45;
-          if (hoveredId && (hoveredId === source || hoveredId === target)) return 0.82;
+          if (downstream ? downstream.edgeIds.has(edge.id) : focusTargetId && (focusTargetId === source || focusTargetId === target)) return 1.45;
+          if (!downstream && hoveredId && (hoveredId === source || hoveredId === target)) return 0.82;
           return focusTargetId ? 0.08 : 0.48;
         }}
         linkOpacity={1}
         linkDirectionalArrowLength={0}
+        linkDirectionalParticles={edge => downstream?.edgeIds.has(edge.id) ? 3 : 0}
+        linkDirectionalParticleSpeed={0.008}
+        linkDirectionalParticleWidth={2.6}
+        linkDirectionalParticleColor={() => "#f59e0b"}
+        linkDirectionalParticleResolution={6}
         enableNodeDrag={false}
         enableNavigationControls
         controlType="orbit"

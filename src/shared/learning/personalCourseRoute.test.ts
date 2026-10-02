@@ -22,20 +22,20 @@ describe('V2 candidate model regressions from V1', () => {
     expect(route.orderedNodeIds).toEqual(['A', 'B', 'C', 'D', 'Y']);
     expect(route.prerequisiteEdges).toHaveLength(5);
   });
-  it('disconnected current state admits actionable roots with real internal edges', () => {
+  it('disconnected current state retains targets without inventing root boundaries', () => {
     const route = buildPersonalCourseRoute(input(['A>B', 'X>Y', 'Q>X'], ['X', 'Y']));
-    expect(route.orderedNodeIds).toEqual(['Q', 'X', 'Y']);
-    expect(route.prerequisiteEdges.map(edge => edge.id)).toEqual(['Q>X', 'X>Y']);
-    expect(route.bridgeKnowledgeIds).toEqual(['Q']);
+    expect(route.orderedNodeIds).toEqual(['X', 'Y']);
+    expect(route.prerequisiteEdges.map(edge => edge.id)).toEqual(['X>Y']);
+    expect(route.bridgeKnowledgeIds).toEqual([]);
   });
   it('retains disconnected Course targets beside connected targets', () => {
     const route = buildPersonalCourseRoute(input(['A>B', 'B>X'], ['X', 'Y']));
     expect(route.orderedNodeIds).toEqual(['A', 'B', 'X', 'Y']);
-    expect(route.disconnectedCourseKnowledgeIds).toEqual([]);
+    expect(route.disconnectedCourseKnowledgeIds).toEqual(['Y']);
   });
-  it('keeps satisfied bridges and overlapping current/course roles', () => {
+  it('keeps acquired targets without historical non-target acquired nodes', () => {
     const route = buildPersonalCourseRoute(input(['A>B', 'B>Z'], ['Z'], ['A', 'B', 'Z']));
-    expect(route.currentKnowledgeIds).toEqual(['A', 'B', 'Z']);
+    expect(route.currentKnowledgeIds).toEqual(['Z']);
     expect(route.courseKnowledgeIds).toEqual(['Z']);
   });
   it('uses the earliest downstream curriculum anchor with deterministic ready ordering', () => {
@@ -51,7 +51,7 @@ describe('V2 candidate model regressions from V1', () => {
   it('keeps users independent and responds to cross-Course state updates', () => {
     const data = input(['A>B', 'B>Z'], ['Z']);
     const before = buildPersonalCourseRoute({ ...data, currentNodeIds: [] });
-    expect(before.orderedNodeIds).toEqual(['A', 'B', 'Z']);
+    expect(before.orderedNodeIds).toEqual(['Z']);
     expect(buildPersonalCourseRoute(data).orderedNodeIds).toEqual(['A', 'B', 'Z']);
     expect(buildPersonalCourseRoute({ ...data, currentNodeIds: [] })).toEqual(before);
   });

@@ -86,32 +86,47 @@ function prepare(input: RoutePlanningInput) {
     return (left?.lessonOrder ?? Infinity) - (right?.lessonOrder ?? Infinity)
       || (left?.coverageOrder ?? Infinity) - (right?.coverageOrder ?? Infinity) || compareId(a, b);
   };
-  const learnable = new Set<string>(); const actionable = new Set<string>();
+  const actionable = new Set<string>();
   for (const id of order) {
     const hard = incoming.get(id)!.filter(edge => edge.strength === 'hard');
     if (current.has(id) || hard.every(edge => current.has(edge.source))) actionable.add(id);
-    if (current.has(id) || hard.every(edge => learnable.has(edge.source))) learnable.add(id);
   }
-  return { ids, edges, incoming, order, course, current, compare, learnable, actionable };
+  return { ids, edges, incoming, order, course, current, compare, actionable };
 }
 
 function capability(data: ReturnType<typeof prepare>): CapabilityModel {
-  const { course, incoming, learnable, edges, current, actionable, compare } = data;
-  const members = new Set(course.keys());
-  const queue = [...course.keys()];
-  for (let i = 0; i < queue.length; i++) for (const edge of incoming.get(queue[i])!) {
-    if (learnable.has(edge.source) && !members.has(edge.source)) { members.add(edge.source); queue.push(edge.source); }
+  const { course, incoming, order, edges, current, actionable, compare } = data;
+  // A gap starts at real acquired capabilities. Every hard branch must have such
+  // support; a soft edge can connect a candidate but never becomes an AND gate.
+  const supported = new Set(current);
+  for (const id of order) {
+    if (current.has(id)) continue;
+    const parents = incoming.get(id)!;
+    if (parents.some(edge => supported.has(edge.source))
+      && parents.every(edge => edge.strength !== 'hard' || supported.has(edge.source))) supported.add(id);
   }
-  // All target roots are terminals for reverse traversal; no unavailable intermediary is admitted.
-  const orderedNodeIds = topological(members, edges, compare);
+  const members = new Set(course.keys());
+  const visited = new Set([...course.keys()].filter(id => !current.has(id) && supported.has(id)));
+  const queue = [...visited];
+  for (let i = 0; i < queue.length; i++) {
+    const id = queue[i];
+    if (current.has(id)) continue; // Do not unfold history before today's boundary.
+    for (const edge of incoming.get(id)!) if (supported.has(edge.source) && !visited.has(edge.source)) {
+      members.add(edge.source); visited.add(edge.source); queue.push(edge.source);
+    }
+  }
+  // Keep real facts between admitted members; acquired color is not an edge filter.
+  // Even unanchored targets retain their real target-to-target relations.
+  const gapEdges = edges.filter(edge => members.has(edge.source) && members.has(edge.target));
+  const orderedNodeIds = topological(members, gapEdges, compare);
   const courseKnowledgeIds = unique(course.keys());
   return {
-    orderedNodeIds, prerequisiteEdges: edges.filter(edge => members.has(edge.source) && members.has(edge.target)),
+    orderedNodeIds, prerequisiteEdges: gapEdges,
     courseKnowledgeIds, currentKnowledgeIds: orderedNodeIds.filter(id => current.has(id)),
     bridgeKnowledgeIds: orderedNodeIds.filter(id => !course.has(id)),
     actionableNodeIds: unique([...actionable].filter(id => members.has(id))),
-    connectedCourseKnowledgeIds: courseKnowledgeIds.filter(id => learnable.has(id)),
-    disconnectedCourseKnowledgeIds: courseKnowledgeIds.filter(id => !learnable.has(id)),
+    connectedCourseKnowledgeIds: courseKnowledgeIds.filter(id => supported.has(id)),
+    disconnectedCourseKnowledgeIds: courseKnowledgeIds.filter(id => !supported.has(id)),
   };
 }
 export function buildCapabilityModel(input: RoutePlanningInput): CapabilityModel { return capability(prepare(input)); }

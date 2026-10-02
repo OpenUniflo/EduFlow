@@ -21,7 +21,15 @@ describe('V2 route UI authority and historical meaning', () => {
   it('ordinary view hides Include/Exclude editor even when constraints are persisted', () => {
     const c = { view: { activeVersion: { ...version, constraints: { includeNodeIds: ['A'], excludeNodeIds: ['B'] } }, plan: { valid: true, route: version.snapshot } }, busy: false, editing: false, preview: null, history: null } as unknown as ReturnType<typeof useRoutePlanning>;
     const html = renderToStaticMarkup(<RoutePlanningPanel control={c} title={id => id}/>);
-    expect(html).toContain('当前路线 V1'); expect(html).not.toContain('选择加入'); expect(html).not.toContain('选择排除');
+    expect(html).not.toContain('当前路线 V1'); expect(html).toContain('调整学习路线'); expect(html).not.toContain('版本历史'); expect(html).not.toContain('重新载入'); expect(html).not.toContain('选择加入'); expect(html).not.toContain('选择排除');
+  });
+  it('route editing exposes history, constraints and Preview/diff while invalid current routes remain explicit', () => {
+    const c = { view: { activeVersion: version, plan: { valid: false, conflicts: [{ kind: 'include_outside_model', rootNodeId: 'old', rootKind: 'include', nodeId: 'old', constraint: 'include' }] } }, busy: false, editing: true, tool: 'include', draft: { includeNodeIds: ['A'], excludeNodeIds: [] }, preview: { valid: true, route: version.snapshot }, history: [] } as unknown as ReturnType<typeof useRoutePlanning>;
+    const html = renderToStaticMarkup(<RoutePlanningPanel control={c} title={id => id}/>);
+    for (const text of ['当前路线 V1', '版本历史', '重新载入当前路线', '选择加入', '选择排除', '清空修改', '重新规划路线', '退出调整', '路线 Preview', '采用新路线', '该能力不在当前项目能力模型中']) expect(html).toContain(text);
+    const ordinary = renderToStaticMarkup(<RoutePlanningPanel control={{ ...c, editing: false }} title={id => id}/>);
+    expect(ordinary).toContain('当前路线需要重新确认');
+    expect(ordinary).not.toContain('路线 Preview'); expect(ordinary).not.toContain('版本历史');
   });
   it('same structural graph does not depend on draft, preview or route version, and no role rings remain', () => {
     const scene = readFileSync('src/features/knowledge/components/KnowledgeAtlasScene.tsx', 'utf8');

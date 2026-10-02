@@ -57,9 +57,20 @@ describe('authoritative V2 route intent API', () => {
     expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['T']);
   });
   it('restores historical constraints through current planning and a new write', async () => {
+    mocks.input.mockResolvedValue({ ...data, input: { ...data.input, currentNodeIds: ['A', 'S'] } });
     expect((await invoke({ action: 'restore', baseVersionId: base, versionId: old })).status).toBe(200);
     expect(mocks.read).toHaveBeenCalledWith('authenticated-client', 'learner', 'course', old);
     expect(mocks.persist.mock.calls[0].slice(5)).toEqual([base, 'restore', old]);
     expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['A', 'S', 'T']);
   });
+  it('rejects historical Include that left the current gap without rewriting history', async () => {
+    const historical = { constraints: { includeNodeIds: ['S'], excludeNodeIds: [] } };
+    mocks.read.mockResolvedValue(historical);
+    const r = await invoke({ action: 'restore', baseVersionId: base, versionId: old });
+    expect(r.status).toBe(422);
+    expect(r.result.error.details.conflicts).toContainEqual(expect.objectContaining({ kind: 'include_outside_model', nodeId: 'S' }));
+    expect(mocks.persist).not.toHaveBeenCalled();
+    expect(historical.constraints).toEqual({ includeNodeIds: ['S'], excludeNodeIds: [] });
+  });
+
 });
