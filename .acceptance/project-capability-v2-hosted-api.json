@@ -1,0 +1,129 @@
+{
+  "preview": "https://edu-flow-choo6yult-july-nanas-projects.vercel.app",
+  "capturedAt": "2026-10-02T06:52:20.544Z",
+  "scope": "Hosted HTTP + authenticated REST; administrator route adjustments restored; already-completed A02 reopened for soft admission; no catalog or evidence writes",
+  "results": [
+    {
+      "name": "current route",
+      "status": 200
+    },
+    {
+      "name": "administrator separate current route",
+      "status": 200
+    },
+    {
+      "name": "forged selectedNodeIds",
+      "status": 400,
+      "code": "invalid_route_intent"
+    },
+    {
+      "name": "forged orderedNodeIds",
+      "status": 400,
+      "code": "invalid_route_intent"
+    },
+    {
+      "name": "forged bridgeNodeIds",
+      "status": 400,
+      "code": "invalid_route_intent"
+    },
+    {
+      "name": "forged userId",
+      "status": 400,
+      "code": "invalid_route_intent"
+    },
+    {
+      "name": "null-base adoption rejected",
+      "status": 400,
+      "code": "invalid_route_intent"
+    },
+    {
+      "name": "outside-model preview",
+      "status": 200
+    },
+    {
+      "name": "outside-model adoption",
+      "status": 422,
+      "code": "route_constraints_conflict",
+      "conflicts": [
+        {
+          "kind": "include_outside_model",
+          "rootNodeId": "nonexistent-hosted-attack",
+          "rootKind": "include",
+          "nodeId": "nonexistent-hosted-attack",
+          "constraint": "include"
+        }
+      ]
+    },
+    {
+      "name": "restore another users version",
+      "status": 404,
+      "code": "route_version_not_found"
+    },
+    {
+      "name": "RLS other-user history hidden",
+      "status": 200
+    },
+    {
+      "name": "direct history mutation denied",
+      "status": 403,
+      "code": "42501"
+    },
+    {
+      "name": "direct adoption RPC denied",
+      "status": 403,
+      "code": "42501"
+    },
+    {
+      "name": "direct Micro RPC denied",
+      "status": 403,
+      "code": "42501"
+    },
+    {
+      "name": "hard prerequisite denies actual Micro",
+      "status": 403,
+      "code": "teaching_prerequisite_required"
+    },
+    {
+      "name": "empty commitment preview",
+      "status": 200
+    },
+    {
+      "name": "empty commitment adopted",
+      "status": 200
+    },
+    {
+      "name": "empty Navigation without curriculum fallback",
+      "status": 200
+    },
+    {
+      "name": "excluded covered node cannot start Micro",
+      "status": 400,
+      "code": "knowledge_not_in_course"
+    },
+    {
+      "name": "stale administrator adoption",
+      "status": 409,
+      "code": "route_version_conflict"
+    },
+    {
+      "name": "administrator restore appends version",
+      "status": 200
+    },
+    {
+      "name": "restored Navigation",
+      "status": 200
+    },
+    {
+      "name": "include unmet real soft source",
+      "status": 200
+    },
+    {
+      "name": "unmet selected soft source allows existing Micro reopen",
+      "status": 200
+    },
+    {
+      "name": "administrator constraints restored after soft admission test",
+      "status": 200
+    }
+  ]
+}

@@ -589,7 +589,7 @@
 ## Micro Completion Context
 
 - Micro completion reaches `learned`, never Micro-alone `mastered`. Existing stronger mastery evidence remains distinct.
-- Course Graph, Course Path and Navigation MUST share teaching prerequisite semantics. Only factual prerequisites with both endpoints in the Course route gate that route; external facts remain facts without a hidden entry gate.
+- Course Graph, Course Path and Navigation MUST share teaching prerequisite semantics. Only factual hard prerequisites with both endpoints in the selected Course route gate that route; soft prerequisites MUST NOT gate learning; external facts remain facts without a hidden entry gate.
 - Micro body owns teaching and Summary; the system shell owns optional Material, Practice, Next Knowledge and Course/source actions. Absent capabilities are omitted, not empty cards.
 - Completion Next uses the Navigation Knowledge identity and preserves optional Course context. Material uses real coverage/Segment and returns to the original Micro completion. Review MUST NOT write formal completion or downgrade progress/state.
 - Historical Micro scope/course fields are compatibility data, not two learner-facing products. Physical cleanup remains deferred to #32.
@@ -604,3 +604,12 @@
 - Fixed and Rule MUST share action/selection contracts and the existing NavigationDecision authority. Model policy remains unsupported until independently implemented and validated; LLM output is not recommendation authority.
 - State–Action–Outcome lineage MUST use explicit validated decision attribution, bounded state summaries, version/hash/cutoff and immutable observations. Manual actions MUST NOT be attributed to a guessed previous recommendation.
 - Course policy is server configuration. Browsers and learners MUST NOT select production policy, write authoritative criterion state, or provide authoritative evaluations. Review remains presentation-local.
+
+## Project Capability and Personal Route V2
+
+- Candidate capability space and selected personal route MUST be separate pure computations over explicit visible graph, Course coverage and user-state inputs. Project targets remain all active CurriculumCoverage Knowledge IDs.
+- hard prerequisites are AND gates; soft prerequisites MUST NOT block Navigation or Micro and MUST NOT enter the default necessary route merely as recommendations.
+- Default selected route is retained targets plus recursive hard closure to satisfied boundaries. Include is candidate-only and fills hard closure; Exclude forbids using even acquired support. Invalid constraints MUST return structured root/support conflicts; all targets excluded is valid and MUST NOT trigger a curriculum fallback.
+- Personal route versions MUST be immutable, user/course scoped and atomically appended with optimistic base-version checking. Only initialization, explicit adoption and restore create versions. Restore MUST replan historical constraints in the current world and MUST NOT roll back learning or history.
+- Server revalidation owns route membership. Client selected/ordered/bridge lists MUST NOT authorize learning; original Course coverage MUST NOT bypass active Exclude. Micro RPCs MUST remain service-only and check expected active version and hard eligibility.
+- Project colors are blue acquired, green pending target and gray pending intermediate; this project-only encoding MUST NOT replace Domain color in Global/Personal Atlas. Same-structure state, draft, Preview and version changes MUST NOT reheat or relayout the force graph.

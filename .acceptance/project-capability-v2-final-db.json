@@ -1,0 +1,149 @@
+{
+  "micro": {
+    "status": "completed",
+    "path_id": "aiad-l1-agc02",
+    "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+    "started_at": "2026-10-02T06:43:10.058765+00:00",
+    "updated_at": "2026-10-02T06:44:57.870724+00:00",
+    "completed_at": "2026-10-02T06:44:57.870724+00:00",
+    "current_step_id": null,
+    "current_unit_id": null
+  },
+  "active": "38c8eeef-55cd-4a18-b2c2-9329fadf8067",
+  "evidence": [
+    {
+      "id": "3096dc2a-db45-492a-9abe-1b077ddd3d91",
+      "context": {
+        "pathId": "aiad-l1-agc02",
+        "courseId": "ai-agents-in-depth"
+      },
+      "node_id": "AGC02",
+      "outcome": "completed",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "event_type": "micro_path_completed",
+      "occurred_at": "2026-10-02T06:44:57.870724+00:00",
+      "source_entity_id": "aiad-l1-agc02"
+    }
+  ],
+  "versions": [
+    {
+      "id": "8cd78213-9ab5-4098-8725-4978e8b69b7a",
+      "source": "initial",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "route_id": "dfcbbeaa-fe62-47ce-9acc-9d9bdfd611ae",
+      "course_id": "ai-agents-in-depth",
+      "created_at": "2026-10-02T06:40:35.960937+00:00",
+      "version_number": 1,
+      "exclude_node_ids": [],
+      "include_node_ids": [],
+      "parent_version_id": null,
+      "structure_fingerprint": "815d5a11a6c5fab120c1e8eae79c9587bf7585f68e5bea528c6a631494e00e48",
+      "restored_from_version_id": null,
+      "snapshot_sha256": "f5299c2757ff20f5449de1947f614d32c6e471ca2c01f3c3ad79e8ec97fecfe8"
+    },
+    {
+      "id": "19c8c417-fa45-46a7-8607-3be55970ca20",
+      "source": "adjustment",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "route_id": "dfcbbeaa-fe62-47ce-9acc-9d9bdfd611ae",
+      "course_id": "ai-agents-in-depth",
+      "created_at": "2026-10-02T06:42:22.022824+00:00",
+      "version_number": 2,
+      "exclude_node_ids": [
+        "P01"
+      ],
+      "include_node_ids": [
+        "A01"
+      ],
+      "parent_version_id": "8cd78213-9ab5-4098-8725-4978e8b69b7a",
+      "structure_fingerprint": "815d5a11a6c5fab120c1e8eae79c9587bf7585f68e5bea528c6a631494e00e48",
+      "restored_from_version_id": null,
+      "snapshot_sha256": "17ee960a08ce82b47b4232d1595fcb222f314f26a4b403f769449d8a8a0d5c77"
+    },
+    {
+      "id": "747dfc56-2603-4107-bb32-175d9ca56c8f",
+      "source": "adjustment",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "route_id": "dfcbbeaa-fe62-47ce-9acc-9d9bdfd611ae",
+      "course_id": "ai-agents-in-depth",
+      "created_at": "2026-10-02T06:46:59.943131+00:00",
+      "version_number": 3,
+      "exclude_node_ids": [
+        "P01"
+      ],
+      "include_node_ids": [
+        "A01",
+        "T15"
+      ],
+      "parent_version_id": "19c8c417-fa45-46a7-8607-3be55970ca20",
+      "structure_fingerprint": "815d5a11a6c5fab120c1e8eae79c9587bf7585f68e5bea528c6a631494e00e48",
+      "restored_from_version_id": null,
+      "snapshot_sha256": "f77e043a12aef9162aa0e28d03c42cd3ecd766e64031bd2d36428c8897f0aa3e"
+    },
+    {
+      "id": "36f63971-246e-4e4f-b936-1d1075e1b05d",
+      "source": "restore",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "route_id": "dfcbbeaa-fe62-47ce-9acc-9d9bdfd611ae",
+      "course_id": "ai-agents-in-depth",
+      "created_at": "2026-10-02T06:47:44.24432+00:00",
+      "version_number": 4,
+      "exclude_node_ids": [],
+      "include_node_ids": [],
+      "parent_version_id": "747dfc56-2603-4107-bb32-175d9ca56c8f",
+      "structure_fingerprint": "815d5a11a6c5fab120c1e8eae79c9587bf7585f68e5bea528c6a631494e00e48",
+      "restored_from_version_id": "8cd78213-9ab5-4098-8725-4978e8b69b7a",
+      "snapshot_sha256": "5314d3fc46a2d97bb59938b0a565f342557d4c41f2d735c4b795c2cdc1b9431e"
+    },
+    {
+      "id": "b4794800-0a9f-4cf0-9bb3-111a48b9032e",
+      "source": "adjustment",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "route_id": "dfcbbeaa-fe62-47ce-9acc-9d9bdfd611ae",
+      "course_id": "ai-agents-in-depth",
+      "created_at": "2026-10-02T06:49:57.685653+00:00",
+      "version_number": 5,
+      "exclude_node_ids": [],
+      "include_node_ids": [
+        "A01"
+      ],
+      "parent_version_id": "36f63971-246e-4e4f-b936-1d1075e1b05d",
+      "structure_fingerprint": "815d5a11a6c5fab120c1e8eae79c9587bf7585f68e5bea528c6a631494e00e48",
+      "restored_from_version_id": null,
+      "snapshot_sha256": "97bcb9c46af1b8cae297a7eaefa62b4ef484b9814f2a2fb4ca371187eaf8f9e8"
+    },
+    {
+      "id": "38c8eeef-55cd-4a18-b2c2-9329fadf8067",
+      "source": "restore",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "route_id": "dfcbbeaa-fe62-47ce-9acc-9d9bdfd611ae",
+      "course_id": "ai-agents-in-depth",
+      "created_at": "2026-10-02T06:56:13.583211+00:00",
+      "version_number": 6,
+      "exclude_node_ids": [],
+      "include_node_ids": [],
+      "parent_version_id": "b4794800-0a9f-4cf0-9bb3-111a48b9032e",
+      "structure_fingerprint": "815d5a11a6c5fab120c1e8eae79c9587bf7585f68e5bea528c6a631494e00e48",
+      "restored_from_version_id": "8cd78213-9ab5-4098-8725-4978e8b69b7a",
+      "snapshot_sha256": "5314d3fc46a2d97bb59938b0a565f342557d4c41f2d735c4b795c2cdc1b9431e"
+    }
+  ],
+  "knowledge": {
+    "status": "learned",
+    "mastery": null,
+    "node_id": "AGC02",
+    "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+    "evidence": null,
+    "updated_at": "2026-10-02T06:44:57.870724+00:00",
+    "mastery_origin": null,
+    "source_node_id": null,
+    "source_node_ids": null
+  },
+  "captured_at": "2026-10-02T06:57:34.334703+00:00",
+  "attempt_count": 6,
+  "verification": {
+    "earlierV1ToV4Unchanged": true,
+    "learningAndEvidenceUnchangedAfterRestore": true,
+    "activeV6RestoresV1EmptyConstraints": true
+  }
+}
