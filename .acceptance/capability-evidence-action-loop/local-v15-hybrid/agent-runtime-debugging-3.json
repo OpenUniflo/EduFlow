@@ -1,0 +1,173 @@
+{
+  "failure": {
+    "message": "LLM response was not valid JSON: provider=deepseek, model=deepseek-v4-flash"
+  },
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v15",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "02554244-0f2f-40f2-aef5-6a3b2f69001a",
+      "generatedAt": "2026-10-03T17:41:07.349Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 544,
+      "completionTokens": 5407
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-agent-runtime-debugging",
+          "line": 1,
+          "quote": "我调试实际运行的库存核查 Agent。运行轨迹 run-r73 显示 Agent 发起 inventory_check 工具调用后失败；工具日志包含 NameError: available_stock is not defined，退出码1。我沿该次 Agent 执行轨迹定位到工具脚本第18行，把拼错的 available_stock 改为已经定义的 available_quantity，保留原输入重新执行同一 Agent 任务；工具返回可用库存40件、退出码0，Agent 输出库存核查报告，轨迹显示工具调用成功且任务完成。我核对报告中的40件与盘点表一致，其他输出没有改变。",
+          "observation": "实际调试库存核查 Agent：run-r73 轨迹显示 inventory_check 工具调用失败，日志为 NameError: available_stock is not defined，退出码1；沿轨迹定位到工具脚本第18行，将拼错的 available_stock 改为已定义的 available_quantity，保留原输入重跑同一任务，工具返回可用库存40件、退出码0，Agent 输出库存核查报告且轨迹显示工具调用成功、任务完成；并核对报告中40件与盘点表一致，其他输出未变。",
+          "capability": "Agent 运行时故障定位、代码变量修复与同输入重跑验证"
+        },
+        {
+          "sourceId": "local-agent-runtime-debugging",
+          "line": 2,
+          "quote": "我据此确认故障在 Agent 运行时工具执行而非任务规划：Runtime Debugging 依据轨迹、错误日志与退出信号定位本次执行故障；不能仅改 Agent 提示词掩盖代码错误，也不能把未执行的静态代码检查当作运行修复。我先复现失败，再沿运行信号定位，最后用同输入完整重跑验证修复。",
+          "observation": "基于轨迹、错误日志与退出信号确认故障位于 Agent 运行时工具执行而非任务规划；并报告调试路径为先复现失败、再沿运行信号定位、最后用同输入完整重跑验证修复。",
+          "capability": "运行时故障归因与调试流程确认"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "E07",
+          "revision_id": "E07-r1",
+          "title": "Runtime Debugging",
+          "description": "依据运行信号定位 Agent 执行故障。",
+          "mastery_criteria": [
+            "能独立完成Runtime Debugging的核心目标与边界",
+            "能在具体场景中识别Runtime Debugging的正确用法与常见误用",
+            "能用可检查的示例证明对Runtime Debugging的掌握"
+          ],
+          "similarity": 0.740782737731934
+        },
+        {
+          "node_id": "EVO01",
+          "revision_id": "EVO01-r1",
+          "title": "Learning Signals from Runtime Trajectories",
+          "description": "从 Agent 的真实运行轨迹、成功失败结果和人工反馈中提取可用于后续改进的学习信号。",
+          "mastery_criteria": [
+            "能从一条运行轨迹中定位可复用的成功或失败信号",
+            "能区分原始日志与可用于更新的学习信号",
+            "能把一个失败案例转化为后续改进输入"
+          ],
+          "similarity": 0.558648042840003
+        },
+        {
+          "node_id": "RT14",
+          "revision_id": "RT14-r2",
+          "title": "Failure Recovery",
+          "description": "识别可恢复与不可恢复的运行失败，并通过重试、回退、恢复或安全终止使 Agent 从失败状态中受控继续。",
+          "mastery_criteria": [
+            "能区分暂时性失败与终止性失败",
+            "能为不同失败选择有界重试、回退、恢复或终止策略",
+            "能说明恢复执行时需要保留哪些状态并避免重复副作用"
+          ],
+          "similarity": 0.534925222396851
+        },
+        {
+          "node_id": "CODE02",
+          "revision_id": "CODE02-r1",
+          "title": "Code as a Reasoning Tool",
+          "description": "让 Agent 通过编写和执行代码完成计算、验证、搜索或中间推导，把代码作为思考过程的一部分。",
+          "mastery_criteria": [
+            "能识别比纯自然语言推理更适合用代码解决的步骤",
+            "能编写一个用于验证或计算中间结论的小程序",
+            "能根据执行结果修正原先的推理或计划"
+          ],
+          "similarity": 0.534613013267517
+        },
+        {
+          "node_id": "E05",
+          "revision_id": "E05-r1",
+          "title": "Regression Test",
+          "description": "用固定用例识别 Agent 能力与行为退化。",
+          "mastery_criteria": [
+            "能独立完成Regression Test的核心目标与边界",
+            "能在具体场景中识别Regression Test的正确用法与常见误用",
+            "能用可检查的示例证明对Regression Test的掌握"
+          ],
+          "similarity": 0.526130378246307
+        }
+      ],
+      [
+        {
+          "node_id": "E07",
+          "revision_id": "E07-r1",
+          "title": "Runtime Debugging",
+          "description": "依据运行信号定位 Agent 执行故障。",
+          "mastery_criteria": [
+            "能独立完成Runtime Debugging的核心目标与边界",
+            "能在具体场景中识别Runtime Debugging的正确用法与常见误用",
+            "能用可检查的示例证明对Runtime Debugging的掌握"
+          ],
+          "similarity": 0.75416845865564
+        },
+        {
+          "node_id": "RT03",
+          "revision_id": "RT03-r1",
+          "title": "Runtime Limit",
+          "description": "为步骤、次数、时间和资源设置运行边界。",
+          "mastery_criteria": [
+            "能独立完成Runtime Limit的核心目标与边界",
+            "能在具体场景中识别Runtime Limit的正确用法与常见误用",
+            "能用可检查的示例证明对Runtime Limit的掌握"
+          ],
+          "similarity": 0.496110543724591
+        },
+        {
+          "node_id": "EVO01",
+          "revision_id": "EVO01-r1",
+          "title": "Learning Signals from Runtime Trajectories",
+          "description": "从 Agent 的真实运行轨迹、成功失败结果和人工反馈中提取可用于后续改进的学习信号。",
+          "mastery_criteria": [
+            "能从一条运行轨迹中定位可复用的成功或失败信号",
+            "能区分原始日志与可用于更新的学习信号",
+            "能把一个失败案例转化为后续改进输入"
+          ],
+          "similarity": 0.47140757824757
+        },
+        {
+          "node_id": "R01",
+          "revision_id": "R01-r1",
+          "title": "Reasoning Loop",
+          "description": "组织可观察的推理、行动与反馈循环。",
+          "mastery_criteria": [
+            "能判断适用条件并运用Reasoning Loop的核心目标与边界",
+            "能在具体场景中识别Reasoning Loop的正确用法与常见误用",
+            "能用可检查的示例证明对Reasoning Loop的掌握"
+          ],
+          "similarity": 0.467680778226946
+        },
+        {
+          "node_id": "MAC08",
+          "revision_id": "MAC08-r1",
+          "title": "Multi-Agent Error Cascade",
+          "description": "一个 Agent 的错误输出被后续 Agent 当作可信输入继续传播，使局部错误放大为系统级失败。",
+          "mastery_criteria": [
+            "能从多 Agent 轨迹中定位错误开始传播的位置",
+            "能解释角色链越长为什么可能放大未验证假设",
+            "能设计一个中间验证点阻止错误级联"
+          ],
+          "similarity": 0.466132217550078
+        }
+      ]
+    ]
+  },
+  "llmCalls": 2,
+  "retrievalCount": 2,
+  "topK": 5,
+  "sourceCount": 1
+}

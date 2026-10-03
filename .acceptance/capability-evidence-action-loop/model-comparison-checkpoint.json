@@ -1,0 +1,930 @@
+{
+  "scope": "Real provider calls with synthetic acceptance records; local read-only Hosted retrieval, not Hosted diagnosis; no model configuration selected",
+  "overallVerdict": "Blocking Issues",
+  "comparisons": {
+    "local-pro-comparison": {
+      "cases": 12,
+      "completed": 9,
+      "failed": 3,
+      "entries": [
+        {
+          "file": "correct-calculation-1.json",
+          "completed": false,
+          "failure": {
+            "message": "Matched knowledge requires evidence units"
+          },
+          "positive": [],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "correct-calculation-2.json",
+          "completed": false,
+          "failure": {
+            "message": "Matched knowledge requires evidence units"
+          },
+          "positive": [],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "correct-calculation-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "input-only-boundary-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "supported"
+            }
+          ],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "input-only-boundary-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "supported"
+            }
+          ],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "input-only-boundary-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "supported"
+            }
+          ],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "python-runtime-1.json",
+          "completed": false,
+          "failure": {
+            "message": "LLM response was truncated: provider=deepseek, model=deepseek-v4-pro"
+          },
+          "positive": [],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "python-runtime-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "PY01",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "E07",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "CODE01",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "python-runtime-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "PY01",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "E07",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-v4-pro"
+          ]
+        }
+      ]
+    },
+    "local-hybrid-comparison": {
+      "cases": 12,
+      "completed": 10,
+      "failed": 2,
+      "entries": [
+        {
+          "file": "correct-calculation-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "correct-calculation-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "correct-calculation-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "input-only-boundary-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "input-only-boundary-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "supported"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "input-only-boundary-3.json",
+          "completed": false,
+          "failure": {
+            "message": "LLM response was not valid JSON: provider=deepseek, model=deepseek-v4-pro"
+          },
+          "positive": [],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "python-runtime-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "PY01",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "T15",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "PY09",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "python-runtime-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "PY01",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "T15",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "E07",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "CODE01",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "python-runtime-3.json",
+          "completed": false,
+          "failure": {
+            "message": "LLM response was truncated: provider=deepseek, model=deepseek-v4-flash"
+          },
+          "positive": [],
+          "models": [
+            "deepseek-flash"
+          ]
+        }
+      ]
+    },
+    "local-v15-flash": {
+      "cases": 16,
+      "completed": 15,
+      "failed": 1,
+      "entries": [
+        {
+          "file": "agent-runtime-debugging-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "E07",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "EVO01",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "T07",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "RT14",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "agent-runtime-debugging-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "E07",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "EVO01",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "CODE01",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "E14",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "RT14",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "agent-runtime-debugging-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "E07",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "E05",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "E14",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "T07",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "correct-calculation-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "correct-calculation-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "correct-calculation-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "RT06",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "input-only-boundary-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "supported"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "input-only-boundary-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "supported"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "input-only-boundary-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "supported"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "partial-two-period-task-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "python-runtime-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "PY01",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "T15",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "CODE01",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "python-runtime-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "PY01",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "CODE02",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "T15",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "E07",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "python-runtime-3.json",
+          "completed": false,
+          "failure": {
+            "message": "LLM response was truncated: provider=deepseek, model=deepseek-v4-flash"
+          },
+          "positive": [],
+          "models": [
+            "deepseek-flash"
+          ]
+        }
+      ]
+    },
+    "local-v15-hybrid": {
+      "cases": 15,
+      "completed": 14,
+      "failed": 1,
+      "entries": [
+        {
+          "file": "agent-runtime-debugging-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "E07",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "EVO01",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "T07",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "R01",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "agent-runtime-debugging-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "E07",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "EVO01",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "E14",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "T07",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "agent-runtime-debugging-3.json",
+          "completed": false,
+          "failure": {
+            "message": "LLM response was not valid JSON: provider=deepseek, model=deepseek-v4-flash"
+          },
+          "positive": [],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "correct-calculation-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "correct-calculation-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "correct-calculation-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "incorrect-paraphrase-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [],
+          "models": [
+            "deepseek-flash"
+          ]
+        },
+        {
+          "file": "input-only-boundary-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "supported"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "input-only-boundary-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "supported"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "input-only-boundary-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "supply-cross-border-lead-time",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "python-runtime-1.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "PY01",
+              "sufficiency": "partial"
+            },
+            {
+              "nodeId": "T15",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "python-runtime-2.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "PY01",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "T15",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "E07",
+              "sufficiency": "supported"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        },
+        {
+          "file": "python-runtime-3.json",
+          "completed": true,
+          "failure": null,
+          "positive": [
+            {
+              "nodeId": "PY01",
+              "sufficiency": "supported"
+            },
+            {
+              "nodeId": "T15",
+              "sufficiency": "partial"
+            }
+          ],
+          "models": [
+            "deepseek-flash",
+            "deepseek-v4-pro"
+          ]
+        }
+      ]
+    }
+  }
+}
