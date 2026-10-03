@@ -1,6 +1,6 @@
 # Enterprise Project Capability Acceptance V1
 
-Status: IN PROGRESS — no joint PASS claimed.
+Status: **PASS for the bounded P2/P3 enterprise scenario acceptance**, after two documented visual repair cycles. First blind review failed; the same initially fresh independent reviewer passed the final repair recheck. This is not a second fresh-user study or an end-to-end learning/action acceptance.
 
 ## Observed baseline (2026-10-03)
 
@@ -100,6 +100,7 @@ Use private runtime environment (never committed): `SUPABASE_URL`, `SUPABASE_SEC
 
 ```sh
 node --env-file=/private/runtime.env --import tsx scripts/acceptance/enterprise-project.ts setup
+node --env-file=/private/runtime.env --import tsx scripts/acceptance/enterprise-project.ts reset-t0
 ACCEPTANCE_PHASE=t0 node --env-file=/private/runtime.env --import tsx scripts/acceptance/enterprise-project.ts verify
 node --env-file=/private/runtime.env --import tsx scripts/acceptance/enterprise-project.ts transition
 ACCEPTANCE_PHASE=t1 node --env-file=/private/runtime.env --import tsx scripts/acceptance/enterprise-project.ts verify
@@ -117,12 +118,12 @@ node --env-file=/private/runtime.env --import tsx scripts/acceptance/enterprise-
 - Security: 19 authenticated HTTP/REST assertions passed initially; own-user headers rather than service-role for conclusions.
 - UX independently found initial unlabeled points and absent business outcome: P1 cognitive barrier. Minimal fix marks actual project targets for existing map-label priority and shows runtime target_outcome plus derived role counts. No coordinate/camera changes. Regression failed before and passed after.
 - Initial controlled T0→T1 passed: gray 8→7, necessary route members 13→12, Navigation path changed; no route version added, complete historical row SHA-256 hashes unchanged, B states unchanged. Next Action remains supplier-quality because the changed shortage branch is later in curriculum order.
-- Engineering: 101 test files / 709 tests, typecheck, lint, production build, client secret audit and knowledge audit passed. Existing H5P CSS and chunk-size warnings remain. Local/Hosted migration versions match fully.
-- Independent Functional gate PASS: ordinary A/B HTTP+REST and browser, exact states/targets, own-read isolation, restore404, stale409, complete immutable histories. Main 19-assertion Hosted suite additionally exercised successful explicit Include and Restore; final A V5 / B V1. See `independent-functional.json` and `security.json`.
+- Engineering: 101 test files / 710 tests, typecheck, lint, production build, client secret audit and knowledge audit passed. Existing H5P CSS and chunk-size warnings remain. Local/Hosted migration versions match fully.
+- Independent Functional gate PASS: ordinary A/B HTTP+REST and browser, exact states/targets, own-read isolation, restore404, stale409, complete immutable histories. Main 19-assertion Hosted suite additionally exercised successful explicit Include and Restore; final A V7 / B V1. See `independent-functional.json` and `security.json`.
 - Existing Hosted capability verification PASS for both historical learner/admin accounts (116 original targets); read/preview/rejected writes only. Existing local `verify-personal-route.ts` persistence verification PASS, cleaning its own temporary fixtures. Hosted migration list matches local. Existing `verify-route-hosted-api.ts` would mutate unrelated admin history, so this scenario's ordinary-user security mode covers the same API protocol instead.
-- Latest implementation Preview `https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app`, `dpl_67qasVjMApQysJN27Q7faNNeZ7s7`, SHA `38eb59e665e185ff580ca14ab1c9b036eade71f4`.
+- First implementation Preview `https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app`, `dpl_67qasVjMApQysJN27Q7faNNeZ7s7`, SHA `38eb59e665e185ff580ca14ab1c9b036eade71f4`.
 - First fresh Final Blind verdict: **未通过完整体验验收**. Exact independent summary: “EduFlow 把项目需要达到的能力、个人已有能力和欠缺能力连接起来，再据此前置关系组织个人学习路线，并尝试连接学习与实训。” It correctly identified A/B roles, differences, downstream support and T1, but found course-first default entry, conflicting green completed states and unclear missing-content next step. `blind-round1.json` preserves failure rather than replacing it with a PASS.
-- Minimal follow-up: route heading uses persisted targetOutcome and live route counts; links to existing capability view; completed route checks use acquired blue; missing-content card identifies the real next capability without inventing execution; model copy explains reverse-boundary pruning. No algorithm, layout engine, schema, dependency or evidence-inference changes. Final recheck pending.
+- Minimal follow-up: route heading uses persisted targetOutcome and live route counts; links to existing capability view; completed route checks use acquired blue; missing-content card identifies the real next capability without inventing execution; model copy explains reverse-boundary pruning. No algorithm, layout engine, schema, dependency or evidence-inference changes. Final recheck results are recorded below.
 - Final evidence in `.acceptance/enterprise-project-v1/`; no secrets/session payloads.
 
 ## Product boundary
@@ -135,3 +136,50 @@ This acceptance can establish P2 and P3 Current State→Gap/Route/Recompute only
 The same initially fresh blind reviewer rechecked `0cff1da` on `nv6oh1byk`: first-screen purpose, color consistency and A/B attribution passed, but overall experience still failed. Exact summary: “EduFlow 把项目目标拆成相互关联的能力，对照个人已有能力找出缺口，生成需要补齐的学习路线，并准备连接学习与实训。” The independent record is `blind-round2.json`; original failing focus screenshot is retained. A request for a fifth fresh agent was rejected by the environment's total agent-thread limit; subsequent rounds are explicitly repair rechecks, not fresh first-impression studies.
 
 Remaining concrete fixes: the next-capability CTA passes its real ID to the existing selected anchor; search selection no longer auto-zooms using a stale previous selection's neighborhood; explicit project focus/fit delegates to ForceGraph zoomToFit with room for overlays, and selecting hides the goal card. None changes node/edge coordinates or force lifecycle. The route shows the latest dated acquired state records already present in user data; it does not fabricate an acquisition event, evidence or durable difference history. Full action/content completion remains outside this acceptance.
+
+
+## Final acceptance (2026-10-03)
+
+Validated code deployment: [READY Preview](https://edu-flow-b4jcw7u4v-july-nanas-projects.vercel.app/courses/enterprise-vietnam-supply-collaboration), deployment `dpl_AeMqJaVQwDv2d4nQCEmTTHpdPicj`, commit `840ffbd15c45254164f7621efb8d01ea0c84ab90`, branch `feature/project-capability-model`. Subsequent evidence-only packaging does not change the application sources. No Production promotion occurred.
+
+|Gate|Result and evidence|
+|---|---|
+|Domain/shared graph|PASS: live 332-node dedup review, 18 atomic Global additions and 23 justified relations, same existing repository/API. Seven Domains preserved; Business Analysis assignments explicit. No new graph, synthetic visual edge, Action node or schema.|
+|Project|PASS: one Course, one Chapter/Lesson, four active target coverages and four minimally valid Assignment coverages; 14 other abilities remain shared support knowledge.|
+|A/B|PASS: same student role, empty capability permissions, active membership, graph and four targets. Precise baseline state guards reject contamination. `t0.json` and independent functional report.|
+|T0→T1|PASS: exposure becomes acquired; model 6/8/4→6/7/4, necessary route13→12/pending10→9; navigation path changes. Same first next capability is correct because a later branch changed. B unchanged. `transition.json`.|
+|Versions/isolation|PASS: no implicit version on state updates, entire historical row hashes unchanged. A V7/B V1. Every prior A V2/V4/V6 was explicit Include; V3/V5/V7 explicit Restore to empty constraints. Cross-user reads hidden, restore404, stale409, client writes403, forged payload400, hard-exclude conflict422. `security.json`.|
+|Laser/stability|PASS on final code Preview: blue/gray/green, 13-edge multibranch, 5-edge branch, 1-edge target, 0-edge leaf and clear; shader time advances; all checks preserve graphData identity, frozen coordinates and camera. Actual callbacks measured in browser; independent review additionally uses real search/pointer interaction. `browser-laser.json`.|
+|Independent function|PASS: original T0/T1 capture plus latest read-only API deep comparison and real-browser previous-UI recheck; no reviewer writes. Latest main browser checks cover final selection CTA and renderer. `independent-functional.json`.|
+|Final visual/recognition|PASS with limits on final repair recheck; original isolated review and first recheck failures retained in `blind-round1.json`/`blind-round2.json`. `blind-final.json` and four final screenshots.|
+|Engineering|PASS: 101 test files / 710 tests, typecheck, lint, production build, client-secret and Knowledge audits; focused model/route/navigation tests included. Existing local personal-route persistence verification passed and removed its own temporary rows. `engineering.json`.|
+|Hosted regression/runtime|PASS: original 116-target course verification for existing learner/admin, latest Preview API verification, no sampled5xx or browser errors. Known DEP0169 remains. `existing-course-regression.json`, `runtime-health.json`.|
+
+The 19 security assertions were executed on `0cff1da`/`nv6oh1byk`; the final `840ffbd` API Git tree is exactly the same (`a83524a89e99a646f60373de507e5d0457e53ea3`). Latest ordinary-user API captures, immutable-history comparisons, original-course regression and browser checks were repeated on `b4jcw7u4v`. This evidence distinction is intentional; security mutations were not repeated solely for UI text/focus changes.
+
+Final state left available to inspect:
+
+|Actor|Actual stored acquired states|Visible blue / gray / green|Route members / pending|Next capability|Version|
+|---|---:|---|---|---|---:|
+|A T1|7|6 / 7 / 4|12 / 9|供应商样品质量证据判读|7|
+|B T0|7|7 / 3 / 4|12 / 6|供应商准入证据判定|1|
+
+Blue counts describe the current goal projection, not lifetime acquired totals. A's already acquired net-demand prerequisite exits the reverse boundary when exposure becomes acquired. Gray candidates supported by enables are not all necessary hard-closure route members.
+
+Final independent wording, preserved verbatim:
+
+> 本轮视觉与认知验收：通过，保留限制。
+>
+> EduFlow 将企业项目目标与个人能力连接起来，展示已具备能力、缺口和能力之间的支撑关系，据此组织个人学习路线，并随能力状态调整路线。
+
+The reviewer observed the exact changed capability in the new recent-state text, A pending10→9, impact unlocked, net removed and B unchanged. The observed support chain remained visible; the next-capability button selected the matching detail. Last round had no login redirect.
+
+## Unverified or limited
+
+- **No fresh-person study after fixes:** platform refused a fifth agent because its total thread limit was reached. The final reviewer was initially fresh and isolated, then performed two independent repair rechecks. Do not call the final pass an unseen-first-exposure experiment.
+- **No full learning/action pipeline:** no authored Micro learning content for these abilities; UI honestly reports content pending. Minimal Assignment definitions are not a complete enterprise training program. No claim of Evidence→State inference, real employee capability accuracy, Action Space, enterprise outcomes, P4/P5/P6 or completed real learning.
+- Desktop and selected-node visual checks only; initial graph/labels remain small. Hard versus non-gating support is explained by detail text, not animation alone. State records identify recent facts, not a persisted historical delta feed.
+- Earlier concurrent acceptance sessions saw transient login redirects; independent sequential checks did not reproduce, and the final exclusive browser round had none. Cause was not proved; no auth behavior was changed to hide it.
+- Runtime log checks are bounded observed windows. Existing H5P CSS/chunk-size and DEP0169 warnings remain, without unrelated fixes.
+
+Accounts are `project-capability-a@eduflow.test` and `project-capability-b@eduflow.test`. Passwords and server keys are excluded from this document and every evidence file. A local mode-0600 login-only handoff is supplied separately. Reproduction requires privately supplied runtime credentials, and the guarded `reset-t0` command above restores only the acceptance transition while preserving all immutable route history.

@@ -86,5 +86,26 @@
     "bothNewButtonsActuallyClicked": true,
     "browserErrors": 0,
     "consoleErrors": 0
+  },
+  "latestApiFollowup": {
+    "preview": "https://edu-flow-b4jcw7u4v-july-nanas-projects.vercel.app",
+    "commit": "840ffbd15c45254164f7621efb8d01ea0c84ab90",
+    "pass": true,
+    "AandBEntireCaptureDeepEqualPreviousT0": true,
+    "includes": [
+      "states",
+      "roles",
+      "membership",
+      "targets",
+      "model",
+      "route",
+      "navigation",
+      "completeHistoryHashes"
+    ],
+    "activeVersions": {
+      "A": 7,
+      "B": 1
+    },
+    "noWrites": true
   }
 }

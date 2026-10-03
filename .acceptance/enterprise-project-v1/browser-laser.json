@@ -1,61 +1,61 @@
 {
-  "preview": "https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app",
-  "commit": "38eb59e665e185ff580ca14ab1c9b036eade71f4",
-  "method": "Read-only current React Fiber/ForceGraph references in production browser; invoked actual onNodeClick/onBackgroundClick callbacks to measure invariants. Independent UX also exercised real pointer/search input. No injected application behavior or layout code.",
-  "frozenPositionsSha256": "0551f4dfda36fb7e37a8a213769e18eb5f764185058d801f652e53933f9e965d",
-  "graphNodes": 17,
-  "factualEdges": 22,
+  "preview": "https://edu-flow-b4jcw7u4v-july-nanas-projects.vercel.app",
+  "commit": "840ffbd15c45254164f7621efb8d01ea0c84ab90",
+  "method": "Read-only current production React/ForceGraph references and actual onNodeClick/onBackgroundClick callbacks for invariants. Separate independent reviewer uses real pointer/search input.",
+  "frozenPositionsSha256": "e7eb3e4da097d9013900f22d2c0cbdf026552bf8f7dcf6e598400d00f56d18cd",
+  "graphNodes": 18,
+  "factualEdges": 23,
   "shaderTimeAdvances": true,
+  "shaderTimes": [
+    74.88889999999999,
+    75.2889
+  ],
   "cases": [
     {
-      "selected": "供应商筛选准则定义",
+      "cameraUnchanged": true,
       "graphDataIdentical": true,
       "positionsUnchanged": true,
-      "cameraUnchanged": true,
+      "selected": "供应商筛选准则定义",
       "visible": 13,
-      "time": 97.8522,
       "expectedFactualDownstreamEdges": 13
     },
     {
-      "selected": "供应商筛选准则定义",
+      "cameraUnchanged": true,
       "graphDataIdentical": true,
       "positionsUnchanged": true,
-      "cameraUnchanged": true,
+      "selected": "供应商筛选准则定义",
       "visible": 13,
-      "time": 115.6515,
       "expectedFactualDownstreamEdges": 13
     },
     {
+      "cameraUnchanged": true,
+      "graphDataIdentical": true,
+      "positionsUnchanged": true,
       "selected": "供应商交付产能核验",
-      "graphDataIdentical": true,
-      "positionsUnchanged": true,
-      "cameraUnchanged": true,
       "visible": 5,
-      "time": 116.06819999999999,
       "expectedFactualDownstreamEdges": 5
     },
     {
-      "selected": "供应商准入证据判定",
+      "cameraUnchanged": true,
       "graphDataIdentical": true,
       "positionsUnchanged": true,
-      "cameraUnchanged": true,
+      "selected": "供应商准入证据判定",
       "visible": 1,
-      "time": 116.4848,
       "expectedFactualDownstreamEdges": 1
     },
     {
-      "selected": "供应恢复备选方案排序",
+      "cameraUnchanged": true,
       "graphDataIdentical": true,
       "positionsUnchanged": true,
-      "cameraUnchanged": true,
+      "selected": "供应恢复备选方案排序",
       "visible": 0,
       "expectedFactualDownstreamEdges": 0
     },
     {
-      "selected": null,
+      "cameraUnchanged": true,
       "graphDataIdentical": true,
       "positionsUnchanged": true,
-      "cameraUnchanged": true,
+      "selected": null,
       "visible": 0,
       "expectedFactualDownstreamEdges": 0
     }
