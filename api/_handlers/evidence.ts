@@ -5,7 +5,7 @@ import { ApiError, handleApi, json, methodNotAllowed } from '../_lib/http.js';
 import { allRows, dataOrThrow } from '../_lib/query.js';
 import { createEmbeddingService } from '../_lib/embedding.js';
 import { readEmbeddingEnvironment, readLlmEnvironment } from '../_lib/env.js';
-import { createJsonGenerationClient } from '../_lib/llm.js';
+import { OpenAICompatibleJsonGenerationClient } from '../_lib/llm.js';
 import { diagnoseEvidence,EvidenceDiagnosisError, EVIDENCE_PROMPT_VERSION, EVIDENCE_TOP_K, parseEvidenceText, type RetrievedKnowledge } from '../../src/features/evidence/diagnosis.js';
 
 export const maxDuration=300;
@@ -111,7 +111,7 @@ export default handleApi(async(request,response)=>{
     const created=await server.from('capability_diagnosis_runs').insert({user_id:user.id,source_ids:body.sourceIds,model:env.llmModel,prompt_version:EVIDENCE_PROMPT_VERSION}).select().single();
     const run=dataOrThrow(created.data,created.error,'Diagnosis creation');
     try {
-      const diagnosis=await diagnoseEvidence(sources.map(source=>({id:source.id,lines:source.parsed_lines})),createJsonGenerationClient(env),async(capability)=>{
+      const diagnosis=await diagnoseEvidence(sources.map(source=>({id:source.id,lines:source.parsed_lines})),new OpenAICompatibleJsonGenerationClient(env,fetch,120000),async(capability)=>{
         const vector=await createEmbeddingService(embeddingEnv).embed(capability);
         const matches=await server.rpc('retrieve_evidence_knowledge',{p_embedding:JSON.stringify(vector),p_model:embeddingEnv.embeddingModel,p_limit:EVIDENCE_TOP_K});
         const nodes=dataOrThrow(matches.data,matches.error,'Knowledge retrieval') as RetrievedKnowledge[];
@@ -127,7 +127,7 @@ export default handleApi(async(request,response)=>{
     } catch(error) {
       const failure=await server.from('capability_diagnosis_runs').update({status:'failed',error:'诊断未完成，请稍后重试；正式能力状态没有改变。',completed_at:new Date().toISOString(),...(error instanceof EvidenceDiagnosisError?{diagnostics:{...error.diagnostics,embedding:{provider:embeddingEnv.embeddingProvider,model:embeddingEnv.embeddingModel,dimensions:embeddingEnv.embeddingDimensions}}}:{})}).eq('id',run.id);
       if(failure.error) console.error('Diagnosis failure recording failed',failure.error.code);
-      console.error('Evidence diagnosis failed',error instanceof Error?error.message:'Unknown error');
+      console.error('Evidence diagnosis failed',{runId:run.id,code:error instanceof EvidenceDiagnosisError?'invalid_or_unavailable_diagnosis':'diagnosis_persistence_failure'});
       throw new ApiError(503,'diagnosis_failed','诊断未完成，请稍后重试；正式能力状态没有改变。');
     }
   }

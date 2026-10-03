@@ -111,6 +111,7 @@ export type ModelExecutionMetadata = {
   maxTokens?: number;
   promptTokens?: number;
   completionTokens?: number;
+  thinking?: boolean;
   validationWarnings?: string[];
 };
 
@@ -122,6 +123,7 @@ export type StructuredGenerationRequest = {
   user: string;
   maxTokens: number;
   temperature: number;
+  thinking?: boolean;
 };
 
 export type StructuredGenerationResult = {

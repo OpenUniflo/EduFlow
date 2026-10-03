@@ -18,6 +18,13 @@ describe("DeepSeek JSON generation adapter", () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({ thinking: { type: "disabled" }, response_format: { type: "json_object" }, stream: false, max_tokens: 100, temperature: 0.1 });
   });
 
+  it("opts a reasoning task into thinking without changing the default", async () => {
+    const request = vi.fn<typeof fetch>(async () => response('{"units":[]}'));
+    const result = await new OpenAICompatibleJsonGenerationClient(config, request).generateJson({...input,thinking:true});
+    expect(JSON.parse(String(request.mock.calls[0][1]?.body)).thinking).toEqual({type:'enabled'});
+    expect(result.metadata.thinking).toBe(true);
+  });
+
   it.each([
     ["empty response", response("")],
     ["invalid JSON", response("not-json")],
