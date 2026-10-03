@@ -1,0 +1,297 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-insufficient-and-attribution",
+      "line": 1,
+      "quote": "我只是转发此邮件，没有核验瓶颈、良率或已有订单负荷，也没有亲自计算。",
+      "observation": "转发了供应商声称每天可交付800件的邮件；未核验瓶颈、良率或已有订单负荷，也未亲自计算。",
+      "capability": "供应商信息转递（邮件转发）"
+    },
+    {
+      "sourceId": "local-insufficient-and-attribution",
+      "line": 2,
+      "quote": "目前写在草稿上的式子是100-40=80，没有复核也没有排除不可用库存。",
+      "observation": "在草稿上写下式子100-40=80；未复核，也未排除不可用库存。",
+      "capability": "草稿式计算"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-supplier-admission-decision",
+      "sufficiency": "insufficient",
+      "confidence": 0.85,
+      "reason": "单元0提及供应商交付产能主张，但仅是转发邮件，并明确未核验瓶颈、良率、已有订单负荷，也未亲自计算；没有独立审查资质、样品质量或交付产能证据，也没有按规则作出通过、条件通过或拒绝判断。",
+      "revisionId": "supply-supplier-admission-decision:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        1
+      ],
+      "nodeId": null,
+      "sufficiency": "unmatched",
+      "confidence": 0,
+      "reason": "本次Top-K候选未与该单元的实际能力表现对应；候选判断保留在诊断记录中。",
+      "revisionId": null,
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "7649767d-6b8f-453d-aa5b-d14e7e63ea78",
+      "generatedAt": "2026-10-03T17:19:27.985Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 485,
+      "completionTokens": 3283
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "c6c2868b-2ee5-4abc-9253-63d15d3af9a3",
+      "generatedAt": "2026-10-03T17:19:58.089Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1979,
+      "completionTokens": 6107
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-site-switch-feasibility": {
+              "reason": "单元0仅说明转发了供应商自称日交付800件的邮件，且未核验瓶颈、良率或订单负荷，也未亲自计算；没有涉及替代基地可用产能、到达时间或订单约束检验，无法对应跨基地供给切换可行性判断。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "supply-supplier-qualification-review": {
+              "reason": "单元0是供应商产能自述邮件的转发与未核验，没有涉及资质证据的主体、范围、有效性、缺项核验，也没有给出通过或补证判断，不能对应供应商资质证据审查。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "supply-supplier-admission-decision": {
+              "reason": "单元0提及供应商交付产能主张，但仅是转发邮件，并明确未核验瓶颈、良率、已有订单负荷，也未亲自计算；没有独立审查资质、样品质量或交付产能证据，也没有按规则作出通过、条件通过或拒绝判断。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.85
+            },
+            "CDS525-K017": {
+              "reason": "单元0是供应商邮件转发和产能未核验，与Forward Propagation的网络逐层前向计算、记录各层输出并提交forward_trace.json无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "TOOL05": {
+              "reason": "单元0是人工转发供应商邮件，不是把外部事件转化为Agent任务触发的规则设计，也不涉及内部事件处理与面向用户沟通的区分或防重复通知控制。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "CODE02": {
+              "reason": "单元1只是草稿上的算式100-40=80，没有编写或执行代码，也没有根据执行结果修正推理，不能对应以代码作为推理工具的步骤识别、程序验证或修正计划。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "PY04": {
+              "reason": "单元1的草稿算式处于库存净需求计算语境，不是Python Expressions的能力证明；没有解释核心目标与边界、识别正确用法与误用，也没有可检查的Expressions示例。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "TOOL03": {
+              "reason": "单元1的草稿算式与工具描述设计无关，没有写出工具用途和边界说明、识别模糊或重叠描述，或根据候选工具调整描述。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "H02": {
+              "reason": "单元1的草稿算式不涉及显式步骤和控制关系组成的工作流，未解释Workflow核心目标与边界，也未识别正确用法或常见误用。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "CDS525-K013": {
+              "reason": "单元1的草稿算式与Stochastic Gradient Descent无关，没有将full-batch更新改为逐样本SGD，也没有记录loss trajectory或提交sgd_trace.csv。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-site-switch-feasibility",
+          "supply-supplier-qualification-review",
+          "supply-supplier-admission-decision",
+          "CDS525-K017",
+          "TOOL05",
+          "CODE02",
+          "PY04",
+          "TOOL03",
+          "H02",
+          "CDS525-K013"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-insufficient-and-attribution",
+          "line": 1,
+          "quote": "我只是转发此邮件，没有核验瓶颈、良率或已有订单负荷，也没有亲自计算。",
+          "observation": "转发了供应商声称每天可交付800件的邮件；未核验瓶颈、良率或已有订单负荷，也未亲自计算。",
+          "capability": "供应商信息转递（邮件转发）"
+        },
+        {
+          "sourceId": "local-insufficient-and-attribution",
+          "line": 2,
+          "quote": "目前写在草稿上的式子是100-40=80，没有复核也没有排除不可用库存。",
+          "observation": "在草稿上写下式子100-40=80；未复核，也未排除不可用库存。",
+          "capability": "草稿式计算"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-site-switch-feasibility",
+          "revision_id": "supply-site-switch-feasibility:v1",
+          "title": "跨基地供给切换可行性判断",
+          "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+          "mastery_criteria": [
+            "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+          ],
+          "similarity": 0.441340095837108
+        },
+        {
+          "node_id": "supply-supplier-qualification-review",
+          "revision_id": "supply-supplier-qualification-review:v1",
+          "title": "供应商资质证据审查",
+          "description": "核验资质证据的主体、范围、有效性和缺项，给出通过或补证判断。",
+          "mastery_criteria": [
+            "核验资质证据的主体、范围、有效性和缺项，给出通过或补证判断。"
+          ],
+          "similarity": 0.428473923893338
+        },
+        {
+          "node_id": "supply-supplier-admission-decision",
+          "revision_id": "supply-supplier-admission-decision:v1",
+          "title": "供应商准入证据判定",
+          "description": "独立审查资质、样品质量及交付产能证据，按明确规则作通过、条件通过或拒绝判断。",
+          "mastery_criteria": [
+            "独立审查资质、样品质量及交付产能证据，按明确规则作通过、条件通过或拒绝判断。"
+          ],
+          "similarity": 0.415486062496071
+        },
+        {
+          "node_id": "CDS525-K017",
+          "revision_id": "CDS525-K017-r1",
+          "title": "Forward Propagation",
+          "description": "按照网络连接方向从输入逐层计算中间表示和最终输出的过程。",
+          "mastery_criteria": [
+            "能准确解释「Forward Propagation」的核心作用、适用边界及与相邻概念的区别",
+            "能完成对应最小可执行任务：对一个小网络完成一次完整前向计算，记录各层输出，并提交 forward_trace.json"
+          ],
+          "similarity": 0.413426580045612
+        },
+        {
+          "node_id": "TOOL05",
+          "revision_id": "TOOL05-r1",
+          "title": "Event Trigger and User Communication",
+          "description": "把外部事件转化为 Agent 任务触发，并通过独立沟通通道向用户发送过程或结果信息。",
+          "mastery_criteria": [
+            "能定义一种外部事件到 Agent 任务的触发规则",
+            "能区分内部事件处理与面向用户的沟通动作",
+            "能设计避免重复通知或无意义触发的基本控制"
+          ],
+          "similarity": 0.410411668134084
+        }
+      ],
+      [
+        {
+          "node_id": "CODE02",
+          "revision_id": "CODE02-r1",
+          "title": "Code as a Reasoning Tool",
+          "description": "让 Agent 通过编写和执行代码完成计算、验证、搜索或中间推导，把代码作为思考过程的一部分。",
+          "mastery_criteria": [
+            "能识别比纯自然语言推理更适合用代码解决的步骤",
+            "能编写一个用于验证或计算中间结论的小程序",
+            "能根据执行结果修正原先的推理或计划"
+          ],
+          "similarity": 0.492388038919934
+        },
+        {
+          "node_id": "PY04",
+          "revision_id": "PY04-r1",
+          "title": "Expressions",
+          "description": "使用表达式组合值、运算和调用。",
+          "mastery_criteria": [
+            "能清楚解释Expressions的核心目标与边界",
+            "能在具体场景中识别Expressions的正确用法与常见误用",
+            "能用可检查的示例证明对Expressions的掌握"
+          ],
+          "similarity": 0.409238636493695
+        },
+        {
+          "node_id": "TOOL03",
+          "revision_id": "TOOL03-r1",
+          "title": "Tool Description Design",
+          "description": "用名称、用途、约束和输入输出说明向模型清晰表达工具能力，帮助模型正确发现和选择工具。",
+          "mastery_criteria": [
+            "能写出描述工具用途和边界的清晰说明",
+            "能识别会导致工具误选的模糊或重叠描述",
+            "能根据多个候选工具调整描述以提高可区分性"
+          ],
+          "similarity": 0.408423114827053
+        },
+        {
+          "node_id": "H02",
+          "revision_id": "H02-r1",
+          "title": "Workflow",
+          "description": "理解由显式步骤和控制关系组成的工作流。",
+          "mastery_criteria": [
+            "能清楚解释Workflow的核心目标与边界",
+            "能在具体场景中识别Workflow的正确用法与常见误用",
+            "能用可检查的示例证明对Workflow的掌握"
+          ],
+          "similarity": 0.407587319612515
+        },
+        {
+          "node_id": "CDS525-K013",
+          "revision_id": "CDS525-K013-r1",
+          "title": "Stochastic Gradient Descent",
+          "description": "使用单个样本或随机样本估计梯度并更新模型参数的优化方法。",
+          "mastery_criteria": [
+            "能准确解释「Stochastic Gradient Descent」的核心作用、适用边界及与相邻概念的区别",
+            "能完成对应最小可执行任务：将 full-batch 更新改为逐样本 SGD，记录 loss trajectory，并提交 sgd_trace.csv"
+          ],
+          "similarity": 0.40591009890498
+        }
+      ]
+    ],
+    "verifications": []
+  },
+  "llmCalls": 2,
+  "retrievalCount": 2
+}

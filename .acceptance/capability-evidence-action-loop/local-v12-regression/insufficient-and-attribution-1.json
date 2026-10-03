@@ -1,0 +1,334 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-insufficient-and-attribution",
+      "line": 1,
+      "quote": "我只是转发此邮件，没有核验瓶颈、良率或已有订单负荷，也没有亲自计算。",
+      "observation": "转发了供应商声称每天能交付800件的邮件，但未核验瓶颈、良率或已有订单负荷，也未亲自计算。",
+      "capability": "供应商产能声明的信息转达（未执行产能核验）"
+    },
+    {
+      "sourceId": "local-insufficient-and-attribution",
+      "line": 2,
+      "quote": "目前写在草稿上的式子是100-40=80，没有复核也没有排除不可用库存。",
+      "observation": "在草稿上写下净需求计算式100-40=80，但未复核，也未排除不可用库存。",
+      "capability": "净需求计算草稿（未复核、未排除不可用库存）"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-supplier-delivery-capacity",
+      "sufficiency": "insufficient",
+      "confidence": 0.96,
+      "reason": "单元0仅转发供应商称每天可交付800件的邮件，并明确未核验瓶颈、良率或已承诺负荷，未亲自计算可交付量，也未识别名义产能误用；单元1是净需求草稿，与本能力无关。证据不足。",
+      "revisionId": "supply-supplier-delivery-capacity:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-supplier-admission-decision",
+      "sufficiency": "insufficient",
+      "confidence": 0.94,
+      "reason": "单元0只转达供应商交付产能声明，未独立审查资质、样品质量或交付产能证据，也没有按规则作出通过、条件通过或拒绝判断；交付产能声明只是待审查输入，不构成准入证据判定动作。",
+      "revisionId": "supply-supplier-admission-decision:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        1
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "insufficient",
+      "confidence": 0.78,
+      "reason": "insufficient: 候选依赖原文第2行：'我计划下周学习净需求计算，目前写在草稿上的式子是100-40=80，没有复核也没有排除不可用库存。' 已执行动作仅为写出草稿式子100-40=80，属于通用减法/算术表达；标准要求的是根据订单需求、可用库存及确认到货计算分时段净需求并正确排除不可用库存。原文明确未复核、未排除不可用库存，也未体现订单需求、确认到货、分时段等对象、条件与专门方法；计划下周学习不等于已执行净需求计算。因此criterionScopePreserved为false，且无可支持的标准子动作达到正确执行，判定insufficient。\n原判断：单元1显示本人已写下净需求计算式100-40=80，属于计算净需求的子动作且结果可检查；但未复核，未排除不可用库存，也未体现确认到货和分时段净需求，故仅部分执行。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        1
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "insufficient",
+      "confidence": 0.9,
+      "reason": "单元1只有未复核、未排除不可用库存的净需求草稿，未使用补货交期窗口，也未计算最早缺料日、缺口量或交期敏感性；净需求草稿只是前置输入，不是缺料暴露评估动作。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "d92f6345-e805-4a1d-a5f3-cdb6ad2a964c",
+      "generatedAt": "2026-10-03T17:14:17.967Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 485,
+      "completionTokens": 1714
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "73483c2e-5584-4577-af33-28d97a7d1d59",
+      "generatedAt": "2026-10-03T17:14:54.728Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1875,
+      "completionTokens": 7942
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-factual-verification-v2",
+      "requestId": "3828006a-3d21-4e2f-b30e-a03d57e655ec",
+      "generatedAt": "2026-10-03T17:14:59.489Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 848,
+      "completionTokens": 934
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-supplier-delivery-capacity": {
+              "reason": "单元0仅转发供应商称每天可交付800件的邮件，并明确未核验瓶颈、良率或已承诺负荷，未亲自计算可交付量，也未识别名义产能误用；单元1是净需求草稿，与本能力无关。证据不足。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.96
+            },
+            "supply-supplier-admission-decision": {
+              "reason": "单元0只转达供应商交付产能声明，未独立审查资质、样品质量或交付产能证据，也没有按规则作出通过、条件通过或拒绝判断；交付产能声明只是待审查输入，不构成准入证据判定动作。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.94
+            },
+            "supply-site-switch-feasibility": {
+              "reason": "单元0仅涉及供应商产能声明转达，未涉及替代基地、可用产能与到达时间，也未检验候选切换是否满足订单约束或区分不可行/缺失证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-alternate-site-capacity": {
+              "reason": "单元0是供应商交付声明转达，未提供替代基地负荷、产品兼容性、转换损失，也未估算可释放产能或指出不确定性。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-supplier-qualification-review": {
+              "reason": "单元0仅转达供应商交付产能声明，未核验资质证据的主体、范围、有效性或缺项，也未给出通过或补证判断。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-net-material-requirement": {
+              "reason": "单元1显示本人已写下净需求计算式100-40=80，属于计算净需求的子动作且结果可检查；但未复核，未排除不可用库存，也未体现确认到货和分时段净需求，故仅部分执行。",
+              "unitIndexes": [
+                1
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.78
+            },
+            "supply-shortage-exposure": {
+              "reason": "单元1只有未复核、未排除不可用库存的净需求草稿，未使用补货交期窗口，也未计算最早缺料日、缺口量或交期敏感性；净需求草稿只是前置输入，不是缺料暴露评估动作。",
+              "unitIndexes": [
+                1
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.9
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "单元1仅是净需求草稿，未量化缺口，也未将缺口映射到受影响订单、停线时段或恢复优先级输入。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-critical-material-identification": {
+              "reason": "单元1仅是净需求草稿，未涉及BOM、替代性、停线影响，也未按准则识别关键物料或说明排除理由。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-admission-decision",
+          "supply-site-switch-feasibility",
+          "supply-alternate-site-capacity",
+          "supply-supplier-qualification-review",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-critical-material-identification"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-insufficient-and-attribution",
+          "line": 1,
+          "quote": "我只是转发此邮件，没有核验瓶颈、良率或已有订单负荷，也没有亲自计算。",
+          "observation": "转发了供应商声称每天能交付800件的邮件，但未核验瓶颈、良率或已有订单负荷，也未亲自计算。",
+          "capability": "供应商产能声明的信息转达（未执行产能核验）"
+        },
+        {
+          "sourceId": "local-insufficient-and-attribution",
+          "line": 2,
+          "quote": "目前写在草稿上的式子是100-40=80，没有复核也没有排除不可用库存。",
+          "observation": "在草稿上写下净需求计算式100-40=80，但未复核，也未排除不可用库存。",
+          "capability": "净需求计算草稿（未复核、未排除不可用库存）"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.684454061454055
+        },
+        {
+          "node_id": "supply-supplier-admission-decision",
+          "revision_id": "supply-supplier-admission-decision:v1",
+          "title": "供应商准入证据判定",
+          "description": "独立审查资质、样品质量及交付产能证据，按明确规则作通过、条件通过或拒绝判断。",
+          "mastery_criteria": [
+            "独立审查资质、样品质量及交付产能证据，按明确规则作通过、条件通过或拒绝判断。"
+          ],
+          "similarity": 0.592312896709875
+        },
+        {
+          "node_id": "supply-site-switch-feasibility",
+          "revision_id": "supply-site-switch-feasibility:v1",
+          "title": "跨基地供给切换可行性判断",
+          "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+          "mastery_criteria": [
+            "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+          ],
+          "similarity": 0.574630838720599
+        },
+        {
+          "node_id": "supply-alternate-site-capacity",
+          "revision_id": "supply-alternate-site-capacity:v1",
+          "title": "替代基地可用产能评估",
+          "description": "根据给定基地负荷、产品兼容性和转换损失估算可释放产能并指出不确定性。",
+          "mastery_criteria": [
+            "根据给定基地负荷、产品兼容性和转换损失估算可释放产能并指出不确定性。"
+          ],
+          "similarity": 0.56171322807254
+        },
+        {
+          "node_id": "supply-supplier-qualification-review",
+          "revision_id": "supply-supplier-qualification-review:v1",
+          "title": "供应商资质证据审查",
+          "description": "核验资质证据的主体、范围、有效性和缺项，给出通过或补证判断。",
+          "mastery_criteria": [
+            "核验资质证据的主体、范围、有效性和缺项，给出通过或补证判断。"
+          ],
+          "similarity": 0.543848774937015
+        }
+      ],
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.874980244786139
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.679910084006498
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.573288466138336
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.510280817134332
+        },
+        {
+          "node_id": "supply-critical-material-identification",
+          "revision_id": "supply-critical-material-identification:v1",
+          "title": "关键物料识别",
+          "description": "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。",
+          "mastery_criteria": [
+            "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。"
+          ],
+          "similarity": 0.468908937638466
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-net-material-requirement": {
+              "criterionScopePreserved": false,
+              "verdict": "insufficient",
+              "reason": "候选依赖原文第2行：'我计划下周学习净需求计算，目前写在草稿上的式子是100-40=80，没有复核也没有排除不可用库存。' 已执行动作仅为写出草稿式子100-40=80，属于通用减法/算术表达；标准要求的是根据订单需求、可用库存及确认到货计算分时段净需求并正确排除不可用库存。原文明确未复核、未排除不可用库存，也未体现订单需求、确认到货、分时段等对象、条件与专门方法；计划下周学习不等于已执行净需求计算。因此criterionScopePreserved为false，且无可支持的标准子动作达到正确执行，判定insufficient。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "retrievalCount": 2
+}

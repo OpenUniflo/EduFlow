@@ -1,0 +1,380 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-cross-line",
+      "line": 1,
+      "quote": "我独立核算订单 N28：D1 需求 120 件、D2 需求 70 件。盘点实物 60 件，其中隔离 15 件不可用，核对可用库存为 45 件。",
+      "observation": "记录了针对订单 N28 独立核算 D1、D2 需求，并盘点实物 60 件、识别隔离 15 件不可用、核对可用库存 45 件的实际过程与中间数据。",
+      "capability": "订单需求与可用库存核算"
+    },
+    {
+      "sourceId": "local-cross-line",
+      "line": 2,
+      "quote": "我核对到货记录：D1 确认到货 25 件，D2 确认到货 20 件，均在各时段用料前到达。",
+      "observation": "记录了对到货记录的核对，确认 D1 到货 25 件、D2 到货 20 件，并核对其在各时段用料前到达。",
+      "capability": "到货记录核对与时段可用性确认"
+    },
+    {
+      "sourceId": "local-cross-line",
+      "line": 3,
+      "quote": "我计算 D1 净需求 max(0,120-45-25)=50 件，可用结余 0；D2 净需求 max(0,70-0-20)=50 件，并核验隔离 15 件没有计入可用库存。",
+      "observation": "记录了 D1 净需求计算为 max(0,120-45-25)=50 件且可用结余 0，D2 净需求计算为 max(0,70-0-20)=50 件，并核验隔离 15 件未计入可用库存。",
+      "capability": "净需求计算与库存隔离核验"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0,
+        1,
+        2
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "supported",
+      "confidence": 0.96,
+      "reason": "line1 盘点实物60件、隔离15件不可用、核对可用库存45件；line2 核对D1到货25件、D2到货20件且均在各时段用料前到达；line3 本人独立计算D1净需求max(0,120-45-25)=50件、可用结余0，D2净需求max(0,70-0-20)=50件，并核验隔离15件未计入可用库存。已按订单需求、可用库存及确认到货分时段计算净需求，并正确排除不可用库存，覆盖mastery_criteria。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learned"
+    },
+    {
+      "unitIndexes": [
+        2
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "insufficient",
+      "confidence": 0.84,
+      "reason": "line3 已计算D1/D2净需求各50件，并核验隔离15件未计入可用库存，但这只是交期窗口缺料暴露评估所需的净需求输入；原文未使用补货交期窗口，未计算最早缺料日，也未计算交期敏感性。line2仅确认到货在用料前到达，不是补货交期窗口。仅提供输入，未执行标准中的最早缺料日、缺口量、交期敏感性计算。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        0,
+        2
+      ],
+      "nodeId": "supply-shortage-impact-assessment",
+      "sufficiency": "insufficient",
+      "confidence": 0.82,
+      "reason": "line1/line3 提供订单N28的D1/D2需求、可用库存45件、净需求各50件，可作为已量化缺口输入；但原文未将该缺口映射到受影响订单、停线时段及恢复优先级输入，未执行缺料中断影响评估的标准动作。仅提供输入，判insufficient。",
+      "revisionId": "supply-shortage-impact-assessment:v1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "58a7d1f7-762a-4924-a133-d9e26736a688",
+      "generatedAt": "2026-10-03T17:23:22.672Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 491,
+      "completionTokens": 1891
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "acd6d018-8b05-4550-be4c-0aa18c640b3f",
+      "generatedAt": "2026-10-03T17:24:12.481Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1880,
+      "completionTokens": 10122
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-factual-verification-v2",
+      "requestId": "1a31d7d4-3553-45df-8400-73c09f9dc433",
+      "generatedAt": "2026-10-03T17:24:20.338Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1035,
+      "completionTokens": 1774
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "line1 盘点实物60件、隔离15件不可用、核对可用库存45件；line2 核对D1到货25件、D2到货20件且均在各时段用料前到达；line3 本人独立计算D1净需求max(0,120-45-25)=50件、可用结余0，D2净需求max(0,70-0-20)=50件，并核验隔离15件未计入可用库存。已按订单需求、可用库存及确认到货分时段计算净需求，并正确排除不可用库存，覆盖mastery_criteria。",
+              "unitIndexes": [
+                0,
+                1,
+                2
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.96
+            },
+            "supply-shortage-exposure": {
+              "reason": "line3 已计算D1/D2净需求各50件，并核验隔离15件未计入可用库存，但这只是交期窗口缺料暴露评估所需的净需求输入；原文未使用补货交期窗口，未计算最早缺料日，也未计算交期敏感性。line2仅确认到货在用料前到达，不是补货交期窗口。仅提供输入，未执行标准中的最早缺料日、缺口量、交期敏感性计算。",
+              "unitIndexes": [
+                2
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.84
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "line1/line3 提供订单N28的D1/D2需求、可用库存45件、净需求各50件，可作为已量化缺口输入；但原文未将该缺口映射到受影响订单、停线时段及恢复优先级输入，未执行缺料中断影响评估的标准动作。仅提供输入，判insufficient。",
+              "unitIndexes": [
+                0,
+                2
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.82
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文仅涉及订单需求、库存盘点、到货记录与净需求计算，未出现瓶颈、良率、已承诺负荷、期间可交付量或名义产能误用，无法对应供应商交付产能核验。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-site-switch-feasibility": {
+              "reason": "原文仅涉及订单N28的库存、到货记录和净需求计算，未出现替代基地可用产能、到达时间、候选切换或订单约束检验，无法对应跨基地供给切换可行性判断。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-cross-border-lead-time": {
+              "reason": "line2仅确认D1/D2到货数量及用料前到达，未分解生产、运输、通关和收货环节，也未给出有依据的交期区间、不确定性或避免重复计时，无法对应跨境补货交期估计。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-supplier-screening-criteria": {
+              "reason": "line3仅计算净需求并核验隔离15件未计入可用库存，未将物料规格与交付要求转成可验证筛选准则，也未区分必须满足门槛和评分项，无法对应供应商筛选准则定义。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-supplier-delivery-capacity",
+          "supply-site-switch-feasibility",
+          "supply-cross-border-lead-time",
+          "supply-supplier-screening-criteria"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-cross-line",
+          "line": 1,
+          "quote": "我独立核算订单 N28：D1 需求 120 件、D2 需求 70 件。盘点实物 60 件，其中隔离 15 件不可用，核对可用库存为 45 件。",
+          "observation": "记录了针对订单 N28 独立核算 D1、D2 需求，并盘点实物 60 件、识别隔离 15 件不可用、核对可用库存 45 件的实际过程与中间数据。",
+          "capability": "订单需求与可用库存核算"
+        },
+        {
+          "sourceId": "local-cross-line",
+          "line": 2,
+          "quote": "我核对到货记录：D1 确认到货 25 件，D2 确认到货 20 件，均在各时段用料前到达。",
+          "observation": "记录了对到货记录的核对，确认 D1 到货 25 件、D2 到货 20 件，并核对其在各时段用料前到达。",
+          "capability": "到货记录核对与时段可用性确认"
+        },
+        {
+          "sourceId": "local-cross-line",
+          "line": 3,
+          "quote": "我计算 D1 净需求 max(0,120-45-25)=50 件，可用结余 0；D2 净需求 max(0,70-0-20)=50 件，并核验隔离 15 件没有计入可用库存。",
+          "observation": "记录了 D1 净需求计算为 max(0,120-45-25)=50 件且可用结余 0，D2 净需求计算为 max(0,70-0-20)=50 件，并核验隔离 15 件未计入可用库存。",
+          "capability": "净需求计算与库存隔离核验"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.795969509958313
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.608385617290644
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.566852748394012
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.557094991207123
+        },
+        {
+          "node_id": "supply-site-switch-feasibility",
+          "revision_id": "supply-site-switch-feasibility:v1",
+          "title": "跨基地供给切换可行性判断",
+          "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+          "mastery_criteria": [
+            "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+          ],
+          "similarity": 0.471794936442982
+        }
+      ],
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.60786600732404
+        },
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "revision_id": "supply-cross-border-lead-time:v1",
+          "title": "跨境补货交期估计",
+          "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+          "mastery_criteria": [
+            "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+          ],
+          "similarity": 0.587461948394775
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.569916903972626
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.545570303103655
+        },
+        {
+          "node_id": "supply-site-switch-feasibility",
+          "revision_id": "supply-site-switch-feasibility:v1",
+          "title": "跨基地供给切换可行性判断",
+          "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+          "mastery_criteria": [
+            "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+          ],
+          "similarity": 0.528204854940793
+        }
+      ],
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.812176311378966
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.62372630450663
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.571045160293579
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.503748655319214
+        },
+        {
+          "node_id": "supply-supplier-screening-criteria",
+          "revision_id": "supply-supplier-screening-criteria:v1",
+          "title": "供应商筛选准则定义",
+          "description": "将物料规格与交付要求转成可验证筛选准则，区别必须满足的门槛和评分项。",
+          "mastery_criteria": [
+            "将物料规格与交付要求转成可验证筛选准则，区别必须满足的门槛和评分项。"
+          ],
+          "similarity": 0.471325281700462
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-net-material-requirement": {
+              "criterionScopePreserved": true,
+              "verdict": "supported",
+              "reason": "标准要求根据订单需求、可用库存及确认到货计算分时段净需求，并正确排除不可用库存。原文第1行给出订单N28的D1需求120件、D2需求70件，盘点实物60件、隔离15件不可用，可用库存核对为45件，60-15=45正确；第2行核对到货记录，D1确认到货25件、D2确认到货20件，均在各时段用料前到达；第3行计算D1净需求max(0,120-45-25)=50件，120-45-25=50正确，D1耗用可用库存后结余0，D2净需求max(0,70-0-20)=50件，70-0-20=50正确，并核验隔离15件未计入可用库存。已执行动作保留了订单需求、可用库存、确认到货及排除不可用库存的限定，计算与结果均正确，故全部标准得到支持。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "llmCalls": 3,
+  "retrievalCount": 3
+}
