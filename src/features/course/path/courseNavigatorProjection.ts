@@ -4,6 +4,7 @@ import type { UserCourseState } from '../types';
 import type { CourseGraphData, CourseRuntimeData } from '../runtime/courseRuntime';
 import { buildCoursePath } from './coursePath';
 import { courseAssignmentEligibility } from '../assignmentExperience';
+import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequisites';
 
 export type NavigatorLearningContent = { nodeId: string; pathId: string; estimatedMinutes?: number };
 export type NavigatorState = 'completed' | 'current' | 'available' | 'locked';
@@ -25,11 +26,13 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
       state: local?.state ?? 'available', navigationState: item.state, blockedBy: item.blockedBy, bridge: !local };
   }) : fallback.map(item => ({ ...item, navigationState: undefined, bridge: false }));
   const action = validDecision?.nextAction;
+  const knowledgeById = new Map(knowledge.map(record => [record.nodeId, record]));
   const route = source.map(item => {
     const completed = item.navigationState ? ['skipped', 'learned'].includes(item.navigationState) : ['completed', 'learned'].includes(item.state);
     const locked = item.navigationState ? item.navigationState === 'blocked' : item.state === 'blocked';
     const state: NavigatorState = action?.nodeId === item.node.id && !locked ? 'current' : completed ? 'completed' : locked ? 'locked' : 'available';
-    return { ...item, state, mastered: item.navigationState === 'skipped' || item.node.status === 'completed' };
+    const status = knowledgeById.get(item.node.id)?.status;
+    return { ...item, state, acquired: satisfiesTeachingPrerequisite(status), mastered: status === 'mastered' };
   });
   const ranks = new Map(route.map((item, index) => [item.node.id, index]));
   const accepted = (id: string) => ['accepted', 'completed'].includes(courseState?.assignmentStates[id]?.status ?? '');
@@ -61,7 +64,7 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
   const courseComplete = complete && remainingPracticeCount === 0;
   const emptyState = action?.reasonCode === 'course_route_empty' ? { title: '当前路线没有待达成项目目标', reason: '可以在项目能力模型中调整路线；已完成的学习和实训记录仍然保留。' } : courseComplete ? { title: '课程已完成', reason: '你已经完成当前课程的全部学习内容与实训。' }
     : complete ? { title: '当前学习内容已完成', reason: `你已经完成当前课程的学习内容。还有 ${remainingPracticeCount} 项实训待完成，可以从下方继续。` }
-    : { title: action?.reasonCode === 'learning_content_unavailable' && current ? `下一步能力：${current.node.title}` : '当前没有可继续的学习内容', reason: `${action?.reasonCode === 'teaching_prerequisite_required' ? '请先完成前置内容，解锁后再继续这一部分。' : '这一学习节点尚未准备可执行学习内容。'}${pendingPractices.length ? `已有的 ${pendingPractices.length} 项实训仍保留在下方。` : ''}` };
+    : { title: action?.reasonCode === 'learning_content_unavailable' && current ? `下一步能力：${current.node.title}` : '当前没有可继续的学习内容', reason: `${action?.reasonCode === 'teaching_prerequisite_required' ? '请先完成前置内容，解锁后再继续这一部分。' : '路线按教学顺序保留这一能力，目前尚无可执行微学习。可返回项目能力模型查看其他已配置行动。'}${pendingPractices.length ? `已有的 ${pendingPractices.length} 项实训仍保留在下方。` : ''}` };
   // Preserve navigation sequence; chapter headers mark transitions without reordering it.
   const sections: Array<{ id: string; title: string; bridge: boolean; items: typeof route }> = [];
   route.forEach(item => {
@@ -74,7 +77,7 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
     section.items.push(item);
   });
   const recentRecords = knowledge.flatMap(record => {
-    const item = route.find(item => item.node.id === record.nodeId && item.state === 'completed');
+    const item = route.find(item => item.node.id === record.nodeId && item.acquired);
     const updatedAt = Date.parse(record.updatedAt ?? '');
     return item && Number.isFinite(updatedAt) ? [{ nodeId: record.nodeId, title: item.node.title, updatedAt }] : [];
   });

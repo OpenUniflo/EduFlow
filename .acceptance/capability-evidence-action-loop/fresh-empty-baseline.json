@@ -1,0 +1,12 @@
+{
+  "userId": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+  "counts": {
+    "user_knowledge_states": 0,
+    "knowledge_evidence": 0,
+    "user_evidence_sources": 0,
+    "edge_action_runs": 0,
+    "personal_course_route_versions": 0
+  },
+  "createdAt": "2026-10-03T19:49:28.272Z",
+  "note": "Fresh ordinary account; no capability, evidence or action data seeded."
+}

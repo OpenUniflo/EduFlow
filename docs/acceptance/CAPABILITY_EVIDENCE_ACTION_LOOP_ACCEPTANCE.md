@@ -1,10 +1,16 @@
 # Capability Evidence Action Loop
 
-Status: **IN PROGRESS — no Phase gate has passed.**
+Status: **A/B implementation and actual Practice state loop verified; final Fresh acceptance in progress.**
 
-## Current gate evidence (2026-10-04)
+Current application: `974cd1a049103e432b00060f018f671924291bff`, feature branch Preview https://edu-flow-bwwpv7ex1-july-nanas-projects.vercel.app (READY). Full engineering checks pass: 105 test files / 757 tests, TypeScript, lint, build, knowledge audit and client-secret audit. The user explicitly reclassified AI semantic-quality deviations as Known Limitations; historical quality failures below are retained, not active blockers.
 
-The rows below describe demonstrated behavior, not a Phase A quality PASS. Historical observations later in this document remain unchanged. Final diagnosis-quality review is still pending; Phase B/C have not started.
+Actual Practice loop: real file → source `27981e1a-adbc-4860-9357-6d2b7b2a0f6e` → completed diagnosis `0a6e620d-781f-4b9e-82bd-b7a7d7d4945e` → explicit UI confirmation → shortage-exposure learned → project intermediate gap2→1, official Evidence4→5, RouteVersion1→1. Original truncation and client interruption are retained. Security reviewer final actual-scenario PASS. Node-datum identity regression fixed and static/loaded-browser checks pass; live structural update is being re-exercised by the final independent Fresh user.
+
+Fresh starts from zero states, evidence, sources, action runs and route versions (`fresh-empty-baseline.json`); no official state seeded. Production app deployment/configuration has not been changed. Additive migrations and explicit test/teaching records were applied to the shared Hosted Supabase database, as recorded below.
+
+## Historical Phase A gate checkpoint (2026-10-04)
+
+The rows below preserve the earlier Phase A checkpoint before the user changed the quality-gate disposition. References to pending B/C or quality blockers in this chronological history are superseded by the current status above and the resumed-scope section.
 
 | Gates | Demonstrated evidence |
 |---|---|
@@ -207,3 +213,10 @@ Phase B success criteria: governed Global templates on existing factual edges; c
 - Independent browser single-item confirmation of proposal `a79bf5a6-33a8-44e9-bba7-197f599ea1b1` succeeded. Target became acquired; Project intermediate gap2→1. Acquired count stayed3 because the now-unneeded upstream net-material node was pruned as shortage-exposure entered current capabilities. Course target count4 was unchanged.
 - Ordinary-user verification PASS: source→unit→proposal→formal Evidence→learned state lineage, B confirmation404/B unchanged, concurrent repeats identical, target enters current projection/exits gap, route reads new current state, RouteVersion remains exactly1. See `practice-confirmation.json`. Practice completion alone never acquired it.
 - Browser review retained blocker UX-C03: structural recomputation detached retained node spheres while labels/edges remained. ForceGraph associates scene objects with datum identity; new data objects reused cached Three objects, so old-datum removal detached the reused visual. Fix preserves retained node/edge datum identities across structural changes (force still reheats only for structural change, camera unaffected). Added pruning regression test. New total **757 tests PASS**; browser recheck pending. UX-C02 selected-source switching verified PASS.
+
+### Fresh original verdict and route presentation correction
+
+- Fresh Reviewer started last with only Preview, a new empty ordinary account and the realistic task/work files. No implementation/design/prior reviews supplied. Original **FAIL** retained verbatim in `fresh-review.json` and six screenshots. The user independently completed both uploads/diagnoses and confirmations; selected/started the Practice by clicking a real edge; result completion left target learning; confirmation made target learned and gap2→1. No graph sphere loss occurred during these live structural changes. Upload control was usable with normal horizontal layout.
+- Fresh Hosted read-only verification PASS (`fresh-hosted-loop.json`): two sources/two completed diagnoses only, actual private result bytes/checksum, execution/source/unit/proposal/formal lineage, learning before confirmation and learned afterward, RouteVersion unchanged at1. No semantic or technical retry on this account.
+- Blocking cognitive finding: Course route labelled required teaching completion counts as acquired capabilities. Existing navigation deliberately retains incomplete required Micro even if capability is learned; this rule is preserved. Projection now exposes capability acquisition from explicit UserKnowledgeState separately from navigation completion; count/recent updates reflect actual capability, and labels say acquired plus teaching pending where appropriate. Unavailable-frontier text now explains curriculum ordering and points to configured alternatives in the project model. New regression asserts acquired status does not bypass required Micro or falsely complete the course.
+- Remaining nonblocking observations retained: long diagnostic wait (roughly90+ seconds; refresh disabled while the request is active), missing learning content at some fixed-route frontiers, search panel overlapping route controls until closed, and occasional LLM technical terminology/conservative or cross-domain candidates. No model/prompt tuning or fabricated content used to hide them. Fresh same-user recheck of corrected presentation pending.

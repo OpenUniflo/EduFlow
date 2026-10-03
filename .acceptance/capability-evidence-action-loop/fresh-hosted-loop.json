@@ -1,0 +1,2314 @@
+{
+  "createdAt": "2026-10-03T20:03:14.469Z",
+  "user_knowledge_states": [
+    {
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-cross-border-lead-time",
+      "status": "learned",
+      "mastery": null,
+      "mastery_origin": "direct",
+      "source_node_id": null,
+      "source_node_ids": null,
+      "evidence": null,
+      "updated_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-landed-cost-calculation",
+      "status": "learned",
+      "mastery": null,
+      "mastery_origin": "direct",
+      "source_node_id": null,
+      "source_node_ids": null,
+      "evidence": null,
+      "updated_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-net-material-requirement",
+      "status": "learned",
+      "mastery": null,
+      "mastery_origin": "direct",
+      "source_node_id": null,
+      "source_node_ids": null,
+      "evidence": null,
+      "updated_at": "2026-10-03T19:59:27.978145+00:00"
+    },
+    {
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-shortage-exposure",
+      "status": "learned",
+      "mastery": null,
+      "mastery_origin": "direct",
+      "source_node_id": null,
+      "source_node_ids": null,
+      "evidence": null,
+      "updated_at": "2026-10-03T19:59:27.978145+00:00"
+    },
+    {
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-shortage-impact-assessment",
+      "status": "learning",
+      "mastery": null,
+      "mastery_origin": "direct",
+      "source_node_id": null,
+      "source_node_ids": null,
+      "evidence": null,
+      "updated_at": "2026-10-03T19:59:35.300216+00:00"
+    }
+  ],
+  "knowledge_evidence": [
+    {
+      "id": "dab4671a-5ac5-4e25-9038-eb88dd41f130",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-cross-border-lead-time",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "5642cde4-3772-4216-9736-2c76f8f3d049",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "5c4690f6-004d-4be0-acea-2fe176a4813c"
+        ],
+        "proposalId": "5642cde4-3772-4216-9736-2c76f8f3d049",
+        "revisionId": "supply-cross-border-lead-time:v1",
+        "diagnosisId": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learned"
+      },
+      "occurred_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "id": "3e63c640-d918-40db-9dec-722df97e5b5e",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-landed-cost-calculation",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "57979760-efd0-45e2-a60f-f2896a27f135",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "e78b2677-1026-4017-8057-460a6e77aeed"
+        ],
+        "proposalId": "57979760-efd0-45e2-a60f-f2896a27f135",
+        "revisionId": "supply-landed-cost-calculation:v1",
+        "diagnosisId": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learned"
+      },
+      "occurred_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "id": "f75c4327-1ba7-4ec2-ac42-35b3f0989cd3",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-net-material-requirement",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "6428f193-6ddf-4382-9250-ae59a0a233ab",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "86560103-f766-4125-af34-40ffbf7377f1",
+          "df7a909e-c512-4dee-9f53-cf00f74e459d",
+          "4ba58a52-4a71-48f7-9af3-d5729e256a0d",
+          "da76efec-f0da-4ed2-bb93-bc5b838fc304",
+          "9c279aab-7d91-42a1-b5a7-a5fb8ab3fd40"
+        ],
+        "proposalId": "6428f193-6ddf-4382-9250-ae59a0a233ab",
+        "revisionId": "supply-net-material-requirement:v1",
+        "diagnosisId": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learned"
+      },
+      "occurred_at": "2026-10-03T19:59:27.978145+00:00"
+    },
+    {
+      "id": "f6bd5779-ec59-46ca-9019-8a7c11efdc05",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-net-material-requirement",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "d8364550-ed4a-4191-9227-b700eedcd465",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "92e5706f-2564-4c69-b515-4989e3a044ee"
+        ],
+        "proposalId": "d8364550-ed4a-4191-9227-b700eedcd465",
+        "revisionId": "supply-net-material-requirement:v1",
+        "diagnosisId": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learned"
+      },
+      "occurred_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "id": "a8c176be-abde-44b2-94b5-dce0be0db9d1",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-shortage-exposure",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "7d26b0a0-70f0-4d77-be00-005357e563a3",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "86560103-f766-4125-af34-40ffbf7377f1",
+          "df7a909e-c512-4dee-9f53-cf00f74e459d",
+          "4ba58a52-4a71-48f7-9af3-d5729e256a0d",
+          "da76efec-f0da-4ed2-bb93-bc5b838fc304",
+          "9c279aab-7d91-42a1-b5a7-a5fb8ab3fd40",
+          "b8b3384e-ae1a-46c1-ac25-f86a31322d29",
+          "83ae2c32-68a5-4439-bef6-69f22a618628"
+        ],
+        "proposalId": "7d26b0a0-70f0-4d77-be00-005357e563a3",
+        "revisionId": "supply-shortage-exposure:v1",
+        "diagnosisId": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learned"
+      },
+      "occurred_at": "2026-10-03T19:59:27.978145+00:00"
+    },
+    {
+      "id": "6dddfead-8180-4f22-90ca-72685e150ddb",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-shortage-exposure",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "1967e7dd-088e-4e9d-b85e-c18f496f68e3",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "92e5706f-2564-4c69-b515-4989e3a044ee",
+          "5c4690f6-004d-4be0-acea-2fe176a4813c"
+        ],
+        "proposalId": "1967e7dd-088e-4e9d-b85e-c18f496f68e3",
+        "revisionId": "supply-shortage-exposure:v1",
+        "diagnosisId": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learning"
+      },
+      "occurred_at": "2026-10-03T19:55:05.521089+00:00"
+    },
+    {
+      "id": "93cbe50a-4045-4e70-8172-07d155fc071c",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-shortage-impact-assessment",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "d97472f6-f6de-4804-ba26-46d36ea5037c",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "86560103-f766-4125-af34-40ffbf7377f1",
+          "df7a909e-c512-4dee-9f53-cf00f74e459d",
+          "4ba58a52-4a71-48f7-9af3-d5729e256a0d",
+          "da76efec-f0da-4ed2-bb93-bc5b838fc304",
+          "9c279aab-7d91-42a1-b5a7-a5fb8ab3fd40",
+          "b8b3384e-ae1a-46c1-ac25-f86a31322d29",
+          "83ae2c32-68a5-4439-bef6-69f22a618628",
+          "784f899e-9134-47de-a043-f18093cc1636"
+        ],
+        "proposalId": "d97472f6-f6de-4804-ba26-46d36ea5037c",
+        "revisionId": "supply-shortage-impact-assessment:v1",
+        "diagnosisId": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learning"
+      },
+      "occurred_at": "2026-10-03T19:59:35.300216+00:00"
+    }
+  ],
+  "user_evidence_sources": [
+    {
+      "id": "754a9597-2af4-4ead-b2aa-ed1ef35be81a",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "title": "个人工作记录.txt",
+      "storage_path": "75228168-e00c-48df-8f2a-3e3d8e1f841a/754a9597-2af4-4ead-b2aa-ed1ef35be81a",
+      "content_type": "text/plain",
+      "byte_size": 1373,
+      "parse_status": "ready",
+      "parsed_lines": [
+        {
+          "line": 1,
+          "text": "我独立完成了订单V104的分时段物料核算并把结果登记到核算表：D1订单100件、D2订单80件；实物库存50件，其中10件隔离不可用，可用40件；确认到货D1为20件、D2为30件。D1净需求=max(0,100-40-20)=40件，D1剩余可用库存0；D2净需求=max(0,80-0-30)=50件。将隔离的10件纳入可用库存会低估D1缺口10件，我明确排除了这一项。"
+        },
+        {
+          "line": 2,
+          "text": "我独立估计并记录跨境补货总交期：生产5至6天、运输3至4天、通关2至3天、收货验收1天，各阶段串行，运输报价未含通关，总计11至14天。我用发运节点核对了时间区间，没有重复计算通关；待核验因素是海关查验可能额外增加2天，因此压力情景为16天，而不是保证到货日期。"
+        },
+        {
+          "line": 3,
+          "text": "我完成可比100件物料的到岸总成本核算：采购每件20元共2000元，整批运输300元，税费以2300元计税基数按5%为115元，检验85元，总成本2500元，单位25元。报价另列的300元物流费已包含在运输中，我已剔除，未重复计费；统一批量和币种后与发票逐项对账无差异。"
+        },
+        {
+          "line": 4,
+          "text": "我编写并运行Python列表推导式，将输入[1,2,3,4]筛选偶数再平方，表达式[x*x for x in values if x%2==0]输出[4,16]；空输入输出[]。我用等价for循环和断言逐一核对了这两个测试，明确过滤发生在平方之前。"
+        }
+      ],
+      "source_sha256": "cc5a4fff100cad59920d5b1541e52b7337ff5a80db488d235eeee3de68ecc391",
+      "parse_error": null,
+      "provenance": {
+        "kind": "user-upload"
+      },
+      "created_at": "2026-10-03T19:52:44.580683+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "title": "交期窗口计算结果.md",
+      "storage_path": "75228168-e00c-48df-8f2a-3e3d8e1f841a/08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "content_type": "text/markdown",
+      "byte_size": 2948,
+      "parse_status": "ready",
+      "parsed_lines": [
+        {
+          "line": 1,
+          "text": "# 缺料窗口核算结果 — 验收演练工作记录"
+        },
+        {
+          "line": 3,
+          "text": "资料性质：这是虚构项目数据上的实际计算演练，用于测试产品闭环，不声称已经接洽或审核真实供应商。以下计算由本次演练执行者根据给定输入完成。"
+        },
+        {
+          "line": 5,
+          "text": "## 输入与口径"
+        },
+        {
+          "line": 6,
+          "text": "材料M用于海外工厂订单，每件产品消耗1单位M，无替代料。2026-10-05期初可用库存70单位，已排除隔离库存。需求按日末扣减，到货在当日开工前已经完成验收并可用。未满足需求作为积欠跨日延续，不取消、不将积欠自动清零。"
+        },
+        {
+          "line": 7,
+          "text": "10月5日需求150、确认到货0；10月6日需求100、确认到货120；10月7日需求80、确认到货100；10月8日需求20、确认到货60。首批补货10月1日下单，承诺10月6日完成到货验收，可用交期窗口为5个日历日。"
+        },
+        {
+          "line": 9,
+          "text": "## 我完成的逐期计算"
+        },
+        {
+          "line": 10,
+          "text": "采用带符号的净结余：上日净结余＋本日可用到货－本日需求。负值代表累计未满足需求，而非可供实物库存。"
+        },
+        {
+          "line": 11,
+          "text": "10月5日：70＋0－150＝−80，累计缺口80。"
+        },
+        {
+          "line": 12,
+          "text": "10月6日：−80＋120－100＝−60，累计缺口60。"
+        },
+        {
+          "line": 13,
+          "text": "10月7日：−60＋100－80＝−40，累计缺口40。"
+        },
+        {
+          "line": 14,
+          "text": "10月8日：−40＋60－20＝0，积欠清零。"
+        },
+        {
+          "line": 15,
+          "text": "因此在该日粒度口径下，最早缺料日是10月5日，最大累计缺口80单位。10月5、6、7日末均存在缺口，10月8日末解除暴露。日内停线的精确小时数尚需工单消耗时点，不能由日末余额冒充计算。"
+        },
+        {
+          "line": 17,
+          "text": "## 我复核的交期敏感性"
+        },
+        {
+          "line": 18,
+          "text": "我将首批120单位的可用交期延迟1天，由10月6日改到10月7日，其他需求及到货不变。重新计算：10月5日−80；10月6日−80＋0－100＝−180；10月7日−180＋220－80＝−40；10月8日−40＋60－20＝0。最大缺口从80升至180，增加100；最早暴露仍为10月5日，按日末评估的解除日仍为10月8日。不能因为最终恢复日不变，就说交期延迟没有影响。"
+        },
+        {
+          "line": 19,
+          "text": "我也复核了首批120单位提前1天至10月5日的情况：10月5日70＋120－150＝40；10月6日40＋0－100＝−60；10月7日−60＋100－80＝−40；10月8日−40＋60－20＝0。最早缺料变为10月6日，比基线晚1天；最大缺口降为60，减少20，但不能完全消除暴露。"
+        },
+        {
+          "line": 21,
+          "text": "## 订单影响追溯"
+        },
+        {
+          "line": 22,
+          "text": "按先到期先分配，订单O1在10月5日需150，基线先满足70，剩余80由10月6日到货补齐；10月6日订单O2需100，先扣除前欠80后只能满足40，剩余60延至10月7日；10月7日订单O3需80，先补O2的60后只能满足40，剩余40延至10月8日；10月8日到货60先补O3的40，再满足当日订单O4的20。此分配与每日累计缺口80、60、40、0交叉核对一致。"
+        },
+        {
+          "line": 24,
+          "text": "结论：首批补货必须优先保证10月6日可用。若延迟到10月7日，需要额外覆盖10月6日增加的100单位积欠暴露。本记录证明本次给定数据的核算过程；真实供应商承诺及交付执行仍需业务人员核实。"
+        }
+      ],
+      "source_sha256": "301779764c565348ac0bba713a2a73d42f60289837d039d66d29b8617bbf70e6",
+      "parse_error": null,
+      "provenance": {
+        "kind": "action-result",
+        "actionId": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+        "courseId": "enterprise-vietnam-supply-collaboration",
+        "actionRunId": "e295728b-fb7a-4832-ae4e-5c3b61b47b93"
+      },
+      "created_at": "2026-10-03T19:56:49.310651+00:00",
+      "archived_at": null
+    }
+  ],
+  "evidence_units": [
+    {
+      "id": "92e5706f-2564-4c69-b515-4989e3a044ee",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "754a9597-2af4-4ead-b2aa-ed1ef35be81a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "source_line": 1,
+      "quote": "我独立完成了订单V104的分时段物料核算并把结果登记到核算表：D1订单100件、D2订单80件；实物库存50件，其中10件隔离不可用，可用40件；确认到货D1为20件、D2为30件。D1净需求=max(0,100-40-20)=40件，D1剩余可用库存0；D2净需求=max(0,80-0-30)=50件。将隔离的10件纳入可用库存会低估D1缺口10件，我明确排除了这一项。",
+      "observation": "完成订单V104分时段物料核算并登记结果，列出D1/D2订单量、实物库存与隔离不可用库存、确认到货，计算D1和D2净需求及D1剩余可用库存，并明确排除将隔离10件计入可用库存的做法。",
+      "capability": "分时段物料核算与净需求计算",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:54:30.538215+00:00"
+    },
+    {
+      "id": "5c4690f6-004d-4be0-acea-2fe176a4813c",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "754a9597-2af4-4ead-b2aa-ed1ef35be81a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "source_line": 2,
+      "quote": "我独立估计并记录跨境补货总交期：生产5至6天、运输3至4天、通关2至3天、收货验收1天，各阶段串行，运输报价未含通关，总计11至14天。我用发运节点核对了时间区间，没有重复计算通关；待核验因素是海关查验可能额外增加2天，因此压力情景为16天，而不是保证到货日期。",
+      "observation": "完成跨境补货总交期估算并记录，将生产、运输、通关、收货验收各阶段串行相加得到11至14天，用发运节点核对时间区间且未重复计算通关，并给出海关查验额外增加2天时的16天压力情景。",
+      "capability": "跨境补货总交期估算与区间核对",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:54:30.538215+00:00"
+    },
+    {
+      "id": "e78b2677-1026-4017-8057-460a6e77aeed",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "754a9597-2af4-4ead-b2aa-ed1ef35be81a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "source_line": 3,
+      "quote": "我完成可比100件物料的到岸总成本核算：采购每件20元共2000元，整批运输300元，税费以2300元计税基数按5%为115元，检验85元，总成本2500元，单位25元。报价另列的300元物流费已包含在运输中，我已剔除，未重复计费；统一批量和币种后与发票逐项对账无差异。",
+      "observation": "完成100件可比物料的到岸总成本核算，计算采购、运输、税费、检验、总成本和单位成本，剔除报价中已含在运输内的300元物流费以避免重复计费，并统一批量和币种后与发票逐项对账无差异。",
+      "capability": "到岸总成本核算与发票对账",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:54:30.538215+00:00"
+    },
+    {
+      "id": "51a5f5b7-bd69-420c-b7ae-827e4d6d7cd7",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "754a9597-2af4-4ead-b2aa-ed1ef35be81a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "source_line": 4,
+      "quote": "我编写并运行Python列表推导式，将输入[1,2,3,4]筛选偶数再平方，表达式[x*x for x in values if x%2==0]输出[4,16]；空输入输出[]。我用等价for循环和断言逐一核对了这两个测试，明确过滤发生在平方之前。",
+      "observation": "编写并运行Python列表推导式，对输入[1,2,3,4]筛选偶数再平方并得到[4,16]，对空输入得到[]，用等价for循环和断言核对这两个测试，并明确过滤发生在平方之前。",
+      "capability": "Python列表推导式编写、运行与测试",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:54:30.538215+00:00"
+    },
+    {
+      "id": "86560103-f766-4125-af34-40ffbf7377f1",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "source_line": 11,
+      "quote": "10月5日：70＋0－150＝−80，累计缺口80。",
+      "observation": "执行10月5日净结余计算：期初70加可用到货0减需求150，得到−80，并记录累计缺口80。",
+      "capability": "缺料窗口逐日净结余核算",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:59:05.771228+00:00"
+    },
+    {
+      "id": "df7a909e-c512-4dee-9f53-cf00f74e459d",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "source_line": 12,
+      "quote": "10月6日：−80＋120－100＝−60，累计缺口60。",
+      "observation": "执行10月6日净结余计算：上日−80加可用到货120减需求100，得到−60，并记录累计缺口60。",
+      "capability": "缺料窗口逐日净结余核算",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:59:05.771228+00:00"
+    },
+    {
+      "id": "4ba58a52-4a71-48f7-9af3-d5729e256a0d",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "source_line": 13,
+      "quote": "10月7日：−60＋100－80＝−40，累计缺口40。",
+      "observation": "执行10月7日净结余计算：上日−60加可用到货100减需求80，得到−40，并记录累计缺口40。",
+      "capability": "缺料窗口逐日净结余核算",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:59:05.771228+00:00"
+    },
+    {
+      "id": "da76efec-f0da-4ed2-bb93-bc5b838fc304",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "source_line": 14,
+      "quote": "10月8日：−40＋60－20＝0，积欠清零。",
+      "observation": "执行10月8日净结余计算：上日−40加可用到货60减需求20，得到0，并记录积欠清零。",
+      "capability": "缺料窗口逐日净结余核算",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:59:05.771228+00:00"
+    },
+    {
+      "id": "9c279aab-7d91-42a1-b5a7-a5fb8ab3fd40",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "source_line": 15,
+      "quote": "因此在该日粒度口径下，最早缺料日是10月5日，最大累计缺口80单位。10月5、6、7日末均存在缺口，10月8日末解除暴露。日内停线的精确小时数尚需工单消耗时点，不能由日末余额冒充计算。",
+      "observation": "基于逐日计算结果归纳最早缺料日为10月5日、最大累计缺口80单位，并指出日内停线小时数需工单消耗时点，不能由日末余额计算。",
+      "capability": "缺料窗口结果归纳与口径局限识别",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:59:05.771228+00:00"
+    },
+    {
+      "id": "b8b3384e-ae1a-46c1-ac25-f86a31322d29",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "source_line": 18,
+      "quote": "我将首批120单位的可用交期延迟1天，由10月6日改到10月7日，其他需求及到货不变。重新计算：10月5日−80；10月6日−80＋0－100＝−180；10月7日−180＋220－80＝−40；10月8日−40＋60－20＝0。最大缺口从80升至180，增加100；最早暴露仍为10月5日，按日末评估的解除日仍为10月8日。不能因为最终恢复日不变，就说交期延迟没有影响。",
+      "observation": "将首批120单位交期从10月6日延迟至10月7日后重新逐日计算，得出最大缺口升至180、增加100，并说明最终恢复日不变不代表延迟无影响。",
+      "capability": "交期延迟敏感性复核",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:59:05.771228+00:00"
+    },
+    {
+      "id": "83ae2c32-68a5-4439-bef6-69f22a618628",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "source_line": 19,
+      "quote": "我也复核了首批120单位提前1天至10月5日的情况：10月5日70＋120－150＝40；10月6日40＋0－100＝−60；10月7日−60＋100－80＝−40；10月8日−40＋60－20＝0。最早缺料变为10月6日，比基线晚1天；最大缺口降为60，减少20，但不能完全消除暴露。",
+      "observation": "将首批120单位提前至10月5日后重新逐日计算，得出最早缺料日变为10月6日、最大缺口降为60、减少20，但不能完全消除暴露。",
+      "capability": "交期提前敏感性复核",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:59:05.771228+00:00"
+    },
+    {
+      "id": "784f899e-9134-47de-a043-f18093cc1636",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "source_line": 22,
+      "quote": "按先到期先分配，订单O1在10月5日需150，基线先满足70，剩余80由10月6日到货补齐；10月6日订单O2需100，先扣除前欠80后只能满足40，剩余60延至10月7日；10月7日订单O3需80，先补O2的60后只能满足40，剩余40延至10月8日；10月8日到货60先补O3的40，再满足当日订单O4的20。此分配与每日累计缺口80、60、40、0交叉核对一致。",
+      "observation": "按先到期先分配追溯O1至O4订单的满足与延欠过程，并用每日累计缺口80、60、40、0交叉核对一致。",
+      "capability": "订单影响追溯与交叉核对",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:59:05.771228+00:00"
+    },
+    {
+      "id": "85772924-6958-468d-978c-abe8c9e1f7c2",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "source_line": 24,
+      "quote": "结论：首批补货必须优先保证10月6日可用。若延迟到10月7日，需要额外覆盖10月6日增加的100单位积欠暴露。本记录证明本次给定数据的核算过程；真实供应商承诺及交付执行仍需业务人员核实。",
+      "observation": "基于前述核算给出结论：首批补货优先保证10月6日可用；若延迟至10月7日需额外覆盖100单位积欠暴露，并声明真实供应商承诺与交付执行仍需核实。",
+      "capability": "核算结论与适用边界说明",
+      "extraction_version": "personal-evidence-v15",
+      "created_at": "2026-10-03T19:59:05.771228+00:00"
+    }
+  ],
+  "capability_state_proposals": [
+    {
+      "id": "5642cde4-3772-4216-9736-2c76f8f3d049",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "unit_ids": [
+        "5c4690f6-004d-4be0-acea-2fe176a4813c"
+      ],
+      "node_id": "supply-cross-border-lead-time",
+      "revision_id": "supply-cross-border-lead-time:v1",
+      "proposed_status": "learned",
+      "sufficiency": "supported",
+      "confidence": 0.97,
+      "reason": "单元1分解生产5至6天、运输3至4天、通关2至3天、收货验收1天，串行汇总11至14天，说明运输报价未含通关且未重复计算通关，并给出海关查验额外2天的16天压力情景，覆盖标准要求。",
+      "confirmation_state": "confirmed",
+      "knowledge_evidence_id": "dab4671a-5ac5-4e25-9038-eb88dd41f130",
+      "created_at": "2026-10-03T19:54:30.85801+00:00",
+      "resolved_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "id": "57979760-efd0-45e2-a60f-f2896a27f135",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "unit_ids": [
+        "e78b2677-1026-4017-8057-460a6e77aeed"
+      ],
+      "node_id": "supply-landed-cost-calculation",
+      "revision_id": "supply-landed-cost-calculation:v1",
+      "proposed_status": "learned",
+      "sufficiency": "supported",
+      "confidence": 0.98,
+      "reason": "单元2汇总采购2000元、运输300元、税费115元、检验85元，总成本2500元、单位25元，剔除已含在运输中的300元物流费避免重复计费，并统一批量币种后与发票逐项对账无差异，覆盖标准要求。",
+      "confirmation_state": "confirmed",
+      "knowledge_evidence_id": "3e63c640-d918-40db-9dec-722df97e5b5e",
+      "created_at": "2026-10-03T19:54:30.85801+00:00",
+      "resolved_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "id": "a57ea174-51dd-4d40-83a0-371aa7c098d6",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "unit_ids": [
+        "92e5706f-2564-4c69-b515-4989e3a044ee",
+        "5c4690f6-004d-4be0-acea-2fe176a4813c"
+      ],
+      "node_id": "supply-shortage-impact-assessment",
+      "revision_id": "supply-shortage-impact-assessment:v1",
+      "proposed_status": null,
+      "sufficiency": "insufficient",
+      "confidence": 0.8,
+      "reason": "单元0量化了D1/D2净需求及D1缺口，单元1给出交期区间，可作为影响评估输入；但未将已量化缺口映射到受影响订单的停线时段或恢复优先级输入，未执行标准中的影响映射动作。",
+      "confirmation_state": "pending",
+      "knowledge_evidence_id": null,
+      "created_at": "2026-10-03T19:54:30.85801+00:00",
+      "resolved_at": null
+    },
+    {
+      "id": "aca018e7-1050-4cb6-91d3-1c9f8c28aede",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "unit_ids": [
+        "5c4690f6-004d-4be0-acea-2fe176a4813c",
+        "e78b2677-1026-4017-8057-460a6e77aeed"
+      ],
+      "node_id": "supply-cost-lead-time-tradeoff",
+      "revision_id": "supply-cost-lead-time-tradeoff:v1",
+      "proposed_status": null,
+      "sufficiency": "insufficient",
+      "confidence": 0.82,
+      "reason": "单元1给出交期区间，单元2给出到岸总成本，但均为单一补货/单一物料数据；没有比较备选方案的总成本和交期，也没有在质量及合规约束下说明取舍和敏感参数，未执行标准中的比较与权衡动作。",
+      "confirmation_state": "pending",
+      "knowledge_evidence_id": null,
+      "created_at": "2026-10-03T19:54:30.85801+00:00",
+      "resolved_at": null
+    },
+    {
+      "id": "9580005a-2d4f-4d92-9315-d7147c14b69e",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "unit_ids": [
+        "51a5f5b7-bd69-420c-b7ae-827e4d6d7cd7"
+      ],
+      "node_id": "CODE02",
+      "revision_id": "CODE02-r1",
+      "proposed_status": "learning",
+      "sufficiency": "partial",
+      "confidence": 0.72,
+      "reason": "partial: 定义是让Agent通过编写和执行代码完成计算、验证、搜索或中间推导，把代码作为思考过程的一部分；验收还要求识别适合代码的步骤、编写验证或计算小程序，并能据执行结果修正原推理。第4行确实编写并运行列表推导式，[1,2,3,4]输出[4,16]、空输入输出[]，并用等价for循环和断言核对，属于正确代码计算/验证子动作；但原文未显示识别何步更适合代码，也未显示据结果修正原推理或计划，完整验收未满足，故partial。\n原判断：单元3编写并运行列表推导式，用等价for循环和断言核对两个测试，属于用代码计算或验证中间结论；但未体现识别哪些步骤更适合代码，也未体现根据执行结果修正原先推理或计划，未覆盖完整标准。",
+      "confirmation_state": "pending",
+      "knowledge_evidence_id": null,
+      "created_at": "2026-10-03T19:54:30.85801+00:00",
+      "resolved_at": null
+    },
+    {
+      "id": "36cc140f-36cf-42a5-9fff-586f20d2b319",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "unit_ids": [
+        "51a5f5b7-bd69-420c-b7ae-827e4d6d7cd7"
+      ],
+      "node_id": "PY85",
+      "revision_id": "PY85-r1",
+      "proposed_status": null,
+      "sufficiency": "insufficient",
+      "confidence": 0.75,
+      "reason": "insufficient: 定义限定：Unit Test 要求隔离验证函数和模块的局部行为，任务对象应为函数/模块。原文第4行实际是编写并运行 Python 列表推导式，并用等价 for 循环和断言核对 [1,2,3,4] 输出 [4,16]、空输入输出 []。该行为虽使用了断言和边界输入，但被验证对象是列表推导式表达式，不是函数或模块，未显示对函数/模块进行隔离验证。因没有确属该定义限定的正确子动作，definitionScopePreserved=false，判定 insufficient。\n原判断：单元3用断言核对两个输入下的列表推导式结果，属于局部验证/测试动作；但未显示隔离函数或模块、测试组织结构或常见误用识别，故仅部分覆盖Unit Test标准。",
+      "confirmation_state": "pending",
+      "knowledge_evidence_id": null,
+      "created_at": "2026-10-03T19:54:30.85801+00:00",
+      "resolved_at": null
+    },
+    {
+      "id": "1967e7dd-088e-4e9d-b85e-c18f496f68e3",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "unit_ids": [
+        "92e5706f-2564-4c69-b515-4989e3a044ee",
+        "5c4690f6-004d-4be0-acea-2fe176a4813c"
+      ],
+      "node_id": "supply-shortage-exposure",
+      "revision_id": "supply-shortage-exposure:v1",
+      "proposed_status": "learning",
+      "sufficiency": "partial",
+      "confidence": 0.72,
+      "reason": "partial: 定义要求独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。第1行给出D1/D2净需求40/50，可作为缺口量子项；第2行给出交期11至14天及查验压力情景16天，可作为交期敏感性子项。但原文没有结合净需求与交期窗口计算最早缺料日，也未完成二者联动的缺料暴露评估；存在正确子动作但完整验收未证明，故partial。\n原判断：单元0已计算D1/D2净需求及D1缺口并排除隔离库存，单元1给出跨境补货交期区间11至14天及海关查验额外2天压力情景16天，涉及交期不确定性；但未把净需求与交期窗口结合计算最早缺料日，也未针对缺口做交期敏感性，故仅部分覆盖。",
+      "confirmation_state": "confirmed",
+      "knowledge_evidence_id": "6dddfead-8180-4f22-90ca-72685e150ddb",
+      "created_at": "2026-10-03T19:54:30.85801+00:00",
+      "resolved_at": "2026-10-03T19:55:05.521089+00:00"
+    },
+    {
+      "id": "d8364550-ed4a-4191-9227-b700eedcd465",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "unit_ids": [
+        "92e5706f-2564-4c69-b515-4989e3a044ee"
+      ],
+      "node_id": "supply-net-material-requirement",
+      "revision_id": "supply-net-material-requirement:v1",
+      "proposed_status": "learned",
+      "sufficiency": "supported",
+      "confidence": 0.98,
+      "reason": "单元0给出D1/D2订单量、实物库存50件中10件隔离不可用、可用40件、确认到货20/30件，并计算D1净需求40、D2净需求50及D1剩余可用库存0，明确排除将隔离10件计入可用库存，覆盖标准要求。",
+      "confirmation_state": "confirmed",
+      "knowledge_evidence_id": "f6bd5779-ec59-46ca-9019-8a7c11efdc05",
+      "created_at": "2026-10-03T19:54:30.85801+00:00",
+      "resolved_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "id": "31b41ffc-ce40-445e-83a6-240e81c9a1e8",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "unit_ids": [
+        "784f899e-9134-47de-a043-f18093cc1636"
+      ],
+      "node_id": "RT06",
+      "revision_id": "RT06-r1",
+      "proposed_status": "learning",
+      "sufficiency": "partial",
+      "confidence": 0.65,
+      "reason": "partial: 定义限定为记录可追溯的输入、决策、动作与结果；验收还要求解释Audit Trail核心目标与边界、识别常见误用并用可检查示例证明掌握。原文第24行称本记录证明本次给定数据的核算过程，并区分真实供应商承诺及交付仍需业务人员核实；第3行也说明为虚构数据演练，这体现了可追溯记录和边界使用。但原文未解释Audit Trail核心目标，也未识别常见误用，完整验收要求未证明，故partial。\n原判断：单位7记录了按先到期先分配对O1-O4的满足与延欠过程，并与每日累计缺口交叉核对，提供了可追溯的决策/动作/结果示例；但未解释Audit Trail核心目标与边界，也未识别正确用法与常见误用。",
+      "confirmation_state": "pending",
+      "knowledge_evidence_id": null,
+      "created_at": "2026-10-03T19:59:05.816582+00:00",
+      "resolved_at": null
+    },
+    {
+      "id": "5a9c1383-0006-47ad-ad4a-233f77faac68",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "unit_ids": [
+        "85772924-6958-468d-978c-abe8c9e1f7c2"
+      ],
+      "node_id": null,
+      "revision_id": null,
+      "proposed_status": null,
+      "sufficiency": "unmatched",
+      "confidence": 0,
+      "reason": "本次Top-K候选未与该单元的实际能力表现对应；候选判断保留在诊断记录中。",
+      "confirmation_state": "pending",
+      "knowledge_evidence_id": null,
+      "created_at": "2026-10-03T19:59:05.816582+00:00",
+      "resolved_at": null
+    },
+    {
+      "id": "6428f193-6ddf-4382-9250-ae59a0a233ab",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "unit_ids": [
+        "86560103-f766-4125-af34-40ffbf7377f1",
+        "df7a909e-c512-4dee-9f53-cf00f74e459d",
+        "4ba58a52-4a71-48f7-9af3-d5729e256a0d",
+        "da76efec-f0da-4ed2-bb93-bc5b838fc304",
+        "9c279aab-7d91-42a1-b5a7-a5fb8ab3fd40"
+      ],
+      "node_id": "supply-net-material-requirement",
+      "revision_id": "supply-net-material-requirement:v1",
+      "proposed_status": "learned",
+      "sufficiency": "supported",
+      "confidence": 0.9,
+      "reason": "本人用期初可用库存70、确认到货和日需求逐日计算净结余（单位0-3），并汇总分时段缺口80/60/40/0（单位4）；完整原文说明期初库存已排除隔离库存，计算未使用不可用库存。覆盖分时段净需求计算与不可用库存排除。",
+      "confirmation_state": "confirmed",
+      "knowledge_evidence_id": "f75c4327-1ba7-4ec2-ac42-35b3f0989cd3",
+      "created_at": "2026-10-03T19:59:05.816582+00:00",
+      "resolved_at": "2026-10-03T19:59:27.978145+00:00"
+    },
+    {
+      "id": "7d26b0a0-70f0-4d77-be00-005357e563a3",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "unit_ids": [
+        "86560103-f766-4125-af34-40ffbf7377f1",
+        "df7a909e-c512-4dee-9f53-cf00f74e459d",
+        "4ba58a52-4a71-48f7-9af3-d5729e256a0d",
+        "da76efec-f0da-4ed2-bb93-bc5b838fc304",
+        "9c279aab-7d91-42a1-b5a7-a5fb8ab3fd40",
+        "b8b3384e-ae1a-46c1-ac25-f86a31322d29",
+        "83ae2c32-68a5-4439-bef6-69f22a618628"
+      ],
+      "node_id": "supply-shortage-exposure",
+      "revision_id": "supply-shortage-exposure:v1",
+      "proposed_status": "learned",
+      "sufficiency": "supported",
+      "confidence": 0.95,
+      "reason": "本人按日完成净结余计算（单位0-3），归纳最早缺料日10月5日、最大累计缺口80（单位4），并实际复核交期延迟1天与提前1天的敏感性，得到最大缺口180/60及最早缺料日变化（单位5-6）。覆盖净需求、补货交期窗口、最早缺料日、缺口量和交期敏感性。",
+      "confirmation_state": "confirmed",
+      "knowledge_evidence_id": "a8c176be-abde-44b2-94b5-dce0be0db9d1",
+      "created_at": "2026-10-03T19:59:05.816582+00:00",
+      "resolved_at": "2026-10-03T19:59:27.978145+00:00"
+    },
+    {
+      "id": "d97472f6-f6de-4804-ba26-46d36ea5037c",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "run_id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "unit_ids": [
+        "86560103-f766-4125-af34-40ffbf7377f1",
+        "df7a909e-c512-4dee-9f53-cf00f74e459d",
+        "4ba58a52-4a71-48f7-9af3-d5729e256a0d",
+        "da76efec-f0da-4ed2-bb93-bc5b838fc304",
+        "9c279aab-7d91-42a1-b5a7-a5fb8ab3fd40",
+        "b8b3384e-ae1a-46c1-ac25-f86a31322d29",
+        "83ae2c32-68a5-4439-bef6-69f22a618628",
+        "784f899e-9134-47de-a043-f18093cc1636"
+      ],
+      "node_id": "supply-shortage-impact-assessment",
+      "revision_id": "supply-shortage-impact-assessment:v1",
+      "proposed_status": "learning",
+      "sufficiency": "partial",
+      "confidence": 0.72,
+      "reason": "partial: 定义限定为独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。原文第22行将累计缺口80/60/40/0映射到订单O1-O4的满足与延后分配，并与逐期缺口交叉核对一致；第24行给出恢复优先级输入，即首批补货优先保证10月6日可用、延迟到10月7日需额外覆盖100单位。但第15行明确日内停线精确小时数尚需工单消耗时点，不能由日末余额冒充计算，原文未映射停线时段。存在正确子动作但完整要求未证明，故partial。\n原判断：已量化各日累计缺口80/60/40/0（单位0-4），并按先到期先分配将缺口映射到订单O1-O4且与累计缺口交叉核对（单位7）；交期敏感性提供恢复优先级输入（单位5-6）。但日内停线精确小时数被明确说明需工单消耗时点，不能由日末余额计算，停线时段未完成。",
+      "confirmation_state": "confirmed",
+      "knowledge_evidence_id": "93cbe50a-4045-4e70-8172-07d155fc071c",
+      "created_at": "2026-10-03T19:59:05.816582+00:00",
+      "resolved_at": "2026-10-03T19:59:35.300216+00:00"
+    }
+  ],
+  "edge_action_runs": [
+    {
+      "id": "e295728b-fb7a-4832-ae4e-5c3b61b47b93",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "action_id": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+      "edge_id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+      "binding_id": "56b73693-92ee-465e-a639-94eaed74425e",
+      "status": "completed",
+      "selection_key": "4bdbbc49-3884-4e99-9bfa-b71a85be5942",
+      "execution_snapshot": {
+        "action": {
+          "id": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+          "type": "practice_task",
+          "title": "核算缺料暴露窗口",
+          "status": "active",
+          "edge_id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+          "created_at": "2026-10-03T19:00:29.835461+00:00",
+          "difficulty": 3,
+          "provenance": {
+            "kind": "admin",
+            "actor_id": "54cd7725-ae57-464b-beba-18e950546f0b"
+          },
+          "updated_at": "2026-10-03T19:02:08.36043+00:00",
+          "description": "根据可用库存、逐期需求与确认到货，计算每期净需求、缺口和持续时间，并说明所影响的订单。",
+          "estimated_minutes": 45,
+          "expected_evidence": "提交包含原始输入、逐期计算、缺料起止和订单影响的 UTF-8 txt/md/csv 工作记录。完成任务不等于已具备能力。",
+          "resource_requirements": [
+            "planning-records"
+          ],
+          "required_capability_ids": [
+            "supply-net-material-requirement"
+          ]
+        },
+        "binding": {
+          "id": "56b73693-92ee-465e-a639-94eaed74425e",
+          "contact": "验收场景：计划负责人（无真实个人联系方式）",
+          "context": "海外工厂供应链协同项目。以下为验收用虚构项目资料，不代表已完成真实企业作业。",
+          "action_id": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+          "available": true,
+          "course_id": "enterprise-vietnam-supply-collaboration",
+          "resources": [
+            {
+              "key": "planning-records",
+              "label": "逐期计划输入",
+              "available": true,
+              "reference": "验收数据：初始可用库存70；第1/2/3期需求150/100/80；各期确认到货0/120/100。请解释积欠是否跨期及缺口解除时间。"
+            }
+          ],
+          "created_at": "2026-10-03T19:00:30.460257+00:00",
+          "updated_at": "2026-10-03T19:02:09.04+00:00",
+          "instructions": "使用自己的工作记录或明确标注的验收资料。逐期列出库存、需求、到货、缺口与受影响订单，再上传包含计算过程的结果。"
+        },
+        "sourceId": "supply-net-material-requirement",
+        "targetId": "supply-shortage-exposure"
+      },
+      "micro_path_id": null,
+      "evidence_source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "created_at": "2026-10-03T19:56:27.82773+00:00",
+      "started_at": "2026-10-03T19:56:35.947567+00:00",
+      "completed_at": "2026-10-03T19:56:51.675698+00:00",
+      "updated_at": "2026-10-03T19:56:51.675698+00:00"
+    }
+  ],
+  "personal_course_route_versions": [
+    {
+      "id": "ac86b54e-103b-43a1-bdb1-95a54ed226a6",
+      "route_id": "f6f35b17-e387-43b6-a495-3ce22530eb0f",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "version_number": 1,
+      "parent_version_id": null,
+      "source": "initial",
+      "include_node_ids": [],
+      "exclude_node_ids": [],
+      "snapshot": {
+        "valid": true,
+        "titles": {
+          "supply-shortage-exposure": "交期窗口缺料暴露评估",
+          "supply-cross-border-lead-time": "跨境补货交期估计",
+          "supply-alternate-site-capacity": "替代基地可用产能评估",
+          "supply-cost-lead-time-tradeoff": "供给备选方案成本交期权衡",
+          "supply-landed-cost-calculation": "到岸总成本计算",
+          "supply-recovery-option-ranking": "供应恢复备选方案排序",
+          "supply-site-switch-feasibility": "跨基地供给切换可行性判断",
+          "supply-net-material-requirement": "物料净需求计算",
+          "supply-shortage-impact-assessment": "缺料中断影响评估",
+          "supply-supplier-delivery-capacity": "供应商交付产能核验",
+          "supply-supplier-admission-decision": "供应商准入证据判定",
+          "supply-sample-quality-interpretation": "供应商样品质量证据判读",
+          "supply-supplier-qualification-review": "供应商资质证据审查"
+        },
+        "conflicts": [],
+        "orderedNodeIds": [
+          "supply-sample-quality-interpretation",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review",
+          "supply-supplier-admission-decision",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-cost-lead-time-tradeoff",
+          "supply-alternate-site-capacity",
+          "supply-site-switch-feasibility",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-recovery-option-ranking"
+        ],
+        "selectedNodeIds": [
+          "supply-alternate-site-capacity",
+          "supply-cost-lead-time-tradeoff",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-net-material-requirement",
+          "supply-recovery-option-ranking",
+          "supply-sample-quality-interpretation",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review"
+        ],
+        "prerequisiteEdges": [
+          {
+            "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+            "source": "supply-alternate-site-capacity",
+            "target": "supply-site-switch-feasibility",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-cost-lead-time-tradeoff",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-shortage-exposure",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-site-switch-feasibility",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+            "source": "supply-landed-cost-calculation",
+            "target": "supply-cost-lead-time-tradeoff",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+            "source": "supply-net-material-requirement",
+            "target": "supply-shortage-exposure",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+            "source": "supply-sample-quality-interpretation",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+            "source": "supply-shortage-exposure",
+            "target": "supply-shortage-impact-assessment",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+            "source": "supply-shortage-impact-assessment",
+            "target": "supply-recovery-option-ranking",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+            "source": "supply-supplier-delivery-capacity",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+            "source": "supply-supplier-qualification-review",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          }
+        ],
+        "bridgeKnowledgeIds": [
+          "supply-sample-quality-interpretation",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-alternate-site-capacity",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment"
+        ],
+        "currentKnowledgeIds": [
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-net-material-requirement"
+        ],
+        "effectiveTargetNodeIds": [
+          "supply-cost-lead-time-tradeoff",
+          "supply-recovery-option-ranking",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision"
+        ]
+      },
+      "structure_fingerprint": "006e1e16ec44e1129f7647f5e6ab44773a2970e8a5a6be16cf8e974def5af12c",
+      "created_at": "2026-10-03T19:55:26.405843+00:00",
+      "restored_from_version_id": null
+    }
+  ],
+  "capability_diagnosis_runs": [
+    {
+      "id": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_ids": [
+        "754a9597-2af4-4ead-b2aa-ed1ef35be81a"
+      ],
+      "status": "completed",
+      "model": "deepseek-flash",
+      "prompt_version": "personal-evidence-v15",
+      "diagnostics": {
+        "topK": 5,
+        "llmCalls": 4,
+        "metadata": [
+          {
+            "model": "deepseek-flash",
+            "stage": "extraction",
+            "provider": "deepseek",
+            "thinking": true,
+            "maxTokens": 16000,
+            "requestId": "d856e7fc-f8f9-4e2c-9b66-e08ce5e2c129",
+            "generatedAt": "2026-10-03T19:53:05.517Z",
+            "temperature": 0,
+            "promptTokens": 749,
+            "promptVersion": "personal-evidence-v15",
+            "schemaVersion": "evidence-units-v1",
+            "completionTokens": 2820
+          },
+          {
+            "model": "deepseek-flash",
+            "stage": "admission",
+            "provider": "deepseek",
+            "thinking": true,
+            "maxTokens": 16000,
+            "requestId": "78d3fa57-991c-493c-9755-b8f94fe8fa7a",
+            "generatedAt": "2026-10-03T19:53:58.054Z",
+            "temperature": 0,
+            "promptTokens": 3323,
+            "promptVersion": "personal-evidence-v15",
+            "schemaVersion": "evidence-sufficiency-v2",
+            "completionTokens": 11439
+          },
+          {
+            "model": "deepseek-flash",
+            "stage": "admission",
+            "provider": "deepseek",
+            "thinking": true,
+            "maxTokens": 16000,
+            "requestId": "b75f8626-0421-40eb-945b-d9f274f6563a",
+            "generatedAt": "2026-10-03T19:54:14.840Z",
+            "temperature": 0,
+            "promptTokens": 1780,
+            "promptVersion": "personal-evidence-v15",
+            "schemaVersion": "evidence-factual-verification-v3",
+            "completionTokens": 3626
+          },
+          {
+            "model": "deepseek-flash",
+            "stage": "admission",
+            "provider": "deepseek",
+            "thinking": true,
+            "maxTokens": 16000,
+            "requestId": "c0792edd-a478-490e-a9df-c4869d156c28",
+            "generatedAt": "2026-10-03T19:54:29.929Z",
+            "temperature": 0,
+            "promptTokens": 1412,
+            "promptVersion": "personal-evidence-v15",
+            "schemaVersion": "evidence-factual-verification-v3",
+            "completionTokens": 3207
+          }
+        ],
+        "artifacts": {
+          "retrieved": [
+            [
+              {
+                "title": "物料净需求计算",
+                "node_id": "supply-net-material-requirement",
+                "similarity": 0.87301168224181,
+                "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+                "revision_id": "supply-net-material-requirement:v1",
+                "mastery_criteria": [
+                  "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+                ]
+              },
+              {
+                "title": "交期窗口缺料暴露评估",
+                "node_id": "supply-shortage-exposure",
+                "similarity": 0.693379661243556,
+                "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+                "revision_id": "supply-shortage-exposure:v1",
+                "mastery_criteria": [
+                  "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+                ]
+              },
+              {
+                "title": "供应商交付产能核验",
+                "node_id": "supply-supplier-delivery-capacity",
+                "similarity": 0.585694993394913,
+                "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+                "revision_id": "supply-supplier-delivery-capacity:v1",
+                "mastery_criteria": [
+                  "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+                ]
+              },
+              {
+                "title": "缺料中断影响评估",
+                "node_id": "supply-shortage-impact-assessment",
+                "similarity": 0.580588425362801,
+                "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+                "revision_id": "supply-shortage-impact-assessment:v1",
+                "mastery_criteria": [
+                  "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+                ]
+              },
+              {
+                "title": "关键物料识别",
+                "node_id": "supply-critical-material-identification",
+                "similarity": 0.546010461687419,
+                "description": "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。",
+                "revision_id": "supply-critical-material-identification:v1",
+                "mastery_criteria": [
+                  "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "跨境补货交期估计",
+                "node_id": "supply-cross-border-lead-time",
+                "similarity": 0.880141801825656,
+                "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+                "revision_id": "supply-cross-border-lead-time:v1",
+                "mastery_criteria": [
+                  "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+                ]
+              },
+              {
+                "title": "交期窗口缺料暴露评估",
+                "node_id": "supply-shortage-exposure",
+                "similarity": 0.620387632262345,
+                "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+                "revision_id": "supply-shortage-exposure:v1",
+                "mastery_criteria": [
+                  "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+                ]
+              },
+              {
+                "title": "缺料中断影响评估",
+                "node_id": "supply-shortage-impact-assessment",
+                "similarity": 0.539044467267725,
+                "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+                "revision_id": "supply-shortage-impact-assessment:v1",
+                "mastery_criteria": [
+                  "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+                ]
+              },
+              {
+                "title": "跨基地供给切换可行性判断",
+                "node_id": "supply-site-switch-feasibility",
+                "similarity": 0.535635017937122,
+                "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+                "revision_id": "supply-site-switch-feasibility:v1",
+                "mastery_criteria": [
+                  "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+                ]
+              },
+              {
+                "title": "供给备选方案成本交期权衡",
+                "node_id": "supply-cost-lead-time-tradeoff",
+                "similarity": 0.526388256169066,
+                "description": "独立比较备选方案的总成本和交期，在给定质量及合规约束下说明取舍和敏感参数。",
+                "revision_id": "supply-cost-lead-time-tradeoff:v1",
+                "mastery_criteria": [
+                  "独立比较备选方案的总成本和交期，在给定质量及合规约束下说明取舍和敏感参数。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "到岸总成本计算",
+                "node_id": "supply-landed-cost-calculation",
+                "similarity": 0.808487080515977,
+                "description": "依据给定费率汇总采购、运输、税费和检验等可比总成本，识别漏项和重复项。",
+                "revision_id": "supply-landed-cost-calculation:v1",
+                "mastery_criteria": [
+                  "依据给定费率汇总采购、运输、税费和检验等可比总成本，识别漏项和重复项。"
+                ]
+              },
+              {
+                "title": "物料净需求计算",
+                "node_id": "supply-net-material-requirement",
+                "similarity": 0.4538587522037,
+                "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+                "revision_id": "supply-net-material-requirement:v1",
+                "mastery_criteria": [
+                  "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+                ]
+              },
+              {
+                "title": "供给备选方案成本交期权衡",
+                "node_id": "supply-cost-lead-time-tradeoff",
+                "similarity": 0.444698340332709,
+                "description": "独立比较备选方案的总成本和交期，在给定质量及合规约束下说明取舍和敏感参数。",
+                "revision_id": "supply-cost-lead-time-tradeoff:v1",
+                "mastery_criteria": [
+                  "独立比较备选方案的总成本和交期，在给定质量及合规约束下说明取舍和敏感参数。"
+                ]
+              },
+              {
+                "title": "跨境补货交期估计",
+                "node_id": "supply-cross-border-lead-time",
+                "similarity": 0.431162156920179,
+                "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+                "revision_id": "supply-cross-border-lead-time:v1",
+                "mastery_criteria": [
+                  "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+                ]
+              },
+              {
+                "title": "供应商交付产能核验",
+                "node_id": "supply-supplier-delivery-capacity",
+                "similarity": 0.422069141618119,
+                "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+                "revision_id": "supply-supplier-delivery-capacity:v1",
+                "mastery_criteria": [
+                  "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "pytest",
+                "node_id": "PY37",
+                "similarity": 0.553130123205788,
+                "description": "使用 pytest 编写和运行自动化测试。",
+                "revision_id": "PY37-r1",
+                "mastery_criteria": [
+                  "能独立完成pytest的核心目标与边界",
+                  "能在具体场景中识别pytest的正确用法与常见误用",
+                  "能用可检查的示例证明对pytest的掌握"
+                ]
+              },
+              {
+                "title": "Code as a Reasoning Tool",
+                "node_id": "CODE02",
+                "similarity": 0.479755713932387,
+                "description": "让 Agent 通过编写和执行代码完成计算、验证、搜索或中间推导，把代码作为思考过程的一部分。",
+                "revision_id": "CODE02-r1",
+                "mastery_criteria": [
+                  "能识别比纯自然语言推理更适合用代码解决的步骤",
+                  "能编写一个用于验证或计算中间结论的小程序",
+                  "能根据执行结果修正原先的推理或计划"
+                ]
+              },
+              {
+                "title": "Plan-and-Execute",
+                "node_id": "R04",
+                "similarity": 0.450370089698731,
+                "description": "先生成可检查计划，再按步骤执行并收集结果。",
+                "revision_id": "R04-r1",
+                "mastery_criteria": [
+                  "能独立完成Plan-and-Execute的核心目标与边界",
+                  "能在具体场景中识别Plan-and-Execute的正确用法与常见误用",
+                  "能用可检查的示例证明对Plan-and-Execute的掌握"
+                ]
+              },
+              {
+                "title": "Python Runtime",
+                "node_id": "PY01",
+                "similarity": 0.435568468702781,
+                "description": "理解 Python 程序的运行环境与执行模型。",
+                "revision_id": "PY01-r1",
+                "mastery_criteria": [
+                  "能清楚解释Python Runtime的核心目标与边界",
+                  "能在具体场景中识别Python Runtime的正确用法与常见误用",
+                  "能用可检查的示例证明对Python Runtime的掌握"
+                ]
+              },
+              {
+                "title": "Unit Test",
+                "node_id": "PY85",
+                "similarity": 0.429546748034173,
+                "description": "隔离验证函数和模块的局部行为。",
+                "revision_id": "PY85-r1",
+                "mastery_criteria": [
+                  "能独立完成Unit Test的核心目标与边界",
+                  "能在具体场景中识别Unit Test的正确用法与常见误用",
+                  "能用可检查的示例证明对Unit Test的掌握"
+                ]
+              }
+            ]
+          ],
+          "extraction": {
+            "units": [
+              {
+                "line": 1,
+                "quote": "我独立完成了订单V104的分时段物料核算并把结果登记到核算表：D1订单100件、D2订单80件；实物库存50件，其中10件隔离不可用，可用40件；确认到货D1为20件、D2为30件。D1净需求=max(0,100-40-20)=40件，D1剩余可用库存0；D2净需求=max(0,80-0-30)=50件。将隔离的10件纳入可用库存会低估D1缺口10件，我明确排除了这一项。",
+                "sourceId": "754a9597-2af4-4ead-b2aa-ed1ef35be81a",
+                "capability": "分时段物料核算与净需求计算",
+                "observation": "完成订单V104分时段物料核算并登记结果，列出D1/D2订单量、实物库存与隔离不可用库存、确认到货，计算D1和D2净需求及D1剩余可用库存，并明确排除将隔离10件计入可用库存的做法。"
+              },
+              {
+                "line": 2,
+                "quote": "我独立估计并记录跨境补货总交期：生产5至6天、运输3至4天、通关2至3天、收货验收1天，各阶段串行，运输报价未含通关，总计11至14天。我用发运节点核对了时间区间，没有重复计算通关；待核验因素是海关查验可能额外增加2天，因此压力情景为16天，而不是保证到货日期。",
+                "sourceId": "754a9597-2af4-4ead-b2aa-ed1ef35be81a",
+                "capability": "跨境补货总交期估算与区间核对",
+                "observation": "完成跨境补货总交期估算并记录，将生产、运输、通关、收货验收各阶段串行相加得到11至14天，用发运节点核对时间区间且未重复计算通关，并给出海关查验额外增加2天时的16天压力情景。"
+              },
+              {
+                "line": 3,
+                "quote": "我完成可比100件物料的到岸总成本核算：采购每件20元共2000元，整批运输300元，税费以2300元计税基数按5%为115元，检验85元，总成本2500元，单位25元。报价另列的300元物流费已包含在运输中，我已剔除，未重复计费；统一批量和币种后与发票逐项对账无差异。",
+                "sourceId": "754a9597-2af4-4ead-b2aa-ed1ef35be81a",
+                "capability": "到岸总成本核算与发票对账",
+                "observation": "完成100件可比物料的到岸总成本核算，计算采购、运输、税费、检验、总成本和单位成本，剔除报价中已含在运输内的300元物流费以避免重复计费，并统一批量和币种后与发票逐项对账无差异。"
+              },
+              {
+                "line": 4,
+                "quote": "我编写并运行Python列表推导式，将输入[1,2,3,4]筛选偶数再平方，表达式[x*x for x in values if x%2==0]输出[4,16]；空输入输出[]。我用等价for循环和断言逐一核对了这两个测试，明确过滤发生在平方之前。",
+                "sourceId": "754a9597-2af4-4ead-b2aa-ed1ef35be81a",
+                "capability": "Python列表推导式编写、运行与测试",
+                "observation": "编写并运行Python列表推导式，对输入[1,2,3,4]筛选偶数再平方并得到[4,16]，对空输入得到[]，用等价for循环和断言核对这两个测试，并明确过滤发生在平方之前。"
+              }
+            ]
+          },
+          "verifications": [
+            {
+              "value": {
+                "verdicts": {
+                  "CODE02": {
+                    "reason": "定义是让Agent通过编写和执行代码完成计算、验证、搜索或中间推导，把代码作为思考过程的一部分；验收还要求识别适合代码的步骤、编写验证或计算小程序，并能据执行结果修正原推理。第4行确实编写并运行列表推导式，[1,2,3,4]输出[4,16]、空输入输出[]，并用等价for循环和断言核对，属于正确代码计算/验证子动作；但原文未显示识别何步更适合代码，也未显示据结果修正原推理或计划，完整验收未满足，故partial。",
+                    "verdict": "partial",
+                    "definitionScopePreserved": true
+                  },
+                  "supply-shortage-exposure": {
+                    "reason": "定义要求独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。第1行给出D1/D2净需求40/50，可作为缺口量子项；第2行给出交期11至14天及查验压力情景16天，可作为交期敏感性子项。但原文没有结合净需求与交期窗口计算最早缺料日，也未完成二者联动的缺料暴露评估；存在正确子动作但完整验收未证明，故partial。",
+                    "verdict": "partial",
+                    "definitionScopePreserved": true
+                  },
+                  "supply-cross-border-lead-time": {
+                    "reason": "定义要求分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。第2行逐项列出生产5至6天、运输3至4天、通关2至3天、收货验收1天，串行合计复核为11至14天；运输报价未含通关、未重复计算，并给出海关查验额外2天的压力情景16天且注明非保证日期，符合定义与验收要求，故supported。",
+                    "verdict": "supported",
+                    "definitionScopePreserved": true
+                  },
+                  "supply-landed-cost-calculation": {
+                    "reason": "定义要求依据给定费率汇总采购、运输、税费和检验等可比总成本，并识别漏项和重复项。第3行采购2000+运输300+税费115+检验85=2500，单位成本2500/100=25；税费基数2300=2000+300，5%为115，均复核正确。原文还识别并剔除报价另列300元物流费的重复项，统一批量和币种后对账，符合定义与验收要求，故supported。",
+                    "verdict": "supported",
+                    "definitionScopePreserved": true
+                  },
+                  "supply-net-material-requirement": {
+                    "reason": "定义限定为根据订单需求、可用库存及确认到货计算分时段净需求并正确排除不可用库存。第1行明确D1需求100、D2需求80，实物库存50中10隔离不可用、可用40，确认到货D1=20、D2=30；复核D1净需求=max(0,100-40-20)=40、剩余0，D2净需求=max(0,80-0-30)=50，且明确排除隔离10件，计算与定义及验收要求一致，登记到核算表，故supported。",
+                    "verdict": "supported",
+                    "definitionScopePreserved": true
+                  }
+                }
+              },
+              "nodeIds": [
+                "supply-net-material-requirement",
+                "supply-shortage-exposure",
+                "supply-cross-border-lead-time",
+                "supply-landed-cost-calculation",
+                "CODE02"
+              ]
+            },
+            {
+              "value": {
+                "verdicts": {
+                  "PY85": {
+                    "reason": "定义限定：Unit Test 要求隔离验证函数和模块的局部行为，任务对象应为函数/模块。原文第4行实际是编写并运行 Python 列表推导式，并用等价 for 循环和断言核对 [1,2,3,4] 输出 [4,16]、空输入输出 []。该行为虽使用了断言和边界输入，但被验证对象是列表推导式表达式，不是函数或模块，未显示对函数/模块进行隔离验证。因没有确属该定义限定的正确子动作，definitionScopePreserved=false，判定 insufficient。",
+                    "verdict": "insufficient",
+                    "definitionScopePreserved": false
+                  }
+                }
+              },
+              "nodeIds": [
+                "PY85"
+              ]
+            }
+          ],
+          "formatFailures": [],
+          "judgmentAttempts": [
+            {
+              "value": {
+                "judgments": {
+                  "R04": {
+                    "reason": "单元3仅有编写运行代码并使用断言核对结果，未生成可检查计划，也未按计划执行并收集结果，不能对应Plan-and-Execute核心标准。",
+                    "confidence": 0.9,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "PY01": {
+                    "reason": "单元3是Python列表推导式执行与断言核对，没有解释Python运行环境或执行模型，也未识别其正确用法与常见误用，不能对应Python Runtime掌握标准。",
+                    "confidence": 0.85,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "PY37": {
+                    "reason": "单元3未出现pytest编写/运行自动化测试、测试文件或pytest断言，仅使用列表推导式、等价for循环和普通断言核对，不能对应pytest掌握标准。",
+                    "confidence": 0.95,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "PY85": {
+                    "reason": "单元3用断言核对两个输入下的列表推导式结果，属于局部验证/测试动作；但未显示隔离函数或模块、测试组织结构或常见误用识别，故仅部分覆盖Unit Test标准。",
+                    "confidence": 0.75,
+                    "sufficiency": "partial",
+                    "unitIndexes": [
+                      3
+                    ]
+                  },
+                  "CODE02": {
+                    "reason": "单元3编写并运行列表推导式，用等价for循环和断言核对两个测试，属于用代码计算或验证中间结论；但未体现识别哪些步骤更适合代码，也未体现根据执行结果修正原先推理或计划，未覆盖完整标准。",
+                    "confidence": 0.72,
+                    "sufficiency": "partial",
+                    "unitIndexes": [
+                      3
+                    ]
+                  },
+                  "supply-shortage-exposure": {
+                    "reason": "单元0已计算D1/D2净需求及D1缺口并排除隔离库存，单元1给出跨境补货交期区间11至14天及海关查验额外2天压力情景16天，涉及交期不确定性；但未把净需求与交期窗口结合计算最早缺料日，也未针对缺口做交期敏感性，故仅部分覆盖。",
+                    "confidence": 0.72,
+                    "sufficiency": "partial",
+                    "unitIndexes": [
+                      0,
+                      1
+                    ]
+                  },
+                  "supply-cross-border-lead-time": {
+                    "reason": "单元1分解生产5至6天、运输3至4天、通关2至3天、收货验收1天，串行汇总11至14天，说明运输报价未含通关且未重复计算通关，并给出海关查验额外2天的16天压力情景，覆盖标准要求。",
+                    "confidence": 0.97,
+                    "sufficiency": "supported",
+                    "unitIndexes": [
+                      1
+                    ]
+                  },
+                  "supply-cost-lead-time-tradeoff": {
+                    "reason": "单元1给出交期区间，单元2给出到岸总成本，但均为单一补货/单一物料数据；没有比较备选方案的总成本和交期，也没有在质量及合规约束下说明取舍和敏感参数，未执行标准中的比较与权衡动作。",
+                    "confidence": 0.82,
+                    "sufficiency": "insufficient",
+                    "unitIndexes": [
+                      1,
+                      2
+                    ]
+                  },
+                  "supply-landed-cost-calculation": {
+                    "reason": "单元2汇总采购2000元、运输300元、税费115元、检验85元，总成本2500元、单位25元，剔除已含在运输中的300元物流费避免重复计费，并统一批量币种后与发票逐项对账无差异，覆盖标准要求。",
+                    "confidence": 0.98,
+                    "sufficiency": "supported",
+                    "unitIndexes": [
+                      2
+                    ]
+                  },
+                  "supply-site-switch-feasibility": {
+                    "reason": "单元1仅涉及跨境补货总交期估计，未涉及替代基地可用产能、到达时间、候选切换是否满足订单约束或缺失证据区分，无法对应标准。",
+                    "confidence": 0.95,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "supply-net-material-requirement": {
+                    "reason": "单元0给出D1/D2订单量、实物库存50件中10件隔离不可用、可用40件、确认到货20/30件，并计算D1净需求40、D2净需求50及D1剩余可用库存0，明确排除将隔离10件计入可用库存，覆盖标准要求。",
+                    "confidence": 0.98,
+                    "sufficiency": "supported",
+                    "unitIndexes": [
+                      0
+                    ]
+                  },
+                  "supply-shortage-impact-assessment": {
+                    "reason": "单元0量化了D1/D2净需求及D1缺口，单元1给出交期区间，可作为影响评估输入；但未将已量化缺口映射到受影响订单的停线时段或恢复优先级输入，未执行标准中的影响映射动作。",
+                    "confidence": 0.8,
+                    "sufficiency": "insufficient",
+                    "unitIndexes": [
+                      0,
+                      1
+                    ]
+                  },
+                  "supply-supplier-delivery-capacity": {
+                    "reason": "单元0为物料净需求计算，单元2为到岸成本核算，均未涉及瓶颈、良率、已承诺负荷、期间可交付量计算或名义产能误用识别，无法对应标准。",
+                    "confidence": 0.95,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "supply-critical-material-identification": {
+                    "reason": "单元0仅涉及订单物料净需求与库存排除，未提供BOM、替代性、停线影响、关键物料识别准则或排除理由说明，无法对应标准。",
+                    "confidence": 0.95,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  }
+                }
+              },
+              "nodeIds": [
+                "supply-net-material-requirement",
+                "supply-shortage-exposure",
+                "supply-supplier-delivery-capacity",
+                "supply-shortage-impact-assessment",
+                "supply-critical-material-identification",
+                "supply-cross-border-lead-time",
+                "supply-site-switch-feasibility",
+                "supply-cost-lead-time-tradeoff",
+                "supply-landed-cost-calculation",
+                "PY37",
+                "CODE02",
+                "R04",
+                "PY01",
+                "PY85"
+              ]
+            }
+          ]
+        },
+        "embedding": {
+          "model": "qwen3.7-text-embedding",
+          "provider": "aliyun",
+          "dimensions": 1024
+        },
+        "sourceCount": 1,
+        "retrievalCount": 4
+      },
+      "error": null,
+      "created_at": "2026-10-03T19:52:53.640317+00:00",
+      "completed_at": "2026-10-03T19:54:30.947+00:00"
+    },
+    {
+      "id": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "source_ids": [
+        "08f6d044-8fe2-4f25-9b76-1be62b3bee3a"
+      ],
+      "status": "completed",
+      "model": "deepseek-flash",
+      "prompt_version": "personal-evidence-v15",
+      "diagnostics": {
+        "topK": 5,
+        "llmCalls": 3,
+        "metadata": [
+          {
+            "model": "deepseek-flash",
+            "stage": "extraction",
+            "provider": "deepseek",
+            "thinking": true,
+            "maxTokens": 16000,
+            "requestId": "5b2aecb3-85fe-45ef-a0fe-775378b6a43a",
+            "generatedAt": "2026-10-03T19:57:35.221Z",
+            "temperature": 0,
+            "promptTokens": 1298,
+            "promptVersion": "personal-evidence-v15",
+            "schemaVersion": "evidence-units-v1",
+            "completionTokens": 8274
+          },
+          {
+            "model": "deepseek-flash",
+            "stage": "admission",
+            "provider": "deepseek",
+            "thinking": true,
+            "maxTokens": 16000,
+            "requestId": "d9bde7e7-c679-4ee1-9190-0eef4fd02ab8",
+            "generatedAt": "2026-10-03T19:58:42.852Z",
+            "temperature": 0,
+            "promptTokens": 4728,
+            "promptVersion": "personal-evidence-v15",
+            "schemaVersion": "evidence-sufficiency-v2",
+            "completionTokens": 14682
+          },
+          {
+            "model": "deepseek-flash",
+            "stage": "admission",
+            "provider": "deepseek",
+            "thinking": true,
+            "maxTokens": 16000,
+            "requestId": "8f20e68a-8674-4542-ae58-7d709362b240",
+            "generatedAt": "2026-10-03T19:59:05.750Z",
+            "temperature": 0,
+            "promptTokens": 2633,
+            "promptVersion": "personal-evidence-v15",
+            "schemaVersion": "evidence-factual-verification-v3",
+            "completionTokens": 4944
+          }
+        ],
+        "artifacts": {
+          "retrieved": [
+            [
+              {
+                "title": "交期窗口缺料暴露评估",
+                "node_id": "supply-shortage-exposure",
+                "similarity": 0.717265107713205,
+                "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+                "revision_id": "supply-shortage-exposure:v1",
+                "mastery_criteria": [
+                  "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+                ]
+              },
+              {
+                "title": "物料净需求计算",
+                "node_id": "supply-net-material-requirement",
+                "similarity": 0.678214310567299,
+                "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+                "revision_id": "supply-net-material-requirement:v1",
+                "mastery_criteria": [
+                  "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+                ]
+              },
+              {
+                "title": "缺料中断影响评估",
+                "node_id": "supply-shortage-impact-assessment",
+                "similarity": 0.524939057238218,
+                "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+                "revision_id": "supply-shortage-impact-assessment:v1",
+                "mastery_criteria": [
+                  "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+                ]
+              },
+              {
+                "title": "供应商交付产能核验",
+                "node_id": "supply-supplier-delivery-capacity",
+                "similarity": 0.501566111854782,
+                "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+                "revision_id": "supply-supplier-delivery-capacity:v1",
+                "mastery_criteria": [
+                  "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+                ]
+              },
+              {
+                "title": "关键物料识别",
+                "node_id": "supply-critical-material-identification",
+                "similarity": 0.447743898899094,
+                "description": "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。",
+                "revision_id": "supply-critical-material-identification:v1",
+                "mastery_criteria": [
+                  "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "交期窗口缺料暴露评估",
+                "node_id": "supply-shortage-exposure",
+                "similarity": 0.717265107713205,
+                "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+                "revision_id": "supply-shortage-exposure:v1",
+                "mastery_criteria": [
+                  "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+                ]
+              },
+              {
+                "title": "物料净需求计算",
+                "node_id": "supply-net-material-requirement",
+                "similarity": 0.678214310567299,
+                "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+                "revision_id": "supply-net-material-requirement:v1",
+                "mastery_criteria": [
+                  "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+                ]
+              },
+              {
+                "title": "缺料中断影响评估",
+                "node_id": "supply-shortage-impact-assessment",
+                "similarity": 0.524939057238218,
+                "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+                "revision_id": "supply-shortage-impact-assessment:v1",
+                "mastery_criteria": [
+                  "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+                ]
+              },
+              {
+                "title": "供应商交付产能核验",
+                "node_id": "supply-supplier-delivery-capacity",
+                "similarity": 0.501566111854782,
+                "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+                "revision_id": "supply-supplier-delivery-capacity:v1",
+                "mastery_criteria": [
+                  "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+                ]
+              },
+              {
+                "title": "关键物料识别",
+                "node_id": "supply-critical-material-identification",
+                "similarity": 0.447743898899094,
+                "description": "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。",
+                "revision_id": "supply-critical-material-identification:v1",
+                "mastery_criteria": [
+                  "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "交期窗口缺料暴露评估",
+                "node_id": "supply-shortage-exposure",
+                "similarity": 0.717212817585858,
+                "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+                "revision_id": "supply-shortage-exposure:v1",
+                "mastery_criteria": [
+                  "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+                ]
+              },
+              {
+                "title": "物料净需求计算",
+                "node_id": "supply-net-material-requirement",
+                "similarity": 0.67818639641445,
+                "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+                "revision_id": "supply-net-material-requirement:v1",
+                "mastery_criteria": [
+                  "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+                ]
+              },
+              {
+                "title": "缺料中断影响评估",
+                "node_id": "supply-shortage-impact-assessment",
+                "similarity": 0.524883715815324,
+                "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+                "revision_id": "supply-shortage-impact-assessment:v1",
+                "mastery_criteria": [
+                  "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+                ]
+              },
+              {
+                "title": "供应商交付产能核验",
+                "node_id": "supply-supplier-delivery-capacity",
+                "similarity": 0.501457661303422,
+                "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+                "revision_id": "supply-supplier-delivery-capacity:v1",
+                "mastery_criteria": [
+                  "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+                ]
+              },
+              {
+                "title": "关键物料识别",
+                "node_id": "supply-critical-material-identification",
+                "similarity": 0.447731736437576,
+                "description": "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。",
+                "revision_id": "supply-critical-material-identification:v1",
+                "mastery_criteria": [
+                  "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "交期窗口缺料暴露评估",
+                "node_id": "supply-shortage-exposure",
+                "similarity": 0.717212817585858,
+                "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+                "revision_id": "supply-shortage-exposure:v1",
+                "mastery_criteria": [
+                  "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+                ]
+              },
+              {
+                "title": "物料净需求计算",
+                "node_id": "supply-net-material-requirement",
+                "similarity": 0.67818639641445,
+                "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+                "revision_id": "supply-net-material-requirement:v1",
+                "mastery_criteria": [
+                  "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+                ]
+              },
+              {
+                "title": "缺料中断影响评估",
+                "node_id": "supply-shortage-impact-assessment",
+                "similarity": 0.524883715815324,
+                "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+                "revision_id": "supply-shortage-impact-assessment:v1",
+                "mastery_criteria": [
+                  "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+                ]
+              },
+              {
+                "title": "供应商交付产能核验",
+                "node_id": "supply-supplier-delivery-capacity",
+                "similarity": 0.501457661303422,
+                "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+                "revision_id": "supply-supplier-delivery-capacity:v1",
+                "mastery_criteria": [
+                  "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+                ]
+              },
+              {
+                "title": "关键物料识别",
+                "node_id": "supply-critical-material-identification",
+                "similarity": 0.447731736437576,
+                "description": "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。",
+                "revision_id": "supply-critical-material-identification:v1",
+                "mastery_criteria": [
+                  "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "交期窗口缺料暴露评估",
+                "node_id": "supply-shortage-exposure",
+                "similarity": 0.705043817167738,
+                "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+                "revision_id": "supply-shortage-exposure:v1",
+                "mastery_criteria": [
+                  "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+                ]
+              },
+              {
+                "title": "缺料中断影响评估",
+                "node_id": "supply-shortage-impact-assessment",
+                "similarity": 0.608545083062204,
+                "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+                "revision_id": "supply-shortage-impact-assessment:v1",
+                "mastery_criteria": [
+                  "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+                ]
+              },
+              {
+                "title": "关键物料供应风险识别",
+                "node_id": "supply-material-risk-identification",
+                "similarity": 0.564815154506131,
+                "description": "识别集中供应、交期波动和替代限制等暴露，区别事实、假设及待核验证据。",
+                "revision_id": "supply-material-risk-identification:v1",
+                "mastery_criteria": [
+                  "识别集中供应、交期波动和替代限制等暴露，区别事实、假设及待核验证据。"
+                ]
+              },
+              {
+                "title": "来料质量异常判定",
+                "node_id": "supply-incoming-quality-anomaly",
+                "similarity": 0.530323700020424,
+                "description": "依据给定检验标准区分批次异常、测量误差及证据不足。",
+                "revision_id": "supply-incoming-quality-anomaly:v1",
+                "mastery_criteria": [
+                  "依据给定检验标准区分批次异常、测量误差及证据不足。"
+                ]
+              },
+              {
+                "title": "物料净需求计算",
+                "node_id": "supply-net-material-requirement",
+                "similarity": 0.52880647950211,
+                "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+                "revision_id": "supply-net-material-requirement:v1",
+                "mastery_criteria": [
+                  "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "交期窗口缺料暴露评估",
+                "node_id": "supply-shortage-exposure",
+                "similarity": 0.652322787323331,
+                "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+                "revision_id": "supply-shortage-exposure:v1",
+                "mastery_criteria": [
+                  "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+                ]
+              },
+              {
+                "title": "跨境补货交期估计",
+                "node_id": "supply-cross-border-lead-time",
+                "similarity": 0.574721234283484,
+                "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+                "revision_id": "supply-cross-border-lead-time:v1",
+                "mastery_criteria": [
+                  "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+                ]
+              },
+              {
+                "title": "供给备选方案成本交期权衡",
+                "node_id": "supply-cost-lead-time-tradeoff",
+                "similarity": 0.56392462742104,
+                "description": "独立比较备选方案的总成本和交期，在给定质量及合规约束下说明取舍和敏感参数。",
+                "revision_id": "supply-cost-lead-time-tradeoff:v1",
+                "mastery_criteria": [
+                  "独立比较备选方案的总成本和交期，在给定质量及合规约束下说明取舍和敏感参数。"
+                ]
+              },
+              {
+                "title": "缺料中断影响评估",
+                "node_id": "supply-shortage-impact-assessment",
+                "similarity": 0.541348831097747,
+                "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+                "revision_id": "supply-shortage-impact-assessment:v1",
+                "mastery_criteria": [
+                  "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+                ]
+              },
+              {
+                "title": "供应商交付产能核验",
+                "node_id": "supply-supplier-delivery-capacity",
+                "similarity": 0.541006223589368,
+                "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+                "revision_id": "supply-supplier-delivery-capacity:v1",
+                "mastery_criteria": [
+                  "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "交期窗口缺料暴露评估",
+                "node_id": "supply-shortage-exposure",
+                "similarity": 0.646189032154297,
+                "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+                "revision_id": "supply-shortage-exposure:v1",
+                "mastery_criteria": [
+                  "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+                ]
+              },
+              {
+                "title": "供给备选方案成本交期权衡",
+                "node_id": "supply-cost-lead-time-tradeoff",
+                "similarity": 0.552050292491913,
+                "description": "独立比较备选方案的总成本和交期，在给定质量及合规约束下说明取舍和敏感参数。",
+                "revision_id": "supply-cost-lead-time-tradeoff:v1",
+                "mastery_criteria": [
+                  "独立比较备选方案的总成本和交期，在给定质量及合规约束下说明取舍和敏感参数。"
+                ]
+              },
+              {
+                "title": "供应商交付产能核验",
+                "node_id": "supply-supplier-delivery-capacity",
+                "similarity": 0.535652816295624,
+                "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+                "revision_id": "supply-supplier-delivery-capacity:v1",
+                "mastery_criteria": [
+                  "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+                ]
+              },
+              {
+                "title": "跨境补货交期估计",
+                "node_id": "supply-cross-border-lead-time",
+                "similarity": 0.533706903457642,
+                "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+                "revision_id": "supply-cross-border-lead-time:v1",
+                "mastery_criteria": [
+                  "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+                ]
+              },
+              {
+                "title": "缺料中断影响评估",
+                "node_id": "supply-shortage-impact-assessment",
+                "similarity": 0.513342022895813,
+                "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+                "revision_id": "supply-shortage-impact-assessment:v1",
+                "mastery_criteria": [
+                  "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "Audit Trail",
+                "node_id": "RT06",
+                "similarity": 0.564915979641079,
+                "description": "记录可追溯的输入、决策、动作与结果。",
+                "revision_id": "RT06-r1",
+                "mastery_criteria": [
+                  "能正确解释并使用Audit Trail的核心目标与边界",
+                  "能在具体场景中识别Audit Trail的正确用法与常见误用",
+                  "能用可检查的示例证明对Audit Trail的掌握"
+                ]
+              },
+              {
+                "title": "Trace / Span",
+                "node_id": "PY91",
+                "similarity": 0.54106716055879,
+                "description": "追踪跨组件执行路径。",
+                "revision_id": "PY91-r1",
+                "mastery_criteria": [
+                  "能独立完成Trace / Span的核心目标与边界",
+                  "能在具体场景中识别Trace / Span的正确用法与常见误用",
+                  "能用可检查的示例证明对Trace / Span的掌握"
+                ]
+              },
+              {
+                "title": "供应商纠正措施有效性验证",
+                "node_id": "supply-corrective-action-verification",
+                "similarity": 0.533914868106234,
+                "description": "根据已判定异常基线、复验及复发数据判断纠正措施是否有效。",
+                "revision_id": "supply-corrective-action-verification:v1",
+                "mastery_criteria": [
+                  "根据已判定异常基线、复验及复发数据判断纠正措施是否有效。"
+                ]
+              },
+              {
+                "title": "缺料中断影响评估",
+                "node_id": "supply-shortage-impact-assessment",
+                "similarity": 0.511256278903044,
+                "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+                "revision_id": "supply-shortage-impact-assessment:v1",
+                "mastery_criteria": [
+                  "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+                ]
+              },
+              {
+                "title": "跨境补货交期估计",
+                "node_id": "supply-cross-border-lead-time",
+                "similarity": 0.484352109951036,
+                "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+                "revision_id": "supply-cross-border-lead-time:v1",
+                "mastery_criteria": [
+                  "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+                ]
+              }
+            ],
+            [
+              {
+                "title": "Outcome Evaluation",
+                "node_id": "E13",
+                "similarity": 0.510340719798761,
+                "description": "依据验收标准评测最终结果。",
+                "revision_id": "E13-r1",
+                "mastery_criteria": [
+                  "能独立完成Outcome Evaluation的核心目标与边界",
+                  "能在具体场景中识别Outcome Evaluation的正确用法与常见误用",
+                  "能用可检查的示例证明对Outcome Evaluation的掌握"
+                ]
+              },
+              {
+                "title": "Runtime Limit",
+                "node_id": "RT03",
+                "similarity": 0.509050785416275,
+                "description": "为步骤、次数、时间和资源设置运行边界。",
+                "revision_id": "RT03-r1",
+                "mastery_criteria": [
+                  "能独立完成Runtime Limit的核心目标与边界",
+                  "能在具体场景中识别Runtime Limit的正确用法与常见误用",
+                  "能用可检查的示例证明对Runtime Limit的掌握"
+                ]
+              },
+              {
+                "title": "Citation",
+                "node_id": "K16",
+                "similarity": 0.507892668247223,
+                "description": "把生成结论追溯到明确来源。",
+                "revision_id": "K16-r1",
+                "mastery_criteria": [
+                  "能独立完成Citation的核心目标与边界",
+                  "能在具体场景中识别Citation的正确用法与常见误用",
+                  "能用可检查的示例证明对Citation的掌握"
+                ]
+              },
+              {
+                "title": "Tool Result",
+                "node_id": "T06",
+                "similarity": 0.496559053454344,
+                "description": "解析、归一化并注入工具执行结果。",
+                "revision_id": "T06-r1",
+                "mastery_criteria": [
+                  "能正确解释并使用Tool Result的核心目标与边界",
+                  "能在具体场景中识别Tool Result的正确用法与常见误用",
+                  "能用可检查的示例证明对Tool Result的掌握"
+                ]
+              },
+              {
+                "title": "Constraint",
+                "node_id": "P03",
+                "similarity": 0.493905365467072,
+                "description": "表达任务执行过程中不得违反的限制。",
+                "revision_id": "P03-r1",
+                "mastery_criteria": [
+                  "能正确解释并使用Constraint的核心目标与边界",
+                  "能在具体场景中识别Constraint的正确用法与常见误用",
+                  "能用可检查的示例证明对Constraint的掌握"
+                ]
+              }
+            ]
+          ],
+          "extraction": {
+            "units": [
+              {
+                "line": 11,
+                "quote": "10月5日：70＋0－150＝−80，累计缺口80。",
+                "sourceId": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+                "capability": "缺料窗口逐日净结余核算",
+                "observation": "执行10月5日净结余计算：期初70加可用到货0减需求150，得到−80，并记录累计缺口80。"
+              },
+              {
+                "line": 12,
+                "quote": "10月6日：−80＋120－100＝−60，累计缺口60。",
+                "sourceId": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+                "capability": "缺料窗口逐日净结余核算",
+                "observation": "执行10月6日净结余计算：上日−80加可用到货120减需求100，得到−60，并记录累计缺口60。"
+              },
+              {
+                "line": 13,
+                "quote": "10月7日：−60＋100－80＝−40，累计缺口40。",
+                "sourceId": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+                "capability": "缺料窗口逐日净结余核算",
+                "observation": "执行10月7日净结余计算：上日−60加可用到货100减需求80，得到−40，并记录累计缺口40。"
+              },
+              {
+                "line": 14,
+                "quote": "10月8日：−40＋60－20＝0，积欠清零。",
+                "sourceId": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+                "capability": "缺料窗口逐日净结余核算",
+                "observation": "执行10月8日净结余计算：上日−40加可用到货60减需求20，得到0，并记录积欠清零。"
+              },
+              {
+                "line": 15,
+                "quote": "因此在该日粒度口径下，最早缺料日是10月5日，最大累计缺口80单位。10月5、6、7日末均存在缺口，10月8日末解除暴露。日内停线的精确小时数尚需工单消耗时点，不能由日末余额冒充计算。",
+                "sourceId": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+                "capability": "缺料窗口结果归纳与口径局限识别",
+                "observation": "基于逐日计算结果归纳最早缺料日为10月5日、最大累计缺口80单位，并指出日内停线小时数需工单消耗时点，不能由日末余额计算。"
+              },
+              {
+                "line": 18,
+                "quote": "我将首批120单位的可用交期延迟1天，由10月6日改到10月7日，其他需求及到货不变。重新计算：10月5日−80；10月6日−80＋0－100＝−180；10月7日−180＋220－80＝−40；10月8日−40＋60－20＝0。最大缺口从80升至180，增加100；最早暴露仍为10月5日，按日末评估的解除日仍为10月8日。不能因为最终恢复日不变，就说交期延迟没有影响。",
+                "sourceId": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+                "capability": "交期延迟敏感性复核",
+                "observation": "将首批120单位交期从10月6日延迟至10月7日后重新逐日计算，得出最大缺口升至180、增加100，并说明最终恢复日不变不代表延迟无影响。"
+              },
+              {
+                "line": 19,
+                "quote": "我也复核了首批120单位提前1天至10月5日的情况：10月5日70＋120－150＝40；10月6日40＋0－100＝−60；10月7日−60＋100－80＝−40；10月8日−40＋60－20＝0。最早缺料变为10月6日，比基线晚1天；最大缺口降为60，减少20，但不能完全消除暴露。",
+                "sourceId": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+                "capability": "交期提前敏感性复核",
+                "observation": "将首批120单位提前至10月5日后重新逐日计算，得出最早缺料日变为10月6日、最大缺口降为60、减少20，但不能完全消除暴露。"
+              },
+              {
+                "line": 22,
+                "quote": "按先到期先分配，订单O1在10月5日需150，基线先满足70，剩余80由10月6日到货补齐；10月6日订单O2需100，先扣除前欠80后只能满足40，剩余60延至10月7日；10月7日订单O3需80，先补O2的60后只能满足40，剩余40延至10月8日；10月8日到货60先补O3的40，再满足当日订单O4的20。此分配与每日累计缺口80、60、40、0交叉核对一致。",
+                "sourceId": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+                "capability": "订单影响追溯与交叉核对",
+                "observation": "按先到期先分配追溯O1至O4订单的满足与延欠过程，并用每日累计缺口80、60、40、0交叉核对一致。"
+              },
+              {
+                "line": 24,
+                "quote": "结论：首批补货必须优先保证10月6日可用。若延迟到10月7日，需要额外覆盖10月6日增加的100单位积欠暴露。本记录证明本次给定数据的核算过程；真实供应商承诺及交付执行仍需业务人员核实。",
+                "sourceId": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+                "capability": "核算结论与适用边界说明",
+                "observation": "基于前述核算给出结论：首批补货优先保证10月6日可用；若延迟至10月7日需额外覆盖100单位积欠暴露，并声明真实供应商承诺与交付执行仍需核实。"
+              }
+            ]
+          },
+          "verifications": [
+            {
+              "value": {
+                "verdicts": {
+                  "RT06": {
+                    "reason": "定义限定为记录可追溯的输入、决策、动作与结果；验收还要求解释Audit Trail核心目标与边界、识别常见误用并用可检查示例证明掌握。原文第24行称本记录证明本次给定数据的核算过程，并区分真实供应商承诺及交付仍需业务人员核实；第3行也说明为虚构数据演练，这体现了可追溯记录和边界使用。但原文未解释Audit Trail核心目标，也未识别常见误用，完整验收要求未证明，故partial。",
+                    "verdict": "partial",
+                    "definitionScopePreserved": true
+                  },
+                  "supply-shortage-exposure": {
+                    "reason": "定义限定为独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。原文第11-14行按净结余逐期计算：70+0-150=-80，-80+120-100=-60，-60+100-80=-40，-40+60-20=0，本人复核等式正确；第15行据此得出最早缺料日10月5日、最大累计缺口80单位、10月8日末解除暴露。第18-19行分别将首批120单位延迟至10月7日、提前至10月5日重算，延迟后最大缺口180、增加100，提前后最早缺料日变为10月6日、最大缺口60、减少20，计算均正确。定义及验收要求已被正确实际执行，故supported。",
+                    "verdict": "supported",
+                    "definitionScopePreserved": true
+                  },
+                  "supply-net-material-requirement": {
+                    "reason": "定义限定为根据订单需求、可用库存及确认到货计算分时段净需求，并正确排除不可用库存。原文第6行明确期初可用库存70单位且已排除隔离库存；第11-14行按“上日净结余＋本日可用到货－本日需求”逐期计算，得到-80、-60、-40、0，本人复核等式正确；第15行汇总分时段累计缺口及最早缺料日。满足定义及验收要求，故supported。",
+                    "verdict": "supported",
+                    "definitionScopePreserved": true
+                  },
+                  "supply-shortage-impact-assessment": {
+                    "reason": "定义限定为独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。原文第22行将累计缺口80/60/40/0映射到订单O1-O4的满足与延后分配，并与逐期缺口交叉核对一致；第24行给出恢复优先级输入，即首批补货优先保证10月6日可用、延迟到10月7日需额外覆盖100单位。但第15行明确日内停线精确小时数尚需工单消耗时点，不能由日末余额冒充计算，原文未映射停线时段。存在正确子动作但完整要求未证明，故partial。",
+                    "verdict": "partial",
+                    "definitionScopePreserved": true
+                  }
+                }
+              },
+              "nodeIds": [
+                "supply-shortage-exposure",
+                "supply-net-material-requirement",
+                "supply-shortage-impact-assessment",
+                "RT06"
+              ]
+            }
+          ],
+          "formatFailures": [],
+          "judgmentAttempts": [
+            {
+              "value": {
+                "judgments": {
+                  "E13": {
+                    "reason": "单位8给出核算结论和真实供应商仍需核实的边界，但未依据明确验收标准评测最终结果，也未体现Outcome Evaluation的核心边界或误用识别。",
+                    "confidence": 0.8,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "K16": {
+                    "reason": "单位8只说本记录证明给定数据的核算过程，未把生成结论追溯到明确来源或引用具体输入/计算出处。",
+                    "confidence": 0.9,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "P03": {
+                    "reason": "单位8是核算结论和外部核实边界，未表达任务执行过程中不得违反的Constraint；候选单元也未包含原文中关于积欠不取消等约束的直接执行。",
+                    "confidence": 0.85,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "T06": {
+                    "reason": "原文没有工具调用、工具结果解析、归一化或注入内容。",
+                    "confidence": 0.98,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "PY91": {
+                    "reason": "单位7是订单分配追溯，不是跨组件执行路径的Trace/Span，未涉及span、trace context或跨组件调用链。",
+                    "confidence": 0.95,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "RT03": {
+                    "reason": "单位8是缺料核算结论与业务核实边界，未为步骤、次数、时间或资源设置运行边界。",
+                    "confidence": 0.95,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "RT06": {
+                    "reason": "单位7记录了按先到期先分配对O1-O4的满足与延欠过程，并与每日累计缺口交叉核对，提供了可追溯的决策/动作/结果示例；但未解释Audit Trail核心目标与边界，也未识别正确用法与常见误用。",
+                    "confidence": 0.65,
+                    "sufficiency": "partial",
+                    "unitIndexes": [
+                      7
+                    ]
+                  },
+                  "supply-shortage-exposure": {
+                    "reason": "本人按日完成净结余计算（单位0-3），归纳最早缺料日10月5日、最大累计缺口80（单位4），并实际复核交期延迟1天与提前1天的敏感性，得到最大缺口180/60及最早缺料日变化（单位5-6）。覆盖净需求、补货交期窗口、最早缺料日、缺口量和交期敏感性。",
+                    "confidence": 0.95,
+                    "sufficiency": "supported",
+                    "unitIndexes": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  },
+                  "supply-cross-border-lead-time": {
+                    "reason": "仅使用5个日历日可用交期窗口并做交期提前/延迟敏感性，未分解生产、运输、通关、收货环节，也未给出交期区间和不确定性或避免重复计时。",
+                    "confidence": 0.95,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "supply-cost-lead-time-tradeoff": {
+                    "reason": "原文只有交期敏感性计算，没有备选方案成本、总成本比较、质量合规约束或成本交期取舍。",
+                    "confidence": 0.98,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "supply-incoming-quality-anomaly": {
+                    "reason": "原文没有来料检验标准、批次异常、测量误差或证据不足判定的内容。",
+                    "confidence": 0.98,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "supply-net-material-requirement": {
+                    "reason": "本人用期初可用库存70、确认到货和日需求逐日计算净结余（单位0-3），并汇总分时段缺口80/60/40/0（单位4）；完整原文说明期初库存已排除隔离库存，计算未使用不可用库存。覆盖分时段净需求计算与不可用库存排除。",
+                    "confidence": 0.9,
+                    "sufficiency": "supported",
+                    "unitIndexes": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4
+                    ]
+                  },
+                  "supply-shortage-impact-assessment": {
+                    "reason": "已量化各日累计缺口80/60/40/0（单位0-4），并按先到期先分配将缺口映射到订单O1-O4且与累计缺口交叉核对（单位7）；交期敏感性提供恢复优先级输入（单位5-6）。但日内停线精确小时数被明确说明需工单消耗时点，不能由日末余额计算，停线时段未完成。",
+                    "confidence": 0.72,
+                    "sufficiency": "partial",
+                    "unitIndexes": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6,
+                      7
+                    ]
+                  },
+                  "supply-supplier-delivery-capacity": {
+                    "reason": "原文只使用给定确认到货与交期窗口，未出现瓶颈、良率、已承诺负荷或期间可交付量计算，也未识别名义产能误用。",
+                    "confidence": 0.95,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "supply-material-risk-identification": {
+                    "reason": "候选单元仅含逐日缺料结果归纳与日粒度局限，未系统识别集中供应、交期波动和替代限制等供应风险，也未区分事实、假设与待核验证据。",
+                    "confidence": 0.9,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "supply-corrective-action-verification": {
+                    "reason": "原文没有供应商异常基线、纠正措施、复验或复发数据，无法判断纠正措施有效性。",
+                    "confidence": 0.98,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  },
+                  "supply-critical-material-identification": {
+                    "reason": "仅说明材料M用于海外订单且无替代料，属于输入条件；未按BOM、替代性和停线影响给出识别准则，也未说明关键物料判定及排除理由。",
+                    "confidence": 0.95,
+                    "sufficiency": "unmatched",
+                    "unitIndexes": []
+                  }
+                }
+              },
+              "nodeIds": [
+                "supply-shortage-exposure",
+                "supply-net-material-requirement",
+                "supply-shortage-impact-assessment",
+                "supply-supplier-delivery-capacity",
+                "supply-critical-material-identification",
+                "supply-material-risk-identification",
+                "supply-incoming-quality-anomaly",
+                "supply-cross-border-lead-time",
+                "supply-cost-lead-time-tradeoff",
+                "RT06",
+                "PY91",
+                "supply-corrective-action-verification",
+                "E13",
+                "RT03",
+                "K16",
+                "T06",
+                "P03"
+              ]
+            }
+          ]
+        },
+        "embedding": {
+          "model": "qwen3.7-text-embedding",
+          "provider": "aliyun",
+          "dimensions": 1024
+        },
+        "sourceCount": 1,
+        "retrievalCount": 9
+      },
+      "error": null,
+      "created_at": "2026-10-03T19:57:01.671391+00:00",
+      "completed_at": "2026-10-03T19:59:05.83+00:00"
+    }
+  ],
+  "verified": [
+    "actual private result checksum",
+    "run source lineage",
+    "source units proposal formal lineage",
+    "learning before result confirmation learned after",
+    "exact RouteVersion unchanged",
+    "two sources two completed diagnoses only"
+  ],
+  "verdict": "PASS"
+}

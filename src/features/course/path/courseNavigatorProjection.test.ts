@@ -16,6 +16,14 @@ const state = (statuses: Record<string, string>) => ({ assignmentStates: Object.
 const project = (options: Partial<Parameters<typeof buildCourseNavigator>[0]> = {}) => buildCourseNavigator({ graph, runtime, knowledge, decision, learningContent: [{ nodeId: id, pathId: 'micro', estimatedMinutes: 8 }], ...options });
 
 describe('Course navigator projection', () => {
+  it('shows confirmed capability separately from unfinished required teaching without bypassing navigation', () => {
+    const result = project({ knowledge: [{ nodeId: id, status: 'learned', updatedAt: '2026-10-04T00:00:00Z' }] });
+    expect(result.route[0]).toMatchObject({ acquired: true, mastered: false, state: 'current' });
+    expect(result.nextAction?.action.pathId).toBe('micro');
+    expect(result.complete).toBe(false);
+    expect(result.recentKnowledgeUpdates.map(item => item.nodeId)).toEqual([id]);
+    expect(project({ knowledge: [{ nodeId: id, status: 'learning' }] }).route[0].acquired).toBe(false);
+  });
   it('maps only actual Decision reasons and preserves unrecognized server explanations', () => {
     expect(project().nextAction?.reason).toBe('按当前课程顺序继续学习。');
     const withReason = (reasonCode: string, reason: string) => project({ decision: { ...decision, nextAction: { ...decision.nextAction, reasonCode, reason } } });
@@ -99,7 +107,7 @@ describe('Course navigator projection', () => {
     ];
     expect(project({ decision: acquiredDecision, knowledge: records }).recentKnowledgeUpdates.map(item => item.nodeId)).toEqual([id]);
     expect(project({ decision: acquiredDecision, knowledge: [{ nodeId: id, status: 'learned', updatedAt: 'invalid' }] }).recentKnowledgeUpdates).toEqual([]);
-    expect(project({ decision, knowledge: records }).recentKnowledgeUpdates).toEqual([]);
+    expect(project({ decision, knowledge: records }).recentKnowledgeUpdates.map(item => item.nodeId)).toEqual([id]);
   });
   it('handles no decision, empty assets and foreign course decisions', () => {
     expect(project({ runtime: routeOnlyRuntime, decision: null }).pendingPractices).toEqual([]);
