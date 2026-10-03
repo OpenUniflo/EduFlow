@@ -1,0 +1,14 @@
+{
+  "reviewer": "graph_ux_reviewer",
+  "commit": "e920113c9e3bbd440b50f9d14c12c7eda33c8758",
+  "preview": "https://edu-flow-nfekjpl0g-july-nanas-projects.vercel.app",
+  "viewport": [
+    1280,
+    633
+  ],
+  "verdict": "PASS_UX_B01_RECHECK",
+  "originalFailurePreserved": "phase-b-graph-review.json",
+  "method": "Waited until building page replaced by EduFlow. Authenticated A with UI. Course Project view; clicked actual relation line at (604,268), expanded Practice, selected with visible UI.",
+  "finding": "Action panel now begins at y208, below tabs and Adjust route button. Heading and description are visible and unobstructed; scrollable body reaches selection. No visible graph movement across interaction, browser errors empty.",
+  "scope": "Recheck of overlap blocker at requested viewport only; Phase C running/completed still not verified."
+}

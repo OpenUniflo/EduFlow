@@ -152,3 +152,8 @@ AI can propose `learning` for partial evidence or `learned` for supported eviden
 Only the authenticated API calls service-only `confirm_capability_proposals`. It locks the user's confirmation batches and proposal rows, validates ownership, completed diagnosis, active Global node/current revision and non-archived parsed sources, inserts `capability_confirmed` formal Knowledge Evidence and advances the existing state monotonically in one transaction. Retry is idempotent. Existing Micro/Assignment mastery recomputation remains unchanged. No Personal Route Version is created by this operation.
 
 Archive keeps original files, units, proposals and existing formal Evidence. It prevents new confirmations from that source. No user-facing hard-delete cascade exists. Reads paginate the database's complete owner-visible sets instead of independently truncating lineage windows. Larger catalogs may later need paginated UI/detail endpoints while preserving complete lineage.
+
+
+## Action completion boundary
+
+Owner-only `edge_action_runs` tracks execution, not mastery. Only service-authoritative transitions select/start/submit, and result sources must belong to that owner. Selection snapshots explain the executed template and resources; they are not project-owned Knowledge or capability state. A completed Practice run remains separate from UserKnowledgeState until its source passes the normal Evidence proposal and explicit-confirmation transaction. A Micro observer mirrors existing completed path progress without writing capability. Neither operation creates Personal Route Versions. See `MICRO_LEARNING_AND_EVIDENCE.md` for resource and snapshot revalidation.

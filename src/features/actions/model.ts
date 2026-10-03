@@ -29,13 +29,16 @@ export type ActionRun = {
   course_id: string;
   action_id: string;
   binding_id: string | null;
-  status: 'selected' | 'in_progress' | 'completed';
+  status: 'selected' | 'in_progress' | 'completed' | 'cancelled';
+  edge_id: string;
+  execution_snapshot: { action: EdgeAction; binding: CourseActionBinding | null; sourceId: string; targetId: string };
+  created_at: string;
   started_at: string | null;
   completed_at: string | null;
   evidence_source_id: string | null;
   micro_path_id: string | null;
 };
-export type ActionReason = { code: 'time' | 'difficulty' | 'missing_resource' | 'missing_capability' | 'source_unacquired' | 'binding_unavailable' | 'archived'; message: string; cost: number };
+export type ActionReason = { code: 'time' | 'difficulty' | 'missing_resource' | 'missing_capability' | 'source_unacquired' | 'binding_unavailable' | 'archived' | 'micro_unavailable'; message: string; cost: number };
 export type ActionCost = { available: boolean; weight: number; reasons: ActionReason[] };
 
 /** Cost units: minutes + 15 per difficulty level above 1 + 30 for an unacquired source.
@@ -44,6 +47,7 @@ export type ActionCost = { available: boolean; weight: number; reasons: ActionRe
  */
 export function evaluateAction(action: EdgeAction, input: {
   sourceId: string;
+  microAvailable?: boolean;
   acquiredIds: ReadonlySet<string>;
   binding?: CourseActionBinding;
 }): ActionCost {
@@ -53,6 +57,7 @@ export function evaluateAction(action: EdgeAction, input: {
   ];
   let available = true;
   const block = (code: ActionReason['code'], message: string) => { available = false; reasons.push({ code, message, cost: 0 }); };
+  if (action.type === 'micro_learning' && input.microAvailable === false) block('micro_unavailable', '微学习尚未就绪：需已发布内容、有效课程路线及必需前置能力');
   if (action.status !== 'active') block('archived', '行动模板已归档');
   if (input.binding && (input.binding.action_id !== action.id || !input.binding.available)) block('binding_unavailable', '项目资源绑定不可用');
   for (const id of [...new Set(action.required_capability_ids)].sort()) {

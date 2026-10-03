@@ -14,3 +14,6 @@
 @media (prefers-reduced-motion:reduce) { .action-branch path { animation:none; } }
 
 @media (max-width:760px) { .edge-action-panel { top:auto; bottom:130px; left:12px; right:12px; width:auto; max-height:35vh; } }
+
+.action-result-upload { display:inline-block; cursor:pointer; }
+.action-result-upload input { display:block; max-width:100%; font-size:12px; margin-top:8px; }

@@ -135,3 +135,10 @@ Technical Review passed against production code `5d9475654baf3d1cbf847097e33692a
 The reviewer independently recomputed the saved snapshot digests, confirmed V1/V2 unchanged by learning and V1–V4 unchanged at final restore, and checked AGC02 state/progress/attempt/Evidence preservation and V6 restore lineage. UI acceptance independently passed the final corrected Preview. Hosted mastered-specific color was not separately exercised; pure presentation tests cover learned/practicing/mastered. Newly added hard ancestors were verified using real local Supabase fixtures; Hosted UI verified closure with its existing real catalog. These distinctions are intentional evidence boundaries, not claimed Hosted coverage.
 
 Final packaging adds documentation, the authorized Hosted acceptance script and redacted evidence only. The final delivery message identifies that packaging commit and its READY Preview; production behavior is unchanged from the reviewed code commit above.
+
+
+## Edge Action presentation
+
+Clicking a factual projected Edge shows Global Action alternatives in a compact detail panel. Their curved branches are screen-space SVG anchored to existing ForceGraph endpoints, never graphData links or force nodes. Candidate dashed grey, selected purple, in-progress cyan flow, completed emerald and unavailable faded grey are separate from the existing orange downstream-support laser. Expanded alternatives, selection and run status leave graph topology, frozen coordinates and camera untouched. Structural official-state changes continue to rebuild only the existing capability projection as required.
+
+Practice uploads open the same global capability workspace with their result source selected. Only confirmed official state changes alter acquired/target/gap presentation; completed ActionRuns do not recolor capabilities. Existing route constraints replan without automatic history additions.

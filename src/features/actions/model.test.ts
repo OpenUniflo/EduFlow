@@ -16,6 +16,11 @@ describe('edge action cost and projection', () => {
     expect(evaluateAction(action, { sourceId: 'source', acquiredIds: new Set(['condition']), binding: { ...binding, resources: [{ ...binding.resources[0], reference: '' }] } }).available).toBe(false);
     expect(evaluateAction(action, { sourceId: 'source', acquiredIds: new Set(['condition']), binding: { ...binding, action_id: 'different' } }).available).toBe(false);
   });
+  it('does not advertise Micro execution before real teaching content is published', () => {
+    const micro: EdgeAction = { ...action, type: 'micro_learning', resource_requirements: [], required_capability_ids: [] };
+    expect(evaluateAction(micro, { sourceId: 'source', acquiredIds: new Set(['source']), microAvailable: false })).toMatchObject({ available: false, reasons: expect.arrayContaining([expect.objectContaining({ code: 'micro_unavailable' })]) });
+    expect(evaluateAction(micro, { sourceId: 'source', acquiredIds: new Set(['source']), microAvailable: true }).available).toBe(true);
+  });
   it('projects alternatives on only real visible edges without copying templates or cross-course bindings', () => {
     const micro: EdgeAction = { ...action, id: 'micro', type: 'micro_learning', resource_requirements: [] };
     const edges = new Set(['factual-edge']);

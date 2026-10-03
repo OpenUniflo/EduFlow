@@ -1,3 +1,4 @@
+import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequisites';
 import { useMemo, useRef, useState } from 'react';
 import { Crosshair, Maximize2, Minus, Plus, Search, X } from 'lucide-react';
 import type { KnowledgeGraph } from '@/features/knowledge/types';
@@ -20,7 +21,6 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const scene = useRef<KnowledgeAtlasSceneHandle>(null);
   const actionData = useEdgeActions(runtime.course.id, authenticated);
   const [edgeId, setEdgeId] = useState<string | null>(null);
-  const [chosenActionId, setChosenActionId] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -33,8 +33,8 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
     } catch (error) { return { model: null, projection: null, error: error instanceof Error ? error.message : '能力依赖计算失败' }; }
   }, [graph, runtime, knowledge, governance]);
   const activeEdge = result.projection?.edges.find(edge => edge.id === edgeId);
-  const alternatives = actionAlternatives(runtime.course.id, activeEdge, actionData, new Set(result.model?.currentKnowledgeIds ?? []));
-  const branches = branchesForActions(alternatives, chosenActionId);
+  const alternatives = actionAlternatives(runtime.course.id, activeEdge, actionData, new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId)));
+  const branches = branchesForActions(alternatives);
   const selected = result.projection?.nodes.find(node => node.id === selectedId);
   const matches = result.projection?.nodes.filter(node => `${node.title} ${node.id}`.toLowerCase().includes(query.toLowerCase())) ?? [];
   const title = (id: string) => graph.nodes.find(node => node.id === id)?.title ?? id;
@@ -45,7 +45,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   return <section className="project-capability" aria-label="项目能力模型">
     {result.error ? <div className="project-capability-info glass-v2" role="alert"><h2>能力依赖暂时无法展示</h2><p>{result.error}</p>{authenticated ? <RoutePlanningPanel control={control} title={title}/> : null}</div> : result.projection && result.model ? <>
       <KnowledgeAtlasScene ref={scene} nodes={result.projection.nodes} edges={result.projection.edges} variant="project" selectedId={selected?.id} onNodeClick={node => choose(node.id)} onBackgroundClick={() => { onSelect(null); setEdgeId(null); }} onEdgeClick={edge => { onSelect(null); setActionId(null); setEdgeId(edge.id); }} actionBranches={branches} onActionClick={setActionId} />
-      {activeEdge ? <EdgeActionPanel alternatives={alternatives} title={`${title(activeEdge.source)} → ${title(activeEdge.target)}`} error={actionData.error} focusedId={actionId} selectedId={chosenActionId} onChoose={setChosenActionId} onFocus={setActionId} onClose={() => setEdgeId(null)}/> : null}
+      {activeEdge ? <EdgeActionPanel alternatives={alternatives} title={`${title(activeEdge.source)} → ${title(activeEdge.target)}`} control={actionData} courseId={runtime.course.id} focusedId={actionId} onFocus={setActionId} onClose={() => setEdgeId(null)}/> : null}
       <div className="project-capability-toolbar">
         <div className="project-capability-search glass-v2">
           <button className="project-search-toggle" aria-label={searchOpen ? '收起能力搜索' : '搜索项目能力'} aria-expanded={searchOpen} onClick={() => setSearchOpen(open => !open)}>{searchOpen ? <X size={18}/> : <Search size={18}/>}</button>

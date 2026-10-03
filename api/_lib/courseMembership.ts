@@ -1,5 +1,5 @@
 import { readPersonalCourseRoute } from "./personalCourseRoute.js";
-import { satisfiesTeachingPrerequisite } from "../../src/shared/learning/teachingPrerequisites.js";
+import { hasUnmetHardPrerequisite, satisfiesTeachingPrerequisite } from "../../src/shared/learning/teachingPrerequisites.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ApiError } from "./http.js";
 import { dataOrThrow } from "./query.js";
@@ -39,8 +39,8 @@ export async function requirePersonalCourseRouteKnowledge(client: SupabaseClient
 /** Only hard prerequisites gate learning; acquired nodes remain reviewable. */
 export async function requireMicroTeachingEligibility(client: SupabaseClient, userId: string, courseId: string, nodeId: string) {
   const personal = await requirePersonalCourseRouteKnowledge(client, userId, courseId, nodeId);
-  const statuses = new Map(personal.states.map(row => [String(row.node_id), String(row.status)]));
-  const unmet = !satisfiesTeachingPrerequisite(statuses.get(nodeId)) && personal.route.prerequisiteEdges.some(edge => edge.strength === 'hard' && edge.target === nodeId && !satisfiesTeachingPrerequisite(statuses.get(edge.source)));
+  const acquired = new Set(personal.states.filter(row => satisfiesTeachingPrerequisite(String(row.status))).map(row => String(row.node_id)));
+  const unmet = hasUnmetHardPrerequisite(nodeId, acquired, personal.route.prerequisiteEdges);
   if (unmet) throw new ApiError(403, 'teaching_prerequisite_required', 'Complete the hard prerequisites before starting this Micro');
   return { ...personal.route, activeVersionId: personal.activeVersionId };
 }

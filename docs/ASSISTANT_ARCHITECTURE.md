@@ -67,3 +67,6 @@ Generic infrastructure should use a mature, maintained component or official SDK
 The explicit **更新我的能力** UI action opens the app-owned, centered non-fullscreen `EvidenceWorkspaceProvider` dialog. This is a tested UI action, not a chat regex or a new assistant/tool runtime. My Evidence is a Learning Space view. Project impact preview invokes the existing pure project projection using candidate inputs; it never hydrates or writes official state. Confirmed transactions refresh the existing application learner repositories.
 
 Operational acceptance remains gated separately: see `acceptance/CAPABILITY_EVIDENCE_ACTION_LOOP_ACCEPTANCE.md`.
+
+
+Practice Action submission may open that same `EvidenceWorkspaceProvider` with a source ID and course preview context. The workspace resolves the original owner-visible source, filters its prior diagnostics and reuses the same diagnosis/confirmation controls. This is an explicit UI entry, not another assistant instance or agent runtime.

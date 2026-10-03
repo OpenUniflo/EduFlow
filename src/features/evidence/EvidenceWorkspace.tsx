@@ -3,24 +3,24 @@ import { X, Upload, FileText } from 'lucide-react';
 import { evidenceRequest, readEvidence, uploadEvidence, type EvidenceData, type EvidenceProposal } from './evidenceClient';
 import './evidence.css';
 
-type EvidenceEnvironment={open:(courseId?:string)=>void;confirmed:()=>Promise<void>;nodeTitle:(id:string)=>string;preview:(courseId:string,proposals:EvidenceProposal[])=>string};
+type EvidenceEnvironment={open:(courseId?:string,sourceId?:string)=>void;confirmed:()=>Promise<void>;nodeTitle:(id:string)=>string;preview:(courseId:string,proposals:EvidenceProposal[])=>string};
 const EvidenceContext=createContext<EvidenceEnvironment|null>(null);
 export const useEvidenceWorkspace=()=>useContext(EvidenceContext);
 export function EvidenceWorkspaceProvider({children,onConfirmed,nodeTitle,preview}:{children:ReactNode;onConfirmed:()=>Promise<void>;nodeTitle:(id:string)=>string;preview:EvidenceEnvironment['preview']}) {
- const [workspace,setWorkspace]=useState<{courseId?:string}|null>(null);const dialog=useRef<HTMLDialogElement>(null);
- const open=useCallback((courseId?:string)=>setWorkspace({courseId}),[]);
+ const [workspace,setWorkspace]=useState<{courseId?:string;sourceId?:string}|null>(null);const dialog=useRef<HTMLDialogElement>(null);
+ const open=useCallback((courseId?:string,sourceId?:string)=>setWorkspace({courseId,sourceId}),[]);
  useEffect(()=>{if(workspace)dialog.current?.showModal();else dialog.current?.close();},[workspace]);
  return <EvidenceContext.Provider value={{open,confirmed:onConfirmed,nodeTitle,preview}}>{children}<dialog ref={dialog} className="capability-workspace" onCancel={()=>setWorkspace(null)} aria-labelledby="capability-workspace-title">
- {workspace?<><header><div><small>个人能力 · 跨项目证据</small><h1 id="capability-workspace-title">更新我的能力</h1><p>先检查证据与候选判断，再明确确认。确认前，你的能力和项目路线不会改变。</p></div><button aria-label="关闭能力更新工作区" onClick={()=>setWorkspace(null)}><X/></button></header><EvidenceLibrary courseId={workspace.courseId} diagnosing/></>:null}
+ {workspace?<><header><div><small>个人能力 · 跨项目证据</small><h1 id="capability-workspace-title">更新我的能力</h1><p>先检查证据与候选判断，再明确确认。确认前，你的能力和项目路线不会改变。</p></div><button aria-label="关闭能力更新工作区" onClick={()=>setWorkspace(null)}><X/></button></header><EvidenceLibrary key={workspace.sourceId ?? workspace.courseId ?? "general"} courseId={workspace.courseId} initialSourceId={workspace.sourceId} diagnosing/></>:null}
  </dialog></EvidenceContext.Provider>;
 }
-export function EvidenceLibrary({courseId,diagnosing=false}:{courseId?:string;diagnosing?:boolean}) {
+export function EvidenceLibrary({courseId,initialSourceId,diagnosing=false}:{courseId?:string;initialSourceId?:string;diagnosing?:boolean}) {
  const environment=useEvidenceWorkspace();const [data,setData]=useState<EvidenceData>({sources:[],units:[],proposals:[],runs:[]});
- const [selected,setSelected]=useState<string[]>([]);const [detail,setDetail]=useState<string|null>(null);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [message,setMessage]=useState('');const [runId,setRunId]=useState<string|null>(null);
+ const [selected,setSelected]=useState<string[]>(initialSourceId?[initialSourceId]:[]);const [detail,setDetail]=useState<string|null>(initialSourceId??null);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [message,setMessage]=useState('');const [runId,setRunId]=useState<string|null>(null);
  const reload=useCallback(async()=>{const next=await readEvidence();setData(next);return next;},[]);
  useEffect(()=>{void reload().catch(error=>setError(error instanceof Error?error.message:'证据加载失败'));},[reload]);
  async function perform(action:()=>Promise<void>) {setBusy(true);setError('');setMessage('');try{await action();await reload();}catch(error){setError(error instanceof Error?error.message:'操作失败');try{await reload();}catch{/* Keep the original action error when the connection remains unavailable. */}}finally{setBusy(false);}}
- const visibleProposals=data.proposals.filter(p=>(!runId||p.run_id===runId)&&data.runs.some(run=>run.id===p.run_id&&run.status==='completed'));
+ const visibleProposals=data.proposals.filter(p=>(!runId||p.run_id===runId)&&data.runs.some(run=>run.id===p.run_id&&run.status==='completed'&&(!initialSourceId||runId||run.source_ids?.includes(initialSourceId))));
  const safe=visibleProposals.filter(p=>p.confirmation_state==='pending'&&p.sufficiency==='supported'&&Number(p.confidence)>=0.85).slice(0,50);
  async function resolve(proposals:EvidenceProposal[],action:'confirm'|'reject') {await evidenceRequest({action,proposalIds:proposals.map(p=>p.id)});if(action==='confirm')await environment?.confirmed();setMessage(action==='confirm'?'已确认，个人能力与项目投影已刷新。路线版本不会自动增加。':'已拒绝这些候选。');}
  return <div className="evidence-library">
