@@ -24,8 +24,8 @@ export function CapabilityEvidenceBoundary({session,children}:{session:MockSessi
    if(!current||current.status==='explore'||current.status==='learning')candidates.set(proposal.node_id,{nodeId:proposal.node_id,status:proposal.proposed_status});
   }
   const before=buildProjectCapabilityModel(graph(),runtime,knowledge);const after=buildProjectCapabilityModel(graph(),runtime,[...candidates.values()]);
-  const affected=proposals.filter(p=>p.node_id&&after.orderedNodeIds.includes(p.node_id));
-  return `${runtime.course.title}：项目内已具备能力 ${before.currentKnowledgeIds.length} → ${after.currentKnowledgeIds.length}；相关候选：${affected.map(p=>nodeTitle(p.node_id!)).join('、')||'无'}。无真实关联的能力只保留在个人状态。确认后重新计算缺口与现有路线，不自动建立路线版本。`;
+  const affected=[...new Set(proposals.flatMap(p=>p.node_id&&p.proposed_status&&after.orderedNodeIds.includes(p.node_id)?[p.node_id]:[]))];
+  return `${runtime.course.title}：项目内已具备能力 ${before.currentKnowledgeIds.length} → ${after.currentKnowledgeIds.length}；相关候选：${affected.map(nodeTitle).join('、')||'无'}。无真实关联的能力只保留在个人状态。确认后重新计算缺口与现有路线，不自动建立路线版本。`;
  }
  return <EvidenceWorkspaceProvider onConfirmed={()=>refreshLearnerState(session.userId)} nodeTitle={nodeTitle} preview={preview}><EvidenceAssistant session={session}>{children}</EvidenceAssistant></EvidenceWorkspaceProvider>;
 }
