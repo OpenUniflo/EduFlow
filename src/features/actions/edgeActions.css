@@ -1,4 +1,4 @@
-.edge-action-panel { position:absolute; top:96px; right:24px; width:min(360px,calc(100% - 48px)); max-height:calc(100% - 190px); overflow:auto; padding:20px; z-index:5; font-size:13px; }
+.edge-action-panel { position:absolute; top:var(--project-detail-top,208px); right:24px; width:min(360px,calc(100% - 48px)); max-height:calc(100% - var(--project-detail-top,208px) - 96px); box-sizing:border-box; border-radius:20px; overflow:auto; padding:20px; z-index:5; font-size:13px; }
 .edge-action-panel h2 { padding-right:24px; font-size:17px; }
 .edge-action-panel h3 { font-size:13px; margin-top:14px; }
 .edge-action-panel p,.edge-action-panel li { line-height:1.6; overflow-wrap:anywhere; }
@@ -12,3 +12,5 @@
 @keyframes action-progress-flow { to { stroke-dashoffset:-28; } }
 @keyframes action-selected-pulse { 50% { opacity:.45; } }
 @media (prefers-reduced-motion:reduce) { .action-branch path { animation:none; } }
+
+@media (max-width:760px) { .edge-action-panel { top:auto; bottom:130px; left:12px; right:12px; width:auto; max-height:35vh; } }

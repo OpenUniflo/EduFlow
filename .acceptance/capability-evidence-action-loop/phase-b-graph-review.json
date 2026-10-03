@@ -1,0 +1,34 @@
+{
+  "reviewer": "graph_ux_reviewer",
+  "commit": "541f90f",
+  "preview": "https://edu-flow-otpl8sku9-july-nanas-projects.vercel.app",
+  "viewport": [
+    1280,
+    633
+  ],
+  "method": "Actual agent-browser session graph-actions-review, owner A login, Course UI -> Project -> search net material -> click rendered actual edge at (603,270) -> expand and select practice. No React invocation or state injection.",
+  "verdict": "CHANGES_REQUIRED",
+  "blocking": [
+    {
+      "id": "UX-B01",
+      "severity": "P1",
+      "finding": "Action popover starts at y96 and overlaps course tabs y89-121 and Adjust route button y148-190, obscuring title and description. Reproduced collapsed and expanded, before and after choosing.",
+      "recommendation": "Reserve nonoverlapping top toolbar/popup layout; avoid controls floating above popup text."
+    }
+  ],
+  "passed": [
+    "Real edge click exposes two alternatives, practice and micro.",
+    "Practice details show execution resources, context, contact, expected evidence, availability and deterministic cost75. Micro alternative shows cost35.",
+    "Practice selection shows 已选择此行动 and purple solid action arc; remaining candidate dashed neutral.",
+    "Orange node-support laser remains visually distinguishable before edge selection.",
+    "Visible graph node pixel positions unchanged across selected-node, edge candidates, expand details, choose states; camera visibly stable.",
+    "Assistant opens within Project and exposes update capability and ordinary chat controls.",
+    "Browser errors command returned empty."
+  ],
+  "limitations": [
+    "No internal force recomputation instrumentation: visual stability observed, parent unit tests separately cover structural stability.",
+    "Execution/running/completed states not verified: Phase C not implemented in reviewed build.",
+    "Assistant sending not repeated; only surface/context access tested."
+  ],
+  "discoverability": "Project brief explicitly says click relation line to compare actions. Target edge thin but clickable on first visual click after selecting source. Action labels clutter in compact 9-node graph; acceptable with zoom, consider hover emphasis later."
+}

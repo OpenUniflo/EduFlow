@@ -9,6 +9,8 @@ const server = createClient(url, process.env.SUPABASE_SECRET_KEY!, options);
 const client = createClient(url, process.env.VITE_SUPABASE_PUBLISHABLE_KEY!, options);
 const actionId = randomUUID();
 let userId = '';
+let otherId = '';
+const privateCourseId = `action-private-${randomUUID()}`;
 let assertions = 0;
 const check = (condition: unknown, message: string) => { assert.ok(condition, message); assertions++; };
 try {
@@ -32,9 +34,19 @@ try {
   check(Boolean((await server.from('course_action_bindings').insert(binding)).error), 'One authoritative binding per course/action');
   check((await client.from('user_knowledge_states').select('node_id')).data?.length === 0, 'Templates and bindings never create official state');
   check((await client.from('personal_course_route_versions').select('id')).data?.length === 0, 'Templates and bindings never create route versions');
+  const otherEmail = `action-other-${randomUUID()}@eduflow.test`, otherPassword = randomUUID() + randomUUID();
+  const other = await server.auth.admin.createUser({ email: otherEmail, password: otherPassword, email_confirm: true }); assert.ifError(other.error); otherId = other.data.user!.id;
+  const b = createClient(url, process.env.VITE_SUPABASE_PUBLISHABLE_KEY!, options);
+  assert.ifError((await b.auth.signInWithPassword({ email: otherEmail, password: otherPassword })).error);
+  assert.ifError((await server.from('courses').insert({ id: privateCourseId, title: 'Private isolation fixture', description: 'Local only', revision: 'test', course_type: 'personal', lifecycle: 'published', owner_user_id: userId })).error);
+  assert.ifError((await server.from('course_action_bindings').insert({ ...binding, course_id: privateCourseId })).error);
+  check((await client.from('course_action_bindings').select('id').eq('course_id', privateCourseId)).data?.length === 1, 'A reads own private-course binding');
+  check((await b.from('course_action_bindings').select('id').eq('course_id', privateCourseId)).data?.length === 0, 'B cannot read A private-course resources');
   console.log(JSON.stringify({ status: 'PASS', assertions, scope: 'local ordinary JWT and schema, not Hosted or browser acceptance' }));
 } finally {
   assert.ifError((await server.from('course_action_bindings').delete().eq('action_id', actionId)).error);
   assert.ifError((await server.from('knowledge_edge_actions').delete().eq('id', actionId)).error);
+  assert.ifError((await server.from('courses').delete().eq('id', privateCourseId)).error);
+  if (otherId) assert.ifError((await server.auth.admin.deleteUser(otherId)).error);
   if (userId) assert.ifError((await server.auth.admin.deleteUser(userId)).error);
 }

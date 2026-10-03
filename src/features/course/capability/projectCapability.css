@@ -1,4 +1,4 @@
-.project-capability { position: absolute; inset: 0; }
+.project-capability { --project-detail-top:208px; position: absolute; inset: 0; }
 .project-capability-info { position: absolute; top: 148px; left: 24px; width: 285px; max-height: calc(100vh - 175px); overflow: auto; padding: 20px; border-radius: 20px; }
 .project-capability h2 { font-size: 18px; margin: 0 0 12px; }
 .project-capability p, .project-capability li { font-size: 13px; line-height: 1.7; color: #64748b; }
@@ -50,9 +50,9 @@
 .project-route-entry p { padding: 10px; background: #ffffffed; border-radius: 10px; }
 .project-capability-editor { position: absolute; z-index: 4; top: 204px; left: 24px; width: 285px; padding: 18px; border-radius: 20px; max-height: calc(100vh - 340px); overflow: auto; }
 .project-capability-editor .route-planning { margin-top: 0; padding-top: 0; border: 0; }
-.project-capability-detail { top: 208px; width: 280px; max-height: calc(100vh - 300px); }
+.project-capability-detail { top: var(--project-detail-top); width: 280px; max-height: calc(100vh - 300px); }
 .project-capability-empty { position: absolute; top: 45%; left: 35%; padding: 20px; border-radius: 16px; }
-@media (max-width: 900px) { .project-capability-toolbar { top: 170px; left: 12px; right: 12px; } .project-capability-editor { top: 226px; left: 12px; } .project-capability-detail { top: 226px; } }
+@media (max-width: 900px) { .project-capability { --project-detail-top:226px; } .project-capability-toolbar { top: 170px; left: 12px; right: 12px; } .project-capability-editor { top: 226px; left: 12px; } .project-capability-detail { top: 226px; } }
 @media (max-width: 760px) {
   .project-capability-toolbar { top: 176px; }
   .project-capability-editor { top: 232px; width: min(285px, calc(100vw - 60px)); max-height: 35vh; }

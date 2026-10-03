@@ -1,0 +1,171 @@
+{
+  "preview": "https://edu-flow-otpl8sku9-july-nanas-projects.vercel.app",
+  "actions": [
+    {
+      "id": "f2136047-8a15-480d-88ed-8fcb70ac599a",
+      "edge_id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+      "type": "micro_learning",
+      "title": "学习缺料暴露分析",
+      "description": "用逐期需求与预计到货识别缺料起点、持续时间和影响范围。",
+      "estimated_minutes": 20,
+      "difficulty": 2,
+      "resource_requirements": [],
+      "required_capability_ids": [],
+      "expected_evidence": "完成既有 Micro 的理解与应用检查；能力状态由既有学习规则判断。",
+      "status": "active",
+      "provenance": {
+        "kind": "admin",
+        "actor_id": "54cd7725-ae57-464b-beba-18e950546f0b"
+      },
+      "created_at": "2026-10-03T19:00:28.047068+00:00",
+      "updated_at": "2026-10-03T19:02:07.04644+00:00"
+    },
+    {
+      "id": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+      "edge_id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+      "type": "practice_task",
+      "title": "核算缺料暴露窗口",
+      "description": "根据可用库存、逐期需求与确认到货，计算每期净需求、缺口和持续时间，并说明所影响的订单。",
+      "estimated_minutes": 45,
+      "difficulty": 3,
+      "resource_requirements": [
+        "planning-records"
+      ],
+      "required_capability_ids": [
+        "supply-net-material-requirement"
+      ],
+      "expected_evidence": "提交包含原始输入、逐期计算、缺料起止和订单影响的 UTF-8 txt/md/csv 工作记录。完成任务不等于已具备能力。",
+      "status": "active",
+      "provenance": {
+        "kind": "admin",
+        "actor_id": "54cd7725-ae57-464b-beba-18e950546f0b"
+      },
+      "created_at": "2026-10-03T19:00:29.835461+00:00",
+      "updated_at": "2026-10-03T19:02:08.36043+00:00"
+    }
+  ],
+  "weights": [
+    [
+      {
+        "actionId": "f2136047-8a15-480d-88ed-8fcb70ac599a",
+        "available": true,
+        "weight": 35,
+        "reasons": [
+          {
+            "code": "time",
+            "cost": 20,
+            "message": "预计 20 分钟"
+          },
+          {
+            "code": "difficulty",
+            "cost": 15,
+            "message": "难度 2/5"
+          }
+        ]
+      },
+      {
+        "actionId": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+        "available": true,
+        "weight": 75,
+        "reasons": [
+          {
+            "code": "time",
+            "cost": 45,
+            "message": "预计 45 分钟"
+          },
+          {
+            "code": "difficulty",
+            "cost": 30,
+            "message": "难度 3/5"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "actionId": "f2136047-8a15-480d-88ed-8fcb70ac599a",
+        "available": true,
+        "weight": 65,
+        "reasons": [
+          {
+            "code": "time",
+            "cost": 20,
+            "message": "预计 20 分钟"
+          },
+          {
+            "code": "difficulty",
+            "cost": 15,
+            "message": "难度 2/5"
+          },
+          {
+            "code": "source_unacquired",
+            "cost": 30,
+            "message": "起点能力尚未具备，包含额外准备成本"
+          }
+        ]
+      },
+      {
+        "actionId": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+        "available": false,
+        "weight": 105,
+        "reasons": [
+          {
+            "code": "time",
+            "cost": 45,
+            "message": "预计 45 分钟"
+          },
+          {
+            "code": "difficulty",
+            "cost": 30,
+            "message": "难度 3/5"
+          },
+          {
+            "code": "missing_capability",
+            "message": "尚未具备执行条件：supply-net-material-requirement",
+            "cost": 0
+          },
+          {
+            "code": "source_unacquired",
+            "cost": 30,
+            "message": "起点能力尚未具备，包含额外准备成本"
+          }
+        ]
+      }
+    ]
+  ],
+  "bindings": [
+    {
+      "id": "4f0a5563-4b42-4ecc-bb61-ed48c60caa45",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "action_id": "f2136047-8a15-480d-88ed-8fcb70ac599a",
+      "context": "海外工厂供应链协同项目。以下为验收用虚构项目资料，不代表已完成真实企业作业。",
+      "contact": "验收场景：计划负责人（无真实个人联系方式）",
+      "instructions": "使用自己的工作记录或明确标注的验收资料。逐期列出库存、需求、到货、缺口与受影响订单，再上传包含计算过程的结果。",
+      "resources": [],
+      "available": true,
+      "created_at": "2026-10-03T19:00:29.256319+00:00",
+      "updated_at": "2026-10-03T19:02:07.738+00:00"
+    },
+    {
+      "id": "56b73693-92ee-465e-a639-94eaed74425e",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "action_id": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+      "context": "海外工厂供应链协同项目。以下为验收用虚构项目资料，不代表已完成真实企业作业。",
+      "contact": "验收场景：计划负责人（无真实个人联系方式）",
+      "instructions": "使用自己的工作记录或明确标注的验收资料。逐期列出库存、需求、到货、缺口与受影响订单，再上传包含计算过程的结果。",
+      "resources": [
+        {
+          "key": "planning-records",
+          "label": "逐期计划输入",
+          "available": true,
+          "reference": "验收数据：初始可用库存70；第1/2/3期需求150/100/80；各期确认到货0/120/100。请解释积欠是否跨期及缺口解除时间。"
+        }
+      ],
+      "available": true,
+      "created_at": "2026-10-03T19:00:30.460257+00:00",
+      "updated_at": "2026-10-03T19:02:09.04+00:00"
+    }
+  ],
+  "apiGovernance": "PASS: ordinary A/B writes denied, admin template and binding writes accepted",
+  "syntheticContext": true
+}
