@@ -81,3 +81,18 @@ it('action alternatives and execution states never rebuild topology, move frozen
   expect(graph.d3ReheatSimulation).toHaveBeenCalledTimes(1);
   expect(graph.cameraPosition).toHaveBeenCalledTimes(1);
 });
+
+it('retains engine datum identities when capability recomputation prunes an upstream node', () => {
+  const before = render().graphData;
+  before.nodes.forEach((node: any, i: number) => { node.x = i * 20; node.y = i; node.z = -i; });
+  // ForceGraph mutates edge endpoints and associates scene objects with datum identity.
+  before.links[1].source = before.nodes[1]; before.links[1].target = before.nodes[2];
+  const after = render('project', { nodes: nodes.slice(1), edges: edges.slice(1) }).graphData;
+  expect(after.nodes).toHaveLength(3);
+  expect(after.nodes[0]).toBe(before.nodes[1]);
+  expect(after.nodes[1]).toBe(before.nodes[2]);
+  expect(after.links[0]).toBe(before.links[1]);
+  expect(after.nodes[0].x).toBe(20);
+  expect(graph.d3ReheatSimulation).toHaveBeenCalledTimes(2);
+  expect(graph.cameraPosition).toHaveBeenCalledTimes(1);
+});

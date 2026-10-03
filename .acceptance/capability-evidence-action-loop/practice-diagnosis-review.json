@@ -1,0 +1,60 @@
+{
+  "reviewer": "Evidence & AI Reviewer",
+  "verdict": "PASS — target candidate semantic and source review only",
+  "diagnosisId": "0a6e620d-781f-4b9e-82bd-b7a7d7d4945e",
+  "proposalId": "a79bf5a6-33a8-44e9-bba7-197f599ea1b1",
+  "nodeId": "supply-shortage-exposure",
+  "revisionId": "supply-shortage-exposure:v1",
+  "sourceId": "27981e1a-adbc-4860-9357-6d2b7b2a0f6e",
+  "sourceSha256": "301779764c565348ac0bba713a2a73d42f60289837d039d66d29b8617bbf70e6",
+  "checks": {
+    "localSourceHashMatches": true,
+    "all10UnitQuotesMatchOriginalLines": true,
+    "all10UnitsOwnerSourceRunLineageMatches": true,
+    "targetReferences8RealUnitsAtLines": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      18,
+      19
+    ],
+    "baselineBalances": [
+      -80,
+      -60,
+      -40,
+      0
+    ],
+    "oneDayLateBalances": [
+      -80,
+      -180,
+      -40,
+      0
+    ],
+    "oneDayEarlyBalances": [
+      40,
+      -60,
+      -40,
+      0
+    ],
+    "targetSupportedLearnedProposalJustified": true,
+    "proposalPending": true,
+    "knowledgeEvidenceId": null,
+    "savedFormalTargetStatus": "learning",
+    "statesAndFormalEventsUnchangedFromInitialAttemptSnapshot": true
+  },
+  "otherCandidates": {
+    "net": "partial合理：未展示隔离库存排除动作，仅已排除的输入口径。",
+    "impact": "partial合理：完成订单映射，未量化停线时段；先到期先分配可作为优先顺序，但不补造生产恢复细节。",
+    "tradeoff": "insufficient合理：没有成本、质量合规约束下的方案权衡。"
+  },
+  "knownLimitations": [
+    "仅支持明确虚构输入上的实际计算演练表现，不代表真实供应商履约经验或实际企业交付。",
+    "仅此次候选审核PASS；既有v15算术和对象范围误判仍为Known Limitations，不据此宣称模型整体质量通过。",
+    "保留首次failed run及技术重试fetch failed记录；服务端completed不等于客户端请求成功。",
+    "目标仍待显式确认，proposed_status learned不是已写入正式learned状态。"
+  ],
+  "reviewOperations": "只读本地保存结果和输入；仅写本审查artifact；未调用模型、未重新诊断、未确认候选、未改变产品数据。"
+}

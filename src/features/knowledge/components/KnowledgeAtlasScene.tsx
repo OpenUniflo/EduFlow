@@ -201,9 +201,24 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const laser = useMemo(() => createProjectLaser(), []);
 
   const structureKey = useMemo(() => atlasStructureKey(nodes, edges, variant), [edges, nodes, variant]);
+  const retainedNodes = useRef(new Map<string, RenderNode>());
+  const retainedEdges = useRef(new Map<string, RenderEdge>());
   // Presentation-only fields intentionally do not participate in structural graph identity.
-  const renderNodes = useMemo<RenderNode[]>(() => nodes.map((node) => ({ ...node })), [structureKey]);
-  const renderEdges = useMemo<RenderEdge[]>(() => edges.map((edge) => ({ ...edge })), [structureKey]);
+  // ForceGraph binds Three objects to data-object identity. Replacing retained data
+  // while reusing its cached Three object lets removal of the old datum detach it.
+  const renderNodes = useMemo<RenderNode[]>(() => {
+    const next = nodes.map(node => retainedNodes.current.get(node.id) ?? { ...node });
+    retainedNodes.current = new Map(next.map(node => [node.id, node]));
+    return next;
+  }, [structureKey]);
+  const renderEdges = useMemo<RenderEdge[]>(() => {
+    const next = edges.map(edge => {
+      const old = retainedEdges.current.get(edge.id);
+      return old && endpointId(old.source) === endpointId(edge.source) && endpointId(old.target) === endpointId(edge.target) ? old : { ...edge };
+    });
+    retainedEdges.current = new Map(next.map(edge => [edge.id, edge]));
+    return next;
+  }, [structureKey]);
   const graphData = useMemo(() => ({ nodes: renderNodes, links: renderEdges }), [renderEdges, renderNodes]);
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const renderNodeById = useMemo(() => new Map(renderNodes.map((node) => [node.id, node])), [renderNodes]);

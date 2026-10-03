@@ -58,6 +58,13 @@ if (mode === 'verify-confirmation') {
   assert.equal(units.length, proposal.unit_ids.length);
   assert.ok(units.every((item: any) => item.source_id === source.id));
   const routeAfter = await call(0, `/api/learner?resource=route-plan&courseId=${courseId}`);
+  const routeBefore = JSON.parse(readFileSync(directory + 'practice-route-before.json', 'utf8'));
+  const target = proposal.node_id;
+  const gap = (route: any) => route.model.orderedNodeIds.filter((id: string) => !route.model.currentKnowledgeIds.includes(id));
+  assert.ok(!routeBefore.model.currentKnowledgeIds.includes(target));
+  assert.ok(routeAfter.model.currentKnowledgeIds.includes(target), 'Confirmed target must enter acquired projection');
+  assert.ok(gap(routeBefore).includes(target) && !gap(routeAfter).includes(target), 'Target must leave the project capability gap');
+  assert.ok(routeAfter.plan.route.currentKnowledgeIds.includes(target), 'Route projection must consume the confirmed current state');
   assert.deepEqual((await snapshot()).versions, baseline.versions);
   writeFileSync(directory + 'practice-confirmation.json', JSON.stringify({ preview, actionRun: run, source, proposal, units, formal, baseline, after, routeBefore: JSON.parse(readFileSync(directory + 'practice-route-before.json', 'utf8')), routeAfter, checks: ['real confirmed target learned', 'source-unit-proposal-formal-state lineage', 'B confirmation denied', 'B unchanged', 'concurrent replay idempotent', 'no automatic RouteVersion'], verdict: 'PASS' }, null, 2) + '\n');
 }
