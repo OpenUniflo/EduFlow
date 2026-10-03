@@ -16,6 +16,7 @@ import {
   type Material,
   type Texture
 } from "three";
+import { actionBranchColors, actionBranchPath, type ActionBranch } from "./actionBranches";
 import { createProjectLaser } from "./projectLaser";
 import { computeDownstreamSubgraph } from "../atlasDownstream";
 import type { AtlasSceneEdge, AtlasSceneNode } from "../projections/atlasProjections";
@@ -42,6 +43,9 @@ export type KnowledgeAtlasSceneProps = {
   className?: string;
   onNodeClick?: (node: AtlasSceneNode) => void;
   onBackgroundClick?: () => void;
+  onEdgeClick?: (edge: AtlasSceneEdge) => void;
+  actionBranches?: ActionBranch[];
+  onActionClick?: (id: string) => void;
 };
 
 type LabelState = { id: string; title: string; x: number; y: number; priority: number; forced: boolean };
@@ -130,6 +134,9 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   autoRotate = false,
   className,
   onNodeClick,
+  actionBranches,
+  onEdgeClick,
+  onActionClick,
   onBackgroundClick
 }, forwardedRef) {
   const graphRef = useRef<ForceGraphMethods<AtlasSceneNode, AtlasSceneEdge> | undefined>(undefined);
@@ -146,6 +153,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hoverPaused, setHoverPaused] = useState(false);
   const [manualInteraction, setManualInteraction] = useState(false);
+  const [branchPositions, setBranchPositions] = useState<Array<ActionBranch & { path: string; x: number; y: number }>>([]);
   const [labels, setLabels] = useState<LabelState[]>([]);
 
   const resources = useMemo(() => {
@@ -402,6 +410,17 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const updateLabels = useCallback(() => {
     const graph = graphRef.current;
     if (!graph) return;
+    const positionedBranches = (actionBranches ?? []).flatMap(branch => {
+      const edge = renderEdges.find(edge => edge.id === branch.edgeId);
+      if (!edge) return [];
+      const source = renderNodeById.get(endpointId(edge.source)), target = renderNodeById.get(endpointId(edge.target));
+      if (!source || !target || !Number.isFinite(source.x) || !Number.isFinite(target.x)) return [];
+      const alternatives = (actionBranches ?? []).filter(item => item.edgeId === branch.edgeId);
+      const start = graph.graph2ScreenCoords(source.x ?? 0, source.y ?? 0, source.z ?? 0);
+      const end = graph.graph2ScreenCoords(target.x ?? 0, target.y ?? 0, target.z ?? 0);
+      return [{ ...branch, ...actionBranchPath(start, end, alternatives.findIndex(item => item.id === branch.id), alternatives.length) }];
+    });
+    setBranchPositions(previous => JSON.stringify(previous) === JSON.stringify(positionedBranches) ? previous : positionedBranches);
     const camera = graph.camera();
     const cameraDistance = Math.hypot(camera.position.x, camera.position.y, camera.position.z);
     const far = cameraDistance > (variant === "global" ? 760 : 680);
@@ -432,7 +451,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     });
     const next = accepted.map(({ width: _width, height: _height, ...label }) => label);
     setLabels((current) => sameLabels(current, next) ? current : next);
-  }, [currentLearningId, focusIds, focusTargetId, hoveredId, renderNodes, searchMatchId, size.height, size.width, variant]);
+  }, [currentLearningId, focusIds, focusTargetId, hoveredId, renderNodes, renderEdges, renderNodeById, actionBranches, searchMatchId, size.height, size.width, variant]);
 
   useEffect(() => {
     let frame = 0;
@@ -576,8 +595,16 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
           hoverResumeTimerRef.current = window.setTimeout(() => setHoverPaused(false), 250);
         }}
         onNodeClick={(node) => onNodeClick?.(node as RenderNode)}
+        onLinkClick={(edge) => onEdgeClick?.(edges.find(item => item.id === edge.id) ?? edge as AtlasSceneEdge)}
         onBackgroundClick={onBackgroundClick}
       />
+      {variant === 'project' && branchPositions.length > 0 ? <svg className="atlas-action-branches" width={size.width} height={size.height} aria-label="关系上的行动替代方案" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}>
+        {branchPositions.map(branch => <g key={branch.id} className={`action-branch action-branch-${branch.status}`}>
+          <path d={branch.path} fill="none" stroke={actionBranchColors[branch.status]} strokeWidth={branch.status === 'candidate' || branch.status === 'unavailable' ? 1.5 : 3} strokeDasharray={branch.status === 'candidate' || branch.status === 'unavailable' ? '4 5' : undefined}/>
+          <path d={branch.path} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onClick={() => onActionClick?.(branch.id)}/>
+          <text x={branch.x} y={branch.y - 7} textAnchor="middle" fontSize={11} fill={actionBranchColors[branch.status]} stroke="#f5f8fc" strokeWidth={4} paintOrder="stroke" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onActionClick?.(branch.id)}>{branch.title}</text>
+        </g>)}
+      </svg> : null}
       <div className="knowledge-atlas-label-layer" aria-hidden="true">
         {labels.map((label) => <span key={label.id} className={label.id === focusTargetId ? "selected" : ""} style={{ transform: `translate(${label.x}px, ${label.y}px) translate(-50%, 0)` }}>{label.title}</span>)}
       </div>

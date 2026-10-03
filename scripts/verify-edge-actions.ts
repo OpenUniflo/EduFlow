@@ -1,0 +1,40 @@
+/** Ordinary-user local governance checks; does not create capability facts or user state. */
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
+const url = process.env.SUPABASE_URL!;
+assert.match(url, /^http:\/\/(127\.0\.0\.1|localhost):/);
+const options = { auth: { persistSession: false, autoRefreshToken: false } };
+const server = createClient(url, process.env.SUPABASE_SECRET_KEY!, options);
+const client = createClient(url, process.env.VITE_SUPABASE_PUBLISHABLE_KEY!, options);
+const actionId = randomUUID();
+let userId = '';
+let assertions = 0;
+const check = (condition: unknown, message: string) => { assert.ok(condition, message); assertions++; };
+try {
+  const email = `action-local-${randomUUID()}@eduflow.test`, password = randomUUID() + randomUUID();
+  const created = await server.auth.admin.createUser({ email, password, email_confirm: true }); assert.ifError(created.error); userId = created.data.user!.id;
+  assert.ifError((await client.auth.signInWithPassword({ email, password })).error);
+  const edges = await server.from('knowledge_edges').select('id').eq('lifecycle_status', 'active').eq('relation', 'prerequisite').limit(1); assert.ifError(edges.error);
+  const courses = await client.from('courses').select('id').eq('lifecycle', 'published').limit(1); assert.ifError(courses.error);
+  const definition = { id: actionId, edge_id: edges.data![0].id, type: 'practice_task', title: 'Local action security fixture', description: 'Not an executed task', estimated_minutes: 10, difficulty: 1, expected_evidence: 'Work record' };
+  check(Boolean((await client.from('knowledge_edge_actions').insert(definition)).error), 'Learner cannot create global action');
+  assert.ifError((await server.from('knowledge_edge_actions').insert(definition)).error);
+  check((await client.from('knowledge_edge_actions').select('id').eq('id', actionId)).data?.length === 1, 'Learner can read global action');
+  check(Boolean((await client.from('knowledge_edge_actions').update({ title: 'Forged' }).eq('id', actionId)).error), 'Learner cannot edit template');
+  check(Boolean((await server.from('knowledge_edge_actions').update({ type: 'micro_learning' }).eq('id', actionId)).error), 'Execution type immutable');
+  check(Boolean((await server.from('knowledge_edge_actions').update({ required_capability_ids: ['nonexistent'] }).eq('id', actionId)).error), 'Execution conditions reference real active capabilities');
+  const binding = { course_id: courses.data![0].id, action_id: actionId, context: 'Local test' };
+  check(Boolean((await client.from('course_action_bindings').insert(binding)).error), 'Learner cannot write project resource binding');
+  assert.ifError((await server.from('course_action_bindings').insert(binding)).error);
+  check((await client.from('course_action_bindings').select('id').eq('action_id', actionId)).data?.length === 1, 'Visible course binding readable');
+  check(Boolean((await client.from('course_action_bindings').update({ context: 'Forged' }).eq('action_id', actionId)).error), 'Learner cannot change resources');
+  check(Boolean((await server.from('course_action_bindings').insert(binding)).error), 'One authoritative binding per course/action');
+  check((await client.from('user_knowledge_states').select('node_id')).data?.length === 0, 'Templates and bindings never create official state');
+  check((await client.from('personal_course_route_versions').select('id')).data?.length === 0, 'Templates and bindings never create route versions');
+  console.log(JSON.stringify({ status: 'PASS', assertions, scope: 'local ordinary JWT and schema, not Hosted or browser acceptance' }));
+} finally {
+  assert.ifError((await server.from('course_action_bindings').delete().eq('action_id', actionId)).error);
+  assert.ifError((await server.from('knowledge_edge_actions').delete().eq('id', actionId)).error);
+  if (userId) assert.ifError((await server.auth.admin.deleteUser(userId)).error);
+}

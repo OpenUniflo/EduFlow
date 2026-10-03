@@ -15,6 +15,7 @@
     }
   },
   "rewrites": [
+    { "source": "/api/edge-actions", "destination": "/api/learner?resource=edge-actions" },
     { "source": "/api/evidence", "destination": "/api/learner?resource=evidence" },
     { "source": "/api/courses", "destination": "/api/course?resource=courses" },
     { "source": "/api/course-authoring", "destination": "/api/course?resource=authoring" },

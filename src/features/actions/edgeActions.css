@@ -1,0 +1,14 @@
+.edge-action-panel { position:absolute; top:96px; right:24px; width:min(360px,calc(100% - 48px)); max-height:calc(100% - 190px); overflow:auto; padding:20px; z-index:5; font-size:13px; }
+.edge-action-panel h2 { padding-right:24px; font-size:17px; }
+.edge-action-panel h3 { font-size:13px; margin-top:14px; }
+.edge-action-panel p,.edge-action-panel li { line-height:1.6; overflow-wrap:anywhere; }
+.edge-action-panel section { border-top:1px solid #dce3ed; padding:12px 0; }
+.edge-action-panel section.focused { border-top-color:#7c3aed; }
+.edge-action-heading { display:flex; flex-direction:column; gap:6px; text-align:left; width:100%; background:transparent; border:0; cursor:pointer; color:inherit; }
+.edge-action-heading span { color:#64748b; font-size:12px; }
+.action-branch-in_progress path:first-child { stroke-dasharray:8 6; animation:action-progress-flow 1s linear infinite; }
+.action-branch-selected path:first-child { animation:action-selected-pulse 1.8s ease-in-out infinite; }
+.action-branch-unavailable { opacity:.5; }
+@keyframes action-progress-flow { to { stroke-dashoffset:-28; } }
+@keyframes action-selected-pulse { 50% { opacity:.45; } }
+@media (prefers-reduced-motion:reduce) { .action-branch path { animation:none; } }

@@ -6,6 +6,8 @@ import { consolidatedResourceForPath } from "./local-api-vite-plugin";
 describe("local consolidated API adapter", () => {
   it("injects the same resource as each hosted public rewrite", () => {
     expect(consolidatedResourceForPath).toEqual({
+      "/api/evidence": "evidence",
+      "/api/edge-actions": "edge-actions",
       "/api/courses": "courses",
       "/api/course-authoring": "authoring",
       "/api/learning": "learning",

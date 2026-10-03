@@ -17,6 +17,8 @@ const handlers = new Map([
   ["/api/knowledge", knowledgeHandler],
   ["/api/courses", courseHandler],
   ["/api/course-authoring", courseHandler],
+  ["/api/evidence", learnerHandler],
+  ["/api/edge-actions", learnerHandler],
   ["/api/learning", learnerHandler],
   ["/api/micro", learnerHandler],
   ["/api/progress", learnerHandler],
@@ -30,7 +32,8 @@ const handlers = new Map([
 ]);
 
 /** Public client paths must match the resource injected by the Vercel rewrite. */
-export const consolidatedResourceForPath: Record<string, "courses" | "authoring" | "learning" | "micro" | "progress" | "navigation"> = {
+export const consolidatedResourceForPath: Record<string, "courses" | "authoring" | "learning" | "micro" | "progress" | "navigation" | "evidence" | "edge-actions"> = {
+  "/api/evidence": "evidence", "/api/edge-actions": "edge-actions",
   "/api/courses": "courses", "/api/course-authoring": "authoring", "/api/learning": "learning", "/api/micro": "micro", "/api/progress": "progress", "/api/navigation": "navigation"
 };
 

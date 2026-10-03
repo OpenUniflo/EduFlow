@@ -22,9 +22,9 @@ const graph = { d3Force: vi.fn(), d3ReheatSimulation: vi.fn(), controls: () => (
 const nodes = ['A', 'B', 'C', 'D'].map((id, i) => ({ id, title: id, color: ['#3b82f6', '#94a3b8', '#22c55e', '#94a3b8'][i], status: 'explore', isCore: true, visualImportance: 0 })) as KnowledgeAtlasSceneProps['nodes'];
 const edges = ['A>B', 'B>C', 'B>D'].map(id => ({ id, source: id[0], target: id[2], relation: 'prerequisite', strength: 'hard' })) as KnowledgeAtlasSceneProps['edges'];
 let selected: string | null = null;
-function render(variant: KnowledgeAtlasSceneProps['variant'] = 'project') {
+function render(variant: KnowledgeAtlasSceneProps['variant'] = 'project', extra: Partial<KnowledgeAtlasSceneProps> = {}) {
   host.index = 0;
-  const element = (KnowledgeAtlasScene as any)({ nodes: nodes.map(n => ({ ...n })), edges: edges.map(e => ({ ...e })), variant, selectedId: selected, onNodeClick: (n: { id: string }) => { selected = n.id; }, onBackgroundClick: () => { selected = null; } });
+  const element = (KnowledgeAtlasScene as any)({ nodes: nodes.map(n => ({ ...n })), edges: edges.map(e => ({ ...e })), variant, ...extra, selectedId: selected, onNodeClick: (n: { id: string }) => { selected = n.id; }, onBackgroundClick: () => { selected = null; } });
   const props = element.props.children[0].props;
   props.ref(graph); host.effects.splice(0).forEach(effect => effect());
   return props;
@@ -61,4 +61,23 @@ it('does not add pulses to the existing Global and Personal variants', () => {
   selected = 'A';
   expect(render('global').linkThreeObject).toBeUndefined();
   expect(render('personal').linkThreeObject).toBeUndefined();
+});
+
+it('action alternatives and execution states never rebuild topology, move frozen nodes or reset camera', () => {
+  const clicked = vi.fn();
+  let props = render('project', { onEdgeClick: clicked });
+  const topology = props.graphData;
+  topology.nodes.forEach((node: any, i: number) => { node.x = i * 20; node.y = i * 10; node.z = -i; });
+  props.onEngineStop();
+  const positions = topology.nodes.map((node: any) => [node.x, node.y, node.z, node.fx, node.fy, node.fz]);
+  props.onLinkClick(edges[0]);
+  expect(clicked).toHaveBeenCalledWith(edges[0]);
+  for (const status of ['candidate', 'selected', 'in_progress', 'completed', 'unavailable'] as const) {
+    props = render('project', { actionBranches: [{ id: 'practice', edgeId: edges[0].id, title: 'Practice', status }, { id: 'micro', edgeId: edges[0].id, title: 'Micro', status: 'candidate' }] });
+    expect(props.graphData).toBe(topology);
+    expect(topology.links).toHaveLength(3);
+    expect(topology.nodes.map((node: any) => [node.x, node.y, node.z, node.fx, node.fy, node.fz])).toEqual(positions);
+  }
+  expect(graph.d3ReheatSimulation).toHaveBeenCalledTimes(1);
+  expect(graph.cameraPosition).toHaveBeenCalledTimes(1);
 });
