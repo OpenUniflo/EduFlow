@@ -1,0 +1,12 @@
+{
+  "reviewer": "graph_ux_reviewer",
+  "commit": "ffb6d1a",
+  "preview": "https://edu-flow-mj8kopagj-july-nanas-projects.vercel.app",
+  "UX-C01": "NOT_RECHECKABLE_IN_COMPLETED_A_RUN; no duplicate result or fabricated UI state created.",
+  "UX-C02": "Initial Practice source scope excludes unrelated history, but after actual UI deselect shortage and select python-runtime, running and failed shortage messages remain visible. Current implementation scopes to initialSourceId, not selected source IDs.",
+  "diagnosis": "Parent-controlled technical retry ongoing. No diagnose or confirm UI clicked. Selected shortage restored before exit.",
+  "screenshots": [
+    "phase-c-recheck-source-scoped.png",
+    "phase-c-recheck-changed-selection-status.png"
+  ]
+}
