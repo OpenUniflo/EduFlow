@@ -128,3 +128,10 @@ node --env-file=/private/runtime.env --import tsx scripts/acceptance/enterprise-
 ## Product boundary
 
 This acceptance can establish P2 and P3 Current State→Gap/Route/Recompute only. It does not establish real-world capability assessment accuracy, enterprise evidence inference, action/resource execution or business performance improvement.
+
+
+## Second review and bounded repair
+
+The same initially fresh blind reviewer rechecked `0cff1da` on `nv6oh1byk`: first-screen purpose, color consistency and A/B attribution passed, but overall experience still failed. Exact summary: “EduFlow 把项目目标拆成相互关联的能力，对照个人已有能力找出缺口，生成需要补齐的学习路线，并准备连接学习与实训。” The independent record is `blind-round2.json`; original failing focus screenshot is retained. A request for a fifth fresh agent was rejected by the environment's total agent-thread limit; subsequent rounds are explicitly repair rechecks, not fresh first-impression studies.
+
+Remaining concrete fixes: the next-capability CTA passes its real ID to the existing selected anchor; search selection no longer auto-zooms using a stale previous selection's neighborhood; explicit project focus/fit delegates to ForceGraph zoomToFit with room for overlays, and selecting hides the goal card. None changes node/edge coordinates or force lifecycle. The route shows the latest dated acquired state records already present in user data; it does not fabricate an acquisition event, evidence or durable difference history. Full action/content completion remains outside this acceptance.

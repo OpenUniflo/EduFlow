@@ -36,7 +36,8 @@
   ],
   "limits": [
     "Reviewer did not perform successful mutation; successful adoption and restore independently inspected via main HTTP evidence.",
-    "Laser and final visual interpretation separate gates."
+    "Laser and final visual interpretation separate gates.",
+    "Main browser transient login redirect during concurrent account use, not reproduced by independent sequential A/B checks; no cause proved."
   ],
   "followup": {
     "pass": true,
@@ -48,5 +49,42 @@
     "BVersion": 1,
     "exactRestoredT0": true,
     "strictStateAndResetGuardsReviewed": true
+  },
+  "latestPreviewFollowup": {
+    "preview": "https://edu-flow-nv6oh1byk-july-nanas-projects.vercel.app",
+    "commit": "0cff1da48fd6d5def13237d7eeb3d4653b844356",
+    "pass": true,
+    "roleMembershipTargetsExact": true,
+    "AandBT0MatchIndependentOriginal": true,
+    "oldHistoryUnchanged": true,
+    "activeVersions": {
+      "A": 7,
+      "B": 1
+    },
+    "routeAcquiredPending": {
+      "A": [
+        3,
+        10
+      ],
+      "B": [
+        6,
+        6
+      ]
+    },
+    "modelBlueGrayGreen": {
+      "A": [
+        6,
+        8,
+        4
+      ],
+      "B": [
+        7,
+        3,
+        4
+      ]
+    },
+    "bothNewButtonsActuallyClicked": true,
+    "browserErrors": 0,
+    "consoleErrors": 0
   }
 }

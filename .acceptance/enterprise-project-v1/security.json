@@ -1,6 +1,6 @@
 {
-  "preview": "https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app",
-  "capturedAt": "2026-10-03T09:12:08.930Z",
+  "preview": "https://edu-flow-nv6oh1byk-july-nanas-projects.vercel.app",
+  "capturedAt": "2026-10-03T09:20:57.604Z",
   "checks": [
     {
       "name": "A current route",
@@ -83,8 +83,8 @@
   "previewCreatedVersions": 0,
   "explicitEditCreatedVersions": 2,
   "otherUserUnchanged": true,
-  "staleBase": "744aba3c-ee8f-4408-9cec-67299ff7ea00",
-  "currentBase": "88182c54-24b8-43f9-919c-04a22aabed45",
+  "staleBase": "88182c54-24b8-43f9-919c-04a22aabed45",
+  "currentBase": "baa26cf1-1745-4100-9dea-dbaf619b2b29",
   "oldVersionHashes": [
     {
       "id": "42246c13-e644-4cd2-a57b-1ec6d1f7a820",
@@ -97,6 +97,14 @@
     {
       "id": "744aba3c-ee8f-4408-9cec-67299ff7ea00",
       "sha256": "6c0b2bbef4ef73bfd904ebed565e8f89cd1fcdf77a4bccfd2db285ba62338cad"
+    },
+    {
+      "id": "996f5d19-147f-4eb7-b4e2-b5ca93d04bcc",
+      "sha256": "51a6141e62acf25a32f453f722f9c782dfb14874589087fb002a0dd4a0e5fbbd"
+    },
+    {
+      "id": "88182c54-24b8-43f9-919c-04a22aabed45",
+      "sha256": "5701d9394264ecc63911d142c349c158417d02052c26a6a284d1c72c99cdfd55"
     }
   ]
 }

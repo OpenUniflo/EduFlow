@@ -1,6 +1,6 @@
 {
-  "preview": "https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app",
-  "capturedAt": "2026-10-03T09:15:20.811Z",
+  "preview": "https://edu-flow-nv6oh1byk-july-nanas-projects.vercel.app",
+  "capturedAt": "2026-10-03T09:25:49.162Z",
   "scenario": "enterprise-project-v1",
   "captures": [
     {
@@ -450,8 +450,8 @@
           ]
         }
       },
-      "activeVersionId": "88182c54-24b8-43f9-919c-04a22aabed45",
-      "versionNumber": 5,
+      "activeVersionId": "baa26cf1-1745-4100-9dea-dbaf619b2b29",
+      "versionNumber": 7,
       "history": [
         {
           "id": "42246c13-e644-4cd2-a57b-1ec6d1f7a820",
@@ -472,6 +472,14 @@
         {
           "id": "88182c54-24b8-43f9-919c-04a22aabed45",
           "sha256": "5701d9394264ecc63911d142c349c158417d02052c26a6a284d1c72c99cdfd55"
+        },
+        {
+          "id": "99d3b60d-01ff-45e2-be35-0817d7d079ba",
+          "sha256": "c4099c0df1260452c463a66c4da1827102d3a463a88dddcc2f41da04d1b1fcfd"
+        },
+        {
+          "id": "baa26cf1-1745-4100-9dea-dbaf619b2b29",
+          "sha256": "e5d495c1b906ed2c97c811d66a4041c67998dc8415a5b5c23a195df95091288e"
         }
       ],
       "states": [
@@ -575,7 +583,7 @@
               "source": "enterprise-project-v1"
             }
           ],
-          "updated_at": "2026-10-03T09:15:10.21122+00:00"
+          "updated_at": "2026-10-03T09:22:46.816147+00:00"
         },
         {
           "user_id": "cadd9270-4cd8-4577-9121-16fd9d085b8b",

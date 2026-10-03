@@ -91,6 +91,16 @@ describe('Course navigator projection', () => {
     expect(project({ decision: { ...missing, nextAction: { ...missing.nextAction, reasonCode: 'course_route_complete' } } }).complete).toBe(false);
     expect(project({ decision: { ...missing, path: [], nextAction: { ...missing.nextAction, reasonCode: 'course_route_complete' } } }).complete).toBe(false);
   });
+  it('shows dated acquired records from the current route without inferring an acquisition event', () => {
+    const acquiredDecision = { ...decision, path: [{ ...decision.path[0], state: 'learned' as const }], nextAction: { ...decision.nextAction, nodeId: undefined } };
+    const records: UserKnowledgeRecord[] = [
+      { nodeId: 'outside-route', status: 'mastered', updatedAt: '2026-10-04T00:00:00Z' },
+      { nodeId: id, status: 'learned', updatedAt: '2026-10-03T10:00:00Z' },
+    ];
+    expect(project({ decision: acquiredDecision, knowledge: records }).recentKnowledgeUpdates.map(item => item.nodeId)).toEqual([id]);
+    expect(project({ decision: acquiredDecision, knowledge: [{ nodeId: id, status: 'learned', updatedAt: 'invalid' }] }).recentKnowledgeUpdates).toEqual([]);
+    expect(project({ decision, knowledge: records }).recentKnowledgeUpdates).toEqual([]);
+  });
   it('handles no decision, empty assets and foreign course decisions', () => {
     expect(project({ runtime: routeOnlyRuntime, decision: null }).pendingPractices).toEqual([]);
     expect(project({ decision: null }).nextAction).toBeNull();

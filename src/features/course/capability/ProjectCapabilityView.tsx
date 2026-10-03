@@ -41,10 +41,10 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
         <div className="project-capability-search glass-v2">
           <button className="project-search-toggle" aria-label={searchOpen ? '收起能力搜索' : '搜索项目能力'} aria-expanded={searchOpen} onClick={() => setSearchOpen(open => !open)}>{searchOpen ? <X size={18}/> : <Search size={18}/>}</button>
           {searchOpen ? <><label>查找能力<input autoFocus aria-label="查找项目能力" placeholder="输入能力名称" value={query} onChange={event => setQuery(event.target.value)} /></label>
-            <div className="project-capability-results">{matches.map(node => <button key={node.id} disabled={control.editing && control.busy} data-node-id={node.id} onClick={() => { choose(node.id); if (!control.editing) { scene.current?.focus(node.id); setSearchOpen(false); } }}><i style={{ background: node.color }} /><span>{node.title}<small>{roles(node)}{draftMark(node.id)}</small></span></button>)}{!matches.length ? <p>没有匹配的能力</p> : null}</div>
+            <div className="project-capability-results">{matches.map(node => <button key={node.id} disabled={control.editing && control.busy} data-node-id={node.id} onClick={() => { choose(node.id); if (!control.editing) { setSearchOpen(false); } }}><i style={{ background: node.color }} /><span>{node.title}<small>{roles(node)}{draftMark(node.id)}</small></span></button>)}{!matches.length ? <p>没有匹配的能力</p> : null}</div>
           </> : null}
         </div>
-        {!control.editing ? <div className="project-capability-goal glass-v2" aria-label="项目目标与当前能力缺口">
+        {!control.editing && !selected ? <div className="project-capability-goal glass-v2" aria-label="项目目标与当前能力缺口">
           {runtime.course.targetOutcome ? <p><strong>项目目标</strong> {runtime.course.targetOutcome}</p> : null}
           <small>当前已具备 {result.model.currentKnowledgeIds.length} 项 · 待补中间能力 {result.model.bridgeKnowledgeIds.filter(id => !result.model!.currentKnowledgeIds.includes(id)).length} 项 · 待达成目标 {result.model.courseKnowledgeIds.filter(id => !result.model!.currentKnowledgeIds.includes(id)).length} 项</small>
           <small>仅显示当前通向目标的能力；已有能力变化后，已不再需要的前置会移出。点击能力，沿光流查看后续支撑。</small>

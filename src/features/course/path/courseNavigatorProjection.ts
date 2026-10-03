@@ -73,7 +73,14 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
     }
     section.items.push(item);
   });
-  return { route, sections, pendingPractices, nextPractice, nextAction, complete, courseComplete, emptyState };
+  const recentRecords = knowledge.flatMap(record => {
+    const item = route.find(item => item.node.id === record.nodeId && item.state === 'completed');
+    const updatedAt = Date.parse(record.updatedAt ?? '');
+    return item && Number.isFinite(updatedAt) ? [{ nodeId: record.nodeId, title: item.node.title, updatedAt }] : [];
+  });
+  const latestUpdate = Math.max(...recentRecords.map(item => item.updatedAt));
+  const recentKnowledgeUpdates = recentRecords.filter(item => item.updatedAt === latestUpdate).sort((a, b) => a.nodeId.localeCompare(b.nodeId));
+  return { route, sections, recentKnowledgeUpdates, pendingPractices, nextPractice, nextAction, complete, courseComplete, emptyState };
 }
 
 export type CourseNavigatorModel = ReturnType<typeof buildCourseNavigator>;

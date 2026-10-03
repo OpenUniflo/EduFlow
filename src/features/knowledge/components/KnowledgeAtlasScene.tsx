@@ -360,6 +360,11 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     const graph = graphRef.current;
     const node = renderNodeById.get(nodeId);
     if (!graph || !node || !Number.isFinite(node.x) || !Number.isFinite(node.y) || !Number.isFinite(node.z)) return false;
+    if (variant === "project") {
+      // Keep the support chain visible; project focus is a user-driven fit over the stable world.
+      graph.zoomToFit(480, Math.min(180, size.height * .28));
+      return true;
+    }
     const target = { x: node.x ?? 0, y: node.y ?? 0, z: node.z ?? 0 };
     const camera = graph.camera();
     let vector = { x: camera.position.x - target.x, y: camera.position.y - target.y, z: camera.position.z - target.z };
@@ -379,7 +384,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       z: target.z + vector.z / length * distance
     }, target, 620);
     return true;
-  }, [focusIds, renderNodeById, variant]);
+  }, [focusIds, renderNodeById, variant, size.height]);
 
   useEffect(() => {
     if (!focusTargetId || variant === "project") return;
@@ -498,7 +503,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   }, [applyNodeAppearance, resources, variant]);
 
   useImperativeHandle(forwardedRef, () => ({
-    fit: () => graphRef.current?.zoomToFit(480, variant === "personal" ? 110 : 70),
+    fit: () => graphRef.current?.zoomToFit(480, variant === "project" ? Math.min(180, size.height * .28) : variant === "personal" ? 110 : 70),
     focus: (nodeId: string) => { focusNode(nodeId); },
     reset: () => {
       const graph = graphRef.current;
@@ -511,7 +516,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       const camera = graph.camera();
       graph.cameraPosition({ x: camera.position.x / multiplier, y: camera.position.y / multiplier, z: camera.position.z / multiplier }, undefined, 180);
     }
-  }), [focusNode, variant]);
+  }), [focusNode, variant, size.height]);
 
   return (
     <div ref={containerRef} className={`knowledge-atlas-scene ${className ?? ""}`}>

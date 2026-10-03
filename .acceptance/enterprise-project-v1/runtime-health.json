@@ -1,10 +1,15 @@
 {
-  "deploymentId": "dpl_67qasVjMApQysJN27Q7faNNeZ7s7",
-  "preview": "https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app",
-  "window": "30 minutes preceding 2026-10-03T09:10Z (latest deployment since creation)",
-  "http5xxCount": 0,
-  "errorLogs": 4,
-  "onlyPreexistingDep0169": true,
-  "mainBrowserPageErrors": 0,
-  "mainBrowserConsoleErrors": 0
+  "preview": "https://edu-flow-nv6oh1byk-july-nanas-projects.vercel.app",
+  "deployment": "dpl_8pGS11gRoMZx7SScRnVd5f7NM5d4",
+  "capturedAt": "2026-10-03T09:22:58.443739+00:00",
+  "window": "15m",
+  "http5xx": 0,
+  "errorLevelEntries": 7,
+  "onlyKnownDeprecation": true,
+  "browserErrors": 0,
+  "browserEvidence": "Independent A/B real browser checks; main browser errors/console empty",
+  "limits": [
+    "Time-window sample, not a guarantee beyond observed requests.",
+    "Main login redirect during concurrent account usage not reproduced by independent reviewer."
+  ]
 }
