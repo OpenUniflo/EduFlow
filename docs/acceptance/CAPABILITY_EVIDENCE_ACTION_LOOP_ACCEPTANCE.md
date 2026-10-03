@@ -47,3 +47,11 @@ Unresolved operational checks: Hosted provider invocation, executable parser int
 - Gold input files are authored **synthetic acceptance work records**, not real employee performance evidence. No live diagnosis verdict has been obtained or fabricated. Formal states for the two fresh evidence-loop test accounts remain empty after upload/parse/security checks.
 
 **Gate status:** Phase A NOT PASSED (real indexed retrieval, gold, confirmed state/project recompute still pending). Phase B NOT STARTED. Phase C NOT STARTED. Fresh Reviewer NOT STARTED. No Action model or execution loop is claimed. Production deployment/configuration was not modified; the additive Hosted schema migration affects the shared database and is explicitly disclosed.
+
+## Latest application checkpoint
+
+Application SHA `978e29b33638b2b2a2bdde36daf9b6dddd6359a8` is READY at `https://edu-flow-4oc19xsrm-july-nanas-projects.vercel.app` (`dpl_2Wg12rXMgs6dH18FuGd93g5rsq13`). This deployment passed the 23 ordinary-JWT isolation/upload assertions again. The admin indexing retry returns explicit HTTP 424 `embedding_provider_unavailable`; the dependency remains unresolved.
+
+Real browser acceptance on that deployment uploaded the synthetic `explicit-work-record.txt`, displayed all four source lines, and reselected it as historical evidence in the Assistant workspace. The dialog measured 1152px inside a 1280px viewport, with exactly one Assistant surface. Diagnosis visibly stopped at the missing-index guard. No browser error was captured. Relative-path browser-tool upload initially failed; an absolute path succeeded. No AI units or matching results are claimed from this upload.
+
+Remaining A acceptance: all major-page browser coverage (especially Micro/Assignment), real AI units and matching/Gold, Hosted proposal isolation and transactional confirmation, refresh of My Learning and relevant/unrelated project recompute, and unchanged route-version count after confirmation. Local confirmation tests are not a substitute for these Hosted gates. Phase B/C and fresh acceptance remain unstarted. See `phase-a-hosted-checkpoint.json` for the exact application checkpoint; subsequent documentation-only commits do not change its tested application.

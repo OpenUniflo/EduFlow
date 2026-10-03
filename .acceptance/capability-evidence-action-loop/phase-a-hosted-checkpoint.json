@@ -1,0 +1,28 @@
+{
+  "applicationCommit": "978e29b33638b2b2a2bdde36daf9b6dddd6359a8",
+  "deploymentId": "dpl_2Wg12rXMgs6dH18FuGd93g5rsq13",
+  "preview": "https://edu-flow-4oc19xsrm-july-nanas-projects.vercel.app",
+  "deploymentState": "READY",
+  "indexRecheck": {
+    "status": 424,
+    "code": "embedding_provider_unavailable",
+    "resolved": false
+  },
+  "browser": {
+    "account": "dedicated evidence acceptance A",
+    "realUpload": "explicit-work-record.txt (synthetic acceptance record)",
+    "parsedSourceLines": 4,
+    "historicalSourceSelectableInWorkspace": true,
+    "assistantSurfaceCount": 1,
+    "dialogWidth": 1152,
+    "viewportWidth": 1280,
+    "diagnosisMessage": "知识检索索引尚未完成，请稍后再试。",
+    "capturedBrowserErrors": [],
+    "toolLimitation": "Relative file path initially produced Invalid evidence request; absolute file path uploaded and parsed successfully."
+  },
+  "hostedSecurityAssertions": 23,
+  "phaseAGate": "NOT PASSED",
+  "phaseB": "NOT STARTED",
+  "phaseC": "NOT STARTED",
+  "freshReviewer": "NOT STARTED"
+}
