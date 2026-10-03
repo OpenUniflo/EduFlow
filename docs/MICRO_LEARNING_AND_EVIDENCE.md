@@ -24,7 +24,7 @@ Knowledge state transitions are monotonic: starting learning reaches `learning`,
 
 The MVP mastery policy is intentionally conservative. Every required Learn Path must be completed and every explicitly required Assignment must be `accepted`. If no Assignment is explicitly required, path completion remains `learned`. `submitted` is never acceptance or mastery.
 
-Evidence is owned by EduFlow and idempotent by `(user, knowledge, event type, source entity)`. It records `micro_path_completed`, `assignment_accepted`, and `workflow_passed` with source identity, outcome, context, and timestamp. This is intentionally shaped for future xAPI export without making xAPI the canonical internal model.
+Evidence is a long-term user-owned asset and is idempotent by `(user, knowledge, event type, source entity)`. It records `micro_path_completed`, `assignment_accepted`, `workflow_passed`, and explicitly user-confirmed `capability_confirmed` with source identity, outcome, context, and timestamp. This is intentionally shaped for future xAPI export without making xAPI the canonical internal model.
 
 Golden Agent, Workflow, and Failure Recovery paths are seeded/imported into canonical tables and are always read through `/api/micro`. TypeScript Demo providers remain local fixtures only and are not consulted by the production composition root.
 
@@ -140,3 +140,11 @@ Only unmet hard prerequisites can return `teaching_prerequisite_required`; soft 
 Migration `20261002061940_personal_course_route_versions_v2.sql` replaces the V1 wrappers with service-only `start_micro_for_route_v2`, `record_micro_step_attempt_v2` and `record_micro_step_completion_v2`. It also adds immutable route persistence and atomic adoption. No V1/V2 parallel membership path remains. Existing content snapshot, criterion evidence, completion and decision-lineage protections are retained. Ordinary authenticated/anon clients cannot execute these functions.
 
 `scripts/verify-personal-route.ts` remains local-only: it uses disposable identities/content, formal Micro completion, concurrency, excluded membership, hard/soft eligibility and RLS/RPC attacks. Never run its fixture workflow on Hosted. `scripts/verify-route-version-schema.sql` provides rollback-only Hosted schema checks; actual Preview HTTP/UI learning is a separate acceptance gate. See [V2](PROJECT_CAPABILITY_MODEL_V2.md).
+
+## Evidence-driven capability discovery
+
+Personal sources do not become Course Materials. Phase A accepts actual UTF-8 TXT/Markdown/CSV uploads into private `user-evidence` Storage, with random object names beneath the owner ID and signed access. It limits each source to 24,000 characters and each diagnosis to five sources. PDF/DOCX online personal parsing is not claimed: the existing Docling converter remains the reuse boundary, but its Hosted invocation has not been established.
+
+The pipeline discovers observations from sources first (up to 12 per source), validates quotations against original lines, retrieves five current active Global Knowledge revisions per observed capability, and judges only those candidates with original source context. Every extracted unit must receive a judgment, including insufficient/unmatched. The two model stages are bounded by the selected evidence, not by the Global graph size. `knowledge_node_revision_embeddings` stores DMXAPI `text-embedding-3-small` vectors (1024 dimensions) keyed by revision/model; administrator indexing is separate from user diagnosis. Diagnosis rejects an incomplete/stale index instead of silently ignoring missing revisions.
+
+Candidate generation cannot write formal evidence or state. See `USER_LEARNING_STATE.md` for the transaction and authority. Action Result integration belongs to later phases and is not yet delivered by this Phase A implementation.

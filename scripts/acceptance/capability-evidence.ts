@@ -1,7 +1,7 @@
 /** Feature Preview acceptance. Credentials supplied privately; never print auth payloads. */
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 const preview=process.env.ACCEPTANCE_PREVIEW_URL!;const url=process.env.ACCEPTANCE_SUPABASE_URL!;const key=process.env.ACCEPTANCE_PUBLISHABLE_KEY!;
 assert.match(new URL(preview).hostname,/^edu-flow-.*\.vercel\.app$/);assert.equal(new URL(url).hostname,'uyljtdbvlivxniililay.supabase.co');
 const client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -16,7 +16,7 @@ if(mode==='index') {
  let after:string|undefined;let total=0;
  do{const result=await request('/api/evidence',{action:'index',...(after?{after}:{})});total+=result.added;after=result.next??undefined;console.log(JSON.stringify({added:result.added,total,next:after??null,model:result.model,dimensions:result.dimensions}));}while(after);
 }else if(mode==='gold') {
- const sourceText=process.env.ACCEPTANCE_SOURCE_TEXT!;assert.ok(sourceText);
+ const sourceText=process.env.ACCEPTANCE_SOURCE_FILE?readFileSync(process.env.ACCEPTANCE_SOURCE_FILE,'utf8'):process.env.ACCEPTANCE_SOURCE_TEXT!;assert.ok(sourceText);
  const sourceTitle=process.env.ACCEPTANCE_SOURCE_TITLE??'能力证据验收资料.txt';
  const before=await request('/api/progress');
  const uploaded=await request('/api/evidence',{action:'upload',title:sourceTitle,contentType:'text/plain',size:Buffer.byteLength(sourceText)});

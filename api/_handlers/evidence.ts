@@ -48,7 +48,9 @@ export default handleApi(async(request,response)=>{
       if(existing.data) continue;
       const revisionResult=await server.from('knowledge_node_revisions').select('title,description,mastery_criteria').eq('id',node.current_revision_id).single();
       const revision=dataOrThrow(revisionResult.data,revisionResult.error,'Knowledge revision');
-      const vector=await createEmbeddingService(env).embed(JSON.stringify(revision));
+      let vector:number[];
+      try { vector=await createEmbeddingService(env).embed(JSON.stringify(revision)); }
+      catch(error) { console.error('Evidence embedding provider unavailable',error instanceof Error?error.message:'Unknown error');throw new ApiError(424,'embedding_provider_unavailable','Embedding 服务不可用，请管理员检查 Preview 配置。'); }
       const stored=await server.from('knowledge_node_revision_embeddings').upsert({revision_id:node.current_revision_id,model:env.embeddingModel,dimensions:env.embeddingDimensions,embedding:JSON.stringify(vector)},{onConflict:'revision_id,model',ignoreDuplicates:true});
       dataOrThrow(stored.data,stored.error,'Embedding persistence');added++;
     }

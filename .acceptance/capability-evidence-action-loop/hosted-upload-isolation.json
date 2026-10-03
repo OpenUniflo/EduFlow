@@ -1,0 +1,32 @@
+{
+  "status": "PASS",
+  "preview": "https://edu-flow-9fwsasgy8-july-nanas-projects.vercel.app",
+  "sourceId": "a2ababff-2722-43fa-94cd-7afa670a673d",
+  "assertions": [
+    "forged source owner rejected",
+    "ordinary A creates upload",
+    "parse actual uploaded bytes",
+    "A sees own source",
+    "B cannot see A source",
+    "B cannot read original file",
+    "B cannot request signed link",
+    "B cannot parse A source",
+    "B cannot archive A source",
+    "B cannot diagnose A source",
+    "A can request private signed original",
+    "learner cannot update global embedding index",
+    "forged confirm owner rejected",
+    "unknown proposal rejected",
+    "direct user_evidence_sources write rejected",
+    "direct evidence_units write rejected",
+    "direct capability_diagnosis_runs write rejected",
+    "direct capability_state_proposals write rejected",
+    "direct user_knowledge_states write rejected",
+    "source can be archived",
+    "archive preserves original",
+    "archived source cannot diagnose",
+    "no official state from uploading or parsing"
+  ],
+  "count": 23,
+  "scope": "ordinary user JWT and real private Storage upload; not AI or Hosted confirmation acceptance"
+}

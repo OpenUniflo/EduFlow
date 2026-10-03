@@ -59,3 +59,11 @@ Course and Material Design mutation providers, Course creation scenarios, and Wo
 ## Infrastructure principle
 
 Generic infrastructure should use a mature, maintained component or official SDK when it is compatible and materially reduces self-maintained protocol code. EduFlow owns product context, permissions, tools, policy, and learning semantics. Dependencies remain behind thin adapters and must earn their deployment, lockfile, and architectural cost; avoiding a small wheel is not a reason to import a heavy framework.
+
+## Capability evidence workspace (Phase A implementation)
+
+`App` owns the single authenticated `GlobalAssistantSurface`. Existing `EduFlowAssistant` page adapters register context/design children, preserving those controls without creating another surface. Unregistered pages receive a route-based context. Project Capability presentation does not hide the Assistant. `AssistantRuntimeProvider` and ordinary small chat remain unchanged.
+
+The explicit **更新我的能力** UI action opens the app-owned, centered non-fullscreen `EvidenceWorkspaceProvider` dialog. This is a tested UI action, not a chat regex or a new assistant/tool runtime. My Evidence is a Learning Space view. Project impact preview invokes the existing pure project projection using candidate inputs; it never hydrates or writes official state. Confirmed transactions refresh the existing application learner repositories.
+
+Operational acceptance remains gated separately: see `acceptance/CAPABILITY_EVIDENCE_ACTION_LOOP_ACCEPTANCE.md`.

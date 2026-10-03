@@ -6,8 +6,8 @@
     "tests": 710
   },
   "phaseA": {
-    "testFiles": 102,
-    "tests": 719,
+    "testFiles": 103,
+    "tests": 730,
     "typecheck": "PASS",
     "lint": "PASS",
     "build": "PASS",
@@ -16,7 +16,9 @@
     "localSecurityAssertions": 20,
     "localSecurityScope": "ordinary JWT/storage plus service transaction concurrency; not Hosted",
     "migrationReplay": "PASS in transaction rolled back; subsequently applied locally",
-    "localAdvisors": "no issues"
+    "localAdvisors": "no issues",
+    "hostedUploadIsolationAssertions": 23,
+    "hostedGold": "NOT RUN: embedding provider HTTP 401"
   },
   "reviews": {
     "dataSecurity": "initial P2 truncated historical lineage; fixed with allRows; read-only recheck PASS",
