@@ -1,0 +1,23 @@
+{
+  "applicationCommit": "788877e14d2f0c8cacacec4838516e77307a6ecf",
+  "preview": "https://edu-flow-f5psp7gmm-july-nanas-projects.vercel.app",
+  "deployment": "dpl_8avRQsXGoNdLACkg9eHMyF2B4Tdo",
+  "checks": {
+    "testFiles": 105,
+    "testsPassed": 758,
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "build": "PASS",
+    "knowledgeAudit": "PASS",
+    "clientSecretAudit": "PASS",
+    "actionMigrationReplay": "PASS",
+    "hostedOrdinaryUserSecurity": "PASS",
+    "practiceConfirmationLineage": "PASS",
+    "freshInitial": "FAIL retained",
+    "freshStateRecheck": "state PASS, continuation FAIL retained",
+    "freshFinalContinuation": "PASS scoped"
+  },
+  "productionDeploymentChanged": false,
+  "productionConfigurationChanged": false,
+  "sharedHostedDatabaseAdditiveChanges": true
+}
