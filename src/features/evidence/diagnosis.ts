@@ -84,10 +84,10 @@ export async function diagnoseEvidence(sources:DiagnosisSource[],llm:StructuredG
   const units=validateObservations(extraction.value,sources);
   for(const unit of units)retrieved.push((await retrieve(unit.capability)).slice(0,EVIDENCE_TOP_K));
   artifacts.retrieved=retrieved;
-  if(!units.length)return {units,matches:[] as DiagnosisMatch[],metadata,artifacts,retrievalCount:0};
+  if(!units.length)return {units,matches:[] as DiagnosisMatch[],metadata,artifacts,llmCalls,retrievalCount:0};
   const groups=new Map<string,{node:RetrievedKnowledge;unitIndexes:number[]}>();
   retrieved.forEach((nodes,index)=>nodes.forEach(node=>{const group=groups.get(node.node_id)??{node,unitIndexes:[]};group.unitIndexes.push(index);groups.set(node.node_id,group);}));
-  if(!groups.size)return {units,matches:units.map((_,index)=>({unitIndexes:[index],nodeId:null,revisionId:null,proposedStatus:null,sufficiency:'unmatched' as const,confidence:1,reason:'没有检索到可匹配的现有知识。'})),metadata,artifacts,retrievalCount:units.length};
+  if(!groups.size)return {units,matches:units.map((_,index)=>({unitIndexes:[index],nodeId:null,revisionId:null,proposedStatus:null,sufficiency:'unmatched' as const,confidence:1,reason:'没有检索到可匹配的现有知识。'})),metadata,artifacts,llmCalls,retrievalCount:units.length};
   const allMatched:Array<{nodeId:string;unitIndexes:number[];sufficiency:'supported'|'partial'|'insufficient';confidence:number;reason:string}>=[];
   const entries=[...groups];
   for(let offset=0;offset<entries.length;offset+=20){
@@ -141,9 +141,9 @@ export async function diagnoseEvidence(sources:DiagnosisSource[],llm:StructuredG
       }
     }
   }
-  return {units,matches,metadata,artifacts,retrievalCount:units.length};
+  return {units,matches,metadata,artifacts,llmCalls,retrievalCount:units.length};
  }catch(error){
   artifacts.retrieved=retrieved;
-  throw new EvidenceDiagnosisError(error instanceof Error?error.message:'Evidence diagnosis failed',{failure:{message:error instanceof Error?error.message:'Evidence diagnosis failed'},metadata,artifacts,retrievalCount:retrieved.length,topK:EVIDENCE_TOP_K,sourceCount:sources.length,llmCalls});
+  throw new EvidenceDiagnosisError(error instanceof Error?error.message:'Evidence diagnosis failed',{failure:{message:error instanceof Error?error.message:'Evidence diagnosis failed'},metadata,artifacts,llmCalls,retrievalCount:retrieved.length,topK:EVIDENCE_TOP_K,sourceCount:sources.length});
  }
 }

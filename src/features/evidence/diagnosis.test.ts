@@ -160,7 +160,7 @@ describe('personal evidence discovery boundary',()=>{
   const error=new Error('LLM content was not valid JSON: provider=test, model=test');
   const generateJson=vi.fn().mockRejectedValueOnce(error).mockResolvedValueOnce({value:{units:[]},metadata:{stage:'extraction'}});
   const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>[]);
-  expect(generateJson).toHaveBeenCalledTimes(2);expect(result.artifacts.formatFailures).toEqual([{stage:'extraction',schemaVersion:'evidence-units-v1',message:error.message}]);
+  expect(generateJson).toHaveBeenCalledTimes(2);expect(result.llmCalls).toBe(2);expect(result.artifacts.formatFailures).toEqual([{stage:'extraction',schemaVersion:'evidence-units-v1',message:error.message}]);
   const failed=vi.fn().mockRejectedValue(error);
   await expect(diagnoseEvidence([source],{generateJson:failed} as unknown as StructuredGenerationClient,async()=>[])).rejects.toThrow(error.message);
   expect(failed).toHaveBeenCalledTimes(2);
