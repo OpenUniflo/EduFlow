@@ -1,0 +1,331 @@
+{
+  "preview": "https://edu-flow-7qp23ppvs-july-nanas-projects.vercel.app",
+  "sourceIds": [
+    "b7081de3-9a36-4ee1-8111-24bc6a3d6d58"
+  ],
+  "runId": "0848179e-25af-4e93-9a7c-5f657106b3e7",
+  "sources": [
+    {
+      "title": "partial.txt",
+      "text": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。尚未获取订单需求和确认到货，未计算净需求。\n"
+    }
+  ],
+  "beforeUserKnowledge": [],
+  "afterUserKnowledge": [],
+  "units": [
+    {
+      "id": "47467451-1f78-43b7-a99f-76947ed71b6d",
+      "user_id": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+      "source_id": "b7081de3-9a36-4ee1-8111-24bc6a3d6d58",
+      "run_id": "0848179e-25af-4e93-9a7c-5f657106b3e7",
+      "source_line": 1,
+      "quote": "尚未获取订单需求和确认到货，未计算净需求。",
+      "observation": "明确说明尚未获取订单需求、未确认到货、未计算净需求。",
+      "capability": "能识别并说明当前任务在需求获取、到货确认和净需求计算方面的未完成状态",
+      "extraction_version": "personal-evidence-v1",
+      "created_at": "2026-10-03T15:44:34.029116+00:00"
+    },
+    {
+      "id": "ebd0d741-efa1-48e7-8c06-0dfe12d721e9",
+      "user_id": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+      "source_id": "b7081de3-9a36-4ee1-8111-24bc6a3d6d58",
+      "run_id": "0848179e-25af-4e93-9a7c-5f657106b3e7",
+      "source_line": 1,
+      "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。",
+      "observation": "完成订单V104库存盘点，区分实物50件、隔离10件、可用40件，并核对库位记录。",
+      "capability": "能执行库存盘点并区分实物、隔离与可用数量，核对库位记录",
+      "extraction_version": "personal-evidence-v1",
+      "created_at": "2026-10-03T15:44:34.029116+00:00"
+    }
+  ],
+  "proposals": [
+    {
+      "id": "18fefc1a-4d41-4b92-9b02-e5591fa08753",
+      "user_id": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+      "run_id": "0848179e-25af-4e93-9a7c-5f657106b3e7",
+      "unit_ids": [
+        "ebd0d741-efa1-48e7-8c06-0dfe12d721e9"
+      ],
+      "node_id": "supply-net-material-requirement",
+      "revision_id": "supply-net-material-requirement:v1",
+      "proposed_status": "learning",
+      "sufficiency": "partial",
+      "confidence": 0.85,
+      "reason": "单元0明确实际执行了订单V104库存盘点，区分实物50件、隔离10件、可用40件，并核对库位记录，这覆盖了净需求计算中正确排除不可用库存的部分前提。但mastery_criteria要求根据订单需求、可用库存及确认到货计算分时段净需求，单元0明确尚未获取订单需求和确认到货，未计算净需求，因此缺少订单需求、确认到货和净需求计算过程与结果，仅部分支持。",
+      "confirmation_state": "pending",
+      "knowledge_evidence_id": null,
+      "created_at": "2026-10-03T15:44:34.082843+00:00",
+      "resolved_at": null
+    },
+    {
+      "id": "339c02e0-f04c-44ec-b7d3-5f290be52e91",
+      "user_id": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+      "run_id": "0848179e-25af-4e93-9a7c-5f657106b3e7",
+      "unit_ids": [
+        "47467451-1f78-43b7-a99f-76947ed71b6d"
+      ],
+      "node_id": "supply-net-material-requirement",
+      "revision_id": "supply-net-material-requirement:v1",
+      "proposed_status": null,
+      "sufficiency": "insufficient",
+      "confidence": 0.9,
+      "reason": "单元1仅说明尚未获取订单需求、未确认到货、未计算净需求，属于未完成状态自述，没有实际执行净需求计算，也没有可检查的计算过程和正确结果，不满足mastery_criteria。",
+      "confirmation_state": "pending",
+      "knowledge_evidence_id": null,
+      "created_at": "2026-10-03T15:44:34.082843+00:00",
+      "resolved_at": null
+    },
+    {
+      "id": "a39a5596-b7e5-48af-a82b-50ba7eb7625e",
+      "user_id": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+      "run_id": "0848179e-25af-4e93-9a7c-5f657106b3e7",
+      "unit_ids": [
+        "ebd0d741-efa1-48e7-8c06-0dfe12d721e9"
+      ],
+      "node_id": null,
+      "revision_id": null,
+      "proposed_status": null,
+      "sufficiency": "unmatched",
+      "confidence": 0.95,
+      "reason": "单元0的能力是执行库存盘点并区分实物、隔离与可用数量，核对库位记录；Top-K候选均未包含语义相同的库存盘点能力，最相似的物料净需求计算是不同能力，因此无匹配。",
+      "confirmation_state": "pending",
+      "knowledge_evidence_id": null,
+      "created_at": "2026-10-03T15:44:34.082843+00:00",
+      "resolved_at": null
+    },
+    {
+      "id": "dfbef674-06e6-4db7-8e77-bf5d89b1cb4b",
+      "user_id": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+      "run_id": "0848179e-25af-4e93-9a7c-5f657106b3e7",
+      "unit_ids": [
+        "47467451-1f78-43b7-a99f-76947ed71b6d"
+      ],
+      "node_id": null,
+      "revision_id": null,
+      "proposed_status": null,
+      "sufficiency": "unmatched",
+      "confidence": 0.95,
+      "reason": "单元1的能力是识别并说明当前任务在需求获取、到货确认和净需求计算方面的未完成状态；Top-K候选均未包含语义相同的未完成状态识别能力，因此无匹配。",
+      "confirmation_state": "pending",
+      "knowledge_evidence_id": null,
+      "created_at": "2026-10-03T15:44:34.082843+00:00",
+      "resolved_at": null
+    }
+  ],
+  "run": {
+    "id": "0848179e-25af-4e93-9a7c-5f657106b3e7",
+    "user_id": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+    "source_ids": [
+      "b7081de3-9a36-4ee1-8111-24bc6a3d6d58"
+    ],
+    "status": "completed",
+    "model": "deepseek-v4-flash",
+    "prompt_version": "personal-evidence-v1",
+    "diagnostics": {
+      "topK": 5,
+      "llmCalls": 2,
+      "metadata": [
+        {
+          "model": "deepseek-flash",
+          "stage": "extraction",
+          "provider": "deepseek",
+          "maxTokens": 6000,
+          "requestId": "46184076-ade4-40f9-81ac-56e3f623a59d",
+          "generatedAt": "2026-10-03T15:44:31.713Z",
+          "temperature": 0,
+          "promptTokens": 244,
+          "promptVersion": "personal-evidence-v1",
+          "schemaVersion": "evidence-units-v1",
+          "completionTokens": 224
+        },
+        {
+          "model": "deepseek-flash",
+          "stage": "admission",
+          "provider": "deepseek",
+          "maxTokens": 7000,
+          "requestId": "26a61768-4571-436c-abd2-d56e4867ec7e",
+          "generatedAt": "2026-10-03T15:44:33.989Z",
+          "temperature": 0,
+          "promptTokens": 1573,
+          "promptVersion": "personal-evidence-v1",
+          "schemaVersion": "evidence-match-v1",
+          "completionTokens": 362
+        }
+      ],
+      "artifacts": {
+        "judgment": {
+          "matches": [
+            {
+              "nodeId": "supply-net-material-requirement",
+              "reason": "单元0明确实际执行了订单V104库存盘点，区分实物50件、隔离10件、可用40件，并核对库位记录，这覆盖了净需求计算中正确排除不可用库存的部分前提。但mastery_criteria要求根据订单需求、可用库存及确认到货计算分时段净需求，单元0明确尚未获取订单需求和确认到货，未计算净需求，因此缺少订单需求、确认到货和净需求计算过程与结果，仅部分支持。",
+              "confidence": 0.85,
+              "sufficiency": "partial",
+              "unitIndexes": [
+                0
+              ]
+            },
+            {
+              "nodeId": "supply-net-material-requirement",
+              "reason": "单元1仅说明尚未获取订单需求、未确认到货、未计算净需求，属于未完成状态自述，没有实际执行净需求计算，也没有可检查的计算过程和正确结果，不满足mastery_criteria。",
+              "confidence": 0.9,
+              "sufficiency": "insufficient",
+              "unitIndexes": [
+                1
+              ]
+            },
+            {
+              "nodeId": null,
+              "reason": "单元0的能力是执行库存盘点并区分实物、隔离与可用数量，核对库位记录；Top-K候选均未包含语义相同的库存盘点能力，最相似的物料净需求计算是不同能力，因此无匹配。",
+              "confidence": 0.95,
+              "sufficiency": "unmatched",
+              "unitIndexes": [
+                0
+              ]
+            },
+            {
+              "nodeId": null,
+              "reason": "单元1的能力是识别并说明当前任务在需求获取、到货确认和净需求计算方面的未完成状态；Top-K候选均未包含语义相同的未完成状态识别能力，因此无匹配。",
+              "confidence": 0.95,
+              "sufficiency": "unmatched",
+              "unitIndexes": [
+                1
+              ]
+            }
+          ]
+        },
+        "retrieved": [
+          [
+            {
+              "title": "物料净需求计算",
+              "node_id": "supply-net-material-requirement",
+              "similarity": 0.565885195205945,
+              "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+              "revision_id": "supply-net-material-requirement:v1",
+              "mastery_criteria": [
+                "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+              ]
+            },
+            {
+              "title": "供应商交付产能核验",
+              "node_id": "supply-supplier-delivery-capacity",
+              "similarity": 0.456109767423899,
+              "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+              "revision_id": "supply-supplier-delivery-capacity:v1",
+              "mastery_criteria": [
+                "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+              ]
+            },
+            {
+              "title": "跨基地供给切换可行性判断",
+              "node_id": "supply-site-switch-feasibility",
+              "similarity": 0.423978764062222,
+              "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+              "revision_id": "supply-site-switch-feasibility:v1",
+              "mastery_criteria": [
+                "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+              ]
+            },
+            {
+              "title": "缺料中断影响评估",
+              "node_id": "supply-shortage-impact-assessment",
+              "similarity": 0.419004211544491,
+              "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+              "revision_id": "supply-shortage-impact-assessment:v1",
+              "mastery_criteria": [
+                "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+              ]
+            },
+            {
+              "title": "Training Task Distribution and Evaluation Isolation",
+              "node_id": "TRAIN09",
+              "similarity": 0.411147664648576,
+              "description": "把训练任务与评估任务按模板、对象或时间等边界隔离，避免任务泄漏导致虚假的泛化结果。",
+              "revision_id": "TRAIN09-r1",
+              "mastery_criteria": [
+                "能识别训练和评估共享具体任务造成的数据泄漏",
+                "能设计一种任务级去重或隔离规则",
+                "能说明验证器可共享而具体评估任务不应泄漏的原因"
+              ]
+            }
+          ],
+          [
+            {
+              "title": "物料净需求计算",
+              "node_id": "supply-net-material-requirement",
+              "similarity": 0.783160556868274,
+              "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+              "revision_id": "supply-net-material-requirement:v1",
+              "mastery_criteria": [
+                "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+              ]
+            },
+            {
+              "title": "交期窗口缺料暴露评估",
+              "node_id": "supply-shortage-exposure",
+              "similarity": 0.665947536648898,
+              "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+              "revision_id": "supply-shortage-exposure:v1",
+              "mastery_criteria": [
+                "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+              ]
+            },
+            {
+              "title": "缺料中断影响评估",
+              "node_id": "supply-shortage-impact-assessment",
+              "similarity": 0.607049750441347,
+              "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+              "revision_id": "supply-shortage-impact-assessment:v1",
+              "mastery_criteria": [
+                "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+              ]
+            },
+            {
+              "title": "供应商交付产能核验",
+              "node_id": "supply-supplier-delivery-capacity",
+              "similarity": 0.583013107417456,
+              "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+              "revision_id": "supply-supplier-delivery-capacity:v1",
+              "mastery_criteria": [
+                "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+              ]
+            },
+            {
+              "title": "关键物料供应风险识别",
+              "node_id": "supply-material-risk-identification",
+              "similarity": 0.540034619567724,
+              "description": "识别集中供应、交期波动和替代限制等暴露，区别事实、假设及待核验证据。",
+              "revision_id": "supply-material-risk-identification:v1",
+              "mastery_criteria": [
+                "识别集中供应、交期波动和替代限制等暴露，区别事实、假设及待核验证据。"
+              ]
+            }
+          ]
+        ],
+        "extraction": {
+          "units": [
+            {
+              "line": 1,
+              "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。",
+              "sourceId": "b7081de3-9a36-4ee1-8111-24bc6a3d6d58",
+              "capability": "能执行库存盘点并区分实物、隔离与可用数量，核对库位记录",
+              "observation": "完成订单V104库存盘点，区分实物50件、隔离10件、可用40件，并核对库位记录。"
+            },
+            {
+              "line": 1,
+              "quote": "尚未获取订单需求和确认到货，未计算净需求。",
+              "sourceId": "b7081de3-9a36-4ee1-8111-24bc6a3d6d58",
+              "capability": "能识别并说明当前任务在需求获取、到货确认和净需求计算方面的未完成状态",
+              "observation": "明确说明尚未获取订单需求、未确认到货、未计算净需求。"
+            }
+          ]
+        }
+      },
+      "sourceCount": 1,
+      "retrievalCount": 2
+    },
+    "error": null,
+    "created_at": "2026-10-03T15:44:30.524017+00:00",
+    "completed_at": "2026-10-03T15:44:34.098+00:00"
+  },
+  "formalStateUnchanged": true
+}

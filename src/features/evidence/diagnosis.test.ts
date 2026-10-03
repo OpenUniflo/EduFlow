@@ -27,8 +27,13 @@ describe('personal evidence discovery boundary',()=>{
   expect(()=>validateMatches({matches:[{unitIndexes:[0],nodeId:'invented',sufficiency:'supported',confidence:1,reason:'test'}]},[unit],[[node]])).toThrow(/outside retrieved/);
  });
  it('allows unmatched evidence and partial evidence only proposes learning',()=>{
-  const result=validateMatches({matches:[{unitIndexes:[0],nodeId:null,sufficiency:'unmatched',confidence:0.6,reason:'不是同一能力'},{unitIndexes:[0],nodeId:'net',sufficiency:'partial',confidence:0.7,reason:'仅部分过程'}]},[unit],[[node]]);
+  const result=validateMatches({matches:[{unitIndexes:[0],nodeId:null,sufficiency:'unmatched',confidence:0.6,reason:'不是同一能力'},{unitIndexes:[1],nodeId:'net',sufficiency:'partial',confidence:0.7,reason:'仅部分过程'}]},[unit,{...unit,sourceId:'second'}],[[node],[node]]);
   expect(result.map(r=>r.proposedStatus)).toEqual([null,'learning']);
+ });
+ it('rejects contradictory matched/unmatched outputs and duplicate node verdicts from real Gold failures',()=>{
+  const match={unitIndexes:[0],nodeId:'net',sufficiency:'partial',confidence:0.7,reason:'partial'};
+  expect(()=>validateMatches({matches:[match,{...match,nodeId:null,sufficiency:'unmatched'}]},[unit],[[node]])).toThrow(/both matched and unmatched/);
+  expect(()=>validateMatches({matches:[match,{...match,sufficiency:'supported'}]},[unit],[[node]])).toThrow(/one judgment per knowledge node/);
  });
  it('multiple sources can support one capability and one source multiple capabilities',()=>{
   const other={...node,node_id:'risk',revision_id:'risk-v1'};

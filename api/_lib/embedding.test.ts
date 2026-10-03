@@ -17,6 +17,19 @@ function embeddingResponse(embedding: unknown): Response {
 }
 
 describe("OpenAICompatibleEmbeddingService", () => {
+  it("retries transient network/429 failures but does not retry credential rejection", async () => {
+    const request=vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce(new Response('',{status:429})).mockResolvedValueOnce(embeddingResponse(Array(1024).fill(0.5)));
+    await expect(new OpenAICompatibleEmbeddingService(config,request).embed('net demand')).resolves.toHaveLength(1024);
+    expect(request).toHaveBeenCalledTimes(3);
+    const unauthorized=vi.fn().mockResolvedValue(new Response('',{status:401}));
+    await expect(new OpenAICompatibleEmbeddingService(config,unauthorized).embed('net demand')).rejects.toThrow(/HTTP 401/);
+    expect(unauthorized).toHaveBeenCalledTimes(1);
+  });
+  it("bounds repeated network failure and never exposes underlying credentials", async () => {
+    const request=vi.fn().mockRejectedValue(new Error('private provider request'));
+    await expect(new OpenAICompatibleEmbeddingService(config,request).embed('net demand')).rejects.toThrow('Embedding request failed: provider=dmxapi, model=text-embedding-3-small, network error');
+    expect(request).toHaveBeenCalledTimes(3);
+  });
   it("uses the configured endpoint, authorization, and explicit 1024-dimensional payload", async () => {
     const request = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => embeddingResponse(
       Array.from({ length: 1024 }, (_, index) => index / 1024)
