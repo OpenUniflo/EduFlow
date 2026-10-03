@@ -1,0 +1,31 @@
+{
+  "commit": "adc266cc73144ec8b438237cb94a658a43e7560e",
+  "deploymentId": "dpl_FiHPut2P3XM5MDtPdcwYbBTxALSJ",
+  "preview": "https://edu-flow-nh17jespj-july-nanas-projects.vercel.app",
+  "state": "READY",
+  "windowUtc": [
+    "2026-10-03T17:21:29Z",
+    "2026-10-03T17:36:29Z"
+  ],
+  "fiveXxLogs": 0,
+  "errorLevelObservations": [
+    {
+      "path": "/api/assistant",
+      "status": 200,
+      "message": "Known Node DEP0169 url.parse deprecation"
+    },
+    {
+      "path": "/api/courses",
+      "status": 200,
+      "message": "Known Node DEP0169 url.parse deprecation"
+    },
+    {
+      "path": "/api/micro",
+      "status": 200,
+      "message": "Known Node DEP0169 url.parse deprecation"
+    }
+  ],
+  "browserErrors": [],
+  "checked": "Ordinary A login, Learning four confirmed states, My Evidence, Refresh Results; no diagnosis invocation in this log window",
+  "limits": "This is a bounded runtime observation, not AI quality acceptance."
+}

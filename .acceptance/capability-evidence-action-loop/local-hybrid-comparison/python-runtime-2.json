@@ -1,0 +1,618 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-python-runtime",
+      "line": 1,
+      "quote": "我在独立终端用 CPython 3.12 运行文件 demo.py，内容为 print(2+3)，命令 python demo.py 得到标准输出5，退出码0；",
+      "observation": "在独立终端用 CPython 3.12 运行 demo.py，文件内容为 print(2+3)，执行命令 python demo.py 后得到标准输出5、退出码0。",
+      "capability": "使用CPython在终端运行Python脚本并检查标准输出与退出码"
+    },
+    {
+      "sourceId": "local-python-runtime",
+      "line": 1,
+      "quote": "再运行 python -c \"import sys; print(sys.version_info.major); print(sys.executable)\" 得到主版本3和当前虚拟环境的解释器路径。",
+      "observation": "运行 python -c 查询 sys.version_info.major 和 sys.executable，得到主版本3和当前虚拟环境的解释器路径。",
+      "capability": "通过python -c查询Python解释器主版本和可执行路径"
+    },
+    {
+      "sourceId": "local-python-runtime",
+      "line": 2,
+      "quote": "我在终端直接输入 Python 表达式 print(2+3) 会被 shell 当作 shell 语法，不能代替 python demo.py；我改为显式调用对应 Python 可执行文件后成功。",
+      "observation": "直接在终端输入 print(2+3) 被 shell 当作 shell 语法，不能替代 python demo.py；改为显式调用对应 Python 可执行文件后成功。",
+      "capability": "区分shell解析与Python解释器执行，并显式调用Python可执行文件运行代码"
+    },
+    {
+      "sourceId": "local-python-runtime",
+      "line": 2,
+      "quote": "另将文件改为 print(undefined_name)，运行得到 NameError 和退出码1，我根据栈追踪定位未定义变量并改为已定义值，再运行输出5、退出码0。",
+      "observation": "将文件改为 print(undefined_name) 后运行得到 NameError 和退出码1；根据栈追踪定位未定义变量并改为已定义值，再次运行输出5、退出码0。",
+      "capability": "运行含未定义变量的脚本，根据栈追踪定位并修复NameError，复验输出与退出码"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "nodeId": "PY01",
+      "sufficiency": "supported",
+      "confidence": 0.95,
+      "reason": "单元0实际用CPython 3.12执行demo.py并检查标准输出5和退出码0；单元1查询解释器主版本与可执行路径；单元2区分shell解析与Python解释器并显式调用成功；单元3用NameError栈追踪定位并修复后复验。完整原文还说明解释器负责读取执行、终端不是解释器，覆盖运行环境与执行模型且有可检查结果。",
+      "revisionId": "PY01-r1",
+      "proposedStatus": "learned"
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "CODE02",
+      "sufficiency": "insufficient",
+      "confidence": 0.6,
+      "reason": "insufficient: 仅执行 demo.py print(2+3) 得5，未显示该代码被用于中间推理、验证或作为思考过程的一部分；把一般代码执行类比为 Code as a Reasoning Tool 会丢失“中间结论/推理工具”限定。未看到识别比自然语言推理更适合代码的步骤、编写用于验证/计算中间结论的小程序或根据执行修正推理，故没有符合限定的标准子动作。\n原判断：单元0用print(2+3)小程序计算并检查输出5、退出码0，属于用代码完成计算/验证的一小步；但未体现识别适合代码的推理步骤或根据执行结果修正推理/计划，缺少把代码作为思考过程一部分的证据。",
+      "revisionId": "CODE02-r1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        2
+      ],
+      "nodeId": "T15",
+      "sufficiency": "partial",
+      "confidence": 0.58,
+      "reason": "partial: 第2行显示直接 shell 输入 Python 表达式失败，改为显式调用 Python 可执行文件后成功，属于 Tool Execution 中识别误用与正确调用外部 Python 的行为，保留外部工具调用对象。但该单元未给出可检查的输出/退出码等完整执行结果，无法确认“可检查示例”及全部核心目标/边界，因此仅部分标准动作得到支持。\n原判断：单元2显式调用对应Python可执行文件并从shell误用中恢复，属于调用外部能力的一次执行；但未展示工具执行的一般管理（参数、结果、失败处理等）及核心边界，不能覆盖完整Tool Execution标准。",
+      "revisionId": "T15-r1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        3
+      ],
+      "nodeId": "E07",
+      "sufficiency": "supported",
+      "confidence": 0.85,
+      "reason": "单元3实际运行得到NameError与退出码1，依据栈追踪定位未定义变量，修改后复验输出5、退出码0；覆盖依据运行信号定位故障、修复和可检查结果。",
+      "revisionId": "E07-r1",
+      "proposedStatus": "learned"
+    },
+    {
+      "unitIndexes": [
+        3
+      ],
+      "nodeId": "CODE01",
+      "sufficiency": "partial",
+      "confidence": 0.7,
+      "reason": "partial: 第2行包含可检查的文件修改：将 undefined_name 改为已定义值并以输出5/退出码0验证，修改目标单一、未显示无关改动，满足 Codebase Search and File Editing 的文件编辑子动作并保留受控修改限定。但未显示代码库搜索范围选择或修改前收集足够局部上下文，故仅部分 mastery criteria 得到支持。\n原判断：单元3实际把demo.py中undefined_name改为已定义值并复验输出/退出码，完成可检查的文件修改；但未展示代码库搜索定位、修改前局部上下文收集或避免无关改动，只覆盖文件编辑的一步。",
+      "revisionId": "CODE01-r1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        3
+      ],
+      "nodeId": "PY09",
+      "sufficiency": "insufficient",
+      "confidence": 0.65,
+      "reason": "insufficient: 第2行只是触发 NameError 后修正变量，没有使用 try/except、raise 或其它异常处理机制来表达/处理失败；不能把观察到运行时错误类比为 Exception 标准中“使用异常表达和处理失败”。没有符合 Exception 限定的正确子动作，故 insufficient。\n原判断：单元3出现NameError并由栈追踪定位修复，体现异常作为失败信号和失败处理；但未使用try/except/raise等异常表达与处理机制，缺少Exception核心用法的可检查示例。",
+      "revisionId": "PY09-r1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v14",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "a97012af-4fe2-4376-a9c6-a90d43c3f01e",
+      "generatedAt": "2026-10-03T17:32:33.455Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 539,
+      "completionTokens": 5013
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v14",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "ef5ca7db-2863-4064-8283-05b8779d7ae7",
+      "generatedAt": "2026-10-03T17:33:32.938Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 2851,
+      "completionTokens": 12573
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "promptVersion": "personal-evidence-v14",
+      "schemaVersion": "evidence-factual-verification-v2",
+      "requestId": "dadeb310-972f-4df8-9ff8-6da255e16c5a",
+      "generatedAt": "2026-10-03T17:35:20.437Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1686,
+      "completionTokens": 11027
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "PY01": {
+              "reason": "单元0实际用CPython 3.12执行demo.py并检查标准输出5和退出码0；单元1查询解释器主版本与可执行路径；单元2区分shell解析与Python解释器并显式调用成功；单元3用NameError栈追踪定位并修复后复验。完整原文还说明解释器负责读取执行、终端不是解释器，覆盖运行环境与执行模型且有可检查结果。",
+              "unitIndexes": [
+                0,
+                1,
+                2,
+                3
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.95
+            },
+            "PY37": {
+              "reason": "仅涉及CPython运行脚本，没有pytest安装、编写测试、断言或运行测试等pytest动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            },
+            "PY08": {
+              "reason": "仅运行单文件demo.py，未展示模块导入、定义、组织或复用等Module行为。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            },
+            "CODE02": {
+              "reason": "单元0用print(2+3)小程序计算并检查输出5、退出码0，属于用代码完成计算/验证的一小步；但未体现识别适合代码的推理步骤或根据执行结果修正推理/计划，缺少把代码作为思考过程一部分的证据。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.6
+            },
+            "PY55": {
+              "reason": "单元0和1只涉及运行脚本、查询解释器版本与路径，未提及GIL、线程、锁或并发执行影响。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            },
+            "PY82": {
+              "reason": "单元1中的import sys是普通导入，不是运行时按名称或条件动态加载模块；未展示importlib、__import__或动态导入用法。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            },
+            "PY19": {
+              "reason": "单元1只输出sys.executable路径字符串，未进行文件读写或路径操作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            },
+            "PY03": {
+              "reason": "单元1只查询版本主号和解释器路径，未展示内置类型的基本行为、操作或可检查示例。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            },
+            "T15": {
+              "reason": "单元2显式调用对应Python可执行文件并从shell误用中恢复，属于调用外部能力的一次执行；但未展示工具执行的一般管理（参数、结果、失败处理等）及核心边界，不能覆盖完整Tool Execution标准。",
+              "unitIndexes": [
+                2
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.58
+            },
+            "MEM02": {
+              "reason": "单元2讨论shell与Python解释器调用，未把知识表示为可执行代码或设计可执行且可验证的知识表示。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            },
+            "PY102": {
+              "reason": "单元2仅区分shell与Python解释器，未定义或加载可插拔Python能力/插件机制。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            },
+            "R04": {
+              "reason": "单元2没有计划生成、按步骤执行或收集结果，只是shell与解释器调用的区分。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            },
+            "E07": {
+              "reason": "单元3实际运行得到NameError与退出码1，依据栈追踪定位未定义变量，修改后复验输出5、退出码0；覆盖依据运行信号定位故障、修复和可检查结果。",
+              "unitIndexes": [
+                3
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.85
+            },
+            "T08": {
+              "reason": "单元3是修改代码后重新运行，不是对同一个可恢复工具失败做有界重试；无重试次数、退避或恢复策略等证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "CODE01": {
+              "reason": "单元3实际把demo.py中undefined_name改为已定义值并复验输出/退出码，完成可检查的文件修改；但未展示代码库搜索定位、修改前局部上下文收集或避免无关改动，只覆盖文件编辑的一步。",
+              "unitIndexes": [
+                3
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.7
+            },
+            "PY09": {
+              "reason": "单元3出现NameError并由栈追踪定位修复，体现异常作为失败信号和失败处理；但未使用try/except/raise等异常表达与处理机制，缺少Exception核心用法的可检查示例。",
+              "unitIndexes": [
+                3
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.65
+            }
+          }
+        },
+        "nodeIds": [
+          "PY01",
+          "PY37",
+          "PY08",
+          "CODE02",
+          "PY55",
+          "PY82",
+          "PY19",
+          "PY03",
+          "T15",
+          "MEM02",
+          "PY102",
+          "R04",
+          "E07",
+          "T08",
+          "CODE01",
+          "PY09"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-python-runtime",
+          "line": 1,
+          "quote": "我在独立终端用 CPython 3.12 运行文件 demo.py，内容为 print(2+3)，命令 python demo.py 得到标准输出5，退出码0；",
+          "observation": "在独立终端用 CPython 3.12 运行 demo.py，文件内容为 print(2+3)，执行命令 python demo.py 后得到标准输出5、退出码0。",
+          "capability": "使用CPython在终端运行Python脚本并检查标准输出与退出码"
+        },
+        {
+          "sourceId": "local-python-runtime",
+          "line": 1,
+          "quote": "再运行 python -c \"import sys; print(sys.version_info.major); print(sys.executable)\" 得到主版本3和当前虚拟环境的解释器路径。",
+          "observation": "运行 python -c 查询 sys.version_info.major 和 sys.executable，得到主版本3和当前虚拟环境的解释器路径。",
+          "capability": "通过python -c查询Python解释器主版本和可执行路径"
+        },
+        {
+          "sourceId": "local-python-runtime",
+          "line": 2,
+          "quote": "我在终端直接输入 Python 表达式 print(2+3) 会被 shell 当作 shell 语法，不能代替 python demo.py；我改为显式调用对应 Python 可执行文件后成功。",
+          "observation": "直接在终端输入 print(2+3) 被 shell 当作 shell 语法，不能替代 python demo.py；改为显式调用对应 Python 可执行文件后成功。",
+          "capability": "区分shell解析与Python解释器执行，并显式调用Python可执行文件运行代码"
+        },
+        {
+          "sourceId": "local-python-runtime",
+          "line": 2,
+          "quote": "另将文件改为 print(undefined_name)，运行得到 NameError 和退出码1，我根据栈追踪定位未定义变量并改为已定义值，再运行输出5、退出码0。",
+          "observation": "将文件改为 print(undefined_name) 后运行得到 NameError 和退出码1；根据栈追踪定位未定义变量并改为已定义值，再次运行输出5、退出码0。",
+          "capability": "运行含未定义变量的脚本，根据栈追踪定位并修复NameError，复验输出与退出码"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.601554715540725
+        },
+        {
+          "node_id": "PY37",
+          "revision_id": "PY37-r1",
+          "title": "pytest",
+          "description": "使用 pytest 编写和运行自动化测试。",
+          "mastery_criteria": [
+            "能独立完成pytest的核心目标与边界",
+            "能在具体场景中识别pytest的正确用法与常见误用",
+            "能用可检查的示例证明对pytest的掌握"
+          ],
+          "similarity": 0.446864648069878
+        },
+        {
+          "node_id": "PY08",
+          "revision_id": "PY08-r1",
+          "title": "Module",
+          "description": "用模块组织和复用 Python 代码。",
+          "mastery_criteria": [
+            "能独立完成Module的核心目标与边界",
+            "能在具体场景中识别Module的正确用法与常见误用",
+            "能用可检查的示例证明对Module的掌握"
+          ],
+          "similarity": 0.433968671087188
+        },
+        {
+          "node_id": "CODE02",
+          "revision_id": "CODE02-r1",
+          "title": "Code as a Reasoning Tool",
+          "description": "让 Agent 通过编写和执行代码完成计算、验证、搜索或中间推导，把代码作为思考过程的一部分。",
+          "mastery_criteria": [
+            "能识别比纯自然语言推理更适合用代码解决的步骤",
+            "能编写一个用于验证或计算中间结论的小程序",
+            "能根据执行结果修正原先的推理或计划"
+          ],
+          "similarity": 0.429636687040329
+        },
+        {
+          "node_id": "PY55",
+          "revision_id": "PY55-r1",
+          "title": "Global Interpreter Lock",
+          "description": "解释 GIL 对 Python 线程执行的影响。",
+          "mastery_criteria": [
+            "能清楚解释Global Interpreter Lock的核心目标与边界",
+            "能在具体场景中识别Global Interpreter Lock的正确用法与常见误用",
+            "能用可检查的示例证明对Global Interpreter Lock的掌握"
+          ],
+          "similarity": 0.414539587931025
+        }
+      ],
+      [
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.554838624308192
+        },
+        {
+          "node_id": "PY82",
+          "revision_id": "PY82-r1",
+          "title": "Dynamic Import",
+          "description": "在运行时动态加载 Python 模块。",
+          "mastery_criteria": [
+            "能独立完成Dynamic Import的核心目标与边界",
+            "能在具体场景中识别Dynamic Import的正确用法与常见误用",
+            "能用可检查的示例证明对Dynamic Import的掌握"
+          ],
+          "similarity": 0.40291377323352
+        },
+        {
+          "node_id": "PY55",
+          "revision_id": "PY55-r1",
+          "title": "Global Interpreter Lock",
+          "description": "解释 GIL 对 Python 线程执行的影响。",
+          "mastery_criteria": [
+            "能清楚解释Global Interpreter Lock的核心目标与边界",
+            "能在具体场景中识别Global Interpreter Lock的正确用法与常见误用",
+            "能用可检查的示例证明对Global Interpreter Lock的掌握"
+          ],
+          "similarity": 0.395053785891944
+        },
+        {
+          "node_id": "PY19",
+          "revision_id": "PY19-r1",
+          "title": "File / Path",
+          "description": "可靠读写文件并操作路径。",
+          "mastery_criteria": [
+            "能独立完成File / Path的核心目标与边界",
+            "能在具体场景中识别File / Path的正确用法与常见误用",
+            "能用可检查的示例证明对File / Path的掌握"
+          ],
+          "similarity": 0.393521643071077
+        },
+        {
+          "node_id": "PY03",
+          "revision_id": "PY03-r1",
+          "title": "Built-in Types",
+          "description": "掌握 Python 内置类型及其基本行为。",
+          "mastery_criteria": [
+            "能清楚解释Built-in Types的核心目标与边界",
+            "能在具体场景中识别Built-in Types的正确用法与常见误用",
+            "能用可检查的示例证明对Built-in Types的掌握"
+          ],
+          "similarity": 0.393469512462616
+        }
+      ],
+      [
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.54764306545258
+        },
+        {
+          "node_id": "T15",
+          "revision_id": "T15-r1",
+          "title": "Tool Execution",
+          "description": "调用外部能力并管理一次执行。",
+          "mastery_criteria": [
+            "能独立完成Tool Execution的核心目标与边界",
+            "能在具体场景中识别Tool Execution的正确用法与常见误用",
+            "能用可检查的示例证明对Tool Execution的掌握"
+          ],
+          "similarity": 0.489814949891112
+        },
+        {
+          "node_id": "MEM02",
+          "revision_id": "MEM02-r1",
+          "title": "Executable Code as Knowledge Representation",
+          "description": "把部分知识表示为可执行代码，使规则、计算或操作过程能被 Agent 直接执行和验证。",
+          "mastery_criteria": [
+            "能说明代码表示知识相对纯文本的优势与限制",
+            "能判断某项知识是否适合表达为可执行代码",
+            "能设计一个可执行且可验证的知识表示示例"
+          ],
+          "similarity": 0.449876484267503
+        },
+        {
+          "node_id": "PY102",
+          "revision_id": "PY102-r1",
+          "title": "Python Plugin",
+          "description": "定义并加载可插拔 Python 能力。",
+          "mastery_criteria": [
+            "能独立完成Python Plugin的核心目标与边界",
+            "能在具体场景中识别Python Plugin的正确用法与常见误用",
+            "能用可检查的示例证明对Python Plugin的掌握"
+          ],
+          "similarity": 0.441934462901025
+        },
+        {
+          "node_id": "R04",
+          "revision_id": "R04-r1",
+          "title": "Plan-and-Execute",
+          "description": "先生成可检查计划，再按步骤执行并收集结果。",
+          "mastery_criteria": [
+            "能独立完成Plan-and-Execute的核心目标与边界",
+            "能在具体场景中识别Plan-and-Execute的正确用法与常见误用",
+            "能用可检查的示例证明对Plan-and-Execute的掌握"
+          ],
+          "similarity": 0.436344921588901
+        }
+      ],
+      [
+        {
+          "node_id": "E07",
+          "revision_id": "E07-r1",
+          "title": "Runtime Debugging",
+          "description": "依据运行信号定位 Agent 执行故障。",
+          "mastery_criteria": [
+            "能独立完成Runtime Debugging的核心目标与边界",
+            "能在具体场景中识别Runtime Debugging的正确用法与常见误用",
+            "能用可检查的示例证明对Runtime Debugging的掌握"
+          ],
+          "similarity": 0.527595607781673
+        },
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.458393221093032
+        },
+        {
+          "node_id": "T08",
+          "revision_id": "T08-r1",
+          "title": "Tool Retry",
+          "description": "对可恢复工具失败实施有界重试。",
+          "mastery_criteria": [
+            "能独立完成Tool Retry的核心目标与边界",
+            "能在具体场景中识别Tool Retry的正确用法与常见误用",
+            "能用可检查的示例证明对Tool Retry的掌握"
+          ],
+          "similarity": 0.425289928913119
+        },
+        {
+          "node_id": "CODE01",
+          "revision_id": "CODE01-r1",
+          "title": "Codebase Search and File Editing",
+          "description": "让 Coding Agent 在代码库中定位相关文件、检索上下文并以受控方式修改目标文件。",
+          "mastery_criteria": [
+            "能选择搜索范围定位与任务相关的代码",
+            "能在修改前收集足够的局部上下文",
+            "能执行可检查的文件修改并避免无关改动"
+          ],
+          "similarity": 0.423148904851145
+        },
+        {
+          "node_id": "PY09",
+          "revision_id": "PY09-r1",
+          "title": "Exception",
+          "description": "使用异常表达和处理失败。",
+          "mastery_criteria": [
+            "能独立完成Exception的核心目标与边界",
+            "能在具体场景中识别Exception的正确用法与常见误用",
+            "能用可检查的示例证明对Exception的掌握"
+          ],
+          "similarity": 0.420840183396318
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "PY01",
+          "CODE02",
+          "T15",
+          "E07",
+          "CODE01",
+          "PY09"
+        ],
+        "value": {
+          "verdicts": {
+            "PY01": {
+              "criterionScopePreserved": true,
+              "verdict": "supported",
+              "reason": "第1-2行显示运行 demo.py print(2+3) 得输出5/退出码0，python -c 检查主版本3与解释器路径；第2行明确区分 shell 直接输入 Python 表达式与显式调用 Python 可执行文件，识别 Python Runtime 边界；另调试 NameError 也依据运行时信号。计算 print(2+3)=5 正确，行为属于本人，保留 Python Runtime 的解释执行对象与边界，3条 mastery criteria 均有明确证据，故 supported。"
+            },
+            "CODE02": {
+              "criterionScopePreserved": false,
+              "verdict": "insufficient",
+              "reason": "仅执行 demo.py print(2+3) 得5，未显示该代码被用于中间推理、验证或作为思考过程的一部分；把一般代码执行类比为 Code as a Reasoning Tool 会丢失“中间结论/推理工具”限定。未看到识别比自然语言推理更适合代码的步骤、编写用于验证/计算中间结论的小程序或根据执行修正推理，故没有符合限定的标准子动作。"
+            },
+            "T15": {
+              "criterionScopePreserved": true,
+              "verdict": "partial",
+              "reason": "第2行显示直接 shell 输入 Python 表达式失败，改为显式调用 Python 可执行文件后成功，属于 Tool Execution 中识别误用与正确调用外部 Python 的行为，保留外部工具调用对象。但该单元未给出可检查的输出/退出码等完整执行结果，无法确认“可检查示例”及全部核心目标/边界，因此仅部分标准动作得到支持。"
+            },
+            "E07": {
+              "criterionScopePreserved": true,
+              "verdict": "supported",
+              "reason": "第2行显示运行 print(undefined_name) 得 NameError/退出码1，依据栈追踪定位未定义变量并改为已定义值，再运行得输出5/退出码0。这是依据运行信号定位并修正故障的 Runtime Debugging 标准动作，计算与结果正确，保留运行时调试对象与方法，3条 mastery criteria 都有清晰证据，故 supported。"
+            },
+            "CODE01": {
+              "criterionScopePreserved": true,
+              "verdict": "partial",
+              "reason": "第2行包含可检查的文件修改：将 undefined_name 改为已定义值并以输出5/退出码0验证，修改目标单一、未显示无关改动，满足 Codebase Search and File Editing 的文件编辑子动作并保留受控修改限定。但未显示代码库搜索范围选择或修改前收集足够局部上下文，故仅部分 mastery criteria 得到支持。"
+            },
+            "PY09": {
+              "criterionScopePreserved": false,
+              "verdict": "insufficient",
+              "reason": "第2行只是触发 NameError 后修正变量，没有使用 try/except、raise 或其它异常处理机制来表达/处理失败；不能把观察到运行时错误类比为 Exception 标准中“使用异常表达和处理失败”。没有符合 Exception 限定的正确子动作，故 insufficient。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "llmCalls": 3,
+  "retrievalCount": 4
+}
