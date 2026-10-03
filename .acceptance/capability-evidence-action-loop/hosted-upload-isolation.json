@@ -1,7 +1,7 @@
 {
   "status": "PASS",
-  "preview": "https://edu-flow-1fg32zrv7-july-nanas-projects.vercel.app",
-  "sourceId": "8d50ee07-cb6f-4d65-a09b-579c3dddcaa5",
+  "preview": "https://edu-flow-izu2n0pvl-july-nanas-projects.vercel.app",
+  "sourceId": "c3096257-ce9e-4158-b6c6-4129102ebde3",
   "assertions": [
     "forged source owner rejected",
     "ordinary A creates upload",
@@ -25,7 +25,7 @@
     "source can be archived",
     "archive preserves original",
     "archived source cannot diagnose",
-    "no official state from uploading or parsing"
+    "no official state change from uploading or parsing"
   ],
   "count": 23,
   "scope": "ordinary user JWT and real private Storage upload; not AI or Hosted confirmation acceptance"

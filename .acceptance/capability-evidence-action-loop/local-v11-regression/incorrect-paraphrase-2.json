@@ -1,0 +1,199 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-incorrect-paraphrase",
+      "line": 1,
+      "quote": "我尝试核算 M91 单期净需求：需求为 150 件，已核实可用库存 70 件，没有确认到货。我在草稿记录 150 减 70 等于 90，所以写下净需求 90 件，尚未复算。",
+      "observation": "实际尝试核算 M91 单期净需求：使用需求150件、已核实可用库存70件、无确认到货，草稿记录150减70等于90，并写下净需求90件，尚未复算。",
+      "capability": "根据需求、可用库存和到货确认情况计算单期净需求并记录结果（尚未复算）"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "insufficient",
+      "confidence": 0.78,
+      "reason": "insufficient: 原文称需求150件、已核实可用库存70件、无确认到货，并尝试核算M91单期净需求。但记录为150减70等于90，实际应为80，且写下净需求90件尚未复算。净需求计算的标准动作依赖正确计算，此处计算结果错误；识别需求、可用库存和无确认到货只是输入信息，不能替代正确执行净需求计算，因此无可支持的已正确执行计算子步骤。\n原判断：单元实际尝试核算 M91 单期净需求：需求150件、已核实可用库存70件、无确认到货，记录150-70=90并写下净需求90件。这对应标准中“根据订单需求、可用库存及确认到货计算净需求”的动作并给出结果，但仅单期，未展示分时段计算，也未明确核验/说明不可用库存排除，且自述尚未复算，故为部分匹配。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "4f5557d3-6d1d-486c-aa85-50ea505bc3eb",
+      "generatedAt": "2026-10-03T17:00:19.798Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 397,
+      "completionTokens": 815
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "fc56a262-744f-461f-bc83-0d05da9772b7",
+      "generatedAt": "2026-10-03T17:00:37.553Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1303,
+      "completionTokens": 3699
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-factual-verification-v1",
+      "requestId": "ca226962-0a5f-48ec-b508-620fde143dc7",
+      "generatedAt": "2026-10-03T17:00:43.671Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 658,
+      "completionTokens": 1135
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "单元实际尝试核算 M91 单期净需求：需求150件、已核实可用库存70件、无确认到货，记录150-70=90并写下净需求90件。这对应标准中“根据订单需求、可用库存及确认到货计算净需求”的动作并给出结果，但仅单期，未展示分时段计算，也未明确核验/说明不可用库存排除，且自述尚未复算，故为部分匹配。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.78
+            },
+            "supply-shortage-exposure": {
+              "reason": "单元只涉及净需求核算，没有使用补货交期窗口，也没有计算最早缺料日、缺口量或交期敏感性；与该缺料暴露评估标准无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "单元未涉及瓶颈、良率、已承诺负荷或期间可交付量，也未识别名义产能误用；与该供应商交付产能核验标准无对应动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "单元没有已量化缺口，也未映射到受影响订单、停线时段或恢复优先级输入；与该缺料中断影响评估标准无对应动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-material-risk-identification": {
+              "reason": "单元未识别集中供应、交期波动、替代限制，也未区分事实、假设和待核验证据；与该关键物料供应风险识别标准无对应动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-supplier-delivery-capacity",
+          "supply-shortage-impact-assessment",
+          "supply-material-risk-identification"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-incorrect-paraphrase",
+          "line": 1,
+          "quote": "我尝试核算 M91 单期净需求：需求为 150 件，已核实可用库存 70 件，没有确认到货。我在草稿记录 150 减 70 等于 90，所以写下净需求 90 件，尚未复算。",
+          "observation": "实际尝试核算 M91 单期净需求：使用需求150件、已核实可用库存70件、无确认到货，草稿记录150减70等于90，并写下净需求90件，尚未复算。",
+          "capability": "根据需求、可用库存和到货确认情况计算单期净需求并记录结果（尚未复算）"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.876692917248396
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.69307577846132
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.602784752845764
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.549237310886383
+        },
+        {
+          "node_id": "supply-material-risk-identification",
+          "revision_id": "supply-material-risk-identification:v1",
+          "title": "关键物料供应风险识别",
+          "description": "识别集中供应、交期波动和替代限制等暴露，区别事实、假设及待核验证据。",
+          "mastery_criteria": [
+            "识别集中供应、交期波动和替代限制等暴露，区别事实、假设及待核验证据。"
+          ],
+          "similarity": 0.502849728038892
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-net-material-requirement": {
+              "verdict": "insufficient",
+              "reason": "原文称需求150件、已核实可用库存70件、无确认到货，并尝试核算M91单期净需求。但记录为150减70等于90，实际应为80，且写下净需求90件尚未复算。净需求计算的标准动作依赖正确计算，此处计算结果错误；识别需求、可用库存和无确认到货只是输入信息，不能替代正确执行净需求计算，因此无可支持的已正确执行计算子步骤。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "retrievalCount": 1
+}

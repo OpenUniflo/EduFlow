@@ -3,7 +3,7 @@ import { diagnoseEvidence,EvidenceDiagnosisError,parseEvidenceText,validateMatch
 import type { StructuredGenerationClient } from '../knowledge/generation/types';
 const source={id:'source',lines:parseEvidenceText('本人计算：100件需求减去40件可用库存，净需求60件。\n计划学习产能核验。')};
 const unit={sourceId:'source',line:1,quote:'净需求60件',observation:'计算净需求',capability:'物料净需求计算'};
-const verified={value:{verdicts:{net:{verdict:'supported',reason:'checked'}}},metadata:{stage:'admission'}};
+const verified={value:{verdicts:{net:{criterionScopePreserved:true,verdict:'supported',reason:'checked'}}},metadata:{stage:'admission'}};
 const partial={unitIndexes:[0],sufficiency:'partial',confidence:0.7,reason:'仅部分过程'};
 const node={node_id:'net',revision_id:'net-v1',title:'净需求',description:'计算净需求',mastery_criteria:[],similarity:0.99};
 describe('personal evidence discovery boundary',()=>{
@@ -98,7 +98,7 @@ describe('personal evidence discovery boundary',()=>{
   const units=Array.from({length:5},(_,index)=>({...unit,capability:String(index)}));
   const generateJson=vi.fn(async input=>{
    if(input.stage==='extraction')return {value:{units},metadata:{stage:'extraction'}};
-   if(input.schemaVersion==='evidence-factual-verification-v1')return {value:{verdicts:Object.fromEntries(JSON.parse(input.user).candidates.map((match:{nodeId:string})=>[match.nodeId,{verdict:'supported',reason:'checked'}]))},metadata:{stage:'admission'}};
+   if(input.schemaVersion==='evidence-factual-verification-v2')return {value:{verdicts:Object.fromEntries(JSON.parse(input.user).candidates.map((match:{nodeId:string})=>[match.nodeId,{criterionScopePreserved:true,verdict:'supported',reason:'checked'}]))},metadata:{stage:'admission'}};
    const {groups}=JSON.parse(input.user);expect(Object.keys(groups).length).toBeLessThanOrEqual(20);
    return {value:{judgments:Object.fromEntries(Object.entries(groups).map(([id,g])=>[id,{...partial,unitIndexes:(g as {unitIndexes:number[]}).unitIndexes}]))},metadata:{stage:'admission'}};
   });
@@ -120,14 +120,14 @@ describe('personal evidence discovery boundary',()=>{
 
  it('can only downgrade positive candidates after factual verification, retaining both judgments',async()=>{
   for(const verdict of ['insufficient','uncertain']){
-   const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:partial}},metadata:{stage:'admission'}}).mockResolvedValueOnce({value:{verdicts:{net:{verdict,reason:'arithmetic was not correct'}}},metadata:{stage:'admission'}});
+   const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:partial}},metadata:{stage:'admission'}}).mockResolvedValueOnce({value:{verdicts:{net:{criterionScopePreserved:true,verdict,reason:'arithmetic was not correct'}}},metadata:{stage:'admission'}});
    const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>[node]);
    expect(result.matches[0]).toMatchObject({nodeId:'net',unitIndexes:[0],sufficiency:'insufficient',proposedStatus:null});
    expect(result.artifacts.verifications).toHaveLength(1);expect(result.artifacts.judgmentAttempts).toHaveLength(1);
   }
  });
  it('fails closed when verification omits a positive candidate or attempts to introduce another',async()=>{
-  for(const verdicts of [{},{other:{verdict:'supported',reason:'invented'}}]){
+  for(const verdicts of [{},{other:{criterionScopePreserved:true,verdict:'supported',reason:'invented'}}]){
    const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:partial}},metadata:{stage:'admission'}}).mockResolvedValueOnce({value:{verdicts},metadata:{stage:'admission'}});
    await expect(diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>[node])).rejects.toThrow(/exactly the positive candidate/);
   }
@@ -135,7 +135,7 @@ describe('personal evidence discovery boundary',()=>{
 
  it('preserves verified correct substeps by lowering supported to partial without upgrading partial',async()=>{
   for(const sufficiency of ['supported','partial']){
-   const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:{...partial,sufficiency}}},metadata:{stage:'admission'}}).mockResolvedValueOnce({value:{verdicts:{net:{verdict:'partial',reason:'correct substep but incomplete coverage'}}},metadata:{stage:'admission'}});
+   const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:{...partial,sufficiency}}},metadata:{stage:'admission'}}).mockResolvedValueOnce({value:{verdicts:{net:{criterionScopePreserved:true,verdict:'partial',reason:'correct substep but incomplete coverage'}}},metadata:{stage:'admission'}});
    const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>[node]);
    expect(result.matches[0]).toMatchObject({nodeId:'net',sufficiency:'partial',proposedStatus:'learning'});
   }
@@ -145,6 +145,25 @@ describe('personal evidence discovery boundary',()=>{
   expect(validateObservations({type:'json_object',units:[unit]},[source])).toEqual([unit]);
   expect(()=>validateObservations({type:'mastered',units:[unit]},[source])).toThrow();
   expect(()=>validateObservations({type:'json_object',owner:'other',units:[unit]},[source])).toThrow();
+ });
+
+ it('rejects cross-object positive verdicts and requires explicit scope verification',async()=>{
+  for(const criterionScopePreserved of [false,undefined]){
+   const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:{...partial,sufficiency:'supported'}}},metadata:{stage:'admission'}}).mockResolvedValueOnce({value:{verdicts:{net:{criterionScopePreserved,verdict:'supported',reason:'generic action without the required object'}}},metadata:{stage:'admission'}});
+   const result=diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>[node]);
+   if(criterionScopePreserved===undefined)await expect(result).rejects.toThrow();
+   else expect((await result).matches[0]).toMatchObject({sufficiency:'insufficient',proposedStatus:null});
+  }
+ });
+
+ it('retries invalid provider JSON only once per diagnosis and retains the failure',async()=>{
+  const error=new Error('LLM content was not valid JSON: provider=test, model=test');
+  const generateJson=vi.fn().mockRejectedValueOnce(error).mockResolvedValueOnce({value:{units:[]},metadata:{stage:'extraction'}});
+  const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>[]);
+  expect(generateJson).toHaveBeenCalledTimes(2);expect(result.artifacts.formatFailures).toEqual([{stage:'extraction',schemaVersion:'evidence-units-v1',message:error.message}]);
+  const failed=vi.fn().mockRejectedValue(error);
+  await expect(diagnoseEvidence([source],{generateJson:failed} as unknown as StructuredGenerationClient,async()=>[])).rejects.toThrow(error.message);
+  expect(failed).toHaveBeenCalledTimes(2);
  });
 
 });

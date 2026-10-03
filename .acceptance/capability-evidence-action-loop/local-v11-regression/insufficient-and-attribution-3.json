@@ -1,0 +1,257 @@
+{
+  "failure": {
+    "message": "LLM content was not valid JSON: provider=deepseek, model=deepseek-v4-flash"
+  },
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "ef358078-5eae-481e-97a9-366c6cba8b13",
+      "generatedAt": "2026-10-03T17:03:26.408Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 485,
+      "completionTokens": 2641
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "6a91f002-5b09-40e4-8bc1-dae32815b504",
+      "generatedAt": "2026-10-03T17:04:08.357Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1990,
+      "completionTokens": 8791
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "CDS525-K017": {
+              "reason": "单元0只描述转发供应商产能邮件且未核验，未解释前向传播核心作用、边界或与相邻概念区别，也未对任何小网络执行逐层前向计算或提交 forward_trace.json。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            },
+            "TOOL05": {
+              "reason": "单元0是转发供应商邮件，不涉及将外部事件转为 Agent 任务触发，也未定义触发规则、区分内部事件处理与用户沟通或设计防重复通知控制。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-site-switch-feasibility": {
+              "reason": "单元0仅涉及供应商邮件声称产能及未核验瓶颈、良率、负荷，未使用替代基地可用产能和到达时间检验切换，未区分不可行与缺失证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            },
+            "supply-supplier-admission-decision": {
+              "reason": "单元0涉及供应商交付产能声明但作者只是转发，明确未核验瓶颈、良率、已有订单负荷，也无资质、样品质量审查，更无通过、条件通过或拒绝判断；仅提供输入未执行独立审查判定。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.75
+            },
+            "MAC04": {
+              "reason": "单元0是供应商邮件转发，不涉及多个 Agent 独立上下文协作，也未解释优势、显式传递信息或识别上下文传递不足与过度传递问题。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            },
+            "supply-net-material-requirement": {
+              "reason": "单元1有草稿式100-40=80，属于对净需求的一次初步计算；但未按分时段、未纳入确认到货，且明确未排除不可用库存和未复核，故只覆盖部分动作。",
+              "unitIndexes": [
+                1
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.8
+            },
+            "supply-shortage-exposure": {
+              "reason": "单元1仅提供净需求草稿100-40=80，未使用补货交期窗口，也未计算最早缺料日、缺口量或交期敏感性；作为前置输入不足以构成缺料暴露计算表现。",
+              "unitIndexes": [
+                1
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.85
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "单元1为净需求草稿，未涉及瓶颈、良率、已承诺负荷或期间可交付量计算，无法识别名义产能误用。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "单元1为净需求草稿，未将已量化缺口映射到受影响订单、停线时段或恢复优先级输入。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            },
+            "supply-supplier-screening-criteria": {
+              "reason": "单元1为净需求草稿，未把物料规格与交付要求转成可验证筛选准则，也未区分必须满足门槛和评分项。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            }
+          }
+        },
+        "nodeIds": [
+          "CDS525-K017",
+          "TOOL05",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision",
+          "MAC04",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-supplier-delivery-capacity",
+          "supply-shortage-impact-assessment",
+          "supply-supplier-screening-criteria"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-insufficient-and-attribution",
+          "line": 1,
+          "quote": "我只是转发此邮件",
+          "observation": "作者自述将供应商声称每天能交付800件的邮件进行了转发；同句自述未核验瓶颈、良率、已有订单负荷，也未亲自计算。",
+          "capability": "供应商邮件转发/信息传递"
+        },
+        {
+          "sourceId": "local-insufficient-and-attribution",
+          "line": 2,
+          "quote": "目前写在草稿上的式子是100-40=80",
+          "observation": "作者在草稿上写下了净需求计算式100-40=80，作为初步计算尝试；同句自述未复核，也未排除不可用库存。",
+          "capability": "净需求计算草稿尝试"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "CDS525-K017",
+          "revision_id": "CDS525-K017-r1",
+          "title": "Forward Propagation",
+          "description": "按照网络连接方向从输入逐层计算中间表示和最终输出的过程。",
+          "mastery_criteria": [
+            "能准确解释「Forward Propagation」的核心作用、适用边界及与相邻概念的区别",
+            "能完成对应最小可执行任务：对一个小网络完成一次完整前向计算，记录各层输出，并提交 forward_trace.json"
+          ],
+          "similarity": 0.425238753174209
+        },
+        {
+          "node_id": "TOOL05",
+          "revision_id": "TOOL05-r1",
+          "title": "Event Trigger and User Communication",
+          "description": "把外部事件转化为 Agent 任务触发，并通过独立沟通通道向用户发送过程或结果信息。",
+          "mastery_criteria": [
+            "能定义一种外部事件到 Agent 任务的触发规则",
+            "能区分内部事件处理与面向用户的沟通动作",
+            "能设计避免重复通知或无意义触发的基本控制"
+          ],
+          "similarity": 0.421638313179959
+        },
+        {
+          "node_id": "supply-site-switch-feasibility",
+          "revision_id": "supply-site-switch-feasibility:v1",
+          "title": "跨基地供给切换可行性判断",
+          "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+          "mastery_criteria": [
+            "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+          ],
+          "similarity": 0.417068898677838
+        },
+        {
+          "node_id": "supply-supplier-admission-decision",
+          "revision_id": "supply-supplier-admission-decision:v1",
+          "title": "供应商准入证据判定",
+          "description": "独立审查资质、样品质量及交付产能证据，按明确规则作通过、条件通过或拒绝判断。",
+          "mastery_criteria": [
+            "独立审查资质、样品质量及交付产能证据，按明确规则作通过、条件通过或拒绝判断。"
+          ],
+          "similarity": 0.411406024349814
+        },
+        {
+          "node_id": "MAC04",
+          "revision_id": "MAC04-r1",
+          "title": "Non-Shared-Context Multi-Agent Collaboration",
+          "description": "让多个 Agent 在独立上下文中工作，通过显式消息、文件或管理器交换最小必要信息。",
+          "mastery_criteria": [
+            "能解释独立上下文协作相对共享上下文的主要优势",
+            "能定义两个 Agent 之间需要显式传递的信息",
+            "能识别上下文传递不足与过度传递分别造成的问题"
+          ],
+          "similarity": 0.40409292055838
+        }
+      ],
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.798179888671038
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.662071644849033
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.557235479354858
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.480229586362839
+        },
+        {
+          "node_id": "supply-supplier-screening-criteria",
+          "revision_id": "supply-supplier-screening-criteria:v1",
+          "title": "供应商筛选准则定义",
+          "description": "将物料规格与交付要求转成可验证筛选准则，区别必须满足的门槛和评分项。",
+          "mastery_criteria": [
+            "将物料规格与交付要求转成可验证筛选准则，区别必须满足的门槛和评分项。"
+          ],
+          "similarity": 0.451683616437484
+        }
+      ]
+    ],
+    "verifications": []
+  },
+  "retrievalCount": 2,
+  "topK": 5,
+  "sourceCount": 1,
+  "llmCalls": 3
+}

@@ -1,0 +1,258 @@
+{
+  "failure": {
+    "message": "LLM content was not valid JSON: provider=deepseek, model=deepseek-v4-flash"
+  },
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "427ef9b3-cad7-4709-bcac-614b74801330",
+      "generatedAt": "2026-10-03T17:02:59.780Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 433,
+      "completionTokens": 3271
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "14322bd7-5c68-4f92-9381-8b1974d39346",
+      "generatedAt": "2026-10-03T17:03:13.425Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1980,
+      "completionTokens": 2706
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "单元0显示已正确排除不可用库存：实物80件中隔离且不可领用20件，按80-20复核可用量60件并与库位记录一致。这对应标准中“正确排除不可用库存”的一项组成动作。不足是订单需求和到货尚未确认，且本次未做净需求计算，因此未完成分时段净需求计算。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.72
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "单元0为库存盘点与可用量核对，涉及实物、隔离库存和库位记录，未涉及瓶颈、良率、已承诺负荷、期间可交付量或名义产能误用。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "supply-shortage-exposure": {
+              "reason": "单元0未使用净需求或补货交期窗口，也未计算最早缺料日、缺口量或交期敏感性，与缺料暴露评估无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "单元0没有将已量化缺口映射到受影响订单、停线时段或恢复优先级输入，仅完成库存盘点与可用量核对。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "supply-site-switch-feasibility": {
+              "reason": "单元0未涉及替代基地可用产能、到达时间、订单约束检验或切换可行性判断。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "I05": {
+              "reason": "单元1仅描述无关几何练习中误写圆面积公式并标记待改，未涉及结构化输出验证，也未报告可定位的Schema Validation错误。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "EVO03": {
+              "reason": "单元1只是无关练习中的错误标记待改，未从失败轨迹提炼可执行指令改动，也未区分应写入指令与知识的事实或验证指令更新效果。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "EVO01": {
+              "reason": "单元1为与库存无关的几何练习错误，并非Agent运行轨迹，也未从成功失败结果或人工反馈中提取可复用学习信号。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "R07": {
+              "reason": "单元1仅提及误写公式并标记为错误待改，未展示回顾执行轨迹、提炼后续改进或判断Reflection适用条件与边界的可检查过程。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "R09": {
+              "reason": "单元1没有Evaluator反馈驱动Optimizer迭代输出的过程，仅描述无关练习中的错误标记待改。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-supplier-delivery-capacity",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-site-switch-feasibility",
+          "I05",
+          "EVO03",
+          "EVO01",
+          "R07",
+          "R09"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-valid-partial-unrelated-error",
+          "line": 1,
+          "quote": "我完成 R30 的库存盘点：实物 80 件，隔离且不可领用的 20 件，复核可用量 80-20=60 件，并与库位记录一致。订单需求和到货尚未确认，本次未做净需求计算。",
+          "observation": "完成 R30 库存盘点，记录实物 80 件、隔离且不可领用 20 件，计算复核可用量 80-20=60 件，并与库位记录核对一致；订单需求和到货尚未确认，未做净需求计算。",
+          "capability": "库存盘点与可用量核对"
+        },
+        {
+          "sourceId": "local-valid-partial-unrelated-error",
+          "line": 2,
+          "quote": "另一个与库存无关的练习里，我误写圆面积为周长的平方，已经标记为错误待改；该练习未用于库存核算。",
+          "observation": "在与库存无关的练习中写下圆面积为周长的平方，并将该错误标记为待改；该练习未用于库存核算。",
+          "capability": "几何练习书写与错误标记"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.617115442414698
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.530711706791916
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.47723440893787
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.446286207880237
+        },
+        {
+          "node_id": "supply-site-switch-feasibility",
+          "revision_id": "supply-site-switch-feasibility:v1",
+          "title": "跨基地供给切换可行性判断",
+          "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+          "mastery_criteria": [
+            "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+          ],
+          "similarity": 0.42905374072701
+        }
+      ],
+      [
+        {
+          "node_id": "I05",
+          "revision_id": "I05-r1",
+          "title": "Schema Validation",
+          "description": "验证结构化输出并报告可定位的错误。",
+          "mastery_criteria": [
+            "能独立完成Schema Validation的核心目标与边界",
+            "能在具体场景中识别Schema Validation的正确用法与常见误用",
+            "能用可检查的示例证明对Schema Validation的掌握"
+          ],
+          "similarity": 0.425348529178083
+        },
+        {
+          "node_id": "EVO03",
+          "revision_id": "EVO03-r1",
+          "title": "Experience-to-Instruction Update",
+          "description": "把运行经验转化为系统提示、规则或 Skill 指令，以改变后续 Agent 行为。",
+          "mastery_criteria": [
+            "能从失败轨迹中提炼可执行的指令改动",
+            "能区分适合写入指令的经验与应写入知识的事实",
+            "能通过前后对照任务验证指令更新是否改善行为"
+          ],
+          "similarity": 0.411308651488504
+        },
+        {
+          "node_id": "EVO01",
+          "revision_id": "EVO01-r1",
+          "title": "Learning Signals from Runtime Trajectories",
+          "description": "从 Agent 的真实运行轨迹、成功失败结果和人工反馈中提取可用于后续改进的学习信号。",
+          "mastery_criteria": [
+            "能从一条运行轨迹中定位可复用的成功或失败信号",
+            "能区分原始日志与可用于更新的学习信号",
+            "能把一个失败案例转化为后续改进输入"
+          ],
+          "similarity": 0.405419360945304
+        },
+        {
+          "node_id": "R07",
+          "revision_id": "R07-r1",
+          "title": "Reflection",
+          "description": "回顾执行轨迹并提炼可用于后续行动的改进。",
+          "mastery_criteria": [
+            "能判断适用条件并运用Reflection的核心目标与边界",
+            "能在具体场景中识别Reflection的正确用法与常见误用",
+            "能用可检查的示例证明对Reflection的掌握"
+          ],
+          "similarity": 0.398263514041901
+        },
+        {
+          "node_id": "R09",
+          "revision_id": "R09-r1",
+          "title": "Evaluator-Optimizer",
+          "description": "让 Evaluator 反馈驱动 Optimizer 迭代输出。",
+          "mastery_criteria": [
+            "能独立完成Evaluator-Optimizer的核心目标与边界",
+            "能在具体场景中识别Evaluator-Optimizer的正确用法与常见误用",
+            "能用可检查的示例证明对Evaluator-Optimizer的掌握"
+          ],
+          "similarity": 0.398233109607287
+        }
+      ]
+    ],
+    "verifications": []
+  },
+  "retrievalCount": 2,
+  "topK": 5,
+  "sourceCount": 1,
+  "llmCalls": 3
+}
