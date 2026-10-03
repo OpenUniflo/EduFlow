@@ -36,7 +36,7 @@ export function projectCapabilityAtlas(graph: KnowledgeGraph, model: CapabilityM
       return { id: node.id, title: node.title, description: node.description, knowledge: node,
         color: current.has(node.id) ? '#3b82f6' : course.has(node.id) ? '#22c55e' : '#94a3b8', domainTitle: domain?.name ?? '未分类', domainId: domain?.id,
         status: states.get(node.id) ?? 'explore', isCore: true, progress: 0, visualImportance: (degree.get(node.id) ?? 0) / max,
-        courseContexts: [], capabilityRoles: { current: current.has(node.id), course: course.has(node.id), bridge: !course.has(node.id) } };
+        courseContexts: [], featured: course.has(node.id), capabilityRoles: { current: current.has(node.id), course: course.has(node.id), bridge: !course.has(node.id) } };
     }), edges,
   };
 }

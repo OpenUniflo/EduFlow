@@ -58,3 +58,12 @@ it.each(['learned', 'practicing', 'mastered'] as const)('an acquired target is b
   const projection = projectCapabilityAtlas(input, buildProjectCapabilityModel(input, routeOnlyRuntime, records), governance, records);
   expect(projection.nodes.find(node => node.id === target)).toMatchObject({ color: '#3b82f6', capabilityRoles: { current: true, course: true, bridge: false } });
 });
+
+it('gives project targets map-label priority at the initial overview without changing graph structure', () => {
+  const input = graph([edge('current', 'bridge'), edge('bridge', target)]);
+  const states = [{ nodeId: 'current', status: 'learned' as const }];
+  const projection = projectCapabilityAtlas(input, buildProjectCapabilityModel(input, routeOnlyRuntime, states), governance, states);
+  expect(projection.nodes.find(node => node.id === target)?.featured).toBe(true);
+  expect(projection.nodes.filter(node => node.featured).map(node => node.id)).toEqual([target]);
+  expect(atlasStructureKey(projection.nodes, projection.edges, 'project')).toBe(atlasStructureKey(projection.nodes.map(node => ({ ...node, featured: false })), projection.edges, 'project'));
+});

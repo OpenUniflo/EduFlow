@@ -60,3 +60,12 @@
   .project-capability-legend { left: 12px; bottom: 18px; padding: 12px; }
   .project-capability-search:has(input) { width: min(240px, calc(100vw - 190px)); }
 }
+
+.project-capability-goal { max-width: min(460px, calc(100vw - 340px)); padding: 12px 16px; border-radius: 16px; }
+.project-capability-goal p { margin: 0 0 7px; font-size: 12px; line-height: 1.55; color: #334155; }
+.project-capability-goal strong { color: #1e293b; }
+.project-capability-goal small { display: block; font-size: 11px; line-height: 1.65; color: #64748b; }
+@media (max-width: 760px) {
+  .project-capability-toolbar { flex-wrap: wrap; }
+  .project-capability-goal { order: 3; max-width: min(460px, calc(100vw - 56px)); }
+}
