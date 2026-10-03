@@ -1,0 +1,41 @@
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { X, Upload, FileText } from 'lucide-react';
+import { evidenceRequest, readEvidence, uploadEvidence, type EvidenceData, type EvidenceProposal } from './evidenceClient';
+import './evidence.css';
+
+type EvidenceEnvironment={open:(courseId?:string)=>void;confirmed:()=>Promise<void>;nodeTitle:(id:string)=>string;preview:(courseId:string,proposals:EvidenceProposal[])=>string};
+const EvidenceContext=createContext<EvidenceEnvironment|null>(null);
+export const useEvidenceWorkspace=()=>useContext(EvidenceContext);
+export function EvidenceWorkspaceProvider({children,onConfirmed,nodeTitle,preview}:{children:ReactNode;onConfirmed:()=>Promise<void>;nodeTitle:(id:string)=>string;preview:EvidenceEnvironment['preview']}) {
+ const [workspace,setWorkspace]=useState<{courseId?:string}|null>(null);const dialog=useRef<HTMLDialogElement>(null);
+ const open=useCallback((courseId?:string)=>setWorkspace({courseId}),[]);
+ useEffect(()=>{if(workspace)dialog.current?.showModal();else dialog.current?.close();},[workspace]);
+ return <EvidenceContext.Provider value={{open,confirmed:onConfirmed,nodeTitle,preview}}>{children}<dialog ref={dialog} className="capability-workspace" onCancel={()=>setWorkspace(null)} aria-labelledby="capability-workspace-title">
+ {workspace?<><header><div><small>个人能力 · 跨项目证据</small><h1 id="capability-workspace-title">更新我的能力</h1><p>先检查证据与候选判断，再明确确认。确认前，你的能力和项目路线不会改变。</p></div><button aria-label="关闭能力更新工作区" onClick={()=>setWorkspace(null)}><X/></button></header><EvidenceLibrary courseId={workspace.courseId} diagnosing/></>:null}
+ </dialog></EvidenceContext.Provider>;
+}
+export function EvidenceLibrary({courseId,diagnosing=false}:{courseId?:string;diagnosing?:boolean}) {
+ const environment=useEvidenceWorkspace();const [data,setData]=useState<EvidenceData>({sources:[],units:[],proposals:[],runs:[]});
+ const [selected,setSelected]=useState<string[]>([]);const [detail,setDetail]=useState<string|null>(null);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [message,setMessage]=useState('');const [runId,setRunId]=useState<string|null>(null);
+ const reload=useCallback(async()=>{const next=await readEvidence();setData(next);return next;},[]);
+ useEffect(()=>{void reload().catch(error=>setError(error instanceof Error?error.message:'证据加载失败'));},[reload]);
+ async function perform(action:()=>Promise<void>) {setBusy(true);setError('');setMessage('');try{await action();await reload();}catch(error){setError(error instanceof Error?error.message:'操作失败');}finally{setBusy(false);}}
+ const visibleProposals=data.proposals.filter(p=>(!runId||p.run_id===runId)&&data.runs.some(run=>run.id===p.run_id&&run.status==='completed'));
+ const safe=visibleProposals.filter(p=>p.confirmation_state==='pending'&&p.sufficiency==='supported'&&Number(p.confidence)>=0.85);
+ async function resolve(proposals:EvidenceProposal[],action:'confirm'|'reject') {await evidenceRequest({action,proposalIds:proposals.map(p=>p.id)});if(action==='confirm')await environment?.confirmed();setMessage(action==='confirm'?'已确认，个人能力与项目投影已刷新。路线版本不会自动增加。':'已拒绝这些候选。');}
+ return <div className="evidence-library">
+ <div className="evidence-toolbar"><div><h2>我的证据</h2><p>长期保存原始资料和能力判断来源；归档不会删除已确认记录。</p></div><label className="atlas-secondary"><Upload size={16}/>上传资料<input type="file" accept=".txt,.md,.csv" disabled={busy} onChange={event=>{const file=event.target.files?.[0];if(file)void perform(async()=>{const id=await uploadEvidence(file);setSelected(current=>[...current,id]);setDetail(id);setMessage('文件已保存至私人证据库并完成解析。');});event.target.value='';}}/></label></div>
+ <p className="evidence-format">支持 UTF-8 TXT、Markdown、CSV，每份最多 24,000 字符。请使用包含本人实际过程与结果的工作资料；计划或教材不能证明已经具备能力。</p>
+ {error?<p role="alert" className="evidence-error">{error}</p>:null}{message?<p role="status">{message}</p>:null}
+ <div className="evidence-columns"><section aria-label="证据资料"><h3>选择本次资料</h3>{!data.sources.length?<p>还没有证据，上传一份工作记录开始。</p>:data.sources.map(source=><article key={source.id} className={source.archived_at?'archived':''}>
+ <label><input type="checkbox" checked={selected.includes(source.id)} disabled={busy||Boolean(source.archived_at)||source.parse_status!=='ready'} onChange={event=>setSelected(ids=>event.target.checked?[...ids,source.id]:ids.filter(id=>id!==source.id))}/><FileText size={16}/><strong>{source.title}</strong></label>
+ <small>{new Date(source.created_at).toLocaleString('zh-CN')} · {source.archived_at?'已归档':source.parse_status==='ready'?'已解析':source.parse_status==='failed'?'解析失败':'等待上传 / 解析'}</small>
+ {source.parse_error?<p>{source.parse_error}</p>:null}<div><button onClick={()=>setDetail(source.id)}>查看原文与关联能力</button>{!source.archived_at?<button disabled={busy} onClick={()=>void perform(async()=>{await evidenceRequest({action:'archive',sourceId:source.id});setSelected(ids=>ids.filter(id=>id!==source.id));})}>归档</button>:null}</div>
+ </article>)}</section><section aria-label="资料解析与证据单元"><h3>资料与 Evidence Units</h3>{detail?<><h4>{data.sources.find(s=>s.id===detail)?.title}</h4><button disabled={busy} onClick={()=>void perform(async()=>{const {url}=await evidenceRequest<{url:string}>({action:'download',sourceId:detail});window.open(url,'_blank','noopener,noreferrer');})}>打开原始文件（临时私有链接）</button><details><summary>查看逐行解析结果</summary><pre>{data.sources.find(s=>s.id===detail)?.parsed_lines.map(line=>`${line.line}  ${line.text}`).join('\n')}</pre></details>{data.units.filter(unit=>unit.source_id===detail).map(unit=><article key={unit.id}><small>原始资料 · 第 {unit.source_line} 行</small><blockquote>{unit.quote}</blockquote><p>{unit.observation}</p><strong>能力表现：{unit.capability}</strong>{data.proposals.filter(p=>p.unit_ids.includes(unit.id)).map(p=><p key={p.id}>{p.node_id?environment?.nodeTitle(p.node_id):'无匹配能力'} · {p.confirmation_state==='confirmed'?'已影响正式能力状态':p.confirmation_state==='rejected'?'已拒绝':'尚未确认'}{p.knowledge_evidence_id?<small> Evidence {p.knowledge_evidence_id}</small>:null}</p>)}</article>)}</>:<p>选择“查看原文与关联能力”追溯资料位置、提取表现和正式确认记录。</p>}</section></div>
+ <div className="evidence-diagnose"><span>已选择 {selected.length} 份资料（每次 1–5 份）</span><button className="atlas-primary" disabled={busy||!selected.length||selected.length>5} onClick={()=>void perform(async()=>{const result=await evidenceRequest<{runId:string}>({action:'diagnose',sourceIds:selected});setRunId(result.runId);setMessage('诊断已完成。候选不是正式能力，请检查证据后确认。');})}>{busy?'正在处理…':diagnosing?'分析资料并提出能力候选':'用选中资料重新诊断'}</button></div>
+ {data.runs.filter(run=>run.status==='failed').slice(0,1).map(run=><p role="status" key={run.id}>{run.error}</p>)}
+ <section className="evidence-proposals" aria-label="能力候选"><div><h2>能力候选 · 等待你的判断</h2><p>证据充分度与语义相似度不同。部分证据最多建议“学习中”，不会成为“已具备”。</p>{safe.length?<button disabled={busy} onClick={()=>void perform(()=>resolve(safe,'confirm'))}>明确确认 {safe.length} 项充分证据（置信度 ≥ 85%）</button>:null}</div>
+ {courseId&&visibleProposals.length?<aside className="evidence-impact"><strong>当前项目影响预览 · 尚未写入</strong><p>{environment?.preview(courseId,visibleProposals.filter(p=>p.confirmation_state==='pending'))}</p></aside>:null}
+ {!visibleProposals.length?<p>诊断后会在此显示匹配知识、充分度、理由与候选状态。</p>:visibleProposals.map(proposal=><article key={proposal.id}><h3>{proposal.node_id?environment?.nodeTitle(proposal.node_id):'没有对应的 Global Knowledge'}</h3><small>{({supported:'证据充分',partial:'部分证据',insufficient:'证据不足',unmatched:'未匹配'} as const)[proposal.sufficiency]} · 置信度 {Math.round(Number(proposal.confidence)*100)}% · 建议 {proposal.proposed_status==='learned'?'已学习':proposal.proposed_status==='learning'?'学习中':'不更改状态'}</small><p>{proposal.reason}</p>{proposal.unit_ids.map(id=>{const unit=data.units.find(u=>u.id===id);return unit?<button key={id} onClick={()=>setDetail(unit.source_id)}>查看证据：{unit.capability} · 第 {unit.source_line} 行</button>:null;})}{proposal.confirmation_state==='pending'?<div className="evidence-decisions"><button disabled={busy||!proposal.proposed_status} onClick={()=>void perform(()=>resolve([proposal],'confirm'))}>我确认这项能力判断</button><button disabled={busy} onClick={()=>void perform(()=>resolve([proposal],'reject'))}>拒绝</button><span>暂不处理：保持待确认即可</span></div>:<strong>{proposal.confirmation_state==='confirmed'?'已正式确认':'已拒绝'}</strong>}</article>)}
+ </section></div>;
+}

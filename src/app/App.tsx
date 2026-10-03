@@ -36,12 +36,13 @@ import { demoWorkflowAssessmentProvider } from "@/demo/scenarios/agenticAiBook/w
 import { demoCourseDesignAssistantProvider } from "@/demo/scenarios/agenticAiBook/courseDesignAssistantScripts";
 import { resolveLegacyRoute } from "@/app/legacyRoutes";
 import { ApiRequestError } from "@/shared/api/apiClient";
+import { CapabilityEvidenceBoundary } from "@/app/integrations/CapabilityEvidenceBoundary";
 import { AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeContext";
 import { AssistantMessagesPage } from "@/features/assistant/pages/AssistantMessagesPage";
 import { authGateState, resolveAuthRedirect } from "@/features/auth/authRedirect";
 
 function AssistantRuntimeBoundary({ session, children }: { session: MockSession | null; children: ReactNode }) {
-  return session ? <AssistantRuntimeProvider session={session}>{children}</AssistantRuntimeProvider> : children;
+  return session ? <AssistantRuntimeProvider session={session}><CapabilityEvidenceBoundary session={session}>{children}</CapabilityEvidenceBoundary></AssistantRuntimeProvider> : children;
 }
 
 function LegacyRedirect() {

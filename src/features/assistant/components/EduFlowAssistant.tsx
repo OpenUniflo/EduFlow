@@ -1,18 +1,23 @@
 import { Bot, Pin, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { AssistantContext } from "@/features/assistant/assistantContext";
 import { authGateState } from "@/features/auth/authRedirect";
+import { useAssistantRegistration, type AssistantSurfaceProps } from "../AssistantSurfaceContext";
 import { AssistantConversation } from "./AssistantConversation";
 
-export function EduFlowAssistant({ context, contextLabel, children, drawerOpen = false, className = "", locked: lockedProp = false }: {
-  context?: AssistantContext;
-  contextLabel: string;
-  children?: ReactNode;
-  drawerOpen?: boolean;
-  className?: string;
-  locked?: boolean;
-}) {
+/** Page adapters register context; only the app-owned surface renders for authenticated users. */
+export function EduFlowAssistant(props: AssistantSurfaceProps) {
+  const register=useAssistantRegistration();const id=useId();const location=useLocation();
+  const {context,contextLabel,children,drawerOpen,className,locked}=props;
+  useLayoutEffect(()=>{
+    if(!register)return;
+    register({id,route:location.pathname,props:{context,contextLabel,children,drawerOpen,className,locked}},id);
+    return ()=>register(null,id);
+  },[register,id,location.pathname,context,contextLabel,children,drawerOpen,className,locked]);
+  return register?null:<AssistantSurface {...props}/>;
+}
+
+export function AssistantSurface({ context, contextLabel, children, drawerOpen = false, className = "", locked: lockedProp = false, onUpdateCapabilities }: AssistantSurfaceProps & {onUpdateCapabilities?:()=>void}) {
   const navigate = useNavigate();
   const location = useLocation();
   const [hovered, setHovered] = useState(false);
@@ -29,6 +34,7 @@ export function EduFlowAssistant({ context, contextLabel, children, drawerOpen =
     {open ? <section className="course-design-assistant-panel eduflow-assistant-panel glass-v2">
       <header><div><Bot size={18}/><span><strong>EduFlow Assistant</strong><small>{pinned ? "已固定 · 基于当前页面上下文" : "悬停预览 · 点击固定"}</small></span></div>{pinned ? <button onClick={() => { setPinned(false); setHovered(false); }} aria-label="关闭 EduFlow Assistant"><X size={16}/></button> : null}</header>
       <div className="course-design-assistant-context"><span>{locked ? "需要登录" : "当前上下文"}</span><strong>{contextLabel}</strong><small>{locked ? "登录后使用 EduFlow Assistant" : `${context!.workspace} · ${context!.experienceMode}`}</small></div>
+      {!locked && onUpdateCapabilities?<button className="atlas-secondary" onClick={onUpdateCapabilities}>更新我的能力</button>:null}
       {locked ? <div className="course-design-assistant-actions"><p>Assistant 会读取个人对话与学习上下文，因此不为匿名访客创建会话。</p><button className="atlas-primary" onClick={() => navigate("/login", { state: authGateState(location) })}>登录后使用 Assistant</button></div> : (children ?? <AssistantConversation context={context!}/>)}
     </section> : null}
     <button className="course-design-assistant-trigger" onClick={() => { setPinned((value) => !value); setHovered(true); }} aria-label="打开 EduFlow Assistant" aria-expanded={open}><Bot size={22}/>{pinned ? <Pin size={10}/> : null}</button>
