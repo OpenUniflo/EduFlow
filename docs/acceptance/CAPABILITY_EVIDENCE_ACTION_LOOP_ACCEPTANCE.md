@@ -2,6 +2,23 @@
 
 Status: **IN PROGRESS — no Phase gate has passed.**
 
+## Current gate evidence (2026-10-04)
+
+The rows below describe demonstrated behavior, not a Phase A quality PASS. Historical observations later in this document remain unchanged. Final diagnosis-quality review is still pending; Phase B/C have not started.
+
+| Gates | Demonstrated evidence |
+|---|---|
+| A01–A04 | Browser checks across Learning, Explore, Courses, Project, Workflows, Micro and Assignment; normal LLM chat and single Assistant; 1152×544 non-fullscreen workspace in 1280×633 viewport. |
+| A05–A07 | Real private upload, parsed source lines, historical source reselection, quote/line buttons; ordinary-owner access and archive checks. |
+| A08–A10 | Hosted `0384d500` has four literal units and three existing supply matches; each unit retrieves Top-K 5. `3ebfa75f` has four Python units. No whole-catalog LLM comparison. |
+| A11–A12 | Before/after formal-state snapshots unchanged for diagnosis; no official state writes in discovery. |
+| A13–A15 | `hosted-confirmation.json`: owner transaction, actual B→A rejection, concurrent/repeated confirmation, unique official evidence and state, lineage and isolation. |
+| A16 | `ui-confirm-before/after.json`, `ui-after-learning.png`: actual UI confirmation updates Learning without reload. |
+| A17–A18 | `ui-confirm-cross-before/after.json`, `ui-after-cross-project.png`: actual UI confirmation immediately exposes two acquired related nodes; later net-material also enters via real facts. |
+| A19–A20 | `hosted-confirmation.json`: PY01 learned but excluded from enterprise projection; route versions unchanged at 1 across all four confirmations. |
+
+Remaining A quality gate: repeated and Hosted verification of the final prompt, including correct partials, cross-object negatives, malformed-response handling and runtime health. Last full suite: 103 files / 749 tests, typecheck, lint, production build, knowledge audit and client-secret audit passed. A later call-count-only correction passed focused tests, typecheck and build; exact Preview `be7bb2f6b1318816aae6d1123a7a63f89dcedca0` / `dpl_GZwXGPxyFFD1t4siNAEz5C3YP8LS` is READY at https://edu-flow-lluajg7ms-july-nanas-projects.vercel.app.
+
 ## Baseline audit — 2026-10-03
 
 - Initial chat checkout: clean detached `a0fc93ece3f76b441cbfd8bae9e26fe1117262e9`. The requested branch is checked out in `/Users/fanyuhang/Documents/OpenUniflo/EduFlow`, also clean. Fetched GitHub and aligned this isolated checkout (detached) to `origin/feature/project-capability-model`, `9933d984931f282c64f061985ca918e5cae992c7`. Original checkout untouched. Delivery must fast-forward the requested remote branch without overwriting concurrent work.
@@ -121,3 +138,6 @@ V3 `38350879466ff7d0862c39282c31f7fe1e59cf1d` / `dpl_8fRecijgNa35Af5Q3Ar4WwHogzt
 - Frozen v11 real-model regression: 31 cases, 28 completed and 3 invalid-JSON failures. AI review found E07 cross-object partials in two Python repeats, so v11 overall remains FAIL. Reviewer retracted a multi-source omission blocker: source B independently contains sufficient inputs/actions/results, and forcing redundant source A into lineage would be wrong.
 - v12 introduces explicit `criterionScopePreserved`: false deterministically downgrades positive suggestions to insufficient; absent field fails validation. This remains a model judgment, not deterministic semantic truth. A real replay rejects E07 while preserving PY01; one new full local Python run preserves PY01. PY09 may be conservatively insufficient; partial is a defensible boundary, not a required result.
 - One format-only retry is allowed across the whole diagnosis for provider content that cannot parse as JSON. It is separate from transport retries and the existing judgment-schema repair. Failure messages/stages and actual call counts are retained; the shared adapter does not expose the raw invalid JSON body, so raw-response retention is not claimed. No semantic-result retries or salvage parsing. Exhausted retry fails closed. Phase A is still awaiting v12 regression/Hosted quality review; B/C have not started.
+
+- Independent AI review corrected another overstrong oracle: the inventory-only `partial.txt` source correctly excludes quarantined stock, but the single-sentence Knowledge criterion can treat that as either a standalone sub-action or a condition of net-demand calculation not yet begun. `partial` or reasoned `insufficient` are both defensible; `supported` is not. Historical expectations/failures remain retained. The reviewer requested the existing one-period correct-calculation case as the unambiguous partial control; no further prompt tuning for inventory-only classification.
+- v13 narrows the scope check to the actual independently checkable sub-action, keeping its own object/method/conditions, rather than demanding the entire workflow. Cross-object Agent debugging and incorrect arithmetic remain strict negatives. v13 targeted and remaining Gold runs are in progress; no overall AI PASS yet.
