@@ -24,5 +24,27 @@
   "phaseAGate": "NOT PASSED",
   "phaseB": "NOT STARTED",
   "phaseC": "NOT STARTED",
-  "freshReviewer": "NOT STARTED"
+  "freshReviewer": "NOT STARTED",
+  "latestVerifiedDeployment": {
+    "commit": "33f5a881e4edd150e314144a91f3272456741af9",
+    "id": "dpl_HCAS8f3fYS6QUaCbnmZhynC2KGoe",
+    "url": "https://edu-flow-l9uuiqsfm-july-nanas-projects.vercel.app",
+    "state": "READY",
+    "indexHttpStatus": 424,
+    "indexErrorCode": "embedding_provider_unavailable"
+  },
+  "additionalBrowserChecks": {
+    "preview": "https://edu-flow-4oc19xsrm-july-nanas-projects.vercel.app",
+    "actor": "dedicated evidence acceptance B",
+    "micro": "E13 / agentic-ai-golden: rendered published Micro and explicit update action",
+    "assignment": "agent-workflow-automation-comparison / agentic-ai: rendered prerequisites-blocked task and explicit update action",
+    "capturedBrowserErrors": [],
+    "stateSideEffects": "Existing Micro auto-start records learning startup for B; no answer or task submission. Do not treat B as an untouched learning-history fixture."
+  },
+  "blockedAudit": {
+    "consecutiveGoalTurns": 3,
+    "dependency": "Valid Hosted Preview embedding provider configuration",
+    "phaseGate": "A before B before C",
+    "goalComplete": false
+  }
 }
