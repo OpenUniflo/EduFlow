@@ -1,0 +1,28 @@
+{
+  "scope": "Local real provider / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [],
+  "matches": [],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v5",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "1ce3eebf-d45d-4e39-867d-6c977a3ed344",
+      "generatedAt": "2026-10-03T16:10:52.879Z",
+      "temperature": 0,
+      "maxTokens": 6000,
+      "promptTokens": 202,
+      "completionTokens": 5
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [],
+    "extraction": {
+      "units": []
+    },
+    "retrieved": []
+  },
+  "retrievalCount": 0
+}

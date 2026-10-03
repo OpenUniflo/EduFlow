@@ -6,7 +6,7 @@ import { allRows, dataOrThrow } from '../_lib/query.js';
 import { createEmbeddingService } from '../_lib/embedding.js';
 import { readEmbeddingEnvironment, readLlmEnvironment } from '../_lib/env.js';
 import { createJsonGenerationClient } from '../_lib/llm.js';
-import { diagnoseEvidence, EVIDENCE_PROMPT_VERSION, EVIDENCE_TOP_K, parseEvidenceText, type RetrievedKnowledge } from '../../src/features/evidence/diagnosis.js';
+import { diagnoseEvidence,EvidenceDiagnosisError, EVIDENCE_PROMPT_VERSION, EVIDENCE_TOP_K, parseEvidenceText, type RetrievedKnowledge } from '../../src/features/evidence/diagnosis.js';
 
 export const maxDuration=300;
 const uploadSchema=z.object({action:z.literal('upload'),title:z.string().trim().min(1).max(240),contentType:z.enum(['text/plain','text/markdown','text/csv']),size:z.number().int().min(1).max(1048576)}).strict();
@@ -125,7 +125,7 @@ export default handleApi(async(request,response)=>{
       const complete=await server.from('capability_diagnosis_runs').update({status:'completed',completed_at:new Date().toISOString(),diagnostics:{embedding:{provider:embeddingEnv.embeddingProvider,model:embeddingEnv.embeddingModel,dimensions:embeddingEnv.embeddingDimensions},metadata:diagnosis.metadata,artifacts:diagnosis.artifacts,retrievalCount:diagnosis.retrievalCount,topK:EVIDENCE_TOP_K,sourceCount:sources.length,llmCalls:diagnosis.metadata.length}}).eq('id',run.id);
       dataOrThrow(complete.data,complete.error,'Diagnosis completion');json(response,201,{runId:run.id});
     } catch(error) {
-      const failure=await server.from('capability_diagnosis_runs').update({status:'failed',error:'诊断未完成，请稍后重试；正式能力状态没有改变。',completed_at:new Date().toISOString()}).eq('id',run.id);
+      const failure=await server.from('capability_diagnosis_runs').update({status:'failed',error:'诊断未完成，请稍后重试；正式能力状态没有改变。',completed_at:new Date().toISOString(),...(error instanceof EvidenceDiagnosisError?{diagnostics:{...error.diagnostics,embedding:{provider:embeddingEnv.embeddingProvider,model:embeddingEnv.embeddingModel,dimensions:embeddingEnv.embeddingDimensions}}}:{})}).eq('id',run.id);
       if(failure.error) console.error('Diagnosis failure recording failed',failure.error.code);
       console.error('Evidence diagnosis failed',error instanceof Error?error.message:'Unknown error');
       throw new ApiError(503,'diagnosis_failed','诊断未完成，请稍后重试；正式能力状态没有改变。');

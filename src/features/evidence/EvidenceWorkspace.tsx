@@ -21,7 +21,7 @@ export function EvidenceLibrary({courseId,diagnosing=false}:{courseId?:string;di
  useEffect(()=>{void reload().catch(error=>setError(error instanceof Error?error.message:'证据加载失败'));},[reload]);
  async function perform(action:()=>Promise<void>) {setBusy(true);setError('');setMessage('');try{await action();await reload();}catch(error){setError(error instanceof Error?error.message:'操作失败');}finally{setBusy(false);}}
  const visibleProposals=data.proposals.filter(p=>(!runId||p.run_id===runId)&&data.runs.some(run=>run.id===p.run_id&&run.status==='completed'));
- const safe=visibleProposals.filter(p=>p.confirmation_state==='pending'&&p.sufficiency==='supported'&&Number(p.confidence)>=0.85);
+ const safe=visibleProposals.filter(p=>p.confirmation_state==='pending'&&p.sufficiency==='supported'&&Number(p.confidence)>=0.85).slice(0,50);
  async function resolve(proposals:EvidenceProposal[],action:'confirm'|'reject') {await evidenceRequest({action,proposalIds:proposals.map(p=>p.id)});if(action==='confirm')await environment?.confirmed();setMessage(action==='confirm'?'已确认，个人能力与项目投影已刷新。路线版本不会自动增加。':'已拒绝这些候选。');}
  return <div className="evidence-library">
  <div className="evidence-toolbar"><div><h2>我的证据</h2><p>长期保存原始资料和能力判断来源；归档不会删除已确认记录。</p></div><label className="atlas-secondary"><Upload size={16}/>上传资料<input type="file" accept=".txt,.md,.csv" disabled={busy} onChange={event=>{const file=event.target.files?.[0];if(file)void perform(async()=>{const id=await uploadEvidence(file);setSelected(current=>[...current,id]);setDetail(id);setMessage('文件已保存至私人证据库并完成解析。');});event.target.value='';}}/></label></div>

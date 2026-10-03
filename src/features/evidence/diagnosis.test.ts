@@ -1,8 +1,9 @@
 import { describe,expect,it,vi } from 'vitest';
-import { diagnoseEvidence,parseEvidenceText,validateMatches,validateObservations } from './diagnosis';
+import { diagnoseEvidence,EvidenceDiagnosisError,parseEvidenceText,validateMatches,validateObservations } from './diagnosis';
 import type { StructuredGenerationClient } from '../knowledge/generation/types';
 const source={id:'source',lines:parseEvidenceText('本人计算：100件需求减去40件可用库存，净需求60件。\n计划学习产能核验。')};
 const unit={sourceId:'source',line:1,quote:'净需求60件',observation:'计算净需求',capability:'物料净需求计算'};
+const partial={unitIndexes:[0],sufficiency:'partial',confidence:0.7,reason:'仅部分过程'};
 const node={node_id:'net',revision_id:'net-v1',title:'净需求',description:'计算净需求',mastery_criteria:[],similarity:0.99};
 describe('personal evidence discovery boundary',()=>{
  it('preserves real line locations rather than compacted line indexes',()=>expect(parseEvidenceText('\n第一行\n\n第二行').map(l=>l.line)).toEqual([2,4]));
@@ -19,8 +20,8 @@ describe('personal evidence discovery boundary',()=>{
  });
  it('does not silently lose judgments or strip source context in the second stage',async()=>{
   expect(()=>validateMatches({matches:[]},[unit],[[node]])).toThrow(/Every evidence unit/);
-  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{matches:[{unitIndexes:[0],nodeId:'net',sufficiency:'insufficient',confidence:0.9,reason:'上下文限定'}]},metadata:{stage:'admission'}});
-  await diagnoseEvidence([source],{generateJson} as StructuredGenerationClient,async()=>[node]);
+  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:{unitIndexes:[0],sufficiency:'insufficient',confidence:0.9,reason:'上下文限定'}}},metadata:{stage:'admission'}});
+  await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>[node]);
   expect(JSON.parse(generateJson.mock.calls[1][0].user).sources).toEqual([source]);
  });
  it('requires retrieved existing identity, never admits invented nodes',()=>{
@@ -36,18 +37,36 @@ describe('personal evidence discovery boundary',()=>{
   expect(()=>validateMatches({matches:[match,{...match,sufficiency:'supported'}]},[unit],[[node]])).toThrow(/one judgment per knowledge node/);
  });
  it('repairs one invalid judgment with retained failure evidence, without repeating extraction or retrieval',async()=>{
-  const match={unitIndexes:[0],nodeId:'net',sufficiency:'partial',confidence:0.7,reason:'仅部分过程'};
-  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{matches:[match,match]},metadata:{stage:'admission'}}).mockResolvedValueOnce({value:{matches:[match]},metadata:{stage:'admission'}});
-  const retrieve=vi.fn(async()=>[node]);const result=await diagnoseEvidence([source],{generateJson} as StructuredGenerationClient,retrieve);
+  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{wrong:partial}},metadata:{stage:'admission'}}).mockResolvedValueOnce({value:{judgments:{net:partial}},metadata:{stage:'admission'}});
+  const retrieve=vi.fn(async()=>[node]);const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,retrieve);
   expect(generateJson).toHaveBeenCalledTimes(3);expect(retrieve).toHaveBeenCalledTimes(1);
-  expect(result.artifacts.judgmentAttempts?.[0].validationError).toMatch(/one judgment per knowledge node/);
+  expect(result.artifacts).toMatchObject({judgmentAttempts:[{validationError:expect.stringMatching(/exactly the server node groups/)},{value:{judgments:{net:partial}}}]});
   expect(result.matches[0].proposedStatus).toBe('learning');
  });
  it('fails closed after the one allowed judgment repair also fails',async()=>{
-  const match={unitIndexes:[0],nodeId:'net',sufficiency:'partial',confidence:0.7,reason:'仅部分过程'};
-  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValue({value:{matches:[match,match]},metadata:{stage:'admission'}});
-  await expect(diagnoseEvidence([source],{generateJson} as StructuredGenerationClient,async()=>[node])).rejects.toThrow(/one judgment per knowledge node/);
+  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValue({value:{judgments:{wrong:partial}},metadata:{stage:'admission'}});
+  await expect(diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>[node])).rejects.toThrow(/exactly the server node groups/);
   expect(generateJson).toHaveBeenCalledTimes(3);
+ });
+ it('retains the rejected judgment when its repair request fails',async()=>{
+  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{wrong:partial}},metadata:{stage:'admission'}}).mockRejectedValueOnce(new Error('LLM unavailable'));
+  const error=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>[node]).catch(error=>error);
+  expect(error).toBeInstanceOf(EvidenceDiagnosisError);
+  expect(error.diagnostics.llmCalls).toBe(3);
+  expect(error.diagnostics.artifacts.judgmentAttempts).toHaveLength(1);
+  expect(error.diagnostics.artifacts.judgmentAttempts[0].validationError).toMatch(/exactly the server node groups/);
+ });
+ it('deterministically groups two sources and allows only one sufficiency verdict for their shared node',async()=>{
+  const second={...unit,sourceId:'source2'};
+  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit,second]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:{...partial,unitIndexes:[0,1]}}},metadata:{stage:'admission'}});
+  const result=await diagnoseEvidence([source,{...source,id:'source2'}],{generateJson} as unknown as StructuredGenerationClient,async()=>[node]);
+  expect(result.matches).toHaveLength(1);expect(result.matches[0].unitIndexes).toEqual([0,1]);
+  expect(JSON.parse(generateJson.mock.calls[1][0].user).sources).toHaveLength(2);
+ });
+ it('derives unmatched units only after all candidate judgments validate',async()=>{
+  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:{unitIndexes:[],sufficiency:'unmatched',confidence:0.9,reason:'different capability'}}},metadata:{stage:'admission'}});
+  const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>[node]);
+  expect(generateJson).toHaveBeenCalledTimes(2);expect(result.matches[0]).toMatchObject({nodeId:null,sufficiency:'unmatched',proposedStatus:null});
  });
  it('multiple sources can support one capability and one source multiple capabilities',()=>{
   const other={...node,node_id:'risk',revision_id:'risk-v1'};
@@ -55,9 +74,9 @@ describe('personal evidence discovery boundary',()=>{
   expect(validateMatches({matches},[unit,{...unit,sourceId:'source2'}],[[node,other],[node]])).toHaveLength(2);
  });
  it('calls extraction without catalog, then retrieval only for evidence candidates',async()=>{
-  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{matches:[{unitIndexes:[0],nodeId:'net',sufficiency:'supported',confidence:0.9,reason:'有可核验计算'}]},metadata:{stage:'admission'}});
+  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:{unitIndexes:[0],sufficiency:'supported',confidence:0.9,reason:'有可核验计算'}}},metadata:{stage:'admission'}});
   const retrieve=vi.fn(async()=>[node]);
-  const result=await diagnoseEvidence([source],{generateJson} as StructuredGenerationClient,retrieve);
+  const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,retrieve);
   expect(generateJson).toHaveBeenCalledTimes(2);expect(retrieve).toHaveBeenCalledExactlyOnceWith(unit.capability);
   expect(generateJson.mock.calls[0][0].user).not.toContain('net-v1');
   expect(result.matches[0]).toMatchObject({nodeId:'net',revisionId:'net-v1',proposedStatus:'learned'});
@@ -65,7 +84,36 @@ describe('personal evidence discovery boundary',()=>{
  });
  it('irrelevant material with no observed capability performs zero knowledge retrieval',async()=>{
   const generateJson=vi.fn().mockResolvedValue({value:{units:[]},metadata:{stage:'extraction'}});const retrieve=vi.fn();
-  expect((await diagnoseEvidence([source],{generateJson} as StructuredGenerationClient,retrieve)).matches).toEqual([]);
+  expect((await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,retrieve)).matches).toEqual([]);
   expect(retrieve).not.toHaveBeenCalled();expect(generateJson).toHaveBeenCalledTimes(1);
  });
+ it('rejects unit reassignment outside a node Top-K group and malformed unmatched verdicts',async()=>{
+  for(const verdict of [{...partial,unitIndexes:[1]},{...partial,unitIndexes:[0,0]},{...partial,unitIndexes:[]},{...partial,sufficiency:'unmatched'}]){
+   const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit,{...unit,capability:'other'}]},metadata:{stage:'extraction'}}).mockResolvedValue({value:{judgments:{net:verdict}},metadata:{stage:'admission'}});
+   await expect(diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async text=>text==='other'?[]:[node])).rejects.toBeInstanceOf(EvidenceDiagnosisError);
+  }
+ });
+ it('batches every retrieved node without dropping candidates and preserves cross-batch matched coverage',async()=>{
+  const units=Array.from({length:5},(_,index)=>({...unit,capability:String(index)}));
+  const generateJson=vi.fn(async input=>{
+   if(input.stage==='extraction')return {value:{units},metadata:{stage:'extraction'}};
+   const {groups}=JSON.parse(input.user);expect(Object.keys(groups).length).toBeLessThanOrEqual(20);
+   return {value:{judgments:Object.fromEntries(Object.entries(groups).map(([id,g])=>[id,{...partial,unitIndexes:(g as {unitIndexes:number[]}).unitIndexes}]))},metadata:{stage:'admission'}};
+  });
+  const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async text=>Array.from({length:5},(_,index)=>({...node,node_id:text+'-'+index})));
+  expect(generateJson).toHaveBeenCalledTimes(3);expect(result.matches).toHaveLength(25);
+  expect(result.matches.every(match=>match.nodeId!==null)).toBe(true);
+ });
+ it('never returns partial proposals when a later judgment batch fails',async()=>{
+  const units=Array.from({length:5},(_,index)=>({...unit,capability:String(index)}));
+  const generateJson=vi.fn(async input=>{
+   if(input.stage==='extraction')return {value:{units},metadata:{stage:'extraction'}};
+   const {groups}=JSON.parse(input.user);
+   if(Object.keys(groups).includes('4-0'))throw new Error('provider unavailable');
+   return {value:{judgments:Object.fromEntries(Object.entries(groups).map(([id,g])=>[id,{...partial,unitIndexes:(g as {unitIndexes:number[]}).unitIndexes}]))},metadata:{stage:'admission'}};
+  });
+  const error=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async text=>Array.from({length:5},(_,index)=>({...node,node_id:text+'-'+index}))).catch(error=>error);
+  expect(error).toBeInstanceOf(EvidenceDiagnosisError);expect(error.diagnostics.artifacts.judgmentAttempts).toHaveLength(1);
+ });
+
 });
