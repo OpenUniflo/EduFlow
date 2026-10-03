@@ -35,6 +35,20 @@ describe('personal evidence discovery boundary',()=>{
   expect(()=>validateMatches({matches:[match,{...match,nodeId:null,sufficiency:'unmatched'}]},[unit],[[node]])).toThrow(/both matched and unmatched/);
   expect(()=>validateMatches({matches:[match,{...match,sufficiency:'supported'}]},[unit],[[node]])).toThrow(/one judgment per knowledge node/);
  });
+ it('repairs one invalid judgment with retained failure evidence, without repeating extraction or retrieval',async()=>{
+  const match={unitIndexes:[0],nodeId:'net',sufficiency:'partial',confidence:0.7,reason:'仅部分过程'};
+  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{matches:[match,match]},metadata:{stage:'admission'}}).mockResolvedValueOnce({value:{matches:[match]},metadata:{stage:'admission'}});
+  const retrieve=vi.fn(async()=>[node]);const result=await diagnoseEvidence([source],{generateJson} as StructuredGenerationClient,retrieve);
+  expect(generateJson).toHaveBeenCalledTimes(3);expect(retrieve).toHaveBeenCalledTimes(1);
+  expect(result.artifacts.judgmentAttempts?.[0].validationError).toMatch(/one judgment per knowledge node/);
+  expect(result.matches[0].proposedStatus).toBe('learning');
+ });
+ it('fails closed after the one allowed judgment repair also fails',async()=>{
+  const match={unitIndexes:[0],nodeId:'net',sufficiency:'partial',confidence:0.7,reason:'仅部分过程'};
+  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValue({value:{matches:[match,match]},metadata:{stage:'admission'}});
+  await expect(diagnoseEvidence([source],{generateJson} as StructuredGenerationClient,async()=>[node])).rejects.toThrow(/one judgment per knowledge node/);
+  expect(generateJson).toHaveBeenCalledTimes(3);
+ });
  it('multiple sources can support one capability and one source multiple capabilities',()=>{
   const other={...node,node_id:'risk',revision_id:'risk-v1'};
   const matches=[{unitIndexes:[0,1],nodeId:'net',sufficiency:'supported',confidence:0.9,reason:'两份过程相互核验'},{unitIndexes:[0],nodeId:'risk',sufficiency:'partial',confidence:0.8,reason:'一份资料还指出风险'}];
