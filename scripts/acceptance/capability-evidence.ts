@@ -25,7 +25,15 @@ if(mode==='index') {
   const file=await client.storage.from(uploaded.bucket).uploadToSignedUrl(uploaded.path,uploaded.token,new Blob([record.text],{type:'text/plain'}));assert.ifError(file.error);
   await request('/api/evidence',{action:'parse',sourceId:uploaded.source.id});sourceIds.push(uploaded.source.id);
  }
- const result=await request('/api/evidence',{action:'diagnose',sourceIds});
+ let result:{runId:string};
+ try{result=await request('/api/evidence',{action:'diagnose',sourceIds});}
+ catch(error){
+  const data=await request('/api/evidence');const after=await request('/api/progress');
+  const run=data.runs.find((r:{source_ids:string[]})=>r.source_ids.length===sourceIds.length&&r.source_ids.every(id=>sourceIds.includes(id)));
+  const failure={status:'FAIL',preview,sourceIds,sources:records,error:error instanceof Error?error.message:'Diagnosis failed',run,beforeUserKnowledge:before.userKnowledge,afterUserKnowledge:after.userKnowledge,formalStateUnchanged:JSON.stringify(before.userKnowledge)===JSON.stringify(after.userKnowledge)};
+  mkdirSync('.acceptance/capability-evidence-action-loop',{recursive:true});writeFileSync(`.acceptance/capability-evidence-action-loop/gold-failed-${run?.id??sourceIds[0]}.json`,JSON.stringify(failure,null,2)+'\n');
+  throw error;
+ }
  const data=await request('/api/evidence');const after=await request('/api/progress');assert.deepEqual(after.userKnowledge,before.userKnowledge,'AI proposal must not write formal state');
  const report={preview,sourceIds,runId:result.runId,sources:records,beforeUserKnowledge:before.userKnowledge,afterUserKnowledge:after.userKnowledge,units:data.units.filter((u:{run_id:string})=>u.run_id===result.runId),proposals:data.proposals.filter((p:{run_id:string})=>p.run_id===result.runId),run:data.runs.find((r:{id:string})=>r.id===result.runId),formalStateUnchanged:true};
  mkdirSync('.acceptance/capability-evidence-action-loop',{recursive:true});writeFileSync(`.acceptance/capability-evidence-action-loop/gold-${result.runId}.json`,JSON.stringify(report,null,2)+'\n');

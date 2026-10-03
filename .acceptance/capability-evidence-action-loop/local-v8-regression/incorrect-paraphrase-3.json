@@ -1,0 +1,187 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-incorrect-paraphrase",
+      "line": 1,
+      "quote": "我尝试核算 M91 单期净需求：需求为 150 件，已核实可用库存 70 件，没有确认到货。我在草稿记录 150 减 70 等于 90，所以写下净需求 90 件，尚未复算。",
+      "observation": "实际尝试核算 M91 单期净需求：以需求 150 件、已核实可用库存 70 件、无确认到货为输入，在草稿中记录 150 减 70 等于 90，并写下净需求 90 件；同时注明尚未复算。",
+      "capability": "执行单期净需求计算并记录草稿结果"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "insufficient",
+      "confidence": 0.95,
+      "reason": "原文仅记录单期净需求草稿：使用需求150、可用库存70、无确认到货，但150-70=90为算术错误（应为80），且注明尚未复算，未覆盖分时段净需求及正确排除不可用库存的完整标准。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "insufficient",
+      "confidence": 0.85,
+      "reason": "原文只给出单期净需求草稿，未涉及补货交期窗口，也未计算最早缺料日、缺口量或交期敏感性；仅提供可能作为输入的净需求，且该净需求计算还有算术错误。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "b33daa04-0371-4d78-9cec-ffb3f0d991e2",
+      "generatedAt": "2026-10-03T16:48:10.161Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 397,
+      "completionTokens": 1011
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "ab0f5203-74ff-467c-94c5-af2fa1f694e1",
+      "generatedAt": "2026-10-03T16:48:35.083Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1324,
+      "completionTokens": 5249
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "原文仅记录单期净需求草稿：使用需求150、可用库存70、无确认到货，但150-70=90为算术错误（应为80），且注明尚未复算，未覆盖分时段净需求及正确排除不可用库存的完整标准。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.95
+            },
+            "supply-shortage-exposure": {
+              "reason": "原文只给出单期净需求草稿，未涉及补货交期窗口，也未计算最早缺料日、缺口量或交期敏感性；仅提供可能作为输入的净需求，且该净需求计算还有算术错误。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.85
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文仅记录净需求草稿，未涉及瓶颈、良率、已承诺负荷或期间可交付量计算，也未识别名义产能误用。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "R04": {
+              "reason": "原文没有生成可检查计划并按步骤执行收集结果的证据，仅有一次净需求草稿记录，且结果错误，不能对应Plan-and-Execute标准。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "CDS525-K017": {
+              "reason": "原文未解释Forward Propagation，也未对小型网络完成一次完整前向计算、记录各层输出或提交forward_trace.json。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-supplier-delivery-capacity",
+          "R04",
+          "CDS525-K017"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-incorrect-paraphrase",
+          "line": 1,
+          "quote": "我尝试核算 M91 单期净需求：需求为 150 件，已核实可用库存 70 件，没有确认到货。我在草稿记录 150 减 70 等于 90，所以写下净需求 90 件，尚未复算。",
+          "observation": "实际尝试核算 M91 单期净需求：以需求 150 件、已核实可用库存 70 件、无确认到货为输入，在草稿中记录 150 减 70 等于 90，并写下净需求 90 件；同时注明尚未复算。",
+          "capability": "执行单期净需求计算并记录草稿结果"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.674760559953437
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.577856259878173
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.495620578788485
+        },
+        {
+          "node_id": "R04",
+          "revision_id": "R04-r1",
+          "title": "Plan-and-Execute",
+          "description": "先生成可检查计划，再按步骤执行并收集结果。",
+          "mastery_criteria": [
+            "能独立完成Plan-and-Execute的核心目标与边界",
+            "能在具体场景中识别Plan-and-Execute的正确用法与常见误用",
+            "能用可检查的示例证明对Plan-and-Execute的掌握"
+          ],
+          "similarity": 0.482152195912338
+        },
+        {
+          "node_id": "CDS525-K017",
+          "revision_id": "CDS525-K017-r1",
+          "title": "Forward Propagation",
+          "description": "按照网络连接方向从输入逐层计算中间表示和最终输出的过程。",
+          "mastery_criteria": [
+            "能准确解释「Forward Propagation」的核心作用、适用边界及与相邻概念的区别",
+            "能完成对应最小可执行任务：对一个小网络完成一次完整前向计算，记录各层输出，并提交 forward_trace.json"
+          ],
+          "similarity": 0.464962702837242
+        }
+      ]
+    ],
+    "verifications": []
+  },
+  "retrievalCount": 1
+}

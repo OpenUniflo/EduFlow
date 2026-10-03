@@ -1,0 +1,29 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [],
+  "matches": [],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "d76969d7-aad6-4cd9-a0ab-27788dcd1ddf",
+      "generatedAt": "2026-10-03T16:33:55.463Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 352,
+      "completionTokens": 78
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [],
+    "extraction": {
+      "units": []
+    },
+    "retrieved": []
+  },
+  "retrievalCount": 0
+}

@@ -11,6 +11,7 @@ for(const actor of ['A','B']){
  const client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
  const auth=await client.auth.signInWithPassword({email:process.env[`ACCEPTANCE_${actor}_EMAIL`]!,password:process.env[`ACCEPTANCE_${actor}_PASSWORD`]!});assert.ifError(auth.error);clients.push(client);tokens.push(auth.data.session!.access_token);users.push(auth.data.user!.id);
 }
+const stateBefore=await clients[0].from('user_knowledge_states').select('*').order('node_id');assert.ifError(stateBefore.error);
 async function api(actor:number,body?:unknown){const r=await fetch(preview+'/api/evidence',{method:body?'POST':'GET',headers:{Authorization:`Bearer ${tokens[actor]}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,data:await r.json()};}
 const text='证据隔离测试：只验证上传、来源与权限，不主张任何能力。';
 const declared={action:'upload',title:'隔离测试资料.txt',contentType:'text/plain',size:Buffer.byteLength(text)};
@@ -32,6 +33,7 @@ for(const table of ['user_evidence_sources','evidence_units','capability_diagnos
 check('source can be archived',(await api(0,{action:'archive',sourceId})).status===200);
 check('archive preserves original',(await api(0,{action:'download',sourceId})).status===200);
 check('archived source cannot diagnose',(await api(0,{action:'diagnose',sourceIds:[sourceId]})).status===404);
-check('no official state from uploading or parsing',(await clients[0].from('user_knowledge_states').select('*')).data?.length===0);
+const stateAfter=await clients[0].from('user_knowledge_states').select('*').order('node_id');assert.ifError(stateAfter.error);
+check('no official state change from uploading or parsing',JSON.stringify(stateAfter.data)===JSON.stringify(stateBefore.data));
 const report={status:'PASS',preview,sourceId,assertions,count:assertions.length,scope:'ordinary user JWT and real private Storage upload; not AI or Hosted confirmation acceptance'};
 writeFileSync('.acceptance/capability-evidence-action-loop/hosted-upload-isolation.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({status:report.status,count:report.count,sourceId}));

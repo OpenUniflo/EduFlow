@@ -1,0 +1,184 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-incorrect-paraphrase",
+      "line": 1,
+      "quote": "我尝试核算 M91 单期净需求：需求为 150 件，已核实可用库存 70 件，没有确认到货。我在草稿记录 150 减 70 等于 90，所以写下净需求 90 件，尚未复算。",
+      "observation": "尝试核算 M91 单期净需求：以需求150件、已核实可用库存70件、未确认到货为输入，在草稿记录150减70等于90，并写下净需求90件；尚未复算。",
+      "capability": "单期净需求核算"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "insufficient",
+      "confidence": 0.9,
+      "reason": "单元尝试核算M91单期净需求，但将150减70写成90，实际应为80，计算结果错误；且自述尚未复算，未体现分时段净需求与正确排除不可用库存。属于错误结果，不能证明掌握。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "insufficient",
+      "confidence": 0.9,
+      "reason": "单元仅提供净需求核算草稿（且计算错误），未使用补货交期窗口，未计算最早缺料日、缺口量或交期敏感性；仅触及前置输入，未执行该标准中的任何动作。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "11b03bf1-dbc3-4bf7-9a12-11719953e5e0",
+      "generatedAt": "2026-10-03T16:37:59.239Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 397,
+      "completionTokens": 1047
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "e52aa5ca-544a-4de9-8394-ec9404f8a6f6",
+      "generatedAt": "2026-10-03T16:38:32.157Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1287,
+      "completionTokens": 7284
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "单元尝试核算M91单期净需求，但将150减70写成90，实际应为80，计算结果错误；且自述尚未复算，未体现分时段净需求与正确排除不可用库存。属于错误结果，不能证明掌握。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.9
+            },
+            "supply-shortage-exposure": {
+              "reason": "单元仅提供净需求核算草稿（且计算错误），未使用补货交期窗口，未计算最早缺料日、缺口量或交期敏感性；仅触及前置输入，未执行该标准中的任何动作。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.9
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "单元只涉及净需求核算，未依据瓶颈、良率和已承诺负荷计算期间可交付量，也未识别名义产能误用。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-material-risk-identification": {
+              "reason": "单元未识别集中供应、交期波动或替代限制等暴露，也未区分事实、假设及待核验证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "单元未将已量化缺口映射到受影响订单、停线时段或恢复优先级输入；仅有净需求草稿，未执行该标准动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-supplier-delivery-capacity",
+          "supply-material-risk-identification",
+          "supply-shortage-impact-assessment"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-incorrect-paraphrase",
+          "line": 1,
+          "quote": "我尝试核算 M91 单期净需求：需求为 150 件，已核实可用库存 70 件，没有确认到货。我在草稿记录 150 减 70 等于 90，所以写下净需求 90 件，尚未复算。",
+          "observation": "尝试核算 M91 单期净需求：以需求150件、已核实可用库存70件、未确认到货为输入，在草稿记录150减70等于90，并写下净需求90件；尚未复算。",
+          "capability": "单期净需求核算"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.769987175165461
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.648107804076047
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.540982695876522
+        },
+        {
+          "node_id": "supply-material-risk-identification",
+          "revision_id": "supply-material-risk-identification:v1",
+          "title": "关键物料供应风险识别",
+          "description": "识别集中供应、交期波动和替代限制等暴露，区别事实、假设及待核验证据。",
+          "mastery_criteria": [
+            "识别集中供应、交期波动和替代限制等暴露，区别事实、假设及待核验证据。"
+          ],
+          "similarity": 0.482470003660918
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.480991958438872
+        }
+      ]
+    ],
+    "verifications": []
+  },
+  "retrievalCount": 1
+}

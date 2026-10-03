@@ -1,0 +1,205 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-similar-not-same",
+      "line": 1,
+      "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+      "observation": "实际进行并记录了仓库分拣线吞吐量测定：60 分钟完成 600 箱，平均 10 箱/分钟，重复两次分别为 595 箱和 605 箱；同一记录限定只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+      "capability": "仓库分拣线吞吐量测量：以固定时长完成箱数、平均速率和重复试验记录吞吐量范围"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "E12",
+      "sufficiency": "partial",
+      "confidence": 0.6,
+      "reason": "单元实际执行并记录了固定时长60分钟、重复两次（595/605箱）、平均10箱/分钟的仓库分拣线吞吐量测定，并限定只测仓内分拣，体现可重复执行、结果可比较及边界；但未说明是在设计/选择基准任务，也未识别Benchmark Task的正确用法与常见误用，未覆盖全部mastery_criteria。",
+      "revisionId": "E12-r1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "35e4470b-4b9d-4b08-b672-c0be9cf8e984",
+      "generatedAt": "2026-10-03T16:39:49.796Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 396,
+      "completionTokens": 964
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "c1f450fa-7f09-41c3-ae10-7360b0670d9e",
+      "generatedAt": "2026-10-03T16:40:09.751Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1318,
+      "completionTokens": 4126
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-factual-verification-v1",
+      "requestId": "1770f8d3-37b1-4e27-bfeb-60d3bff50c4a",
+      "generatedAt": "2026-10-03T16:40:27.174Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 811,
+      "completionTokens": 3844
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "E12": {
+              "reason": "单元实际执行并记录了固定时长60分钟、重复两次（595/605箱）、平均10箱/分钟的仓库分拣线吞吐量测定，并限定只测仓内分拣，体现可重复执行、结果可比较及边界；但未说明是在设计/选择基准任务，也未识别Benchmark Task的正确用法与常见误用，未覆盖全部mastery_criteria。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.6
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文明确“本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单”，未依据瓶颈、良率和已承诺负荷计算供应商期间可交付量，也未识别名义产能误用。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            },
+            "EVAL02": {
+              "reason": "原文仅记录仓库分拣线吞吐量的重复测量，没有解释Pass@k衡量的事件、区分一次成功率与多次尝试至少一次成功，也未判断Pass@k适用场景。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            },
+            "supply-supplier-screening-criteria": {
+              "reason": "原文只测仓内分拣线吞吐量并明确不涉及供应商相关事项，未将物料规格与交付要求转成可验证筛选准则，也未区别门槛和评分项。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            },
+            "EVAL03": {
+              "reason": "原文仅记录两次吞吐量重复测量结果（595和605箱），未解释Pass^k与Pass@k的方向性差异，未说明连续成功为何更严格，也未在高可靠任务中选择连续成功评估方式。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            }
+          }
+        },
+        "nodeIds": [
+          "E12",
+          "supply-supplier-delivery-capacity",
+          "EVAL02",
+          "supply-supplier-screening-criteria",
+          "EVAL03"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-similar-not-same",
+          "line": 1,
+          "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+          "observation": "实际进行并记录了仓库分拣线吞吐量测定：60 分钟完成 600 箱，平均 10 箱/分钟，重复两次分别为 595 箱和 605 箱；同一记录限定只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+          "capability": "仓库分拣线吞吐量测量：以固定时长完成箱数、平均速率和重复试验记录吞吐量范围"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "E12",
+          "revision_id": "E12-r1",
+          "title": "Benchmark Task",
+          "description": "设计可重复执行、结果可比较的基准任务。",
+          "mastery_criteria": [
+            "能独立完成Benchmark Task的核心目标与边界",
+            "能在具体场景中识别Benchmark Task的正确用法与常见误用",
+            "能用可检查的示例证明对Benchmark Task的掌握"
+          ],
+          "similarity": 0.498554006175816
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.488675653934479
+        },
+        {
+          "node_id": "EVAL02",
+          "revision_id": "EVAL02-r1",
+          "title": "Pass@k",
+          "description": "衡量在最多 k 次尝试中至少一次成功的概率，用于观察 Agent 在多次采样下的能力上限。",
+          "mastery_criteria": [
+            "能解释 Pass@k 衡量的事件",
+            "能区分一次成功率与多次尝试至少一次成功的含义",
+            "能判断何时 Pass@k 更适合用于探索能力上限而非业务可靠性"
+          ],
+          "similarity": 0.47136726975441
+        },
+        {
+          "node_id": "supply-supplier-screening-criteria",
+          "revision_id": "supply-supplier-screening-criteria:v1",
+          "title": "供应商筛选准则定义",
+          "description": "将物料规格与交付要求转成可验证筛选准则，区别必须满足的门槛和评分项。",
+          "mastery_criteria": [
+            "将物料规格与交付要求转成可验证筛选准则，区别必须满足的门槛和评分项。"
+          ],
+          "similarity": 0.464603011059405
+        },
+        {
+          "node_id": "EVAL03",
+          "revision_id": "EVAL03-r1",
+          "title": "Pass^k",
+          "description": "衡量连续多次尝试都成功的可靠性指标，用于关注真实业务中稳定重复完成任务的能力。",
+          "mastery_criteria": [
+            "能解释 Pass^k 与 Pass@k 的方向性差异",
+            "能说明连续成功要求为什么比单次成功更严格",
+            "能在高可靠任务中选择适当的连续成功评估方式"
+          ],
+          "similarity": 0.461215761972414
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "E12"
+        ],
+        "value": {
+          "verdicts": {
+            "E12": {
+              "verdict": "valid",
+              "reason": "核验原文：确实记录60分钟完成600箱、平均10箱/分钟，重复两次为595和605箱，并限定只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。由此可确认存在固定时长、重复试验、结果可比和边界限定等与Benchmark Task相关的可核实子动作；但原文未说明是在设计/选择基准任务，也未识别Benchmark Task的正确用法与常见误用，未覆盖全部mastery_criteria。候选将其定为partial/learning并指出未覆盖全部标准，依赖事实成立，评价恰当。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "retrievalCount": 1
+}
