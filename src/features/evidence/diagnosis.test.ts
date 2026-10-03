@@ -17,6 +17,12 @@ describe('personal evidence discovery boundary',()=>{
   const result=validateMatches({matches:[{unitIndexes:[0],nodeId:'net',sufficiency:'insufficient',confidence:0.99,reason:'只有计划，没有已完成的表现'}]},[unit],[[node]]);
   expect(result[0].proposedStatus).toBeNull();
  });
+ it('does not silently lose judgments or strip source context in the second stage',async()=>{
+  expect(()=>validateMatches({matches:[]},[unit],[[node]])).toThrow(/Every evidence unit/);
+  const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{matches:[{unitIndexes:[0],nodeId:'net',sufficiency:'insufficient',confidence:0.9,reason:'上下文限定'}]},metadata:{stage:'admission'}});
+  await diagnoseEvidence([source],{generateJson} as StructuredGenerationClient,async()=>[node]);
+  expect(JSON.parse(generateJson.mock.calls[1][0].user).sources).toEqual([source]);
+ });
  it('requires retrieved existing identity, never admits invented nodes',()=>{
   expect(()=>validateMatches({matches:[{unitIndexes:[0],nodeId:'invented',sufficiency:'supported',confidence:1,reason:'test'}]},[unit],[[node]])).toThrow(/outside retrieved/);
  });

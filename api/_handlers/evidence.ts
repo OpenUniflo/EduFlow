@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { createServerSupabase, createUserSupabase, requireCapability } from '../_lib/supabase.js';
+import { createServerSupabase, createUserSupabase } from '../_lib/supabase.js';
 import { ApiError, handleApi, json, methodNotAllowed } from '../_lib/http.js';
 import { allRows, dataOrThrow } from '../_lib/query.js';
 import { createEmbeddingService } from '../_lib/embedding.js';
@@ -34,7 +34,8 @@ export default handleApi(async(request,response)=>{
   const body=parsed.data;
   const server=createServerSupabase();
   if(body.action==='index') {
-    await requireCapability(user,'global-domain-admin');
+    const profile=await server.from('profiles').select('role,capabilities').eq('id',user.id).single();
+    if(profile.error || (profile.data.role!=='admin' && !profile.data.capabilities?.includes('global-domain-admin'))) throw new ApiError(403,'forbidden','Global administrator authority is required');
     const env=readEmbeddingEnvironment();
     let query=server.from('knowledge_nodes').select('id,current_revision_id').eq('scope','global').eq('status','active').order('id').limit(12);
     if(body.after) query=query.gt('id',body.after);
