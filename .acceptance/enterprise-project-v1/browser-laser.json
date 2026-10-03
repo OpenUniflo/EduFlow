@@ -1,0 +1,63 @@
+{
+  "preview": "https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app",
+  "commit": "38eb59e665e185ff580ca14ab1c9b036eade71f4",
+  "method": "Read-only current React Fiber/ForceGraph references in production browser; invoked actual onNodeClick/onBackgroundClick callbacks to measure invariants. Independent UX also exercised real pointer/search input. No injected application behavior or layout code.",
+  "frozenPositionsSha256": "0551f4dfda36fb7e37a8a213769e18eb5f764185058d801f652e53933f9e965d",
+  "graphNodes": 17,
+  "factualEdges": 22,
+  "shaderTimeAdvances": true,
+  "cases": [
+    {
+      "selected": "供应商筛选准则定义",
+      "graphDataIdentical": true,
+      "positionsUnchanged": true,
+      "cameraUnchanged": true,
+      "visible": 13,
+      "time": 97.8522,
+      "expectedFactualDownstreamEdges": 13
+    },
+    {
+      "selected": "供应商筛选准则定义",
+      "graphDataIdentical": true,
+      "positionsUnchanged": true,
+      "cameraUnchanged": true,
+      "visible": 13,
+      "time": 115.6515,
+      "expectedFactualDownstreamEdges": 13
+    },
+    {
+      "selected": "供应商交付产能核验",
+      "graphDataIdentical": true,
+      "positionsUnchanged": true,
+      "cameraUnchanged": true,
+      "visible": 5,
+      "time": 116.06819999999999,
+      "expectedFactualDownstreamEdges": 5
+    },
+    {
+      "selected": "供应商准入证据判定",
+      "graphDataIdentical": true,
+      "positionsUnchanged": true,
+      "cameraUnchanged": true,
+      "visible": 1,
+      "time": 116.4848,
+      "expectedFactualDownstreamEdges": 1
+    },
+    {
+      "selected": "供应恢复备选方案排序",
+      "graphDataIdentical": true,
+      "positionsUnchanged": true,
+      "cameraUnchanged": true,
+      "visible": 0,
+      "expectedFactualDownstreamEdges": 0
+    },
+    {
+      "selected": null,
+      "graphDataIdentical": true,
+      "positionsUnchanged": true,
+      "cameraUnchanged": true,
+      "visible": 0,
+      "expectedFactualDownstreamEdges": 0
+    }
+  ]
+}

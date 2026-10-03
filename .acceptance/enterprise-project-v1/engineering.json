@@ -1,0 +1,26 @@
+{
+  "fullSuite": {
+    "files": 101,
+    "tests": 709,
+    "pass": true
+  },
+  "focused": {
+    "files": 2,
+    "tests": 13,
+    "pass": true
+  },
+  "typecheck": "PASS",
+  "lint": "PASS",
+  "productionBuild": "PASS",
+  "clientSecretAudit": "PASS",
+  "knowledgeAudit": "PASS",
+  "migrationHistory": "Local/Hosted equal through 20261002061940_personal_course_route_versions_v2; no migration added",
+  "warnings": [
+    "Existing H5P CSS *width",
+    "Existing large build chunks",
+    "Existing Node DEP0169 url.parse"
+  ],
+  "hostedSecurityAssertions": 19,
+  "existingHostedCapabilityRegression": "PASS, ordinary learner and administrator, 116 original targets",
+  "existingLocalPersonalRoutePersistence": "PASS: hard-only closure, optional Include closure, immutable versions, preview no write, concurrency409, restore new version, empty goals, stale/excluded Micro rejection, user isolation/RPC denial; own temporary fixtures cleaned"
+}

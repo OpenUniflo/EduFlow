@@ -1,0 +1,14 @@
+{
+  "beforePreview": "https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app",
+  "afterPreview": "https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app",
+  "transition": "supply-shortage-exposure",
+  "grayBefore": 8,
+  "grayAfter": 7,
+  "routeBefore": 13,
+  "routeAfter": 12,
+  "routeVersionsAdded": 0,
+  "historyHashUnchanged": true,
+  "otherUserStateUnchanged": true,
+  "navigationPathChanged": true,
+  "nextActionChanged": false
+}

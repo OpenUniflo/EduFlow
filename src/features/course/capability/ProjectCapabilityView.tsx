@@ -47,7 +47,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
         {!control.editing ? <div className="project-capability-goal glass-v2" aria-label="项目目标与当前能力缺口">
           {runtime.course.targetOutcome ? <p><strong>项目目标</strong> {runtime.course.targetOutcome}</p> : null}
           <small>当前已具备 {result.model.currentKnowledgeIds.length} 项 · 待补中间能力 {result.model.bridgeKnowledgeIds.filter(id => !result.model!.currentKnowledgeIds.includes(id)).length} 项 · 待达成目标 {result.model.courseKnowledgeIds.filter(id => !result.model!.currentKnowledgeIds.includes(id)).length} 项</small>
-          <small>路径随已有能力调整。点击能力，沿光流查看它支撑的后续能力。</small>
+          <small>仅显示当前通向目标的能力；已有能力变化后，已不再需要的前置会移出。点击能力，沿光流查看后续支撑。</small>
         </div> : null}
         {!control.editing && authenticated ? <RoutePlanningPanel control={control} title={title}/> : null}
       </div>

@@ -1,0 +1,52 @@
+{
+  "reviewer": "independent Functional Acceptance Reviewer",
+  "preview": "https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app",
+  "capturedT0": "2026-10-03T09:08:27.386Z",
+  "capturedT1": "2026-10-03T09:09:37.972Z",
+  "pass": true,
+  "findings": [
+    "Original verify lacked exact state set guard; corrected in acceptance tool, independent fixture assertion passed."
+  ],
+  "assertions": {
+    "sameRolePermissionsMembershipTargets": true,
+    "exactControlledT0States": true,
+    "onlyOneAStateAdded": true,
+    "oldAStatesUnchanged": true,
+    "BEntireCaptureUnchanged": true,
+    "historyEntireRowsUnchanged": true,
+    "noImplicitVersion": true,
+    "crossUserStatesHistoryHidden": true,
+    "crossUserRestore404": true,
+    "staleAdopt409": true,
+    "AandBRealBrowserLogin": true,
+    "browserConsoleErrors": 0,
+    "browserPageErrors": 0
+  },
+  "historyHashes": [
+    {
+      "actor": "A",
+      "count": 3,
+      "sha256": "e4fa1da4bf3ccbade748d1540cf7d6d436420f9644885e5b54b840ef7824c8de"
+    },
+    {
+      "actor": "B",
+      "count": 1,
+      "sha256": "eb50d430b23ab5debbafab57de2fa13c98ae9209041ffefcc7d4fa5455dcfad2"
+    }
+  ],
+  "limits": [
+    "Reviewer did not perform successful mutation; successful adoption and restore independently inspected via main HTTP evidence.",
+    "Laser and final visual interpretation separate gates."
+  ],
+  "followup": {
+    "pass": true,
+    "AOldVersions1Through3Unchanged": true,
+    "AExplicitAdjustmentV4Parent": 3,
+    "AExplicitRestoreV5Parent": 4,
+    "ARestoredFromVersion": 3,
+    "AFinalConstraints": [],
+    "BVersion": 1,
+    "exactRestoredT0": true,
+    "strictStateAndResetGuardsReviewed": true
+  }
+}

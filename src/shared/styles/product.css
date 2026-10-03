@@ -6980,10 +6980,10 @@ body:has(.micro-learning-page) { min-width: 0; overflow: auto; }
 .navigator-stop { position: relative; height: 180px; }
 .navigator-connector { position: absolute; top: 0; width: 100%; height: 180px; overflow: visible; pointer-events: none; }
 .navigator-connector path { fill: none; stroke: #dfe4ed; stroke-width: 3; }
-.navigator-stop.completed .navigator-connector path { stroke: #a9c8bc; }
+.navigator-stop.completed .navigator-connector path { stroke: #afbfdf; }
 .navigator-node { position: absolute; z-index: 1; top: 0; left: var(--path-x); transform: translateX(-50%); display: grid; place-items: center; width: 68px; height: 68px; border: 2px solid #d6dce8; border-radius: 50%; color: #8a94ab; background: #fff; box-shadow: 0 5px 0 #e1e5ed; }
 .navigator-node span { display: grid; place-items: center; }
-.navigator-stop.completed .navigator-node { color: #fff; background: #326954; border-color: #326954; box-shadow: 0 5px 0 #234e3e; }
+.navigator-stop.completed .navigator-node { color: #fff; background: #3b82f6; border-color: #3b82f6; box-shadow: 0 5px 0 #2563b8; }
 .navigator-stop.current .navigator-node { color: #fff; background: var(--atlas-brand,#6375df); border-color: var(--atlas-brand,#6375df); box-shadow: 0 5px 0 #4856ab,0 0 0 8px #687cdb16; }
 .navigator-stop.locked .navigator-node { background: #e9ecf2; box-shadow: 0 5px 0 #e0e4eb; }
 .navigator-node-copy { position: absolute; z-index: 1; top: 82px; left: var(--path-x); transform: translateX(-50%); width: min(210px,58%); text-align: center; pointer-events: none; }
@@ -7009,6 +7009,7 @@ body:has(.micro-learning-page) { min-width: 0; overflow: auto; }
 .navigator-practice-detail { border: 0; margin: auto; color: inherit; }
 .navigator-practice-detail::backdrop { background: #17223655; }
 
+.navigator-locate + .navigator-locate { margin-left: 20px; }
 .navigator-locate { border: 0; padding: 10px 0; background: transparent; color: #5869b8; font-size: 12px; }
 
 @media (min-width: 901px) {

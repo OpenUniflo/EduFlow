@@ -89,7 +89,7 @@ async function setup() {
 async function transition(reset=false){
   const c=privileged();const {data,error}=await c.auth.admin.listUsers({page:1,perPage:100});assert.ifError(error);const user=data.users.find(u=>u.email===actorEmail('A'));assert.equal(user?.user_metadata.acceptance,scenario.version);assert.ok(user);
   const existing=await c.from('user_knowledge_states').select('*').eq('user_id',user.id).eq('node_id',id(scenario.transition.node)).maybeSingle();assert.ifError(existing.error);
-  if(existing.data)assert.ok(JSON.stringify(existing.data.evidence).includes('acceptance-transition'),'Refuse modifying genuine learning');
+  if(existing.data){assert.equal(existing.data.status,'learned');assert.equal(existing.data.mastery_origin,'direct');assert.ok(Array.isArray(existing.data.evidence)&&existing.data.evidence.length===1&&existing.data.evidence[0].source===scenario.version&&existing.data.evidence[0].type==='acceptance-transition','Refuse modifying genuine or mixed learning evidence');}
   if(reset){if(existing.data){const r=await c.from('user_knowledge_states').delete().eq('user_id',user.id).eq('node_id',id(scenario.transition.node));assert.ifError(r.error);}}
   else if(!existing.data){const r=await c.from('user_knowledge_states').insert({user_id:user.id,node_id:id(scenario.transition.node),status:'learned',mastery_origin:'direct',evidence:[{source:scenario.version,type:'acceptance-transition',note:'受控 T0→T1，只验证 State→Gap→Route；非企业 Evidence inference。'}]});assert.ifError(r.error);}
   console.log(reset?'A restored to controlled T0; route history retained.':'A transitioned to T1 through controlled server authority; no route adoption.');
@@ -106,6 +106,11 @@ async function verify() {
       get(`/api/learner?resource=route-plan&courseId=${courseId}`),get('/api/knowledge'),get(`/api/courses?id=${courseId}`),get(`/rest/v1/user_knowledge_states?user_id=eq.${session.user.id}&select=*&order=node_id`,true),get(`/rest/v1/profiles?id=eq.${session.user.id}&select=role,capabilities`,true),get(`/rest/v1/user_course_states?course_id=eq.${courseId}&select=is_active`,true),get(`/rest/v1/personal_course_route_versions?course_id=eq.${courseId}&select=*&order=version_number`,true),get(`/api/navigation?courseId=${courseId}`)
     ]);
     assert.deepEqual(profile,[{role:'student',capabilities:[]}]);assert.deepEqual(membership,[{is_active:true}]);
+    const changed=actor==='A'&&states.some((s:{node_id:string})=>s.node_id===id(scenario.transition.node));
+    const phase=process.env.ACCEPTANCE_PHASE??'current';if(actor==='A'&&phase.endsWith('t0'))assert.equal(changed,false,'T0 baseline');if(actor==='A'&&phase.endsWith('t1'))assert.equal(changed,true,'T1 baseline');
+    const expected=[...scenario.states[actor].map(id),...(changed?[id(scenario.transition.node)]:[])].sort();
+    assert.deepEqual(states.map((s:{node_id:string})=>s.node_id).sort(),expected,'Exact controlled learner state set; no historical contamination');
+    assert.ok(states.every((s:{status:string;mastery_origin:string;evidence:Array<{source:string}>})=>s.status==='learned'&&s.mastery_origin==='direct'&&s.evidence?.length===1&&s.evidence[0].source===scenario.version));
     validateKnowledgeGraph(graph);
     assert.equal(validateCourseIntegrity(runtime,new InMemoryKnowledgeRepository(graph),userKnowledgeAccess(session.user.id)),true);
     for(const node of scenario.nodes)assert.ok(graph.nodes.some((n:{id:string;scope:string})=>n.id===node.id&&n.scope==='global'));

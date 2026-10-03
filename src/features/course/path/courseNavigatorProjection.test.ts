@@ -85,7 +85,8 @@ describe('Course navigator projection', () => {
   });
   it('never mistakes missing assets, empty routes or contradictory completion for success', () => {
     const missing = { ...decision, nextAction: { kind: 'next' as const, resourceKind: 'course' as const, nodeId: id, reasonCode: 'learning_content_unavailable', reason: 'Missing' } };
-    expect(project({ decision: missing }).emptyState.title).toBe('当前没有可继续的学习内容');
+    expect(project({ decision: missing }).emptyState.title).toBe('下一步能力：Route Knowledge');
+    expect(project({ decision: missing }).nextAction).toBeNull();
     expect(project({ decision: missing }).emptyState.reason).toContain('4 项实训仍保留在下方');
     expect(project({ decision: { ...missing, nextAction: { ...missing.nextAction, reasonCode: 'course_route_complete' } } }).complete).toBe(false);
     expect(project({ decision: { ...missing, path: [], nextAction: { ...missing.nextAction, reasonCode: 'course_route_complete' } } }).complete).toBe(false);

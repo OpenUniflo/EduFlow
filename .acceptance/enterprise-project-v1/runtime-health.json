@@ -1,0 +1,10 @@
+{
+  "deploymentId": "dpl_67qasVjMApQysJN27Q7faNNeZ7s7",
+  "preview": "https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app",
+  "window": "30 minutes preceding 2026-10-03T09:10Z (latest deployment since creation)",
+  "http5xxCount": 0,
+  "errorLogs": 4,
+  "onlyPreexistingDep0169": true,
+  "mainBrowserPageErrors": 0,
+  "mainBrowserConsoleErrors": 0
+}

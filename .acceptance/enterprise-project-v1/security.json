@@ -1,0 +1,102 @@
+{
+  "preview": "https://edu-flow-rcpwclt8s-july-nanas-projects.vercel.app",
+  "capturedAt": "2026-10-03T09:12:08.930Z",
+  "checks": [
+    {
+      "name": "A current route",
+      "status": 200
+    },
+    {
+      "name": "B current route",
+      "status": 200
+    },
+    {
+      "name": "0 cross-user history hidden",
+      "status": 200
+    },
+    {
+      "name": "0 cross-user states hidden",
+      "status": 200
+    },
+    {
+      "name": "0 cross-user restore denied",
+      "status": 404
+    },
+    {
+      "name": "0 client history mutation denied",
+      "status": 403
+    },
+    {
+      "name": "0 client state mutation denied",
+      "status": 403
+    },
+    {
+      "name": "1 cross-user history hidden",
+      "status": 200
+    },
+    {
+      "name": "1 cross-user states hidden",
+      "status": 200
+    },
+    {
+      "name": "1 cross-user restore denied",
+      "status": 404
+    },
+    {
+      "name": "1 client history mutation denied",
+      "status": 403
+    },
+    {
+      "name": "1 client state mutation denied",
+      "status": 403
+    },
+    {
+      "name": "Include preview",
+      "status": 200
+    },
+    {
+      "name": "hard Exclude conflict preview",
+      "status": 200
+    },
+    {
+      "name": "hard Exclude adoption rejected",
+      "status": 422
+    },
+    {
+      "name": "forged authority rejected",
+      "status": 400
+    },
+    {
+      "name": "explicit Include adoption appends version",
+      "status": 200
+    },
+    {
+      "name": "stale route adoption rejected",
+      "status": 409
+    },
+    {
+      "name": "restore appends current-world version",
+      "status": 200
+    }
+  ],
+  "historyUnchanged": true,
+  "previewCreatedVersions": 0,
+  "explicitEditCreatedVersions": 2,
+  "otherUserUnchanged": true,
+  "staleBase": "744aba3c-ee8f-4408-9cec-67299ff7ea00",
+  "currentBase": "88182c54-24b8-43f9-919c-04a22aabed45",
+  "oldVersionHashes": [
+    {
+      "id": "42246c13-e644-4cd2-a57b-1ec6d1f7a820",
+      "sha256": "3d26f3764935b2021258ea4de557bb3d7fd70d461b11aaf50d17ae96c64828a6"
+    },
+    {
+      "id": "ce1c3bfe-485b-48ef-8716-bda69297867a",
+      "sha256": "3a4002936dd7a41c901ef29c041d58f8ef6cac3ec254667301711b87a61c4c07"
+    },
+    {
+      "id": "744aba3c-ee8f-4408-9cec-67299ff7ea00",
+      "sha256": "6c0b2bbef4ef73bfd904ebed565e8f89cd1fcdf77a4bccfd2db285ba62338cad"
+    }
+  ]
+}
