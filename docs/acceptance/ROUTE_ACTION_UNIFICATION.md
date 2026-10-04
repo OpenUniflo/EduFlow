@@ -2,7 +2,7 @@
 
 2026-10-04. This is an execution record, not a completion claim.
 
-## Latest checkpoint — 2026-10-04 14:39 UTC
+## Latest checkpoint — 2026-10-04 14:47 UTC
 
 Implementation HEAD `d06b0b9dafabcc170913b5d5f331674a2d1e8bd0` is READY at https://edu-flow-m4upxj1ka-july-nanas-projects.vercel.app. The status below supersedes historical pending statements, which remain as the phase-by-phase audit trail. **Whole-goal acceptance is not complete.**
 
@@ -12,6 +12,10 @@ Implementation HEAD `d06b0b9dafabcc170913b5d5f331674a2d1e8bd0` is READY at https
 - Library and Source Detail show one formal confirmation separately from pending contributions. Four final desktop/narrow screenshots passed independent UI review. Assistant presentation contexts and keyboard/draft/modal behavior passed fresh checks.
 - v18 plan-only negative control completed in 2.909s with zero units/proposals. Positive repeat and wrong-calculation control remain unverified: extraction works, but embedding calls fail with `UND_ERR_CONNECT_TIMEOUT` before retrieval. Most recent positive Run `17fbfaff-3a05-4db2-81db-f5931aefb07b` failed at 14:37:41 UTC after 53.65s. Latest Preview runtime logs contain corresponding `/api/evidence` 503s. No fake retrieval, fallback model, weaker threshold or partial proposals were introduced to obtain a PASS.
 - Remaining: restore provider connectivity, repeat the same positive source and wrong-calculation control under v18, and complete same-mounted Project post-confirmation coordinate/camera verification. A successful historical v16 confirmation does not validate v18 judgment quality.
+
+Later check on READY documentation checkpoint `904199ab81735463e41a25e5c4ab5e743163f52d`, https://edu-flow-qkxdtrja7-july-nanas-projects.vercel.app: the existing local embedding smoke test passed with aliyun / qwen3.7-text-embedding / 1024 finite dimensions. This does not establish identical local and Preview configuration. Fresh Preview wrong-calculation Run `90125704-b63a-4d93-88e5-d570fda6f2d1` completed in 18.15s, retrieved the relevant net-material-requirement node, and explicitly rejected 100−40=170 as incorrect. Its sole diagnostic proposal has `sufficiency=insufficient`, `proposed_status=null`, no evidence and no confirmation. Independent data review marks this specific negative control PASS; it was rejected at sufficiency, so independent-verifier negative behavior is not established. The fixture labels itself a synthetic incorrect attempt, so general error-detection reliability is not claimed. See `final-quality-controls.json`.
+
+The subsequent positive Run `95b7e999-f2b4-4671-93bc-edbd2601ca0e` failed after 55.86s with the same embedding connection timeout, zero persisted units and zero proposals. Connectivity is intermittent. Final outstanding work is now the positive repeat and same-mounted Project confirmation stability; criteria 29 and 33 remain FAIL. The latest deployment's initial zero-5xx window preceded this failure and must not be represented as a clean final runtime check.
 
 ### 33-criterion checkpoint
 
