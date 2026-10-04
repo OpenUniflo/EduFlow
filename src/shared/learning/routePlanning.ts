@@ -209,3 +209,6 @@ export function routeStructure(input: RoutePlanningInput, constraints: RouteCons
     courseOrder: [...input.courseOrder].map(row => ({ ...row })).sort(compareOrder),
   };
 }
+
+/** Existing deterministic Kahn ordering, also used by factual route presentation. */
+export { topological as orderRouteNodes };

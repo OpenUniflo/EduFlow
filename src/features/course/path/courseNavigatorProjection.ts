@@ -1,4 +1,4 @@
-import type { CapabilityRelation } from '@/shared/learning/routePlanning';
+import { orderRouteNodes, type CapabilityRelation } from '@/shared/learning/routePlanning';
 import type { RoutePlanView } from '@/shared/learning/routeVersion';
 import { routeRelations } from '@/shared/learning/routePresentation';
 import type { NavigationDecision } from '@/shared/learning/navigation';
@@ -29,14 +29,17 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
   }) : fallback.map(item => ({ ...item, navigationState: undefined, bridge: false }));
   const validRouteView = routeView?.activeVersion?.courseId === runtime.course.id ? routeView : null;
   const selectedRoute = validRouteView?.plan.valid ? validRouteView.plan.route : null;
-  const routeSource = selectedRoute ? selectedRoute.orderedNodeIds.flatMap(id => {
+  const rawRouteSource = selectedRoute ? selectedRoute.orderedNodeIds.flatMap(id => {
     const existing = source.find(item => item.node.id === id);
     return existing ? [existing] : [{ node: { id, title: validRouteView?.activeVersion?.snapshot.titles[id] ?? id }, state: 'available' as const, blockedBy: [], navigationState: undefined, bridge: !byId.has(id) }];
   }) : validRouteView && !validRouteView.plan.valid ? [] : source;
-  const members = new Set(routeSource.map(item => item.node.id));
+  const members = new Set(rawRouteSource.map(item => item.node.id));
   const relations: CapabilityRelation[] = selectedRoute ? routeRelations(selectedRoute, validRouteView?.model?.supportEdges ?? []) : graph.knowledgeEdges
     .flatMap((edge): CapabilityRelation[] => edge.relation === 'prerequisite' ? [{ ...edge, relation: 'prerequisite' }] : edge.relation === 'enables' ? [{ ...edge, relation: 'enables' }] : [])
-    .filter(edge => members.has(edge.source) && members.has(edge.target));
+    .filter(edge => members.has(edge.source) && members.has(edge.target)).sort((a, b) => a.id.localeCompare(b.id));
+  const fallbackRank = new Map(rawRouteSource.map((item, index) => [item.node.id, index]));
+  const fallbackOrder = selectedRoute ? selectedRoute.orderedNodeIds : orderRouteNodes(members, relations.filter(edge => edge.relation === 'prerequisite'), (a, b) => fallbackRank.get(a)! - fallbackRank.get(b)!);
+  const routeSource = fallbackOrder.flatMap(id => rawRouteSource.filter(item => item.node.id === id));
   const action = validDecision?.nextAction;
   const knowledgeById = new Map(knowledge.map(record => [record.nodeId, record]));
   const route = routeSource.map(item => {

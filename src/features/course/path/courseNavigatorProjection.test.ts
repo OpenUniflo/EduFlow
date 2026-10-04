@@ -116,10 +116,13 @@ describe('Course navigator projection', () => {
     expect(project({ decision: { ...decision, courseId: 'other' } }).nextAction).toBeNull();
   });
   it('preserves factual fallback edges and rejects another course route view', () => {
-    const second = { ...graph.knowledgeNodes[0], id: 'next' };
+    const second = { ...graph.knowledgeNodes[0], id: 'next', primaryCoverage: { ...graph.knowledgeNodes[0].primaryCoverage, lessonOrder: -1 } };
     const edge = { id: 'fact', source: id, target: 'next', relation: 'prerequisite', strength: 'hard', reason: 'Required'  } as typeof graph.knowledgeEdges[number];
     const fallbackGraph = { ...graph, knowledgeNodes: [...graph.knowledgeNodes, second], knowledgeEdges: [edge] };
     expect(project({ graph: fallbackGraph, decision: null }).relations).toEqual([edge]);
+    expect(project({ graph: fallbackGraph, decision: null }).route.map(item => item.node.id)).toEqual([id, 'next']);
+    const enabling = { ...edge, id: 'a-enable', relation: 'enables' as const, strength: 1 };
+    expect(project({ graph: { ...fallbackGraph, knowledgeEdges: [edge, enabling] }, decision: null }).relations).toEqual(project({ graph: { ...fallbackGraph, knowledgeEdges: [enabling, edge] }, decision: null }).relations);
     const foreign = { activeVersion: { courseId: 'other' }, plan: { valid: true, route: { orderedNodeIds: ['foreign'] } } } as RoutePlanView;
     expect(project({ graph: fallbackGraph, decision: null, routeView: foreign }).route.map(item => item.node.id)).not.toContain('foreign');
   });
