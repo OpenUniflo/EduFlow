@@ -1,0 +1,17 @@
+{
+  "capturedAt": "2026-10-04T18:16:08.314Z",
+  "implementationCommit": "184fc283d97e0bb2e4f3fb6c17828196819e5100",
+  "preview": "https://edu-flow-lejy34mqc-july-nanas-projects.vercel.app",
+  "coreBrowserRequests": "Course, Knowledge, Micro, Workflow, Route, Actions, Assistant, Evidence all recovered/200; Analyze201 and run200",
+  "initialAnonymousCourses503": "Observed once during first initialization; explicit UI reload recovered. No matching 503 in queried runtime window; cause unestablished. Not counted as successful acceptance.",
+  "nodeWarning": "Existing DEP0169 on HTTP200; not an application failure",
+  "logs": {
+    "content": [
+      {
+        "type": "text",
+        "text": "## Runtime Logs\n\n**Project:** prj_po8NNFg8tIXZJnanYCDR8uxGnpDz\n**Deployment:** dpl_9qCUojh7mGJBa8rP9r5981nPeE4e\n**Time range:** 2026-10-04T18:06:05.476Z → 2026-10-04T18:16:05.476Z\n\n### 18:07:20 GET /api/navigation 200 [error/serverless]\ndep=dpl_9qCUojh7mGJBa8rP9r5981nPeE4e branch=feature/project-capability-model cache=BYPASS\n    (node:4) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n    (Use `node --trace-deprecation ...` to show where the warning was created)\n\n### 18:07:20 GET /api/edge-actions 200 [error/serverless]\ndep=dpl_9qCUojh7mGJBa8rP9r5981nPeE4e branch=feature/project-capability-model cache=BYPASS\n    (node:4) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n    (Use `node --trace-deprecation ...` to show where the warning was created)\n\n### 18:07:09 GET /api/assistant 200 [error/serverless]\ndep=dpl_9qCUojh7mGJBa8rP9r5981nPeE4e branch=feature/project-capability-model cache=BYPASS\n    (node:4) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n    (Use `node --trace-deprecation ...` to show where the warning was created)\n\n### 18:06:20 GET /api/courses 200 [error/serverless]\ndep=dpl_9qCUojh7mGJBa8rP9r5981nPeE4e branch=feature/project-capability-model cache=BYPASS\n    (node:4) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n    (Use `node --trace-deprecation ...` to show where the warning was created)\n\n### 18:06:07 GET /api/micro 200 [error/serverless]\ndep=dpl_9qCUojh7mGJBa8rP9r5981nPeE4e branch=feature/project-capability-model cache=MISS\n    (node:4) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n    (Use `node --trace-deprecation ...` to show where the warning was created)\n"
+      }
+    ],
+    "isError": false
+  }
+}

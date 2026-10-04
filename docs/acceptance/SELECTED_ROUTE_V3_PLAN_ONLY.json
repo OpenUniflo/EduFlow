@@ -1,0 +1,18 @@
+{
+  "capturedAt": "2026-10-04T18:10:53.327Z",
+  "preview": "https://edu-flow-lejy34mqc-july-nanas-projects.vercel.app",
+  "runs": [
+    {
+      "id": "57b5f6b1-6692-4ddd-a8ed-70be32ac93e2",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "status": "completed",
+      "prompt_version": "personal-evidence-v18",
+      "created_at": "2026-10-04 18:08:23.862021+00",
+      "completed_at": "2026-10-04 18:08:25.79+00",
+      "units": 0,
+      "proposals": 0
+    }
+  ],
+  "routeVersionCreated": 0,
+  "UKSMutated": false
+}

@@ -1,0 +1,349 @@
+{
+  "capturedAt": "2026-10-04T17:27:12.997Z",
+  "microAndPracticePreview": "https://edu-flow-gu9rpzqyr-july-nanas-projects.vercel.app",
+  "completionAndPlanOnlyPreview": "https://edu-flow-izhkov3j6-july-nanas-projects.vercel.app",
+  "route": {
+    "id": "0608e192-a134-4739-802f-551ba03d30b3",
+    "versions": 3
+  },
+  "microRun": {
+    "id": "32e6d5f5-d16f-4c0c-a1f4-2e43bd2917d3",
+    "status": "completed",
+    "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+    "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+    "action_id": "905947b9-07f4-528a-a2d8-9abd385d1d4e",
+    "course_id": "enterprise-vietnam-supply-collaboration",
+    "binding_id": "f2f6cdf8-c986-5adc-aec7-d46fa687a248",
+    "created_at": "2026-10-04T17:00:50.960627+00:00",
+    "started_at": "2026-10-04T17:00:53.825897+00:00",
+    "updated_at": "2026-10-04T17:02:27.9783+00:00",
+    "completed_at": "2026-10-04T17:02:27.9783+00:00",
+    "assignment_id": null,
+    "micro_path_id": "enterprise-route-action-v3-quality",
+    "selection_key": "f624d882-5864-45aa-a95a-634360ce5f73",
+    "execution_version": 2,
+    "evidence_source_id": null,
+    "execution_snapshot": {
+      "action": {
+        "id": "905947b9-07f4-528a-a2d8-9abd385d1d4e",
+        "type": "micro_learning",
+        "title": "学习供应商样品质量证据判读案例",
+        "status": "active",
+        "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+        "created_at": "2026-10-04T16:36:13.554457+00:00",
+        "difficulty": 2,
+        "provenance": {
+          "kind": "acceptance",
+          "version": "enterprise-route-action-v3",
+          "courseId": "enterprise-vietnam-supply-collaboration"
+        },
+        "updated_at": "2026-10-04T16:36:13.554457+00:00",
+        "description": "匿名受控验收教学案例；输入为案例假设，不是企业实时数据或个人能力证据。 供应商筛选准则定义 → 供应商样品质量证据判读。",
+        "estimated_minutes": 8,
+        "expected_evidence": "绑定教学步骤的完成记录；不直接赋予正式能力。",
+        "resource_requirements": [],
+        "required_capability_ids": []
+      },
+      "binding": {
+        "id": "f2f6cdf8-c986-5adc-aec7-d46fa687a248",
+        "contact": "",
+        "context": "匿名受控验收教学案例；输入为案例假设，不是企业实时数据或个人能力证据。",
+        "action_id": "905947b9-07f4-528a-a2d8-9abd385d1d4e",
+        "available": true,
+        "course_id": "enterprise-vietnam-supply-collaboration",
+        "resources": [],
+        "created_at": "2026-10-04T16:36:13.554457+00:00",
+        "updated_at": "2026-10-04T16:36:13.554457+00:00",
+        "instructions": "完成解释、当前案例检查和边界应用。",
+        "assignment_id": null,
+        "micro_path_id": "enterprise-route-action-v3-quality"
+      },
+      "sourceId": "supply-supplier-screening-criteria",
+      "targetId": "supply-sample-quality-interpretation",
+      "routeVersionId": "b26d1555-247a-4e9d-b787-0b1d7fddab56",
+      "repeatedFromRunId": null
+    },
+    "assignment_attempt_id": null
+  },
+  "planOnly": {
+    "id": "a648025c-9c59-4fef-9b7b-94997b55cfd5",
+    "error": null,
+    "model": "deepseek-flash",
+    "status": "completed",
+    "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+    "created_at": "2026-10-04T17:25:11.863677+00:00",
+    "source_ids": [
+      "e9e6a7ec-096b-47f6-80da-8b5e3df06358"
+    ],
+    "diagnostics": {
+      "topK": 5,
+      "llmCalls": 1,
+      "metadata": [
+        {
+          "model": "deepseek-flash",
+          "stage": "extraction",
+          "provider": "deepseek",
+          "thinking": true,
+          "maxTokens": 16000,
+          "requestId": "9d1c7cd4-32dd-4ff0-a0a1-db977c6caa2c",
+          "generatedAt": "2026-10-04T17:25:14.155Z",
+          "temperature": 0,
+          "promptTokens": 423,
+          "promptVersion": "personal-evidence-v18",
+          "schemaVersion": "evidence-units-v1",
+          "completionTokens": 435,
+          "requestedReasoningEffort": "low"
+        }
+      ],
+      "artifacts": {
+        "retrieved": [],
+        "extraction": {
+          "units": []
+        },
+        "formatFailures": [],
+        "judgmentAttempts": []
+      },
+      "embedding": {
+        "model": "qwen3.7-text-embedding",
+        "provider": "aliyun",
+        "dimensions": 1024
+      },
+      "sourceCount": 1,
+      "retrievalCount": 0
+    },
+    "completed_at": "2026-10-04T17:25:14.155+00:00",
+    "prompt_version": "personal-evidence-v18"
+  },
+  "qualityUKS": {
+    "status": "learning",
+    "mastery": null,
+    "node_id": "supply-sample-quality-interpretation",
+    "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+    "evidence": null,
+    "updated_at": "2026-10-04T17:00:57.824278+00:00",
+    "mastery_origin": null,
+    "source_node_id": null,
+    "source_node_ids": null
+  },
+  "practiceRuns": [
+    {
+      "id": "ce46cd08-5ee4-438d-8233-fd753ee72e28",
+      "status": "completed",
+      "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "action_id": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "binding_id": "1631b4f5-8506-539f-ad14-ceda773ecf7b",
+      "created_at": "2026-10-04T17:11:52.230761+00:00",
+      "started_at": "2026-10-04T17:11:53.718512+00:00",
+      "updated_at": "2026-10-04T17:12:09.214104+00:00",
+      "completed_at": "2026-10-04T17:12:09.214104+00:00",
+      "assignment_id": "enterprise-route-action-v3-quality-trace",
+      "micro_path_id": null,
+      "selection_key": "bbacf414-30de-4ad1-a151-26d0f529dd2b",
+      "execution_version": 2,
+      "evidence_source_id": null,
+      "execution_snapshot": {
+        "action": {
+          "id": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+          "type": "practice_task",
+          "title": "复核供应商样品质量证据判读案例判断",
+          "status": "active",
+          "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+          "created_at": "2026-10-04T16:36:13.554457+00:00",
+          "difficulty": 3,
+          "provenance": {
+            "kind": "acceptance",
+            "version": "enterprise-route-action-v3",
+            "courseId": "enterprise-vietnam-supply-collaboration"
+          },
+          "updated_at": "2026-10-04T16:36:13.554457+00:00",
+          "description": "匿名受控验收教学案例；输入为案例假设，不是企业实时数据或个人能力证据。 供应商筛选准则定义 → 供应商样品质量证据判读。",
+          "estimated_minutes": 12,
+          "expected_evidence": "既有 Assignment Attempt、Performance Result 与 Evidence lineage；不直接赋予正式能力。",
+          "resource_requirements": [],
+          "required_capability_ids": []
+        },
+        "binding": {
+          "id": "1631b4f5-8506-539f-ad14-ceda773ecf7b",
+          "contact": "",
+          "context": "匿名受控验收教学案例；输入为案例假设，不是企业实时数据或个人能力证据。",
+          "action_id": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+          "available": true,
+          "course_id": "enterprise-vietnam-supply-collaboration",
+          "resources": [],
+          "created_at": "2026-10-04T16:36:13.554457+00:00",
+          "updated_at": "2026-10-04T16:36:13.554457+00:00",
+          "instructions": "定位案例轨迹中第一处错误判断。",
+          "assignment_id": "enterprise-route-action-v3-quality-trace",
+          "micro_path_id": null
+        },
+        "sourceId": "supply-supplier-screening-criteria",
+        "targetId": "supply-sample-quality-interpretation",
+        "routeVersionId": "0608e192-a134-4739-802f-551ba03d30b3",
+        "repeatedFromRunId": null
+      },
+      "assignment_attempt_id": "259e43c7-e1e9-47a1-8227-8aa1fa29476b"
+    },
+    {
+      "id": "3bb6f4ea-2e8b-4e0f-a42a-8712fd4d0e9c",
+      "status": "completed",
+      "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "action_id": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "binding_id": "1631b4f5-8506-539f-ad14-ceda773ecf7b",
+      "created_at": "2026-10-04T17:14:40.684947+00:00",
+      "started_at": "2026-10-04T17:14:42.232075+00:00",
+      "updated_at": "2026-10-04T17:15:20.695944+00:00",
+      "completed_at": "2026-10-04T17:15:20.695944+00:00",
+      "assignment_id": "enterprise-route-action-v3-quality-trace",
+      "micro_path_id": null,
+      "selection_key": "f67937a1-d75b-4edb-b39c-40d979a681a6",
+      "execution_version": 2,
+      "evidence_source_id": null,
+      "execution_snapshot": {
+        "action": {
+          "id": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+          "type": "practice_task",
+          "title": "复核供应商样品质量证据判读案例判断",
+          "status": "active",
+          "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+          "created_at": "2026-10-04T16:36:13.554457+00:00",
+          "difficulty": 3,
+          "provenance": {
+            "kind": "acceptance",
+            "version": "enterprise-route-action-v3",
+            "courseId": "enterprise-vietnam-supply-collaboration"
+          },
+          "updated_at": "2026-10-04T16:36:13.554457+00:00",
+          "description": "匿名受控验收教学案例；输入为案例假设，不是企业实时数据或个人能力证据。 供应商筛选准则定义 → 供应商样品质量证据判读。",
+          "estimated_minutes": 12,
+          "expected_evidence": "既有 Assignment Attempt、Performance Result 与 Evidence lineage；不直接赋予正式能力。",
+          "resource_requirements": [],
+          "required_capability_ids": []
+        },
+        "binding": {
+          "id": "1631b4f5-8506-539f-ad14-ceda773ecf7b",
+          "contact": "",
+          "context": "匿名受控验收教学案例；输入为案例假设，不是企业实时数据或个人能力证据。",
+          "action_id": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+          "available": true,
+          "course_id": "enterprise-vietnam-supply-collaboration",
+          "resources": [],
+          "created_at": "2026-10-04T16:36:13.554457+00:00",
+          "updated_at": "2026-10-04T16:36:13.554457+00:00",
+          "instructions": "定位案例轨迹中第一处错误判断。",
+          "assignment_id": "enterprise-route-action-v3-quality-trace",
+          "micro_path_id": null
+        },
+        "sourceId": "supply-supplier-screening-criteria",
+        "targetId": "supply-sample-quality-interpretation",
+        "routeVersionId": "0608e192-a134-4739-802f-551ba03d30b3",
+        "repeatedFromRunId": "ce46cd08-5ee4-438d-8233-fd753ee72e28"
+      },
+      "assignment_attempt_id": "ca8c62c9-f899-4913-a844-c5673fa1c46d"
+    }
+  ],
+  "practiceResults": [
+    {
+      "id": "897ff18f-aede-47f6-824d-21d548886b79",
+      "score": 1,
+      "outcome": "passed",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "version": 1,
+      "feedback": {
+        "code": "trace_root_cause_found",
+        "message": "The earliest failing step was identified."
+      },
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "attempt_id": "259e43c7-e1e9-47a1-8227-8aa1fa29476b",
+      "evaluated_at": "2026-10-04T17:12:09.214104+00:00",
+      "evaluated_by": null,
+      "assignment_id": "enterprise-route-action-v3-quality-trace",
+      "evaluator_kind": "rule"
+    },
+    {
+      "id": "61fce744-6177-4d94-92d7-21b4c9bee24e",
+      "score": 1,
+      "outcome": "passed",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "version": 1,
+      "feedback": {
+        "code": "trace_root_cause_found",
+        "message": "The earliest failing step was identified."
+      },
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "attempt_id": "ca8c62c9-f899-4913-a844-c5673fa1c46d",
+      "evaluated_at": "2026-10-04T17:15:20.695944+00:00",
+      "evaluated_by": null,
+      "assignment_id": "enterprise-route-action-v3-quality-trace",
+      "evaluator_kind": "rule"
+    }
+  ],
+  "practiceAttempts": [
+    {
+      "id": "259e43c7-e1e9-47a1-8227-8aa1fa29476b",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "response": {
+        "kind": "trace",
+        "selectedStepId": "decision"
+      },
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "submitted_at": "2026-10-04T17:12:09.214104+00:00",
+      "action_run_id": "ce46cd08-5ee4-438d-8233-fd753ee72e28",
+      "assignment_id": "enterprise-route-action-v3-quality-trace",
+      "attempt_number": 1,
+      "idempotency_key": "048f73af-0bec-418c-8df7-cd492c22be96"
+    },
+    {
+      "id": "ca8c62c9-f899-4913-a844-c5673fa1c46d",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "response": {
+        "kind": "trace",
+        "selectedStepId": "decision"
+      },
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "submitted_at": "2026-10-04T17:15:20.695944+00:00",
+      "action_run_id": "3bb6f4ea-2e8b-4e0f-a42a-8712fd4d0e9c",
+      "assignment_id": "enterprise-route-action-v3-quality-trace",
+      "attempt_number": 2,
+      "idempotency_key": "dde5a2b1-3869-4b64-94d9-c53c539515a4"
+    }
+  ],
+  "practiceEvidence": [
+    {
+      "id": "32bc2112-0601-4921-8e56-25f342fb709c",
+      "context": {
+        "courseId": "enterprise-vietnam-supply-collaboration",
+        "resultId": "61fce744-6177-4d94-92d7-21b4c9bee24e",
+        "attemptId": "ca8c62c9-f899-4913-a844-c5673fa1c46d",
+        "assignmentId": "enterprise-route-action-v3-quality-trace",
+        "evaluatorKind": "rule"
+      },
+      "node_id": "supply-sample-quality-interpretation",
+      "outcome": "accepted",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "event_type": "assignment_accepted",
+      "occurred_at": "2026-10-04T17:15:20.695944+00:00",
+      "source_entity_id": "61fce744-6177-4d94-92d7-21b4c9bee24e"
+    },
+    {
+      "id": "6ff25fcc-bbfb-43d1-a877-fd7e5edaed16",
+      "context": {
+        "courseId": "enterprise-vietnam-supply-collaboration",
+        "resultId": "897ff18f-aede-47f6-824d-21d548886b79",
+        "attemptId": "259e43c7-e1e9-47a1-8227-8aa1fa29476b",
+        "assignmentId": "enterprise-route-action-v3-quality-trace",
+        "evaluatorKind": "rule"
+      },
+      "node_id": "supply-sample-quality-interpretation",
+      "outcome": "accepted",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "event_type": "assignment_accepted",
+      "occurred_at": "2026-10-04T17:12:09.214104+00:00",
+      "source_entity_id": "897ff18f-aede-47f6-824d-21d548886b79"
+    }
+  ],
+  "scope": "Execution captured at A V3 before later explicit A/B V4 Adopts; current versions are recorded separately in SELECTED_ROUTE_V3_HOSTED.json. Repeat preserved V3; subsequent V4 was a separate explicit planning action."
+}

@@ -1,18 +1,18 @@
 {
-  "preview": "https://edu-flow-nwijzafzm-july-nanas-projects.vercel.app",
-  "capturedAt": "2026-10-04T16:50:42.278Z",
+  "preview": "https://edu-flow-lejy34mqc-july-nanas-projects.vercel.app",
+  "capturedAt": "2026-10-04T18:06:31.499Z",
   "courseId": "enterprise-vietnam-supply-collaboration",
   "captures": [
     {
       "actor": "A",
       "userId": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
       "currentVersion": {
-        "id": "b26d1555-247a-4e9d-b787-0b1d7fddab56",
+        "id": "92a05099-70d1-4048-97b0-59b031b74312",
         "routeId": "69abef8b-6015-412e-91cf-3707a73a1b5f",
         "userId": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
         "courseId": "enterprise-vietnam-supply-collaboration",
-        "versionNumber": 2,
-        "parentVersionId": "a59dc09e-47af-441c-9d02-a6f89f8fade2",
+        "versionNumber": 4,
+        "parentVersionId": "0608e192-a134-4739-802f-551ba03d30b3",
         "source": "adjustment",
         "constraints": {
           "includeNodeIds": [
@@ -50,7 +50,7 @@
             {
               "order": 0,
               "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
-              "actionId": "905947b9-07f4-528a-a2d8-9abd385d1d4e",
+              "actionId": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
               "sourceNodeId": "supply-supplier-screening-criteria",
               "targetNodeId": "supply-sample-quality-interpretation"
             },
@@ -64,7 +64,7 @@
             {
               "order": 2,
               "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-qualification-review",
-              "actionId": "96b03b5d-477d-59d3-a53f-ec2551109cc4",
+              "actionId": "cac1ece8-698f-570a-a134-3b74726f3dea",
               "sourceNodeId": "supply-supplier-screening-criteria",
               "targetNodeId": "supply-supplier-qualification-review"
             },
@@ -340,11 +340,11 @@
             "supply-supplier-screening-criteria"
           ],
           "currentKnowledgeIds": [
+            "supply-critical-material-identification",
             "supply-cross-border-lead-time",
+            "supply-incoming-quality-anomaly",
             "supply-landed-cost-calculation",
             "supply-net-material-requirement",
-            "supply-critical-material-identification",
-            "supply-incoming-quality-anomaly",
             "supply-supplier-screening-criteria"
           ],
           "effectiveTargetNodeIds": [
@@ -355,7 +355,7 @@
           ]
         },
         "structureFingerprint": "006e1e16ec44e1129f7647f5e6ab44773a2970e8a5a6be16cf8e974def5af12c",
-        "createdAt": "2026-10-04T16:45:38.304996+00:00",
+        "createdAt": "2026-10-04T17:32:18.315052+00:00",
         "restoredFromVersionId": null
       },
       "previewRoute": {
@@ -1415,7 +1415,7 @@
             {
               "order": 0,
               "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
-              "actionId": "905947b9-07f4-528a-a2d8-9abd385d1d4e",
+              "actionId": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
               "sourceNodeId": "supply-supplier-screening-criteria",
               "targetNodeId": "supply-sample-quality-interpretation"
             },
@@ -1429,7 +1429,7 @@
             {
               "order": 2,
               "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-qualification-review",
-              "actionId": "96b03b5d-477d-59d3-a53f-ec2551109cc4",
+              "actionId": "cac1ece8-698f-570a-a134-3b74726f3dea",
               "sourceNodeId": "supply-supplier-screening-criteria",
               "targetNodeId": "supply-supplier-qualification-review"
             },
@@ -1705,11 +1705,11 @@
             "supply-supplier-screening-criteria"
           ],
           "currentKnowledgeIds": [
+            "supply-critical-material-identification",
             "supply-cross-border-lead-time",
+            "supply-incoming-quality-anomaly",
             "supply-landed-cost-calculation",
             "supply-net-material-requirement",
-            "supply-critical-material-identification",
-            "supply-incoming-quality-anomaly",
             "supply-supplier-screening-criteria"
           ],
           "effectiveTargetNodeIds": [
@@ -1721,7 +1721,7 @@
         },
         "conflicts": []
       },
-      "previewElapsedMs": 809,
+      "previewElapsedMs": 705,
       "UKS": [
         {
           "node_id": "supply-critical-material-identification",
@@ -1779,6 +1779,11 @@
           ]
         },
         {
+          "node_id": "supply-sample-quality-interpretation",
+          "status": "learning",
+          "evidence": null
+        },
+        {
           "node_id": "supply-supplier-screening-criteria",
           "status": "learned",
           "evidence": [
@@ -1790,6 +1795,272 @@
           ]
         }
       ],
+      "projectNodes": 18,
+      "projectEdges": 23,
+      "plannableEdges": 23,
+      "edgeCoverage": [
+        {
+          "edgeId": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+          "sourceId": "supply-net-material-requirement",
+          "targetId": "supply-shortage-exposure",
+          "relation": "hard",
+          "activeActionCount": 5,
+          "actionIds": [
+            "1f3c52b9-a99d-561d-a2c6-a6ffa205162c",
+            "3680f15d-f70b-4100-8cdc-7c281207a94d",
+            "81d35b57-0133-55b5-a170-6573660b4988",
+            "d1ada4d4-840e-50a3-aafd-06717c135866",
+            "f2136047-8a15-480d-88ed-8fcb70ac599a"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+          "sourceId": "supply-cross-border-lead-time",
+          "targetId": "supply-shortage-exposure",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "0901506a-929b-561a-ae80-30101a41a010",
+            "752fe0db-c1bc-5392-aa5c-78749add727b"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+          "sourceId": "supply-landed-cost-calculation",
+          "targetId": "supply-cost-lead-time-tradeoff",
+          "relation": "hard",
+          "activeActionCount": 3,
+          "actionIds": [
+            "7e378b3e-185d-5ba2-a49a-0f0f925c81b8",
+            "ae02dee2-0bf9-5cd2-a7fe-a0e964d6ad1c",
+            "c38ddf0f-42b3-59c8-afd6-a21374cefa38"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+          "sourceId": "supply-cross-border-lead-time",
+          "targetId": "supply-cost-lead-time-tradeoff",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "0818890f-9593-5a71-a9ed-4c8824e0c802",
+            "b6262dd4-74ef-5a15-a47e-48d08db023d8"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+          "sourceId": "supply-supplier-qualification-review",
+          "targetId": "supply-supplier-admission-decision",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "4fc5e6dc-ba4a-5ba9-a6b6-4b65eb498621",
+            "e9629c75-1df5-5c17-a970-1c66130f5f77"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+          "sourceId": "supply-sample-quality-interpretation",
+          "targetId": "supply-supplier-admission-decision",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "aa17ce98-044d-5685-a0ec-caf701759734",
+            "de9d5146-77da-54c6-a02e-f4ae02b62bde"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+          "sourceId": "supply-supplier-delivery-capacity",
+          "targetId": "supply-supplier-admission-decision",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "58c6b0a1-291f-5a1a-a4de-392515b2caf9",
+            "bfc6b3d5-0076-55e6-a955-702aa1506142"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+          "sourceId": "supply-shortage-exposure",
+          "targetId": "supply-shortage-impact-assessment",
+          "relation": "hard",
+          "activeActionCount": 4,
+          "actionIds": [
+            "2b45415c-d52a-5a03-a820-ce3d30ac510b",
+            "7e81d669-bcf2-5803-a925-48cbc8485bd8",
+            "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+            "dcba05d9-2bed-59b6-a192-a842799711a8"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+          "sourceId": "supply-alternate-site-capacity",
+          "targetId": "supply-site-switch-feasibility",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "27f88561-4c1b-5c8a-a8f9-0f4ad0cd4883",
+            "7f91fc3e-dcc9-5bff-a3c3-da28bef4a0ab"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+          "sourceId": "supply-cross-border-lead-time",
+          "targetId": "supply-site-switch-feasibility",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "d3a86a02-efac-5cb5-a365-338b772f5502",
+            "d44e9e78-b516-53d8-a76c-f6ecc92bca2c"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+          "sourceId": "supply-shortage-impact-assessment",
+          "targetId": "supply-recovery-option-ranking",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "8c6a0298-5ee1-5300-a01c-6a28c06abf7d",
+            "c4fde77b-31df-51dd-abc6-e3114e0394cb"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+          "sourceId": "supply-incoming-quality-anomaly",
+          "targetId": "supply-corrective-action-verification",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "20e231bb-ed44-536e-ad70-b7ce503841a5",
+            "93931082-d98f-5bac-a0d8-5dee3dd6eee3"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-critical-material-identification-supply-material-risk-identification",
+          "sourceId": "supply-critical-material-identification",
+          "targetId": "supply-material-risk-identification",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "8a8dc61a-430e-5a2f-a67c-d09f76e5172f",
+            "c3acaafa-bbdc-5de4-a56e-faae6a4afd09"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-material-risk-identification-supply-shortage-impact-assessment",
+          "sourceId": "supply-material-risk-identification",
+          "targetId": "supply-shortage-impact-assessment",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "37a172f8-e74f-5303-ad27-260e2e41bb56",
+            "a06f3b77-ca86-50a9-a6a6-18d1dec902b8"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-qualification-review",
+          "sourceId": "supply-supplier-screening-criteria",
+          "targetId": "supply-supplier-qualification-review",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "96b03b5d-477d-59d3-a53f-ec2551109cc4",
+            "cac1ece8-698f-570a-a134-3b74726f3dea"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+          "sourceId": "supply-supplier-screening-criteria",
+          "targetId": "supply-sample-quality-interpretation",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+            "905947b9-07f4-528a-a2d8-9abd385d1d4e"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-delivery-capacity",
+          "sourceId": "supply-supplier-screening-criteria",
+          "targetId": "supply-supplier-delivery-capacity",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "4ac25258-20d0-505d-a2ac-c0c288b80b56",
+            "5dfe2726-29c7-558c-a5e2-691562fc476c"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+          "sourceId": "supply-supplier-delivery-capacity",
+          "targetId": "supply-alternate-site-capacity",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "11bf0c5e-6f14-589d-a593-7286670485e0",
+            "3b93abef-6eca-58fd-a4a9-5fcc151e71c7"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+          "sourceId": "supply-shortage-exposure",
+          "targetId": "supply-cost-lead-time-tradeoff",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "180fe4a2-89d7-5b83-a20c-c405fda78e23",
+            "a3d3905a-cb17-52e5-af85-55a14e6c6906"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+          "sourceId": "supply-supplier-admission-decision",
+          "targetId": "supply-cost-lead-time-tradeoff",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "65a8bac3-522a-58b9-ad6d-b81b81344f4f",
+            "e192c4f9-d618-5742-a3f3-d79c1f756977"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+          "sourceId": "supply-site-switch-feasibility",
+          "targetId": "supply-recovery-option-ranking",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "2e1694c7-54ef-5f80-a444-273689e05626",
+            "fa3133bb-ab29-555a-ae5b-56cee5f31f6e"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+          "sourceId": "supply-corrective-action-verification",
+          "targetId": "supply-recovery-option-ranking",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "af75134c-4c14-54e9-ac49-c3c492621072",
+            "c347d69b-ad79-5764-a133-0212b943dd1e"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+          "sourceId": "supply-sample-quality-interpretation",
+          "targetId": "supply-incoming-quality-anomaly",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "c4e22c29-07e0-5eda-ab96-123fd0fee408",
+            "cedf8b75-fdfb-5c64-a8d6-042d7ed97647"
+          ]
+        }
+      ],
+      "missingActionEdges": 0,
+      "actionsWithoutExecutor": 0,
       "activeActions": 52,
       "Micro": 24,
       "Practice": 28,
@@ -1802,12 +2073,12 @@
       "actor": "B",
       "userId": "54cd7725-ae57-464b-beba-18e950546f0b",
       "currentVersion": {
-        "id": "9c427293-05a0-4d67-bcfd-79d8e51b4422",
+        "id": "7cf2c59a-e7b7-4330-9a20-4f1862d9957e",
         "routeId": "a59a9621-c57a-4b5c-aad8-c715dcf86427",
         "userId": "54cd7725-ae57-464b-beba-18e950546f0b",
         "courseId": "enterprise-vietnam-supply-collaboration",
-        "versionNumber": 2,
-        "parentVersionId": "e3c2e60e-bb4c-4ae9-8f8d-a081a7b5fd69",
+        "versionNumber": 4,
+        "parentVersionId": "b90f2dd4-f387-49f2-9923-a48d40668f27",
         "source": "adjustment",
         "constraints": {
           "includeNodeIds": [
@@ -2068,13 +2339,13 @@
             "supply-corrective-action-verification"
           ],
           "currentKnowledgeIds": [
-            "supply-sample-quality-interpretation",
-            "supply-supplier-delivery-capacity",
-            "supply-supplier-qualification-review",
             "supply-cross-border-lead-time",
+            "supply-incoming-quality-anomaly",
             "supply-landed-cost-calculation",
+            "supply-sample-quality-interpretation",
             "supply-shortage-exposure",
-            "supply-incoming-quality-anomaly"
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review"
           ],
           "effectiveTargetNodeIds": [
             "supply-cost-lead-time-tradeoff",
@@ -2084,7 +2355,7 @@
           ]
         },
         "structureFingerprint": "006e1e16ec44e1129f7647f5e6ab44773a2970e8a5a6be16cf8e974def5af12c",
-        "createdAt": "2026-10-04T16:45:42.149726+00:00",
+        "createdAt": "2026-10-04T18:05:36.46481+00:00",
         "restoredFromVersionId": null
       },
       "previewRoute": {
@@ -3080,13 +3351,13 @@
             "supply-corrective-action-verification"
           ],
           "currentKnowledgeIds": [
-            "supply-sample-quality-interpretation",
-            "supply-supplier-delivery-capacity",
-            "supply-supplier-qualification-review",
             "supply-cross-border-lead-time",
+            "supply-incoming-quality-anomaly",
             "supply-landed-cost-calculation",
+            "supply-sample-quality-interpretation",
             "supply-shortage-exposure",
-            "supply-incoming-quality-anomaly"
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review"
           ],
           "effectiveTargetNodeIds": [
             "supply-cost-lead-time-tradeoff",
@@ -3097,7 +3368,7 @@
         },
         "conflicts": []
       },
-      "previewElapsedMs": 596,
+      "previewElapsedMs": 615,
       "UKS": [
         {
           "node_id": "supply-cross-border-lead-time",
@@ -3155,6 +3426,11 @@
           ]
         },
         {
+          "node_id": "supply-supplier-admission-decision",
+          "status": "learning",
+          "evidence": null
+        },
+        {
           "node_id": "supply-supplier-delivery-capacity",
           "status": "learned",
           "evidence": [
@@ -3177,6 +3453,272 @@
           ]
         }
       ],
+      "projectNodes": 18,
+      "projectEdges": 23,
+      "plannableEdges": 23,
+      "edgeCoverage": [
+        {
+          "edgeId": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+          "sourceId": "supply-net-material-requirement",
+          "targetId": "supply-shortage-exposure",
+          "relation": "hard",
+          "activeActionCount": 5,
+          "actionIds": [
+            "1f3c52b9-a99d-561d-a2c6-a6ffa205162c",
+            "3680f15d-f70b-4100-8cdc-7c281207a94d",
+            "81d35b57-0133-55b5-a170-6573660b4988",
+            "d1ada4d4-840e-50a3-aafd-06717c135866",
+            "f2136047-8a15-480d-88ed-8fcb70ac599a"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+          "sourceId": "supply-cross-border-lead-time",
+          "targetId": "supply-shortage-exposure",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "0901506a-929b-561a-ae80-30101a41a010",
+            "752fe0db-c1bc-5392-aa5c-78749add727b"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+          "sourceId": "supply-landed-cost-calculation",
+          "targetId": "supply-cost-lead-time-tradeoff",
+          "relation": "hard",
+          "activeActionCount": 3,
+          "actionIds": [
+            "7e378b3e-185d-5ba2-a49a-0f0f925c81b8",
+            "ae02dee2-0bf9-5cd2-a7fe-a0e964d6ad1c",
+            "c38ddf0f-42b3-59c8-afd6-a21374cefa38"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+          "sourceId": "supply-cross-border-lead-time",
+          "targetId": "supply-cost-lead-time-tradeoff",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "0818890f-9593-5a71-a9ed-4c8824e0c802",
+            "b6262dd4-74ef-5a15-a47e-48d08db023d8"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+          "sourceId": "supply-supplier-qualification-review",
+          "targetId": "supply-supplier-admission-decision",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "4fc5e6dc-ba4a-5ba9-a6b6-4b65eb498621",
+            "e9629c75-1df5-5c17-a970-1c66130f5f77"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+          "sourceId": "supply-sample-quality-interpretation",
+          "targetId": "supply-supplier-admission-decision",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "aa17ce98-044d-5685-a0ec-caf701759734",
+            "de9d5146-77da-54c6-a02e-f4ae02b62bde"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+          "sourceId": "supply-supplier-delivery-capacity",
+          "targetId": "supply-supplier-admission-decision",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "58c6b0a1-291f-5a1a-a4de-392515b2caf9",
+            "bfc6b3d5-0076-55e6-a955-702aa1506142"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+          "sourceId": "supply-shortage-exposure",
+          "targetId": "supply-shortage-impact-assessment",
+          "relation": "hard",
+          "activeActionCount": 4,
+          "actionIds": [
+            "2b45415c-d52a-5a03-a820-ce3d30ac510b",
+            "7e81d669-bcf2-5803-a925-48cbc8485bd8",
+            "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+            "dcba05d9-2bed-59b6-a192-a842799711a8"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+          "sourceId": "supply-alternate-site-capacity",
+          "targetId": "supply-site-switch-feasibility",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "27f88561-4c1b-5c8a-a8f9-0f4ad0cd4883",
+            "7f91fc3e-dcc9-5bff-a3c3-da28bef4a0ab"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+          "sourceId": "supply-cross-border-lead-time",
+          "targetId": "supply-site-switch-feasibility",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "d3a86a02-efac-5cb5-a365-338b772f5502",
+            "d44e9e78-b516-53d8-a76c-f6ecc92bca2c"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+          "sourceId": "supply-shortage-impact-assessment",
+          "targetId": "supply-recovery-option-ranking",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "8c6a0298-5ee1-5300-a01c-6a28c06abf7d",
+            "c4fde77b-31df-51dd-abc6-e3114e0394cb"
+          ]
+        },
+        {
+          "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+          "sourceId": "supply-incoming-quality-anomaly",
+          "targetId": "supply-corrective-action-verification",
+          "relation": "hard",
+          "activeActionCount": 2,
+          "actionIds": [
+            "20e231bb-ed44-536e-ad70-b7ce503841a5",
+            "93931082-d98f-5bac-a0d8-5dee3dd6eee3"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-critical-material-identification-supply-material-risk-identification",
+          "sourceId": "supply-critical-material-identification",
+          "targetId": "supply-material-risk-identification",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "8a8dc61a-430e-5a2f-a67c-d09f76e5172f",
+            "c3acaafa-bbdc-5de4-a56e-faae6a4afd09"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-material-risk-identification-supply-shortage-impact-assessment",
+          "sourceId": "supply-material-risk-identification",
+          "targetId": "supply-shortage-impact-assessment",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "37a172f8-e74f-5303-ad27-260e2e41bb56",
+            "a06f3b77-ca86-50a9-a6a6-18d1dec902b8"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-qualification-review",
+          "sourceId": "supply-supplier-screening-criteria",
+          "targetId": "supply-supplier-qualification-review",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "96b03b5d-477d-59d3-a53f-ec2551109cc4",
+            "cac1ece8-698f-570a-a134-3b74726f3dea"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+          "sourceId": "supply-supplier-screening-criteria",
+          "targetId": "supply-sample-quality-interpretation",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+            "905947b9-07f4-528a-a2d8-9abd385d1d4e"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-delivery-capacity",
+          "sourceId": "supply-supplier-screening-criteria",
+          "targetId": "supply-supplier-delivery-capacity",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "4ac25258-20d0-505d-a2ac-c0c288b80b56",
+            "5dfe2726-29c7-558c-a5e2-691562fc476c"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+          "sourceId": "supply-supplier-delivery-capacity",
+          "targetId": "supply-alternate-site-capacity",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "11bf0c5e-6f14-589d-a593-7286670485e0",
+            "3b93abef-6eca-58fd-a4a9-5fcc151e71c7"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+          "sourceId": "supply-shortage-exposure",
+          "targetId": "supply-cost-lead-time-tradeoff",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "180fe4a2-89d7-5b83-a20c-c405fda78e23",
+            "a3d3905a-cb17-52e5-af85-55a14e6c6906"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+          "sourceId": "supply-supplier-admission-decision",
+          "targetId": "supply-cost-lead-time-tradeoff",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "65a8bac3-522a-58b9-ad6d-b81b81344f4f",
+            "e192c4f9-d618-5742-a3f3-d79c1f756977"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+          "sourceId": "supply-site-switch-feasibility",
+          "targetId": "supply-recovery-option-ranking",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "2e1694c7-54ef-5f80-a444-273689e05626",
+            "fa3133bb-ab29-555a-ae5b-56cee5f31f6e"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+          "sourceId": "supply-corrective-action-verification",
+          "targetId": "supply-recovery-option-ranking",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "af75134c-4c14-54e9-ac49-c3c492621072",
+            "c347d69b-ad79-5764-a133-0212b943dd1e"
+          ]
+        },
+        {
+          "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+          "sourceId": "supply-sample-quality-interpretation",
+          "targetId": "supply-incoming-quality-anomaly",
+          "relation": "enables",
+          "activeActionCount": 2,
+          "actionIds": [
+            "c4e22c29-07e0-5eda-ab96-123fd0fee408",
+            "cedf8b75-fdfb-5c64-a8d6-042d7ed97647"
+          ]
+        }
+      ],
+      "missingActionEdges": 0,
+      "actionsWithoutExecutor": 0,
       "activeActions": 52,
       "Micro": 24,
       "Practice": 28,

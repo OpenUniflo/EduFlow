@@ -23,6 +23,8 @@ Prefer opacity and transform. Avoid bounce, overshoot and ordinary interactions 
 
 Course Route restores the existing vertical sequential path style. Adopted Action Steps show completed/current/next status, title, duration and one Start/Continue operation. The connecting line expresses execution order only. Users change nodes, relations or Action alternatives in Project Capability → Adjust Route, inspect the complete Preview, then Adopt. There is no Action choice menu in Course Route.
 
+Project shows the complete active, visible factual ancestor structure; personal state changes recommendation and route highlights, not structural visibility. Narrow screens can collapse the goal copy and planning panel while keeping the draft and graph position. Evidence footer actions reserve space for the Assistant trigger; closing its modal returns keyboard focus to the opener and preserves the Assistant draft.
+
 Assistant opens from its bottom-right trigger toward the upper left and reverses on close. Its header contains title, secondary context and close/pin controls; its body has a compact primary action and secondary shortcuts; composer and full-chat link sit below. Workspaces use the same surface language, with a clear header, staged primary action and two-column desktop/single-column mobile layout.
 
 ## Evidence workspace

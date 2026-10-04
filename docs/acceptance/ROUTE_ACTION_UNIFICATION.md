@@ -1,6 +1,108 @@
-# Route / Action unification — work in progress
+# Route / Action unification — final acceptance
 
-2026-10-04. This is an execution record, not a completion claim.
+## 新契约最终验收 · 2026-10-05（Asia/Shanghai）
+
+**45 PASS / 0 FAIL / 0 NOT APPLICABLE。** 此表覆盖新产品契约；后面的历史阶段记录不再是当前产品定义。此前 31 PASS / 2 FAIL 属于上一版产品契约的阶段结果；本轮新产品契约增加了新的验收要求，因此重新完成了最终验收。
+
+功能验收代码：`184fc283d97e0bb2e4f3fb6c17828196819e5100`，READY [Feature Preview](https://edu-flow-lejy34mqc-july-nanas-projects.vercel.app)。最终文档提交与其对应的最新 READY 地址在交付回复中给出；不会以历史地址冒充最新 HEAD。所有部署均为 Preview，未 Promote Production。
+
+- 当前正式路线：普通用户 A V4／18能力／23 Steps；管理员 B V4／14能力／17 Steps。两个账号看到相同完整 Project 18 nodes／23事实关系／52 Active Actions（24 Micro、28 Practice），每关系至少2个，关键关系3/4/5个。缺Action=0，无executor=0。各Step和每条Edge计数见 [两账号完整报告](SELECTED_ROUTE_V3_ACCOUNTS.md) 与 [真实API/RLS捕获](SELECTED_ROUTE_V3_HOSTED.json)。A6/B7 acquired；两账号新增quality/admission均只保持learning，未因完成获得能力。
+- A Action-only Preview 保留18/23，只换criteria→quality的Micro到Practice，采用后生成V3；窄屏再换criteria→qualification生成V4。B显式移除quality→defect形成V3/16Steps；恢复它的有效Preview含唯一added青色方向脉冲，采用后V4/17Steps。Preview逐次零Version写入。两账号历史保持，不按weight静默改正式选择。
+- Course顺序执行示例：A Step1 quality Practice（completed）→Step2 capacity Micro（current）→Step3 qualification Practice；B Step1 admission Micro（completed）→Step2 admission Micro（source=capacity）。标题相同的Action仍由Edge/Action ID区分；序列线不是KnowledgeEdge。
+- 实际A Micro Run `32e6d5f5-d16f-4c0c-a1f4-2e43bd2917d3` 精确quality资源3/3；B `65b5d45f-ec43-4169-af1d-7294f0607c48` 精确admission资源3/3。A Practice `ce46cd08-5ee4-438d-8233-fd753ee72e28` 与repeat `3bb6f4ea-2e8b-4e0f-a42a-8712fd4d0e9c` 对应两个独立Attempt、Result、KnowledgeEvidence。见 [历史执行lineage](SELECTED_ROUTE_V3_EXECUTION.json) 和 [当前Run读验](SELECTED_ROUTE_V3_CURRENT_RUNS.json)。
+- Desktop1440×1000与390×844完成Current、Preview、调整、Action选择、采用、顺序Course、NodeDetail、Assistant/Evidence。收起窄屏目标与编辑面板保留草稿；Assistant launch不再合成hover重开；modal关闭焦点返回trigger并保留草稿；footer给入口留空间，实际Analyze201完成。最近plan-only Run `57b5f6b1-6692-4ddd-a8ed-70be32ac93e2` v18在1.93s完成，零units/候选，未改Route/UKS。
+- 图实际采样：A18节点Current/Preview/reduced位置完全相同；B Include未具备真实祖先14→15时原14坐标相同；移除和合法新增可选关系时14坐标相同；Project ring=0。脉冲source→target，静态事实线不编码虚实差异；reduced停止持续流动但保留23/17静态方向箭头。见 [A视觉DOM](SELECTED_ROUTE_V3_VISUAL_DOM.json)、[B坐标/diff/焦点/按钮命中](SELECTED_ROUTE_V3_ADMIN_VISUAL.json)。未具备且无可到达前序的起点可查看/规划，但诚实阻止Adopt，未制造灰色入口或降低门禁。
+- 最终自动回归：117文件／870测试PASS；typecheck、lint、production build PASS（10.68s）；Knowledge与client-secret审计PASS。真实本地数据库47事务检查PASS（包括并发、版本冲突、幂等、repeat、锁顺序）；测试资料明确标记且不写Hosted。
+- 本目标的增量migration：`20261004095510_action_execution_resources_v2.sql`、`20261004162208_route_selected_action_execution.sql`。前者增加nullable executor/attempt链接；后者仅增加service-only SECURITY INVOKER包装。旧列、旧RPC、旧版本仍可用；legacy snapshot不自动补选。61个版本本地/Hosted逐项一致。测试数据仅补Action与真实教学/Assignment资源；Knowledge全表hash保持原值，未重写事实图。
+- Security Advisor新增高危0：保留既有5个service-only RLS INFO，以及can_read_course SECURITY DEFINER执行权限与泄漏密码保护WARN；不声称历史告警全清。见 [Advisor原始结果](SELECTED_ROUTE_V3_SECURITY.json)。Runtime核心请求均成功，已知DEP0169出现在HTTP200日志。184fc28首次匿名初始化曾有单次courses503，显式重载恢复；该失败不计PASS，后续登录和核心API正常，日志未定位其原因。
+- 四位只读Reviewer独立审查产品、图/动画、UI、数据/RLS。发现的范围、完成导航、hover重开、焦点与footer遮挡已修复并实际重测；最后审查无剩余阻断。
+
+### 45 条成功标准
+
+| # | 标准 | 结果与证据 |
+|---|---|---|
+| 1 | Personal Route 包含 Edge + selected Action | PASS — immutable executionSteps；两账号逐步引用报告 |
+| 2 | Route Version 版本化选择 | PASS — optimistic adoption；历史快照与事务回归 |
+| 3 | 改 Action 可以产生 Preview | PASS — A criteria→quality 与 B quality→admission Action-only 实测 |
+| 4 | 仅 Adopt 创建新版本 | PASS — 真实 Preview 零写入；显式 A/B V4 |
+| 5 | Course 恢复顺序式前端 | PASS — 纵向课程路线截图 |
+| 6 | Course 不展示 DAG | PASS — Course Path 结构回归及实际截图 |
+| 7 | Course 不重新要求路线决策 | PASS — 正式 Step 只有开始/继续与次级调整 |
+| 8 | Course 每步明确 Action | PASS — A23/B17 executionSteps 引用完整 |
+| 9 | 顺序视觉不制造 Edge | PASS — 序列连接仅为 DOM presentation |
+| 10 | Project 是 Route + Action Planner | PASS — 完整18/23结构与关系/行动编辑 |
+| 11 | 可调整节点路线 | PASS — 未具备真实祖先 Include +合法性提示实测 |
+| 12 | 可调整每条 Edge 的 Action | PASS — 两账号 radios、Preview、Adopt |
+| 13 | 普通关系线统一 | PASS — 实线，实际DOM与截图 |
+| 14 | hard/soft/enables 无虚线主编码 | PASS — 实线共享样式；虚线仅候选分支 |
+| 15 | 底层 relation 语义保留 | PASS — 事实审计、hard gates、enables单独数据 |
+| 16 | Project Route Ring 删除 | PASS — DOM rings=0；其他Atlas未改 |
+| 17 | Current 默认持续显示 | PASS — A/B进入Project立即可见 |
+| 18 | Current 有方向脉冲 | PASS — 紫色source→target，实际连续偏移采样 |
+| 19 | Preview 有方向脉冲 | PASS — 青色route-forward-flow；合法added边实景 |
+| 20 | Current/Preview 可区分 | PASS — 紫/青，baseline减弱；kept/added/removed |
+| 21 | Pulse 不改变 topology | PASS — 结构始终18/23；Engine记录回归 |
+| 22 | Pulse 不改变 coordinates | PASS — A18与B14保留节点逐一坐标完全相同 |
+| 23 | Pulse 不重置 Camera | PASS — 投影坐标及用户Fit后稳定；无自动fit/engine camera |
+| 24 | 两账号项目数据完整 | PASS — 同项目18/23/52，个人UKS不同 |
+| 25 | 每条可规划 Edge ≥2 Action | PASS — 23条逐条API校验；缺失0 |
+| 26 | 关键 Edge 多方案可切换 | PASS — 3/4/5方案与实际五分支截图 |
+| 27 | 全部测试 Action 有真实 executor | PASS — 24 Micro /28 Practice，未绑定0 |
+| 28 | 没有第二套 Practice | PASS — 既有Assignment Attempt/Result/Evidence |
+| 29 | Micro 精确执行指定资源 | PASS — A quality/B admission ActionRun各3/3 |
+| 30 | Practice 精确执行指定资源 | PASS — quality-trace两次Run和具体Attempt |
+| 31 | ActionRun 与 Route selection 分明 | PASS — 历史RouteVersion引用；独立执行记录 |
+| 32 | Repeat 不改 Route selection | PASS — V3重复时仍3版本；V4为后续显式Adopt |
+| 33 | Completion 不自动赋予能力 | PASS — quality/admission保持learning；无acquired/mastery |
+| 34 | Evidence/UKS 权威不变 | PASS — Attempt→Result→Evidence；原明确确认lineage保留 |
+| 35 | 两账号不同 Personal Route | PASS — A18节点23Step；B14节点17Step |
+| 36 | Desktop 核心流程 | PASS — 两个账号实际Project/Planner/执行与截图 |
+| 37 | Narrow 核心流程 | PASS — 390×844两账号；面板折叠、选择、Adopt、详情、Assistant/Evidence |
+| 38 | Reduced Motion | PASS — 持续Pulse none/display none，静态箭头保留 |
+| 39 | 自动测试/typecheck/lint/build | PASS — 117文件870测试；全部PASS；47本地事务 |
+| 40 | Migration history 一致 | PASS — 61本地/Hosted exact version相同 |
+| 41 | 无新增高危Advisor | PASS — 基线告警保留，新增0 |
+| 42 | 最新Feature Preview READY | PASS — 实现184fc28 READY；交付HEAD的文档部署另作最终核验 |
+| 43 | 不 Promote Production | PASS — 所有部署target=null，feature分支 |
+| 44 | Embedding 真实成功/timeout已记录 | PASS — v18 wrong-calculation实际1024检索成功；不改模型/标准 |
+| 45 | Fresh UX 全流程 | PASS — 四Reviewer收口；所有本轮实际缺陷修复并重测 |
+
+### 截图索引
+
+路径均为 `output/playwright/route-selected-v3/`；记录功能代码所在部署，后续文档部署不改变这些UI实现。静态截图配合实际DOM/网络/数据库验证，不能单独证明动画或执行。
+
+| 场景 | 截图 | 部署代码 |
+|---|---|---|
+| Current directional pulse / ordinary完整Project | fresh-ordinary-project.png |184fc28|
+| Preview directional pulse | fresh-narrow-preview-pulse.png |be9de51|
+| 合法新增边Preview pulse | fresh-admin-valid-added-pulse.png |158e193|
+| 移除边Preview | fresh-admin-removed-preview.png |158e193|
+| Adjust Route + Action选择 | adjust-route-actions-desktop.png、fresh-admin-narrow-action-selection.png |f65fa12 /158e193|
+| Multi Action Edge五分支 | fresh-multi-action-edge.png |158e193|
+| Adopted路线V4 | fresh-narrow-adopted-course.png |be9de51|
+| Course恢复顺序式 / Current Step | course-current-desktop.png、fresh-admin-course-route.png |f65fa12 /158e193|
+| Admin完整Project | fresh-admin-project.png |158e193|
+| Narrow Project | fresh-admin-narrow-project.png、fresh-narrow-project-current.png |158e193 /be9de51|
+| Narrow Course | fresh-admin-narrow-course.png、fresh-narrow-adopted-course.png |158e193 /be9de51|
+| Narrow Node Detail | fresh-admin-narrow-detail.png、fresh-narrow-node-detail.png |158e193 /be9de51|
+| Reduced Motion | fresh-admin-narrow-reduced.png、fresh-reduced-static-preview.png |158e193 /be9de51|
+| Micro exact executor完成 | fresh-admin-micro-complete.png、micro-exact-resource-complete.png |158e193 /f65fa12|
+| Practice repeat完成 | practice-repeat-completed.png |f65fa12|
+| Assistant桌面/窄屏 | fresh-desktop-assistant.png、fresh-admin-narrow-assistant.png |184fc28 /158e193|
+| Evidence桌面/窄屏已修复底栏 | fresh-desktop-evidence.png、fresh-narrow-evidence-footer-fixed.png |184fc28|
+| Evidence plan-only完成 | fresh-narrow-evidence-plan-only-complete.png |184fc28|
+
+其他早期`narrow-*`失败/过渡截图只保留为历史，不是最终视觉PASS证据；`fresh-admin-narrow-evidence.png`也仅记录修复前footer遮挡。
+
+### Known limitations
+
+当前v18配置已有真实1024维Embedding成功检索（wrong-calculation Run `90125704-b63a-4d93-88e5-d570fda6f2d1`；[质量控制](final-quality-controls.json)）。Vercel→Aliyun仍可能UND_ERR_CONNECT_TIMEOUT，正样本历史调用也存在provider截断/高延迟；本轮依据新契约记为外部可靠性限制，不伪造retrieval、不换弱模型、不降低Evidence标准。零候选plan-only不被当成Embedding成功证据。历史v16明确确认的Evidence/lineage保留，也不冒充新的v18正样本质量证明。
+
+Workflow-mode Assignment仍不开放为Action executor，因为既有Workflow完成尚未携带ActionRun身份；普通Workflow能力保留。未配置legacy Action不猜资源，旧Route缺executionSteps需要显式调整。Production build既有H5P/大chunk提示保留。单次初始化503已重载恢复，不声称所有网络请求永久无失败。
+
+正式契约：[Capability / Route / Action](../architecture/CAPABILITY_ROUTE_ACTION_CONTRACT.md)、[Frontend Design System](../design/FRONTEND_DESIGN_SYSTEM.md)。原有阶段记录保留在下方，仅用于审计历史。
+
+---
 
 ## Incremental contract revision — 2026-10-04
 
@@ -10,7 +112,11 @@ Baseline: `8a9c1dc2f9a740d9a558bab717f97443534a3cf2`, clean required branch, no 
 
 Stage success gates: (1) versioned choices/legacy read/preview-only/action-only adopt tests; (2) sequential formal-Step UI and exact Navigator execution; (3) stable directional Project pulses plus planning UI; (4) two-account complete executable fixture and read-only integrity report; (5) all 45 criteria, latest READY browser desktop/narrow, reviewers, tests/audits/advisors and final artifacts. Historical embedding success under current v18 configuration is retained in `final-quality-controls.json`; intermittent external timeout is now a known limitation and does not block this goal.
 
-## Latest checkpoint — 2026-10-04 14:47 UTC
+## Historical checkpoint — superseded by the 45-criterion contract
+
+The following records describe earlier implementations and failures, not the current product contract. The current authorities are CAPABILITY_ROUTE_ACTION_CONTRACT.md and FRONTEND_DESIGN_SYSTEM.md.
+
+### Checkpoint — 2026-10-04 14:47 UTC
 
 Implementation HEAD `d06b0b9dafabcc170913b5d5f331674a2d1e8bd0` is READY at https://edu-flow-m4upxj1ka-july-nanas-projects.vercel.app. The status below supersedes historical pending statements, which remain as the phase-by-phase audit trail. **Whole-goal acceptance is not complete.**
 
@@ -164,11 +270,11 @@ Explicit Micro fresh browser execution completed all seven teaching steps (inclu
 
 Latest READY Feature Preview for availability refresh commit `10f8fbd11ef86b5931e2b85137e08a674defbec1`: https://edu-flow-hcwb7q67s-july-nanas-projects.vercel.app (`dpl_3nEELqjehLAX8BHtca2EsoPsspsF`). The above full execution was performed on preceding READY `9a1f190`; latest-refresh-specific browser check remains pending.
 
-## Phase 3/4 acceptance contract
+## Historical Phase 3/4 acceptance contract
 
 One course-scoped Route controller and Action controller feed Path, Node Detail and Project. KnowledgeNodeDetail requires visible Knowledge plus explicit user state; course projection is optional. Bridge selection stays in Path, never fabricates curriculum or inherits all course materials. Skill Tree retains complete course relations/assets independent of personal exclusions; Path emphasizes outgoing current factual relations. Shared Action controls own selection, confirmation, start/repeat and snapshot history. Navigator prioritizes owned active execution, then available current-edge Actions by shared rank, and has an honest no-action state without automatic Micro fallback. Old navigation may supply learning progress only. Tests cover scope, source-oriented actions, Bridge absence of curriculum and active history after route changes; fresh desktop/narrow validation remains required.
 
-## Phase 5/6 acceptance contract
+## Historical Phase 5/6 acceptance contract
 
 Force input is the active visible factual ancestor closure of Course targets, independent of acquired state, current route, draft and preview. Only prerequisite/enables facts participate; hidden structural context is neither selectable nor labelled and is excluded from explicit Fit. Current Route is visible on entry. Valid Preview shows kept/added/removed edges and node membership (including isolated nodes), preserving Current baseline. Every overlay edge must match a current factual edge ID, direction and relation. Preview is presentation-only; Adopt remains the existing version mutation. Search, relation details, downstream highlighting and Action branches use the displayed project scope. Hover, click and keyboard expose the same Action count/choices without changing engine graph identity or camera. Tests cover closure cycles, inactive and unrelated nodes, acquired pruning, stale snapshot edges, empty/singleton routes and diff identity. Browser screenshots and coordinate/camera assertions remain necessary before PASS.
 
@@ -198,7 +304,7 @@ Phase5 follow-up on READY `85facdbc29564f67a32e19cfa36d252395158a8f`, https://ed
 
 Additional fresh 85facdb validation: explicit target exclusion adopted V5; complete Skill Tree still displays CTX01, its bound learning path, context-trace Assignment and four Action records (`phase3-skill-tree-excluded-target.png`). Removing that exclusion produces an added-node/real-edge Preview with retained node position within 1px (`phase5-preview-added.png`). Hosted version count stayed five during Preview; explicit Adopt created V6 and restored the initial two-node scope. No Action or Knowledge mutation was performed. The Preview screenshot revealed its legend beneath a long editor: the follow-up moves route explanation into the same editor flow rather than adding another floating offset. Final production build and scoped lint passed for that refinement.
 
-## Phase 7 acceptance contract
+## Historical Phase 7 acceptance contract
 
 Assistant context is a complete projection of the foreground presentation, not a merge with a previously selected object. Today can carry its current Knowledge/Course; Evidence and History clear that Today context. Skill Tree uses its current anchor, Route supports visible Bridge identity, and Project uses its own selected node/edge/action without inheriting the Skill Tree anchor or design privileges. Evidence Workspace temporarily overrides the page context and closing restores the page registration. Route version, ActionRun, Evidence source and Diagnosis Run use distinct optional identities rather than overloading workflow runId. The server parser must preserve and validate supported context, without treating client context as authorization. Existing Course authoring proposal/apply behavior remains under the explicit design view. Small Assistant uses a compact context label, close/pin controls, one relevant primary operation, composer and secondary full-conversation link; opening/closing uses existing motion tokens and respects reduced motion. Acceptance requires tests for same-path presentation changes and stale-identity clearing, plus fresh desktop/mobile screenshots and no duplicate global surface.
 
@@ -210,7 +316,7 @@ Phase7 fresh checkpoint on READY `6472d960c3b1f11be80a78fb078e6332d70666d3`, htt
 
 Additional 6472d96 fresh checks: Path Bridge Assistant displays A02 title and personal-route presentation; switching to Project clears the old anchor, selecting CTX01 updates the title, and selecting the factual A02→CTX01 edge updates it to that relation. These checks found a pre-existing page-control collision: the open course drawer intercepted the Project tab click. The follow-up reserves header space above the learning drawer (desktop and narrow) rather than escalating z-index. Production build passes; fresh latest verification remains required. Assistant desktop/narrow visuals passed independent UI review.
 
-## Phase 8–10 acceptance contract
+## Historical Phase 8–10 acceptance contract
 
 Evidence Library defaults to source summaries (title, creation time, parse/archive state, provenance, diagnosis use, unique associated capability count and confirmed count), with Upload primary and Update secondary. Source details load only when selected and trace original file, parsed lines, source-owned units, contributing proposals and diagnosis history. Diagnostic workspace exposes Select → Analyze → Review → Confirm with one stage-dependent primary action and an explicit unchanged-state notice. A selected Diagnosis Run is required for every new-UI decision; candidates are never merged across runs. Switching sources resets the active diagnostic selection. Failed/in-progress runs remain inspectable and retry does not silently create confirmation.
 
@@ -258,3 +364,10 @@ v17 same-source Run `0517d634-c26a-4abb-9f9a-41fe20c8caf0` failed at the final i
 - Hosted migration 新增 `20261004162208_route_selected_action_execution.sql`，共 61 项。只新增服务端可调用的 invoker RPC 包装，原字段、旧 RPC、旧 snapshot 继续兼容。authenticated/anon 无新函数执行权限。Security Advisor 基线未变：5 项服务端表无客户端策略 INFO；既有 can_read_course 执行权限及密码保护 WARN，无新增高危项。
 - 企业项目补充 13 Micro / 39 教学步骤、18 Assignment（16 trace、2旧记录类 answer），49 新 Action。现有 3 Action 定义和所有历史 Run 保留，仅对双 NULL 绑定补充对应 executor。23 条真实关系都有至少 2 Action；关键关系有 3/4/5 方案；合计 52 active Actions，24 Micro / 28 Practice，缺 Action / 无 executor 均 0。
 - 已授权的普通/admin 账号分别注入现有 A/B 的 6/7 项受控 UKS，明确 acceptance-baseline 标记并保留冲突状态；它们不是测评结论。KnowledgeNode/KnowledgeEdge 全表哈希前后不变。实际资源与引用统计见 `ENTERPRISE_ROUTE_ACTION_V3_DATA.json`。两个新正式路线仍须通过真实 Preview/Adopt 验收。
+
+### Hosted 运行检查与修复
+
+- 首次新部署发现共享 ESM import 缺少 `.js`，Micro function 启动失败；修复后新部署 Micro GET 200。未把该失败部署计为 Fresh UX PASS。
+- 实际浏览器随后发现旧 Course integrity 条件拒绝 Bridge AssignmentCoverage。校验已仅扩展到真实可见 active prerequisite/enables 上游支撑能力；related-only、无关、不可见中间路径及非 active 节点仍拒绝。课程节点与目标不扩展。产品与数据 Reviewer 复审通过。
+- 最新自动回归为 117 文件 / 867 测试，typecheck、lint、build 通过。真实 API 两账号 Preview 不写版本、Adopt 追加版本且旧历史逐行不变：普通 A 为 V2/23 Steps/6 acquired，admin B 为 V2/17 Steps/7 acquired。两个账号均读取 52 个有效 Action 绑定，跨用户版本和 UKS 不可见，真实 CourseRuntimeData 通过校验。见 `SELECTED_ROUTE_V3_HOSTED.json`。
+- 此记录仍不替代桌面、390×844 与 reduced-motion 的真实浏览器验收。
