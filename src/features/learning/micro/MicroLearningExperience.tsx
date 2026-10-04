@@ -43,11 +43,11 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
   useEffect(()=>{
     let active=true;
     setNavigationDecision(null);setNavigationError(false);
-    if(session&&courseId&&progress?.status==="completed"&&!pinned) {
+    if(session&&courseId&&!actionRunId&&progress?.status==="completed"&&!pinned) {
       void applicationServices.learnerStateService.getNavigation(courseId).then((decision)=>{if(active)setNavigationDecision(decision);}).catch(()=>{if(active)setNavigationError(true);});
     }
     return()=>{active=false;};
-  },[courseId,knowledgeId,navigationAttempt,pinned,progress?.status,session]);
+  },[courseId,knowledgeId,navigationAttempt,pinned,progress?.status,session,actionRunId]);
   useEffect(()=>{setReviewCursor(null);setPinned(null);},[path?.id,actionRunId]);
   const actionSteps = path && actionRunId ? microReviewSteps(path) : [];
   const actionCursor = actionSteps.find(cursor => !actionProgress?.stepIds.includes(cursor.stepId)) ?? actionSteps[actionSteps.length - 1];
@@ -71,14 +71,14 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
   const formalCompleted=actionRunId?Boolean(actionProgress?.complete):progress?.status==="completed";
   const completedCount=actionRunId?(actionProgress?.stepIds.length??0):formalCompleted?total:path.units.reduce((sum,item)=>sum+(repository.getUnitProgress(item.id)?.completedStepIds.length??0),0);
   const showCompleted=formalCompleted&&!pinned&&!reviewCursor;
-  const completionActions=resolveMicroCompletionContext({knowledgeId,runtime:courseId?applicationServices.courseRepository.getCourse(courseId):undefined,decision:navigationDecision,hasMicro:(nodeId)=>Boolean(repository.getPath(nodeId,{courseId,mode:"learn"}))});
+  const completionActions=resolveMicroCompletionContext({knowledgeId,runtime:courseId?applicationServices.courseRepository.getCourse(courseId):undefined,decision:navigationDecision,actionExecution:Boolean(actionRunId),hasMicro:(nodeId)=>Boolean(repository.getPath(nodeId,{courseId,mode:"learn"}))});
   const nextAction=completionActions.find((action)=>action.kind==="next");
 
   const previous=previousMicroReviewStep(path,{unitId:unit.id,stepId:step.id});
   const nextReview=()=>{if(!reviewCursor)return;const next=nextMicroReviewStep(path,reviewCursor);setReviewCursor(next&&!((!formalCompleted||pinned)&&next.unitId===formalUnit.id&&next.stepId===formalStep.id)&&!(next.unitId===progress?.currentUnitId&&next.stepId===progress?.currentStepId&&!formalCompleted)?next:null);};
   return <main className="micro-learning-page"><GlobalNav active="learning" session={session} onLogout={onLogout}/><header className="micro-learning-header"><button onClick={()=>navigate(returnTarget)}><ArrowLeft size={16}/>返回</button><span><small>MICRO LEARNING · {path.estimatedMinutes} 分钟</small><strong>{path.title}</strong></span><i>{showCompleted?total:currentIndex} / {total}</i></header>
     <section className="micro-learning-stage">{startError?<div className="micro-feedback retry" role="alert">学习尚未成功启动；当前 Step 不会被记录。<button type="button" onClick={()=>{setStartError(false);void repository.start(path.id,courseId).catch(()=>setStartError(true));}}>重试启动</button></div>:null}<div className="micro-progress" aria-label={`${actionRunId ? "本次行动进度" : "正式学习进度"} ${completedCount}/${total}`}><i style={{width:`${completedCount/Math.max(total,1)*100}%`}}/></div>
-      {showCompleted?<article className="micro-card micro-complete"><Check size={36}/><span className="atlas-kicker">PATH COMPLETED</span><h1>这条微学习路径已完成</h1><p>{actionRunId?"本次行动的执行观察已保存；行动完成不会额外授予能力，正式状态仍由既有证据规则决定。":session?"完成已持久化为学习证据；主动复习不会清空进度、重复完成证据或降低学习状态。":"你已完成一次匿名本地体验；答案与进度不会写入账户或 learner state。"}</p>{completionActions.length||navigationError?<section className="micro-completion-context" aria-label="继续学习与相关内容"><h2>继续学习 / 相关内容</h2>
+      {showCompleted?<article className="micro-card micro-complete"><Check size={36}/><span className="atlas-kicker">PATH COMPLETED</span><h1>这条微学习路径已完成</h1><p>{actionRunId?"本次行动的执行观察已保存；行动完成不会额外授予能力，正式状态仍由既有证据规则决定。":session?"完成已持久化为学习证据；主动复习不会清空进度、重复完成证据或降低学习状态。":"你已完成一次匿名本地体验；答案与进度不会写入账户或 learner state。"}</p>{actionRunId&&courseId?<button className="atlas-primary micro-completion-next" onClick={()=>navigate(`/courses/${encodeURIComponent(courseId)}`)}>继续正式路线<ArrowRight size={17}/></button>:null}{completionActions.length||navigationError?<section className="micro-completion-context" aria-label="继续学习与相关内容"><h2>继续学习 / 相关内容</h2>
         {nextAction?<button className="atlas-primary micro-completion-next" onClick={()=>navigate(nextAction.href,{state:{returnTo:returnTarget,recommendationDecisionId:navigationDecision?.decisionId,microPathId:navigationDecision?.nextAction.resourceKind==="micro"?navigationDecision.nextAction.resourceId:undefined}})}><span>继续下一项<strong>{nextAction.title}</strong></span><ArrowRight size={17}/></button>:null}
         {completionActions.filter((action)=>action.kind!=="next").map((action)=><button key={action.href} className="atlas-secondary micro-completion-related" onClick={()=>navigate(action.href,{state:{returnTo:`${location.pathname}${location.search}`,returnState:{returnTo:returnTarget}}})}><span>{action.kind==="material"?"相关资料":"相关练习"}<strong>{action.title}</strong></span><ArrowRight size={15}/></button>)}
         {navigationError?<div className="micro-feedback retry" role="alert">下一步暂时无法加载；学习进度已保存。<button className="atlas-secondary" onClick={()=>setNavigationAttempt((value)=>value+1)}>重试下一步</button></div>:null}

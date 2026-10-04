@@ -9,6 +9,7 @@ export function resolveMicroCompletionContext(input: {
   knowledgeId: string;
   runtime?: CourseRuntimeData | null;
   decision?: NavigationDecision | null;
+  actionExecution?: boolean;
   hasMicro(knowledgeId: string): boolean;
 }): MicroCompletionAction[] {
   const { runtime, knowledgeId, decision } = input;
@@ -23,10 +24,10 @@ export function resolveMicroCompletionContext(input: {
     href: buildMaterialDeepLink({ courseId, materialId: entry.materialId, segmentId: entry.segmentId })
   }));
   const assignmentIds = new Set(runtime.assignmentCoverages.filter((coverage) => coverage.nodeId === knowledgeId).map((coverage) => coverage.assignmentId));
-  actions.push(...runtime.assignments.filter((assignment) => assignmentIds.has(assignment.id)).sort((left, right) => left.order-right.order || left.id.localeCompare(right.id)).map((assignment): MicroCompletionAction => ({
+  if (!input.actionExecution) actions.push(...runtime.assignments.filter((assignment) => assignmentIds.has(assignment.id)).sort((left, right) => left.order-right.order || left.id.localeCompare(right.id)).map((assignment): MicroCompletionAction => ({
     kind: "practice", title: assignment.title, href: `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignment.id)}`
   })));
-  const next = decision?.courseId === courseId ? decision.nextAction : undefined;
+  const next = !input.actionExecution && decision?.courseId === courseId ? decision.nextAction : undefined;
   if (next?.nodeId && next.nodeId !== knowledgeId
     && inContext(next.nodeId)) {
     const material = next.resourceKind === "material" ? resolveKnowledgeMaterialEntries(runtime, next.nodeId).find((entry) => entry.materialId === next.resourceId) : undefined;
