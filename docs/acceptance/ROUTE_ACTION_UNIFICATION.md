@@ -2,6 +2,81 @@
 
 2026-10-04. This is an execution record, not a completion claim.
 
+## Latest checkpoint — 2026-10-04 14:39 UTC
+
+Implementation HEAD `d06b0b9dafabcc170913b5d5f331674a2d1e8bd0` is READY at https://edu-flow-m4upxj1ka-july-nanas-projects.vercel.app. The status below supersedes historical pending statements, which remain as the phase-by-phase audit trail. **Whole-goal acceptance is not complete.**
+
+- Full suite: 115 files / 831 tests PASS; lint, typecheck, production build, Knowledge audit and client-secret audit PASS. Adapter metadata follow-up: 11 focused tests and production build PASS. Hosted migration count: 60, matching local; Security Advisor baseline unchanged.
+- Hosted factual route audit: 17 courses / 11 active routes / 28 scenarios / zero mismatches. Fresh enterprise DOM: 15 factual relations (11 prerequisite, 4 enables). Fresh missing-source execution rejected with 422 `target_prerequisite_required`, with no ActionRun write.
+- Latest desktop candidate/confirmation and 390×844 explicit confirmation PASS. Only CTX01 from v16 Run `b8ae8e4f-5177-476f-b316-b7d9c0b911dd` was confirmed; the other six proposals remain pending. An intentionally mismatched Run returned 409 `diagnosis_scope_mismatch` without mutation. Formal evidence `bfcfbfa7-7473-40ca-906e-8fa544a8558a` preserves proposal, diagnosis, revision and six source-unit identities. The route remains V6 / six versions. See `final-confirmation-audit.json`.
+- Library and Source Detail show one formal confirmation separately from pending contributions. Four final desktop/narrow screenshots passed independent UI review. Assistant presentation contexts and keyboard/draft/modal behavior passed fresh checks.
+- v18 plan-only negative control completed in 2.909s with zero units/proposals. Positive repeat and wrong-calculation control remain unverified: extraction works, but embedding calls fail with `UND_ERR_CONNECT_TIMEOUT` before retrieval. Most recent positive Run `17fbfaff-3a05-4db2-81db-f5931aefb07b` failed at 14:37:41 UTC after 53.65s. Latest Preview runtime logs contain corresponding `/api/evidence` 503s. No fake retrieval, fallback model, weaker threshold or partial proposals were introduced to obtain a PASS.
+- Remaining: restore provider connectivity, repeat the same positive source and wrong-calculation control under v18, and complete same-mounted Project post-confirmation coordinate/camera verification. A successful historical v16 confirmation does not validate v18 judgment quality.
+
+### 33-criterion checkpoint
+
+PASS refers to the recorded implementation and browser evidence, including previous phase deployments where noted; it does not claim every historical screenshot was captured on the latest deployment. FAIL includes required verification blocked by the live provider.
+
+| # | Success criterion | Result / evidence |
+|---|---|---|
+| 1 | No fabricated Course Route edges | PASS — Hosted audit and fresh DOM |
+| 2 | Ordered IDs never define edges | PASS — factual projection and DAG regression |
+| 3 | Prerequisite and enables display | PASS — fresh 11/4 relation split |
+| 4 | Hard prerequisite differs from enables | PASS — gates, styles and tests |
+| 5 | Personal Route remains authority | PASS — formal snapshot and adoption checks |
+| 6 | Micro and Practice are Action types | PASS — explicit common execution contract |
+| 7 | One Practice executor | PASS — existing Assignment attempts/results/evidence |
+| 8 | Explicit execution resource | PASS — exact bound Micro and Assignment |
+| 9 | Missing source blocks execution | PASS — fresh 422 and zero writes |
+| 10 | Weight participates in ranking | PASS — available, weight, stable ID |
+| 11 | Completed Action repeat | PASS — fresh repeated execution and retained history |
+| 12 | Switching requires confirmation | PASS — cancel retains run; confirm changes run |
+| 13 | Shared Node Detail core | PASS — Skill Tree / Route context |
+| 14 | Bridge detail works | PASS — optional curriculum, explicit resource |
+| 15 | Full Skill Tree content | PASS — excluded target remains in Skill Tree |
+| 16 | Route detail emphasizes route growth | PASS — source-oriented factual relations |
+| 17 | No automatic Project switch | PASS — ordinary and Bridge clicks |
+| 18 | Current Route visible by default | PASS — baseline overlay |
+| 19 | Visible Preview Diff | PASS — retained/added/removed screenshots |
+| 20 | No version before Adopt | PASS — Hosted counts before/after |
+| 21 | Hover/branch spatial stability | PASS — engine regression and ≤1px browser comparison |
+| 22 | No unrelated Global project relations | PASS — displayed factual project scope |
+| 23 | Correct Assistant context | PASS — Learning/Evidence/Skill Tree/Route/Project/Assignment |
+| 24 | Consistent visual system | PASS — independently reviewed final surfaces |
+| 25 | Evidence readability | PASS — desktop/narrow Library and detail |
+| 26 | Library and diagnosis separated | PASS — summary/detail/run interfaces |
+| 27 | Run-scoped confirmation | PASS — explicit payload, 409 negative and actual confirmation |
+| 28 | Reduced motion | PASS — actual narrow controls and no progress animation |
+| 29 | Desktop/narrow complete core flows | FAIL — final v18 analysis is blocked before retrieval |
+| 30 | State/evidence/route/Micro/Assignment/RLS authority | PASS — tests, Hosted lineage and unchanged versions |
+| 31 | No Production promotion | PASS — Feature Preview only |
+| 32 | Latest Feature READY | PASS — exact implementation HEAD deployment |
+| 33 | Complete Fresh UX acceptance | FAIL — v18 quality controls and Project confirmation stability outstanding |
+
+### Screenshot index
+
+All paths are under `output/playwright/route-action-unification/`. Earlier defect screenshots are retained as history, not selected as final visual PASS evidence.
+
+| Requested view | Selected artifact |
+|---|---|
+| 1 Course Route default | `phase3-route-default.png` |
+| 2 Route Node Detail | `phase3-action-in-progress.png` |
+| 3 Bridge Node Detail | `phase3-bridge-detail.png` |
+| 4 Current Route | `phase5-current-route.png` |
+| 5 Preview Diff | `phase5-preview-diff.png`, `phase5-preview-added.png` |
+| 6 Edge Hover | `phase5-edge-hover.png` |
+| 7 Multiple Actions | `phase5-numbered-actions.png` |
+| 8 Action in progress | `phase3-action-in-progress.png` |
+| 9 Compact Assistant | `phase7-assistant-compact.png`, `final-assistant-assignment.png` |
+| 10 Empty Workspace | `phase8-workspace-empty.png` |
+| 11 Selected source | `phase8-source-selected.png` |
+| 12 Diagnosing | `phase8-diagnosing.png` |
+| 13 Candidates | `final-candidates.png` |
+| 14 Confirmation | `final-confirmation.png`, `final-confirmed-narrow.png` |
+| 15 Evidence Library | `final-library.png` |
+| 16 Evidence Detail | `final-source-detail.png` |
+| 17 Narrow viewport | `final-library-narrow.png`, `final-source-detail-narrow.png`, `phase5-narrow-actions-fixed.png`, `phase5-narrow-editor-fixed.png` |
+
 ## Verified baseline
 
 - Original chat checkout `/Users/fanyuhang/.codex/worktrees/0109/EduFlow` was detached at a0fc93e. Required branch was checked out cleanly at `/Users/fanyuhang/Documents/OpenUniflo/EduFlow`, 29 commits behind. Fetched origin and fast-forwarded that existing branch to `06fb55c44b76eafec8f21eeab84f71598dd12cf4`. All implementation continues there on `feature/project-capability-model`.

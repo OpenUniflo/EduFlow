@@ -1,7 +1,7 @@
 {
-  "implementationCommit": "d9e9c475eae7776ee7bb1a070ea6f86828fcb0a3",
+  "implementationCommit": "d06b0b9dafabcc170913b5d5f331674a2d1e8bd0",
   "inputSha256": "ae66b96aeb2207558dd6472559b7532fb3fe1be87db3c3716051dcd4261c49eb",
-  "checkedAt": "2026-10-04T13:42:57.078Z",
+  "checkedAt": "2026-10-04T14:19:56.285Z",
   "project": "uyljtdbvlivxniililay",
   "method": "Current pure planCourseRoute + production routeRelations over Hosted active facts; all published courses and every existing active route constraint/state. No route writes. This audits factual topology, not user visibility permissions.",
   "courseCount": 17,
