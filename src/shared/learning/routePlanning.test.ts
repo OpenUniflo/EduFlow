@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCapabilityModel, planCourseRoute, routeStructure, PrerequisiteCycleError, type RoutePlanningInput, type RouteConstraints } from './routePlanning';
+import { buildCapabilityModel, planCourseRoute, projectAncestorNodeIds, routeStructure, PrerequisiteCycleError, type RoutePlanningInput, type RouteConstraints } from './routePlanning';
 const input = (hard: string[], soft: string[] = [], targets = ['T'], current: string[] = []): RoutePlanningInput => ({
   nodeIds: [...new Set([...hard, ...soft].flatMap(pair => pair.split('>')).concat(targets, current))],
   prerequisiteEdges: [...hard.map(id => ({ id, strength: 'hard' as const })), ...soft.map(id => ({ id, strength: 'soft' as const }))].map(edge => ({ ...edge, source: edge.id.split('>')[0], target: edge.id.split('>')[1] })),
@@ -13,6 +13,10 @@ function route(data: RoutePlanningInput, intent = constraints()) {
   return result.route;
 }
 describe('V2 necessary route and distinct candidate space', () => {
+  it('project ancestry stops at unavailable identities and never admits unrelated descendants', () => {
+    expect(projectAncestorNodeIds(['A', 'T', 'outside'], ['T'], [{source:'A',target:'missing'},{source:'missing',target:'T'},{source:'T',target:'outside'}])).toEqual(['T']);
+    expect(projectAncestorNodeIds(['A', 'T'], ['T'], [{source:'A',target:'T'},{source:'T',target:'A'}])).toEqual(['A','T']);
+  });
   it('keeps an explicitly included acquired ancestor after the target is acquired', () => {
     const data = input([], ['A>T'], ['T'], ['A', 'T', 'unrelated']);
     expect(buildCapabilityModel(data).orderedNodeIds).toEqual(['T']);
@@ -26,7 +30,7 @@ describe('V2 necessary route and distinct candidate space', () => {
     const data = { ...input([], [], ['T'], ['A', 'T']), enablesEdges: [{ id: 'support', source: 'A', target: 'T', relation: 'enables' as const, strength: 1 }] };
     expect(route(data, constraints(['A'])).selectedNodeIds).toEqual(['A', 'T']);
     expect(route(data, constraints(['A'])).prerequisiteEdges).toEqual([]);
-    expect(planCourseRoute({ ...data, currentNodeIds: ['T'] }, constraints(['A']))).toMatchObject({ valid: false });
+    expect(planCourseRoute({ ...data, currentNodeIds: ['T'] }, constraints(['A']))).toMatchObject({ valid: true, route: { selectedNodeIds: ['A', 'T'], prerequisiteEdges: [] } });
   });
   it('does not retain an acquired include after its identity or connecting fact disappears', () => {
     const data = input([], ['A>T'], ['T'], ['A', 'T']);
@@ -171,10 +175,11 @@ describe('V2.1 current gap candidate space', () => {
     expect(model.prerequisiteEdges.map(e => e.id)).toContain('X>B');
     expect(model.prerequisiteEdges.map(e => e.id)).toContain('B>C');
   });
-  it('revalidates historical Include without changing its constraints or structural fingerprint', () => {
+  it('explicitly includes real project context behind acquired boundaries without changing default recommendations', () => {
     const data = input(['A>X', 'X>B', 'B>T'], [], ['T'], ['A', 'B']);
     const intent = constraints(['X']); const saved = structuredClone(intent);
-    expect(planCourseRoute(data, intent)).toMatchObject({ valid: false, conflicts: [{ kind: 'include_outside_model', nodeId: 'X' }] });
+    expect(planCourseRoute(data, intent)).toMatchObject({ valid: true, route: { selectedNodeIds: ['A', 'B', 'T', 'X'] } });
+    expect(route(data).selectedNodeIds).toEqual(['B', 'T']);
     expect(intent).toEqual(saved);
     expect(routeStructure(data, intent)).toEqual(routeStructure({ ...data, currentNodeIds: ['A'] }, intent));
   });

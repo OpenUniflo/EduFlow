@@ -1,21 +1,13 @@
 import { executionRelations,type RouteExecutionStep } from '@/shared/learning/routeExecution';
 import type { KnowledgeGraph } from '@/features/knowledge/types';
-import type { CapabilityRelation, SelectedRoute } from '@/shared/learning/routePlanning';
+import { projectAncestorNodeIds, type CapabilityRelation, type SelectedRoute } from '@/shared/learning/routePlanning';
 import { type RouteOverlay, type RouteOverlayState } from '@/shared/learning/routePresentation';
 
 /** Structural range only. Acquired state and route edits must never alter force input. */
 export function projectStructuralGraph(graph: KnowledgeGraph, targetIds: readonly string[]): KnowledgeGraph {
   const active = new Set(graph.nodes.filter(node => node.status === 'active').map(node => node.id));
   const facts = graph.edges.filter(edge => edge.relation !== 'related' && active.has(edge.source) && active.has(edge.target));
-  const incoming = new Map<string, string[]>();
-  for (const edge of facts) incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source]);
-  const members = new Set(targetIds.filter(id => active.has(id)));
-  const queue = [...members];
-  for (let index = 0; index < queue.length; index++) {
-    for (const source of incoming.get(queue[index]) ?? []) if (!members.has(source)) {
-      members.add(source); queue.push(source);
-    }
-  }
+  const members = new Set(projectAncestorNodeIds([...active], targetIds, facts));
   return {
     nodes: graph.nodes.filter(node => members.has(node.id)).sort((a, b) => a.id.localeCompare(b.id)),
     edges: facts.filter(edge => members.has(edge.source) && members.has(edge.target)).sort((a, b) => a.id.localeCompare(b.id)),

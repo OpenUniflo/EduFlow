@@ -42,7 +42,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const currentRoute = control.view?.plan.valid ? control.view.plan.route : control.view?.activeVersion?.snapshot.valid ? control.view.activeVersion.snapshot : null;
   const previewRoute = useMemo(()=>control.preview?.valid ? {...control.preview.route,executionSteps:control.preview.execution?.steps} : null,[control.preview]);
   const overlay = useMemo(() => projectRouteOverlay(structuralGraph, currentRoute, previewRoute), [structuralGraph, currentRoute, previewRoute]);
-  const visibleIds = useMemo(() => new Set([...(result.model?.orderedNodeIds ?? []), ...overlay.nodes.map(node => node.id)]), [result.model, overlay]);
+  const visibleIds = useMemo(() => new Set(structuralGraph.nodes.map(node => node.id)), [structuralGraph]);
   const visibleEdges = structuralGraph.edges.filter(edge => visibleIds.has(edge.source) && visibleIds.has(edge.target));
   const counts = useMemo(() => {
     const result = new Map<string, number>();
@@ -57,7 +57,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const matches = result.projection?.nodes.filter(node => visibleIds.has(node.id) && `${node.title} ${node.id}`.toLowerCase().includes(query.toLowerCase())) ?? [];
   const title = (id: string) => graph.nodes.find(node => node.id === id)?.title ?? id;
   const roles = (node: NonNullable<typeof selected>) => [node.capabilityRoles?.current && '已具备', node.capabilityRoles?.course && '项目目标', node.capabilityRoles?.bridge && '中间能力', result.model?.disconnectedCourseKnowledgeIds.includes(node.id) && '暂无当前能力入口'].filter(Boolean).join(' · ');
-  const canInclude = (id: string) => Boolean(result.model?.orderedNodeIds.includes(id) || knowledge.some(record => record.nodeId === id && satisfiesTeachingPrerequisite(record.status)) || control.draft.includeNodeIds.includes(id));
+  const canInclude = (id: string) => visibleIds.has(id);
   const choose = (id: string) => {
     setEdgeId(null); setDraftNotice('');
     if (control.editing) {
@@ -91,7 +91,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
           <button className="project-goal-toggle" aria-expanded={goalExpanded} onClick={() => setGoalExpanded(value => !value)}>项目目标与能力缺口</button>
           {runtime.course.targetOutcome ? <p><strong>项目目标</strong> {runtime.course.targetOutcome}</p> : null}
           <small>当前显示：已具备 {displayedNodes.filter(node => node.capabilityRoles?.current).length} 项 · 待补中间能力 {displayedNodes.filter(node => node.capabilityRoles?.bridge && !node.capabilityRoles.current).length} 项 · 待达成目标 {displayedNodes.filter(node => node.capabilityRoles?.course && !node.capabilityRoles.current).length} 项</small>
-          <small>显示当前候选能力与正式路线；预览只改变标记，不移动能力。点击关系线或展开关系列表比较行动方案。</small>
+          <small>显示完整项目能力结构与个人正式路线；预览只改变标记，不移动能力。点击关系线或展开关系列表比较行动方案。</small>
         </div> : null}
         {!control.editing && authenticated ? <RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title}/> : null}
       </div>

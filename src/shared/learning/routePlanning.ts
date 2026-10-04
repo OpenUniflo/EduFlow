@@ -146,6 +146,17 @@ function capability(data: ReturnType<typeof prepare>, enables: readonly Capabili
 }
 export function buildCapabilityModel(input: RoutePlanningInput): CapabilityModel { return capability(prepare(input), input.enablesEdges); }
 
+/** Complete active, caller-visible factual project context; independent of user state. */
+export function projectAncestorNodeIds(nodeIds: readonly string[], targetIds: readonly string[], relations: readonly {source: string; target: string}[]): string[] {
+  const active = new Set(nodeIds);
+  const incoming = new Map<string, string[]>();
+  for (const edge of relations) if (active.has(edge.source) && active.has(edge.target)) incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source]);
+  const members = new Set(targetIds.filter(id => active.has(id)));
+  const queue = [...members];
+  for (let index = 0; index < queue.length; index++) for (const source of incoming.get(queue[index]) ?? []) if (!members.has(source)) { members.add(source); queue.push(source); }
+  return unique(members);
+}
+
 /** Union hard closure, with acquired boundaries; selected soft edges explain order only. */
 export function planCourseRoute(input: RoutePlanningInput, constraints: RouteConstraints = { includeNodeIds: [], excludeNodeIds: [] }): RoutePlan {
   let data: ReturnType<typeof prepare>;
@@ -156,21 +167,12 @@ export function planCourseRoute(input: RoutePlanningInput, constraints: RouteCon
   const model = capability(data, input.enablesEdges);
   const candidates = new Set(model.orderedNodeIds);
   const includes = unique(constraints.includeNodeIds); const excludes = new Set(constraints.excludeNodeIds);
-  // Acquiring a downstream target can prune a previously included start from
-  // the candidate view. Preserve explicit acquired ancestors through real facts;
-  // unrelated acquired nodes and unavailable identities remain outside the route.
-  if (includes.some(id => data.current.has(id) && !candidates.has(id))) {
-    const ancestors = new Set(model.courseKnowledgeIds);
-    const incoming = new Map<string, string[]>();
-    for (const edge of [...data.edges, ...(input.enablesEdges ?? [])]) {
-      if (!data.ids.has(edge.source) || !data.ids.has(edge.target)) continue;
-      incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source]);
-    }
-    const queue = [...ancestors];
-    for (let i = 0; i < queue.length; i++) for (const source of incoming.get(queue[i]) ?? []) {
-      if (!ancestors.has(source)) { ancestors.add(source); queue.push(source); }
-    }
-    for (const id of includes) if (data.current.has(id) && ancestors.has(id)) candidates.add(id);
+  // Personal recommendations may prune context behind acquired boundaries.
+  // Explicit planning can still include active factual project ancestors;
+  // unrelated nodes and unavailable identities remain outside the route.
+  if (includes.some(id => !candidates.has(id))) {
+    const ancestors = new Set(projectAncestorNodeIds([...data.ids], model.courseKnowledgeIds, [...data.edges, ...(input.enablesEdges ?? [])]));
+    for (const id of includes) if (data.ids.has(id) && ancestors.has(id)) candidates.add(id);
   }
 
   const conflicts: RouteConflict[] = [];

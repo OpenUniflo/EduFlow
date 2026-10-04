@@ -65,13 +65,14 @@ describe('authoritative V2 route intent API', () => {
     expect(mocks.persist.mock.calls[0].slice(5,8)).toEqual([base, 'restore', old]);
     expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['A', 'S', 'T']);
   });
-  it('rejects historical Include that left the current gap without rewriting history', async () => {
+  it('restores an explicitly included unacquired factual ancestor without rewriting history', async () => {
     const historical = { constraints: { includeNodeIds: ['S'], excludeNodeIds: [] } };
     mocks.read.mockResolvedValue(historical);
     const r = await invoke({ action: 'restore', baseVersionId: base, versionId: old });
-    expect(r.status).toBe(422);
-    expect(r.result.error.details.conflicts).toContainEqual(expect.objectContaining({ kind: 'include_outside_model', nodeId: 'S' }));
-    expect(mocks.persist).not.toHaveBeenCalled();
+    expect(r.status).toBe(200);
+    expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['A', 'S', 'T']);
+    expect(mocks.persist.mock.calls[0].slice(5,8)).toEqual([base, 'restore', old]);
+    expect(mocks.persist.mock.calls[0][9]).toBeUndefined();
     expect(historical.constraints).toEqual({ includeNodeIds: ['S'], excludeNodeIds: [] });
   });
 

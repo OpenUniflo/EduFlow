@@ -29,7 +29,7 @@ beforeEach(() => {
     courseOrder: [{ nodeId: 'target', lessonOrder: 1, coverageOrder: 1 }],
     prerequisiteEdges: [
       { id: 'retained', source: 'source', target: 'target', strength: 'soft' },
-      { id: 'unrelated', source: 'other', target: 'source', strength: 'soft' },
+      { id: 'unrelated', source: 'source', target: 'other', strength: 'soft' },
     ],
   } });
   mocks.active.mockResolvedValue({ snapshot: {}, constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
@@ -52,4 +52,18 @@ it('advertises a bound Micro on a formal acquired Bridge edge without completed 
   const response = { status() { return response; }, json(value: typeof body) { body = value; }, setHeader() {} };
   await handler({ method: 'GET', query: { courseId: 'course' }, headers: {} } as unknown as VercelRequest, response as unknown as VercelResponse);
   expect(body?.availableMicroActionIds).toEqual(['retained-action']);
+});
+
+it('reads all factual Project ancestor alternatives after personal candidate pruning without granting execution', async () => {
+  const route = await mocks.input();
+  route.input.nodeIds.push('outside');
+  route.input.prerequisiteEdges.find((edge: {id:string;target:string}) => edge.id === 'unrelated').target = 'outside';
+  route.input.prerequisiteEdges.push({ id: 'context', source: 'other', target: 'source', strength: 'soft' });
+  mocks.input.mockResolvedValue(route);
+  tables.knowledge_edge_actions.push({ id: 'context-action', edge_id: 'context', status: 'active', type: 'micro_learning' });
+  let body: { actions: { id: string }[]; availableActionIds: string[] } | undefined;
+  const response = { status() { return response; }, json(value: typeof body) { body = value; }, setHeader() {} };
+  await handler({ method: 'GET', query: { courseId: 'course' }, headers: {} } as unknown as VercelRequest, response as unknown as VercelResponse);
+  expect(body?.actions.map(action => action.id)).toEqual(['retained-action', 'context-action']);
+  expect(body?.availableActionIds).toEqual([]);
 });
