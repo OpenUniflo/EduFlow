@@ -39,3 +39,9 @@ Evidence Library is a long-lived asset library with summary loading and source d
 Hosted Preview shares Production Supabase. Changes must be additive and compatible, with no destructive migrations, table/column removal or Production promotion. Local committed migrations are authoritative. Preserve RLS, evidence lineage, formal route versions and existing execution authority.
 
 Each phase requires relevant automatic tests, independent review, and actual browser validation. Final acceptance includes all 33 user criteria, full tests, typecheck, lint, build, audits, migration/advisor checks, READY Preview and fresh desktop/narrow screenshots. A missing check is not a PASS.
+
+## Stable Project renderer range
+
+Current and Preview overlays require a structural renderer range that outlives candidate pruning. Compute the active visible factual prerequisite/enables ancestor closure of all Course target IDs from structural inputs only, with cycle-safe traversal. Keep this real-node/real-edge range in the force input; user state, route versions, Preview and adoption never alter it. The candidate model and Include permissions remain unchanged. Display only candidate/current/preview-needed nodes and relations; unused structural context has no labels, hit targets, search results, pulses or Action branches. Explicit Fit uses visible nodes, while presentation changes never fit automatically.
+
+This is a renderer projection, not another graph or knowledge authority. Its deliberate cost is that hidden real relations influence stable coordinates. It avoids a second layout system, fake facts and Preview-triggered relayout. Arbitrary ancestor-depth truncation is not permitted; measure actual Hosted range sizes before addressing performance.

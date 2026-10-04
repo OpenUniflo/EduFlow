@@ -27,3 +27,11 @@
 .knowledge-action-history { display:grid; gap:8px; padding-block:16px; border-bottom:1px solid var(--atlas-border,#dce3ed); }
 .knowledge-node-detail summary { cursor:pointer; font-weight:600; padding-block:10px; }
 .knowledge-node-detail small { display:block; }
+
+.atlas-detail-drawer .edge-action-panel h2 { font-size:17px; margin-block:14px 8px; }
+.edge-action-panel [role="alertdialog"] { margin-block:16px; padding:16px; border:1px solid var(--atlas-border,#dce3ed); border-radius:14px; background:var(--atlas-surface,#f5f7fb); }
+.atlas-detail-drawer .edge-action-panel [role="alertdialog"] h3 { font-size:15px; color:inherit; margin:0 0 10px; }
+.action-confirm-buttons { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+.edge-action-panel > .atlas-secondary { margin-block:8px 12px; }
+.edge-action-panel section > .atlas-secondary,.edge-action-panel section > .atlas-primary { margin:8px 8px 0 0; }
+.edge-action-panel button:focus-visible,.knowledge-node-detail summary:focus-visible { outline:2px solid #6475e9; outline-offset:3px; }

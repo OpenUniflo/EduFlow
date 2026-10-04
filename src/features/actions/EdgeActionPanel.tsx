@@ -64,9 +64,9 @@ export function EdgeActionPanel({ alternatives, title, control, courseId, focuse
   return <aside className={`edge-action-panel ${embedded ? 'edge-action-inline' : 'glass-v2'}`} aria-label="关系行动方案">
     {onClose ? <button className="atlas-panel-close" aria-label="关闭行动方案" onClick={onClose}>×</button> : null}
     <h2>{title}</h2><p>以下行动是推进这条能力关系的替代方案。执行完成后仍需证据与正式能力判断。</p>
-    <button disabled={busy} onClick={() => void control.reload().catch(() => setLocalError('刷新失败，请稍后重试。'))}>刷新执行记录</button>
+    <button className="atlas-secondary" disabled={busy} onClick={() => void control.reload().catch(() => setLocalError('刷新失败，请稍后重试。'))}>刷新执行记录</button>
     {control.error || localError ? <p role="alert">{control.error || localError}</p> : !alternatives.length ? <p>这条关系尚未配置行动。</p> : null}
-    {switchRequest ? <section ref={confirmation} tabIndex={-1} role="alertdialog" aria-label="确认切换行动"><h3>切换当前行动？</h3><p>“{switchRequest.activeTitle}”将停止，已有记录会保留。确认后选择新的实施方式。</p><button disabled={busy} onClick={() => setSwitchRequest(null)}>保留当前行动</button><button disabled={busy} onClick={() => { void control.select(switchRequest.actionId, switchRequest.activeRunId, switchRequest.repeatRunId).then(run => { if (run) setSwitchRequest(null); }); }}>确认切换</button></section> : null}
+    {switchRequest ? <section ref={confirmation} tabIndex={-1} role="alertdialog" aria-label="确认切换行动"><h3>切换当前行动？</h3><p>“{switchRequest.activeTitle}”将停止，已有记录会保留。确认后选择新的实施方式。</p><div className="action-confirm-buttons"><button className="atlas-secondary" disabled={busy} onClick={() => setSwitchRequest(null)}>保留当前行动</button><button className="atlas-primary" disabled={busy} onClick={() => { void control.select(switchRequest.actionId, switchRequest.activeRunId, switchRequest.repeatRunId).then(run => { if (run) setSwitchRequest(null); }); }}>确认切换</button></div></section> : null}
     {alternatives.map(({ action: currentAction, binding: currentBinding, cost, run }, index) => {
       const active = run && ['selected', 'in_progress'].includes(run.status);
       const action = active ? run.execution_snapshot.action : currentAction;
@@ -78,11 +78,11 @@ export function EdgeActionPanel({ alternatives, title, control, courseId, focuse
         {binding ? <><h3>项目执行信息</h3><p>{binding.context}</p><p>{binding.instructions}</p>{binding.contact ? <p>联系：{binding.contact}</p> : null}<ul>{binding.resources.map(resource => <li key={resource.key}>{resource.label}：{resource.reference} · {resource.available ? '可用' : '不可用'}</li>)}</ul></> : null}
         <h3>预期证据</h3><p>{action.expected_evidence}</p>
         {!run || run.status === 'completed' ? <button className="atlas-primary" disabled={busy || !cost.available} onClick={() => select(currentAction, run?.status === "completed" ? run.id : undefined)}>{run ? '再次实践' : '选择此行动'}</button> : null}
-        {run?.status === 'selected' ? <><button disabled={busy || !cost.available} onClick={() => select(currentAction)}>重新核对并选择</button><button className="atlas-primary" disabled={busy || !control.continuableRunIds?.includes(run.id)} onClick={() => void control.start(run)}>开始{action.type === 'micro_learning' ? '微学习' : '实践任务'}</button></> : null}
+        {run?.status === 'selected' ? <><button className="atlas-secondary" disabled={busy || !cost.available} onClick={() => select(currentAction)}>重新核对并选择</button><button className="atlas-primary" disabled={busy || !control.continuableRunIds?.includes(run.id)} onClick={() => void control.start(run)}>开始{action.type === 'micro_learning' ? '微学习' : '实践任务'}</button></> : null}
         {run?.status === 'in_progress' && action.type === 'practice_task' ? <button className="atlas-primary" disabled={busy || !control.continuableRunIds?.includes(run.id)} onClick={() => void control.start(run)}>继续实训</button> : null}
-        {run?.status === 'in_progress' ? <button disabled={busy || !cost.available} onClick={() => select(currentAction)}>重新核对执行内容</button> : null}
-        {run?.status === 'in_progress' && action.type === 'micro_learning' ? <><button disabled={busy || !control.continuableRunIds?.includes(run.id)} onClick={() => void control.start(run)}>继续微学习</button><button disabled={busy} onClick={() => void control.transition(run.id, 'sync-micro')}>核对微学习完成状态</button><p>微学习沿用既有学习判定规则；此处的行动完成记录不会另行授予能力。</p></> : null}
-        {run?.evidence_source_id ? <button disabled={busy} onClick={() => evidence?.open(courseId, run.evidence_source_id!)}>分析结果证据并确认能力</button> : null}
+        {run?.status === 'in_progress' ? <button className="atlas-secondary" disabled={busy || !cost.available} onClick={() => select(currentAction)}>重新核对执行内容</button> : null}
+        {run?.status === 'in_progress' && action.type === 'micro_learning' ? <><button className="atlas-secondary" disabled={busy || !control.continuableRunIds?.includes(run.id)} onClick={() => void control.start(run)}>继续微学习</button><button className="atlas-secondary" disabled={busy} onClick={() => void control.transition(run.id, 'sync-micro')}>核对微学习完成状态</button><p>微学习沿用既有学习判定规则；此处的行动完成记录不会另行授予能力。</p></> : null}
+        {run?.evidence_source_id ? <button className="atlas-secondary" disabled={busy} onClick={() => evidence?.open(courseId, run.evidence_source_id!)}>分析结果证据并确认能力</button> : null}
       </> : null}
     </section>; })}
   </aside>;
