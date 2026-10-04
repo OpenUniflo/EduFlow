@@ -103,3 +103,9 @@
 }
 
 .project-capability-editor .project-route-legend { position: static; margin-bottom: 12px; padding: 0 0 12px; border: 0; border-bottom: 1px solid #dbe3ee; border-radius: 0; background: none; box-shadow: none; }
+.project-goal-toggle { display: none; }
+.project-capability-editor[hidden] { display: none; }
+@media (max-width: 760px) {
+  .project-goal-toggle { display: block; border: 0; padding: 0 0 6px; background: transparent; color: #334155; font: inherit; font-size: 12px; cursor: pointer; }
+  .project-capability-goal:not(.expanded) p, .project-capability-goal:not(.expanded) small:last-child { display: none; }
+}
