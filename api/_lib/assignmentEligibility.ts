@@ -3,7 +3,7 @@ import { assignmentEligibility } from '../../src/shared/learning/assignmentEligi
 import { dataOrThrow } from './query.js';
 
 type Row = Record<string, unknown>;
-export async function readAssignmentEligibility(client: SupabaseClient, userId: string, courseId: string, assignmentId: string) {
+export async function readAssignmentEligibility(client: SupabaseClient, userId: string, courseId: string, assignmentId: string, actionContext?: { targetId: string; status: string }) {
   const [coverageResult, dependencyResult, stateResult] = await Promise.all([
     client.from('assignment_coverages').select('node_id').eq('course_id', courseId).eq('assignment_id', assignmentId),
     client.from('assignment_dependencies').select('source_assignment_id').eq('course_id', courseId).eq('target_assignment_id', assignmentId).eq('strength', 'hard'),
@@ -15,7 +15,7 @@ export async function readAssignmentEligibility(client: SupabaseClient, userId: 
   const ids = [...new Set(coverage.map(row => String(row.node_id)))];
   const dependencyIds = dependencies.map(row => String(row.source_assignment_id));
   const [nodesResult, knowledgeResult, dependencyStatesResult] = await Promise.all([
-    ids.length ? client.from('curriculum_coverages').select('node_id').eq('course_id', courseId).in('node_id', ids) : { data: [], error: null },
+    ids.length ? actionContext ? client.from('knowledge_nodes').select('id').eq('status', 'active').in('id', ids) : client.from('curriculum_coverages').select('node_id').eq('course_id', courseId).in('node_id', ids) : { data: [], error: null },
     ids.length ? client.from('user_knowledge_states').select('node_id,status').eq('user_id', userId).in('node_id', ids) : { data: [], error: null },
     dependencyIds.length ? client.from('user_assignment_states').select('assignment_id,status').eq('user_id', userId).eq('course_id', courseId).in('assignment_id', dependencyIds) : { data: [], error: null },
   ]);
@@ -24,9 +24,11 @@ export async function readAssignmentEligibility(client: SupabaseClient, userId: 
   const states = dataOrThrow(dependencyStatesResult.data as Row[] | null, dependencyStatesResult.error, 'Assignment prerequisite state lookup');
   return { previous, coverage, eligibility: assignmentEligibility({
     // Caller has already revalidated published Course and owned Assignment.
-    published: true, coverageValid: ids.every(id => nodes.some(row => row.node_id === id)),
-    knowledgeStatuses: ids.map(id => knowledge.find(row => row.node_id === id)?.status as string | undefined),
+    published: true, coverageValid: ids.every(id => nodes.some(row => (actionContext ? row.id : row.node_id) === id)),
+    // Only the verified edge target is being formed by this practice. Other coverage
+    // and AssignmentDependency requirements keep the ordinary Assignment rules.
+    knowledgeStatuses: ids.map(id => actionContext?.targetId === id ? 'learned' : knowledge.find(row => row.node_id === id)?.status as string | undefined),
     hardDependencyStatuses: dependencyIds.map(id => states.find(row => row.assignment_id === id)?.status as string | undefined),
-    status: previous?.status as string | undefined,
+    status: actionContext?.status ?? previous?.status as string | undefined,
   }) };
 }

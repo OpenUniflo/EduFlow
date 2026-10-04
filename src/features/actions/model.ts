@@ -22,6 +22,8 @@ export type CourseActionBinding = {
   instructions: string;
   resources: { key: string; label: string; reference: string; available: boolean }[];
   available: boolean;
+  micro_path_id?: string | null;
+  assignment_id?: string | null;
 };
 export type ActionRun = {
   id: string;
@@ -31,23 +33,26 @@ export type ActionRun = {
   binding_id: string | null;
   status: 'selected' | 'in_progress' | 'completed' | 'cancelled';
   edge_id: string;
-  execution_snapshot: { action: EdgeAction; binding: CourseActionBinding | null; sourceId: string; targetId: string };
+  execution_snapshot: { action: EdgeAction; binding: CourseActionBinding | null; sourceId: string; targetId: string; repeatedFromRunId?: string | null };
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
   evidence_source_id: string | null;
   micro_path_id: string | null;
+  assignment_id?: string | null;
+  execution_version?: number;
 };
-export type ActionReason = { code: 'time' | 'difficulty' | 'missing_resource' | 'missing_capability' | 'source_unacquired' | 'binding_unavailable' | 'archived' | 'micro_unavailable'; message: string; cost: number };
+export type ActionReason = { code: 'time' | 'difficulty' | 'missing_resource' | 'missing_capability' | 'source_unacquired' | 'binding_unavailable' | 'archived' | 'micro_unavailable' | 'executor_unavailable'; message: string; cost: number };
 export type ActionCost = { available: boolean; weight: number; reasons: ActionReason[] };
 
-/** Cost units: minutes + 15 per difficulty level above 1 + 30 for an unacquired source.
- * Missing mandatory capabilities/resources make execution unavailable; cost remains explainable.
+/** Cost units: minutes + 15 per difficulty level above 1.
+ * An unacquired source and missing mandatory capabilities/resources block execution.
  * No similarity, LLM output, Course progress or Assignment completion enters this calculation.
  */
 export function evaluateAction(action: EdgeAction, input: {
   sourceId: string;
   microAvailable?: boolean;
+  executionAvailable?: boolean;
   acquiredIds: ReadonlySet<string>;
   binding?: CourseActionBinding;
 }): ActionCost {
@@ -57,6 +62,7 @@ export function evaluateAction(action: EdgeAction, input: {
   ];
   let available = true;
   const block = (code: ActionReason['code'], message: string) => { available = false; reasons.push({ code, message, cost: 0 }); };
+  if (input.executionAvailable === false) block('executor_unavailable', '尚未配置可执行内容，或执行条件未满足');
   if (action.type === 'micro_learning' && input.microAvailable === false) block('micro_unavailable', '微学习尚未就绪：需已发布内容、有效课程路线及必需前置能力');
   if (action.status !== 'active') block('archived', '行动模板已归档');
   if (input.binding && (input.binding.action_id !== action.id || !input.binding.available)) block('binding_unavailable', '项目资源绑定不可用');
@@ -66,8 +72,14 @@ export function evaluateAction(action: EdgeAction, input: {
   for (const key of [...new Set(action.resource_requirements)].sort()) {
     if (!input.binding?.resources.some(resource => resource.key === key && resource.available && resource.reference.trim())) block('missing_resource', `缺少可用资源：${key}`);
   }
-  if (!input.acquiredIds.has(input.sourceId)) reasons.push({ code: 'source_unacquired', cost: 30, message: '起点能力尚未具备，包含额外准备成本' });
+  if (!input.acquiredIds.has(input.sourceId)) block('source_unacquired', '需要先形成起点能力，才能开始这条关系上的行动');
   return { available, weight: reasons.reduce((sum, reason) => sum + reason.cost, 0), reasons };
+}
+
+/** Recommendation order is a presentation, never an automatic user choice. */
+export function rankActions<T extends { action: { id: string }; cost: ActionCost }>(alternatives: readonly T[]): T[] {
+  return [...alternatives].sort((a, b) => Number(b.cost.available) - Number(a.cost.available)
+    || a.cost.weight - b.cost.weight || a.action.id.localeCompare(b.action.id));
 }
 
 /** Projection only: action alternatives never add nodes, edges or inferred connectivity. */

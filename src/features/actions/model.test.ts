@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateAction, projectEdgeActions, type EdgeAction, type CourseActionBinding } from './model';
+import { evaluateAction, projectEdgeActions, rankActions, type EdgeAction, type CourseActionBinding } from './model';
 const action: EdgeAction = { id: 'practice', edge_id: 'factual-edge', type: 'practice_task', title: 'Verify', description: 'Verify a result', estimated_minutes: 45, difficulty: 3, resource_requirements: ['dataset'], required_capability_ids: ['condition'], expected_evidence: 'Work record', status: 'active', provenance: {} };
 const binding: CourseActionBinding = { id: 'binding', course_id: 'course', action_id: action.id, context: 'Project context', contact: '', instructions: 'Compare measurements', resources: [{ key: 'dataset', label: 'Data', reference: 'https://example.org/data', available: true }], available: true };
 describe('edge action cost and projection', () => {
-  it('changes cost with official user state and explains the exact sum', () => {
+  it('requires an acquired source instead of charging extra preparation cost', () => {
     const experienced = evaluateAction(action, { sourceId: 'source', acquiredIds: new Set(['source', 'condition']), binding });
     const preparing = evaluateAction(action, { sourceId: 'source', acquiredIds: new Set(['condition']), binding });
     expect(experienced).toMatchObject({ available: true, weight: 75 });
-    expect(preparing).toMatchObject({ available: true, weight: 105 });
+    expect(preparing).toMatchObject({ available: false, weight: 75 });
     expect(preparing.reasons.map(reason => reason.code)).toEqual(['time', 'difficulty', 'source_unacquired']);
+  });
+  it('ranks available actions first, then lower cost and stable identity without mutating input', () => {
+    const row = (id: string, available: boolean, weight: number) => ({ action: { id }, cost: { available, weight, reasons: [] } });
+    const input = [row('cheap-blocked', false, 1), row('z', true, 10), row('a', true, 10), row('costly', true, 20)];
+    expect(rankActions(input).map(item => item.action.id)).toEqual(['a', 'z', 'costly', 'cheap-blocked']);
+    expect(rankActions([...input].reverse())).toEqual(rankActions(input));
+    expect(input[0].action.id).toBe('cheap-blocked');
   });
   it('requires mandatory capabilities and actual available project resources', () => {
     expect(evaluateAction(action, { sourceId: 'source', acquiredIds: new Set(), binding }).available).toBe(false);

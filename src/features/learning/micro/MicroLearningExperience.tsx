@@ -1,4 +1,6 @@
 import { resolveMicroCompletionContext } from "./microCompletionContext";
+import { apiRequest } from "@/shared/api/apiClient";
+import type { ActionRun } from "@/features/actions/model";
 import { MicroBody } from "./MicroBody";
 import { mechanismFeedback, mechanismMessage } from "@/shared/learning/microMechanisms";
 import { NativeInteraction, initialAnswer } from "./NativeInteraction";
@@ -9,7 +11,7 @@ import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices,refreshLearnerState } from "@/app/services/applicationServices";
 import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
 import type { MockSession } from "@/features/auth/types";
-import { firstMicroReviewStep,previousMicroReviewStep,resolveMicroResumeStep,isMicroReviewSubmissionCorrect,nextMicroReviewStep,resolveMicroLearningReturnTarget,type H5PContentDescriptor,type H5PResult,type MicroInteraction,type MicroLearningAnswer,type MicroLearningRepository,type MicroReviewCursor,type MicroStep,type MicroLearningPath } from "./microLearning";
+import { microReviewSteps,firstMicroReviewStep,previousMicroReviewStep,resolveMicroResumeStep,isMicroReviewSubmissionCorrect,nextMicroReviewStep,resolveMicroLearningReturnTarget,type H5PContentDescriptor,type H5PResult,type MicroInteraction,type MicroLearningAnswer,type MicroLearningRepository,type MicroReviewCursor,type MicroStep,type MicroLearningPath } from "./microLearning";
 import type { NavigationDecision } from "@/shared/learning/navigation";
 
 const H5PPlayer=lazy(()=>import("./H5PInteraction").then((module)=>({default:module.H5PInteraction})));
@@ -18,13 +20,26 @@ const hasAnswer=(answer:MicroLearningAnswer)=>Array.isArray(answer)?answer.lengt
 export function MicroLearningExperience({session,onLogout,repository}:{session:MockSession|null;onLogout():void;repository:MicroLearningRepository}) {
   const navigate=useNavigate(),location=useLocation(),{knowledgeId=""}=useParams(),[searchParams]=useSearchParams();
   const courseId=searchParams.get("courseId")??undefined;
-  const requestedPathId = typeof location.state?.microPathId === "string" ? location.state.microPathId : undefined;
+  const actionRunId = searchParams.get("actionRunId") || undefined;
+  const requestedPathId = searchParams.get("pathId") || (typeof location.state?.microPathId === "string" ? location.state.microPathId : undefined);
+  const [actionProgress, setActionProgress] = useState<{ stepIds: string[]; complete: boolean } | null>(null);
+  const [actionError, setActionError] = useState("");
+  useEffect(() => {
+    let live = true; setActionProgress(null); setActionError("");
+    if (actionRunId && courseId) void apiRequest<{ run: ActionRun; microStepIds: string[] }>(`/api/edge-actions?courseId=${encodeURIComponent(courseId)}&runId=${encodeURIComponent(actionRunId)}`).then(async value => {
+      if (value.run.micro_path_id !== requestedPathId || value.run.execution_snapshot.targetId !== knowledgeId || value.run.status === 'cancelled') throw new Error('该微学习与行动执行记录不匹配。');
+      if (value.run.status !== 'completed') await apiRequest('/api/edge-actions', { method: 'POST', body: JSON.stringify({ action: 'transition', runId: actionRunId, operation: 'start' }) });
+      if (live) setActionProgress({ stepIds: value.microStepIds, complete: value.run.status === 'completed' });
+    }).catch(error => { if (live) setActionError(error instanceof Error ? error.message : '无法读取行动执行记录'); });
+    return () => { live = false; };
+  }, [actionRunId, courseId, requestedPathId, knowledgeId]);
   const recommendationDecisionId = typeof location.state?.recommendationDecisionId === "string" ? location.state.recommendationDecisionId : undefined;
   const [revision,setRevision]=useState(0),[navigationAttempt,setNavigationAttempt]=useState(0),[pinned,setPinned]=useState<MicroReviewCursor|null>(null),[reviewCursor,setReviewCursor]=useState<MicroReviewCursor|null>(null),[busy,setBusy]=useState(false),[navigationDecision,setNavigationDecision]=useState<NavigationDecision|null>(null),[navigationError,setNavigationError]=useState(false),[startError,setStartError]=useState(false);
   useEffect(()=>repository.subscribe(()=>setRevision((value)=>value+1)),[repository]);
   const path=useMemo(()=>repository.getPath(knowledgeId,{courseId,mode:"learn",pathId:requestedPathId}),[courseId,knowledgeId,repository,revision,requestedPathId]);
   const progress=path?repository.getPathProgress(path.id):undefined;
-  useEffect(()=>{if(path&&progress?.status!=="completed"&&progress?.status!=="in_progress"){setStartError(false);void repository.start(path.id,courseId).catch(()=>setStartError(true));}},[courseId,path,progress?.status,repository]);
+  const actionReady = !actionRunId || Boolean(actionProgress);
+  useEffect(()=>{if(path&&actionReady&&progress?.status!=="completed"&&progress?.status!=="in_progress"){setStartError(false);void repository.start(path.id,courseId).catch(()=>setStartError(true));}},[courseId,path,progress?.status,repository,actionReady]);
   useEffect(()=>{
     let active=true;
     setNavigationDecision(null);setNavigationError(false);
@@ -33,9 +48,11 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
     }
     return()=>{active=false;};
   },[courseId,knowledgeId,navigationAttempt,pinned,progress?.status,session]);
-  useEffect(()=>{setReviewCursor(null);setPinned(null);},[path?.id]);
-  const formalUnit=path?.units.find((item)=>item.id===(pinned?.unitId??progress?.currentUnitId))??path?.units[0];
-  const formalStep=formalUnit?(pinned?formalUnit.steps.find((item)=>item.id===pinned.stepId):resolveMicroResumeStep(formalUnit,repository.getUnitProgress(formalUnit.id),progress?.currentStepId)):undefined;
+  useEffect(()=>{setReviewCursor(null);setPinned(null);},[path?.id,actionRunId]);
+  const actionSteps = path && actionRunId ? microReviewSteps(path) : [];
+  const actionCursor = actionSteps.find(cursor => !actionProgress?.stepIds.includes(cursor.stepId)) ?? actionSteps[actionSteps.length - 1];
+  const formalUnit=path?.units.find((item)=>item.id===(pinned?.unitId??actionCursor?.unitId??progress?.currentUnitId))??path?.units[0];
+  const formalStep=formalUnit?(pinned?formalUnit.steps.find((item)=>item.id===pinned.stepId):actionCursor?formalUnit.steps.find(item=>item.id===actionCursor.stepId):resolveMicroResumeStep(formalUnit,repository.getUnitProgress(formalUnit.id),progress?.currentStepId)):undefined;
   const unit=reviewCursor?path?.units.find((item)=>item.id===reviewCursor.unitId):formalUnit;
   const step=reviewCursor?unit?.steps.find((item)=>item.id===reviewCursor.stepId):formalStep;
   const returnTarget=resolveMicroLearningReturnTarget(location.state,courseId);
@@ -43,15 +60,16 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
   const complete=useCallback(async(unitId:string,stepId:string,submission?:Parameters<MicroLearningRepository["completeStep"]>[3],clientDurationMs?:number)=>{
     if(!path)return false;
     setBusy(true);setPinned({unitId,stepId});
-    try { const result=await repository.completeStep(path.id,unitId,stepId,submission,courseId,{decisionId:recommendationDecisionId,clientDurationMs});if(result.correct&&session)await refreshLearnerState(session.userId);return result.correct; }
+    try { const result=await repository.completeStep(path.id,unitId,stepId,submission,courseId,{decisionId:recommendationDecisionId,clientDurationMs,actionRunId});if(actionRunId)setActionProgress({stepIds:result.actionStepIds??[],complete:result.completed});if(result.correct&&session)await refreshLearnerState(session.userId);return result.correct; }
     finally { setBusy(false); }
-  },[courseId,path,repository,session,recommendationDecisionId]);
+  },[courseId,path,repository,session,recommendationDecisionId,actionRunId]);
+  if(actionRunId&&!actionProgress)return <main className="micro-learning-page"><GlobalNav active="learning" session={session} onLogout={onLogout}/><Unsupported title={actionError?'无法继续本次行动':'正在读取本次行动…'} body={actionError||'正在核对执行资源和起点能力。'} onBack={()=>navigate(returnTarget)}/></main>;
   if(!path)return <main className="micro-learning-page"><GlobalNav active="learning" session={session} onLogout={onLogout}/><Unsupported title="该知识暂不支持快速学习" body="当前还没有已发布的 MicroLearningPath。你仍然可以返回来源，或继续查看关联课件。" onBack={()=>navigate(returnTarget)}/></main>;
   if(!unit||!step||!formalUnit||!formalStep)return <main className="micro-learning-page"><GlobalNav active="learning" session={session} onLogout={onLogout}/><Unsupported title="该快速学习内容尚未完整发布" body="发布内容缺少必要 Unit 或 Step。" onBack={()=>navigate(returnTarget)}/></main>;
   const total=path.units.reduce((sum,item)=>sum+item.steps.length,0);
   const currentIndex=path.units.filter((item)=>item.position<unit.position).reduce((sum,item)=>sum+item.steps.length,0)+unit.steps.findIndex((item)=>item.id===step.id)+1;
-  const formalCompleted=progress?.status==="completed";
-  const completedCount=formalCompleted?total:path.units.reduce((sum,item)=>sum+(repository.getUnitProgress(item.id)?.completedStepIds.length??0),0);
+  const formalCompleted=actionRunId?Boolean(actionProgress?.complete):progress?.status==="completed";
+  const completedCount=actionRunId?(actionProgress?.stepIds.length??0):formalCompleted?total:path.units.reduce((sum,item)=>sum+(repository.getUnitProgress(item.id)?.completedStepIds.length??0),0);
   const showCompleted=formalCompleted&&!pinned&&!reviewCursor;
   const completionActions=resolveMicroCompletionContext({knowledgeId,runtime:courseId?applicationServices.courseRepository.getCourse(courseId):undefined,decision:navigationDecision,hasMicro:(nodeId)=>Boolean(repository.getPath(nodeId,{courseId,mode:"learn"}))});
   const nextAction=completionActions.find((action)=>action.kind==="next");
@@ -66,7 +84,7 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
         {navigationError?<div className="micro-feedback retry" role="alert">下一步暂时无法加载；学习进度已保存。<button className="atlas-secondary" onClick={()=>setNavigationAttempt((value)=>value+1)}>重试下一步</button></div>:null}
         </section>:null}<div className="micro-completion-footer"><button className="atlas-secondary" onClick={()=>setReviewCursor(firstMicroReviewStep(path))}><RotateCcw size={15}/>重新复习</button><button className="atlas-secondary" onClick={()=>navigate(returnTarget)}>{courseId&&returnTarget===`/courses/${encodeURIComponent(courseId)}`?"返回课程":"返回来源"}<ArrowRight size={15}/></button></div></article>:null}
       {!showCompleted?<>
-        {!formalCompleted||pinned?<div hidden={Boolean(reviewCursor)} className="micro-step-slot"><MicroStepPanel key={`${path.id}:${formalStep.id}`} path={path} unitId={formalUnit.id} step={formalStep} repository={repository} session={session} review={false} active={!reviewCursor} busy={busy} previous={previousMicroReviewStep(path,{unitId:formalUnit.id,stepId:formalStep.id})} onBack={(cursor)=>setReviewCursor(cursor)} onNext={()=>setPinned(null)} onReturn={()=>setReviewCursor(null)} onComplete={(submission,duration)=>complete(formalUnit.id,formalStep.id,submission,duration)}/></div>:null}
+        {!formalCompleted||pinned?<div hidden={Boolean(reviewCursor)} className="micro-step-slot"><MicroStepPanel key={`${actionRunId ?? "learning"}:${path.id}:${formalStep.id}`} path={path} unitId={formalUnit.id} step={formalStep} repository={repository} session={session} review={false} active={!reviewCursor} busy={busy} previous={previousMicroReviewStep(path,{unitId:formalUnit.id,stepId:formalStep.id})} onBack={(cursor)=>setReviewCursor(cursor)} onNext={()=>setPinned(null)} onReturn={()=>setReviewCursor(null)} onComplete={(submission,duration)=>complete(formalUnit.id,formalStep.id,submission,duration)}/></div>:null}
         {reviewCursor?<MicroStepPanel key={`review:${path.id}:${step.id}`} path={path} unitId={unit.id} step={step} repository={repository} session={session} review active busy={busy} previous={previous} onBack={setReviewCursor} onNext={nextReview} onReturn={()=>setReviewCursor(null)}/>:null}
       </>:null}
     </section><EduFlowAssistant context={context?{...context,microPathId:path.id,microUnitId:unit.id,microStepId:step.id}:undefined} locked={!session} contextLabel={path.title}/></main>;

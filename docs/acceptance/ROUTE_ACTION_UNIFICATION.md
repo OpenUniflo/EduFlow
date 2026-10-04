@@ -43,3 +43,24 @@ Four separate read-only reviewers completed product, graph/interaction, UI/UX, a
 ## Remaining work (not PASS)
 
 Finish Phase 1 latest Preview visual/runtime validation. Then implement Action resource binding, Assignment reuse and repetition with atomic lineage, confirmed switching, history, source gate and recommendation; unified KnowledgeNodeDetail including Bridge; Navigator Action integration; project overlays/diff/branch/relationship scope; presentation-aware Assistant; Evidence Library and staged run-scoped diagnosis with summary/detail APIs; unified tokens/reduced motion. Run each phase's review/fix loop. Complete final full tests/audits, migration consistency/advisors, latest READY Preview 5xx/fresh acceptance, all 17 requested screenshots and all 33 success criteria. No final completion or final commit claimed yet.
+
+## Verified updates, 2026-10-04
+
+Phase 1 Preview `78364753d6ac6ff3cdfdf55c09b1d99eda929b20` is READY at https://edu-flow-qkch8tfd7-july-nanas-projects.vercel.app. Ordinary-user browser console had zero errors. Independent UI review passed the final desktop title wrapping, narrow controls and actual Fit result screenshots:
+- `output/playwright/route-action-unification/phase1-desktop-final.png`
+- `output/playwright/route-action-unification/phase1-narrow-controls-fixed.png`
+- `output/playwright/route-action-unification/phase1-narrow-fit.png`
+
+Phase 2 implementation is local and uncommitted. The additive migration `20261004095510_action_execution_resources_v2.sql` introduces explicit nullable Micro/Assignment executor references and links existing attempts to ActionRun. It preserves old RPC signatures and v1 records; no new Practice lifecycle or client write policy was introduced. No Phase 2 migration has been applied to Hosted.
+
+Practice reuses Assignment evaluation, results, review and evidence. Starting an Action does not write practicing state. Repetition preserves accepted Assignment aggregate status, owns a fresh attempt lineage, and exact-attempt review remains possible. Micro repetition evaluates through the existing Micro pipeline, observes only this run's accepted steps and does not replay historical completion evidence. Action resource availability, source gates, cost ranking and explicit switching confirmation are implemented.
+
+Deliberate current boundary: workflow-mode Assignments are unavailable as Action executors until their existing WorkflowRun completion can carry ActionRun identity. Ordinary course workflow execution remains available. Unconfigured legacy bindings are honestly unavailable in the new UI; the two existing enterprise Practice bindings cannot be guessed because their target Knowledge lacks AssignmentCoverage.
+
+Independent data review found and fixes cover: concurrent attempt ownership theft, advisory-lock inversion, replay moving the current attempt pointer backwards, pending manual review bypass, changed Micro snapshot/path, and historical Practice repeating through explicit route exclusion. Saved Assignment retries now recover the exact persisted result despite subsequent Action archival, while rejecting changed response/execution identity.
+
+Verification before these last two regression additions: 108 test files / 778 tests passed; typecheck, lint, production build passed (existing bundle-size/H5P warnings). Latest local transactional suite passed 32 checks, including archived Action replay; legacy Action regression passed 25 assertions. Full migration transaction replay passed before the latest replay fix. Final Phase 2 full checks, migration consistency, Hosted application and fresh Preview acceptance remain pending.
+
+The remaining phases and the 33 final criteria are still incomplete. This record is not a completion claim.
+
+Phase 2 final local checkpoint: 108 files / 780 tests PASS; typecheck, lint, build, relation audit and client-secret audit PASS. Full current migration replay in a rolled-back transaction PASS; local Security Advisor at warning level reports no issues. Reviewer rechecked the last two fixes and found no blocker. Hosted still has the original 59 migrations immediately before deployment.

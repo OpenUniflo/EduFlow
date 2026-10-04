@@ -37,10 +37,10 @@ export function CourseManagementPage({ session, onLogout }: { session: MockSessi
   }
 
   async function accept(submission: AssignmentSubmissionReview) {
-    const key = `${submission.learnerUserId}:${submission.courseId}:${submission.assignmentId}`;
+    const key = `${submission.learnerUserId}:${submission.courseId}:${submission.assignmentId}:${submission.attemptId ?? "aggregate"}`;
     setAccepting(key);
     try {
-      await applicationServices.learnerStateService.acceptAssignment(submission.courseId, submission.assignmentId, submission.learnerUserId);
+      await applicationServices.learnerStateService.acceptAssignment(submission.courseId, submission.assignmentId, submission.learnerUserId, submission.attemptId);
       await loadSubmissions();
     } catch (error) {
       console.error("Assignment acceptance failed", error);
@@ -64,8 +64,8 @@ export function CourseManagementPage({ session, onLogout }: { session: MockSessi
         <div className="course-review-list">{submissions.map((submission) => {
           const runtime = runtimeById.get(submission.courseId);
           const assignment = runtime?.assignments.find((item) => item.id === submission.assignmentId);
-          const key = `${submission.learnerUserId}:${submission.courseId}:${submission.assignmentId}`;
-          return <article key={key}><div><strong>{assignment?.title ?? submission.assignmentId}</strong><span>{runtime?.course.title ?? submission.courseId} · {submission.learnerName}</span></div><div className={`atlas-pill ${submission.status}`}>{submission.status}</div>{submission.status === "submitted" ? <button className="atlas-primary" disabled={accepting === key} onClick={() => void accept(submission)}>Accept</button> : <span className="course-review-accepted"><Check size={15} />已验收</span>}</article>;
+          const key = `${submission.learnerUserId}:${submission.courseId}:${submission.assignmentId}:${submission.attemptId ?? "aggregate"}`;
+          return <article key={key}><div><strong>{assignment?.title ?? submission.assignmentId}</strong><span>{runtime?.course.title ?? submission.courseId} · {submission.learnerName}{submission.attemptNumber ? ` · 第 ${submission.attemptNumber} 次提交` : ""}</span>{submission.response ? <details><summary>查看本次提交</summary><pre>{JSON.stringify(submission.response, null, 2)}</pre></details> : null}</div><div className={`atlas-pill ${submission.status}`}>{submission.status}</div>{submission.status === "submitted" ? <button className="atlas-primary" disabled={accepting === key} onClick={() => void accept(submission)}>Accept</button> : <span className="course-review-accepted"><Check size={15} />已验收</span>}</article>;
         })}{!submissions.length && !reviewError ? <p className="atlas-empty-state">当前没有待验收或已验收的 learner submission。</p> : null}</div>
       </section>
     </div>

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { learningDataHash, readLearningData } from "../_lib/learningData.js";
+import { requireActionMicroEligibility } from '../_lib/edgeActionRuns.js';
 import { CRITERION_ESTIMATOR_VERSION, type CriterionReference } from "../../src/shared/learning/criterionState.js";
 import { decodeLearningContent } from "../../src/shared/content/richText.js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -68,7 +69,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     return;
   }
   if (request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
-  const body = request.body as { action?: string; pathId?: string; unitId?: string; stepId?: string; submission?: unknown; answer?: NativeAnswer; contentRef?: string; contextCourseId?: string; idempotencyKey?: string; decisionId?: string; clientDurationMs?: number };
+  const body = request.body as { action?: string; pathId?: string; unitId?: string; stepId?: string; submission?: unknown; answer?: NativeAnswer; contentRef?: string; contextCourseId?: string; idempotencyKey?: string; decisionId?: string; clientDurationMs?: number; actionRunId?: string };
   if (!body.action) throw new ApiError(400, "invalid_micro_action", "action is required");
   if(body.action==="resolve-h5p-content") {
     if(!body.contentRef)throw new ApiError(400,"invalid_h5p_request","contentRef is required");
@@ -141,7 +142,11 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const effectiveCourseId = body.contextCourseId ?? pathCourseId;
   let authorization: Awaited<ReturnType<typeof requireMicroTeachingEligibility>> | null = null;
   if (effectiveCourseId) {
-    if (user) authorization = await requireMicroTeachingEligibility(client, user.id, effectiveCourseId, text(path, "knowledge_id"));
+    if (user && body.actionRunId) {
+      const runResult = await client.from('edge_action_runs').select('id').eq('id', body.actionRunId).eq('user_id', user.id).eq('course_id', effectiveCourseId).eq('micro_path_id', body.pathId).maybeSingle();
+      if (!dataOrThrow(runResult.data, runResult.error, 'Micro action context')) throw new ApiError(404, 'micro_action_unavailable', '该微学习执行记录不存在。');
+      authorization = await requireActionMicroEligibility(client, user.id, effectiveCourseId, text(path, 'knowledge_id'), true);
+    } else if (user) authorization = await requireMicroTeachingEligibility(client, user.id, effectiveCourseId, text(path, "knowledge_id"));
     else await requireCourseKnowledge(client, effectiveCourseId, text(path, "knowledge_id"));
     if(pathCourseId && pathCourseId !== effectiveCourseId) throw new ApiError(400, "micro_context_mismatch", "Micro path does not belong to the selected Course");
   }
@@ -159,14 +164,15 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     correct = h5pCompletionPasses(completion,policy);
   } else correct = nativeInteractionCorrect(interaction, body.submission === undefined ? body.answer : body.submission as NativeAnswer);
   if (!user) { json(response, 200, { correct, completed: false }); return; }
-  const metadata = z.object({ idempotencyKey: z.string().min(8).max(160).optional(), decisionId: z.uuid().optional(),
+  const metadata = z.object({ idempotencyKey: z.string().min(8).max(160).optional(), decisionId: z.uuid().optional(), actionRunId: z.uuid().optional(),
     clientDurationMs: z.number().int().min(0).max(86400000).optional() }).safeParse(body);
   if (!metadata.success) throw new ApiError(400, "invalid_attempt_metadata", "Invalid attempt metadata");
   const submission = body.submission === undefined ? body.answer ?? null : body.submission;
   if (JSON.stringify(submission).length > 65536) throw new ApiError(400, "response_too_large", "Micro response is too large");
   const instruction = !interaction || interaction.mode === "explore" || step.kind === "explanation" || step.kind === "summary";
   const outcome = interaction?.type === "h5p" ? "reported_completion" : instruction ? "observed" : correct ? "correct" : "incorrect";
-  const recorded = await createServerSupabase().rpc("record_micro_step_attempt_v2", {
+  const recorded = await createServerSupabase().rpc(metadata.data.actionRunId ? 'record_action_micro_step' : "record_micro_step_attempt_v2", {
+    ...(metadata.data.actionRunId ? { p_run_id: metadata.data.actionRunId } : {}),
     p_route_node_ids: authorization?.selectedNodeIds ?? null,
     p_expected_version_id: authorization?.activeVersionId ?? null,
     p_user_id: user.id, p_path_id: body.pathId, p_unit_id: body.unitId, p_step_id: body.stepId,
@@ -185,6 +191,6 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const progress = object(result.progress);
   const attempt = object(result.attempt);
   json(response, 200, { correct: attempt ? Boolean(attempt.completion_accepted) : correct,
-    completed: progress?.status === "completed", attemptId: attempt?.id, evidenceSequence: attempt?.sequence,
+    completed: metadata.data.actionRunId ? object(result.actionRun)?.status === 'completed' : progress?.status === "completed", actionStepIds: result.actionStepIds, attemptId: attempt?.id, evidenceSequence: attempt?.sequence,
     duplicate: result.duplicate, pathProgress: progress ? mapProgress(progress) : undefined });
 });

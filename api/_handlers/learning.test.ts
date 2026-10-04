@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-const mocks = vi.hoisted(() => ({ user: vi.fn(), server: vi.fn() }));
+const mocks = vi.hoisted(() => ({ user: vi.fn(), server: vi.fn(), actionRun: vi.fn() }));
 vi.mock('../_lib/supabase.js', () => ({ createUserSupabase: mocks.user, createServerSupabase: mocks.server }));
+vi.mock('../_lib/edgeActionRuns.js', () => ({ requireAssignmentActionRun: mocks.actionRun }));
 import handler from './learning';
 type Row = Record<string, unknown>;
 let tables: Record<string,Row[]>; let writes: string[];
@@ -12,6 +13,7 @@ function query(table:string) {
     eq: (key:string,value:unknown) => { rows=rows.filter(row => row[key]===value); return q; },
     in: (key:string,values:unknown[]) => { rows=rows.filter(row => values.includes(row[key])); return q; },
     limit: () => q,
+    order: () => q,
     maybeSingle: () => { single=true; return q; },
     single: () => { single=true; return q; },
     upsert: (value:Row) => { writes.push(table); tables[table]=[value]; rows=[value]; return q; },
@@ -54,5 +56,35 @@ describe('Assignment API guard before all mutations', () => {
     if(invalid==='foreign assignment')tables.course_assignments[0].course_id='other';
     if(invalid==='foreign coverage')tables.curriculum_coverages=[];
     expect((await call('start-assignment')).status).toBeGreaterThanOrEqual(400);expect(writes).toEqual([]);
+  });
+  it('returns a saved Action response despite later execution changes without another write', async () => {
+    tables.learning_attempts = [{ id: 'attempt', user_id: 'learner', course_id: 'course', assignment_id: 'task', action_run_id: 'run', idempotency_key: 'saved-key', response: { kind: 'answer', text: 'Response' } }];
+    tables.performance_results = [{ id: 'result', attempt_id: 'attempt', outcome: 'pending', feedback: { message: 'Saved review' } }];
+    mocks.actionRun.mockRejectedValue(new Error('Action archived'));
+    const result = await call('submit-assignment', { actionRunId: 'run', idempotencyKey: 'saved-key', response: { kind: 'answer', text: 'Response' } });
+    expect(result).toMatchObject({ status: 200, body: { duplicate: true, attemptId: 'attempt', resultId: 'result' } });
+    expect(writes).toEqual([]);
+    expect((await call('submit-assignment', { actionRunId: 'other', idempotencyKey: 'saved-key', response: { kind: 'answer', text: 'Response' } })).status).toBe(409);
+  });
+  it('starts a verified Action target without practicing writes or resetting accepted aggregate', async () => {
+    tables.user_knowledge_states = [];
+    tables.knowledge_nodes = [{ id: 'node', status: 'active' }];
+    tables.user_assignment_states = [{ user_id: 'learner', course_id: 'course', assignment_id: 'task', status: 'accepted' }];
+    mocks.actionRun.mockResolvedValue({ id: 'run', status: 'in_progress', execution_snapshot: { targetId: 'node' } });
+    const rpc = vi.fn(async () => ({ data: { id: 'run', status: 'in_progress' }, error: null }));
+    mocks.server.mockReturnValue({ from: query, rpc });
+    expect((await call('start-assignment', { actionRunId: 'run' })).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith('transition_edge_action_run_v2', { p_user_id: 'learner', p_run_id: 'run', p_operation: 'start' });
+    expect(writes).not.toContain('user_knowledge_states');
+    expect(writes).not.toContain('user_assignment_states');
+    expect(tables.user_assignment_states[0].status).toBe('accepted');
+  });
+  it('does not waive other covered Knowledge readiness for an Action target', async () => {
+    tables.assignment_coverages.push({ course_id: 'course', assignment_id: 'task', node_id: 'other' });
+    tables.knowledge_nodes = [{ id: 'node', status: 'active' }, { id: 'other', status: 'active' }];
+    tables.user_knowledge_states = [];
+    mocks.actionRun.mockResolvedValue({ id: 'run', status: 'in_progress', execution_snapshot: { targetId: 'node' } });
+    expect((await call('start-assignment', { actionRunId: 'run' })).status).toBe(403);
+    expect(writes).toEqual([]);
   });
 });
