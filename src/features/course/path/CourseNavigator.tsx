@@ -59,6 +59,8 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
     return buildCourseNavigator({ graph, runtime, knowledge, courseState, decision: result.decision, routeView: routeControl.view, learningContent: exact ? [...learningContent, exact] : learningContent });
   }, [graph, runtime, knowledge, courseState, result.decision, routeControl.view, learningContent, resolveLearningContent]);
   const recommendation = courseActionRecommendation(runtime.course.id, model.relations, actionControl, new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId)));
+  const recommendedTarget = recommendation.kind === 'active' ? recommendation.run.execution_snapshot.targetId : recommendation.kind === 'candidate' ? recommendation.recommended.edge.target : null;
+  const pathModel = { ...model, route: model.route.map(item => ({ ...item, state: item.acquired ? 'completed' as const : item.state === 'locked' ? 'locked' as const : item.node.id === recommendedTarget ? 'current' as const : 'available' as const })) };
   const next = model.nextPractice;
   const routeAcquired = model.route.length > 0 && model.route.every(item => item.acquired);
   const hasConfiguredActions = actionControl.actions.some(action => model.relations.some(edge => edge.id === action.edge_id));
@@ -84,7 +86,7 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
       </section>
       <ActionRunHistory runs={actionControl.runs} control={actionControl} courseId={runtime.course.id} acquiredIds={new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId))} title={id => graph.knowledgeNodes.find(node => node.id === id)?.title ?? routeControl.view?.activeVersion?.snapshot.titles[id] ?? id} visibleEdgeIds={new Set(model.relations.map(edge => edge.id))}/>
     </aside>
-    {authenticated && (!routeControl.view || routeControl.view.activeVersion?.courseId !== runtime.course.id) ? <p role={routeControl.error ? "alert" : "status"}>{routeControl.error || "正在加载正式个人路线…"}</p> : <CoursePathView model={model} targetOutcome={runtime.course.targetOutcome} onInspectCapabilities={onInspectCapabilities} onSelect={onSelect} />}
+    {authenticated && (!routeControl.view || routeControl.view.activeVersion?.courseId !== runtime.course.id) ? <p role={routeControl.error ? "alert" : "status"}>{routeControl.error || "正在加载正式个人路线…"}</p> : <CoursePathView model={pathModel} targetOutcome={runtime.course.targetOutcome} onInspectCapabilities={onInspectCapabilities} onSelect={onSelect} />}
     </div>
     {detail ? <dialog ref={dialogRef} className="navigator-practice-detail" aria-label={detail.title} onClose={() => setDetail(null)}><button autoFocus className="atlas-secondary" onClick={() => setDetail(null)}>关闭任务详情</button><h2>{detail.title}</h2><p>{detail.description}</p><h3>任务要求</h3><ul>{detail.requirements.map((text, index) => <li key={index}>{text}</li>)}</ul><h3>交付成果</h3><p>{detail.expectedOutput}</p><h3>验收标准</h3><ul>{detail.acceptanceCriteria.map((text, index) => <li key={index}>{text}</li>)}</ul><p>任务记录已保留；下一步学习安排以行动队列为准。</p>{detailEligibility?.reason && !detailEligibility.viewOnly ? <p role="status">{detailEligibility.reason}</p> : null}<button className="atlas-secondary" disabled={!detailEligibility?.canStart && !detailEligibility?.viewOnly} onClick={() => navigate(`/courses/${encodeURIComponent(runtime.course.id)}/assignments/${encodeURIComponent(detail.id)}`)}>{detailEligibility?.cta}</button></dialog> : null}
   </div>;

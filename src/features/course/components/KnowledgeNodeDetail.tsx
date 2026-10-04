@@ -11,7 +11,7 @@ import type { CapabilityRelation } from '@/shared/learning/routePlanning';
 import { buildMaterialDeepLink, resolveKnowledgeMaterialEntry } from '@/features/material/materialNavigation';
 import { Link } from 'react-router-dom';
 
-const stateLabel = { explore: '尚未具备', learning: '学习中', learned: '已学会', practicing: '实践中', mastered: '已掌握' };
+export const knowledgeStateLabel = { explore: '尚未具备', learning: '学习中', learned: '已学会', practicing: '实践中', mastered: '已掌握' };
 export function KnowledgeNodeDetail({ node, courseNode, runtime, graph, knowledge, relations, context, actions, onSelect, initialEdgeId, learningPath }: {
   learningPath?: { id: string; title: string }; initialEdgeId?: string | null; node: KnowledgeNode; courseNode?: CourseSkillTreeNode | null; runtime: CourseRuntimeData; graph: KnowledgeGraph;
   knowledge: UserKnowledgeRecord[]; relations: readonly CapabilityRelation[];
@@ -26,7 +26,7 @@ export function KnowledgeNodeDetail({ node, courseNode, runtime, graph, knowledg
   const incoming = relations.filter(edge => edge.target === node.id);
   const runs = actions.runs.filter(run => run.execution_snapshot.sourceId === node.id || run.execution_snapshot.targetId === node.id);
   return <div className="knowledge-node-detail" data-context={context}>
-    <section className="atlas-drawer-section"><h3>当前能力</h3><strong>{stateLabel[current?.status ?? 'explore']}</strong><p>{node.description}</p>{node.masteryCriteria.length ? <details><summary>能力要求</summary><ul>{node.masteryCriteria.map(item => <li key={item}>{item}</li>)}</ul></details> : null}</section>
+    <section className="atlas-drawer-section"><h3>当前能力</h3><strong>{knowledgeStateLabel[current?.status ?? 'explore']}</strong><p>{node.description}</p>{node.masteryCriteria.length ? <details><summary>能力要求</summary><ul>{node.masteryCriteria.map(item => <li key={item}>{item}</li>)}</ul></details> : null}</section>
     {learningPath ? <section className="atlas-drawer-section"><h3>已有学习内容</h3><p>{learningPath.title}</p><Link className="atlas-secondary" to={`/learn/micro/${encodeURIComponent(node.id)}?courseId=${encodeURIComponent(runtime.course.id)}&pathId=${encodeURIComponent(learningPath.id)}`}>打开这份学习内容</Link><small>学习前置条件仍由正式路线核验。</small></section> : null}
     <section className="atlas-drawer-section"><h3>{context === 'personal-route' ? '沿当前路线继续' : '从这里出发'}</h3>
       {!outgoing.length ? <p>当前范围没有从此能力出发的关系。</p> : outgoing.map(edge => {
