@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import type { StructuredGenerationClient, StructuredGenerationRequest, StructuredGenerationResult } from '../knowledge/generation/types';
 
-export const EVIDENCE_PROMPT_VERSION = 'personal-evidence-v15';
+export const EVIDENCE_PROMPT_VERSION = 'personal-evidence-v16';
 export const EVIDENCE_TOP_K = 5;
+// Keep complete evidence per node while bounding each model's judgment output.
+const JUDGMENT_BATCH_SIZE = 5;
 export const MAX_SOURCE_CHARACTERS = 24000;
 export type EvidenceLine = { line: number; text: string };
 export type DiagnosisSource = { id: string; lines: EvidenceLine[] };
@@ -90,8 +92,8 @@ export async function diagnoseEvidence(sources:DiagnosisSource[],llm:StructuredG
   if(!groups.size)return {units,matches:units.map((_,index)=>({unitIndexes:[index],nodeId:null,revisionId:null,proposedStatus:null,sufficiency:'unmatched' as const,confidence:1,reason:'没有检索到可匹配的现有知识。'})),metadata,artifacts,llmCalls,retrievalCount:units.length};
   const allMatched:Array<{nodeId:string;unitIndexes:number[];sufficiency:'supported'|'partial'|'insufficient';confidence:number;reason:string}>=[];
   const entries=[...groups];
-  for(let offset=0;offset<entries.length;offset+=20){
-  const batch=new Map(entries.slice(offset,offset+20));
+  for(let offset=0;offset<entries.length;offset+=JUDGMENT_BATCH_SIZE){
+  const batch=new Map(entries.slice(offset,offset+JUDGMENT_BATCH_SIZE));
   const nodeIds=[...batch.keys()];
   const context={sources,units,groups:Object.fromEntries(batch)};
   for(let attempt=0;attempt<2;attempt++){

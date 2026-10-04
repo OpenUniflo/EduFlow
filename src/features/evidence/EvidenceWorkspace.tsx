@@ -22,7 +22,7 @@ export function EvidenceWorkspaceProvider({children,onConfirmed,nodeTitle,previe
  const [revision,setRevision]=useState(0);const changed=useCallback(()=>setRevision(value=>value+1),[]);
  const dialog=useRef<HTMLDialogElement>(null);const workspaceOpen=useRef(false);workspaceOpen.current=Boolean(workspace);const reduced=useReducedMotion();
  const open=useCallback((courseId?:string,sourceId?:string,runId?:string)=>{setSelection({sourceId,runId});setWorkspace({courseId,sourceId,runId});},[]);
- const close=useCallback(()=>setWorkspace(null),[]);
+ const close=useCallback(()=>{setWorkspace(null);changed();},[changed]);
  useEffect(()=>{if(workspace&&!dialog.current?.open)dialog.current?.showModal();},[workspace]);
  const confirmed=async()=>{await onConfirmed();changed();};
  return <EvidenceContext.Provider value={{open,close,confirmed,nodeTitle,preview,revision,changed,surfaceHost:workspace?surfaceHost:null,foreground:workspace?{courseId:workspace.courseId,...selection}:undefined}}>{children}

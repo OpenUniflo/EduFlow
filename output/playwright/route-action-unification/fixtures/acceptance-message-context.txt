@@ -1,0 +1,8 @@
+Acceptance test fixture — 路线行动统一验收：消息上下文排错
+这是用于产品验收的合成工作记录，不表示真实用户的工作经历。以下描述的是本次受控练习中实际完成的步骤与结果，供能力候选流程测试。
+任务：排查 Agent 第二轮调用为什么不知道第一轮工具返回的结果。我检查了发往模型的实际 messages 数组，确认上下文并不自动包含浏览器上显示的所有聊天记录。
+第一轮请求包含 system「你是仓库助手」、user「查询订单 T100 的状态」。模型生成 assistant 消息，含 tool_calls [{id:"call_1",name:"lookup_order",arguments:{order_id:"T100"}}]。
+工具执行返回 {order_id:"T100",status:"shipped"}。故障版本第二轮请求只有 system 和原始 user 两条消息，丢掉了 assistant 工具调用消息以及 tool 结果消息。因此模型没有读到 shipped。
+我在请求组装处保留 system 和已有的 user/assistant 历史，将 assistant 工具调用消息加入历史，再追加 role=tool、tool_call_id=call_1、content 为上述 JSON 的消息，然后发起第二轮模型调用。
+我逐条还原第二轮上下文，顺序是：system 约束助手职责；user 提出订单问题；assistant 请求调用工具；tool 提供与 call_1 对应的外部事实。第二轮模型返回 assistant「订单 T100 已发货」。
+核查结果：网络请求 payload 中四条消息及 tool_call_id 对应关系正确，模型答复与工具结果一致。我没有把工具结果写成 system 指令，也没有声称模型能看到未发送的 UI 历史。

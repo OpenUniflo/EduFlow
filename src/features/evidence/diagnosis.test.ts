@@ -99,12 +99,26 @@ describe('personal evidence discovery boundary',()=>{
   const generateJson=vi.fn(async input=>{
    if(input.stage==='extraction')return {value:{units},metadata:{stage:'extraction'}};
    if(input.schemaVersion==='evidence-factual-verification-v3'){expect(JSON.parse(input.user).candidates.length).toBeLessThanOrEqual(5);return {value:{verdicts:Object.fromEntries(JSON.parse(input.user).candidates.map((match:{nodeId:string})=>[match.nodeId,{definitionScopePreserved:true,verdict:'supported',reason:'checked'}]))},metadata:{stage:'admission'}};}
-   const {groups}=JSON.parse(input.user);expect(Object.keys(groups).length).toBeLessThanOrEqual(20);
+   const {groups}=JSON.parse(input.user);expect(Object.keys(groups).length).toBeLessThanOrEqual(5);expect(JSON.parse(input.user).sources).toEqual([source]);
    return {value:{judgments:Object.fromEntries(Object.entries(groups).map(([id,g])=>[id,{...partial,unitIndexes:(g as {unitIndexes:number[]}).unitIndexes}]))},metadata:{stage:'admission'}};
   });
   const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async text=>Array.from({length:5},(_,index)=>({...node,node_id:text+'-'+index})));
-  expect(generateJson).toHaveBeenCalledTimes(8);expect(result.matches).toHaveLength(25);
+  expect(generateJson).toHaveBeenCalledTimes(11);expect(result.matches).toHaveLength(25);
   expect(result.matches.every(match=>match.nodeId!==null)).toBe(true);
+ });
+ it('bounds fourteen judgments as 5/5/4 without splitting a node shared across sources',async()=>{
+  const sources=[source,{...source,id:'source2'}];
+  const units=[{...unit,capability:'first'},{...unit,capability:'second'},{...unit,sourceId:'source2',capability:'third'}];
+  const batches:string[][]=[];let sharedIndexes:number[]=[];
+  const generateJson=vi.fn(async input=>{
+   if(input.stage==='extraction')return {value:{units},metadata:{stage:'extraction'}};
+   const context=JSON.parse(input.user);expect(context.sources).toEqual(sources);expect(context.units).toEqual(units);
+   batches.push(Object.keys(context.groups));if(context.groups['node-9'])sharedIndexes=context.groups['node-9'].unitIndexes;
+   return {value:{judgments:Object.fromEntries(Object.entries(context.groups).map(([id,g])=>[id,{...partial,sufficiency:'insufficient',unitIndexes:(g as {unitIndexes:number[]}).unitIndexes}]))},metadata:{stage:'admission'}};
+  });
+  const result=await diagnoseEvidence(sources,{generateJson} as unknown as StructuredGenerationClient,async text=>Array.from({length:5},(_,i)=>({...node,node_id:'node-'+(i+(text==='first'?0:text==='second'?5:9))})));
+  expect(batches.map(batch=>batch.length)).toEqual([5,5,4]);expect(new Set(batches.flat()).size).toBe(14);expect(sharedIndexes).toEqual([1,2]);
+  expect(result.matches).toHaveLength(14);expect(result.matches.every(match=>match.proposedStatus===null)).toBe(true);
  });
  it('never returns partial proposals when a later judgment batch fails',async()=>{
   const units=Array.from({length:5},(_,index)=>({...unit,capability:String(index)}));
@@ -115,7 +129,7 @@ describe('personal evidence discovery boundary',()=>{
    return {value:{judgments:Object.fromEntries(Object.entries(groups).map(([id,g])=>[id,{...partial,unitIndexes:(g as {unitIndexes:number[]}).unitIndexes}]))},metadata:{stage:'admission'}};
   });
   const error=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async text=>Array.from({length:5},(_,index)=>({...node,node_id:text+'-'+index}))).catch(error=>error);
-  expect(error).toBeInstanceOf(EvidenceDiagnosisError);expect(error.diagnostics.artifacts.judgmentAttempts).toHaveLength(1);
+  expect(error).toBeInstanceOf(EvidenceDiagnosisError);expect(error.diagnostics.artifacts.judgmentAttempts).toHaveLength(4);
  });
 
  it('can only downgrade positive candidates after factual verification, retaining both judgments',async()=>{
