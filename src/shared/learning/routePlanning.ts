@@ -156,6 +156,23 @@ export function planCourseRoute(input: RoutePlanningInput, constraints: RouteCon
   const model = capability(data, input.enablesEdges);
   const candidates = new Set(model.orderedNodeIds);
   const includes = unique(constraints.includeNodeIds); const excludes = new Set(constraints.excludeNodeIds);
+  // Acquiring a downstream target can prune a previously included start from
+  // the candidate view. Preserve explicit acquired ancestors through real facts;
+  // unrelated acquired nodes and unavailable identities remain outside the route.
+  if (includes.some(id => data.current.has(id) && !candidates.has(id))) {
+    const ancestors = new Set(model.courseKnowledgeIds);
+    const incoming = new Map<string, string[]>();
+    for (const edge of [...data.edges, ...(input.enablesEdges ?? [])]) {
+      if (!data.ids.has(edge.source) || !data.ids.has(edge.target)) continue;
+      incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source]);
+    }
+    const queue = [...ancestors];
+    for (let i = 0; i < queue.length; i++) for (const source of incoming.get(queue[i]) ?? []) {
+      if (!ancestors.has(source)) { ancestors.add(source); queue.push(source); }
+    }
+    for (const id of includes) if (data.current.has(id) && ancestors.has(id)) candidates.add(id);
+  }
+
   const conflicts: RouteConflict[] = [];
   for (const id of includes) {
     if (excludes.has(id)) conflicts.push({ kind: 'include_exclude', rootNodeId: id, rootKind: 'include', nodeId: id, constraint: 'exclude' });

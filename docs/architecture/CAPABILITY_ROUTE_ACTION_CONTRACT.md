@@ -12,6 +12,8 @@ Only prerequisite and enables participate in execution presentation. A hard prer
 
 orderedNodeIds supplies deterministic reading/layout order only. Never connect adjacent IDs. Every rendered relationship must preserve the identity, endpoints, relation and strength of a real KnowledgeEdge. Current prerequisite relations come from the formal route snapshot/current plan. Enables are factual support edges with both endpoints in selectedNodeIds; they never enter prerequisiteEdges.
 
+An explicitly included acquired ancestor remains eligible when target acquisition prunes it from the candidate view, provided active factual prerequisite/enables relations still connect it to a Course target. This does not automatically include ancestors or admit unrelated acquired nodes; Exclude and hard-closure checks still apply. Revalidation never mutates an immutable route version.
+
 Route preview is presentation-only until explicit adoption. Preview cannot create a route version. Current, kept, added and removed overlays do not change structural node/edge identity, coordinates, force lifecycle or camera. Project detail defaults to project supportEdges; extra Global facts require a separately labelled disclosure.
 
 ## Execution

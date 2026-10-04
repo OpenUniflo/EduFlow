@@ -13,6 +13,27 @@ function route(data: RoutePlanningInput, intent = constraints()) {
   return result.route;
 }
 describe('V2 necessary route and distinct candidate space', () => {
+  it('keeps an explicitly included acquired ancestor after the target is acquired', () => {
+    const data = input([], ['A>T'], ['T'], ['A', 'T', 'unrelated']);
+    expect(buildCapabilityModel(data).orderedNodeIds).toEqual(['T']);
+    expect(route(data, constraints(['A'])).orderedNodeIds).toEqual(['A', 'T']);
+    expect(route(data, constraints(['A'])).prerequisiteEdges.map(edge => edge.id)).toEqual(['A>T']);
+    expect(planCourseRoute(data, constraints(['unrelated']))).toMatchObject({ valid: false });
+    expect(planCourseRoute(data, constraints(['A'], ['A']))).toMatchObject({ valid: false });
+  });
+
+  it('retains an explicit acquired enables ancestor without casting enables to prerequisite', () => {
+    const data = { ...input([], [], ['T'], ['A', 'T']), enablesEdges: [{ id: 'support', source: 'A', target: 'T', relation: 'enables' as const, strength: 1 }] };
+    expect(route(data, constraints(['A'])).selectedNodeIds).toEqual(['A', 'T']);
+    expect(route(data, constraints(['A'])).prerequisiteEdges).toEqual([]);
+    expect(planCourseRoute({ ...data, currentNodeIds: ['T'] }, constraints(['A']))).toMatchObject({ valid: false });
+  });
+  it('does not retain an acquired include after its identity or connecting fact disappears', () => {
+    const data = input([], ['A>T'], ['T'], ['A', 'T']);
+    expect(planCourseRoute({ ...data, nodeIds: ['T'] }, constraints(['A']))).toMatchObject({ valid: false });
+    expect(planCourseRoute({ ...data, prerequisiteEdges: [] }, constraints(['A']))).toMatchObject({ valid: false });
+  });
+
   it('requires every hard branch, leaves optional soft branch in model only', () => {
     const data = input(['A>T', 'B>T', 'C>S'], ['S>T'], ['T'], ['A', 'B', 'C']);
     expect(buildCapabilityModel(data).orderedNodeIds).toEqual(['A', 'B', 'C', 'S', 'T']);
