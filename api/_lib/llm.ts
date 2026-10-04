@@ -37,6 +37,7 @@ export class OpenAICompatibleJsonGenerationClient implements StructuredGeneratio
       promptVersion: input.promptVersion, schemaVersion: input.schemaVersion,
       requestId: typeof payload.id === "string" ? payload.id : "unreported", generatedAt: new Date().toISOString(),
       temperature: input.temperature, maxTokens: input.maxTokens, thinking: input.thinking ?? false,
+      ...(input.thinking && input.reasoningEffort ? { requestedReasoningEffort: input.reasoningEffort } : {}),
       ...(typeof payload.usage?.prompt_tokens === "number" ? { promptTokens: payload.usage.prompt_tokens } : {}),
       ...(typeof payload.usage?.completion_tokens === "number" ? { completionTokens: payload.usage.completion_tokens } : {})
     } };
@@ -56,6 +57,7 @@ export class OpenAICompatibleJsonGenerationClient implements StructuredGeneratio
           body: JSON.stringify({
             model: this.config.llmModel,
             thinking: { type: input.thinking ? "enabled" : "disabled" },
+            ...(input.thinking && input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
             messages: [{ role: "system", content: input.system }, { role: "user", content: input.user }],
             response_format: { type: "json_object" }, max_tokens: input.maxTokens,
             temperature: input.temperature, stream: false

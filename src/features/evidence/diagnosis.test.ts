@@ -104,6 +104,7 @@ describe('personal evidence discovery boundary',()=>{
   });
   const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async text=>Array.from({length:5},(_,index)=>({...node,node_id:text+'-'+index})));
   expect(generateJson).toHaveBeenCalledTimes(19);expect(result.matches).toHaveLength(25);
+  expect(generateJson.mock.calls.every(([input])=>input.thinking===true&&input.reasoningEffort==='low')).toBe(true);
   expect(result.matches.every(match=>match.nodeId!==null)).toBe(true);
  });
  it('bounds fourteen judgments as 5/5/4 without splitting a node shared across sources',async()=>{
