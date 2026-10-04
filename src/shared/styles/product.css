@@ -7016,5 +7016,7 @@ body:has(.micro-learning-page) { min-width: 0; overflow: auto; }
   .navigator-queue { max-height: calc(100dvh - 175px); overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; }
 }
 .atlas-graph-page[data-presentation="path"][data-experience="learn"] .atlas-detail-drawer .atlas-primary { color: #5869b8; background: #edf0f8; box-shadow: none; }
-/* Inspectable path details must sit above the Course view switch. */
-.atlas-graph-page[data-presentation="path"] .atlas-detail-drawer { z-index: 66; }
+/* Keep course view controls and node details in separate vertical space. */
+.atlas-graph-page[data-experience="learn"] { --course-detail-top: 144px; }
+.atlas-graph-page[data-experience="learn"] .atlas-detail-drawer { top: var(--course-detail-top); height: calc(100dvh - var(--course-detail-top)); }
+@media (max-width: 760px) { .atlas-graph-page[data-experience="learn"] { --course-detail-top: 176px; } }
