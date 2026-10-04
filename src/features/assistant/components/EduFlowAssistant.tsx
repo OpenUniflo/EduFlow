@@ -1,3 +1,5 @@
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import '../assistantSurface.css';
 import { Bot, Pin, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -24,19 +26,23 @@ export function AssistantSurface({ context, contextLabel, children, drawerOpen =
   const [pinned, setPinned] = useState(false);
   const timerRef = useRef<number | null>(null);
   const open = hovered || pinned;
+  const reducedMotion = useReducedMotion();
+  const panelRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  function close() { setPinned(false); setHovered(false); triggerRef.current?.focus(); }
 
+  useEffect(() => { if (pinned) panelRef.current?.querySelector<HTMLInputElement>("input,button")?.focus(); }, [pinned]);
   useEffect(() => () => { if (timerRef.current) window.clearTimeout(timerRef.current); }, []);
   function enter() { if (timerRef.current) window.clearTimeout(timerRef.current); setHovered(true); }
-  function leave() { if (!pinned) timerRef.current = window.setTimeout(() => setHovered(false), 220); }
+  function leave() { if (panelRef.current?.contains(document.activeElement)) return; if (!pinned) timerRef.current = window.setTimeout(() => setHovered(false), 220); }
 
   const locked = lockedProp || !context;
-  return <aside className={`eduflow-assistant course-design-assistant ${drawerOpen ? "drawer-open" : ""} ${open ? "open" : ""} ${pinned ? "pinned" : ""} ${className}`} onMouseEnter={enter} onMouseLeave={leave} aria-label="EduFlow Assistant" data-workspace={context?.workspace ?? "locked"} data-experience-mode={context?.experienceMode ?? "learn"}>
-    {open ? <section className="course-design-assistant-panel eduflow-assistant-panel glass-v2">
-      <header><div><Bot size={18}/><span><strong>EduFlow Assistant</strong><small>{pinned ? "已固定 · 基于当前页面上下文" : "悬停预览 · 点击固定"}</small></span></div>{pinned ? <button onClick={() => { setPinned(false); setHovered(false); }} aria-label="关闭 EduFlow Assistant"><X size={16}/></button> : null}</header>
-      <div className="course-design-assistant-context"><span>{locked ? "需要登录" : "当前上下文"}</span><strong>{contextLabel}</strong><small>{locked ? "登录后使用 EduFlow Assistant" : `${context!.workspace} · ${context!.experienceMode}`}</small></div>
-      {!locked && onUpdateCapabilities?<button className="atlas-secondary" onClick={onUpdateCapabilities}>更新我的能力</button>:null}
+  return <aside className={`eduflow-assistant course-design-assistant ${drawerOpen ? "drawer-open" : ""} ${open ? "open" : ""} ${pinned ? "pinned" : ""} ${className}`} onMouseEnter={enter} onMouseLeave={leave} onBlur={event => { if (!pinned && !event.currentTarget.contains(event.relatedTarget as Node | null) && !event.currentTarget.matches(":hover")) setHovered(false); }} onKeyDown={event => { if(event.key === "Escape") { event.stopPropagation(); close(); } }} aria-label="EduFlow Assistant" data-presentation={context?.presentation} data-workspace={context?.workspace ?? "locked"} data-experience-mode={context?.experienceMode ?? "learn"}>
+    <AnimatePresence initial={false}>{open ? <motion.section ref={panelRef} key="assistant-panel" initial={{opacity:0,scale:reducedMotion?1:.97,y:reducedMotion?0:10}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:reducedMotion?1:.97,y:reducedMotion?0:10}} transition={{duration:reducedMotion?0:.24,ease:'easeOut'}} className="course-design-assistant-panel eduflow-assistant-panel glass-v2">
+      <header><div><Bot size={18}/><span><strong>EduFlow Assistant</strong><small title={contextLabel}>{locked ? '登录后使用 EduFlow Assistant' : contextLabel}</small></span></div><div className="assistant-window-controls"><button aria-label={pinned ? '取消固定 Assistant' : '固定 Assistant'} aria-pressed={pinned} onClick={() => setPinned(value => !value)}><Pin size={15}/></button><button onClick={close} aria-label="关闭 EduFlow Assistant"><X size={16}/></button></div></header>
+      {!locked && onUpdateCapabilities ? <div className="assistant-primary-operation"><button className="atlas-primary" onClick={onUpdateCapabilities}>更新我的能力</button><small>从你的资料中确认新的能力</small></div> : null}
       {locked ? <div className="course-design-assistant-actions"><p>Assistant 会读取个人对话与学习上下文，因此不为匿名访客创建会话。</p><button className="atlas-primary" onClick={() => navigate("/login", { state: authGateState(location) })}>登录后使用 Assistant</button></div> : (children ?? <AssistantConversation context={context!}/>)}
-    </section> : null}
-    <button className="course-design-assistant-trigger" onClick={() => { setPinned((value) => !value); setHovered(true); }} aria-label="打开 EduFlow Assistant" aria-expanded={open}><Bot size={22}/>{pinned ? <Pin size={10}/> : null}</button>
+    </motion.section> : null}</AnimatePresence>
+    <button ref={triggerRef} className="course-design-assistant-trigger" onClick={() => { if(pinned) close(); else {setPinned(true);setHovered(true);} }} aria-label="打开 EduFlow Assistant" aria-expanded={open}><Bot size={22}/>{pinned ? <Pin size={10}/> : null}</button>
   </aside>;
 }

@@ -9,7 +9,7 @@ import { applicationServices, refreshLearnerState } from '@/app/services/applica
 
 function EvidenceAssistant({session,children}:{session:MockSession;children:ReactNode}) {
  const evidence=useEvidenceWorkspace()!;
- return <GlobalAssistantSurface session={session} onUpdateCapabilities={evidence.open}>{children}</GlobalAssistantSurface>;
+ return <GlobalAssistantSurface surfaceHost={evidence.surfaceHost} foreground={evidence.foreground?{contextLabel:"更新我的能力",context:{workspace:"learning",experienceMode:"learn",presentation:"evidence-workspace",userRole:session.role,capabilities:session.capabilities,courseId:evidence.foreground.courseId,evidenceSourceId:evidence.foreground.sourceId,diagnosisRunId:evidence.foreground.runId}}:undefined} session={session} onUpdateCapabilities={evidence.open}>{children}</GlobalAssistantSurface>;
 }
 export function CapabilityEvidenceBoundary({session,children}:{session:MockSession;children:ReactNode}) {
  const graph=()=>applicationServices.knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId));

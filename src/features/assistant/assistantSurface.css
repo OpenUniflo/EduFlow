@@ -1,0 +1,23 @@
+.eduflow-assistant.course-design-assistant { flex-direction: column; align-items: flex-end; gap: 12px; }
+.eduflow-assistant .eduflow-assistant-panel { width: min(360px, calc(100vw - 48px)); padding: 18px; border: 1px solid var(--atlas-border, #dce3ed); background: var(--atlas-surface, #fff); transform-origin: bottom right; }
+.eduflow-assistant .eduflow-assistant-panel header { gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--atlas-border, #e3e8ef); }
+.eduflow-assistant .eduflow-assistant-panel header > div:first-child { min-width: 0; justify-content: flex-start; }
+.eduflow-assistant .eduflow-assistant-panel header span { min-width: 0; gap: 5px; }
+.eduflow-assistant .eduflow-assistant-panel header strong { font-size: 14px; color: var(--atlas-ink); }
+.eduflow-assistant .eduflow-assistant-panel header small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--atlas-muted); }
+.eduflow-assistant .assistant-window-controls { flex-shrink: 0; gap: 4px; }
+.eduflow-assistant .assistant-window-controls button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; color: var(--atlas-muted); background: transparent; cursor: pointer; }
+.eduflow-assistant .assistant-window-controls button:hover, .eduflow-assistant .assistant-window-controls button[aria-pressed="true"] { color: var(--atlas-brand); background: #eef1ff; }
+.eduflow-assistant .assistant-primary-operation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 16px 0 6px; }
+.eduflow-assistant .assistant-primary-operation button { width: auto; padding: 9px 12px; font-size: 12px; }
+.eduflow-assistant .assistant-primary-operation small { color: var(--atlas-muted); font-size: 11px; }
+.eduflow-assistant .assistant-conversation-messages { max-height: 220px; }
+.eduflow-assistant .assistant-chat-message p, .eduflow-assistant .assistant-empty, .eduflow-assistant .assistant-error { font-size: 12px; line-height: 1.6; }
+.eduflow-assistant .assistant-input-mode button, .eduflow-assistant .assistant-open-full { font-size: 11px; }
+.eduflow-assistant .course-design-assistant-input { margin-top: 0; }
+.eduflow-assistant .course-design-assistant-input input { padding: 11px 12px; font-size: 13px; }
+.eduflow-assistant button:focus-visible, .eduflow-assistant input:focus-visible { outline: 2px solid var(--atlas-brand); outline-offset: 3px; }
+.eduflow-assistant button:disabled { opacity: .5; cursor: not-allowed; }
+.eduflow-assistant .assistant-open-full { justify-content: flex-end; color: var(--atlas-muted); font-weight: 500; }
+@media(max-width:620px) { .eduflow-assistant.course-design-assistant { right: 12px; bottom: 24px; } .eduflow-assistant .eduflow-assistant-panel { width: calc(100vw - 24px); max-height: calc(100dvh - 170px); } }
+@media(prefers-reduced-motion:reduce) { .eduflow-assistant.course-design-assistant, .eduflow-assistant .course-design-assistant-trigger { transition: none; } .eduflow-assistant .course-design-assistant-trigger:hover { transform: none; } .eduflow-assistant .spin { animation: none; } }

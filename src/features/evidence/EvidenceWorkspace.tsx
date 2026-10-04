@@ -3,20 +3,25 @@ import { X, Upload, FileText } from 'lucide-react';
 import { evidenceRequest, readEvidence, uploadEvidence, type EvidenceData, type EvidenceProposal } from './evidenceClient';
 import './evidence.css';
 
-type EvidenceEnvironment={open:(courseId?:string,sourceId?:string)=>void;confirmed:()=>Promise<void>;nodeTitle:(id:string)=>string;preview:(courseId:string,proposals:EvidenceProposal[])=>string};
+type EvidenceSelection={sourceId?:string;runId?:string};
+type EvidenceEnvironment={surfaceHost?:HTMLElement|null;foreground?:EvidenceSelection & {courseId?:string};open:(courseId?:string,sourceId?:string)=>void;confirmed:()=>Promise<void>;nodeTitle:(id:string)=>string;preview:(courseId:string,proposals:EvidenceProposal[])=>string};
 const EvidenceContext=createContext<EvidenceEnvironment|null>(null);
 export const useEvidenceWorkspace=()=>useContext(EvidenceContext);
 export function EvidenceWorkspaceProvider({children,onConfirmed,nodeTitle,preview}:{children:ReactNode;onConfirmed:()=>Promise<void>;nodeTitle:(id:string)=>string;preview:EvidenceEnvironment['preview']}) {
+ const [surfaceHost,setSurfaceHost]=useState<HTMLDivElement|null>(null);
+ const [selection,setSelection]=useState<EvidenceSelection>({});
  const [workspace,setWorkspace]=useState<{courseId?:string;sourceId?:string}|null>(null);const dialog=useRef<HTMLDialogElement>(null);
- const open=useCallback((courseId?:string,sourceId?:string)=>setWorkspace({courseId,sourceId}),[]);
+ const open=useCallback((courseId?:string,sourceId?:string)=>{setSelection({sourceId});setWorkspace({courseId,sourceId});},[]);
  useEffect(()=>{if(workspace)dialog.current?.showModal();else dialog.current?.close();},[workspace]);
- return <EvidenceContext.Provider value={{open,confirmed:onConfirmed,nodeTitle,preview}}>{children}<dialog ref={dialog} className="capability-workspace" onCancel={()=>setWorkspace(null)} aria-labelledby="capability-workspace-title">
- {workspace?<><header><div><small>个人能力 · 跨项目证据</small><h1 id="capability-workspace-title">更新我的能力</h1><p>先检查证据与候选判断，再明确确认。确认前，你的能力和项目路线不会改变。</p></div><button aria-label="关闭能力更新工作区" onClick={()=>setWorkspace(null)}><X/></button></header><EvidenceLibrary key={workspace.sourceId ?? workspace.courseId ?? "general"} courseId={workspace.courseId} initialSourceId={workspace.sourceId} diagnosing/></>:null}
+ return <EvidenceContext.Provider value={{open,confirmed:onConfirmed,nodeTitle,preview,surfaceHost:workspace?surfaceHost:null,foreground:workspace?{courseId:workspace.courseId,...selection}:undefined}}>{children}<dialog ref={dialog} className="capability-workspace" onCancel={()=>setWorkspace(null)} aria-labelledby="capability-workspace-title">
+ {workspace?<><header><div><small>个人能力 · 跨项目证据</small><h1 id="capability-workspace-title">更新我的能力</h1><p>先检查证据与候选判断，再明确确认。确认前，你的能力和项目路线不会改变。</p></div><button aria-label="关闭能力更新工作区" onClick={()=>setWorkspace(null)}><X/></button></header><EvidenceLibrary key={workspace.sourceId ?? workspace.courseId ?? "general"} courseId={workspace.courseId} initialSourceId={workspace.sourceId} onContextChange={setSelection} diagnosing/></>:null}
+ <div ref={setSurfaceHost} className="evidence-assistant-host"/>
  </dialog></EvidenceContext.Provider>;
 }
-export function EvidenceLibrary({courseId,initialSourceId,diagnosing=false}:{courseId?:string;initialSourceId?:string;diagnosing?:boolean}) {
+export function EvidenceLibrary({courseId,initialSourceId,diagnosing=false,onContextChange}:{courseId?:string;initialSourceId?:string;diagnosing?:boolean;onContextChange?:(selection:EvidenceSelection)=>void}) {
  const environment=useEvidenceWorkspace();const [data,setData]=useState<EvidenceData>({sources:[],units:[],proposals:[],runs:[]});
  const [selected,setSelected]=useState<string[]>(initialSourceId?[initialSourceId]:[]);const [detail,setDetail]=useState<string|null>(initialSourceId??null);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [message,setMessage]=useState('');const [runId,setRunId]=useState<string|null>(null);
+ useEffect(()=>{onContextChange?.({sourceId:detail??undefined,runId:runId??undefined});},[detail,runId,onContextChange]);
  const reload=useCallback(async()=>{const next=await readEvidence();setData(next);return next;},[]);
  useEffect(()=>{void reload().catch(error=>setError(error instanceof Error?error.message:'证据加载失败'));},[reload]);
  async function perform(action:()=>Promise<void>) {setBusy(true);setError('');setMessage('');try{await action();await reload();}catch(error){setError(error instanceof Error?error.message:'操作失败');try{await reload();}catch{/* Keep the original action error when the connection remains unavailable. */}}finally{setBusy(false);}}

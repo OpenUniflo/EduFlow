@@ -4,6 +4,12 @@ export type AssistantWorkspace = (typeof assistantWorkspaces)[number];
 export type AssistantContextSnapshot = {
   workspace: AssistantWorkspace;
   experienceMode: "learn" | "design";
+  presentation?: string;
+  edgeId?: string;
+  routeVersionId?: string;
+  actionRunId?: string;
+  evidenceSourceId?: string;
+  diagnosisRunId?: string;
   courseId?: string;
   chapterId?: string;
   lessonId?: string;
@@ -112,7 +118,7 @@ export function parseAssistantStructuredContent(value: unknown): AssistantStruct
   throw new Error("Assistant structured content type is unsupported");
 }
 
-const optionalIdentityKeys = ["courseId", "chapterId", "lessonId", "knowledgeId", "materialId", "segmentId", "assignmentId", "workflowId", "runId", "actionId", "taskId", "microPathId", "microUnitId", "microStepId", "selectedObject"] as const;
+const optionalIdentityKeys = ["presentation", "edgeId", "routeVersionId", "actionRunId", "evidenceSourceId", "diagnosisRunId", "courseId", "chapterId", "lessonId", "knowledgeId", "materialId", "segmentId", "assignmentId", "workflowId", "runId", "actionId", "taskId", "microPathId", "microUnitId", "microStepId", "selectedObject"] as const;
 
 export function parseAssistantContext(value: unknown): AssistantContextSnapshot {
   if (!value || typeof value !== "object") throw new Error("Assistant context is required");

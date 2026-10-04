@@ -1,3 +1,5 @@
+import { EduFlowAssistant } from '@/features/assistant/components/EduFlowAssistant';
+import type { AssistantContext } from '@/features/assistant/assistantContext';
 import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequisites';
 import { useMemo, useRef, useState } from 'react';
 import { Crosshair, Maximize2, Minus, Plus, Search, X } from 'lucide-react';
@@ -15,7 +17,8 @@ import { projectStructuralGraph, projectRouteOverlay } from './projectRoutePrese
 import { relationLabel } from '@/shared/learning/routePresentation';
 import './projectCapability.css';
 
-export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, onSelect, onRoute, authenticated = false, control, actionData }: {
+export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, onSelect, onRoute, authenticated = false, control, actionData, assistantIdentity, active = true }: {
+  assistantIdentity?: Pick<AssistantContext, "userRole" | "capabilities">; active?: boolean;
   control: ReturnType<typeof useRoutePlanning>; actionData: ReturnType<typeof useEdgeActions>;
   graph: KnowledgeGraph; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[]; authenticated?: boolean;
   selectedId: string | null; onSelect(id: string | null): void; onRoute(): void;
@@ -73,7 +76,9 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
         {overlay.preview ? <><strong>路线预览 · 尚未采用</strong><span className="route-key-kept">保留</span><span className="route-key-added">新增</span><span className="route-key-removed">移除</span></> : <><strong>{control.view && !control.view.plan.valid ? '已采用路线 · 当前待重新确认' : '当前正式路线'}{control.view?.activeVersion ? ` V${control.view.activeVersion.versionNumber}` : ''}</strong><span>{overlay.nodes.length} 项能力 · {overlay.edges.length} 条真实关系</span></>}
         <small>实线：必要前置 · 长虚线：推荐前置 · 点线：能力支撑</small>
       </div>;
+  const focused = alternatives.find(item => item.action.id === actionId);
   return <section className="project-capability" aria-label="项目能力模型">
+    {active && assistantIdentity ? <EduFlowAssistant context={{ ...assistantIdentity, workspace: 'courses', experienceMode: 'learn', presentation: 'project-capability', courseId: runtime.course.id, routeVersionId: control.view?.activeVersion?.id, knowledgeId: !control.editing ? selected?.id : undefined, edgeId: !control.editing ? activeEdge?.id : undefined, actionId: !control.editing ? focused?.action.id : undefined }} contextLabel={control.editing ? '调整项目路线' : activeEdge ? `${title(activeEdge.source)} → ${title(activeEdge.target)}` : selected?.title ?? runtime.course.title} /> : null}
     {result.error ? <div className="project-capability-info glass-v2" role="alert"><h2>能力依赖暂时无法展示</h2><p>{result.error}</p>{authenticated ? <RoutePlanningPanel control={control} title={title}/> : null}</div> : result.projection && result.model ? <>
       <KnowledgeAtlasScene ref={scene} nodes={result.projection.nodes} edges={result.projection.edges} variant="project" selectedId={selected?.id} onNodeClick={node => choose(node.id)} onBackgroundClick={() => { onSelect(null); setEdgeId(null); }} onEdgeClick={edge => { if (control.editing) return; onSelect(null); setActionId(null); setEdgeId(edge.id); }} actionBranches={branches} onActionClick={setActionId} visibleNodeIds={visibleIds} routeOverlay={overlay} edgeActionCounts={counts} />
       {activeEdge && !control.editing ? <EdgeActionPanel alternatives={alternatives} title={`${title(activeEdge.source)} → ${title(activeEdge.target)}`} control={actionData} courseId={runtime.course.id} focusedId={actionId} onFocus={setActionId} onClose={() => setEdgeId(null)}/> : null}
