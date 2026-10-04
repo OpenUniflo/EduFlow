@@ -88,3 +88,11 @@ export function projectEdgeActions(edgeIds: ReadonlySet<string>, actions: readon
     .map(action => ({ action, binding: bindings.find(binding => binding.course_id === courseId && binding.action_id === action.id) }))
     .sort((a, b) => a.action.id.localeCompare(b.action.id));
 }
+
+export type ActionData = { actions: EdgeAction[]; bindings: CourseActionBinding[]; runs: ActionRun[]; availableMicroActionIds: string[]; availableActionIds: string[]; continuableRunIds?: string[] };
+export function actionAlternatives(courseId: string, edge: { id: string; source: string } | undefined, data: ActionData, acquiredIds: ReadonlySet<string>) {
+  return rankActions(projectEdgeActions(new Set(edge ? [edge.id] : []), data.actions, data.bindings, courseId).map(item => ({ ...item,
+    run: data.runs.find(run => run.action_id === item.action.id && run.status !== 'cancelled'),
+    cost: evaluateAction(item.action, { sourceId: edge!.source, acquiredIds, binding: item.binding, microAvailable: data.availableMicroActionIds.includes(item.action.id), executionAvailable: data.availableActionIds.includes(item.action.id) }),
+  })));
+}

@@ -13,7 +13,8 @@ import { RoutePlanningPanel } from './RoutePlanningPanel';
 import { actionAlternatives, branchesForActions, EdgeActionPanel, useEdgeActions } from '@/features/actions/EdgeActionPanel';
 import './projectCapability.css';
 
-export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, onSelect, onRoute, authenticated = false }: {
+export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, onSelect, onRoute, authenticated = false, control, actionData }: {
+  control: ReturnType<typeof useRoutePlanning>; actionData: ReturnType<typeof useEdgeActions>;
   graph: KnowledgeGraph; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[]; authenticated?: boolean;
   selectedId: string | null; onSelect(id: string | null): void; onRoute(): void;
 }) {
@@ -23,9 +24,6 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const [actionId, setActionId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const knowledgeKey = JSON.stringify(knowledge.map(record => [record.nodeId, record.status]).sort());
-  const control = useRoutePlanning(runtime.course.id, authenticated, knowledgeKey);
-  const actionData = useEdgeActions(runtime.course.id, authenticated, `${control.view?.activeVersion?.id ?? ""}:${knowledgeKey}`);
   const result = useMemo(() => {
     try {
       const model = buildProjectCapabilityModel(graph, runtime, knowledge);

@@ -31,7 +31,10 @@ export default handleApi(async (request, response) => {
       allRows(client.from('edge_action_runs').select('*').eq('course_id', courseId).order('created_at', { ascending: false }).order('id'), 'Action runs'),
     ]);
     const modelEdges = buildCapabilityModel(routeData.input).supportEdges;
-    const scopedEdges = new Set([...modelEdges.map(edge => edge.id), ...runs.map(run => String(run.edge_id))]);
+    const modelEdgeIds = new Set(modelEdges.map(edge => edge.id));
+    const courseNodes = new Set(routeData.input.courseOrder.map(item => item.nodeId));
+    const courseEdges = [...routeData.input.prerequisiteEdges, ...(routeData.input.enablesEdges ?? [])].filter(edge => courseNodes.has(edge.source) && courseNodes.has(edge.target));
+    const scopedEdges = new Set([...modelEdges.map(edge => edge.id), ...courseEdges.map(edge => edge.id), ...runs.map(run => String(run.edge_id))]);
     const edges = [...routeData.input.prerequisiteEdges.map(edge => ({ ...edge, relation: 'prerequisite' as const })), ...(routeData.input.enablesEdges ?? [])].filter(edge => scopedEdges.has(edge.id));
     const [actions, bindings, microPaths, version, assignments] = await Promise.all([
       edges.length ? allRows(client.from('knowledge_edge_actions').select('*').eq('status', 'active').in('edge_id', edges.map(edge => edge.id)).order('id'), 'Project edge actions') : [],
@@ -47,7 +50,7 @@ export default handleApi(async (request, response) => {
       const edge = edges.find(edge => edge.id === action.edge_id);
       const target = edge?.target ?? '';
       const binding = bindings.find(binding => binding.action_id === action.id);
-      return Boolean(action.type === 'micro_learning' && binding?.available && version && edge && !version.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && plan.valid && (plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target))
+      return Boolean(action.type === 'micro_learning' && binding?.available && version && edge && !version.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && plan.valid && (modelEdgeIds.has(edge.id) && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target))
         && !hasUnmetHardPrerequisite(target, acquired, plan.route.prerequisiteEdges)
         && microPaths.some(path => path.id === binding.micro_path_id && path.knowledge_id === target));
     }).map(action => action.id);
@@ -55,12 +58,23 @@ export default handleApi(async (request, response) => {
       const binding = bindings.find(binding => binding.action_id === action.id);
       const edge = edges.find(edge => edge.id === action.edge_id);
       const assignment = assignments.find(assignment => assignment.id === binding?.assignment_id);
-      const scopeAvailable = edge && !version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && (completedActions.has(action.id) || plan.valid && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(edge.target));
+      const scopeAvailable = edge && !version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && (completedActions.has(action.id) || modelEdgeIds.has(edge.id) && plan.valid && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(edge.target));
       if (!edge || !version || !scopeAvailable || !assignment || assignment.mode === 'workflow' || (assignment.experience as { type?: string } | null)?.type === 'workflow' || !binding?.available || !binding.assignment_id || binding.micro_path_id || hasUnmetHardPrerequisite(edge.target, acquired, routeData.input.prerequisiteEdges)) return null;
       const { coverage, eligibility } = await readAssignmentEligibility(client, user.id, courseId, String(binding.assignment_id), { targetId: edge.target, status: 'not_started' });
       return !eligibility.reason && coverage.some(row => row.node_id === edge.target) ? action.id : null;
     }));
-    json(response, 200, { actions, bindings, runs, availableMicroActionIds, availableActionIds: [...availableMicroActionIds, ...availablePractice.filter(Boolean)] }); return;
+    const continuableRunIds = (await Promise.all(runs.filter(run => run.execution_version === 2 && ['selected', 'in_progress'].includes(String(run.status))).map(async run => {
+      try {
+        const snapshot = run.execution_snapshot as { repeatedFromRunId?: string; action?: { updated_at?: string }; binding?: { updated_at?: string } } | null;
+        const context = await requireActionExecution(client, user.id, courseId, String(run.action_id), run.status === 'in_progress' || snapshot?.repeatedFromRunId ? String(run.edge_id) : undefined);
+        if (context.action.updated_at !== snapshot?.action?.updated_at || context.binding?.updated_at !== snapshot?.binding?.updated_at || context.microPathId !== run.micro_path_id || (context.binding?.assignment_id ?? null) !== (run.assignment_id ?? null)) return null;
+        return String(run.id);
+      } catch (error) {
+        if (error instanceof ApiError && error.status < 500) return null;
+        throw error;
+      }
+    }))).filter((id): id is string => id !== null);
+    json(response, 200, { actions, bindings, runs, continuableRunIds, availableMicroActionIds, availableActionIds: [...availableMicroActionIds, ...availablePractice.filter(Boolean)] }); return;
   }
   if (request.method !== 'POST') return methodNotAllowed(response, ['GET', 'POST']);
   const parsed = bodySchema.safeParse(request.body);
