@@ -1,7 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 // Exercise the real component's memo/effect lifecycle with a recording graph engine.
 // GPU appearance/motion is verified separately in the hosted browser.
-const host = vi.hoisted(() => ({ slots: [] as any[], index: 0, effects: [] as (() => void)[] }));
+const host = vi.hoisted(() => ({ slots: [] as any[], index: 0, effects: [] as (() => void)[], reducedMotion: false }));
+vi.mock('motion/react', () => ({ useReducedMotion: () => host.reducedMotion }));
 vi.mock('react', () => {
   const memo = (fn: () => any, deps: any[]) => {
     const i = host.index++; const old = host.slots[i];
@@ -30,7 +31,7 @@ function render(variant: KnowledgeAtlasSceneProps['variant'] = 'project', extra:
   return props;
 }
 beforeEach(() => {
-  host.slots = []; host.effects = []; selected = null; vi.clearAllMocks();
+  host.slots = []; host.effects = []; host.reducedMotion = false; selected = null; vi.clearAllMocks();
   vi.stubGlobal('window', { setTimeout: vi.fn(), clearTimeout: vi.fn() });
   vi.stubGlobal('requestAnimationFrame', vi.fn()); vi.stubGlobal('cancelAnimationFrame', vi.fn());
 });
@@ -94,5 +95,27 @@ it('retains engine datum identities when capability recomputation prunes an upst
   expect(after.links[0]).toBe(before.links[1]);
   expect(after.nodes[0].x).toBe(20);
   expect(graph.d3ReheatSimulation).toHaveBeenCalledTimes(2);
+  expect(graph.cameraPosition).toHaveBeenCalledTimes(1);
+});
+
+it('changes route visibility, diff and reduced motion without reheating or resetting the stable world', () => {
+  const before = render().graphData;
+  before.nodes.forEach((node: any, i: number) => { node.x = i * 20; node.y = i; node.z = -i; });
+  render().onEngineStop();
+  const positions = before.nodes.map((node: any) => [node.x, node.y, node.z, node.fx, node.fy, node.fz]);
+  for (const preview of [false, true]) {
+    host.reducedMotion = preview;
+    const props = render('project', { visibleNodeIds: new Set(['B', 'C']), routeOverlay: {
+      preview, nodes: [{ id: 'B', state: preview ? 'removed' : 'current' }, { id: 'C', state: preview ? 'kept' : 'current' }],
+      edges: [{ id: 'B>C', state: preview ? 'removed' : 'current' }],
+    } });
+    expect(props.graphData).toBe(before);
+    expect(props.nodeVisibility(nodes[0])).toBe(false);
+    expect(props.nodeVisibility(nodes[1])).toBe(true);
+    expect(props.linkVisibility(edges[0])).toBe(false);
+    expect(props.linkVisibility(edges[1])).toBe(true);
+    expect(before.nodes.map((node: any) => [node.x, node.y, node.z, node.fx, node.fy, node.fz])).toEqual(positions);
+  }
+  expect(graph.d3ReheatSimulation).toHaveBeenCalledTimes(1);
   expect(graph.cameraPosition).toHaveBeenCalledTimes(1);
 });

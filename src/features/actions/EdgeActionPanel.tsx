@@ -72,7 +72,7 @@ export function EdgeActionPanel({ alternatives, title, control, courseId, focuse
       const action = active ? run.execution_snapshot.action : currentAction;
       const binding = active ? run.execution_snapshot.binding : currentBinding;
       return <section key={action.id} className={focusedId === action.id ? 'focused' : ''}>
-      <button className="edge-action-heading" aria-expanded={focusedId === action.id} onClick={() => onFocus(action.id)}><strong>{index === 0 && cost.available ? '推荐 · ' : ''}{action.title}</strong><span>{action.type === 'micro_learning' ? '微学习' : '实践任务'} · {action.estimated_minutes} 分钟 · 难度 {action.difficulty}/5</span></button>
+      <button className="edge-action-heading" aria-expanded={focusedId === action.id} onClick={() => onFocus(action.id)}><strong>{!embedded ? `${index + 1} · ` : ''}{index === 0 && cost.available ? '推荐 · ' : ''}{action.title}</strong><span>{action.type === 'micro_learning' ? '微学习' : '实践任务'} · {action.estimated_minutes} 分钟 · 难度 {action.difficulty}/5</span></button>
       <p>{run ? ({ selected: '已选择', in_progress: '执行中', completed: '执行完成 · 不等于能力已具备', cancelled: '已取消' } as const)[run.status] : cost.available ? '资源与能力条件已满足' : '当前不可执行'} · 综合成本 {cost.weight}</p>
       {focusedId === action.id ? <><p>{action.description}</p><ul>{cost.reasons.map((reason, index) => <li key={`${reason.code}-${index}`}>{reason.message}{reason.cost ? `（+${reason.cost}）` : ''}</li>)}</ul>
         {binding ? <><h3>项目执行信息</h3><p>{binding.context}</p><p>{binding.instructions}</p>{binding.contact ? <p>联系：{binding.contact}</p> : null}<ul>{binding.resources.map(resource => <li key={resource.key}>{resource.label}：{resource.reference} · {resource.available ? '可用' : '不可用'}</li>)}</ul></> : null}

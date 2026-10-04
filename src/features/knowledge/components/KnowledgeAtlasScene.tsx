@@ -476,7 +476,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     const far = cameraDistance > (variant === "global" ? 760 : 680);
     const medium = cameraDistance > (variant === "global" ? 480 : 420);
     const candidates = renderNodes
-      .filter((node) => isVisible(node.id) && Number.isFinite(node.x) && Number.isFinite(node.y) && Number.isFinite(node.z))
+      .filter((node) => !(actionBranches?.length && actionBranches.some(branch => { const edge = renderEdges.find(edge => edge.id === branch.edgeId); return edge && [endpointId(edge.source), endpointId(edge.target)].includes(node.id); })) && isVisible(node.id) && Number.isFinite(node.x) && Number.isFinite(node.y) && Number.isFinite(node.z))
       .map((renderNode) => {
         const node = nodeById.get(renderNode.id) ?? renderNode;
         return { node: { ...node, x: renderNode.x, y: renderNode.y, z: renderNode.z } as RenderNode, priority: labelPriority(node, focusTargetId, hoveredId, focusIds, searchMatchId, currentLearningId) };
@@ -656,10 +656,10 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       </svg> : null}
       {variant === 'project' && edgeHint ? <div className="atlas-edge-hint" role="tooltip" style={{ transform: `translate(${edgeHint.x}px, ${edgeHint.y}px) translate(-50%, -120%)` }}>{edgeHint.text}</div> : null}
       {variant === 'project' && branchPositions.length > 0 ? <svg className="atlas-action-branches" width={size.width} height={size.height} aria-label="关系上的行动替代方案" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}>
-        {branchPositions.map(branch => <g key={branch.id} className={`action-branch action-branch-${branch.status}`}>
+        {branchPositions.map((branch, index) => <g key={branch.id} className={`action-branch action-branch-${branch.status}`}>
           <path d={branch.path} fill="none" stroke={actionBranchColors[branch.status]} strokeWidth={branch.status === 'candidate' || branch.status === 'unavailable' ? 1.5 : 3} strokeDasharray={branch.status === 'candidate' || branch.status === 'unavailable' ? '4 5' : undefined}/>
           <path d={branch.path} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onClick={() => onActionClick?.(branch.id)}/>
-          <text x={branch.x} y={branch.y - 7} textAnchor="middle" fontSize={11} fill={actionBranchColors[branch.status]} stroke="#f5f8fc" strokeWidth={4} paintOrder="stroke" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onActionClick?.(branch.id)}>{branch.title}</text>
+          <g style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onActionClick?.(branch.id)}><title>{`${index + 1} · ${branch.title}`}</title><circle cx={branch.x} cy={branch.y} r={9} fill="#f5f8fc" stroke={actionBranchColors[branch.status]} strokeWidth={1.5}/><text x={branch.x} y={branch.y + 4} textAnchor="middle" fontSize={11} fill={actionBranchColors[branch.status]}>{index + 1}</text></g>
         </g>)}
       </svg> : null}
       <div className="knowledge-atlas-label-layer" aria-hidden="true">
