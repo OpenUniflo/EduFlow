@@ -61,10 +61,19 @@ function validateUniqueOrders<T>(errors: string[], items: readonly T[], order: (
 /** Validates owned data and references without requiring a learner-usable route. */
 export function validateCourseIntegrity(runtime: CourseRuntimeData, knowledgeRepository: KnowledgeRepository, access: KnowledgeAccessContext) {
   const errors: string[] = [];
-  const nodeIds = new Set(knowledgeRepository.getVisibleGraph(access).nodes.filter((node) => node.status === "active").map((node) => node.id));
+  const visibleGraph = knowledgeRepository.getVisibleGraph(access);
+  const nodeIds = new Set(visibleGraph.nodes.filter((node) => node.status === "active").map((node) => node.id));
   const chapterIds = new Set(runtime.chapters.map((chapter) => chapter.id));
   const lessonIds = new Set(runtime.lessons.map((lesson) => lesson.id));
   const courseNodeIds = new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId));
+  // Course-owned Assignments may support Bridge Knowledge through real incoming
+  // prerequisite/enables facts without adding that Knowledge to the curriculum.
+  const assignmentNodeIds = new Set(courseNodeIds);
+  const supportQueue = [...courseNodeIds];
+  const incomingSupport = groupBy(visibleGraph.edges.filter(edge => edge.relation !== "related" && nodeIds.has(edge.source) && nodeIds.has(edge.target)), edge => edge.target);
+  for (let index = 0; index < supportQueue.length; index++) for (const edge of incomingSupport.get(supportQueue[index]) ?? []) {
+    if (!assignmentNodeIds.has(edge.source)) { assignmentNodeIds.add(edge.source); supportQueue.push(edge.source); }
+  }
   const assignmentIds = new Set(runtime.assignments.map((assignment) => assignment.id));
   const outcomeIds = new Set(runtime.chapterOutcomes.map((outcome) => outcome.id));
   const finalProjectIds = new Set(runtime.finalProjects.map((project) => project.id));
@@ -169,7 +178,7 @@ export function validateCourseIntegrity(runtime: CourseRuntimeData, knowledgeRep
   const assignmentRelations = new Set<string>();
   runtime.assignmentCoverages.forEach((coverage) => {
     if (!assignmentIds.has(coverage.assignmentId)) errors.push(`AssignmentCoverage ${coverage.id} references unknown Assignment`);
-    if (!courseNodeIds.has(coverage.nodeId)) errors.push(`AssignmentCoverage ${coverage.id} references a node outside the Course`);
+    if (!assignmentNodeIds.has(coverage.nodeId)) errors.push(`AssignmentCoverage ${coverage.id} references a node outside the Course`);
     if (!nodeIds.has(coverage.nodeId)) errors.push(`AssignmentCoverage ${coverage.id} references invisible KnowledgeNode ${coverage.nodeId}`);
     const relation = `${coverage.assignmentId}:${coverage.nodeId}`;
     if (assignmentRelations.has(relation)) errors.push(`Duplicate AssignmentCoverage relation ${relation}`);

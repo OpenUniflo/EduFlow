@@ -626,3 +626,5 @@
 - Project ordinary KnowledgeEdges MUST use one solid line visual; prerequisite/enables semantics remain in data and details. Candidate Action branches MAY use dashes.
 - Current and Preview routes MUST use directional source-to-target presentation pulses over factual Edges without topology, force position or camera changes. Reduced motion uses static highlights and arrows.
 - Project default Route node rings MUST NOT render; Global/Personal learning and mastery rings retain their existing meaning.
+
+- Course-owned AssignmentCoverage may reference active, visible Bridge Knowledge that supports course Knowledge through factual prerequisite/enables ancestry. It MUST NOT imply CurriculumCoverage, CourseTargetKnowledge, or a synthetic KnowledgeEdge; unrelated, related-only, and inaccessible targets MUST be rejected.

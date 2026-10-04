@@ -1,0 +1,3190 @@
+{
+  "preview": "https://edu-flow-nwijzafzm-july-nanas-projects.vercel.app",
+  "capturedAt": "2026-10-04T16:50:42.278Z",
+  "courseId": "enterprise-vietnam-supply-collaboration",
+  "captures": [
+    {
+      "actor": "A",
+      "userId": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "currentVersion": {
+        "id": "b26d1555-247a-4e9d-b787-0b1d7fddab56",
+        "routeId": "69abef8b-6015-412e-91cf-3707a73a1b5f",
+        "userId": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+        "courseId": "enterprise-vietnam-supply-collaboration",
+        "versionNumber": 2,
+        "parentVersionId": "a59dc09e-47af-441c-9d02-a6f89f8fade2",
+        "source": "adjustment",
+        "constraints": {
+          "includeNodeIds": [
+            "supply-corrective-action-verification",
+            "supply-critical-material-identification",
+            "supply-material-risk-identification",
+            "supply-supplier-screening-criteria"
+          ],
+          "excludeNodeIds": []
+        },
+        "snapshot": {
+          "valid": true,
+          "titles": {
+            "supply-shortage-exposure": "交期窗口缺料暴露评估",
+            "supply-cross-border-lead-time": "跨境补货交期估计",
+            "supply-alternate-site-capacity": "替代基地可用产能评估",
+            "supply-cost-lead-time-tradeoff": "供给备选方案成本交期权衡",
+            "supply-landed-cost-calculation": "到岸总成本计算",
+            "supply-recovery-option-ranking": "供应恢复备选方案排序",
+            "supply-site-switch-feasibility": "跨基地供给切换可行性判断",
+            "supply-incoming-quality-anomaly": "来料质量异常判定",
+            "supply-net-material-requirement": "物料净需求计算",
+            "supply-shortage-impact-assessment": "缺料中断影响评估",
+            "supply-supplier-delivery-capacity": "供应商交付产能核验",
+            "supply-supplier-admission-decision": "供应商准入证据判定",
+            "supply-supplier-screening-criteria": "供应商筛选准则定义",
+            "supply-material-risk-identification": "关键物料供应风险识别",
+            "supply-sample-quality-interpretation": "供应商样品质量证据判读",
+            "supply-supplier-qualification-review": "供应商资质证据审查",
+            "supply-corrective-action-verification": "供应商纠正措施有效性验证",
+            "supply-critical-material-identification": "关键物料识别"
+          },
+          "conflicts": [],
+          "executionSteps": [
+            {
+              "order": 0,
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+              "actionId": "905947b9-07f4-528a-a2d8-9abd385d1d4e",
+              "sourceNodeId": "supply-supplier-screening-criteria",
+              "targetNodeId": "supply-sample-quality-interpretation"
+            },
+            {
+              "order": 1,
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-delivery-capacity",
+              "actionId": "4ac25258-20d0-505d-a2ac-c0c288b80b56",
+              "sourceNodeId": "supply-supplier-screening-criteria",
+              "targetNodeId": "supply-supplier-delivery-capacity"
+            },
+            {
+              "order": 2,
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-qualification-review",
+              "actionId": "96b03b5d-477d-59d3-a53f-ec2551109cc4",
+              "sourceNodeId": "supply-supplier-screening-criteria",
+              "targetNodeId": "supply-supplier-qualification-review"
+            },
+            {
+              "order": 3,
+              "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "actionId": "de9d5146-77da-54c6-a02e-f4ae02b62bde",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 4,
+              "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "actionId": "58c6b0a1-291f-5a1a-a4de-392515b2caf9",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 5,
+              "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "actionId": "e9629c75-1df5-5c17-a970-1c66130f5f77",
+              "sourceNodeId": "supply-supplier-qualification-review",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 6,
+              "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+              "actionId": "65a8bac3-522a-58b9-ad6d-b81b81344f4f",
+              "sourceNodeId": "supply-supplier-admission-decision",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 7,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "actionId": "b6262dd4-74ef-5a15-a47e-48d08db023d8",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 8,
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "ae02dee2-0bf9-5cd2-a7fe-a0e964d6ad1c",
+              "sourceNodeId": "supply-landed-cost-calculation",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 9,
+              "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+              "actionId": "3b93abef-6eca-58fd-a4a9-5fcc151e71c7",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-alternate-site-capacity"
+            },
+            {
+              "order": 10,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "actionId": "d44e9e78-b516-53d8-a76c-f6ecc92bca2c",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-site-switch-feasibility"
+            },
+            {
+              "order": 11,
+              "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "actionId": "7f91fc3e-dcc9-5bff-a3c3-da28bef4a0ab",
+              "sourceNodeId": "supply-alternate-site-capacity",
+              "targetNodeId": "supply-site-switch-feasibility"
+            },
+            {
+              "order": 12,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "actionId": "0901506a-929b-561a-ae80-30101a41a010",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-shortage-exposure"
+            },
+            {
+              "order": 13,
+              "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+              "actionId": "180fe4a2-89d7-5b83-a20c-c405fda78e23",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 14,
+              "edgeId": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "actionId": "1f3c52b9-a99d-561d-a2c6-a6ffa205162c",
+              "sourceNodeId": "supply-net-material-requirement",
+              "targetNodeId": "supply-shortage-exposure"
+            },
+            {
+              "order": 15,
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "7e81d669-bcf2-5803-a925-48cbc8485bd8",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-shortage-impact-assessment"
+            },
+            {
+              "order": 16,
+              "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+              "actionId": "fa3133bb-ab29-555a-ae5b-56cee5f31f6e",
+              "sourceNodeId": "supply-site-switch-feasibility",
+              "targetNodeId": "supply-recovery-option-ranking"
+            },
+            {
+              "order": 17,
+              "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "actionId": "8c6a0298-5ee1-5300-a01c-6a28c06abf7d",
+              "sourceNodeId": "supply-shortage-impact-assessment",
+              "targetNodeId": "supply-recovery-option-ranking"
+            },
+            {
+              "order": 18,
+              "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+              "actionId": "c4e22c29-07e0-5eda-ab96-123fd0fee408",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-incoming-quality-anomaly"
+            },
+            {
+              "order": 19,
+              "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "actionId": "20e231bb-ed44-536e-ad70-b7ce503841a5",
+              "sourceNodeId": "supply-incoming-quality-anomaly",
+              "targetNodeId": "supply-corrective-action-verification"
+            },
+            {
+              "order": 20,
+              "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+              "actionId": "af75134c-4c14-54e9-ac49-c3c492621072",
+              "sourceNodeId": "supply-corrective-action-verification",
+              "targetNodeId": "supply-recovery-option-ranking"
+            },
+            {
+              "order": 21,
+              "edgeId": "knowledge-enables-supply-critical-material-identification-supply-material-risk-identification",
+              "actionId": "c3acaafa-bbdc-5de4-a56e-faae6a4afd09",
+              "sourceNodeId": "supply-critical-material-identification",
+              "targetNodeId": "supply-material-risk-identification"
+            },
+            {
+              "order": 22,
+              "edgeId": "knowledge-enables-supply-material-risk-identification-supply-shortage-impact-assessment",
+              "actionId": "a06f3b77-ca86-50a9-a6a6-18d1dec902b8",
+              "sourceNodeId": "supply-material-risk-identification",
+              "targetNodeId": "supply-shortage-impact-assessment"
+            }
+          ],
+          "orderedNodeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-supplier-admission-decision",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-cost-lead-time-tradeoff",
+            "supply-alternate-site-capacity",
+            "supply-site-switch-feasibility",
+            "supply-net-material-requirement",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-recovery-option-ranking",
+            "supply-critical-material-identification",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification",
+            "supply-material-risk-identification",
+            "supply-supplier-screening-criteria"
+          ],
+          "selectedNodeIds": [
+            "supply-alternate-site-capacity",
+            "supply-corrective-action-verification",
+            "supply-cost-lead-time-tradeoff",
+            "supply-critical-material-identification",
+            "supply-cross-border-lead-time",
+            "supply-incoming-quality-anomaly",
+            "supply-landed-cost-calculation",
+            "supply-material-risk-identification",
+            "supply-net-material-requirement",
+            "supply-recovery-option-ranking",
+            "supply-sample-quality-interpretation",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-supplier-screening-criteria"
+          ],
+          "prerequisiteEdges": [
+            {
+              "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "source": "supply-alternate-site-capacity",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-shortage-exposure",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "source": "supply-incoming-quality-anomaly",
+              "target": "supply-corrective-action-verification",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "source": "supply-landed-cost-calculation",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "source": "supply-net-material-requirement",
+              "target": "supply-shortage-exposure",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "source": "supply-sample-quality-interpretation",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "source": "supply-shortage-exposure",
+              "target": "supply-shortage-impact-assessment",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "source": "supply-shortage-impact-assessment",
+              "target": "supply-recovery-option-ranking",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "source": "supply-supplier-delivery-capacity",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "source": "supply-supplier-qualification-review",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            }
+          ],
+          "bridgeKnowledgeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-alternate-site-capacity",
+            "supply-net-material-requirement",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-critical-material-identification",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification",
+            "supply-material-risk-identification",
+            "supply-supplier-screening-criteria"
+          ],
+          "currentKnowledgeIds": [
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-net-material-requirement",
+            "supply-critical-material-identification",
+            "supply-incoming-quality-anomaly",
+            "supply-supplier-screening-criteria"
+          ],
+          "effectiveTargetNodeIds": [
+            "supply-cost-lead-time-tradeoff",
+            "supply-recovery-option-ranking",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision"
+          ]
+        },
+        "structureFingerprint": "006e1e16ec44e1129f7647f5e6ab44773a2970e8a5a6be16cf8e974def5af12c",
+        "createdAt": "2026-10-04T16:45:38.304996+00:00",
+        "restoredFromVersionId": null
+      },
+      "previewRoute": {
+        "valid": true,
+        "conflicts": [],
+        "route": {
+          "orderedNodeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-supplier-admission-decision",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-cost-lead-time-tradeoff",
+            "supply-alternate-site-capacity",
+            "supply-site-switch-feasibility",
+            "supply-net-material-requirement",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-recovery-option-ranking",
+            "supply-critical-material-identification",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification",
+            "supply-material-risk-identification",
+            "supply-supplier-screening-criteria"
+          ],
+          "selectedNodeIds": [
+            "supply-alternate-site-capacity",
+            "supply-corrective-action-verification",
+            "supply-cost-lead-time-tradeoff",
+            "supply-critical-material-identification",
+            "supply-cross-border-lead-time",
+            "supply-incoming-quality-anomaly",
+            "supply-landed-cost-calculation",
+            "supply-material-risk-identification",
+            "supply-net-material-requirement",
+            "supply-recovery-option-ranking",
+            "supply-sample-quality-interpretation",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-supplier-screening-criteria"
+          ],
+          "effectiveTargetNodeIds": [
+            "supply-cost-lead-time-tradeoff",
+            "supply-recovery-option-ranking",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision"
+          ],
+          "prerequisiteEdges": [
+            {
+              "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "source": "supply-alternate-site-capacity",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-shortage-exposure",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "source": "supply-incoming-quality-anomaly",
+              "target": "supply-corrective-action-verification",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "source": "supply-landed-cost-calculation",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "source": "supply-net-material-requirement",
+              "target": "supply-shortage-exposure",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "source": "supply-sample-quality-interpretation",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "source": "supply-shortage-exposure",
+              "target": "supply-shortage-impact-assessment",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "source": "supply-shortage-impact-assessment",
+              "target": "supply-recovery-option-ranking",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "source": "supply-supplier-delivery-capacity",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "source": "supply-supplier-qualification-review",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            }
+          ],
+          "currentKnowledgeIds": [
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-net-material-requirement",
+            "supply-critical-material-identification",
+            "supply-incoming-quality-anomaly",
+            "supply-supplier-screening-criteria"
+          ],
+          "bridgeKnowledgeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-alternate-site-capacity",
+            "supply-net-material-requirement",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-critical-material-identification",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification",
+            "supply-material-risk-identification",
+            "supply-supplier-screening-criteria"
+          ]
+        },
+        "execution": {
+          "steps": [
+            {
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+              "actionId": "905947b9-07f4-528a-a2d8-9abd385d1d4e",
+              "sourceNodeId": "supply-supplier-screening-criteria",
+              "targetNodeId": "supply-sample-quality-interpretation",
+              "order": 0
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-delivery-capacity",
+              "actionId": "4ac25258-20d0-505d-a2ac-c0c288b80b56",
+              "sourceNodeId": "supply-supplier-screening-criteria",
+              "targetNodeId": "supply-supplier-delivery-capacity",
+              "order": 1
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-qualification-review",
+              "actionId": "96b03b5d-477d-59d3-a53f-ec2551109cc4",
+              "sourceNodeId": "supply-supplier-screening-criteria",
+              "targetNodeId": "supply-supplier-qualification-review",
+              "order": 2
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "actionId": "de9d5146-77da-54c6-a02e-f4ae02b62bde",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-supplier-admission-decision",
+              "order": 3
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "actionId": "58c6b0a1-291f-5a1a-a4de-392515b2caf9",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-supplier-admission-decision",
+              "order": 4
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "actionId": "e9629c75-1df5-5c17-a970-1c66130f5f77",
+              "sourceNodeId": "supply-supplier-qualification-review",
+              "targetNodeId": "supply-supplier-admission-decision",
+              "order": 5
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+              "actionId": "65a8bac3-522a-58b9-ad6d-b81b81344f4f",
+              "sourceNodeId": "supply-supplier-admission-decision",
+              "targetNodeId": "supply-cost-lead-time-tradeoff",
+              "order": 6
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "actionId": "b6262dd4-74ef-5a15-a47e-48d08db023d8",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-cost-lead-time-tradeoff",
+              "order": 7
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "ae02dee2-0bf9-5cd2-a7fe-a0e964d6ad1c",
+              "sourceNodeId": "supply-landed-cost-calculation",
+              "targetNodeId": "supply-cost-lead-time-tradeoff",
+              "order": 8
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+              "actionId": "3b93abef-6eca-58fd-a4a9-5fcc151e71c7",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-alternate-site-capacity",
+              "order": 9
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "actionId": "d44e9e78-b516-53d8-a76c-f6ecc92bca2c",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-site-switch-feasibility",
+              "order": 10
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "actionId": "7f91fc3e-dcc9-5bff-a3c3-da28bef4a0ab",
+              "sourceNodeId": "supply-alternate-site-capacity",
+              "targetNodeId": "supply-site-switch-feasibility",
+              "order": 11
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "actionId": "0901506a-929b-561a-ae80-30101a41a010",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-shortage-exposure",
+              "order": 12
+            },
+            {
+              "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+              "actionId": "180fe4a2-89d7-5b83-a20c-c405fda78e23",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-cost-lead-time-tradeoff",
+              "order": 13
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "actionId": "1f3c52b9-a99d-561d-a2c6-a6ffa205162c",
+              "sourceNodeId": "supply-net-material-requirement",
+              "targetNodeId": "supply-shortage-exposure",
+              "order": 14
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "7e81d669-bcf2-5803-a925-48cbc8485bd8",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-shortage-impact-assessment",
+              "order": 15
+            },
+            {
+              "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+              "actionId": "fa3133bb-ab29-555a-ae5b-56cee5f31f6e",
+              "sourceNodeId": "supply-site-switch-feasibility",
+              "targetNodeId": "supply-recovery-option-ranking",
+              "order": 16
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "actionId": "8c6a0298-5ee1-5300-a01c-6a28c06abf7d",
+              "sourceNodeId": "supply-shortage-impact-assessment",
+              "targetNodeId": "supply-recovery-option-ranking",
+              "order": 17
+            },
+            {
+              "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+              "actionId": "c4e22c29-07e0-5eda-ab96-123fd0fee408",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-incoming-quality-anomaly",
+              "order": 18
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "actionId": "20e231bb-ed44-536e-ad70-b7ce503841a5",
+              "sourceNodeId": "supply-incoming-quality-anomaly",
+              "targetNodeId": "supply-corrective-action-verification",
+              "order": 19
+            },
+            {
+              "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+              "actionId": "af75134c-4c14-54e9-ac49-c3c492621072",
+              "sourceNodeId": "supply-corrective-action-verification",
+              "targetNodeId": "supply-recovery-option-ranking",
+              "order": 20
+            },
+            {
+              "edgeId": "knowledge-enables-supply-critical-material-identification-supply-material-risk-identification",
+              "actionId": "c3acaafa-bbdc-5de4-a56e-faae6a4afd09",
+              "sourceNodeId": "supply-critical-material-identification",
+              "targetNodeId": "supply-material-risk-identification",
+              "order": 21
+            },
+            {
+              "edgeId": "knowledge-enables-supply-material-risk-identification-supply-shortage-impact-assessment",
+              "actionId": "a06f3b77-ca86-50a9-a6a6-18d1dec902b8",
+              "sourceNodeId": "supply-material-risk-identification",
+              "targetNodeId": "supply-shortage-impact-assessment",
+              "order": 22
+            }
+          ],
+          "options": [
+            {
+              "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+              "actionId": "af75134c-4c14-54e9-ac49-c3c492621072",
+              "title": "学习供应恢复备选方案排序案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+              "actionId": "c347d69b-ad79-5764-a133-0212b943dd1e",
+              "title": "复核供应恢复备选方案排序案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-critical-material-identification-supply-material-risk-identification",
+              "actionId": "c3acaafa-bbdc-5de4-a56e-faae6a4afd09",
+              "title": "学习关键物料供应风险识别案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-critical-material-identification-supply-material-risk-identification",
+              "actionId": "8a8dc61a-430e-5a2f-a67c-d09f76e5172f",
+              "title": "复核关键物料供应风险识别案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-material-risk-identification-supply-shortage-impact-assessment",
+              "actionId": "a06f3b77-ca86-50a9-a6a6-18d1dec902b8",
+              "title": "学习缺料中断影响评估案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-material-risk-identification-supply-shortage-impact-assessment",
+              "actionId": "37a172f8-e74f-5303-ad27-260e2e41bb56",
+              "title": "复核缺料中断影响评估案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+              "actionId": "c4e22c29-07e0-5eda-ab96-123fd0fee408",
+              "title": "学习来料质量异常判定案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+              "actionId": "cedf8b75-fdfb-5c64-a8d6-042d7ed97647",
+              "title": "复核来料质量异常判定案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+              "actionId": "180fe4a2-89d7-5b83-a20c-c405fda78e23",
+              "title": "学习供给备选方案成本交期权衡案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+              "actionId": "a3d3905a-cb17-52e5-af85-55a14e6c6906",
+              "title": "复核供给备选方案成本交期权衡案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+              "actionId": "fa3133bb-ab29-555a-ae5b-56cee5f31f6e",
+              "title": "学习供应恢复备选方案排序案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+              "actionId": "2e1694c7-54ef-5f80-a444-273689e05626",
+              "title": "复核供应恢复备选方案排序案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+              "actionId": "65a8bac3-522a-58b9-ad6d-b81b81344f4f",
+              "title": "学习供给备选方案成本交期权衡案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+              "actionId": "e192c4f9-d618-5742-a3f3-d79c1f756977",
+              "title": "复核供给备选方案成本交期权衡案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+              "actionId": "3b93abef-6eca-58fd-a4a9-5fcc151e71c7",
+              "title": "学习替代基地可用产能评估案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+              "actionId": "11bf0c5e-6f14-589d-a593-7286670485e0",
+              "title": "复核替代基地可用产能评估案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+              "actionId": "905947b9-07f4-528a-a2d8-9abd385d1d4e",
+              "title": "学习供应商样品质量证据判读案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+              "actionId": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+              "title": "复核供应商样品质量证据判读案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-delivery-capacity",
+              "actionId": "4ac25258-20d0-505d-a2ac-c0c288b80b56",
+              "title": "学习供应商交付产能核验案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-delivery-capacity",
+              "actionId": "5dfe2726-29c7-558c-a5e2-691562fc476c",
+              "title": "复核供应商交付产能核验案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-qualification-review",
+              "actionId": "96b03b5d-477d-59d3-a53f-ec2551109cc4",
+              "title": "学习供应商资质证据审查案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-qualification-review",
+              "actionId": "cac1ece8-698f-570a-a134-3b74726f3dea",
+              "title": "复核供应商资质证据审查案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "actionId": "7f91fc3e-dcc9-5bff-a3c3-da28bef4a0ab",
+              "title": "学习跨基地供给切换可行性判断案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "actionId": "27f88561-4c1b-5c8a-a8f9-0f4ad0cd4883",
+              "title": "复核跨基地供给切换可行性判断案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "actionId": "b6262dd4-74ef-5a15-a47e-48d08db023d8",
+              "title": "学习供给备选方案成本交期权衡案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "actionId": "0818890f-9593-5a71-a9ed-4c8824e0c802",
+              "title": "复核供给备选方案成本交期权衡案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "actionId": "0901506a-929b-561a-ae80-30101a41a010",
+              "title": "学习交期窗口缺料暴露评估案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "actionId": "752fe0db-c1bc-5392-aa5c-78749add727b",
+              "title": "复核交期窗口缺料暴露评估案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "actionId": "d44e9e78-b516-53d8-a76c-f6ecc92bca2c",
+              "title": "学习跨基地供给切换可行性判断案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "actionId": "d3a86a02-efac-5cb5-a365-338b772f5502",
+              "title": "复核跨基地供给切换可行性判断案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "actionId": "20e231bb-ed44-536e-ad70-b7ce503841a5",
+              "title": "学习供应商纠正措施有效性验证案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "actionId": "93931082-d98f-5bac-a0d8-5dee3dd6eee3",
+              "title": "复核供应商纠正措施有效性验证案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "ae02dee2-0bf9-5cd2-a7fe-a0e964d6ad1c",
+              "title": "学习供给备选方案成本交期权衡案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "7e378b3e-185d-5ba2-a49a-0f0f925c81b8",
+              "title": "复核供给备选方案成本交期权衡边界条件",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "c38ddf0f-42b3-59c8-afd6-a21374cefa38",
+              "title": "复核供给备选方案成本交期权衡案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "actionId": "1f3c52b9-a99d-561d-a2c6-a6ffa205162c",
+              "title": "学习交期窗口缺料暴露评估案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "actionId": "f2136047-8a15-480d-88ed-8fcb70ac599a",
+              "title": "学习缺料暴露分析",
+              "type": "micro_learning",
+              "estimatedMinutes": 20,
+              "weight": 35,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "actionId": "81d35b57-0133-55b5-a170-6573660b4988",
+              "title": "复核交期窗口缺料暴露评估案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "actionId": "d1ada4d4-840e-50a3-aafd-06717c135866",
+              "title": "复核交期窗口缺料暴露评估边界条件",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "actionId": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+              "title": "核算缺料暴露窗口",
+              "type": "practice_task",
+              "estimatedMinutes": 45,
+              "weight": 75,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [
+                "supply-net-material-requirement"
+              ],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "actionId": "de9d5146-77da-54c6-a02e-f4ae02b62bde",
+              "title": "学习供应商准入证据判定案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "actionId": "aa17ce98-044d-5685-a0ec-caf701759734",
+              "title": "复核供应商准入证据判定案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "7e81d669-bcf2-5803-a925-48cbc8485bd8",
+              "title": "学习缺料中断影响评估案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "2b45415c-d52a-5a03-a820-ce3d30ac510b",
+              "title": "复核缺料中断影响评估案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "dcba05d9-2bed-59b6-a192-a842799711a8",
+              "title": "复核缺料中断影响评估边界条件",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+              "title": "推导订单停线与恢复窗口",
+              "type": "practice_task",
+              "estimatedMinutes": 40,
+              "weight": 70,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [
+                "supply-shortage-exposure"
+              ],
+              "reasons": [
+                "尚未具备执行条件：supply-shortage-exposure",
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "actionId": "8c6a0298-5ee1-5300-a01c-6a28c06abf7d",
+              "title": "学习供应恢复备选方案排序案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "actionId": "c4fde77b-31df-51dd-abc6-e3114e0394cb",
+              "title": "复核供应恢复备选方案排序案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "actionId": "58c6b0a1-291f-5a1a-a4de-392515b2caf9",
+              "title": "学习供应商准入证据判定案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "actionId": "bfc6b3d5-0076-55e6-a955-702aa1506142",
+              "title": "复核供应商准入证据判定案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "actionId": "e9629c75-1df5-5c17-a970-1c66130f5f77",
+              "title": "学习供应商准入证据判定案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "actionId": "4fc5e6dc-ba4a-5ba9-a6b6-4b65eb498621",
+              "title": "复核供应商准入证据判定案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            }
+          ],
+          "issues": [],
+          "complete": true
+        }
+      },
+      "currentRoute": {
+        "valid": true,
+        "route": {
+          "valid": true,
+          "titles": {
+            "supply-shortage-exposure": "交期窗口缺料暴露评估",
+            "supply-cross-border-lead-time": "跨境补货交期估计",
+            "supply-alternate-site-capacity": "替代基地可用产能评估",
+            "supply-cost-lead-time-tradeoff": "供给备选方案成本交期权衡",
+            "supply-landed-cost-calculation": "到岸总成本计算",
+            "supply-recovery-option-ranking": "供应恢复备选方案排序",
+            "supply-site-switch-feasibility": "跨基地供给切换可行性判断",
+            "supply-incoming-quality-anomaly": "来料质量异常判定",
+            "supply-net-material-requirement": "物料净需求计算",
+            "supply-shortage-impact-assessment": "缺料中断影响评估",
+            "supply-supplier-delivery-capacity": "供应商交付产能核验",
+            "supply-supplier-admission-decision": "供应商准入证据判定",
+            "supply-supplier-screening-criteria": "供应商筛选准则定义",
+            "supply-material-risk-identification": "关键物料供应风险识别",
+            "supply-sample-quality-interpretation": "供应商样品质量证据判读",
+            "supply-supplier-qualification-review": "供应商资质证据审查",
+            "supply-corrective-action-verification": "供应商纠正措施有效性验证",
+            "supply-critical-material-identification": "关键物料识别"
+          },
+          "conflicts": [],
+          "executionSteps": [
+            {
+              "order": 0,
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+              "actionId": "905947b9-07f4-528a-a2d8-9abd385d1d4e",
+              "sourceNodeId": "supply-supplier-screening-criteria",
+              "targetNodeId": "supply-sample-quality-interpretation"
+            },
+            {
+              "order": 1,
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-delivery-capacity",
+              "actionId": "4ac25258-20d0-505d-a2ac-c0c288b80b56",
+              "sourceNodeId": "supply-supplier-screening-criteria",
+              "targetNodeId": "supply-supplier-delivery-capacity"
+            },
+            {
+              "order": 2,
+              "edgeId": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-qualification-review",
+              "actionId": "96b03b5d-477d-59d3-a53f-ec2551109cc4",
+              "sourceNodeId": "supply-supplier-screening-criteria",
+              "targetNodeId": "supply-supplier-qualification-review"
+            },
+            {
+              "order": 3,
+              "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "actionId": "de9d5146-77da-54c6-a02e-f4ae02b62bde",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 4,
+              "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "actionId": "58c6b0a1-291f-5a1a-a4de-392515b2caf9",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 5,
+              "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "actionId": "e9629c75-1df5-5c17-a970-1c66130f5f77",
+              "sourceNodeId": "supply-supplier-qualification-review",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 6,
+              "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+              "actionId": "65a8bac3-522a-58b9-ad6d-b81b81344f4f",
+              "sourceNodeId": "supply-supplier-admission-decision",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 7,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "actionId": "b6262dd4-74ef-5a15-a47e-48d08db023d8",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 8,
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "ae02dee2-0bf9-5cd2-a7fe-a0e964d6ad1c",
+              "sourceNodeId": "supply-landed-cost-calculation",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 9,
+              "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+              "actionId": "3b93abef-6eca-58fd-a4a9-5fcc151e71c7",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-alternate-site-capacity"
+            },
+            {
+              "order": 10,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "actionId": "d44e9e78-b516-53d8-a76c-f6ecc92bca2c",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-site-switch-feasibility"
+            },
+            {
+              "order": 11,
+              "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "actionId": "7f91fc3e-dcc9-5bff-a3c3-da28bef4a0ab",
+              "sourceNodeId": "supply-alternate-site-capacity",
+              "targetNodeId": "supply-site-switch-feasibility"
+            },
+            {
+              "order": 12,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "actionId": "0901506a-929b-561a-ae80-30101a41a010",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-shortage-exposure"
+            },
+            {
+              "order": 13,
+              "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+              "actionId": "180fe4a2-89d7-5b83-a20c-c405fda78e23",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 14,
+              "edgeId": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "actionId": "1f3c52b9-a99d-561d-a2c6-a6ffa205162c",
+              "sourceNodeId": "supply-net-material-requirement",
+              "targetNodeId": "supply-shortage-exposure"
+            },
+            {
+              "order": 15,
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "7e81d669-bcf2-5803-a925-48cbc8485bd8",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-shortage-impact-assessment"
+            },
+            {
+              "order": 16,
+              "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+              "actionId": "fa3133bb-ab29-555a-ae5b-56cee5f31f6e",
+              "sourceNodeId": "supply-site-switch-feasibility",
+              "targetNodeId": "supply-recovery-option-ranking"
+            },
+            {
+              "order": 17,
+              "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "actionId": "8c6a0298-5ee1-5300-a01c-6a28c06abf7d",
+              "sourceNodeId": "supply-shortage-impact-assessment",
+              "targetNodeId": "supply-recovery-option-ranking"
+            },
+            {
+              "order": 18,
+              "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+              "actionId": "c4e22c29-07e0-5eda-ab96-123fd0fee408",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-incoming-quality-anomaly"
+            },
+            {
+              "order": 19,
+              "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "actionId": "20e231bb-ed44-536e-ad70-b7ce503841a5",
+              "sourceNodeId": "supply-incoming-quality-anomaly",
+              "targetNodeId": "supply-corrective-action-verification"
+            },
+            {
+              "order": 20,
+              "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+              "actionId": "af75134c-4c14-54e9-ac49-c3c492621072",
+              "sourceNodeId": "supply-corrective-action-verification",
+              "targetNodeId": "supply-recovery-option-ranking"
+            },
+            {
+              "order": 21,
+              "edgeId": "knowledge-enables-supply-critical-material-identification-supply-material-risk-identification",
+              "actionId": "c3acaafa-bbdc-5de4-a56e-faae6a4afd09",
+              "sourceNodeId": "supply-critical-material-identification",
+              "targetNodeId": "supply-material-risk-identification"
+            },
+            {
+              "order": 22,
+              "edgeId": "knowledge-enables-supply-material-risk-identification-supply-shortage-impact-assessment",
+              "actionId": "a06f3b77-ca86-50a9-a6a6-18d1dec902b8",
+              "sourceNodeId": "supply-material-risk-identification",
+              "targetNodeId": "supply-shortage-impact-assessment"
+            }
+          ],
+          "orderedNodeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-supplier-admission-decision",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-cost-lead-time-tradeoff",
+            "supply-alternate-site-capacity",
+            "supply-site-switch-feasibility",
+            "supply-net-material-requirement",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-recovery-option-ranking",
+            "supply-critical-material-identification",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification",
+            "supply-material-risk-identification",
+            "supply-supplier-screening-criteria"
+          ],
+          "selectedNodeIds": [
+            "supply-alternate-site-capacity",
+            "supply-corrective-action-verification",
+            "supply-cost-lead-time-tradeoff",
+            "supply-critical-material-identification",
+            "supply-cross-border-lead-time",
+            "supply-incoming-quality-anomaly",
+            "supply-landed-cost-calculation",
+            "supply-material-risk-identification",
+            "supply-net-material-requirement",
+            "supply-recovery-option-ranking",
+            "supply-sample-quality-interpretation",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-supplier-screening-criteria"
+          ],
+          "prerequisiteEdges": [
+            {
+              "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "source": "supply-alternate-site-capacity",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-shortage-exposure",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "source": "supply-incoming-quality-anomaly",
+              "target": "supply-corrective-action-verification",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "source": "supply-landed-cost-calculation",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+              "source": "supply-net-material-requirement",
+              "target": "supply-shortage-exposure",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "source": "supply-sample-quality-interpretation",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "source": "supply-shortage-exposure",
+              "target": "supply-shortage-impact-assessment",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "source": "supply-shortage-impact-assessment",
+              "target": "supply-recovery-option-ranking",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "source": "supply-supplier-delivery-capacity",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "source": "supply-supplier-qualification-review",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            }
+          ],
+          "bridgeKnowledgeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-alternate-site-capacity",
+            "supply-net-material-requirement",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-critical-material-identification",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification",
+            "supply-material-risk-identification",
+            "supply-supplier-screening-criteria"
+          ],
+          "currentKnowledgeIds": [
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-net-material-requirement",
+            "supply-critical-material-identification",
+            "supply-incoming-quality-anomaly",
+            "supply-supplier-screening-criteria"
+          ],
+          "effectiveTargetNodeIds": [
+            "supply-cost-lead-time-tradeoff",
+            "supply-recovery-option-ranking",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision"
+          ]
+        },
+        "conflicts": []
+      },
+      "previewElapsedMs": 809,
+      "UKS": [
+        {
+          "node_id": "supply-critical-material-identification",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-incoming-quality-anomaly",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-landed-cost-calculation",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-net-material-requirement",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-supplier-screening-criteria",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        }
+      ],
+      "activeActions": 52,
+      "Micro": 24,
+      "Practice": 28,
+      "steps": 23,
+      "historyPreserved": true,
+      "courseIntegrity": true,
+      "previewCreatedVersions": 0
+    },
+    {
+      "actor": "B",
+      "userId": "54cd7725-ae57-464b-beba-18e950546f0b",
+      "currentVersion": {
+        "id": "9c427293-05a0-4d67-bcfd-79d8e51b4422",
+        "routeId": "a59a9621-c57a-4b5c-aad8-c715dcf86427",
+        "userId": "54cd7725-ae57-464b-beba-18e950546f0b",
+        "courseId": "enterprise-vietnam-supply-collaboration",
+        "versionNumber": 2,
+        "parentVersionId": "e3c2e60e-bb4c-4ae9-8f8d-a081a7b5fd69",
+        "source": "adjustment",
+        "constraints": {
+          "includeNodeIds": [
+            "supply-corrective-action-verification"
+          ],
+          "excludeNodeIds": []
+        },
+        "snapshot": {
+          "valid": true,
+          "titles": {
+            "supply-shortage-exposure": "交期窗口缺料暴露评估",
+            "supply-cross-border-lead-time": "跨境补货交期估计",
+            "supply-alternate-site-capacity": "替代基地可用产能评估",
+            "supply-cost-lead-time-tradeoff": "供给备选方案成本交期权衡",
+            "supply-landed-cost-calculation": "到岸总成本计算",
+            "supply-recovery-option-ranking": "供应恢复备选方案排序",
+            "supply-site-switch-feasibility": "跨基地供给切换可行性判断",
+            "supply-incoming-quality-anomaly": "来料质量异常判定",
+            "supply-shortage-impact-assessment": "缺料中断影响评估",
+            "supply-supplier-delivery-capacity": "供应商交付产能核验",
+            "supply-supplier-admission-decision": "供应商准入证据判定",
+            "supply-sample-quality-interpretation": "供应商样品质量证据判读",
+            "supply-supplier-qualification-review": "供应商资质证据审查",
+            "supply-corrective-action-verification": "供应商纠正措施有效性验证"
+          },
+          "conflicts": [],
+          "executionSteps": [
+            {
+              "order": 0,
+              "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "actionId": "de9d5146-77da-54c6-a02e-f4ae02b62bde",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 1,
+              "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "actionId": "58c6b0a1-291f-5a1a-a4de-392515b2caf9",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 2,
+              "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "actionId": "e9629c75-1df5-5c17-a970-1c66130f5f77",
+              "sourceNodeId": "supply-supplier-qualification-review",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 3,
+              "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+              "actionId": "65a8bac3-522a-58b9-ad6d-b81b81344f4f",
+              "sourceNodeId": "supply-supplier-admission-decision",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 4,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "actionId": "b6262dd4-74ef-5a15-a47e-48d08db023d8",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 5,
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "ae02dee2-0bf9-5cd2-a7fe-a0e964d6ad1c",
+              "sourceNodeId": "supply-landed-cost-calculation",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 6,
+              "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+              "actionId": "180fe4a2-89d7-5b83-a20c-c405fda78e23",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 7,
+              "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+              "actionId": "3b93abef-6eca-58fd-a4a9-5fcc151e71c7",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-alternate-site-capacity"
+            },
+            {
+              "order": 8,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "actionId": "d44e9e78-b516-53d8-a76c-f6ecc92bca2c",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-site-switch-feasibility"
+            },
+            {
+              "order": 9,
+              "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "actionId": "7f91fc3e-dcc9-5bff-a3c3-da28bef4a0ab",
+              "sourceNodeId": "supply-alternate-site-capacity",
+              "targetNodeId": "supply-site-switch-feasibility"
+            },
+            {
+              "order": 10,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "actionId": "0901506a-929b-561a-ae80-30101a41a010",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-shortage-exposure"
+            },
+            {
+              "order": 11,
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "7e81d669-bcf2-5803-a925-48cbc8485bd8",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-shortage-impact-assessment"
+            },
+            {
+              "order": 12,
+              "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+              "actionId": "fa3133bb-ab29-555a-ae5b-56cee5f31f6e",
+              "sourceNodeId": "supply-site-switch-feasibility",
+              "targetNodeId": "supply-recovery-option-ranking"
+            },
+            {
+              "order": 13,
+              "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "actionId": "8c6a0298-5ee1-5300-a01c-6a28c06abf7d",
+              "sourceNodeId": "supply-shortage-impact-assessment",
+              "targetNodeId": "supply-recovery-option-ranking"
+            },
+            {
+              "order": 14,
+              "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+              "actionId": "c4e22c29-07e0-5eda-ab96-123fd0fee408",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-incoming-quality-anomaly"
+            },
+            {
+              "order": 15,
+              "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "actionId": "20e231bb-ed44-536e-ad70-b7ce503841a5",
+              "sourceNodeId": "supply-incoming-quality-anomaly",
+              "targetNodeId": "supply-corrective-action-verification"
+            },
+            {
+              "order": 16,
+              "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+              "actionId": "af75134c-4c14-54e9-ac49-c3c492621072",
+              "sourceNodeId": "supply-corrective-action-verification",
+              "targetNodeId": "supply-recovery-option-ranking"
+            }
+          ],
+          "orderedNodeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-supplier-admission-decision",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-cost-lead-time-tradeoff",
+            "supply-alternate-site-capacity",
+            "supply-site-switch-feasibility",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-recovery-option-ranking",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification"
+          ],
+          "selectedNodeIds": [
+            "supply-alternate-site-capacity",
+            "supply-corrective-action-verification",
+            "supply-cost-lead-time-tradeoff",
+            "supply-cross-border-lead-time",
+            "supply-incoming-quality-anomaly",
+            "supply-landed-cost-calculation",
+            "supply-recovery-option-ranking",
+            "supply-sample-quality-interpretation",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review"
+          ],
+          "prerequisiteEdges": [
+            {
+              "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "source": "supply-alternate-site-capacity",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-shortage-exposure",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "source": "supply-incoming-quality-anomaly",
+              "target": "supply-corrective-action-verification",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "source": "supply-landed-cost-calculation",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "source": "supply-sample-quality-interpretation",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "source": "supply-shortage-exposure",
+              "target": "supply-shortage-impact-assessment",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "source": "supply-shortage-impact-assessment",
+              "target": "supply-recovery-option-ranking",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "source": "supply-supplier-delivery-capacity",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "source": "supply-supplier-qualification-review",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            }
+          ],
+          "bridgeKnowledgeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-alternate-site-capacity",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification"
+          ],
+          "currentKnowledgeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-shortage-exposure",
+            "supply-incoming-quality-anomaly"
+          ],
+          "effectiveTargetNodeIds": [
+            "supply-cost-lead-time-tradeoff",
+            "supply-recovery-option-ranking",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision"
+          ]
+        },
+        "structureFingerprint": "006e1e16ec44e1129f7647f5e6ab44773a2970e8a5a6be16cf8e974def5af12c",
+        "createdAt": "2026-10-04T16:45:42.149726+00:00",
+        "restoredFromVersionId": null
+      },
+      "previewRoute": {
+        "valid": true,
+        "conflicts": [],
+        "route": {
+          "orderedNodeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-supplier-admission-decision",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-cost-lead-time-tradeoff",
+            "supply-alternate-site-capacity",
+            "supply-site-switch-feasibility",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-recovery-option-ranking",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification"
+          ],
+          "selectedNodeIds": [
+            "supply-alternate-site-capacity",
+            "supply-corrective-action-verification",
+            "supply-cost-lead-time-tradeoff",
+            "supply-cross-border-lead-time",
+            "supply-incoming-quality-anomaly",
+            "supply-landed-cost-calculation",
+            "supply-recovery-option-ranking",
+            "supply-sample-quality-interpretation",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review"
+          ],
+          "effectiveTargetNodeIds": [
+            "supply-cost-lead-time-tradeoff",
+            "supply-recovery-option-ranking",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision"
+          ],
+          "prerequisiteEdges": [
+            {
+              "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "source": "supply-alternate-site-capacity",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-shortage-exposure",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "source": "supply-incoming-quality-anomaly",
+              "target": "supply-corrective-action-verification",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "source": "supply-landed-cost-calculation",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "source": "supply-sample-quality-interpretation",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "source": "supply-shortage-exposure",
+              "target": "supply-shortage-impact-assessment",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "source": "supply-shortage-impact-assessment",
+              "target": "supply-recovery-option-ranking",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "source": "supply-supplier-delivery-capacity",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "source": "supply-supplier-qualification-review",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            }
+          ],
+          "currentKnowledgeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-shortage-exposure",
+            "supply-incoming-quality-anomaly"
+          ],
+          "bridgeKnowledgeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-alternate-site-capacity",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification"
+          ]
+        },
+        "execution": {
+          "steps": [
+            {
+              "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "actionId": "de9d5146-77da-54c6-a02e-f4ae02b62bde",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-supplier-admission-decision",
+              "order": 0
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "actionId": "58c6b0a1-291f-5a1a-a4de-392515b2caf9",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-supplier-admission-decision",
+              "order": 1
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "actionId": "e9629c75-1df5-5c17-a970-1c66130f5f77",
+              "sourceNodeId": "supply-supplier-qualification-review",
+              "targetNodeId": "supply-supplier-admission-decision",
+              "order": 2
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+              "actionId": "65a8bac3-522a-58b9-ad6d-b81b81344f4f",
+              "sourceNodeId": "supply-supplier-admission-decision",
+              "targetNodeId": "supply-cost-lead-time-tradeoff",
+              "order": 3
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "actionId": "b6262dd4-74ef-5a15-a47e-48d08db023d8",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-cost-lead-time-tradeoff",
+              "order": 4
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "ae02dee2-0bf9-5cd2-a7fe-a0e964d6ad1c",
+              "sourceNodeId": "supply-landed-cost-calculation",
+              "targetNodeId": "supply-cost-lead-time-tradeoff",
+              "order": 5
+            },
+            {
+              "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+              "actionId": "180fe4a2-89d7-5b83-a20c-c405fda78e23",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-cost-lead-time-tradeoff",
+              "order": 6
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+              "actionId": "3b93abef-6eca-58fd-a4a9-5fcc151e71c7",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-alternate-site-capacity",
+              "order": 7
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "actionId": "d44e9e78-b516-53d8-a76c-f6ecc92bca2c",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-site-switch-feasibility",
+              "order": 8
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "actionId": "7f91fc3e-dcc9-5bff-a3c3-da28bef4a0ab",
+              "sourceNodeId": "supply-alternate-site-capacity",
+              "targetNodeId": "supply-site-switch-feasibility",
+              "order": 9
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "actionId": "0901506a-929b-561a-ae80-30101a41a010",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-shortage-exposure",
+              "order": 10
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "7e81d669-bcf2-5803-a925-48cbc8485bd8",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-shortage-impact-assessment",
+              "order": 11
+            },
+            {
+              "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+              "actionId": "fa3133bb-ab29-555a-ae5b-56cee5f31f6e",
+              "sourceNodeId": "supply-site-switch-feasibility",
+              "targetNodeId": "supply-recovery-option-ranking",
+              "order": 12
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "actionId": "8c6a0298-5ee1-5300-a01c-6a28c06abf7d",
+              "sourceNodeId": "supply-shortage-impact-assessment",
+              "targetNodeId": "supply-recovery-option-ranking",
+              "order": 13
+            },
+            {
+              "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+              "actionId": "c4e22c29-07e0-5eda-ab96-123fd0fee408",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-incoming-quality-anomaly",
+              "order": 14
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "actionId": "20e231bb-ed44-536e-ad70-b7ce503841a5",
+              "sourceNodeId": "supply-incoming-quality-anomaly",
+              "targetNodeId": "supply-corrective-action-verification",
+              "order": 15
+            },
+            {
+              "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+              "actionId": "af75134c-4c14-54e9-ac49-c3c492621072",
+              "sourceNodeId": "supply-corrective-action-verification",
+              "targetNodeId": "supply-recovery-option-ranking",
+              "order": 16
+            }
+          ],
+          "options": [
+            {
+              "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+              "actionId": "af75134c-4c14-54e9-ac49-c3c492621072",
+              "title": "学习供应恢复备选方案排序案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+              "actionId": "c347d69b-ad79-5764-a133-0212b943dd1e",
+              "title": "复核供应恢复备选方案排序案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+              "actionId": "c4e22c29-07e0-5eda-ab96-123fd0fee408",
+              "title": "学习来料质量异常判定案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+              "actionId": "cedf8b75-fdfb-5c64-a8d6-042d7ed97647",
+              "title": "复核来料质量异常判定案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+              "actionId": "180fe4a2-89d7-5b83-a20c-c405fda78e23",
+              "title": "学习供给备选方案成本交期权衡案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+              "actionId": "a3d3905a-cb17-52e5-af85-55a14e6c6906",
+              "title": "复核供给备选方案成本交期权衡案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+              "actionId": "fa3133bb-ab29-555a-ae5b-56cee5f31f6e",
+              "title": "学习供应恢复备选方案排序案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+              "actionId": "2e1694c7-54ef-5f80-a444-273689e05626",
+              "title": "复核供应恢复备选方案排序案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+              "actionId": "65a8bac3-522a-58b9-ad6d-b81b81344f4f",
+              "title": "学习供给备选方案成本交期权衡案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+              "actionId": "e192c4f9-d618-5742-a3f3-d79c1f756977",
+              "title": "复核供给备选方案成本交期权衡案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动"
+              ]
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+              "actionId": "3b93abef-6eca-58fd-a4a9-5fcc151e71c7",
+              "title": "学习替代基地可用产能评估案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+              "actionId": "11bf0c5e-6f14-589d-a593-7286670485e0",
+              "title": "复核替代基地可用产能评估案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "actionId": "7f91fc3e-dcc9-5bff-a3c3-da28bef4a0ab",
+              "title": "学习跨基地供给切换可行性判断案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "actionId": "27f88561-4c1b-5c8a-a8f9-0f4ad0cd4883",
+              "title": "复核跨基地供给切换可行性判断案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "actionId": "b6262dd4-74ef-5a15-a47e-48d08db023d8",
+              "title": "学习供给备选方案成本交期权衡案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "actionId": "0818890f-9593-5a71-a9ed-4c8824e0c802",
+              "title": "复核供给备选方案成本交期权衡案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "actionId": "0901506a-929b-561a-ae80-30101a41a010",
+              "title": "学习交期窗口缺料暴露评估案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "actionId": "752fe0db-c1bc-5392-aa5c-78749add727b",
+              "title": "复核交期窗口缺料暴露评估案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "actionId": "d44e9e78-b516-53d8-a76c-f6ecc92bca2c",
+              "title": "学习跨基地供给切换可行性判断案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "actionId": "d3a86a02-efac-5cb5-a365-338b772f5502",
+              "title": "复核跨基地供给切换可行性判断案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "actionId": "20e231bb-ed44-536e-ad70-b7ce503841a5",
+              "title": "学习供应商纠正措施有效性验证案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "actionId": "93931082-d98f-5bac-a0d8-5dee3dd6eee3",
+              "title": "复核供应商纠正措施有效性验证案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "ae02dee2-0bf9-5cd2-a7fe-a0e964d6ad1c",
+              "title": "学习供给备选方案成本交期权衡案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "7e378b3e-185d-5ba2-a49a-0f0f925c81b8",
+              "title": "复核供给备选方案成本交期权衡边界条件",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "c38ddf0f-42b3-59c8-afd6-a21374cefa38",
+              "title": "复核供给备选方案成本交期权衡案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "actionId": "de9d5146-77da-54c6-a02e-f4ae02b62bde",
+              "title": "学习供应商准入证据判定案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "actionId": "aa17ce98-044d-5685-a0ec-caf701759734",
+              "title": "复核供应商准入证据判定案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "7e81d669-bcf2-5803-a925-48cbc8485bd8",
+              "title": "学习缺料中断影响评估案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "2b45415c-d52a-5a03-a820-ce3d30ac510b",
+              "title": "复核缺料中断影响评估案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "dcba05d9-2bed-59b6-a192-a842799711a8",
+              "title": "复核缺料中断影响评估边界条件",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+              "title": "推导订单停线与恢复窗口",
+              "type": "practice_task",
+              "estimatedMinutes": 40,
+              "weight": 70,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [
+                "supply-shortage-exposure"
+              ],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "actionId": "8c6a0298-5ee1-5300-a01c-6a28c06abf7d",
+              "title": "学习供应恢复备选方案排序案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "actionId": "c4fde77b-31df-51dd-abc6-e3114e0394cb",
+              "title": "复核供应恢复备选方案排序案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": false,
+              "requiredCapabilityIds": [],
+              "reasons": [
+                "需要先形成起点能力，才能开始这条关系上的行动",
+                "需要先形成目标能力的必要前置。"
+              ]
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "actionId": "58c6b0a1-291f-5a1a-a4de-392515b2caf9",
+              "title": "学习供应商准入证据判定案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "actionId": "bfc6b3d5-0076-55e6-a955-702aa1506142",
+              "title": "复核供应商准入证据判定案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "actionId": "e9629c75-1df5-5c17-a970-1c66130f5f77",
+              "title": "学习供应商准入证据判定案例",
+              "type": "micro_learning",
+              "estimatedMinutes": 8,
+              "weight": 23,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            },
+            {
+              "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "actionId": "4fc5e6dc-ba4a-5ba9-a6b6-4b65eb498621",
+              "title": "复核供应商准入证据判定案例判断",
+              "type": "practice_task",
+              "estimatedMinutes": 12,
+              "weight": 42,
+              "planningAvailable": true,
+              "availableNow": true,
+              "requiredCapabilityIds": [],
+              "reasons": []
+            }
+          ],
+          "issues": [],
+          "complete": true
+        }
+      },
+      "currentRoute": {
+        "valid": true,
+        "route": {
+          "valid": true,
+          "titles": {
+            "supply-shortage-exposure": "交期窗口缺料暴露评估",
+            "supply-cross-border-lead-time": "跨境补货交期估计",
+            "supply-alternate-site-capacity": "替代基地可用产能评估",
+            "supply-cost-lead-time-tradeoff": "供给备选方案成本交期权衡",
+            "supply-landed-cost-calculation": "到岸总成本计算",
+            "supply-recovery-option-ranking": "供应恢复备选方案排序",
+            "supply-site-switch-feasibility": "跨基地供给切换可行性判断",
+            "supply-incoming-quality-anomaly": "来料质量异常判定",
+            "supply-shortage-impact-assessment": "缺料中断影响评估",
+            "supply-supplier-delivery-capacity": "供应商交付产能核验",
+            "supply-supplier-admission-decision": "供应商准入证据判定",
+            "supply-sample-quality-interpretation": "供应商样品质量证据判读",
+            "supply-supplier-qualification-review": "供应商资质证据审查",
+            "supply-corrective-action-verification": "供应商纠正措施有效性验证"
+          },
+          "conflicts": [],
+          "executionSteps": [
+            {
+              "order": 0,
+              "edgeId": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "actionId": "de9d5146-77da-54c6-a02e-f4ae02b62bde",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 1,
+              "edgeId": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "actionId": "58c6b0a1-291f-5a1a-a4de-392515b2caf9",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 2,
+              "edgeId": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "actionId": "e9629c75-1df5-5c17-a970-1c66130f5f77",
+              "sourceNodeId": "supply-supplier-qualification-review",
+              "targetNodeId": "supply-supplier-admission-decision"
+            },
+            {
+              "order": 3,
+              "edgeId": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+              "actionId": "65a8bac3-522a-58b9-ad6d-b81b81344f4f",
+              "sourceNodeId": "supply-supplier-admission-decision",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 4,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "actionId": "b6262dd4-74ef-5a15-a47e-48d08db023d8",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 5,
+              "edgeId": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "actionId": "ae02dee2-0bf9-5cd2-a7fe-a0e964d6ad1c",
+              "sourceNodeId": "supply-landed-cost-calculation",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 6,
+              "edgeId": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+              "actionId": "180fe4a2-89d7-5b83-a20c-c405fda78e23",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-cost-lead-time-tradeoff"
+            },
+            {
+              "order": 7,
+              "edgeId": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+              "actionId": "3b93abef-6eca-58fd-a4a9-5fcc151e71c7",
+              "sourceNodeId": "supply-supplier-delivery-capacity",
+              "targetNodeId": "supply-alternate-site-capacity"
+            },
+            {
+              "order": 8,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "actionId": "d44e9e78-b516-53d8-a76c-f6ecc92bca2c",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-site-switch-feasibility"
+            },
+            {
+              "order": 9,
+              "edgeId": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "actionId": "7f91fc3e-dcc9-5bff-a3c3-da28bef4a0ab",
+              "sourceNodeId": "supply-alternate-site-capacity",
+              "targetNodeId": "supply-site-switch-feasibility"
+            },
+            {
+              "order": 10,
+              "edgeId": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "actionId": "0901506a-929b-561a-ae80-30101a41a010",
+              "sourceNodeId": "supply-cross-border-lead-time",
+              "targetNodeId": "supply-shortage-exposure"
+            },
+            {
+              "order": 11,
+              "edgeId": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "actionId": "7e81d669-bcf2-5803-a925-48cbc8485bd8",
+              "sourceNodeId": "supply-shortage-exposure",
+              "targetNodeId": "supply-shortage-impact-assessment"
+            },
+            {
+              "order": 12,
+              "edgeId": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+              "actionId": "fa3133bb-ab29-555a-ae5b-56cee5f31f6e",
+              "sourceNodeId": "supply-site-switch-feasibility",
+              "targetNodeId": "supply-recovery-option-ranking"
+            },
+            {
+              "order": 13,
+              "edgeId": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "actionId": "8c6a0298-5ee1-5300-a01c-6a28c06abf7d",
+              "sourceNodeId": "supply-shortage-impact-assessment",
+              "targetNodeId": "supply-recovery-option-ranking"
+            },
+            {
+              "order": 14,
+              "edgeId": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+              "actionId": "c4e22c29-07e0-5eda-ab96-123fd0fee408",
+              "sourceNodeId": "supply-sample-quality-interpretation",
+              "targetNodeId": "supply-incoming-quality-anomaly"
+            },
+            {
+              "order": 15,
+              "edgeId": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "actionId": "20e231bb-ed44-536e-ad70-b7ce503841a5",
+              "sourceNodeId": "supply-incoming-quality-anomaly",
+              "targetNodeId": "supply-corrective-action-verification"
+            },
+            {
+              "order": 16,
+              "edgeId": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+              "actionId": "af75134c-4c14-54e9-ac49-c3c492621072",
+              "sourceNodeId": "supply-corrective-action-verification",
+              "targetNodeId": "supply-recovery-option-ranking"
+            }
+          ],
+          "orderedNodeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-supplier-admission-decision",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-cost-lead-time-tradeoff",
+            "supply-alternate-site-capacity",
+            "supply-site-switch-feasibility",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-recovery-option-ranking",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification"
+          ],
+          "selectedNodeIds": [
+            "supply-alternate-site-capacity",
+            "supply-corrective-action-verification",
+            "supply-cost-lead-time-tradeoff",
+            "supply-cross-border-lead-time",
+            "supply-incoming-quality-anomaly",
+            "supply-landed-cost-calculation",
+            "supply-recovery-option-ranking",
+            "supply-sample-quality-interpretation",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review"
+          ],
+          "prerequisiteEdges": [
+            {
+              "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+              "source": "supply-alternate-site-capacity",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-shortage-exposure",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+              "source": "supply-cross-border-lead-time",
+              "target": "supply-site-switch-feasibility",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+              "source": "supply-incoming-quality-anomaly",
+              "target": "supply-corrective-action-verification",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+              "source": "supply-landed-cost-calculation",
+              "target": "supply-cost-lead-time-tradeoff",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+              "source": "supply-sample-quality-interpretation",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+              "source": "supply-shortage-exposure",
+              "target": "supply-shortage-impact-assessment",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+              "source": "supply-shortage-impact-assessment",
+              "target": "supply-recovery-option-ranking",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+              "source": "supply-supplier-delivery-capacity",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            },
+            {
+              "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+              "source": "supply-supplier-qualification-review",
+              "target": "supply-supplier-admission-decision",
+              "strength": "hard"
+            }
+          ],
+          "bridgeKnowledgeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-alternate-site-capacity",
+            "supply-shortage-exposure",
+            "supply-shortage-impact-assessment",
+            "supply-incoming-quality-anomaly",
+            "supply-corrective-action-verification"
+          ],
+          "currentKnowledgeIds": [
+            "supply-sample-quality-interpretation",
+            "supply-supplier-delivery-capacity",
+            "supply-supplier-qualification-review",
+            "supply-cross-border-lead-time",
+            "supply-landed-cost-calculation",
+            "supply-shortage-exposure",
+            "supply-incoming-quality-anomaly"
+          ],
+          "effectiveTargetNodeIds": [
+            "supply-cost-lead-time-tradeoff",
+            "supply-recovery-option-ranking",
+            "supply-site-switch-feasibility",
+            "supply-supplier-admission-decision"
+          ]
+        },
+        "conflicts": []
+      },
+      "previewElapsedMs": 596,
+      "UKS": [
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-incoming-quality-anomaly",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-landed-cost-calculation",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-sample-quality-interpretation",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        },
+        {
+          "node_id": "supply-supplier-qualification-review",
+          "status": "learned",
+          "evidence": [
+            {
+              "note": "用户明确授权的受控验收状态，不是测评或真实企业能力证据。",
+              "type": "acceptance-baseline",
+              "source": "enterprise-route-action-v3"
+            }
+          ]
+        }
+      ],
+      "activeActions": 52,
+      "Micro": 24,
+      "Practice": 28,
+      "steps": 17,
+      "historyPreserved": true,
+      "courseIntegrity": true,
+      "previewCreatedVersions": 0
+    }
+  ],
+  "RLScrossUserHidden": true
+}
