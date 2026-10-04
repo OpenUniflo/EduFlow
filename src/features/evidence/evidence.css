@@ -74,4 +74,8 @@
 @media(max-width:760px){.capability-workspace{width:96vw;max-width:96vw;height:92dvh;max-height:92dvh;border-radius:16px}.capability-workspace-header,.capability-diagnosis{padding:20px}.capability-diagnosis{padding-bottom:90px}.evidence-library-header,.evidence-source-detail>header,.evidence-run-heading{flex-direction:column;gap:12px}.evidence-source-grid,.evidence-detail-columns{grid-template-columns:1fr}.evidence-steps{grid-template-columns:repeat(2,1fr);gap:12px}.evidence-card{padding:16px}.evidence-section-heading{flex-wrap:wrap;gap:12px}.evidence-stage-actions{flex-wrap:wrap}.learning-evidence{padding:144px 18px 30px}.evidence-library{padding-top:16px}.evidence-card dl{gap:8px}.evidence-format{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.evidence-analyzing>.spin{animation:none}}
 
+@media(max-width:760px){
+ .capability-workspace .evidence-stage-actions{padding-inline-end:64px}
+}
+
 .evidence-stage{outline:none;scroll-margin-top:20px}
