@@ -19,7 +19,9 @@ Typography, spacing, borders, radii, surfaces and shadows use shared tokens. Avo
 - Drawer, modal and Assistant: 220–320 ms.
 - Relationship transition: 280–420 ms.
 
-Prefer opacity and transform. Avoid bounce, overshoot and ordinary interactions over 500 ms. Animate semantic changes only. Current Route uses a restrained stable overlay; preview preserves kept edges and distinguishes added/removed facts. Action branches unfold from real edges without altering graph topology, positions, camera or force lifecycle. Hover never causes layout.
+Prefer opacity and transform. Avoid bounce, overshoot and ordinary interactions over 500 ms. Current Project Route continuously communicates source→target execution direction with a restrained pulse on real Edges. Preview uses a distinct coordinated color and directional pulse; Current remains visible but subdued, with kept/added/removed facts understandable. Ordinary Project relationship lines use one solid style; relation types remain in text details. Unselected Action branches may be dashed. Remove default Project Route node rings; temporary interaction halo and Atlas learning/mastery rings retain their meanings. Overlays and branches never change topology, positions, camera or force lifecycle.
+
+Course Route restores the existing vertical sequential path style. Adopted Action Steps show completed/current/next status, title, duration and one Start/Continue operation. The connecting line expresses execution order only. Users change nodes, relations or Action alternatives in Project Capability → Adjust Route, inspect the complete Preview, then Adopt. There is no Action choice menu in Course Route.
 
 Assistant opens from its bottom-right trigger toward the upper left and reverses on close. Its header contains title, secondary context and close/pin controls; its body has a compact primary action and secondary shortcuts; composer and full-chat link sit below. Workspaces use the same surface language, with a clear header, staged primary action and two-column desktop/single-column mobile layout.
 
@@ -29,4 +31,4 @@ Show four steps: 选择资料 → 分析资料 → 查看能力候选 → 确认
 
 ## Reduced motion and verification
 
-prefers-reduced-motion: reduce removes looping flows, pulses and large movement while preserving colors, borders, icons and all operations. Keyboard focus is visible; dialogs have names and usable closing/focus behavior. Verify desktop and narrow viewport with screenshots; DOM assertions alone cannot establish visual success.
+prefers-reduced-motion: reduce removes looping flows, pulses and large movement while preserving static Route highlights and source→target arrows, colors, borders, icons and all operations. Keyboard focus is visible; dialogs have names and usable closing/focus behavior. Verify desktop and 390×844 with screenshots, and actual directional pulse motion; DOM assertions alone cannot establish visual success.

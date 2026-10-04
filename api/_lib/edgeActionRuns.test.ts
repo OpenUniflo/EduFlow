@@ -22,7 +22,7 @@ const client = { from(table: string) {
 beforeEach(() => {
   input = { nodeIds: ['source', 'target', 'other'], currentNodeIds: ['source'], courseOrder: [{ nodeId: 'target', lessonOrder: 1, coverageOrder: 1 }], prerequisiteEdges: [{ id: 'edge', source: 'source', target: 'target', strength: 'hard' }] };
   mocks.route.mockImplementation(async () => ({ input }));
-  mocks.version.mockResolvedValue({ constraints: { includeNodeIds: [], excludeNodeIds: [] } }); mocks.micro.mockResolvedValue({});
+  mocks.version.mockResolvedValue({ id:'version',snapshot:{}, constraints: { includeNodeIds: [], excludeNodeIds: [] } }); mocks.micro.mockResolvedValue({});
   tables = {
     knowledge_edge_actions: [{ id: 'action', edge_id: 'edge', status: 'active', type: 'micro_learning', estimated_minutes: 5, difficulty: 1, required_capability_ids: [], resource_requirements: [], updated_at: '1' }],
     course_action_bindings: [{ id: 'binding', action_id: 'action', course_id: 'course', available: true, resources: [], micro_path_id: 'second-path', updated_at: '1' }],
@@ -69,7 +69,7 @@ describe('explicit Action execution authority', () => {
   });
   it('starts a first bound Action on an explicitly included acquired Bridge relation', async () => {
     input.currentNodeIds = ['source', 'target'];
-    mocks.version.mockResolvedValue({ constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
+    mocks.version.mockResolvedValue({ id:'version',snapshot:{}, constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
     expect((await requireActionExecution(client, 'learner', 'course', 'action')).microPathId).toBe('second-path');
   });
   it('rejects a new route Action when its source is missing, including non-gating relations', async () => {
@@ -85,7 +85,7 @@ describe('explicit Action execution authority', () => {
   });
   it('does not repeat a retained Practice through an explicitly excluded capability', async () => {
     tables.knowledge_edge_actions[0].type = 'practice_task';
-    mocks.version.mockResolvedValue({ constraints: { includeNodeIds: [], excludeNodeIds: ['target'] } });
+    mocks.version.mockResolvedValue({ id:'version',snapshot:{}, constraints: { includeNodeIds: [], excludeNodeIds: ['target'] } });
     await expect(requireActionExecution(client, 'learner', 'course', 'action', 'edge')).rejects.toMatchObject({ code: 'action_excluded' });
   });
   it('does not advertise workflow execution without ActionRun result lineage', async () => {
@@ -94,4 +94,16 @@ describe('explicit Action execution authority', () => {
     tables.course_assignments = [{ id: 'task', course_id: 'course', mode: 'workflow' }];
     await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'action_assignment_unavailable' });
   });
+  it('rejects a different Action on the same formal Edge and preserves the chosen reference',async()=>{
+    mocks.version.mockResolvedValue({id:'version',constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{valid:true,executionSteps:[{edgeId:'edge',actionId:'other-action',sourceNodeId:'source',targetNodeId:'target',order:0}]}});
+    await expect(requireActionExecution(client,'learner','course','action')).rejects.toMatchObject({code:'action_not_selected_in_route'});
+    // A real retained execution remains independent of a changed future plan.
+    expect((await requireActionExecution(client,'learner','course','action','edge')).microPathId).toBe('second-path');
+  });
+  it('keeps adopted steps executable after UKS prunes the dynamically replanned graph',async()=>{
+    input.currentNodeIds=['source','target'];
+    mocks.version.mockResolvedValue({id:'version',constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{valid:true,executionSteps:[{edgeId:'edge',actionId:'action',sourceNodeId:'source',targetNodeId:'target',order:0}]}});
+    expect((await requireActionExecution(client,'learner','course','action')).routeVersionId).toBe('version');
+  });
+
 });

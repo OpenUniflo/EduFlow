@@ -1,6 +1,6 @@
 import { orderRouteNodes, type CapabilityRelation } from '@/shared/learning/routePlanning';
 import type { RoutePlanView } from '@/shared/learning/routeVersion';
-import { routeRelations } from '@/shared/learning/routePresentation';
+import { executionRelations } from '@/shared/learning/routeExecution';
 import type { NavigationDecision } from '@/shared/learning/navigation';
 import type { UserKnowledgeRecord } from '@/features/profile/types';
 import type { UserCourseState } from '../types';
@@ -34,7 +34,7 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
     return existing ? [existing] : [{ node: { id, title: validRouteView?.activeVersion?.snapshot.titles[id] ?? id }, state: 'available' as const, blockedBy: [], navigationState: undefined, bridge: !byId.has(id) }];
   }) : validRouteView && !validRouteView.plan.valid ? [] : source;
   const members = new Set(rawRouteSource.map(item => item.node.id));
-  const relations: CapabilityRelation[] = selectedRoute ? routeRelations(selectedRoute, supportEdges ?? validRouteView?.model?.supportEdges ?? []) : graph.knowledgeEdges
+  const relations: CapabilityRelation[] = selectedRoute ? executionRelations({...selectedRoute,executionSteps:validRouteView?.activeVersion?.snapshot.executionSteps}, supportEdges ?? validRouteView?.model?.supportEdges ?? []) : graph.knowledgeEdges
     .flatMap((edge): CapabilityRelation[] => edge.relation === 'prerequisite' ? [{ ...edge, relation: 'prerequisite' }] : edge.relation === 'enables' ? [{ ...edge, relation: 'enables' }] : [])
     .filter(edge => members.has(edge.source) && members.has(edge.target)).sort((a, b) => a.id.localeCompare(b.id));
   const fallbackRank = new Map(rawRouteSource.map((item, index) => [item.node.id, index]));

@@ -27,8 +27,11 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
   const version = await readActiveVersion(client, userId, courseId);
   if (version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target)) throw new ApiError(422, 'action_excluded', '该关系的能力已从当前路线明确排除，请先调整路线。');
   if (!retainedEdgeId) {
+    const formal = version?.snapshot.executionSteps;
     const plan = version ? planCourseRoute(routeData.input, version.constraints) : null;
-    if (!plan?.valid || !routeRelations(plan.route, edges).some(relation => relation.id === edge.id)) throw new ApiError(422, 'action_outside_route', '请先在个人路线中选择这条真实关系，再开始行动。');
+    if (formal !== undefined) {
+      if (!version?.snapshot.valid || !formal.some(step=>step.edgeId===edge.id && step.sourceNodeId===edge.source && step.targetNodeId===edge.target && step.actionId===actionId)) throw new ApiError(422,'action_not_selected_in_route','该行动不是正式路线的已选方案，请在项目能力模型中调整并采用路线。');
+    } else if (!plan?.valid || !routeRelations(plan.route, edges).some(relation => relation.id === edge.id)) throw new ApiError(422, 'action_outside_route', '请先在个人路线中选择这条真实关系，再开始行动。');
   }
   if (hasUnmetHardPrerequisite(edge.target, new Set(routeData.input.currentNodeIds), routeData.input.prerequisiteEdges)) throw new ApiError(422, 'target_prerequisite_required', '请先形成目标能力的必要前置。');
   const cost = evaluateAction(action, { sourceId: edge.source, acquiredIds: new Set(routeData.input.currentNodeIds), binding: binding ?? undefined });
@@ -52,7 +55,7 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
     const { eligibility } = await readAssignmentEligibility(client, userId, courseId, binding.assignment_id, { targetId: edge.target, status: 'not_started' });
     if (eligibility.reason) throw new ApiError(422, 'action_assignment_prerequisite', eligibility.reason);
   }
-  return { action, binding, edge, cost, microPathId };
+  return { action, binding, edge, cost, microPathId, routeVersionId: version?.id ?? null };
 }
 
 /** A retained execution may review an acquired target pruned from today's candidate

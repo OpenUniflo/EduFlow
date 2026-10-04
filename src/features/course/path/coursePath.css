@@ -1,10 +1,15 @@
-.course-route-canvas { height: min(68vh, 780px); min-height: 420px; border: 1px solid var(--atlas-border); border-radius: 18px; background: var(--atlas-surface, #fff); }
-.course-route-canvas .react-flow__controls { left: 12px !important; right: auto !important; bottom: 12px !important; margin: 0; }
-.route-knowledge { width: 224px; height: 112px; display: flex; flex-direction: column; justify-content: center; gap: 5px; text-align: left; padding: 10px 18px; border: 1px solid var(--atlas-border); border-left: 4px solid var(--route-node-color); border-radius: 14px; background: #fff; color: #172033; cursor: pointer; }
-.route-knowledge > * { flex-shrink: 0; }
-.route-knowledge.acquired { --route-node-color: #3b82f6; }.route-knowledge.target { --route-node-color: #22c55e; }.route-knowledge.intermediate { --route-node-color: #94a3b8; }
-.route-knowledge small,.route-knowledge span { color: #526176; font-size: 12px; }.route-knowledge strong { font-size: 16px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }.route-knowledge:focus-visible { outline: 3px solid #3b82f6; outline-offset: 3px; }
-.route-relation-legend { display: flex; flex-wrap: wrap; gap: 16px; color: var(--atlas-muted); font-size: 12px; }.route-accessible-relations { margin-top: 16px; font-size: 13px; }.route-accessible-relations li { margin: 8px 0; }.route-accessible-relations button { cursor: pointer; }
-@media(max-width: 700px) { .course-route-canvas { min-height: 440px; height: 62vh; } }
-
-.route-canvas-hint { margin: 8px 0; font-size: 12px; color: var(--atlas-muted); }
+/* The existing navigator path is the scoped authority for sequential execution. */
+.course-execution-path .navigator-stop { height: 220px; }
+.course-execution-path .navigator-connector { height: 220px; }
+.course-execution-path .navigator-node-copy { width: min(250px,65%); }
+.course-execution-path .navigator-node-copy > button { pointer-events: auto; margin: 8px auto 0; min-height: 36px; padding: 7px 18px; }
+.course-execution-path .navigator-node-copy strong { -webkit-line-clamp: 3; }
+.course-execution-path .navigator-node:focus-visible { outline: 3px solid var(--atlas-brand); outline-offset: 6px; }
+.course-execution-path .upcoming .navigator-node { background: #edf0f5; }
+.route-action-choices fieldset { margin: 16px 0; padding: 12px; border: 1px solid var(--atlas-border); border-radius: 12px; }
+.route-action-choices legend { font-size: 13px; font-weight: 600; }
+.route-action-choices fieldset > small { display: block; margin: 6px 0; }
+.route-action-choice { display: flex; gap: 9px; padding: 9px 0; align-items: flex-start; }
+.route-action-choice input { flex-shrink: 0; margin-top: 4px; }
+.route-action-choice span { min-width: 0; }
+.route-action-choice small,.route-planning ol small,.route-history-snapshot li small { display: block; font-size: 11px; color: var(--atlas-muted); overflow-wrap: anywhere; }

@@ -1,6 +1,6 @@
 import type { CapabilityRelation } from '@/shared/learning/routePlanning';
 import { ActionRunHistory } from '@/features/actions/ActionRunHistory';
-import { courseActionRecommendation } from './courseActionRecommendation';
+import { routeExecutionProjection } from './routeExecutionProjection';
 import type { useEdgeActions } from '@/features/actions/EdgeActionPanel';
 import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequisites';
 import { useNavigate } from 'react-router-dom';
@@ -60,23 +60,32 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
       ? resolveLearningContent?.(selected.nodeId, selected.resourceId) : undefined;
     return buildCourseNavigator({ graph, runtime, knowledge, courseState, decision: result.decision, routeView: routeControl.view, supportEdges, learningContent: exact ? [...learningContent, exact] : learningContent });
   }, [graph, runtime, knowledge, courseState, result.decision, routeControl.view, supportEdges, learningContent, resolveLearningContent]);
-  const recommendation = courseActionRecommendation(runtime.course.id, model.relations, actionControl, new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId)));
-  const recommendedTarget = recommendation.kind === 'active' ? recommendation.run.execution_snapshot.targetId : recommendation.kind === 'candidate' ? recommendation.recommended.edge.target : null;
-  const pathModel = { ...model, route: model.route.map(item => ({ ...item, state: item.acquired ? 'completed' as const : item.state === 'locked' ? 'locked' as const : item.node.id === recommendedTarget ? 'current' as const : 'available' as const })) };
+  const execution=routeExecutionProjection(runtime.course.id,routeControl.view,actionControl);
+  const current=execution.steps[execution.currentIndex];
+  const [switchRunId,setSwitchRunId]=useState<string|null>(null);
+  const switchConfirmation=useRef<HTMLElement>(null);
+  const switchTrigger=useRef<HTMLElement|null>(null);
+  useEffect(()=>{if(switchRunId){switchConfirmation.current?.focus();switchConfirmation.current?.scrollIntoView({behavior:reduced?'instant':'smooth',block:'center'});}else switchTrigger.current?.focus();},[switchRunId,reduced]);
+  const launch=async (index:number,confirmedRunId?:string)=>{
+    const step=execution.steps[index];
+    if(!step || execution.needsAdjustment || step.unavailable || !step.canExecute || actionControl.busy)return;
+    if(step.run && actionControl.continuableRunIds?.includes(step.run.id)) { await actionControl.start(step.run,execution.version?.id);return; }
+    const conflicting=actionControl.runs.find(run=>run.edge_id===step.edgeId && ['selected','in_progress'].includes(run.status));
+    if(conflicting && !confirmedRunId){switchTrigger.current=document.activeElement instanceof HTMLElement?document.activeElement:null;setSwitchRunId(conflicting.id);return;}
+    const run=await actionControl.select(step.actionId,confirmedRunId,undefined,execution.version?.id);
+    if(run){setSwitchRunId(null);await actionControl.start(run,execution.version?.id);}
+  };
   const next = model.nextPractice;
-  const routeAcquired = model.route.length > 0 && model.route.every(item => item.acquired);
-  const hasConfiguredActions = actionControl.actions.some(action => model.relations.some(edge => edge.id === action.edge_id));
-  const emptyTitle = routeAcquired ? '当前路线能力已具备' : hasConfiguredActions ? '当前没有可执行行动' : '当前关系尚未配置可执行行动';
-  const emptyReason = routeAcquired ? '你可以查看执行记录，或主动选择再次实践。' : hasConfiguredActions ? '可在节点详情查看执行条件；完成行动后仍需依据证据判断能力。' : '可查看节点中的已有学习内容。历史记录仍保留。';
   function practiceRow(item: typeof model.pendingPractices[number]) {
     return <button className="navigator-practice-row" key={item.assignment.id} onClick={() => setDetail(item.assignment)}><strong>{item.assignment.title}</strong><small>{item.status === 'submitted' ? '已提交 · 等待审核' : !item.ready ? '等待前置实训完成' : item.status === 'needs_revision' ? '需要修改' : '待完成'} · 查看任务</small></button>;
   }
   return <div className="course-navigator"><div className="navigator-columns">
     <aside className="navigator-queue" aria-label="课程行动队列">
-      <motion.section className="navigator-next" key={recommendation.kind} initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .2 }} aria-label="推荐下一步" aria-live="polite">
-        <span className="atlas-kicker">推荐下一步</span>
+      <motion.section className="navigator-next" key={current?.actionId??'empty'} initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .2 }} aria-label="当前正式步骤" aria-live="polite">
+        <span className="atlas-kicker">当前正式步骤</span>
         {showPolicy && result.decision?.recommendationPolicy ? <small>当前推荐策略 · {result.decision.recommendationPolicy === 'fixed' ? 'Fixed' : 'Rule'}</small> : null}
-        {!authenticated ? <><h2>登录后继续你的路线</h2><p>为你保留学习进度与实训待办。</p><button className="atlas-primary" onClick={onSignIn}>登录开始学习 <ArrowRight size={16} /></button></> : actionControl.loading || routeControl.busy ? <p role="status">正在读取路线与行动…</p> : recommendation.kind === 'active' ? <><h2>{recommendation.run.execution_snapshot.action.title}</h2><p>{recommendation.outsideRoute ? '这项行动已不在当前路线中，执行记录仍保留。' : '继续你已选择的实施方式。'}</p><button className="atlas-primary" disabled={actionControl.busy} onClick={() => void actionControl.start(recommendation.run)}>继续当前行动 <ArrowRight size={16}/></button></> : recommendation.kind === 'candidate' ? <><h2>{recommendation.recommended.action.title}</h2><p>从已有起点推进下一项能力，按当前执行条件与成本推荐。</p><small><Clock3 size={12}/> {recommendation.recommended.action.estimated_minutes} 分钟</small><button className="atlas-primary" onClick={() => onSelect(recommendation.recommended.edge.source, recommendation.recommended.edge.id)}>{recommendation.alternatives.length > 1 ? '选择实施方式' : '开始实施'} <ArrowRight size={16}/></button></> : <><h2>{emptyTitle}</h2><p>{emptyReason}</p>{onInspectCapabilities ? <button className="atlas-secondary" onClick={() => onInspectCapabilities()}>查看能力关系</button> : null}</>}
+        {!authenticated ? <><h2>登录后继续你的路线</h2><p>为你保留学习进度与实训待办。</p><button className="atlas-primary" onClick={onSignIn}>登录开始学习 <ArrowRight size={16} /></button></> : actionControl.loading || routeControl.busy ? <p role="status">正在读取路线与行动…</p> : execution.needsAdjustment || current?.unavailable ? <><h2>当前正式路线需要调整</h2><p>{execution.issue || '当前正式路线中的行动已不可用，需要调整路线。'}</p>{onInspectCapabilities?<button className="atlas-secondary" onClick={()=>onInspectCapabilities()}>调整路线</button>:null}</> : current ? <><h2>{current.title}</h2><p>{current.run?.status==='in_progress'?'继续正式路线中已选定的行动。':current.canExecute?'行动已选定，可以开始。':current.reason||'需要先形成起点能力或完成前置实训。'}</p><small><Clock3 size={12}/> {current.action?.estimated_minutes} 分钟</small><button className="atlas-primary" disabled={actionControl.busy || !current.canExecute} onClick={()=>void launch(execution.currentIndex)}>{current.run?.status==='in_progress'?'继续当前行动':'开始当前步骤'} <ArrowRight size={16}/></button></> : <><h2>{execution.steps.length?'路线行动已完成':'当前没有待执行步骤'}</h2><p>执行历史继续保留；能力状态依据正式证据判断。</p>{onInspectCapabilities?<button className="atlas-secondary" onClick={()=>onInspectCapabilities()}>调整路线</button>:null}</>}
+        {switchRunId?<section ref={switchConfirmation} tabIndex={-1} role="alertdialog" aria-label="确认切换行动"><h3>切换正在执行的行动？</h3><p>确认后停止这条关系上原有行动，历史记录会保留。</p><button className="atlas-secondary" disabled={actionControl.busy} onClick={()=>setSwitchRunId(null)}>保留当前行动</button><button className="atlas-primary" disabled={actionControl.busy} onClick={()=>void launch(execution.currentIndex,switchRunId)}>确认切换并开始</button></section>:null}
         {actionControl.error ? <p role="alert">{actionControl.error}</p> : null}{result.error ? <p role="status">学习进度暂时未同步。<button className="atlas-secondary" onClick={() => setRetry(value => value + 1)}>重试同步</button></p> : null}
       </motion.section>
       <section className="navigator-backlog" aria-label="实训待办"><h2>实训待办 <span>· {authenticated ? model.pendingPractices.length : '—'}</span></h2>
@@ -88,7 +97,7 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
       </section>
       <ActionRunHistory runs={actionControl.runs} control={actionControl} courseId={runtime.course.id} acquiredIds={new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId))} title={id => knowledgeTitle?.(id) ?? graph.knowledgeNodes.find(node => node.id === id)?.title ?? routeControl.view?.activeVersion?.snapshot.titles[id] ?? id} visibleEdgeIds={new Set(model.relations.map(edge => edge.id))}/>
     </aside>
-    {authenticated && (!routeControl.view || routeControl.view.activeVersion?.courseId !== runtime.course.id) ? <p role={routeControl.error ? "alert" : "status"}>{routeControl.error || "正在加载正式个人路线…"}</p> : <CoursePathView model={pathModel} targetOutcome={runtime.course.targetOutcome} onInspectCapabilities={onInspectCapabilities} onSelect={onSelect} />}
+    {authenticated && (!routeControl.view || routeControl.view.activeVersion?.courseId !== runtime.course.id) ? <p role={routeControl.error ? "alert" : "status"}>{routeControl.error || "正在加载正式个人路线…"}</p> : <CoursePathView model={execution} busy={actionControl.busy} onExecute={index=>void launch(index)} targetOutcome={runtime.course.targetOutcome} onInspectCapabilities={onInspectCapabilities} onSelect={onSelect} />}
     </div>
     {detail ? <dialog ref={dialogRef} className="navigator-practice-detail" aria-label={detail.title} onClose={() => setDetail(null)}><button autoFocus className="atlas-secondary" onClick={() => setDetail(null)}>关闭任务详情</button><h2>{detail.title}</h2><p>{detail.description}</p><h3>任务要求</h3><ul>{detail.requirements.map((text, index) => <li key={index}>{text}</li>)}</ul><h3>交付成果</h3><p>{detail.expectedOutput}</p><h3>验收标准</h3><ul>{detail.acceptanceCriteria.map((text, index) => <li key={index}>{text}</li>)}</ul><p>任务记录已保留；下一步学习安排以行动队列为准。</p>{detailEligibility?.reason && !detailEligibility.viewOnly ? <p role="status">{detailEligibility.reason}</p> : null}<button className="atlas-secondary" disabled={!detailEligibility?.canStart && !detailEligibility?.viewOnly} onClick={() => navigate(`/courses/${encodeURIComponent(runtime.course.id)}/assignments/${encodeURIComponent(detail.id)}`)}>{detailEligibility?.cta}</button></dialog> : null}
   </div>;

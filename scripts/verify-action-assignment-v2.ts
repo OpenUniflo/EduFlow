@@ -1,6 +1,7 @@
 /** Local-only transactional contract test. All learner states below are labelled fixtures. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { createClient } from '@supabase/supabase-js';
 import { currentRoute } from '../api/_lib/routePlanning.js';
 import { learningDataHash } from '../api/_lib/learningData.js';
@@ -120,6 +121,62 @@ try {
   check((await server.from('user_knowledge_states').select('node_id').eq('user_id', learner).eq('node_id', targetId)).data?.length === 0, 'Repeated Micro Action grants no capability');
   const replay = await rpc('select_edge_action_v2', { ...microArgs, p_selection_key: randomUUID(), p_expected_active_run_id: null });
   check(replay.id !== microRun.id, 'Completed Micro action can be selected for another distinct execution');
+  // V3 contracts reuse real facts/resources above. The fixture snapshot is trusted
+  // server output; this section tests atomic choice authority, not planner ranking.
+  const snapshot = { ...route.view.activeVersion!.snapshot, executionSteps: [{ edgeId: edges[0].id, actionId: templates[0].action.id, sourceNodeId: edges[0].source_node_id, targetNodeId: targetId, order: 0 }] };
+  const adoption = (base: string, actionId: string) => ({ p_user_id: learner, p_course_id: courseId, p_base_version_id: base, p_source: 'adjustment', p_include_node_ids: [], p_exclude_node_ids: [], p_snapshot: { ...snapshot, executionSteps: [{ ...snapshot.executionSteps[0], actionId }] }, p_structure_fingerprint: 'acceptance-local-v3', p_restored_from_version_id: null });
+  const formal = await rpc('adopt_personal_course_route', adoption(route.view.activeVersion!.id, templates[0].action.id));
+  const chosen = { ...args(0,replay.id), p_expected_version_id: formal.id };
+  check((await clients[0].rpc('select_route_action_v3',chosen)).error,'Learner cannot invoke privileged route choice writer');
+  check((await server.rpc('select_route_action_v3',{...args(1,replay.id),p_expected_version_id:formal.id})).error,'Unselected alternative cannot replace formal Action');
+  check((await server.from('edge_action_runs').select('status').eq('id',replay.id).single()).data?.status==='selected','Adoption and rejected alternatives never cancel existing work');
+  const selected = await Promise.all([rpc('select_route_action_v3',chosen),rpc('select_route_action_v3',chosen)]);
+  check(selected[0].id===selected[1].id,'Concurrent V3 retries select one Run');
+  check(selected[0].execution_snapshot.routeVersionId===formal.id,'New Run records adopted version reference');
+  // Hold the adoption lock until the competing first start has entered the RPC.
+  const changed = adoption(formal.id,templates[1].action.id);
+  const sql = (value: unknown) => "'"+String(value).replace(/'/g,"''")+"'";
+  const lockedAdoption = spawn('docker',['exec','-i','supabase_db_EduFlow','psql','-U','postgres','-v','ON_ERROR_STOP=1','-At'],{stdio:['pipe','pipe','pipe']});
+  let lockedOutput=''; let lockedError='';
+  lockedAdoption.stderr.on('data',chunk=>{lockedError+=chunk;});
+  const locked = new Promise<void>((resolve,reject)=>{
+    lockedAdoption.stdout.on('data',chunk=>{lockedOutput+=chunk;if(lockedOutput.includes('route-lock-held'))resolve();});
+    lockedAdoption.on('error',reject);lockedAdoption.on('exit',code=>{if(code && !lockedOutput.includes('route-lock-held'))reject(new Error(lockedError));});
+  });
+  const finished = new Promise<void>((resolve,reject)=>lockedAdoption.on('exit',code=>code===0?resolve():reject(new Error(lockedError))));
+  lockedAdoption.stdin.end(`begin; select pg_advisory_xact_lock(hashtextextended('personal-route:${learner}:${courseId}',0)); select 'route-lock-held'; select pg_sleep(1); select adopt_personal_course_route(${sql(learner)}::uuid,${sql(courseId)},${sql(formal.id)}::uuid,'adjustment','{}'::text[],'{}'::text[],${sql(JSON.stringify(changed.p_snapshot))}::jsonb,'acceptance-local-v3',null); commit;`);
+  await locked;
+  const racedStart = await server.rpc('transition_route_action_v3',{p_user_id:learner,p_run_id:selected[0].id,p_operation:'start',p_expected_version_id:formal.id});
+  await finished;
+  check(racedStart.error?.code==='PT409','First start racing adoption rechecks the version after the route lock');
+  check((await server.from('edge_action_runs').select('status').eq('id',selected[0].id).single()).data?.status==='selected','Rejected stale start never becomes in_progress');
+  check((await rpc('select_route_action_v3',chosen)).id===selected[0].id,'Committed selection retry stays idempotent after adoption');
+  const pointer = await server.from('personal_course_routes').select('active_version_id').eq('user_id',learner).eq('course_id',courseId).single();assert.ifError(pointer.error);
+  const nextChoice=await rpc('select_route_action_v3',{...args(1,selected[0].id),p_expected_version_id:pointer.data.active_version_id});
+  await rpc('transition_route_action_v3',{p_user_id:learner,p_run_id:nextChoice.id,p_operation:'start',p_expected_version_id:pointer.data.active_version_id});
+  await rpc('record_action_assignment_attempt',submit(nextChoice.id,randomUUID()));
+  const newer=await rpc('adopt_personal_course_route',adoption(pointer.data.active_version_id,templates[0].action.id));
+  const again=await rpc('select_route_action_v3',{...args(1),p_expected_version_id:newer.id,p_repeat_run_id:nextChoice.id});
+  check(again.id!==nextChoice.id,'Legal repeat creates a distinct Run independent of current future choice');
+  await rpc('transition_route_action_v3',{p_user_id:learner,p_run_id:again.id,p_operation:'start',p_expected_version_id:newer.id});
+  check((await server.from('personal_course_routes').select('active_version_id').eq('user_id',learner).eq('course_id',courseId).single()).data?.active_version_id===newer.id,'Repeat and start leave route selection/version unchanged');
+  check((await server.from('user_knowledge_states').select('node_id').eq('user_id',learner).eq('node_id',targetId)).data?.length===0,'V3 execution still grants no capability');
+  const microFormal=await rpc('adopt_personal_course_route',adoption(newer.id,template.data.id));
+  const microChosen={...microArgs,p_selection_key:randomUUID(),p_expected_active_run_id:again.id,p_expected_version_id:microFormal.id};
+  const concurrentMicro=await rpc('select_route_action_v3',microChosen);
+  await rpc('transition_route_action_v3',{p_user_id:learner,p_run_id:concurrentMicro.id,p_operation:'start',p_expected_version_id:microFormal.id});
+  for(const operation of ['sync-micro','start','select']) {
+    const stepArgs={...microStep(stepIds[0]),p_run_id:concurrentMicro.id,p_expected_version_id:microFormal.id};
+    const held=spawn('docker',['exec','-i','supabase_db_EduFlow','psql','-U','postgres','-v','ON_ERROR_STOP=1','-At'],{stdio:['pipe','pipe','pipe']});
+    let output='',errors='';held.stderr.on('data',chunk=>{errors+=chunk;});
+    const acquired=new Promise<void>((resolve,reject)=>{held.stdout.on('data',chunk=>{output+=chunk;if(output.includes('micro-lock-held'))resolve();});held.on('error',reject);held.on('exit',code=>{if(code && !output.includes('micro-lock-held'))reject(new Error(errors));});});
+    const done=new Promise<void>((resolve,reject)=>held.on('exit',code=>code===0?resolve():reject(new Error(errors))));
+    held.stdin.end(`begin; set local statement_timeout='8s'; select pg_advisory_xact_lock(hashtextextended('criterion-evidence:${learner}',0)); select id from edge_action_runs where id=${sql(concurrentMicro.id)}::uuid for update; select 'micro-lock-held'; select pg_sleep(.3); select record_action_micro_step(${sql(learner)}::uuid,${sql(pathId)},${sql(unitId)},${sql(stepIds[0])},${sql(courseId)},${sql(stepArgs.p_key)},null,true,'observed',${sql(stepArgs.p_step_hash)},100,null,${sql(JSON.stringify(expected))}::jsonb,${sql('{'+route.view.plan.route!.selectedNodeIds.join(',')+'}')}::text[],${sql(microFormal.id)}::uuid,${sql(concurrentMicro.id)}::uuid); commit;`);
+    await acquired;
+    const competed=operation==='select'?await server.rpc('select_route_action_v3',{...microChosen,p_selection_key:randomUUID(),p_expected_active_run_id:concurrentMicro.id}):await server.rpc('transition_route_action_v3',{p_user_id:learner,p_run_id:concurrentMicro.id,p_operation:operation,p_expected_version_id:microFormal.id});
+    await done;check(!competed.error,`Micro submission and V3 ${operation} share locks without deadlock`);
+  }
+  check((await server.from('personal_course_routes').select('active_version_id').eq('user_id',learner).eq('course_id',courseId).single()).data?.active_version_id===microFormal.id,'Concurrent Micro operations leave selected Action/version unchanged');
   console.log(JSON.stringify({ status: 'PASS', checks, scope: 'local labelled fixtures; no Hosted writes' }));
 } finally {
   for (const user of users) {

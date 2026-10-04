@@ -28,7 +28,7 @@ describe('V2 route UI authority and historical meaning', () => {
     const html = renderToStaticMarkup(<RoutePlanningPanel control={c} title={id => id}/>);
     for (const text of ['当前路线 V1', '版本历史', '重新载入当前路线', '选择加入', '选择排除', '清空修改', '重新规划路线', '退出调整', '路线 Preview', '采用新路线', '该能力不在当前项目能力模型中']) expect(html).toContain(text);
     const ordinary = renderToStaticMarkup(<RoutePlanningPanel control={{ ...c, editing: false }} title={id => id}/>);
-    expect(ordinary).toContain('当前路线需要重新确认');
+    expect(ordinary).toContain('当前正式路线需要调整');
     expect(ordinary).not.toContain('路线 Preview'); expect(ordinary).not.toContain('版本历史');
   });
   it('same structural graph does not depend on draft, preview or route version, and no role rings remain', () => {
@@ -37,4 +37,11 @@ describe('V2 route UI authority and historical meaning', () => {
     expect(scene).toContain('atlasStructureKey(nodes, edges, variant)');
     expect(scene).toContain('variant !== "project"');
   });
+  it('explains an acquired-boundary enables choice from structural facts instead of candidate scope',()=>{
+    const step={edgeId:'real-enables',actionId:'chosen',sourceNodeId:'A',targetNodeId:'B',order:0};
+    const c={view:{activeVersion:{...version,snapshot:{...version.snapshot,executionSteps:[step]}},model:{supportEdges:[]},plan:{valid:true,route:version.snapshot},execution:{options:[{edgeId:step.edgeId,actionId:step.actionId,title:'已选行动',type:'micro_learning',estimatedMinutes:8,planningAvailable:true,availableNow:true,reasons:[]}]}},editing:true,draft:{includeNodeIds:[],excludeNodeIds:[]},actionChoices:[step],selectedEdgeIds:[step.edgeId],busy:false} as unknown as ReturnType<typeof useRoutePlanning>;
+    const html=renderToStaticMarkup(<RoutePlanningPanel control={c} title={id=>`能力${id}`} relations={[{id:step.edgeId,source:'A',target:'B',relation:'enables',strength:.5,reason:'真实支撑'}]}/>);
+    expect(html).toContain('<legend>能力A → 能力B</legend>');expect(html).toContain('已选行动');
+  });
+
 });

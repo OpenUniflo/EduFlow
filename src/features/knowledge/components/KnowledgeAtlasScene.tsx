@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useId, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from 'motion/react';
 import ForceGraph3D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-3d";
 import {
@@ -165,7 +165,8 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const [branchPositions, setBranchPositions] = useState<Array<ActionBranch & { path: string; x: number; y: number }>>([]);
   const [labels, setLabels] = useState<LabelState[]>([]);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
-  const [routePositions, setRoutePositions] = useState<{ nodes: { id: string; state: RouteOverlayState; x: number; y: number }[]; edges: { id: string; state: RouteOverlayState | 'context'; x1: number; y1: number; x2: number; y2: number; dash?: string }[] }>({ nodes: [], edges: [] });
+  const routeArrowId=useId().replace(/:/g,'');
+  const [routePositions, setRoutePositions] = useState<{ nodes: { id: string; state: RouteOverlayState; x: number; y: number }[]; edges: { id: string; state: RouteOverlayState | 'context'; x1: number; y1: number; x2: number; y2: number }[] }>({ nodes: [], edges: [] });
   const [edgeHint, setEdgeHint] = useState<{ x: number; y: number; text: string } | null>(null);
   const isVisible = useCallback((id: string) => !visibleNodeIds || visibleNodeIds.has(id), [visibleNodeIds]);
 
@@ -448,8 +449,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       edges: (routeOverlay ? renderEdges : []).flatMap(edge => {
         const item = routeOverlay?.edges.find(item => item.id === edge.id) ?? { id: edge.id, state: 'context' as const };
         const start = screenNode(endpointId(edge.source)), end = screenNode(endpointId(edge.target));
-        return start && end ? [{ ...item, x1: start.x, y1: start.y, x2: end.x, y2: end.y,
-          dash: edge.relation === 'enables' ? '2 6' : edge.strength === 'soft' ? '7 5' : undefined }] : [];
+        return start && end ? [{ ...item, x1: start.x, y1: start.y, x2: end.x, y2: end.y }] : [];
       }),
     };
     setRoutePositions(previous => JSON.stringify(previous) === JSON.stringify(positionedRoute) ? previous : positionedRoute);
@@ -650,9 +650,14 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
         onLinkHover={edge => setHoveredEdgeId(edge ? String(edge.id) : null)}
         onBackgroundClick={onBackgroundClick}
       />
-      {variant === 'project' && routeOverlay ? <svg className="atlas-route-overlay" width={size.width} height={size.height} aria-label={routeOverlay.preview ? '路线预览差异' : '当前正式路线'} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        {routePositions.edges.map(edge => <line key={`${edge.id}-${edge.state}`} data-route-edge={edge.state === 'context' ? undefined : edge.id} className={`route-overlay-${edge.state}`} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} strokeWidth={edge.state === 'context' ? 1 : 3} strokeDasharray={edge.dash} />)}
-        {routePositions.nodes.map(node => <circle key={`${node.id}-${node.state}`} data-route-node={node.id} className={`route-overlay-${node.state}`} cx={node.x} cy={node.y} r={10} fill="none" strokeWidth={1.5} strokeDasharray={node.state === 'removed' ? '2 4' : undefined} />)}
+      {variant === 'project' && routeOverlay ? <svg className={`atlas-route-overlay ${routeOverlay.preview?'is-preview':''} ${reducedMotion?'reduced-motion':''}`} width={size.width} height={size.height} aria-label={routeOverlay.preview ? '路线预览差异' : '当前正式路线'} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        <defs><marker id={routeArrowId} viewBox="0 0 8 8" refX="16" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 8 4 L 0 8 z" fill="context-stroke"/></marker></defs>
+        {routePositions.edges.map(edge=><g key={edge.id} className={`route-overlay-${edge.state}`} data-route-edge={edge.state==='context'?undefined:edge.id} data-route-direction="source-target">
+          {edge.state==='kept'?<line className="route-current-baseline" x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} strokeWidth={6}/>:null}
+          <line className="route-fact-line" x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} strokeWidth={edge.state==='context'?1:2.5} markerEnd={edge.state==='context'?undefined:`url(#${routeArrowId})`}/>
+          {edge.state!=='context'?<line className="route-directional-pulse" pathLength={100} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} strokeWidth={4} strokeLinecap="round"/>:null}
+        </g>)}
+        {routePositions.nodes.map(node=><g key={node.id} data-route-node={node.id} data-x={node.x} data-y={node.y}/>)}
       </svg> : null}
       {variant === 'project' && edgeHint ? <div className="atlas-edge-hint" role="tooltip" style={{ transform: `translate(${edgeHint.x}px, ${edgeHint.y}px) translate(-50%, -120%)` }}>{edgeHint.text}</div> : null}
       {variant === 'project' && branchPositions.length > 0 ? <svg className="atlas-action-branches" width={size.width} height={size.height} aria-label="关系上的行动替代方案" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}>

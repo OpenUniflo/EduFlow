@@ -10,7 +10,7 @@ vi.mock('react', () => {
     return host.slots[i].value;
   };
   return {
-    forwardRef: (fn: any) => fn,
+    forwardRef: (fn: any) => fn,useId:()=>'route-test-arrow',
     useState(initial: any) { const i = host.index++; if (!(i in host.slots)) host.slots[i] = typeof initial === 'function' ? initial() : initial; return [host.slots[i], (value: any) => { host.slots[i] = typeof value === 'function' ? value(host.slots[i]) : value; }]; },
     useRef(initial: any) { const i = host.index++; return host.slots[i] ??= { current: initial }; },
     useMemo: memo, useCallback: (fn: any, deps: any[]) => memo(() => fn, deps), useImperativeHandle() {},
@@ -19,13 +19,15 @@ vi.mock('react', () => {
 });
 vi.mock('react-force-graph-3d', () => ({ default: () => null }));
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneProps } from './KnowledgeAtlasScene';
-const graph = { d3Force: vi.fn(), d3ReheatSimulation: vi.fn(), controls: () => ({}), pauseAnimation: vi.fn(), resumeAnimation: vi.fn(), cameraPosition: vi.fn() };
+const graph = { graph2ScreenCoords:(x:number,y:number)=>({x,y}),camera:()=>({position:{x:0,y:0,z:700}}),d3Force: vi.fn(), d3ReheatSimulation: vi.fn(), controls: () => ({}), pauseAnimation: vi.fn(), resumeAnimation: vi.fn(), cameraPosition: vi.fn() };
 const nodes = ['A', 'B', 'C', 'D'].map((id, i) => ({ id, title: id, color: ['#3b82f6', '#94a3b8', '#22c55e', '#94a3b8'][i], status: 'explore', isCore: true, visualImportance: 0 })) as KnowledgeAtlasSceneProps['nodes'];
 const edges = ['A>B', 'B>C', 'B>D'].map(id => ({ id, source: id[0], target: id[2], relation: 'prerequisite', strength: 'hard' })) as KnowledgeAtlasSceneProps['edges'];
 let selected: string | null = null;
+let lastElement:any;
 function render(variant: KnowledgeAtlasSceneProps['variant'] = 'project', extra: Partial<KnowledgeAtlasSceneProps> = {}) {
   host.index = 0;
   const element = (KnowledgeAtlasScene as any)({ nodes: nodes.map(n => ({ ...n })), edges: edges.map(e => ({ ...e })), variant, ...extra, selectedId: selected, onNodeClick: (n: { id: string }) => { selected = n.id; }, onBackgroundClick: () => { selected = null; } });
+  lastElement=element;
   const props = element.props.children[0].props;
   props.ref(graph); host.effects.splice(0).forEach(effect => effect());
   return props;
@@ -118,4 +120,26 @@ it('changes route visibility, diff and reduced motion without reheating or reset
   }
   expect(graph.d3ReheatSimulation).toHaveBeenCalledTimes(1);
   expect(graph.cameraPosition).toHaveBeenCalledTimes(1);
+});
+
+it('projects solid facts and source-to-target pulse geometry without route circles; candidate branches retain dashes',()=>{
+  const overlay={preview:true,nodes:[{id:'A',state:'kept' as const},{id:'B',state:'kept' as const}],edges:[{id:'A>B',state:'kept' as const}]};
+  const extras={routeOverlay:overlay,actionBranches:[{id:'alternative',edgeId:'A>B',title:'Alternative',status:'candidate' as const}]};
+  const before=render('project',extras).graphData;
+  before.nodes.forEach((node:any,index:number)=>{node.x=20+index*30;node.y=30+index*10;node.z=0;});
+  const frame=vi.mocked(requestAnimationFrame).mock.calls[vi.mocked(requestAnimationFrame).mock.calls.length-1][0];frame(100);
+  render('project',extras);
+  function all(element:any):any[]{if(Array.isArray(element))return element.flatMap(all);return element?.props?[element,...all(element.props.children)]:[];}
+  const elements=all(lastElement);
+  const fact=elements.find(element=>element.props.className==='route-fact-line');
+  const pulse=elements.find(element=>element.props.className==='route-directional-pulse');
+  expect(fact.props.strokeDasharray).toBeUndefined();expect(pulse.props).toMatchObject({x1:20,y1:30,x2:50,y2:40,pathLength:100});
+  expect(fact.props.markerEnd).toBe('url(#route-test-arrow)');
+  expect(elements.find(element=>element.props['data-route-edge']==='A>B').props['data-route-direction']).toBe('source-target');
+  expect(elements.filter(element=>element.props['data-route-node']).every(element=>element.type==='g')).toBe(true);
+  expect(elements.some(element=>element.type==='circle' && element.props['data-route-node'])).toBe(false);
+  expect(elements.some(element=>element.type==='path' && element.props.strokeDasharray==='4 5')).toBe(true);
+  expect(graph.d3ReheatSimulation).toHaveBeenCalledTimes(1);expect(graph.cameraPosition).toHaveBeenCalledTimes(1);
+  host.reducedMotion=true;render('project',extras);
+  expect(all(lastElement).find(element=>String(element.props.className).includes('atlas-route-overlay')).props.className).toContain('reduced-motion');
 });

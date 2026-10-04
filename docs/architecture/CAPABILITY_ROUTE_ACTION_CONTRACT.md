@@ -4,13 +4,17 @@ Frozen for the frontend execution unification, 2026-10-04.
 
 ## Authorities
 
-The shared Knowledge Graph is the only factual capability graph. Global project planning uses its Global projection; this does not remove visible Tenant/User knowledge from existing curriculum contracts. KnowledgeEdge records facts. Personal Route records where the learner intends to go. Action describes how to advance along one factual Edge. ActionRun records the selected execution, Evidence records its results, and UserKnowledgeState alone records formal personal capability.
+The shared Knowledge Graph is the only factual capability graph. Global project planning uses its Global projection; this does not remove visible Tenant/User knowledge from existing curriculum contracts. KnowledgeEdge records facts. Personal Route is the user's formally adopted execution plan for a Course/Project: real Edge membership, one selected Action per executable Edge and deterministic execution order. Project Capability is the Route + Action planner; Course Route executes its adopted result. ActionDefinition describes an alternative on one factual Edge. ActionRun records one actual execution, Evidence records its results, and UserKnowledgeState alone records formal personal capability.
 
 Only prerequisite and enables participate in execution presentation. A hard prerequisite is necessary and may require route membership or block execution. A soft prerequisite is factual but is not a hard gate. Enables supports a target, can carry Actions, and never forces source membership by itself. Related is excluded by default.
 
 ## Route projection
 
-orderedNodeIds supplies deterministic reading/layout order only. Never connect adjacent IDs. Every rendered relationship must preserve the identity, endpoints, relation and strength of a real KnowledgeEdge. Current prerequisite relations come from the formal route snapshot/current plan. Enables are factual support edges with both endpoints in selectedNodeIds; they never enter prerequisiteEdges.
+orderedNodeIds supplies deterministic knowledge reading/layout order only. Never infer KnowledgeEdges from adjacent IDs. Every Project relationship preserves real identity, endpoints, relation and strength. Current prerequisite relations come from the formal route snapshot/current plan. Enables are factual support edges with both endpoints in selectedNodeIds; they never enter prerequisiteEdges.
+
+Immutable Route Version snapshots store executionSteps containing only stable Edge/Action references, endpoints and explicit order, never copied Action content. Preview contains the complete proposed Edge membership, Action choices and execution order. Changing only an Action is a Route adjustment; explicit Adopt alone creates a new Version. Repeating/retrying an ActionRun does not rewrite Route selection. Historic snapshots without executionSteps remain readable and require explicit planning before new Course Route execution; no read-side automatic choice is persisted. Unavailable adopted Actions remain selected and demand adjustment, never silent replacement.
+
+Course Route reuses the earlier vertical sequential path styling and presents completed/current/next adopted Actions. Its Step-to-Step line represents execution order, is not a KnowledgeEdge and never enters graph data. Course Route and Navigator do not compare alternatives; a secondary Adjust Route entry opens Project Capability. Source and hard-prerequisite execution gates remain intact for selected Actions, including future Steps whose sources have not yet formed.
 
 An explicitly included acquired ancestor remains eligible when target acquisition prunes it from the candidate view, provided active factual prerequisite/enables relations still connect it to a Course target. This does not automatically include ancestors or admit unrelated acquired nodes; Exclude and hard-closure checks still apply. Revalidation never mutates an immutable route version.
 
@@ -26,7 +30,7 @@ Completion is not acquisition or mastery. Results enter the existing Evidence/ca
 
 ## Shared detail and navigation
 
-Skill Tree and Personal Route share KnowledgeNodeDetail core. Core Knowledge information is required; chapter, lesson, coverage and material context are optional. Bridge nodes open detail and never switch presentation automatically. Skill Tree retains complete course content. Personal Route emphasizes outgoing factual route relationships and their Actions. Navigator recommends from those same Actions and Runs, prioritizing active work; it does not create a second Action authority.
+Skill Tree and Personal Route share KnowledgeNodeDetail core. Core Knowledge information is required; chapter, lesson, coverage and material context are optional. Bridge nodes open detail and never switch presentation automatically. Skill Tree retains complete course content. Course Route emphasizes adopted Action Steps and their details. Navigator continues the current selected Step's in-progress Run or starts its selected Action; alternatives and changes live in Project planning.
 
 Assistant context follows the foreground presentation and its selection, including Route node/edge, Project node/edge, Evidence and explicit Assignment/Action context. Hidden selections cannot supply foreground context.
 
@@ -38,7 +42,11 @@ Evidence Library is a long-lived asset library with summary loading and source d
 
 Hosted Preview shares Production Supabase. Changes must be additive and compatible, with no destructive migrations, table/column removal or Production promotion. Local committed migrations are authoritative. Preserve RLS, evidence lineage, formal route versions and existing execution authority.
 
-Each phase requires relevant automatic tests, independent review, and actual browser validation. Final acceptance includes all 33 user criteria, full tests, typecheck, lint, build, audits, migration/advisor checks, READY Preview and fresh desktop/narrow screenshots. A missing check is not a PASS.
+Each phase requires relevant automatic tests, independent review, and actual browser validation. Final acceptance follows the new 45 criteria, full tests, typecheck, lint, build, audits, migration/advisor checks, READY Preview and fresh desktop/390×844 screenshots. Both authorized test accounts need distinct states and complete formal Routes, with at least two active executable alternatives on every plannable project Edge and at least three on key Edges. Fixtures extend Actions/resources only and never invent Knowledge facts. Once the current embedding configuration has a real successful call, intermittent external timeouts are a known reliability limitation rather than a blocker for this frontend/Route/Action goal. Judgment standards and retrieval remain unchanged.
+
+## Project visual encoding
+
+Ordinary Project KnowledgeEdges share one quiet solid-line visual. Hard/soft/enables remain factual data and textual detail, not different dash patterns. Dashed branches mean unselected Action candidates. Current Route has a continuous directional source→target pulse overlay; Preview uses a distinct coordinated directional pulse, retains a subdued Current baseline, and distinguishes kept/added/removed facts. Reduced motion replaces loops with static highlight and direction arrows. Default Project Route node rings are removed; temporary hover/selection halo remains. Other Atlas learning/mastery rings retain their existing semantics. Every presentation overlay preserves topology, frozen coordinates, engine and camera lifecycle.
 
 ## Stable Project renderer range
 

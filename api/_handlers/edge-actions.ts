@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { readActiveVersion, readRouteInput, defaultConstraints } from '../_lib/routePlanning.js';
 import { buildCapabilityModel, planCourseRoute } from '../../src/shared/learning/routePlanning.js';
 import { routeRelations } from '../../src/shared/learning/routePresentation.js';
+import { executionRelations } from '../../src/shared/learning/routeExecution.js';
 import { hasUnmetHardPrerequisite } from '../../src/shared/learning/teachingPrerequisites.js';
 import { createServerSupabase, createUserSupabase } from '../_lib/supabase.js';
 import { ApiError, handleApi, json, methodNotAllowed } from '../_lib/http.js';
@@ -12,7 +13,7 @@ import { readAssignmentEligibility } from '../_lib/assignmentEligibility.js';
 const id = z.string().min(1).max(512);
 const template = z.object({ id: z.uuid().optional(), edge_id: id, type: z.enum(['micro_learning', 'practice_task']), title: z.string().trim().min(1).max(240), description: z.string().max(12000), estimated_minutes: z.number().int().min(1).max(10080), difficulty: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]), resource_requirements: z.array(id).max(30), required_capability_ids: z.array(id).max(30), expected_evidence: z.string().trim().min(1).max(12000), status: z.enum(['active', 'archived']) }).strict();
 const binding = z.object({ course_id: id, action_id: z.uuid(), context: z.string().max(12000), contact: z.string().max(2000), instructions: z.string().max(12000), resources: z.array(z.object({ key: id, label: z.string().max(240), reference: z.string().max(4000), available: z.boolean() }).strict()).max(30), available: z.boolean(), micro_path_id: id.nullable().optional(), assignment_id: id.nullable().optional() }).strict();
-const bodySchema = z.discriminatedUnion('action', [z.object({ action: z.literal('select'), courseId: id, actionId: z.uuid(), selectionKey: z.uuid(), expectedActiveRunId: z.uuid().nullable().optional(), repeatRunId: z.uuid().optional() }).strict(), z.object({ action: z.literal('transition'), runId: z.uuid(), operation: z.enum(['start', 'sync-micro']) }).strict(), z.object({ action: z.literal('save-template'), template }).strict(), z.object({ action: z.literal('save-binding'), binding }).strict()]);
+const bodySchema = z.discriminatedUnion('action', [z.object({ action: z.literal('select'), courseId: id, actionId: z.uuid(), selectionKey: z.uuid(), expectedActiveRunId: z.uuid().nullable().optional(), repeatRunId: z.uuid().optional(), routeVersionId: z.uuid().optional() }).strict(), z.object({ action: z.literal('transition'), runId: z.uuid(), operation: z.enum(['start', 'sync-micro']), routeVersionId: z.uuid().optional() }).strict(), z.object({ action: z.literal('save-template'), template }).strict(), z.object({ action: z.literal('save-binding'), binding }).strict()]);
 export default handleApi(async (request, response) => {
   const { client, user } = await createUserSupabase(request);
   response.setHeader('Cache-Control', 'private, no-store');
@@ -35,9 +36,9 @@ export default handleApi(async (request, response) => {
     const modelEdges = buildCapabilityModel(routeData.input).supportEdges;
     const courseNodes = new Set(routeData.input.courseOrder.map(item => item.nodeId));
     const courseEdges = [...routeData.input.prerequisiteEdges, ...(routeData.input.enablesEdges ?? [])].filter(edge => courseNodes.has(edge.source) && courseNodes.has(edge.target));
-    const plan = planCourseRoute(routeData.input, version?.constraints ?? defaultConstraints);
+    const plan = version?.snapshot.executionSteps !== undefined && version.snapshot.valid ? {valid:true as const,route:version.snapshot,conflicts:[]} : planCourseRoute(routeData.input, version?.constraints ?? defaultConstraints);
     const facts = [...routeData.input.prerequisiteEdges.map(edge => ({ ...edge, relation: 'prerequisite' as const })), ...(routeData.input.enablesEdges ?? [])];
-    const routeEdges = plan.valid ? routeRelations(plan.route, facts) : [];
+    const routeEdges = plan.valid ? (version?.snapshot.executionSteps !== undefined ? executionRelations(version.snapshot,facts) : routeRelations(plan.route, facts)) : [];
     const routeEdgeIds = new Set(routeEdges.map(edge => edge.id));
     const scopedEdges = new Set([...modelEdges.map(edge => edge.id), ...routeEdges.map(edge => edge.id), ...courseEdges.map(edge => edge.id), ...runs.map(run => String(run.edge_id))]);
     const edges = facts.filter(edge => scopedEdges.has(edge.id));
@@ -54,7 +55,7 @@ export default handleApi(async (request, response) => {
       const target = edge?.target ?? '';
       const binding = bindings.find(binding => binding.action_id === action.id);
       return Boolean(action.type === 'micro_learning' && binding?.available && version && edge && !version.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && plan.valid && (routeEdgeIds.has(edge.id) && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target))
-        && !hasUnmetHardPrerequisite(target, acquired, plan.route.prerequisiteEdges)
+        && !hasUnmetHardPrerequisite(target, acquired, routeData.input.prerequisiteEdges)
         && microPaths.some(path => path.id === binding.micro_path_id && path.knowledge_id === target));
     }).map(action => action.id);
     const availablePractice = await Promise.all(actions.filter(action => action.type === 'practice_task').map(async action => {
@@ -85,6 +86,12 @@ export default handleApi(async (request, response) => {
   const server = createServerSupabase();
   const body = parsed.data;
   if (body.action === 'select') {
+    const duplicateResult = await client.from('edge_action_runs').select('*').eq('user_id',user.id).eq('selection_key',body.selectionKey).maybeSingle();
+    const duplicate = dataOrThrow(duplicateResult.data,duplicateResult.error,'Action selection retry');
+    if (duplicate) {
+      if (duplicate.course_id !== body.courseId || duplicate.action_id !== body.actionId || duplicate.execution_version !== 2) throw new ApiError(409,'selection_key_conflict','此请求标识已用于其他行动。');
+      json(response,200,{run:duplicate});return;
+    }
     let retainedEdgeId: string | undefined;
     if (body.repeatRunId) {
       const previousResult = await client.from('edge_action_runs').select('edge_id').eq('id', body.repeatRunId).eq('user_id', user.id).eq('course_id', body.courseId).eq('action_id', body.actionId).eq('status', 'completed').maybeSingle();
@@ -93,7 +100,7 @@ export default handleApi(async (request, response) => {
       retainedEdgeId = String(previous.edge_id);
     }
     const context = await requireActionExecution(client, user.id, body.courseId, body.actionId, retainedEdgeId);
-    const result = await server.rpc('select_edge_action_v2', { p_user_id: user.id, p_course_id: body.courseId, p_action_id: body.actionId, p_selection_key: body.selectionKey, p_action_version: context.action.updated_at, p_binding_version: context.binding?.updated_at ?? null, p_expected_active_run_id: body.expectedActiveRunId ?? null, p_repeat_run_id: body.repeatRunId ?? null });
+    const result = await server.rpc('select_route_action_v3', { p_user_id: user.id, p_course_id: body.courseId, p_action_id: body.actionId, p_selection_key: body.selectionKey, p_expected_version_id: body.routeVersionId ?? context.routeVersionId, p_action_version: context.action.updated_at, p_binding_version: context.binding?.updated_at ?? null, p_expected_active_run_id: body.expectedActiveRunId ?? null, p_repeat_run_id: body.repeatRunId ?? null });
     if (result.error) throw new ApiError(409, 'action_selection_changed', '行动或执行条件已变化，请刷新后重新选择。');
     json(response, 200, { run: result.data }); return;
   }
@@ -102,11 +109,13 @@ export default handleApi(async (request, response) => {
     const run = dataOrThrow(found.data, found.error, 'Owned action run');
     if (!run) throw new ApiError(404, 'run_not_found', '执行记录不存在。');
     await requirePublishedCourse(client, run.course_id);
+    let expectedVersionId = body.routeVersionId ?? null;
     if (body.operation === 'start' && ['selected', 'in_progress'].includes(run.status)) {
       const context = await requireActionExecution(client, user.id, run.course_id, run.action_id, run.status === 'in_progress' || run.execution_snapshot.repeatedFromRunId ? run.edge_id : undefined);
+      expectedVersionId = body.routeVersionId ?? context.routeVersionId;
       if (context.microPathId !== run.micro_path_id) throw new ApiError(409, 'micro_path_changed', '微学习内容已变化，请重新选择行动。');
     }
-    const result = await server.rpc('transition_edge_action_run_v2', { p_user_id: user.id, p_run_id: run.id, p_operation: body.operation });
+    const result = await server.rpc('transition_route_action_v3', { p_user_id: user.id, p_run_id: run.id, p_operation: body.operation, p_expected_version_id: expectedVersionId });
     if (result.error) throw new ApiError(result.error.code === 'P0002' ? 404 : 409, 'action_transition_rejected', '执行状态、资源或结果资料已变化，请刷新后检查。');
     json(response, 200, { run: result.data }); return;
   }

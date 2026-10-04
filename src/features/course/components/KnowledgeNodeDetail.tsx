@@ -1,3 +1,4 @@
+import type { RouteExecutionStep } from '@/shared/learning/routeExecution';
 import { EduFlowAssistant } from '@/features/assistant/components/EduFlowAssistant';
 import type { AssistantContext } from '@/features/assistant/assistantContext';
 import { ActionRunHistory } from '@/features/actions/ActionRunHistory';
@@ -14,14 +15,14 @@ import { buildMaterialDeepLink, resolveKnowledgeMaterialEntry } from '@/features
 import { Link } from 'react-router-dom';
 
 export const knowledgeStateLabel = { explore: '尚未具备', learning: '学习中', learned: '已学会', practicing: '实践中', mastered: '已掌握' };
-export function KnowledgeNodeDetail({ node, courseNode, runtime, graph, knowledge, relations, context, actions, onSelect, initialEdgeId, learningPath, assistantIdentity, routeVersionId }: {
-  assistantIdentity?: Pick<AssistantContext, "userRole" | "capabilities">; routeVersionId?: string;
+export function KnowledgeNodeDetail({ node, courseNode, runtime, graph, knowledge, relations, context, actions, onSelect, initialEdgeId, learningPath, assistantIdentity, routeVersionId,routeSteps,onAdjustRoute }: {
+  routeSteps?:RouteExecutionStep[];onAdjustRoute?():void;assistantIdentity?: Pick<AssistantContext, "userRole" | "capabilities">; routeVersionId?: string;
   learningPath?: { id: string; title: string }; initialEdgeId?: string | null; node: KnowledgeNode; courseNode?: CourseSkillTreeNode | null; runtime: CourseRuntimeData; graph: KnowledgeGraph;
   knowledge: UserKnowledgeRecord[]; relations: readonly CapabilityRelation[];
   context: 'skill-tree' | 'personal-route' | 'project-capability'; actions: ReturnType<typeof useEdgeActions>; onSelect(id: string): void;
 }) {
   const [expandedEdge, setExpandedEdge] = useState<string | null>(initialEdgeId ?? null);
-  const [focusedAction, setFocusedAction] = useState<string | null>(null);
+  const [focusedAction, setFocusedAction] = useState<string | null>(context==='personal-route'?routeSteps?.find(step=>step.edgeId===initialEdgeId)?.actionId??null:null);
   const title = (id: string) => graph.nodes.find(item => item.id === id)?.title ?? id;
   const current = knowledge.find(record => record.nodeId === node.id);
   const acquired = new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId));
@@ -33,12 +34,14 @@ export function KnowledgeNodeDetail({ node, courseNode, runtime, graph, knowledg
   return <div className="knowledge-node-detail" data-context={context}>
     {assistantIdentity ? <EduFlowAssistant context={{...assistantIdentity, workspace:'courses', experienceMode:'learn', presentation:context, courseId:runtime.course.id, knowledgeId:node.id, edgeId:activeEdge?.id, actionId:activeAction?.id, ...(context === 'personal-route' ? {routeVersionId} : {})}} contextLabel={activeEdge ? `${node.title} → ${title(activeEdge.target)}` : node.title} drawerOpen /> : null}
     <section className="atlas-drawer-section"><h3>当前能力</h3><strong>{knowledgeStateLabel[current?.status ?? 'explore']}</strong><p>{node.description}</p>{node.masteryCriteria.length ? <details><summary>能力要求</summary><ul>{node.masteryCriteria.map(item => <li key={item}>{item}</li>)}</ul></details> : null}</section>
-    {learningPath ? <section className="atlas-drawer-section"><h3>已有学习内容</h3><p>{learningPath.title}</p><Link className="atlas-secondary" to={`/learn/micro/${encodeURIComponent(node.id)}?courseId=${encodeURIComponent(runtime.course.id)}&pathId=${encodeURIComponent(learningPath.id)}`}>打开这份学习内容</Link><small>学习前置条件仍由正式路线核验。</small></section> : null}
+    {learningPath && context!=='personal-route' ? <section className="atlas-drawer-section"><h3>已有学习内容</h3><p>{learningPath.title}</p><Link className="atlas-secondary" to={`/learn/micro/${encodeURIComponent(node.id)}?courseId=${encodeURIComponent(runtime.course.id)}&pathId=${encodeURIComponent(learningPath.id)}`}>打开这份学习内容</Link><small>学习前置条件仍由正式路线核验。</small></section> : null}
     <section className="atlas-drawer-section"><h3>{context === 'personal-route' ? '沿当前路线继续' : '从这里出发'}</h3>
       {!outgoing.length ? <p>当前范围没有从此能力出发的关系。</p> : outgoing.map(edge => {
-        const alternatives = actionAlternatives(runtime.course.id, edge, actions, acquired);
-        return <div key={edge.id} className="knowledge-relation-card"><button className="atlas-secondary" aria-expanded={expandedEdge === edge.id} onClick={() => { setExpandedEdge(expandedEdge === edge.id ? null : edge.id); setFocusedAction(alternatives[0]?.action.id ?? null); }}><span>{node.title} → {title(edge.target)}</span><small>{relationLabel(edge)} · {alternatives.length} 个行动方案</small></button>
-          {expandedEdge === edge.id ? <EdgeActionPanel embedded alternatives={alternatives} title={title(edge.target)} control={actions} courseId={runtime.course.id} focusedId={focusedAction} onFocus={setFocusedAction} /> : null}
+        const chosen=routeSteps?.find(step=>step.edgeId===edge.id)?.actionId;
+        const all=actionAlternatives(runtime.course.id, edge, actions, acquired);
+        const alternatives=context==='personal-route'?all.filter(item=>item.action.id===chosen):all;
+        return <div key={edge.id} className="knowledge-relation-card"><button className="atlas-secondary" aria-expanded={expandedEdge === edge.id} onClick={() => { setExpandedEdge(expandedEdge === edge.id ? null : edge.id); setFocusedAction(alternatives[0]?.action.id ?? null); }}><span>{node.title} → {title(edge.target)}</span><small>{relationLabel(edge)} · {context==='personal-route'?'正式已选行动':`${alternatives.length} 个行动方案`}</small></button>
+          {expandedEdge === edge.id ? <EdgeActionPanel embedded formalChoice={context==='personal-route'} routeVersionId={routeVersionId} planningOnly={context!=='personal-route'} onAdjust={onAdjustRoute} alternatives={alternatives} title={title(edge.target)} control={actions} courseId={runtime.course.id} focusedId={focusedAction} onFocus={setFocusedAction} /> : null}
         </div>;
       })}
     </section>

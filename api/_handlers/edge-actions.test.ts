@@ -32,7 +32,7 @@ beforeEach(() => {
       { id: 'unrelated', source: 'other', target: 'source', strength: 'soft' },
     ],
   } });
-  mocks.active.mockResolvedValue({ constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
+  mocks.active.mockResolvedValue({ snapshot: {}, constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
   mocks.micro.mockResolvedValue([]);
 });
 

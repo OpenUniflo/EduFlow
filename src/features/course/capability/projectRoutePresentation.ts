@@ -1,6 +1,7 @@
+import { executionRelations,type RouteExecutionStep } from '@/shared/learning/routeExecution';
 import type { KnowledgeGraph } from '@/features/knowledge/types';
 import type { CapabilityRelation, SelectedRoute } from '@/shared/learning/routePlanning';
-import { routeRelations, type RouteOverlay, type RouteOverlayState } from '@/shared/learning/routePresentation';
+import { type RouteOverlay, type RouteOverlayState } from '@/shared/learning/routePresentation';
 
 /** Structural range only. Acquired state and route edits must never alter force input. */
 export function projectStructuralGraph(graph: KnowledgeGraph, targetIds: readonly string[]): KnowledgeGraph {
@@ -23,16 +24,16 @@ export function projectStructuralGraph(graph: KnowledgeGraph, targetIds: readonl
 }
 
 /** Snapshot prerequisites are authoritative; enables come from real structural facts. */
-export function projectRouteOverlay(graph: KnowledgeGraph, current: SelectedRoute | null, preview: SelectedRoute | null): RouteOverlay {
+export function projectRouteOverlay(graph: KnowledgeGraph, current: (SelectedRoute & {executionSteps?:RouteExecutionStep[]}) | null, preview: (SelectedRoute & {executionSteps?:RouteExecutionStep[]}) | null): RouteOverlay {
   const facts: CapabilityRelation[] = graph.edges.flatMap<CapabilityRelation>(edge => edge.relation === 'prerequisite' ? [edge]
     : edge.relation === 'enables' ? [{ ...edge, relation: 'enables' }] : []);
   const byId = new Map(facts.map(edge => [edge.id, edge]));
   const nodeIds = new Set(graph.nodes.map(node => node.id));
-  const edgesFor = (route: SelectedRoute | null) => new Set(route ? routeRelations(route, facts).filter(edge => {
+  const edgesFor = (route: (SelectedRoute & {executionSteps?:RouteExecutionStep[]}) | null) => new Set(route ? executionRelations(route, facts).filter(edge => {
     const fact = byId.get(edge.id);
     return fact?.source === edge.source && fact.target === edge.target && fact.relation === edge.relation;
   }).map(edge => edge.id) : []);
-  const nodesFor = (route: SelectedRoute | null) => new Set(route?.selectedNodeIds.filter(id => nodeIds.has(id)) ?? []);
+  const nodesFor = (route: (SelectedRoute & {executionSteps?:RouteExecutionStep[]}) | null) => new Set(route?.selectedNodeIds.filter(id => nodeIds.has(id)) ?? []);
   const diff = (before: Set<string>, after: Set<string>) => [...new Set([...before, ...after])].sort().map(id => ({
     id, state: (!preview ? 'current' : before.has(id) ? after.has(id) ? 'kept' : 'removed' : 'added') as RouteOverlayState,
   }));

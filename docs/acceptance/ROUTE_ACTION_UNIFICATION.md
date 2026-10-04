@@ -2,6 +2,14 @@
 
 2026-10-04. This is an execution record, not a completion claim.
 
+## Incremental contract revision — 2026-10-04
+
+此前 31 PASS / 2 FAIL 属于上一版产品契约的阶段结果；本轮新产品契约增加了新的验收要求，因此需要重新完成最终验收。
+
+Baseline: `8a9c1dc2f9a740d9a558bab717f97443534a3cf2`, clean required branch, no remote divergence, exact READY https://edu-flow-c8ch7fre5-july-nanas-projects.vercel.app, 60 Hosted migrations. Preserve factual graph, execution/evidence/state/RLS authority and existing Assistant/Evidence surfaces. Revise immutable Route snapshot to Edge + selected Action + order; restore the historical sequential Course Path; make Project the full planner; unify Project factual line styles, remove default Route rings and add directional Current/Preview pulses. Existing JSON snapshot can hold reference-only executionSteps without new columns; backend validation and explicit adoption remain necessary. Historical snapshots remain readable and do not receive silently persisted choices. Risks: incomplete legacy routes, stale Action resources and presentation accidentally triggering graph/camera lifecycle.
+
+Stage success gates: (1) versioned choices/legacy read/preview-only/action-only adopt tests; (2) sequential formal-Step UI and exact Navigator execution; (3) stable directional Project pulses plus planning UI; (4) two-account complete executable fixture and read-only integrity report; (5) all 45 criteria, latest READY browser desktop/narrow, reviewers, tests/audits/advisors and final artifacts. Historical embedding success under current v18 configuration is retained in `final-quality-controls.json`; intermittent external timeout is now a known limitation and does not block this goal.
+
 ## Latest checkpoint — 2026-10-04 14:47 UTC
 
 Implementation HEAD `d06b0b9dafabcc170913b5d5f331674a2d1e8bd0` is READY at https://edu-flow-m4upxj1ka-july-nanas-projects.vercel.app. The status below supersedes historical pending statements, which remain as the phase-by-phase audit trail. **Whole-goal acceptance is not complete.**
@@ -239,3 +247,14 @@ Fresh enterprise zero-supply-state UI shows inspectable alternatives and disable
 Fresh af9a985 negative gate now returns **422 target_prerequisite_required**, with no selected run and no source UKS (Hosted read). Enterprise Path DOM resolves **15/15 factual edges: 11 prerequisite, 4 enables**, saved in `final-fresh-route-dom.json`. Narrow candidate/confirmation disclosure screenshots passed independent UI review and actual pointer hit testing. Assistant Skill Tree/Assignment labels and presentation match their foreground objects. No unrelated graph/code changes were needed.
 
 v17 same-source Run `0517d634-c26a-4abb-9f9a-41fe20c8caf0` failed at the final independent-verification request after 272.63s; full earlier batches succeeded. Smaller requests alone did not resolve intermittent reasoning truncation. Official [DeepSeek effort documentation](https://api-docs.deepseek.com/guides/thinking_mode/) confirms enabled thinking defaults to high and accepts low/high/max. v18 explicitly requests low effort for Evidence only, retaining thinking, full source context, all semantic rules and independent verification. The adapter records **requestedReasoningEffort**, not an assertion that the provider honored it; callers omitting effort keep existing behavior. This can change model judgment quality and is not claimed as a pure performance optimization. Data review requires same-source repeats plus plan-only and wrong-calculation negative controls before acceptance. Fixtures are labelled synthetic; no negative proposal will be confirmed. Full suite **115 / 831 PASS**, lint/build PASS; metadata follow-up 11 focused checks/build PASS. Live quality and final confirmation remain pending.
+
+## 新契约实施检查点 · 2026-10-05
+
+此记录是阶段证据，不代表 45 项最终完成；新的 Hosted 浏览器验收尚待进行。
+
+- 新版 `executionSteps` 只保存真实 Edge、Action、两端与顺序引用。Course 使用 Git 历史中的纵向执行路径；Project 负责完整选择与 Preview。节点修改与 Action-only 编辑通过显式 `scopeMode` 保持 Preview/Adopt 一致。
+- 自动测试 117 文件 / 865 项通过；typecheck、lint、Knowledge audit、client secret audit 通过。真实本地数据库 47 项事务校验通过，包括并发采用/首次启动冲突、幂等重试、合法重复、criterion→route→run 锁顺序。
+- 四位 Reviewer 已独立复审修复；未发现剩余代码层阻塞。实际 Hosted 动画、桌面与窄屏尚未标 PASS。
+- Hosted migration 新增 `20261004162208_route_selected_action_execution.sql`，共 61 项。只新增服务端可调用的 invoker RPC 包装，原字段、旧 RPC、旧 snapshot 继续兼容。authenticated/anon 无新函数执行权限。Security Advisor 基线未变：5 项服务端表无客户端策略 INFO；既有 can_read_course 执行权限及密码保护 WARN，无新增高危项。
+- 企业项目补充 13 Micro / 39 教学步骤、18 Assignment（16 trace、2旧记录类 answer），49 新 Action。现有 3 Action 定义和所有历史 Run 保留，仅对双 NULL 绑定补充对应 executor。23 条真实关系都有至少 2 Action；关键关系有 3/4/5 方案；合计 52 active Actions，24 Micro / 28 Practice，缺 Action / 无 executor 均 0。
+- 已授权的普通/admin 账号分别注入现有 A/B 的 6/7 项受控 UKS，明确 acceptance-baseline 标记并保留冲突状态；它们不是测评结论。KnowledgeNode/KnowledgeEdge 全表哈希前后不变。实际资源与引用统计见 `ENTERPRISE_ROUTE_ACTION_V3_DATA.json`。两个新正式路线仍须通过真实 Preview/Adopt 验收。

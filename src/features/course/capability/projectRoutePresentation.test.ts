@@ -64,4 +64,14 @@ describe('Project stable structure and route overlays', () => {
     expect(projectRouteOverlay(graph, null, route([target]))).toEqual({ preview: true, nodes: [{ id: target, state: 'added' }], edges: [] });
     expect(projectRouteOverlay(graph, null, null)).toEqual({ preview: false, nodes: [], edges: [] });
   });
+  it('new snapshot overlays use exact chosen Edge membership and preserve Action-only topology',()=>{
+    const graph=projectStructuralGraph(input,[target]);
+    const baseline={...route(['root',target]),executionSteps:[{edgeId:`root>${target}`,actionId:'micro',sourceNodeId:'root',targetNodeId:target,order:0}]};
+    const preview={...baseline,executionSteps:[{...baseline.executionSteps[0],actionId:'practice'}]};
+    const original=structuredClone(graph);
+    expect(projectRouteOverlay(graph,baseline,preview).edges).toEqual([{id:`root>${target}`,state:'kept'}]);
+    expect(graph).toEqual(original);
+    expect(projectRouteOverlay(graph,{...baseline,executionSteps:[]},null).edges).toEqual([]);
+  });
+
 });

@@ -1,16 +1,24 @@
 .project-capability { --project-detail-top:208px; position: absolute; inset: 0; }
-.atlas-route-overlay { --route-current: #6366b8; --route-added: #087f8c; --route-removed: #a66651; }
-.atlas-route-overlay .route-overlay-current, .atlas-route-overlay .route-overlay-kept { stroke: var(--route-current); opacity: .72; }
-.atlas-route-overlay .route-overlay-context { stroke: #8392a8; opacity: .35; }
-.atlas-route-overlay .route-overlay-added { stroke: var(--route-added); animation: route-added-appear 320ms ease-out both; }
-.atlas-route-overlay .route-overlay-removed { stroke: var(--route-removed); opacity: .52; }
-@keyframes route-added-appear { from { opacity: 0; } to { opacity: .9; } }
+.atlas-route-overlay { --route-current: #6867bc; --route-preview: #087f8c; --route-removed: #a66651; }
+.atlas-route-overlay .route-overlay-current { stroke: var(--route-current); opacity: .8; }
+.atlas-route-overlay .route-overlay-kept,.atlas-route-overlay .route-overlay-added { stroke: var(--route-preview); opacity: .92; }
+.atlas-route-overlay .route-overlay-context { stroke: #8392a8; opacity: .3; }
+.atlas-route-overlay .route-overlay-removed { stroke: var(--route-current); opacity: .22; }
+.atlas-route-overlay .route-fact-line { fill: none; }
+.atlas-route-overlay .route-current-baseline { stroke: var(--route-current); opacity: .3; }
+.atlas-route-overlay .route-directional-pulse { stroke-dasharray: 9 91; animation: route-forward-flow 2400ms linear infinite; }
+.atlas-route-overlay .route-overlay-kept .route-directional-pulse,.atlas-route-overlay .route-overlay-added .route-directional-pulse { animation-duration: 2000ms; }
+.atlas-route-overlay .route-overlay-added .route-fact-line { stroke-width: 3.5; }
+.atlas-route-overlay .route-overlay-kept .route-fact-line { stroke-width: 2.5; }
+@keyframes route-forward-flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+.atlas-route-overlay.reduced-motion .route-directional-pulse { display: none; animation: none; }
+@media(prefers-reduced-motion:reduce) { .atlas-route-overlay .route-directional-pulse { display: none; animation: none; } }
 .atlas-edge-hint { position: absolute; top: 0; left: 0; pointer-events: none; padding: 8px 12px; border: 1px solid var(--border-subtle, #dbe3ee); border-radius: 10px; background: var(--surface-raised, #fff); color: var(--text-primary, #334155); font-size: 12px; white-space: nowrap; }
 .project-route-legend { position: absolute; bottom: 180px; left: 24px; display: flex; flex-wrap: wrap; gap: 8px 14px; max-width: 330px; padding: 12px 16px; border-radius: 14px; font-size: 12px; pointer-events: none; }
 .project-route-legend strong, .project-route-legend small { width: 100%; }
-.route-key-kept { color: #6366b8; }
+.route-key-kept { color: #087f8c; }
 .route-key-added { color: #087f8c; }
-.route-key-removed { color: #a66651; }
+.route-key-removed { color: #7f7ea6; }
 .project-relations-list { position: absolute; z-index: 4; right: 96px; bottom: 26px; max-width: 330px; max-height: 35vh; overflow: auto; padding: 12px 16px; border-radius: 14px; font-size: 12px; }
 .project-relations-list summary { cursor: pointer; }
 .project-relations-list button { display: grid; width: 100%; text-align: left; gap: 5px; margin-top: 8px; }
