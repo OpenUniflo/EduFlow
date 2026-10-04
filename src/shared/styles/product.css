@@ -6999,7 +6999,7 @@ body:has(.micro-learning-page) { min-width: 0; overflow: auto; }
 .navigator-practice-detail p,.navigator-practice-detail li { font-size: 14px; line-height: 1.8; }
 @media (max-width: 900px) {
   .course-navigator { padding: 0 20px 80px; }
-  .navigator-columns { grid-template-columns: 1fr; gap: 24px; max-width: 620px; padding-top: 148px; }
+  .navigator-columns { grid-template-columns: 1fr; gap: 24px; max-width: 620px; padding-top: 178px; }
   .navigator-queue { position: static; }
   .navigator-path-heading { margin-bottom: 28px; }
   .navigator-next h2 { font-size: 22px; }

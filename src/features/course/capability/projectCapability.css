@@ -20,7 +20,6 @@
 @media (max-width: 760px) {
   .atlas-graph-page .atlas-skill-course-island { grid-template-columns: minmax(0,1fr) auto; gap: 6px; }
   .atlas-graph-page .atlas-skill-course-island .atlas-skill-header-actions { justify-content: flex-start; }
-  .atlas-graph-page .course-navigator { padding-top: 170px; }
   .project-capability-info { top: 176px; width: 200px; max-height: 40vh; padding: 14px; }
   .project-capability-detail { top: auto; bottom: 76px; left: 12px; right: 12px; width: auto; max-height: 32vh; padding: 18px; }
   .project-capability-controls { left: auto; right: 18px; }
