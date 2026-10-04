@@ -93,3 +93,5 @@
   .project-capability-toolbar { flex-wrap: wrap; }
   .project-capability-goal { order: 3; max-width: min(460px, calc(100vw - 56px)); }
 }
+
+.project-capability-editor .project-route-legend { position: static; margin-bottom: 12px; padding: 0 0 12px; border: 0; border-bottom: 1px solid #dbe3ee; border-radius: 0; background: none; box-shadow: none; }
