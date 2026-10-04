@@ -8,9 +8,10 @@ vi.mock('../_lib/edgeActionRuns.js', () => ({ availableMicroPaths: mocks.micro, 
 import handler from './edge-actions';
 
 type Row = Record<string, unknown>;
+let tables: Record<string, Row[]>;
 beforeEach(() => {
   vi.resetAllMocks();
-  const tables: Record<string, Row[]> = {
+  tables = {
     knowledge_edge_actions: ['retained', 'unrelated', 'invented'].map(edge_id => ({ id: `${edge_id}-action`, edge_id, status: 'active', type: 'micro_learning' })),
   };
   const client = { from(table: string) {
@@ -42,4 +43,13 @@ it('returns an explicitly retained acquired route edge without history, but excl
   expect(status).toBe(200);
   expect(body?.actions.map(action => action.id)).toEqual(['retained-action']);
   expect(body?.availableActionIds).toEqual([]);
+});
+
+it('advertises a bound Micro on a formal acquired Bridge edge without completed history', async () => {
+  tables.course_action_bindings = [{ course_id: 'course', action_id: 'retained-action', available: true, micro_path_id: 'bound' }];
+  mocks.micro.mockResolvedValue([{ id: 'bound', knowledge_id: 'target' }]);
+  let body: { availableMicroActionIds: string[] } | undefined;
+  const response = { status() { return response; }, json(value: typeof body) { body = value; }, setHeader() {} };
+  await handler({ method: 'GET', query: { courseId: 'course' }, headers: {} } as unknown as VercelRequest, response as unknown as VercelResponse);
+  expect(body?.availableMicroActionIds).toEqual(['retained-action']);
 });

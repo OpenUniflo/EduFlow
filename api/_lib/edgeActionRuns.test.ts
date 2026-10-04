@@ -64,8 +64,24 @@ describe('explicit Action execution authority', () => {
   });
   it('can repeat a real historical edge after acquired capability prunes the candidate model', async () => {
     input.currentNodeIds = ['source', 'target'];
-    await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'action_outside_project' });
+    await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'action_outside_route' });
     expect((await requireActionExecution(client, 'learner', 'course', 'action', 'edge')).microPathId).toBe('second-path');
+  });
+  it('starts a first bound Action on an explicitly included acquired Bridge relation', async () => {
+    input.currentNodeIds = ['source', 'target'];
+    mocks.version.mockResolvedValue({ constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
+    expect((await requireActionExecution(client, 'learner', 'course', 'action')).microPathId).toBe('second-path');
+  });
+  it('rejects a new route Action when its source is missing, including non-gating relations', async () => {
+    input.currentNodeIds = [];
+    input.courseOrder = [{ nodeId: 'source', lessonOrder: 0, coverageOrder: 0 }, ...input.courseOrder];
+    input.prerequisiteEdges = [];
+    input.enablesEdges = [{ id: 'edge', source: 'source', target: 'target', relation: 'enables', strength: 1 }];
+    await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'action_conditions_unmet' });
+  });
+  it('retains target hard gates for a new formally selected relation', async () => {
+    input.prerequisiteEdges = [...input.prerequisiteEdges, { id: 'other-hard', source: 'other', target: 'target', strength: 'hard' }];
+    await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'target_prerequisite_required' });
   });
   it('does not repeat a retained Practice through an explicitly excluded capability', async () => {
     tables.knowledge_edge_actions[0].type = 'practice_task';

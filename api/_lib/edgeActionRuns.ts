@@ -3,7 +3,8 @@ import { ApiError } from './http.js';
 import { allRows, dataOrThrow } from './query.js';
 import { requirePublishedCourse, requireMicroTeachingEligibility } from './courseMembership.js';
 import { readActiveVersion, readRouteInput } from './routePlanning.js';
-import { buildCapabilityModel, planCourseRoute } from '../../src/shared/learning/routePlanning.js';
+import { planCourseRoute } from '../../src/shared/learning/routePlanning.js';
+import { routeRelations } from '../../src/shared/learning/routePresentation.js';
 import { hasUnmetHardPrerequisite } from '../../src/shared/learning/teachingPrerequisites.js';
 import { evaluateAction, type EdgeAction, type CourseActionBinding, type ActionRun } from '../../src/features/actions/model.js';
 import { readAssignmentEligibility } from './assignmentEligibility.js';
@@ -20,16 +21,14 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
   const action = dataOrThrow(actionResult.data, actionResult.error, 'Execution action') as EdgeAction & { updated_at: string } | null;
   if (!action) throw new ApiError(404, 'action_unavailable', '行动不可用。');
   const binding = dataOrThrow(bindingResult.data, bindingResult.error, 'Execution binding') as CourseActionBinding & { updated_at: string } | null;
-  const edges = retainedEdgeId === action.edge_id
-    ? [...routeData.input.prerequisiteEdges.map(edge => ({ ...edge, relation: 'prerequisite' as const })), ...(routeData.input.enablesEdges ?? [])]
-    : buildCapabilityModel(routeData.input).supportEdges;
+  const edges = [...routeData.input.prerequisiteEdges.map(edge => ({ ...edge, relation: 'prerequisite' as const })), ...(routeData.input.enablesEdges ?? [])];
   const edge = edges.find(edge => edge.id === action.edge_id && routeData.input.nodeIds.includes(edge.source) && routeData.input.nodeIds.includes(edge.target));
   if (!edge) throw new ApiError(422, 'action_outside_project', '该行动当前不在项目的真实能力关系中。');
   const version = await readActiveVersion(client, userId, courseId);
   if (version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target)) throw new ApiError(422, 'action_excluded', '该关系的能力已从当前路线明确排除，请先调整路线。');
   if (!retainedEdgeId) {
     const plan = version ? planCourseRoute(routeData.input, version.constraints) : null;
-    if (!plan?.valid || !plan.route.selectedNodeIds.includes(edge.source) || !plan.route.selectedNodeIds.includes(edge.target)) throw new ApiError(422, 'action_outside_route', '请先在个人路线中选择这条真实关系，再开始行动。');
+    if (!plan?.valid || !routeRelations(plan.route, edges).some(relation => relation.id === edge.id)) throw new ApiError(422, 'action_outside_route', '请先在个人路线中选择这条真实关系，再开始行动。');
   }
   if (hasUnmetHardPrerequisite(edge.target, new Set(routeData.input.currentNodeIds), routeData.input.prerequisiteEdges)) throw new ApiError(422, 'target_prerequisite_required', '请先形成目标能力的必要前置。');
   const cost = evaluateAction(action, { sourceId: edge.source, acquiredIds: new Set(routeData.input.currentNodeIds), binding: binding ?? undefined });

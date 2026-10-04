@@ -98,12 +98,12 @@ describe('personal evidence discovery boundary',()=>{
   const units=Array.from({length:5},(_,index)=>({...unit,capability:String(index)}));
   const generateJson=vi.fn(async input=>{
    if(input.stage==='extraction')return {value:{units},metadata:{stage:'extraction'}};
-   if(input.schemaVersion==='evidence-factual-verification-v3'){expect(JSON.parse(input.user).candidates.length).toBeLessThanOrEqual(5);return {value:{verdicts:Object.fromEntries(JSON.parse(input.user).candidates.map((match:{nodeId:string})=>[match.nodeId,{definitionScopePreserved:true,verdict:'supported',reason:'checked'}]))},metadata:{stage:'admission'}};}
+   if(input.schemaVersion==='evidence-factual-verification-v3'){expect(JSON.parse(input.user).candidates.length).toBeLessThanOrEqual(2);return {value:{verdicts:Object.fromEntries(JSON.parse(input.user).candidates.map((match:{nodeId:string})=>[match.nodeId,{definitionScopePreserved:true,verdict:'supported',reason:'checked'}]))},metadata:{stage:'admission'}};}
    const {groups}=JSON.parse(input.user);expect(Object.keys(groups).length).toBeLessThanOrEqual(5);expect(JSON.parse(input.user).sources).toEqual([source]);
    return {value:{judgments:Object.fromEntries(Object.entries(groups).map(([id,g])=>[id,{...partial,unitIndexes:(g as {unitIndexes:number[]}).unitIndexes}]))},metadata:{stage:'admission'}};
   });
   const result=await diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async text=>Array.from({length:5},(_,index)=>({...node,node_id:text+'-'+index})));
-  expect(generateJson).toHaveBeenCalledTimes(11);expect(result.matches).toHaveLength(25);
+  expect(generateJson).toHaveBeenCalledTimes(19);expect(result.matches).toHaveLength(25);
   expect(result.matches.every(match=>match.nodeId!==null)).toBe(true);
  });
  it('bounds fourteen judgments as 5/5/4 without splitting a node shared across sources',async()=>{
@@ -180,4 +180,28 @@ describe('personal evidence discovery boundary',()=>{
   expect(failed).toHaveBeenCalledTimes(2);
  });
 
+});
+
+it.each([false,true])('bounds parallel verification and settles failures before returning (failure=%s)',async fail=>{
+ const nodes=Array.from({length:5},(_,index)=>({...node,node_id:`node-${index}`}));
+ let active=0;let peak=0;const completed:string[]=[];
+ const generateJson=vi.fn(async input=>{
+  if(input.stage==='extraction')return {value:{units:[unit]},metadata:{stage:'extraction'}};
+  if(input.schemaVersion!=='evidence-factual-verification-v3')return {value:{judgments:Object.fromEntries(nodes.map(n=>[n.node_id,partial]))},metadata:{stage:'admission'}};
+  const context=JSON.parse(input.user) as {sources:unknown;candidates:{nodeId:string}[]};
+  expect(context.sources).toEqual([source]);expect(context.candidates.length).toBeLessThanOrEqual(2);
+  active++;peak=Math.max(peak,active);const first=context.candidates[0].nodeId;
+  await new Promise(resolve=>setTimeout(resolve,first==='node-0'?10:1));
+  active--;completed.push(first);
+  if(fail&&first==='node-2')throw new Error('verification provider failed');
+  return {value:{verdicts:Object.fromEntries(context.candidates.map(n=>[n.nodeId,{definitionScopePreserved:true,verdict:'supported',reason:'checked'}]))},metadata:{stage:'admission'}};
+ });
+ const pending=diagnoseEvidence([source],{generateJson} as unknown as StructuredGenerationClient,async()=>nodes);
+ if(fail)await expect(pending).rejects.toThrow('verification provider failed');
+ else {
+  const result=await pending;
+  expect((result.artifacts.verifications as {nodeIds:string[]}[]).map(v=>v.nodeIds)).toEqual([['node-0','node-1'],['node-2','node-3'],['node-4']]);
+  expect(result.matches.map(m=>m.nodeId)).toEqual(nodes.map(n=>n.node_id));
+ }
+ expect(peak).toBe(2);expect(active).toBe(0);expect(completed.slice(0,2)).toEqual(['node-2','node-0']);
 });

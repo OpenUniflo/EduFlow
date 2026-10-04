@@ -33,12 +33,12 @@ export default handleApi(async (request, response) => {
       readActiveVersion(client, user.id, courseId),
     ]);
     const modelEdges = buildCapabilityModel(routeData.input).supportEdges;
-    const modelEdgeIds = new Set(modelEdges.map(edge => edge.id));
     const courseNodes = new Set(routeData.input.courseOrder.map(item => item.nodeId));
     const courseEdges = [...routeData.input.prerequisiteEdges, ...(routeData.input.enablesEdges ?? [])].filter(edge => courseNodes.has(edge.source) && courseNodes.has(edge.target));
     const plan = planCourseRoute(routeData.input, version?.constraints ?? defaultConstraints);
     const facts = [...routeData.input.prerequisiteEdges.map(edge => ({ ...edge, relation: 'prerequisite' as const })), ...(routeData.input.enablesEdges ?? [])];
     const routeEdges = plan.valid ? routeRelations(plan.route, facts) : [];
+    const routeEdgeIds = new Set(routeEdges.map(edge => edge.id));
     const scopedEdges = new Set([...modelEdges.map(edge => edge.id), ...routeEdges.map(edge => edge.id), ...courseEdges.map(edge => edge.id), ...runs.map(run => String(run.edge_id))]);
     const edges = facts.filter(edge => scopedEdges.has(edge.id));
     const [actions, bindings, microPaths, assignments] = await Promise.all([
@@ -53,7 +53,7 @@ export default handleApi(async (request, response) => {
       const edge = edges.find(edge => edge.id === action.edge_id);
       const target = edge?.target ?? '';
       const binding = bindings.find(binding => binding.action_id === action.id);
-      return Boolean(action.type === 'micro_learning' && binding?.available && version && edge && !version.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && plan.valid && (modelEdgeIds.has(edge.id) && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target))
+      return Boolean(action.type === 'micro_learning' && binding?.available && version && edge && !version.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && plan.valid && (routeEdgeIds.has(edge.id) && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target))
         && !hasUnmetHardPrerequisite(target, acquired, plan.route.prerequisiteEdges)
         && microPaths.some(path => path.id === binding.micro_path_id && path.knowledge_id === target));
     }).map(action => action.id);
@@ -61,7 +61,7 @@ export default handleApi(async (request, response) => {
       const binding = bindings.find(binding => binding.action_id === action.id);
       const edge = edges.find(edge => edge.id === action.edge_id);
       const assignment = assignments.find(assignment => assignment.id === binding?.assignment_id);
-      const scopeAvailable = edge && !version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && (completedActions.has(action.id) || modelEdgeIds.has(edge.id) && plan.valid && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(edge.target));
+      const scopeAvailable = edge && !version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && (completedActions.has(action.id) || routeEdgeIds.has(edge.id) && plan.valid && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(edge.target));
       if (!edge || !version || !scopeAvailable || !assignment || assignment.mode === 'workflow' || (assignment.experience as { type?: string } | null)?.type === 'workflow' || !binding?.available || !binding.assignment_id || binding.micro_path_id || hasUnmetHardPrerequisite(edge.target, acquired, routeData.input.prerequisiteEdges)) return null;
       const { coverage, eligibility } = await readAssignmentEligibility(client, user.id, courseId, String(binding.assignment_id), { targetId: edge.target, status: 'not_started' });
       return !eligibility.reason && coverage.some(row => row.node_id === edge.target) ? action.id : null;
