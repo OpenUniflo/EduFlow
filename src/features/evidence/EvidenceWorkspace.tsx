@@ -21,13 +21,14 @@ export function EvidenceWorkspaceProvider({children,onConfirmed,nodeTitle,previe
  const [workspace,setWorkspace]=useState<Workspace|null>(null);
  const [revision,setRevision]=useState(0);const changed=useCallback(()=>setRevision(value=>value+1),[]);
  const dialog=useRef<HTMLDialogElement>(null);const workspaceOpen=useRef(false);workspaceOpen.current=Boolean(workspace);const reduced=useReducedMotion();
- const open=useCallback((courseId?:string,sourceId?:string,runId?:string)=>{setSelection({sourceId,runId});setWorkspace({courseId,sourceId,runId});},[]);
+ const returnFocus=useRef<HTMLElement|null>(null);
+ const open=useCallback((courseId?:string,sourceId?:string,runId?:string)=>{const opener=document.activeElement as HTMLElement|null;returnFocus.current=opener?.closest('[aria-label="EduFlow Assistant"]')?.querySelector<HTMLButtonElement>('[aria-label="打开 EduFlow Assistant"]')??opener;setSelection({sourceId,runId});setWorkspace({courseId,sourceId,runId});},[]);
  const close=useCallback(()=>{setWorkspace(null);changed();},[changed]);
  useEffect(()=>{if(workspace&&!dialog.current?.open)dialog.current?.showModal();},[workspace]);
  const confirmed=async()=>{await onConfirmed();changed();};
  return <EvidenceContext.Provider value={{open,close,confirmed,nodeTitle,preview,revision,changed,surfaceHost:workspace?surfaceHost:null,foreground:workspace?{courseId:workspace.courseId,...selection}:undefined}}>{children}
   <dialog ref={dialog} className="capability-workspace" onCancel={event=>{event.preventDefault();close();}} aria-labelledby="capability-workspace-title">
-   <AnimatePresence onExitComplete={()=>{if(!workspaceOpen.current)dialog.current?.close();}}>{workspace?<motion.div key="workspace" initial={{opacity:0,y:reduced?0:12}} animate={{opacity:1,y:0}} exit={{opacity:0,y:reduced?0:12}} transition={{duration:reduced?0:.24}} className="capability-workspace-content">
+   <AnimatePresence onExitComplete={()=>{if(!workspaceOpen.current){dialog.current?.close();if(returnFocus.current?.isConnected&&!returnFocus.current.closest('[inert]'))returnFocus.current.focus();}}}>{workspace?<motion.div key="workspace" initial={{opacity:0,y:reduced?0:12}} animate={{opacity:1,y:0}} exit={{opacity:0,y:reduced?0:12}} transition={{duration:reduced?0:.24}} className="capability-workspace-content">
     <header className="capability-workspace-header"><div><span className="evidence-eyebrow">个人能力</span><h1 id="capability-workspace-title">更新我的能力</h1><p>从真实资料中检查能力依据，再决定是否更新。</p></div><button className="evidence-icon-button" aria-label="关闭能力更新工作区" onClick={close}><X size={20}/></button></header>
     <CapabilityDiagnosis key={`${workspace.courseId??''}:${workspace.sourceId??''}:${workspace.runId??''}`} workspace={workspace} onContextChange={setSelection}/>
    </motion.div>:null}</AnimatePresence>
