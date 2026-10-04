@@ -1,3 +1,4 @@
+import type { CapabilityRelation } from '@/shared/learning/routePlanning';
 import { ActionRunHistory } from '@/features/actions/ActionRunHistory';
 import { courseActionRecommendation } from './courseActionRecommendation';
 import type { useEdgeActions } from '@/features/actions/EdgeActionPanel';
@@ -21,7 +22,8 @@ const navigationResponse = z.object({
   nextAction: z.object({ kind: z.enum(['skip','remediation','review','practice','next']), resourceKind: z.enum(['micro','material','assignment','course']), nodeId: z.string().optional(), resourceId: z.string().optional(), reason: z.string(), reasonCode: z.string() }),
 });
 
-export function CourseNavigator({ graph, runtime, knowledge, courseState, authenticated, loadNavigation, onSelect, onSignIn, onInspectCapabilities, learningContent, resolveLearningContent, showPolicy = false, actionControl, routeControl }: {
+export function CourseNavigator({ graph, runtime, knowledge, courseState, authenticated, loadNavigation, onSelect, onSignIn, onInspectCapabilities, learningContent, resolveLearningContent, showPolicy = false, actionControl, routeControl, supportEdges, knowledgeTitle }: {
+  supportEdges?: readonly CapabilityRelation[]; knowledgeTitle?(id: string): string | undefined;
   actionControl: ReturnType<typeof useEdgeActions>;
   routeControl: ReturnType<typeof useRoutePlanning>;
   graph: CourseGraphData; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[]; courseState?: UserCourseState;
@@ -56,8 +58,8 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
     const selected = result.decision?.nextAction;
     const exact = selected?.resourceKind === 'micro' && selected.nodeId && selected.resourceId
       ? resolveLearningContent?.(selected.nodeId, selected.resourceId) : undefined;
-    return buildCourseNavigator({ graph, runtime, knowledge, courseState, decision: result.decision, routeView: routeControl.view, learningContent: exact ? [...learningContent, exact] : learningContent });
-  }, [graph, runtime, knowledge, courseState, result.decision, routeControl.view, learningContent, resolveLearningContent]);
+    return buildCourseNavigator({ graph, runtime, knowledge, courseState, decision: result.decision, routeView: routeControl.view, supportEdges, learningContent: exact ? [...learningContent, exact] : learningContent });
+  }, [graph, runtime, knowledge, courseState, result.decision, routeControl.view, supportEdges, learningContent, resolveLearningContent]);
   const recommendation = courseActionRecommendation(runtime.course.id, model.relations, actionControl, new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId)));
   const recommendedTarget = recommendation.kind === 'active' ? recommendation.run.execution_snapshot.targetId : recommendation.kind === 'candidate' ? recommendation.recommended.edge.target : null;
   const pathModel = { ...model, route: model.route.map(item => ({ ...item, state: item.acquired ? 'completed' as const : item.state === 'locked' ? 'locked' as const : item.node.id === recommendedTarget ? 'current' as const : 'available' as const })) };
@@ -84,7 +86,7 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
           {model.pendingPractices.filter(item => item !== next).length > 3 ? <details><summary>查看全部 {model.pendingPractices.length} 项</summary>{model.pendingPractices.filter(item => item !== next).slice(3).map(practiceRow)}</details> : null}
         </>}
       </section>
-      <ActionRunHistory runs={actionControl.runs} control={actionControl} courseId={runtime.course.id} acquiredIds={new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId))} title={id => graph.knowledgeNodes.find(node => node.id === id)?.title ?? routeControl.view?.activeVersion?.snapshot.titles[id] ?? id} visibleEdgeIds={new Set(model.relations.map(edge => edge.id))}/>
+      <ActionRunHistory runs={actionControl.runs} control={actionControl} courseId={runtime.course.id} acquiredIds={new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId))} title={id => knowledgeTitle?.(id) ?? graph.knowledgeNodes.find(node => node.id === id)?.title ?? routeControl.view?.activeVersion?.snapshot.titles[id] ?? id} visibleEdgeIds={new Set(model.relations.map(edge => edge.id))}/>
     </aside>
     {authenticated && (!routeControl.view || routeControl.view.activeVersion?.courseId !== runtime.course.id) ? <p role={routeControl.error ? "alert" : "status"}>{routeControl.error || "正在加载正式个人路线…"}</p> : <CoursePathView model={pathModel} targetOutcome={runtime.course.targetOutcome} onInspectCapabilities={onInspectCapabilities} onSelect={onSelect} />}
     </div>

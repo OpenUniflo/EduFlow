@@ -11,7 +11,7 @@
 .action-branch-unavailable { opacity:.5; }
 @keyframes action-progress-flow { to { stroke-dashoffset:-28; } }
 @keyframes action-selected-pulse { 50% { opacity:.45; } }
-@media (prefers-reduced-motion:reduce) { .action-branch path { animation:none; } }
+@media (prefers-reduced-motion:reduce) { .action-branch path:first-child { animation:none; } }
 
 @media (max-width:760px) { .edge-action-panel { top:auto; bottom:130px; left:12px; right:12px; width:auto; max-height:35vh; } }
 

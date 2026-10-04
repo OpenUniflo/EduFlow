@@ -132,6 +132,14 @@ describe('Course navigator projection', () => {
     expect(result.route.find(item => item.node.id === 'target')).toMatchObject({ state: 'locked', blockedBy: ['Bridge'] });
     expect(result.relations.map(edge => edge.id)).toEqual(['bt']);
   });
+  it('keeps real enables between retained acquired route nodes after candidate pruning', () => {
+    const routeView = { activeVersion: { courseId: runtime.course.id, snapshot: { titles: { bridge: 'Bridge', target: 'Target' } } }, model: { supportEdges: [] }, plan: { valid: true, route: { orderedNodeIds: ['bridge', 'target'], selectedNodeIds: ['bridge', 'target'], prerequisiteEdges: [] } } } as unknown as RoutePlanView;
+    const enabling = { id: 'enable', source: 'bridge', target: 'target', relation: 'enables' as const, strength: .8 };
+    const outside = { ...enabling, id: 'outside', source: 'other' };
+    const result = project({ decision: null, routeView, supportEdges: [outside, enabling], knowledge: [{ nodeId: 'bridge', status: 'learned' }, { nodeId: 'target', status: 'learned' }] });
+    expect(result.relations).toEqual([enabling]);
+    expect(result.route.every(item => item.state !== 'locked')).toBe(true);
+  });
   it('groups chapters without changing server route order', () => {
     const second = { ...graph.knowledgeNodes[0], id: 'next', chapterId: 'chapter-2' };
     const result = project({ graph: { ...graph, knowledgeNodes: [...graph.knowledgeNodes, second], chapters: [...graph.chapters, { ...graph.chapters[0], id: 'chapter-2', title: 'Second chapter' }] }, decision: { ...decision, path: [...decision.path, { nodeId: 'next', title: 'Next', state: 'blocked', blockedBy: [] }] } });

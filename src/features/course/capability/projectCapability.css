@@ -23,7 +23,7 @@
 .project-capability-info { position: absolute; top: 148px; left: 24px; width: 285px; max-height: calc(100vh - 175px); overflow: auto; padding: 20px; border-radius: 20px; }
 .project-capability h2 { font-size: 18px; margin: 0 0 12px; }
 .project-capability p, .project-capability li { font-size: 13px; line-height: 1.7; color: #64748b; }
-.project-capability-legend { position: absolute; z-index: 4; left: 24px; bottom: 26px; display: grid; gap: 8px; font-size: 12px; padding: 14px 18px; border-radius: 16px; pointer-events: none; }
+.project-capability-legend { position: absolute; z-index: 4; left: 24px; bottom: 26px; display: grid; gap: 8px; font-size: 12px; padding: 14px 18px; border-radius: 16px; }
 .project-capability-info > small { font-size: 11px; color: #64748b; }
 .project-capability-search label { display: grid; gap: 8px; margin-top: 16px; font-size: 12px; }
 .project-capability-search input { width: 100%; box-sizing: border-box; padding: 9px; border: 1px solid #dbe3ee; border-radius: 9px; background: #ffffffb3; }
@@ -43,8 +43,10 @@
   .atlas-graph-page .atlas-skill-course-island .atlas-skill-header-actions { justify-content: flex-start; }
   .project-capability-info { top: 176px; width: 200px; max-height: 40vh; padding: 14px; }
   .project-capability-detail { top: auto; bottom: 76px; left: 12px; right: 12px; width: auto; max-height: 32vh; padding: 18px; }
-  .project-capability-controls { left: auto; right: 18px; }
+  .project-capability-controls { left: 12px; right: auto; }
 }
+.project-capability-legend summary { cursor: pointer; }
+.project-capability-legend > div { display: grid; gap: 8px; padding-top: 10px; }
 .project-capability-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .route-planning { margin-top: 16px; border-top: 1px solid #dbe3ee; padding-top: 14px; }
 .route-planning h3, .project-capability-detail h3 { font-size: 13px; margin: 16px 0 8px; }
@@ -70,6 +72,8 @@
 .project-route-entry p { padding: 10px; background: #ffffffed; border-radius: 10px; }
 .project-capability-editor { position: absolute; z-index: 4; top: 204px; left: 24px; width: 285px; padding: 18px; border-radius: 20px; max-height: calc(100vh - 340px); overflow: auto; }
 .project-capability-editor .route-planning { margin-top: 0; padding-top: 0; border: 0; }
+.project-capability-editor .project-capability-search { margin-bottom: 12px; }
+.project-capability-editor .project-capability-search:has(input) { width: auto; }
 .project-capability-detail { top: var(--project-detail-top); width: 280px; max-height: calc(100vh - 300px); }
 .project-capability-empty { position: absolute; top: 45%; left: 35%; padding: 20px; border-radius: 16px; }
 @media (max-width: 900px) { .project-capability { --project-detail-top:226px; } .project-capability-toolbar { top: 170px; left: 12px; right: 12px; } .project-capability-editor { top: 226px; left: 12px; } .project-capability-detail { top: 226px; } }
@@ -77,7 +81,7 @@
   .project-capability-toolbar { top: 176px; }
   .project-capability-editor { top: 232px; width: min(285px, calc(100vw - 60px)); max-height: 35vh; }
   .project-capability-detail { top: auto; bottom: 130px; max-height: 25vh; }
-  .project-capability-legend { left: 12px; bottom: 18px; padding: 12px; }
+  .project-capability-legend { left: 12px; bottom: 86px; padding: 12px; max-width: calc(100vw - 48px); }
   .project-capability-search:has(input) { width: min(240px, calc(100vw - 190px)); }
 }
 

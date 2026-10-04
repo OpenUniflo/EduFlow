@@ -11,8 +11,8 @@ import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequ
 
 export type NavigatorLearningContent = { nodeId: string; pathId: string; estimatedMinutes?: number };
 export type NavigatorState = 'completed' | 'current' | 'available' | 'locked';
-export function buildCourseNavigator({ graph, runtime, knowledge, courseState, decision, routeView, learningContent = [] }: {
-  routeView?: RoutePlanView | null; graph: CourseGraphData; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[];
+export function buildCourseNavigator({ graph, runtime, knowledge, courseState, decision, routeView, supportEdges, learningContent = [] }: {
+  supportEdges?: readonly CapabilityRelation[]; routeView?: RoutePlanView | null; graph: CourseGraphData; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[];
   courseState?: UserCourseState; decision?: NavigationDecision | null; learningContent?: NavigatorLearningContent[];
 }) {
   const validDecision = decision?.courseId === runtime.course.id ? decision : null;
@@ -34,7 +34,7 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
     return existing ? [existing] : [{ node: { id, title: validRouteView?.activeVersion?.snapshot.titles[id] ?? id }, state: 'available' as const, blockedBy: [], navigationState: undefined, bridge: !byId.has(id) }];
   }) : validRouteView && !validRouteView.plan.valid ? [] : source;
   const members = new Set(rawRouteSource.map(item => item.node.id));
-  const relations: CapabilityRelation[] = selectedRoute ? routeRelations(selectedRoute, validRouteView?.model?.supportEdges ?? []) : graph.knowledgeEdges
+  const relations: CapabilityRelation[] = selectedRoute ? routeRelations(selectedRoute, supportEdges ?? validRouteView?.model?.supportEdges ?? []) : graph.knowledgeEdges
     .flatMap((edge): CapabilityRelation[] => edge.relation === 'prerequisite' ? [{ ...edge, relation: 'prerequisite' }] : edge.relation === 'enables' ? [{ ...edge, relation: 'enables' }] : [])
     .filter(edge => members.has(edge.source) && members.has(edge.target)).sort((a, b) => a.id.localeCompare(b.id));
   const fallbackRank = new Map(rawRouteSource.map((item, index) => [item.node.id, index]));
