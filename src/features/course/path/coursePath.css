@@ -1,0 +1,6 @@
+.course-route-canvas { height: min(68vh, 780px); min-height: 420px; border: 1px solid var(--atlas-border); border-radius: 18px; background: var(--atlas-surface, #fff); }
+.route-knowledge { width: 224px; height: 112px; display: flex; flex-direction: column; justify-content: center; gap: 8px; text-align: left; padding: 14px 18px; border: 1px solid var(--atlas-border); border-left: 4px solid var(--route-node-color); border-radius: 14px; background: #fff; color: #172033; cursor: pointer; }
+.route-knowledge.acquired { --route-node-color: #3b82f6; }.route-knowledge.target { --route-node-color: #22c55e; }.route-knowledge.intermediate { --route-node-color: #94a3b8; }
+.route-knowledge small,.route-knowledge span { color: #526176; font-size: 11px; }.route-knowledge strong { font-size: 14px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }.route-knowledge:focus-visible { outline: 3px solid #3b82f6; outline-offset: 3px; }
+.route-relation-legend { display: flex; flex-wrap: wrap; gap: 16px; color: var(--atlas-muted); font-size: 12px; }.route-accessible-relations { margin-top: 16px; font-size: 13px; }.route-accessible-relations li { margin: 8px 0; }.route-accessible-relations button { cursor: pointer; }
+@media(max-width: 700px) { .course-route-canvas { min-height: 440px; height: 62vh; } }

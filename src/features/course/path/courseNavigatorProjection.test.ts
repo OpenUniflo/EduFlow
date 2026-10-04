@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildCourseNavigator, pathX } from './courseNavigatorProjection';
+import { buildCourseNavigator } from './courseNavigatorProjection';
 import { routeOnlyRuntime, routeOnlyKnowledgeGraph } from '../runtime/courseFoundation.fixture';
 import { buildCourseGraphData } from '../runtime/courseRuntime';
 import type { CourseAssignment, UserCourseState } from '../types';
 import type { NavigationDecision } from '@/shared/learning/navigation';
+import type { RoutePlanView } from '@/shared/learning/routeVersion';
 import type { UserKnowledgeRecord } from '@/features/profile/types';
 
 const graph = buildCourseGraphData(routeOnlyRuntime, undefined, routeOnlyKnowledgeGraph, []);
@@ -114,18 +115,27 @@ describe('Course navigator projection', () => {
     expect(project({ decision: null }).nextAction).toBeNull();
     expect(project({ decision: { ...decision, courseId: 'other' } }).nextAction).toBeNull();
   });
+  it('preserves factual fallback edges and rejects another course route view', () => {
+    const second = { ...graph.knowledgeNodes[0], id: 'next' };
+    const edge = { id: 'fact', source: id, target: 'next', relation: 'prerequisite', strength: 'hard', reason: 'Required'  } as typeof graph.knowledgeEdges[number];
+    const fallbackGraph = { ...graph, knowledgeNodes: [...graph.knowledgeNodes, second], knowledgeEdges: [edge] };
+    expect(project({ graph: fallbackGraph, decision: null }).relations).toEqual([edge]);
+    const foreign = { activeVersion: { courseId: 'other' }, plan: { valid: true, route: { orderedNodeIds: ['foreign'] } } } as RoutePlanView;
+    expect(project({ graph: fallbackGraph, decision: null, routeView: foreign }).route.map(item => item.node.id)).not.toContain('foreign');
+  });
+  it('computes new bridge eligibility from formal hard facts while navigation is stale', () => {
+    const routeView = { activeVersion: { courseId: runtime.course.id, snapshot: { titles: { bridge: 'Bridge', target: 'Target' } } }, model: { supportEdges: [] }, plan: { valid: true, route: { orderedNodeIds: ['bridge', 'target'], selectedNodeIds: ['bridge','target'], prerequisiteEdges: [{ id: 'bt', source: 'bridge', target: 'target', strength: 'hard' }] } } } as unknown as RoutePlanView;
+    const result = project({ decision: null, routeView, knowledge: [] });
+    expect(result.route.find(item => item.node.id === 'target')).toMatchObject({ state: 'locked', blockedBy: ['Bridge'] });
+    expect(result.relations.map(edge => edge.id)).toEqual(['bt']);
+  });
   it('groups chapters without changing server route order', () => {
     const second = { ...graph.knowledgeNodes[0], id: 'next', chapterId: 'chapter-2' };
     const result = project({ graph: { ...graph, knowledgeNodes: [...graph.knowledgeNodes, second], chapters: [...graph.chapters, { ...graph.chapters[0], id: 'chapter-2', title: 'Second chapter' }] }, decision: { ...decision, path: [...decision.path, { nodeId: 'next', title: 'Next', state: 'blocked', blockedBy: [] }] } });
     expect(result.sections.map(section => section.title)).toEqual(['Route','Second chapter']);
     expect(result.route.map(item => item.node.id)).toEqual([id,'next']);
   });
-  it('positions identical route indices deterministically inside mobile-safe bounds', () => {
-    const positions = Array.from({ length: 80 }, (_, index) => pathX(index));
-    expect(positions).toEqual(Array.from({ length: 80 }, (_, index) => pathX(index)));
-    expect(positions.slice(0,5)).toEqual([50,68,50,32,50]);
-    expect(positions.every(x => x >= 32 && x <= 68)).toBe(true);
-  });
+
 });
 
 describe('personal route bridge presentation', () => {

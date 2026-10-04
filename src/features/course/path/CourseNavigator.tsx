@@ -9,6 +9,7 @@ import type { UserKnowledgeRecord } from '@/features/profile/types';
 import type { CourseGraphData, CourseRuntimeData } from '../runtime/courseRuntime';
 import type { CourseAssignment, UserCourseState } from '../types';
 import { buildCourseNavigator, type NavigatorLearningContent } from './courseNavigatorProjection';
+import { useRoutePlanning } from '../capability/useRoutePlanning';
 import { CoursePathView } from './CoursePathView';
 
 const navigationResponse = z.object({
@@ -32,6 +33,7 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
   useEffect(() => { if (detail) dialogRef.current?.showModal(); }, [detail]);
   const detailEligibility = detail ? courseAssignmentEligibility(runtime, detail.id, knowledge, courseState) : null;
   const knowledgeKey = JSON.stringify(knowledge.map(item => [item.nodeId, item.status, item.updatedAt]).sort(([a], [b]) => String(a).localeCompare(String(b))));
+  const routeControl = useRoutePlanning(runtime.course.id, authenticated, knowledgeKey);
   // The hydrated course snapshot changes after Micro / Assignment completion.
   useEffect(() => {
     if (!authenticated) { setResult({ loading: false }); return; }
@@ -49,8 +51,8 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
     const selected = result.decision?.nextAction;
     const exact = selected?.resourceKind === 'micro' && selected.nodeId && selected.resourceId
       ? resolveLearningContent?.(selected.nodeId, selected.resourceId) : undefined;
-    return buildCourseNavigator({ graph, runtime, knowledge, courseState, decision: result.decision, learningContent: exact ? [...learningContent, exact] : learningContent });
-  }, [graph, runtime, knowledge, courseState, result.decision, learningContent, resolveLearningContent]);
+    return buildCourseNavigator({ graph, runtime, knowledge, courseState, decision: result.decision, routeView: routeControl.view, learningContent: exact ? [...learningContent, exact] : learningContent });
+  }, [graph, runtime, knowledge, courseState, result.decision, routeControl.view, learningContent, resolveLearningContent]);
   const action = model.nextAction;
   const minutes = action?.estimatedMinutes;
   const next = model.nextPractice;
@@ -72,7 +74,7 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
         </>}
       </section>
     </aside>
-    <CoursePathView model={model} targetOutcome={runtime.course.targetOutcome} onInspectCapabilities={onInspectCapabilities} onSelect={onSelect} />
+    {authenticated && (!routeControl.view || routeControl.view.activeVersion?.courseId !== runtime.course.id) ? <p role={routeControl.error ? "alert" : "status"}>{routeControl.error ?? "正在加载正式个人路线…"}</p> : <CoursePathView model={model} targetOutcome={runtime.course.targetOutcome} onInspectCapabilities={onInspectCapabilities} onSelect={onSelect} />}
     </div>
     {detail ? <dialog ref={dialogRef} className="navigator-practice-detail" aria-label={detail.title} onClose={() => setDetail(null)}><button autoFocus className="atlas-secondary" onClick={() => setDetail(null)}>关闭任务详情</button><h2>{detail.title}</h2><p>{detail.description}</p><h3>任务要求</h3><ul>{detail.requirements.map((text, index) => <li key={index}>{text}</li>)}</ul><h3>交付成果</h3><p>{detail.expectedOutput}</p><h3>验收标准</h3><ul>{detail.acceptanceCriteria.map((text, index) => <li key={index}>{text}</li>)}</ul><p>任务记录已保留；下一步学习安排以行动队列为准。</p>{detailEligibility?.reason && !detailEligibility.viewOnly ? <p role="status">{detailEligibility.reason}</p> : null}<button className="atlas-secondary" disabled={!detailEligibility?.canStart && !detailEligibility?.viewOnly} onClick={() => navigate(`/courses/${encodeURIComponent(runtime.course.id)}/assignments/${encodeURIComponent(detail.id)}`)}>{detailEligibility?.cta}</button></dialog> : null}
   </div>;

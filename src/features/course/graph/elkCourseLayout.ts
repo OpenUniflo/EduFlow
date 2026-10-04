@@ -319,3 +319,21 @@ export async function layoutCourseGraph(graphData: CourseGraphData, projection: 
   const height = Math.max(...nodes.filter((node) => node.kind === "chapter").map((node) => node.y + node.height), 720) + GRAPH_PADDING;
   return { nodes, edges, width, height };
 }
+
+/** Flat route view uses the same ELK engine/options as the hierarchical course graph.
+ * Only factual structural inputs enter this bounded cache; presentation never does.
+ */
+const routeLayouts = new Map<string, Promise<ElkNode>>();
+export function layoutCourseRoute(courseId: string, orderedIds: readonly string[], edges: readonly { id: string; source: string; target: string }[]) {
+  const canonicalEdges = [...edges].sort((a, b) => a.id.localeCompare(b.id));
+  const key = JSON.stringify([courseId, orderedIds, canonicalEdges.map(edge => [edge.id, edge.source, edge.target])]);
+  let pending = routeLayouts.get(key);
+  if (!pending) {
+    pending = elk.layout({ id: courseId, children: orderedIds.map(id => ({ id, width: 224, height: 112 })), edges: canonicalEdges.map(edgeToElk), layoutOptions: { ...layeredOptions, 'org.eclipse.elk.direction': 'DOWN', 'org.eclipse.elk.layered.cycleBreaking.strategy': 'MODEL_ORDER', 'org.eclipse.elk.padding': '[top=32,left=32,bottom=32,right=32]' } });
+    routeLayouts.set(key, pending);
+    if (routeLayouts.size > 20) routeLayouts.delete(routeLayouts.keys().next().value!);
+    void pending.catch(() => routeLayouts.delete(key));
+  }
+  return pending;
+}
+export { sectionPath as courseEdgePath };

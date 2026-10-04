@@ -1,35 +1,46 @@
-import { Check, Circle, Lock, Play } from 'lucide-react';
-import { motion, useReducedMotion } from 'motion/react';
-import type { CSSProperties } from 'react';
-import { pathX, type CourseNavigatorModel } from './courseNavigatorProjection';
+import { useEffect, useMemo, useState } from 'react';
+import { BaseEdge, Controls, Handle, MarkerType, Position, ReactFlow, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react';
+import type { ElkNode } from 'elkjs/lib/elk-api';
+import '@xyflow/react/dist/style.css';
+import { layoutCourseRoute, courseEdgePath } from '../graph/elkCourseLayout';
+import { relationLabel } from '@/shared/learning/routePresentation';
+import type { CourseNavigatorModel } from './courseNavigatorProjection';
+import './coursePath.css';
 
+type RouteNodeData = { item: CourseNavigatorModel['route'][number]; select(id: string): void };
+function RouteNode({ data }: NodeProps<Node<RouteNodeData>>) {
+  const { item } = data;
+  return <><Handle type="target" position={Position.Top}/><button className={`route-knowledge ${item.acquired ? 'acquired' : item.bridge ? 'intermediate' : 'target'} ${item.state}`} onClick={() => data.select(item.node.id)} aria-label={`${item.node.title}，查看能力详情`}>
+    <small>{item.acquired ? '已具备' : item.state === 'locked' ? '前置未满足 · 可查看' : item.bridge ? '中间能力' : '项目目标'}</small><strong>{item.node.title}</strong><span>查看能力与行动 →</span>
+  </button><Handle type="source" position={Position.Bottom}/></>;
+}
+function RouteEdge({ data, markerEnd, style }: EdgeProps<Edge<{ path: string }>>) {
+  return <BaseEdge path={data?.path ?? ''} markerEnd={markerEnd} style={style}/>;
+}
+const nodeTypes = { route: RouteNode };
+const edgeTypes = { route: RouteEdge };
 export function CoursePathView({ model, targetOutcome, onInspectCapabilities, onSelect }: { model: CourseNavigatorModel; targetOutcome?: string; onInspectCapabilities?(nodeId?: string): void; onSelect(nodeId: string): void }) {
-  const reduced = useReducedMotion();
-  let offset = 0;
+  const structure = JSON.stringify([model.courseId, model.route.map(item => item.node.id), model.relations.map(edge => ({ id: edge.id, source: edge.source, target: edge.target }))]);
+  const [layout, setLayout] = useState<{ key: string; result?: ElkNode; error?: string } | null>(null);
+  useEffect(() => {
+    let active = true;
+    const [courseId, ids, edges] = JSON.parse(structure) as [string, string[], { id: string; source: string; target: string }[]];
+    void layoutCourseRoute(courseId, ids, edges).then(result => { if (active) setLayout({ key: structure, result }); }).catch(() => { if (active) setLayout({ key: structure, error: '路线布局暂时无法加载。' }); });
+    return () => { active = false; };
+  }, [structure]);
+  const result = layout?.key === structure ? layout.result : undefined;
+  const nodes = useMemo(() => (result?.children ?? []).flatMap(node => {
+    const item = model.route.find(item => item.node.id === node.id);
+    return item ? [{ id: node.id, type: 'route', position: { x: node.x ?? 0, y: node.y ?? 0 }, data: { item, select: onSelect }, width: 224, height: 112 }] : [];
+  }), [result, model.route, onSelect]);
+  const edges = (result?.edges ?? []).flatMap(edge => {
+    const fact = model.relations.find(fact => fact.id === edge.id);
+    return fact ? [{ id: fact.id, source: fact.source, target: fact.target, type: 'route', data: { path: courseEdgePath(edge) }, ariaLabel: relationLabel(fact), markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' }, style: { stroke: '#64748b', strokeWidth: fact.relation === 'prerequisite' && fact.strength === 'hard' ? 2.2 : 1.4, strokeDasharray: fact.relation === 'enables' ? '3 6' : fact.strength === 'soft' ? '8 5' : undefined } }] : [];
+  });
   return <section className="navigator-path" aria-label="学习路线">
-    <header className="navigator-path-heading"><span className="atlas-kicker">{targetOutcome ? '项目目标与个人能力路径' : '你的学习路线'}</span><h2>{targetOutcome ? '从已有能力，走向项目目标' : '一步一步，走向理解'}</h2><p>{targetOutcome ?? '沿着路线前进，已学内容与待完成实训会为你保留。'}</p><p>当前路线 · 已具备 {model.route.filter(item => item.acquired).length} 项 · 待补 {model.route.filter(item => !item.acquired).length} 项。已有能力变化后，路线会重新计算。能力已具备与课程教学完成分别记录，未完成的必修微学习仍会保留。</p>{model.recentKnowledgeUpdates.length ? <p className="navigator-recent-state">最近能力状态记录 · {model.recentKnowledgeUpdates.map(item => item.title).join('、')}：已具备。路线已按当前状态计算。</p> : null}{onInspectCapabilities ? <button className="navigator-locate" onClick={() => onInspectCapabilities()}>查看项目能力与缺口 →</button> : null}{model.route.some(item => item.state === 'current') ? <button className="navigator-locate" onClick={() => document.querySelector('.navigator-stop.current')?.scrollIntoView({ behavior: reduced ? 'instant' : 'smooth', block: 'center' })}>定位当前步骤 ↓</button> : null}</header>
-    {!model.route.length ? <p role="status">当前路线没有待达成项目目标。</p> : null}
-    {model.sections.map((section, sectionIndex) => {
-      const start = offset; offset += section.items.length;
-      return <section className="navigator-chapter" key={`${section.id}-${sectionIndex}`}>
-        <header><small>{section.bridge ? '课程外能力' : '课程篇章'}</small><h3>{section.title}</h3></header>
-        <ol className="navigator-track">
-          {section.items.map((item, index) => {
-            const x = pathX(start + index); const nextX = pathX(start + index + 1);
-            const label = item.acquired ? `${item.mastered ? '已掌握' : '已具备'}${item.state === 'completed' ? '' : ' · 教学待完成'}` : item.state === 'completed' ? '教学已完成' : item.state === 'current' ? model.nextAction ? '推荐下一步' : '下一步能力 · 内容待准备' : item.state === 'locked' ? '前置未满足' : '前置已满足';
-            return <motion.li layout={!reduced} initial={false} transition={{ duration: reduced ? 0 : .24 }} className={`navigator-stop ${item.state}`} key={item.node.id} style={{ '--path-x': `${x}%` } as CSSProperties}>
-              {index < section.items.length - 1 ? <svg className="navigator-connector" viewBox="0 0 100 180" preserveAspectRatio="none" aria-hidden="true"><path d={`M ${x} 36 C ${x} 125, ${nextX} 125, ${nextX} 216`} vectorEffect="non-scaling-stroke" /></svg> : null}
-              <button className="navigator-node" type="button" aria-current={item.state === 'current' ? 'step' : undefined} aria-label={`${item.node.title}，${item.state === 'locked' ? '尚未解锁，可查看详情' : label}`} onClick={() => onSelect(item.node.id)} title={item.blockedBy.length ? `先完成：${item.blockedBy.join('、')}` : item.node.title}>
-                <motion.span key={item.state} initial={reduced ? false : { opacity: .5, scale: .9 }} animate={{ opacity: 1, scale: 1 }}>
-                  {item.state === 'completed' ? <Check size={25} /> : item.state === 'locked' ? <Lock size={21} /> : item.state === 'current' ? <Play size={24} /> : <Circle size={21} />}
-                </motion.span>
-              </button>
-              <div className="navigator-node-copy"><small>{label}</small><strong>{item.node.title}</strong></div>
-            </motion.li>;
-          })}
-        </ol>
-      </section>;
-    })}
-    {model.complete ? <p className="navigator-finish">✓ 教学路线已学完 · 实训进度单独保留</p> : null}
+    <header className="navigator-path-heading"><span className="atlas-kicker">当前个人路线</span><h2>从已有能力，走向项目目标</h2><p>{targetOutcome ?? '沿真实能力关系选择下一步行动。'}</p><p>已具备 {model.route.filter(item => item.acquired).length} 项 · 待形成 {model.route.filter(item => !item.acquired).length} 项。行动完成和能力状态分别记录。</p>{onInspectCapabilities ? <button className="navigator-locate" onClick={() => onInspectCapabilities()}>调整路线与查看能力关系 →</button> : null}</header>
+    <p className="route-relation-legend"><span>━ 必要前置</span><span>┄ 推荐前置</span><span>┈ 能力支撑 · 非门槛</span></p>
+    {!model.route.length ? <p role="status">当前没有可展示的路线节点。</p> : result ? <div className="course-route-canvas"><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} nodesDraggable={false} nodesConnectable={false} fitView minZoom={0.3} maxZoom={1.5} aria-label="真实能力关系路线"><Controls showInteractive={false}/></ReactFlow></div> : <p role={layout?.error ? 'alert' : 'status'}>{layout?.error ?? '正在排列能力关系…'}</p>}
+    <details className="route-accessible-relations"><summary>查看全部能力与真实关系</summary><ul>{model.route.map(item => <li key={item.node.id}><button onClick={() => onSelect(item.node.id)}>{item.node.title}</button></li>)}</ul><ul>{model.relations.map(edge => <li key={edge.id} data-edge-id={edge.id}>{model.route.find(item => item.node.id === edge.source)?.node.title ?? edge.source} → {model.route.find(item => item.node.id === edge.target)?.node.title ?? edge.target} · {relationLabel(edge)}</li>)}</ul></details>
   </section>;
 }

@@ -1,3 +1,6 @@
+import type { CapabilityRelation } from '@/shared/learning/routePlanning';
+import type { RoutePlanView } from '@/shared/learning/routeVersion';
+import { routeRelations } from '@/shared/learning/routePresentation';
 import type { NavigationDecision } from '@/shared/learning/navigation';
 import type { UserKnowledgeRecord } from '@/features/profile/types';
 import type { UserCourseState } from '../types';
@@ -8,9 +11,8 @@ import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequ
 
 export type NavigatorLearningContent = { nodeId: string; pathId: string; estimatedMinutes?: number };
 export type NavigatorState = 'completed' | 'current' | 'available' | 'locked';
-export function pathX(index: number) { return 50 + Math.round(18 * Math.sin(index * Math.PI / 2)); }
-export function buildCourseNavigator({ graph, runtime, knowledge, courseState, decision, learningContent = [] }: {
-  graph: CourseGraphData; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[];
+export function buildCourseNavigator({ graph, runtime, knowledge, courseState, decision, routeView, learningContent = [] }: {
+  routeView?: RoutePlanView | null; graph: CourseGraphData; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[];
   courseState?: UserCourseState; decision?: NavigationDecision | null; learningContent?: NavigatorLearningContent[];
 }) {
   const validDecision = decision?.courseId === runtime.course.id ? decision : null;
@@ -25,14 +27,25 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
     return { node: local?.node ?? { id: item.nodeId, title: item.title },
       state: local?.state ?? 'available', navigationState: item.state, blockedBy: item.blockedBy, bridge: !local };
   }) : fallback.map(item => ({ ...item, navigationState: undefined, bridge: false }));
+  const validRouteView = routeView?.activeVersion?.courseId === runtime.course.id ? routeView : null;
+  const selectedRoute = validRouteView?.plan.valid ? validRouteView.plan.route : null;
+  const routeSource = selectedRoute ? selectedRoute.orderedNodeIds.flatMap(id => {
+    const existing = source.find(item => item.node.id === id);
+    return existing ? [existing] : [{ node: { id, title: validRouteView?.activeVersion?.snapshot.titles[id] ?? id }, state: 'available' as const, blockedBy: [], navigationState: undefined, bridge: !byId.has(id) }];
+  }) : validRouteView && !validRouteView.plan.valid ? [] : source;
+  const members = new Set(routeSource.map(item => item.node.id));
+  const relations: CapabilityRelation[] = selectedRoute ? routeRelations(selectedRoute, validRouteView?.model?.supportEdges ?? []) : graph.knowledgeEdges
+    .flatMap((edge): CapabilityRelation[] => edge.relation === 'prerequisite' ? [{ ...edge, relation: 'prerequisite' }] : edge.relation === 'enables' ? [{ ...edge, relation: 'enables' }] : [])
+    .filter(edge => members.has(edge.source) && members.has(edge.target));
   const action = validDecision?.nextAction;
   const knowledgeById = new Map(knowledge.map(record => [record.nodeId, record]));
-  const route = source.map(item => {
+  const route = routeSource.map(item => {
     const completed = item.navigationState ? ['skipped', 'learned'].includes(item.navigationState) : ['completed', 'learned'].includes(item.state);
-    const locked = item.navigationState ? item.navigationState === 'blocked' : item.state === 'blocked';
+    const missing = selectedRoute?.prerequisiteEdges.filter(edge => edge.target === item.node.id && edge.strength === 'hard' && !satisfiesTeachingPrerequisite(knowledgeById.get(edge.source)?.status)) ?? [];
+    const locked = selectedRoute ? !satisfiesTeachingPrerequisite(knowledgeById.get(item.node.id)?.status) && missing.length > 0 : item.navigationState ? item.navigationState === 'blocked' : item.state === 'blocked';
     const state: NavigatorState = action?.nodeId === item.node.id && !locked ? 'current' : completed ? 'completed' : locked ? 'locked' : 'available';
     const status = knowledgeById.get(item.node.id)?.status;
-    return { ...item, state, acquired: satisfiesTeachingPrerequisite(status), mastered: status === 'mastered' };
+    return { ...item, blockedBy: selectedRoute ? missing.map(edge => routeSource.find(row => row.node.id === edge.source)?.node.title ?? edge.source) : item.blockedBy, state, acquired: satisfiesTeachingPrerequisite(status), mastered: status === 'mastered' };
   });
   const ranks = new Map(route.map((item, index) => [item.node.id, index]));
   const accepted = (id: string) => ['accepted', 'completed'].includes(courseState?.assignmentStates[id]?.status ?? '');
@@ -83,7 +96,7 @@ export function buildCourseNavigator({ graph, runtime, knowledge, courseState, d
   });
   const latestUpdate = Math.max(...recentRecords.map(item => item.updatedAt));
   const recentKnowledgeUpdates = recentRecords.filter(item => item.updatedAt === latestUpdate).sort((a, b) => a.nodeId.localeCompare(b.nodeId));
-  return { route, sections, recentKnowledgeUpdates, pendingPractices, nextPractice, nextAction, complete, courseComplete, emptyState };
+  return { courseId: runtime.course.id, route, relations, sections, recentKnowledgeUpdates, pendingPractices, nextPractice, nextAction, complete, courseComplete, emptyState };
 }
 
 export type CourseNavigatorModel = ReturnType<typeof buildCourseNavigator>;
