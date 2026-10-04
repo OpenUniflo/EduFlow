@@ -44,9 +44,10 @@ export default handleApi(async (request, response) => {
     const acquired = new Set(routeData.input.currentNodeIds);
     const completedActions = new Set(runs.filter(run => run.status === 'completed').map(run => run.action_id));
     const availableMicroActionIds = actions.filter(action => {
-      const target = edges.find(edge => edge.id === action.edge_id)?.target ?? '';
+      const edge = edges.find(edge => edge.id === action.edge_id);
+      const target = edge?.target ?? '';
       const binding = bindings.find(binding => binding.action_id === action.id);
-      return Boolean(action.type === 'micro_learning' && binding?.available && version && plan.valid && (plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target) && !version.constraints.excludeNodeIds.includes(target))
+      return Boolean(action.type === 'micro_learning' && binding?.available && version && edge && !version.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && plan.valid && (plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target))
         && !hasUnmetHardPrerequisite(target, acquired, plan.route.prerequisiteEdges)
         && microPaths.some(path => path.id === binding.micro_path_id && path.knowledge_id === target));
     }).map(action => action.id);

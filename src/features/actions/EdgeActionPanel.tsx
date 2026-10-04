@@ -7,7 +7,7 @@ import type { ActionBranch } from '@/features/knowledge/components/actionBranche
 import './edgeActions.css';
 export type ActionData = { actions: EdgeAction[]; bindings: CourseActionBinding[]; runs: ActionRun[]; availableMicroActionIds: string[]; availableActionIds: string[] };
 const emptyData: ActionData = { actions: [], bindings: [], runs: [], availableMicroActionIds: [], availableActionIds: [] };
-export function useEdgeActions(courseId: string, authenticated: boolean) {
+export function useEdgeActions(courseId: string, authenticated: boolean, executionRevision = '') {
   const [data, setData] = useState<ActionData>(emptyData);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -20,7 +20,7 @@ export function useEdgeActions(courseId: string, authenticated: boolean) {
     setData(emptyData); setError(''); keys.current.clear();
     if (authenticated) read().then(value => { if (active) setData(value); }).catch(() => { if (active) setError('行动暂时无法加载，请刷新结果重试。'); });
     return () => { active = false; };
-  }, [read, authenticated]);
+  }, [read, authenticated, executionRevision]);
   async function perform(body: unknown) {
     setBusy(true); setError('');
     try {

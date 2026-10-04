@@ -19,13 +19,13 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
 }) {
   const governance = useDomainGovernance();
   const scene = useRef<KnowledgeAtlasSceneHandle>(null);
-  const actionData = useEdgeActions(runtime.course.id, authenticated);
   const [edgeId, setEdgeId] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const knowledgeKey = JSON.stringify(knowledge.map(record => [record.nodeId, record.status]).sort());
   const control = useRoutePlanning(runtime.course.id, authenticated, knowledgeKey);
+  const actionData = useEdgeActions(runtime.course.id, authenticated, `${control.view?.activeVersion?.id ?? ""}:${knowledgeKey}`);
   const result = useMemo(() => {
     try {
       const model = buildProjectCapabilityModel(graph, runtime, knowledge);
