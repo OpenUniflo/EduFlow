@@ -1,3 +1,4 @@
+import { readEvidenceView } from '../_lib/evidenceRead.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createServerSupabase, createUserSupabase } from '../_lib/supabase.js';
@@ -12,7 +13,7 @@ export const maxDuration=300;
 const uploadSchema=z.object({action:z.literal('upload'),title:z.string().trim().min(1).max(240),contentType:z.enum(['text/plain','text/markdown','text/csv']),size:z.number().int().min(1).max(1048576)}).strict();
 const sourceSchema=z.object({action:z.enum(['parse','archive','download']),sourceId:z.string().uuid()}).strict();
 const diagnosisSchema=z.object({action:z.literal('diagnose'),sourceIds:z.array(z.string().uuid()).min(1).max(5)}).strict();
-const confirmationSchema=z.object({action:z.enum(['confirm','reject']),proposalIds:z.array(z.string().uuid()).min(1).max(50)}).strict();
+const confirmationSchema=z.object({action:z.enum(['confirm','reject']),proposalIds:z.array(z.string().uuid()).min(1).max(50),runId:z.string().uuid().optional()}).strict();
 const indexSchema=z.object({action:z.literal('index'),after:z.string().optional()}).strict();
 const requestSchema=z.union([uploadSchema,sourceSchema,diagnosisSchema,confirmationSchema,indexSchema]);
 
@@ -20,6 +21,9 @@ export default handleApi(async(request,response)=>{
   const {client,user}=await createUserSupabase(request);
   response.setHeader('Cache-Control','private, no-store');
   if(request.method==='GET') {
+    const query={...request.query};
+    if(query.resource==='evidence')delete query.resource; // Vercel learner multiplexing, not a view filter.
+    if(Object.keys(query).length){json(response,200,await readEvidenceView(client,query));return;}
     const results=await Promise.all([
       allRows(client.from('user_evidence_sources').select('*').order('created_at',{ascending:false}).order('id'),'Evidence sources'),
       allRows(client.from('evidence_units').select('*').order('created_at',{ascending:false}).order('id'),'Evidence units'),
@@ -96,6 +100,11 @@ export default handleApi(async(request,response)=>{
   }
   if(body.action==='confirm'||body.action==='reject') {
     if(new Set(body.proposalIds).size!==body.proposalIds.length) throw new ApiError(400,'duplicate_proposal','Duplicate proposal');
+    if(body.runId) {
+      const selected=await client.from('capability_state_proposals').select('id,run_id').in('id',body.proposalIds);
+      const proposals=dataOrThrow(selected.data,selected.error,'Diagnosis confirmation scope');
+      if(proposals.length!==body.proposalIds.length||proposals.some(proposal=>proposal.run_id!==body.runId))throw new ApiError(409,'diagnosis_scope_mismatch','请选择同一次诊断中的能力候选。');
+    }
     const result=await server.rpc('confirm_capability_proposals',{p_user_id:user.id,p_ids:body.proposalIds,p_decision:body.action});
     if(result.error) throw new ApiError(result.error.code==='P0002'?404:409,'confirmation_rejected','候选已变化、资料已归档或没有足够证据；请刷新后检查。');
     json(response,200,{resolutions:result.data});return;
