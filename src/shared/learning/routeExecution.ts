@@ -1,5 +1,5 @@
-import type { CapabilityRelation, SelectedRoute } from './routePlanning';
-import { routeRelations } from './routePresentation';
+import type { CapabilityRelation, SelectedRoute } from './routePlanning.js';
+import { routeRelations } from './routePresentation.js';
 
 export type RouteActionChoice = { edgeId: string; actionId: string };
 export type RouteExecutionStep = RouteActionChoice & { sourceNodeId: string; targetNodeId: string; order: number };
