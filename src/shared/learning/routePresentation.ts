@@ -1,5 +1,12 @@
 import type { CapabilityRelation, SelectedRoute } from './routePlanning';
 
+export type RouteOverlayState = 'current' | 'kept' | 'added' | 'removed';
+export type RouteOverlay = {
+  nodes: { id: string; state: RouteOverlayState }[];
+  edges: { id: string; state: RouteOverlayState }[];
+  preview: boolean;
+};
+
 /** Reading order is never a source of relationship facts. */
 export function routeRelations(route: SelectedRoute, supportEdges: readonly CapabilityRelation[]): CapabilityRelation[] {
   const members = new Set(route.selectedNodeIds);

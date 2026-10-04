@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { useReducedMotion } from 'motion/react';
 import ForceGraph3D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-3d";
 import {
   AdditiveBlending,
@@ -21,6 +22,7 @@ import { createProjectLaser } from "./projectLaser";
 import { computeDownstreamSubgraph } from "../atlasDownstream";
 import type { AtlasSceneEdge, AtlasSceneNode } from "../projections/atlasProjections";
 import { atlasStructureKey, canonicalAtlasCamera, freezeAtlasNodePositions, resetAtlasCamera } from "../atlasCamera";
+import type { RouteOverlay, RouteOverlayState } from '@/shared/learning/routePresentation';
 
 type RenderNode = NodeObject<AtlasSceneNode> & AtlasSceneNode;
 type RenderEdge = LinkObject<AtlasSceneNode, AtlasSceneEdge> & AtlasSceneEdge;
@@ -46,6 +48,9 @@ export type KnowledgeAtlasSceneProps = {
   onEdgeClick?: (edge: AtlasSceneEdge) => void;
   actionBranches?: ActionBranch[];
   onActionClick?: (id: string) => void;
+  visibleNodeIds?: ReadonlySet<string>;
+  routeOverlay?: RouteOverlay;
+  edgeActionCounts?: ReadonlyMap<string, number>;
 };
 
 type LabelState = { id: string; title: string; x: number; y: number; priority: number; forced: boolean };
@@ -137,8 +142,12 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   actionBranches,
   onEdgeClick,
   onActionClick,
+  visibleNodeIds,
+  routeOverlay,
+  edgeActionCounts,
   onBackgroundClick
 }, forwardedRef) {
+  const reducedMotion = useReducedMotion();
   const graphRef = useRef<ForceGraphMethods<AtlasSceneNode, AtlasSceneEdge> | undefined>(undefined);
   const graphBootedRef = useRef(false);
   const graphResumeTimerRef = useRef<number | null>(null);
@@ -155,6 +164,10 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const [manualInteraction, setManualInteraction] = useState(false);
   const [branchPositions, setBranchPositions] = useState<Array<ActionBranch & { path: string; x: number; y: number }>>([]);
   const [labels, setLabels] = useState<LabelState[]>([]);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [routePositions, setRoutePositions] = useState<{ nodes: { id: string; state: RouteOverlayState; x: number; y: number }[]; edges: { id: string; state: RouteOverlayState | 'context'; x1: number; y1: number; x2: number; y2: number; dash?: string }[] }>({ nodes: [], edges: [] });
+  const [edgeHint, setEdgeHint] = useState<{ x: number; y: number; text: string } | null>(null);
+  const isVisible = useCallback((id: string) => !visibleNodeIds || visibleNodeIds.has(id), [visibleNodeIds]);
 
   const resources = useMemo(() => {
     const spheres = new Map<string, SphereGeometry>();
@@ -224,7 +237,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const renderNodeById = useMemo(() => new Map(renderNodes.map((node) => [node.id, node])), [renderNodes]);
   const focusTargetId = selectedId ?? searchMatchId ?? null;
   const downstream = useMemo(() => variant === "project" && focusTargetId
-    ? computeDownstreamSubgraph(focusTargetId, edges) : null, [variant, focusTargetId, structureKey]);
+    ? computeDownstreamSubgraph(focusTargetId, edges.filter(edge => isVisible(edge.source) && isVisible(edge.target))) : null, [variant, focusTargetId, edges, isVisible]);
   useEffect(() => { laser.select(downstream?.edgeIds); }, [laser, downstream]);
   useEffect(() => { laser.retain(new Set(renderEdges.map(edge => edge.id))); }, [laser, renderEdges]);
   const linkThreeObject = useCallback((edge: RenderEdge) => laser.object(edge.id), [laser]);
@@ -307,11 +320,11 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   useEffect(() => {
     const controls = graphRef.current?.controls() as { autoRotate?: boolean; autoRotateSpeed?: number; enableDamping?: boolean; dampingFactor?: number } | undefined;
     if (!controls) return;
-    controls.autoRotate = variant === "global" && autoRotate && !focusTargetId && !hoveredId && !hoverPaused && !manualInteraction;
+    controls.autoRotate = !reducedMotion && variant === "global" && autoRotate && !focusTargetId && !hoveredId && !hoverPaused && !manualInteraction;
     controls.autoRotateSpeed = 0.16;
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-  }, [autoRotate, focusTargetId, hoverPaused, hoveredId, manualInteraction, variant]);
+  }, [autoRotate, focusTargetId, hoverPaused, hoveredId, manualInteraction, variant, reducedMotion]);
 
   useEffect(() => {
     const controls = graphRef.current?.controls() as { addEventListener?: (type: string, listener: () => void) => void; removeEventListener?: (type: string, listener: () => void) => void } | undefined;
@@ -385,7 +398,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     if (!graph || !node || !Number.isFinite(node.x) || !Number.isFinite(node.y) || !Number.isFinite(node.z)) return false;
     if (variant === "project") {
       // Keep the support chain visible; project focus is a user-driven fit over the stable world.
-      graph.zoomToFit(480, Math.min(180, size.height * .28));
+      graph.zoomToFit(reducedMotion ? 0 : 320, Math.min(180, size.height * .28), node => isVisible(String(node.id)));
       return true;
     }
     const target = { x: node.x ?? 0, y: node.y ?? 0, z: node.z ?? 0 };
@@ -405,9 +418,9 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
       x: target.x + vector.x / length * distance,
       y: target.y + vector.y / length * distance,
       z: target.z + vector.z / length * distance
-    }, target, 620);
+    }, target, reducedMotion ? 0 : 320);
     return true;
-  }, [focusIds, renderNodeById, variant, size.height]);
+  }, [focusIds, renderNodeById, variant, size.height, isVisible, reducedMotion]);
 
   useEffect(() => {
     if (!focusTargetId || variant === "project") return;
@@ -425,11 +438,33 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const updateLabels = useCallback(() => {
     const graph = graphRef.current;
     if (!graph) return;
+    const screenNode = (id: string) => {
+      const node = renderNodeById.get(id);
+      return node && isVisible(id) && Number.isFinite(node.x) && Number.isFinite(node.y) && Number.isFinite(node.z)
+        ? graph.graph2ScreenCoords(node.x ?? 0, node.y ?? 0, node.z ?? 0) : null;
+    };
+    const positionedRoute = {
+      nodes: (routeOverlay?.nodes ?? []).flatMap(node => { const point = screenNode(node.id); return point ? [{ ...node, ...point }] : []; }),
+      edges: (routeOverlay ? renderEdges : []).flatMap(edge => {
+        const item = routeOverlay?.edges.find(item => item.id === edge.id) ?? { id: edge.id, state: 'context' as const };
+        const start = screenNode(endpointId(edge.source)), end = screenNode(endpointId(edge.target));
+        return start && end ? [{ ...item, x1: start.x, y1: start.y, x2: end.x, y2: end.y,
+          dash: edge.relation === 'enables' ? '2 6' : edge.strength === 'soft' ? '7 5' : undefined }] : [];
+      }),
+    };
+    setRoutePositions(previous => JSON.stringify(previous) === JSON.stringify(positionedRoute) ? previous : positionedRoute);
+    const hoveredEdge = renderEdges.find(edge => edge.id === hoveredEdgeId);
+    const hintStart = hoveredEdge && screenNode(endpointId(hoveredEdge.source));
+    const hintEnd = hoveredEdge && screenNode(endpointId(hoveredEdge.target));
+    const count = hoveredEdgeId ? edgeActionCounts?.get(hoveredEdgeId) ?? 0 : 0;
+    const hint = hintStart && hintEnd ? { x: (hintStart.x + hintEnd.x) / 2, y: (hintStart.y + hintEnd.y) / 2,
+      text: count ? `${count} 个行动方案 · 点击比较` : '当前关系尚未配置行动' } : null;
+    setEdgeHint(previous => JSON.stringify(previous) === JSON.stringify(hint) ? previous : hint);
     const positionedBranches = (actionBranches ?? []).flatMap(branch => {
       const edge = renderEdges.find(edge => edge.id === branch.edgeId);
       if (!edge) return [];
       const source = renderNodeById.get(endpointId(edge.source)), target = renderNodeById.get(endpointId(edge.target));
-      if (!source || !target || !Number.isFinite(source.x) || !Number.isFinite(target.x)) return [];
+      if (!source || !target || !isVisible(source.id) || !isVisible(target.id) || !Number.isFinite(source.x) || !Number.isFinite(target.x)) return [];
       const alternatives = (actionBranches ?? []).filter(item => item.edgeId === branch.edgeId);
       const start = graph.graph2ScreenCoords(source.x ?? 0, source.y ?? 0, source.z ?? 0);
       const end = graph.graph2ScreenCoords(target.x ?? 0, target.y ?? 0, target.z ?? 0);
@@ -441,7 +476,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     const far = cameraDistance > (variant === "global" ? 760 : 680);
     const medium = cameraDistance > (variant === "global" ? 480 : 420);
     const candidates = renderNodes
-      .filter((node) => Number.isFinite(node.x) && Number.isFinite(node.y) && Number.isFinite(node.z))
+      .filter((node) => isVisible(node.id) && Number.isFinite(node.x) && Number.isFinite(node.y) && Number.isFinite(node.z))
       .map((renderNode) => {
         const node = nodeById.get(renderNode.id) ?? renderNode;
         return { node: { ...node, x: renderNode.x, y: renderNode.y, z: renderNode.z } as RenderNode, priority: labelPriority(node, focusTargetId, hoveredId, focusIds, searchMatchId, currentLearningId) };
@@ -466,13 +501,13 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     });
     const next = accepted.map(({ width: _width, height: _height, ...label }) => label);
     setLabels((current) => sameLabels(current, next) ? current : next);
-  }, [currentLearningId, focusIds, focusTargetId, hoveredId, renderNodes, renderEdges, renderNodeById, actionBranches, searchMatchId, size.height, size.width, variant]);
+  }, [currentLearningId, focusIds, focusTargetId, hoveredId, renderNodes, renderEdges, renderNodeById, nodeById, actionBranches, searchMatchId, size.height, size.width, variant, isVisible, routeOverlay, hoveredEdgeId, edgeActionCounts]);
 
   useEffect(() => {
     let frame = 0;
     let previous = 0;
     const tick = (time: number) => {
-      if (variant === "project") laser.tick(time);
+      if (variant === "project") laser.tick(reducedMotion ? 0 : time);
       if (time - previous > 80) {
         previous = time;
         updateLabels();
@@ -481,7 +516,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [updateLabels, laser, variant]);
+  }, [updateLabels, laser, variant, reducedMotion]);
 
   const nodeThreeObject = useCallback((node: NodeObject<AtlasSceneNode>) => {
     const item = node as RenderNode;
@@ -537,20 +572,20 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   }, [applyNodeAppearance, resources, variant]);
 
   useImperativeHandle(forwardedRef, () => ({
-    fit: () => graphRef.current?.zoomToFit(480, variant === "project" ? Math.min(180, size.height * .28) : variant === "personal" ? 110 : 70),
+    fit: () => graphRef.current?.zoomToFit(reducedMotion ? 0 : 320, variant === "project" ? Math.min(180, size.height * .28) : variant === "personal" ? 110 : 70, node => isVisible(String(node.id))),
     focus: (nodeId: string) => { focusNode(nodeId); },
     reset: () => {
       const graph = graphRef.current;
       if (!graph) return;
-      resetAtlasCamera(variant, (position, lookAt, duration) => graph.cameraPosition(position, lookAt, duration));
+      resetAtlasCamera(variant, (position, lookAt, duration) => graph.cameraPosition(position, lookAt, reducedMotion ? 0 : duration));
     },
     zoomBy: (multiplier: number) => {
       const graph = graphRef.current;
       if (!graph) return;
       const camera = graph.camera();
-      graph.cameraPosition({ x: camera.position.x / multiplier, y: camera.position.y / multiplier, z: camera.position.z / multiplier }, undefined, 180);
+      graph.cameraPosition({ x: camera.position.x / multiplier, y: camera.position.y / multiplier, z: camera.position.z / multiplier }, undefined, reducedMotion ? 0 : 180);
     }
-  }), [focusNode, variant, size.height]);
+  }), [focusNode, variant, size.height, isVisible, reducedMotion]);
 
   return (
     <div ref={containerRef} className={`knowledge-atlas-scene ${className ?? ""}`}>
@@ -565,7 +600,8 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
         showNavInfo={false}
         nodeThreeObject={nodeThreeObject}
         nodeLabel={() => ""}
-        nodeVisibility={() => true}
+        nodeVisibility={node => isVisible(String(node.id))}
+        linkVisibility={edge => isVisible(endpointId(edge.source)) && isVisible(endpointId(edge.target))}
         linkColor={(edge) => {
           const source = endpointId(edge.source);
           const target = endpointId(edge.target);
@@ -611,8 +647,14 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
         }}
         onNodeClick={(node) => onNodeClick?.(node as RenderNode)}
         onLinkClick={(edge) => onEdgeClick?.(edges.find(item => item.id === edge.id) ?? edge as AtlasSceneEdge)}
+        onLinkHover={edge => setHoveredEdgeId(edge ? String(edge.id) : null)}
         onBackgroundClick={onBackgroundClick}
       />
+      {variant === 'project' && routeOverlay ? <svg className="atlas-route-overlay" width={size.width} height={size.height} aria-label={routeOverlay.preview ? '路线预览差异' : '当前正式路线'} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        {routePositions.edges.map(edge => <line key={`${edge.id}-${edge.state}`} data-route-edge={edge.state === 'context' ? undefined : edge.id} className={`route-overlay-${edge.state}`} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} strokeWidth={edge.state === 'context' ? 1 : 3} strokeDasharray={edge.dash} />)}
+        {routePositions.nodes.map(node => <circle key={`${node.id}-${node.state}`} data-route-node={node.id} className={`route-overlay-${node.state}`} cx={node.x} cy={node.y} r={10} fill="none" strokeWidth={1.5} strokeDasharray={node.state === 'removed' ? '2 4' : undefined} />)}
+      </svg> : null}
+      {variant === 'project' && edgeHint ? <div className="atlas-edge-hint" role="tooltip" style={{ transform: `translate(${edgeHint.x}px, ${edgeHint.y}px) translate(-50%, -120%)` }}>{edgeHint.text}</div> : null}
       {variant === 'project' && branchPositions.length > 0 ? <svg className="atlas-action-branches" width={size.width} height={size.height} aria-label="关系上的行动替代方案" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}>
         {branchPositions.map(branch => <g key={branch.id} className={`action-branch action-branch-${branch.status}`}>
           <path d={branch.path} fill="none" stroke={actionBranchColors[branch.status]} strokeWidth={branch.status === 'candidate' || branch.status === 'unavailable' ? 1.5 : 3} strokeDasharray={branch.status === 'candidate' || branch.status === 'unavailable' ? '4 5' : undefined}/>

@@ -1,4 +1,25 @@
 .project-capability { --project-detail-top:208px; position: absolute; inset: 0; }
+.atlas-route-overlay { --route-current: #6366b8; --route-added: #087f8c; --route-removed: #a66651; }
+.atlas-route-overlay .route-overlay-current, .atlas-route-overlay .route-overlay-kept { stroke: var(--route-current); opacity: .72; }
+.atlas-route-overlay .route-overlay-context { stroke: #8392a8; opacity: .35; }
+.atlas-route-overlay .route-overlay-added { stroke: var(--route-added); animation: route-added-appear 320ms ease-out both; }
+.atlas-route-overlay .route-overlay-removed { stroke: var(--route-removed); opacity: .52; }
+@keyframes route-added-appear { from { opacity: 0; } to { opacity: .9; } }
+.atlas-edge-hint { position: absolute; top: 0; left: 0; pointer-events: none; padding: 8px 12px; border: 1px solid var(--border-subtle, #dbe3ee); border-radius: 10px; background: var(--surface-raised, #fff); color: var(--text-primary, #334155); font-size: 12px; white-space: nowrap; }
+.project-route-legend { position: absolute; bottom: 180px; left: 24px; display: flex; flex-wrap: wrap; gap: 8px 14px; max-width: 330px; padding: 12px 16px; border-radius: 14px; font-size: 12px; pointer-events: none; }
+.project-route-legend strong, .project-route-legend small { width: 100%; }
+.route-key-kept { color: #6366b8; }
+.route-key-added { color: #087f8c; }
+.route-key-removed { color: #a66651; }
+.project-relations-list { position: absolute; z-index: 4; right: 24px; bottom: 26px; max-width: 330px; max-height: 35vh; overflow: auto; padding: 12px 16px; border-radius: 14px; font-size: 12px; }
+.project-relations-list summary { cursor: pointer; }
+.project-relations-list button { display: grid; width: 100%; text-align: left; gap: 5px; margin-top: 8px; }
+.project-relations-list small { color: #64748b; }
+@media (max-width: 760px) {
+  .project-route-legend { bottom: 190px; left: 12px; max-width: calc(100vw - 56px); }
+  .project-relations-list { bottom: 140px; left: 12px; right: auto; max-width: calc(100vw - 56px); }
+}
+@media (prefers-reduced-motion: reduce) { .atlas-route-overlay .route-overlay-added { animation: none; } }
 .project-capability-info { position: absolute; top: 148px; left: 24px; width: 285px; max-height: calc(100vh - 175px); overflow: auto; padding: 20px; border-radius: 20px; }
 .project-capability h2 { font-size: 18px; margin: 0 0 12px; }
 .project-capability p, .project-capability li { font-size: 13px; line-height: 1.7; color: #64748b; }

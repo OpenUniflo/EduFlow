@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { readActiveVersion, readRouteInput, defaultConstraints } from '../_lib/routePlanning.js';
 import { buildCapabilityModel, planCourseRoute } from '../../src/shared/learning/routePlanning.js';
+import { routeRelations } from '../../src/shared/learning/routePresentation.js';
 import { hasUnmetHardPrerequisite } from '../../src/shared/learning/teachingPrerequisites.js';
 import { createServerSupabase, createUserSupabase } from '../_lib/supabase.js';
 import { ApiError, handleApi, json, methodNotAllowed } from '../_lib/http.js';
@@ -26,24 +27,26 @@ export default handleApi(async (request, response) => {
       const steps = run.micro_path_id ? await allRows(client.from('micro_step_attempts').select('step_id').eq('action_run_id', run.id).eq('completion_accepted', true).order('id'), 'Micro execution steps') : [];
       json(response, 200, { run, microStepIds: [...new Set(steps.map(row => row.step_id))] }); return;
     }
-    const [routeData, runs] = await Promise.all([
+    const [routeData, runs, version] = await Promise.all([
       readRouteInput(client, user.id, courseId),
       allRows(client.from('edge_action_runs').select('*').eq('course_id', courseId).order('created_at', { ascending: false }).order('id'), 'Action runs'),
+      readActiveVersion(client, user.id, courseId),
     ]);
     const modelEdges = buildCapabilityModel(routeData.input).supportEdges;
     const modelEdgeIds = new Set(modelEdges.map(edge => edge.id));
     const courseNodes = new Set(routeData.input.courseOrder.map(item => item.nodeId));
     const courseEdges = [...routeData.input.prerequisiteEdges, ...(routeData.input.enablesEdges ?? [])].filter(edge => courseNodes.has(edge.source) && courseNodes.has(edge.target));
-    const scopedEdges = new Set([...modelEdges.map(edge => edge.id), ...courseEdges.map(edge => edge.id), ...runs.map(run => String(run.edge_id))]);
-    const edges = [...routeData.input.prerequisiteEdges.map(edge => ({ ...edge, relation: 'prerequisite' as const })), ...(routeData.input.enablesEdges ?? [])].filter(edge => scopedEdges.has(edge.id));
-    const [actions, bindings, microPaths, version, assignments] = await Promise.all([
+    const plan = planCourseRoute(routeData.input, version?.constraints ?? defaultConstraints);
+    const facts = [...routeData.input.prerequisiteEdges.map(edge => ({ ...edge, relation: 'prerequisite' as const })), ...(routeData.input.enablesEdges ?? [])];
+    const routeEdges = plan.valid ? routeRelations(plan.route, facts) : [];
+    const scopedEdges = new Set([...modelEdges.map(edge => edge.id), ...routeEdges.map(edge => edge.id), ...courseEdges.map(edge => edge.id), ...runs.map(run => String(run.edge_id))]);
+    const edges = facts.filter(edge => scopedEdges.has(edge.id));
+    const [actions, bindings, microPaths, assignments] = await Promise.all([
       edges.length ? allRows(client.from('knowledge_edge_actions').select('*').eq('status', 'active').in('edge_id', edges.map(edge => edge.id)).order('id'), 'Project edge actions') : [],
       allRows(client.from('course_action_bindings').select('*').eq('course_id', courseId).order('id'), 'Course action resources'),
       availableMicroPaths(client, courseId),
-      readActiveVersion(client, user.id, courseId),
       allRows(client.from('course_assignments').select('id,mode,experience').eq('course_id', courseId).order('id'), 'Action Assignment executors'),
     ]);
-    const plan = planCourseRoute(routeData.input, version?.constraints ?? defaultConstraints);
     const acquired = new Set(routeData.input.currentNodeIds);
     const completedActions = new Set(runs.filter(run => run.status === 'completed').map(run => run.action_id));
     const availableMicroActionIds = actions.filter(action => {
