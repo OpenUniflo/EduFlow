@@ -116,5 +116,5 @@
 .project-relations-list summary { cursor:pointer; }
 .project-relations-list button { display:grid; width:100%; text-align:left; gap:5px; margin-top:8px; }
 .project-relations-list small { color:#64748b; }
-@media(max-width:900px) { .project-overview { top:calc(var(--project-top-control-band) + 92px); width:calc(100% - 32px); min-width:0; } .project-capability-editor { top:294px; } }
+@media(max-width:900px) { .project-overview { top:calc(var(--project-top-control-band) + 92px); width:calc(100% - 32px); min-width:0; } .project-capability:has(.project-overview[open]) .project-capability-toolbar { visibility:hidden; } .project-capability-editor { top:294px; } }
 @media(max-width:760px) { .project-overview { top:calc(var(--project-top-control-band) + 92px); } .project-overview > summary { padding:10px 12px; } .project-overview-body { max-height:30vh; } .project-capability-editor { top:304px; max-height:30vh; } }
