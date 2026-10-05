@@ -17,3 +17,7 @@ Independent Reviewer1 captured26 protected table hashes before/after cleanup, pl
 ## UX protocol
 
 Use only A/B with Reset before each fresh flow. Run Course Route→Practice (chat, Trace/Text/real private file, explicit submit)→Capability Update (upload, analyze, Proposal, Confirm)→Route Impact Preview without Adopt. Verify1366×768 and1440×900 at100% browser zoom;390×844 and Reduced Motion. Context and Timeline scroll independently, Composer/upload/send/formal submission stay accessible, no page/dialog/timeline scroll competition. Source/history/technical disclosures start folded. Failed Run appears once with one Re-analyze entry and no Refresh. Ordinary UI hides Run UUID. Overview toggles preserve graph/camera; Current/Preview pulses preserve existing semantics. Screenshot names use acceptance-a/acceptance-b. All66 objective criteria require final itemized evidence before completion.
+
+## First READY Preview finding
+
+67af2b8 Preview revealed a real interaction defect: the transparent full-width Course header intercepted the newly aligned Overview summary. Native click and elementFromPoint confirmed interception. Header blank space now passes pointers through; actual left/right/middle controls retain pointer events. This changes presentation hit-testing only. Overview must pass a fresh native click and stability check on the corrected Preview. No JS click bypass counts as acceptance.
