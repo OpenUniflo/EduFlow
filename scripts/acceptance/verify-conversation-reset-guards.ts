@@ -4,13 +4,14 @@ import {randomUUID} from 'node:crypto';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {resetSql} from './reset-conversation-evidence.js';
-const output='.acceptance/conversation-evidence';mkdirSync(output,{recursive:true});
+const output='.acceptance/conversation-workbench';mkdirSync(output,{recursive:true});
 assert.equal(readFileSync('supabase/.temp/project-ref','utf8').trim(),'uyljtdbvlivxniililay');
-const baseline=JSON.parse(readFileSync(`${output}/baseline.json`,'utf8'));
+const baseline=JSON.parse(readFileSync(process.env.ACCEPTANCE_RESET_MANIFEST??`${output}/acceptance-ab-baseline.json`,'utf8'));
 const actor=baseline.accounts[0].id,source=randomUUID(),run=randomUUID();
 const quote=(value:unknown)=>`'${String(value).replace(/'/g,"''")}'`;
-const oldSource=baseline.tables.user_evidence_sources[0].id;
+const oldSource=randomUUID();baseline.tables.user_evidence_sources.push({id:oldSource});
 const setup=`begin;
+insert into user_evidence_sources(id,user_id,title,storage_path,content_type,byte_size,provenance) values(${quote(oldSource)},${quote(actor)},'Acceptance rollback-only retained source',${quote(actor+'/'+oldSource)},'text/plain',1,jsonb_build_object('kind','acceptance-rollback-guard'));
 insert into user_evidence_sources(id,user_id,title,storage_path,content_type,byte_size,provenance) values(${quote(source)},${quote(actor)},'Acceptance rollback-only reset guard',${quote(actor+'/'+source)},'text/plain',1,jsonb_build_object('kind','acceptance-rollback-guard','courseId',${quote(baseline.courseId)}));
 insert into capability_diagnosis_runs(id,user_id,source_ids,model,prompt_version) values(${quote(run)},${quote(actor)},array[${quote(source)}::uuid,${quote(oldSource)}::uuid],'acceptance-rollback-guard','acceptance-only');
 `;
@@ -24,8 +25,9 @@ const snapshot=(check.rows??check)[0].snapshot;assert.equal(snapshot.guardRows,0
 
 // Exercise the real generated DELETE against Hosted rows, then roll back every change.
 const sessions={courseOnly:randomUUID(),mixed:randomUUID(),unrelated:randomUUID(),empty:randomUUID()};
-const baselineSession=baseline.tables.assistant_sessions[0].id;
+const baselineSession=baseline.tables.assistant_sessions[0]?.id??randomUUID();const hasBaselineSession=baseline.tables.assistant_sessions.length>0;if(!hasBaselineSession)baseline.tables.assistant_sessions.push({id:baselineSession});
 const sessionSetup=`begin;
+${hasBaselineSession?'':`insert into assistant_sessions(id,user_id,title) values(${quote(baselineSession)},${quote(actor)},'Acceptance rollback-only retained session');`}
 insert into assistant_sessions(id,user_id,title) values
  (${quote(sessions.courseOnly)},${quote(actor)},'Acceptance course-only Global'),
  (${quote(sessions.mixed)},${quote(actor)},'Acceptance mixed Global'),

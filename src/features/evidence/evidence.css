@@ -1,5 +1,5 @@
 /* Evidence shares the product's light surfaces; no reader or Assistant selectors. */
-.capability-workspace{width:min(1040px,94vw);max-width:94vw;height:88dvh;max-height:88dvh;padding:0;border:1px solid var(--atlas-border);border-radius:20px;background:var(--atlas-bg);color:var(--atlas-ink);box-shadow:var(--atlas-shadow);overflow:auto}
+.capability-workspace{width:min(1040px,94vw);max-width:94vw;height:calc(100dvh - 48px);max-height:calc(100dvh - 48px);padding:0;border:1px solid var(--atlas-border);border-radius:20px;background:var(--atlas-bg);color:var(--atlas-ink);box-shadow:var(--atlas-shadow);overflow:hidden}
 .capability-workspace::backdrop{background:rgba(31,45,61,.38)}
 .capability-workspace-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:24px 30px;border-bottom:1px solid var(--atlas-border);background:var(--atlas-panel-strong)}
 .evidence-library,.capability-diagnosis{color:var(--atlas-ink);font-size:14px;line-height:1.6}
@@ -71,7 +71,7 @@
 .learning-evidence{height:100%;overflow:auto;padding:132px 5vw 40px}
 .learning-evidence>header{max-width:1120px;margin:auto}
 @keyframes evidence-spin{to{transform:rotate(360deg)}}
-@media(max-width:760px){.capability-workspace{width:96vw;max-width:96vw;height:92dvh;max-height:92dvh;border-radius:16px}.capability-workspace-header,.capability-diagnosis{padding:20px}.capability-diagnosis{padding-bottom:90px}.evidence-library-header,.evidence-source-detail>header,.evidence-run-heading{flex-direction:column;gap:12px}.evidence-source-grid,.evidence-detail-columns{grid-template-columns:1fr}.evidence-steps{grid-template-columns:repeat(2,1fr);gap:12px}.evidence-card{padding:16px}.evidence-section-heading{flex-wrap:wrap;gap:12px}.evidence-stage-actions{flex-wrap:wrap}.learning-evidence{padding:144px 18px 30px}.evidence-library{padding-top:16px}.evidence-card dl{gap:8px}.evidence-format{font-size:11px}}
+@media(max-width:760px){.capability-workspace{width:96vw;max-width:96vw;height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);border-radius:16px}.capability-workspace-header,.capability-diagnosis{padding:20px}.capability-diagnosis{padding-bottom:90px}.evidence-library-header,.evidence-source-detail>header,.evidence-run-heading{flex-direction:column;gap:12px}.evidence-source-grid,.evidence-detail-columns{grid-template-columns:1fr}.evidence-steps{grid-template-columns:repeat(2,1fr);gap:12px}.evidence-card{padding:16px}.evidence-section-heading{flex-wrap:wrap;gap:12px}.evidence-stage-actions{flex-wrap:wrap}.learning-evidence{padding:144px 18px 30px}.evidence-library{padding-top:16px}.evidence-card dl{gap:8px}.evidence-format{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.evidence-analyzing>.spin{animation:none}}
 
 @media(max-width:760px){
@@ -79,3 +79,5 @@
 }
 
 .evidence-stage{outline:none;scroll-margin-top:20px}
+
+.capability-workspace-content{height:100%;min-height:0;overflow:hidden}.capability-workspace .conversation-workbench{border:0;border-radius:inherit}.capability-workspace .workbench-header h1{font-size:22px}.capability-workspace .workbench-header p{margin:0;font-size:13px}@media(max-width:760px){.capability-workspace .workbench-header h1{font-size:18px}}

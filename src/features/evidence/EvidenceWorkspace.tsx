@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { X, Upload, FileText, ArrowLeft } from 'lucide-react';
 import { evidenceRequest, readEvidenceLibrary, readEvidenceSource, readEvidenceHistory, uploadEvidence, type EvidenceSourceSummary, type EvidenceSourceDetail , type EvidenceHistory, type EvidenceProposal } from './evidenceClient';
-import { CapabilityConversation } from './CapabilityConversation';
+import { ConversationWorkbenchShell } from '@/shared/components/ConversationWorkbenchShell';
+import { CapabilityConversation, CapabilityWorkbenchContext } from './CapabilityConversation';
 import './evidence.css';
 
 type EvidenceSelection={sourceId?:string;runId?:string};
@@ -28,9 +29,10 @@ export function EvidenceWorkspaceProvider({children,onConfirmed,nodeTitle,previe
  const confirmed=async()=>{await onConfirmed();changed();};
  return <EvidenceContext.Provider value={{open,close,confirmed,nodeTitle,preview,revision,changed,surfaceHost:workspace?surfaceHost:null,foreground:workspace?{courseId:workspace.courseId,...selection}:undefined}}>{children}
   <dialog ref={dialog} className="capability-workspace" onCancel={event=>{event.preventDefault();close();}} aria-labelledby="capability-workspace-title">
-   <AnimatePresence onExitComplete={()=>{if(!workspaceOpen.current){dialog.current?.close();if(returnFocus.current?.isConnected&&!returnFocus.current.closest('[inert]'))returnFocus.current.focus();}}}>{workspace?<motion.div key="workspace" initial={{opacity:0,y:reduced?0:12}} animate={{opacity:1,y:0}} exit={{opacity:0,y:reduced?0:12}} transition={{duration:reduced?0:.24}} className="capability-workspace-content">
-    <header className="capability-workspace-header"><div><span className="evidence-eyebrow">个人能力</span><h1 id="capability-workspace-title">更新我的能力</h1><p>从真实资料中检查能力依据，再决定是否更新。</p></div><button className="evidence-icon-button" aria-label="关闭能力更新工作区" onClick={close}><X size={20}/></button></header>
+   <AnimatePresence onExitComplete={()=>{if(!workspaceOpen.current){dialog.current?.close();if(returnFocus.current?.isConnected&&!returnFocus.current.closest('[inert]'))returnFocus.current.focus();}}}>{workspace?<motion.div key="workspace" initial={false} animate={{opacity:1,y:0}} exit={{opacity:0,y:reduced?0:8}} transition={{duration:reduced?0:.24}} className="capability-workspace-content">
+    <ConversationWorkbenchShell mode="个人能力" title="更新我的能力" titleId="capability-workspace-title" description="从真实资料中检查能力依据，再决定是否更新。" contextLabel={workspace.courseId?'课程项目上下文':'个人能力资料'} action={<button className="atlas-secondary" aria-label="关闭能力更新工作区" onClick={close}><X size={18}/>关闭</button>} context={<CapabilityWorkbenchContext/>}>
     <CapabilityConversation courseId={workspace.courseId} sourceId={workspace.sourceId} initialRunId={workspace.runId} key={`${workspace.courseId??''}:${workspace.sourceId??''}:${workspace.runId??''}`} onContextChange={setSelection}/>
+    </ConversationWorkbenchShell>
    </motion.div>:null}</AnimatePresence>
    <div ref={setSurfaceHost} className="evidence-assistant-host"/>
   </dialog>

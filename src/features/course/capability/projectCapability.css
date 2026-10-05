@@ -1,3 +1,4 @@
+.atlas-graph-page { --project-top-control-band:80px; }
 .project-capability { --project-detail-top:208px; position: absolute; inset: 0; }
 .atlas-route-overlay { --route-current: #6867bc; --route-preview: #087f8c; --route-removed: #a66651; }
 .atlas-route-overlay .route-overlay-current { stroke: var(--route-current); opacity: .8; }
@@ -103,11 +104,11 @@
 }
 
 /* Project information has one centered disclosure; graph inputs remain independent. */
-.project-overview { position:absolute; z-index:4; top:148px; left:50%; transform:translateX(-50%); width:min(600px,calc(100% - 460px)); min-width:280px; border-radius:14px; font-size:12px; }
-.project-overview > summary { cursor:pointer; padding:12px 16px; display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; }
+.project-overview { position:absolute; z-index:4; top:var(--project-top-control-band); left:50%; transform:translateX(-50%); width:min(520px,calc(100% - 720px)); min-width:280px; border-radius:14px; font-size:12px; }
+.project-overview > summary { cursor:pointer; min-height:42px; box-sizing:border-box; padding:10px 14px; display:flex; flex-wrap:nowrap; gap:6px 12px; align-items:center; }
 .project-overview > summary::after { content:'⌄'; margin-left:auto; }
 .project-overview[open] > summary::after { content:'⌃'; }
-.project-overview > summary span { color:#64748b; }
+.project-overview > summary strong { flex:none; }.project-overview > summary span { color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .project-overview-body { padding:0 16px 12px; max-height:36vh; overflow:auto; display:grid; gap:12px; }
 .project-overview-body h3 { font-size:13px; margin:8px 0; }
 .project-overview-body p { margin:4px 0; }
@@ -115,5 +116,5 @@
 .project-relations-list summary { cursor:pointer; }
 .project-relations-list button { display:grid; width:100%; text-align:left; gap:5px; margin-top:8px; }
 .project-relations-list small { color:#64748b; }
-@media(max-width:900px) { .project-overview { top:226px; width:calc(100% - 32px); min-width:0; } .project-capability-editor { top:294px; } }
-@media(max-width:760px) { .project-overview { top:232px; } .project-overview > summary { padding:10px 12px; } .project-overview-body { max-height:30vh; } .project-capability-editor { top:304px; max-height:30vh; } }
+@media(max-width:900px) { .project-overview { top:calc(var(--project-top-control-band) + 92px); width:calc(100% - 32px); min-width:0; } .project-capability-editor { top:294px; } }
+@media(max-width:760px) { .project-overview { top:calc(var(--project-top-control-band) + 92px); } .project-overview > summary { padding:10px 12px; } .project-overview-body { max-height:30vh; } .project-capability-editor { top:304px; max-height:30vh; } }
