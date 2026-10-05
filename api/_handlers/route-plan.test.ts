@@ -9,6 +9,7 @@ import handler from './route-plan';
 const base = '11111111-1111-4111-8111-111111111111';
 const old = '22222222-2222-4222-8222-222222222222';
 const data = { input: { nodeIds: ['A', 'T', 'S', 'X'], currentNodeIds: [], courseOrder: [{ nodeId: 'T', lessonOrder: 0, coverageOrder: 0 }], prerequisiteEdges: [{ id: 'A>T', source: 'A', target: 'T', strength: 'hard' }, { id: 'S>T', source: 'S', target: 'T', strength: 'soft' }] }, nodes: [], states: [] };
+const historicalSnapshot = () => ({valid:true,selectedNodeIds:['A','T'],orderedNodeIds:['A','T'],prerequisiteEdges:[{id:'A>T',source:'A',target:'T',strength:'hard'}],currentKnowledgeIds:['A'],effectiveTargetNodeIds:['T'],bridgeKnowledgeIds:['A'],executionSteps:[{edgeId:'A>T',actionId:old,sourceNodeId:'A',targetNodeId:'T',order:0}]});
 async function invoke(body?: Record<string, unknown>) {
   if(body?.action==='adopt' && body.previewState===undefined && body.baseVersionId){
     const {baseVersionId:_base,action:_action,...intent}=body;
@@ -103,9 +104,33 @@ describe('authoritative V2 route intent API', () => {
   });
   it('restores historical Action references rather than reranking them',async()=>{
     mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A']}});
-    mocks.read.mockResolvedValue({constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{executionSteps:[{edgeId:'A>T',actionId:old,sourceNodeId:'A',targetNodeId:'T',order:0}]}});
+    mocks.read.mockResolvedValue({constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:historicalSnapshot()});
     expect((await invoke({action:'restore',baseVersionId:base,versionId:old})).status).toBe(200);
     expect(mocks.persist.mock.calls[0][9][0].actionId).toBe(old);
+  });
+
+  it('restores the historical execution scope after UKS grows without shrinking it or mutating history',async()=>{
+    const snapshot=historicalSnapshot();const before=structuredClone(snapshot);
+    mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A','T']}});
+    mocks.read.mockResolvedValue({constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot});
+    expect((await invoke({action:'restore',baseVersionId:base,versionId:old})).status).toBe(200);
+    expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['A','T']);
+    expect(mocks.persist.mock.calls[0][9]).toEqual(before.executionSteps);
+    expect(mocks.persist.mock.calls[0].slice(5,8)).toEqual([base,'restore',old]);
+    expect(snapshot).toEqual(before);
+  });
+
+  it.each(['node','relation','action','order'])('rejects invalid historical %s without replacing decisions or writing a version',async(kind)=>{
+    const snapshot=historicalSnapshot();
+    mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A','T'],
+      ...(kind==='node'?{nodeIds:['T','S','X']}:{ }),
+      ...(kind==='relation'?{prerequisiteEdges:[]}:{ })}});
+    if(kind==='action')mocks.options.mockResolvedValue([{edgeId:'A>T',actionId:base,title:'Other',type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[]}]);
+    if(kind==='order')snapshot.executionSteps[0].order=1;
+    const before=structuredClone(snapshot);
+    mocks.read.mockResolvedValue({constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot});
+    expect((await invoke({action:'restore',baseVersionId:base,versionId:old})).status).toBe(422);
+    expect(mocks.persist).not.toHaveBeenCalled();expect(snapshot).toEqual(before);
   });
 
   it('Action-only Preview and Adopt keep formal scope after target capability is acquired',async()=>{
