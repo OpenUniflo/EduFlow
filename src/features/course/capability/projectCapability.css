@@ -152,3 +152,6 @@
  .route-bottom-bar { left:12px; right:12px; bottom:12px; flex-wrap:wrap; padding:10px 12px; gap:8px; }.route-bottom-bar>div:first-child { width:100%; max-height:80px; font-size:12px; }.route-bottom-bar .route-planning-actions { margin-left:auto; }
  .route-planning-hint { top:384px; }.project-capability:has(.route-planning-header) .project-capability-controls { bottom:122px; }
 }
+
+/* The application-owned Assistant must not cover explicit planning decisions. */
+.eduflow-assistant.project-planning-assistant { display:none; }

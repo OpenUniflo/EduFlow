@@ -21,3 +21,6 @@
 .eduflow-assistant .assistant-open-full { justify-content: flex-end; color: var(--atlas-muted); font-weight: 500; }
 @media(max-width:620px) { .eduflow-assistant.course-design-assistant { right: 12px; bottom: 24px; } .eduflow-assistant .eduflow-assistant-panel { width: calc(100vw - 24px); max-height: calc(100dvh - 170px); } }
 @media(prefers-reduced-motion:reduce) { .eduflow-assistant.course-design-assistant, .eduflow-assistant .course-design-assistant-trigger { transition: none; } .eduflow-assistant .course-design-assistant-trigger:hover { transform: none; } .eduflow-assistant .spin { animation: none; } }
+
+/* The full Workbench already owns a conversation and stable Composer. */
+body:has(.conversation-workbench) .eduflow-assistant { display:none; }

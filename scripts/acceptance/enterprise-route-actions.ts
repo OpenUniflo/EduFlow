@@ -40,7 +40,16 @@ export function enterpriseActionFixture(){
 }
 const quote=(value:unknown)=>`'${(typeof value==='string'?value:JSON.stringify(value)).replace(/'/g,"''")}'`;
 /** Upgrade only two existing Gold tasks; no user state, IDs or relationship writes. */
-export function practiceGoldUpdateSql(){return practiceGold.assignments.map(task=>`update course_assignments set title=${quote(task.title)},description=${quote(task.description)},requirements=${quote(task.requirements)}::jsonb,expected_output=${quote(task.expected_output)},acceptance_criteria=${quote(task.acceptance_criteria)}::jsonb,experience=${quote(task.experience)}::jsonb where course_id=${quote(practiceGold.courseId)} and id=${quote(task.id)};`).join('\n');}
+export function practiceGoldUpdateSql(){
+ const tasks=practiceGold.assignments.map(task=>`update course_assignments set title=${quote(task.title)},description=${quote(task.description)},requirements=${quote(task.requirements)}::jsonb,expected_output=${quote(task.expected_output)},acceptance_criteria=${quote(task.acceptance_criteria)}::jsonb,experience=${quote(task.experience)}::jsonb where course_id=${quote(practiceGold.courseId)} and id=${quote(task.id)};`);
+ const actions=practiceGold.actions.flatMap(link=>{
+  const task=practiceGold.assignments.find(task=>task.id===link.assignmentId)!;
+  const scope=`course_id=${quote(practiceGold.courseId)} and assignment_id=${quote(task.id)} and action_id=${quote(link.actionId)}::uuid`;
+  return [`update knowledge_edge_actions set description=${quote(task.experience.prompt)},expected_evidence=${quote(task.expected_output)} where id=${quote(link.actionId)}::uuid and exists(select 1 from course_action_bindings where ${scope});`,
+   `update course_action_bindings set context=${quote(task.description)},instructions=${quote(task.requirements.join('\n'))},resources=${quote([{key:link.resourceKey,label:link.resourceLabel,reference:task.description,available:true}])}::jsonb where ${scope};`];
+ });
+ return [...tasks,...actions].join('\n');
+}
 export function fixtureSQL(){
  const f=enterpriseActionFixture();
  const records:Array<[string,Record<string,unknown>[]]>=[['micro_learning_paths',f.paths],['micro_units',f.units],['micro_steps',f.steps],['course_assignments',f.assignments],['assignment_coverages',f.coverages],['knowledge_edge_actions',f.actions.map(({target:_t,variant:_v,...a})=>a)],['course_action_bindings',f.bindings]];

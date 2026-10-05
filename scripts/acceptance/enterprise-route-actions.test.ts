@@ -25,3 +25,7 @@ it('Gold upgrade is limited to two existing curriculum tasks and leaves user his
  const sql=practiceGoldUpdateSql();expect(sql.match(/update course_assignments/g)).toHaveLength(2);expect(sql).not.toMatch(/insert|delete|user_knowledge_states|edge_action_runs|knowledge_edges/);expect(sql).toContain("course_id='enterprise-vietnam-supply-collaboration'");
  for(const a of enterpriseActionFixture().assignments.filter(a=>a.id.endsWith('-record'))){expect(a.requirements.length).toBeGreaterThanOrEqual(3);expect(a.acceptance_criteria.length).toBeGreaterThanOrEqual(3);expect(a.description).toContain('教学场景');expect(a.experience.type).not.toBe('trace');}
 });
+
+it('Gold Action context is generated from the same task input and output, with stable identities',()=>{
+ const sql=practiceGoldUpdateSql();expect(sql.match(/update knowledge_edge_actions/g)).toHaveLength(2);expect(sql.match(/update course_action_bindings/g)).toHaveLength(2);expect(sql).toContain("assignment_id='enterprise-route-action-v3-impact-record'");expect(sql).toContain('当前可用物料 30 件');expect(sql).toContain('10 月 6 日 16:00');expect(sql).not.toContain('2026-10-09');expect(sql).not.toContain('每小时10件');
+});
