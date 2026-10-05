@@ -26,7 +26,7 @@ One Edge can expose multiple Actions. Supported execution types are micro_learni
 
 An unacquired source makes an Action unavailable with the explanation that the source capability must first be formed. Exploration remains possible. Recommendations sort available first, then ascending weight, then stable Action ID; recommendation is not selection. Changing an in-progress Action requires explicit confirmation. Repetition creates a new Run and preserves history. Runs remain discoverable after route changes.
 
-Completion is not acquisition or mastery. Results enter the existing Evidence/candidate/confirmation pipeline. Existing Micro and Assignment evidence authority remains intact; ActionRun adds no capability mutation authority.
+Completion is not acquisition or mastery. Results enter the existing Evidence/candidate/confirmation pipeline. Micro and Assignment completion preserve progress and Evidence; only explicit Evidence Diagnosis Proposal confirmation changes UKS. ActionRun adds no capability mutation authority.
 
 ## Shared detail and navigation
 
@@ -40,7 +40,7 @@ Evidence Library is a long-lived asset library with summary loading and source d
 
 ## Compatibility and acceptance
 
-Hosted Preview shares Production Supabase. Changes must be additive and compatible, with no destructive migrations, table/column removal or Production promotion. Local committed migrations are authoritative. Preserve RLS, evidence lineage, formal route versions and existing execution authority.
+All environments are test-stage. Applied migrations remain immutable; new migrations may remove superseded semantics without destructive reset. Feature Preview suffices; no Production promotion. Local committed migrations are authoritative. Preserve RLS, evidence lineage, formal route versions and existing execution authority.
 
 Each phase requires relevant automatic tests, independent review, and actual browser validation. Final acceptance follows the new 45 criteria, full tests, typecheck, lint, build, audits, migration/advisor checks, READY Preview and fresh desktop/390×844 screenshots. Both authorized test accounts need distinct states and complete formal Routes, with at least two active executable alternatives on every plannable project Edge and at least three on key Edges. Fixtures extend Actions/resources only and never invent Knowledge facts. Once the current embedding configuration has a real successful call, intermittent external timeouts are a known reliability limitation rather than a blocker for this frontend/Route/Action goal. Judgment standards and retrieval remain unchanged.
 
@@ -59,3 +59,7 @@ Bridge 的课程上下文 Practice 仍使用既有 CourseAssignment / Assignment
 ## Conversation extension · 2026-10-05
 
 Practice and capability update share ConversationWorkspace UI and existing Assistant persistence. Ordinary chat never becomes Evidence. Explicit Practice submission uses the existing Assignment backend; real attachments use private Evidence sources. Conversation Practice completion does not update capability. See [Conversation and Evidence contract](CONVERSATION_EVIDENCE_CONTRACT.md). Formal Route remains unchanged after capability confirmation; Project Preview and explicit Adopt remain the only adjustment path.
+
+## Practice performance boundary · 2026-10-05
+
+ActionRun selected → in_progress → completed means a formal user submission and its Attempt + PerformanceResult have committed, regardless of passed/failed/pending. A completed Run is never reopened; another practice uses a new Run and numbered Attempt. Idempotent transport retries return the original Attempt. PerformanceResult alone records quality. Failed and pending user work remain eligible Evidence. Assignment submission and teacher review never mutate UKS; Evidence → Diagnosis → Proposal → explicit Confirm owns capability changes. Confirm never adopts a Route. Preview is non-authoritative; explicit Adopt creates immutable history. Material/Micro start and Micro completion no longer write UKS. The former completion-to-learned and Assignment/Micro conjunction-to-mastered shortcuts are removed. Existing capability history is preserved.

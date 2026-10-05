@@ -41,6 +41,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession |
     ...runtime.chapters.map((chapter) => chapter.title),
     ...graphData.knowledgeNodes.map((node) => node.title)
   ].some((value) => value.toLowerCase().includes(needle)));
+  const emptyMine = tab === "mine" && tabCourses.length === 0;
   const recent = session ? [...courses].filter(({ runtime,state,summary }) => runtime.course.lifecycle === "published" && state?.isActive && summary).sort((left, right) => (right.summary?.updatedAt ?? "").localeCompare(left.summary?.updatedAt ?? ""))[0] : undefined;
   const learningCount = courses.filter((item) => item.runtime.course.lifecycle === "published" && item.state?.isActive).length;
 
@@ -61,7 +62,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession |
       <div className="atlas-content-wrap">
         <section className="atlas-course-title atlas-course-title-row"><div><h1>课程中心</h1><p>{session ? "标准课程与仅你可见的个人课程共用同一课程体系；我的课程只包含你主动选择或开始的课程。" : "无需登录即可浏览已发布的标准课程；个人课程、进度与我的课程会在登录后显示。"}</p></div><span className="atlas-pill">{courses.length} 门可见课程{session ? ` · ${learningCount} 门我的课程` : ""}</span></section>
         {session?<nav className="learning-view-tabs" aria-label="课程范围"><button className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>我的课程</button><button className={tab === "all" ? "active" : ""} onClick={() => setTab("all")}>全部课程</button></nav>:null}
-        <div className="atlas-course-actions"><label className="atlas-course-search glass-v2"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索课程、篇章或知识点…" aria-label="搜索课程" /></label><button className="atlas-secondary" onClick={() => { setQuery(""); setTab("all"); }}><Layers3 size={16} /> 浏览全部课程</button></div>
+        {!emptyMine ? <div className="atlas-course-actions"><label className="atlas-course-search glass-v2"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索课程、篇章或知识点…" aria-label="搜索课程" /></label><button className="atlas-secondary" onClick={() => { setQuery(""); setTab("all"); }}><Layers3 size={16} /> 浏览全部课程</button></div> : null}
         {recent?.summary ? <section className="atlas-course-section">
           <div className="atlas-section-row"><div><span className="atlas-kicker">RECENT</span><h2>最近学习</h2></div></div>
           <article className="atlas-featured-course glass-v2" onClick={() => navigate(`/courses/${recent.runtime.course.id}`)}>
@@ -71,15 +72,15 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession |
         </section> : null}
         <section className="atlas-course-section">
           <div className="atlas-section-row"><h2>{tab === "mine" ? "我的课程" : "全部课程"}</h2><span>{visible.length} 门课程</span></div>
-          <div className="atlas-course-grid">
+          {emptyMine ? <article className="learning-empty learning-empty-course glass-v2"><span className="atlas-kicker">开始你的学习</span><h3>选择第一门课程</h3><p>这里会保存你主动开始的课程与学习进度。<br/>先看看公开课程，找到想完成的项目。</p><button className="atlas-primary" onClick={() => { setQuery(""); setTab("all"); }}>浏览全部课程 <ArrowRight size={15}/></button></article> : <div className="atlas-course-grid">
             {visible.map(({ runtime, summary, state, graphData }) => {
               const personalDraft = runtime.course.courseType === "personal" && runtime.course.lifecycle === "draft";
               const personal = runtime.course.courseType === "personal";
               const sourceCourse = runtime.course.sourceCourseId ? courses.find((item) => item.runtime.course.id === runtime.course.sourceCourseId)?.runtime.course : undefined;
               return <article className="atlas-course-card" key={runtime.course.id} onClick={() => navigate(`/courses/${runtime.course.id}`)}><div className="atlas-card-accent" style={{ background: runtime.course.accentColor }} /><div className="atlas-pill">{personalDraft ? "课程草稿" : personal ? "已发布 · 个人课程" : state?.isActive ? "我的课程" : "标准课程"} · {runtime.course.title}</div><h3>{runtime.course.subtitle ?? runtime.course.title}</h3><p>{runtime.course.description}</p>{personal ? <div className="atlas-course-meta"><span>来源目标：{runtime.course.targetOutcome ?? "未记录"}</span>{sourceCourse ? <span>参考课程：{sourceCourse.title}</span> : null}<span>最后修改：{runtime.course.updatedAt ? new Date(runtime.course.updatedAt).toLocaleString("zh-CN") : "时间未知"}</span></div> : null}{pathPreview(runtime.chapters)}<div className="atlas-course-meta"><span>{runtime.lessons.length} 课</span><span>{graphData.knowledgeNodes.length} 个学习内容</span><span>{runtime.assignments.length} 个实践任务</span></div>{session&&summary&&!personalDraft?<div className="atlas-progress-row"><span>实践进度</span><div className="atlas-progress-track"><i style={{ width: `${summary.progress}%` }} /></div><strong>{summary.progress}%</strong></div>:null}<div className="atlas-card-actions">{personalDraft ? <><button className="atlas-primary" disabled={!runtime.course.creationBriefMessageId} onClick={(event) => { event.stopPropagation(); if (runtime.course.creationBriefMessageId) navigate(`/courses/create?briefId=${encodeURIComponent(runtime.course.creationBriefMessageId)}`); }}>继续创建</button><button className="atlas-secondary" onClick={(event) => { event.stopPropagation(); navigate(`/courses/${runtime.course.id}`); }}>预览草稿</button></> : !session?<button className="atlas-primary">浏览课程</button>:state?.isActive ? <><button className="atlas-primary" onClick={(event) => { event.stopPropagation(); navigate(`/courses/${runtime.course.id}`); }}>继续课程</button><button className="atlas-secondary" disabled={membershipBusy === runtime.course.id} onClick={(event) => { event.stopPropagation(); void setMembership(runtime.course.id, false); }}>移出我的课程</button></> : <button className="atlas-primary" disabled={membershipBusy === runtime.course.id} onClick={(event) => { event.stopPropagation(); void setMembership(runtime.course.id, true); }}>开始课程</button>}</div></article>;
             })}
-            {!visible.length && tab === "mine" ? <article className="learning-empty"><h3>你还没有开始任何课程</h3><p>浏览公开课程；开始课程只会加入“我的课程”，不会自动开始第一个学习内容。</p><button className="atlas-primary" onClick={() => setTab("all")}>浏览全部课程 <ArrowRight size={15}/></button></article> : null}
-          </div>
+            {!visible.length ? <p className="course-search-empty" role="status">没有匹配的课程，请调整搜索内容。</p> : null}
+          </div>}
         </section>
       </div>
     </main>

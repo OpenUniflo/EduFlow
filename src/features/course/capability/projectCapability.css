@@ -118,3 +118,37 @@
 .project-relations-list small { color:#64748b; }
 @media(max-width:900px) { .project-overview { top:calc(var(--project-top-control-band) + 92px); width:calc(100% - 32px); min-width:0; } .project-capability:has(.project-overview[open]) :is(.project-capability-toolbar,.project-capability-editor) { display:none; } .project-capability-editor { top:294px; } }
 @media(max-width:760px) { .project-overview { top:calc(var(--project-top-control-band) + 92px); } .project-overview > summary { padding:10px 12px; } .project-overview-body { max-height:30vh; } .project-capability-editor { top:304px; max-height:30vh; } }
+/* Planning controls float over the stable graph; only the current inspector scrolls. */
+.route-planning-header { position:absolute; z-index:6; top:148px; left:24px; right:24px; display:flex; align-items:center; gap:12px; padding:10px 14px; border-radius:16px; }
+.route-planning-header strong,.route-planning-header small { display:block; }
+.route-planning-header small { margin-top:4px; color:var(--atlas-muted); }
+.route-header-actions { margin-left:auto; display:flex; gap:8px; }
+.route-structure-tools { position:absolute; z-index:5; left:24px; top:226px; display:flex; align-items:flex-start; gap:6px; padding:8px; border-radius:14px; }
+.route-structure-tools .project-capability-search { background:none; border:0; box-shadow:none; padding:0; }
+.route-edge-inspector { position:absolute; z-index:5; right:24px; top:226px; width:310px; box-sizing:border-box; max-height:calc(100vh - 354px); overflow:auto; padding:18px; border-radius:18px; animation:route-inspector-enter 160ms ease-out; }
+.route-edge-inspector header { display:flex; justify-content:space-between; align-items:center; }
+.route-edge-inspector h3 { font-size:15px; line-height:1.6; }
+.route-edge-inspector fieldset { border:0; padding:0; min-width:0; }
+.route-edge-inspector .route-action-choice { display:flex; gap:8px; margin:8px 0; padding:10px; background:var(--surface-raised,#fff); border:1px solid #dbe3ee; border-radius:10px; }
+.route-action-choice:has(input:checked) { border-color:#8c91d1; background:#f0f0fb; }
+.route-action-choice input { flex:none; margin-top:4px; }
+.route-planning-hint { position:absolute; top:288px; left:24px; max-width:250px; padding:10px 14px; border-radius:12px; pointer-events:none; }
+.route-bottom-bar { position:absolute; z-index:6; left:24px; right:24px; bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 18px; border-radius:18px; box-sizing:border-box; }
+.route-bottom-bar p { margin:4px 0; }.route-bottom-bar .route-planning-actions { flex:none; margin:0; }
+.route-bottom-bar>div:first-child { max-height:100px; overflow:auto; }
+.project-capability:has(.route-planning-header) .project-capability-controls { bottom:116px; }
+.route-planning button.atlas-primary { background:var(--atlas-primary,#4f46a5); border-color:transparent; color:#fff; }
+.route-modal-backdrop { position:fixed; inset:0; z-index:200; display:grid; place-items:center; padding:20px; background:#17233855; backdrop-filter:blur(5px); }
+.route-modal { box-sizing:border-box; width:min(640px,100%); padding:24px; border-radius:20px; max-height:calc(100dvh - 40px); overflow:auto; }
+.route-modal header { display:flex; align-items:center; justify-content:space-between; }.route-modal h2 { font-size:18px; margin:0 0 12px; }
+.route-modal p { font-size:13px; line-height:1.7; }.route-history-row { box-sizing:border-box; }
+@keyframes route-inspector-enter { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+@media(prefers-reduced-motion:reduce) { .route-edge-inspector { animation:none; } }
+@media(max-width:900px) { .route-planning-header { top:226px; left:12px; right:12px; }.route-structure-tools,.route-edge-inspector { top:308px; }.route-edge-inspector { right:12px; max-height:calc(100dvh - 442px); }.route-structure-tools { left:12px; }.route-planning-hint { top:366px; left:12px; } }
+@media(max-width:760px) {
+ .route-planning-header { top:218px; padding:8px; gap:6px; flex-wrap:wrap; }.route-planning-header>div:nth-child(2) { flex:1; }.route-header-actions { margin-left:auto; }.route-planning-header small { font-size:10px; }
+ .route-structure-tools { top:326px; right:12px; }.route-structure-tools .project-capability-search:has(input) { position:absolute; left:0; right:0; top:48px; width:auto; padding:12px; background:#fff; }
+ .route-edge-inspector { top:auto; bottom:126px; left:12px; right:12px; width:auto; max-height:33dvh; padding:12px; }.route-edge-inspector h3 { margin:4px 0; }.route-edge-inspector>p { margin:4px 0; }
+ .route-bottom-bar { left:12px; right:12px; bottom:12px; flex-wrap:wrap; padding:10px 12px; gap:8px; }.route-bottom-bar>div:first-child { width:100%; max-height:80px; font-size:12px; }.route-bottom-bar .route-planning-actions { margin-left:auto; }
+ .route-planning-hint { top:384px; }.project-capability:has(.route-planning-header) .project-capability-controls { bottom:122px; }
+}

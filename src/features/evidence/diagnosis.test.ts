@@ -206,3 +206,17 @@ it.each([false,true])('bounds parallel verification and settles failures before 
  }
  expect(peak).toBe(2);expect(active).toBe(0);expect(completed.slice(0,2)).toEqual(['node-2','node-0']);
 });
+
+it.each([
+ {outcomes:['failed'],status:'learning'},
+ {outcomes:['pending'],status:'learned'},
+ {outcomes:['failed','passed'],status:'learned'},
+])('reads complete context at judgment and verification, respects $outcomes without turning context into quotes',async ({outcomes,status})=>{
+ const contexts=outcomes.map((outcome,index)=>({courseId:'course',assignment:{id:'task',title:'Practice',scenario:'case',requirements:['compute'],expectedOutput:'record',acceptanceCriteria:['correct calculation'],experience:{type:'answer'}},knowledgeIds:['net'],attempt:{id:`attempt-${index}`,number:index+1,submittedAt:'date',response:{kind:'answer',text:'user work'}},performanceResult:{id:`result-${index}`,version:1,outcome,feedback:{message:'formal feedback'},evaluator_kind:'rule',evaluated_at:'date'},actionRun:{id:`run-${index}`,status:'completed',executionSnapshot:{}},action:{id:'action',edge_id:'edge',title:'Act',type:'practice_task',description:'do',expected_evidence:'record'},edge:{id:'edge',source_node_id:'input',target_node_id:'net',relation:'enables'}})) as import('./evidenceTypes').PracticeEvidenceContext[];
+ const input={...source,practiceContexts:contexts};
+ const generateJson=vi.fn().mockResolvedValueOnce({value:{units:[unit]},metadata:{stage:'extraction'}}).mockResolvedValueOnce({value:{judgments:{net:{unitIndexes:[0],sufficiency:'supported',confidence:1,reason:'checked original'}}},metadata:{stage:'admission'}}).mockResolvedValueOnce(verified);
+ const result=await diagnoseEvidence([input],{generateJson} as unknown as StructuredGenerationClient,async()=>[node]);
+ for(const index of [1,2])expect(JSON.parse(generateJson.mock.calls[index][0].user).sources[0].practiceContexts).toEqual(contexts);
+ expect(result.matches[0].proposedStatus).toBe(status);expect(result.artifacts.practiceContexts).toEqual([{sourceId:'source',contexts}]);
+ expect(()=>validateObservations({units:[{...unit,quote:'formal feedback'}]},[input])).toThrow(/untraceable/);
+});

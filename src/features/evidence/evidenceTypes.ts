@@ -10,3 +10,15 @@ export type EvidenceRun = {id:string;source_ids:string[];status:'running'|'compl
 export type EvidenceSourceDetail = {source:EvidenceSource;units:EvidenceUnit[];proposals:EvidenceProposal[];runs:EvidenceRun[]};
 export type EvidenceRunDetail = {run:EvidenceRun;sources:Pick<EvidenceSource,'id'|'title'>[];units:EvidenceUnit[];proposals:EvidenceProposal[]};
 export type EvidenceHistory = {runs:EvidenceRun[];nextCursor:string|null};
+
+/** Dynamic provenance, separate from quotable user lines. */
+export type PracticeEvidenceContext = {
+  courseId: string;
+  assignment: { id: string; title: string; scenario: string; requirements: string[]; expectedOutput: string; acceptanceCriteria: string[]; experience: unknown };
+  knowledgeIds: string[];
+  attempt: { id: string; number: number; submittedAt: string; response: import('@/shared/learning/assignmentAttempt').AssignmentResponse };
+  performanceResult: { id: string; version: number; outcome: 'passed'|'failed'|'pending'; score?: number; feedback: unknown; evaluator_kind: string; evaluated_at: string };
+  actionRun: { id: string; status: string; executionSnapshot: unknown } | null;
+  action: { id: string; edge_id: string; title: string; type: string; description: string; expected_evidence: string } | null;
+  edge: { id: string; source_node_id: string; target_node_id: string; relation: string; prerequisite_strength?: string; reason?: string } | null;
+};

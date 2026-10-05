@@ -9,6 +9,7 @@ import { createEmbeddingService } from '../_lib/embedding.js';
 import { readEmbeddingEnvironment, readLlmEnvironment } from '../_lib/env.js';
 import { OpenAICompatibleJsonGenerationClient } from '../_lib/llm.js';
 import { diagnoseEvidence,EvidenceDiagnosisError, EVIDENCE_PROMPT_VERSION, EVIDENCE_TOP_K, parseEvidenceText, type RetrievedKnowledge } from '../../src/features/evidence/diagnosis.js';
+import { practiceContextsForSource } from '../_lib/practiceContext.js';
 
 export const maxDuration=300;
 const uploadSchema=z.object({action:z.literal('upload'),title:z.string().trim().min(1).max(240),contentType:z.enum(['text/plain','text/markdown','text/csv']),size:z.number().int().min(1).max(1048576),courseId:z.string().optional(),assignmentId:z.string().optional(),actionRunId:z.string().uuid().optional(),supplement:z.boolean().optional()}).strict();
@@ -132,7 +133,7 @@ export default handleApi(async(request,response)=>{
     const created=await server.from('capability_diagnosis_runs').insert({user_id:user.id,source_ids:body.sourceIds,model:env.llmModel,prompt_version:EVIDENCE_PROMPT_VERSION}).select().single();
     const run=dataOrThrow(created.data,created.error,'Diagnosis creation');
     try {
-      const diagnosis=await diagnoseEvidence(sources.map(source=>({id:source.id,lines:source.parsed_lines})),new OpenAICompatibleJsonGenerationClient(env,fetch,120000),async(capability)=>{
+      const diagnosis=await diagnoseEvidence(await Promise.all(sources.map(async source=>({id:source.id,lines:source.parsed_lines,practiceContexts:await practiceContextsForSource(client,user.id,source)}))),new OpenAICompatibleJsonGenerationClient(env,fetch,120000),async(capability)=>{
         const vector=await createEmbeddingService(embeddingEnv).embed(capability);
         const matches=await server.rpc('retrieve_evidence_knowledge',{p_embedding:JSON.stringify(vector),p_model:embeddingEnv.embeddingModel,p_limit:EVIDENCE_TOP_K});
         const nodes=dataOrThrow(matches.data,matches.error,'Knowledge retrieval') as RetrievedKnowledge[];

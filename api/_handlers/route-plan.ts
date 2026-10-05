@@ -1,3 +1,4 @@
+import { routePreviewState } from '../_lib/routePreviewState.js';
 import { z } from 'zod';
 import { handleApi, ApiError, json, methodNotAllowed } from '../_lib/http.js';
 import { createUserSupabase } from '../_lib/supabase.js';
@@ -12,7 +13,7 @@ const intent = { includeNodeIds: ids, excludeNodeIds: ids };
 const choices = { actionChoices:z.array(z.object({edgeId:z.string().min(1).max(512),actionId:z.uuid()}).strict()).max(10000).optional(), selectedEdgeIds:ids.optional(), scopeMode:z.enum(['current','replan']).optional() };
 const bodySchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('preview'), ...intent,...choices }).strict(),
-  z.object({ action: z.literal('adopt'), baseVersionId: z.uuid(), ...intent,...choices }).strict(),
+  z.object({ action: z.literal('adopt'), baseVersionId: z.uuid(), previewState:z.string().regex(/^[a-f0-9]{64}$/), ...intent,...choices,actionChoices:choices.actionChoices.unwrap(),selectedEdgeIds:ids }).strict(),
   z.object({ action: z.literal('restore'), baseVersionId: z.uuid(), versionId: z.uuid() }).strict(),
 ]);
 export default handleApi(async (request, response) => {
@@ -48,12 +49,15 @@ export default handleApi(async (request, response) => {
   if (!plan.valid) throw new ApiError(422, 'route_constraints_conflict', '当前规划约束无法满足。', { conflicts: plan.conflicts });
   const executionChoices = historical ? historical.snapshot?.executionSteps : body.action !== 'restore' ? body.actionChoices : undefined;
   const selectedEdgeIds = historical ? historical.snapshot?.executionSteps?.map(step=>step.edgeId) : body.action !== 'restore' ? body.selectedEdgeIds : undefined;
-  const execution = await readRouteActionOptions(client,courseId,data.input,plan.route,user.id).then(options=>planRouteExecution({route:plan.route,
+  const options=await readRouteActionOptions(client,courseId,data.input,plan.route,user.id);
+  const execution = planRouteExecution({route:plan.route,
     facts:[...data.input.prerequisiteEdges.map(edge=>({...edge,relation:'prerequisite' as const})),...(data.input.enablesEdges??[])],
-    options,choices:executionChoices,selectedEdgeIds,acquiredNodeIds:data.input.currentNodeIds}));
-  if (body.action === 'preview') { json(response,200,{plan:{...plan,execution},baseVersionId:active?.id??null});return; }
-  // Legacy callers may still adopt node-only snapshots; new explicit decisions and
-  // restored execution snapshots must be complete and never silently substituted.
+    options,choices:executionChoices,selectedEdgeIds,acquiredNodeIds:data.input.currentNodeIds});
+  const previewState=routePreviewState(data.input,data.states,constraints,active?.id??null,options,{selectedNodeIds:plan.route.selectedNodeIds,steps:execution.steps});
+  if(body.action==='adopt' && body.previewState!==previewState)throw new ApiError(409,'route_preview_stale','能力或路线状态已经变化，需要重新计算路线。');
+  if (body.action === 'preview') { json(response,200,{plan:{...plan,execution},baseVersionId:active?.id??null,previewState});return; }
+  // New adoption always carries explicit execution decisions. Historical node-only
+  // snapshots remain readable and retain their existing restoration contract.
   const explicitExecution = historical ? historical.snapshot?.executionSteps !== undefined : body.action !== 'restore' && (body.actionChoices !== undefined || body.selectedEdgeIds !== undefined);
   if (explicitExecution && (!execution.complete || execution.steps.some(step=>!executionChoices?.some(choice=>choice.edgeId===step.edgeId && choice.actionId===step.actionId)))) throw new ApiError(422,'route_actions_incomplete','请为每条路线关系选择合法行动后再采用。',{issues:execution.issues});
   // No snapshot, route node list, user identity, or preview result is accepted from the browser.

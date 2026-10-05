@@ -21,15 +21,15 @@ describe('V2 route UI authority and historical meaning', () => {
   it('ordinary view hides Include/Exclude editor even when constraints are persisted', () => {
     const c = { view: { activeVersion: { ...version, constraints: { includeNodeIds: ['A'], excludeNodeIds: ['B'] } }, plan: { valid: true, route: version.snapshot } }, busy: false, editing: false, preview: null, history: null } as unknown as ReturnType<typeof useRoutePlanning>;
     const html = renderToStaticMarkup(<RoutePlanningPanel control={c} title={id => id}/>);
-    expect(html).not.toContain('当前路线 V1'); expect(html).toContain('调整学习路线'); expect(html).not.toContain('版本历史'); expect(html).not.toContain('重新载入'); expect(html).not.toContain('选择加入'); expect(html).not.toContain('选择排除');
+    expect(html).not.toContain('当前路线 V1'); expect(html).toContain('调整学习路线'); expect(html).toContain('版本历史'); expect(html).not.toContain('重新载入'); expect(html).not.toContain('选择加入'); expect(html).not.toContain('选择排除');
   });
   it('route editing exposes history, constraints and Preview/diff while invalid current routes remain explicit', () => {
     const c = { view: { activeVersion: version, plan: { valid: false, conflicts: [{ kind: 'include_outside_model', rootNodeId: 'old', rootKind: 'include', nodeId: 'old', constraint: 'include' }] } }, busy: false, editing: true, tool: 'include', draft: { includeNodeIds: ['A'], excludeNodeIds: [] }, preview: { valid: true, route: version.snapshot }, history: [] } as unknown as ReturnType<typeof useRoutePlanning>;
     const html = renderToStaticMarkup(<RoutePlanningPanel control={c} title={id => id}/>);
-    for (const text of ['当前路线 V1', '版本历史', '重新载入当前路线', '选择加入', '选择排除', '清空修改', '重新规划路线', '退出调整', '路线 Preview', '采用新路线', '该能力不在当前项目能力模型中']) expect(html).toContain(text);
+    for (const text of ['当前 V1', '历史版本', '重新载入', '加入能力', '排除能力', '退出路线调整', 'Preview：', '采用新路线']) expect(html).toContain(text);
     const ordinary = renderToStaticMarkup(<RoutePlanningPanel control={{ ...c, editing: false }} title={id => id}/>);
     expect(ordinary).toContain('当前正式路线需要调整');
-    expect(ordinary).not.toContain('路线 Preview'); expect(ordinary).not.toContain('版本历史');
+    expect(ordinary).not.toContain('路线 Preview'); expect(ordinary).toContain('版本历史');
   });
   it('same structural graph does not depend on draft, preview or route version, and no role rings remain', () => {
     const scene = readFileSync('src/features/knowledge/components/KnowledgeAtlasScene.tsx', 'utf8');
@@ -40,8 +40,17 @@ describe('V2 route UI authority and historical meaning', () => {
   it('explains an acquired-boundary enables choice from structural facts instead of candidate scope',()=>{
     const step={edgeId:'real-enables',actionId:'chosen',sourceNodeId:'A',targetNodeId:'B',order:0};
     const c={view:{activeVersion:{...version,snapshot:{...version.snapshot,executionSteps:[step]}},model:{supportEdges:[]},plan:{valid:true,route:version.snapshot},execution:{options:[{edgeId:step.edgeId,actionId:step.actionId,title:'已选行动',type:'micro_learning',estimatedMinutes:8,planningAvailable:true,availableNow:true,reasons:[]}]}},editing:true,draft:{includeNodeIds:[],excludeNodeIds:[]},actionChoices:[step],selectedEdgeIds:[step.edgeId],busy:false} as unknown as ReturnType<typeof useRoutePlanning>;
-    const html=renderToStaticMarkup(<RoutePlanningPanel control={c} title={id=>`能力${id}`} relations={[{id:step.edgeId,source:'A',target:'B',relation:'enables',strength:.5,reason:'真实支撑'}]}/>);
-    expect(html).toContain('<legend>能力A → 能力B</legend>');expect(html).toContain('已选行动');
+    const html=renderToStaticMarkup(<RoutePlanningPanel control={c} edgeId={step.edgeId} title={id=>`能力${id}`} relations={[{id:step.edgeId,source:'A',target:'B',relation:'enables',strength:.5,reason:'真实支撑'}]}/>);
+    expect(html).toContain('能力A → 能力B');expect(html).toContain('已选行动');
   });
 
+});
+
+it('current inspector contains only the selected factual Edge alternatives',()=>{
+ const option=(edgeId:string,title:string)=>({edgeId,actionId:title,title,type:'practice_task',estimatedMinutes:20,weight:20,planningAvailable:true,availableNow:true,reasons:[]});
+ const c={view:{activeVersion:version,plan:{valid:true,route:version.snapshot},execution:{options:[option('ab','本关系成果'),option('bc','其他关系成果')]}},editing:true,actionChoices:[],draft:{includeNodeIds:[],excludeNodeIds:[]}} as unknown as ReturnType<typeof useRoutePlanning>;
+ const facts=[{id:'ab',source:'A',target:'B',relation:'enables' as const,strength:.5,reason:'真实关系'}];
+ const html=renderToStaticMarkup(<RoutePlanningPanel control={c} relations={facts} edgeId="ab" title={id=>id}/>);
+ expect(html).toContain('本关系成果');expect(html).not.toContain('其他关系成果');expect(html).toContain('路线调整操作区');expect(html).toContain('退出路线调整');
+ const empty=renderToStaticMarkup(<RoutePlanningPanel control={c} relations={facts} title={id=>id}/>);expect(empty).not.toContain('本关系成果');expect(empty).toContain('点击图中能力');
 });

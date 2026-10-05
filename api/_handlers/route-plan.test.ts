@@ -10,6 +10,10 @@ const base = '11111111-1111-4111-8111-111111111111';
 const old = '22222222-2222-4222-8222-222222222222';
 const data = { input: { nodeIds: ['A', 'T', 'S', 'X'], currentNodeIds: [], courseOrder: [{ nodeId: 'T', lessonOrder: 0, coverageOrder: 0 }], prerequisiteEdges: [{ id: 'A>T', source: 'A', target: 'T', strength: 'hard' }, { id: 'S>T', source: 'S', target: 'T', strength: 'soft' }] }, nodes: [], states: [] };
 async function invoke(body?: Record<string, unknown>) {
+  if(body?.action==='adopt' && body.previewState===undefined && body.baseVersionId){
+    const {baseVersionId:_base,action:_action,...intent}=body;
+    const preview=await invoke({action:'preview',...intent});body={...body,previewState:preview.result?.previewState??'a'.repeat(64),actionChoices:body.actionChoices??preview.result?.plan?.execution?.steps?.map(({edgeId,actionId}:any)=>({edgeId,actionId}))??[],selectedEdgeIds:body.selectedEdgeIds??preview.result?.plan?.execution?.steps?.map((step:any)=>step.edgeId)??[]};
+  }
   let status = 0; let result: any;
   const res = { status(code: number) { status = code; return res; }, json(value: unknown) { result = value; }, setHeader() {} };
   await handler({ method: body ? 'POST' : 'GET', body, query: { courseId: 'course' }, headers: {} } as unknown as VercelRequest, res as unknown as VercelResponse);
@@ -52,10 +56,12 @@ describe('authoritative V2 route intent API', () => {
     expect((await invoke({ action: 'adopt', baseVersionId: old, includeNodeIds: [], excludeNodeIds: [] })).status).toBe(409);
     expect(mocks.persist).not.toHaveBeenCalled();
   });
-  it('adoption recomputes current inputs, not previous preview output', async () => {
-    await invoke({ action: 'preview', includeNodeIds: [], excludeNodeIds: [] });
+  it('changed capability state rejects prior Preview and requires explicit recalculation', async () => {
+    const preview=await invoke({ action: 'preview', includeNodeIds: [], excludeNodeIds: [] });
     mocks.input.mockResolvedValue({ ...data, input: { ...data.input, currentNodeIds: ['T'] } });
-    expect((await invoke({ action: 'adopt', baseVersionId: base, includeNodeIds: [], excludeNodeIds: [] })).status).toBe(200);
+    expect((await invoke({ action: 'adopt', baseVersionId: base, previewState:preview.result.previewState,includeNodeIds: [], excludeNodeIds: [],actionChoices:[],selectedEdgeIds:[] })).status).toBe(409);
+    expect(mocks.persist).not.toHaveBeenCalled();
+    expect((await invoke({ action: 'adopt', baseVersionId: base, includeNodeIds: [], excludeNodeIds: [],actionChoices:[],selectedEdgeIds:[] })).status).toBe(200);
     expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['T']);
   });
   it('restores historical constraints through current planning and a new write', async () => {
@@ -123,4 +129,18 @@ it('explicit node replan keeps Preview and Adopt scope consistent after clearing
   const intent={includeNodeIds:[],excludeNodeIds:[],scopeMode:'replan',actionChoices:[]};
   const preview=await invoke({action:'preview',...intent});expect(preview.status).toBe(200);expect(preview.result.plan.route.selectedNodeIds).toEqual(['T']);expect(preview.result.plan.execution.steps).toEqual([]);
   const adopted=await invoke({action:'adopt',baseVersionId:base,...intent,selectedEdgeIds:[]});expect(adopted.status).toBe(200);expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(preview.result.plan.route.selectedNodeIds);expect(mocks.persist.mock.calls[0][9]).toEqual([]);
+});
+
+it.each(['knowledge','graph','action','version'])('rejects stale %s input without writing a version',async(kind)=>{
+ const intent={includeNodeIds:[],excludeNodeIds:[],actionChoices:[{edgeId:'A>T',actionId:base}],selectedEdgeIds:['A>T']};
+ mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A']},states:[{node_id:'A',status:'learned'}]});
+ const preview=await invoke({action:'preview',...intent});expect(preview.status).toBe(200);
+ if(kind==='knowledge')mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A']},states:[{node_id:'A',status:'mastered'}]});
+ if(kind==='graph')mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A'],prerequisiteEdges:[{id:'A>T',source:'A',target:'T',strength:'soft'}]}});
+ if(kind==='action')mocks.options.mockResolvedValue([{edgeId:'A>T',actionId:base,title:'Micro',type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:false,availableNow:false,reasons:['archived']}]);
+ if(kind==='version')mocks.active.mockResolvedValue({id:old});
+ const result=await invoke({action:'adopt',baseVersionId:base,previewState:preview.result.previewState,...intent});expect(result.status).toBe(409);expect(mocks.persist).not.toHaveBeenCalled();
+});
+it('adoption requires a real Preview token',async()=>{
+ expect((await invoke({action:'adopt',baseVersionId:base,previewState:'forged',includeNodeIds:[],excludeNodeIds:[]})).status).toBe(400);expect(mocks.persist).not.toHaveBeenCalled();
 });

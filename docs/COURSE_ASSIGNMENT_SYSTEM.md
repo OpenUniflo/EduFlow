@@ -95,11 +95,11 @@ Initialization and tests validate structural reference integrity, workflow templ
 
 ## 15. Evidence relationship
 
-Assignment completion may later produce KnowledgeEvidence for the covered nodes. That pipeline must preserve evidence lineage and remain separate from mastery calculation; completion alone never means 100% mastery.
+Formal Assignment results and original submissions can produce Evidence for the covered nodes. That pipeline must preserve evidence lineage and remain separate from mastery calculation; completion alone never means 100% mastery.
 
 ## 16. Non-goals
 
-V1 does not implement submissions, teacher grading, automatic scoring, an Artifact Graph, Assignment DAG editor, project assembly runtime, full learner history, tenant sharing, a global Assignment library, or backend LLM generation.
+Current Practice implements immutable numbered submissions, deterministic Trace evaluation, pending/manual review, original private file artifacts and explicit Evidence diagnosis. These do not grant capability; explicit proposal confirmation owns that change. An Artifact Graph, Assignment DAG editor, project assembly runtime, tenant sharing and a global Assignment library remain outside this scope.
 
 ## 17. Course Assignment Drawer Projection
 

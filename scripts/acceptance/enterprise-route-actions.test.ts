@@ -1,5 +1,5 @@
 import { expect,it } from 'vitest';
-import { enterpriseActionFixture,fixtureSQL } from './enterprise-route-actions';
+import { enterpriseActionFixture,fixtureSQL,practiceGoldUpdateSql } from './enterprise-route-actions';
 import scenario from './fixtures/enterprise-project-v1.json';
 import { validateNativeMicroInteraction,isNativeMicroInteractionCorrect,type NativeMicroInteraction } from '../../src/shared/learning/nativeMicroInteraction';
 import { evaluateAssignmentResponse } from '../../api/_lib/assignmentEvaluator';
@@ -19,4 +19,9 @@ it('Micro content contains worked examples and two independently valid interacti
 });
 it('setup is namespaced, preserves Knowledge facts/history and uses explicitly labeled A/B test states',()=>{
  const sql=fixtureSQL();expect(sql).not.toMatch(/(?:insert into|update|delete from) public\.(?:knowledge_nodes|knowledge_edges|edge_action_runs|personal_course_route_versions)\b/);expect(sql).toContain('acceptance-baseline');expect(sql).toContain('on conflict do nothing');expect(sql).toContain('micro_path_id is null and assignment_id is null');expect(scenario.states.A).not.toEqual(scenario.states.B);
+});
+
+it('Gold upgrade is limited to two existing curriculum tasks and leaves user history and Knowledge facts untouched',()=>{
+ const sql=practiceGoldUpdateSql();expect(sql.match(/update course_assignments/g)).toHaveLength(2);expect(sql).not.toMatch(/insert|delete|user_knowledge_states|edge_action_runs|knowledge_edges/);expect(sql).toContain("course_id='enterprise-vietnam-supply-collaboration'");
+ for(const a of enterpriseActionFixture().assignments.filter(a=>a.id.endsWith('-record'))){expect(a.requirements.length).toBeGreaterThanOrEqual(3);expect(a.acceptance_criteria.length).toBeGreaterThanOrEqual(3);expect(a.description).toContain('教学场景');expect(a.experience.type).not.toBe('trace');}
 });

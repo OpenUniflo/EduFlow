@@ -30,7 +30,6 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [draftNotice, setDraftNotice] = useState('');
-  const [editorCollapsed, setEditorCollapsed] = useState(false);
   const structuralGraph = useMemo(() => projectStructuralGraph(graph, runtime.curriculumCoverages.map(coverage => coverage.nodeId)), [graph, runtime]);
   const result = useMemo(() => {
     try {
@@ -81,14 +80,13 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   return <section className="project-capability" aria-label="项目能力模型">
     {active && assistantIdentity ? <EduFlowAssistant context={{ ...assistantIdentity, workspace: 'courses', experienceMode: 'learn', presentation: 'project-capability', courseId: runtime.course.id, routeVersionId: control.view?.activeVersion?.id, knowledgeId: !control.editing ? selected?.id : undefined, edgeId: !control.editing ? activeEdge?.id : undefined, actionId: !control.editing ? focused?.action.id : undefined }} contextLabel={control.editing ? '调整项目路线' : activeEdge ? `${title(activeEdge.source)} → ${title(activeEdge.target)}` : selected?.title ?? runtime.course.title} /> : null}
     {result.error ? <div className="project-capability-info glass-v2" role="alert"><h2>能力依赖暂时无法展示</h2><p>{result.error}</p>{authenticated ? <RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title}/> : null}</div> : result.projection && result.model ? <>
-      <KnowledgeAtlasScene ref={scene} nodes={result.projection.nodes} edges={result.projection.edges} variant="project" selectedId={selected?.id} onNodeClick={node => choose(node.id)} onBackgroundClick={() => { onSelect(null); setEdgeId(null); }} onEdgeClick={edge => { if (control.editing) return; onSelect(null); setActionId(null); setEdgeId(edge.id); }} actionBranches={branches} onActionClick={setActionId} visibleNodeIds={visibleIds} routeOverlay={overlay} edgeActionCounts={counts} />
+      <KnowledgeAtlasScene ref={scene} nodes={result.projection.nodes} edges={result.projection.edges} variant="project" selectedId={selected?.id} onNodeClick={node => choose(node.id)} onBackgroundClick={() => { onSelect(null); setEdgeId(null); }} onEdgeClick={edge => { onSelect(null); setActionId(null); setEdgeId(edge.id); }} actionBranches={branches} onActionClick={setActionId} visibleNodeIds={visibleIds} routeOverlay={overlay} edgeActionCounts={counts} />
       {activeEdge && !control.editing ? <EdgeActionPanel planningOnly onAdjust={control.begin} alternatives={alternatives} title={`${title(activeEdge.source)} → ${title(activeEdge.target)}`} control={actionData} courseId={runtime.course.id} focusedId={actionId} onFocus={setActionId} onClose={() => setEdgeId(null)}/> : null}
       <div className="project-capability-toolbar">
-        {control.editing ? <button className="atlas-secondary project-editor-toggle" aria-expanded={!editorCollapsed} aria-controls="project-route-editor" onClick={() => setEditorCollapsed(value => !value)}>{editorCollapsed ? '展开规划面板' : '查看路线图'}</button> : null}
         {!control.editing ? searchPanel : null}
         {!control.editing && authenticated ? <RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title}/> : null}
       </div>
-      <details className="project-overview glass-v2" aria-label="项目概览">
+      <details className="project-overview glass-v2" hidden={control.editing} aria-label="项目概览">
         <summary><strong>项目概览</strong><span>项目目标 · {control.view?.activeVersion ? `正式路线 V${control.view.activeVersion.versionNumber}` : '尚无正式路线'} · {visibleEdges.length} 条关系 / {visibleEdges.reduce((sum,edge)=>sum+(counts.get(edge.id)??0),0)} 个行动</span></summary>
         <div className="project-overview-body">
           <section><h3>项目目标</h3><p>{runtime.course.targetOutcome??runtime.course.description}</p></section>
@@ -97,9 +95,10 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
           <section><h3>关系与行动</h3><p>{visibleEdges.length} 条真实关系 · {visibleEdges.reduce((sum,edge)=>sum+(counts.get(edge.id)??0),0)} 个可选行动</p><details className="project-relations-list"><summary>查看全部关系与行动</summary>{visibleEdges.map(edge=><button className="atlas-secondary" key={edge.id} onClick={()=>{onSelect(null);setActionId(null);setEdgeId(edge.id);}}><span>{title(edge.source)} → {title(edge.target)}</span><small>{edge.relation==='prerequisite'?relationLabel(edge):'能力支撑'} · {counts.get(edge.id)??0} 个行动方案</small></button>)}</details></section>
         </div>
       </details>
-      {control.editing ? <aside id="project-route-editor" hidden={editorCollapsed} className="project-capability-editor glass-v2" aria-label="调整学习路线工具">{routeLegend}{searchPanel}{draftNotice ? <p role="status">{draftNotice}</p> : null}<RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title}/></aside> : null}
-      {!activeEdge && !selected ? <details className="project-capability-legend glass-v2" aria-label="能力图例"><summary>能力与行动图例</summary><div><span><i style={{ background: '#3b82f6' }}/>蓝 · 已具备</span><span><i style={{ background: '#22c55e' }}/>绿 · 未具备项目目标</span><span><i style={{ background: '#94a3b8' }}/>灰 · 未具备中间能力</span><span>行动：虚线候选 · 紫色已选 · 青色流动执行中 · 翠绿完成 · 淡灰不可用</span></div></details> : null}
+      {control.editing ? <RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title} edgeId={edgeId} search={searchPanel} onInspect={id=>{setEdgeId(id||null);onSelect(null);if(id){const fact=visibleEdges.find(edge=>edge.id===id);if(fact)scene.current?.focus(fact.target);}}}/> : null}
+      {!control.editing && !activeEdge && !selected ? <details className="project-capability-legend glass-v2" aria-label="能力图例"><summary>能力与行动图例</summary><div><span><i style={{ background: '#3b82f6' }}/>蓝 · 已具备</span><span><i style={{ background: '#22c55e' }}/>绿 · 未具备项目目标</span><span><i style={{ background: '#94a3b8' }}/>灰 · 未具备中间能力</span><span>行动：虚线候选 · 紫色已选 · 青色流动执行中 · 翠绿完成 · 淡灰不可用</span></div></details> : null}
       {!result.projection.nodes.length ? <p className="project-capability-empty glass-v2" role="status">当前课程没有可展示的有效能力。</p> : null}
+      {!control.editing ? routeLegend : null}
       <div className="project-capability-controls glass-v2"><button aria-label="放大能力模型" onClick={() => scene.current?.zoomBy(1.2)}><Plus size={18}/></button><button aria-label="缩小能力模型" onClick={() => scene.current?.zoomBy(.8)}><Minus size={18}/></button><button aria-label="适配能力模型" onClick={() => scene.current?.fit()}><Maximize2 size={18}/></button><button aria-label="聚焦所选能力" disabled={!selected} onClick={() => selected && scene.current?.focus(selected.id)}><Crosshair size={18}/></button></div>
       {selected && !control.editing && !activeEdge ? <aside className="project-capability-detail glass-v2" aria-label="能力详情"><button className="atlas-panel-close" aria-label="关闭能力详情" onClick={() => onSelect(null)}><X size={17}/></button><span>{roles(selected)}{draftMark(selected.id)}</span><h2>{selected.title}</h2><p><i className="project-domain-dot" style={{ background: domain?.canonicalColor ?? '#94a3b8' }}/>{selected.domainTitle}</p><p>{selected.description}</p>
         <h3>前置关系</h3><ul>{visibleEdges.filter(edge => edge.relation === 'prerequisite' && edge.target === selected.id).map(edge => <li key={edge.id}>{title(edge.source)} · {edge.strength === 'hard' ? '必须前置' : '推荐前置，可跳过'}</li>)}</ul>

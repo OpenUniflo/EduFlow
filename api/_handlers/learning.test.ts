@@ -63,7 +63,7 @@ describe('Assignment API guard before all mutations', () => {
     const body={conversation:true,idempotencyKey:'saved-key',response:{kind:'answer',text:'Response',attachmentSourceIds:['10000000-0000-4000-8000-000000000002']}};
     expect(await call('submit-assignment',body)).toMatchObject({status:200,body:{duplicate:true,attemptId:'attempt',outcome:'pending'}});
     expect(writes).toEqual([]);
-    expect((await call('submit-assignment',{...body,conversation:false})).status).toBe(409);
+    expect((await call('submit-assignment',{...body,conversation:false})).status).toBe(200);
   });
   it('returns a saved Action response despite later execution changes without another write', async () => {
     tables.learning_attempts = [{ id: 'attempt', user_id: 'learner', course_id: 'course', assignment_id: 'task', action_run_id: 'run', idempotency_key: 'saved-key', response: { kind: 'answer', text: 'Response' } }];
@@ -95,4 +95,24 @@ describe('Assignment API guard before all mutations', () => {
     expect((await call('start-assignment', { actionRunId: 'run' })).status).toBe(403);
     expect(writes).toEqual([]);
   });
+});
+
+it.each(['failed','pending','passed'])('a completed %s ActionRun does not report acceptance from execution alone',async()=>{
+  tables={courses:[{id:'course',lifecycle:'published'}],course_assignments:[{id:'task',course_id:'course'}],assignment_coverages:[],assignment_dependencies:[]};
+  mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});mocks.server.mockReturnValue({from:query});
+  mocks.actionRun.mockResolvedValue({id:'run',status:'completed',execution_snapshot:{targetId:'node'}});
+  expect(await call('start-assignment',{actionRunId:'run'})).toMatchObject({status:200,body:{status:'completed'}});
+});
+it('explicitly repeats the latest standalone attempt without a fake Run or capability write',async()=>{
+  writes=[];tables={courses:[{id:'course',lifecycle:'published'}],course_assignments:[{id:'task',course_id:'course'}],assignment_coverages:[{course_id:'course',assignment_id:'task',node_id:'node'}],curriculum_coverages:[{course_id:'course',node_id:'node'}],user_knowledge_states:[{user_id:'learner',node_id:'node',status:'learned'}],user_assignment_states:[{user_id:'learner',course_id:'course',assignment_id:'task',status:'accepted'}],learning_attempts:[{id:'old',user_id:'learner',course_id:'course',assignment_id:'task',action_run_id:null}]};
+  mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});mocks.server.mockReturnValue({from:query});
+  expect(await call('start-assignment',{repeatAttemptId:'old'})).toMatchObject({status:200,body:{status:'started'}});
+  expect(writes).toEqual(['user_course_states','user_assignment_states']);expect(tables.learning_attempts[0].id).toBe('old');
+  expect((await call('start-assignment',{repeatAttemptId:'foreign'})).status).toBe(409);
+});
+
+it('opening Material records activity membership without writing formal capability',async()=>{
+ writes=[];tables={courses:[{id:'course',lifecycle:'published'}],knowledge_nodes:[{id:'node',status:'active'}],curriculum_coverages:[{course_id:'course',node_id:'node'}],materials:[{id:'material',course_id:'course'}],material_knowledge_coverages:[{course_id:'course',material_id:'material',node_id:'node'}]};
+ mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});mocks.server.mockReturnValue({from:query});
+ expect((await call('start-material',{materialId:'material',nodeId:'node'})).status).toBe(200);expect(writes).toEqual(['user_course_states']);
 });

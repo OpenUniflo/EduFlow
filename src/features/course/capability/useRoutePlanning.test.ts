@@ -45,7 +45,7 @@ it('Action-only edits create a Preview and Adopt sends its exact Edge/Action ref
   vi.mocked(apiRequest).mockResolvedValueOnce(initial);render();await flush();render().begin();
   render().chooseAction('ab','new');expect(render().preview).toBeNull();expect(render().view?.activeVersion?.id).toBe('v1');
   const execution={steps:[{...step,actionId:'new'}],options:[],issues:[],complete:true};
-  vi.mocked(apiRequest).mockResolvedValueOnce({baseVersionId:'v1',plan:{valid:true,route:{},conflicts:[],execution}});
+  vi.mocked(apiRequest).mockResolvedValueOnce({baseVersionId:'v1',previewState:'a'.repeat(64),plan:{valid:true,route:{},conflicts:[],execution}});
   await render().replan();
   expect(JSON.parse(vi.mocked(apiRequest).mock.calls[1][1]!.body as string)).toMatchObject({action:'preview',actionChoices:[{edgeId:'ab',actionId:'new'}]});
   expect(render().view?.activeVersion?.id).toBe('v1');
@@ -58,8 +58,24 @@ it('Action-only edits create a Preview and Adopt sends its exact Edge/Action ref
 it('clearing or reverting node edits keeps the replan scope intent through Preview and Adopt',async()=>{
  const step={edgeId:'ab',actionId:'old',sourceNodeId:'A',targetNodeId:'B',order:0};
  vi.mocked(apiRequest).mockResolvedValueOnce({activeVersion:{id:'v1',snapshot:{executionSteps:[step]},constraints:{includeNodeIds:[],excludeNodeIds:[]}}});render();await flush();render().begin();render().mark('A');render().mark('A');render().clear();
- vi.mocked(apiRequest).mockResolvedValueOnce({baseVersionId:'v1',plan:{valid:true,route:{},conflicts:[],execution:{steps:[],options:[],issues:[],complete:true}}});await render().replan();
+ vi.mocked(apiRequest).mockResolvedValueOnce({baseVersionId:'v1',previewState:'a'.repeat(64),plan:{valid:true,route:{},conflicts:[],execution:{steps:[],options:[],issues:[],complete:true}}});await render().replan();
  expect(JSON.parse(vi.mocked(apiRequest).mock.calls[1][1]!.body as string).scopeMode).toBe('replan');
  vi.mocked(apiRequest).mockResolvedValueOnce({}).mockResolvedValueOnce(response);await render().adopt();
  expect(JSON.parse(vi.mocked(apiRequest).mock.calls[2][1]!.body as string)).toMatchObject({scopeMode:'replan',selectedEdgeIds:[],actionChoices:[]});
+});
+
+it('all dirty dismissal paths preserve drafts until explicit discard; clean changes do not prompt',async()=>{
+ vi.mocked(apiRequest).mockResolvedValueOnce(response);render();await flush();render().begin();
+ const exit=vi.fn(),stay=vi.fn();render().mark('A');expect(render().dirty).toBe(true);
+ render().requestDismiss(exit,stay);expect(exit).not.toHaveBeenCalled();expect(render().dismissPending).toBe(true);
+ render().keepEditing();expect(stay).toHaveBeenCalled();expect(render().draft.includeNodeIds).toEqual(['A']);
+ render().reload();expect(render().dismissPending).toBe(true);expect(apiRequest).toHaveBeenCalledTimes(1);render().keepEditing();
+ render().showHistory();expect(apiRequest).toHaveBeenCalledTimes(1);render().keepEditing();
+ render().requestDismiss(exit);render().discardDraft();expect(exit).toHaveBeenCalledOnce();expect(render().editing).toBe(false);
+});
+it('capability changes invalidate a complete Preview and prevent Adopt until recalculation',async()=>{
+ vi.mocked(apiRequest).mockResolvedValueOnce(response);render();await flush();render().begin();
+ vi.mocked(apiRequest).mockResolvedValueOnce({baseVersionId:'v1',previewState:'a'.repeat(64),plan:{valid:true,route:{},execution:{steps:[],options:[],issues:[],complete:true}}});await render().replan();
+ vi.mocked(apiRequest).mockResolvedValueOnce(response);render('new-state');await flush();expect(render('new-state').stale).toBe(true);
+ const count=vi.mocked(apiRequest).mock.calls.length;await render('new-state').adopt();expect(apiRequest).toHaveBeenCalledTimes(count);
 });

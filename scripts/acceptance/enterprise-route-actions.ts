@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import scenario from './fixtures/enterprise-project-v1.json' with { type:'json' };
 import teaching from './fixtures/enterprise-route-action-v3.json' with { type:'json' };
+import practiceGold from './fixtures/practice-gold-v1.json' with { type:'json' };
 const courseId=scenario.courseId;
 const identity=(key:string)=>{const h=createHash('sha256').update(`${teaching.version}:${key}`).digest('hex');return `${h.slice(0,8)}-${h.slice(8,12)}-5${h.slice(13,16)}-a${h.slice(17,20)}-${h.slice(20,32)}`;};
 const node=(key:string)=>{const found=scenario.nodes.find(n=>n.key===key);if(!found)throw new Error(`Unknown real Knowledge ${key}`);return found;};
@@ -26,7 +27,7 @@ export function enterpriseActionFixture(){
  const extras=extraKeys.map((key,i)=>makeAssignment(teaching.cases.find(c=>c.key===key)!,true,4+assignments.length+i));assignments.push(...extras);
  // One explicit file executor preserves the upload Action; the other remains a text executor.
  const legacyAssignments=[['exposure','核算缺料暴露窗口'],['impact','推导订单停线与恢复窗口']].map(([key,title],i)=>({course_id:courseId,id:`${teaching.version}-${key}-record`,display_order:4+assignments.length+i,title,description:`${teaching.note}\n${teaching.cases.find(c=>c.key===key)!.explanation}`,requirements:[node(key).criterion],expected_output:'包含原始输入、计算过程、判断和假设的工作记录。',acceptance_criteria:[node(key).criterion],mode:'instruction',estimated_minutes:40,experience:{type:key==='exposure'?'code':'answer',knowledgeNodeId:node(key).id,prompt:key==='exposure'?'上传本人核算缺料暴露窗口的 TXT、Markdown 或 CSV 原始记录，可补充计算说明；文件名不能替代实际内容。':'提交本人推导订单停线与恢复窗口的工作记录。能力更新仍由独立证据分析与明确确认完成。'}}));
- const allAssignments=[...assignments,...legacyAssignments];
+ const allAssignments=[...assignments,...legacyAssignments].map(assignment=>({...assignment,...practiceGold.assignments.find(gold=>gold.id===assignment.id)}));
  const coverages=allAssignments.map(a=>({course_id:courseId,id:`${a.id}-coverage`,assignment_id:a.id,node_id:a.experience.knowledgeNodeId,role:'practice',required:false}));
  const actions=scenario.relations.flatMap(([source,target,type])=>{
   const edgeId=`knowledge-${type==='enables'?'enables':'prerequisite'}-${node(source).id}-${node(target).id}`;
@@ -38,12 +39,14 @@ export function enterpriseActionFixture(){
  return {courseId,version:teaching.version,paths,units,steps,assignments:allAssignments,coverages,actions,bindings,legacyBindings};
 }
 const quote=(value:unknown)=>`'${(typeof value==='string'?value:JSON.stringify(value)).replace(/'/g,"''")}'`;
+/** Upgrade only two existing Gold tasks; no user state, IDs or relationship writes. */
+export function practiceGoldUpdateSql(){return practiceGold.assignments.map(task=>`update course_assignments set title=${quote(task.title)},description=${quote(task.description)},requirements=${quote(task.requirements)}::jsonb,expected_output=${quote(task.expected_output)},acceptance_criteria=${quote(task.acceptance_criteria)}::jsonb,experience=${quote(task.experience)}::jsonb where course_id=${quote(practiceGold.courseId)} and id=${quote(task.id)};`).join('\n');}
 export function fixtureSQL(){
  const f=enterpriseActionFixture();
  const records:Array<[string,Record<string,unknown>[]]>=[['micro_learning_paths',f.paths],['micro_units',f.units],['micro_steps',f.steps],['course_assignments',f.assignments],['assignment_coverages',f.coverages],['knowledge_edge_actions',f.actions.map(({target:_t,variant:_v,...a})=>a)],['course_action_bindings',f.bindings]];
  const insert=(table:string,rows:Record<string,unknown>[])=>{const columns=Object.keys(rows[0]).join(',');return `insert into public.${table}(${columns}) select ${columns} from jsonb_populate_recordset(null::public.${table},${quote(rows)}::jsonb) on conflict do nothing;`;};
  const users=[['4eee17e2-6fe7-4de2-b0ba-3a177fe235f0','A'],['54cd7725-ae57-464b-beba-18e950546f0b','B']] as const;
  const states=users.flatMap(([user,actor])=>scenario.states[actor].map(key=>({user_id:user,node_id:node(key).id,status:'learned',mastery_origin:'direct',evidence:[{source:f.version,type:'acceptance-baseline',note:'用户明确授权的受控验收状态，不是测评或真实企业能力证据。'}]})));
- return `begin; select pg_advisory_xact_lock(hashtext(${quote(f.version)}));\n${records.map(([t,r])=>insert(t,r)).join('\n')}\nupdate course_assignments set experience=${quote(f.assignments.find(a=>a.id===`${teaching.version}-exposure-record`)!.experience)}::jsonb where course_id=${quote(f.courseId)} and id=${quote(`${teaching.version}-exposure-record`)};\n${f.legacyBindings.map(b=>`update public.course_action_bindings set micro_path_id=${b.micro_path_id?quote(b.micro_path_id):'null'}, assignment_id=${b.assignment_id?quote(b.assignment_id):'null'} where course_id=${quote(f.courseId)} and action_id=${quote(b.action_id)} and micro_path_id is null and assignment_id is null;`).join('\n')}\n${insert('user_knowledge_states',states)}\ncommit;`;
+ return `begin; select pg_advisory_xact_lock(hashtext(${quote(f.version)}));\n${records.map(([t,r])=>insert(t,r)).join('\n')}\n${practiceGoldUpdateSql()}\n${f.legacyBindings.map(b=>`update public.course_action_bindings set micro_path_id=${b.micro_path_id?quote(b.micro_path_id):'null'}, assignment_id=${b.assignment_id?quote(b.assignment_id):'null'} where course_id=${quote(f.courseId)} and action_id=${quote(b.action_id)} and micro_path_id is null and assignment_id is null;`).join('\n')}\n${insert('user_knowledge_states',states)}\ncommit;`;
 }
-if(process.argv[1]?.endsWith('/enterprise-route-actions.ts')){const output=process.argv[2];if(!output)throw new Error('Provide SQL output path; no implicit database writes.');writeFileSync(output,fixtureSQL());console.log(JSON.stringify({output,...Object.fromEntries(Object.entries(enterpriseActionFixture()).filter(([,v])=>Array.isArray(v)).map(([k,v])=>[k,(v as unknown[]).length]))}));}
+if(process.argv[1]?.endsWith('/enterprise-route-actions.ts')){const output=process.argv[2];if(!output)throw new Error('Provide SQL output path; no implicit database writes.');writeFileSync(output,process.argv[3]==='--gold-only'?`begin;\n${practiceGoldUpdateSql()}\ncommit;`:fixtureSQL());console.log(JSON.stringify({output,...Object.fromEntries(Object.entries(enterpriseActionFixture()).filter(([,v])=>Array.isArray(v)).map(([k,v])=>[k,(v as unknown[]).length]))}));}

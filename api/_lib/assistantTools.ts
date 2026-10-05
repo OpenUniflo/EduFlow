@@ -1,3 +1,4 @@
+import { readPracticeReview } from './practiceContext.js';
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { tool } from "ai";
 import { z } from "zod";
@@ -195,6 +196,7 @@ export function createAssistantTools(client: SupabaseClient, user: User, context
     getAssignmentContext: tool({ description: "Read one Course-owned Assignment, its Knowledge coverage, and direct Assignment dependencies.", inputSchema: z.object({ courseId: id, assignmentId: id }), execute: ({ courseId, assignmentId }: { courseId: string; assignmentId: string }) => safe(() => getAssignmentContext(client, user, courseId, assignmentId)) }),
     getMicroContext: tool({ description: "Read a published Micro Learning path and optional current Unit/Step for explanation or hints only.", inputSchema: z.object({ pathId: id, unitId: id.optional(), stepId: id.optional() }), execute: ({ pathId, unitId, stepId }: { pathId: string; unitId?: string; stepId?: string }) => safe(() => getMicroContext(client, pathId, unitId, stepId)) }),
     getLearnerState: tool({ description: "Read only the authenticated learner's real Knowledge and Course state.", inputSchema: z.object({ nodeId: id.optional(), courseId: id.optional() }), execute: ({ nodeId, courseId }: { nodeId?: string; courseId?: string }) => safe(() => getLearnerState(client, user, nodeId, courseId)) }),
+    getPracticeReviewContext: tool({ description: "Read the authenticated learner's formal Practice submission, original file contents, Assignment scenario/criteria, Action/Edge and latest Result/feedback. Teaching feedback only; no grading or business writes.", inputSchema:z.object({attemptId:z.string().uuid()}), execute:({attemptId}:{attemptId:string})=>safe(()=>readPracticeReview(client,user.id,attemptId)) }),
     getEvidenceContext: tool({ description: "Read one owned Evidence Source or Diagnosis Run and its actual proposals for explanation only. Never write or confirm capability.", inputSchema:z.object({sourceId:z.string().uuid().optional(),runId:z.string().uuid().optional()}), execute:({sourceId,runId}:{sourceId?:string;runId?:string})=>safe(async()=>runId?readEvidenceView(client,{view:'run',runId}):sourceId?readEvidenceView(client,{view:'source',sourceId}):null) }),
     getCurrentContext: tool({ description: "Resolve the current page's explicit EduFlow entity identities using authoritative product data.", inputSchema: z.object({}), execute: () => safe(async () => ({
       identity: context,
@@ -202,6 +204,7 @@ export function createAssistantTools(client: SupabaseClient, user: User, context
       knowledge: context.knowledgeId ? await getKnowledge(client, context.knowledgeId) : undefined,
       course: context.courseId ? await getCourseContext(client, user, context.courseId, context.knowledgeId) : undefined,
       material: context.courseId && context.materialId ? await getMaterialContext(client, user, context.courseId, context.materialId, context.segmentId) : undefined,
+      practiceReview: context.actionRunId ? await (async()=>{const found=await client.from('learning_attempts').select('id').eq('user_id',user.id).eq('action_run_id',context.actionRunId!).order('attempt_number',{ascending:false}).limit(1).maybeSingle();const attempt=dataOrThrow(found.data,found.error,'Review Attempt');return attempt?readPracticeReview(client,user.id,attempt.id):undefined;})() : undefined,
       assignment: context.courseId && context.assignmentId ? await getAssignmentContext(client, user, context.courseId, context.assignmentId) : undefined,
       micro: context.microPathId ? await getMicroContext(client, context.microPathId, context.microUnitId, context.microStepId) : undefined,
       learner: await getLearnerState(client, user, context.knowledgeId, context.courseId)

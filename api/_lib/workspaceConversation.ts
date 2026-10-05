@@ -26,7 +26,12 @@ export async function workspaceAssistantAction(client: SupabaseClient, userId: s
     const run = await client.from('capability_diagnosis_runs').select('id').eq('id', context.diagnosisRunId).eq('user_id', userId).maybeSingle();
     if (!dataOrThrow(run.data, run.error, 'Conversation diagnosis')) throw new ApiError(404, 'run_not_found', 'Diagnosis unavailable');
   }
-  const binding = [body.mode, context.courseId, context.assignmentId, context.actionRunId, context.evidenceSourceId, context.diagnosisRunId];
+  if(context.repeatAttemptId){
+    const original=await client.from('learning_attempts').select('id,action_run_id').eq('id',context.repeatAttemptId).eq('user_id',userId).eq('course_id',context.courseId!).eq('assignment_id',context.assignmentId!).maybeSingle();
+    const attempt=dataOrThrow(original.data,original.error,'Repeat workspace origin');
+    if(!attempt || attempt.action_run_id || context.actionRunId)throw new ApiError(404,'repeat_context_unavailable','Repeated practice origin unavailable');
+  }
+  const binding = [body.mode, context.courseId, context.assignmentId, context.actionRunId, context.evidenceSourceId, context.diagnosisRunId,...(context.repeatAttemptId?[context.repeatAttemptId]:[])];
   const courseKey=createHash('sha256').update(context.courseId??'personal').digest('hex').slice(0,16);
   const title = `workspace:${body.mode}:${courseKey}:${createHash('sha256').update(JSON.stringify(binding)).digest('hex').slice(0,32)}`;
   if (body.action === 'workspace-session') {

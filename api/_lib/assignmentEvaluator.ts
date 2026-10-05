@@ -8,12 +8,12 @@ const object = (value: unknown): Row | null => value && typeof value === "object
 function parseCoreResponse(value: unknown): AssignmentResponse | null {
   const response = object(value);
   if (response?.kind === "trace" && typeof response.selectedStepId === "string" && response.selectedStepId.trim()) return { kind: "trace", selectedStepId: response.selectedStepId };
-  if (response?.kind === "answer" && typeof response.text === "string" && response.text.trim()) return { kind: "answer", text: response.text.trim() };
+  if (response?.kind === "answer" && (response.text == null || typeof response.text === "string") && (String(response.text ?? "").trim() || (Array.isArray(response.attachmentSourceIds) && response.attachmentSourceIds.length))) return { kind: "answer", text: String(response.text ?? "").trim() };
   if (response?.kind === "code") {
     const ids = response.attachmentSourceIds;
     if (ids != null && (!Array.isArray(ids) || ids.length > 5 || !ids.every(id => typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) || new Set(ids).size !== ids.length)) return null;
     if ((response.code != null && typeof response.code !== 'string') || (response.fileName != null && typeof response.fileName !== 'string')) return null;
-    if (!`${response.code ?? ""}${response.fileName ?? ""}`.trim() && !(Array.isArray(ids) && ids.length)) return null;
+    if (!String(response.code ?? "").trim() && !(Array.isArray(ids) && ids.length)) return null;
     return { kind:"code", code:typeof response.code === "string" ? response.code : undefined, fileName:typeof response.fileName === "string" ? response.fileName : undefined, ...(Array.isArray(ids) ? { attachmentSourceIds:ids as string[] } : {}) };
   }
   if (response?.kind === "workflow" && typeof response.runId === "string" && response.runId.trim()) return { kind: "workflow", runId: response.runId };
