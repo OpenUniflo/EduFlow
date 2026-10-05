@@ -11,7 +11,7 @@ type RuntimeValue = {
   sending: boolean;
   error: string;
   selectSession(sessionId: string | null): Promise<void>;
-  send(message: string, context: AssistantContextSnapshot): Promise<void>;
+  send(message: string, context: AssistantContextSnapshot): Promise<boolean>;
   planGoal(goalText: string, context: AssistantContextSnapshot): Promise<boolean>;
   refineGoal(planningMessageId: string, refinement: string, context: AssistantContextSnapshot): Promise<void>;
   useExistingCourse(planningMessageId: string, courseId: string, context: AssistantContextSnapshot): Promise<string>;
@@ -70,7 +70,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
 
   const send = useCallback(async (content: string, context: AssistantContextSnapshot) => {
     const message = content.trim();
-    if (!message || sending) return;
+    if (!message || sending) return false;
     setSending(true); setError("");
     const optimisticUser: AssistantMessage = { id: `pending-user-${crypto.randomUUID()}`, sessionId: activeSessionId ?? "pending", role: "user", content: message, context, createdAt: new Date().toISOString() };
     const optimisticAssistant: AssistantMessage = { id: `pending-assistant-${crypto.randomUUID()}`, sessionId: activeSessionId ?? "pending", role: "assistant", content: "", context, createdAt: new Date().toISOString() };
@@ -86,10 +86,10 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
         setActiveSessionId(result.sessionId);
         window.localStorage.setItem(storageKey, result.sessionId);
       }
-      await reloadSessions();
+      await reloadSessions();return true;
     } catch (sendError) {
       setMessages((current) => current.filter((item) => item.id !== optimisticAssistant.id));
-      setError(sendError instanceof Error ? sendError.message : "Assistant 暂时不可用");
+      setError(sendError instanceof Error ? sendError.message : "Assistant 暂时不可用");return false;
     } finally { setSending(false); }
   }, [activeSessionId, reloadSessions, sending, storageKey]);
 

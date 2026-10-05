@@ -57,6 +57,14 @@ describe('Assignment API guard before all mutations', () => {
     if(invalid==='foreign coverage')tables.curriculum_coverages=[];
     expect((await call('start-assignment')).status).toBeGreaterThanOrEqual(400);expect(writes).toEqual([]);
   });
+  it('returns an exact saved conversation submission before checking an archived attachment without ActionRun',async()=>{
+    tables.learning_attempts=[{id:'attempt',user_id:'learner',course_id:'course',assignment_id:'task',action_run_id:null,idempotency_key:'saved-key',response:{kind:'answer',text:'Response',attachmentSourceIds:['10000000-0000-4000-8000-000000000002'],submissionMode:'conversation'}}];
+    tables.performance_results=[{id:'result',attempt_id:'attempt',version:1,outcome:'pending',feedback:{message:'Saved manual result'}}];
+    const body={conversation:true,idempotencyKey:'saved-key',response:{kind:'answer',text:'Response',attachmentSourceIds:['10000000-0000-4000-8000-000000000002']}};
+    expect(await call('submit-assignment',body)).toMatchObject({status:200,body:{duplicate:true,attemptId:'attempt',outcome:'pending'}});
+    expect(writes).toEqual([]);
+    expect((await call('submit-assignment',{...body,conversation:false})).status).toBe(409);
+  });
   it('returns a saved Action response despite later execution changes without another write', async () => {
     tables.learning_attempts = [{ id: 'attempt', user_id: 'learner', course_id: 'course', assignment_id: 'task', action_run_id: 'run', idempotency_key: 'saved-key', response: { kind: 'answer', text: 'Response' } }];
     tables.performance_results = [{ id: 'result', attempt_id: 'attempt', outcome: 'pending', feedback: { message: 'Saved review' } }];

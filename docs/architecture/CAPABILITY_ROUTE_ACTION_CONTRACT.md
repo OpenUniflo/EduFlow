@@ -36,7 +36,7 @@ Assistant context follows the foreground presentation and its selection, includi
 
 ## Evidence
 
-Evidence Library is a long-lived asset library with summary loading and source detail on demand. Diagnosis is an explicit workspace: choose sources, analyze, review candidates, confirm. Only proposals from the explicitly selected Diagnosis Run are shown/confirmed together. Before confirmation, formal capability and route stay unchanged.
+Evidence Library is a long-lived asset library with summary loading and source detail on demand. Diagnosis is an explicit conversational workspace: sources, analysis, run-scoped candidates and explicit confirmation form one continuous timeline. Only proposals from the explicitly selected Diagnosis Run are shown/confirmed together. Before confirmation, formal capability and route stay unchanged.
 
 ## Compatibility and acceptance
 
@@ -55,3 +55,7 @@ Current and Preview overlays require a structural renderer range that outlives c
 This is a renderer projection, not another graph or knowledge authority. The complete factual project structure owns stable coordinates while each personal route highlights its selected subset. It avoids a second layout system, fake facts and Preview-triggered relayout. Arbitrary ancestor-depth truncation is not permitted; measure actual Hosted range sizes before addressing performance.
 
 Bridge 的课程上下文 Practice 仍使用既有 CourseAssignment / AssignmentCoverage。其目标可以是沿真实 active、可见 prerequisite / enables 上游关系支撑本课程的 Knowledge；它无需成为 CurriculumCoverage。Course integrity 必须拒绝无关、仅 related、不可见或非 active 目标。Course Skill Tree 和课程目标仍只由 CurriculumCoverage / CourseTargetKnowledge 定义。
+
+## Conversation extension · 2026-10-05
+
+Practice and capability update share ConversationWorkspace UI and existing Assistant persistence. Ordinary chat never becomes Evidence. Explicit Practice submission uses the existing Assignment backend; real attachments use private Evidence sources. Conversation Practice completion does not update capability. See [Conversation and Evidence contract](CONVERSATION_EVIDENCE_CONTRACT.md). Formal Route remains unchanged after capability confirmation; Project Preview and explicit Adopt remain the only adjustment path.

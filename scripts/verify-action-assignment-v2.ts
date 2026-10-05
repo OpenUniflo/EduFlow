@@ -77,6 +77,18 @@ try {
   check((await server.rpc('record_manual_assignment_review', { ...reviewArgs, p_learner_user_id: reviewer })).error, 'Exact review validates attempt owner');
   await rpc('record_manual_assignment_review', reviewArgs);
   check((await server.from('edge_action_runs').select('status').eq('id', run.id).single()).data?.status === 'completed', 'Exact pending review completes repeated run despite accepted aggregate');
+  // The conversation entrypoint uses the actual server role, including auth-schema isolation.
+  const beforeConversation=JSON.stringify((await server.from('user_knowledge_states').select('*').eq('user_id',learner).order('node_id')).data);
+  const conversationSelection=await rpc('select_edge_action_v2',args(1));
+  await rpc('transition_edge_action_run_v2',{p_user_id:learner,p_run_id:conversationSelection.id,p_operation:'start'});
+  const conversationArgs={...submit(conversationSelection.id,randomUUID()),p_response:{kind:'answer',text:'Labelled local conversation response',submissionMode:'conversation'}};
+  const conversationResult=(await rpc('record_conversation_action_assignment_attempt',conversationArgs))[0];
+  check(conversationResult.attempt_id!==pending.attempt_id,'Conversation keeps prior immutable attempts');
+  check((await rpc('record_conversation_action_assignment_attempt',conversationArgs))[0].duplicate,'Conversation Action retry has one exact Attempt');
+  check((await server.from('learning_attempts').select('action_run_id').eq('id',conversationResult.attempt_id).single()).data?.action_run_id===conversationSelection.id,'Conversation records launched ActionRun');
+  check((await server.from('edge_action_runs').select('status').eq('id',conversationSelection.id).single()).data?.status==='completed','Conversation result completes its execution only');
+  check(JSON.stringify((await server.from('user_knowledge_states').select('*').eq('user_id',learner).order('node_id')).data)===beforeConversation,'Conversation completion preserves all capability state');
+  check((await clients[0].rpc('record_conversation_action_assignment_attempt',conversationArgs)).error,'Authenticated client cannot invoke conversation evaluator writer');
   const archived = await server.from('knowledge_edge_actions').update({ status: 'archived' }).eq('id', templates[1].action.id); assert.ifError(archived.error);
   check((await rpc('record_action_assignment_attempt', submit(run.id, pendingKey, 'pending')))[0].duplicate, 'Saved attempt retry survives later Action archival');
   check((await server.rpc('record_action_assignment_attempt', { ...submit(run.id, pendingKey), p_response: { kind: 'answer', text: 'Changed response' } })).error, 'Archived retry still rejects changed response');

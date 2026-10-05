@@ -2,6 +2,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { tool } from "ai";
 import { z } from "zod";
 import type { AssistantContextSnapshot } from "../../src/features/assistant/assistantContract.js";
+import { readEvidenceView } from "./evidenceRead.js";
 import { dataOrThrow } from "./query.js";
 import { planLearningGoal } from "./goalPlanningService.js";
 
@@ -194,8 +195,10 @@ export function createAssistantTools(client: SupabaseClient, user: User, context
     getAssignmentContext: tool({ description: "Read one Course-owned Assignment, its Knowledge coverage, and direct Assignment dependencies.", inputSchema: z.object({ courseId: id, assignmentId: id }), execute: ({ courseId, assignmentId }: { courseId: string; assignmentId: string }) => safe(() => getAssignmentContext(client, user, courseId, assignmentId)) }),
     getMicroContext: tool({ description: "Read a published Micro Learning path and optional current Unit/Step for explanation or hints only.", inputSchema: z.object({ pathId: id, unitId: id.optional(), stepId: id.optional() }), execute: ({ pathId, unitId, stepId }: { pathId: string; unitId?: string; stepId?: string }) => safe(() => getMicroContext(client, pathId, unitId, stepId)) }),
     getLearnerState: tool({ description: "Read only the authenticated learner's real Knowledge and Course state.", inputSchema: z.object({ nodeId: id.optional(), courseId: id.optional() }), execute: ({ nodeId, courseId }: { nodeId?: string; courseId?: string }) => safe(() => getLearnerState(client, user, nodeId, courseId)) }),
+    getEvidenceContext: tool({ description: "Read one owned Evidence Source or Diagnosis Run and its actual proposals for explanation only. Never write or confirm capability.", inputSchema:z.object({sourceId:z.string().uuid().optional(),runId:z.string().uuid().optional()}), execute:({sourceId,runId}:{sourceId?:string;runId?:string})=>safe(async()=>runId?readEvidenceView(client,{view:'run',runId}):sourceId?readEvidenceView(client,{view:'source',sourceId}):null) }),
     getCurrentContext: tool({ description: "Resolve the current page's explicit EduFlow entity identities using authoritative product data.", inputSchema: z.object({}), execute: () => safe(async () => ({
       identity: context,
+      evidence:context.diagnosisRunId?await readEvidenceView(client,{view:'run',runId:context.diagnosisRunId}):context.evidenceSourceId?await readEvidenceView(client,{view:'source',sourceId:context.evidenceSourceId}):undefined,
       knowledge: context.knowledgeId ? await getKnowledge(client, context.knowledgeId) : undefined,
       course: context.courseId ? await getCourseContext(client, user, context.courseId, context.knowledgeId) : undefined,
       material: context.courseId && context.materialId ? await getMaterialContext(client, user, context.courseId, context.materialId, context.segmentId) : undefined,

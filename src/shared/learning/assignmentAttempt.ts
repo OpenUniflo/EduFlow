@@ -1,8 +1,8 @@
-export type AssignmentResponse =
+export type AssignmentResponse = (
   | { kind: "answer"; text: string }
-  | { kind: "code"; code?: string; fileName?: string }
+  | { kind: "code"; code?: string; fileName?: string; attachmentSourceIds?: string[] }
   | { kind: "trace"; selectedStepId: string }
-  | { kind: "workflow"; runId: string };
+  | { kind: "workflow"; runId: string }) & { attachmentSourceIds?: string[] };
 
 export type PerformanceOutcome = "passed" | "failed" | "pending";
 

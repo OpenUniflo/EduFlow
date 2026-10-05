@@ -5,13 +5,26 @@ export type RuleEvaluation = { outcome: PerformanceOutcome; score?: number; feed
 
 const object = (value: unknown): Row | null => value && typeof value === "object" && !Array.isArray(value) ? value as Row : null;
 
-export function parseAssignmentResponse(value: unknown): AssignmentResponse | null {
+function parseCoreResponse(value: unknown): AssignmentResponse | null {
   const response = object(value);
   if (response?.kind === "trace" && typeof response.selectedStepId === "string" && response.selectedStepId.trim()) return { kind: "trace", selectedStepId: response.selectedStepId };
   if (response?.kind === "answer" && typeof response.text === "string" && response.text.trim()) return { kind: "answer", text: response.text.trim() };
-  if (response?.kind === "code" && (typeof response.code === "string" || typeof response.fileName === "string") && `${response.code ?? ""}${response.fileName ?? ""}`.trim()) return { kind: "code", code: typeof response.code === "string" ? response.code : undefined, fileName: typeof response.fileName === "string" ? response.fileName : undefined };
+  if (response?.kind === "code") {
+    const ids = response.attachmentSourceIds;
+    if (ids != null && (!Array.isArray(ids) || ids.length > 5 || !ids.every(id => typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) || new Set(ids).size !== ids.length)) return null;
+    if ((response.code != null && typeof response.code !== 'string') || (response.fileName != null && typeof response.fileName !== 'string')) return null;
+    if (!`${response.code ?? ""}${response.fileName ?? ""}`.trim() && !(Array.isArray(ids) && ids.length)) return null;
+    return { kind:"code", code:typeof response.code === "string" ? response.code : undefined, fileName:typeof response.fileName === "string" ? response.fileName : undefined, ...(Array.isArray(ids) ? { attachmentSourceIds:ids as string[] } : {}) };
+  }
   if (response?.kind === "workflow" && typeof response.runId === "string" && response.runId.trim()) return { kind: "workflow", runId: response.runId };
   return null;
+}
+
+export function parseAssignmentResponse(value: unknown): AssignmentResponse | null {
+  const source=object(value);const ids=source?.attachmentSourceIds;
+  if(ids!=null&&(!Array.isArray(ids)||ids.length>4||!ids.every(id=>typeof id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))||new Set(ids).size!==ids.length))return null;
+  const response=parseCoreResponse(value);
+  return response?{...response,...(Array.isArray(ids)?{attachmentSourceIds:ids as string[]}:{})}:null;
 }
 
 export function evaluateAssignmentResponse(assignment: Row, response: AssignmentResponse): RuleEvaluation {

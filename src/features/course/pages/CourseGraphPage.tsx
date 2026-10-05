@@ -95,7 +95,7 @@ function CourseGraphWorkspace({ session, onLogout, courseDesignAssistantProvider
   useEffect(() => userKnowledgeRepository.subscribe(() => setKnowledgeRevision(value => value + 1)), []);
   const learnerKnowledge = useMemo(() => session ? userKnowledgeRepository.getUserKnowledge(session.userId) : [], [session, knowledgeRevision]);
   const [capabilitySelectedId, setCapabilitySelectedId] = useState<string | null>(null);
-  const [capabilityVisited, setCapabilityVisited] = useState(false);
+  const [capabilityVisited, setCapabilityVisited] = useState(() => new URLSearchParams(window.location.search).has("routeImpact"));
   const userCourseState = useOptionalUserCourseState(session?.userId, courseId);
   const graphData = useMemo(() => graphRuntime ? buildCourseGraphData(graphRuntime, userCourseState, structuralFatal.length ? baseKnowledgeGraph : editableKnowledgeGraph, learnerKnowledge) : null, [baseKnowledgeGraph, editableKnowledgeGraph, graphRuntime, learnerKnowledge, structuralFatal.length, userCourseState]);
   const courseChapters = graphData?.chapters ?? [];
@@ -104,7 +104,7 @@ function CourseGraphWorkspace({ session, onLogout, courseDesignAssistantProvider
   const graphRef = useRef<CourseGraphHandle>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<CourseGraphView>("overview");
-  const [presentation, setPresentation] = useState<"path" | "graph" | "capability">(authoringRoute ? "graph" : "path");
+  const [presentation, setPresentation] = useState<"path" | "graph" | "capability">(authoringRoute ? "graph" : new URLSearchParams(window.location.search).has("routeImpact") ? "capability" : "path");
   const [mode, setMode] = useState<"knowledge" | "assignment">("knowledge");
   const [experience, setExperience] = useState<"learn" | "design">(() => new URLSearchParams(window.location.search).get("experience") === "design" && canDesignCourse(session) ? "design" : "learn");
   const detailFacet = detailFacetForMode(mode);
@@ -134,6 +134,13 @@ function CourseGraphWorkspace({ session, onLogout, courseDesignAssistantProvider
   const knowledgeKey = `${session?.userId ?? "anonymous"}:` + JSON.stringify(learnerKnowledge.map(record => [record.nodeId, record.status, record.updatedAt]).sort());
   const executionEnabled = Boolean(session && runtime && !personalDraftPreview && !designEnabled);
   const routeControl = useRoutePlanning(courseId, executionEnabled, knowledgeKey);
+  const impactRequested=useRef(false);
+  useEffect(()=>{
+    if(!impactRequested.current&&executionEnabled&&!routeControl.busy&&routeControl.view?.activeVersion&&new URLSearchParams(location.search).has('routeImpact')){
+      impactRequested.current=true;void routeControl.previewImpact();
+      setCapabilityVisited(true);setPresentation('capability');
+    }
+  },[executionEnabled,routeControl,location.search]);
   const actionControl = useEdgeActions(courseId, executionEnabled, `${routeControl.view?.activeVersion?.id ?? ''}:${knowledgeKey}`);
   const selectedRoute = routeControl.view?.plan.valid ? routeControl.view.plan.route : null;
   const visibleSupportEdges = useMemo(() => baseKnowledgeGraph.edges.flatMap((edge): CapabilityRelation[] => edge.relation === 'prerequisite' ? [{ ...edge, relation: 'prerequisite' }] : edge.relation === 'enables' ? [{ ...edge, relation: 'enables' }] : []), [baseKnowledgeGraph]);

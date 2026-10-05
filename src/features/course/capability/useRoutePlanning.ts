@@ -84,6 +84,17 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
     continueEditing: () => { draftRevision.current++; setPreview(null); },
     reload: () => run(async () => { await load(); setEditing(false); setPreview(null); }),
     showHistory: () => run(refreshHistory),
+    previewImpact: () => run(async () => {
+      if (!view?.activeVersion || busy) return;
+      const version=view.activeVersion; const constraints={includeNodeIds:[...version.constraints.includeNodeIds],excludeNodeIds:[...version.constraints.excludeNodeIds]};
+      const revision=++draftRevision.current;
+      setDraft(constraints);setBaseVersionId(version.id);setScopeMode('replan');setActionChoices([]);setSelectedEdgeIds(undefined);setHistorical(null);setEditing(true);
+      const result=await post<{plan:ExecutionRoutePlan;baseVersionId:string|null}>({action:'preview',...constraints,scopeMode:'replan',actionChoices:[]});
+      if(revision!==draftRevision.current)return;
+      if(result.baseVersionId!==version.id)throw new Error('正式路线已变化，请重新载入后查看建议。');
+      setPreview(result.plan);setProposal(result.plan);
+      if(result.plan.execution){setActionChoices(result.plan.execution.steps.map(({edgeId,actionId})=>({edgeId,actionId})));if(result.plan.execution.complete)setSelectedEdgeIds(result.plan.execution.steps.map(step=>step.edgeId));}
+    }),
     closeHistory: () => { setHistory(null); setHistorical(null); },
     replan: () => run(async () => {
       const revision = draftRevision.current;

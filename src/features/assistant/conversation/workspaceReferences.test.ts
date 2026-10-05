@@ -1,0 +1,8 @@
+import {expect,it} from 'vitest';
+import {orderedWorkspaceReferences,type RecoveryReference} from './workspaceReferences';
+import type {AssistantMessage} from '../assistantContract';
+const reference=(event:RecoveryReference['event'],referenceId:string,recordedAt:string):RecoveryReference=>({type:'workspace_event',schemaVersion:1,event,referenceId,recordedAt});
+const message=(ref:RecoveryReference):AssistantMessage=>({id:ref.referenceId,sessionId:'owned',role:'assistant',content:'saved',structuredContent:ref,context:{workspace:'learning',experienceMode:'learn'},createdAt:ref.recordedAt!});
+it('a failed old event hint cannot replace a newer persisted diagnosis',()=>{const old=reference('diagnosis','old','2026-10-05T01:00:00Z'),latest=reference('diagnosis','latest','2026-10-05T02:00:00Z');expect(orderedWorkspaceReferences([message(latest)],[old,latest]).slice(-1)[0]?.referenceId).toBe('latest');});
+it('a newly uploaded missing event stays after old persisted attachments and duplicate hints merge once',()=>{const old=reference('attachment','old','2026-10-05T01:00:00Z'),latest=reference('attachment','new','2026-10-05T02:00:00Z');expect(orderedWorkspaceReferences([message(old)],[old,latest]).map(ref=>ref.referenceId)).toEqual(['old','new']);});
+it('new events from another browser outrank stale local hints and old undated hints',()=>{const old=reference('diagnosis','old','2026-10-05T01:00:00Z'),latest=reference('confirmation','other-browser','2026-10-05T02:00:00Z');expect(orderedWorkspaceReferences([message(latest)],[old,{...old,referenceId:'legacy',recordedAt:undefined}]).slice(-1)[0]?.referenceId).toBe('other-browser');});

@@ -1,41 +1,20 @@
-import { ArrowLeft, ArrowRight, Check, Clock3, FileCode2, Network, Upload } from "lucide-react";
+import { ArrowLeft, Check, Clock3, FileCode2, Network } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
-import type { AssignmentExperience } from "@/features/course/types";
 import { courseAssignmentEligibility, evaluateTraceSelection } from "@/features/course/assignmentExperience";
 import { useOptionalUserCourseState, workflowLaunchUrl } from "@/features/learning/progress/progressService";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
-import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
+import { ConversationWorkspace, type ConversationItem } from "@/features/assistant/conversation/ConversationWorkspace";
+import { orderedWorkspaceReferences } from '@/features/assistant/conversation/workspaceReferences';
+import { useWorkspaceConversation } from "@/features/assistant/conversation/useWorkspaceConversation";
+import { CapabilityConversation } from "@/features/evidence/CapabilityConversation";
+import { evidenceRequest, readEvidenceSource, uploadEvidence, type EvidenceUploadProgress } from "@/features/evidence/evidenceClient";
 import { authGateState } from "@/features/auth/authRedirect";
 import type { AssignmentResponse } from "@/shared/learning/assignmentAttempt";
-import type { NavigationDecision } from "@/shared/learning/navigation";
 
-function AnswerExperience({ prompt, onSubmit, guest = false }: { prompt?: string; onSubmit: (response: AssignmentResponse) => void; guest?: boolean }) {
-  const [answer, setAnswer] = useState("");
-  return <section className="assignment-experience-body"><h2>开放回答</h2><p>{prompt}</p><textarea value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="写下你的架构判断、证据与边界…" /><button className="atlas-primary" disabled={!answer.trim()} onClick={() => onSubmit({ kind: "answer", text: answer.trim() })}>{guest?"完成本地体验":"提交答案"}</button></section>;
-}
-
-function CodeExperience({ experience, onSubmit, guest = false }: { experience: AssignmentExperience; onSubmit: (response: AssignmentResponse) => void; guest?: boolean }) {
-  const [code, setCode] = useState(experience.starterCode ?? "");
-  const [fileName, setFileName] = useState("");
-  return <section className="assignment-experience-body"><h2>代码 / 文件提交</h2><p>{experience.prompt}</p><textarea className="assignment-code-input" value={code} onChange={(event) => setCode(event.target.value)} spellCheck={false} /><label className="assignment-file-picker"><Upload size={16} />选择本地文件<input type="file" accept={experience.acceptedFileTypes?.join(",")} onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")} /></label>{fileName ? <small>已选择：{fileName}</small> : null}<button className="atlas-primary" disabled={!code.trim() && !fileName} onClick={() => onSubmit({ kind: "code", code: code.trim() || undefined, fileName: fileName || undefined })}>{guest?"完成本地体验":"提交成果"}</button></section>;
-}
-
-function TraceExperience({ experience, onSubmit, guest = false }: { experience: AssignmentExperience; onSubmit: (response: AssignmentResponse) => void; guest?: boolean }) {
-  const [selected, setSelected] = useState("");
-  const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
-  function checkSelection() {
-    if (!guest) {
-      onSubmit({ kind: "trace", selectedStepId: selected });
-      return;
-    }
-    setFeedback(evaluateTraceSelection(experience, selected) ? "correct" : "incorrect");
-  }
-  return <section className="assignment-experience-body"><h2>Trace Debug</h2><p>{experience.prompt}</p><div className="assignment-trace">{experience.traceSteps?.map((step, index) => <button key={step.id} className={selected === step.id ? "selected" : ""} onClick={() => {setSelected(step.id);setFeedback(null);}}><span>{String(index + 1).padStart(2,"0")}</span><code>{step.label}</code></button>)}</div>{feedback ? <div className={`assignment-trace-feedback ${feedback}`} role="status"><strong>{feedback === "correct" ? "✓ 定位正确" : "✕ 这里不是根因"}</strong><span>{feedback === "correct" ? "该步骤已越过允许的运行边界，应进入恢复或终止策略，而不是继续等待。" : "继续检查出现异常、超时或错误状态的步骤。"}</span></div> : null}{feedback === "correct" ? <button className="atlas-primary" onClick={() => onSubmit({ kind: "trace", selectedStepId: selected })}>{guest?"完成本地体验":"完成本次实训"}</button> : <button className="atlas-primary" disabled={!selected} onClick={checkSelection}>{guest?"检查本地判断":"提交故障判断"}</button>}</section>;
-}
 
 export function AssignmentExperiencePage({ session, onLogout }: { session: MockSession | null; onLogout: () => void }) {
   const navigate = useNavigate();
@@ -48,57 +27,75 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
   const eligibility = runtime && assignment ? courseAssignmentEligibility(runtime, assignment.id, session ? applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId) : [], courseState) : null;
   const [startConfirmed, setStartConfirmed] = useState(false);
   const [resultLoaded, setResultLoaded] = useState(false);
+  const [retryRevision,setRetryRevision]=useState(0);
+  const [retry,setRetry]=useState<(()=>void)>();
   const [needsRevision, setNeedsRevision] = useState(false);
   const submissionKey=useRef(crypto.randomUUID());
-  const [submitted, setSubmitted] = useState(false); const [accepted, setAccepted] = useState(false); const [busy, setBusy] = useState(false); const [navigationDecision, setNavigationDecision] = useState<NavigationDecision | null>(null); const [feedback,setFeedback]=useState<string|null>(null); const [requestError,setRequestError]=useState<string|null>(null);
+  const [submitted, setSubmitted] = useState(false); const [accepted, setAccepted] = useState(false); const [busy, setBusy] = useState(false);  const [feedback,setFeedback]=useState<string|null>(null); const [requestError,setRequestError]=useState<string|null>(null);
   const knowledgeById = useMemo(() => new Map(applicationServices.knowledgeRepository.getVisibleGraph(session?userKnowledgeAccess(session.userId):globalKnowledgeAccess).nodes.map((node) => [node.id, node])), [session]);
-  if (!runtime || !assignment) return <main className="assignment-page"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>实训不存在</h1><button className="atlas-primary" onClick={() => navigate(`/courses/${courseId}`)}>返回课程</button></section></main>;
-  const experience = assignment.experience ?? { type: assignment.mode === "workflow" ? "workflow" : "answer", prompt: assignment.description };
-  const stableAssignmentId = assignment.id;
-  const coverages = runtime.assignmentCoverages.filter((coverage) => coverage.assignmentId === assignment.id);
-  const dependencies = runtime.assignmentDependencies.filter((dependency) => dependency.targetAssignmentId === assignment.id).flatMap((dependency) => {
-    const source = runtime.assignments.find((item) => item.id === dependency.sourceAssignmentId);
+  const [answer,setAnswer] = useState(""); const [traceStep,setTraceStep] = useState("");
+  const [formalAttachmentIds,setFormalAttachmentIds]=useState<string[]>([]);
+  const [attachmentIds,setAttachmentIds] = useState<string[]>([]); const [attachmentTitles,setAttachmentTitles] = useState<Record<string,string>>({});
+  const [attemptId,setAttemptId] = useState<string>(); const [capabilitySources,setCapabilitySources] = useState<string[]>();
+  const context = useMemo(() => ({workspace:"courses" as const,experienceMode:"learn" as const,presentation:"practice",courseId,assignmentId,actionRunId}),[courseId,assignmentId,actionRunId]);
+  const chat = useWorkspaceConversation("practice",context,Boolean(session&&assignment));
+  const savedAttachments = JSON.stringify(orderedWorkspaceReferences(chat.messages,chat.references).filter(ref=>ref.event==='attachment').map(ref=>ref.referenceId));
+  useEffect(()=>{let live=true;const ids=[...new Set(JSON.parse(savedAttachments) as string[])];void Promise.all(ids.map(id=>readEvidenceSource(id))).then(values=>{if(!live)return;const uploads=values.filter(value=>value.source.provenance.kind==='practice-attachment'&&value.source.provenance.courseId===courseId&&value.source.provenance.assignmentId===assignmentId&&value.source.provenance.actionRunId===actionRunId);setAttachmentIds(uploads.slice(-4).map(value=>value.source.id));setAttachmentTitles(Object.fromEntries(values.map(value=>[value.source.id,value.source.title])));}).catch(()=>{if(live)setRequestError('附件暂时无法读取，请重试恢复。');});return()=>{live=false;};},[savedAttachments,courseId,assignmentId,actionRunId]);
+
+  const experience = assignment?.experience ?? { type: assignment?.mode === "workflow" ? "workflow" : "answer", prompt: assignment?.description };
+  const stableAssignmentId = assignment?.id??"";
+  const coverages = (runtime?.assignmentCoverages??[]).filter((coverage) => coverage.assignmentId === assignment?.id);
+  const dependencies = (runtime?.assignmentDependencies??[]).filter((dependency) => dependency.targetAssignmentId === assignment?.id).flatMap((dependency) => {
+    const source = runtime?.assignments.find((item) => item.id === dependency.sourceAssignmentId);
     return source ? [source] : [];
   });
   useEffect(() => {
-    if (!session || (!actionRunId && !eligibility?.canStart)) return;
+    if (!session || !stableAssignmentId || (!actionRunId && !eligibility?.canStart)) return;
     let live = true; setStartConfirmed(false); setRequestError(null);
-    void applicationServices.learnerStateService.startAssignment(courseId, stableAssignmentId, actionRunId)
+    void applicationServices.learnerStateService.startAssignment(courseId, stableAssignmentId, actionRunId, true)
       .then(async () => { await refreshLearnerState(session.userId); if (live) setStartConfirmed(true); })
       .catch(() => { if (live) setRequestError("无法启动实训，学习条件可能已变化，请返回课程后重试。"); });
     return () => { live = false; };
-  }, [courseId, session, stableAssignmentId, eligibility?.canStart, actionRunId]);
-  useEffect(()=>{if(!session)return;let live=true;setResultLoaded(false);setRequestError(null);void applicationServices.learnerStateService.getAssignmentResult(courseId,stableAssignmentId,actionRunId).then(({result})=>{if(!live||!result)return;setSubmitted(result.outcome !== "failed");setNeedsRevision(result.outcome === "failed");setAccepted(result.accepted);setFeedback(result.feedback.message);if (!actionRunId) return applicationServices.learnerStateService.getNavigation(courseId).then((decision)=>{if(live)setNavigationDecision(decision);});}).catch(()=>{if(live)setRequestError("已保存的结果或下一步暂时无法加载，请重试。");}).finally(()=>{if(live)setResultLoaded(true);});return()=>{live=false;};},[courseId,session,stableAssignmentId,actionRunId]);
+  }, [courseId, session, stableAssignmentId, eligibility?.canStart, actionRunId,retryRevision]);
+  useEffect(()=>{if(!session||!stableAssignmentId)return;let live=true;setResultLoaded(false);setRequestError(null);void applicationServices.learnerStateService.getAssignmentResult(courseId,stableAssignmentId,actionRunId).then(({result})=>{if(!live||!result)return;setSubmitted(true);setNeedsRevision(result.outcome === "failed");setAccepted(result.accepted);setFeedback(result.feedback.message);setAttemptId(result.attemptId);setFormalAttachmentIds(result.response?.attachmentSourceIds??[]);if(result.response?.kind==='answer')setAnswer(result.response.text);if(result.response?.kind==='code'){setAnswer(result.response.code??'');setAttachmentIds(result.response.attachmentSourceIds??[]);}if(result.response?.kind==='trace')setTraceStep(result.response.selectedStepId);}).catch(()=>{if(live)setRequestError("已保存的结果或下一步暂时无法加载，请重试。");}).finally(()=>{if(live)setResultLoaded(true);});return()=>{live=false;};},[courseId,session,stableAssignmentId,actionRunId,retryRevision]);
   useEffect(() => {
     submissionKey.current = crypto.randomUUID();
-    setSubmitted(false); setAccepted(false); setNeedsRevision(false); setNavigationDecision(null); setFeedback(null);
+    setSubmitted(false); setAccepted(false); setNeedsRevision(false); setFeedback(null);setAnswer("");setTraceStep("");setAttachmentIds([]);setAttachmentTitles({});setAttemptId(undefined);setCapabilitySources(undefined);
   }, [courseId, stableAssignmentId, actionRunId]);
+  const savedDiagnosis = chat.references.some(ref=>['diagnosis','confirmation'].includes(ref.event))||chat.messages.some(message=>message.structuredContent?.type==='workspace_event'&&['diagnosis','confirmation'].includes(message.structuredContent.event));
+  useEffect(()=>{if(savedDiagnosis)setCapabilitySources(JSON.parse(savedAttachments) as string[]);},[savedDiagnosis,savedAttachments]);
+  if (!runtime || !assignment) return <main className="assignment-page"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>实训不存在</h1><button className="atlas-primary" onClick={() => navigate(`/courses/${courseId}`)}>返回课程</button></section></main>;
   async function submit(response: AssignmentResponse) {
-    if (busy || (session && (!startConfirmed || !resultLoaded || (!actionRunId && !eligibility?.canSubmit)))) return; setBusy(true);setRequestError(null);
+    if (busy || (session && (!startConfirmed || !resultLoaded || (!actionRunId && !eligibility?.canSubmit)))) return; setBusy(true);setRequestError(null);setRetry(()=>()=>void submit(response));
     try {
       if (!session) {
         setSubmitted(true);
         setAccepted(response.kind === "trace" && evaluateTraceSelection(experience, response.selectedStepId));
         return;
       }
-      const result = await applicationServices.learnerStateService.submitAssignment(courseId, stableAssignmentId, response,submissionKey.current,actionRunId);
+      const result = await applicationServices.learnerStateService.submitAssignment(courseId, stableAssignmentId, response,submissionKey.current,actionRunId,true);
       setSubmitted(true);
+      setAttemptId(result.attemptId);setFormalAttachmentIds(response.attachmentSourceIds??[]);
+      await chat.record("submission",result.attemptId);
       setAccepted(result.accepted);
       setNeedsRevision(result.outcome === "failed");
       setFeedback(result.feedback.message);
-      await refreshLearnerState(session.userId);
-      try { if (!actionRunId) setNavigationDecision(await applicationServices.learnerStateService.getNavigation(courseId)); } catch { setRequestError("提交结果已保存，但下一步暂时无法加载。你可以稍后重试或返回课程。"); }
+      await refreshLearnerState(session.userId).catch(()=>{setRequestError('正式实践结果已保存，能力投影暂未刷新。重试读取即可。');setRetry(()=>()=>setRetryRevision(value=>value+1));});
+
     }
     catch { setRequestError("提交失败，未确认保存结果。请检查网络后重试。"); }
     finally { setBusy(false); }
   }
-  const nextActionHref = navigationDecision?.nextAction.resourceKind === "micro" && navigationDecision.nextAction.nodeId
-    ? `/learn/micro/${encodeURIComponent(navigationDecision.nextAction.nodeId)}?courseId=${encodeURIComponent(courseId)}`
-    : navigationDecision?.nextAction.resourceKind === "assignment" && navigationDecision.nextAction.resourceId
-      ? `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(navigationDecision.nextAction.resourceId)}`
-      : navigationDecision?.nextAction.resourceKind === "material" && navigationDecision.nextAction.resourceId
-        ? `/courses/${encodeURIComponent(courseId)}/materials/${encodeURIComponent(navigationDecision.nextAction.resourceId)}`
-        : `/courses/${encodeURIComponent(courseId)}`;
+  async function attach(file:File,progress:EvidenceUploadProgress={}) {if(attachmentIds.length>=4&&!progress.upload){setRequestError('每次实践最多选择4份附件，请先完成当前提交。');return;}if(!session){setRequestError("登录后才能保存真实文件。");return;}setBusy(true);setRequestError(null);setRetry(()=>()=>void attach(file,progress));try{const id=await uploadEvidence(file,{courseId,assignmentId,actionRunId},progress);setAttachmentIds(current=>[...current,id].slice(-4));setAttachmentTitles(current=>({...current,[id]:file.name}));await chat.record("attachment",id);}catch(error){setRequestError(error instanceof Error?error.message:"上传失败，请重新上传。");}finally{setBusy(false);}}
+  async function inspectCapability() {if(!attemptId)return;setBusy(true);setRequestError(null);setRetry(()=>()=>void inspectCapability());try{const result=await evidenceRequest<{sourceIds:string[]}>({action:'assignment-source',attemptId});for(const id of result.sourceIds)await chat.record('attachment',id);setCapabilitySources(result.sourceIds);}catch(error){setRequestError(error instanceof Error?error.message:'证据资料暂未保存，请重试。');}finally{setBusy(false);}}
+  const task:ConversationItem={id:'practice-task',role:'assistant',content:<><h2>{assignment.title}</h2><p>{experience.prompt??assignment.description}</p><details><summary>任务背景与要求</summary><p>{assignment.description}</p><ul>{assignment.requirements.map(requirement=><li key={requirement}>{requirement}</li>)}</ul><p>预期输出：{assignment.expectedOutput}</p></details><h3>验收标准</h3><ul>{assignment.acceptanceCriteria.map(criterion=><li key={criterion}>{criterion}</li>)}</ul><small>普通消息用于讨论；下方明确的正式提交才会保存 Assignment Response。</small></>};
+  const messages:ConversationItem[]=[task,...chat.messages.map(message=>({id:message.id,role:message.role,content:message.structuredContent?.type==='workspace_event'?<><p>{message.content}</p><small>{message.structuredContent.event==='attachment'?attachmentTitles[message.structuredContent.referenceId]??message.structuredContent.referenceId:`记录 ${message.structuredContent.referenceId}`}</small></>:<><p>{message.content}</p>{message.role==='user'&&!submitted&&experience.type!=='trace'&&experience.type!=='workflow'?<button className="atlas-secondary" onClick={()=>setAnswer(message.content)}>将这条消息作为本次实践成果</button>:null}</>}))];
+  if(submitted)messages.push({id:'practice-result',role:'assistant',content:<div className={`assignment-submitted ${accepted?'passed':'not-passed'}`}><h2>{!session?'本次匿名体验已完成':accepted?'本次实训已通过正式验收':'本次提交已记录'}</h2><p>{feedback??'匿名体验只在当前页面保存。'}</p><p>Practice 完成与能力形成是独立状态。正式能力和路线没有自动更新。</p>{formalAttachmentIds.length?<ul>{formalAttachmentIds.map(id=><li key={id}>{attachmentTitles[id]??'本人提交的原始文件'}<button className="atlas-secondary" onClick={()=>void evidenceRequest<{url:string}>({action:'download',sourceId:id}).then(result=>window.open(result.url,'_blank','noopener')).catch(()=>setRequestError('原始文件暂时无法打开，请重试。'))}>查看原文件</button></li>)}</ul>:null}{session&&attemptId?<button className="atlas-primary" disabled={busy} onClick={()=>void inspectCapability()}>检查能力变化</button>:null}<button className="atlas-secondary" onClick={()=>navigate(`/courses/${encodeURIComponent(courseId)}`)}>继续正式路线</button></div>});
+  const canSubmit=!busy&&(!session||(startConfirmed&&resultLoaded&&Boolean(chat.sessionId)&&(Boolean(actionRunId)||Boolean(eligibility?.canSubmit))));
+  const response:AssignmentResponse=experience.type==='trace'?{kind:'trace',selectedStepId:traceStep,attachmentSourceIds:attachmentIds}:experience.type==='code'?{kind:'code',code:answer.trim()||undefined,attachmentSourceIds:attachmentIds,fileName:attachmentIds.map(id=>attachmentTitles[id]).filter(Boolean).join('、')||undefined}:{kind:'answer',text:answer.trim(),attachmentSourceIds:attachmentIds};
+  const ready=experience.type==='trace'?Boolean(traceStep):experience.type==='code'?Boolean(answer.trim()||attachmentIds.length):Boolean(answer.trim());
+  if(!submitted&&experience.type!=='workflow')messages.push({id:'formal-submission',role:'assistant',content:<section className="assignment-experience-body"><h3>{experience.type==='trace'?'选择最早失败点':'准备本次正式成果'}</h3>{experience.type==='trace'?<div className="assignment-trace">{experience.traceSteps?.map((step,index)=><button disabled={busy} key={step.id} className={traceStep===step.id?'selected':''} aria-pressed={traceStep===step.id} onClick={()=>setTraceStep(step.id)}><span>{String(index+1).padStart(2,'0')}</span><code>{step.label}</code></button>)}</div>:<><details open={Boolean(answer)}><summary>{answer?"已准备正式成果 · 复核或编辑":"直接编辑正式成果（也可从本人消息选择）"}</summary><label>本次正式提交内容<textarea aria-label="正式实践成果" value={answer} onChange={event=>setAnswer(event.target.value)} placeholder="写下本人完成的过程、计算依据、结论与边界…"/></label></details>{attachmentIds.length?<ul>{attachmentIds.map(id=><li key={id}>{attachmentTitles[id]??id} · 已保存原始文件 <button className="atlas-secondary" onClick={()=>void evidenceRequest<{url:string}>({action:'download',sourceId:id}).then(result=>window.open(result.url,'_blank','noopener')).catch(()=>setRequestError('原始文件暂时无法打开，请重试。'))}>查看原文件</button></li>)}</ul>:null}<p>这里的成果和选定附件将进入正式提交；普通聊天与 Assistant 回复不会自动加入。</p></>}<button className="atlas-primary" disabled={!canSubmit||!ready} onClick={()=>void submit(response)}>{session?'正式提交本次实践':'完成本地体验'}</button></section>});
+  if(!submitted&&experience.type==='workflow')messages.push({id:'workflow-launch',role:'assistant',content:<><p>在现有工作流画布完成任务，执行结果仍由 Workflow Runtime 保存。</p><button className="atlas-primary" onClick={()=>session?navigate(workflowLaunchUrl({courseId,assignmentId:assignment.id,workflowTemplateId:assignment.workflowTemplateId!})):navigate('/login',{state:authGateState(location)})}>{session?'进入画布':'登录后进入画布'}</button></>});
   return <main className="assignment-page">
     <GlobalNav active="courses" session={session} onLogout={onLogout} />
     <header className="assignment-page-header glass-v2"><button onClick={() => navigate(`/courses/${courseId}`)}><ArrowLeft size={17} />返回课程</button><div><span>COURSE ASSIGNMENT</span><h1>{assignment.title}</h1><p>{assignment.description}</p></div><aside><span><Clock3 size={14} />{assignment.estimatedMinutes ?? 25} 分钟</span><span><Network size={14} />{coverages.length} 个 Knowledge</span><span><FileCode2 size={14} />{experience.type}</span></aside></header>
@@ -112,9 +109,13 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
         <section><h3>验收标准</h3>{assignment.acceptanceCriteria.map((item) => <span key={item}>✓ {item}</span>)}</section>
       </aside>
       <article className="assignment-experience-card glass-v2">
-        {requestError?<div className="assignment-trace-feedback incorrect" role="alert"><strong>暂时无法完成请求</strong><span>{requestError}</span></div>:null}{session && !actionRunId && eligibility?.reason && !eligibility.viewOnly ? <section role="status"><h2>暂时不能开始实训</h2><p>{eligibility.reason}</p></section> : session && !actionRunId && eligibility?.viewOnly && !submitted ? <p role="status">{resultLoaded ? "当前没有可显示的详细结果，请返回课程查看任务状态。" : "正在读取已保存的提交…"}</p> : session && (!resultLoaded || ((actionRunId || !eligibility?.viewOnly) && !startConfirmed)) ? <p role="status">正在确认实训条件…</p> : submitted ? <div className={`assignment-submitted ${accepted ? "passed" : "not-passed"}`}><Check size={34} /><h2>{session?(accepted ? "本次实训已通过确定性验收" : "本次提交已记录"):"本次匿名体验已完成"}</h2><p>{session?(feedback??(accepted ? "已写入有效实践证据；是否 mastered 仍由完整掌握策略决定。" : "正式 Attempt 与待评阅或未通过的 PerformanceResult 已保存；提交不等于通过或 mastery。")):"答案、文件选择与反馈只存在于当前页面，没有正式提交、成绩或 learner state 写入。"}</p>{actionRunId ? <section className="assignment-next-action"><strong>继续正式路线</strong><span>本次行动结果已保存；回到课程查看当前步骤。</span><button className="atlas-primary" onClick={() => navigate(`/courses/${encodeURIComponent(courseId)}`)}>继续正式路线 <ArrowRight size={15} /></button></section> : navigationDecision ? <section className="assignment-next-action"><small>NEXT ACTION · {navigationDecision.policyVersion}</small><strong>{navigationDecision.nextAction.kind === "remediation" ? "先复习，再重试" : navigationDecision.nextAction.kind === "practice" ? "继续实训" : "继续学习路线"}</strong><span>{navigationDecision.nextAction.reason}</span><button className="atlas-primary" onClick={() => navigate(nextActionHref)}>前往下一步 <ArrowRight size={15} /></button></section> : null}{session && needsRevision && (actionRunId || eligibility?.canSubmit) && !accepted ? <button className="atlas-secondary" onClick={() => { submissionKey.current=crypto.randomUUID();setSubmitted(false); setNavigationDecision(null);setRequestError(null); }}>继续修改</button> : null}</div> : experience.type === "answer" ? <AnswerExperience guest={!session} prompt={experience.prompt} onSubmit={(response) => void submit(response)} /> : experience.type === "code" ? <CodeExperience guest={!session} experience={experience} onSubmit={(response) => void submit(response)} /> : experience.type === "trace" ? <TraceExperience guest={!session} experience={experience} onSubmit={(response) => void submit(response)} /> : <section className="assignment-experience-body"><h2>画布</h2><p>{experience.prompt}</p><div className="assignment-workflow-preview"><Network size={34} /><strong>继承型工作流已准备</strong><span>画布将从现有 Planner、Workers 与 Merge 结构开始。</span></div><button className="atlas-primary" onClick={() => session?navigate(workflowLaunchUrl({courseId,assignmentId:assignment.id,workflowTemplateId:assignment.workflowTemplateId!})):navigate("/login",{state:authGateState(location)})}>{session?"进入画布":"登录后进入画布"} <ArrowRight size={15} /></button></section>}
+        {session&&(!resultLoaded||((Boolean(actionRunId)||eligibility?.canStart)&&!startConfirmed))&&!submitted?<p role="status">正在恢复正式结果并确认实践条件…</p>:null}
+        {capabilitySources?<CapabilityConversation courseId={courseId} initialSourceIds={capabilitySources} conversation={chat} prefix={messages.filter(message=>message.id==='practice-task'||message.id==='practice-result')}/>:<ConversationWorkspace mode="practice" messages={messages} loading={chat.loading} sending={busy||chat.sending||chat.loading} error={requestError??chat.error} onRetry={requestError?retry??(()=>setRetryRevision(value=>value+1)):chat.retry} onSend={text=>{setRetry(()=>()=>void chat.send(text));return chat.send(text);}} onAttachment={session&&chat.sessionId?file=>void attach(file):undefined}/>}
+        {session&&needsRevision&&!accepted?<button className="atlas-secondary" disabled={busy} onClick={()=>{submissionKey.current=crypto.randomUUID();setSubmitted(false);setCapabilitySources(undefined);setAttachmentIds(formalAttachmentIds);setRequestError(null);}}>继续修改</button>:null}
+        {session&&!actionRunId&&eligibility?.reason&&!eligibility.viewOnly?<p role="status">{eligibility.reason}</p>:null}
+
       </article>
     </div>
-    <EduFlowAssistant context={session?{workspace:"courses",experienceMode:"learn",userRole:session.role,capabilities:session.capabilities,courseId,presentation:"assignment",actionRunId,knowledgeId:coverages.length===1?coverages[0].nodeId:undefined,assignmentId}:undefined} locked={!session} contextLabel={assignment.title}/>
+
   </main>;
 }

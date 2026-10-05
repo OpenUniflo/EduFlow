@@ -34,3 +34,9 @@ Show four steps: 选择资料 → 分析资料 → 查看能力候选 → 确认
 ## Reduced motion and verification
 
 prefers-reduced-motion: reduce removes looping flows, pulses and large movement while preserving static Route highlights and source→target arrows, colors, borders, icons and all operations. Keyboard focus is visible; dialogs have names and usable closing/focus behavior. Verify desktop and 390×844 with screenshots, and actual directional pulse motion; DOM assertions alone cannot establish visual success.
+
+## Conversation and Project Overview · 2026-10-05
+
+This supersedes the earlier four-step Evidence wizard presentation. Assistant, Practice and capability update share a continuous timeline, composer, real attachment entry, status, retry and structured cards. Formal actions remain explicit controls. Historical analysis cards identify their Run and cannot confirm another Run. Supporting text and evidence use progressive disclosure. Full workspaces remain legible at 390×844, support keyboard and IME, avoid focus stealing and respect reduced motion.
+
+Project goal, current Route and relations/actions live in one centered, default-collapsed Project Overview. Its nested list navigates factual Edges. Planning summary describes Current/Preview changes without drawing another route. Disclosure never changes topology, force, coordinates or camera.

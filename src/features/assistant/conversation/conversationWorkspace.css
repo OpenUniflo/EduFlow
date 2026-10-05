@@ -1,0 +1,28 @@
+.conversation-workspace { display:flex; flex-direction:column; min-width:0; width:100%; color:var(--text-primary,#253348); font-size:14px; }
+.conversation-timeline { overflow:auto; max-height:62vh; min-height:180px; padding:12px; display:flex; flex-direction:column; gap:18px; }
+.conversation-message { max-width:92%; min-width:0; align-self:flex-start; }
+.conversation-message.user { align-self:flex-end; max-width:85%; }
+.conversation-message > small { display:block; margin:0 0 6px; color:#64748b; font-size:12px; }
+.conversation-message-content { padding:14px 16px; background:var(--surface-raised,#fff); border:1px solid var(--border-subtle,#dbe3ee); border-radius:14px; overflow-wrap:anywhere; white-space:pre-wrap; line-height:1.65; }
+.conversation-message.user .conversation-message-content { background:#eef4ff; }
+.conversation-message-content h2,.conversation-message-content h3 { margin:0 0 10px; }
+.conversation-message-content p { margin:8px 0; }
+.conversation-message-content details { white-space:normal; margin-top:10px; }
+.conversation-message-content summary { cursor:pointer; }
+.conversation-message-content button { max-width:100%; }
+.conversation-message-content pre { max-width:100%; overflow:auto; }
+.conversation-composer { border-top:1px solid #dbe3ee; padding:12px; background:var(--surface-raised,#fff); border-radius:0 0 14px 14px; }
+.conversation-composer textarea { width:100%; box-sizing:border-box; min-height:70px; max-height:180px; resize:vertical; font:inherit; padding:10px; border:1px solid #dbe3ee; border-radius:10px; }
+.conversation-composer-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:8px; }
+.conversation-composer-actions button { display:flex; align-items:center; gap:6px; min-height:40px; }
+.conversation-error { margin:8px 12px; padding:12px; background:#fff5f3; border-radius:10px; }
+.conversation-error p { margin:0 0 8px; }
+.conversation-workspace :focus-visible { outline:2px solid #3b82f6; outline-offset:3px; }
+@media(max-width:760px) { .conversation-timeline { padding:8px; max-height:58vh; } .conversation-message { max-width:100%; } .conversation-message-content { padding:12px; } .conversation-composer { padding:8px; } }
+@media(prefers-reduced-motion:reduce) { .conversation-workspace .spin { animation:none; } }
+
+.assistant-conversation.compact .conversation-timeline { max-height:220px; min-height:60px; padding:4px; gap:8px; }
+.assistant-conversation.compact .conversation-message-content { padding:8px; font-size:12px; }
+.assistant-conversation.compact .conversation-composer textarea { min-height:44px; font-size:12px; }
+.assistant-conversation.compact .conversation-composer { padding:6px; }
+.assistant-conversation .assistant-timeline-card { min-width:0; max-width:100%; }

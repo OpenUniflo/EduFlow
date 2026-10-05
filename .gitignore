@@ -13,3 +13,4 @@ dist/
 /docs/local/AI-Agents-in-Depth-zh-CN.pdf
 /tmp/gold-course-sync/
 .vercel
+/.acceptance/

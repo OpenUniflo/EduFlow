@@ -31,7 +31,6 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const [searchOpen, setSearchOpen] = useState(false);
   const [draftNotice, setDraftNotice] = useState('');
   const [editorCollapsed, setEditorCollapsed] = useState(false);
-  const [goalExpanded, setGoalExpanded] = useState(false);
   const structuralGraph = useMemo(() => projectStructuralGraph(graph, runtime.curriculumCoverages.map(coverage => coverage.nodeId)), [graph, runtime]);
   const result = useMemo(() => {
     try {
@@ -87,16 +86,17 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
       <div className="project-capability-toolbar">
         {control.editing ? <button className="atlas-secondary project-editor-toggle" aria-expanded={!editorCollapsed} aria-controls="project-route-editor" onClick={() => setEditorCollapsed(value => !value)}>{editorCollapsed ? '展开规划面板' : '查看路线图'}</button> : null}
         {!control.editing ? searchPanel : null}
-        {!control.editing && !selected && !activeEdge ? <div className={`project-capability-goal glass-v2${goalExpanded ? ' expanded' : ''}`} aria-label="项目目标与当前能力缺口">
-          <button className="project-goal-toggle" aria-expanded={goalExpanded} onClick={() => setGoalExpanded(value => !value)}>项目目标与能力缺口</button>
-          {runtime.course.targetOutcome ? <p><strong>项目目标</strong> {runtime.course.targetOutcome}</p> : null}
-          <small>当前显示：已具备 {displayedNodes.filter(node => node.capabilityRoles?.current).length} 项 · 待补中间能力 {displayedNodes.filter(node => node.capabilityRoles?.bridge && !node.capabilityRoles.current).length} 项 · 待达成目标 {displayedNodes.filter(node => node.capabilityRoles?.course && !node.capabilityRoles.current).length} 项</small>
-          <small>显示完整项目能力结构与个人正式路线；预览只改变标记，不移动能力。点击关系线或展开关系列表比较行动方案。</small>
-        </div> : null}
         {!control.editing && authenticated ? <RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title}/> : null}
       </div>
-      {(!control.editing || editorCollapsed) && !activeEdge && !selected ? routeLegend : null}
-      {!control.editing && !selected && !activeEdge ? <details className="project-relations-list glass-v2"><summary>查看项目关系与行动 · {visibleEdges.length}</summary>{visibleEdges.map(edge => <button className="atlas-secondary" key={edge.id} onClick={() => { onSelect(null); setActionId(null); setEdgeId(edge.id); }}><span>{title(edge.source)} → {title(edge.target)}</span><small>{edge.relation === 'prerequisite' ? relationLabel(edge) : '能力支撑'} · {counts.get(edge.id) ?? 0} 个行动方案</small></button>)}{!visibleEdges.length ? <p>当前展示范围没有能力关系。</p> : null}</details> : null}
+      <details className="project-overview glass-v2" aria-label="项目概览">
+        <summary><strong>项目概览</strong><span>项目目标 · {control.view?.activeVersion ? `正式路线 V${control.view.activeVersion.versionNumber}` : '尚无正式路线'} · {visibleEdges.length} 条关系 / {visibleEdges.reduce((sum,edge)=>sum+(counts.get(edge.id)??0),0)} 个行动</span></summary>
+        <div className="project-overview-body">
+          <section><h3>项目目标</h3><p>{runtime.course.targetOutcome??runtime.course.description}</p></section>
+          <section><h3>当前正式路线{control.view?.activeVersion?` V${control.view.activeVersion.versionNumber}`:''}</h3><p>{control.view?.activeVersion?.snapshot.valid?`${control.view.activeVersion.snapshot.orderedNodeIds.length} 项能力 · ${control.view.activeVersion.snapshot.executionSteps?.length??0} 个执行步骤`:'尚未采用可执行路线'}</p><p>正在执行 {actionData.runs.filter(run=>run.status==='in_progress').length} 项 · 历史完成 {actionData.runs.filter(run=>run.status==='completed').length} 次</p></section>
+          {control.editing?<section><h3>调整路线 · Preview 尚未采用</h3>{previewRoute&&control.view?.activeVersion?.snapshot.valid?<p>+{previewRoute.executionSteps?.filter(step=>!control.view!.activeVersion!.snapshot.executionSteps?.some(current=>current.edgeId===step.edgeId)).length??0} Steps · −{control.view.activeVersion.snapshot.executionSteps?.filter(step=>!previewRoute.executionSteps?.some(next=>next.edgeId===step.edgeId)).length??0} Steps · {previewRoute.executionSteps?.filter(step=>control.view!.activeVersion!.snapshot.executionSteps?.some(current=>current.edgeId===step.edgeId&&current.actionId!==step.actionId)).length??0} 个 Action 变化</p>:<p>在图中选择真实关系与行动，生成 Preview 后检查差异。</p>}<small>Current / Preview 的执行方向由图中持续的方向脉冲表达。</small></section>:null}
+          <section><h3>关系与行动</h3><p>{visibleEdges.length} 条真实关系 · {visibleEdges.reduce((sum,edge)=>sum+(counts.get(edge.id)??0),0)} 个可选行动</p><details className="project-relations-list"><summary>查看全部关系与行动</summary>{visibleEdges.map(edge=><button className="atlas-secondary" key={edge.id} onClick={()=>{onSelect(null);setActionId(null);setEdgeId(edge.id);}}><span>{title(edge.source)} → {title(edge.target)}</span><small>{edge.relation==='prerequisite'?relationLabel(edge):'能力支撑'} · {counts.get(edge.id)??0} 个行动方案</small></button>)}</details></section>
+        </div>
+      </details>
       {control.editing ? <aside id="project-route-editor" hidden={editorCollapsed} className="project-capability-editor glass-v2" aria-label="调整学习路线工具">{routeLegend}{searchPanel}{draftNotice ? <p role="status">{draftNotice}</p> : null}<RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title}/></aside> : null}
       {!activeEdge && !selected ? <details className="project-capability-legend glass-v2" aria-label="能力图例"><summary>能力与行动图例</summary><div><span><i style={{ background: '#3b82f6' }}/>蓝 · 已具备</span><span><i style={{ background: '#22c55e' }}/>绿 · 未具备项目目标</span><span><i style={{ background: '#94a3b8' }}/>灰 · 未具备中间能力</span><span>行动：虚线候选 · 紫色已选 · 青色流动执行中 · 翠绿完成 · 淡灰不可用</span></div></details> : null}
       {!result.projection.nodes.length ? <p className="project-capability-empty glass-v2" role="status">当前课程没有可展示的有效能力。</p> : null}

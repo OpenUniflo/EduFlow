@@ -63,7 +63,17 @@ export type CourseCreationBrief = {
   practiceEmphasis?: boolean;
 };
 
-export type AssistantStructuredContent = CourseSearchTimelineContent | CourseCreationBrief;
+export type WorkspaceTimelineContent = {
+  type: "workspace_event"; schemaVersion: 1;
+  event: "attachment" | "submission" | "diagnosis" | "confirmation";
+  referenceId: string;
+};
+export type AssistantStructuredContent = CourseSearchTimelineContent | CourseCreationBrief | WorkspaceTimelineContent;
+
+// Isolate a corrupt or newer card without losing the rest of the conversation.
+export function safeAssistantStructuredContent(value: unknown) {
+  try { return parseAssistantStructuredContent(value); } catch { return undefined; }
+}
 
 export type AssistantSession = {
   id: string;
@@ -85,6 +95,12 @@ export function parseAssistantStructuredContent(value: unknown): AssistantStruct
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Assistant structured content is invalid");
   const source = value as Record<string, unknown>;
   if (source.schemaVersion !== 1) throw new Error("Assistant structured content schema is unsupported");
+  if (source.type === "workspace_event") {
+    if (!["attachment", "submission", "diagnosis", "confirmation"].includes(String(source.event))) throw new Error("Workspace event is invalid");
+    const referenceId=requiredString(source,'referenceId');
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(referenceId))throw new Error('Workspace reference is invalid');
+    return { type: "workspace_event", schemaVersion: 1, event: source.event as WorkspaceTimelineContent["event"], referenceId };
+  }
   if (source.type === "course_search") {
     if (!source.plan || typeof source.plan !== "object" || Array.isArray(source.plan)) throw new Error("Assistant Course Search plan is invalid");
     return {

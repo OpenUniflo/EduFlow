@@ -27,14 +27,14 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const learnerCourseId = typeof request.query.courseId === "string" ? request.query.courseId : undefined;
     if (assignmentId && learnerCourseId) {
       const actionRunId = typeof request.query.actionRunId === 'string' ? request.query.actionRunId : undefined;
-      let attemptQuery = client.from("learning_attempts").select("id,attempt_number").eq("user_id",user.id).eq("course_id",learnerCourseId).eq("assignment_id",assignmentId);
+      let attemptQuery = client.from("learning_attempts").select("id,attempt_number,response").eq("user_id",user.id).eq("course_id",learnerCourseId).eq("assignment_id",assignmentId);
       if (actionRunId) attemptQuery = attemptQuery.eq('action_run_id', actionRunId);
       const attemptResult = await attemptQuery.order("attempt_number",{ascending:false}).limit(1).maybeSingle();
       const attempt = dataOrThrow(attemptResult.data as Row|null,attemptResult.error,"Latest Assignment Attempt lookup");
       if (!attempt) { json(response,200,{result:null}); return; }
       const performanceResult = await client.from("performance_results").select("id,outcome,feedback,evaluated_at,version").eq("attempt_id",text(attempt,"id")).order("version",{ascending:false}).limit(1).single();
       const performance = dataOrThrow(performanceResult.data as Row|null,performanceResult.error,"Latest PerformanceResult lookup");
-      json(response,200,{result:{attemptId:text(attempt,"id"),resultId:text(performance,"id"),outcome:text(performance,"outcome"),accepted:text(performance,"outcome")==="passed",feedback:performance.feedback,evaluatedAt:text(performance,"evaluated_at")}}); return;
+      json(response,200,{result:{attemptId:text(attempt,"id"),resultId:text(performance,"id"),outcome:text(performance,"outcome"),accepted:text(performance,"outcome")==="passed",feedback:performance.feedback,evaluatedAt:text(performance,"evaluated_at"),response:attempt.response}}); return;
     }
     const server = await requireTeacher(user.id);
     const courseId = learnerCourseId;
@@ -67,9 +67,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     return;
   }
   if (request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
-  const body = request.body as { action?: "start-material" | "start-assignment" | "submit-assignment" | "accept-assignment"; nodeId?: string; courseId?: string; materialId?: string; assignmentId?: string; learnerUserId?: string; idempotencyKey?: string; response?: unknown; actionRunId?: string; attemptId?: string };
+  const body = request.body as { action?: "start-material" | "start-assignment" | "submit-assignment" | "accept-assignment"; nodeId?: string; courseId?: string; materialId?: string; assignmentId?: string; learnerUserId?: string; idempotencyKey?: string; response?: unknown; actionRunId?: string; conversation?: boolean; attemptId?: string };
   if (!body.action) throw new ApiError(400, "invalid_learning_action", "An action is required");
   if (!["start-material","start-assignment","submit-assignment","accept-assignment"].includes(body.action)) throw new ApiError(400,"invalid_learning_action","Unsupported learning action");
+  if (body.conversation != null && typeof body.conversation !== "boolean") throw new ApiError(400,"invalid_conversation_flag","Conversation flag must be boolean");
   if (body.action === "start-material") {
     if (!body.nodeId || !body.courseId || !body.materialId) throw new ApiError(400, "invalid_learning_action", "nodeId, courseId and materialId are required");
     await requireCourseKnowledge(client, body.courseId, body.nodeId);
@@ -100,11 +101,11 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   if (!assignment) throw new ApiError(404, "assignment_not_found", "Assignment is unavailable");
   await requirePublishedCourse(client, body.courseId);
   // Recover an acknowledged submission before checking today's mutable execution conditions.
-  if (body.action === 'submit-assignment' && body.actionRunId && body.idempotencyKey) {
+  if (body.action === 'submit-assignment' && body.idempotencyKey) {
     const savedResult = await client.from('learning_attempts').select('id,response,action_run_id').eq('user_id', user.id).eq('course_id', body.courseId).eq('assignment_id', body.assignmentId).eq('idempotency_key', body.idempotencyKey).maybeSingle();
     const saved = dataOrThrow(savedResult.data, savedResult.error, 'Saved Action submission');
     if (saved) {
-      if (saved.action_run_id !== body.actionRunId || !isDeepStrictEqual(saved.response, JSON.parse(JSON.stringify(parseAssignmentResponse(body.response))))) throw new ApiError(409, 'assignment_idempotency_conflict', 'This idempotency key belongs to a different execution or response');
+      if ((saved.action_run_id??null) !== (body.actionRunId??null) || !isDeepStrictEqual(saved.response, JSON.parse(JSON.stringify({...parseAssignmentResponse(body.response),...(body.conversation ? {submissionMode:"conversation"} : {})})))) throw new ApiError(409, 'assignment_idempotency_conflict', 'This idempotency key belongs to a different execution or response');
       const result = await client.from('performance_results').select('id,outcome,feedback').eq('attempt_id', saved.id).order('version', { ascending: false }).limit(1).single();
       const persisted = dataOrThrow(result.data, result.error, 'Saved Action result');
       json(response, 200, { status: persisted.outcome === 'passed' ? 'accepted' : persisted.outcome === 'failed' ? 'needs_revision' : 'submitted', accepted: persisted.outcome === 'passed', attemptId: saved.id, resultId: persisted.id, outcome: persisted.outcome, duplicate: true, feedback: persisted.feedback }); return;
@@ -131,7 +132,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const write = await createServerSupabase().from("user_assignment_states").upsert({ user_id: user.id, course_id: body.courseId, assignment_id: body.assignmentId, status: "started", progress: 1, started_at: previous?.started_at ?? now, updated_at: now });
       dataOrThrow(write.data, write.error, "Assignment start");
     }
-    await Promise.all(coverage.map((item) => updateKnowledgeAtLeast(createServerSupabase(), user.id, text(item, "node_id"), "practicing")));
+    if (!body.conversation) await Promise.all(coverage.map((item) => updateKnowledgeAtLeast(createServerSupabase(), user.id, text(item, "node_id"), "practicing")));
     json(response, 200, { status: "started" }); return;
   }
   const submission = parseAssignmentResponse(body.response);
@@ -143,10 +144,19 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const retry = dataOrThrow(retryResult.data as Row | null, retryResult.error, "Assignment retry lookup");
     if (!retry) throw new ApiError(409, "assignment_not_started", "Start an eligible Assignment before submitting; submitted or completed work cannot be resubmitted");
   }
+  if (submission.kind !== 'workflow') {
+    const ids = submission.attachmentSourceIds ?? [];
+    if (body.conversation && submission.kind==='code' && !submission.code?.trim() && !ids.length) throw new ApiError(400, 'file_content_required', '请提交实际代码或已上传的文件。');
+    if (ids.length) {
+      const sources = await client.from('user_evidence_sources').select('id,source_sha256').in('id', ids).eq('user_id',user.id).eq('parse_status','ready').is('archived_at',null);
+      const rows = dataOrThrow(sources.data,sources.error,'Practice attachment ownership');
+      if (rows.length !== ids.length || rows.some(source => !source.source_sha256)) throw new ApiError(404,'practice_attachment_unavailable','请选择本人已解析且未归档的文件。');
+    }
+  }
   const evaluation = evaluateAssignmentResponse(assignment, submission);
-  const recorded = await createServerSupabase().rpc(actionRun ? 'record_action_assignment_attempt' : "record_assignment_attempt", {
+  const recorded = await createServerSupabase().rpc(body.conversation ? (actionRun ? 'record_conversation_action_assignment_attempt' : 'record_conversation_assignment_attempt') : (actionRun ? 'record_action_assignment_attempt' : 'record_assignment_attempt'), {
     ...(actionRun ? { p_user_id: user.id, p_run_id: actionRun.id } : { p_learner_user_id: user.id, p_course_id: body.courseId, p_assignment_id: body.assignmentId }), p_idempotency_key: body.idempotencyKey,
-    p_response: submission, p_outcome: evaluation.outcome, p_score: evaluation.score ?? null,
+    p_response: {...submission,...(body.conversation ? {submissionMode:"conversation"} : {})}, p_outcome: evaluation.outcome, p_score: evaluation.score ?? null,
     p_feedback: evaluation.feedback, p_evaluator_kind: evaluation.evaluatorKind
   });
   if (recorded.error?.code === "23505") throw new ApiError(409, "assignment_idempotency_conflict", "This idempotency key was already used with a different response");

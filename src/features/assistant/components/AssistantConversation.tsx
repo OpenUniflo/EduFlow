@@ -1,8 +1,9 @@
-import { ArrowUpRight, BookOpen, FileText, Loader2, Search, Send, Target } from "lucide-react";
+import { ArrowUpRight, BookOpen, FileText, Search, Target } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { AssistantContextSnapshot, AssistantMessage, CourseCreationBrief, CourseSearchTimelineContent } from "../assistantContract";
 import { snapshotAssistantContext, type AssistantContext } from "../assistantContext";
+import { ConversationWorkspace } from "../conversation/ConversationWorkspace";
 import { useAssistantRuntime } from "../AssistantRuntimeContext";
 
 function BriefComposer({ planningMessageId, sourceCourseId, initialAdjustments = "", initialReference = "none", context, onDone }: { planningMessageId: string; sourceCourseId?: string; initialAdjustments?: string; initialReference?: "none" | "upload_in_creator"; context: AssistantContextSnapshot; onDone(): void }) {
@@ -64,14 +65,16 @@ function BriefCard({ message, content, context }: { message: AssistantMessage; c
 
 function TimelineMessage({ message, runtimeContext }: { message: AssistantMessage; runtimeContext: AssistantContextSnapshot }) {
   const structured = message.structuredContent;
-  return <article className={`assistant-chat-message ${message.role}`}><small>{message.role === "user" ? "你" : "EduFlow"}</small><p>{message.content}</p>{structured?.type === "course_search" ? <CourseSearchCard message={message} content={structured} context={runtimeContext} /> : structured?.type === "course_creation_brief" ? <BriefCard message={message} content={structured} context={runtimeContext} /> : null}</article>;
+  return <><p>{message.content}</p>{structured?.type === "course_search" ? <CourseSearchCard message={message} content={structured} context={runtimeContext} /> : structured?.type === "course_creation_brief" ? <BriefCard message={message} content={structured} context={runtimeContext} /> : null}</>;
 }
 
 export function AssistantConversation({ context, compact = true }: { context: AssistantContext; compact?: boolean }) {
-  const navigate = useNavigate(); const runtime = useAssistantRuntime(); const [input, setInput] = useState(""); const [goalMode, setGoalMode] = useState(false);
+  const navigate = useNavigate(); const runtime = useAssistantRuntime(); const [goalMode, setGoalMode] = useState(false);
   const visible = compact ? runtime.messages.slice(-8) : runtime.messages; const contextSnapshot = snapshotAssistantContext(context);
-  async function submit() { const value = input.trim(); if (!value || runtime.sending) return; if (goalMode) { if (await runtime.planGoal(value, contextSnapshot)) setInput(""); } else { setInput(""); await runtime.send(value, contextSnapshot); } }
-  return <div className={`assistant-conversation ${compact ? "compact" : "full"}`}><div className="assistant-conversation-messages" aria-live="polite">
-    {runtime.loading ? <p className="assistant-empty"><Loader2 size={14} className="spin" />正在加载对话…</p> : visible.length ? visible.map((message) => <TimelineMessage key={message.id} message={message} runtimeContext={contextSnapshot} />) : <p className="assistant-empty">可以询问当前页面中的 Knowledge、Course、Material 或你的学习状态。</p>}
-  </div>{runtime.error ? <p className="assistant-error" role="alert">{runtime.error} {goalMode && input.trim() ? "你可以修改上方目标后再次提交。" : ""}</p> : null}<div className="assistant-input-mode"><button className={goalMode ? "active" : ""} onClick={() => setGoalMode((value) => !value)}><Target size={13} />{goalMode ? "目标规划模式" : "规划学习目标"}</button></div><div className="course-design-assistant-input"><input value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} placeholder={goalMode ? "用自己的话描述你想做到什么…" : "询问 EduFlow…"} /><button disabled={runtime.sending || !input.trim()} onClick={() => void submit()} aria-label={goalMode ? "规划学习目标" : "发送给 EduFlow Assistant"}>{runtime.sending ? <Loader2 size={15} className="spin" /> : <Send size={15} />}</button></div>{compact ? <button className="assistant-open-full" onClick={() => navigate("/messages")}>进入完整对话<ArrowUpRight size={13} /></button> : null}</div>;
+  return <div className={`assistant-conversation ${compact ? "compact" : "full"}`}><ConversationWorkspace mode="assistant" loading={runtime.loading} sending={runtime.sending} error={runtime.error}
+    messages={visible.map(message => ({ id:message.id,role:message.role,content:<TimelineMessage message={message} runtimeContext={contextSnapshot}/> }))}
+    placeholder={goalMode ? "用自己的话描述你想做到什么…" : "询问 EduFlow…"}
+    onSend={async value => { if (goalMode) return runtime.planGoal(value,contextSnapshot); return runtime.send(value,contextSnapshot); }}
+    composerActions={<button className={goalMode ? "active" : ""} aria-pressed={goalMode} onClick={() => setGoalMode(value => !value)}><Target size={13}/>{goalMode ? "目标规划模式" : "规划学习目标"}</button>}/>
+    {compact ? <button className="assistant-open-full" onClick={() => navigate("/messages")}>进入完整对话<ArrowUpRight size={13}/></button> : null}</div>;
 }

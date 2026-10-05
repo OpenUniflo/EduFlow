@@ -19,14 +19,6 @@
 .route-key-kept { color: #087f8c; }
 .route-key-added { color: #087f8c; }
 .route-key-removed { color: #7f7ea6; }
-.project-relations-list { position: absolute; z-index: 4; right: 96px; bottom: 26px; max-width: 330px; max-height: 35vh; overflow: auto; padding: 12px 16px; border-radius: 14px; font-size: 12px; }
-.project-relations-list summary { cursor: pointer; }
-.project-relations-list button { display: grid; width: 100%; text-align: left; gap: 5px; margin-top: 8px; }
-.project-relations-list small { color: #64748b; }
-@media (max-width: 760px) {
-  .project-route-legend { bottom: 190px; left: 12px; max-width: calc(100vw - 56px); }
-  .project-relations-list { bottom: 140px; left: 12px; right: auto; max-width: calc(100vw - 56px); }
-}
 @media (prefers-reduced-motion: reduce) { .atlas-route-overlay .route-overlay-added { animation: none; } }
 .project-capability-info { position: absolute; top: 148px; left: 24px; width: 285px; max-height: calc(100vh - 175px); overflow: auto; padding: 20px; border-radius: 20px; }
 .project-capability h2 { font-size: 18px; margin: 0 0 12px; }
@@ -109,3 +101,19 @@
   .project-goal-toggle { display: block; border: 0; padding: 0 0 6px; background: transparent; color: #334155; font: inherit; font-size: 12px; cursor: pointer; }
   .project-capability-goal:not(.expanded) p, .project-capability-goal:not(.expanded) small:last-child { display: none; }
 }
+
+/* Project information has one centered disclosure; graph inputs remain independent. */
+.project-overview { position:absolute; z-index:4; top:148px; left:50%; transform:translateX(-50%); width:min(600px,calc(100% - 460px)); min-width:280px; border-radius:14px; font-size:12px; }
+.project-overview > summary { cursor:pointer; padding:12px 16px; display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; }
+.project-overview > summary::after { content:'⌄'; margin-left:auto; }
+.project-overview[open] > summary::after { content:'⌃'; }
+.project-overview > summary span { color:#64748b; }
+.project-overview-body { padding:0 16px 12px; max-height:36vh; overflow:auto; display:grid; gap:12px; }
+.project-overview-body h3 { font-size:13px; margin:8px 0; }
+.project-overview-body p { margin:4px 0; }
+.project-relations-list { position:static; width:auto; max-height:24vh; overflow:auto; padding:0; }
+.project-relations-list summary { cursor:pointer; }
+.project-relations-list button { display:grid; width:100%; text-align:left; gap:5px; margin-top:8px; }
+.project-relations-list small { color:#64748b; }
+@media(max-width:900px) { .project-overview { top:226px; width:calc(100% - 32px); min-width:0; } .project-capability-editor { top:294px; } }
+@media(max-width:760px) { .project-overview { top:232px; } .project-overview > summary { padding:10px 12px; } .project-overview-body { max-height:30vh; } .project-capability-editor { top:304px; max-height:30vh; } }

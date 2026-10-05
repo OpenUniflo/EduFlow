@@ -1,3 +1,4 @@
+import { assignmentEvidenceSource } from '../_lib/assignmentEvidence.js';
 import { readEvidenceView } from '../_lib/evidenceRead.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -10,12 +11,13 @@ import { OpenAICompatibleJsonGenerationClient } from '../_lib/llm.js';
 import { diagnoseEvidence,EvidenceDiagnosisError, EVIDENCE_PROMPT_VERSION, EVIDENCE_TOP_K, parseEvidenceText, type RetrievedKnowledge } from '../../src/features/evidence/diagnosis.js';
 
 export const maxDuration=300;
-const uploadSchema=z.object({action:z.literal('upload'),title:z.string().trim().min(1).max(240),contentType:z.enum(['text/plain','text/markdown','text/csv']),size:z.number().int().min(1).max(1048576)}).strict();
+const uploadSchema=z.object({action:z.literal('upload'),title:z.string().trim().min(1).max(240),contentType:z.enum(['text/plain','text/markdown','text/csv']),size:z.number().int().min(1).max(1048576),courseId:z.string().optional(),assignmentId:z.string().optional(),actionRunId:z.string().uuid().optional(),supplement:z.boolean().optional()}).strict();
 const sourceSchema=z.object({action:z.enum(['parse','archive','download']),sourceId:z.string().uuid()}).strict();
 const diagnosisSchema=z.object({action:z.literal('diagnose'),sourceIds:z.array(z.string().uuid()).min(1).max(5)}).strict();
 const confirmationSchema=z.object({action:z.enum(['confirm','reject']),proposalIds:z.array(z.string().uuid()).min(1).max(50),runId:z.string().uuid().optional()}).strict();
 const indexSchema=z.object({action:z.literal('index'),after:z.string().optional()}).strict();
-const requestSchema=z.union([uploadSchema,sourceSchema,diagnosisSchema,confirmationSchema,indexSchema]);
+const assignmentSourceSchema=z.object({action:z.literal('assignment-source'),attemptId:z.string().uuid()}).strict();
+const requestSchema=z.union([assignmentSourceSchema,uploadSchema,sourceSchema,diagnosisSchema,confirmationSchema,indexSchema]);
 
 export default handleApi(async(request,response)=>{
   const {client,user}=await createUserSupabase(request);
@@ -37,6 +39,7 @@ export default handleApi(async(request,response)=>{
   if(!parsed.success) throw new ApiError(400,'invalid_evidence_request','Invalid evidence request');
   const body=parsed.data;
   const server=createServerSupabase();
+  if(body.action==='assignment-source') {json(response,200,await assignmentEvidenceSource(client,server,user.id,body.attemptId));return;}
   if(body.action==='index') {
     const profile=await server.from('profiles').select('role,capabilities').eq('id',user.id).single();
     if(profile.error || (profile.data.role!=='admin' && !profile.data.capabilities?.includes('global-domain-admin'))) throw new ApiError(403,'forbidden','Global administrator authority is required');
@@ -61,8 +64,17 @@ export default handleApi(async(request,response)=>{
     json(response,200,{added,next:nodes?.length===12?nodes[nodes.length-1].id:null,model:env.embeddingModel,dimensions:env.embeddingDimensions});return;
   }
   if(body.action==='upload') {
+    if(body.assignmentId) {
+      if(!body.courseId)throw new ApiError(400,'course_required','Course required');
+      const assignment=await client.from('course_assignments').select('id').eq('course_id',body.courseId).eq('id',body.assignmentId).maybeSingle();
+      if(!dataOrThrow(assignment.data,assignment.error,'Practice upload context'))throw new ApiError(404,'assignment_not_found','Assignment unavailable');
+    }
+    if(body.actionRunId) {
+      const run=await client.from('edge_action_runs').select('id').eq('user_id',user.id).eq('id',body.actionRunId).eq('course_id',body.courseId??'').eq('assignment_id',body.assignmentId??'').maybeSingle();
+      if(!dataOrThrow(run.data,run.error,'Practice upload execution'))throw new ApiError(404,'run_not_found','Execution unavailable');
+    }
     const id=randomUUID();const path=`${user.id}/${id}`;
-    const result=await server.from('user_evidence_sources').insert({id,user_id:user.id,title:body.title,storage_path:path,content_type:body.contentType,byte_size:body.size,provenance:{kind:'user-upload'}}).select().single();
+    const result=await server.from('user_evidence_sources').insert({id,user_id:user.id,title:body.title,storage_path:path,content_type:body.contentType,byte_size:body.size,provenance:{kind:body.assignmentId?'practice-attachment':body.supplement?'user-supplement':'user-upload',...(body.courseId?{courseId:body.courseId}:{}),...(body.assignmentId?{assignmentId:body.assignmentId}:{}),...(body.actionRunId?{actionRunId:body.actionRunId}:{})}}).select().single();
     const source=dataOrThrow(result.data,result.error,'Evidence source creation');
     const signed=await server.storage.from('user-evidence').createSignedUploadUrl(path);
     if(signed.error) throw new ApiError(503,'upload_unavailable','上传地址创建失败，请重试。');
@@ -100,10 +112,10 @@ export default handleApi(async(request,response)=>{
   }
   if(body.action==='confirm'||body.action==='reject') {
     if(new Set(body.proposalIds).size!==body.proposalIds.length) throw new ApiError(400,'duplicate_proposal','Duplicate proposal');
-    if(body.runId) {
+    {
       const selected=await client.from('capability_state_proposals').select('id,run_id').in('id',body.proposalIds);
       const proposals=dataOrThrow(selected.data,selected.error,'Diagnosis confirmation scope');
-      if(proposals.length!==body.proposalIds.length||proposals.some(proposal=>proposal.run_id!==body.runId))throw new ApiError(409,'diagnosis_scope_mismatch','请选择同一次诊断中的能力候选。');
+      if(proposals.length!==body.proposalIds.length||new Set(proposals.map(proposal=>proposal.run_id)).size!==1||(body.runId&&proposals.some(proposal=>proposal.run_id!==body.runId)))throw new ApiError(409,'diagnosis_scope_mismatch','请选择同一次诊断中的能力候选。');
     }
     const result=await server.rpc('confirm_capability_proposals',{p_user_id:user.id,p_ids:body.proposalIds,p_decision:body.action});
     if(result.error) throw new ApiError(result.error.code==='P0002'?404:409,'confirmation_rejected','候选已变化、资料已归档或没有足够证据；请刷新后检查。');
@@ -137,7 +149,7 @@ export default handleApi(async(request,response)=>{
       const failure=await server.from('capability_diagnosis_runs').update({status:'failed',error:'诊断未完成，请稍后重试；正式能力状态没有改变。',completed_at:new Date().toISOString(),...(error instanceof EvidenceDiagnosisError?{diagnostics:{...error.diagnostics,embedding:{provider:embeddingEnv.embeddingProvider,model:embeddingEnv.embeddingModel,dimensions:embeddingEnv.embeddingDimensions}}}:{})}).eq('id',run.id);
       if(failure.error) console.error('Diagnosis failure recording failed',failure.error.code);
       console.error('Evidence diagnosis failed',{runId:run.id,code:error instanceof EvidenceDiagnosisError?'invalid_or_unavailable_diagnosis':'diagnosis_persistence_failure'});
-      throw new ApiError(503,'diagnosis_failed','诊断未完成，请稍后重试；正式能力状态没有改变。');
+      throw new ApiError(503,'diagnosis_failed','诊断未完成，请稍后重试；正式能力状态和路线没有改变。',{runId:run.id});
     }
   }
 });
