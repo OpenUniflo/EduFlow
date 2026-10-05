@@ -21,3 +21,5 @@ Use only A/B with Reset before each fresh flow. Run Course Route→Practice (cha
 ## First READY Preview finding
 
 67af2b8 Preview revealed a real interaction defect: the transparent full-width Course header intercepted the newly aligned Overview summary. Native click and elementFromPoint confirmed interception. Header blank space now passes pointers through; actual left/right/middle controls retain pointer events. This changes presentation hit-testing only. Overview must pass a fresh native click and stability check on the corrected Preview. No JS click bypass counts as acceptance.
+
+Independent Reviewer2 also found narrow-screen Search/Adjust controls still at176px, colliding with Overview's new172px row. Their absolute overlay row now starts below Overview with8px separation. Graph dimensions/camera remain untouched. Fresh narrow click validation required.

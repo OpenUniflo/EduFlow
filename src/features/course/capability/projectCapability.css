@@ -77,9 +77,9 @@
 .project-capability-editor .project-capability-search:has(input) { width: auto; }
 .project-capability-detail { top: var(--project-detail-top); width: 280px; max-height: calc(100vh - 300px); }
 .project-capability-empty { position: absolute; top: 45%; left: 35%; padding: 20px; border-radius: 16px; }
-@media (max-width: 900px) { .project-capability { --project-detail-top:226px; } .project-capability-toolbar { top: 170px; left: 12px; right: 12px; } .project-capability-editor { top: 226px; left: 12px; } .project-capability-detail { top: 226px; } }
+@media (max-width: 900px) { .project-capability { --project-detail-top:226px; } .project-capability-toolbar { top: calc(var(--project-top-control-band) + 144px); left: 12px; right: 12px; } .project-capability-editor { top: 226px; left: 12px; } .project-capability-detail { top: 226px; } }
 @media (max-width: 760px) {
-  .project-capability-toolbar { top: 176px; }
+  .project-capability-toolbar { top: calc(var(--project-top-control-band) + 144px); }
   .project-capability-editor { top: 232px; width: min(285px, calc(100vw - 60px)); max-height: 35vh; }
   .project-capability-detail { top: auto; bottom: 130px; max-height: 25vh; }
   .project-capability-legend { left: 12px; bottom: 86px; padding: 12px; max-width: calc(100vw - 48px); }
