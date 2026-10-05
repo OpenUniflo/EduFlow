@@ -114,7 +114,7 @@ Fresh提交后，主Agent独立核对 UKS/正式Route不变；B Confirm仅新增
 | 34 | Stale Preview 不能静默 Adopt。 | PASS | Fresh两tab V13→V14；旧Preview Adopt409无新Version；重算后明确Adopt V15；API stale knowledge/graph/action/version回归 |
 | 35 | Preview 不 Adopt 不改变正式 Route。 | PASS | A Preview保持V8；明确Adopt V9；B Impact Preview保持V13；实际Adopt V14/V15/V16 |
 | 36 | Adopt 创建新 Route Version。 | PASS | A Preview保持V8；明确Adopt V9；B Impact Preview保持V13；实际Adopt V14/V15/V16 |
-| 37 | History 保持不可变。 | PASS | F/primary-protected-history-final.json：旧20Versions逐行不变；恢复修复另待限定复验 |
+| 37 | History 保持不可变。 | PASS | F/primary-protected-history-final.json：旧20Versions逐行不变；合法历史V13→V17恢复成功，F/primary-restore-authority-checks.json |
 | 38 | Planner 不改变 factual graph。 | PASS | F/primary-planner-geometry-checks.json：18Nodes/23Edges加入、排除、dirty保留坐标/事实/Camera逐项相同；A Preview亦相同 |
 | 39 | Planner 不改变节点坐标。 | PASS | F/primary-planner-geometry-checks.json：18Nodes/23Edges加入、排除、dirty保留坐标/事实/Camera逐项相同；A Preview亦相同 |
 | 40 | Planner 不重置 Camera。 | PASS | F/primary-planner-geometry-checks.json：18Nodes/23Edges加入、排除、dirty保留坐标/事实/Camera逐项相同；A Preview亦相同 |
