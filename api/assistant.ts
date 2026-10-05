@@ -298,6 +298,8 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     messages,
     tools: createAssistantTools(client, user, context),
     stopWhen: stepCountIs(4),
+    // Reserve the bounded final step for a user-facing answer after tool reads.
+    prepareStep: ({ stepNumber }) => stepNumber >= 3 ? { toolChoice: "none" } : undefined,
     timeout: { totalMs: 110_000, stepMs: 45_000, chunkMs: 20_000 },
     providerOptions: { dmxapi: { thinking: { type: "enabled" } } },
     onEnd: async ({ text, finishReason }) => {

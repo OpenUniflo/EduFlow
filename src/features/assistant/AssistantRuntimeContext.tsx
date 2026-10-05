@@ -88,7 +88,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       }
       await reloadSessions();return true;
     } catch (sendError) {
-      setMessages((current) => current.filter((item) => item.id !== optimisticAssistant.id));
+      setMessages((current) => current.filter((item) => item.id !== optimisticAssistant.id && item.id !== optimisticUser.id));
       setError(sendError instanceof Error ? sendError.message : "Assistant 暂时不可用");return false;
     } finally { setSending(false); }
   }, [activeSessionId, reloadSessions, sending, storageKey]);

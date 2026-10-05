@@ -1,0 +1,22 @@
+import {expect,it,vi} from 'vitest';
+import {tool} from 'ai';
+import {MockLanguageModelV4,simulateReadableStream} from 'ai/test';
+import {z} from 'zod';
+import type {VercelRequest,VercelResponse} from '@vercel/node';
+const mocks=vi.hoisted(()=>({provider:vi.fn(),client:vi.fn(),tools:vi.fn()}));
+vi.mock('@ai-sdk/openai-compatible',()=>({createOpenAICompatible:()=>mocks.provider}));
+vi.mock('../../api/_lib/supabase.js',()=>({createUserSupabase:mocks.client}));
+vi.mock('../../api/_lib/env.js',()=>({readLlmEnvironment:()=>({llmModel:'test-model',llmBaseUrl:'https://test.invalid',llmApiKey:'test-only'})}));
+vi.mock('../../api/_lib/assistantTools.js',()=>({createAssistantTools:mocks.tools}));
+import handler from '../../api/assistant';
+it('a provider repeatedly reading tools still produces and persists an answer within the bounded stream',async()=>{
+ const records:Array<Record<string,any>>=[];const tables:string[]=[];
+ const client={from(table:string){tables.push(table);const query={select(){return query;},eq(){return query;},order(){return query;},limit(){return query;},insert(value:Record<string,any>){records.push({...value,id:String(records.length),sequence:records.length});return query;},update(){return query;},maybeSingle:async()=>({data:{id:'owned-session',user_id:'owned'},error:null}),then(resolve:(result:unknown)=>unknown){return Promise.resolve({data:table==='assistant_messages'?[...records].reverse():null,error:null}).then(resolve);}};return query;}};
+ mocks.client.mockResolvedValue({client,user:{id:'owned'}});
+ const read=vi.fn(async()=>({title:'Actual visible course'}));mocks.tools.mockReturnValue({lookup:tool({inputSchema:z.object({}),execute:read})});
+ const model=new MockLanguageModelV4({doStream:async(options)=>{const final=options.toolChoice?.type==='none';return {stream:simulateReadableStream({chunks:[{type:'stream-start',warnings:[]},...(final?[{type:'text-start',id:'answer'},{type:'text-delta',id:'answer',delta:'Actual visible course is available.'},{type:'text-end',id:'answer'}]:[{type:'tool-call',toolCallId:crypto.randomUUID(),toolName:'lookup',input:'{}'}]),{type:'finish',finishReason:{unified:final?'stop':'tool-calls',raw:final?'stop':'tool_calls'},usage:{inputTokens:{total:1,noCache:1,cacheRead:0,cacheWrite:0},outputTokens:{total:1,text:final?1:0,reasoning:0}}}] as any}),warnings:[]};}});
+ mocks.provider.mockReturnValue(model);
+ let output='';let status=0;const response={writeHead(code:number){status=code;},write(chunk:Uint8Array){output+=new TextDecoder().decode(chunk);return true;},end(){},setHeader(){},status(code:number){status=code;return response;},json(value:unknown){throw new Error(JSON.stringify(value));}};
+ await handler({method:'POST',headers:{},query:{},body:{sessionId:'owned-session',message:'Which course is available?',context:{workspace:'courses',experienceMode:'learn'}}} as VercelRequest,response as unknown as VercelResponse);
+ expect(status).toBe(200);expect(output).toBe('Actual visible course is available.');expect(read).toHaveBeenCalledTimes(3);expect(model.doStreamCalls).toHaveLength(4);expect(records.filter(record=>record.role==='assistant')).toEqual([expect.objectContaining({content:output})]);expect(new Set(tables)).toEqual(new Set(['assistant_sessions','assistant_messages']));
+});
