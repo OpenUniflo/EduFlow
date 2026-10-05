@@ -6,7 +6,8 @@ import { dataOrThrow } from './query.js';
 
 function stableId(value: string) { const hex = createHash('sha256').update(value).digest('hex'); return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-8${hex.slice(17,20)}-${hex.slice(20,32)}`; }
 export async function workspaceAssistantAction(client: SupabaseClient, userId: string, body: Record<string, unknown>) {
-  const context = parseAssistantContext(body.context);
+  let context;
+  try {context=parseAssistantContext(body.context);}catch{throw new ApiError(400,'workspace_context_invalid','Invalid workspace context');}
   if (!['practice', 'capability-update'].includes(String(body.mode))) throw new ApiError(400, 'workspace_mode_invalid', 'Invalid conversation mode');
   if (body.mode === 'practice') {
     if (!context.courseId || !context.assignmentId) throw new ApiError(400, 'assignment_required', 'Assignment context required');
@@ -39,7 +40,8 @@ export async function workspaceAssistantAction(client: SupabaseClient, userId: s
   if (typeof body.sessionId !== 'string') throw new ApiError(400, 'session_required', 'Session required');
   const session = await client.from('assistant_sessions').select('id,title').eq('id', body.sessionId).eq('user_id', userId).maybeSingle();
   if (dataOrThrow(session.data, session.error, 'Workspace session ownership')?.title !== title) throw new ApiError(404, 'session_not_found', 'Session unavailable');
-  const event = parseAssistantStructuredContent(body.structuredContent);
+  let event;
+  try{event=parseAssistantStructuredContent(body.structuredContent);}catch{throw new ApiError(400,'event_invalid','Invalid workspace reference');}
   if (event?.type !== 'workspace_event') throw new ApiError(400, 'event_invalid', 'Workspace event required');
   const table = event.event === 'attachment' ? 'user_evidence_sources' : event.event === 'submission' ? 'learning_attempts' : 'capability_diagnosis_runs';
   const target = await client.from(table).select('*').eq('id', event.referenceId).eq('user_id', userId).maybeSingle();
