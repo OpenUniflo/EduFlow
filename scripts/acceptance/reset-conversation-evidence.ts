@@ -71,12 +71,12 @@ export function resetSql(baseline:Record<string,any>) {
  delete from capability_diagnosis_runs where id in(select id from reset_runs);
  delete from knowledge_evidence where ${owner} and not(id=any(${ids('knowledge_evidence')})) and (context->>'courseId'=${quote(courseId)} or context->>'diagnosisId' in(select id::text from reset_runs) or id in(select id from reset_evidence));
  delete from learning_events where ${courseScope} and not(id=any(${ids('learning_events')}));
- update edge_action_runs set assignment_attempt_id=null where ${courseScope} and not(id=any(${ids('edge_action_runs')}));
+ update edge_action_runs set assignment_attempt_id=null,status='in_progress',completed_at=null where ${courseScope} and assignment_attempt_id is not null and not(assignment_attempt_id=any(${ids('learning_attempts')}));
  delete from performance_results where ${courseScope} and not(id=any(${ids('performance_results')}));
  delete from micro_step_attempts where ${courseScope} and not(id=any(${ids('micro_step_attempts')}));
  delete from learning_attempts where ${courseScope} and not(id=any(${ids('learning_attempts')}));
  delete from edge_action_runs where ${courseScope} and not(id=any(${ids('edge_action_runs')}));
- delete from assistant_sessions s where s.user_id in(${users}) and not(s.id=any(${ids('assistant_sessions')})) and s.title like 'workspace:%' and (s.title like ${quote('workspace:%:'+courseKey+':%')} or exists(select 1 from assistant_messages m where m.session_id=s.id and m.context_snapshot->>'courseId'=${quote(courseId)}));
+ delete from assistant_sessions s where s.user_id in(${users}) and not(s.id=any(${ids('assistant_sessions')})) and (s.title like ${quote('workspace:%:'+courseKey+':%')} or exists(select 1 from assistant_messages m where m.session_id=s.id and m.context_snapshot->>'courseId'=${quote(courseId)})) and not exists(select 1 from assistant_messages m where m.session_id=s.id and m.context_snapshot->>'courseId' is distinct from ${quote(courseId)});
  delete from user_evidence_sources where id in(select id from reset_sources);
  update personal_course_routes set active_version_id=null where ${courseScope};
  delete from personal_course_route_versions where ${courseScope} and not(id=any(${ids('personal_course_route_versions')}));
