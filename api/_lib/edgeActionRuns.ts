@@ -1,3 +1,4 @@
+import { isArtifactPracticeExecutor } from '../../src/shared/learning/practiceBoundary.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ApiError } from './http.js';
 import { allRows, dataOrThrow } from './query.js';
@@ -49,7 +50,7 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
     if (!binding?.assignment_id || binding.micro_path_id) throw new ApiError(422, 'action_assignment_unavailable', '该行动尚未绑定具体实训，请选择其他行动。');
     const assignmentResult = await client.from('course_assignments').select('mode,experience').eq('course_id', courseId).eq('id', binding.assignment_id).maybeSingle();
     const assignment = dataOrThrow(assignmentResult.data, assignmentResult.error, 'Assignment executor');
-    if (!assignment || assignment.mode === 'workflow' || assignment.experience?.type === 'workflow') throw new ApiError(422, 'action_assignment_unavailable', '该任务暂不支持从关系行动启动，请使用课程实训入口。');
+    if (!isArtifactPracticeExecutor(assignment)) throw new ApiError(422, 'action_assignment_unavailable', '该任务暂不支持从关系行动启动，请使用课程实训入口。');
     const coverageResult = await client.from('assignment_coverages').select('node_id').eq('course_id', courseId).eq('assignment_id', binding.assignment_id).eq('node_id', edge.target).maybeSingle();
     if (!dataOrThrow(coverageResult.data, coverageResult.error, 'Action Assignment target coverage')) throw new ApiError(422, 'action_assignment_unavailable', '绑定实训未覆盖该关系的目标能力。');
     const { eligibility } = await readAssignmentEligibility(client, userId, courseId, binding.assignment_id, { targetId: edge.target, status: 'not_started' });

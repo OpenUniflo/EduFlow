@@ -1,3 +1,4 @@
+import { isArtifactPracticeExecutor } from '../../src/shared/learning/practiceBoundary.js';
 import { z } from 'zod';
 import { readActiveVersion, readRouteInput, defaultConstraints } from '../_lib/routePlanning.js';
 import { projectAncestorNodeIds, planCourseRoute } from '../../src/shared/learning/routePlanning.js';
@@ -64,7 +65,7 @@ export default handleApi(async (request, response) => {
       const edge = edges.find(edge => edge.id === action.edge_id);
       const assignment = assignments.find(assignment => assignment.id === binding?.assignment_id);
       const scopeAvailable = edge && !version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && (completedActions.has(action.id) || routeEdgeIds.has(edge.id) && plan.valid && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(edge.target));
-      if (!edge || !version || !scopeAvailable || !assignment || assignment.mode === 'workflow' || (assignment.experience as { type?: string } | null)?.type === 'workflow' || !binding?.available || !binding.assignment_id || binding.micro_path_id || hasUnmetHardPrerequisite(edge.target, acquired, routeData.input.prerequisiteEdges)) return null;
+      if (!edge || !version || !scopeAvailable || !isArtifactPracticeExecutor(assignment) || !binding?.available || !binding.assignment_id || binding.micro_path_id || hasUnmetHardPrerequisite(edge.target, acquired, routeData.input.prerequisiteEdges)) return null;
       const { coverage, eligibility } = await readAssignmentEligibility(client, user.id, courseId, String(binding.assignment_id), { targetId: edge.target, status: 'not_started' });
       return !eligibility.reason && coverage.some(row => row.node_id === edge.target) ? action.id : null;
     }));

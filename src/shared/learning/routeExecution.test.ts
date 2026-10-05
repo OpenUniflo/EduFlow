@@ -9,7 +9,7 @@ describe('formal execution Route references',()=>{
   it('linearizes a factual DAG without creating the adjacent reading-order edge',()=>{
     const original=structuredClone({route,facts});
     const result=planRouteExecution({route,facts,options});
-    expect(result.complete).toBe(true);expect(result.steps.map(s=>s.edgeId)).toEqual(['ab','cb','ad','bd']);
+    expect(result.complete).toBe(true);expect(result.steps.map(s=>s.edgeId)).toEqual(['ab','cb','bd']);
     expect(result.steps.map(s=>[s.sourceNodeId,s.targetNodeId])).not.toContainEqual(['A','C']);
     expect({route,facts}).toEqual(original);expect(result.steps[0]).not.toHaveProperty('title');
   });
@@ -32,7 +32,7 @@ describe('formal execution Route references',()=>{
   });
   it('permits omitting optional support but not a necessary prerequisite',()=>{
     expect(planRouteExecution({route,facts,options,selectedEdgeIds:['ab','cb','bd']}).complete).toBe(true);
-    expect(planRouteExecution({route,facts,options,selectedEdgeIds:['ab','bd']}).issues).toContainEqual({edgeId:'cb',reason:'必要前置关系不能从路线中省略。'});
+    expect(planRouteExecution({route,facts,options,selectedEdgeIds:['ab','bd']}).issues).toContainEqual(expect.objectContaining({kind:'hard_edge_required',edgeId:'cb'}));
   });
   it('new formal relation membership is exactly persisted Edge selection',()=>{
     const steps=planRouteExecution({route,facts,options,selectedEdgeIds:['ab','cb','bd']}).steps;
@@ -58,7 +58,7 @@ describe('formal execution Route references',()=>{
   it('orders enables Steps by source formation even when curriculum puts their target first',()=>{
     const edges:CapabilityRelation[]=[{id:'ac',source:'A',target:'C',relation:'prerequisite',strength:'hard'},{id:'cb',source:'C',target:'B',relation:'enables',strength:.5}];
     const selected={...route,selectedNodeIds:['A','B','C'],orderedNodeIds:['B','A','C'],currentKnowledgeIds:['A'],effectiveTargetNodeIds:['B'],prerequisiteEdges:[edges[0]] as SelectedRoute['prerequisiteEdges']};
-    const result=planRouteExecution({route:selected,facts:edges,options:edges.map(e=>option(e.id,e.id))});
+    const result=planRouteExecution({route:selected,facts:edges,options:edges.map(e=>option(e.id,e.id)),selectedEdgeIds:['ac','cb']});
     expect(result.complete).toBe(true);expect(result.steps.map(s=>s.edgeId)).toEqual(['ac','cb']);
   });
   it('rejects disconnected source formation and unmet required capabilities without inventing Steps',()=>{
@@ -81,4 +81,52 @@ describe('formal execution Route references',()=>{
     expect(snapshot).toEqual(before);
   });
 
+});
+
+describe('deterministic hard and optional execution selection',()=>{
+  it('retains valid optional decisions but ignores old decisions outside the new scope',()=>{
+    const result=planRouteExecution({route,facts,options,retainedEdgeIds:['ad','gone']});
+    expect(result.complete).toBe(true);expect(result.steps.map(step=>step.edgeId)).toContain('ad');expect(result.steps.map(step=>step.edgeId)).not.toContain('gone');
+  });
+  it('does not select new enables or soft prerequisites when membership expands',()=>{
+    const soft={id:'soft',source:'C',target:'D',relation:'prerequisite' as const,strength:'soft' as const};
+    const result=planRouteExecution({route:{...route,prerequisiteEdges:[...route.prerequisiteEdges,soft]},facts:[...facts,soft],options:[...options,option('soft','soft-action')]});
+    expect(result.complete).toBe(true);expect(result.steps.map(step=>step.edgeId)).toEqual(['ab','cb','bd']);
+  });
+  it('reports a real candidate support edge then converges after explicit selection',()=>{
+    const edge={id:'support',source:'A',target:'T',relation:'enables' as const,strength:.8};
+    const selected={...route,selectedNodeIds:['A','T'],orderedNodeIds:['T','A'],currentKnowledgeIds:['A'],effectiveTargetNodeIds:['T'],prerequisiteEdges:[]};
+    const input={route:selected,facts:[edge],options:[option('support','learn')]};
+    const missing=planRouteExecution(input);expect(missing.steps).toEqual([]);expect(missing.issues).toEqual([expect.objectContaining({kind:'support_edge_required',nodeId:'T',candidateEdgeIds:['support']})]);
+    expect(planRouteExecution({...input,selectedEdgeIds:['support']}).complete).toBe(true);
+  });
+  it('uses typed action, source, requirement and missing-target issues',()=>{
+    expect(planRouteExecution({route,facts,options:[]}).issues).toContainEqual(expect.objectContaining({kind:'action_required',edgeId:'ab'}));
+    expect(planRouteExecution({route,facts,options,choices:[{edgeId:'ab',actionId:'retired'}]}).issues).toContainEqual(expect.objectContaining({kind:'action_unavailable',actionId:'retired'}));
+    expect(planRouteExecution({route:{...route,currentKnowledgeIds:[]},facts,options}).issues).toContainEqual(expect.objectContaining({kind:'source_unreachable',nodeId:'A'}));
+    expect(planRouteExecution({route,facts,options:options.map(o=>({...o,requiredCapabilityIds:['M']}))}).issues).toContainEqual(expect.objectContaining({kind:'required_capability_missing',requiredNodeIds:expect.arrayContaining(['M'])}));
+    expect(planRouteExecution({route:{...route,effectiveTargetNodeIds:['Z']},facts,options}).issues).toContainEqual(expect.objectContaining({kind:'target_unreachable',nodeId:'Z'}));
+    expect(planRouteExecution({route,facts,options,selectedEdgeIds:['fake']}).issues).toContainEqual(expect.objectContaining({kind:'edge_not_in_route',edgeId:'fake'}));
+  });
+  it('hard edges remain selected even when an invalid removal request is diagnosed',()=>{
+    const result=planRouteExecution({route,facts,options,selectedEdgeIds:[]});
+    expect(result.issues).toContainEqual(expect.objectContaining({kind:'hard_edge_required'}));expect(result.steps.map(s=>s.edgeId)).toEqual(['ab','cb','bd']);
+  });
+  it('rejects repeated Assignment execution across different edges',()=>{
+    const result=planRouteExecution({route,facts,options:options.map(o=>({...o,type:'practice_task' as const,assignmentId:'one-task'}))});
+    expect(result.complete).toBe(false);expect(result.steps.length).toBe(1);expect(result.issues).toContainEqual(expect.objectContaining({kind:'action_unavailable'}));
+  });
+  it('every proposed step is a real factual edge and carries no copied Action',()=>{
+    const result=planRouteExecution({route,facts,options,retainedEdgeIds:['ad']});
+    for(const step of result.steps){expect(facts).toContainEqual(expect.objectContaining({id:step.edgeId,source:step.sourceNodeId,target:step.targetNodeId}));expect(step).not.toHaveProperty('title');}
+  });
+});
+
+it('exact history scope rejects changed prerequisite semantics before offering restore',async()=>{
+ const {isExecutionScopeValid}=await import('./routeExecution');
+ const snapshot={...route,valid:true};
+ expect(isExecutionScopeValid(snapshot,route.selectedNodeIds,facts)).toBe(true);
+ expect(isExecutionScopeValid(snapshot,route.selectedNodeIds,facts.map(edge=>edge.relation==='prerequisite'&&edge.id==='ab'?{...edge,strength:'soft' as const}:edge))).toBe(false);
+ expect(isExecutionScopeValid({...snapshot,valid:false},route.selectedNodeIds,facts)).toBe(false);
+ expect(isExecutionScopeValid(snapshot,['A','C','D'],facts)).toBe(false);
 });

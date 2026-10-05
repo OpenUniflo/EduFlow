@@ -99,7 +99,7 @@ Formal Assignment results and original submissions can produce Evidence for the 
 
 ## 16. Non-goals
 
-Current Practice implements immutable numbered submissions, deterministic Trace evaluation, pending/manual review, original private file artifacts and explicit Evidence diagnosis. These do not grant capability; explicit proposal confirmation owns that change. An Artifact Graph, Assignment DAG editor, project assembly runtime, tenant sharing and a global Assignment library remain outside this scope.
+Current artifact Practice implements immutable numbered text/file submissions, pending/manual review, original private file artifacts and explicit Evidence diagnosis. Quiz/Trace/single-choice/multiple-choice are understanding checks belonging to Micro Learning; they are not formal artifact Practice executors. Historical check definitions and results remain readable. These do not grant capability; explicit proposal confirmation owns that change. An Artifact Graph, Assignment DAG editor, project assembly runtime, tenant sharing and a global Assignment library remain outside this scope.
 
 ## 17. Course Assignment Drawer Projection
 

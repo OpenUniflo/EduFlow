@@ -1,3 +1,4 @@
+import { isArtifactPracticeExecutor } from '../../src/shared/learning/practiceBoundary.js';
 import { isDeepStrictEqual } from "node:util";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createServerSupabase, createUserSupabase } from "../_lib/supabase.js";
@@ -109,6 +110,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       json(response, 200, { status: persisted.outcome === 'passed' ? 'accepted' : persisted.outcome === 'failed' ? 'needs_revision' : 'submitted', accepted: persisted.outcome === 'passed', attemptId: saved.id, resultId: persisted.id, outcome: persisted.outcome, duplicate: true, feedback: persisted.feedback }); return;
     }
   }
+  if (!isArtifactPracticeExecutor(assignment) && (assignment.experience as {type?:string}|null)?.type !== 'workflow' && assignment.mode !== 'workflow') throw new ApiError(422, 'practice_executor_unavailable', '理解检查不属于成果实践，请使用微学习。');
   const actionRun = body.actionRunId ? await requireAssignmentActionRun(client, user.id, body.courseId, body.assignmentId, body.actionRunId) : null;
   let repeatAssignment=false;
   if(body.action==='start-assignment' && body.repeatAttemptId && !actionRun) {

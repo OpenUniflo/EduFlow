@@ -169,3 +169,18 @@ it.each(['knowledge','graph','action','version'])('rejects stale %s input withou
 it('adoption requires a real Preview token',async()=>{
  expect((await invoke({action:'adopt',baseVersionId:base,previewState:'forged',includeNodeIds:[],excludeNodeIds:[]})).status).toBe(400);expect(mocks.persist).not.toHaveBeenCalled();
 });
+
+it('rejects restoring the currently active version without writing history',async()=>{
+ mocks.read.mockResolvedValue({id:base,constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:historicalSnapshot()});
+ const result=await invoke({action:'restore',baseVersionId:base,versionId:base});
+ expect(result.status).toBe(409);expect(result.result.error.code).toBe('route_version_current');expect(mocks.persist).not.toHaveBeenCalled();
+});
+
+it('Action-only retained scope automatically includes a new live hard prerequisite',async()=>{
+ const snapshot={...historicalSnapshot(),selectedNodeIds:['A','S','T'],orderedNodeIds:['A','S','T']};
+ mocks.active.mockResolvedValue({id:base,constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot});
+ mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A','S'],prerequisiteEdges:[data.input.prerequisiteEdges[0],{id:'S>T',source:'S',target:'T',strength:'hard'}]}});
+ const options=[{edgeId:'A>T',actionId:old,title:'A action',type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[]},{edgeId:'S>T',actionId:base,title:'S action',type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[]}];mocks.options.mockResolvedValue(options);
+ const result=await invoke({action:'preview',scopeMode:'current',includeNodeIds:[],excludeNodeIds:[],selectedEdgeIds:['A>T'],actionChoices:[{edgeId:'A>T',actionId:old}]});
+ expect(result.status).toBe(200);expect(result.result.plan.execution.complete).toBe(true);expect(result.result.plan.execution.steps.map((step:any)=>step.edgeId)).toEqual(['A>T','S>T']);expect(snapshot.prerequisiteEdges).toHaveLength(1);
+});

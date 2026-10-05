@@ -155,3 +155,32 @@
 
 /* The application-owned Assistant must not cover explicit planning decisions. */
 .eduflow-assistant.project-planning-assistant { display:none; }
+/* Selection is neutral and independent of learning, Route and Draft colors. */
+.planning-selection { transition:opacity 140ms ease-out; }
+.route-structure-tools { align-items:center; max-width:300px; }
+.route-structure-tools>span { color:#64748b; font-size:12px; padding:0 6px; }
+.route-inspector-relation { display:block; width:100%; margin:6px 0; text-align:left; }
+.route-inspector-relation small { display:block; color:#64748b; margin-top:4px; }
+.route-node-inspector { animation-duration:220ms; }
+.route-history-dialog { width:min(980px,100%); height:min(720px,calc(100dvh - 40px)); display:flex; flex-direction:column; overflow:hidden; background:var(--surface-raised,#fff); }
+.route-history { display:grid; grid-template-columns:200px minmax(0,1fr); gap:20px; flex:1; min-height:0; }
+.route-history-list,.route-history-detail { min-height:0; overflow:auto; overscroll-behavior:contain; }
+.route-history-list { border-right:1px solid #dbe3ee; padding-right:14px; }
+.route-history-row[aria-pressed="true"] { background:#eef0f8; border-color:#7d86a7; color:#243552; }
+.route-history-snapshot { border:0; margin:0; animation:route-history-enter 200ms ease-out; }
+.route-history-snapshot h3 { margin-top:0; }
+.route-history-snapshot li { font-size:13px; line-height:1.7; }
+.route-history-snapshot small { display:block; color:#64748b; }
+.route-history-snapshot details { margin:16px 0; }.route-history-snapshot summary { cursor:pointer; }
+.route-history-footer { border-top:1px solid #dbe3ee; margin-top:16px; padding-top:14px; flex:none; display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; align-items:center; }
+.route-history-footer p { margin:4px 0; }.route-history-back { display:none; }
+.route-modal .route-planning-actions button { font-size:12px; }
+@keyframes route-history-enter { from { opacity:.4; } to { opacity:1; } }
+@media(max-width:760px) {
+ .route-history-dialog { height:calc(100dvh - 24px); padding:16px; }.route-modal-backdrop:has(.route-history-dialog) { padding:12px; }
+ .route-history { display:block; }.route-history-list { height:100%; border:0; padding:0; }
+ .route-history-detail { display:none; height:100%; }.route-history.has-detail .route-history-list { display:none; }.route-history.has-detail .route-history-detail { display:block; }
+ .route-history-back { display:block; margin-bottom:14px; }.route-history-footer>div { width:100%; }.route-history-footer .route-planning-actions { margin:0; }
+ .route-structure-tools { max-width:none; }.route-bottom-bar { min-height:112px; }.route-edge-inspector { bottom:144px; }
+}
+@media(prefers-reduced-motion:reduce) { .planning-selection { transition:none; }.route-history-snapshot,.route-node-inspector { animation:none; } }

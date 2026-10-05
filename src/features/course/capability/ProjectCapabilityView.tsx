@@ -29,7 +29,6 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const [actionId, setActionId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [draftNotice, setDraftNotice] = useState('');
   const structuralGraph = useMemo(() => projectStructuralGraph(graph, runtime.curriculumCoverages.map(coverage => coverage.nodeId)), [graph, runtime]);
   const result = useMemo(() => {
     try {
@@ -55,21 +54,14 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const matches = result.projection?.nodes.filter(node => visibleIds.has(node.id) && `${node.title} ${node.id}`.toLowerCase().includes(query.toLowerCase())) ?? [];
   const title = (id: string) => graph.nodes.find(node => node.id === id)?.title ?? id;
   const roles = (node: NonNullable<typeof selected>) => [node.capabilityRoles?.current && '已具备', node.capabilityRoles?.course && '项目目标', node.capabilityRoles?.bridge && '中间能力', result.model?.disconnectedCourseKnowledgeIds.includes(node.id) && '暂无当前能力入口'].filter(Boolean).join(' · ');
-  const canInclude = (id: string) => visibleIds.has(id);
-  const choose = (id: string) => {
-    setEdgeId(null); setDraftNotice('');
-    if (control.editing) {
-      onSelect(null);
-      if (control.tool === 'include' && !canInclude(id)) { setDraftNotice(`${title(id)} 是路线前置上下文，当前不支持单独加入；它仍会随目标的必要前置保留。`); return; }
-      control.mark(id);
-    } else onSelect(id);
-  };
+  const choose = (id: string) => {setEdgeId(null);onSelect(id);};
   const draftMark = (id: string) => !control.editing ? '' : control.draft.includeNodeIds.includes(id) ? ' · 加入' : control.draft.excludeNodeIds.includes(id) ? ' · 排除' : '';
+  const planningNode=selected?{id:selected.id,title:selected.title,description:selected.description,state:selected.capabilityRoles?.current?'已具备':'未具备',role:roles(selected)}:undefined;
   const domain = selected ? resolveNodeDomain(selected.id, governance).domain : undefined;
   const searchPanel = <div className="project-capability-search glass-v2">
           <button className="project-search-toggle" aria-label={searchOpen ? '收起能力搜索' : '搜索项目能力'} aria-expanded={searchOpen} onClick={() => setSearchOpen(open => !open)}>{searchOpen ? <X size={18}/> : <Search size={18}/>}</button>
           {searchOpen ? <><label>查找能力<input autoFocus aria-label="查找项目能力" placeholder="输入能力名称" value={query} onChange={event => setQuery(event.target.value)} /></label>
-            <div className="project-capability-results">{matches.map(node => <button key={node.id} disabled={control.editing && (control.busy || control.tool === 'include' && !canInclude(node.id))} title={control.editing && control.tool === 'include' && !canInclude(node.id) ? '路线前置上下文，当前不支持单独加入' : undefined} data-node-id={node.id} onClick={() => { choose(node.id); if (!control.editing) { setSearchOpen(false); } }}><i style={{ background: node.color }} /><span>{node.title}<small>{roles(node)}{draftMark(node.id)}</small></span></button>)}{!matches.length ? <p>没有匹配的能力</p> : null}</div>
+            <div className="project-capability-results">{matches.map(node => <button key={node.id} data-node-id={node.id} onClick={() => { choose(node.id); if (!control.editing) { setSearchOpen(false); } }}><i style={{ background: node.color }} /><span>{node.title}<small>{roles(node)}{draftMark(node.id)}</small></span></button>)}{!matches.length ? <p>没有匹配的能力</p> : null}</div>
           </> : null}
         </div>;
   const routeLegend = <div className="project-route-legend glass-v2" role="status" aria-label="路线图层说明">
@@ -80,7 +72,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   return <section className="project-capability" aria-label="项目能力模型">
     {active && assistantIdentity ? <EduFlowAssistant className={control.editing?"project-planning-assistant":""} context={{ ...assistantIdentity, workspace: 'courses', experienceMode: 'learn', presentation: 'project-capability', courseId: runtime.course.id, routeVersionId: control.view?.activeVersion?.id, knowledgeId: !control.editing ? selected?.id : undefined, edgeId: !control.editing ? activeEdge?.id : undefined, actionId: !control.editing ? focused?.action.id : undefined }} contextLabel={control.editing ? '调整项目路线' : activeEdge ? `${title(activeEdge.source)} → ${title(activeEdge.target)}` : selected?.title ?? runtime.course.title} /> : null}
     {result.error ? <div className="project-capability-info glass-v2" role="alert"><h2>能力依赖暂时无法展示</h2><p>{result.error}</p>{authenticated ? <RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title}/> : null}</div> : result.projection && result.model ? <>
-      <KnowledgeAtlasScene ref={scene} nodes={result.projection.nodes} edges={result.projection.edges} variant="project" selectedId={selected?.id} onNodeClick={node => choose(node.id)} onBackgroundClick={() => { onSelect(null); setEdgeId(null); }} onEdgeClick={edge => { onSelect(null); setActionId(null); setEdgeId(edge.id); }} actionBranches={branches} onActionClick={setActionId} visibleNodeIds={visibleIds} routeOverlay={overlay} edgeActionCounts={counts} />
+      <KnowledgeAtlasScene ref={scene} nodes={result.projection.nodes} edges={result.projection.edges} variant="project" selectedId={selected?.id} selectedEdgeId={edgeId} draftNodeChanges={control.editing?{include:control.draft.includeNodeIds,exclude:control.draft.excludeNodeIds}:undefined} onNodeClick={node => choose(node.id)} onBackgroundClick={() => { onSelect(null); setEdgeId(null); }} onEdgeClick={edge => { onSelect(null); setActionId(null); setEdgeId(edge.id); }} actionBranches={branches} onActionClick={setActionId} visibleNodeIds={visibleIds} routeOverlay={overlay} edgeActionCounts={counts} />
       {activeEdge && !control.editing ? <EdgeActionPanel planningOnly onAdjust={control.begin} alternatives={alternatives} title={`${title(activeEdge.source)} → ${title(activeEdge.target)}`} control={actionData} courseId={runtime.course.id} focusedId={actionId} onFocus={setActionId} onClose={() => setEdgeId(null)}/> : null}
       <div className="project-capability-toolbar">
         {!control.editing ? searchPanel : null}
@@ -95,7 +87,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
           <section><h3>关系与行动</h3><p>{visibleEdges.length} 条真实关系 · {visibleEdges.reduce((sum,edge)=>sum+(counts.get(edge.id)??0),0)} 个可选行动</p><details className="project-relations-list"><summary>查看全部关系与行动</summary>{visibleEdges.map(edge=><button className="atlas-secondary" key={edge.id} onClick={()=>{onSelect(null);setActionId(null);setEdgeId(edge.id);}}><span>{title(edge.source)} → {title(edge.target)}</span><small>{edge.relation==='prerequisite'?relationLabel(edge):'能力支撑'} · {counts.get(edge.id)??0} 个行动方案</small></button>)}</details></section>
         </div>
       </details>
-      {control.editing ? <RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title} edgeId={edgeId} search={searchPanel} onInspect={id=>{setEdgeId(id||null);onSelect(null);if(id){const fact=visibleEdges.find(edge=>edge.id===id);if(fact)scene.current?.focus(fact.target);}}}/> : null}
+      {control.editing ? <RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title} edgeId={edgeId} node={planningNode} search={searchPanel} onInspect={id=>{setEdgeId(id||null);onSelect(null);}} onInspectNode={id=>{setEdgeId(null);onSelect(id||null);}} onLocateIssue={issue=>{if(['action_required','action_unavailable','hard_edge_required','edge_not_in_route'].includes(issue.kind)&&issue.edgeId){setEdgeId(issue.edgeId);onSelect(null);const fact=visibleEdges.find(edge=>edge.id===issue.edgeId);if(fact)scene.current?.focus(fact.target);}else{const id=issue.nodeId??issue.sourceNodeId??issue.targetNodeId;if(id){setEdgeId(null);onSelect(id);scene.current?.focus(id);}}}}/> : null}
       {!control.editing && !activeEdge && !selected ? <details className="project-capability-legend glass-v2" aria-label="能力图例"><summary>能力与行动图例</summary><div><span><i style={{ background: '#3b82f6' }}/>蓝 · 已具备</span><span><i style={{ background: '#22c55e' }}/>绿 · 未具备项目目标</span><span><i style={{ background: '#94a3b8' }}/>灰 · 未具备中间能力</span><span>行动：虚线候选 · 紫色已选 · 青色流动执行中 · 翠绿完成 · 淡灰不可用</span></div></details> : null}
       {!result.projection.nodes.length ? <p className="project-capability-empty glass-v2" role="status">当前课程没有可展示的有效能力。</p> : null}
       {!control.editing ? routeLegend : null}

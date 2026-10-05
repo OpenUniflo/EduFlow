@@ -47,7 +47,7 @@ Practice and capability update use the presentation-only `ConversationWorkbenchS
 
 At 1366×768 and 1440×900, browser zoom must be **100%**. Composer, upload, send and formal submission remain visible without scrolling the page. At 390×844, Context defaults to a folded summary, Timeline fills the remaining space and Composer remains directly accessible. Compact Global Assistant retains its separately scoped 220px timeline and is not rendered in the full Shell.
 
-Guidance, Trace, files, source selection, analysis, Proposal, Result, Confirm, Error and Route Impact use one quiet card language: 14px outer / 12px nested radii, subtle neutral borders, white/soft-neutral surfaces, 12–16px padding, 16px timeline rhythm and restrained 15px titles. One card has one dominant primary action. When the Dock contains a formal action, conversational Send is secondary. Source picker and historical/technical analysis details default folded. Run UUID appears only in technical details. An immutable failed Run shows one failure card, unchanged-state explanation and one Re-analyze action; only running analysis offers Refresh Status.
+Guidance, files, source selection, analysis, Proposal, Result, Confirm, Error and Route Impact use one quiet card language: 14px outer / 12px nested radii, subtle neutral borders, white/soft-neutral surfaces, 12–16px padding, 16px timeline rhythm and restrained 15px titles. One card has one dominant primary action. When the Dock contains a formal action, conversational Send is secondary. Source picker and historical/technical analysis details default folded. Run UUID appears only in technical details. An immutable failed Run shows one failure card, unchanged-state explanation and one Re-analyze action; only running analysis offers Refresh Status.
 
 Use existing motion/react: Shell 240ms fade with at most8px translation, cards180ms with at most4px translation, disclosure180ms opacity. No bounce or ornamental loops. Reduced Motion removes displacement, disclosure animation and spinners while preserving state, focus and all controls.
 
@@ -55,12 +55,20 @@ Project Top Control Band uses one `--project-top-control-band` token for the lef
 
 ## Practice and graph planning · 2026-10-05
 
-成果实践使用既有 Conversation Workbench：任务场景与真实输入直接进入初始 Timeline，预期成果/验收标准可展开，Context 保留完整任务条件。Composer 始终与讨论分离，明确的「正式提交本次实践」保存本人文字、真实私有附件或两者；Trace 是辅助结构化案例检查，不是唯一实践体验。Result 明确区分通过/未达到标准/待审核；AI 实践反馈基于本人正式成果、文件、场景、标准与正式评价，只提供教学建议。再次实践进入新的 Run/Attempt，会话按执行身份隔离，旧成果仍可打开。
+成果实践使用既有 Conversation Workbench：任务场景与真实输入直接进入初始 Timeline，预期成果/验收标准可展开，Context 保留完整任务条件。Composer 始终与讨论分离，明确的「正式提交本次实践」保存本人文字、真实私有附件或两者；Practice Workbench 不承载 Quiz / Trace / 单选 / 多选任务；理解检查属于 Micro Learning。Result 明确区分通过/未达到标准/待审核；AI 实践反馈基于本人正式成果、文件、场景、标准与正式评价，只提供教学建议。再次实践进入新的 Run/Attempt，会话按执行身份隔离，旧成果仍可打开。
 
-项目能力图在 Planning Mode 保持相同事实拓扑、冻结坐标与相机。固定 Header 显示当前版本→草稿/预览、×退出、历史、重新载入；轻量加入/排除工具作用于图中 Node；Edge 点击只打开当前关系的行动 Inspector。Inspector 展示类型、时长、可用条件和推荐成本，独立滚动，不列全部关系。固定 Bottom Bar 展示草稿修改数或 Preview 的增/减/行动变化；未完成关系提供明确定位按钮。进入、退出、Preview 和 Adopt 都不重新布局或 fit；定位是用户驱动的相机操作。
+项目能力图在 Planning Mode 保持相同事实拓扑、冻结坐标与相机。固定 Header 显示当前版本→草稿/预览、×退出、历史、重新载入；Node 点击只选择并打开 Node Inspector，以明确加入/排除/撤销按钮修改 Draft；Edge 点击只选择并打开当前关系的行动 Inspector。Inspector 展示类型、时长、可用条件和推荐成本，独立滚动，不列全部关系。固定 Bottom Bar 展示草稿修改数或 Preview 的增/减/行动变化；未完成关系提供明确定位按钮。进入、退出、Preview 和 Adopt 都不重新布局或 fit；定位是用户驱动的相机操作。
 
-路线未采用修改受到统一放弃确认保护，包括×、取消、重新载入、历史、课程视图切换、导航与浏览器返回；reload/关闭浏览器使用原生离开提示。Dialog 初始聚焦安全动作、Tab 保留在弹窗、Escape 返回编辑。历史在独立 Dialog 中读取不可变快照，恢复会生成新版本。过期 Preview 显示重新计算，正式采用须通过服务端 relevant state 与 Preview 决策指纹验证。
+路线未采用修改受到统一放弃确认保护，包括×、取消、重新载入、历史、课程视图切换、导航与浏览器返回；reload/关闭浏览器使用原生离开提示。Dialog 初始聚焦安全动作、Tab 保留在弹窗、Escape 返回编辑。历史在主从 Dialog 中读取不可变快照；列表和详情独立滚动，点击立即更新详情，默认先显示与当前版本的能力/关系/Action差异。恢复 Footer 固定可达，当前版本不可恢复自身，失效版本提供基于结构重新规划；恢复与 Adopt 都生成新版本。过期 Preview 显示重新计算，正式采用须通过服务端 relevant state 与 Preview 决策指纹验证。
 
 我的课程为零时，空状态占据完整内容宽度，使用一个浏览全部课程入口；隐藏搜索与顶部重复入口。搜索无结果与未开始课程使用不同文案。课程 membership、个人路线历史与正式能力互不替代。
 
 Inspector 和空状态使用短时淡入/轻微位移动画，不移动图或 Composer；Reduced Motion 禁用这些装饰动画，保留所有操作与静态方向表达。窄屏 Header 可换行、Inspector 为局部底部面板，Bottom Bar 保持可达。
+
+## Planning selection and History · 2026-10-06
+
+Selection has its own neutral outline/highlight, separate from blue/green/gray capability state and Current/Preview colors. Draft includes/excludes use +/− badges; Preview added/removed/kept is another overlay. None participates in structural inputs, force, coordinates or camera. Only explicit user Fit/Focus/issue location changes the camera.
+
+Node Inspector displays description, capability state, project role, formal membership, Draft constraints, Preview membership, factual prerequisites/support and explicit Include/Exclude/Undo. Edge Inspector distinguishes “正式行动” and “调整后”, then offers current legal choices; choosing an Action updates Draft only. Bottom Bar owns whole-route Preview and Adopt, separates capability +/−, relation +/−, Action replacement and unresolved issues, and states why adoption is unavailable. “定位下一项” dispatches typed issues to their Node/Edge and repair controls.
+
+Desktop History is list/detail with independent scrolling and a stable Footer. The selected/current row is visible and version detail updates immediately without scrolling to the end. Diff is primary; complete route/constraints/technical UUID details are folded. At 390×844, selecting a version shows a detail page with a back-to-list control; Footer remains reachable. Current restore is disabled. Invalid exact restore offers historical replan into the existing Planner. Selection uses 140ms, Inspector 220ms, History 200ms opacity; reduced motion removes nonessential transition/displacement and keeps all static focus/difference information.

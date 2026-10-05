@@ -50,6 +50,8 @@ export type KnowledgeAtlasSceneProps = {
   onActionClick?: (id: string) => void;
   visibleNodeIds?: ReadonlySet<string>;
   routeOverlay?: RouteOverlay;
+  selectedEdgeId?: string|null;
+  draftNodeChanges?: {include:readonly string[];exclude:readonly string[]};
   edgeActionCounts?: ReadonlyMap<string, number>;
 };
 
@@ -144,6 +146,8 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   onActionClick,
   visibleNodeIds,
   routeOverlay,
+  selectedEdgeId,
+  draftNodeChanges,
   edgeActionCounts,
   onBackgroundClick
 }, forwardedRef) {
@@ -166,7 +170,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
   const [labels, setLabels] = useState<LabelState[]>([]);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const routeArrowId=useId().replace(/:/g,'');
-  const [routePositions, setRoutePositions] = useState<{ nodes: { id: string; state: RouteOverlayState; x: number; y: number }[]; edges: { id: string; state: RouteOverlayState | 'context'; x1: number; y1: number; x2: number; y2: number }[] }>({ nodes: [], edges: [] });
+  const [routePositions, setRoutePositions] = useState<{ nodes: { id: string; state: RouteOverlayState | 'context'; x: number; y: number }[]; edges: { id: string; state: RouteOverlayState | 'context'; x1: number; y1: number; x2: number; y2: number }[] }>({ nodes: [], edges: [] });
   const [edgeHint, setEdgeHint] = useState<{ x: number; y: number; text: string } | null>(null);
   const isVisible = useCallback((id: string) => !visibleNodeIds || visibleNodeIds.has(id), [visibleNodeIds]);
 
@@ -445,7 +449,7 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
         ? graph.graph2ScreenCoords(node.x ?? 0, node.y ?? 0, node.z ?? 0) : null;
     };
     const positionedRoute = {
-      nodes: (routeOverlay?.nodes ?? []).flatMap(node => { const point = screenNode(node.id); return point ? [{ ...node, ...point }] : []; }),
+      nodes: (variant==='project'?renderNodes.map(node=>({id:node.id,state:routeOverlay?.nodes.find(item=>item.id===node.id)?.state??'context' as const})):(routeOverlay?.nodes??[])).flatMap(node => { const point = screenNode(node.id); return point ? [{ ...node, ...point }] : []; }),
       edges: (routeOverlay ? renderEdges : []).flatMap(edge => {
         const item = routeOverlay?.edges.find(item => item.id === edge.id) ?? { id: edge.id, state: 'context' as const };
         const start = screenNode(endpointId(edge.source)), end = screenNode(endpointId(edge.target));
@@ -657,7 +661,12 @@ export const KnowledgeAtlasScene = forwardRef<KnowledgeAtlasSceneHandle, Knowled
           <line className="route-fact-line" x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} strokeWidth={edge.state==='context'?1:2.5} markerEnd={edge.state==='context'?undefined:`url(#${routeArrowId})`}/>
           {edge.state!=='context'?<line className="route-directional-pulse" pathLength={100} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} strokeWidth={4} strokeLinecap="round"/>:null}
         </g>)}
-        {routePositions.nodes.map(node=><g key={node.id} data-route-node={node.id} data-x={node.x} data-y={node.y}/>)}
+        {routePositions.nodes.map(node=><g key={node.id} data-route-node={node.state==='context'?undefined:node.id} data-project-node={node.id} data-x={node.x} data-y={node.y}>
+          {node.state==='added'||node.state==='removed'?<circle cx={node.x} cy={node.y} r={16} fill="none" stroke={node.state==='added'?'#087f8c':'#a66651'} strokeWidth={1} strokeDasharray="3 4"/>:null}
+          {node.id===selectedId?<circle className="planning-selection" data-selected-node={node.id} cx={node.x} cy={node.y} r={12} fill="none" stroke="#334155" strokeWidth={2}/>:null}
+          {draftNodeChanges?.include.includes(node.id)||draftNodeChanges?.exclude.includes(node.id)?<g data-draft-node={node.id} data-draft-state={draftNodeChanges.include.includes(node.id)?'include':'exclude'}><circle cx={node.x+13} cy={node.y-13} r={7} fill="#fff" stroke="#64748b"/><text x={node.x+13} y={node.y-9} textAnchor="middle" fontSize={12} fill="#334155">{draftNodeChanges.include.includes(node.id)?'+':'−'}</text></g>:null}
+        </g>)}
+        {routePositions.edges.filter(edge=>edge.id===selectedEdgeId).map(edge=><line key={edge.id} data-selected-edge={edge.id} className="planning-selection" x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="#334155" strokeWidth={3} strokeLinecap="round"/>)}
       </svg> : null}
       {variant === 'project' && edgeHint ? <div className="atlas-edge-hint" role="tooltip" style={{ transform: `translate(${edgeHint.x}px, ${edgeHint.y}px) translate(-50%, -120%)` }}>{edgeHint.text}</div> : null}
       {variant === 'project' && branchPositions.length > 0 ? <svg className="atlas-action-branches" width={size.width} height={size.height} aria-label="关系上的行动替代方案" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}>

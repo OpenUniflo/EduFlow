@@ -5,6 +5,7 @@ import {captureSql,query,payload,acceptanceResetAccounts} from './reset-conversa
 const file=process.env.ACCEPTANCE_RESET_MANIFEST??'.acceptance/conversation-workbench/acceptance-ab-baseline.json';
 const baseline=JSON.parse(readFileSync(file,'utf8'));
 assert.deepEqual(baseline.accounts,acceptanceResetAccounts);
+assert.equal(baseline.tables.edge_action_runs.filter((row:any)=>row.status==='in_progress').length,0,'Baseline contains an unfinished acceptance Run');
 const current=payload(query(captureSql()));
 const canonical=(rows:unknown[])=>rows.map(row=>JSON.stringify(row)).sort();
 for(const table of Object.keys(baseline.tables)){

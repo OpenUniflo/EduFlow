@@ -15,6 +15,6 @@ export function routeRelations(route: SelectedRoute, supportEdges: readonly Capa
     ...supportEdges.filter(edge => edge.relation === 'enables'),
   ].filter(edge => members.has(edge.source) && members.has(edge.target)).sort((a, b) => a.id.localeCompare(b.id));
 }
-export function relationLabel(edge: CapabilityRelation) {
-  return edge.relation === 'enables' ? '能力支撑' : edge.strength === 'hard' ? '必要前置' : '推荐前置';
+export function relationLabel(edge: {relation:'prerequisite'|'enables'|'related';strength?:string|number}) {
+  return edge.relation === 'related' ? '相关知识' : edge.relation === 'enables' ? '能力支撑' : edge.strength === 'hard' ? '必要前置' : '推荐前置';
 }

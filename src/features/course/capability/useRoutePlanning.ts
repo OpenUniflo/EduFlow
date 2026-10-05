@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiRequest, ApiRequestError } from '@/shared/api/apiClient';
+import type { RouteExecutionPlan } from '@/shared/learning/routeExecution';
 import type { RouteConstraints, RoutePlan } from '@/shared/learning/routePlanning';
 import type { ExecutionRoutePlan, RoutePlanView, RouteVersion } from '@/shared/learning/routeVersion';
 const empty = (): RouteConstraints => ({ includeNodeIds: [], excludeNodeIds: [] });
@@ -26,7 +27,16 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
   const dismissAction=useRef<(()=>void)|undefined>(undefined); const stayAction=useRef<(()=>void)|undefined>(undefined);
   const baseline=useRef<{draft:RouteConstraints;choices:Array<{edgeId:string;actionId:string}>;edges?:string[]}|undefined>(undefined);
   const [history, setHistory] = useState<RouteVersion[] | null>(null);
+  const [historyActionTitles,setHistoryActionTitles]=useState<Record<string,string>>({});
+  const [historyInspection,setHistoryInspection]=useState<{versionId:string;execution:RouteExecutionPlan}|null>(null);
+  const [inspectingHistory,setInspectingHistory]=useState(false);
   const [historical, setHistorical] = useState<RouteVersion | null>(null);
+  useEffect(()=>{
+    if(!historical||!history)return;
+    let live=true;setHistoryInspection(null);setInspectingHistory(true);
+    void apiRequest<{versionId:string;execution:RouteExecutionPlan}>(`${path}&view=inspect&versionId=${encodeURIComponent(historical.id)}`).then(result=>{if(live)setHistoryInspection(result);}).catch(error=>{if(live)setError(error instanceof Error?error.message:'历史路线校验失败，请重新选择版本重试。');}).finally(()=>{if(live)setInspectingHistory(false);});
+    return ()=>{live=false;};
+  },[historical,history,path]);
   const requestGeneration = useRef(0);
   const load = useCallback(async () => {
     const generation = ++requestGeneration.current;
@@ -66,7 +76,7 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
   const mark = (id: string, action = tool) => {
     if (!editing || busy) return;
     draftRevision.current++;
-    setPreview(null);setSelectedEdgeIds(undefined);setScopeMode('replan');
+    setPreview(null);setScopeMode('replan');
     setDraft(previous => {
       const toggle = (ids: readonly string[]) => ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id].sort();
       return action === 'include'
@@ -74,9 +84,9 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
         : { includeNodeIds: previous.includeNodeIds.filter(value => value !== id), excludeNodeIds: toggle(previous.excludeNodeIds) };
     });
   };
-  const refreshHistory = async () => { setHistory((await apiRequest<{ versions: RouteVersion[] }>(`${path}&view=history`)).versions); };
+  const refreshHistory = async () => {const result=await apiRequest<{versions:RouteVersion[];actionTitles?:Record<string,string>}>(`${path}&view=history`);setHistory(result.versions);setHistoryActionTitles(result.actionTitles??{});setHistorical(result.versions.find(version=>version.id===view?.activeVersion?.id)??result.versions[0]??null);};
   const accept = (versionId?: string) => run(async () => {
-    if (versionId ? !view?.activeVersion : !baseVersionId || stale || !previewState || !preview?.valid || !preview.execution?.complete) return;
+    if (versionId ? !view?.activeVersion || versionId===view.activeVersion.id : !baseVersionId || stale || !previewState || !preview?.valid || !preview.execution?.complete) return;
     await post(versionId ? { action: 'restore', versionId, baseVersionId: view!.activeVersion!.id }
       : { action: 'adopt', baseVersionId,previewState, ...draft,scopeMode, actionChoices:preview!.execution!.steps.map(({edgeId,actionId})=>({edgeId,actionId})),selectedEdgeIds:preview!.execution!.steps.map(step=>step.edgeId) });
     setEditing(false); setPreview(null); setHistorical(null);
@@ -92,11 +102,14 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
   return {
     view, busy, error, editing, tool,dirty,changeCount,stale,dismissPending,requestDismiss,leave:(action:()=>void)=>requestDismiss(()=>{discard();action();}),
     keepEditing:()=>{setDismissPending(false);stayAction.current?.();dismissAction.current=undefined;stayAction.current=undefined;},
-    discardDraft:()=>{const action=dismissAction.current;setDismissPending(false);discard();dismissAction.current=undefined;stayAction.current=undefined;action?.();}, draft, preview, proposal, actionChoices, selectedEdgeIds, history, historical, begin, mark, setTool, setHistorical,
+    discardDraft:()=>{const action=dismissAction.current;setDismissPending(false);discard();dismissAction.current=undefined;stayAction.current=undefined;action?.();}, draft, preview, proposal, actionChoices, selectedEdgeIds, history, historical, historyInspection, inspectingHistory, historyActionTitles, begin, mark, setTool, setHistorical,
+    removeNodeConstraint: (id:string) => {if(busy)return;draftRevision.current++;setPreview(null);setScopeMode('replan');setDraft(previous=>({includeNodeIds:previous.includeNodeIds.filter(value=>value!==id),excludeNodeIds:previous.excludeNodeIds.filter(value=>value!==id)}));},
+    undoNode: (id:string) => { if(busy)return;draftRevision.current++;setPreview(null);setScopeMode('replan');setDraft(previous=>({includeNodeIds:[...previous.includeNodeIds.filter(value=>value!==id),...(baseline.current?.draft.includeNodeIds.includes(id)?[id]:[])].sort(),excludeNodeIds:[...previous.excludeNodeIds.filter(value=>value!==id),...(baseline.current?.draft.excludeNodeIds.includes(id)?[id]:[])].sort()})); },
+    replanHistorical: (version:RouteVersion) => { if(busy||!view?.activeVersion)return;begin();setDraft({includeNodeIds:[...new Set([...version.constraints.includeNodeIds,...version.snapshot.selectedNodeIds])].filter(id=>!version.constraints.excludeNodeIds.includes(id)),excludeNodeIds:[...version.constraints.excludeNodeIds]});setScopeMode('replan');setSelectedEdgeIds(version.snapshot.executionSteps?.map(step=>step.edgeId));setActionChoices((version.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})));setHistory(null);setHistorical(null); },
     chooseAction: (edgeId:string,actionId:string) => { if(busy)return; draftRevision.current++;setPreview(null);setActionChoices(previous=>[...previous.filter(choice=>choice.edgeId!==edgeId),{edgeId,actionId}]); },
-    chooseEdge: (edgeId:string,selected:boolean) => { if(busy)return;draftRevision.current++;setPreview(null);setSelectedEdgeIds(previous=>{const ids=previous??[...new Set((proposal?.execution?.options??view?.execution?.options??[]).map(option=>option.edgeId))];return selected?[...new Set([...ids,edgeId])]:ids.filter(id=>id!==edgeId);}); },
+    chooseEdge: (edgeId:string,selected:boolean) => { if(busy)return;draftRevision.current++;setPreview(null);setSelectedEdgeIds(previous=>{const ids=previous??view?.activeVersion?.snapshot.executionSteps?.map(step=>step.edgeId)??[];return selected?[...new Set([...ids,edgeId])]:ids.filter(id=>id!==edgeId);}); },
     cancel:()=>requestDismiss(discard),
-    clear: () => { draftRevision.current++; setDraft(empty());setScopeMode('replan');setActionChoices([]);setSelectedEdgeIds(undefined);setProposal(null); setPreview(null); },
+    clear: () => { draftRevision.current++; setDraft(empty());setScopeMode('replan');setActionChoices([]);setSelectedEdgeIds(undefined);setProposal(null);setPreview(null); },
     continueEditing: () => { draftRevision.current++; setPreview(null); },
     reload:()=>requestDismiss(()=>void run(async()=>{await load();discard();})),
     showHistory:()=>requestDismiss(()=>{discard();void run(refreshHistory);}),
@@ -105,8 +118,8 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
       const version=view.activeVersion; const constraints={includeNodeIds:[...version.constraints.includeNodeIds],excludeNodeIds:[...version.constraints.excludeNodeIds]};
       baseline.current={draft:version.constraints,choices:(version.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})),edges:version.snapshot.executionSteps?.map(step=>step.edgeId)};
       const revision=++draftRevision.current;
-      setDraft(constraints);setBaseVersionId(version.id);setScopeMode('replan');setActionChoices([]);setSelectedEdgeIds(undefined);setHistorical(null);setEditing(true);
-      const result=await post<{plan:ExecutionRoutePlan;baseVersionId:string|null;previewState:string}>({action:'preview',...constraints,scopeMode:'replan',actionChoices:[]});
+      setDraft(constraints);setBaseVersionId(version.id);setScopeMode('replan');setActionChoices((version.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})));setSelectedEdgeIds(version.snapshot.executionSteps?.map(step=>step.edgeId));setHistorical(null);setEditing(true);
+      const result=await post<{plan:ExecutionRoutePlan;baseVersionId:string|null;previewState:string}>({action:'preview',...constraints,scopeMode:'replan',actionChoices:version.snapshot.executionSteps?.map(({edgeId,actionId})=>({edgeId,actionId})),selectedEdgeIds:version.snapshot.executionSteps?.map(step=>step.edgeId)});
       if(revision!==draftRevision.current)return;
       if(result.baseVersionId!==version.id)throw new Error('正式路线已变化，请重新载入后查看建议。');
       setPreviewState(result.previewState);setStale(false);setPreview(result.plan);setProposal(result.plan);
