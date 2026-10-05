@@ -49,6 +49,7 @@ export function resetSql(baseline:Record<string,any>) {
  const resetSourceIds=baseline.resetSourceIds??[];assert.ok(Array.isArray(resetSourceIds));for(const id of resetSourceIds)assert.match(id,/^[a-f0-9-]{36}$/);
  const ids=(table:string)=>`array[${baseline.tables[table].map((row:{id:string})=>quote(row.id)+'::uuid').join(',')}]::uuid[]`;
  const nodeList=baseline.nodeIds.map(quote).join(',');
+ const scopedSessionMessage=`coalesce(m.context_snapshot->>'courseId'=${quote(courseId)} or (m.context_snapshot->>'courseId' is null and m.structured_content->>'type'='workspace_event' and m.structured_content->>'schemaVersion'='1' and ((m.structured_content->>'event'='attachment' and exists(select 1 from reset_sources r where r.user_id=s.user_id and r.id::text=m.structured_content->>'referenceId')) or (m.structured_content->>'event' in ('diagnosis','confirmation') and exists(select 1 from reset_runs r where r.user_id=s.user_id and r.id::text=m.structured_content->>'referenceId')))),false)`;
  const restore=[...restored,'edge_action_runs' as const].map(table=>{
   const scope=table==='user_knowledge_states'?`${owner} and node_id in (${nodeList})`:table.startsWith('user_micro_')?progressScope:courseScope;
   const rows=baseline.tables[table] as Record<string,unknown>[];
@@ -83,7 +84,9 @@ export function resetSql(baseline:Record<string,any>) {
  delete from micro_step_attempts where ${courseScope} and not(id=any(${ids('micro_step_attempts')}));
  delete from learning_attempts where ${courseScope} and not(id=any(${ids('learning_attempts')}));
  delete from edge_action_runs where ${courseScope} and not(id=any(${ids('edge_action_runs')}));
- delete from assistant_sessions s where s.user_id in(${users}) and not(s.id=any(${ids('assistant_sessions')})) and (s.title like ${quote('workspace:%:'+courseKey+':%')} or exists(select 1 from assistant_messages m where m.session_id=s.id and m.context_snapshot->>'courseId'=${quote(courseId)})) and not exists(select 1 from assistant_messages m where m.session_id=s.id and m.context_snapshot->>'courseId' is distinct from ${quote(courseId)});
+ create temp table reset_sessions on commit drop as select s.id from assistant_sessions s where s.user_id in(${users}) and (s.title like ${quote('workspace:%:'+courseKey+':%')} or exists(select 1 from assistant_messages m where m.session_id=s.id and ${scopedSessionMessage})) and not exists(select 1 from assistant_messages m where m.session_id=s.id and not (${scopedSessionMessage}));
+ delete from assistant_messages where session_id in(select id from reset_sessions) and session_id=any(${ids('assistant_sessions')}) and created_at>=${quote(baseline.capturedAt??'1970-01-01T00:00:00Z')}::timestamptz;
+ delete from assistant_sessions where id in(select id from reset_sessions) and not(id=any(${ids('assistant_sessions')}));
  delete from user_evidence_sources where id in(select id from reset_sources);
  update personal_course_routes set active_version_id=null where ${courseScope};
  delete from personal_course_route_versions where ${courseScope} and not(id=any(${ids('personal_course_route_versions')}));

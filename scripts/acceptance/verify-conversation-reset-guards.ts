@@ -54,3 +54,39 @@ const rollbackResult=JSON.parse(execFileSync('pnpm',['exec','supabase','db','que
 assert.equal((rollbackResult.rows??rollbackResult)[0].probe_rows,0);
 writeFileSync(`${output}/session-reset-guard.json`,JSON.stringify({pass:true,courseOnlyDeleted:true,emptyCourseWorkspaceDeleted:true,mixedHistoryPreserved:true,unrelatedPreserved:true,baselinePreserved:true,probeRowsAfterRollback:0}));
 console.log('Hosted session reset scope and rollback PASS');
+
+// A Personal Capability Dialog can have no course context while its owned references
+// prove the course scope. Unknown/mixed history and empty generic sessions stay intact.
+const ownedSource=randomUUID(),ownedRun=randomUUID();
+const referenceSessions=Object.fromEntries(['diagnosis','attachment','mixed','otherCourse','malformed','empty','retained','historical'].map(key=>[key,randomUUID()]));
+baseline.tables.assistant_sessions.push({id:referenceSessions.retained},{id:referenceSessions.historical});
+const event=(kind:string,referenceId:string,schemaVersion=1)=>({type:'workspace_event',schemaVersion,event:kind,referenceId});
+const records=[
+ ['diagnosis',{},event('diagnosis',ownedRun)],['attachment',{},event('attachment',ownedSource)],
+ ['mixed',{},event('diagnosis',ownedRun)],['mixed',{},null],
+ ['otherCourse',{courseId:'unrelated-course'},event('diagnosis',ownedRun)],
+ ['malformed',{},event('diagnosis',ownedRun,99)],['malformed',{},event('diagnosis','not-a-uuid')],
+ ['retained',{},event('diagnosis',ownedRun)],['historical',{courseId:baseline.courseId},null],
+ ['historical',{},event('confirmation',ownedRun)],
+] as const;
+const referenceSetup=`begin;
+insert into user_evidence_sources(id,user_id,title,storage_path,content_type,byte_size,provenance) values(${quote(ownedSource)},${quote(actor)},'Acceptance rollback-only reference source',${quote(actor+'/'+ownedSource)},'text/plain',1,jsonb_build_object('kind','acceptance-rollback-guard','courseId',${quote(baseline.courseId)}));
+insert into capability_diagnosis_runs(id,user_id,source_ids,model,prompt_version) values(${quote(ownedRun)},${quote(actor)},array[${quote(ownedSource)}::uuid],'acceptance-rollback-guard','acceptance-only');
+insert into assistant_sessions(id,user_id,title) values ${Object.entries(referenceSessions).map(([key,id])=>`(${quote(id)},${quote(actor)},${quote('Acceptance reference guard '+key)})`).join(',')};
+insert into assistant_messages(session_id,role,content,context_snapshot,structured_content,created_at) values ${records.map(([key,context,structured],index)=>`(${quote(referenceSessions[key])},'user','Acceptance rollback-only',${quote(JSON.stringify(context))}::jsonb,${structured?quote(JSON.stringify(structured))+'::jsonb':'null'},${index===8?quote(baseline.capturedAt)+'::timestamptz - interval \'1 second\'':'now()'})`).join(',')};
+`;
+const referenceAssertions=`do $$begin
+ if exists(select 1 from assistant_sessions where id in(${quote(referenceSessions.diagnosis)},${quote(referenceSessions.attachment)})) then raise exception 'Owned course reference session survived reset';end if;
+ if (select count(*) from assistant_sessions where id in(${['mixed','otherCourse','malformed','empty','retained','historical'].map(key=>quote(referenceSessions[key])).join(',')}))<>6 then raise exception 'Protected reference history/session removed';end if;
+ if (select count(*) from assistant_messages where session_id=${quote(referenceSessions.mixed)})<>2 then raise exception 'Mixed null history changed';end if;
+ if (select count(*) from assistant_messages where session_id=${quote(referenceSessions.otherCourse)})<>1 or (select count(*) from assistant_messages where session_id=${quote(referenceSessions.malformed)})<>2 then raise exception 'Unrelated/malformed reference changed';end if;
+ if exists(select 1 from assistant_messages where session_id=${quote(referenceSessions.retained)}) then raise exception 'Retained empty baseline acquired stale test history';end if;
+ if (select count(*) from assistant_messages where session_id=${quote(referenceSessions.historical)})<>1 then raise exception 'Pre-capture history changed';end if;
+end$$; rollback;`;
+const referencePath=`${output}/reference-session-reset-guard.sql`;
+writeFileSync(referencePath,referenceSetup+resetSql(baseline).replace(/^begin;\n/,'').replace(/commit;$/,()=>referenceAssertions));
+execFileSync('pnpm',['exec','supabase','db','query','--linked','--file',referencePath,'--output','json'],{encoding:'utf8',stdio:'pipe'});
+const remaining=JSON.parse(execFileSync('pnpm',['exec','supabase','db','query','--linked',`select count(*)::int as probe_rows from assistant_sessions where id in(${Object.values(referenceSessions).map(quote).join(',')});`,'--output','json'],{encoding:'utf8',stdio:'pipe'}));
+assert.equal((remaining.rows??remaining)[0].probe_rows,0);
+writeFileSync(`${output}/reference-session-reset-guard.json`,JSON.stringify({pass:true,nullOwnedDiagnosisDeleted:true,nullOwnedAttachmentDeleted:true,mixedHistoryPreserved:true,otherCoursePreserved:true,malformedPreserved:true,genericEmptyPreserved:true,retainedBaselineSessionPreserved:true,newTestMessagesRemoved:true,preCaptureHistoryPreserved:true,probeRowsAfterRollback:0}));
+console.log('Hosted owned-reference session scope and retained history rollback PASS');
