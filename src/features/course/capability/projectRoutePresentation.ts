@@ -15,6 +15,12 @@ export function projectStructuralGraph(graph: KnowledgeGraph, targetIds: readonl
   };
 }
 
+/** One presentation scope for graph, search, counters and inspectors. */
+export function projectVisibleNodeIds(graph:KnowledgeGraph,route:Pick<SelectedRoute,'selectedNodeIds'>|null,targetIds:readonly string[],editing:boolean):Set<string> {
+  const members=new Set([...(route?.selectedNodeIds??[]),...targetIds]);
+  return new Set(graph.nodes.filter(node=>editing || members.has(node.id)).map(node=>node.id));
+}
+
 /** Snapshot prerequisites are authoritative; enables come from real structural facts. */
 export function projectRouteOverlay(graph: KnowledgeGraph, current: (SelectedRoute & {executionSteps?:RouteExecutionStep[]}) | null, preview: (SelectedRoute & {executionSteps?:RouteExecutionStep[]}) | null): RouteOverlay {
   const facts: CapabilityRelation[] = graph.edges.flatMap<CapabilityRelation>(edge => edge.relation === 'prerequisite' ? [edge]

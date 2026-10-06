@@ -1,11 +1,13 @@
-/* The existing navigator path is the scoped authority for sequential execution. */
+/* The existing navigator path is the scoped authority for stable Route reading order. */
 .course-execution-path .navigator-stop { height: 220px; }
 .course-execution-path .navigator-connector { height: 220px; }
 .course-execution-path .navigator-node-copy { width: min(250px,65%); }
 .course-execution-path .navigator-node-copy > button { pointer-events: auto; margin: 8px auto 0; min-height: 36px; padding: 7px 18px; }
 .course-execution-path .navigator-node-copy strong { -webkit-line-clamp: 3; }
 .course-execution-path .navigator-node:focus-visible { outline: 3px solid var(--atlas-brand); outline-offset: 6px; }
-.course-execution-path .upcoming .navigator-node { background: #edf0f5; }
+.course-execution-path .blocked .navigator-node { background: #edf0f5; }
+.course-execution-path .available .navigator-node,.course-execution-path .in_progress .navigator-node { color: #fff; background: var(--atlas-brand,#6375df); border-color: var(--atlas-brand,#6375df); }
+.course-execution-path .satisfied .navigator-node { color: #6375df; border-color: #a9b1cf; background: #f2f4fa; }
 .route-action-choices fieldset { margin: 16px 0; padding: 12px; border: 1px solid var(--atlas-border); border-radius: 12px; }
 .route-action-choices legend { font-size: 13px; font-weight: 600; }
 .route-action-choices fieldset > small { display: block; margin: 6px 0; }

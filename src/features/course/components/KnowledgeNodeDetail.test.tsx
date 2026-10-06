@@ -10,8 +10,8 @@ const runtime = {course:{id:'course'},materials:[{id:'unrelated',title:'不相�
 const actions = {actions:[],bindings:[],runs:[],availableActionIds:[],availableMicroActionIds:[],start:vi.fn()} as unknown as ReturnType<typeof useEdgeActions>;
 it('renders Bridge core and source-oriented relations without requiring curriculum or leaking course materials', () => {
   const html = renderToStaticMarkup(<MemoryRouter><KnowledgeNodeDetail node={node} runtime={runtime} graph={{nodes:[node],edges:[],revisions:[]}} knowledge={[{nodeId:node.id,status:'learned'}]} relations={[{id:'out',source:'bridge',target:'target',relation:'enables',strength:1},{id:'in',source:'start',target:'bridge',relation:'prerequisite',strength:'hard'}]} learningPath={{id:"explicit-path",title:"起点学习内容"}} context="personal-route" actions={actions} onSelect={vi.fn()}/></MemoryRouter>);
-  for (const text of ['实际知识内容','已学会','补充能力 → target','通向这里的关系','未配置本课程教学覆盖']) expect(html).toContain(text);
-  expect(html).not.toContain('不相关课件');
+  for (const text of ['实际知识内容','已学会']) expect(html).toContain(text);
+  expect(html).not.toContain('不相关课件');expect(html).not.toContain('未配置本课程教学覆盖');expect(html).not.toContain('补充能力 → target');
   expect(html).not.toContain('pathId=explicit-path'); expect(html).not.toContain('起点学习内容');
 });
 
@@ -24,4 +24,9 @@ it('formal Route detail starts its already chosen Action and does not show alter
 it('unavailable formal Action explains adjustment instead of claiming no Action was configured',()=>{
   const html=renderToStaticMarkup(<MemoryRouter><KnowledgeNodeDetail node={node} runtime={runtime} graph={{nodes:[node],edges:[],revisions:[]}} knowledge={[{nodeId:node.id,status:'learned'}]} relations={[{id:'out',source:'bridge',target:'target',relation:'enables',strength:1}]} context="personal-route" routeSteps={[{edgeId:'out',actionId:'archived',sourceNodeId:'bridge',targetNodeId:'target',order:0}]} initialEdgeId="out" actions={actions} onSelect={vi.fn()} onAdjustRoute={vi.fn()}/></MemoryRouter>);
   expect(html).toContain('当前正式路线中的行动已不可用，需要调整路线');expect(html).toContain('调整路线');expect(html).not.toContain('这条关系尚未配置行动');
+});
+
+it('formal details filter both incoming and outgoing structural candidates and omit curriculum warnings',()=>{
+  const html=renderToStaticMarkup(<MemoryRouter><KnowledgeNodeDetail node={node} runtime={runtime} graph={{nodes:[node],edges:[],revisions:[]}} knowledge={[]} relations={[{id:'out',source:'bridge',target:'selected-target',relation:'enables',strength:1},{id:'candidate',source:'bridge',target:'unselected-target',relation:'enables',strength:1},{id:'incoming',source:'unselected-source',target:'bridge',relation:'prerequisite',strength:'hard'}]} context="personal-route" routeSteps={[{edgeId:'out',actionId:'chosen',sourceNodeId:'bridge',targetNodeId:'selected-target',order:0}]} actions={actions} onSelect={vi.fn()}/></MemoryRouter>);
+  expect(html).toContain('selected-target');expect(html).not.toContain('unselected-target');expect(html).not.toContain('unselected-source');expect(html).not.toContain('未配置本课程教学覆盖');
 });

@@ -26,8 +26,9 @@ export function KnowledgeNodeDetail({ node, courseNode, runtime, graph, knowledg
   const title = (id: string) => graph.nodes.find(item => item.id === id)?.title ?? id;
   const current = knowledge.find(record => record.nodeId === node.id);
   const acquired = new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId));
-  const outgoing = relations.filter(edge => edge.source === node.id);
-  const incoming = relations.filter(edge => edge.target === node.id);
+  const scopedRelations=context==='personal-route'?relations.filter(edge=>routeSteps?.some(step=>step.edgeId===edge.id && step.sourceNodeId===edge.source && step.targetNodeId===edge.target)):relations;
+  const outgoing = scopedRelations.filter(edge => edge.source === node.id);
+  const incoming = scopedRelations.filter(edge => edge.target === node.id);
   const runs = actions.runs.filter(run => run.execution_snapshot.sourceId === node.id || run.execution_snapshot.targetId === node.id);
   const activeEdge = outgoing.find(edge => edge.id === expandedEdge);
   const activeAction = activeEdge ? actions.actions.find(action => action.id === focusedAction && action.edge_id === activeEdge.id) : undefined;
@@ -50,7 +51,7 @@ export function KnowledgeNodeDetail({ node, courseNode, runtime, graph, knowledg
       <ul>{courseNode.curriculumContexts.map(item => <li key={item.id}>{runtime.lessons.find(lesson => lesson.id === item.lessonId)?.title} · {item.role}</li>)}</ul>
       <h3>学习材料</h3>{courseNode.materialContexts.length ? courseNode.materialContexts.map(item => { const material = runtime.materials.find(material => material.id === item.materialId); return material ? <p key={material.id}><Link to={buildMaterialDeepLink({ courseId: runtime.course.id, materialId: material.id, segmentId: resolveKnowledgeMaterialEntry(runtime, node.id, material.id)?.segmentId })}>{material.title}</Link></p> : null; }) : <p>暂无关联材料。</p>}
       <h3>对应实训</h3>{courseNode.assignmentContexts.length ? courseNode.assignmentContexts.map(item => <p key={item.assignment.id}><Link to={`/courses/${encodeURIComponent(runtime.course.id)}/assignments/${encodeURIComponent(item.assignment.id)}`}>{item.assignment.title}</Link></p>) : <p>暂无关联实训。</p>}
-    </details> : <p className="atlas-drawer-section">此能力是路线中的补充能力，未配置本课程教学覆盖。</p>}
+    </details> : context==='skill-tree'?<p className="atlas-drawer-section">此能力未配置本课程教学覆盖。</p>:null}
     <ActionRunHistory runs={runs} control={actions} courseId={runtime.course.id} acquiredIds={acquired} title={title} visibleEdgeIds={new Set(relations.map(edge => edge.id))}/>
     {actions.error ? <p role="alert">{actions.error}</p> : null}
   </div>;

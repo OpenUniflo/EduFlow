@@ -13,7 +13,7 @@ import { buildProjectCapabilityModel, projectCapabilityAtlas } from './projectCa
 import { useRoutePlanning } from './useRoutePlanning';
 import { RoutePlanningPanel } from './RoutePlanningPanel';
 import { actionAlternatives, branchesForActions, EdgeActionPanel, useEdgeActions } from '@/features/actions/EdgeActionPanel';
-import { projectStructuralGraph, projectRouteOverlay } from './projectRoutePresentation';
+import { projectStructuralGraph, projectRouteOverlay, projectVisibleNodeIds } from './projectRoutePresentation';
 import { relationLabel } from '@/shared/learning/routePresentation';
 import './projectCapability.css';
 
@@ -36,10 +36,10 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
       return { model, projection: projectCapabilityAtlas(graph, model, governance, knowledge, structuralGraph), error: null };
     } catch (error) { return { model: null, projection: null, error: error instanceof Error ? error.message : '能力依赖计算失败' }; }
   }, [graph, runtime, knowledge, governance, structuralGraph]);
-  const currentRoute = control.view?.plan.valid ? control.view.plan.route : control.view?.activeVersion?.snapshot.valid ? control.view.activeVersion.snapshot : null;
+  const currentRoute = control.view?.activeVersion?.snapshot ?? null;
   const previewRoute = useMemo(()=>control.preview?.valid ? {...control.preview.route,executionSteps:control.preview.execution?.steps} : null,[control.preview]);
   const overlay = useMemo(() => projectRouteOverlay(structuralGraph, currentRoute, previewRoute), [structuralGraph, currentRoute, previewRoute]);
-  const visibleIds = useMemo(() => new Set(structuralGraph.nodes.map(node => node.id)), [structuralGraph]);
+  const visibleIds = useMemo(() => projectVisibleNodeIds(structuralGraph,currentRoute,runtime.curriculumCoverages.map(coverage=>coverage.nodeId),control.editing), [structuralGraph,currentRoute,runtime,control.editing]);
   const visibleEdges = structuralGraph.edges.filter(edge => visibleIds.has(edge.source) && visibleIds.has(edge.target));
   const counts = useMemo(() => {
     const result = new Map<string, number>();
@@ -53,7 +53,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const selected = displayedNodes.find(node => node.id === selectedId);
   const matches = result.projection?.nodes.filter(node => visibleIds.has(node.id) && `${node.title} ${node.id}`.toLowerCase().includes(query.toLowerCase())) ?? [];
   const title = (id: string) => graph.nodes.find(node => node.id === id)?.title ?? id;
-  const roles = (node: NonNullable<typeof selected>) => [node.capabilityRoles?.current && '已具备', node.capabilityRoles?.course && '项目目标', node.capabilityRoles?.bridge && '中间能力', result.model?.disconnectedCourseKnowledgeIds.includes(node.id) && '暂无当前能力入口'].filter(Boolean).join(' · ');
+  const roles = (node: NonNullable<typeof selected>) => control.editing && !(previewRoute??currentRoute)?.selectedNodeIds.includes(node.id) && !control.draft.includeNodeIds.includes(node.id) ? '候选能力 · 未纳入当前路线' : [node.capabilityRoles?.current && '已具备', node.capabilityRoles?.course && '项目目标', node.capabilityRoles?.bridge && '中间能力', result.model?.disconnectedCourseKnowledgeIds.includes(node.id) && '暂无当前能力入口'].filter(Boolean).join(' · ');
   const choose = (id: string) => {setEdgeId(null);onSelect(id);};
   const draftMark = (id: string) => !control.editing ? '' : control.draft.includeNodeIds.includes(id) ? ' · 加入' : control.draft.excludeNodeIds.includes(id) ? ' · 排除' : '';
   const planningNode=selected?{id:selected.id,title:selected.title,description:selected.description,state:selected.capabilityRoles?.current?'已具备':'未具备',role:roles(selected)}:undefined;
