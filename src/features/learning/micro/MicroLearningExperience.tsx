@@ -39,7 +39,7 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
   const path=useMemo(()=>repository.getPath(knowledgeId,{courseId,mode:"learn",pathId:requestedPathId}),[courseId,knowledgeId,repository,revision,requestedPathId]);
   const progress=path?repository.getPathProgress(path.id):undefined;
   const actionReady = !actionRunId || Boolean(actionProgress);
-  useEffect(()=>{if(path&&actionReady&&progress?.status!=="completed"&&progress?.status!=="in_progress"){setStartError(false);void repository.start(path.id,courseId).catch(()=>setStartError(true));}},[courseId,path,progress?.status,repository,actionReady]);
+  useEffect(()=>{if(path&&!actionRunId&&actionReady&&progress?.status!=="completed"&&progress?.status!=="in_progress"){setStartError(false);void repository.start(path.id,courseId).catch(()=>setStartError(true));}},[courseId,path,progress?.status,repository,actionReady,actionRunId]);
   useEffect(()=>{
     let active=true;
     setNavigationDecision(null);setNavigationError(false);
