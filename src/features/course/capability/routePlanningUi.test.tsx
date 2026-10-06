@@ -72,6 +72,14 @@ it('History renders every same-Edge Action and separates addition/removal/reorde
  expect(html).toContain('＋ Action：新增成果');expect(html).toContain('行动顺序变化');expect(spy).not.toHaveBeenCalled();spy.mockRestore();
 });
 
+it('unavailable historical choices remain explicitly removable and recommendation follows planner cost',()=>{
+ const option=(actionId:string,weight:number)=>({edgeId:'ab',actionId,title:actionId,type:'micro_learning' as const,estimatedMinutes:8,weight,planningAvailable:true,availableNow:true,reasons:[]});
+ const c={view:{activeVersion:version},editing:true,actionChoices:[{edgeId:'ab',actionId:'archived'}],selectedEdgeIds:['ab'],catalog:[option('expensive',65),option('preferred',23)],draft:{includeNodeIds:[],excludeNodeIds:[]}} as unknown as ReturnType<typeof useRoutePlanning>;
+ const html=renderToStaticMarkup(<RoutePlanningPanel control={c} edgeId="ab" title={id=>id} relations={[{id:'ab',source:'A',target:'B',relation:'enables',strength:.5,reason:'fact'}]}/>);
+ expect(html).toContain('所选行动已失效');expect(html).toContain('aria-label="移除行动 1"');
+ expect(html).toContain('preferred · 推荐');expect(html).not.toContain('expensive · 推荐');
+});
+
 it('Project branches mark all adopted Actions on the same factual Edge',async()=>{
  const {branchesForActions}=await import('@/features/actions/EdgeActionPanel');
  const alternatives=['a','b','c'].map(id=>({action:{id,edge_id:'ab',title:id},cost:{available:true,weight:1,reasons:[]}})) as unknown as Parameters<typeof branchesForActions>[0];

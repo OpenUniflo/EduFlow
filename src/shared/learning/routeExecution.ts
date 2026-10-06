@@ -8,6 +8,9 @@ export type RouteActionOption = RouteActionChoice & {
   title: string; type: 'micro_learning' | 'practice_task'; estimatedMinutes: number;
   assignmentId?: string; weight: number; planningAvailable: boolean; availableNow: boolean; reasons: string[]; requiredCapabilityIds?: string[];
 };
+export function compareRouteActionOptions(a: RouteActionOption, b: RouteActionOption): number {
+  return a.edgeId.localeCompare(b.edgeId) || Number(b.planningAvailable)-Number(a.planningAvailable) || Number(b.availableNow)-Number(a.availableNow) || a.weight-b.weight || a.actionId.localeCompare(b.actionId);
+}
 export type RouteExecutionIssueKind = 'action_required' | 'action_unavailable' | 'source_unreachable' | 'required_capability_missing' | 'hard_edge_required' | 'target_unreachable' | 'edge_not_in_route' | 'support_edge_required';
 export type RouteExecutionIssue = {
   kind: RouteExecutionIssueKind; edgeId?: string; actionId?: string; nodeId?: string;
@@ -48,8 +51,7 @@ export function planRouteExecution(input: {
     pairs.add(pair);
     choices.set(choice.edgeId,[...(choices.get(choice.edgeId)??[]),choice.actionId]);
   }
-  const options = input.options.filter(option => allEdges.some(edge => edge.id === option.edgeId)).sort((a,b) =>
-    a.edgeId.localeCompare(b.edgeId) || Number(b.planningAvailable)-Number(a.planningAvailable) || Number(b.availableNow)-Number(a.availableNow) || a.weight-b.weight || a.actionId.localeCompare(b.actionId));
+  const options = input.options.filter(option => allEdges.some(edge => edge.id === option.edgeId)).sort(compareRouteActionOptions);
   const pending: Array<{edge:CapabilityRelation;options:RouteActionOption[]}> = [];
   const assignments = new Set<string>();
   edges.forEach(edge => {
