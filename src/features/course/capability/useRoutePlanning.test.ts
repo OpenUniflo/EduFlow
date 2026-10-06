@@ -8,8 +8,9 @@ vi.mock('react', () => ({
   useCallback(fn: any, deps: any[]) { const i = host.index++; const old = host.slots[i]; if (!old || deps.some((d, j) => d !== old.deps[j])) host.slots[i] = { fn, deps }; return host.slots[i].fn; },
   useEffect(fn: any, deps: any[]) { const i = host.index++; const old = host.slots[i]; if (!old || deps.some((d, j) => d !== old.deps[j])) { host.effects.push(() => { old?.cleanup?.(); host.slots[i].cleanup = fn(); }); host.slots[i] = { deps }; } },
 }));
-vi.mock('@/shared/api/apiClient', () => ({ apiRequest: vi.fn(), ApiRequestError: class extends Error {} }));
-import { apiRequest } from '@/shared/api/apiClient';
+const requests=vi.hoisted(()=>({api:vi.fn()}));
+vi.mock('@/shared/api/apiClient', () => ({ apiRequest: (path:string,...args:unknown[])=>path.includes('view=catalog')?Promise.resolve({options:[]}):requests.api(path,...args), ApiRequestError: class extends Error {} }));
+const apiRequest=requests.api;
 import { useRoutePlanning } from './useRoutePlanning';
 const response = { activeVersion: { id: 'v1', snapshot: {}, constraints: { includeNodeIds: [], excludeNodeIds: [] } } };
 function render(key = 'one') { host.index = 0; const control = useRoutePlanning('course', true, key); host.effects.splice(0).forEach(effect => effect()); return control; }
@@ -43,7 +44,7 @@ it('Action-only edits create a Preview and Adopt sends its exact Edge/Action ref
   const step={edgeId:'ab',actionId:'old',sourceNodeId:'A',targetNodeId:'B',order:0};
   const initial={activeVersion:{id:'v1',snapshot:{executionSteps:[step]},constraints:{includeNodeIds:[],excludeNodeIds:[]}}};
   vi.mocked(apiRequest).mockResolvedValueOnce(initial);render();await flush();render().begin();
-  render().chooseAction('ab','new');expect(render().preview).toBeNull();expect(render().view?.activeVersion?.id).toBe('v1');
+  render().chooseAction('ab','old');render().chooseAction('ab','new');expect(render().preview).toBeNull();expect(render().view?.activeVersion?.id).toBe('v1');
   const execution={steps:[{...step,actionId:'new'}],options:[],issues:[],complete:true};
   vi.mocked(apiRequest).mockResolvedValueOnce({baseVersionId:'v1',previewState:'a'.repeat(64),plan:{valid:true,route:{},conflicts:[],execution}});
   await render().replan();
@@ -78,4 +79,26 @@ it('capability changes invalidate a complete Preview and prevent Adopt until rec
  vi.mocked(apiRequest).mockResolvedValueOnce({baseVersionId:'v1',previewState:'a'.repeat(64),plan:{valid:true,route:{},execution:{steps:[],options:[],issues:[],complete:true}}});await render().replan();
  vi.mocked(apiRequest).mockResolvedValueOnce(response);render('new-state');await flush();expect(render('new-state').stale).toBe(true);
  const count=vi.mocked(apiRequest).mock.calls.length;await render('new-state').adopt();expect(apiRequest).toHaveBeenCalledTimes(count);
+});
+
+it('multi-select preserves local order, toggles, moves and returns clean after undo',async()=>{
+ const step={edgeId:'ab',actionId:'a',sourceNodeId:'A',targetNodeId:'B',order:0};
+ requests.api.mockResolvedValueOnce({activeVersion:{id:'v1',snapshot:{executionSteps:[step]},constraints:{includeNodeIds:[],excludeNodeIds:[]}}});
+ render();await flush();render().begin();render().chooseAction('ab','b');render().chooseAction('cd','x');render().moveAction('ab','b',-1);
+ expect(render().actionChoices).toEqual([{edgeId:'ab',actionId:'b'},{edgeId:'ab',actionId:'a'},{edgeId:'cd',actionId:'x'}]);
+ expect(render().dirty).toBe(true);render().chooseAction('ab','b');render().chooseAction('cd','x');expect(render().dirty).toBe(false);
+ render().chooseAction('ab','a');expect(render().dirty).toBe(true);
+});
+it('normalizes Edge membership when the adopted snapshot contains multiple same-Edge Steps',async()=>{
+ const steps=['a','b'].map((actionId,order)=>({edgeId:'ab',actionId,sourceNodeId:'A',targetNodeId:'B',order}));
+ requests.api.mockResolvedValueOnce({activeVersion:{id:'v1',snapshot:{executionSteps:steps},constraints:{includeNodeIds:[],excludeNodeIds:[]}}});render();await flush();render().begin();
+ expect(render().selectedEdgeIds).toEqual(['ab']);expect(render().actionChoices.map(choice=>choice.actionId)).toEqual(['a','b']);
+});
+
+it('clearing the final Action stays empty through Preview and cannot Adopt',async()=>{
+ const step={edgeId:'ab',actionId:'a',sourceNodeId:'A',targetNodeId:'B',order:0};
+ requests.api.mockResolvedValueOnce({activeVersion:{id:'v1',snapshot:{executionSteps:[step]},constraints:{includeNodeIds:[],excludeNodeIds:[]}}});render();await flush();render().begin();render().chooseAction('ab','a');
+ requests.api.mockResolvedValueOnce({baseVersionId:'v1',previewState:'a'.repeat(64),plan:{valid:true,route:{},execution:{steps:[],options:[],complete:false,issues:[{kind:'action_required',edgeId:'ab',reason:'至少一个行动'}]}}});await render().replan();
+ expect(JSON.parse(requests.api.mock.calls[1][1]!.body as string).actionChoices).toEqual([]);expect(render().actionChoices).toEqual([]);
+ const count=requests.api.mock.calls.length;await render().adopt();expect(requests.api).toHaveBeenCalledTimes(count);
 });

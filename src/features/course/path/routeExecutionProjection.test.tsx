@@ -8,7 +8,7 @@ const steps=[{edgeId:'ab',actionId:'selected',sourceNodeId:'A',targetNodeId:'B',
 const action=(id:string,edge_id:string,type='micro_learning')=>({id,edge_id,title:id,estimated_minutes:8,status:'active',type}) as EdgeAction;
 const data:ActionData={actions:[action('cheaper','ab'),action('selected','ab'),action('practice','cb','practice_task')],runs:[],bindings:[],availableMicroActionIds:['selected'],availableActionIds:['selected','practice']};
 const view={activeVersion:{id:'v1',courseId:'course',snapshot:{valid:true,executionSteps:steps}},plan:{valid:true},execution:{complete:true,issues:[],options:steps.map(step=>({...step,planningAvailable:true,availableNow:true,reasons:[]}))}} as unknown as RoutePlanView;
-const run=(id:string,actionId:string,edgeId:string,status:ActionRun['status']):ActionRun=>({id,course_id:'course',action_id:actionId,edge_id:edgeId,status}) as ActionRun;
+const run=(id:string,actionId:string,edgeId:string,status:ActionRun['status']):ActionRun=>({id,execution_version:2,user_id:'u',course_id:'course',action_id:actionId,edge_id:edgeId,status}) as ActionRun;
 describe('Course formal sequential execution',()=>{
   it('uses exactly adopted choices even when cheaper alternatives are first',()=>{
     const model=routeExecutionProjection('course',view,data);

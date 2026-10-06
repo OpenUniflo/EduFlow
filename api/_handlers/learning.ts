@@ -1,3 +1,4 @@
+import { readActiveVersion } from '../_lib/routePlanning.js';
 import { isArtifactPracticeExecutor } from '../../src/shared/learning/practiceBoundary.js';
 import { isDeepStrictEqual } from "node:util";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
@@ -121,6 +122,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   }
   const { previous, eligibility } = await readAssignmentEligibility(client, user.id, body.courseId, body.assignmentId, actionRun ? {
     targetId: actionRun.execution_snapshot.targetId,
+    reachableNodeIds:actionRun.executionReachableNodeIds,
     status: actionRun.status === 'in_progress' ? 'started' : actionRun.status === 'completed' ? 'completed' : 'not_started',
   } : undefined, repeatAssignment ? 'started' : undefined);
   if (body.action === 'start-assignment' && actionRun?.status === 'completed') { json(response, 200, { status: 'completed' }); return; }
@@ -130,7 +132,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (!eligibility.canStart) throw new ApiError(409, "assignment_state_conflict", "This Assignment is submitted or complete; view its saved result instead");
     await activateCourse(client, user.id, body.courseId);
     if (actionRun) {
-      const started = await createServerSupabase().rpc('transition_edge_action_run_v2', { p_user_id: user.id, p_run_id: actionRun.id, p_operation: 'start' });
+      const started = await createServerSupabase().rpc('transition_route_action_v3', { p_user_id: user.id, p_run_id: actionRun.id, p_operation: 'start',p_expected_version_id:(await readActiveVersion(client,user.id,body.courseId))?.id??null });
       dataOrThrow(started.data, started.error, 'Start Assignment Action');
       // Starting execution is not capability evidence. Do not set practicing.
       json(response, 200, { status: 'started' }); return;

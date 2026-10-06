@@ -54,6 +54,7 @@ export function evaluateAction(action: EdgeAction, input: {
   microAvailable?: boolean;
   executionAvailable?: boolean;
   acquiredIds: ReadonlySet<string>;
+  routeExecutionReachableIds?: ReadonlySet<string>;
   binding?: CourseActionBinding;
 }): ActionCost {
   const reasons: ActionReason[] = [
@@ -67,12 +68,12 @@ export function evaluateAction(action: EdgeAction, input: {
   if (action.status !== 'active') block('archived', '行动模板已归档');
   if (input.binding && (input.binding.action_id !== action.id || !input.binding.available)) block('binding_unavailable', '项目资源绑定不可用');
   for (const id of [...new Set(action.required_capability_ids)].sort()) {
-    if (!input.acquiredIds.has(id)) block('missing_capability', `尚未具备执行条件：${id}`);
+    if (!input.acquiredIds.has(id) && !input.routeExecutionReachableIds?.has(id)) block('missing_capability', `尚未具备执行条件：${id}`);
   }
   for (const key of [...new Set(action.resource_requirements)].sort()) {
     if (!input.binding?.resources.some(resource => resource.key === key && resource.available && resource.reference.trim())) block('missing_resource', `缺少可用资源：${key}`);
   }
-  if (!input.acquiredIds.has(input.sourceId)) block('source_unacquired', '需要先形成起点能力，才能开始这条关系上的行动');
+  if (!input.acquiredIds.has(input.sourceId) && !input.routeExecutionReachableIds?.has(input.sourceId)) block('source_unacquired', '需要先形成起点能力，才能开始这条关系上的行动');
   return { available, weight: reasons.reduce((sum, reason) => sum + reason.cost, 0), reasons };
 }
 
@@ -89,10 +90,10 @@ export function projectEdgeActions(edgeIds: ReadonlySet<string>, actions: readon
     .sort((a, b) => a.action.id.localeCompare(b.action.id));
 }
 
-export type ActionData = { actions: EdgeAction[]; bindings: CourseActionBinding[]; runs: ActionRun[]; availableMicroActionIds: string[]; availableActionIds: string[]; continuableRunIds?: string[] };
+export type ActionData = { actions: EdgeAction[]; bindings: CourseActionBinding[]; runs: ActionRun[]; availableMicroActionIds: string[]; availableActionIds: string[]; routeExecutionReachableNodeIds?:string[]; continuableRunIds?: string[] };
 export function actionAlternatives(courseId: string, edge: { id: string; source: string } | undefined, data: ActionData, acquiredIds: ReadonlySet<string>) {
   return rankActions(projectEdgeActions(new Set(edge ? [edge.id] : []), data.actions, data.bindings, courseId).map(item => ({ ...item,
     run: data.runs.find(run => run.action_id === item.action.id && run.status !== 'cancelled'),
-    cost: evaluateAction(item.action, { sourceId: edge!.source, acquiredIds, binding: item.binding, microAvailable: data.availableMicroActionIds.includes(item.action.id), executionAvailable: data.availableActionIds.includes(item.action.id) }),
+    cost: evaluateAction(item.action, { sourceId: edge!.source, acquiredIds, routeExecutionReachableIds:new Set(data.routeExecutionReachableNodeIds??[]), binding: item.binding, microAvailable: data.availableMicroActionIds.includes(item.action.id), executionAvailable: data.availableActionIds.includes(item.action.id) }),
   })));
 }

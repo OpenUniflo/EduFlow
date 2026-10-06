@@ -89,6 +89,6 @@ export function EdgeActionPanel({ alternatives, title, control, courseId, focuse
     </section>; })}
   </aside>;
 }
-export function branchesForActions(alternatives: ReturnType<typeof actionAlternatives>,selectedActionId?:string): ActionBranch[] {
-  return alternatives.map(({ action, cost, run }) => ({ id: action.id, edgeId: action.edge_id, title: action.title, status: run && run.status !== 'cancelled' ? run.status : action.id===selectedActionId?'selected':!cost.available ? 'unavailable' : 'candidate' }));
+export function branchesForActions(alternatives: ReturnType<typeof actionAlternatives>,selectedActionIds?:readonly string[]): ActionBranch[] {
+  return alternatives.map(({ action, cost, run }) => ({ id: action.id, edgeId: action.edge_id, title: action.title, status: run && run.status !== 'cancelled' ? run.status : selectedActionIds?.includes(action.id)?'selected':!cost.available ? 'unavailable' : 'candidate' }));
 }

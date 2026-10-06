@@ -184,3 +184,13 @@
  .route-structure-tools { max-width:none; }.route-bottom-bar { min-height:112px; }.route-edge-inspector { bottom:144px; }
 }
 @media(prefers-reduced-motion:reduce) { .planning-selection { transition:none; }.route-history-snapshot,.route-node-inspector { animation:none; } }
+
+/* Details expand above a stationary action bar; graph/outer scroll remain untouched. */
+.project-editing-overview { top:var(--project-top-control-band); left:50%; right:auto; transform:translateX(-50%); width:min(520px,calc(100% - 720px)); min-width:280px; box-sizing:border-box; }
+.route-action-order ol { padding-left:22px; }.route-action-order li { display:flex; align-items:center; gap:6px; margin:8px 0; }.route-action-order li span { flex:1; }.route-action-order button { min-width:32px; min-height:32px; }
+.route-change-details { position:absolute; z-index:7; left:24px; right:24px; bottom:112px; max-height:32dvh; overflow:auto; padding:14px 18px; border-radius:16px; box-sizing:border-box; overscroll-behavior:contain; }
+.route-change-details header { display:flex; justify-content:space-between; align-items:center; }.route-change-details ul { padding-left:20px; }.route-change-details li { margin:8px 0; }.route-change-details button { color:inherit; }
+.route-bottom-bar>div:first-child>button { margin-right:10px; }
+@media(max-width:760px) { .project-editing-overview { top:calc(var(--project-top-control-band) + 92px); width:calc(100% - 24px); min-width:0; }.route-change-details { left:12px; right:12px; bottom:136px; max-height:30dvh; } }
+
+@media(min-width:761px) and (max-width:900px) { .project-editing-overview { top:calc(var(--project-top-control-band) + 92px); width:calc(100% - 32px); min-width:0; } }

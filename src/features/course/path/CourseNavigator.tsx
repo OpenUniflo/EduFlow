@@ -28,7 +28,7 @@ export function CourseNavigator({ graph, runtime, knowledge, courseState, authen
   routeControl: ReturnType<typeof useRoutePlanning>;
   graph: CourseGraphData; runtime: CourseRuntimeData; knowledge: UserKnowledgeRecord[]; courseState?: UserCourseState;
   showPolicy?: boolean; authenticated: boolean; loadNavigation(courseId: string): Promise<NavigationDecision>;
-  onSelect(id: string, edgeId?: string): void;
+  onSelect(id: string, edgeId?: string, actionId?:string): void;
   onSignIn(): void; onInspectCapabilities?(nodeId?: string): void; learningContent: NavigatorLearningContent[];
   resolveLearningContent?(nodeId: string, pathId: string): NavigatorLearningContent | undefined;
 }) {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiRequest, ApiRequestError } from '@/shared/api/apiClient';
-import type { RouteExecutionPlan } from '@/shared/learning/routeExecution';
+import type { RouteExecutionPlan, RouteActionOption } from '@/shared/learning/routeExecution';
+import { routeDiff } from '@/shared/learning/routeDiff';
 import type { RouteConstraints, RoutePlan } from '@/shared/learning/routePlanning';
 import type { ExecutionRoutePlan, RoutePlanView, RouteVersion } from '@/shared/learning/routeVersion';
 const empty = (): RouteConstraints => ({ includeNodeIds: [], excludeNodeIds: [] });
@@ -18,6 +19,7 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
   const [baseVersionId, setBaseVersionId] = useState<string | null>(null);
   const [preview, setPreview] = useState<ExecutionRoutePlan | null>(null);
   const [proposal,setProposal] = useState<ExecutionRoutePlan | null>(null);
+  const explicitChoices=useRef(false);
   const [actionChoices,setActionChoices] = useState<Array<{edgeId:string;actionId:string}>>([]);
   const [selectedEdgeIds,setSelectedEdgeIds] = useState<string[] | undefined>();
   const [scopeMode,setScopeMode] = useState<'current'|'replan'>('replan');
@@ -26,6 +28,13 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
   const [dismissPending,setDismissPending]=useState(false);
   const dismissAction=useRef<(()=>void)|undefined>(undefined); const stayAction=useRef<(()=>void)|undefined>(undefined);
   const baseline=useRef<{draft:RouteConstraints;choices:Array<{edgeId:string;actionId:string}>;edges?:string[]}|undefined>(undefined);
+  const [catalog,setCatalog]=useState<RouteActionOption[]>([]);
+  useEffect(()=>{
+    if(!authenticated||!editing)return;
+    let live=true;
+    void apiRequest<{options:RouteActionOption[]}>(`${path}&view=catalog`).then(result=>{if(live)setCatalog(result.options);}).catch(error=>{if(live)setError(error instanceof Error?error.message:'行动读取失败');});
+    return ()=>{live=false;};
+  },[authenticated,editing,path,knowledgeKey]);
   const [history, setHistory] = useState<RouteVersion[] | null>(null);
   const [historyActionTitles,setHistoryActionTitles]=useState<Record<string,string>>({});
   const [historyInspection,setHistoryInspection]=useState<{versionId:string;execution:RouteExecutionPlan}|null>(null);
@@ -65,12 +74,12 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
   const post = <T,>(body: unknown) => apiRequest<T>(path, { method: 'POST', body: JSON.stringify(body) });
   const begin = () => {
     if (!view?.activeVersion || busy) return;
-    draftRevision.current++;setStale(false);setPreviewState(undefined);
-    baseline.current={draft:view.activeVersion.constraints,choices:(view.activeVersion.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})),edges:view.activeVersion.snapshot.executionSteps?.map(step=>step.edgeId)};
+    draftRevision.current++;setStale(false);setPreviewState(undefined);explicitChoices.current=view.activeVersion.snapshot.executionSteps!==undefined;
+    baseline.current={draft:view.activeVersion.constraints,choices:(view.activeVersion.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})),edges:view.activeVersion.snapshot.executionSteps ? [...new Set(view.activeVersion.snapshot.executionSteps.map(step=>step.edgeId))] : undefined};
     setDraft({ includeNodeIds: [...view.activeVersion.constraints.includeNodeIds], excludeNodeIds: [...view.activeVersion.constraints.excludeNodeIds] });
     setActionChoices((view.activeVersion.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})));
     setScopeMode(view.activeVersion.snapshot.executionSteps===undefined?'replan':'current');
-    setSelectedEdgeIds(view.activeVersion.snapshot.executionSteps?.map(step=>step.edgeId));setProposal(null);
+    setSelectedEdgeIds(view.activeVersion.snapshot.executionSteps ? [...new Set(view.activeVersion.snapshot.executionSteps.map(step=>step.edgeId))] : undefined);setProposal(null);
     setBaseVersionId(view.activeVersion.id); setPreview(null); setEditing(true); setHistorical(null); setError('');
   };
   const mark = (id: string, action = tool) => {
@@ -88,13 +97,13 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
   const accept = (versionId?: string) => run(async () => {
     if (versionId ? !view?.activeVersion || versionId===view.activeVersion.id : !baseVersionId || stale || !previewState || !preview?.valid || !preview.execution?.complete) return;
     await post(versionId ? { action: 'restore', versionId, baseVersionId: view!.activeVersion!.id }
-      : { action: 'adopt', baseVersionId,previewState, ...draft,scopeMode, actionChoices:preview!.execution!.steps.map(({edgeId,actionId})=>({edgeId,actionId})),selectedEdgeIds:preview!.execution!.steps.map(step=>step.edgeId) });
+      : { action: 'adopt', baseVersionId,previewState, ...draft,scopeMode, actionChoices:preview!.execution!.steps.map(({edgeId,actionId})=>({edgeId,actionId})),selectedEdgeIds:[...new Set(preview!.execution!.steps.map(step=>step.edgeId))] });
     setEditing(false); setPreview(null); setHistorical(null);
     await load(); if (history) await refreshHistory();
   });
   const symmetric=(a:readonly string[],b:readonly string[])=>new Set([...a.filter(id=>!b.includes(id)),...b.filter(id=>!a.includes(id))]).size;
   const changeCount=baseline.current?symmetric(draft.includeNodeIds,baseline.current.draft.includeNodeIds)+symmetric(draft.excludeNodeIds,baseline.current.draft.excludeNodeIds)
-    +actionChoices.filter(choice=>baseline.current!.choices.find(old=>old.edgeId===choice.edgeId)?.actionId!==choice.actionId).length
+    +(()=>{const steps=(choices:typeof actionChoices)=>choices.map((choice,order)=>({...choice,sourceNodeId:'',targetNodeId:'',order}));const diff=routeDiff({selectedNodeIds:[],executionSteps:steps(baseline.current!.choices)},{selectedNodeIds:[],executionSteps:steps(actionChoices)});return diff.addedActions.length+diff.removedActions.length+diff.reorderedEdgeIds.length;})()
     +(selectedEdgeIds?symmetric(selectedEdgeIds,baseline.current.edges??[]):0):0;
   const dirty=editing&&changeCount>0;
   const discard=()=>{draftRevision.current++;setEditing(false);setPreview(null);setProposal(null);setPreviewState(undefined);setError('');setStale(false);};
@@ -102,41 +111,43 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
   return {
     view, busy, error, editing, tool,dirty,changeCount,stale,dismissPending,requestDismiss,leave:(action:()=>void)=>requestDismiss(()=>{discard();action();}),
     keepEditing:()=>{setDismissPending(false);stayAction.current?.();dismissAction.current=undefined;stayAction.current=undefined;},
-    discardDraft:()=>{const action=dismissAction.current;setDismissPending(false);discard();dismissAction.current=undefined;stayAction.current=undefined;action?.();}, draft, preview, proposal, actionChoices, selectedEdgeIds, history, historical, historyInspection, inspectingHistory, historyActionTitles, begin, mark, setTool, setHistorical,
+    discardDraft:()=>{const action=dismissAction.current;setDismissPending(false);discard();dismissAction.current=undefined;stayAction.current=undefined;action?.();}, draft, preview, proposal, catalog, actionChoices, selectedEdgeIds, history, historical, historyInspection, inspectingHistory, historyActionTitles, begin, mark, setTool, setHistorical,
     removeNodeConstraint: (id:string) => {if(busy)return;draftRevision.current++;setPreview(null);setScopeMode('replan');setDraft(previous=>({includeNodeIds:previous.includeNodeIds.filter(value=>value!==id),excludeNodeIds:previous.excludeNodeIds.filter(value=>value!==id)}));},
     undoNode: (id:string) => { if(busy)return;draftRevision.current++;setPreview(null);setScopeMode('replan');setDraft(previous=>({includeNodeIds:[...previous.includeNodeIds.filter(value=>value!==id),...(baseline.current?.draft.includeNodeIds.includes(id)?[id]:[])].sort(),excludeNodeIds:[...previous.excludeNodeIds.filter(value=>value!==id),...(baseline.current?.draft.excludeNodeIds.includes(id)?[id]:[])].sort()})); },
-    replanHistorical: (version:RouteVersion) => { if(busy||!view?.activeVersion)return;begin();setDraft({includeNodeIds:[...new Set([...version.constraints.includeNodeIds,...version.snapshot.selectedNodeIds])].filter(id=>!version.constraints.excludeNodeIds.includes(id)),excludeNodeIds:[...version.constraints.excludeNodeIds]});setScopeMode('replan');setSelectedEdgeIds(version.snapshot.executionSteps?.map(step=>step.edgeId));setActionChoices((version.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})));setHistory(null);setHistorical(null); },
-    chooseAction: (edgeId:string,actionId:string) => { if(busy)return; draftRevision.current++;setPreview(null);setActionChoices(previous=>[...previous.filter(choice=>choice.edgeId!==edgeId),{edgeId,actionId}]); },
-    chooseEdge: (edgeId:string,selected:boolean) => { if(busy)return;draftRevision.current++;setPreview(null);setSelectedEdgeIds(previous=>{const ids=previous??view?.activeVersion?.snapshot.executionSteps?.map(step=>step.edgeId)??[];return selected?[...new Set([...ids,edgeId])]:ids.filter(id=>id!==edgeId);}); },
+    replanHistorical: (version:RouteVersion) => { if(busy||!view?.activeVersion)return;begin();explicitChoices.current=version.snapshot.executionSteps!==undefined;setDraft({includeNodeIds:[...new Set([...version.constraints.includeNodeIds,...version.snapshot.selectedNodeIds])].filter(id=>!version.constraints.excludeNodeIds.includes(id)),excludeNodeIds:[...version.constraints.excludeNodeIds]});setScopeMode('replan');setSelectedEdgeIds(version.snapshot.executionSteps ? [...new Set(version.snapshot.executionSteps.map(step=>step.edgeId))] : undefined);setActionChoices((version.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})));setHistory(null);setHistorical(null); },
+    chooseAction: (edgeId:string,actionId:string) => { if(busy)return;explicitChoices.current=true; draftRevision.current++;setPreview(null);setActionChoices(previous=>previous.some(choice=>choice.edgeId===edgeId&&choice.actionId===actionId)?previous.filter(choice=>choice.edgeId!==edgeId||choice.actionId!==actionId):[...previous,{edgeId,actionId}]); },
+    moveAction: (edgeId:string,actionId:string,direction:-1|1) => {if(busy)return;draftRevision.current++;setPreview(null);setActionChoices(previous=>{const indices=previous.flatMap((choice,index)=>choice.edgeId===edgeId?[index]:[]);const local=indices.findIndex(index=>previous[index].actionId===actionId);const next=local+direction;if(local<0||next<0||next>=indices.length)return previous;const result=[...previous];[result[indices[local]],result[indices[next]]]=[result[indices[next]],result[indices[local]]];return result;});},
+    chooseEdge: (edgeId:string,selected:boolean) => { if(busy)return;explicitChoices.current=true;draftRevision.current++;setPreview(null);setSelectedEdgeIds(previous=>{const ids=previous??view?.activeVersion?.snapshot.executionSteps?.map(step=>step.edgeId)??[];return selected?[...new Set([...ids,edgeId])]:ids.filter(id=>id!==edgeId);}); },
     cancel:()=>requestDismiss(discard),
-    clear: () => { draftRevision.current++; setDraft(empty());setScopeMode('replan');setActionChoices([]);setSelectedEdgeIds(undefined);setProposal(null);setPreview(null); },
+    clear: () => { explicitChoices.current=false;draftRevision.current++; setDraft(empty());setScopeMode('replan');setActionChoices([]);setSelectedEdgeIds(undefined);setProposal(null);setPreview(null); },
     continueEditing: () => { draftRevision.current++; setPreview(null); },
     reload:()=>requestDismiss(()=>void run(async()=>{await load();discard();})),
     showHistory:()=>requestDismiss(()=>{discard();void run(refreshHistory);}),
     previewImpact: () => run(async () => {
       if (!view?.activeVersion || busy) return;
       const version=view.activeVersion; const constraints={includeNodeIds:[...version.constraints.includeNodeIds],excludeNodeIds:[...version.constraints.excludeNodeIds]};
-      baseline.current={draft:version.constraints,choices:(version.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})),edges:version.snapshot.executionSteps?.map(step=>step.edgeId)};
+      baseline.current={draft:version.constraints,choices:(version.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})),edges:version.snapshot.executionSteps ? [...new Set(version.snapshot.executionSteps.map(step=>step.edgeId))] : undefined};
       const revision=++draftRevision.current;
-      setDraft(constraints);setBaseVersionId(version.id);setScopeMode('replan');setActionChoices((version.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})));setSelectedEdgeIds(version.snapshot.executionSteps?.map(step=>step.edgeId));setHistorical(null);setEditing(true);
-      const result=await post<{plan:ExecutionRoutePlan;baseVersionId:string|null;previewState:string}>({action:'preview',...constraints,scopeMode:'replan',actionChoices:version.snapshot.executionSteps?.map(({edgeId,actionId})=>({edgeId,actionId})),selectedEdgeIds:version.snapshot.executionSteps?.map(step=>step.edgeId)});
+      setDraft(constraints);setBaseVersionId(version.id);setScopeMode('replan');setActionChoices((version.snapshot.executionSteps??[]).map(({edgeId,actionId})=>({edgeId,actionId})));setSelectedEdgeIds(version.snapshot.executionSteps ? [...new Set(version.snapshot.executionSteps.map(step=>step.edgeId))] : undefined);setHistorical(null);setEditing(true);
+      const result=await post<{plan:ExecutionRoutePlan;baseVersionId:string|null;previewState:string}>({action:'preview',...constraints,scopeMode:'replan',actionChoices:version.snapshot.executionSteps?.map(({edgeId,actionId})=>({edgeId,actionId})),selectedEdgeIds:version.snapshot.executionSteps ? [...new Set(version.snapshot.executionSteps.map(step=>step.edgeId))] : undefined});
       if(revision!==draftRevision.current)return;
       if(result.baseVersionId!==version.id)throw new Error('正式路线已变化，请重新载入后查看建议。');
       setPreviewState(result.previewState);setStale(false);setPreview(result.plan);setProposal(result.plan);
-      if(result.plan.execution){setActionChoices(result.plan.execution.steps.map(({edgeId,actionId})=>({edgeId,actionId})));if(result.plan.execution.complete)setSelectedEdgeIds(result.plan.execution.steps.map(step=>step.edgeId));}
+      if(result.plan.execution){setActionChoices(result.plan.execution.steps.map(({edgeId,actionId})=>({edgeId,actionId})));if(result.plan.execution.complete)setSelectedEdgeIds([...new Set(result.plan.execution.steps.map(step=>step.edgeId))]);}
     }),
     closeHistory: () => { setHistory(null); setHistorical(null); },
     replan: () => run(async () => {
       const revision = draftRevision.current;
       if(stale){const latest=await load();setBaseVersionId(latest.activeVersion?.id??null);}
-      const result = await post<{ plan: ExecutionRoutePlan; baseVersionId: string | null;previewState:string }>({ action: 'preview', ...draft,scopeMode,actionChoices,selectedEdgeIds });
+      const result = await post<{ plan: ExecutionRoutePlan; baseVersionId: string | null;previewState:string }>({ action: 'preview', ...draft,scopeMode,actionChoices:explicitChoices.current?actionChoices:undefined,selectedEdgeIds });
       if (revision !== draftRevision.current) return;
       if (!stale && result.baseVersionId !== baseVersionId) throw new Error('路线已在其他页面更新，请重新载入当前路线后再调整。');
       setPreviewState(result.previewState);setStale(false);setPreview(result.plan);setProposal(result.plan);
       if(result.plan.valid && result.plan.execution) {
         // Suggestions are draft decisions only, never adopted by this response.
-        setActionChoices(previous=>{const resolved=new Map(previous.map(choice=>[choice.edgeId,choice]));for(const step of result.plan.execution!.steps)resolved.set(step.edgeId,{edgeId:step.edgeId,actionId:step.actionId});return [...resolved.values()];});
-        if(result.plan.execution.complete)setSelectedEdgeIds(result.plan.execution.steps.map(step=>step.edgeId));
+        if(!explicitChoices.current)setActionChoices(result.plan.execution.steps.map(({edgeId,actionId})=>({edgeId,actionId})));
+        explicitChoices.current=true;
+        if(result.plan.execution.complete)setSelectedEdgeIds([...new Set(result.plan.execution.steps.map(step=>step.edgeId))]);
       }
     }),
     adopt: () => accept(), restore: (versionId: string) => accept(versionId),

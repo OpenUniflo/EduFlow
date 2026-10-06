@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const mocks = vi.hoisted(() => ({ user: vi.fn(), server: vi.fn(), actionRun: vi.fn() }));
 vi.mock('../_lib/supabase.js', () => ({ createUserSupabase: mocks.user, createServerSupabase: mocks.server }));
 vi.mock('../_lib/edgeActionRuns.js', () => ({ requireAssignmentActionRun: mocks.actionRun }));
+vi.mock('../_lib/routePlanning.js',()=>({readActiveVersion:vi.fn(async()=>({id:'version'}))}));
 import handler from './learning';
 type Row = Record<string, unknown>;
 let tables: Record<string,Row[]>; let writes: string[];
@@ -82,10 +83,18 @@ describe('Assignment API guard before all mutations', () => {
     const rpc = vi.fn(async () => ({ data: { id: 'run', status: 'in_progress' }, error: null }));
     mocks.server.mockReturnValue({ from: query, rpc });
     expect((await call('start-assignment', { actionRunId: 'run' })).status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith('transition_edge_action_run_v2', { p_user_id: 'learner', p_run_id: 'run', p_operation: 'start' });
+    expect(rpc).toHaveBeenCalledWith('transition_route_action_v3', { p_user_id: 'learner', p_run_id: 'run', p_operation: 'start',p_expected_version_id:'version' });
     expect(writes).not.toContain('user_knowledge_states');
     expect(writes).not.toContain('user_assignment_states');
     expect(tables.user_assignment_states[0].status).toBe('accepted');
+  });
+  it('uses verified execution reachability for additional Assignment coverage without writing UKS',async()=>{
+    tables.assignment_coverages.push({course_id:'course',assignment_id:'task',node_id:'B'});
+    tables.knowledge_nodes=[{id:'node',status:'active'},{id:'B',status:'active'}];tables.user_knowledge_states=[];
+    mocks.actionRun.mockResolvedValue({id:'run',status:'in_progress',execution_snapshot:{targetId:'node'},executionReachableNodeIds:['B']});
+    mocks.server.mockReturnValue({from:query,rpc:vi.fn(async()=>({data:{id:'run'},error:null}))});
+    expect((await call('start-assignment',{actionRunId:'run'})).status).toBe(200);
+    expect(tables.user_knowledge_states).toEqual([]);expect(writes).not.toContain('user_knowledge_states');
   });
   it('does not waive other covered Knowledge readiness for an Action target', async () => {
     tables.assignment_coverages.push({ course_id: 'course', assignment_id: 'task', node_id: 'other' });

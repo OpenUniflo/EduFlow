@@ -54,3 +54,32 @@ it('current inspector contains only the selected factual Edge alternatives',()=>
  expect(html).toContain('本关系成果');expect(html).not.toContain('其他关系成果');expect(html).toContain('路线调整操作区');expect(html).toContain('退出路线调整');
  const empty=renderToStaticMarkup(<RoutePlanningPanel control={c} relations={facts} title={id=>id}/>);expect(empty).not.toContain('本关系成果');expect(empty).toContain('点击能力查看详情');
 });
+
+it('renders multiple checked Actions with ordered controls before Preview and keeps out-of-scope hard facts optional',()=>{
+ const steps=['a','b'].map((actionId,order)=>({edgeId:'ab',actionId,sourceNodeId:'A',targetNodeId:'B',order}));
+ const catalog=steps.map(step=>({...step,title:step.actionId,type:'micro_learning' as const,estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:false,reasons:[]}));
+ const c={view:{activeVersion:version,plan:{valid:true,route:version.snapshot}},editing:true,actionChoices:steps,selectedEdgeIds:['ab'],catalog,draft:{includeNodeIds:[],excludeNodeIds:[]}} as unknown as ReturnType<typeof useRoutePlanning>;
+ const html=renderToStaticMarkup(<RoutePlanningPanel control={c} edgeId="ab" title={id=>id} relations={[{id:'ab',source:'A',target:'B',relation:'prerequisite',strength:'hard',reason:'fact'}]}/>);
+ expect(html).not.toContain('type="radio"');expect(html).toContain('已选执行顺序');expect(html).toContain('上移行动 2');expect(html).toContain('下移行动 1');
+ expect(html).not.toContain('必须保留');expect(html).toContain('纳入执行路线');expect(html).toContain('查看详情');
+});
+it('History renders every same-Edge Action and separates addition/removal/reorder',()=>{
+ const steps=['a','b'].map((actionId,order)=>({edgeId:'ab',actionId,sourceNodeId:'A',targetNodeId:'B',order}));
+ const current={...version,snapshot:{...version.snapshot,executionSteps:steps}};
+ const next={...version,id:'v2',snapshot:{...version.snapshot,executionSteps:[steps[1],steps[0],{...steps[0],actionId:'c',order:2}]}};
+ const spy=vi.spyOn(console,'error').mockImplementation(()=>{});
+ const html=renderToStaticMarkup(<HistoricalRoute version={next} current={current} actionTitles={{a:'甲行动',b:'乙行动',c:'新增成果'}}/>);
+ expect(html).toContain('＋ Action：新增成果');expect(html).toContain('行动顺序变化');expect(spy).not.toHaveBeenCalled();spy.mockRestore();
+});
+
+it('Project branches mark all adopted Actions on the same factual Edge',async()=>{
+ const {branchesForActions}=await import('@/features/actions/EdgeActionPanel');
+ const alternatives=['a','b','c'].map(id=>({action:{id,edge_id:'ab',title:id},cost:{available:true,weight:1,reasons:[]}})) as unknown as Parameters<typeof branchesForActions>[0];
+ expect(branchesForActions(alternatives,['b','a']).map(branch=>branch.status)).toEqual(['selected','selected','candidate']);
+});
+
+it('invalid structural Preview counts unresolved conflicts and exposes their locator',()=>{
+ const c={view:{activeVersion:version},editing:true,actionChoices:[],draft:{includeNodeIds:[],excludeNodeIds:['A']},preview:{valid:false,route:null,conflicts:[{kind:'excluded_hard_prerequisite',nodeId:'A',rootNodeId:'B',rootKind:'target',constraint:'exclude'}]}} as unknown as ReturnType<typeof useRoutePlanning>;
+ const html=renderToStaticMarkup(<RoutePlanningPanel control={c} title={id=>id}/>);
+ expect(html).toContain('待处理 1');expect(html).toContain('定位能力');expect(html).toContain('展开详情');
+});

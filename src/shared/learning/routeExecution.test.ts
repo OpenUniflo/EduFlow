@@ -21,7 +21,7 @@ describe('formal execution Route references',()=>{
   });
   it('Action-only choices change Steps without changing Knowledge topology or membership',()=>{
     const before=planRouteExecution({route,facts,options});
-    const after=planRouteExecution({route,facts,options,choices:[{edgeId:'ab',actionId:'ab-practice'}]});
+    const after=planRouteExecution({route,facts,options,choices:[{edgeId:'ab',actionId:'ab-practice'},{edgeId:'cb',actionId:'cb-micro'},{edgeId:'bd',actionId:'bd-micro'}]});
     expect(after.steps[0].actionId).toBe('ab-practice');expect(after.steps.map(s=>s.edgeId)).toEqual(before.steps.map(s=>s.edgeId));
     expect(route.selectedNodeIds).toEqual(['A','B','C','D']);
   });
@@ -129,4 +129,48 @@ it('exact history scope rejects changed prerequisite semantics before offering r
  expect(isExecutionScopeValid(snapshot,route.selectedNodeIds,facts.map(edge=>edge.relation==='prerequisite'&&edge.id==='ab'?{...edge,strength:'soft' as const}:edge))).toBe(false);
  expect(isExecutionScopeValid({...snapshot,valid:false},route.selectedNodeIds,facts)).toBe(false);
  expect(isExecutionScopeValid(snapshot,['A','C','D'],facts)).toBe(false);
+});
+
+describe('ordered multi-action groups and execution progress',()=>{
+ it.each([1,2,5])('supports %i Actions per Edge with stable local order',count=>{
+  const actions=Array.from({length:count},(_,i)=>option('ab',`action-${i}`));
+  const choices=[...actions].reverse().map(({edgeId,actionId})=>({edgeId,actionId}));
+  const result=planRouteExecution({route,facts,options:[...actions,...options],choices:[...choices,{edgeId:'cb',actionId:'cb-micro'},{edgeId:'bd',actionId:'bd-micro'}]});
+  expect(result.complete).toBe(true);
+  expect(result.steps.slice(0,count).map(s=>s.actionId)).toEqual(choices.map(s=>s.actionId));
+  expect(result.steps.map(s=>s.order)).toEqual(result.steps.map((_,i)=>i));
+  expect(inspectRouteExecution({...route,executionSteps:result.steps},facts,[...actions,...options]).complete).toBe(true);
+ });
+ it('rejects duplicate Edge/Action choices and interleaved immutable groups',()=>{
+  const choice={edgeId:'ab',actionId:'ab-micro'};
+  expect(planRouteExecution({route,facts,options,choices:[choice,choice]}).complete).toBe(false);
+  const result=planRouteExecution({route,facts,options,choices:[choice,{edgeId:'ab',actionId:'ab-practice'},{edgeId:'cb',actionId:'cb-micro'},{edgeId:'bd',actionId:'bd-micro'}]});
+  const steps=[result.steps[0],result.steps[2],result.steps[1],result.steps[3]].map((s,order)=>({...s,order}));
+  expect(inspectRouteExecution({...route,executionSteps:steps},facts,options).complete).toBe(false);
+ });
+ it('reaches targets only after every selected incoming Edge group completes; never writes UKS',async()=>{
+  const {routeExecutionProgress}=await import('./routeExecution');
+  const steps=planRouteExecution({route,facts,options,choices:[{edgeId:'ab',actionId:'ab-micro'},{edgeId:'ab',actionId:'ab-practice'},{edgeId:'cb',actionId:'cb-micro'},{edgeId:'bd',actionId:'bd-micro'}]}).steps;
+  const uks=['A','C'];
+  const run=(index:number)=>({user_id:'u',course_id:'c',edge_id:steps[index].edgeId,action_id:steps[index].actionId,status:'completed',execution_version:2});
+  const progress=(runs:ReturnType<typeof run>[])=>routeExecutionProgress({userId:'u',courseId:'c',steps,runs,acquiredNodeIds:uks});
+  expect(progress([run(0)]).currentStep?.actionId).toBe('ab-practice');
+  expect(progress([run(0)]).completedEdgeIds).not.toContain('ab');
+  expect(progress([run(0),run(1)]).reachableNodeIds).not.toContain('B');
+  expect(progress([run(0),run(1),run(2)]).reachableNodeIds).toContain('B');
+  expect(progress([run(0),run(1),run(2)]).currentStep?.edgeId).toBe('bd');
+  expect(uks).toEqual(['A','C']);
+  expect(progress([{...run(0),user_id:'other'}]).currentIndex).toBe(0);
+  expect(progress([{...run(0),execution_version:1}]).currentIndex).toBe(1);
+  expect(progress([run(0),{...run(0),status:'in_progress'}]).currentIndex).toBe(1);
+ });
+});
+
+it('explicitly empty selections never regain defaults; untouched planning may recommend',()=>{
+ const selected={...route,selectedNodeIds:['A','B'],orderedNodeIds:['A','B'],currentKnowledgeIds:['A'],effectiveTargetNodeIds:['B'],prerequisiteEdges:[facts[0]] as SelectedRoute['prerequisiteEdges']};
+ const input={route:selected,facts:[facts[0]],options:[option('ab','removed')],selectedEdgeIds:['ab']};
+ expect(planRouteExecution({...input,choices:[]}).steps).toEqual([]);
+ expect(planRouteExecution({...input,choices:[]}).issues).toContainEqual(expect.objectContaining({kind:'action_required',edgeId:'ab'}));
+ expect(planRouteExecution({...input,choices:[]}).complete).toBe(false);
+ expect(planRouteExecution(input).complete).toBe(true);
 });

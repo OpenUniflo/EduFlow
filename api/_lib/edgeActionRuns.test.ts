@@ -97,7 +97,8 @@ describe('explicit Action execution authority', () => {
   it('rejects a different Action on the same formal Edge and preserves the chosen reference',async()=>{
     mocks.version.mockResolvedValue({id:'version',constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{valid:true,executionSteps:[{edgeId:'edge',actionId:'other-action',sourceNodeId:'source',targetNodeId:'target',order:0}]}});
     await expect(requireActionExecution(client,'learner','course','action')).rejects.toMatchObject({code:'action_not_selected_in_route'});
-    // A real retained execution remains independent of a changed future plan.
+    // A real completed execution may repeat independently of future choices.
+    tables.edge_action_runs=[{user_id:'learner',course_id:'course',action_id:'action',edge_id:'edge',status:'completed',execution_version:1}];
     expect((await requireActionExecution(client,'learner','course','action','edge')).microPathId).toBe('second-path');
   });
   it('keeps adopted steps executable after UKS prunes the dynamically replanned graph',async()=>{
@@ -106,4 +107,19 @@ describe('explicit Action execution authority', () => {
     expect((await requireActionExecution(client,'learner','course','action')).routeVersionId).toBe('version');
   });
 
+});
+
+it('server blocks later same-Edge Actions and reaches the next Edge without a UKS write',async()=>{
+ const steps=[{edgeId:'edge',actionId:'first',sourceNodeId:'source',targetNodeId:'target',order:0},{edgeId:'edge',actionId:'action',sourceNodeId:'source',targetNodeId:'target',order:1},{edgeId:'next',actionId:'next-action',sourceNodeId:'target',targetNodeId:'other',order:2}];
+ mocks.version.mockResolvedValue({id:'version',constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{valid:true,executionSteps:steps}});
+ await expect(requireActionExecution(client,'learner','course','action')).rejects.toMatchObject({code:'route_step_not_current'});
+ tables.edge_action_runs=[{user_id:'learner',course_id:'course',edge_id:'edge',action_id:'first',execution_version:2,status:'completed'}];
+ expect((await requireActionExecution(client,'learner','course','action')).routeVersionId).toBe('version');
+ tables.edge_action_runs.push({user_id:'learner',course_id:'course',edge_id:'edge',action_id:'action',execution_version:2,status:'completed'});
+ input.prerequisiteEdges=[...input.prerequisiteEdges,{id:'next',source:'target',target:'other',strength:'hard'}];
+ tables.knowledge_edge_actions.push({...tables.knowledge_edge_actions[0],id:'next-action',edge_id:'next'});
+ tables.course_action_bindings.push({...tables.course_action_bindings[0],id:'next-binding',action_id:'next-action',micro_path_id:'next-path'});
+ tables.micro_learning_paths.push({id:'next-path',course_id:'course',knowledge_id:'other',mode:'learn',status:'published'});
+ expect((await requireActionExecution(client,'learner','course','next-action')).microPathId).toBe('next-path');
+ expect(input.currentNodeIds).toEqual(['source']);expect(tables.user_knowledge_states).toBeUndefined();
 });

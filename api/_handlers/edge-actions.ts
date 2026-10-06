@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { readActiveVersion, readRouteInput, defaultConstraints } from '../_lib/routePlanning.js';
 import { projectAncestorNodeIds, planCourseRoute } from '../../src/shared/learning/routePlanning.js';
 import { routeRelations } from '../../src/shared/learning/routePresentation.js';
-import { executionRelations } from '../../src/shared/learning/routeExecution.js';
+import { executionRelations, routeExecutionProgress } from '../../src/shared/learning/routeExecution.js';
 import { hasUnmetHardPrerequisite } from '../../src/shared/learning/teachingPrerequisites.js';
 import { createServerSupabase, createUserSupabase } from '../_lib/supabase.js';
 import { ApiError, handleApi, json, methodNotAllowed } from '../_lib/http.js';
@@ -50,13 +50,15 @@ export default handleApi(async (request, response) => {
       availableMicroPaths(client, courseId),
       allRows(client.from('course_assignments').select('id,mode,experience').eq('course_id', courseId).order('id'), 'Action Assignment executors'),
     ]);
-    const acquired = new Set(routeData.input.currentNodeIds);
+    const progress=version?.snapshot.executionSteps ? routeExecutionProgress({userId:user.id,courseId,steps:version.snapshot.executionSteps,runs:runs as import('../../src/shared/learning/routeExecution.js').ExecutionRunReference[],acquiredNodeIds:routeData.input.currentNodeIds}) : null;
+    const acquired = new Set(progress?.reachableNodeIds??routeData.input.currentNodeIds);
+    const currentAction=(id:string)=>!progress || progress.currentStep?.actionId===id;
     const completedActions = new Set(runs.filter(run => run.status === 'completed').map(run => run.action_id));
     const availableMicroActionIds = actions.filter(action => {
       const edge = edges.find(edge => edge.id === action.edge_id);
       const target = edge?.target ?? '';
       const binding = bindings.find(binding => binding.action_id === action.id);
-      return Boolean(action.type === 'micro_learning' && binding?.available && version && edge && !version.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && plan.valid && (routeEdgeIds.has(edge.id) && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target))
+      return Boolean(action.type === 'micro_learning' && currentAction(String(action.id)) && binding?.available && version && edge && !version.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && plan.valid && (routeEdgeIds.has(edge.id) && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target))
         && !hasUnmetHardPrerequisite(target, acquired, routeData.input.prerequisiteEdges)
         && microPaths.some(path => path.id === binding.micro_path_id && path.knowledge_id === target));
     }).map(action => action.id);
@@ -65,8 +67,8 @@ export default handleApi(async (request, response) => {
       const edge = edges.find(edge => edge.id === action.edge_id);
       const assignment = assignments.find(assignment => assignment.id === binding?.assignment_id);
       const scopeAvailable = edge && !version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && (completedActions.has(action.id) || routeEdgeIds.has(edge.id) && plan.valid && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(edge.target));
-      if (!edge || !version || !scopeAvailable || !isArtifactPracticeExecutor(assignment) || !binding?.available || !binding.assignment_id || binding.micro_path_id || hasUnmetHardPrerequisite(edge.target, acquired, routeData.input.prerequisiteEdges)) return null;
-      const { coverage, eligibility } = await readAssignmentEligibility(client, user.id, courseId, String(binding.assignment_id), { targetId: edge.target, status: 'not_started' });
+      if (!currentAction(String(action.id)) || !edge || !version || !scopeAvailable || !isArtifactPracticeExecutor(assignment) || !binding?.available || !binding.assignment_id || binding.micro_path_id || hasUnmetHardPrerequisite(edge.target, acquired, routeData.input.prerequisiteEdges)) return null;
+      const { coverage, eligibility } = await readAssignmentEligibility(client, user.id, courseId, String(binding.assignment_id), { targetId: edge.target, status: 'not_started', reachableNodeIds:[...acquired] });
       return !eligibility.reason && coverage.some(row => row.node_id === edge.target) ? action.id : null;
     }));
     const continuableRunIds = (await Promise.all(runs.filter(run => run.execution_version === 2 && ['selected', 'in_progress'].includes(String(run.status))).map(async run => {
@@ -80,7 +82,7 @@ export default handleApi(async (request, response) => {
         throw error;
       }
     }))).filter((id): id is string => id !== null);
-    json(response, 200, { actions, bindings, runs, continuableRunIds, availableMicroActionIds, availableActionIds: [...availableMicroActionIds, ...availablePractice.filter(Boolean)] }); return;
+    json(response, 200, { actions, bindings, runs, routeExecutionReachableNodeIds:progress?.reachableNodeIds, continuableRunIds, availableMicroActionIds, availableActionIds: [...availableMicroActionIds, ...availablePractice.filter(Boolean)] }); return;
   }
   if (request.method !== 'POST') return methodNotAllowed(response, ['GET', 'POST']);
   const parsed = bodySchema.safeParse(request.body);

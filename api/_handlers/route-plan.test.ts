@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), course: vi.fn(), input: vi.fn(), active: vi.fn(), read: vi.fn(), persist: vi.fn(), current: vi.fn(),options:vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), course: vi.fn(), input: vi.fn(), active: vi.fn(), read: vi.fn(), persist: vi.fn(), current: vi.fn(),options:vi.fn(),runs:vi.fn() }));
 vi.mock('../_lib/supabase.js', () => ({ createUserSupabase: mocks.auth }));
 vi.mock('../_lib/courseMembership.js', () => ({ requirePublishedCourse: mocks.course }));
-vi.mock('../_lib/routeExecution.js',()=>({readRouteActionOptions:mocks.options}));
+vi.mock('../_lib/routeExecution.js',()=>({readRouteActionOptions:mocks.options,readOwnedRouteRuns:mocks.runs}));
 vi.mock('../_lib/routePlanning.js', () => ({ readRouteInput: mocks.input, readActiveVersion: mocks.active, readVersion: mocks.read, persistRoute: mocks.persist, currentRoute: mocks.current, mapRouteVersion: (r: unknown) => r }));
 import handler from './route-plan';
 const base = '11111111-1111-4111-8111-111111111111';
@@ -21,7 +21,7 @@ async function invoke(body?: Record<string, unknown>) {
   return { status, result };
 }
 beforeEach(() => {
-  vi.resetAllMocks(); mocks.auth.mockResolvedValue({ client: 'authenticated-client', user: { id: 'learner' } }); mocks.course.mockResolvedValue({});
+  vi.resetAllMocks(); mocks.runs.mockResolvedValue([]); mocks.auth.mockResolvedValue({ client: 'authenticated-client', user: { id: 'learner' } }); mocks.course.mockResolvedValue({});
   mocks.input.mockResolvedValue(structuredClone(data)); mocks.active.mockResolvedValue({ id: base });
   mocks.persist.mockResolvedValue({ id: 'new' }); mocks.read.mockResolvedValue({ constraints: { includeNodeIds: ['S'], excludeNodeIds: [] } });
   mocks.options.mockResolvedValue([{edgeId:'A>T',actionId:base,title:'Micro',type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:false,reasons:['source not acquired']},{edgeId:'A>T',actionId:old,title:'Practice',type:'practice_task',estimatedMinutes:20,weight:20,planningAvailable:true,availableNow:false,reasons:[]}]);
@@ -176,11 +176,26 @@ it('rejects restoring the currently active version without writing history',asyn
  expect(result.status).toBe(409);expect(result.result.error.code).toBe('route_version_current');expect(mocks.persist).not.toHaveBeenCalled();
 });
 
-it('Action-only retained scope automatically includes a new live hard prerequisite',async()=>{
+it('new live hard prerequisite is mandatory but its Action still requires explicit selection',async()=>{
  const snapshot={...historicalSnapshot(),selectedNodeIds:['A','S','T'],orderedNodeIds:['A','S','T']};
  mocks.active.mockResolvedValue({id:base,constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot});
  mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A','S'],prerequisiteEdges:[data.input.prerequisiteEdges[0],{id:'S>T',source:'S',target:'T',strength:'hard'}]}});
  const options=[{edgeId:'A>T',actionId:old,title:'A action',type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[]},{edgeId:'S>T',actionId:base,title:'S action',type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[]}];mocks.options.mockResolvedValue(options);
  const result=await invoke({action:'preview',scopeMode:'current',includeNodeIds:[],excludeNodeIds:[],selectedEdgeIds:['A>T'],actionChoices:[{edgeId:'A>T',actionId:old}]});
- expect(result.status).toBe(200);expect(result.result.plan.execution.complete).toBe(true);expect(result.result.plan.execution.steps.map((step:any)=>step.edgeId)).toEqual(['A>T','S>T']);expect(snapshot.prerequisiteEdges).toHaveLength(1);
+ expect(result.status).toBe(200);expect(result.result.plan.execution.complete).toBe(false);expect(result.result.plan.execution.issues).toContainEqual(expect.objectContaining({kind:'action_required',edgeId:'S>T'}));expect(result.result.plan.execution.steps.map((step:any)=>step.edgeId)).toEqual(['A>T']);expect(snapshot.prerequisiteEdges).toHaveLength(1);
+});
+
+it('adopts ordered multiple Actions on one Edge exactly once',async()=>{
+ mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A']}});
+ const result=await invoke({action:'adopt',baseVersionId:base,includeNodeIds:[],excludeNodeIds:[],actionChoices:[{edgeId:'A>T',actionId:old},{edgeId:'A>T',actionId:base}],selectedEdgeIds:['A>T']});
+ expect(result.status).toBe(200);expect(mocks.persist).toHaveBeenCalledTimes(1);
+ expect(mocks.persist.mock.calls[0][9].map((step:any)=>[step.edgeId,step.actionId,step.order])).toEqual([['A>T',old,0],['A>T',base,1]]);
+});
+it('rejects duplicate selections and removal of an active Action before adoption',async()=>{
+ mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A']}});
+ const intent={action:'adopt',baseVersionId:base,includeNodeIds:[],excludeNodeIds:[],selectedEdgeIds:['A>T']};
+ expect((await invoke({...intent,actionChoices:[{edgeId:'A>T',actionId:base},{edgeId:'A>T',actionId:base}]})).status).toBe(422);
+ mocks.runs.mockResolvedValue([{user_id:'learner',course_id:'course',edge_id:'A>T',action_id:old,status:'in_progress'}]);
+ expect((await invoke({...intent,actionChoices:[{edgeId:'A>T',actionId:base}]})).result.error.code).toBe('route_active_run_conflict');
+ expect(mocks.persist).not.toHaveBeenCalled();
 });

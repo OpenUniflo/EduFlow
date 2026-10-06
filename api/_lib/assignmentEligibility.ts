@@ -3,7 +3,7 @@ import { assignmentEligibility } from '../../src/shared/learning/assignmentEligi
 import { dataOrThrow } from './query.js';
 
 type Row = Record<string, unknown>;
-export async function readAssignmentEligibility(client: SupabaseClient, userId: string, courseId: string, assignmentId: string, actionContext?: { targetId: string; status: string }, statusOverride?: string) {
+export async function readAssignmentEligibility(client: SupabaseClient, userId: string, courseId: string, assignmentId: string, actionContext?: { targetId: string; status: string; reachableNodeIds?:readonly string[] }, statusOverride?: string) {
   const [coverageResult, dependencyResult, stateResult] = await Promise.all([
     client.from('assignment_coverages').select('node_id').eq('course_id', courseId).eq('assignment_id', assignmentId),
     client.from('assignment_dependencies').select('source_assignment_id').eq('course_id', courseId).eq('target_assignment_id', assignmentId).eq('strength', 'hard'),
@@ -27,7 +27,7 @@ export async function readAssignmentEligibility(client: SupabaseClient, userId: 
     published: true, coverageValid: ids.every(id => nodes.some(row => (actionContext ? row.id : row.node_id) === id)),
     // Only the verified edge target is being formed by this practice. Other coverage
     // and AssignmentDependency requirements keep the ordinary Assignment rules.
-    knowledgeStatuses: ids.map(id => actionContext?.targetId === id ? 'learned' : knowledge.find(row => row.node_id === id)?.status as string | undefined),
+    knowledgeStatuses: ids.map(id => actionContext?.targetId === id || actionContext?.reachableNodeIds?.includes(id) ? 'learned' : knowledge.find(row => row.node_id === id)?.status as string | undefined),
     hardDependencyStatuses: dependencyIds.map(id => states.find(row => row.assignment_id === id)?.status as string | undefined),
     status: statusOverride ?? actionContext?.status ?? previous?.status as string | undefined,
   }) };
