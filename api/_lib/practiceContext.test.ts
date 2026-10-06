@@ -27,3 +27,15 @@ it('rejects foreign attempts and forged formal source lineage',async()=>{
 it.each(['passed','pending','failed'])('preserves %s as separate evidence context without assigning capabilities',async outcome=>{
  const context=await readPracticeContext(client({...rows,performance_results:[{...rows.performance_results[0],outcome}]}),'owner','attempt');expect(context.performanceResult.outcome).toBe(outcome);
 });
+it('resolves owned Node Practice evidence without inventing or querying an Edge',async()=>{
+ const tables={...rows,edge_action_runs:[{...rows.edge_action_runs[0],edge_id:null,node_id:'target'}],knowledge_edge_actions:[{...rows.knowledge_edge_actions[0],edge_id:null,node_id:'target'}]};
+ const before=JSON.stringify(tables);const owned=client(tables),from=owned.from.bind(owned);owned.from=((table:string)=>{if(table==='knowledge_edges')throw new Error('Node context must not query an Edge');return from(table);}) as typeof owned.from;
+ const context=await readPracticeContext(owned,'owner','attempt');
+ expect(context).toMatchObject({knowledgeIds:['target'],action:{node_id:'target',edge_id:null},edge:null,actionRun:{id:'run'}});
+ expect(JSON.stringify(tables)).toBe(before);
+ expect(await practiceContextsForSource(client(tables),'owner',{id:'attempt',provenance:{kind:'assignment-response',attemptId:'attempt',courseId:'course',assignmentId:'task'}})).toHaveLength(1);
+});
+it.each(['different-node','missing-coverage','mixed-scope'])('rejects invalid Node Practice %s lineage',async reason=>{
+ const tables={...rows,edge_action_runs:[{...rows.edge_action_runs[0],edge_id:null,node_id:'target'}],knowledge_edge_actions:[{...rows.knowledge_edge_actions[0],edge_id:reason==='mixed-scope'?'edge':null,node_id:reason==='different-node'?'other':'target'}],assignment_coverages:reason==='missing-coverage'?[]:rows.assignment_coverages};
+ await expect(readPracticeContext(client(tables),'owner','attempt')).rejects.toMatchObject({status:409});
+});

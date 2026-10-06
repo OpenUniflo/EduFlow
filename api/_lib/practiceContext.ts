@@ -12,7 +12,7 @@ export async function readPracticeContext(client: SupabaseClient, userId: string
   const [task, evaluated, runResult, coverage] = await Promise.all([
     client.from('course_assignments').select('id,title,description,requirements,expected_output,acceptance_criteria,experience').eq('course_id', attempt.course_id).eq('id', attempt.assignment_id).maybeSingle(),
     client.from('performance_results').select('id,version,outcome,score,feedback,evaluator_kind,evaluated_at').eq('attempt_id', attempt.id).eq('user_id', userId).order('version', { ascending: false }).limit(1).maybeSingle(),
-    attempt.action_run_id ? client.from('edge_action_runs').select('id,action_id,edge_id,course_id,assignment_id,status,execution_snapshot').eq('id', attempt.action_run_id).eq('user_id', userId).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    attempt.action_run_id ? client.from('edge_action_runs').select('id,action_id,edge_id,node_id,course_id,assignment_id,status,execution_snapshot').eq('id', attempt.action_run_id).eq('user_id', userId).maybeSingle() : Promise.resolve({ data: null, error: null }),
     allRows(client.from('assignment_coverages').select('node_id').eq('course_id',attempt.course_id).eq('assignment_id',attempt.assignment_id).order('node_id'), 'Practice coverage'),
   ]);
   const assignment = dataOrThrow(task.data, task.error, 'Practice Assignment') as Row | null;
@@ -22,11 +22,13 @@ export async function readPracticeContext(client: SupabaseClient, userId: string
   let action = null, edge = null;
   if (run) {
     const [a, e] = await Promise.all([
-      client.from('knowledge_edge_actions').select('id,edge_id,title,type,description,expected_evidence').eq('id', run.action_id).maybeSingle(),
-      client.from('knowledge_edges').select('id,source_node_id,target_node_id,relation,prerequisite_strength,reason').eq('id', run.edge_id).maybeSingle(),
+      client.from('knowledge_edge_actions').select('id,edge_id,node_id,title,type,description,expected_evidence').eq('id', run.action_id).maybeSingle(),
+      run.edge_id ? client.from('knowledge_edges').select('id,source_node_id,target_node_id,relation,prerequisite_strength,reason').eq('id', run.edge_id).maybeSingle() : Promise.resolve({data:null,error:null}),
     ]);
     action = dataOrThrow(a.data,a.error,'Practice Action'); edge = dataOrThrow(e.data,e.error,'Practice factual Edge');
-    if (!action || !edge || action.edge_id !== edge.id) throw new ApiError(409, 'practice_context_incomplete', '实践行动与真实关系无法核验。');
+    const nodeScope=Boolean(run.node_id)&&!run.edge_id&&action?.node_id===run.node_id&&!action.edge_id&&coverage.some(row=>row.node_id===run.node_id);
+    const edgeScope=Boolean(run.edge_id)&&!run.node_id&&Boolean(edge)&&action?.edge_id===edge?.id&&!action?.node_id;
+    if (!action || action.type!=='practice_task' || (!nodeScope&&!edgeScope)) throw new ApiError(409, 'practice_context_incomplete', '实践行动与真实能力或关系无法核验。');
   }
   return { courseId: attempt.course_id, assignment: { id: assignment.id, title: assignment.title, scenario: assignment.description, requirements: assignment.requirements, expectedOutput: assignment.expected_output, acceptanceCriteria: assignment.acceptance_criteria, experience: assignment.experience }, knowledgeIds: coverage.map(row=>String(row.node_id)), attempt: { id: attempt.id, number: attempt.attempt_number, submittedAt: attempt.submitted_at, response: attempt.response }, performanceResult: result, actionRun: run ? { id: run.id, status: run.status, executionSnapshot: run.execution_snapshot } : null, action, edge };
 }
