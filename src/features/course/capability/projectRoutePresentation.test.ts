@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { projectStructuralGraph, projectRouteOverlay } from './projectRoutePresentation';
+import { projectCapabilityGraph, projectRouteOverlay } from './projectRoutePresentation';
 import { buildProjectCapabilityModel, projectCapabilityAtlas } from './projectCapability';
 import { routeOnlyKnowledgeGraph, routeOnlyRuntime } from '../runtime/courseFoundation.fixture';
 import type { KnowledgeGraph, KnowledgeEdge } from '@/features/knowledge/types';
@@ -10,12 +10,13 @@ const target = 'route-knowledge';
 const prerequisite = (source: string, target: string): KnowledgeEdge => ({ id: `${source}>${target}`, source, target, relation: 'prerequisite', strength: 'hard', reason: 'Factual test relation' });
 const input: KnowledgeGraph = {
   nodes: ['root', 'bridge', target, 'other', 'inactive'].map(id => ({ ...routeOnlyKnowledgeGraph.nodes[0], id, status: id === 'inactive' ? 'deprecated' : 'active' })),
-  edges: [prerequisite('root', 'bridge'), prerequisite('bridge', target), prerequisite('inactive', target),
+  edges: [prerequisite('root', 'bridge'), prerequisite('bridge', target), { ...prerequisite('inactive', target), relation:'prerequisite', strength:'soft' },
     { ...prerequisite('root', target), relation: 'enables', strength: .8 },
     { ...prerequisite('bridge', 'root'), relation: 'enables', strength: .8 },
     { ...prerequisite('other', target), relation: 'related', strength: .8 }], revisions: [],
 };
 const route = (ids: string[], edges: SelectedRoute['prerequisiteEdges'] = []): SelectedRoute => ({ selectedNodeIds: ids, orderedNodeIds: [...ids].reverse(), prerequisiteEdges: edges, effectiveTargetNodeIds: [target], currentKnowledgeIds: [], bridgeKnowledgeIds: [] });
+const projectStructuralGraph = (graph: KnowledgeGraph, targets: string[]) => projectCapabilityGraph(graph, buildProjectCapabilityModel(graph, { ...routeOnlyRuntime, curriculumCoverages: targets.map((nodeId, order) => ({...routeOnlyRuntime.curriculumCoverages[0],nodeId,order})) }, [{nodeId:'root',status:'learned'}]));
 const governance = { domains: [], assignments: [], candidates: [], proposals: [], revision: 1 };
 
 describe('Project stable structure and route overlays', () => {
@@ -27,17 +28,16 @@ describe('Project stable structure and route overlays', () => {
     expect(projectStructuralGraph({ ...input, nodes: [...input.nodes].reverse(), edges: [...input.edges].reverse() }, [target])).toEqual(graph);
   });
 
-  it('preserves force identity after acquiring the target prunes candidate ancestors', () => {
+  it('changes force structure only when formal acquisition changes the model', () => {
     const supportedInput = { ...input, edges: input.edges.filter(edge => edge.source !== 'inactive') };
-    const structural = projectStructuralGraph(supportedInput, [target]);
     const initial = [{ nodeId: 'root', status: 'learned' as const }];
     const beforeModel = buildProjectCapabilityModel(supportedInput, routeOnlyRuntime, initial);
     const state = [...initial, { nodeId: target, status: 'learned' as const }];
     const afterModel = buildProjectCapabilityModel(supportedInput, routeOnlyRuntime, state);
     expect(beforeModel.orderedNodeIds).not.toEqual(afterModel.orderedNodeIds);
-    const before = projectCapabilityAtlas(input, beforeModel, governance, initial, structural);
-    const after = projectCapabilityAtlas(input, afterModel, governance, state, structural);
-    expect(atlasStructureKey(before.nodes, before.edges, 'project')).toBe(atlasStructureKey(after.nodes, after.edges, 'project'));
+    const before = projectCapabilityAtlas(input, beforeModel, governance, initial);
+    const after = projectCapabilityAtlas(input, afterModel, governance, state);
+    expect(atlasStructureKey(before.nodes, before.edges, 'project')).not.toBe(atlasStructureKey(after.nodes, after.edges, 'project'));
     expect(after.nodes.find(node => node.id === target)?.color).toBe('#3b82f6');
   });
 

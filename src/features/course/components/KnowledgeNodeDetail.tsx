@@ -1,4 +1,4 @@
-import type { RouteExecutionStep } from '@/shared/learning/routeExecution';
+import { isNodeScope, type RouteExecutionStep } from '@/shared/learning/routeExecution';
 import { EduFlowAssistant } from '@/features/assistant/components/EduFlowAssistant';
 import type { AssistantContext } from '@/features/assistant/assistantContext';
 import { ActionRunHistory } from '@/features/actions/ActionRunHistory';
@@ -31,11 +31,15 @@ export function KnowledgeNodeDetail({ node, courseNode, runtime, graph, knowledg
   const incoming = scopedRelations.filter(edge => edge.target === node.id);
   const runs = actions.runs.filter(run => run.execution_snapshot.sourceId === node.id || run.execution_snapshot.targetId === node.id);
   const activeEdge = outgoing.find(edge => edge.id === expandedEdge);
-  const activeAction = activeEdge ? actions.actions.find(action => action.id === focusedAction && action.edge_id === activeEdge.id) : undefined;
+  const nodeChoices=routeSteps?.filter(step=>isNodeScope(step)&&step.nodeId===node.id)??[];
+  const nodeAlternatives=actionAlternatives(runtime.course.id,{nodeId:node.id},actions,acquired);
+  const formalNodeAlternatives=context==='personal-route'?nodeChoices.flatMap(step=>nodeAlternatives.filter(item=>item.action.id===step.actionId)):nodeAlternatives;
+  const activeAction = !activeEdge ? actions.actions.find(action=>action.id===focusedAction&&action.node_id===node.id) : activeEdge ? actions.actions.find(action => action.id === focusedAction && action.edge_id === activeEdge.id) : undefined;
   return <div className="knowledge-node-detail" data-context={context}>
     {assistantIdentity ? <EduFlowAssistant context={{...assistantIdentity, workspace:'courses', experienceMode:'learn', presentation:context, courseId:runtime.course.id, knowledgeId:node.id, edgeId:activeEdge?.id, actionId:activeAction?.id, ...(context === 'personal-route' ? {routeVersionId} : {})}} contextLabel={activeEdge ? `${node.title} → ${title(activeEdge.target)}` : node.title} drawerOpen /> : null}
     <section className="atlas-drawer-section"><h3>当前能力</h3><strong>{knowledgeStateLabel[current?.status ?? 'explore']}</strong><p>{node.description}</p>{node.masteryCriteria.length ? <details><summary>能力要求</summary><ul>{node.masteryCriteria.map(item => <li key={item}>{item}</li>)}</ul></details> : null}</section>
     {learningPath && context!=='personal-route' ? <section className="atlas-drawer-section"><h3>已有学习内容</h3><p>{learningPath.title}</p><Link className="atlas-secondary" to={`/learn/micro/${encodeURIComponent(node.id)}?courseId=${encodeURIComponent(runtime.course.id)}&pathId=${encodeURIComponent(learningPath.id)}`}>打开这份学习内容</Link><small>学习前置条件仍由正式路线核验。</small></section> : null}
+    {(context==='personal-route'?nodeChoices.length:!relations.some(edge=>edge.target===node.id)&&nodeAlternatives.length)?<section className="atlas-drawer-section"><h3>根能力行动</h3><EdgeActionPanel embedded formalChoice={context==='personal-route'} routeVersionId={routeVersionId} planningOnly={context!=='personal-route'} onAdjust={onAdjustRoute} alternatives={formalNodeAlternatives} title={node.title} control={actions} courseId={runtime.course.id} focusedId={focusedAction} onFocus={setFocusedAction}/></section>:null}
     <section className="atlas-drawer-section"><h3>{context === 'personal-route' ? '沿当前路线继续' : '从这里出发'}</h3>
       {!outgoing.length ? <p>当前范围没有从此能力出发的关系。</p> : outgoing.map(edge => {
         const chosen=routeSteps?.filter(step=>step.edgeId===edge.id).map(step=>step.actionId)??[];

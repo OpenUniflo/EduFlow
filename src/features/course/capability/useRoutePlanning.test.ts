@@ -85,7 +85,7 @@ it('multi-select preserves local order, toggles, moves and returns clean after u
  const step={edgeId:'ab',actionId:'a',sourceNodeId:'A',targetNodeId:'B',order:0};
  requests.api.mockResolvedValueOnce({activeVersion:{id:'v1',snapshot:{executionSteps:[step]},constraints:{includeNodeIds:[],excludeNodeIds:[]}}});
  render();await flush();render().begin();render().chooseAction('ab','b');render().chooseAction('cd','x');render().moveAction('ab','b',-1);
- expect(render().actionChoices).toEqual([{edgeId:'ab',actionId:'b'},{edgeId:'ab',actionId:'a'},{edgeId:'cd',actionId:'x'}]);
+ expect(render().actionChoices).toEqual([{edgeId:'ab',actionId:'b'},{scope:'edge',edgeId:'ab',actionId:'a'},{edgeId:'cd',actionId:'x'}]);
  expect(render().dirty).toBe(true);render().chooseAction('ab','b');render().chooseAction('cd','x');expect(render().dirty).toBe(false);
  render().chooseAction('ab','a');expect(render().dirty).toBe(true);
 });

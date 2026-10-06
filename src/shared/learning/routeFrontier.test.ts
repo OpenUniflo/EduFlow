@@ -12,7 +12,7 @@ const steps: RouteExecutionStep[] = ['ab','ab','cb','bd','ae'].map((edgeId,order
   const edge=facts.find(edge=>edge.id===edgeId)!;
   return {edgeId,actionId:`action-${order}`,sourceNodeId:edge.source,targetNodeId:edge.target,order};
 });
-const run=(index:number):ExecutionRunReference=>({user_id:'u',course_id:'c',edge_id:steps[index].edgeId,action_id:steps[index].actionId,status:'completed'});
+const run=(index:number):ExecutionRunReference=>({user_id:'u',course_id:'c',edge_id:steps[index].edgeId??null,action_id:steps[index].actionId,status:'completed'});
 const progress=(runs:ExecutionRunReference[]=[],acquiredNodeIds=['A','C'])=>routeExecutionProgress({userId:'u',courseId:'c',steps,runs,acquiredNodeIds,facts});
 describe('dependency-driven execution frontier',()=>{
   it('makes independent first Actions and parallel hard incoming Actions available',()=>{

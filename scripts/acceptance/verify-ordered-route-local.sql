@@ -41,7 +41,7 @@ begin
  if not('A02'=any(route_execution_reachable_nodes(u,c))) then raise exception 'Completed Edge group must reach target without UKS';end if;
  r:=select_route_action_v3(u,c,a3,gen_random_uuid(),(select updated_at from knowledge_edge_actions where id=a3),(select updated_at from course_action_bindings where id=b3),v);
  r:=transition_route_action_v3(u,r.id,'start',v);
- perform pg_temp.expect_route_rejection(format('select adopt_personal_course_route(%L,%L,%L,''adjust'',''{}'',''{}'',%L::jsonb,''test'')',u,c,v,jsonb_build_object('valid',true,'executionSteps',steps-2)));
+ perform pg_temp.expect_route_rejection(format('select adopt_personal_course_route(%L,%L,%L,''adjustment'',''{}'',''{}'',%L::jsonb,''test'')',u,c,v,jsonb_build_object('valid',true,'executionSteps',steps-2)));
  select coalesce(jsonb_agg(to_jsonb(s) order by s.node_id),'[]') into after_uks from user_knowledge_states s where user_id=u;
  if after_uks is distinct from before_uks then raise exception 'UKS changed during Action execution';end if;
  raise notice 'PASS: current gate, legacy future start/submit rejection, pending/failed completion, all-actions reachability, active conflict, byte-equivalent UKS';

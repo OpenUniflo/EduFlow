@@ -1,4 +1,4 @@
-/** Pure V2 planning. Adapters supply authenticated visible identities and facts. */
+/** Pure capability model and Personal Route planning. Adapters supply authenticated visible identities and facts. */
 export type RoutePrerequisite = { id: string; source: string; target: string; strength: 'hard' | 'soft' };
 export type CapabilityEnable = { id: string; source: string; target: string; relation: 'enables'; strength: number };
 export type CapabilityRelation = (RoutePrerequisite & { relation: 'prerequisite' }) | CapabilityEnable;
@@ -110,9 +110,10 @@ function capability(data: ReturnType<typeof prepare>, enables: readonly Capabili
     incoming.get(edge.target)!.push(edge); outgoing.get(edge.source)?.push(edge);
     if (edge.relation === 'prerequisite' && edge.strength === 'hard') hardRemaining.set(edge.target, hardRemaining.get(edge.target)! + 1);
   }
-  // Least fixed point over actual acquired boundaries. Enables cycles are valid;
-  // they cannot bootstrap themselves or bypass even one unsupported hard parent.
-  const supported = new Set(current); const frontier = [...current];
+  // Legitimate no-incoming roots can begin through Node Actions. Acquisition
+  // supplies additional boundaries; cycles cannot bootstrap without either entry.
+  const roots = [...ids].filter(id => incoming.get(id)!.length === 0);
+  const supported = new Set([...current, ...roots]); const frontier = [...supported];
   for (let i = 0; i < frontier.length; i++) for (const edge of outgoing.get(frontier[i])!) {
     if (edge.relation === 'prerequisite' && edge.strength === 'hard') hardRemaining.set(edge.target, hardRemaining.get(edge.target)! - 1);
     if (!supported.has(edge.target) && hardRemaining.get(edge.target) === 0) {
@@ -167,13 +168,6 @@ export function planCourseRoute(input: RoutePlanningInput, constraints: RouteCon
   const model = capability(data, input.enablesEdges);
   const candidates = new Set(model.orderedNodeIds);
   const includes = unique(constraints.includeNodeIds); const excludes = new Set(constraints.excludeNodeIds);
-  // Personal recommendations may prune context behind acquired boundaries.
-  // Explicit planning can still include active factual project ancestors;
-  // unrelated nodes and unavailable identities remain outside the route.
-  if (includes.some(id => !candidates.has(id))) {
-    const ancestors = new Set(projectAncestorNodeIds([...data.ids], model.courseKnowledgeIds, [...data.edges, ...(input.enablesEdges ?? [])]));
-    for (const id of includes) if (data.ids.has(id) && ancestors.has(id)) candidates.add(id);
-  }
 
   const conflicts: RouteConflict[] = [];
   for (const id of includes) {

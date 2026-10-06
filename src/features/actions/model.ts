@@ -1,7 +1,6 @@
-/** Global templates attach to factual edges; courses supply resources, never template copies. */
-export type EdgeAction = {
+/** Global templates attach to one real Node or Edge; courses bind executors. */
+export type CapabilityAction = ({edge_id:string;node_id?:null}|{edge_id:null;node_id:string}) & {
   id: string;
-  edge_id: string;
   type: 'micro_learning' | 'practice_task';
   title: string;
   description: string;
@@ -13,6 +12,8 @@ export type EdgeAction = {
   status: 'active' | 'archived';
   provenance: Record<string, unknown>;
 };
+/** Compatibility name for existing consumers and persisted table names. */
+export type EdgeAction = CapabilityAction;
 export type CourseActionBinding = {
   id: string;
   course_id: string;
@@ -32,8 +33,9 @@ export type ActionRun = {
   action_id: string;
   binding_id: string | null;
   status: 'selected' | 'in_progress' | 'completed' | 'cancelled';
-  edge_id: string;
-  execution_snapshot: { action: EdgeAction; binding: CourseActionBinding | null; sourceId: string; targetId: string; repeatedFromRunId?: string | null };
+  edge_id: string | null;
+  node_id?: string | null;
+  execution_snapshot: { action: EdgeAction; binding: CourseActionBinding | null; sourceId: string | null; targetId: string; repeatedFromRunId?: string | null };
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
@@ -50,7 +52,7 @@ export type ActionCost = { available: boolean; weight: number; reasons: ActionRe
  * No similarity, LLM output, Course progress or Assignment completion enters this calculation.
  */
 export function evaluateAction(action: EdgeAction, input: {
-  sourceId: string;
+  sourceId?: string | null;
   microAvailable?: boolean;
   executionAvailable?: boolean;
   acquiredIds: ReadonlySet<string>;
@@ -73,7 +75,7 @@ export function evaluateAction(action: EdgeAction, input: {
   for (const key of [...new Set(action.resource_requirements)].sort()) {
     if (!input.binding?.resources.some(resource => resource.key === key && resource.available && resource.reference.trim())) block('missing_resource', `缺少可用资源：${key}`);
   }
-  if (!input.acquiredIds.has(input.sourceId) && !input.routeExecutionReachableIds?.has(input.sourceId)) block('source_unacquired', '需要先形成起点能力，才能开始这条关系上的行动');
+  if (action.edge_id !== null && input.sourceId && !input.acquiredIds.has(input.sourceId) && !input.routeExecutionReachableIds?.has(input.sourceId)) block('source_unacquired', '需要先形成起点能力，才能开始这条关系上的行动');
   return { available, weight: reasons.reduce((sum, reason) => sum + reason.cost, 0), reasons };
 }
 
@@ -85,15 +87,15 @@ export function rankActions<T extends { action: { id: string }; cost: ActionCost
 
 /** Projection only: action alternatives never add nodes, edges or inferred connectivity. */
 export function projectEdgeActions(edgeIds: ReadonlySet<string>, actions: readonly EdgeAction[], bindings: readonly CourseActionBinding[], courseId: string) {
-  return actions.filter(action => action.status === 'active' && edgeIds.has(action.edge_id))
+  return actions.filter(action => action.status === 'active' && action.edge_id !== null && edgeIds.has(action.edge_id))
     .map(action => ({ action, binding: bindings.find(binding => binding.course_id === courseId && binding.action_id === action.id) }))
     .sort((a, b) => a.action.id.localeCompare(b.action.id));
 }
 
-export type ActionData = { actions: EdgeAction[]; bindings: CourseActionBinding[]; runs: ActionRun[]; availableMicroActionIds: string[]; availableActionIds: string[]; routeExecutionReachableNodeIds?:string[]; continuableRunIds?: string[] };
-export function actionAlternatives(courseId: string, edge: { id: string; source: string } | undefined, data: ActionData, acquiredIds: ReadonlySet<string>) {
-  return rankActions(projectEdgeActions(new Set(edge ? [edge.id] : []), data.actions, data.bindings, courseId).map(item => ({ ...item,
+export type ActionData = { actions: EdgeAction[]; bindings: CourseActionBinding[]; runs: ActionRun[]; availableMicroActionIds: string[]; availableActionIds: string[]; routeExecutionReachableNodeIds?:string[]; repeatableActionIds?:string[]; continuableRunIds?: string[] };
+export function actionAlternatives(courseId: string, scope: { id: string; source: string } | { nodeId: string } | undefined, data: ActionData, acquiredIds: ReadonlySet<string>) {
+  return rankActions((scope && 'nodeId' in scope ? data.actions.filter(action=>action.status==='active' && action.node_id===scope.nodeId).map(action=>({action,binding:data.bindings.find(binding=>binding.course_id===courseId&&binding.action_id===action.id)})) : projectEdgeActions(new Set(scope && 'id' in scope ? [scope.id] : []),data.actions,data.bindings,courseId)).map(item => ({ ...item,
     run: data.runs.find(run => run.action_id === item.action.id && run.status !== 'cancelled'),
-    cost: evaluateAction(item.action, { sourceId: edge!.source, acquiredIds, routeExecutionReachableIds:new Set(data.routeExecutionReachableNodeIds??[]), binding: item.binding, microAvailable: data.availableMicroActionIds.includes(item.action.id), executionAvailable: data.availableActionIds.includes(item.action.id) }),
+    cost: evaluateAction(item.action, { sourceId: scope && 'source' in scope ? scope.source : null, acquiredIds, routeExecutionReachableIds:new Set(data.routeExecutionReachableNodeIds??[]), binding: item.binding, microAvailable: (data.runs.find(run=>run.action_id===item.action.id&&run.status!=='cancelled')?.status==='completed'?data.repeatableActionIds??[]:data.availableMicroActionIds).includes(item.action.id), executionAvailable: (data.runs.find(run=>run.action_id===item.action.id&&run.status!=='cancelled')?.status==='completed'?data.repeatableActionIds??[]:data.availableActionIds).includes(item.action.id) }),
   })));
 }

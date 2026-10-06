@@ -1,3 +1,5 @@
+> Historical acceptance: the Normal/Editing range rule below was superseded by [V3](../PROJECT_CAPABILITY_MODEL_V3.md). These results are not V3 acceptance.
+
 # Route frontier acceptance · 2026-10-06
 
 ## Phase 0 baseline and success criteria

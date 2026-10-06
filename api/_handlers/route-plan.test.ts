@@ -87,14 +87,14 @@ describe('authoritative V2 route intent API', () => {
     mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A']}});
     const response=await invoke({action:'preview',includeNodeIds:[],excludeNodeIds:[],actionChoices:[{edgeId:'A>T',actionId:old}]});
     expect(response.status).toBe(200);expect(response.result.plan.route.selectedNodeIds).toEqual(['A','T']);
-    expect(response.result.plan.execution.steps).toEqual([{edgeId:'A>T',actionId:old,sourceNodeId:'A',targetNodeId:'T',order:0}]);
+    expect(response.result.plan.execution.steps).toEqual([{scope:'edge',edgeId:'A>T',actionId:old,sourceNodeId:'A',targetNodeId:'T',order:0}]);
     expect(mocks.persist).not.toHaveBeenCalled();
   });
   it('adopts future references when an earlier factual Step can form their source',async()=>{
     mocks.input.mockResolvedValue({...data,input:{...data.input,nodeIds:['ROOT','A','T'],currentNodeIds:['ROOT'],prerequisiteEdges:[{id:'ROOT>A',source:'ROOT',target:'A',strength:'hard'},{id:'A>T',source:'A',target:'T',strength:'hard'}]}});
-    mocks.options.mockResolvedValue([{edgeId:'ROOT>A',actionId:base,title:'Root Micro',type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[]},{edgeId:'A>T',actionId:old,title:'Future Practice',type:'practice_task',estimatedMinutes:20,weight:20,planningAvailable:true,availableNow:false,reasons:['source not acquired']}]);
-    expect((await invoke({action:'adopt',baseVersionId:base,includeNodeIds:[],excludeNodeIds:[],actionChoices:[{edgeId:'ROOT>A',actionId:base},{edgeId:'A>T',actionId:old}]})).status).toBe(200);
-    expect(mocks.persist.mock.calls[0][9]).toEqual([{edgeId:'ROOT>A',actionId:base,sourceNodeId:'ROOT',targetNodeId:'A',order:0},{edgeId:'A>T',actionId:old,sourceNodeId:'A',targetNodeId:'T',order:1}]);
+    mocks.options.mockResolvedValue([{scope:'edge',edgeId:'ROOT>A',actionId:base,title:'Root Micro',type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[]},{edgeId:'A>T',actionId:old,title:'Future Practice',type:'practice_task',estimatedMinutes:20,weight:20,planningAvailable:true,availableNow:false,reasons:['source not acquired']}]);
+    expect((await invoke({action:'adopt',baseVersionId:base,includeNodeIds:[],excludeNodeIds:[],actionChoices:[{scope:'edge',edgeId:'ROOT>A',actionId:base},{edgeId:'A>T',actionId:old}]})).status).toBe(200);
+    expect(mocks.persist.mock.calls[0][9]).toEqual([{scope:'edge',edgeId:'ROOT>A',actionId:base,sourceNodeId:'ROOT',targetNodeId:'A',order:0},{scope:'edge',edgeId:'A>T',actionId:old,sourceNodeId:'A',targetNodeId:'T',order:1}]);
   });
   it('does not silently fill incomplete or invalid adopted choices',async()=>{
     for(const actionChoices of [[],[{edgeId:'A>T',actionId:'33333333-3333-4333-8333-333333333333'}]]) {

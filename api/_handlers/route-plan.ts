@@ -6,12 +6,12 @@ import { requirePublishedCourse } from '../_lib/courseMembership.js';
 import { allRows } from '../_lib/query.js';
 import { currentRoute, mapRouteVersion, persistRoute, readActiveVersion, readRouteInput, readVersion } from '../_lib/routePlanning.js';
 import { routeRelations } from '../../src/shared/learning/routePresentation.js';
-import { planCourseRoute, projectAncestorNodeIds } from '../../src/shared/learning/routePlanning.js';
-import { inspectRouteExecution, planRouteExecution, isExecutionScopeValid } from '../../src/shared/learning/routeExecution.js';
+import { planCourseRoute, buildCapabilityModel } from '../../src/shared/learning/routePlanning.js';
+import { inspectRouteExecution, planRouteExecution, isExecutionScopeValid, isNodeScope, executionEdgeIds, sameActionScope, runMatchesStep } from '../../src/shared/learning/routeExecution.js';
 import { readRouteActionOptions, readOwnedRouteRuns } from '../_lib/routeExecution.js';
 const ids = z.array(z.string().min(1).max(512)).max(10000);
 const intent = { includeNodeIds: ids, excludeNodeIds: ids };
-const choices = { actionChoices:z.array(z.object({edgeId:z.string().min(1).max(512),actionId:z.uuid()}).strict()).max(10000).optional(), selectedEdgeIds:ids.optional(), scopeMode:z.enum(['current','replan']).optional() };
+const choices = { actionChoices:z.array(z.union([z.object({scope:z.literal('node'),nodeId:z.string().min(1).max(512),actionId:z.uuid()}).strict(),z.object({scope:z.literal('edge').optional(),edgeId:z.string().min(1).max(512),actionId:z.uuid()}).strict()])).max(10000).optional(), selectedEdgeIds:ids.optional(), scopeMode:z.enum(['current','replan']).optional() };
 const bodySchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('preview'), ...intent,...choices }).strict(),
   z.object({ action: z.literal('adopt'), baseVersionId: z.uuid(), previewState:z.string().regex(/^[a-f0-9]{64}$/), ...intent,...choices,actionChoices:choices.actionChoices.unwrap(),selectedEdgeIds:ids }).strict(),
@@ -28,7 +28,7 @@ export default handleApi(async (request, response) => {
       const data=await readRouteInput(client,user.id,courseId);
       const facts=[...data.input.prerequisiteEdges.map(edge=>({...edge,relation:'prerequisite' as const})),...(data.input.enablesEdges??[])];
       const targets=data.input.courseOrder.map(item=>item.nodeId);
-      const ids=projectAncestorNodeIds(data.input.nodeIds,targets,facts);
+      const ids=buildCapabilityModel(data.input).orderedNodeIds;
       const scope={selectedNodeIds:ids,orderedNodeIds:ids,prerequisiteEdges:data.input.prerequisiteEdges.filter(edge=>ids.includes(edge.source)&&ids.includes(edge.target)),currentKnowledgeIds:[...data.input.currentNodeIds],effectiveTargetNodeIds:targets,bridgeKnowledgeIds:[]};
       json(response,200,{options:await readRouteActionOptions(client,courseId,data.input,scope,user.id)});return;
     }
@@ -73,8 +73,8 @@ export default handleApi(async (request, response) => {
   const plan = retainScope?{valid:true as const,route:retainedRoute!,conflicts:[]}:planCourseRoute(data.input, constraints);
   if (body.action === 'preview' && !plan.valid) { json(response, 200, { plan, baseVersionId: active?.id ?? null }); return; }
   if (!plan.valid) throw new ApiError(422, 'route_constraints_conflict', '当前规划约束无法满足。', { conflicts: plan.conflicts });
-  const executionChoices = historical ? historical.snapshot?.executionSteps : body.action !== 'restore' ? body.actionChoices ?? active?.snapshot?.executionSteps?.filter(step=>plan.route.selectedNodeIds.includes(step.sourceNodeId)&&plan.route.selectedNodeIds.includes(step.targetNodeId)) : undefined;
-  const selectedEdgeIds = historical ? historical.snapshot?.executionSteps ? [...new Set(historical.snapshot.executionSteps.map(step=>step.edgeId))] : undefined : body.action !== 'restore' ? body.selectedEdgeIds : undefined;
+  const executionChoices = historical ? historical.snapshot?.executionSteps : body.action !== 'restore' ? body.actionChoices ?? active?.snapshot?.executionSteps?.filter(step=>isNodeScope(step)?plan.route.selectedNodeIds.includes(step.nodeId):plan.route.selectedNodeIds.includes(step.sourceNodeId)&&plan.route.selectedNodeIds.includes(step.targetNodeId)) : undefined;
+  const selectedEdgeIds = historical ? historical.snapshot?.executionSteps ? executionEdgeIds(historical.snapshot.executionSteps) : undefined : body.action !== 'restore' ? body.selectedEdgeIds : undefined;
   const options=await readRouteActionOptions(client,courseId,data.input,plan.route,user.id);
   const facts=[...data.input.prerequisiteEdges.map(edge=>({...edge,relation:'prerequisite' as const})),...(data.input.enablesEdges??[])];
   const members=routeRelations(plan.route,facts);
@@ -83,17 +83,17 @@ export default handleApi(async (request, response) => {
   // A restore revalidates the actual historical decisions, including their order.
   // Replanning would mix a smaller current gap with the old execution references.
   const execution = historicalExecution ? inspectRouteExecution(plan.route,facts,options,data.input.currentNodeIds)
-    : planRouteExecution({route:plan.route,facts,options,choices:executionChoices,selectedEdgeIds:selectedForPreview,acquiredNodeIds:data.input.currentNodeIds,retainedEdgeIds:active?.snapshot?.executionSteps?.map(step=>step.edgeId),excludedNodeIds:constraints.excludeNodeIds});
+    : planRouteExecution({route:plan.route,facts,options,choices:executionChoices,selectedEdgeIds:selectedForPreview,acquiredNodeIds:data.input.currentNodeIds,retainedEdgeIds:active?.snapshot?.executionSteps?executionEdgeIds(active.snapshot.executionSteps):undefined,excludedNodeIds:constraints.excludeNodeIds});
   const previewState=routePreviewState(data.input,data.states,constraints,active?.id??null,options,{selectedNodeIds:plan.route.selectedNodeIds,steps:execution.steps});
   if(body.action==='adopt' && body.previewState!==previewState)throw new ApiError(409,'route_preview_stale','能力或路线状态已经变化，需要重新计算路线。');
   if (body.action === 'preview') { json(response,200,{plan:{...plan,execution},baseVersionId:active?.id??null,previewState});return; }
   // New adoption always carries explicit execution decisions. Historical node-only
   // snapshots remain readable and retain their existing restoration contract.
   const explicitExecution = historical ? historical.snapshot?.executionSteps !== undefined : body.action !== 'restore' && (body.actionChoices !== undefined || body.selectedEdgeIds !== undefined);
-  if (explicitExecution && (!execution.complete || execution.steps.some(step=>!executionChoices?.some(choice=>choice.edgeId===step.edgeId && choice.actionId===step.actionId)))) throw new ApiError(422,'route_actions_incomplete','请为每条路线关系选择合法行动后再采用。',{issues:execution.issues});
+  if (explicitExecution && (!execution.complete || execution.steps.some(step=>!executionChoices?.some(choice=>sameActionScope(choice,step) && choice.actionId===step.actionId)))) throw new ApiError(422,'route_actions_incomplete','请为每条路线关系选择合法行动后再采用。',{issues:execution.issues});
   const runs=await readOwnedRouteRuns(client,user.id,courseId);
   const activeRuns=runs.filter(run=>['selected','in_progress'].includes(run.status));
-  if(activeRuns.some(run=>!execution.steps.some(step=>step.edgeId===run.edge_id&&step.actionId===run.action_id) || (!runs.some(done=>done.status==='completed'&&done.edge_id===run.edge_id&&done.action_id===run.action_id) && execution.steps.filter(step=>step.edgeId===run.edge_id).find(step=>!runs.some(done=>done.status==='completed' && done.edge_id===step.edgeId && done.action_id===step.actionId))?.actionId!==run.action_id))) throw new ApiError(409,'route_active_run_conflict','当前行动尚在执行，请先完成或明确处理后再采用路线。');
+  if(activeRuns.some(run=>!execution.steps.some(step=>runMatchesStep(run,step)) || (!runs.some(done=>done.status==='completed' && done.edge_id===run.edge_id && (done.node_id??null)===(run.node_id??null) && done.action_id===run.action_id) && execution.steps.filter(step=>isNodeScope(step)?step.nodeId===run.node_id:step.edgeId===run.edge_id).find(step=>!runs.some(done=>done.status==='completed' && runMatchesStep(done,step)))?.actionId!==run.action_id))) throw new ApiError(409,'route_active_run_conflict','当前行动尚在执行，请先完成或明确处理后再采用路线。');
   // No snapshot, route node list, user identity, or preview result is accepted from the browser.
   const version = await persistRoute(user.id, courseId, data, constraints, plan.route, body.baseVersionId,
     body.action === 'restore' ? 'restore' : 'adjustment', body.action === 'restore' ? body.versionId : null, [], explicitExecution ? execution.steps : undefined);

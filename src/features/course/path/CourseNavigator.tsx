@@ -1,3 +1,4 @@
+import { isNodeScope, executionEdgeIds } from '@/shared/learning/routeExecution';
 import { ActionRunHistory } from '@/features/actions/ActionRunHistory';
 import { routeExecutionProjection } from './routeExecutionProjection';
 import type { useEdgeActions } from '@/features/actions/EdgeActionPanel';
@@ -31,7 +32,7 @@ export function CourseNavigator({ graph, runtime, knowledge, authenticated, onSe
     const step=execution.steps[index];
     if(!step || execution.needsAdjustment || step.unavailable || !step.canExecute || actionControl.busy)return;
     if(step.run && actionControl.continuableRunIds?.includes(step.run.id)) { await actionControl.start(step.run,execution.version?.id);return; }
-    const conflicting=actionControl.runs.find(run=>run.edge_id===step.edgeId && ['selected','in_progress'].includes(run.status));
+    const conflicting=actionControl.runs.find(run=>(isNodeScope(step)?run.node_id===step.nodeId:run.edge_id===step.edgeId) && ['selected','in_progress'].includes(run.status));
     if(conflicting && !confirmedRunId){switchTrigger.current=document.activeElement instanceof HTMLElement?document.activeElement:null;setSwitchStepIndex(index);setSwitchRunId(conflicting.id);return;}
     const run=await actionControl.select(step.actionId,confirmedRunId,undefined,execution.version?.id);
     if(run){setSwitchRunId(null);await actionControl.start(run,execution.version?.id);}
@@ -44,7 +45,7 @@ export function CourseNavigator({ graph, runtime, knowledge, authenticated, onSe
         {switchRunId?<section ref={switchConfirmation} tabIndex={-1} role="alertdialog" aria-label="确认切换行动"><h3>切换正在执行的行动？</h3><p>确认后停止这条关系上原有行动，历史记录会保留。</p><button className="atlas-secondary" disabled={actionControl.busy} onClick={()=>setSwitchRunId(null)}>保留当前行动</button><button className="atlas-primary" disabled={actionControl.busy} onClick={()=>void launch(switchStepIndex,switchRunId)}>确认切换并开始</button></section>:null}
         {actionControl.error ? <p role="alert">{actionControl.error}</p> : null}
       </motion.section>
-      <ActionRunHistory runs={actionControl.runs} control={actionControl} courseId={runtime.course.id} acquiredIds={new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId))} title={id => knowledgeTitle?.(id) ?? graph.knowledgeNodes.find(node => node.id === id)?.title ?? routeControl.view?.activeVersion?.snapshot.titles[id] ?? id} visibleEdgeIds={new Set(execution.steps.map(step => step.edgeId))}/>
+      <ActionRunHistory runs={actionControl.runs} control={actionControl} courseId={runtime.course.id} acquiredIds={new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId))} title={id => knowledgeTitle?.(id) ?? graph.knowledgeNodes.find(node => node.id === id)?.title ?? routeControl.view?.activeVersion?.snapshot.titles[id] ?? id} visibleEdgeIds={new Set(executionEdgeIds(execution.steps))}/>
     </aside>
     {authenticated && (!routeControl.view || routeControl.view.activeVersion?.courseId !== runtime.course.id) ? <p role={routeControl.error ? "alert" : "status"}>{routeControl.error || "正在加载正式个人路线…"}</p> : <CoursePathView model={execution} busy={actionControl.busy} onExecute={index=>void launch(index)} targetOutcome={runtime.course.targetOutcome} onInspectCapabilities={onInspectCapabilities} onSelect={onSelect} />}
     </div>

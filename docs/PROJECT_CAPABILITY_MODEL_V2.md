@@ -1,3 +1,7 @@
+# Superseded contract
+
+The V3 contract in [PROJECT_CAPABILITY_MODEL_V3.md](PROJECT_CAPABILITY_MODEL_V3.md) replaces acquired-only roots, Normal/Editing range differences and Edge-only Actions. The following design and acceptance results are historical records and are preserved.
+
 # Project Capability Model / Personal Course Route V2
 
 ## V2.2 factual support and laser (2026-10-02)

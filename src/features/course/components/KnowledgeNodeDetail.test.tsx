@@ -30,3 +30,10 @@ it('formal details filter both incoming and outgoing structural candidates and o
   const html=renderToStaticMarkup(<MemoryRouter><KnowledgeNodeDetail node={node} runtime={runtime} graph={{nodes:[node],edges:[],revisions:[]}} knowledge={[]} relations={[{id:'out',source:'bridge',target:'selected-target',relation:'enables',strength:1},{id:'candidate',source:'bridge',target:'unselected-target',relation:'enables',strength:1},{id:'incoming',source:'unselected-source',target:'bridge',relation:'prerequisite',strength:'hard'}]} context="personal-route" routeSteps={[{edgeId:'out',actionId:'chosen',sourceNodeId:'bridge',targetNodeId:'selected-target',order:0}]} actions={actions} onSelect={vi.fn()}/></MemoryRouter>);
   expect(html).toContain('selected-target');expect(html).not.toContain('unselected-target');expect(html).not.toContain('unselected-source');expect(html).not.toContain('未配置本课程教学覆盖');
 });
+
+it('formal Node Step renders its existing Action guidance and executor without a fake relation',()=>{
+ const template={id:'node-chosen',edge_id:null,node_id:node.id,type:'micro_learning',title:'根行动',description:'根能力指导方法',estimated_minutes:8,difficulty:1,resource_requirements:[],required_capability_ids:[],expected_evidence:'根能力验收证据',status:'active',provenance:{}};
+ const control={...actions,actions:[template],availableActionIds:[template.id],availableMicroActionIds:[template.id],busy:false};
+ const html=renderToStaticMarkup(<MemoryRouter><KnowledgeNodeDetail node={node} runtime={runtime} graph={{nodes:[node],edges:[],revisions:[]}} knowledge={[]} relations={[]} context="personal-route" routeSteps={[{scope:'node',nodeId:node.id,actionId:template.id,order:0}]} initialActionId={template.id} actions={control as unknown as ReturnType<typeof useEdgeActions>} onSelect={vi.fn()}/></MemoryRouter>);
+ expect(html).toContain('根能力指导方法');expect(html).toContain('根能力验收证据');expect(html).toContain('开始已选行动');expect(html).not.toContain('undefined');
+});

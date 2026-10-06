@@ -61,7 +61,7 @@ export async function persistRoute(userId: string, courseId: string, data: Await
   const result = await createServerSupabase().rpc('adopt_personal_course_route', {
     p_user_id: userId, p_course_id: courseId, p_base_version_id: baseVersionId, p_source: source,
     p_include_node_ids: [...new Set(constraints.includeNodeIds)].sort(), p_exclude_node_ids: [...new Set(constraints.excludeNodeIds)].sort(),
-    p_snapshot: { ...snapshot, ...(executionSteps === undefined ? {} : { executionSteps }), valid: route !== null, conflicts: initialConflicts, titles: Object.fromEntries(data.nodes.filter(row => selected.has(String(row.id))).map(row => [String(row.id), String(row.title)])) },
+    p_snapshot: { ...snapshot, planningCurrentNodeIds:[...data.input.currentNodeIds], planningKnowledgeStates:data.states.filter(row=>data.input.nodeIds.includes(String(row.node_id))).map(row=>({nodeId:row.node_id,status:row.status})), ...(executionSteps === undefined ? {} : { executionSteps }), valid: route !== null, conflicts: initialConflicts, titles: Object.fromEntries(data.nodes.filter(row => selected.has(String(row.id))).map(row => [String(row.id), String(row.title)])) },
     p_structure_fingerprint: fingerprint(data.input, constraints), p_restored_from_version_id: restoredFromVersionId,
   });
   if (result.error?.code === 'PT409') throw new ApiError(409, 'route_version_conflict', '路线已在其他页面更新，请重新载入后规划。');

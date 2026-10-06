@@ -13,7 +13,7 @@ import { buildProjectCapabilityModel, projectCapabilityAtlas } from './projectCa
 import { useRoutePlanning } from './useRoutePlanning';
 import { RoutePlanningPanel } from './RoutePlanningPanel';
 import { actionAlternatives, branchesForActions, EdgeActionPanel, useEdgeActions } from '@/features/actions/EdgeActionPanel';
-import { projectStructuralGraph, projectRouteOverlay, projectVisibleNodeIds } from './projectRoutePresentation';
+import { projectCapabilityGraph, projectRouteOverlay, projectVisibleNodeIds } from './projectRoutePresentation';
 import { relationLabel } from '@/shared/learning/routePresentation';
 import './projectCapability.css';
 
@@ -29,34 +29,35 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const [actionId, setActionId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const structuralGraph = useMemo(() => projectStructuralGraph(graph, runtime.curriculumCoverages.map(coverage => coverage.nodeId)), [graph, runtime]);
   const result = useMemo(() => {
     try {
       const model = buildProjectCapabilityModel(graph, runtime, knowledge);
-      return { model, projection: projectCapabilityAtlas(graph, model, governance, knowledge, structuralGraph), error: null };
+      return { model, projection: projectCapabilityAtlas(graph, model, governance, knowledge), error: null };
     } catch (error) { return { model: null, projection: null, error: error instanceof Error ? error.message : '能力依赖计算失败' }; }
-  }, [graph, runtime, knowledge, governance, structuralGraph]);
+  }, [graph, runtime, knowledge, governance]);
+  const structuralGraph = useMemo(() => projectCapabilityGraph(graph, result.model), [graph, result.model]);
   const currentRoute = control.view?.activeVersion?.snapshot ?? null;
   const previewRoute = useMemo(()=>control.preview?.valid ? {...control.preview.route,executionSteps:control.preview.execution?.steps} : null,[control.preview]);
   const overlay = useMemo(() => projectRouteOverlay(structuralGraph, currentRoute, previewRoute), [structuralGraph, currentRoute, previewRoute]);
-  const visibleIds = useMemo(() => projectVisibleNodeIds(structuralGraph,currentRoute,runtime.curriculumCoverages.map(coverage=>coverage.nodeId),control.editing), [structuralGraph,currentRoute,runtime,control.editing]);
+  const visibleIds = useMemo(() => projectVisibleNodeIds(structuralGraph), [structuralGraph]);
   const visibleEdges = structuralGraph.edges.filter(edge => visibleIds.has(edge.source) && visibleIds.has(edge.target));
   const counts = useMemo(() => {
     const result = new Map<string, number>();
-    for (const action of actionData.actions) if (action.status === 'active') result.set(action.edge_id, (result.get(action.edge_id) ?? 0) + 1);
+    for (const action of actionData.actions) if (action.status === 'active' && action.edge_id) result.set(action.edge_id, (result.get(action.edge_id) ?? 0) + 1);
     return result;
   }, [actionData.actions]);
   const activeEdge = visibleEdges.find(edge => edge.id === edgeId);
   const alternatives = actionAlternatives(runtime.course.id, activeEdge, actionData, new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId)));
+  const nodeAlternatives=selectedId && !graph.edges.some(edge=>edge.relation!=='related'&&edge.target===selectedId)?actionAlternatives(runtime.course.id,{nodeId:selectedId},actionData,new Set(knowledge.filter(record=>satisfiesTeachingPrerequisite(record.status)).map(record=>record.nodeId))):[];
   const branches = control.editing ? [] : branchesForActions(alternatives,control.view?.activeVersion?.snapshot.executionSteps?.filter(step=>step.edgeId===activeEdge?.id).map(step=>step.actionId));
   const displayedNodes = result.projection?.nodes.filter(node => visibleIds.has(node.id)) ?? [];
   const selected = displayedNodes.find(node => node.id === selectedId);
   const matches = result.projection?.nodes.filter(node => visibleIds.has(node.id) && `${node.title} ${node.id}`.toLowerCase().includes(query.toLowerCase())) ?? [];
   const title = (id: string) => graph.nodes.find(node => node.id === id)?.title ?? id;
-  const roles = (node: NonNullable<typeof selected>) => control.editing && !(previewRoute??currentRoute)?.selectedNodeIds.includes(node.id) && !control.draft.includeNodeIds.includes(node.id) ? '候选能力 · 未纳入当前路线' : [node.capabilityRoles?.current && '已具备', node.capabilityRoles?.course && '项目目标', node.capabilityRoles?.bridge && '中间能力', result.model?.disconnectedCourseKnowledgeIds.includes(node.id) && '暂无当前能力入口'].filter(Boolean).join(' · ');
+  const roles = (node: NonNullable<typeof selected>) => !(previewRoute??currentRoute)?.selectedNodeIds.includes(node.id) && !(control.editing && control.draft.includeNodeIds.includes(node.id)) ? '候选能力 · 未纳入当前路线' : [node.capabilityRoles?.current && '已具备', node.capabilityRoles?.course && '项目目标', node.capabilityRoles?.bridge && '中间能力', result.model?.disconnectedCourseKnowledgeIds.includes(node.id) && '暂无当前能力入口'].filter(Boolean).join(' · ');
   const choose = (id: string) => {setEdgeId(null);onSelect(id);};
   const draftMark = (id: string) => !control.editing ? '' : control.draft.includeNodeIds.includes(id) ? ' · 加入' : control.draft.excludeNodeIds.includes(id) ? ' · 排除' : '';
-  const planningNode=selected?{id:selected.id,title:selected.title,description:selected.description,state:selected.capabilityRoles?.current?'已具备':'未具备',role:roles(selected)}:undefined;
+  const planningNode=selected?{id:selected.id,title:selected.title,description:selected.description,state:selected.capabilityRoles?.current?'已具备':'未具备',role:roles(selected),root:!graph.edges.some(edge=>edge.relation!=='related' && edge.target===selected.id)}:undefined;
   const domain = selected ? resolveNodeDomain(selected.id, governance).domain : undefined;
   const searchPanel = <div className="project-capability-search glass-v2">
           <button className="project-search-toggle" aria-label={searchOpen ? '收起能力搜索' : '搜索项目能力'} aria-expanded={searchOpen} onClick={() => setSearchOpen(open => !open)}>{searchOpen ? <X size={18}/> : <Search size={18}/>}</button>
@@ -94,7 +95,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
       {selected && !control.editing && !activeEdge ? <aside className="project-capability-detail glass-v2" aria-label="能力详情"><button className="atlas-panel-close" aria-label="关闭能力详情" onClick={() => onSelect(null)}><X size={17}/></button><span>{roles(selected)}{draftMark(selected.id)}</span><h2>{selected.title}</h2><p><i className="project-domain-dot" style={{ background: domain?.canonicalColor ?? '#94a3b8' }}/>{selected.domainTitle}</p><p>{selected.description}</p>
         <h3>前置关系</h3><ul>{visibleEdges.filter(edge => edge.relation === 'prerequisite' && edge.target === selected.id).map(edge => <li key={edge.id}>{title(edge.source)} · {edge.strength === 'hard' ? '必须前置' : '推荐前置，可跳过'}</li>)}</ul>
         {visibleEdges.some(edge => edge.relation === 'enables' && (edge.source === selected.id || edge.target === selected.id)) ? <><h3>能力支撑 · 非学习门槛</h3><ul>{visibleEdges.filter(edge => edge.relation === 'enables' && (edge.source === selected.id || edge.target === selected.id)).map(edge => <li key={edge.id} title={edge.reason}>{title(edge.source)} → {title(edge.target)}</li>)}</ul></> : null}
-        {selected.knowledge?.masteryCriteria.length ? <><h3>能力要求</h3><ul>{selected.knowledge.masteryCriteria.map((criterion, index) => <li key={index}>{criterion}</li>)}</ul></> : null}<p>候选能力不一定进入必要路线。下一步与学习内容是否可用，请查看课程路线。</p><button className="atlas-primary" onClick={onRoute}>查看课程路线</button></aside> : null}
+        {selected.knowledge?.masteryCriteria.length ? <><h3>能力要求</h3><ul>{selected.knowledge.masteryCriteria.map((criterion, index) => <li key={index}>{criterion}</li>)}</ul></> : null}{nodeAlternatives.length?<EdgeActionPanel embedded title="根能力行动" alternatives={nodeAlternatives} control={actionData} courseId={runtime.course.id} focusedId={actionId} onFocus={setActionId} planningOnly onAdjust={control.begin}/>:null}<p>候选能力不一定进入必要路线。下一步与学习内容是否可用，请查看课程路线。</p><button className="atlas-primary" onClick={onRoute}>查看课程路线</button></aside> : null}
     </> : null}
   </section>;
 }

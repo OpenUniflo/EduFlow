@@ -20,13 +20,13 @@ import { resolveNodeDomain } from '@/features/knowledge/domain/domainResolution'
 import type { DomainGovernanceState } from '@/features/knowledge/domain/DomainGovernanceRepository';
 import type { AtlasSceneProjection } from '@/features/knowledge/projections/atlasProjections';
 
-export function projectCapabilityAtlas(graph: KnowledgeGraph, model: CapabilityModel, governance: DomainGovernanceState, knowledge: UserKnowledgeRecord[], structuralGraph?: KnowledgeGraph): AtlasSceneProjection {
-  const members = new Set(structuralGraph?.nodes.map(node => node.id) ?? model.orderedNodeIds);
+export function projectCapabilityAtlas(graph: KnowledgeGraph, model: CapabilityModel, governance: DomainGovernanceState, knowledge: UserKnowledgeRecord[]): AtlasSceneProjection {
+  const members = new Set(model.orderedNodeIds);
   const current = new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId));
   const course = new Set(model.courseKnowledgeIds);
   const states = new Map(knowledge.map(record => [record.nodeId, record.status]));
   const edgeIds = new Set(model.supportEdges.map(edge => edge.id));
-  const edges = structuralGraph?.edges ?? graph.edges.filter(edge => edgeIds.has(edge.id));
+  const edges = graph.edges.filter(edge => edgeIds.has(edge.id));
   const degree = new Map<string, number>();
   edges.forEach(edge => { for (const id of [edge.source, edge.target]) degree.set(id, (degree.get(id) ?? 0) + 1); });
   const max = Math.max(1, ...degree.values());

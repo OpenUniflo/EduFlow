@@ -38,3 +38,11 @@ describe('edge action cost and projection', () => {
     expect([...edges]).toEqual(['factual-edge']);
   });
 });
+
+it('completed Node alternatives use explicit repeat eligibility without reopening ordinary frontier',async()=>{
+ const {actionAlternatives}=await import('./model');
+ const node:EdgeAction={...action,id:'node',edge_id:null,node_id:'root',type:'micro_learning',required_capability_ids:[],resource_requirements:[]};
+ const data={actions:[node],bindings:[],runs:[{action_id:'node',status:'completed'}],availableActionIds:[],availableMicroActionIds:[],repeatableActionIds:['node']} as unknown as Parameters<typeof actionAlternatives>[2];
+ expect(actionAlternatives('course',{nodeId:'root'},data,new Set())[0].cost.available).toBe(true);
+ expect(actionAlternatives('course',{nodeId:'root'},{...data,repeatableActionIds:[]},new Set())[0].cost.available).toBe(false);
+});

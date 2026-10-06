@@ -31,9 +31,9 @@ describe('capability support is not a learning prerequisite', () => {
     expect(ids(data)).toEqual(['A','T','X','Y']);
     expect(planCourseRoute(data).valid).toBe(true);
   });
-  it('enables never bypasses an unsupported hard AND branch', () => {
+  it('enables preserves hard AND while unacquired roots remain legitimate', () => {
     const data = input(['A','B','X','T'], [pre('A','X'),pre('B','X')], [enable('A','X'),enable('X','T')]);
-    expect(ids(data)).toEqual(['T']);
+    expect(ids(data)).toEqual(['A','B','T','X']);
     expect(buildCapabilityModel(data).actionableNodeIds).not.toContain('X');
     expect(ids({...data,currentNodeIds:['A','B']})).toEqual(['A','B','T','X']);
   });
@@ -55,7 +55,7 @@ describe('capability support is not a learning prerequisite', () => {
     const data = input(['A','X','T','B'],[pre('B','X','soft')],[enable('A','X'),enable('X','T')]);
     const before = JSON.stringify(data);
     const model = buildCapabilityModel(data);
-    expect(model.orderedNodeIds.sort()).toEqual(['A','T','X']);
+    expect(model.orderedNodeIds.sort()).toEqual(['A','B','T','X']);
     expect(buildCapabilityModel({...data,nodeIds:[...data.nodeIds].reverse(),enablesEdges:[...data.enablesEdges!].reverse()})).toEqual(buildCapabilityModel(data));
     expect(JSON.stringify(data)).toBe(before);
   });

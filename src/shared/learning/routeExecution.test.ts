@@ -1,9 +1,9 @@
 import { describe,expect,it } from 'vitest';
-import { executionRelations,inspectRouteExecution,planRouteExecution,type RouteActionOption } from './routeExecution';
+import { actionChoice,executionRelations,inspectRouteExecution,planRouteExecution,type RouteActionOption } from './routeExecution';
 import type { CapabilityRelation,SelectedRoute } from './routePlanning';
 const facts:CapabilityRelation[]=[{id:'ab',source:'A',target:'B',relation:'prerequisite',strength:'hard'},{id:'cb',source:'C',target:'B',relation:'prerequisite',strength:'hard'},{id:'bd',source:'B',target:'D',relation:'prerequisite',strength:'hard'},{id:'ad',source:'A',target:'D',relation:'enables',strength:.5}];
 const route:SelectedRoute={selectedNodeIds:['A','B','C','D'],orderedNodeIds:['A','C','B','D'],prerequisiteEdges:facts.filter(e=>e.relation==='prerequisite') as SelectedRoute['prerequisiteEdges'],effectiveTargetNodeIds:['D'],currentKnowledgeIds:['A','C'],bridgeKnowledgeIds:['A','C','B']};
-const option=(edgeId:string,actionId:string,extra:Partial<RouteActionOption>={}):RouteActionOption=>({edgeId,actionId,title:actionId,type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[],...extra});
+const option=(edgeId:string,actionId:string,extra:Partial<Extract<RouteActionOption,{edgeId:string}>>={}):RouteActionOption=>({edgeId,actionId,title:actionId,type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[],...extra});
 const options=facts.flatMap(e=>[option(e.id,`${e.id}-micro`),option(e.id,`${e.id}-practice`,{type:'practice_task',weight:20})]);
 describe('formal execution Route references',()=>{
   it('linearizes a factual DAG without creating the adjacent reading-order edge',()=>{
@@ -52,7 +52,7 @@ describe('formal execution Route references',()=>{
   });
   it('rejects duplicate Edge identity, corrupt order and reversed endpoints',()=>{
     const steps=planRouteExecution({route,facts,options}).steps;
-    expect(inspectRouteExecution({...route,executionSteps:[{...steps[0],sourceNodeId:'B',targetNodeId:'A'},...steps.slice(1)]},facts,options).complete).toBe(false);
+    expect(inspectRouteExecution({...route,executionSteps:[{scope:'edge',edgeId:steps[0].edgeId!,actionId:steps[0].actionId,order:steps[0].order,sourceNodeId:'B',targetNodeId:'A'},...steps.slice(1)]},facts,options).complete).toBe(false);
     expect(inspectRouteExecution({...route,executionSteps:[steps[0],steps[0],...steps.slice(2)]},facts,options).complete).toBe(false);
   });
   it('orders enables Steps by source formation even when curriculum puts their target first',()=>{
@@ -97,7 +97,7 @@ describe('deterministic hard and optional execution selection',()=>{
     const edge={id:'support',source:'A',target:'T',relation:'enables' as const,strength:.8};
     const selected={...route,selectedNodeIds:['A','T'],orderedNodeIds:['T','A'],currentKnowledgeIds:['A'],effectiveTargetNodeIds:['T'],prerequisiteEdges:[]};
     const input={route:selected,facts:[edge],options:[option('support','learn')]};
-    const missing=planRouteExecution(input);expect(missing.steps).toEqual([]);expect(missing.issues).toEqual([expect.objectContaining({kind:'support_edge_required',nodeId:'T',candidateEdgeIds:['support']})]);
+    const missing=planRouteExecution(input);expect(missing.steps).toEqual([]);expect(missing.issues).toContainEqual(expect.objectContaining({kind:'support_edge_required',nodeId:'T',candidateEdgeIds:['support']}));
     expect(planRouteExecution({...input,selectedEdgeIds:['support']}).complete).toBe(true);
   });
   it('uses typed action, source, requirement and missing-target issues',()=>{
@@ -134,7 +134,7 @@ it('exact history scope rejects changed prerequisite semantics before offering r
 describe('ordered multi-action groups and execution progress',()=>{
  it.each([1,2,5])('supports %i Actions per Edge with stable local order',count=>{
   const actions=Array.from({length:count},(_,i)=>option('ab',`action-${i}`));
-  const choices=[...actions].reverse().map(({edgeId,actionId})=>({edgeId,actionId}));
+  const choices=[...actions].reverse().map(actionChoice);
   const result=planRouteExecution({route,facts,options:[...actions,...options],choices:[...choices,{edgeId:'cb',actionId:'cb-micro'},{edgeId:'bd',actionId:'bd-micro'}]});
   expect(result.complete).toBe(true);
   expect(result.steps.slice(0,count).map(s=>s.actionId)).toEqual(choices.map(s=>s.actionId));
@@ -152,7 +152,7 @@ describe('ordered multi-action groups and execution progress',()=>{
   const {routeExecutionProgress}=await import('./routeExecution');
   const steps=planRouteExecution({route,facts,options,choices:[{edgeId:'ab',actionId:'ab-micro'},{edgeId:'ab',actionId:'ab-practice'},{edgeId:'cb',actionId:'cb-micro'},{edgeId:'bd',actionId:'bd-micro'}]}).steps;
   const uks=['A','C'];
-  const run=(index:number)=>({user_id:'u',course_id:'c',edge_id:steps[index].edgeId,action_id:steps[index].actionId,status:'completed',execution_version:2});
+  const run=(index:number)=>({user_id:'u',course_id:'c',edge_id:steps[index].edgeId??null,action_id:steps[index].actionId,status:'completed',execution_version:2});
   const progress=(runs:ReturnType<typeof run>[])=>routeExecutionProgress({userId:'u',courseId:'c',steps,runs,acquiredNodeIds:uks,facts});
   expect(steps[progress([run(0)]).recommendedStepIndex!]?.actionId).toBe('ab-practice');
   expect(progress([run(0)]).completedEdgeIds).not.toContain('ab');

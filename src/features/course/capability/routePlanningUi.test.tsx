@@ -91,3 +91,11 @@ it('invalid structural Preview counts unresolved conflicts and exposes their loc
  const html=renderToStaticMarkup(<RoutePlanningPanel control={c} title={id=>id}/>);
  expect(html).toContain('待处理 1');expect(html).toContain('定位能力');expect(html).toContain('展开详情');
 });
+
+it('Node history reorder shows exact scope, local new order and Node technical identity',()=>{
+ const steps=['a','b'].map((actionId,order)=>({scope:'node' as const,nodeId:'A',actionId,order}));
+ const current={...version,snapshot:{...version.snapshot,executionSteps:steps}};
+ const next={...version,id:'v2',snapshot:{...version.snapshot,executionSteps:[{...steps[1],order:0},{...steps[0],order:1}]}};
+ const html=renderToStaticMarkup(<HistoricalRoute version={next} current={current} actionTitles={{a:'甲行动',b:'乙行动'}}/>);
+ expect(html).toContain('节点行动顺序变化：当时的能力标题');expect(html).toContain('乙行动 → 甲行动');expect(html).toContain('node:A');expect(html).not.toContain('undefined');
+});

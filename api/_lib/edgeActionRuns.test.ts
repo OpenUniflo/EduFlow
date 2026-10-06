@@ -69,7 +69,7 @@ describe('explicit Action execution authority', () => {
   });
   it('starts a first bound Action on an explicitly included acquired Bridge relation', async () => {
     input.currentNodeIds = ['source', 'target'];
-    mocks.version.mockResolvedValue({ id:'version',snapshot:{}, constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
+    mocks.version.mockResolvedValue({ id:'version',snapshot:{valid:true,selectedNodeIds:['source','target'],executionSteps:[{edgeId:'edge',actionId:'action',sourceNodeId:'source',targetNodeId:'target',order:0}]}, constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
     expect((await requireActionExecution(client, 'learner', 'course', 'action')).microPathId).toBe('second-path');
   });
   it('rejects a new route Action when its source is missing, including non-gating relations', async () => {

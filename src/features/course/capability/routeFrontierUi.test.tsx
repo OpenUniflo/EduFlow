@@ -4,11 +4,10 @@ import { readFileSync } from 'node:fs';
 import * as project from './projectRoutePresentation';
 import * as planning from './RoutePlanningPanel';
 
-it('normal projection hides structural candidates; editing reveals them without changing input',()=>{
-  const graph={nodes:[{id:'A'},{id:'B'},{id:'candidate'}],edges:[]} as unknown as Parameters<typeof project.projectStructuralGraph>[0];
-  const route={selectedNodeIds:['A']} as Parameters<typeof project.projectVisibleNodeIds>[1];
-  expect([...project.projectVisibleNodeIds(graph,route,['B'],false)]).toEqual(['A','B']);
-  expect([...project.projectVisibleNodeIds(graph,route,['B'],true)]).toEqual(['A','B','candidate']);
+it('normal, editing and preview preserve the same model candidates',()=>{
+  const graph={nodes:[{id:'A'},{id:'B'},{id:'candidate'}],edges:[]} as unknown as Parameters<typeof project.projectCapabilityGraph>[0];
+  expect([...project.projectVisibleNodeIds(graph)]).toEqual(['A','B','candidate']);
+  expect([...project.projectVisibleNodeIds(graph)]).toEqual(['A','B','candidate']);
   expect(graph.nodes).toHaveLength(3);
 });
 it('SVG context geometry excludes hidden endpoints as well as hidden nodes',()=>{

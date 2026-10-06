@@ -5,7 +5,7 @@ import { allRows, dataOrThrow } from './query.js';
 import { requirePublishedCourse, requireMicroTeachingEligibility } from './courseMembership.js';
 import { readActiveVersion, readRouteInput } from './routePlanning.js';
 import { planCourseRoute } from '../../src/shared/learning/routePlanning.js';
-import { routeExecutionProgress } from '../../src/shared/learning/routeExecution.js';
+import { routeExecutionProgress, isRouteNodeRoot, runMatchesStep } from '../../src/shared/learning/routeExecution.js';
 import { hasUnmetHardPrerequisite } from '../../src/shared/learning/teachingPrerequisites.js';
 import { routeRelations } from '../../src/shared/learning/routePresentation.js';
 import { evaluateAction, type EdgeAction, type CourseActionBinding, type ActionRun } from '../../src/features/actions/model.js';
@@ -13,7 +13,7 @@ import { readAssignmentEligibility } from './assignmentEligibility.js';
 export async function availableMicroPaths(client: SupabaseClient, courseId: string) {
   return allRows(client.from('micro_learning_paths').select('id,knowledge_id,course_id').eq('status', 'published').eq('mode', 'learn').order('id'), 'Action Micro paths').then(paths => paths.filter(path => path.course_id == null || path.course_id === courseId));
 }
-export async function requireActionExecution(client: SupabaseClient, userId: string, courseId: string, actionId: string, retainedEdgeId?: string) {
+export async function requireActionExecution(client: SupabaseClient, userId: string, courseId: string, actionId: string, retainedScope?: string | boolean) {
   await requirePublishedCourse(client, courseId);
   const [actionResult, bindingResult, routeData] = await Promise.all([
     client.from('knowledge_edge_actions').select('*').eq('id', actionId).eq('status', 'active').maybeSingle(),
@@ -25,42 +25,45 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
   const binding = dataOrThrow(bindingResult.data, bindingResult.error, 'Execution binding') as CourseActionBinding & { updated_at: string } | null;
   const edges = [...routeData.input.prerequisiteEdges.map(edge => ({ ...edge, relation: 'prerequisite' as const })), ...(routeData.input.enablesEdges ?? [])];
   const edge = edges.find(edge => edge.id === action.edge_id && routeData.input.nodeIds.includes(edge.source) && routeData.input.nodeIds.includes(edge.target));
-  if (!edge) throw new ApiError(422, 'action_outside_project', '该行动当前不在项目的真实能力关系中。');
+  const targetId=action.node_id??edge?.target;
+  const sourceId=edge?.source??null;
+  if (!targetId || !routeData.input.nodeIds.includes(targetId)) throw new ApiError(422, 'action_outside_project', '该行动当前不在项目的真实能力关系中。');
   const version = await readActiveVersion(client, userId, courseId);
-  if (version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target)) throw new ApiError(422, 'action_excluded', '该关系的能力已从当前路线明确排除，请先调整路线。');
-  if (!retainedEdgeId) {
+  if (version?.constraints.excludeNodeIds.some(id => id === sourceId || id === targetId)) throw new ApiError(422, 'action_excluded', '该关系的能力已从当前路线明确排除，请先调整路线。');
+  if (!retainedScope) {
     const formal = version?.snapshot.executionSteps;
     const plan = version ? planCourseRoute(routeData.input, version.constraints) : null;
     if (formal !== undefined) {
-      if (!version?.snapshot.valid || !formal.some(step=>step.edgeId===edge.id && step.sourceNodeId===edge.source && step.targetNodeId===edge.target && step.actionId===actionId)) throw new ApiError(422,'action_not_selected_in_route','该行动不是正式路线的已选方案，请在项目能力模型中调整并采用路线。');
-    } else if (!plan?.valid || !routeRelations(plan.route, edges).some(relation => relation.id === edge.id)) throw new ApiError(422, 'action_outside_route', '请先在个人路线中选择这条真实关系，再开始行动。');
+      if (!version?.snapshot.valid || !formal.some(step=>runMatchesStep({edge_id:action.edge_id,node_id:action.node_id,action_id:actionId},step) && (action.node_id ? isRouteNodeRoot(action.node_id,version.snapshot,edges) : step.sourceNodeId===sourceId && step.targetNodeId===targetId))) throw new ApiError(422,'action_not_selected_in_route','该行动不是正式路线的已选方案，请在项目能力模型中调整并采用路线。');
+    } else if (action.node_id || !plan?.valid || !routeRelations(plan.route, edges).some(relation => relation.id === edge?.id)) throw new ApiError(422, 'action_outside_route', '请先在个人路线中选择这条真实关系，再开始行动。');
   }
+  if(action.node_id && (!version?.snapshot.valid || !isRouteNodeRoot(action.node_id,version.snapshot,edges))) throw new ApiError(422,'node_action_not_root','节点行动只能执行当前正式路线中的真实根能力。');
   const formal=version?.snapshot.executionSteps;
   const runs=formal ? await allRows(client.from('edge_action_runs').select('*').eq('user_id',userId).eq('course_id',courseId).order('id'),'Route execution progress') as ActionRun[] : [];
-  const progress=formal ? routeExecutionProgress({userId,courseId,steps:formal,runs,acquiredNodeIds:routeData.input.currentNodeIds,facts:edges,selectedPrerequisiteEdges:version?.snapshot.prerequisiteEdges}) : null;
+  const progress=formal ? routeExecutionProgress({userId,courseId,steps:formal,runs,acquiredNodeIds:routeData.input.currentNodeIds,facts:edges,selectedNodeIds:version?.snapshot.selectedNodeIds,selectedPrerequisiteEdges:version?.snapshot.prerequisiteEdges}) : null;
   const reachable=new Set(progress?.reachableNodeIds??routeData.input.currentNodeIds);
-  if(progress && (!retainedEdgeId || !runs.some(run=>run.status==='completed'&&run.edge_id===edge.id&&run.action_id===actionId)) && !progress.availableStepIndexes.some(index=>formal![index].edgeId===edge.id && formal![index].actionId===actionId)) throw new ApiError(409,'route_step_not_available','该行动尚未进入可执行前沿；请先完成同一关系的前序行动或形成起点能力。已完成行动请使用再次执行。');
-  if (!formal && hasUnmetHardPrerequisite(edge.target,reachable,routeData.input.prerequisiteEdges)) throw new ApiError(422,'target_prerequisite_required','请先形成目标能力的必要前置。');
-  const cost = evaluateAction(action, { sourceId: edge.source, acquiredIds: new Set(routeData.input.currentNodeIds), routeExecutionReachableIds:reachable, binding: binding ?? undefined });
+  if(progress && (!retainedScope || !runs.some(run=>run.status==='completed'&&run.edge_id===action.edge_id&&(run.node_id??null)===(action.node_id??null)&&run.action_id===actionId)) && !progress.availableStepIndexes.some(index=>runMatchesStep({edge_id:action.edge_id,node_id:action.node_id,action_id:actionId},formal![index]))) throw new ApiError(409,'route_step_not_available','该行动尚未进入可执行前沿；请先完成同一关系的前序行动或形成起点能力。已完成行动请使用再次执行。');
+  if (!formal && hasUnmetHardPrerequisite(targetId,reachable,routeData.input.prerequisiteEdges)) throw new ApiError(422,'target_prerequisite_required','请先形成目标能力的必要前置。');
+  const cost = evaluateAction(action, { sourceId, acquiredIds: new Set(routeData.input.currentNodeIds), routeExecutionReachableIds:reachable, binding: binding ?? undefined });
   if (!cost.available) throw new ApiError(422, 'action_conditions_unmet', cost.reasons.filter(reason => reason.code !== 'time' && reason.code !== 'difficulty').map(reason => reason.message).join('；'));
   let microPathId: string | null = null;
   if (action.type === 'micro_learning') {
     const paths = await availableMicroPaths(client, courseId);
-    const path = paths.find(path => path.id === binding?.micro_path_id && path.knowledge_id === edge.target);
+    const path = paths.find(path => path.id === binding?.micro_path_id && path.knowledge_id === targetId);
     if (!path) throw new ApiError(422, 'action_micro_unavailable', '该能力尚无已发布的微学习内容，请选择其他行动。');
     // Existing Micro authority owns teaching eligibility; never initialize a route from Action execution.
     if (!await readActiveVersion(client, userId, courseId)) throw new ApiError(409, 'route_not_initialized', '请先打开课程路线。');
     if(formal) { /* Formal Action authority already validated the exact Step and local order. */ }
-    else await requireActionMicroEligibility(client, userId, courseId, edge.target, Boolean(retainedEdgeId));
+    else await requireActionMicroEligibility(client, userId, courseId, targetId, Boolean(retainedScope));
     microPathId = String(path.id);
   } else {
     if (!binding?.assignment_id || binding.micro_path_id) throw new ApiError(422, 'action_assignment_unavailable', '该行动尚未绑定具体实训，请选择其他行动。');
     const assignmentResult = await client.from('course_assignments').select('mode,experience').eq('course_id', courseId).eq('id', binding.assignment_id).maybeSingle();
     const assignment = dataOrThrow(assignmentResult.data, assignmentResult.error, 'Assignment executor');
     if (!isArtifactPracticeExecutor(assignment)) throw new ApiError(422, 'action_assignment_unavailable', '该任务暂不支持从关系行动启动，请使用课程实训入口。');
-    const coverageResult = await client.from('assignment_coverages').select('node_id').eq('course_id', courseId).eq('assignment_id', binding.assignment_id).eq('node_id', edge.target).maybeSingle();
+    const coverageResult = await client.from('assignment_coverages').select('node_id').eq('course_id', courseId).eq('assignment_id', binding.assignment_id).eq('node_id', targetId).maybeSingle();
     if (!dataOrThrow(coverageResult.data, coverageResult.error, 'Action Assignment target coverage')) throw new ApiError(422, 'action_assignment_unavailable', '绑定实训未覆盖该关系的目标能力。');
-    const { eligibility } = await readAssignmentEligibility(client, userId, courseId, binding.assignment_id, { targetId: edge.target, status: 'not_started', reachableNodeIds:[...reachable] });
+    const { eligibility } = await readAssignmentEligibility(client, userId, courseId, binding.assignment_id, { targetId: targetId, status: 'not_started', reachableNodeIds:[...reachable] });
     if (eligibility.reason) throw new ApiError(422, 'action_assignment_prerequisite', eligibility.reason);
   }
   return { action, binding, edge, cost, microPathId, routeVersionId: version?.id ?? null, executionReachableNodeIds:[...reachable] };
@@ -73,7 +76,7 @@ export async function requireActionMicroEligibility(client: SupabaseClient, user
     const result=await client.from('edge_action_runs').select('*').eq('id',runId).eq('user_id',userId).eq('course_id',courseId).maybeSingle();
     const run=dataOrThrow(result.data,result.error,'Micro Action eligibility') as ActionRun|null;
     if(!run || run.execution_snapshot.targetId!==nodeId || !['selected','in_progress','completed'].includes(run.status)) throw new ApiError(404,'micro_action_unavailable','微学习执行上下文不可用。');
-    if(run.status!=='completed') await requireActionExecution(client,userId,courseId,run.action_id,run.status==='in_progress'||run.execution_snapshot.repeatedFromRunId?run.edge_id:undefined);
+    if(run.status!=='completed') await requireActionExecution(client,userId,courseId,run.action_id,run.status==='in_progress'||run.execution_snapshot.repeatedFromRunId?true:undefined);
     const version=await readActiveVersion(client,userId,courseId);
     if(version?.snapshot.executionSteps!==undefined) return {...version.snapshot,activeVersionId:version.id};
   }
@@ -95,7 +98,7 @@ export async function requireAssignmentActionRun(client: SupabaseClient, userId:
   let executionReachableNodeIds:readonly string[]=[];
   // Completed runs remain readable even after route/content changes.
   if (run.status !== 'completed') {
-    const context = await requireActionExecution(client, userId, courseId, run.action_id, run.status === 'in_progress' || run.execution_snapshot.repeatedFromRunId ? run.edge_id : undefined);
+    const context = await requireActionExecution(client, userId, courseId, run.action_id, run.status === 'in_progress' || run.execution_snapshot.repeatedFromRunId ? true : undefined);
     executionReachableNodeIds=context.executionReachableNodeIds;
     if (context.binding?.assignment_id !== assignmentId) throw new ApiError(409, 'action_executor_changed', '行动绑定已变化，请重新选择。');
   }

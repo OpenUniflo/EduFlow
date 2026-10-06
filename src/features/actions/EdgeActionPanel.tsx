@@ -57,15 +57,15 @@ export function EdgeActionPanel({ alternatives, title, control, courseId, focuse
   useEffect(() => { if (switchRequest) confirmation.current?.focus(); else switchTrigger.current?.focus(); }, [switchRequest]);
   const busy = control.busy;
   function select(action: EdgeAction, repeatRunId?: string,startAfterSelect=false) {
-    const active = control.runs.find(run => run.edge_id === action.edge_id && ['selected', 'in_progress'].includes(run.status));
+    const active = control.runs.find(run => run.edge_id === action.edge_id && (run.node_id??null)===(action.node_id??null) && ['selected', 'in_progress'].includes(run.status));
     if (active) { switchTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; setSwitchRequest({ actionId: action.id, activeRunId: active.id, activeTitle: active.execution_snapshot.action.title, repeatRunId,startAfterSelect }); }
     else void control.select(action.id, undefined, repeatRunId,routeVersionId).then(run=>{if(run && startAfterSelect)void control.start(run,routeVersionId);});
   }
   return <aside className={`edge-action-panel ${embedded ? 'edge-action-inline' : 'glass-v2'}`} aria-label="关系行动方案">
     {onClose ? <button className="atlas-panel-close" aria-label="关闭行动方案" onClick={onClose}>×</button> : null}
-    <h2>{title}</h2><p>{formalChoice?"这是正式路线已采用的行动。": "以下行动是推进这条能力关系的替代方案。"}执行完成后仍需证据与正式能力判断。</p>
+    <h2>{title}</h2><p>{formalChoice?"这是正式路线已采用的行动。": "以下行动是推进这项能力或真实关系的替代方案。"}执行完成后仍需证据与正式能力判断。</p>
     <button className="atlas-secondary" disabled={busy} onClick={() => void control.reload().catch(() => setLocalError('刷新失败，请稍后重试。'))}>刷新执行记录</button>
-    {control.error || localError ? <p role="alert">{control.error || localError}</p> : !alternatives.length ? <p>{formalChoice?'当前正式路线中的行动已不可用，需要调整路线。':'这条关系尚未配置行动。'}{formalChoice && onAdjust?<button className="atlas-secondary" onClick={onAdjust}>调整路线</button>:null}</p> : null}
+    {control.error || localError ? <p role="alert">{control.error || localError}</p> : !alternatives.length ? <p>{formalChoice?'当前正式路线中的行动已不可用，需要调整路线。':'该能力或关系尚未配置行动。'}{formalChoice && onAdjust?<button className="atlas-secondary" onClick={onAdjust}>调整路线</button>:null}</p> : null}
     {switchRequest ? <section ref={confirmation} tabIndex={-1} role="alertdialog" aria-label="确认切换行动"><h3>切换当前行动？</h3><p>“{switchRequest.activeTitle}”将停止，已有记录会保留。确认后选择新的实施方式。</p><div className="action-confirm-buttons"><button className="atlas-secondary" disabled={busy} onClick={() => setSwitchRequest(null)}>保留当前行动</button><button className="atlas-primary" disabled={busy} onClick={() => { void control.select(switchRequest.actionId, switchRequest.activeRunId, switchRequest.repeatRunId,routeVersionId).then(run => { if (run) {setSwitchRequest(null);if(switchRequest.startAfterSelect)void control.start(run,routeVersionId);} }); }}>{switchRequest.startAfterSelect?'确认切换并开始':'确认切换'}</button></div></section> : null}
     {alternatives.map(({ action: currentAction, binding: currentBinding, cost, run }, index) => {
       const active = run && ['selected', 'in_progress'].includes(run.status);
@@ -90,5 +90,5 @@ export function EdgeActionPanel({ alternatives, title, control, courseId, focuse
   </aside>;
 }
 export function branchesForActions(alternatives: ReturnType<typeof actionAlternatives>,selectedActionIds?:readonly string[]): ActionBranch[] {
-  return alternatives.map(({ action, cost, run }) => ({ id: action.id, edgeId: action.edge_id, title: action.title, status: run && run.status !== 'cancelled' ? run.status : selectedActionIds?.includes(action.id)?'selected':!cost.available ? 'unavailable' : 'candidate' }));
+  return alternatives.filter(({action})=>action.edge_id!==null).map(({ action, cost, run }) => ({ id: action.id, edgeId: action.edge_id!, title: action.title, status: run && run.status !== 'cancelled' ? run.status : selectedActionIds?.includes(action.id)?'selected':!cost.available ? 'unavailable' : 'candidate' }));
 }

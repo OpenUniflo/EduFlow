@@ -1,3 +1,4 @@
+import { isNodeScope, sameActionScope } from '@/shared/learning/routeExecution';
 import { Check, Circle, Play } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { CSSProperties } from 'react';
@@ -23,8 +24,8 @@ export function CoursePathView({model,targetOutcome,onInspectCapabilities,onSele
       const recommended=index===model.recommendedStepIndex;
       return <motion.li initial={false} className={`navigator-stop ${step.state}${recommended?' recommended current':''}`} key={`${step.edgeId}:${step.actionId}:${step.order}`} data-step-edge={step.edgeId} data-step-action={step.actionId} style={{'--path-x':`${x}%`} as CSSProperties}>
         {index<model.steps.length-1?<svg className="navigator-connector" data-reading-order="true" viewBox="0 0 100 220" preserveAspectRatio="none" aria-hidden="true"><path d={`M ${x} 36 C ${x} 145, ${nextX} 145, ${nextX} 256`} vectorEffect="non-scaling-stroke"/></svg>:null}
-        <button className="navigator-node" aria-current={recommended?'step':undefined} aria-label={`${step.title}，${label}，查看详情`} onClick={()=>onSelect(step.sourceNodeId,step.edgeId,step.actionId)}><span>{step.completed?<Check size={25}/>:step.canExecute?<Play size={24}/>:<Circle size={21}/>}</span></button>
-        <div className="navigator-node-copy"><small>{label}{recommended?' · 推荐下一步':''} · Step {index+1} · 关系内行动 {model.steps.slice(0,index+1).filter(item=>item.edgeId===step.edgeId).length}/{model.steps.filter(item=>item.edgeId===step.edgeId).length}</small><strong>{step.title}</strong><em>{step.action?`${step.action.type==='micro_learning'?'微学习':'实践任务'} · 约 ${step.action.estimated_minutes} 分钟`:'行动已不可用，需要调整路线'}</em>{!step.canExecute && !step.completed?<em>{step.reason}</em>:null}
+        <button className="navigator-node" aria-current={recommended?'step':undefined} aria-label={`${step.title}，${label}，查看详情`} onClick={()=>onSelect(isNodeScope(step)?step.nodeId:step.sourceNodeId,step.edgeId,step.actionId)}><span>{step.completed?<Check size={25}/>:step.canExecute?<Play size={24}/>:<Circle size={21}/>}</span></button>
+        <div className="navigator-node-copy"><small>{label}{recommended?' · 推荐下一步':''} · Step {index+1} · 范围内行动 {model.steps.slice(0,index+1).filter(item=>sameActionScope(item,step)).length}/{model.steps.filter(item=>sameActionScope(item,step)).length}</small><strong>{step.title}</strong><em>{step.action?`${step.action.type==='micro_learning'?'微学习':'实践任务'} · 约 ${step.action.estimated_minutes} 分钟`:'行动已不可用，需要调整路线'}</em>{!step.canExecute && !step.completed?<em>{step.reason}</em>:null}
           {step.canExecute && !step.completed || step.state==='in_progress'?<button className="atlas-primary" disabled={busy || model.needsAdjustment || step.unavailable || !step.canExecute} onClick={()=>onExecute(index)}>{step.run?.status==='in_progress'?'继续':step.satisfied?'可选执行':'开始'}</button>:null}
         </div>
       </motion.li>;

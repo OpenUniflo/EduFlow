@@ -4,7 +4,7 @@ const step=(edgeId:string,actionId:string,order=0)=>({edgeId,actionId,sourceNode
 it('separates Node/Edge membership from added, removed and reordered Actions',()=>{
  const old={selectedNodeIds:['A','B'],executionSteps:[step('one','a'),step('one','b'),step('removed','r')]};
  const next={selectedNodeIds:['B','C'],executionSteps:[step('one','b'),step('one','a'),step('one','c'),step('added','d'),step('added','e')]};
- expect(routeDiff(old,next)).toEqual({addedNodeIds:['C'],removedNodeIds:['A'],addedEdgeIds:['added'],removedEdgeIds:['removed'],addedActions:[step('one','c'),step('added','d'),step('added','e')],removedActions:[step('removed','r')],reorderedEdgeIds:['one']});
+ expect(routeDiff(old,next)).toEqual({addedNodeIds:['C'],removedNodeIds:['A'],addedEdgeIds:['added'],removedEdgeIds:['removed'],addedActions:[step('one','c'),step('added','d'),step('added','e')],removedActions:[step('removed','r')],reorderedEdgeIds:['one'],reorderedNodeIds:[]});
  expect(routeDiff(next,next).reorderedEdgeIds).toEqual([]);
 });
 it('removing one Action never removes its Edge',()=>{

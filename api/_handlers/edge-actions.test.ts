@@ -32,7 +32,7 @@ beforeEach(() => {
       { id: 'unrelated', source: 'source', target: 'other', strength: 'soft' },
     ],
   } });
-  mocks.active.mockResolvedValue({ snapshot: {}, constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
+  mocks.active.mockResolvedValue({ snapshot: {valid:true,selectedNodeIds:['source','target'],currentKnowledgeIds:['source','target'],prerequisiteEdges:[{id:'retained',source:'source',target:'target',strength:'soft'}],executionSteps:[{edgeId:'retained',actionId:'retained-action',sourceNodeId:'source',targetNodeId:'target',order:0}]}, constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
   mocks.micro.mockResolvedValue([]);
 });
 
@@ -75,7 +75,7 @@ it('advertises a bound Micro on a formal acquired Bridge edge without completed 
   expect(body?.availableMicroActionIds).toEqual(['retained-action']);
 });
 
-it('reads all factual Project ancestor alternatives after personal candidate pruning without granting execution', async () => {
+it('reads current model and retained formal alternatives without reviving pruned ancestors', async () => {
   const route = await mocks.input();
   route.input.nodeIds.push('outside');
   route.input.prerequisiteEdges.find((edge: {id:string;target:string}) => edge.id === 'unrelated').target = 'outside';
@@ -85,6 +85,17 @@ it('reads all factual Project ancestor alternatives after personal candidate pru
   let body: { actions: { id: string }[]; availableActionIds: string[] } | undefined;
   const response = { status() { return response; }, json(value: typeof body) { body = value; }, setHeader() {} };
   await handler({ method: 'GET', query: { courseId: 'course' }, headers: {} } as unknown as VercelRequest, response as unknown as VercelResponse);
-  expect(body?.actions.map(action => action.id)).toEqual(['retained-action', 'context-action']);
+  expect(body?.actions.map(action => action.id)).toEqual(['retained-action']);
   expect(body?.availableActionIds).toEqual([]);
+});
+
+it('retains formal/historical Node catalog after UKS prunes current model and exposes separate repeat eligibility',async()=>{
+ const data=await mocks.input();data.input.prerequisiteEdges=[{id:'retained',source:'source',target:'target',strength:'hard'}];mocks.input.mockResolvedValue(data);
+ tables.knowledge_edge_actions.push({id:'node-action',node_id:'source',edge_id:null,status:'active',type:'micro_learning',required_capability_ids:[],resource_requirements:[],estimated_minutes:5,difficulty:1});
+ tables.edge_action_runs=[{id:'done',user_id:'learner',course_id:'course',action_id:'node-action',node_id:'source',edge_id:null,status:'completed'}];
+ const version=await mocks.active();version.snapshot.executionSteps.unshift({scope:'node',nodeId:'source',actionId:'node-action',order:0});mocks.active.mockResolvedValue(version);
+ let body:{actions:{id:string}[];repeatableActionIds:string[];availableActionIds:string[]}|undefined;
+ const response={status(){return response;},json(value:typeof body){body=value;},setHeader(){}};
+ await handler({method:'GET',query:{courseId:'course'},headers:{}} as unknown as VercelRequest,response as unknown as VercelResponse);
+ expect(body?.actions.map(action=>action.id)).toContain('node-action');expect(body?.repeatableActionIds).toContain('node-action');expect(body?.availableActionIds).not.toContain('node-action');
 });

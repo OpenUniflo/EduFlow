@@ -17,15 +17,15 @@ describe('reviewed enterprise shared-graph acceptance',()=>{
   const a=input('A'),b=input('B');const am=buildCapabilityModel(a),bm=buildCapabilityModel(b);
   expect(am.courseKnowledgeIds).toEqual(bm.courseKnowledgeIds);expect(am.courseKnowledgeIds).toHaveLength(4);
   expect(am.currentKnowledgeIds).toHaveLength(6);expect(bm.currentKnowledgeIds).toHaveLength(7);
-  expect(gray(a)).toHaveLength(8);expect(gray(b)).toHaveLength(3);expect(plan(a).selectedNodeIds).not.toEqual(plan(b).selectedNodeIds);
+  expect(gray(a)).toHaveLength(8);expect(gray(b)).toHaveLength(5);expect(plan(a).selectedNodeIds).not.toEqual(plan(b).selectedNodeIds);
   expect(nav(a).nextAction.nodeId).not.toEqual(nav(b).nextAction.nodeId);
   expect(am.disconnectedCourseKnowledgeIds).toEqual([]);expect(bm.disconnectedCourseKnowledgeIds).toEqual([]);
  });
- it('every gray is non-target, unacquired, factually acquired-supported and reaches an unfinished target',()=>{
+ it('every gray is non-target, unacquired, factually root/acquired-supported and reaches an unfinished target',()=>{
   for(const data of [input('A'),input('B'),input('A',true)]){
    const model=buildCapabilityModel(data);const factual=[...data.prerequisiteEdges,...(data.enablesEdges??[])];
    const reachable=(roots:readonly string[])=>{const visited=new Set(roots),queue=[...roots];for(let i=0;i<queue.length;i++)for(const e of factual)if(e.source===queue[i]&&!visited.has(e.target)){visited.add(e.target);queue.push(e.target);}return visited;};
-   const supported=reachable(data.currentNodeIds);
+   const supported=reachable([...data.currentNodeIds,...data.nodeIds.filter(id=>!factual.some(edge=>edge.target===id))]);
    for(const node of gray(data)){expect(model.courseKnowledgeIds).not.toContain(node);expect(data.currentNodeIds).not.toContain(node);expect(supported.has(node)).toBe(true);expect(model.courseKnowledgeIds.some(t=>!data.currentNodeIds.includes(t)&&reachable([node]).has(t))).toBe(true);}
    expect(model.orderedNodeIds.every(n=>data.nodeIds.includes(n))).toBe(true);
    expect(model.supportEdges.every(e=>factual.some(f=>f.id===e.id))).toBe(true);

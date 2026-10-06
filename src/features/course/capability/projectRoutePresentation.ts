@@ -1,24 +1,22 @@
 import { executionRelations,type RouteExecutionStep } from '@/shared/learning/routeExecution';
 import type { KnowledgeGraph } from '@/features/knowledge/types';
-import { projectAncestorNodeIds, type CapabilityRelation, type SelectedRoute } from '@/shared/learning/routePlanning';
+import { type CapabilityModel, type CapabilityRelation, type SelectedRoute } from '@/shared/learning/routePlanning';
 import { type RouteOverlay, type RouteOverlayState } from '@/shared/learning/routePresentation';
 
-/** Structural range only. Acquired state and route edits must never alter force input. */
-export function projectStructuralGraph(graph: KnowledgeGraph, targetIds: readonly string[]): KnowledgeGraph {
-  const active = new Set(graph.nodes.filter(node => node.status === 'active').map(node => node.id));
-  const facts = graph.edges.filter(edge => edge.relation !== 'related' && active.has(edge.source) && active.has(edge.target));
-  const members = new Set(projectAncestorNodeIds([...active], targetIds, facts));
+/** Renderer projection of the one current model; no second ancestor builder. */
+export function projectCapabilityGraph(graph: KnowledgeGraph, model: CapabilityModel | null): KnowledgeGraph {
+  const members = new Set(model?.orderedNodeIds ?? []);
+  const facts = new Set(model?.supportEdges.map(edge => edge.id) ?? []);
   return {
     nodes: graph.nodes.filter(node => members.has(node.id)).sort((a, b) => a.id.localeCompare(b.id)),
-    edges: facts.filter(edge => members.has(edge.source) && members.has(edge.target)).sort((a, b) => a.id.localeCompare(b.id)),
+    edges: graph.edges.filter(edge => facts.has(edge.id)).sort((a, b) => a.id.localeCompare(b.id)),
     revisions: graph.revisions.filter(revision => members.has(revision.nodeId)),
   };
 }
 
-/** One presentation scope for graph, search, counters and inspectors. */
-export function projectVisibleNodeIds(graph:KnowledgeGraph,route:Pick<SelectedRoute,'selectedNodeIds'>|null,targetIds:readonly string[],editing:boolean):Set<string> {
-  const members=new Set([...(route?.selectedNodeIds??[]),...targetIds]);
-  return new Set(graph.nodes.filter(node=>editing || members.has(node.id)).map(node=>node.id));
+/** Graph, search, counters and inspectors share all current model members. */
+export function projectVisibleNodeIds(graph: KnowledgeGraph): Set<string> {
+  return new Set(graph.nodes.map(node => node.id));
 }
 
 /** Snapshot prerequisites are authoritative; enables come from real structural facts. */
