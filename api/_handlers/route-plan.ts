@@ -71,7 +71,8 @@ export default handleApi(async (request, response) => {
     try {
       model=buildCapabilityModel(data.input);
       inModel=Boolean(formal?.selectedNodeIds.every(id=>model!.orderedNodeIds.includes(id) && !model!.disconnectedCourseKnowledgeIds.includes(id))
-        && formal.executionSteps?.every(step=>isNodeScope(step)||model!.supportEdges.some(edge=>edge.id===step.edgeId)));
+        && formal.executionSteps?.every(step=>isNodeScope(step)||model!.supportEdges.some(edge=>edge.id===step.edgeId))
+        && data.input.prerequisiteEdges.every(edge=>edge.strength!=='hard'||!formal.selectedNodeIds.includes(edge.target)||data.input.currentNodeIds.includes(edge.target)||model!.supportEdges.some(fact=>fact.id===edge.id)));
     } catch (error) { if (!(error instanceof PrerequisiteCycleError)) throw error; }
   }
   // Historical reads/restoration preserve exact decisions. A new adjustment

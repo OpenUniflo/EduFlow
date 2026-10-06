@@ -22,8 +22,8 @@ export type SelectedRoute = {
   effectiveTargetNodeIds: string[]; currentKnowledgeIds: string[]; bridgeKnowledgeIds: string[];
 };
 export type RouteConflict = {
-  kind: 'include_exclude' | 'include_outside_model' | 'excluded_hard_prerequisite' | 'unavailable_hard_prerequisite' | 'target_without_acquired_path' | 'prerequisite_cycle';
-  rootNodeId?: string; rootKind?: 'target' | 'include'; nodeId?: string;
+  kind: 'include_exclude' | 'include_outside_model' | 'excluded_hard_prerequisite' | 'unavailable_hard_prerequisite' | 'hard_prerequisite_outside_path' | 'target_without_acquired_path' | 'prerequisite_cycle';
+  rootNodeId?: string; rootKind?: 'target' | 'include'; nodeId?: string; edgeId?: string;
   constraint: 'include' | 'exclude' | 'knowledge_graph';
 };
 export type RoutePlan = { valid: true; route: SelectedRoute; conflicts: [] } | { valid: false; route: null; conflicts: RouteConflict[] };
@@ -203,6 +203,13 @@ export function planCourseRoute(input: RoutePlanningInput, constraints: RouteCon
       members.add(edge.source); queue.push(edge.source);
     }
   }
+  // Projection never removes the full factual hard gate. A selected unacquired
+  // node requiring a relation without a legal path witness cannot be planned.
+  const modelEdgeIds=new Set(model.supportEdges.map(edge=>edge.id));
+  for(const id of members)if(!data.current.has(id))for(const edge of data.incoming.get(id)!) {
+    if(edge.strength==='hard'&&!modelEdgeIds.has(edge.id))conflicts.push({kind:'hard_prerequisite_outside_path',rootNodeId:id,rootKind:includes.includes(id)?'include':'target',nodeId:edge.source,edgeId:edge.id,constraint:'knowledge_graph'});
+  }
+  if(conflicts.length)return {valid:false,route:null,conflicts};
   const orderedNodeIds = topological(members, data.edges, data.compare);
   return { valid: true, conflicts: [], route: {
     orderedNodeIds, selectedNodeIds: unique(members), effectiveTargetNodeIds,

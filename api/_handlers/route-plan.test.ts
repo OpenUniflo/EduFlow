@@ -253,3 +253,19 @@ it('rejects a factual cycle backedge absent from the model even when every endpo
  const clean={...intent,scopeMode:'replan',includeNodeIds:['A','S','X'],selectedEdgeIds:intent.selectedEdgeIds.filter(id=>id!=='X>S'),actionChoices:executionSteps.filter(step=>step.edgeId!=='X>S').map(({edgeId,actionId})=>({edgeId,actionId}))};
  const cleaned=await invoke({action:'adopt',baseVersionId:base,...clean});expect(cleaned.status,JSON.stringify(cleaned.result)).toBe(200);expect(mocks.persist.mock.calls[0][9].map((step:any)=>step.edgeId)).not.toContain('X>S');
 });
+
+it('rejects a selected branch whose full hard gate is outside model paths without weakening AND',async()=>{
+ const enables=['A>X','A>Y','Y>X','X>T'].map(id=>({id,source:id.split('>')[0],target:id.split('>')[1],relation:'enables',strength:.8}));
+ const options=enables.map(edge=>({edgeId:edge.id,actionId:base,title:edge.id,type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[]}));
+ mocks.input.mockResolvedValue({...data,input:{...data.input,nodeIds:['A','X','Y','T'],currentNodeIds:['A'],prerequisiteEdges:[{id:'X>Y',source:'X',target:'Y',strength:'hard'}],enablesEdges:enables}});
+ mocks.options.mockResolvedValue(options);
+ const steps=enables.map((edge,order)=>({edgeId:edge.id,actionId:base,sourceNodeId:edge.source,targetNodeId:edge.target,order}));
+ const snapshot={...historicalSnapshot(),selectedNodeIds:['A','X','Y','T'],orderedNodeIds:['A','X','Y','T'],prerequisiteEdges:[],executionSteps:steps};
+ const constraints={includeNodeIds:['A','X','Y'],excludeNodeIds:[]};
+ mocks.active.mockResolvedValue({id:base,constraints,snapshot});
+ const intent={scopeMode:'current',...constraints,selectedEdgeIds:enables.map(edge=>edge.id),actionChoices:steps.map(({edgeId,actionId})=>({edgeId,actionId}))};
+ const preview=await invoke({action:'preview',...intent});expect(preview.status).toBe(200);expect(preview.result.plan).toMatchObject({valid:false,conflicts:[{kind:'hard_prerequisite_outside_path',rootNodeId:'Y',edgeId:'X>Y'}]});
+ expect((await invoke({action:'adopt',baseVersionId:base,...intent})).status).toBe(422);expect(mocks.persist).not.toHaveBeenCalled();
+ const clean={...intent,scopeMode:'replan',includeNodeIds:['A','X'],selectedEdgeIds:['A>X','X>T'],actionChoices:intent.actionChoices.filter(choice=>['A>X','X>T'].includes(choice.edgeId))};
+ const adopted=await invoke({action:'adopt',baseVersionId:base,...clean});expect(adopted.status,JSON.stringify(adopted.result)).toBe(200);expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['A','T','X']);
+});
