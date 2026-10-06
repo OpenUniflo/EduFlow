@@ -4,7 +4,7 @@ import { ApiError } from './http.js';
 import { allRows, dataOrThrow } from './query.js';
 import { requirePublishedCourse, requireMicroTeachingEligibility } from './courseMembership.js';
 import { readActiveVersion, readRouteInput } from './routePlanning.js';
-import { planCourseRoute } from '../../src/shared/learning/routePlanning.js';
+import { buildCapabilityModel, planCourseRoute, PrerequisiteCycleError } from '../../src/shared/learning/routePlanning.js';
 import { routeExecutionProgress, isRouteNodeRoot, runMatchesStep } from '../../src/shared/learning/routeExecution.js';
 import { hasUnmetHardPrerequisite } from '../../src/shared/learning/teachingPrerequisites.js';
 import { routeRelations } from '../../src/shared/learning/routePresentation.js';
@@ -31,6 +31,13 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
   const version = await readActiveVersion(client, userId, courseId);
   if (version?.constraints.excludeNodeIds.some(id => id === sourceId || id === targetId)) throw new ApiError(422, 'action_excluded', '该关系的能力已从当前路线明确排除，请先调整路线。');
   if (!retainedScope) {
+    let model;
+    try { model=buildCapabilityModel(routeData.input); }
+    catch (error) { if (error instanceof PrerequisiteCycleError) throw new ApiError(422,'project_model_invalid','真实前置关系存在循环，请修正后再调整路线。'); throw error; }
+    if (!routeData.input.currentNodeIds.includes(targetId) && (!model.orderedNodeIds.includes(targetId)
+      || (sourceId && !model.orderedNodeIds.includes(sourceId))
+      || model.disconnectedCourseKnowledgeIds.includes(targetId)
+      || (action.edge_id&&!model.supportEdges.some(edge=>edge.id===action.edge_id)))) throw new ApiError(422,'action_outside_project','历史行动不属于当前已掌握能力到项目目标的有效路径，请先整理并重新采用路线。');
     const formal = version?.snapshot.executionSteps;
     const plan = version ? planCourseRoute(routeData.input, version.constraints) : null;
     if (formal !== undefined) {

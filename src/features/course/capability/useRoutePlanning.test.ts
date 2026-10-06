@@ -102,3 +102,35 @@ it('clearing the final Action stays empty through Preview and cannot Adopt',asyn
  expect(JSON.parse(requests.api.mock.calls[1][1]!.body as string).actionChoices).toEqual([]);expect(render().actionChoices).toEqual([]);
  const count=requests.api.mock.calls.length;await render().adopt();expect(requests.api).toHaveBeenCalledTimes(count);
 });
+
+it('surfaces old model-external choices and only clears them through an explicit draft operation',async()=>{
+ const {buildCapabilityModel}=await import('@/shared/learning/routePlanning');
+ const model=buildCapabilityModel({nodeIds:['A','T','old'],currentNodeIds:['A'],courseOrder:[{nodeId:'T',lessonOrder:0,coverageOrder:0}],prerequisiteEdges:[{id:'ab',source:'A',target:'T',strength:'hard'}]});
+ const steps=[{scope:'node',nodeId:'old',actionId:'old-node',order:0},{edgeId:'old-edge',sourceNodeId:'old',targetNodeId:'T',actionId:'old-action',order:1},{edgeId:'ab',sourceNodeId:'A',targetNodeId:'T',actionId:'kept',order:2}];
+ const initial={model,activeVersion:{id:'v1',constraints:{includeNodeIds:['old'],excludeNodeIds:[]},snapshot:{selectedNodeIds:['old','A','T'],executionSteps:steps}}};
+ const saved=structuredClone(initial);requests.api.mockResolvedValueOnce(initial);render();await flush();render().begin();
+ expect(render().draft.includeNodeIds).toEqual(['old']);expect(render().modelChanges).toMatchObject({nodeIds:['old'],edgeIds:['old-edge']});
+ expect(render().dirty).toBe(false);expect(requests.api).toHaveBeenCalledTimes(1);
+ render().reconcileModel();
+ expect(render().draft.includeNodeIds).toEqual(['A','T']);expect(render().actionChoices).toEqual([{scope:'edge',edgeId:'ab',actionId:'kept'}]);expect(render().selectedEdgeIds).toEqual(['ab']);expect(render().modelChanges?.nodeIds).toEqual([]);expect(render().dirty).toBe(true);
+ expect(initial).toEqual(saved);expect(render().view?.activeVersion?.id).toBe('v1');expect(requests.api).toHaveBeenCalledTimes(1);
+ requests.api.mockResolvedValueOnce({baseVersionId:'v1',previewState:'a'.repeat(64),plan:{valid:true,route:{},conflicts:[],execution:{steps:[steps[2]],issues:[],options:[],complete:true}}});await render().replan();
+ expect(JSON.parse(requests.api.mock.calls[1][1]!.body as string)).toMatchObject({action:'preview',scopeMode:'replan',includeNodeIds:['A','T'],selectedEdgeIds:['ab'],actionChoices:[{edgeId:'ab',actionId:'kept'}]});
+});
+it('historical replanning never turns model-external historical membership into a new Include',async()=>{
+ const {buildCapabilityModel}=await import('@/shared/learning/routePlanning');
+ const model=buildCapabilityModel({nodeIds:['T','old'],currentNodeIds:['T'],courseOrder:[{nodeId:'T',lessonOrder:0,coverageOrder:0}],prerequisiteEdges:[]});
+ const initial={model,activeVersion:{id:'v1',constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{selectedNodeIds:['T'],executionSteps:[]}}};
+ requests.api.mockResolvedValueOnce(initial);render();await flush();
+ render().replanHistorical({constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{selectedNodeIds:['old','T'],executionSteps:[]}} as any);
+ expect(render().draft.includeNodeIds).toEqual(['T']);expect(render().view?.activeVersion?.snapshot.selectedNodeIds).toEqual(['T']);
+});
+
+it('a membership-only historical cleanup is dirty and cannot silently dismiss without adoption',async()=>{
+ const {buildCapabilityModel}=await import('@/shared/learning/routePlanning');
+ const model=buildCapabilityModel({nodeIds:['T','old'],currentNodeIds:['T'],prerequisiteEdges:[],courseOrder:[{nodeId:'T',lessonOrder:0,coverageOrder:0}]});
+ const initial={model,activeVersion:{id:'v1',constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{selectedNodeIds:['T','old'],executionSteps:[]}}};
+ requests.api.mockResolvedValueOnce(initial);render();await flush();render().begin();expect(render().dirty).toBe(false);
+ render().reconcileModel();expect(render().dirty).toBe(true);render().cancel();expect(render().dismissPending).toBe(true);expect(render().editing).toBe(true);
+ expect(initial.activeVersion.snapshot.selectedNodeIds).toEqual(['T','old']);expect(requests.api).toHaveBeenCalledTimes(1);
+});

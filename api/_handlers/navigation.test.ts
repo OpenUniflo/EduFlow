@@ -110,7 +110,7 @@ describe("Navigation authority pagination", () => {
     expect(chunks.every((chunk) => chunk.length === 1 || chunk.reduce((total, id) => total + encodeURIComponent(id).length + 3, 0) <= 4_000)).toBe(true);
   });
 
-  it("lets a decision-changing prerequisite on page three block the route and reuses the same decision", async () => {
+  it("does not lose the unacquired hard prerequisite on page three when rejecting an unanchored route", async () => {
     const sourceIds = Array.from({ length: 1_201 }, (_, index) => `source-${String(index).padStart(4, "0")}`);
     const nodeIds = [...sourceIds, "target"];
     const tableRows: Record<string, Row[]> = {
@@ -129,9 +129,9 @@ describe("Navigation authority pagination", () => {
     await handler(request, first.response);
     const second = responseRecorder();
     await handler(request, second.response);
-    expect(first.statusCode()).toBe(200);
-    expect(first.body()).toMatchObject({ decisionId: "decision-1", nextAction: { kind: "next", nodeId: "source-1200", reasonCode: "learning_content_unavailable" } });
-    expect(second.body()).toMatchObject({ decisionId: "decision-1" });
+    expect(first.statusCode()).toBe(422);
+    expect(first.body()).toMatchObject({error:{code:"route_constraints_conflict"}});
+    expect(second.statusCode()).toBe(422);
     expect(requirePublishedCourse).toHaveBeenCalledWith(userClient, "course");
   });
 

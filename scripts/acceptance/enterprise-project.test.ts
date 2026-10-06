@@ -17,24 +17,24 @@ describe('reviewed enterprise shared-graph acceptance',()=>{
   const a=input('A'),b=input('B');const am=buildCapabilityModel(a),bm=buildCapabilityModel(b);
   expect(am.courseKnowledgeIds).toEqual(bm.courseKnowledgeIds);expect(am.courseKnowledgeIds).toHaveLength(4);
   expect(am.currentKnowledgeIds).toHaveLength(6);expect(bm.currentKnowledgeIds).toHaveLength(7);
-  expect(gray(a)).toHaveLength(8);expect(gray(b)).toHaveLength(5);expect(plan(a).selectedNodeIds).not.toEqual(plan(b).selectedNodeIds);
+  expect(gray(a)).toHaveLength(8);expect(gray(b)).toHaveLength(3);expect(plan(a).selectedNodeIds).not.toEqual(plan(b).selectedNodeIds);
   expect(nav(a).nextAction.nodeId).not.toEqual(nav(b).nextAction.nodeId);
   expect(am.disconnectedCourseKnowledgeIds).toEqual([]);expect(bm.disconnectedCourseKnowledgeIds).toEqual([]);
  });
- it('every gray is non-target, unacquired, factually root/acquired-supported and reaches an unfinished target',()=>{
+ it('every gray is non-target, unacquired, factually acquired-supported and reaches an unfinished target',()=>{
   for(const data of [input('A'),input('B'),input('A',true)]){
    const model=buildCapabilityModel(data);const factual=[...data.prerequisiteEdges,...(data.enablesEdges??[])];
    const reachable=(roots:readonly string[])=>{const visited=new Set(roots),queue=[...roots];for(let i=0;i<queue.length;i++)for(const e of factual)if(e.source===queue[i]&&!visited.has(e.target)){visited.add(e.target);queue.push(e.target);}return visited;};
-   const supported=reachable([...data.currentNodeIds,...data.nodeIds.filter(id=>!factual.some(edge=>edge.target===id))]);
-   for(const node of gray(data)){expect(model.courseKnowledgeIds).not.toContain(node);expect(data.currentNodeIds).not.toContain(node);expect(supported.has(node)).toBe(true);expect(model.courseKnowledgeIds.some(t=>!data.currentNodeIds.includes(t)&&reachable([node]).has(t))).toBe(true);}
+   const supported=reachable(data.currentNodeIds);
+   for(const node of gray(data)){expect(model.supportEdges.some(e=>e.target===node)).toBe(true);expect(model.supportEdges.some(e=>e.source===node)).toBe(true);expect(model.courseKnowledgeIds).not.toContain(node);expect(data.currentNodeIds).not.toContain(node);expect(supported.has(node)).toBe(true);expect(model.courseKnowledgeIds.some(t=>!data.currentNodeIds.includes(t)&&reachable([node]).has(t))).toBe(true);}
    expect(model.orderedNodeIds.every(n=>data.nodeIds.includes(n))).toBe(true);
    expect(model.supportEdges.every(e=>factual.some(f=>f.id===e.id))).toBe(true);
   }
  });
- it('A acquired exposure prunes historical net boundary and recomputes route/navigation without changing structure',()=>{
+ it('A acquired exposure changes route boundaries while preserving all anchored model paths and recomputes route/navigation without changing structure',()=>{
   const a=input('A'),next=input('A',true),b=input('B');const saved=JSON.stringify(plan(a)),beforeB=JSON.stringify(plan(b));
   expect(gray(a)).toContain(id('exposure'));expect(gray(next)).not.toContain(id('exposure'));expect(buildCapabilityModel(next).currentKnowledgeIds).toContain(id('exposure'));
-  expect(buildCapabilityModel(next).orderedNodeIds).not.toContain(id('net'));expect(plan(a).selectedNodeIds).toHaveLength(13);expect(plan(next).selectedNodeIds).toHaveLength(12);
+  expect(buildCapabilityModel(next).orderedNodeIds).toContain(id('net'));expect(plan(a).selectedNodeIds).toHaveLength(13);expect(plan(next).selectedNodeIds).toHaveLength(12);
   expect(nav(a).path).not.toEqual(nav(next).path);expect(routeStructure(a,{includeNodeIds:[],excludeNodeIds:[]})).toEqual(routeStructure(next,{includeNodeIds:[],excludeNodeIds:[]}));
   expect(JSON.stringify(plan(a))).toEqual(saved);expect(JSON.stringify(plan(b))).toEqual(beforeB);
  });

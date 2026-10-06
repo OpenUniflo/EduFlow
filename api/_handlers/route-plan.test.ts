@@ -35,6 +35,7 @@ describe('authoritative V2 route intent API', () => {
     expect(mocks.persist).not.toHaveBeenCalled();
   });
   it('preview does not initialize or write and includes hard closure only', async () => {
+    mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A']}});
     const r = await invoke({ action: 'preview', includeNodeIds: [], excludeNodeIds: [] });
     expect(r.status).toBe(200); expect(r.result.plan.route.selectedNodeIds).toEqual(['A', 'T']);
     expect(mocks.persist).not.toHaveBeenCalled(); expect(mocks.current).not.toHaveBeenCalled();
@@ -72,14 +73,13 @@ describe('authoritative V2 route intent API', () => {
     expect(mocks.persist.mock.calls[0].slice(5,8)).toEqual([base, 'restore', old]);
     expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['A', 'S', 'T']);
   });
-  it('restores an explicitly included unacquired factual ancestor without rewriting history', async () => {
+  it('does not recreate an unacquired ancestor from legacy node-only history', async () => {
     const historical = { constraints: { includeNodeIds: ['S'], excludeNodeIds: [] } };
     mocks.read.mockResolvedValue(historical);
     const r = await invoke({ action: 'restore', baseVersionId: base, versionId: old });
-    expect(r.status).toBe(200);
-    expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['A', 'S', 'T']);
-    expect(mocks.persist.mock.calls[0].slice(5,8)).toEqual([base, 'restore', old]);
-    expect(mocks.persist.mock.calls[0][9]).toBeUndefined();
+    expect(r.status).toBe(422);
+    expect(r.result.error.details.conflicts).toContainEqual(expect.objectContaining({kind:'include_outside_model',nodeId:'S'}));
+    expect(mocks.persist).not.toHaveBeenCalled();
     expect(historical.constraints).toEqual({ includeNodeIds: ['S'], excludeNodeIds: [] });
   });
 
@@ -133,19 +133,19 @@ describe('authoritative V2 route intent API', () => {
     expect(mocks.persist).not.toHaveBeenCalled();expect(snapshot).toEqual(before);
   });
 
-  it('Action-only Preview and Adopt keep formal scope after target capability is acquired',async()=>{
-    const snapshot={valid:true,selectedNodeIds:['A','T'],orderedNodeIds:['A','T'],prerequisiteEdges:[{id:'A>T',source:'A',target:'T',strength:'hard'}],currentKnowledgeIds:['A'],effectiveTargetNodeIds:['T'],bridgeKnowledgeIds:['A'],executionSteps:[{edgeId:'A>T',actionId:base,sourceNodeId:'A',targetNodeId:'T',order:0}]};
+  it('requires explicit reconciliation when acquisition removes an old execution scope',async()=>{
+    const snapshot=historicalSnapshot(), before=structuredClone(snapshot);
     mocks.active.mockResolvedValue({id:base,constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot});
     mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A','T']}});
-    const intent={includeNodeIds:[],excludeNodeIds:[],selectedEdgeIds:['A>T'],actionChoices:[{edgeId:'A>T',actionId:old}]};
-    const result=await invoke({action:'preview',...intent});
-    expect(result.status).toBe(200);expect(result.result.plan.route.selectedNodeIds).toEqual(['A','T']);expect(result.result.plan.execution.steps[0].actionId).toBe(old);
+    const result=await invoke({action:'preview',scopeMode:'current',includeNodeIds:[],excludeNodeIds:[],selectedEdgeIds:['A>T'],actionChoices:[{edgeId:'A>T',actionId:old}]});
+    expect(result.result.plan.route.selectedNodeIds).toEqual(['T']);
+    expect(result.result.plan.execution.complete).toBe(false);
+    expect(result.result.plan.execution.issues).toContainEqual(expect.objectContaining({kind:'edge_not_in_route'}));
     expect(mocks.persist).not.toHaveBeenCalled();
-    expect((await invoke({action:'adopt',baseVersionId:base,...intent})).status).toBe(200);
-    expect(mocks.persist.mock.calls[0][9][0].actionId).toBe(old);expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['A','T']);
-    expect(snapshot.executionSteps[0].actionId).toBe(base);
+    expect((await invoke({action:'adopt',baseVersionId:base,scopeMode:'replan',includeNodeIds:[],excludeNodeIds:[],selectedEdgeIds:[],actionChoices:[]})).status).toBe(200);
+    expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['T']);
+    expect(snapshot).toEqual(before);
   });
-
 });
 
 it('explicit node replan keeps Preview and Adopt scope consistent after clearing constraints and UKS growth',async()=>{
@@ -211,4 +211,45 @@ it('permits an independent Edge before an active Run but rejects a new unfinishe
   mocks.persist.mockClear();
   expect((await invoke({...intent,actionChoices:[{edgeId:'S>X',actionId:other},{edgeId:'A>T',actionId:old},{edgeId:'A>T',actionId:base}]})).result.error.code).toBe('route_active_run_conflict');
   expect(mocks.persist).not.toHaveBeenCalled();
+});
+
+it('current-scope Preview cannot turn a model-external historical Include into an invisible action blocker',async()=>{
+ const snapshot={...historicalSnapshot(),selectedNodeIds:['A','S','T'],orderedNodeIds:['S','A','T']};
+ const saved=structuredClone(snapshot);
+ mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A'],enablesEdges:[{id:'S>A',source:'S',target:'A',relation:'enables',strength:.8}]}});
+ mocks.active.mockResolvedValue({id:base,constraints:{includeNodeIds:['S'],excludeNodeIds:[]},snapshot});
+ const intent={scopeMode:'current',includeNodeIds:['S'],excludeNodeIds:[],selectedEdgeIds:['A>T'],actionChoices:[{edgeId:'A>T',actionId:old}]};
+ const result=await invoke({action:'preview',...intent});
+ expect(result.status).toBe(200);expect(result.result.plan).toMatchObject({valid:false,route:null,conflicts:[{kind:'include_outside_model',nodeId:'S'}]});
+ expect(result.result.plan.execution).toBeUndefined();expect(mocks.persist).not.toHaveBeenCalled();
+ expect((await invoke({action:'adopt',baseVersionId:base,...intent})).status).toBe(422);
+ expect((await invoke({action:'adopt',baseVersionId:base,...intent,scopeMode:'replan',includeNodeIds:[]})).status).toBe(200);
+ expect(mocks.persist.mock.calls[0][4].selectedNodeIds).toEqual(['A','T']);expect(snapshot).toEqual(saved);
+});
+
+it('returns structured prerequisite-cycle conflicts and preserves independent exact restoration',async()=>{
+ const snapshot=historicalSnapshot();
+ mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A'],prerequisiteEdges:[...data.input.prerequisiteEdges,{id:'S>X',source:'S',target:'X',strength:'hard'},{id:'X>S',source:'X',target:'S',strength:'hard'}]}});
+ const preview=await invoke({action:'preview',includeNodeIds:[],excludeNodeIds:[]});
+ expect(preview.status).toBe(200);expect(preview.result.plan).toMatchObject({valid:false,conflicts:[{kind:'prerequisite_cycle'}]});
+ expect((await invoke({action:'adopt',baseVersionId:base,includeNodeIds:[],excludeNodeIds:[]})).status).toBe(422);
+ expect(mocks.persist).not.toHaveBeenCalled();
+ mocks.read.mockResolvedValue({id:old,constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot});
+ expect((await invoke({action:'restore',baseVersionId:base,versionId:old})).status).toBe(200);
+ expect(mocks.persist.mock.calls[0][9]).toEqual(snapshot.executionSteps);
+});
+
+it('rejects a factual cycle backedge absent from the model even when every endpoint is a model member',async()=>{
+ const edges=['A>S','S>X','X>S','X>T'].map(id=>({id,source:id.split('>')[0],target:id.split('>')[1],relation:'enables',strength:.8}));
+ const options=edges.map((edge,index)=>({edgeId:edge.id,actionId:index%2?old:base,title:edge.id,type:'micro_learning',estimatedMinutes:8,weight:8,planningAvailable:true,availableNow:true,reasons:[]}));
+ const executionSteps=edges.map((edge,index)=>({edgeId:edge.id,actionId:options[index].actionId,sourceNodeId:edge.source,targetNodeId:edge.target,order:index}));
+ const snapshot={...historicalSnapshot(),selectedNodeIds:['A','S','X','T'],orderedNodeIds:['A','S','X','T'],prerequisiteEdges:[],executionSteps};
+ mocks.input.mockResolvedValue({...data,input:{...data.input,currentNodeIds:['A'],prerequisiteEdges:[],enablesEdges:edges}});
+ mocks.options.mockResolvedValue(options);mocks.active.mockResolvedValue({id:base,constraints:{includeNodeIds:['S','X'],excludeNodeIds:[]},snapshot});
+ const intent={scopeMode:'current',includeNodeIds:['S','X'],excludeNodeIds:[],selectedEdgeIds:edges.map(edge=>edge.id),actionChoices:executionSteps.map(({edgeId,actionId})=>({edgeId,actionId}))};
+ const preview=await invoke({action:'preview',...intent});expect(preview.result.plan.execution.complete).toBe(false);
+ expect(preview.result.plan.execution.issues).toContainEqual(expect.objectContaining({kind:'edge_not_in_route',edgeId:'X>S'}));
+ expect((await invoke({action:'adopt',baseVersionId:base,...intent})).status).toBe(422);expect(mocks.persist).not.toHaveBeenCalled();
+ const clean={...intent,scopeMode:'replan',includeNodeIds:['A','S','X'],selectedEdgeIds:intent.selectedEdgeIds.filter(id=>id!=='X>S'),actionChoices:executionSteps.filter(step=>step.edgeId!=='X>S').map(({edgeId,actionId})=>({edgeId,actionId}))};
+ const cleaned=await invoke({action:'adopt',baseVersionId:base,...clean});expect(cleaned.status,JSON.stringify(cleaned.result)).toBe(200);expect(mocks.persist.mock.calls[0][9].map((step:any)=>step.edgeId)).not.toContain('X>S');
 });

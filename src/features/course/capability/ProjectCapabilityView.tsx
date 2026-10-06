@@ -53,7 +53,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   const displayedNodes = result.projection?.nodes.filter(node => visibleIds.has(node.id)) ?? [];
   const selected = displayedNodes.find(node => node.id === selectedId);
   const matches = result.projection?.nodes.filter(node => visibleIds.has(node.id) && `${node.title} ${node.id}`.toLowerCase().includes(query.toLowerCase())) ?? [];
-  const title = (id: string) => graph.nodes.find(node => node.id === id)?.title ?? id;
+  const title = (id: string) => graph.nodes.find(node => node.id === id)?.title ?? control.view?.activeVersion?.snapshot.titles[id] ?? id;
   const roles = (node: NonNullable<typeof selected>) => !(previewRoute??currentRoute)?.selectedNodeIds.includes(node.id) && !(control.editing && control.draft.includeNodeIds.includes(node.id)) ? '候选能力 · 未纳入当前路线' : [node.capabilityRoles?.current && '已具备', node.capabilityRoles?.course && '项目目标', node.capabilityRoles?.bridge && '中间能力', result.model?.disconnectedCourseKnowledgeIds.includes(node.id) && '暂无当前能力入口'].filter(Boolean).join(' · ');
   const choose = (id: string) => {setEdgeId(null);onSelect(id);};
   const draftMark = (id: string) => !control.editing ? '' : control.draft.includeNodeIds.includes(id) ? ' · 加入' : control.draft.excludeNodeIds.includes(id) ? ' · 排除' : '';

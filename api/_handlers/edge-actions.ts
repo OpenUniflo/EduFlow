@@ -40,8 +40,10 @@ export default handleApi(async (request, response) => {
     const courseEdges = [...routeData.input.prerequisiteEdges, ...(routeData.input.enablesEdges ?? [])].filter(edge => courseNodes.has(edge.source) && courseNodes.has(edge.target));
     const plan = version?.snapshot.executionSteps !== undefined && version.snapshot.valid ? {valid:true as const,route:version.snapshot,conflicts:[]} : planCourseRoute(routeData.input, version?.constraints ?? defaultConstraints);
     const facts = [...routeData.input.prerequisiteEdges.map(edge => ({ ...edge, relation: 'prerequisite' as const })), ...(routeData.input.enablesEdges ?? [])];
-    const projectNodes = new Set(buildCapabilityModel(routeData.input).orderedNodeIds);
-    const projectEdges = facts.filter(edge => projectNodes.has(edge.source) && projectNodes.has(edge.target));
+    const model=buildCapabilityModel(routeData.input);
+    const projectNodes = new Set(model.orderedNodeIds);
+    const projectEdges = model.supportEdges;
+    const freshScope=(target:string,source?:string,edgeId?:string)=>routeData.input.currentNodeIds.includes(target)||projectNodes.has(target)&&(!source||projectNodes.has(source))&&!model.disconnectedCourseKnowledgeIds.includes(target)&&(!edgeId||projectEdges.some(edge=>edge.id===edgeId));
     const routeEdges = plan.valid ? (version?.snapshot.executionSteps !== undefined ? executionRelations(version.snapshot,facts) : routeRelations(plan.route, facts)) : [];
     const routeEdgeIds = new Set(routeEdges.map(edge => edge.id));
     const scopedEdges = new Set([...projectEdges.map(edge => edge.id), ...routeEdges.map(edge => edge.id), ...courseEdges.map(edge => edge.id), ...runs.map(run => String(run.edge_id))]);
@@ -63,7 +65,7 @@ export default handleApi(async (request, response) => {
       const edge = edges.find(edge => edge.id === action.edge_id);
       const target = edge?.target ?? '';
       const binding = bindings.find(binding => binding.action_id === action.id);
-      return Boolean(action.type === 'micro_learning' && frontierAction(String(action.id)) && binding?.available && version && edge && !version.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && plan.valid && (routeEdgeIds.has(edge.id) && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target))
+      return Boolean(action.type === 'micro_learning' && freshScope(target,edge?.source,edge?.id) && frontierAction(String(action.id)) && binding?.available && version && edge && !version.constraints.excludeNodeIds.some(id => id === edge.source || id === target) && plan.valid && (routeEdgeIds.has(edge.id) && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(target) || completedActions.has(action.id) && acquired.has(target))
         && evaluateAction(action as EdgeAction,{sourceId:edge.source,acquiredIds:acquired,binding:binding as CourseActionBinding}).available
         && (progress || !hasUnmetHardPrerequisite(target, acquired, routeData.input.prerequisiteEdges))
         && microPaths.some(path => path.id === binding.micro_path_id && path.knowledge_id === target));
@@ -72,14 +74,14 @@ export default handleApi(async (request, response) => {
       const binding = bindings.find(binding => binding.action_id === action.id);
       const edge = edges.find(edge => edge.id === action.edge_id);
       const assignment = assignments.find(assignment => assignment.id === binding?.assignment_id);
-      const scopeAvailable = edge && !version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && (completedActions.has(action.id) || routeEdgeIds.has(edge.id) && plan.valid && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(edge.target));
+      const scopeAvailable = edge && freshScope(edge.target,edge.source,edge.id) && !version?.constraints.excludeNodeIds.some(id => id === edge.source || id === edge.target) && (completedActions.has(action.id) || routeEdgeIds.has(edge.id) && plan.valid && plan.route.selectedNodeIds.includes(edge.source) && plan.route.selectedNodeIds.includes(edge.target));
       if (!frontierAction(String(action.id)) || !edge || !version || !scopeAvailable || !isArtifactPracticeExecutor(assignment) || !binding?.available || !binding.assignment_id || binding.micro_path_id || !progress && hasUnmetHardPrerequisite(edge.target, acquired, routeData.input.prerequisiteEdges)) return null;
       if(!evaluateAction(action as EdgeAction,{sourceId:edge.source,acquiredIds:acquired,binding:binding as CourseActionBinding}).available) return null;
       const { coverage, eligibility } = await readAssignmentEligibility(client, user.id, courseId, String(binding.assignment_id), { targetId: edge.target, status: 'not_started', reachableNodeIds:[...acquired] });
       return !eligibility.reason && coverage.some(row => row.node_id === edge.target) ? action.id : null;
     }));
     const nodeOptions=plan.valid && nodeActions.length ? await readRouteActionOptions(client,courseId,routeData.input,plan.route,user.id) : [];
-    const availableNodeActions=nodeOptions.filter(option=>option.scope==='node' && option.availableNow && version?.snapshot.executionSteps?.some(step=>step.scope==='node' && step.nodeId===option.nodeId && step.actionId===option.actionId));
+    const availableNodeActions=nodeOptions.filter(option=>option.scope==='node' && freshScope(option.nodeId) && option.availableNow && version?.snapshot.executionSteps?.some(step=>step.scope==='node' && step.nodeId===option.nodeId && step.actionId===option.actionId));
     availableMicroActionIds.push(...availableNodeActions.filter(option=>option.type==='micro_learning').map(option=>option.actionId));
     const repeatableActionIds=(await Promise.all([...completedActions].map(async actionId=>{
       try {await requireActionExecution(client,user.id,courseId,String(actionId),true);return String(actionId);}

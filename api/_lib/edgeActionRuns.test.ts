@@ -77,11 +77,11 @@ describe('explicit Action execution authority', () => {
     input.courseOrder = [{ nodeId: 'source', lessonOrder: 0, coverageOrder: 0 }, ...input.courseOrder];
     input.prerequisiteEdges = [];
     input.enablesEdges = [{ id: 'edge', source: 'source', target: 'target', relation: 'enables', strength: 1 }];
-    await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'action_conditions_unmet' });
+    await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'action_outside_project' });
   });
   it('retains target hard gates for a new formally selected relation', async () => {
     input.prerequisiteEdges = [...input.prerequisiteEdges, { id: 'other-hard', source: 'other', target: 'target', strength: 'hard' }];
-    await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'target_prerequisite_required' });
+    await expect(requireActionExecution(client, 'learner', 'course', 'action')).rejects.toMatchObject({ code: 'action_outside_project' });
   });
   it('does not repeat a retained Practice through an explicitly excluded capability', async () => {
     tables.knowledge_edge_actions[0].type = 'practice_task';
@@ -116,6 +116,7 @@ it('server blocks later same-Edge Actions and reaches the next Edge without a UK
  tables.edge_action_runs=[{user_id:'learner',course_id:'course',edge_id:'edge',action_id:'first',execution_version:2,status:'completed'}];
  expect((await requireActionExecution(client,'learner','course','action')).routeVersionId).toBe('version');
  tables.edge_action_runs.push({user_id:'learner',course_id:'course',edge_id:'edge',action_id:'action',execution_version:2,status:'completed'});
+ input.courseOrder=[...input.courseOrder,{nodeId:'other',lessonOrder:2,coverageOrder:0}];
  input.prerequisiteEdges=[...input.prerequisiteEdges,{id:'next',source:'target',target:'other',strength:'hard'}];
  tables.knowledge_edge_actions.push({...tables.knowledge_edge_actions[0],id:'next-action',edge_id:'next'});
  tables.course_action_bindings.push({...tables.course_action_bindings[0],id:'next-binding',action_id:'next-action',micro_path_id:'next-path'});
@@ -134,6 +135,6 @@ it('accepts either independent hard incoming Action without waiting for the othe
   expect((await requireActionExecution(client,'learner','course','other-action')).routeVersionId).toBe('version');
   expect((await requireActionExecution(client,'learner','course','action')).routeVersionId).toBe('version');
   input.currentNodeIds=['source'];
-  await expect(requireActionExecution(client,'learner','course','other-action')).rejects.toMatchObject({code:'route_step_not_available'});
-  expect((await requireActionExecution(client,'learner','course','action')).routeVersionId).toBe('version');
+  await expect(requireActionExecution(client,'learner','course','other-action')).rejects.toMatchObject({code:'action_outside_project'});
+  await expect(requireActionExecution(client,'learner','course','action')).rejects.toMatchObject({code:'action_outside_project'});
 });

@@ -1,6 +1,6 @@
 # Capability, Route and Action contract
 
-Current V3 contract, 2026-10-06. Supersedes the V2 acquired-only candidate entry, expanded Editing range and Edge-only Action rules.
+Current V3 contract, amended 2026-10-07. The acquired-entry amendment below supersedes the earlier V3 unacquired-root admission rule; Node/Edge Action contracts and immutable history remain.
 
 ## Authorities
 
@@ -16,7 +16,7 @@ Immutable Route Version snapshots store executionSteps containing only stable No
 
 Course Route reuses the earlier vertical sequential path styling and presents completed, in-progress, available, blocked and capability-satisfied adopted Actions. Its Step-to-Step line represents stable reading order, is not a KnowledgeEdge and never enters graph data. Course Route and Navigator do not compare alternatives; a secondary Adjust Route entry opens Project Capability. Server execution gates use formal capability plus derived Route execution reachability. Every available frontier Action can start; a recommended Step is presentation only. Completed Steps may repeat without blocking progression.
 
-Include requires the Personal Route to pass through a capability already in the current model; it never admits an ancestor outside that model. Intermediate selected nodes must lie on selected factual execution paths. Legitimate roots need no incoming Edge and can execute Node Actions. Exclude changes route constraints only.
+Include requires the Personal Route to pass through a capability already in the current model; it never admits an ancestor outside that model. Intermediate selected nodes must lie on selected factual execution paths. Current Project entries must be formally acquired; historic Node-scope execution remains readable and retains its executor contract without invented Edges. Exclude changes route constraints only.
 
 Route preview is presentation-only until explicit adoption. Preview cannot create a route version. Current, kept, added and removed overlays do not change structural node/edge identity, coordinates, force lifecycle or camera. Project detail defaults to project supportEdges; extra Global facts require a separately labelled disclosure.
 
@@ -50,7 +50,7 @@ Ordinary Project KnowledgeEdges share one quiet solid-line visual. Hard/soft/ena
 
 ## Stable Project renderer range
 
-Normal, Editing, Preview, Search, counts, Inspector and SVG overlays use one Project Capability Model. Its union of legitimate target paths supports multiple roots, branches and merges. Reverse traversal stops at formal acquired boundaries; unacquired no-incoming roots are legitimate entries. Hard prerequisite AND is preserved, soft/enables are support and related is excluded. Resource availability is not model membership. Deterministic cycle-safe algorithms must not enumerate all paths or fabricate facts.
+Normal, Editing, Preview, Search, counts, Inspector and SVG overlays use one Project Capability Model. Its union of legitimate target paths supports multiple roots, branches and merges. Project path entries are formally acquired (blue) capabilities only. Forward support is seeded exclusively from acquired capabilities and respects hard AND. Reverse traversal from unfinished Course targets retains all supported branches, including those through acquired intermediates. Every unacquired non-target (gray) member has an incoming and outgoing factual relation and is acquired-reachable and target-reaching. An unacquired factual root is excluded, even if historical Include or Node Actions reference it. Course targets remain explicit context, including disconnected targets; disconnected unfinished targets return a structured conflict rather than becoming execution roots. Hard prerequisite AND is preserved, soft/enables are support and related is excluded. Resource availability is not model membership. Deterministic cycle-safe algorithms must not enumerate all paths or fabricate facts.
 
 Presentation state never changes model topology, coordinates, force lifecycle or camera. Formal UKS confirmation may change the model's structural set and permit structural layout recomputation, but never automatically creates a Personal Route Version. Existing adopted snapshots remain immutable and may refer to capabilities outside today's model; history inspection revalidates their factual references without rewriting them.
 
@@ -107,3 +107,11 @@ All selected Actions in a Node scope must actually complete before that root bec
 Preview represents selected capabilities, factual Edges, Node Actions, Edge Actions and local order separately. A floating intermediate is invalid; missing resources make execution incomplete without deleting the Project model. Adopt requires valid plan, complete execution and fresh Preview, revalidated server-side. Capability confirmation invalidates stale Preview but does not adopt a Route. Node Actions never draw virtual Edges; pulses follow real selected Edges only.
 
 Adopt serializes with capability confirmation and Micro writes, and checks the API-read visible Knowledge states inside its transaction. Private facts from another user do not affect caller-visible root eligibility. Repeat eligibility is separate from the ordinary frontier and requires a genuinely completed owned Run.
+
+## Original goal supplement · 2026-10-07
+
+This continues the existing V3 goal; it does not replace its execution, Evidence, migration, reviewer or Hosted acceptance gates. The user corrected Project membership to the union of all real acquired-to-unfinished-target paths. Earlier V3 acceptance assertions requiring unacquired roots in the current Project Model are superseded. Their Node executor, Result/Evidence, completion/repeat and immutable historical compatibility coverage remains applicable. Related facts and Action resource availability still cannot determine membership. The fixed point and reverse traversal are iterative; cyclic components require local non-repeating entry-to-exit path witnesses, excluding detours/backtracking while keeping useful cyclic branches. The acyclic condensation does not enumerate global paths; dense cyclic components can require combinatorial local search. optional cycles cannot bootstrap an entry, hard prerequisites remain AND and optional relations do not become hard gates.
+
+A new Preview/Adopt adjustment cannot retain model-external nodes through `scopeMode=current`. Historical Include that is no longer in the model produces `include_outside_model`, never an invisible execution-resource requirement. Editing displays model-external historical membership/constraints/Node and Edge choices before Preview. An explicit “按当前模型整理草稿” operation removes those draft references, keeps in-model choices and local order, and uses live replanning. It does not write or cancel anything. The removal appears in the draft/Preview diff and only explicit Adopt creates a new version. Historical replanning never promotes model-external saved membership into a fresh Include.
+
+Exact historical restoration remains a separate factual/resource/execution validation contract and preserves the saved scope and order. It does not change the Project Model. A fresh Action on an unacquired capability must belong to the current anchored model; retained owned in-progress/completed execution and evidence remain governed by the existing run contract. No history, Knowledge facts, UKS or active Runs are deleted or rewritten by model reconciliation.

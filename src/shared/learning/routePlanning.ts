@@ -1,4 +1,5 @@
 /** Pure capability model and Personal Route planning. Adapters supply authenticated visible identities and facts. */
+import { anchoredCapabilityPaths } from './anchoredCapabilityPaths.js';
 export type RoutePrerequisite = { id: string; source: string; target: string; strength: 'hard' | 'soft' };
 export type CapabilityEnable = { id: string; source: string; target: string; relation: 'enables'; strength: number };
 export type CapabilityRelation = (RoutePrerequisite & { relation: 'prerequisite' }) | CapabilityEnable;
@@ -21,7 +22,7 @@ export type SelectedRoute = {
   effectiveTargetNodeIds: string[]; currentKnowledgeIds: string[]; bridgeKnowledgeIds: string[];
 };
 export type RouteConflict = {
-  kind: 'include_exclude' | 'include_outside_model' | 'excluded_hard_prerequisite' | 'unavailable_hard_prerequisite' | 'prerequisite_cycle';
+  kind: 'include_exclude' | 'include_outside_model' | 'excluded_hard_prerequisite' | 'unavailable_hard_prerequisite' | 'target_without_acquired_path' | 'prerequisite_cycle';
   rootNodeId?: string; rootKind?: 'target' | 'include'; nodeId?: string;
   constraint: 'include' | 'exclude' | 'knowledge_graph';
 };
@@ -110,30 +111,31 @@ function capability(data: ReturnType<typeof prepare>, enables: readonly Capabili
     incoming.get(edge.target)!.push(edge); outgoing.get(edge.source)?.push(edge);
     if (edge.relation === 'prerequisite' && edge.strength === 'hard') hardRemaining.set(edge.target, hardRemaining.get(edge.target)! + 1);
   }
-  // Legitimate no-incoming roots can begin through Node Actions. Acquisition
-  // supplies additional boundaries; cycles cannot bootstrap without either entry.
-  const roots = [...ids].filter(id => incoming.get(id)!.length === 0);
-  const supported = new Set([...current, ...roots]); const frontier = [...supported];
+  // Only formal acquired capabilities supply project path entries. A factual
+  // root is not an acquired entry merely because it has no incoming relations.
+  const supported = new Set(current); const frontier = [...supported];
   for (let i = 0; i < frontier.length; i++) for (const edge of outgoing.get(frontier[i])!) {
     if (edge.relation === 'prerequisite' && edge.strength === 'hard') hardRemaining.set(edge.target, hardRemaining.get(edge.target)! - 1);
     if (!supported.has(edge.target) && hardRemaining.get(edge.target) === 0) {
       supported.add(edge.target); frontier.push(edge.target);
     }
   }
-  const members = new Set(course.keys());
   const visited = new Set([...course.keys()].filter(id => !current.has(id) && supported.has(id)));
   const queue = [...visited];
   for (let i = 0; i < queue.length; i++) {
     const id = queue[i];
-    if (current.has(id)) continue; // Do not unfold history before today's boundary.
+    // Keep every anchored branch, including paths through acquired intermediates.
     for (const edge of incoming.get(id)!) if (supported.has(edge.source) && !visited.has(edge.source)) {
-      members.add(edge.source); visited.add(edge.source); queue.push(edge.source);
+      visited.add(edge.source); queue.push(edge.source);
     }
   }
-  // Keep real facts between admitted members; acquired color is not an edge filter.
-  // Even unanchored targets retain their real target-to-target relations.
-  const gapEdges = edges.filter(edge => members.has(edge.source) && members.has(edge.target));
-  const retainedSupport = supportEdges.filter(edge => members.has(edge.source) && members.has(edge.target));
+  const paths=anchoredCapabilityPaths(visited,supportEdges,current,new Set([...course.keys()].filter(id=>!current.has(id))));
+  // Targets remain explicit context even without an entry. Gray membership and
+  // projected relations require an actual acquired-to-target path witness.
+  const members = new Set([...course.keys(),...paths.members]);
+  const retainedSupport = paths.edges;
+  const retainedIds=new Set(retainedSupport.map(edge=>edge.id));
+  const gapEdges = edges.filter(edge => retainedIds.has(edge.id));
   const orderedNodeIds = topological(members, gapEdges, compare);
   const courseKnowledgeIds = unique(course.keys());
   return {
@@ -174,6 +176,7 @@ export function planCourseRoute(input: RoutePlanningInput, constraints: RouteCon
     if (excludes.has(id)) conflicts.push({ kind: 'include_exclude', rootNodeId: id, rootKind: 'include', nodeId: id, constraint: 'exclude' });
     if (!candidates.has(id)) conflicts.push({ kind: 'include_outside_model', rootNodeId: id, rootKind: 'include', nodeId: id, constraint: 'include' });
   }
+  if (conflicts.length) return { valid: false, route: null, conflicts };
   const effectiveTargetNodeIds = model.courseKnowledgeIds.filter(id => !excludes.has(id));
   const roots = [...effectiveTargetNodeIds.map(id => ({ id, kind: 'target' as const })), ...includes.filter(id => candidates.has(id) && !excludes.has(id)).map(id => ({ id, kind: 'include' as const }))];
   // Memoized first hard failure per node explains every root without traversing paths per target.
@@ -189,17 +192,21 @@ export function planCourseRoute(input: RoutePlanningInput, constraints: RouteCon
   for (const root of roots) {
     const reason = failure.get(root.id);
     if (reason) conflicts.push({ ...reason, rootNodeId: root.id, rootKind: root.kind, constraint: reason.kind === 'excluded_hard_prerequisite' ? 'exclude' : 'knowledge_graph' });
+    else if (!data.current.has(root.id) && !model.connectedCourseKnowledgeIds.includes(root.id) && root.kind === 'target') conflicts.push({kind:'target_without_acquired_path',rootNodeId:root.id,rootKind:'target',nodeId:root.id,constraint:'knowledge_graph'});
   }
   if (conflicts.length) return { valid: false, route: null, conflicts };
   const members = new Set(roots.map(root => root.id)); const queue = [...members];
   for (let i = 0; i < queue.length; i++) {
     const id = queue[i]; if (data.current.has(id)) continue;
-    for (const edge of data.incoming.get(id)!) if (edge.strength === 'hard' && !members.has(edge.source)) { members.add(edge.source); queue.push(edge.source); }
+    for (const edge of data.incoming.get(id)!) if (edge.strength === 'hard' && !members.has(edge.source)) {
+      if (!candidates.has(edge.source)) return {valid:false,route:null,conflicts:[{kind:'unavailable_hard_prerequisite',nodeId:edge.source,rootNodeId:id,rootKind:'target',constraint:'knowledge_graph'}]};
+      members.add(edge.source); queue.push(edge.source);
+    }
   }
   const orderedNodeIds = topological(members, data.edges, data.compare);
   return { valid: true, conflicts: [], route: {
     orderedNodeIds, selectedNodeIds: unique(members), effectiveTargetNodeIds,
-    prerequisiteEdges: data.edges.filter(edge => members.has(edge.source) && members.has(edge.target)),
+    prerequisiteEdges: model.prerequisiteEdges.filter(edge => members.has(edge.source) && members.has(edge.target)),
     currentKnowledgeIds: orderedNodeIds.filter(id => data.current.has(id)),
     bridgeKnowledgeIds: orderedNodeIds.filter(id => !data.course.has(id)),
   } };

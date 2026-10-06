@@ -4,7 +4,7 @@ Current contract: [Capability, Route and Action](architecture/CAPABILITY_ROUTE_A
 
 Targets continue to use every active CurriculumCoverage Knowledge ID, as in V2; course_target_knowledge retains its existing destination semantics.
 
-The shared Knowledge Graph owns facts. Project Capability Model is the current union of legitimate candidate paths to Course targets, bounded by formal acquired UKS, including unacquired roots, multiple branches and merges. Personal Route is the explicitly adopted execution subset. Presentation and Action resources do not determine model membership.
+The shared Knowledge Graph owns facts. Project Capability Model is the current union of legitimate candidate paths to Course targets, starting only from formal acquired UKS, with multiple acquired entries, branches and merges. The 2026-10-07 user correction supersedes the earlier unacquired-root admission rule. Personal Route is the explicitly adopted execution subset. Presentation and Action resources do not determine model membership.
 
 Node and factual Edge scopes share Micro/Practice, ActionRun, Result and Evidence. Only actual completion grants route execution reachability; acquired state satisfies without fake Runs. Formal UKS changes only through Evidence → Diagnosis → Proposal → explicit Confirm. An established Route changes only through Preview → Adopt (or explicit revalidated restore).
 
@@ -32,3 +32,13 @@ Each phase begins with failing regression tests. Model tests cover unacquired ro
 - Hosted rollback: both scoped executor pipelines, Repeat, local order, freshness and RLS passed actual assertions. Fourteen core tables had identical before/after hashes; fixture residue zero. Security advisors retain exactly the baseline debt. Acquired-root optional-execution wording was corrected following real browser review.
 
 - Actual Node Micro completed three saved steps, unlocked its factual downstream Edge, and left UKS unchanged. Node Practice saved an owned artifact Response and pending PerformanceResult, completed execution, and preserved UKS. Concurrent Node selection returned one Run. Its first diagnosis exposed a remaining Edge-only Practice context check; the failed diagnosis was preserved, and the existing context resolver now validates either exact Node+Assignment coverage or exact factual Edge scope. Four regression cases cover valid Node lineage and mismatched/mixed/uncovered scope. Reviewer 1 independently passed the context/diagnosis suite; final Hosted diagnosis and browser gates must use the subsequent deployment.
+
+## Supplement to the existing goal · 2026-10-07
+
+The original goal remains open, including its previously pending Hosted acquired-confirmation gate. New regressions cover acquired-to-target path membership, gray incoming/outgoing constraints, hard AND without unacquired-root bootstrapping, all anchored branches through acquired intermediates, model-external historical Include, explicit draft cleanup and unchanged history. Old Node Action execution evidence is retained as history, not used to justify unacquired roots in the new Project Model.
+
+Model construction remains independent of Route selection and Action resources. Active Course targets remain visible context and disconnected unfinished targets are explicitly unplannable; the system does not invent entry facts or Node execution for them. Current-scope adjustment must fit the live model. Model-external historical choices are shown outside the graph and can be explicitly removed from the draft before Preview/Adopt.
+
+The revised model also excludes cyclic detours and factual backedges without a non-repeating acquired-to-target path witness. New Route planning, Action catalogs and fresh execution enforce both node and Edge membership; exact historical restoration and owned retained execution preserve their existing contracts. Draft cleanup keeps legal historical membership and removes only model-external intent after an explicit click; it never writes UKS or Route Versions.
+
+Supplemental automated gate: 135 files / 1,032 tests PASS, including deterministic small-graph exhaustive path-oracle checks, historical Include cleanup, model-external cycle Edge rejection, structured prerequisite-cycle conflicts, and unchanged history. TypeScript, lint, production build and both audits PASS. No dependencies or migrations changed in this supplement. Final Hosted checks are recorded separately against the matching READY Preview; the original acquired-confirmation gate is still required.

@@ -31,19 +31,19 @@ describe('capability support is not a learning prerequisite', () => {
     expect(ids(data)).toEqual(['A','T','X','Y']);
     expect(planCourseRoute(data).valid).toBe(true);
   });
-  it('enables preserves hard AND while unacquired roots remain legitimate', () => {
+  it('enables cannot bypass an unacquired hard branch', () => {
     const data = input(['A','B','X','T'], [pre('A','X'),pre('B','X')], [enable('A','X'),enable('X','T')]);
-    expect(ids(data)).toEqual(['A','B','T','X']);
+    expect(ids(data)).toEqual(['T']);
     expect(buildCapabilityModel(data).actionableNodeIds).not.toContain('X');
     expect(ids({...data,currentNodeIds:['A','B']})).toEqual(['A','B','T','X']);
   });
   it('preserves hard facts from missing endpoints', () => {
     expect(ids(input(['A','X','T'], [pre('missing','X')], [enable('A','X'),enable('X','T')]))).toEqual(['T']);
   });
-  it('keeps all targets, including acquired terminals and unanchored target-to-target edges', () => {
+  it('keeps all target context without admitting unanchored target-to-target edges', () => {
     const data = input(['A','T','U'], [], [enable('T','U')], ['A','T','U'], ['A']);
     expect(ids(data)).toEqual(['A','T','U']);
-    expect(buildCapabilityModel(data).supportEdges).toEqual([enable('T','U')]);
+    expect(buildCapabilityModel(data).supportEdges).toEqual([]);
   });
   it('Include takes only hard closure, Exclude enables origin is not a hard conflict', () => {
     const data = input(['A','H','X','T'], [pre('H','X')], [enable('A','H'),enable('X','T')]);
@@ -55,7 +55,7 @@ describe('capability support is not a learning prerequisite', () => {
     const data = input(['A','X','T','B'],[pre('B','X','soft')],[enable('A','X'),enable('X','T')]);
     const before = JSON.stringify(data);
     const model = buildCapabilityModel(data);
-    expect(model.orderedNodeIds.sort()).toEqual(['A','B','T','X']);
+    expect(model.orderedNodeIds.sort()).toEqual(['A','T','X']);
     expect(buildCapabilityModel({...data,nodeIds:[...data.nodeIds].reverse(),enablesEdges:[...data.enablesEdges!].reverse()})).toEqual(buildCapabilityModel(data));
     expect(JSON.stringify(data)).toBe(before);
   });

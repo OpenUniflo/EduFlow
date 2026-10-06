@@ -23,7 +23,7 @@ describe('Project stable structure and route overlays', () => {
   it('walks factual incoming closure through enables cycles, excluding inactive and related nodes', () => {
     const graph = projectStructuralGraph(input, [target, 'missing']);
     expect(graph.nodes.map(node => node.id)).toEqual(['bridge', 'root', target]);
-    expect(graph.edges.map(edge => edge.id)).toEqual(['bridge>root', `bridge>${target}`, 'root>bridge', `root>${target}`]);
+    expect(graph.edges.map(edge => edge.id)).toEqual([`bridge>${target}`, 'root>bridge', `root>${target}`]);
     expect(graph.edges.every(edge => input.edges.includes(edge))).toBe(true);
     expect(projectStructuralGraph({ ...input, nodes: [...input.nodes].reverse(), edges: [...input.edges].reverse() }, [target])).toEqual(graph);
   });
@@ -47,7 +47,7 @@ describe('Project stable structure and route overlays', () => {
     const after = route(['bridge', target], [{ id: `bridge>${target}`, source: 'bridge', target, strength: 'hard' }]);
     const overlay = projectRouteOverlay(graph, before, after);
     expect(overlay.nodes).toEqual([{ id: 'bridge', state: 'kept' }, { id: 'root', state: 'removed' }, { id: target, state: 'added' }]);
-    expect(overlay.edges).toEqual([{ id: 'bridge>root', state: 'removed' }, { id: `bridge>${target}`, state: 'added' }, { id: 'root>bridge', state: 'removed' }]);
+    expect(overlay.edges).toEqual([{ id: `bridge>${target}`, state: 'added' }, { id: 'root>bridge', state: 'removed' }]);
     const same = projectRouteOverlay(graph, after, after);
     expect(same.edges).toEqual([{ id: `bridge>${target}`, state: 'kept' }]);
     expect(projectRouteOverlay(graph, route(['root', target]), null).edges).toEqual([{ id: `root>${target}`, state: 'current' }]);

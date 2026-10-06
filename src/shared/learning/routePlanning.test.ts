@@ -44,13 +44,13 @@ describe('V2 necessary route and distinct candidate space', () => {
     expect(route(data, constraints(['S'])).prerequisiteEdges.find(edge => edge.id === 'S>T')?.strength).toBe('soft');
   });
   it('retains soft when its source is a target or needed by another hard branch', () => {
-    expect(route(input([], ['S>T'], ['T', 'S'])).orderedNodeIds).toEqual(['S', 'T']);
-    expect(route(input(['S>X'], ['S>T'], ['T', 'X'])).selectedNodeIds).toEqual(['S', 'T', 'X']);
+    expect(route(input([], ['S>T'], ['T', 'S'], ['S'])).orderedNodeIds).toEqual(['S', 'T']);
+    expect(route(input(['S>X'], ['S>T'], ['T', 'X'], ['S'])).selectedNodeIds).toEqual(['S', 'T', 'X']);
   });
   it('includes the satisfied hard frontier without unanchored gray roots', () => {
     const data = input(['A>B', 'B>T'], [], ['T'], ['A']);
     expect(buildCapabilityModel(data).actionableNodeIds).toEqual(['A', 'B']);
-    expect(buildCapabilityModel({ ...data, currentNodeIds: [] }).actionableNodeIds).toEqual(['A']);
+    expect(buildCapabilityModel({ ...data, currentNodeIds: [] }).actionableNodeIds).toEqual([]);
     expect(route(data).orderedNodeIds).toEqual(['A', 'B', 'T']);
   });
   it('does not confuse one hard predecessor with AND learnability', () => {
@@ -62,7 +62,7 @@ describe('V2 necessary route and distinct candidate space', () => {
   it('cuts unreachable soft intermediates rather than leaving disconnected upstream candidates', () => {
     const data = { ...input(['M>B'], ['A>B', 'B>T']), nodeIds: ['A', 'B', 'T'] };
     expect(buildCapabilityModel(data).orderedNodeIds).toEqual(['T']);
-    expect(route(data).orderedNodeIds).toEqual(['T']);
+    expect(planCourseRoute(data)).toMatchObject({valid:false,conflicts:[{kind:'target_without_acquired_path'}]});
   });
   it('keeps unavailable targets without inventing facts or outside identities', () => {
     const data = { ...input(['M>B'], ['A>B', 'B>T'], ['T', 'B']), nodeIds: ['A', 'B', 'T'] };
@@ -81,7 +81,7 @@ describe('V2 necessary route and distinct candidate space', () => {
 });
 describe('V2 Include / Exclude constraints', () => {
   it('can exclude soft and ordinary unused intermediate capabilities', () => {
-    expect(route(input(['A>S'], ['S>T']), constraints([], ['S'])).orderedNodeIds).toEqual(['T']);
+    expect(route(input(['A>S'], ['S>T'], ['T'], ['T']), constraints([], ['S'])).orderedNodeIds).toEqual(['T']);
   });
   it('excluded acquired hard support is never used', () => {
     const result = planCourseRoute(input(['A>T'], [], ['T'], ['A']), constraints([], ['A']));
@@ -92,7 +92,7 @@ describe('V2 Include / Exclude constraints', () => {
     expect(result.conflicts.map(c => [c.rootNodeId, c.nodeId])).toEqual([['T', 'A'], ['X', 'A']]);
   });
   it('excluding a target drops the promise while retaining it in the model', () => {
-    const data = input([], [], ['T', 'X']);
+    const data = input([], [], ['T', 'X'], ['T','X']);
     expect(route(data, constraints([], ['T'])).effectiveTargetNodeIds).toEqual(['X']);
     expect(buildCapabilityModel(data).courseKnowledgeIds).toEqual(['T', 'X']);
     const empty = route(data, constraints([], ['T', 'X']));
@@ -116,7 +116,7 @@ describe('V2 Include / Exclude constraints', () => {
 });
 describe('V2 determinism, fingerprint and graph integrity', () => {
   it('orders a multi-target subgraph by downstream curriculum priority and stable IDs', () => {
-    const data = input(['A>B', 'B>Z', 'A>C', 'C>X'], [], ['X', 'Z']);
+    const data = input(['A>B', 'B>Z', 'A>C', 'C>X'], [], ['X', 'Z'], ['A']);
     expect(route(data).orderedNodeIds).toEqual(['A', 'C', 'X', 'B', 'Z']);
   });
   it('never mutates inputs and is invariant to every input array permutation', () => {
@@ -129,7 +129,7 @@ describe('V2 determinism, fingerprint and graph integrity', () => {
     expect(data).toEqual(original); expect(intent).toEqual(constraints(['S'], ['X']));
   });
   it('structural fingerprint input ignores state even when selected closure changes', () => {
-    const data = input(['A>B', 'B>T']); const after = { ...data, currentNodeIds: ['B'] };
+    const data = input(['A>B', 'B>T'], [], ['T'], ['A']); const after = { ...data, currentNodeIds: ['B'] };
     expect(route(data).selectedNodeIds).not.toEqual(route(after).selectedNodeIds);
     expect(routeStructure(data, constraints())).toEqual(routeStructure(after, constraints()));
     expect(routeStructure({ ...data, prerequisiteEdges: data.prerequisiteEdges.map(e => ({ ...e, strength: 'soft' as const })) }, constraints())).not.toEqual(routeStructure(data, constraints()));
@@ -141,7 +141,7 @@ describe('V2 determinism, fingerprint and graph integrity', () => {
   });
   it('does not enumerate paths in a branching graph or recurse on long chains', () => {
     const hard = Array.from({ length: 5000 }, (_, i) => `N${i}>N${i + 1}`);
-    expect(route(input(hard, [], ['N5000'])).orderedNodeIds).toHaveLength(5001);
+    expect(route(input(hard, [], ['N5000'], ['N0'])).orderedNodeIds).toHaveLength(5001);
   });
 });
 
@@ -152,20 +152,20 @@ describe('V2.1 current gap candidate space', () => {
     { name: 'arbitrary depth', hard: ['A>X', 'X>Y', 'Y>Z', 'Z>T'], targets: ['T'], current: ['A'], kept: ['A', 'X', 'Y', 'Z', 'T'] },
     { name: 'dead branch', hard: ['A>X'], targets: ['T'], current: ['A'], kept: ['T'] },
     { name: 'acquired target history', hard: ['X>B'], targets: ['B'], current: ['B'], kept: ['B'] },
-    { name: 'history between acquired nodes', hard: ['A>X', 'X>B', 'B>Y', 'Y>C'], targets: ['C'], current: ['A', 'B'], kept: ['B', 'Y', 'C'] },
+    { name: 'history between acquired nodes', hard: ['A>X', 'X>B', 'B>Y', 'Y>C'], targets: ['C'], current: ['A', 'B'], kept: ['A','X','B','Y','C'] },
     { name: 'shared history and pending support', hard: ['A>X', 'X>B', 'X>C'], targets: ['B', 'C'], current: ['A', 'B'], kept: ['A', 'B', 'X', 'C'] },
     { name: 'all targets acquired', hard: ['X>B', 'Y>C'], targets: ['B', 'C'], current: ['B', 'C'], kept: ['B', 'C'] },
     { name: 'acquired target supports future gap', hard: ['B>X', 'X>C'], targets: ['B', 'C'], current: ['B'], kept: ['B', 'X', 'C'] },
     { name: 'AND satisfied', hard: ['A>X', 'B>X', 'X>T'], targets: ['T'], current: ['A', 'B'], kept: ['A', 'B', 'X', 'T'] },
-    { name: 'AND with legitimate unacquired second root', hard: ['A>X', 'B>X', 'X>T'], targets: ['T'], current: ['A'], kept: ['A','B','X','T'] },
-    { name: 'legitimate unacquired root', hard: ['X>Y', 'Y>T'], targets: ['T'], current: [], kept: ['X','Y','T'] },
+    { name: 'AND rejects an unacquired second root', hard: ['A>X', 'B>X', 'X>T'], targets: ['T'], current: ['A'], kept: ['T'] },
+    { name: 'unacquired roots are not project entries', hard: ['X>Y', 'Y>T'], targets: ['T'], current: [], kept: ['T'] },
     { name: 'pending target continues downstream', hard: ['A>T', 'T>X', 'X>U'], targets: ['T', 'U'], current: ['A'], kept: ['A', 'T', 'X', 'U'] },
   ])('$name', ({ hard, targets, current, kept }) => {
     expect(buildCapabilityModel(input(hard, [], targets, current)).orderedNodeIds.slice().sort()).toEqual(kept.slice().sort());
   });
   it('soft adds candidates without gating or entering the default selected route', () => {
     const data = input(['A>X', 'X>T'], ['A>S', 'S>T', 'M>T'], ['T'], ['A']);
-    expect(buildCapabilityModel(data).orderedNodeIds.slice().sort()).toEqual(['A', 'M', 'S', 'T', 'X']);
+    expect(buildCapabilityModel(data).orderedNodeIds.slice().sort()).toEqual(['A','S','T','X']);
     expect(route(data).selectedNodeIds).toEqual(['A', 'T', 'X']);
   });
   it('preserves factual edges between members retained for a current gap', () => {
@@ -176,22 +176,22 @@ describe('V2.1 current gap candidate space', () => {
   it('explicitly includes real project context behind acquired boundaries without changing default recommendations', () => {
     const data = input(['A>X', 'X>B', 'B>T'], [], ['T'], ['A', 'B']);
     const intent = constraints(['X']); const saved = structuredClone(intent);
-    expect(planCourseRoute(data, intent)).toMatchObject({valid:false,conflicts:[{kind:'include_outside_model'}]});
+    expect(planCourseRoute(data, intent)).toMatchObject({valid:true,route:{selectedNodeIds:['A','B','T','X']}});
     expect(route(data).selectedNodeIds).toEqual(['B', 'T']);
     expect(intent).toEqual(saved);
     expect(routeStructure(data, intent)).toEqual(routeStructure({ ...data, currentNodeIds: ['A'] }, intent));
   });
   it('preserves factual relations among unanchored targets without admitting gray roots', () => {
     const model = buildCapabilityModel(input(['X>T', 'T>U'], [], ['T', 'U']));
-    expect(model.orderedNodeIds).toEqual(['X','T', 'U']);
-    expect(model.prerequisiteEdges.map(e => e.id)).toEqual(['T>U','X>T']);
-    expect(model.disconnectedCourseKnowledgeIds).toEqual([]);
+    expect(model.orderedNodeIds).toEqual(['T','U']);
+    expect(model.prerequisiteEdges).toEqual([]);
+    expect(model.disconnectedCourseKnowledgeIds).toEqual(['T','U']);
   });
   it('an unanchored target soft edge does not confer support or gate a supported target', () => {
     const model = buildCapabilityModel(input(['A>T'], ['U>T'], ['T', 'U'], ['A']));
-    expect(model.prerequisiteEdges.map(e => e.id)).toEqual(['A>T', 'U>T']);
-    expect(model.disconnectedCourseKnowledgeIds).toEqual([]);
-    expect(model.connectedCourseKnowledgeIds).toEqual(['T','U']);
+    expect(model.prerequisiteEdges.map(e => e.id)).toEqual(['A>T']);
+    expect(model.disconnectedCourseKnowledgeIds).toEqual(['U']);
+    expect(model.connectedCourseKnowledgeIds).toEqual(['T']);
   });
 
 });

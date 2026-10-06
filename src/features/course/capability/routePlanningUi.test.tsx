@@ -105,3 +105,9 @@ it('Node history reorder shows exact scope, local new order and Node technical i
  const html=renderToStaticMarkup(<HistoricalRoute version={next} current={current} actionTitles={{a:'甲行动',b:'乙行动'}}/>);
  expect(html).toContain('节点行动顺序变化：当时的能力标题');expect(html).toContain('乙行动 → 甲行动');expect(html).toContain('node:A');expect(html).not.toContain('undefined');
 });
+
+it('shows model-external historical selections before Preview with an explicit draft cleanup action',()=>{
+ const c={view:{activeVersion:{...version,constraints:{includeNodeIds:['old'],excludeNodeIds:[]}}},editing:true,draft:{includeNodeIds:['old'],excludeNodeIds:[]},actionChoices:[],modelChanges:{nodeIds:['old'],edgeIds:[]},reconcileModel:vi.fn()} as unknown as ReturnType<typeof useRoutePlanning>;
+ const html=renderToStaticMarkup(<RoutePlanningPanel control={c} title={id=>id==='old'?'供应商筛选准则定义':id}/>);
+ expect(html).toContain('当前模型外的历史选择');expect(html).toContain('供应商筛选准则定义');expect(html).toContain('按当前模型整理草稿');expect(html).toContain('正式路线在采用前保持原样');expect(html).not.toContain('定位下一项');
+});

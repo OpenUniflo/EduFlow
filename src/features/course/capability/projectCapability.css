@@ -194,3 +194,9 @@
 @media(max-width:760px) { .project-editing-overview { top:calc(var(--project-top-control-band) + 92px); width:calc(100% - 24px); min-width:0; }.route-change-details { left:12px; right:12px; bottom:136px; max-height:30dvh; } }
 
 @media(min-width:761px) and (max-width:900px) { .project-editing-overview { top:calc(var(--project-top-control-band) + 92px); width:calc(100% - 32px); min-width:0; } }
+
+.route-model-changes { position: absolute; left: 24px; top: 290px; width: min(360px, calc(100% - 48px)); box-sizing: border-box; max-height: calc(100dvh - 450px); overflow: auto; padding: 16px; border-radius: 16px; z-index: 6; }
+.route-model-changes h3 { margin: 0 0 8px; }
+.route-model-changes ul { padding-left: 20px; }
+@media (max-width: 900px) { .route-model-changes { top: 370px; left: 12px; width: calc(100% - 24px); max-height: calc(100dvh - 530px); } }
+@media (max-width: 600px) { .route-model-changes { top: 388px; max-height: calc(100dvh - 550px); } }
