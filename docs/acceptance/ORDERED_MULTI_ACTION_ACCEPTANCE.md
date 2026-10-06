@@ -79,7 +79,7 @@ Desktop 1366×768 and 1440×900 plus mobile 390×844 / reduced motion PASS. Expa
 
 ### Tests, deployments and review
 
-Final implementation regression: **129 files / 971 tests PASS**. TypeScript, lint, production build, `audit:knowledge`, `audit:client-secrets`, diff checks and Hosted migration consistency PASS. Local actual SQL RPC rollback verification covers out-of-order start/submit, retained future Run, pending/failed committed execution, multi-incoming completion, adjustment conflict and unchanged UKS; repeated catalog publication inserts zero rows on its second execution. One earlier cold dynamic-import UI test timeout passed on rerun; final full suite passes.
+Final implementation regression: **129 files / 971 tests PASS**. TypeScript, lint, production build, `audit:knowledge`, `audit:client-secrets`, diff checks and Hosted migration consistency PASS. Local actual SQL RPC rollback verification covers out-of-order start/submit, retained future Run, pending/failed committed execution, multi-action Edge group completion, adjustment conflict and unchanged UKS; converging incoming-Edge completion is additionally covered by pure tests; repeated catalog publication inserts zero rows on its second execution. One earlier cold dynamic-import UI test timeout passed on rerun; final full suite passes.
 
 | Tested deployment | Commit | State |
 | --- | --- | --- |
