@@ -12,7 +12,7 @@ let tables: Record<string, Row[]>;
 beforeEach(() => {
   vi.resetAllMocks();
   tables = {
-    knowledge_edge_actions: ['retained', 'unrelated', 'invented'].map(edge_id => ({ id: `${edge_id}-action`, edge_id, status: 'active', type: 'micro_learning' })),
+    knowledge_edge_actions: ['retained', 'unrelated', 'invented'].map(edge_id => ({ id: `${edge_id}-action`, edge_id, status: 'active', type: 'micro_learning',required_capability_ids:[],resource_requirements:[],estimated_minutes:5,difficulty:1 })),
   };
   const client = { from(table: string) {
     let rows = tables[table] ?? [];
@@ -34,6 +34,27 @@ beforeEach(() => {
   } });
   mocks.active.mockResolvedValue({ snapshot: {}, constraints: { includeNodeIds: ['source'], excludeNodeIds: [] } });
   mocks.micro.mockResolvedValue([]);
+});
+
+it('GET exposes every legal frontier Micro and checks its own requirements/resources',async()=>{
+  const route=await mocks.input(); route.input.currentNodeIds=['source','other'];
+  route.input.prerequisiteEdges=[{id:'retained',source:'source',target:'target',strength:'hard'},{id:'unrelated',source:'other',target:'target',strength:'hard'}];
+  const steps=route.input.prerequisiteEdges.map((edge:{id:string;source:string;target:string},order:number)=>({edgeId:edge.id,actionId:`${edge.id}-action`,sourceNodeId:edge.source,targetNodeId:edge.target,order}));
+  mocks.active.mockResolvedValue({id:'v',snapshot:{valid:true,selectedNodeIds:['source','other','target'],prerequisiteEdges:route.input.prerequisiteEdges,executionSteps:steps},constraints:{includeNodeIds:[],excludeNodeIds:[]}});
+  mocks.input.mockResolvedValue(route);
+  tables.course_action_bindings=steps.map((step:{actionId:string})=>({course_id:'course',action_id:step.actionId,available:true,micro_path_id:'bound',resources:[]}));
+  mocks.micro.mockResolvedValue([{id:'bound',knowledge_id:'target'}]);
+  const read=async()=>{
+    let body:{availableActionIds:string[]}|undefined;
+    const response={status(){return response;},json(value:typeof body){body=value;},setHeader(){}};
+    await handler({method:'GET',query:{courseId:'course'},headers:{}} as unknown as VercelRequest,response as unknown as VercelResponse);
+    return body!;
+  };
+  expect((await read()).availableActionIds).toEqual(['retained-action','unrelated-action']);
+  tables.knowledge_edge_actions[0].required_capability_ids=['missing'];
+  expect((await read()).availableActionIds).toEqual(['unrelated-action']);
+  tables.knowledge_edge_actions[1].resource_requirements=['missing-resource'];
+  expect((await read()).availableActionIds).toEqual([]);
 });
 
 it('returns an explicitly retained acquired route edge without history, but excludes unrelated and invented connections', async () => {

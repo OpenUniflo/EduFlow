@@ -3,13 +3,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { RoutePlanningInput, SelectedRoute } from '../../src/shared/learning/routePlanning.js';
 import { routeExecutionProgress, type ExecutionRunReference, type RouteActionOption, type RouteExecutionStep } from '../../src/shared/learning/routeExecution.js';
 import { evaluateAction, type CourseActionBinding, type EdgeAction } from '../../src/features/actions/model.js';
-import { hasUnmetHardPrerequisite } from '../../src/shared/learning/teachingPrerequisites.js';
 import { allRows } from './query.js';
 import { readAssignmentEligibility } from './assignmentEligibility.js';
 
 /** Authenticated catalog reads; future Steps may be planned before their sources form. */
 export async function readRouteActionOptions(client: SupabaseClient, courseId: string, input: RoutePlanningInput, route: SelectedRoute & {executionSteps?:RouteExecutionStep[]}, userId?: string): Promise<RouteActionOption[]> {
-  const facts = [...input.prerequisiteEdges, ...(input.enablesEdges ?? [])].filter(edge => route.selectedNodeIds.includes(edge.source) && route.selectedNodeIds.includes(edge.target));
+  const facts = [...input.prerequisiteEdges.map(edge=>({...edge,relation:'prerequisite' as const})), ...(input.enablesEdges ?? [])].filter(edge => route.selectedNodeIds.includes(edge.source) && route.selectedNodeIds.includes(edge.target));
   if (!facts.length) return [];
   const [actionRows, bindingRows, paths, assignments, coverages] = await Promise.all([
     allRows(client.from('knowledge_edge_actions').select('*').eq('status','active').in('edge_id',facts.map(edge => edge.id)).order('id'),'Route Action alternatives'),
@@ -20,7 +19,7 @@ export async function readRouteActionOptions(client: SupabaseClient, courseId: s
   ]);
   const acquired = new Set(input.currentNodeIds);
   const runs=userId && route.executionSteps ? await allRows(client.from('edge_action_runs').select('*').eq('user_id',userId).eq('course_id',courseId).order('id'),'Route progress') as ExecutionRunReference[] : [];
-  const progress=userId && route.executionSteps ? routeExecutionProgress({userId,courseId,steps:route.executionSteps,runs,acquiredNodeIds:input.currentNodeIds}) : null;
+  const progress=userId && route.executionSteps ? routeExecutionProgress({userId,courseId,steps:route.executionSteps,runs,acquiredNodeIds:input.currentNodeIds,facts,selectedPrerequisiteEdges:route.prerequisiteEdges}) : null;
   const reachable=new Set(progress?.reachableNodeIds??input.currentNodeIds);
   const potential = new Set([...input.currentNodeIds,...route.selectedNodeIds]);
   return Promise.all(actionRows.map(async row => {
@@ -33,12 +32,11 @@ export async function readRouteActionOptions(client: SupabaseClient, courseId: s
       : !binding.micro_path_id && isArtifactPracticeExecutor(assignment) && coverages.some(row => row.assignment_id === binding.assignment_id && row.node_id === edge.target)));
     const planned = evaluateAction(action,{sourceId:edge.source,binding,acquiredIds:potential,executionAvailable:executor});
     const immediate = evaluateAction(action,{sourceId:edge.source,binding,acquiredIds:acquired,routeExecutionReachableIds:reachable,executionAvailable:executor});
-    const hardBlocked = hasUnmetHardPrerequisite(edge.target,reachable,input.prerequisiteEdges);
     const eligibility = action.type==='practice_task' && executor && binding?.assignment_id && userId
       ? (await readAssignmentEligibility(client,userId,courseId,binding.assignment_id,{targetId:edge.target,status:'not_started',reachableNodeIds:[...reachable]})).eligibility : null;
     return { edgeId:edge.id,actionId:action.id,title:action.title,type:action.type,estimatedMinutes:action.estimated_minutes,
-      weight:immediate.weight,planningAvailable:planned.available,availableNow:(!progress || progress.currentStep?.actionId===action.id) && immediate.available && !hardBlocked && !eligibility?.reason,assignmentId:action.type==='practice_task'?String(binding?.assignment_id??''):undefined,requiredCapabilityIds:[...new Set([...action.required_capability_ids,...(action.type==='practice_task'?coverages.filter(row=>row.assignment_id===binding?.assignment_id && row.node_id!==edge.target).map(row=>String(row.node_id)):[])])],
-      reasons:[...immediate.reasons.filter(reason => !['time','difficulty'].includes(reason.code)).map(reason => reason.message),...(hardBlocked?['需要先形成目标能力的必要前置。']:[]),...(eligibility?.reason?[eligibility.reason]:[])] };
+      weight:immediate.weight,planningAvailable:planned.available,availableNow:(!progress || progress.availableStepIndexes.some(index=>route.executionSteps![index].edgeId===edge.id && route.executionSteps![index].actionId===action.id)) && immediate.available && !eligibility?.reason,assignmentId:action.type==='practice_task'?String(binding?.assignment_id??''):undefined,requiredCapabilityIds:[...new Set([...action.required_capability_ids,...(action.type==='practice_task'?coverages.filter(row=>row.assignment_id===binding?.assignment_id && row.node_id!==edge.target).map(row=>String(row.node_id)):[])])],
+      reasons:[...immediate.reasons.filter(reason => !['time','difficulty'].includes(reason.code)).map(reason => reason.message),...(eligibility?.reason?[eligibility.reason]:[])] };
   }));
 }
 

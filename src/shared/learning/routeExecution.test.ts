@@ -72,11 +72,11 @@ describe('formal execution Route references',()=>{
     expect(result.complete).toBe(true);expect(route.selectedNodeIds).not.toContain('EXTERNAL');
   });
 
-  it('reports a new live hard prerequisite without rewriting an immutable adopted Route',()=>{
+  it('keeps unselected external hard facts outside execution authority without rewriting a Route',()=>{
     const snapshot={...route,executionSteps:planRouteExecution({route,facts,options}).steps};
     const before=structuredClone(snapshot);
     const live=[...facts,{id:'zb',source:'Z',target:'B',relation:'prerequisite' as const,strength:'hard' as const}];
-    expect(inspectRouteExecution(snapshot,live,options,['A','C']).complete).toBe(false);
+    expect(inspectRouteExecution(snapshot,live,options,['A','C']).complete).toBe(true);
     expect(inspectRouteExecution(snapshot,live,options,['A','C','Z']).complete).toBe(true);
     expect(snapshot).toEqual(before);
   });
@@ -153,16 +153,16 @@ describe('ordered multi-action groups and execution progress',()=>{
   const steps=planRouteExecution({route,facts,options,choices:[{edgeId:'ab',actionId:'ab-micro'},{edgeId:'ab',actionId:'ab-practice'},{edgeId:'cb',actionId:'cb-micro'},{edgeId:'bd',actionId:'bd-micro'}]}).steps;
   const uks=['A','C'];
   const run=(index:number)=>({user_id:'u',course_id:'c',edge_id:steps[index].edgeId,action_id:steps[index].actionId,status:'completed',execution_version:2});
-  const progress=(runs:ReturnType<typeof run>[])=>routeExecutionProgress({userId:'u',courseId:'c',steps,runs,acquiredNodeIds:uks});
-  expect(progress([run(0)]).currentStep?.actionId).toBe('ab-practice');
+  const progress=(runs:ReturnType<typeof run>[])=>routeExecutionProgress({userId:'u',courseId:'c',steps,runs,acquiredNodeIds:uks,facts});
+  expect(steps[progress([run(0)]).recommendedStepIndex!]?.actionId).toBe('ab-practice');
   expect(progress([run(0)]).completedEdgeIds).not.toContain('ab');
   expect(progress([run(0),run(1)]).reachableNodeIds).not.toContain('B');
   expect(progress([run(0),run(1),run(2)]).reachableNodeIds).toContain('B');
-  expect(progress([run(0),run(1),run(2)]).currentStep?.edgeId).toBe('bd');
+  expect(steps[progress([run(0),run(1),run(2)]).recommendedStepIndex!]?.edgeId).toBe('bd');
   expect(uks).toEqual(['A','C']);
-  expect(progress([{...run(0),user_id:'other'}]).currentIndex).toBe(0);
-  expect(progress([{...run(0),execution_version:1}]).currentIndex).toBe(1);
-  expect(progress([run(0),{...run(0),status:'in_progress'}]).currentIndex).toBe(1);
+  expect(progress([{...run(0),user_id:'other'}]).recommendedStepIndex).toBe(0);
+  expect(progress([{...run(0),execution_version:1}]).recommendedStepIndex).toBe(1);
+  expect(progress([run(0),{...run(0),status:'in_progress'}]).recommendedStepIndex).toBe(1);
  });
 });
 

@@ -7,7 +7,7 @@ import { allRows } from '../_lib/query.js';
 import { currentRoute, mapRouteVersion, persistRoute, readActiveVersion, readRouteInput, readVersion } from '../_lib/routePlanning.js';
 import { routeRelations } from '../../src/shared/learning/routePresentation.js';
 import { planCourseRoute, projectAncestorNodeIds } from '../../src/shared/learning/routePlanning.js';
-import { inspectRouteExecution, planRouteExecution, isExecutionScopeValid, routeExecutionProgress } from '../../src/shared/learning/routeExecution.js';
+import { inspectRouteExecution, planRouteExecution, isExecutionScopeValid } from '../../src/shared/learning/routeExecution.js';
 import { readRouteActionOptions, readOwnedRouteRuns } from '../_lib/routeExecution.js';
 const ids = z.array(z.string().min(1).max(512)).max(10000);
 const intent = { includeNodeIds: ids, excludeNodeIds: ids };
@@ -93,8 +93,7 @@ export default handleApi(async (request, response) => {
   if (explicitExecution && (!execution.complete || execution.steps.some(step=>!executionChoices?.some(choice=>choice.edgeId===step.edgeId && choice.actionId===step.actionId)))) throw new ApiError(422,'route_actions_incomplete','请为每条路线关系选择合法行动后再采用。',{issues:execution.issues});
   const runs=await readOwnedRouteRuns(client,user.id,courseId);
   const activeRuns=runs.filter(run=>['selected','in_progress'].includes(run.status));
-  const progress=routeExecutionProgress({userId:user.id,courseId,steps:execution.steps,runs,acquiredNodeIds:data.input.currentNodeIds});
-  if(activeRuns.some(run=>!execution.steps.some(step=>step.edgeId===run.edge_id&&step.actionId===run.action_id) || (!runs.some(done=>done.status==='completed'&&done.edge_id===run.edge_id&&done.action_id===run.action_id) && progress.currentStep?.actionId!==run.action_id))) throw new ApiError(409,'route_active_run_conflict','当前行动尚在执行，请先完成或明确处理后再采用路线。');
+  if(activeRuns.some(run=>!execution.steps.some(step=>step.edgeId===run.edge_id&&step.actionId===run.action_id) || (!runs.some(done=>done.status==='completed'&&done.edge_id===run.edge_id&&done.action_id===run.action_id) && execution.steps.filter(step=>step.edgeId===run.edge_id).find(step=>!runs.some(done=>done.status==='completed' && done.edge_id===step.edgeId && done.action_id===step.actionId))?.actionId!==run.action_id))) throw new ApiError(409,'route_active_run_conflict','当前行动尚在执行，请先完成或明确处理后再采用路线。');
   // No snapshot, route node list, user identity, or preview result is accepted from the browser.
   const version = await persistRoute(user.id, courseId, data, constraints, plan.route, body.baseVersionId,
     body.action === 'restore' ? 'restore' : 'adjustment', body.action === 'restore' ? body.versionId : null, [], explicitExecution ? execution.steps : undefined);

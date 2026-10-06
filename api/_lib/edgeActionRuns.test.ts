@@ -112,7 +112,7 @@ describe('explicit Action execution authority', () => {
 it('server blocks later same-Edge Actions and reaches the next Edge without a UKS write',async()=>{
  const steps=[{edgeId:'edge',actionId:'first',sourceNodeId:'source',targetNodeId:'target',order:0},{edgeId:'edge',actionId:'action',sourceNodeId:'source',targetNodeId:'target',order:1},{edgeId:'next',actionId:'next-action',sourceNodeId:'target',targetNodeId:'other',order:2}];
  mocks.version.mockResolvedValue({id:'version',constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{valid:true,executionSteps:steps}});
- await expect(requireActionExecution(client,'learner','course','action')).rejects.toMatchObject({code:'route_step_not_current'});
+ await expect(requireActionExecution(client,'learner','course','action')).rejects.toMatchObject({code:'route_step_not_available'});
  tables.edge_action_runs=[{user_id:'learner',course_id:'course',edge_id:'edge',action_id:'first',execution_version:2,status:'completed'}];
  expect((await requireActionExecution(client,'learner','course','action')).routeVersionId).toBe('version');
  tables.edge_action_runs.push({user_id:'learner',course_id:'course',edge_id:'edge',action_id:'action',execution_version:2,status:'completed'});
@@ -122,4 +122,18 @@ it('server blocks later same-Edge Actions and reaches the next Edge without a UK
  tables.micro_learning_paths.push({id:'next-path',course_id:'course',knowledge_id:'other',mode:'learn',status:'published'});
  expect((await requireActionExecution(client,'learner','course','next-action')).microPathId).toBe('next-path');
  expect(input.currentNodeIds).toEqual(['source']);expect(tables.user_knowledge_states).toBeUndefined();
+});
+
+it('accepts either independent hard incoming Action without waiting for the other',async()=>{
+  input.currentNodeIds=['source','other'];
+  input.prerequisiteEdges=[...input.prerequisiteEdges,{id:'other-hard',source:'other',target:'target',strength:'hard'}];
+  const steps=input.prerequisiteEdges.map((edge,order)=>({edgeId:edge.id,actionId:order?'other-action':'action',sourceNodeId:edge.source,targetNodeId:edge.target,order}));
+  mocks.version.mockResolvedValue({id:'version',constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{valid:true,executionSteps:steps}});
+  tables.knowledge_edge_actions.push({...tables.knowledge_edge_actions[0],id:'other-action',edge_id:'other-hard'});
+  tables.course_action_bindings.push({...tables.course_action_bindings[0],id:'other-binding',action_id:'other-action'});
+  expect((await requireActionExecution(client,'learner','course','other-action')).routeVersionId).toBe('version');
+  expect((await requireActionExecution(client,'learner','course','action')).routeVersionId).toBe('version');
+  input.currentNodeIds=['source'];
+  await expect(requireActionExecution(client,'learner','course','other-action')).rejects.toMatchObject({code:'route_step_not_available'});
+  expect((await requireActionExecution(client,'learner','course','action')).routeVersionId).toBe('version');
 });

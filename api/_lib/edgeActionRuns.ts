@@ -6,8 +6,8 @@ import { requirePublishedCourse, requireMicroTeachingEligibility } from './cours
 import { readActiveVersion, readRouteInput } from './routePlanning.js';
 import { planCourseRoute } from '../../src/shared/learning/routePlanning.js';
 import { routeExecutionProgress } from '../../src/shared/learning/routeExecution.js';
-import { routeRelations } from '../../src/shared/learning/routePresentation.js';
 import { hasUnmetHardPrerequisite } from '../../src/shared/learning/teachingPrerequisites.js';
+import { routeRelations } from '../../src/shared/learning/routePresentation.js';
 import { evaluateAction, type EdgeAction, type CourseActionBinding, type ActionRun } from '../../src/features/actions/model.js';
 import { readAssignmentEligibility } from './assignmentEligibility.js';
 export async function availableMicroPaths(client: SupabaseClient, courseId: string) {
@@ -37,10 +37,10 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
   }
   const formal=version?.snapshot.executionSteps;
   const runs=formal ? await allRows(client.from('edge_action_runs').select('*').eq('user_id',userId).eq('course_id',courseId).order('id'),'Route execution progress') as ActionRun[] : [];
-  const progress=formal ? routeExecutionProgress({userId,courseId,steps:formal,runs,acquiredNodeIds:routeData.input.currentNodeIds}) : null;
+  const progress=formal ? routeExecutionProgress({userId,courseId,steps:formal,runs,acquiredNodeIds:routeData.input.currentNodeIds,facts:edges,selectedPrerequisiteEdges:version?.snapshot.prerequisiteEdges}) : null;
   const reachable=new Set(progress?.reachableNodeIds??routeData.input.currentNodeIds);
-  if(progress && (!retainedEdgeId || !runs.some(run=>run.status==='completed'&&run.edge_id===edge.id&&run.action_id===actionId)) && (progress.currentStep?.edgeId!==edge.id || progress.currentStep.actionId!==actionId)) throw new ApiError(409,'route_step_not_current','请先完成当前正式路线行动，已完成行动请使用再次执行。');
-  if (hasUnmetHardPrerequisite(edge.target, reachable, routeData.input.prerequisiteEdges)) throw new ApiError(422, 'target_prerequisite_required', '请先形成目标能力的必要前置。');
+  if(progress && (!retainedEdgeId || !runs.some(run=>run.status==='completed'&&run.edge_id===edge.id&&run.action_id===actionId)) && !progress.availableStepIndexes.some(index=>formal![index].edgeId===edge.id && formal![index].actionId===actionId)) throw new ApiError(409,'route_step_not_available','该行动尚未进入可执行前沿；请先完成同一关系的前序行动或形成起点能力。已完成行动请使用再次执行。');
+  if (!formal && hasUnmetHardPrerequisite(edge.target,reachable,routeData.input.prerequisiteEdges)) throw new ApiError(422,'target_prerequisite_required','请先形成目标能力的必要前置。');
   const cost = evaluateAction(action, { sourceId: edge.source, acquiredIds: new Set(routeData.input.currentNodeIds), routeExecutionReachableIds:reachable, binding: binding ?? undefined });
   if (!cost.available) throw new ApiError(422, 'action_conditions_unmet', cost.reasons.filter(reason => reason.code !== 'time' && reason.code !== 'difficulty').map(reason => reason.message).join('；'));
   let microPathId: string | null = null;
@@ -50,7 +50,7 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
     if (!path) throw new ApiError(422, 'action_micro_unavailable', '该能力尚无已发布的微学习内容，请选择其他行动。');
     // Existing Micro authority owns teaching eligibility; never initialize a route from Action execution.
     if (!await readActiveVersion(client, userId, courseId)) throw new ApiError(409, 'route_not_initialized', '请先打开课程路线。');
-    if(formal) { /* Formal Action authority already validated the exact Step and hard gate. */ }
+    if(formal) { /* Formal Action authority already validated the exact Step and local order. */ }
     else await requireActionMicroEligibility(client, userId, courseId, edge.target, Boolean(retainedEdgeId));
     microPathId = String(path.id);
   } else {

@@ -199,3 +199,16 @@ it('rejects duplicate selections and removal of an active Action before adoption
  expect((await invoke({...intent,actionChoices:[{edgeId:'A>T',actionId:base}]})).result.error.code).toBe('route_active_run_conflict');
  expect(mocks.persist).not.toHaveBeenCalled();
 });
+
+it('permits an independent Edge before an active Run but rejects a new unfinished same-Edge predecessor',async()=>{
+  const input={...data.input,currentNodeIds:['A','S'],prerequisiteEdges:[{id:'A>T',source:'A',target:'T',strength:'hard'},{id:'S>X',source:'S',target:'X',strength:'hard'}],courseOrder:[{nodeId:'X',lessonOrder:0,coverageOrder:0},{nodeId:'T',lessonOrder:1,coverageOrder:0}]};
+  mocks.input.mockResolvedValue({...data,input});
+  const other='33333333-3333-4333-8333-333333333333';
+  const options=await mocks.options();mocks.options.mockResolvedValue([...options,{...options[0],edgeId:'S>X',actionId:other}]);
+  mocks.runs.mockResolvedValue([{user_id:'learner',course_id:'course',edge_id:'A>T',action_id:base,status:'in_progress'}]);
+  const intent={action:'adopt',baseVersionId:base,includeNodeIds:[],excludeNodeIds:[],selectedEdgeIds:['S>X','A>T']};
+  expect((await invoke({...intent,actionChoices:[{edgeId:'S>X',actionId:other},{edgeId:'A>T',actionId:base}]})).status).toBe(200);
+  mocks.persist.mockClear();
+  expect((await invoke({...intent,actionChoices:[{edgeId:'S>X',actionId:other},{edgeId:'A>T',actionId:old},{edgeId:'A>T',actionId:base}]})).result.error.code).toBe('route_active_run_conflict');
+  expect(mocks.persist).not.toHaveBeenCalled();
+});

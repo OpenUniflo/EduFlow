@@ -1,4 +1,4 @@
-import type { CapabilityRelation, SelectedRoute } from './routePlanning.js';
+import type { CapabilityRelation, SelectedRoute, RoutePrerequisite } from './routePlanning.js';
 import { routeRelations } from './routePresentation.js';
 
 export type RouteActionChoice = { edgeId: string; actionId: string };
@@ -21,7 +21,7 @@ export type RouteExecutionPlan = {
   issues: RouteExecutionIssue[]; complete: boolean;
 };
 
-/** A sequential Step connector is an execution order, never a KnowledgeEdge. */
+/** Step connectors are stable reading order, never KnowledgeEdge dependencies. */
 export function executionRelations(route: SelectedRoute & { executionSteps?: RouteExecutionStep[] }, facts: readonly CapabilityRelation[]) {
   const relations = routeRelations(route, facts);
   return route.executionSteps === undefined ? relations : relations.filter(edge => route.executionSteps!.some(step => step.edgeId === edge.id));
@@ -75,19 +75,18 @@ export function planRouteExecution(input: {
   // Planning reachability is transient and never changes formal UKS.
   while(pending.length) {
     const index=pending.findIndex(({edge,options})=>expected.has(edge.source)
-      && options.every(option=>(option.requiredCapabilityIds??[]).every(id=>expected.has(id)))
-      && (expected.has(edge.target) || input.facts.filter(fact=>fact.relation==='prerequisite' && fact.strength==='hard' && fact.target===edge.target).every(fact=>expected.has(fact.source))));
+      && options.every(option=>(option.requiredCapabilityIds??[]).every(id=>expected.has(id))));
     if(index<0) {
       for(const {edge,options} of pending) for(const option of options) {
         if(!expected.has(edge.source)) issues.push({kind:'source_unreachable',edgeId:edge.id,actionId:option.actionId,nodeId:edge.source,sourceNodeId:edge.source,targetNodeId:edge.target,reason:'起点尚未具备，也没有可到达的前序步骤。'});
-        const missing=[...new Set([...(option.requiredCapabilityIds??[]),...input.facts.filter(fact=>fact.relation==='prerequisite'&&fact.strength==='hard'&&fact.target===edge.target&&!expected.has(edge.target)).map(fact=>fact.source)])].filter(id=>!expected.has(id));
+        const missing=[...new Set([...(option.requiredCapabilityIds??[])])].filter(id=>!expected.has(id));
         if(missing.length) issues.push({kind:'required_capability_missing',edgeId:edge.id,actionId:option.actionId,nodeId:missing[0],requiredNodeIds:missing,targetNodeId:edge.target,reason:'行动所需的必要能力没有形成路径。'});
       }
       break;
     }
     const [{edge,options}]=pending.splice(index,1);
     for(const option of options) steps.push({edgeId:edge.id,actionId:option.actionId,sourceNodeId:edge.source,targetNodeId:edge.target,order:steps.length});
-    if(edges.filter(incoming=>incoming.target===edge.target).every(incoming=>steps.some(step=>step.edgeId===incoming.id))) expected.add(edge.target);
+    for (const id of routeReachableNodes(steps, input.facts, new Set(steps.map(step=>step.edgeId)), input.acquiredNodeIds ?? input.route.currentKnowledgeIds, edges)) expected.add(id);
   }
   const missingNodes=new Set([...input.route.effectiveTargetNodeIds,...issues.filter(issue=>issue.kind==='source_unreachable').map(issue=>issue.nodeId!),...issues.flatMap(issue=>issue.requiredNodeIds??[])]);
   for(const id of missingNodes) if(!expected.has(id)) {
@@ -120,25 +119,63 @@ export function inspectRouteExecution(route: SelectedRoute & { executionSteps?: 
     const option = options.find(option => option.edgeId === step.edgeId && option.actionId === step.actionId && option.planningAvailable);
     if(option?.assignmentId){if(assignments.has(option.assignmentId))issues.push({kind:'action_unavailable',...step,reason:'同一任务不得因跨关系绑定重复执行。'});assignments.add(option.assignmentId);}
     if (!option) issues.push({ kind:'action_unavailable', ...step, reason: '当前正式路线中的行动已不可用，需要调整路线。' });
-    const reachable = expected.has(step.sourceNodeId) && (option?.requiredCapabilityIds ?? []).every(id=>expected.has(id))
-      && (expected.has(step.targetNodeId) || facts.filter(edge=>edge.relation==='prerequisite' && edge.strength==='hard' && edge.target===step.targetNodeId).every(edge=>expected.has(edge.source)));
-    if (!reachable) issues.push({kind:!expected.has(step.sourceNodeId)?'source_unreachable':'required_capability_missing',nodeId:!expected.has(step.sourceNodeId)?step.sourceNodeId:[...(option?.requiredCapabilityIds??[]),...facts.filter(edge=>edge.relation==='prerequisite'&&edge.strength==='hard'&&edge.target===step.targetNodeId).map(edge=>edge.source)].find(id=>!expected.has(id)),...step,reason:'当前真实关系或必要能力已变化，正式路线无法按原顺序到达，需要调整路线。'});
-    else if (option && fact && !route.executionSteps!.slice(index+1).some(later=>later.targetNodeId===step.targetNodeId)) expected.add(step.targetNodeId);
+
   });
   for (const edge of facts) if (edge.relation==='prerequisite'&&edge.strength === 'hard' && members.has(edge.source)&&members.has(edge.target)&&!seen.has(edge.id)) issues.push({ kind:'hard_edge_required', edgeId: edge.id, reason: '正式路线缺少必要前置的行动选择。' });
+  // Inspection checks hypothetical source/Action dependency reachability, independent
+  // of cross-Edge display order; invalid references remain explicit, never replaced.
+  const pending = [...route.executionSteps];
+  const plannedEdges = new Set<string>();
+  while (pending.length) {
+    const index = pending.findIndex(step => expected.has(step.sourceNodeId) && (options.find(option=>option.edgeId===step.edgeId && option.actionId===step.actionId)?.requiredCapabilityIds ?? []).every(id=>expected.has(id)));
+    if(index < 0) break;
+    const [step] = pending.splice(index,1);
+    if(!pending.some(other=>other.edgeId===step.edgeId)) plannedEdges.add(step.edgeId);
+    for(const id of routeReachableNodes(route.executionSteps,facts,plannedEdges,acquiredNodeIds)) expected.add(id);
+  }
+  for(const step of pending) issues.push({kind:!expected.has(step.sourceNodeId)?'source_unreachable':'required_capability_missing',...step,reason:'正式路线的起点或行动所需能力没有可达路径，需要调整路线。'});
   for(const id of route.effectiveTargetNodeIds)if(!expected.has(id))issues.push({kind:'target_unreachable',nodeId:id,targetNodeId:id,reason:'历史目标在当前条件下没有形成可执行路径，请重新规划。'});
   return { steps: route.executionSteps, options: [...options], complete: !issues.length, issues };
 }
 
 /** Owned execution records provide progress, independent of Result quality and UKS. */
 export type ExecutionRunReference = {user_id:string;course_id:string;edge_id:string;action_id:string;status:string;execution_version?:number};
-export function routeExecutionProgress(input:{userId:string;courseId:string;steps:readonly RouteExecutionStep[];runs:readonly ExecutionRunReference[];acquiredNodeIds:readonly string[]}) {
+/** Fixed point over selected factual groups; order never contributes dependency. */
+function routeReachableNodes(steps: readonly RouteExecutionStep[], facts: readonly CapabilityRelation[], performed: ReadonlySet<string>, acquired: readonly string[], selectedFacts?: readonly CapabilityRelation[], selectedPrerequisiteEdges: readonly RoutePrerequisite[] = []) {
+  const reachable = new Set(acquired);
+  const groups = [...new Map(steps.map(step=>[step.edgeId,step])).values()].filter(step=>facts.some(edge=>edge.id===step.edgeId && edge.source===step.sourceNodeId && edge.target===step.targetNodeId));
+  const incoming = selectedFacts ?? groups.flatMap(step=>facts.filter(edge=>edge.id===step.edgeId));
+  let changed=true;
+  while(changed) {
+    changed=false;
+    for(const step of groups) {
+      if(reachable.has(step.targetNodeId) || !performed.has(step.edgeId) || !reachable.has(step.sourceNodeId)) continue;
+      const hard=[...incoming.filter(edge=>edge.target===step.targetNodeId && edge.relation==='prerequisite' && edge.strength==='hard'),...selectedPrerequisiteEdges.filter(edge=>edge.target===step.targetNodeId && edge.strength==='hard' && steps.some(selected=>selected.edgeId===edge.id))];
+      if(hard.some(edge=>!performed.has(edge.id) || !reachable.has(edge.source) || !facts.some(fact=>fact.id===edge.id && fact.source===edge.source && fact.target===edge.target && fact.relation==='prerequisite' && fact.strength==='hard'))) continue;
+      reachable.add(step.targetNodeId); changed=true;
+    }
+  }
+  return [...reachable].sort();
+}
+
+export function routeExecutionProgress(input:{userId:string;courseId:string;steps:readonly RouteExecutionStep[];runs:readonly ExecutionRunReference[];acquiredNodeIds:readonly string[];facts:readonly CapabilityRelation[];selectedPrerequisiteEdges?:readonly RoutePrerequisite[];options?:readonly RouteActionOption[]}) {
   const owned=input.runs.filter(run=>run.user_id===input.userId && run.course_id===input.courseId && run.status==='completed');
   const completed=input.steps.map(step=>owned.some(run=>run.edge_id===step.edgeId && run.action_id===step.actionId));
-  const currentIndex=completed.findIndex(done=>!done);
-  const prefix=currentIndex<0?input.steps.length:currentIndex;
-  const completedEdgeIds=[...new Set(input.steps.map(step=>step.edgeId))].filter(id=>input.steps.every((step,index)=>step.edgeId!==id||index<prefix));
-  const reachable=new Set(input.acquiredNodeIds);
-  for(const step of input.steps.slice(0,prefix)) if(reachable.has(step.sourceNodeId) && input.steps.filter(incoming=>incoming.targetNodeId===step.targetNodeId).every(incoming=>completedEdgeIds.includes(incoming.edgeId))) reachable.add(step.targetNodeId);
-  return {completed,currentIndex,currentStep:currentIndex<0?undefined:input.steps[currentIndex],completedEdgeIds,reachableNodeIds:[...reachable]};
+  const acquired=new Set(input.acquiredNodeIds);
+  const satisfied=input.steps.map((step,index)=>!completed[index] && acquired.has(step.targetNodeId));
+  const completedEdgeIds=[...new Set(input.steps.map(step=>step.edgeId))].filter(id=>input.steps.every((step,index)=>step.edgeId!==id || completed[index]));
+  const reachableNodeIds=routeReachableNodes(input.steps,input.facts,new Set(completedEdgeIds),input.acquiredNodeIds,undefined,input.selectedPrerequisiteEdges);
+  const reachable=new Set(reachableNodeIds);
+  const first=new Set<string>();
+  const availableStepIndexes:number[]=[];
+  input.steps.forEach((step,index)=>{
+    if(completed[index] || first.has(step.edgeId)) return;
+    first.add(step.edgeId);
+    const factValid=input.facts.some(edge=>edge.id===step.edgeId && edge.source===step.sourceNodeId && edge.target===step.targetNodeId);
+    const option=input.options?.find(option=>option.edgeId===step.edgeId && option.actionId===step.actionId);
+    if(factValid && reachable.has(step.sourceNodeId) && (!input.options || option?.planningAvailable && (option.requiredCapabilityIds??[]).every(id=>reachable.has(id)))) availableStepIndexes.push(index);
+  });
+  availableStepIndexes.sort((a,b)=>input.steps[a].order-input.steps[b].order);
+  const recommendedStepIndex=availableStepIndexes.find(index=>!satisfied[index]);
+  return {completed,satisfied,completedEdgeIds,reachableNodeIds,availableStepIndexes,recommendedStepIndex};
 }
