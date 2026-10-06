@@ -5,6 +5,12 @@ import { HistoricalRoute, RouteConflicts, RoutePlanningPanel } from './RoutePlan
 import type { RouteVersion } from '@/shared/learning/routeVersion';
 import type { useRoutePlanning } from './useRoutePlanning';
 const version: RouteVersion = { id: 'v1', routeId: 'r', userId: 'u', courseId: 'c', versionNumber: 1, source: 'initial', parentVersionId: null, restoredFromVersionId: null, createdAt: '2026-10-02T00:00:00Z', structureFingerprint: 's', constraints: { includeNodeIds: [], excludeNodeIds: [] }, snapshot: { valid: true, conflicts: [], titles: { A: '当时的能力标题' }, selectedNodeIds: ['A'], orderedNodeIds: ['A'], prerequisiteEdges: [], effectiveTargetNodeIds: ['A'], currentKnowledgeIds: [], bridgeKnowledgeIds: [] } };
+it('acquired root explains optional execution instead of requiring a fabricated Node Run',()=>{
+ const c={view:{activeVersion:version},editing:true,actionChoices:[],draft:{includeNodeIds:[],excludeNodeIds:[]}} as unknown as ReturnType<typeof useRoutePlanning>;
+ const html=renderToStaticMarkup(<RoutePlanningPanel control={c} title={id=>id} node={{id:'A',title:'已具备的根',description:'事实根',state:'已具备',role:'中间能力',root:true}}/>);
+ expect(html).toContain('能力已满足，可跳过或选择补充执行');
+ expect(html).not.toContain('至少选择一个行动，才可采用可执行路线');
+});
 describe('V2 route UI authority and historical meaning', () => {
   it('history renders saved titles and distinguishes viewing from restore-as-new', () => {
     const html = renderToStaticMarkup(<HistoricalRoute version={version} disabled={false} restore={vi.fn()}/>);

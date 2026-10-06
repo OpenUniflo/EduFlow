@@ -24,7 +24,9 @@ Each phase begins with failing regression tests. Model tests cover unacquired ro
 
 - Forward migrations: 20261006160207_capability_action_node_scope; 20261006161720_capability_action_visibility_and_freshness. Existing tables, FK lineage and saved snapshots remain intact. Both were applied and verified on Local and Hosted; historical files were not edited.
 - Local transactional SQL verifies actual Node Micro and Practice submissions, independent roots, same-scope ordering, completion reachability, explicit Repeat, constraint/binding integrity, private caller visibility, RLS, missing order, stale UKS, immutable history and byte-equivalent UKS/facts. Existing Edge ordered RPC regression also passes; all fixture mutations roll back.
-- Current automated gate: 135 files / 1,015 tests PASS; TypeScript, lint, production build, knowledge relation audit and client secret audit PASS.
+- Current automated gate: 135 files / 1,016 tests PASS; TypeScript, lint, production build, knowledge relation audit and client secret audit PASS.
 - Reviewer 1 independently passed the two SQL transactions and inspected actual function privileges/freshness. Reviewer 2 passed 11 files / 146 tests after Node detail, retained catalog, Repeat and reorder fixes. Hosted/final-SHA Gate remains pending.
 
 - Explicit `enterprise-node-action-v5` TEST resources were inserted on Hosted for five existing real roots: five Micro Paths and five business artifact Assignments, ten exact Node-scope Actions. No Knowledge facts, legacy resources or user state were changed. Generator is idempotent and lives only under acceptance tooling.
+
+- Hosted rollback: both scoped executor pipelines, Repeat, local order, freshness and RLS passed actual assertions. Fourteen core tables had identical before/after hashes; fixture residue zero. Security advisors retain exactly the baseline debt. Acquired-root optional-execution wording was corrected following real browser review.
