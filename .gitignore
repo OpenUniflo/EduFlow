@@ -14,3 +14,4 @@ dist/
 /tmp/gold-course-sync/
 .vercel
 /.acceptance/
+/output/
