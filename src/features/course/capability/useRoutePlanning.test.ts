@@ -103,19 +103,22 @@ it('clearing the final Action stays empty through Preview and cannot Adopt',asyn
  const count=requests.api.mock.calls.length;await render().adopt();expect(requests.api).toHaveBeenCalledTimes(count);
 });
 
-it('surfaces old model-external choices and only clears them through an explicit draft operation',async()=>{
+it('entering adjustment reconciles inherited model-external choices without writing the formal route',async()=>{
  const {buildCapabilityModel}=await import('@/shared/learning/routePlanning');
  const model=buildCapabilityModel({nodeIds:['A','T','old'],currentNodeIds:['A'],courseOrder:[{nodeId:'T',lessonOrder:0,coverageOrder:0}],prerequisiteEdges:[{id:'ab',source:'A',target:'T',strength:'hard'}]});
  const steps=[{scope:'node',nodeId:'old',actionId:'old-node',order:0},{edgeId:'old-edge',sourceNodeId:'old',targetNodeId:'T',actionId:'old-action',order:1},{edgeId:'ab',sourceNodeId:'A',targetNodeId:'T',actionId:'kept',order:2}];
  const initial={model,activeVersion:{id:'v1',constraints:{includeNodeIds:['old'],excludeNodeIds:[]},snapshot:{selectedNodeIds:['old','A','T'],executionSteps:steps}}};
  const saved=structuredClone(initial);requests.api.mockResolvedValueOnce(initial);render();await flush();render().begin();
- expect(render().draft.includeNodeIds).toEqual(['old']);expect(render().modelChanges).toMatchObject({nodeIds:['old'],edgeIds:['old-edge']});
- expect(render().dirty).toBe(false);expect(requests.api).toHaveBeenCalledTimes(1);
- render().reconcileModel();
  expect(render().draft.includeNodeIds).toEqual(['A','T']);expect(render().actionChoices).toEqual([{scope:'edge',edgeId:'ab',actionId:'kept'}]);expect(render().selectedEdgeIds).toEqual(['ab']);expect(render().modelChanges?.nodeIds).toEqual([]);expect(render().dirty).toBe(true);
  expect(initial).toEqual(saved);expect(render().view?.activeVersion?.id).toBe('v1');expect(requests.api).toHaveBeenCalledTimes(1);
  requests.api.mockResolvedValueOnce({baseVersionId:'v1',previewState:'a'.repeat(64),plan:{valid:true,route:{},conflicts:[],execution:{steps:[steps[2]],issues:[],options:[],complete:true}}});await render().replan();
  expect(JSON.parse(requests.api.mock.calls[1][1]!.body as string)).toMatchObject({action:'preview',scopeMode:'replan',includeNodeIds:['A','T'],selectedEdgeIds:['ab'],actionChoices:[{edgeId:'ab',actionId:'kept'}]});
+ expect(render().preview?.valid).toBe(true);
+ expect(render().modelChanges).toMatchObject({nodeIds:[],edgeIds:[]});
+ requests.api.mockResolvedValueOnce({}).mockResolvedValueOnce({...initial,activeVersion:{...initial.activeVersion,id:'v2'}});
+ await render().adopt();
+ expect(JSON.parse(requests.api.mock.calls[2][1]!.body as string)).toMatchObject({action:'adopt',includeNodeIds:['A','T'],selectedEdgeIds:['ab'],actionChoices:[{edgeId:'ab',actionId:'kept'}]});
+ expect(initial).toEqual(saved);
 });
 it('historical replanning never turns model-external historical membership into a new Include',async()=>{
  const {buildCapabilityModel}=await import('@/shared/learning/routePlanning');
@@ -126,11 +129,47 @@ it('historical replanning never turns model-external historical membership into 
  expect(render().draft.includeNodeIds).toEqual(['T']);expect(render().view?.activeVersion?.snapshot.selectedNodeIds).toEqual(['T']);
 });
 
-it('a membership-only historical cleanup is dirty and cannot silently dismiss without adoption',async()=>{
+it('automatic membership-only draft cleanup is reviewable and cannot silently dismiss without adoption',async()=>{
  const {buildCapabilityModel}=await import('@/shared/learning/routePlanning');
  const model=buildCapabilityModel({nodeIds:['T','old'],currentNodeIds:['T'],prerequisiteEdges:[],courseOrder:[{nodeId:'T',lessonOrder:0,coverageOrder:0}]});
  const initial={model,activeVersion:{id:'v1',constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{selectedNodeIds:['T','old'],executionSteps:[]}}};
- requests.api.mockResolvedValueOnce(initial);render();await flush();render().begin();expect(render().dirty).toBe(false);
- render().reconcileModel();expect(render().dirty).toBe(true);render().cancel();expect(render().dismissPending).toBe(true);expect(render().editing).toBe(true);
+ requests.api.mockResolvedValueOnce(initial);render();await flush();render().begin();expect(render().dirty).toBe(true);
+ expect(render().modelChanges?.nodeIds).toEqual([]);render().cancel();expect(render().dismissPending).toBe(true);expect(render().editing).toBe(true);
  expect(initial.activeVersion.snapshot.selectedNodeIds).toEqual(['T','old']);expect(requests.api).toHaveBeenCalledTimes(1);
+});
+
+it('undo cannot restore an inherited model-external Include after automatic reconciliation',async()=>{
+ const {buildCapabilityModel}=await import('@/shared/learning/routePlanning');
+ const model=buildCapabilityModel({nodeIds:['T','old'],currentNodeIds:['T'],prerequisiteEdges:[],courseOrder:[{nodeId:'T',lessonOrder:0,coverageOrder:0}]});
+ const initial={model,activeVersion:{id:'v1',constraints:{includeNodeIds:['old'],excludeNodeIds:[]},snapshot:{selectedNodeIds:['T','old'],executionSteps:[]}}};
+ requests.api.mockResolvedValueOnce(initial);render();await flush();render().begin();render().undoNode('old');
+ expect(render().draft.includeNodeIds).toEqual(['T']);expect(render().modelChanges?.nodeIds).toEqual([]);
+ expect(initial.activeVersion.constraints.includeNodeIds).toEqual(['old']);
+});
+
+it('Preview impact reconciles inherited choices before its request, without adopting or mutating history',async()=>{
+ const {buildCapabilityModel,planCourseRoute}=await import('@/shared/learning/routePlanning');
+ const input={nodeIds:['A','T','old'],currentNodeIds:['A'],prerequisiteEdges:[{id:'ab',source:'A',target:'T',strength:'hard' as const}],courseOrder:[{nodeId:'T',lessonOrder:0,coverageOrder:0}]};
+ const model=buildCapabilityModel(input);
+ const step={edgeId:'ab',sourceNodeId:'A',targetNodeId:'T',actionId:'kept',order:0};
+ const initial={model,activeVersion:{id:'v1',constraints:{includeNodeIds:['old'],excludeNodeIds:[]},snapshot:{selectedNodeIds:['old','A','T'],executionSteps:[{scope:'node',nodeId:'old',actionId:'removed',order:0},step]}}};
+ const saved=structuredClone(initial);requests.api.mockResolvedValueOnce(initial);render();await flush();
+ requests.api.mockImplementationOnce(async(_path,request)=>{
+   const intent=JSON.parse(request.body);const plan=planCourseRoute(input,intent);
+   expect(plan.valid).toBe(true);expect(intent.actionChoices).toEqual([{scope:'edge',edgeId:'ab',actionId:'kept'}]);
+   return {baseVersionId:'v1',previewState:'a'.repeat(64),plan:{...plan,execution:{steps:[step],options:[],issues:[],complete:true}}};
+ });
+ await render().previewImpact();
+ expect(render().preview?.valid).toBe(true);expect(render().modelChanges?.nodeIds).toEqual([]);expect(render().dirty).toBe(true);
+ expect(initial).toEqual(saved);expect(requests.api).toHaveBeenCalledTimes(2);
+});
+
+it('historical replanning also removes explicit model-external Includes and scopes while retaining legal Excludes',async()=>{
+ const {buildCapabilityModel}=await import('@/shared/learning/routePlanning');
+ const model=buildCapabilityModel({nodeIds:['T','U','old'],currentNodeIds:['T','U'],prerequisiteEdges:[],courseOrder:[{nodeId:'T',lessonOrder:0,coverageOrder:0},{nodeId:'U',lessonOrder:0,coverageOrder:1}]});
+ const initial={model,activeVersion:{id:'v1',constraints:{includeNodeIds:[],excludeNodeIds:[]},snapshot:{selectedNodeIds:['T'],executionSteps:[]}}};
+ requests.api.mockResolvedValueOnce(initial);render();await flush();
+ const history={constraints:{includeNodeIds:['old'],excludeNodeIds:['U']},snapshot:{selectedNodeIds:['old','T'],executionSteps:[{scope:'node',nodeId:'old',actionId:'removed'}]}};
+ const saved=structuredClone(history);render().replanHistorical(history as any);
+ expect(render().draft).toEqual({includeNodeIds:['T'],excludeNodeIds:['U']});expect(render().actionChoices).toEqual([]);expect(render().modelChanges?.nodeIds).toEqual([]);expect(history).toEqual(saved);
 });
