@@ -1,0 +1,63 @@
+{
+  "status": "INCOMPLETE",
+  "phaseA": {
+    "functionalGateEvidence": "Demonstrated; see current gate evidence table",
+    "security": "PASS for recorded ordinary-user Hosted scenarios and static delta",
+    "aiQuality": "BLOCKING ISSUES"
+  },
+  "phaseB": "NOT STARTED",
+  "phaseC": "NOT STARTED",
+  "freshReviewer": "NOT STARTED",
+  "applicationCommit": "e5beb38af405ffe3920c1a58094472c5c1b67cc1",
+  "preview": "https://edu-flow-8igxoc6oa-july-nanas-projects.vercel.app",
+  "deploymentId": "dpl_5i5svEA5wMwGE4gHrRGasFPFMKDR",
+  "deploymentState": "READY",
+  "checks": {
+    "tests": 749,
+    "testFiles": 103,
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "productionBuild": "PASS",
+    "knowledgeAudit": "PASS",
+    "clientSecretAudit": "PASS",
+    "latestOrdinaryUserSecurityChecks": 23,
+    "repeatConfirmation": "PASS: exact rows unchanged, evidence=4, states=4, routeVersions=1"
+  },
+  "aiReview": {
+    "verdict": "Blocking Issues",
+    "flash": {
+      "total": 16,
+      "completed": 15,
+      "technicalFailures": 1
+    },
+    "hybrid": {
+      "total": 15,
+      "completed": 14,
+      "technicalFailures": 1
+    },
+    "specificFailures": [
+      "Flash incorrect-paraphrase-2: 150-70=90 incorrectly verified as correct and proposed learning",
+      "Hybrid python-runtime-2: ordinary Python debugging proposed E07 learned despite Agent scope",
+      "Flash python-runtime-2: E07 partial despite acknowledging missing Agent context",
+      "Flash python-runtime-1 and agent-runtime-debugging-2: CODE01 partial without Coding Agent/codebase context"
+    ],
+    "limitedSuccesses": [
+      "Six correct single-period cases remained partial",
+      "Six input-only controls did not promote exposure/impact",
+      "Five completed actual-Agent synthetic positive cases supported E07; one failed technically"
+    ],
+    "scope": "Synthetic acceptance records, real local providers and read-only Hosted retrieval; not new Hosted diagnosis proof"
+  },
+  "latestRuntime": {
+    "windowUtc": [
+      "2026-10-03T17:37:36Z",
+      "2026-10-03T17:47:36Z"
+    ],
+    "fiveXxLogs": 0,
+    "scope": "Latest Preview security and idempotence rechecks only"
+  },
+  "harnessCorrection": "The additional idempotence recheck initially used nonexistent source_type instead of event_type, failed before mutation, then was corrected against actual schema and passed. Existing original confirmation acceptance remained valid.",
+  "remainingDependency": "User was asked for an available alternative LLM/provider for local and Preview, without posting secrets. DeepSeek-only adapter must be adapted to any chosen different provider before validating. Embedding is working.",
+  "productionDeploymentOrConfigurationModified": false,
+  "sharedHostedDatabase": "Earlier authorized additive migrations 20261003141557 and 20261003153848 remain applied and documented."
+}

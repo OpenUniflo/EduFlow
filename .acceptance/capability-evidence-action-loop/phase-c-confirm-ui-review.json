@@ -1,0 +1,34 @@
+{
+  "reviewer": "graph_ux_reviewer",
+  "commit": "53fe096",
+  "preview": "https://edu-flow-cyat6shyn-july-nanas-projects.vercel.app",
+  "singleConfirm": "Clicked actual button in 交期窗口缺料暴露评估 card, confidence98 supported learned. Card then 已正式确认. No other candidate confirmed, no re-diagnosis.",
+  "UX-C02": "PASS: selecting python-runtime removes shortage error statuses and changes candidates to Python headings. Restoring shortage restores its candidates.",
+  "before": {
+    "projectAcquired": 3,
+    "intermediateGap": 2,
+    "targets": 4,
+    "target": "not acquired, existing learning"
+  },
+  "after": {
+    "projectAcquired": 3,
+    "intermediateGap": 1,
+    "targets": 4,
+    "target": "acquired",
+    "pruned": "物料净需求计算 no longer included in current projected capability support closure",
+    "route": "Current curriculum route acquired0/gap4 remains because all four course targets still unacquired"
+  },
+  "blocker": {
+    "id": "UX-C03",
+    "severity": "P1",
+    "finding": "After successful confirmation and closing workspace, every node sphere disappears while edge lines and labels remain. Still absent after 3 seconds and selecting acquired target. No browser errors.",
+    "screenshots": [
+      "phase-c-confirm-project-after-missing-nodes.png",
+      "phase-c-confirm-project-after-wait.png",
+      "phase-c-confirm-target-acquired-detail.png"
+    ]
+  },
+  "camera": "Projection structural node set changed (net requirement removed) and positions rearranged. No fit/camera command issued by reviewer. Cannot infer internal camera state from images.",
+  "completedBranch": "Previously completed practice branch belonged to net->shortage edge, now pruned with upstream node; panel closed on updated structural projection.",
+  "errors": []
+}

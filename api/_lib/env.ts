@@ -5,10 +5,10 @@ export type ServerEnvironment = {
 };
 
 export type EmbeddingEnvironment = {
-  embeddingProvider: "dmxapi";
+  embeddingProvider: "dmxapi" | "aliyun";
   embeddingBaseUrl: string;
   embeddingApiKey: string;
-  embeddingModel: "text-embedding-3-small";
+  embeddingModel: "text-embedding-3-small" | "qwen3.7-text-embedding";
   embeddingDimensions: number;
 };
 
@@ -19,8 +19,6 @@ export type LlmEnvironment = {
   llmModel: string;
 };
 
-const EMBEDDING_PROVIDER = "dmxapi";
-const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1024;
 
 function required(name: string, value: string | undefined) {
@@ -72,11 +70,13 @@ export function readServerEnvironment(env: NodeJS.ProcessEnv = process.env): Ser
 }
 
 export function readEmbeddingEnvironment(env: NodeJS.ProcessEnv = process.env): EmbeddingEnvironment {
+  const provider = required("EMBEDDING_PROVIDER", env.EMBEDDING_PROVIDER);
+  if (provider !== "dmxapi" && provider !== "aliyun") throw new Error("EMBEDDING_PROVIDER must be dmxapi or aliyun");
   return {
-    embeddingProvider: exact("EMBEDDING_PROVIDER", env.EMBEDDING_PROVIDER, EMBEDDING_PROVIDER),
+    embeddingProvider: provider,
     embeddingBaseUrl: serverBaseUrl("EMBEDDING_BASE_URL", env.EMBEDDING_BASE_URL),
     embeddingApiKey: required("EMBEDDING_API_KEY", env.EMBEDDING_API_KEY),
-    embeddingModel: exact("EMBEDDING_MODEL", env.EMBEDDING_MODEL, EMBEDDING_MODEL),
+    embeddingModel: exact("EMBEDDING_MODEL", env.EMBEDDING_MODEL, provider === "aliyun" ? "qwen3.7-text-embedding" : "text-embedding-3-small"),
     embeddingDimensions: embeddingDimensions(env.EMBEDDING_DIMENSIONS)
   };
 }

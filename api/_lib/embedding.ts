@@ -22,7 +22,7 @@ export class OpenAICompatibleEmbeddingService implements EmbeddingService {
   async embed(text: string): Promise<number[]> {
     if (!text.trim()) throw new Error("Embedding input must not be empty");
 
-    const response = await this.request(`${this.config.embeddingBaseUrl}/embeddings`, {
+    const response = await this.requestWithTransientRetry({
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.config.embeddingApiKey}`,
@@ -66,6 +66,25 @@ export class OpenAICompatibleEmbeddingService implements EmbeddingService {
       );
     }
     return embedding;
+  }
+
+  private async requestWithTransientRetry(init: RequestInit): Promise<Response> {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await this.request(`${this.config.embeddingBaseUrl}/embeddings`, { ...init, signal: AbortSignal.timeout(30_000) });
+        if (response.ok || (response.status !== 429 && response.status < 500) || attempt === 3) return response;
+        await response.body?.cancel();
+      } catch (error) {
+        if (attempt === 3) {
+          const cause=error&&typeof error==='object'&&'cause' in error?error.cause:undefined;
+          const code=cause&&typeof cause==='object'&&'code' in cause?String(cause.code):'';
+          const diagnostic=/^[A-Z0-9_]{1,80}$/.test(code)?` (${code})`:'';
+          throw new Error(`Embedding request failed: provider=${this.config.embeddingProvider}, model=${this.config.embeddingModel}, network error${diagnostic}`);
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 150 * attempt));
+    }
+    throw new Error('Embedding request failed after bounded retries');
   }
 }
 

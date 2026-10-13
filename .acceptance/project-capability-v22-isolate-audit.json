@@ -1,0 +1,778 @@
+{
+  "baseline": "dbae09f673ff6e86a2c18555b2bd48fb2b4e7a44",
+  "project": "uyljtdbvlivxniililay",
+  "course": "ai-agents-in-depth",
+  "targets": 117,
+  "prerequisiteInternal": 108,
+  "enablesInternal": 19,
+  "relatedInternal": 9,
+  "generationRuns": 0,
+  "classification": "A/B/C not evidenced for this manual course; C confirmed independently in current generator policy. D not found in listed active Global edges.",
+  "nodes": [
+    {
+      "nodeId": "C03",
+      "title": "Agent State",
+      "coverage": [
+        {
+          "id": "aiad-cov-C03",
+          "role": "introduce",
+          "node_id": "C03",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-02",
+          "display_order": 10
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-enables-c03-rt01",
+          "source": "C03",
+          "target": "RT01",
+          "relation": "enables",
+          "strength": 0.88,
+          "reason": "An autonomous loop needs state that persists observations, actions, and progress.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-a02-c03",
+          "source": "A02",
+          "target": "C03",
+          "relation": "enables",
+          "strength": 0.86,
+          "reason": "LLM agent architecture requires explicit state across model and tool turns.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-c03-k04",
+          "source": "C03",
+          "target": "K04",
+          "relation": "enables",
+          "strength": 0.9,
+          "reason": "Working state is the task-scoped portion of the broader agent state.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-related-c03-s15",
+          "source": "C03",
+          "target": "S15",
+          "relation": "related",
+          "strength": 0.82,
+          "reason": "Database persistence stores the durable portions of agent state across runs.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "E: existing active enables filtered out; K12/T14 also have prerequisites only to non-target endpoints",
+      "repair": "Expose existing enables; no new edge"
+    },
+    {
+      "nodeId": "E05",
+      "title": "Regression Test",
+      "coverage": [
+        {
+          "id": "aiad-cov-E05",
+          "role": "introduce",
+          "node_id": "E05",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-06",
+          "display_order": 9
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-enables-e13-e05",
+          "source": "E13",
+          "target": "E05",
+          "relation": "enables",
+          "strength": 0.86,
+          "reason": "Repeatable outcome scores allow regression tests to detect quality loss.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-e14-e05",
+          "source": "E14",
+          "target": "E05",
+          "relation": "enables",
+          "strength": 0.74,
+          "reason": "Trajectory checks let regression tests detect behavioral changes before final output.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-py86-e05",
+          "source": "PY86",
+          "target": "E05",
+          "relation": "enables",
+          "strength": 0.78,
+          "reason": "Integration tests detect regressions across system boundaries.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "E: existing active enables filtered out; K12/T14 also have prerequisites only to non-target endpoints",
+      "repair": "Expose existing enables; no new edge"
+    },
+    {
+      "nodeId": "E06",
+      "title": "Observability",
+      "coverage": [
+        {
+          "id": "aiad-cov-E06",
+          "role": "introduce",
+          "node_id": "E06",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-06",
+          "display_order": 13
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-enables-e06-e07",
+          "source": "E06",
+          "target": "E07",
+          "relation": "enables",
+          "strength": 0.9,
+          "reason": "Logs, metrics, and traces provide the evidence used in runtime debugging.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-rt06-e06",
+          "source": "RT06",
+          "target": "E06",
+          "relation": "enables",
+          "strength": 0.88,
+          "reason": "An audit trail supplies structured events for logs, metrics, and traces.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-e06-e14",
+          "source": "E06",
+          "target": "E14",
+          "relation": "enables",
+          "strength": 0.82,
+          "reason": "Observability captures the intermediate execution evidence used for trajectory evaluation.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-py89-e06",
+          "source": "PY89",
+          "target": "E06",
+          "relation": "enables",
+          "strength": 0.86,
+          "reason": "Structured logging is a core source of observability events.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-py90-e06",
+          "source": "PY90",
+          "target": "E06",
+          "relation": "enables",
+          "strength": 0.86,
+          "reason": "Metrics provide quantitative observability signals.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "E: existing active enables filtered out; K12/T14 also have prerequisites only to non-target endpoints",
+      "repair": "Expose existing enables; no new edge"
+    },
+    {
+      "nodeId": "EVO06",
+      "title": "Self-Improving Update Method",
+      "coverage": [
+        {
+          "id": "aiad-cov-EVO06",
+          "role": "introduce",
+          "node_id": "EVO06",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-07",
+          "display_order": 15
+        }
+      ],
+      "relations": [
+        {
+          "id": "book-gold-v1-enables-evo02-evo06",
+          "source": "EVO02",
+          "target": "EVO06",
+          "relation": "enables",
+          "strength": 0.72,
+          "reason": "Manual Gold: source enables practical use of target without being a strict cognitive prerequisite.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "book-gold-v1-enables-evo03-evo06",
+          "source": "EVO03",
+          "target": "EVO06",
+          "relation": "enables",
+          "strength": 0.72,
+          "reason": "Manual Gold: source enables practical use of target without being a strict cognitive prerequisite.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "book-gold-v1-enables-evo04-evo06",
+          "source": "EVO04",
+          "target": "EVO06",
+          "relation": "enables",
+          "strength": 0.72,
+          "reason": "Manual Gold: source enables practical use of target without being a strict cognitive prerequisite.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "book-gold-v1-enables-evo05-evo06",
+          "source": "EVO05",
+          "target": "EVO06",
+          "relation": "enables",
+          "strength": 0.72,
+          "reason": "Manual Gold: source enables practical use of target without being a strict cognitive prerequisite.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "E: existing active enables filtered out; K12/T14 also have prerequisites only to non-target endpoints",
+      "repair": "Expose existing enables; no new edge"
+    },
+    {
+      "nodeId": "H02",
+      "title": "Workflow",
+      "coverage": [
+        {
+          "id": "aiad-cov-H02",
+          "role": "introduce",
+          "node_id": "H02",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-01",
+          "display_order": 5
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-related-h02-h03",
+          "source": "H02",
+          "target": "H03",
+          "relation": "related",
+          "strength": 0.55,
+          "reason": "Automation systems and workflows both coordinate explicit executable steps.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-related-ag01-h02",
+          "source": "AG01",
+          "target": "H02",
+          "relation": "related",
+          "strength": 0.62,
+          "reason": "Agent behavior can be composed with deterministic workflow control.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-h02-wf05",
+          "source": "H02",
+          "target": "WF05",
+          "relation": "enables",
+          "strength": 0.84,
+          "reason": "Workflow control provides deterministic structure around agent decisions and approvals.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "E: existing active enables filtered out; K12/T14 also have prerequisites only to non-target endpoints",
+      "repair": "Expose existing enables; no new edge"
+    },
+    {
+      "nodeId": "K04",
+      "title": "Working State",
+      "coverage": [
+        {
+          "id": "aiad-cov-K04",
+          "role": "introduce",
+          "node_id": "K04",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-03",
+          "display_order": 0
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-related-k04-k05",
+          "source": "K04",
+          "target": "K05",
+          "relation": "related",
+          "strength": 0.68,
+          "reason": "Working state and long-term memory differ in lifetime but share state persistence concerns.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-c03-k04",
+          "source": "C03",
+          "target": "K04",
+          "relation": "enables",
+          "strength": 0.9,
+          "reason": "Working state is the task-scoped portion of the broader agent state.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-related-i04-k04",
+          "source": "I04",
+          "target": "K04",
+          "relation": "related",
+          "strength": 0.82,
+          "reason": "Working state is a direct source selected during context engineering.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-py64-k04",
+          "source": "PY64",
+          "target": "K04",
+          "relation": "enables",
+          "strength": 0.62,
+          "reason": "SQL can query structured working state stored relationally.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-py71-k04",
+          "source": "PY71",
+          "target": "K04",
+          "relation": "enables",
+          "strength": 0.75,
+          "reason": "Redis supports low-latency task and session working state.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "E: existing active enables filtered out; K12/T14 also have prerequisites only to non-target endpoints",
+      "repair": "Expose existing enables; no new edge"
+    },
+    {
+      "nodeId": "K12",
+      "title": "Chunking",
+      "coverage": [
+        {
+          "id": "aiad-cov-K12",
+          "role": "introduce",
+          "node_id": "K12",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-03",
+          "display_order": 6
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-prerequisite-k01-k12",
+          "source": "K01",
+          "target": "K12",
+          "relation": "prerequisite",
+          "strength": "hard",
+          "reason": "Content must be parsed before it can be split into retrievable chunks.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-k12-k13",
+          "source": "K12",
+          "target": "K13",
+          "relation": "enables",
+          "strength": 0.82,
+          "reason": "Semantic chunks provide bounded units for embedding.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "book-gold-v1-enables-k12-rag01",
+          "source": "K12",
+          "target": "RAG01",
+          "relation": "enables",
+          "strength": 0.75,
+          "reason": "Chunking provides bounded content units that can be embedded and retrieved densely.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "book-gold-v1-enables-k12-rag02",
+          "source": "K12",
+          "target": "RAG02",
+          "relation": "enables",
+          "strength": 0.65,
+          "reason": "Chunking provides bounded lexical units that can also be indexed for sparse retrieval.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "E: existing active enables filtered out; K12/T14 also have prerequisites only to non-target endpoints",
+      "repair": "Expose existing enables; no new edge"
+    },
+    {
+      "nodeId": "MA06",
+      "title": "Model Context Protocol",
+      "coverage": [
+        {
+          "id": "aiad-cov-MA06",
+          "role": "introduce",
+          "node_id": "MA06",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-04",
+          "display_order": 7
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-related-ma03-ma06",
+          "source": "MA03",
+          "target": "MA06",
+          "relation": "related",
+          "strength": 0.74,
+          "reason": "MCP standardizes discovery and invocation of tool-like capabilities.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-related-ma06-t11",
+          "source": "MA06",
+          "target": "T11",
+          "relation": "related",
+          "strength": 0.88,
+          "reason": "MCP provides standardized discovery and invocation of tool interfaces.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-related-ma06-ma15",
+          "source": "MA06",
+          "target": "MA15",
+          "relation": "related",
+          "strength": 0.76,
+          "reason": "A plugin may package an MCP integration alongside skills and tools.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "F/H: old manually curated catalog retained only related; source-backed directional reconstruction missing",
+      "repair": "Reviewed direct fact in scripts/data-repairs/project-capability-relations-v22.sql"
+    },
+    {
+      "nodeId": "RT06",
+      "title": "Audit Trail",
+      "coverage": [
+        {
+          "id": "aiad-cov-RT06",
+          "role": "introduce",
+          "node_id": "RT06",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-02",
+          "display_order": 11
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-enables-rt15-rt06",
+          "source": "RT15",
+          "target": "RT06",
+          "relation": "enables",
+          "strength": 0.88,
+          "reason": "Checkpoint events contribute traceable state snapshots to the audit trail.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-rt06-e06",
+          "source": "RT06",
+          "target": "E06",
+          "relation": "enables",
+          "strength": 0.88,
+          "reason": "An audit trail supplies structured events for logs, metrics, and traces.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "E: existing active enables filtered out; K12/T14 also have prerequisites only to non-target endpoints",
+      "repair": "Expose existing enables; no new edge"
+    },
+    {
+      "nodeId": "RT14",
+      "title": "Failure Recovery",
+      "coverage": [
+        {
+          "id": "aiad-cov-RT14",
+          "role": "introduce",
+          "node_id": "RT14",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-05",
+          "display_order": 0
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-enables-rt03-rt14",
+          "source": "RT03",
+          "target": "RT14",
+          "relation": "enables",
+          "strength": 0.78,
+          "reason": "Bounded runtime failures can trigger controlled recovery instead of unbounded execution.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-t08-rt14",
+          "source": "T08",
+          "target": "RT14",
+          "relation": "enables",
+          "strength": 0.82,
+          "reason": "Bounded tool retries are one direct recovery strategy for transient runtime failure.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-rt15-rt14",
+          "source": "RT15",
+          "target": "RT14",
+          "relation": "enables",
+          "strength": 0.84,
+          "reason": "A checkpoint provides the saved state needed to resume after runtime failure.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "F/H: enables exist but only from non-target, currently unsupported endpoints; missing source-backed outgoing recovery support",
+      "repair": "Reviewed direct fact in scripts/data-repairs/project-capability-relations-v22.sql"
+    },
+    {
+      "nodeId": "S02",
+      "title": "Sandbox",
+      "coverage": [
+        {
+          "id": "aiad-cov-S02",
+          "role": "introduce",
+          "node_id": "S02",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-01",
+          "display_order": 8
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-related-s01-s02",
+          "source": "S01",
+          "target": "S02",
+          "relation": "related",
+          "strength": 0.62,
+          "reason": "Sandboxing is one enforcement mechanism for system guardrails.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-related-s02-t15",
+          "source": "S02",
+          "target": "T15",
+          "relation": "related",
+          "strength": 0.82,
+          "reason": "A sandbox constrains side effects while tools execute external code or actions.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "book-gold-v1-related-s02-tool06",
+          "source": "S02",
+          "target": "TOOL06",
+          "relation": "related",
+          "strength": 0.75,
+          "reason": "Manual Gold: the two concepts have a significant non-prerequisite relationship.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "F/H: old manually curated catalog retained only related; source-backed directional reconstruction missing",
+      "repair": "Reviewed direct fact in scripts/data-repairs/project-capability-relations-v22.sql"
+    },
+    {
+      "nodeId": "S03",
+      "title": "Least Privilege",
+      "coverage": [
+        {
+          "id": "aiad-cov-S03",
+          "role": "introduce",
+          "node_id": "S03",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-01",
+          "display_order": 9
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-related-s01-s03",
+          "source": "S01",
+          "target": "S03",
+          "relation": "related",
+          "strength": 0.72,
+          "reason": "Least privilege is a core policy used to implement action guardrails.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-related-s03-t09",
+          "source": "S03",
+          "target": "T09",
+          "relation": "related",
+          "strength": 0.92,
+          "reason": "Least privilege determines the resources and actions exposed through tool permissions.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "F/H: old manually curated catalog retained only related; source-backed directional reconstruction missing",
+      "repair": "Reviewed direct fact in scripts/data-repairs/project-capability-relations-v22.sql"
+    },
+    {
+      "nodeId": "S08",
+      "title": "Service Deployment",
+      "coverage": [
+        {
+          "id": "aiad-cov-S08",
+          "role": "introduce",
+          "node_id": "S08",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-07",
+          "display_order": 17
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-enables-s14-s08",
+          "source": "S14",
+          "target": "S08",
+          "relation": "enables",
+          "strength": 0.72,
+          "reason": "A stable API service is an executable unit that can be deployed.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-s15-s08",
+          "source": "S15",
+          "target": "S08",
+          "relation": "enables",
+          "strength": 0.7,
+          "reason": "Production deployment requires a persistence design for durable state.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-s07-s08",
+          "source": "S07",
+          "target": "S08",
+          "relation": "enables",
+          "strength": 0.76,
+          "reason": "Queue workers are runtime units that must be deployed with the service.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-py95-s08",
+          "source": "PY95",
+          "target": "S08",
+          "relation": "enables",
+          "strength": 0.9,
+          "reason": "Docker provides a reproducible artifact for service deployment.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-py50-py98",
+          "source": "PY50",
+          "target": "S08",
+          "relation": "enables",
+          "strength": 0.72,
+          "reason": "A FastAPI application is a concrete service prepared for deployment.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "F/G: legacy extra curriculum target; book audit explicitly marks unsupported route bridge",
+      "repair": "Remove only current coverage; preserve Knowledge and user/history identities"
+    },
+    {
+      "nodeId": "T12",
+      "title": "Function Calling",
+      "coverage": [
+        {
+          "id": "aiad-cov-T12",
+          "role": "introduce",
+          "node_id": "T12",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-04",
+          "display_order": 2
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-enables-t11-t12",
+          "source": "T11",
+          "target": "T12",
+          "relation": "enables",
+          "strength": 0.9,
+          "reason": "Function calling expresses requests against a discoverable tool interface.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-t12-t14",
+          "source": "T12",
+          "target": "T14",
+          "relation": "enables",
+          "strength": 0.92,
+          "reason": "Function-calling protocols carry structured arguments for the chosen tool.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "E: existing active enables filtered out; K12/T14 also have prerequisites only to non-target endpoints",
+      "repair": "Expose existing enables; no new edge"
+    },
+    {
+      "nodeId": "T14",
+      "title": "Tool Arguments",
+      "coverage": [
+        {
+          "id": "aiad-cov-T14",
+          "role": "introduce",
+          "node_id": "T14",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-04",
+          "display_order": 6
+        }
+      ],
+      "relations": [
+        {
+          "id": "knowledge-enables-t03-t14",
+          "source": "T03",
+          "target": "T14",
+          "relation": "enables",
+          "strength": 0.8,
+          "reason": "Selecting a tool determines the argument contract that must be populated.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-prerequisite-t14-t15",
+          "source": "T14",
+          "target": "T15",
+          "relation": "prerequisite",
+          "strength": "hard",
+          "reason": "A tool cannot be invoked correctly without valid arguments for its interface.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-t12-t14",
+          "source": "T12",
+          "target": "T14",
+          "relation": "enables",
+          "strength": 0.92,
+          "reason": "Function-calling protocols carry structured arguments for the chosen tool.",
+          "lifecycle": "active"
+        },
+        {
+          "id": "knowledge-enables-py49-t14",
+          "source": "PY49",
+          "target": "T14",
+          "relation": "enables",
+          "strength": 0.82,
+          "reason": "Pydantic validates structured tool arguments before execution.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "E: existing active enables filtered out; K12/T14 also have prerequisites only to non-target endpoints",
+      "repair": "Expose existing enables; no new edge"
+    },
+    {
+      "nodeId": "TOOL06",
+      "title": "Virtual Identity",
+      "coverage": [
+        {
+          "id": "aiad-cov-TOOL06",
+          "role": "introduce",
+          "node_id": "TOOL06",
+          "course_id": "ai-agents-in-depth",
+          "lesson_id": "aiad-lesson-04",
+          "display_order": 10
+        }
+      ],
+      "relations": [
+        {
+          "id": "book-gold-v1-related-s02-tool06",
+          "source": "S02",
+          "target": "TOOL06",
+          "relation": "related",
+          "strength": 0.75,
+          "reason": "Manual Gold: the two concepts have a significant non-prerequisite relationship.",
+          "lifecycle": "active"
+        }
+      ],
+      "cause": "F/H: old manually curated catalog retained only related; source-backed directional reconstruction missing",
+      "repair": "Reviewed direct fact in scripts/data-repairs/project-capability-relations-v22.sql"
+    }
+  ]
+}

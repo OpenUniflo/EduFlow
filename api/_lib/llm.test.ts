@@ -18,6 +18,25 @@ describe("DeepSeek JSON generation adapter", () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({ thinking: { type: "disabled" }, response_format: { type: "json_object" }, stream: false, max_tokens: 100, temperature: 0.1 });
   });
 
+  it("opts a reasoning task into thinking without changing the default", async () => {
+    const request = vi.fn<typeof fetch>(async () => response('{"units":[]}'));
+    const result = await new OpenAICompatibleJsonGenerationClient(config, request).generateJson({...input,thinking:true});
+    expect(JSON.parse(String(request.mock.calls[0][1]?.body)).thinking).toEqual({type:'enabled'});
+    expect(result.metadata.thinking).toBe(true);
+  });
+
+  it('sends explicit reasoning effort only for opted-in reasoning tasks and records it', async () => {
+    const request = vi.fn<typeof fetch>(async () => response('{"units":[]}'));
+    const client = new OpenAICompatibleJsonGenerationClient(config, request);
+    const result = await client.generateJson({...input,thinking:true,reasoningEffort:'low'});
+    expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toMatchObject({thinking:{type:'enabled'},reasoning_effort:'low'});
+    expect(result.metadata.requestedReasoningEffort).toBe('low');
+    await client.generateJson({...input,thinking:false,reasoningEffort:'low'});
+    expect(JSON.parse(String(request.mock.calls[1][1]?.body))).not.toHaveProperty('reasoning_effort');
+    await client.generateJson({...input,thinking:true});
+    expect(JSON.parse(String(request.mock.calls[2][1]?.body))).not.toHaveProperty('reasoning_effort');
+  });
+
   it.each([
     ["empty response", response("")],
     ["invalid JSON", response("not-json")],

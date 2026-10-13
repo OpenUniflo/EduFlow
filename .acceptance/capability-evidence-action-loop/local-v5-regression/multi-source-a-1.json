@@ -1,0 +1,249 @@
+{
+  "scope": "Local real provider / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-multi-source-a",
+      "line": 1,
+      "quote": "订单 V104：本人核对 D1 需求 100 件、D2 需求 80 件，实物 50 件、隔离 10 件，可用 40 件，确认到货 D1 为 20 件、D2 为 30 件。已核对需求单和到货确认记录。",
+      "observation": "核对订单V104的D1需求100件、D2需求80件、实物50件、隔离10件、可用40件，确认到货D1为20件、D2为30件，并核对需求单和到货确认记录。",
+      "capability": "订单需求与库存到货数据核对"
+    },
+    {
+      "sourceId": "local-multi-source-b",
+      "line": 1,
+      "quote": "订单 V104：本人依据盘点与到货核对记录计算 D1 净需求 max(0,100−40−20)=40，剩余可用 0；D2 净需求 max(0,80−0−30)=50。隔离库存未计入，并对各时段的到货日期逐项核对。",
+      "observation": "依据盘点与到货核对记录计算D1净需求max(0,100−40−20)=40、剩余可用0，D2净需求max(0,80−0−30)=50，未计入隔离库存，并逐项核对各时段到货日期。",
+      "capability": "净需求计算与到货日期核对"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0,
+        1
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "supported",
+      "confidence": 0.95,
+      "reason": "单元1核对需求、可用库存及确认到货，单元2据此计算D1/D2净需求并排除隔离库存，覆盖标准全部动作。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learned"
+    },
+    {
+      "unitIndexes": [
+        1
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "insufficient",
+      "confidence": 0.85,
+      "reason": "单元2仅逐项核对到货日期，未计算最早缺料日、缺口量或交期敏感性，缺少标准核心动作。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v5",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "25952f84-2bfe-41ef-9c58-aac917ffc4dc",
+      "generatedAt": "2026-10-03T16:11:09.709Z",
+      "temperature": 0,
+      "maxTokens": 6000,
+      "promptTokens": 345,
+      "completionTokens": 323
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v5",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "8dc26f83-1eb1-4c69-9cb1-e59d7c3edbb2",
+      "generatedAt": "2026-10-03T16:11:13.015Z",
+      "temperature": 0,
+      "maxTokens": 7000,
+      "promptTokens": 1432,
+      "completionTokens": 288
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "单元1核对需求、可用库存及确认到货，单元2据此计算D1/D2净需求并排除隔离库存，覆盖标准全部动作。",
+              "unitIndexes": [
+                0,
+                1
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.95
+            },
+            "supply-shortage-exposure": {
+              "reason": "单元2仅逐项核对到货日期，未计算最早缺料日、缺口量或交期敏感性，缺少标准核心动作。",
+              "unitIndexes": [
+                1
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.85
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "两单元均未涉及瓶颈、良率、已承诺负荷或可交付量计算，与标准无对应动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "两单元未将缺口映射到受影响订单、停线时段或恢复优先级输入，无对应动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "supply-cross-border-lead-time": {
+              "reason": "两单元未分解生产、运输、通关、收货环节，也未给出交期区间或不确定性，无对应动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-supplier-delivery-capacity",
+          "supply-shortage-impact-assessment",
+          "supply-cross-border-lead-time"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-multi-source-a",
+          "line": 1,
+          "quote": "订单 V104：本人核对 D1 需求 100 件、D2 需求 80 件，实物 50 件、隔离 10 件，可用 40 件，确认到货 D1 为 20 件、D2 为 30 件。已核对需求单和到货确认记录。",
+          "observation": "核对订单V104的D1需求100件、D2需求80件、实物50件、隔离10件、可用40件，确认到货D1为20件、D2为30件，并核对需求单和到货确认记录。",
+          "capability": "订单需求与库存到货数据核对"
+        },
+        {
+          "sourceId": "local-multi-source-b",
+          "line": 1,
+          "quote": "订单 V104：本人依据盘点与到货核对记录计算 D1 净需求 max(0,100−40−20)=40，剩余可用 0；D2 净需求 max(0,80−0−30)=50。隔离库存未计入，并对各时段的到货日期逐项核对。",
+          "observation": "依据盘点与到货核对记录计算D1净需求max(0,100−40−20)=40、剩余可用0，D2净需求max(0,80−0−30)=50，未计入隔离库存，并逐项核对各时段到货日期。",
+          "capability": "净需求计算与到货日期核对"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.653653879572567
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.539668012231711
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.518919587135315
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.511171936988831
+        },
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "revision_id": "supply-cross-border-lead-time:v1",
+          "title": "跨境补货交期估计",
+          "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+          "mastery_criteria": [
+            "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+          ],
+          "similarity": 0.474854052066803
+        }
+      ],
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.829944277702102
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.725955014761243
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.638989210128784
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.517642140388489
+        },
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "revision_id": "supply-cross-border-lead-time:v1",
+          "title": "跨境补货交期估计",
+          "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+          "mastery_criteria": [
+            "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+          ],
+          "similarity": 0.512940585613251
+        }
+      ]
+    ]
+  },
+  "retrievalCount": 2
+}

@@ -1,0 +1,201 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-partial",
+      "line": 1,
+      "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。",
+      "observation": "完成订单 V104 的库存盘点，记录实物 50 件、隔离 10 件、可用 40 件，并核对库位记录。",
+      "capability": "库存盘点、可用库存核算与库位记录核对"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "partial",
+      "confidence": 0.82,
+      "reason": "partial: 核验原文：本人完成订单V104库存盘点，实物50件、隔离10件、可用40件，50-10=40计算正确，且已核对库位记录，这构成“正确排除不可用库存”的实际子动作。但原文同时明确尚未获取订单需求和确认到货，也未计算净需求；定义要求根据订单需求、可用库存及确认到货计算分时段净需求。因此仅有部分正确子动作，不足以支持全部标准，维持 partial。\n原判断：单元中本人已实际完成订单V104库存盘点并算出可用40件，明确将隔离10件排除，属于标准中“正确排除不可用库存”的直接动作；但原文明确尚未获取订单需求和确认到货、未计算净需求，缺少“根据订单需求、可用库存及确认到货计算分时段净需求”的主体计算，因此只能判部分。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "417c96c5-b9fa-4030-a63a-020fb6563ab8",
+      "generatedAt": "2026-10-03T16:39:14.330Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 381,
+      "completionTokens": 2621
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "010a3689-73d5-4e6c-98a3-9d93c6683972",
+      "generatedAt": "2026-10-03T16:39:30.501Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1240,
+      "completionTokens": 3189
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-factual-verification-v1",
+      "requestId": "da4ee3ce-6f40-4b88-bc10-285dfe83f2f4",
+      "generatedAt": "2026-10-03T16:39:57.073Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 736,
+      "completionTokens": 5638
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "单元中本人已实际完成订单V104库存盘点并算出可用40件，明确将隔离10件排除，属于标准中“正确排除不可用库存”的直接动作；但原文明确尚未获取订单需求和确认到货、未计算净需求，缺少“根据订单需求、可用库存及确认到货计算分时段净需求”的主体计算，因此只能判部分。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.82
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "单元仅记录订单V104的库存盘点、可用库存和库位记录核对，未涉及供应商瓶颈、良率、已承诺负荷、期间可交付量计算或名义产能误用识别，没有对应标准中的任何组成动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-shortage-exposure": {
+              "reason": "单元没有净需求、补货交期窗口、最早缺料日、缺口量或交期敏感性计算；原文还明确尚未获取需求与确认到货、未计算净需求，只有库存盘点，不能对应缺料暴露评估。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "RT06": {
+              "reason": "单元仅陈述库存盘点结果及未完成净需求，未解释或使用Audit Trail的核心目标与边界，未识别其正确用法与常见误用，也没有可检查的Audit Trail示例；“已核对库位记录”是库存业务动作，不是Audit Trail能力的组成表现。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.93
+            },
+            "supply-site-switch-feasibility": {
+              "reason": "单元只涉及订单V104本基地库存盘点，未提供替代基地可用产能、到达时间、订单约束检验，也未进行候选切换可行性判断或不可行/缺失证据区分，与该标准无对应动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-supplier-delivery-capacity",
+          "supply-shortage-exposure",
+          "RT06",
+          "supply-site-switch-feasibility"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-partial",
+          "line": 1,
+          "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。",
+          "observation": "完成订单 V104 的库存盘点，记录实物 50 件、隔离 10 件、可用 40 件，并核对库位记录。",
+          "capability": "库存盘点、可用库存核算与库位记录核对"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.577558330675215
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.47559180710267
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.420243623889033
+        },
+        {
+          "node_id": "RT06",
+          "revision_id": "RT06-r1",
+          "title": "Audit Trail",
+          "description": "记录可追溯的输入、决策、动作与结果。",
+          "mastery_criteria": [
+            "能正确解释并使用Audit Trail的核心目标与边界",
+            "能在具体场景中识别Audit Trail的正确用法与常见误用",
+            "能用可检查的示例证明对Audit Trail的掌握"
+          ],
+          "similarity": 0.395459001850397
+        },
+        {
+          "node_id": "supply-site-switch-feasibility",
+          "revision_id": "supply-site-switch-feasibility:v1",
+          "title": "跨基地供给切换可行性判断",
+          "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+          "mastery_criteria": [
+            "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+          ],
+          "similarity": 0.38891763157144
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-net-material-requirement": {
+              "verdict": "partial",
+              "reason": "核验原文：本人完成订单V104库存盘点，实物50件、隔离10件、可用40件，50-10=40计算正确，且已核对库位记录，这构成“正确排除不可用库存”的实际子动作。但原文同时明确尚未获取订单需求和确认到货，也未计算净需求；定义要求根据订单需求、可用库存及确认到货计算分时段净需求。因此仅有部分正确子动作，不足以支持全部标准，维持 partial。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "retrievalCount": 1
+}

@@ -1,0 +1,783 @@
+{
+  "preview": "https://edu-flow-17oeux0v5-july-nanas-projects.vercel.app",
+  "actor": "B",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "before": [
+    {
+      "id": "supply-alternate-site-capacity",
+      "x": "910.9163754105234",
+      "y": "473.50542099383773"
+    },
+    {
+      "id": "supply-corrective-action-verification",
+      "x": "621.6581312254327",
+      "y": "438.3351320963708"
+    },
+    {
+      "id": "supply-cost-lead-time-tradeoff",
+      "x": "776.1164974069196",
+      "y": "502.1236971249914"
+    },
+    {
+      "id": "supply-cross-border-lead-time",
+      "x": "773.8797064004028",
+      "y": "374.2552670304378"
+    },
+    {
+      "id": "supply-incoming-quality-anomaly",
+      "x": "664.8196783143677",
+      "y": "454.8535339270566"
+    },
+    {
+      "id": "supply-landed-cost-calculation",
+      "x": "796.8209558989613",
+      "y": "524.7412546448066"
+    },
+    {
+      "id": "supply-recovery-option-ranking",
+      "x": "669.4764814908193",
+      "y": "461.6413449215612"
+    },
+    {
+      "id": "supply-sample-quality-interpretation",
+      "x": "741.6796286905338",
+      "y": "523.5116984240433"
+    },
+    {
+      "id": "supply-shortage-exposure",
+      "x": "649.1855020311915",
+      "y": "427.89274268491585"
+    },
+    {
+      "id": "supply-shortage-impact-assessment",
+      "x": "569.4397800244056",
+      "y": "530.3470935786546"
+    },
+    {
+      "id": "supply-site-switch-feasibility",
+      "x": "816.8318522827913",
+      "y": "417.9767717504481"
+    },
+    {
+      "id": "supply-supplier-admission-decision",
+      "x": "803.8970231372235",
+      "y": "542.234747343163"
+    },
+    {
+      "id": "supply-supplier-delivery-capacity",
+      "x": "894.2856043402838",
+      "y": "559.2331419766335"
+    },
+    {
+      "id": "supply-supplier-qualification-review",
+      "x": "838.5041012349188",
+      "y": "512.4879216344602"
+    }
+  ],
+  "addedUnacquiredContext": {
+    "nodes": [
+      {
+        "id": "supply-alternate-site-capacity",
+        "x": "910.9163754105234",
+        "y": "473.50542099383773"
+      },
+      {
+        "id": "supply-corrective-action-verification",
+        "x": "621.6581312254327",
+        "y": "438.3351320963708"
+      },
+      {
+        "id": "supply-cost-lead-time-tradeoff",
+        "x": "776.1164974069196",
+        "y": "502.1236971249914"
+      },
+      {
+        "id": "supply-cross-border-lead-time",
+        "x": "773.8797064004028",
+        "y": "374.2552670304378"
+      },
+      {
+        "id": "supply-incoming-quality-anomaly",
+        "x": "664.8196783143677",
+        "y": "454.8535339270566"
+      },
+      {
+        "id": "supply-landed-cost-calculation",
+        "x": "796.8209558989613",
+        "y": "524.7412546448066"
+      },
+      {
+        "id": "supply-recovery-option-ranking",
+        "x": "669.4764814908193",
+        "y": "461.6413449215612"
+      },
+      {
+        "id": "supply-sample-quality-interpretation",
+        "x": "741.6796286905338",
+        "y": "523.5116984240433"
+      },
+      {
+        "id": "supply-shortage-exposure",
+        "x": "649.1855020311915",
+        "y": "427.89274268491585"
+      },
+      {
+        "id": "supply-shortage-impact-assessment",
+        "x": "569.4397800244056",
+        "y": "530.3470935786546"
+      },
+      {
+        "id": "supply-site-switch-feasibility",
+        "x": "816.8318522827913",
+        "y": "417.9767717504481"
+      },
+      {
+        "id": "supply-supplier-admission-decision",
+        "x": "803.8970231372235",
+        "y": "542.234747343163"
+      },
+      {
+        "id": "supply-supplier-delivery-capacity",
+        "x": "894.2856043402838",
+        "y": "559.2331419766335"
+      },
+      {
+        "id": "supply-supplier-qualification-review",
+        "x": "838.5041012349188",
+        "y": "512.4879216344602"
+      },
+      {
+        "id": "supply-supplier-screening-criteria",
+        "x": "820.0273165099001",
+        "y": "579.2328324855297"
+      }
+    ],
+    "edges": [
+      {
+        "id": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+        "state": null,
+        "source": null,
+        "target": null
+      },
+      {
+        "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+        "state": null,
+        "source": null,
+        "target": null
+      }
+    ]
+  },
+  "removedOptionalEdge": {
+    "nodes": [
+      {
+        "id": "supply-alternate-site-capacity",
+        "x": "910.9163754105234",
+        "y": "473.50542099383773"
+      },
+      {
+        "id": "supply-corrective-action-verification",
+        "x": "621.6581312254327",
+        "y": "438.3351320963708"
+      },
+      {
+        "id": "supply-cost-lead-time-tradeoff",
+        "x": "776.1164974069196",
+        "y": "502.1236971249914"
+      },
+      {
+        "id": "supply-cross-border-lead-time",
+        "x": "773.8797064004028",
+        "y": "374.2552670304378"
+      },
+      {
+        "id": "supply-incoming-quality-anomaly",
+        "x": "664.8196783143677",
+        "y": "454.8535339270566"
+      },
+      {
+        "id": "supply-landed-cost-calculation",
+        "x": "796.8209558989613",
+        "y": "524.7412546448066"
+      },
+      {
+        "id": "supply-recovery-option-ranking",
+        "x": "669.4764814908193",
+        "y": "461.6413449215612"
+      },
+      {
+        "id": "supply-sample-quality-interpretation",
+        "x": "741.6796286905338",
+        "y": "523.5116984240433"
+      },
+      {
+        "id": "supply-shortage-exposure",
+        "x": "649.1855020311915",
+        "y": "427.89274268491585"
+      },
+      {
+        "id": "supply-shortage-impact-assessment",
+        "x": "569.4397800244056",
+        "y": "530.3470935786546"
+      },
+      {
+        "id": "supply-site-switch-feasibility",
+        "x": "816.8318522827913",
+        "y": "417.9767717504481"
+      },
+      {
+        "id": "supply-supplier-admission-decision",
+        "x": "803.8970231372235",
+        "y": "542.234747343163"
+      },
+      {
+        "id": "supply-supplier-delivery-capacity",
+        "x": "894.2856043402838",
+        "y": "559.2331419766335"
+      },
+      {
+        "id": "supply-supplier-qualification-review",
+        "x": "838.5041012349188",
+        "y": "512.4879216344602"
+      }
+    ],
+    "edges": [
+      {
+        "id": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+        "class": "route-overlay-removed",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+        "class": "route-overlay-kept",
+        "direction": "source-target"
+      }
+    ],
+    "rings": 0
+  },
+  "retainedCoordinatesIdenticalOnInclude": true,
+  "retainedCoordinatesIdenticalOnEdgeRemoval": true,
+  "previewCreatedVersions": 0,
+  "unreachableStartingCapabilityPreventsAdoption": true,
+  "narrowReduced": {
+    "pulse": [
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      },
+      {
+        "animation": "none",
+        "display": "none"
+      }
+    ],
+    "arrows": 17
+  },
+  "narrowWorkspaceFocus": {
+    "focus": "打开 EduFlow Assistant",
+    "dialogs": 0
+  },
+  "validAddedEdgePreview": {
+    "before": [
+      {
+        "id": "supply-alternate-site-capacity",
+        "x": "264.57874238386023",
+        "y": "412.34415207561614"
+      },
+      {
+        "id": "supply-corrective-action-verification",
+        "x": "158.18772170870972",
+        "y": "398.9170109704981"
+      },
+      {
+        "id": "supply-cost-lead-time-tradeoff",
+        "x": "214.01872357290966",
+        "y": "422.71975284344484"
+      },
+      {
+        "id": "supply-cross-border-lead-time",
+        "x": "212.80061073202543",
+        "y": "380.4568440934019"
+      },
+      {
+        "id": "supply-incoming-quality-anomaly",
+        "x": "173.31909139267998",
+        "y": "404.26149513140984"
+      },
+      {
+        "id": "supply-landed-cost-calculation",
+        "x": "219.2711001247493",
+        "y": "429.8168445272384"
+      },
+      {
+        "id": "supply-recovery-option-ranking",
+        "x": "177.07645287121795",
+        "y": "408.3920173736482"
+      },
+      {
+        "id": "supply-sample-quality-interpretation",
+        "x": "203.4770286476143",
+        "y": "431.19339274393155"
+      },
+      {
+        "id": "supply-shortage-exposure",
+        "x": "171.93111044722696",
+        "y": "398.50997461441085"
+      },
+      {
+        "id": "supply-shortage-impact-assessment",
+        "x": "144.42795362285392",
+        "y": "432.19336066405907"
+      },
+      {
+        "id": "supply-site-switch-feasibility",
+        "x": "229.13100594471155",
+        "y": "393.08869421588645"
+      },
+      {
+        "id": "supply-supplier-admission-decision",
+        "x": "226.04885179954198",
+        "y": "437.6303568590761"
+      },
+      {
+        "id": "supply-supplier-delivery-capacity",
+        "x": "261.20317263504023",
+        "y": "444.4999760527469"
+      },
+      {
+        "id": "supply-supplier-qualification-review",
+        "x": "240.96616920703974",
+        "y": "426.8438991808049"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "supply-alternate-site-capacity",
+        "x": "264.57874238386023",
+        "y": "412.34415207561614"
+      },
+      {
+        "id": "supply-corrective-action-verification",
+        "x": "158.18772170870972",
+        "y": "398.9170109704981"
+      },
+      {
+        "id": "supply-cost-lead-time-tradeoff",
+        "x": "214.01872357290966",
+        "y": "422.71975284344484"
+      },
+      {
+        "id": "supply-cross-border-lead-time",
+        "x": "212.80061073202543",
+        "y": "380.4568440934019"
+      },
+      {
+        "id": "supply-incoming-quality-anomaly",
+        "x": "173.31909139267998",
+        "y": "404.26149513140984"
+      },
+      {
+        "id": "supply-landed-cost-calculation",
+        "x": "219.2711001247493",
+        "y": "429.8168445272384"
+      },
+      {
+        "id": "supply-recovery-option-ranking",
+        "x": "177.07645287121795",
+        "y": "408.3920173736482"
+      },
+      {
+        "id": "supply-sample-quality-interpretation",
+        "x": "203.4770286476143",
+        "y": "431.19339274393155"
+      },
+      {
+        "id": "supply-shortage-exposure",
+        "x": "171.93111044722696",
+        "y": "398.50997461441085"
+      },
+      {
+        "id": "supply-shortage-impact-assessment",
+        "x": "144.42795362285392",
+        "y": "432.19336066405907"
+      },
+      {
+        "id": "supply-site-switch-feasibility",
+        "x": "229.13100594471155",
+        "y": "393.08869421588645"
+      },
+      {
+        "id": "supply-supplier-admission-decision",
+        "x": "226.04885179954198",
+        "y": "437.6303568590761"
+      },
+      {
+        "id": "supply-supplier-delivery-capacity",
+        "x": "261.20317263504023",
+        "y": "444.4999760527469"
+      },
+      {
+        "id": "supply-supplier-qualification-review",
+        "x": "240.96616920703974",
+        "y": "426.8438991808049"
+      }
+    ],
+    "edges": [
+      {
+        "id": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+        "class": "route-overlay-added",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      },
+      {
+        "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+        "class": "route-overlay-kept",
+        "direction": "source-target",
+        "pulseAnimation": "route-forward-flow"
+      }
+    ],
+    "coordinatesIdentical": true,
+    "previewCreatedVersions": 0,
+    "baselineVersion": 3,
+    "adoptedVersion": 4
+  },
+  "footerCorrection": {
+    "preview": "https://edu-flow-lejy34mqc-july-nanas-projects.vercel.app",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "button": {
+      "x": 189.1953125,
+      "y": 683.0625,
+      "right": 297.1953125,
+      "bottom": 719.0625
+    },
+    "trigger": {
+      "x": 326,
+      "y": 768,
+      "right": 378,
+      "bottom": 820
+    },
+    "overlap": false,
+    "buttonCenterReceivesPointer": true,
+    "actualAnalyzeStatus": 201,
+    "completedRun": "57b5f6b1-6692-4ddd-a8ed-70be32ac93e2"
+  }
+}

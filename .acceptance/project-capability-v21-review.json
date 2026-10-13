@@ -1,0 +1,107 @@
+{
+  "role": "Independent Review / Hosted Acceptance",
+  "date": "2026-10-02",
+  "finalPreview": "https://edu-flow-nv8d14sgh-july-nanas-projects.vercel.app",
+  "initialPreview": "https://edu-flow-2srra5p50-july-nanas-projects.vercel.app",
+  "courseId": "ai-agents-in-depth",
+  "accountRole": "ordinary learner",
+  "findings": {
+    "blocking": 0,
+    "major": 0,
+    "minor": 0
+  },
+  "technical": {
+    "stage1FocusedTests": 58,
+    "generatedDagScenarios": 12000,
+    "stage2AndRelatedTests": 69,
+    "finalRendererAndUiTests": 8,
+    "productionFilesEditedByReviewer": false
+  },
+  "modelBeforeLearning": {
+    "nodes": 117,
+    "targets": 117,
+    "edges": 108,
+    "blueTargets": 6,
+    "grayIntermediates": 0
+  },
+  "modelAfterLearning": {
+    "nodes": 117,
+    "targets": 117,
+    "edges": 108,
+    "blueTargets": 7,
+    "grayIntermediates": 0,
+    "updatedNode": {
+      "id": "WF05",
+      "status": "learned",
+      "color": "#3b82f6",
+      "current": true,
+      "course": true
+    }
+  },
+  "realCanvasSelection": {
+    "selectedId": "CTX01",
+    "downstreamPulseEdges": 11,
+    "matchesIndependentDirectedTraversal": true,
+    "upstreamEdge": {
+      "source": "A02",
+      "target": "CTX01",
+      "width": 0.08,
+      "color": "rgba(92,112,145,0.018)"
+    },
+    "graphDataIdentityPreserved": true,
+    "all117CoordinatesPreserved": true,
+    "cameraPreserved": true,
+    "backgroundClearsSelectionAndParticles": true,
+    "blueA02PulseEdgeCount": 55,
+    "blueLeafAGC03PulseEdgeCount": 0
+  },
+  "particleMovementFinalPreview": {
+    "source": "CTX01",
+    "target": "CTX02",
+    "beforeGeometricRatio": 0.1200000000000273,
+    "afterGeometricRatio": 0.3600000000000276,
+    "frames": 30,
+    "elapsedMs": 512.9,
+    "interpretation": "Actual Three.js particle advances source to target. One real117-node graph sample; not a general large-graph benchmark."
+  },
+  "routeUi": {
+    "initialVersion": 6,
+    "include": "A02",
+    "exclude": "AGC03",
+    "previewAdded": 0,
+    "previewRemoved": 1,
+    "adoptedVersion": 7,
+    "restoredFromVersion": 6,
+    "restoredVersion": 8,
+    "toolsHiddenAfterAdoptAndRestore": true,
+    "versionAfterNewMicroLearning": 8
+  },
+  "micro": {
+    "nodeId": "WF05",
+    "enteredFrom": "Navigation recommended next",
+    "progress": "5/5",
+    "interaction": "answered and checked through real UI",
+    "completion": "PATH COMPLETED persisted",
+    "nextRecommendation": "Guardrail"
+  },
+  "ui": [
+    "Canvas is primary; permanent large left sidebar removed",
+    "Search defaults collapsed and collapses after normal selection",
+    "Bottom-left three-color legend",
+    "Single normal route-edit entry",
+    "Include/Exclude/Preview/Adopt/History/Restore available only in editing",
+    "On-demand detail remains; business colors preserved"
+  ],
+  "finalBrowserConsole": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "limitations": [
+    "Real learner model has zero gray intermediates after valid pruning; no hosted gray-node interaction claimed. Gray behavior verified in pure and renderer lifecycle tests.",
+    "Route mutation/Micro browser flow ran on initial Preview; final Preview differed only by upstream-hover dim correction and was separately checked for real canvas selection, geometry/camera stability, pulse movement and clearing."
+  ],
+  "screenshots": [
+    ".acceptance/project-capability-v21-ui/v21-review-default.png",
+    ".acceptance/project-capability-v21-ui/v21-review-green-pulse-final.png"
+  ]
+}

@@ -17,7 +17,10 @@ describe("Course-scoped learner action membership", () => {
     const micro = source("api/_handlers/micro.ts");
     expect(micro).toContain("if (body.contextCourseId)");
     expect(micro).toContain("requireCourseKnowledge(client, body.contextCourseId, text(path, \"knowledge_id\"))");
-    expect(micro).toContain("activateCourse(client, user.id, body.contextCourseId)");
+    expect(micro).toContain('rpc("start_micro_for_route_v2"');
+    const migration = source("supabase/migrations/20261002061940_personal_course_route_versions_v2.sql");
+    expect(migration).toContain("insert into user_course_states(user_id,course_id,is_active,updated_at)");
+    expect(migration).toContain("assert_personal_route_micro_v2(p_user_id,effective_course,p.knowledge_id,p_expected_version_id,p_route_node_ids)");
     expect(micro).toContain("if (pathCourseId && pathCourseId !== body.contextCourseId)");
   });
   it("activates Course Material progress and Assignment start while deactivation remains non-destructive", () => {

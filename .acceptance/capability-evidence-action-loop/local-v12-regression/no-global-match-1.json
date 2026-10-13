@@ -1,0 +1,181 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-no-global-match",
+      "line": 1,
+      "quote": "我完成小提琴琴桥弧度调整，并逐弦检查运弓接触，记录调整前后相邻弦误触次数从 8 降至 1。",
+      "observation": "完成小提琴琴桥弧度调整，逐弦检查运弓接触，并记录调整前后相邻弦误触次数由 8 降至 1。",
+      "capability": "小提琴琴桥弧度调整与运弓接触检查及效果量化"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": null,
+      "sufficiency": "unmatched",
+      "confidence": 0,
+      "reason": "本次Top-K候选未与该单元的实际能力表现对应；候选判断保留在诊断记录中。",
+      "revisionId": null,
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "f71290da-75ed-46b7-a7ae-a2634acf0e68",
+      "generatedAt": "2026-10-03T17:22:45.468Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 367,
+      "completionTokens": 449
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "917b5faa-d9e4-4ea0-a7a8-218e75b4a6d4",
+      "generatedAt": "2026-10-03T17:22:49.709Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1187,
+      "completionTokens": 678
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "T14": {
+              "reason": "原文仅描述小提琴琴桥弧度调整、逐弦检查运弓接触并记录误触次数变化，未涉及依据 Tool Interface 构造参数、识别字段缺失/类型错误/有损字符串转换，也未在执行前用 Schema 或等价规则验证工具参数。该内容与 Tool Arguments 无对应组成动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.99
+            },
+            "CU02": {
+              "reason": "原文未涉及视觉语义与屏幕坐标的 grounding、从截图选择界面元素或识别界面变化导致旧定位失效；小提琴琴桥和运弓接触检查不属于 GUI Visual Grounding。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.99
+            },
+            "R09": {
+              "reason": "原文没有 Evaluator 反馈驱动 Optimizer 迭代输出的过程、边界或可检查示例；仅记录小提琴调整前后误触次数变化，不能构成 Evaluator-Optimizer 的组成表现。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.99
+            },
+            "I05": {
+              "reason": "原文没有验证结构化输出、报告可定位错误或使用 Schema Validation 的相关过程；小提琴琴桥调整与结构化输出验证无关。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.99
+            },
+            "R08": {
+              "reason": "原文没有使用明确标准判断输出或轨迹质量、识别 Evaluator 用法或误用，也没有可检查示例证明掌握 Evaluator；记录误触次数变化不等同于按明确标准评估输出质量。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.99
+            }
+          }
+        },
+        "nodeIds": [
+          "T14",
+          "CU02",
+          "R09",
+          "I05",
+          "R08"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-no-global-match",
+          "line": 1,
+          "quote": "我完成小提琴琴桥弧度调整，并逐弦检查运弓接触，记录调整前后相邻弦误触次数从 8 降至 1。",
+          "observation": "完成小提琴琴桥弧度调整，逐弦检查运弓接触，并记录调整前后相邻弦误触次数由 8 降至 1。",
+          "capability": "小提琴琴桥弧度调整与运弓接触检查及效果量化"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "T14",
+          "revision_id": "T14-r2",
+          "title": "Tool Arguments",
+          "description": "根据工具接口生成、传递并校验参数，保持字段、类型和结构在模型到执行器之间的语义一致性。",
+          "mastery_criteria": [
+            "能依据 Tool Interface 构造合法参数",
+            "能识别字段缺失、类型错误和有损字符串转换等参数问题",
+            "能在执行前用 Schema 或等价规则验证工具参数"
+          ],
+          "similarity": 0.373908825283717
+        },
+        {
+          "node_id": "CU02",
+          "revision_id": "CU02-r1",
+          "title": "GUI Visual Grounding",
+          "description": "把自然语言目标或视觉理解结果定位到屏幕上的具体界面元素与可操作位置。",
+          "mastery_criteria": [
+            "能解释视觉语义与屏幕坐标之间的 grounding 问题",
+            "能从截图中选择与操作目标对应的界面元素",
+            "能识别界面变化导致旧定位失效的情况"
+          ],
+          "similarity": 0.37197561598115
+        },
+        {
+          "node_id": "R09",
+          "revision_id": "R09-r1",
+          "title": "Evaluator-Optimizer",
+          "description": "让 Evaluator 反馈驱动 Optimizer 迭代输出。",
+          "mastery_criteria": [
+            "能独立完成Evaluator-Optimizer的核心目标与边界",
+            "能在具体场景中识别Evaluator-Optimizer的正确用法与常见误用",
+            "能用可检查的示例证明对Evaluator-Optimizer的掌握"
+          ],
+          "similarity": 0.370173595558024
+        },
+        {
+          "node_id": "I05",
+          "revision_id": "I05-r1",
+          "title": "Schema Validation",
+          "description": "验证结构化输出并报告可定位的错误。",
+          "mastery_criteria": [
+            "能独立完成Schema Validation的核心目标与边界",
+            "能在具体场景中识别Schema Validation的正确用法与常见误用",
+            "能用可检查的示例证明对Schema Validation的掌握"
+          ],
+          "similarity": 0.367211089466683
+        },
+        {
+          "node_id": "R08",
+          "revision_id": "R08-r1",
+          "title": "Evaluator",
+          "description": "使用明确标准判断输出或轨迹质量。",
+          "mastery_criteria": [
+            "能判断适用条件并运用Evaluator的核心目标与边界",
+            "能在具体场景中识别Evaluator的正确用法与常见误用",
+            "能用可检查的示例证明对Evaluator的掌握"
+          ],
+          "similarity": 0.364020339490196
+        }
+      ]
+    ],
+    "verifications": []
+  },
+  "llmCalls": 2,
+  "retrievalCount": 1
+}

@@ -1,0 +1,199 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-partial",
+      "line": 1,
+      "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。",
+      "observation": "实际完成订单 V104 的库存盘点，记录实物 50 件、隔离 10 件、可用 40 件，并已核对库位记录。",
+      "capability": "库存盘点与库位核对"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "partial",
+      "confidence": 0.76,
+      "reason": "partial: 原文仅记录完成订单 V104 库存盘点：实物 50 件、隔离 10 件、可用 40 件，并核对库位记录。其中在计算可用库存时正确排除了隔离的 10 件不可用库存，属于净需求计算所需的一个正确子动作。但原文明确尚未获取订单需求和确认到货，且未计算净需求，缺少分时段净需求计算及完整依赖，因此不能判定为 supported；只能核实部分正确子动作，判定为 partial。\n原判断：原文显示本人已完成订单V104库存盘点，明确将实物50件中隔离10件排除，得出可用40件，并核对库位记录。这对应标准中“正确排除不可用库存”的动作，但原文同时明确尚未获取订单需求和确认到货，且未计算净需求，因此仅覆盖部分组成动作，判partial。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "abc8bd5d-5026-4269-927d-571468ec2d23",
+      "generatedAt": "2026-10-03T16:59:26.275Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 381,
+      "completionTokens": 1077
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "266a7f92-9a6a-462f-ab17-9aa672566701",
+      "generatedAt": "2026-10-03T16:59:36.897Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1227,
+      "completionTokens": 2016
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-factual-verification-v1",
+      "requestId": "323549a9-07f0-486d-baa6-ec9b57069327",
+      "generatedAt": "2026-10-03T16:59:39.880Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 613,
+      "completionTokens": 581
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "原文显示本人已完成订单V104库存盘点，明确将实物50件中隔离10件排除，得出可用40件，并核对库位记录。这对应标准中“正确排除不可用库存”的动作，但原文同时明确尚未获取订单需求和确认到货，且未计算净需求，因此仅覆盖部分组成动作，判partial。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.76
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文仅涉及订单V104的库存盘点、隔离与可用数量、库位核对，没有任何关于瓶颈、良率、已承诺负荷、期间可交付量计算或名义产能误用识别的内容，与该能力标准不匹配。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-shortage-exposure": {
+              "reason": "原文只有库存盘点和可用库存结果，未出现净需求使用、补货交期窗口、最早缺料日、缺口量或交期敏感性计算；且本人明确未计算净需求，因此与该标准无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-incoming-quality-anomaly": {
+              "reason": "原文未依据任何检验标准区分批次异常、测量误差或证据不足；仅提到隔离10件和可用40件，属于库存状态记录，不是来料质量异常判定。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-landed-cost-calculation": {
+              "reason": "原文没有任何采购、运输、税费、检验等费率汇总或到岸总成本计算，也未识别漏项和重复项，与该能力标准不匹配。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-supplier-delivery-capacity",
+          "supply-shortage-exposure",
+          "supply-incoming-quality-anomaly",
+          "supply-landed-cost-calculation"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-partial",
+          "line": 1,
+          "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。",
+          "observation": "实际完成订单 V104 的库存盘点，记录实物 50 件、隔离 10 件、可用 40 件，并已核对库位记录。",
+          "capability": "库存盘点与库位核对"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.482592001038552
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.403806567192078
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.370489988072813
+        },
+        {
+          "node_id": "supply-incoming-quality-anomaly",
+          "revision_id": "supply-incoming-quality-anomaly:v1",
+          "title": "来料质量异常判定",
+          "description": "依据给定检验标准区分批次异常、测量误差及证据不足。",
+          "mastery_criteria": [
+            "依据给定检验标准区分批次异常、测量误差及证据不足。"
+          ],
+          "similarity": 0.359635412693024
+        },
+        {
+          "node_id": "supply-landed-cost-calculation",
+          "revision_id": "supply-landed-cost-calculation:v1",
+          "title": "到岸总成本计算",
+          "description": "依据给定费率汇总采购、运输、税费和检验等可比总成本，识别漏项和重复项。",
+          "mastery_criteria": [
+            "依据给定费率汇总采购、运输、税费和检验等可比总成本，识别漏项和重复项。"
+          ],
+          "similarity": 0.351157486438751
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-net-material-requirement": {
+              "verdict": "partial",
+              "reason": "原文仅记录完成订单 V104 库存盘点：实物 50 件、隔离 10 件、可用 40 件，并核对库位记录。其中在计算可用库存时正确排除了隔离的 10 件不可用库存，属于净需求计算所需的一个正确子动作。但原文明确尚未获取订单需求和确认到货，且未计算净需求，缺少分时段净需求计算及完整依赖，因此不能判定为 supported；只能核实部分正确子动作，判定为 partial。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "retrievalCount": 1
+}

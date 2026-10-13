@@ -1,0 +1,2 @@
+我在独立终端用 CPython 3.12 运行文件 demo.py，内容为 print(2+3)，命令 python demo.py 得到标准输出5，退出码0；再运行 python -c "import sys; print(sys.version_info.major); print(sys.executable)" 得到主版本3和当前虚拟环境的解释器路径。明确由解释器负责读取和执行 Python 程序，终端本身不是 Python 解释器。
+我在终端直接输入 Python 表达式 print(2+3) 会被 shell 当作 shell 语法，不能代替 python demo.py；我改为显式调用对应 Python 可执行文件后成功。另将文件改为 print(undefined_name)，运行得到 NameError 和退出码1，我根据栈追踪定位未定义变量并改为已定义值，再运行输出5、退出码0。验证时始终使用同一个解释器路径，避免系统 Python 与虚拟环境 Python 混用。

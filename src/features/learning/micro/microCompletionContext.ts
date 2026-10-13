@@ -9,22 +9,27 @@ export function resolveMicroCompletionContext(input: {
   knowledgeId: string;
   runtime?: CourseRuntimeData | null;
   decision?: NavigationDecision | null;
+  actionExecution?: boolean;
   hasMicro(knowledgeId: string): boolean;
 }): MicroCompletionAction[] {
   const { runtime, knowledgeId, decision } = input;
-  if (!runtime || !runtime.curriculumCoverages.some((coverage) => coverage.nodeId === knowledgeId)) return [];
+  if (!runtime) return [];
+  const routeDecision = decision?.courseId === runtime.course.id ? decision : undefined;
+  const inContext = (id: string) => runtime.curriculumCoverages.some(coverage => coverage.nodeId === id)
+    || Boolean(routeDecision?.path.some(item => item.nodeId === id));
+  if (!inContext(knowledgeId)) return [];
   const courseId = runtime.course.id;
   const actions: MicroCompletionAction[] = resolveKnowledgeMaterialEntries(runtime, knowledgeId).map((entry) => ({
     kind: "material", title: entry.segmentTitle ? `${entry.materialTitle} · ${entry.segmentTitle}` : entry.materialTitle,
     href: buildMaterialDeepLink({ courseId, materialId: entry.materialId, segmentId: entry.segmentId })
   }));
   const assignmentIds = new Set(runtime.assignmentCoverages.filter((coverage) => coverage.nodeId === knowledgeId).map((coverage) => coverage.assignmentId));
-  actions.push(...runtime.assignments.filter((assignment) => assignmentIds.has(assignment.id)).sort((left, right) => left.order-right.order || left.id.localeCompare(right.id)).map((assignment): MicroCompletionAction => ({
+  if (!input.actionExecution) actions.push(...runtime.assignments.filter((assignment) => assignmentIds.has(assignment.id)).sort((left, right) => left.order-right.order || left.id.localeCompare(right.id)).map((assignment): MicroCompletionAction => ({
     kind: "practice", title: assignment.title, href: `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignment.id)}`
   })));
-  const next = decision?.courseId === courseId ? decision.nextAction : undefined;
+  const next = !input.actionExecution && decision?.courseId === courseId ? decision.nextAction : undefined;
   if (next?.nodeId && next.nodeId !== knowledgeId
-    && runtime.curriculumCoverages.some((coverage) => coverage.nodeId === next.nodeId)) {
+    && inContext(next.nodeId)) {
     const material = next.resourceKind === "material" ? resolveKnowledgeMaterialEntries(runtime, next.nodeId).find((entry) => entry.materialId === next.resourceId) : undefined;
     const href = next.resourceKind === "micro" && input.hasMicro(next.nodeId)
       ? `/learn/micro/${encodeURIComponent(next.nodeId)}?${new URLSearchParams({ courseId })}`

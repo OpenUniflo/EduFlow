@@ -1,0 +1,23 @@
+{
+  "reviewer": "graph_ux_reviewer",
+  "commit": "974cd1a",
+  "preview": "https://edu-flow-bwwpv7ex1-july-nanas-projects.vercel.app",
+  "viewport": [
+    1280,
+    633
+  ],
+  "verdict": "PASS_EXISTING_STATE_RENDER_AND_SELECTION",
+  "proved": [
+    "A existing acquired target loads with all8 projected node spheres visible.",
+    "Search lists 交期窗口缺料暴露评估 as acquired and opens corresponding detail.",
+    "Selection shows orange downstream support laser with node spheres remaining.",
+    "Closing detail leaves same visible node positions; no visible camera jump caused by search, selection, drawer close.",
+    "Project3acquired/1intermediate/4targets reflects prior confirmation and upstream pruning.",
+    "Browser errors empty."
+  ],
+  "notProved": [
+    "Live confirmation -> structural pruning transition not repeated because A target already acquired; no state rollback or duplicate confirmation performed. Fresh-account full loop must verify that transition.",
+    "No internal camera/force instrumentation; stability is visual evidence."
+  ],
+  "originalFailurePreserved": "phase-c-confirm-ui-review.json"
+}

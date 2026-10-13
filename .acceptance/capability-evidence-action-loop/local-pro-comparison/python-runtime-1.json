@@ -1,0 +1,311 @@
+{
+  "failure": {
+    "message": "LLM response was truncated: provider=deepseek, model=deepseek-v4-pro"
+  },
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "68878e41-b923-45e7-87a0-a1c8bb3d0d66",
+      "generatedAt": "2026-10-03T17:23:49.225Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 590,
+      "completionTokens": 4650
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-python-runtime",
+          "line": 1,
+          "quote": "我在独立终端用 CPython 3.12 运行文件 demo.py，内容为 print(2+3)，命令 python demo.py 得到标准输出5，退出码0；",
+          "observation": "运行一个含 print(2+3) 的 Python 文件，观察到标准输出为 5 且退出码为 0。",
+          "capability": "执行 Python 脚本文件并读取标准输出与退出码"
+        },
+        {
+          "sourceId": "local-python-runtime",
+          "line": 1,
+          "quote": "再运行 python -c \"import sys; print(sys.version_info.major); print(sys.executable)\" 得到主版本3和当前虚拟环境的解释器路径。",
+          "observation": "通过 python -c 执行一段查询代码，获得解释器主版本号和当前虚拟环境解释器路径。",
+          "capability": "查询当前 Python 解释器版本和路径"
+        },
+        {
+          "sourceId": "local-python-runtime",
+          "line": 2,
+          "quote": "我在终端直接输入 Python 表达式 print(2+3) 会被 shell 当作 shell 语法，不能代替 python demo.py；我改为显式调用对应 Python 可执行文件后成功。",
+          "observation": "尝试在终端直接输入 Python 表达式时遇到 shell 语法问题，随后改为显式调用对应 Python 可执行文件后成功执行。",
+          "capability": "区分 shell 与 Python 解释器调用并纠正直接输入表达式错误"
+        },
+        {
+          "sourceId": "local-python-runtime",
+          "line": 2,
+          "quote": "另将文件改为 print(undefined_name)，运行得到 NameError 和退出码1，我根据栈追踪定位未定义变量并改为已定义值，再运行输出5、退出码0。",
+          "observation": "修改文件引入未定义变量后运行，观察到 NameError 和退出码 1；依据栈追踪定位未定义变量，修改后重新运行得到输出 5 和退出码 0。",
+          "capability": "根据 NameError 栈追踪定位并修复未定义变量后重新运行脚本"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.52979420036691
+        },
+        {
+          "node_id": "BR01",
+          "revision_id": "BR01-r1",
+          "title": "Async Tool Execution",
+          "description": "在异步 Runtime 中可靠执行外部工具并处理结果、超时与生命周期。",
+          "mastery_criteria": [
+            "能独立完成Async Tool Execution的核心目标与边界",
+            "能在具体场景中识别Async Tool Execution的正确用法与常见误用",
+            "能用可检查的示例证明对Async Tool Execution的掌握"
+          ],
+          "similarity": 0.480162129397331
+        },
+        {
+          "node_id": "T15",
+          "revision_id": "T15-r1",
+          "title": "Tool Execution",
+          "description": "调用外部能力并管理一次执行。",
+          "mastery_criteria": [
+            "能独立完成Tool Execution的核心目标与边界",
+            "能在具体场景中识别Tool Execution的正确用法与常见误用",
+            "能用可检查的示例证明对Tool Execution的掌握"
+          ],
+          "similarity": 0.454195670043651
+        },
+        {
+          "node_id": "PY08",
+          "revision_id": "PY08-r1",
+          "title": "Module",
+          "description": "用模块组织和复用 Python 代码。",
+          "mastery_criteria": [
+            "能独立完成Module的核心目标与边界",
+            "能在具体场景中识别Module的正确用法与常见误用",
+            "能用可检查的示例证明对Module的掌握"
+          ],
+          "similarity": 0.425463638413228
+        },
+        {
+          "node_id": "T06",
+          "revision_id": "T06-r1",
+          "title": "Tool Result",
+          "description": "解析、归一化并注入工具执行结果。",
+          "mastery_criteria": [
+            "能正确解释并使用Tool Result的核心目标与边界",
+            "能在具体场景中识别Tool Result的正确用法与常见误用",
+            "能用可检查的示例证明对Tool Result的掌握"
+          ],
+          "similarity": 0.41892633607325
+        }
+      ],
+      [
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.559236254737601
+        },
+        {
+          "node_id": "PY19",
+          "revision_id": "PY19-r1",
+          "title": "File / Path",
+          "description": "可靠读写文件并操作路径。",
+          "mastery_criteria": [
+            "能独立完成File / Path的核心目标与边界",
+            "能在具体场景中识别File / Path的正确用法与常见误用",
+            "能用可检查的示例证明对File / Path的掌握"
+          ],
+          "similarity": 0.420072053666589
+        },
+        {
+          "node_id": "PY37",
+          "revision_id": "PY37-r1",
+          "title": "pytest",
+          "description": "使用 pytest 编写和运行自动化测试。",
+          "mastery_criteria": [
+            "能独立完成pytest的核心目标与边界",
+            "能在具体场景中识别pytest的正确用法与常见误用",
+            "能用可检查的示例证明对pytest的掌握"
+          ],
+          "similarity": 0.409777653508713
+        },
+        {
+          "node_id": "PY55",
+          "revision_id": "PY55-r1",
+          "title": "Global Interpreter Lock",
+          "description": "解释 GIL 对 Python 线程执行的影响。",
+          "mastery_criteria": [
+            "能清楚解释Global Interpreter Lock的核心目标与边界",
+            "能在具体场景中识别Global Interpreter Lock的正确用法与常见误用",
+            "能用可检查的示例证明对Global Interpreter Lock的掌握"
+          ],
+          "similarity": 0.402242046661438
+        },
+        {
+          "node_id": "PY102",
+          "revision_id": "PY102-r1",
+          "title": "Python Plugin",
+          "description": "定义并加载可插拔 Python 能力。",
+          "mastery_criteria": [
+            "能独立完成Python Plugin的核心目标与边界",
+            "能在具体场景中识别Python Plugin的正确用法与常见误用",
+            "能用可检查的示例证明对Python Plugin的掌握"
+          ],
+          "similarity": 0.399679660797119
+        }
+      ],
+      [
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.507862776049211
+        },
+        {
+          "node_id": "PY04",
+          "revision_id": "PY04-r1",
+          "title": "Expressions",
+          "description": "使用表达式组合值、运算和调用。",
+          "mastery_criteria": [
+            "能清楚解释Expressions的核心目标与边界",
+            "能在具体场景中识别Expressions的正确用法与常见误用",
+            "能用可检查的示例证明对Expressions的掌握"
+          ],
+          "similarity": 0.495439887590425
+        },
+        {
+          "node_id": "PY09",
+          "revision_id": "PY09-r1",
+          "title": "Exception",
+          "description": "使用异常表达和处理失败。",
+          "mastery_criteria": [
+            "能独立完成Exception的核心目标与边界",
+            "能在具体场景中识别Exception的正确用法与常见误用",
+            "能用可检查的示例证明对Exception的掌握"
+          ],
+          "similarity": 0.437229339049499
+        },
+        {
+          "node_id": "PY03",
+          "revision_id": "PY03-r1",
+          "title": "Built-in Types",
+          "description": "掌握 Python 内置类型及其基本行为。",
+          "mastery_criteria": [
+            "能清楚解释Built-in Types的核心目标与边界",
+            "能在具体场景中识别Built-in Types的正确用法与常见误用",
+            "能用可检查的示例证明对Built-in Types的掌握"
+          ],
+          "similarity": 0.423143804073334
+        },
+        {
+          "node_id": "T06",
+          "revision_id": "T06-r1",
+          "title": "Tool Result",
+          "description": "解析、归一化并注入工具执行结果。",
+          "mastery_criteria": [
+            "能正确解释并使用Tool Result的核心目标与边界",
+            "能在具体场景中识别Tool Result的正确用法与常见误用",
+            "能用可检查的示例证明对Tool Result的掌握"
+          ],
+          "similarity": 0.406118327743908
+        }
+      ],
+      [
+        {
+          "node_id": "E07",
+          "revision_id": "E07-r1",
+          "title": "Runtime Debugging",
+          "description": "依据运行信号定位 Agent 执行故障。",
+          "mastery_criteria": [
+            "能独立完成Runtime Debugging的核心目标与边界",
+            "能在具体场景中识别Runtime Debugging的正确用法与常见误用",
+            "能用可检查的示例证明对Runtime Debugging的掌握"
+          ],
+          "similarity": 0.494383006953181
+        },
+        {
+          "node_id": "CODE01",
+          "revision_id": "CODE01-r1",
+          "title": "Codebase Search and File Editing",
+          "description": "让 Coding Agent 在代码库中定位相关文件、检索上下文并以受控方式修改目标文件。",
+          "mastery_criteria": [
+            "能选择搜索范围定位与任务相关的代码",
+            "能在修改前收集足够的局部上下文",
+            "能执行可检查的文件修改并避免无关改动"
+          ],
+          "similarity": 0.449320134480008
+        },
+        {
+          "node_id": "T08",
+          "revision_id": "T08-r1",
+          "title": "Tool Retry",
+          "description": "对可恢复工具失败实施有界重试。",
+          "mastery_criteria": [
+            "能独立完成Tool Retry的核心目标与边界",
+            "能在具体场景中识别Tool Retry的正确用法与常见误用",
+            "能用可检查的示例证明对Tool Retry的掌握"
+          ],
+          "similarity": 0.426395407485414
+        },
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.423322290182117
+        },
+        {
+          "node_id": "PY09",
+          "revision_id": "PY09-r1",
+          "title": "Exception",
+          "description": "使用异常表达和处理失败。",
+          "mastery_criteria": [
+            "能独立完成Exception的核心目标与边界",
+            "能在具体场景中识别Exception的正确用法与常见误用",
+            "能用可检查的示例证明对Exception的掌握"
+          ],
+          "similarity": 0.408930808305743
+        }
+      ]
+    ]
+  },
+  "llmCalls": 2,
+  "retrievalCount": 4,
+  "topK": 5,
+  "sourceCount": 1
+}

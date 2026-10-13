@@ -1,0 +1,30 @@
+{
+  "learner": {
+    "existingVersionCount": 6,
+    "allExistingVersionsUnchanged": true,
+    "totalVersionCount": 8,
+    "activeVersion": 8,
+    "activeConstraints": {
+      "includeNodeIds": [],
+      "excludeNodeIds": []
+    },
+    "targets": 117,
+    "acquired": 7,
+    "bridgeCount": 0,
+    "WF05": "learned"
+  },
+  "admin": {
+    "existingVersionCount": 7,
+    "allExistingVersionsUnchanged": true,
+    "totalVersionCount": 9,
+    "activeVersion": 9,
+    "activeConstraints": {
+      "includeNodeIds": [],
+      "excludeNodeIds": []
+    },
+    "targets": 117,
+    "acquired": 4,
+    "bridgeCount": 0,
+    "WF05": null
+  }
+}

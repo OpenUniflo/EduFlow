@@ -1,0 +1,14 @@
+import type { CapabilityModel, RouteConstraints, RoutePlan, RouteConflict, SelectedRoute } from './routePlanning';
+import type { RouteExecutionStep, RouteExecutionPlan } from './routeExecution';
+export type RouteSnapshot = SelectedRoute & { valid: boolean; conflicts: RouteConflict[]; titles: Record<string, string>; executionSteps?: RouteExecutionStep[] };
+export type ExecutionRoutePlan = RoutePlan & { execution?: RouteExecutionPlan };
+export type RouteVersion = {
+  id: string; routeId: string; userId: string; courseId: string; versionNumber: number;
+  parentVersionId: string | null; source: 'initial' | 'adjustment' | 'restore';
+  constraints: RouteConstraints; snapshot: RouteSnapshot; structureFingerprint: string;
+  createdAt: string; restoredFromVersionId: string | null;
+};
+export type RoutePlanView = {
+  activeVersion: RouteVersion | null; model: CapabilityModel | null; plan: RoutePlan;
+  structureChanged: boolean; versions?: RouteVersion[]; execution?: RouteExecutionPlan;
+};

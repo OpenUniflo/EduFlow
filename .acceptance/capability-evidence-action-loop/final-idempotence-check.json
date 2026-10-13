@@ -1,0 +1,32 @@
+{
+  "preview": "https://edu-flow-8igxoc6oa-july-nanas-projects.vercel.app",
+  "ordinaryOwnerJwt": true,
+  "proposalIds": [
+    "c1e687fc-2812-4158-aa92-aaeba03e12cb",
+    "168f2732-65f0-4c8c-bbf6-73c7cfa04845",
+    "799013c0-d9d0-4d46-a936-6b37c25cfe09",
+    "0cefc060-3689-480e-a4c8-b084071ab49e"
+  ],
+  "exactRowsUnchanged": true,
+  "states": [
+    {
+      "node": "PY01",
+      "status": "learned"
+    },
+    {
+      "node": "supply-cross-border-lead-time",
+      "status": "learned"
+    },
+    {
+      "node": "supply-landed-cost-calculation",
+      "status": "learned"
+    },
+    {
+      "node": "supply-net-material-requirement",
+      "status": "learned"
+    }
+  ],
+  "evidenceCount": 4,
+  "routeVersions": 1,
+  "status": "PASS"
+}

@@ -1,0 +1,256 @@
+{
+  "units": [
+    {
+      "sourceId": "local-partial",
+      "line": 1,
+      "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。",
+      "observation": "完成订单 V104 的库存盘点，记录实物 50 件、隔离 10 件、可用 40 件，并已核对库位记录。",
+      "capability": "能执行库存盘点并区分实物、隔离与可用数量，且核对库位记录"
+    },
+    {
+      "sourceId": "local-partial",
+      "line": 1,
+      "quote": "尚未获取订单需求和确认到货，未计算净需求。",
+      "observation": "明确说明尚未获取订单需求、未确认到货、未计算净需求。",
+      "capability": "能识别并说明当前任务中尚未完成的前置条件与未执行的计算"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "partial",
+      "confidence": 0.85,
+      "reason": "单元0明确实际执行了库存盘点，正确区分实物50件、隔离10件、可用40件，并核对了库位记录，这覆盖了净需求计算中“正确排除不可用库存”所需的部分可观察表现。但该能力标准要求“根据订单需求、可用库存及确认到货计算分时段净需求”，单元0明确尚未获取订单需求、未确认到货、未计算净需求，因此缺少订单需求、确认到货和净需求计算过程与结果，不能判定为supported。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        1
+      ],
+      "nodeId": null,
+      "sufficiency": "unmatched",
+      "confidence": 0.9,
+      "reason": "单元1仅说明尚未获取订单需求、未确认到货、未计算净需求，属于对未完成前置条件和未执行计算的陈述。Top-K候选（P05、CDS525-K017、RT02、CODE02、R03）均与“识别并说明当前任务中尚未完成的前置条件与未执行的计算”无足够语义相同的能力，不能匹配。",
+      "revisionId": null,
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v3",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "3a9506ac-0522-4a76-9874-689399d0dbdd",
+      "generatedAt": "2026-10-03T15:55:27.859Z",
+      "temperature": 0,
+      "maxTokens": 6000,
+      "promptTokens": 221,
+      "completionTokens": 183
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v3",
+      "schemaVersion": "evidence-match-v1",
+      "requestId": "2bd151c3-35cd-44b3-8856-e239feebd4fc",
+      "generatedAt": "2026-10-03T15:55:31.369Z",
+      "temperature": 0,
+      "maxTokens": 7000,
+      "promptTokens": 1547,
+      "completionTokens": 253
+    }
+  ],
+  "artifacts": {
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-partial",
+          "line": 1,
+          "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。",
+          "observation": "完成订单 V104 的库存盘点，记录实物 50 件、隔离 10 件、可用 40 件，并已核对库位记录。",
+          "capability": "能执行库存盘点并区分实物、隔离与可用数量，且核对库位记录"
+        },
+        {
+          "sourceId": "local-partial",
+          "line": 1,
+          "quote": "尚未获取订单需求和确认到货，未计算净需求。",
+          "observation": "明确说明尚未获取订单需求、未确认到货、未计算净需求。",
+          "capability": "能识别并说明当前任务中尚未完成的前置条件与未执行的计算"
+        }
+      ]
+    },
+    "judgment": {
+      "matches": [
+        {
+          "unitIndexes": [
+            0
+          ],
+          "nodeId": "supply-net-material-requirement",
+          "sufficiency": "partial",
+          "confidence": 0.85,
+          "reason": "单元0明确实际执行了库存盘点，正确区分实物50件、隔离10件、可用40件，并核对了库位记录，这覆盖了净需求计算中“正确排除不可用库存”所需的部分可观察表现。但该能力标准要求“根据订单需求、可用库存及确认到货计算分时段净需求”，单元0明确尚未获取订单需求、未确认到货、未计算净需求，因此缺少订单需求、确认到货和净需求计算过程与结果，不能判定为supported。"
+        },
+        {
+          "unitIndexes": [
+            1
+          ],
+          "nodeId": null,
+          "sufficiency": "unmatched",
+          "confidence": 0.9,
+          "reason": "单元1仅说明尚未获取订单需求、未确认到货、未计算净需求，属于对未完成前置条件和未执行计算的陈述。Top-K候选（P05、CDS525-K017、RT02、CODE02、R03）均与“识别并说明当前任务中尚未完成的前置条件与未执行的计算”无足够语义相同的能力，不能匹配。"
+        }
+      ]
+    },
+    "judgmentAttempts": [
+      {
+        "value": {
+          "matches": [
+            {
+              "unitIndexes": [
+                0
+              ],
+              "nodeId": "supply-net-material-requirement",
+              "sufficiency": "partial",
+              "confidence": 0.85,
+              "reason": "单元0明确实际执行了库存盘点，正确区分实物50件、隔离10件、可用40件，并核对了库位记录，这覆盖了净需求计算中“正确排除不可用库存”所需的部分可观察表现。但该能力标准要求“根据订单需求、可用库存及确认到货计算分时段净需求”，单元0明确尚未获取订单需求、未确认到货、未计算净需求，因此缺少订单需求、确认到货和净需求计算过程与结果，不能判定为supported。"
+            },
+            {
+              "unitIndexes": [
+                1
+              ],
+              "nodeId": null,
+              "sufficiency": "unmatched",
+              "confidence": 0.9,
+              "reason": "单元1仅说明尚未获取订单需求、未确认到货、未计算净需求，属于对未完成前置条件和未执行计算的陈述。Top-K候选（P05、CDS525-K017、RT02、CODE02、R03）均与“识别并说明当前任务中尚未完成的前置条件与未执行的计算”无足够语义相同的能力，不能匹配。"
+            }
+          ]
+        }
+      }
+    ],
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.562272498404465
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.451029068108911
+        },
+        {
+          "node_id": "supply-site-switch-feasibility",
+          "revision_id": "supply-site-switch-feasibility:v1",
+          "title": "跨基地供给切换可行性判断",
+          "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+          "mastery_criteria": [
+            "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+          ],
+          "similarity": 0.419581343035378
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.411100278961628
+        },
+        {
+          "node_id": "W04",
+          "revision_id": "W04-r1",
+          "title": "Worker",
+          "description": "接收明确子任务并返回受约束结果。",
+          "mastery_criteria": [
+            "能独立完成Worker的核心目标与边界",
+            "能在具体场景中识别Worker的正确用法与常见误用",
+            "能用可检查的示例证明对Worker的掌握"
+          ],
+          "similarity": 0.402981185202316
+        }
+      ],
+      [
+        {
+          "node_id": "P05",
+          "revision_id": "P05-r1",
+          "title": "Completion Condition",
+          "description": "把自然语言要求转化为可检查的完成条件。",
+          "mastery_criteria": [
+            "能独立完成Completion Condition的核心目标与边界",
+            "能在具体场景中识别Completion Condition的正确用法与常见误用",
+            "能用可检查的示例证明对Completion Condition的掌握"
+          ],
+          "similarity": 0.593199491500859
+        },
+        {
+          "node_id": "CDS525-K017",
+          "revision_id": "CDS525-K017-r1",
+          "title": "Forward Propagation",
+          "description": "按照网络连接方向从输入逐层计算中间表示和最终输出的过程。",
+          "mastery_criteria": [
+            "能准确解释「Forward Propagation」的核心作用、适用边界及与相邻概念的区别",
+            "能完成对应最小可执行任务：对一个小网络完成一次完整前向计算，记录各层输出，并提交 forward_trace.json"
+          ],
+          "similarity": 0.559879300569152
+        },
+        {
+          "node_id": "RT02",
+          "revision_id": "RT02-r1",
+          "title": "Task State Machine",
+          "description": "用状态和转换表达 Agent 任务生命周期。",
+          "mastery_criteria": [
+            "能正确解释并使用Task State Machine的核心目标与边界",
+            "能在具体场景中识别Task State Machine的正确用法与常见误用",
+            "能用可检查的示例证明对Task State Machine的掌握"
+          ],
+          "similarity": 0.551999297618917
+        },
+        {
+          "node_id": "CODE02",
+          "revision_id": "CODE02-r1",
+          "title": "Code as a Reasoning Tool",
+          "description": "让 Agent 通过编写和执行代码完成计算、验证、搜索或中间推导，把代码作为思考过程的一部分。",
+          "mastery_criteria": [
+            "能识别比纯自然语言推理更适合用代码解决的步骤",
+            "能编写一个用于验证或计算中间结论的小程序",
+            "能根据执行结果修正原先的推理或计划"
+          ],
+          "similarity": 0.55021956862328
+        },
+        {
+          "node_id": "R03",
+          "revision_id": "R03-r1",
+          "title": "Planning",
+          "description": "在执行前形成有目标、有依赖的行动计划。",
+          "mastery_criteria": [
+            "能判断适用条件并运用Planning的核心目标与边界",
+            "能在具体场景中识别Planning的正确用法与常见误用",
+            "能用可检查的示例证明对Planning的掌握"
+          ],
+          "similarity": 0.545551841920834
+        }
+      ]
+    ]
+  },
+  "retrievalCount": 2
+}

@@ -1,0 +1,18 @@
+{
+  "preview": "https://edu-flow-6pbjj7qeo-july-nanas-projects.vercel.app",
+  "runId": "565ac277-37be-4aba-996c-0cd68907fadb",
+  "sourceId": "27981e1a-adbc-4860-9357-6d2b7b2a0f6e",
+  "checks": [
+    "B run read isolated",
+    "B transition404",
+    "owner spoof400",
+    "client PATCH denied",
+    "privileged RPC denied",
+    "B private Storage denied",
+    "A actual bytes match checksum",
+    "concurrent result submission returns same immutable run",
+    "source execution provenance",
+    "formal states/evidence/route rows unchanged"
+  ],
+  "verdict": "PASS"
+}

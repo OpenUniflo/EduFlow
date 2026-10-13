@@ -41,3 +41,9 @@ pnpm acceptance:phase4.2:live -- --job-id <completed-job-uuid> --owner-id <local
 ```
 
 This command is guarded to Local Supabase. `pnpm verify:knowledge-generation:local` independently verifies atomic persistence, reload, idempotent rerun, and rollback without a live model call.
+
+## Project Capability Model V3
+
+`enterprise-node-actions.ts` generates explicitly marked TEST Node Micro/Practice resources for the five existing enterprise roots. It validates root identity before insert, uses stable new identities, and never writes Knowledge facts or user state. Run `pnpm exec tsx scripts/acceptance/enterprise-node-actions.ts /tmp/node-resources.sql` to review the SQL before applying authorized acceptance data.
+
+`verify-node-route-local.sql` and `verify-ordered-route-local.sql` exercise actual scoped RPCs and roll back all fixture writes. Hosted browser gates and final Preview verification are tracked in `docs/PROJECT_CAPABILITY_MODEL_V3.md`.

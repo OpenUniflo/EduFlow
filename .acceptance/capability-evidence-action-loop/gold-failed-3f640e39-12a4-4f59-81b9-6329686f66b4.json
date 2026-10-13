@@ -1,0 +1,81 @@
+{
+  "scope": "Recovered owner-JWT failed Hosted run; no successful diagnosis implied",
+  "preview": "https://edu-flow-fwgdyj2ej-july-nanas-projects.vercel.app",
+  "run": {
+    "id": "3f640e39-12a4-4f59-81b9-6329686f66b4",
+    "user_id": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+    "source_ids": [
+      "fddd2b48-d25a-45e7-9609-e6b12c56338b"
+    ],
+    "status": "failed",
+    "model": "deepseek-v4-flash",
+    "prompt_version": "personal-evidence-v8",
+    "diagnostics": {
+      "topK": 5,
+      "llmCalls": 1,
+      "metadata": [
+        {
+          "model": "deepseek-flash",
+          "stage": "extraction",
+          "provider": "deepseek",
+          "thinking": true,
+          "maxTokens": 16000,
+          "requestId": "a995db55-3edd-4d8a-b08a-f01da0a83872",
+          "generatedAt": "2026-10-03T16:51:45.693Z",
+          "temperature": 0,
+          "promptTokens": 557,
+          "promptVersion": "personal-evidence-v8",
+          "schemaVersion": "evidence-units-v1",
+          "completionTokens": 9395
+        }
+      ],
+      "artifacts": {
+        "retrieved": [],
+        "extraction": {
+          "type": "json_object",
+          "units": [
+            {
+              "line": 1,
+              "quote": "我在独立终端用 CPython 3.12 运行文件 demo.py，内容为 print(2+3)，命令 python demo.py 得到标准输出5，退出码0",
+              "sourceId": "fddd2b48-d25a-45e7-9609-e6b12c56338b",
+              "capability": "运行 Python 脚本并核对标准输出与退出码",
+              "observation": "在独立终端用 CPython 3.12 运行文件 demo.py（内容为 print(2+3)），命令 python demo.py 得到标准输出 5 和退出码 0。"
+            },
+            {
+              "line": 1,
+              "quote": "再运行 python -c \"import sys; print(sys.version_info.major); print(sys.executable)\" 得到主版本3和当前虚拟环境的解释器路径。",
+              "sourceId": "fddd2b48-d25a-45e7-9609-e6b12c56338b",
+              "capability": "检查 Python 解释器主版本与可执行文件路径",
+              "observation": "执行 python -c 打印 sys.version_info.major 和 sys.executable，得到主版本 3 与当前虚拟环境的解释器路径。"
+            },
+            {
+              "line": 2,
+              "quote": "我在终端直接输入 Python 表达式 print(2+3) 会被 shell 当作 shell 语法，不能代替 python demo.py；我改为显式调用对应 Python 可执行文件后成功。",
+              "sourceId": "fddd2b48-d25a-45e7-9609-e6b12c56338b",
+              "capability": "通过显式调用 Python 可执行文件在 shell 中执行 Python 代码",
+              "observation": "直接在终端输入 Python 表达式 print(2+3) 时被 shell 当作 shell 语法处理，不能替代 python demo.py；改为显式调用对应 Python 可执行文件后成功。"
+            },
+            {
+              "line": 2,
+              "quote": "另将文件改为 print(undefined_name)，运行得到 NameError 和退出码1，我根据栈追踪定位未定义变量并改为已定义值，再运行输出5、退出码0。",
+              "sourceId": "fddd2b48-d25a-45e7-9609-e6b12c56338b",
+              "capability": "根据栈追踪定位并修复 NameError，再运行验证",
+              "observation": "将文件改为 print(undefined_name) 后运行得到 NameError 和退出码 1；根据栈追踪定位未定义变量并改为已定义值，再次运行输出 5、退出码 0。"
+            }
+          ]
+        },
+        "judgmentAttempts": []
+      },
+      "embedding": {
+        "model": "qwen3.7-text-embedding",
+        "provider": "aliyun",
+        "dimensions": 1024
+      },
+      "sourceCount": 1,
+      "retrievalCount": 0
+    },
+    "error": "诊断未完成，请稍后重试；正式能力状态没有改变。",
+    "created_at": "2026-10-03T16:51:08.069809+00:00",
+    "completed_at": "2026-10-03T16:51:45.694+00:00"
+  }
+}

@@ -1,0 +1,202 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-partial",
+      "line": 1,
+      "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。尚未获取订单需求和确认到货，未计算净需求。",
+      "observation": "已实际完成订单 V104 的库存盘点并核对库位记录，记录实物 50 件、隔离 10 件、可用 40 件；尚未获取订单需求和确认到货，未计算净需求。",
+      "capability": "库存盘点与库位记录核对"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "insufficient",
+      "confidence": 0.76,
+      "reason": "insufficient: 标准限定为“根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存”。原文第1行仅执行订单V104库存盘点：实物50件、隔离10件、可用40件，并核对库位记录；同时明确“尚未获取订单需求和确认到货，未计算净需求”。虽然已正确从库存中排除隔离10件并得出可用40件，但该动作只是盘点/可用库存确认，未保留净需求计算所要求的分时段净需求对象、订单需求与确认到货条件及专门计算方法，因此criterionScopePreserved=false，服务端强制判为insufficient。\n原判断：单元显示已实际完成订单 V104 库存盘点：实物 50 件、隔离 10 件，并得出可用 40 件，完成“正确排除不可用库存”这一组成动作并给出实际结果；但明确尚未获取订单需求和确认到货，未计算分时段净需求，缺少净需求计算主体过程与结果。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "004fa894-08f1-4bbd-b8f9-8cfd70162087",
+      "generatedAt": "2026-10-03T17:19:11.781Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 381,
+      "completionTokens": 2369
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "49ac9856-77ed-48f7-8a0b-9e33ee28b92a",
+      "generatedAt": "2026-10-03T17:19:19.085Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1247,
+      "completionTokens": 1428
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-factual-verification-v2",
+      "requestId": "0d73eb12-76ff-4bcc-a465-091b462b3571",
+      "generatedAt": "2026-10-03T17:19:25.700Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 730,
+      "completionTokens": 1370
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "单元显示已实际完成订单 V104 库存盘点：实物 50 件、隔离 10 件，并得出可用 40 件，完成“正确排除不可用库存”这一组成动作并给出实际结果；但明确尚未获取订单需求和确认到货，未计算分时段净需求，缺少净需求计算主体过程与结果。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.76
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "单元内容为订单 V104 的库存盘点与库位核对，未涉及供应商瓶颈、良率、已承诺负荷、期间可交付量或名义产能误用，与供应商交付产能核验标准不对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-shortage-exposure": {
+              "reason": "单元仅记录库存盘点和库位核对，未使用净需求与补货交期窗口，也未计算最早缺料日、缺口量或交期敏感性，与缺料暴露评估标准不对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-corrective-action-verification": {
+              "reason": "单元未涉及已判定异常基线、复验数据、复发数据或供应商纠正措施有效性判断，与纠正措施有效性验证标准不对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "supply-incoming-quality-anomaly": {
+              "reason": "单元是库存盘点与库位记录核对，未依据给定检验标准区分批次异常、测量误差或证据不足，与来料质量异常判定标准不对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-supplier-delivery-capacity",
+          "supply-shortage-exposure",
+          "supply-corrective-action-verification",
+          "supply-incoming-quality-anomaly"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-partial",
+          "line": 1,
+          "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。尚未获取订单需求和确认到货，未计算净需求。",
+          "observation": "已实际完成订单 V104 的库存盘点并核对库位记录，记录实物 50 件、隔离 10 件、可用 40 件；尚未获取订单需求和确认到货，未计算净需求。",
+          "capability": "库存盘点与库位记录核对"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.469851183606584
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.403868865505595
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.365750182695689
+        },
+        {
+          "node_id": "supply-corrective-action-verification",
+          "revision_id": "supply-corrective-action-verification:v1",
+          "title": "供应商纠正措施有效性验证",
+          "description": "根据已判定异常基线、复验及复发数据判断纠正措施是否有效。",
+          "mastery_criteria": [
+            "根据已判定异常基线、复验及复发数据判断纠正措施是否有效。"
+          ],
+          "similarity": 0.362754301696506
+        },
+        {
+          "node_id": "supply-incoming-quality-anomaly",
+          "revision_id": "supply-incoming-quality-anomaly:v1",
+          "title": "来料质量异常判定",
+          "description": "依据给定检验标准区分批次异常、测量误差及证据不足。",
+          "mastery_criteria": [
+            "依据给定检验标准区分批次异常、测量误差及证据不足。"
+          ],
+          "similarity": 0.356080757846744
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-net-material-requirement": {
+              "criterionScopePreserved": false,
+              "verdict": "insufficient",
+              "reason": "标准限定为“根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存”。原文第1行仅执行订单V104库存盘点：实物50件、隔离10件、可用40件，并核对库位记录；同时明确“尚未获取订单需求和确认到货，未计算净需求”。虽然已正确从库存中排除隔离10件并得出可用40件，但该动作只是盘点/可用库存确认，未保留净需求计算所要求的分时段净需求对象、订单需求与确认到货条件及专门计算方法，因此criterionScopePreserved=false，服务端强制判为insufficient。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "llmCalls": 3,
+  "retrievalCount": 1
+}

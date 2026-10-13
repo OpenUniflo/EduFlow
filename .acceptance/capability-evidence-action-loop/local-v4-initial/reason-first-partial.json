@@ -1,0 +1,131 @@
+{
+  "scope": "Local real provider / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-partial",
+      "line": 1,
+      "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。",
+      "observation": "完成订单 V104 的库存盘点，记录实物 50 件、隔离 10 件、可用 40 件，并核对库位记录。",
+      "capability": "库存盘点与库位记录核对"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": null,
+      "sufficiency": "unmatched",
+      "confidence": 0.95,
+      "reason": "候选标准均不匹配。物料净需求计算的标准动作是“根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存”，quote中仅完成库存盘点并记录实物、隔离、可用数量及核对库位记录，未涉及订单需求、确认到货或净需求计算，因此不匹配。供应商交付产能核验的标准动作是“依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用”，quote中无相关计算或识别行为。交期窗口缺料暴露评估的标准动作是“独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性”，quote中未使用净需求或补货交期窗口。供应商纠正措施有效性验证的标准动作是“根据已判定异常基线、复验及复发数据判断纠正措施是否有效”，quote中无异常基线、复验或复发数据。来料质量异常判定的标准动作是“依据给定检验标准区分批次异常、测量误差及证据不足”，quote中无检验标准或异常判定行为。",
+      "revisionId": null,
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v4",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "3cbc0fc6-305e-49f8-b090-f2b23c20c97e",
+      "generatedAt": "2026-10-03T16:08:52.773Z",
+      "temperature": 0,
+      "maxTokens": 6000,
+      "promptTokens": 231,
+      "completionTokens": 103
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v4",
+      "schemaVersion": "evidence-semantic-choices-v1",
+      "requestId": "ae38acff-7ccb-4236-b3e4-145a826a245d",
+      "generatedAt": "2026-10-03T16:08:55.436Z",
+      "temperature": 0,
+      "maxTokens": 6000,
+      "promptTokens": 968,
+      "completionTokens": 267
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-partial",
+          "line": 1,
+          "quote": "我完成订单 V104 的库存盘点：实物 50 件，其中隔离 10 件，可用 40 件；已核对库位记录。",
+          "observation": "完成订单 V104 的库存盘点，记录实物 50 件、隔离 10 件、可用 40 件，并核对库位记录。",
+          "capability": "库存盘点与库位记录核对"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.469851183606584
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.403868865505595
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.365750182695689
+        },
+        {
+          "node_id": "supply-corrective-action-verification",
+          "revision_id": "supply-corrective-action-verification:v1",
+          "title": "供应商纠正措施有效性验证",
+          "description": "根据已判定异常基线、复验及复发数据判断纠正措施是否有效。",
+          "mastery_criteria": [
+            "根据已判定异常基线、复验及复发数据判断纠正措施是否有效。"
+          ],
+          "similarity": 0.362754301696506
+        },
+        {
+          "node_id": "supply-incoming-quality-anomaly",
+          "revision_id": "supply-incoming-quality-anomaly:v1",
+          "title": "来料质量异常判定",
+          "description": "依据给定检验标准区分批次异常、测量误差及证据不足。",
+          "mastery_criteria": [
+            "依据给定检验标准区分批次异常、测量误差及证据不足。"
+          ],
+          "similarity": 0.356080757846744
+        }
+      ]
+    ],
+    "matching": {
+      "choices": {
+        "0": {
+          "reason": "候选标准均不匹配。物料净需求计算的标准动作是“根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存”，quote中仅完成库存盘点并记录实物、隔离、可用数量及核对库位记录，未涉及订单需求、确认到货或净需求计算，因此不匹配。供应商交付产能核验的标准动作是“依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用”，quote中无相关计算或识别行为。交期窗口缺料暴露评估的标准动作是“独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性”，quote中未使用净需求或补货交期窗口。供应商纠正措施有效性验证的标准动作是“根据已判定异常基线、复验及复发数据判断纠正措施是否有效”，quote中无异常基线、复验或复发数据。来料质量异常判定的标准动作是“依据给定检验标准区分批次异常、测量误差及证据不足”，quote中无检验标准或异常判定行为。",
+          "nodeIds": [],
+          "confidence": 0.95
+        }
+      }
+    }
+  },
+  "retrievalCount": 1
+}

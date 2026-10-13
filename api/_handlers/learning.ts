@@ -1,12 +1,15 @@
+import { readActiveVersion } from '../_lib/routePlanning.js';
+import { isArtifactPracticeExecutor } from '../../src/shared/learning/practiceBoundary.js';
+import { isDeepStrictEqual } from "node:util";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createServerSupabase, createUserSupabase } from "../_lib/supabase.js";
 import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
-import { dataOrThrow } from "../_lib/query.js";
-import { updateKnowledgeAtLeast } from "../_lib/mastery.js";
+import { allRows, dataOrThrow } from "../_lib/query.js";
 import { activateCourse, requireCourseKnowledge, requirePublishedCourse } from "../_lib/courseMembership.js";
 import { evaluateAssignmentResponse, parseAssignmentResponse } from "../_lib/assignmentEvaluator.js";
 
 import { readAssignmentEligibility } from "../_lib/assignmentEligibility.js";
+import { requireAssignmentActionRun } from "../_lib/edgeActionRuns.js";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
@@ -24,12 +27,15 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const assignmentId = typeof request.query.assignmentId === "string" ? request.query.assignmentId : undefined;
     const learnerCourseId = typeof request.query.courseId === "string" ? request.query.courseId : undefined;
     if (assignmentId && learnerCourseId) {
-      const attemptResult = await client.from("learning_attempts").select("id,attempt_number").eq("user_id",user.id).eq("course_id",learnerCourseId).eq("assignment_id",assignmentId).order("attempt_number",{ascending:false}).limit(1).maybeSingle();
+      const actionRunId = typeof request.query.actionRunId === 'string' ? request.query.actionRunId : undefined;
+      let attemptQuery = client.from("learning_attempts").select("id,attempt_number,response").eq("user_id",user.id).eq("course_id",learnerCourseId).eq("assignment_id",assignmentId);
+      if (actionRunId) attemptQuery = attemptQuery.eq('action_run_id', actionRunId);
+      const attemptResult = await attemptQuery.order("attempt_number",{ascending:false}).limit(1).maybeSingle();
       const attempt = dataOrThrow(attemptResult.data as Row|null,attemptResult.error,"Latest Assignment Attempt lookup");
       if (!attempt) { json(response,200,{result:null}); return; }
       const performanceResult = await client.from("performance_results").select("id,outcome,feedback,evaluated_at,version").eq("attempt_id",text(attempt,"id")).order("version",{ascending:false}).limit(1).single();
       const performance = dataOrThrow(performanceResult.data as Row|null,performanceResult.error,"Latest PerformanceResult lookup");
-      json(response,200,{result:{attemptId:text(attempt,"id"),resultId:text(performance,"id"),outcome:text(performance,"outcome"),accepted:text(performance,"outcome")==="passed",feedback:performance.feedback,evaluatedAt:text(performance,"evaluated_at")}}); return;
+      json(response,200,{result:{attemptId:text(attempt,"id"),resultId:text(performance,"id"),outcome:text(performance,"outcome"),accepted:text(performance,"outcome")==="passed",feedback:performance.feedback,evaluatedAt:text(performance,"evaluated_at"),response:attempt.response}}); return;
     }
     const server = await requireTeacher(user.id);
     const courseId = learnerCourseId;
@@ -37,7 +43,15 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (courseId) statesQuery = statesQuery.eq("course_id", courseId);
     const statesResult = await statesQuery;
     const states = dataOrThrow(statesResult.data as Row[] | null, statesResult.error, "Assignment submissions lookup");
-    const learnerIds = [...new Set(states.map((state) => text(state, "user_id")))];
+    let actionAttemptsQuery = server.from('learning_attempts').select('id,user_id,course_id,assignment_id,action_run_id,attempt_number,submitted_at,response').not('action_run_id', 'is', null).order('id');
+    if (courseId) actionAttemptsQuery = actionAttemptsQuery.eq('course_id', courseId);
+    const actionAttempts = await allRows(actionAttemptsQuery, 'Action Assignment review attempts');
+    const actionResults = actionAttempts.length ? await allRows(server.from('performance_results').select('attempt_id,outcome,version,evaluated_at').in('attempt_id', actionAttempts.map(row => row.id)).order('id'), 'Action review results') : [];
+    const currentActionResults = actionAttempts.flatMap(attempt => {
+      const result = actionResults.filter(row => row.attempt_id === attempt.id).sort((a, b) => Number(b.version) - Number(a.version))[0];
+      return result && result.outcome !== 'failed' ? [{ attempt, result }] : [];
+    });
+    const learnerIds = [...new Set([...states.map((state) => text(state, "user_id")), ...actionAttempts.map(attempt => String(attempt.user_id))])];
     const profilesResult = learnerIds.length ? await server.from("profiles").select("id,display_name").in("id", learnerIds) : { data: [], error: null };
     const profiles = dataOrThrow(profilesResult.data as Row[] | null, profilesResult.error, "Assignment learner profiles lookup");
     const displayNameById = new Map(profiles.map((profile) => [text(profile, "id"), text(profile, "display_name")]));
@@ -45,13 +59,19 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       learnerUserId: text(state, "user_id"), learnerName: displayNameById.get(text(state, "user_id")) || "Learner",
       courseId: text(state, "course_id"), assignmentId: text(state, "assignment_id"), status: text(state, "status"),
       submittedAt: state.submitted_at == null ? undefined : text(state, "submitted_at"), acceptedAt: state.accepted_at == null ? undefined : text(state, "accepted_at")
-    })) });
+    })).concat(currentActionResults.map(({ attempt, result }) => ({
+      learnerUserId: String(attempt.user_id), learnerName: displayNameById.get(String(attempt.user_id)) || 'Learner',
+      courseId: String(attempt.course_id), assignmentId: String(attempt.assignment_id), status: result.outcome === 'passed' ? 'accepted' : 'submitted',
+      submittedAt: String(attempt.submitted_at), acceptedAt: result.outcome === 'passed' ? String(result.evaluated_at) : undefined,
+      attemptId: String(attempt.id), actionRunId: String(attempt.action_run_id), attemptNumber: Number(attempt.attempt_number), response: attempt.response,
+    }))) });
     return;
   }
   if (request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
-  const body = request.body as { action?: "start-material" | "start-assignment" | "submit-assignment" | "accept-assignment"; nodeId?: string; courseId?: string; materialId?: string; assignmentId?: string; learnerUserId?: string; idempotencyKey?: string; response?: unknown };
+  const body = request.body as { action?: "start-material" | "start-assignment" | "submit-assignment" | "accept-assignment"; nodeId?: string; courseId?: string; materialId?: string; assignmentId?: string; learnerUserId?: string; idempotencyKey?: string; response?: unknown; actionRunId?: string; conversation?: boolean; attemptId?: string; repeatAttemptId?: string };
   if (!body.action) throw new ApiError(400, "invalid_learning_action", "An action is required");
   if (!["start-material","start-assignment","submit-assignment","accept-assignment"].includes(body.action)) throw new ApiError(400,"invalid_learning_action","Unsupported learning action");
+  if (body.conversation != null && typeof body.conversation !== "boolean") throw new ApiError(400,"invalid_conversation_flag","Conversation flag must be boolean");
   if (body.action === "start-material") {
     if (!body.nodeId || !body.courseId || !body.materialId) throw new ApiError(400, "invalid_learning_action", "nodeId, courseId and materialId are required");
     await requireCourseKnowledge(client, body.courseId, body.nodeId);
@@ -63,7 +83,6 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const coverage = dataOrThrow(coverageResult.data as Row[] | null, coverageResult.error, "Material Knowledge coverage lookup");
     if (!material || !coverage.length) throw new ApiError(404, "material_learning_unavailable", "This Material is not available for the selected learning content");
     await activateCourse(client, user.id, body.courseId);
-    await updateKnowledgeAtLeast(createServerSupabase(), user.id, body.nodeId, "learning");
     json(response, 200, { status: "learning" }); return;
   }
   if (!body.courseId || !body.assignmentId) throw new ApiError(400, "invalid_learning_action", "courseId and assignmentId are required");
@@ -72,8 +91,8 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const server = await requireTeacher(user.id);
     const stateResult = await server.from("user_assignment_states").select("status,started_at,submitted_at").eq("user_id", body.learnerUserId).eq("course_id", body.courseId).eq("assignment_id", body.assignmentId).maybeSingle();
     const state = dataOrThrow(stateResult.data as Row | null, stateResult.error, "Assignment submission lookup");
-    if (!state || text(state, "status") !== "submitted") throw new ApiError(409, "assignment_not_submitted", "Only a submitted Assignment can be accepted");
-    const reviewResult = await server.rpc("record_manual_assignment_review", { p_learner_user_id: body.learnerUserId, p_course_id: body.courseId, p_assignment_id: body.assignmentId, p_reviewer_user_id: user.id });
+    if (!body.attemptId && (!state || text(state, "status") !== "submitted")) throw new ApiError(409, "assignment_not_submitted", "Only a submitted Assignment can be accepted");
+    const reviewResult = await server.rpc("record_manual_assignment_review", { p_learner_user_id: body.learnerUserId, p_course_id: body.courseId, p_assignment_id: body.assignmentId, p_reviewer_user_id: user.id, ...(body.attemptId ? { p_attempt_id: body.attemptId } : {}) });
     dataOrThrow(reviewResult.data, reviewResult.error, "Manual Assignment acceptance");
     json(response, 200, { status: "accepted", accepted: true }); return;
   }
@@ -81,17 +100,48 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   const assignment = dataOrThrow(assignmentResult.data as Row | null, assignmentResult.error, "Assignment lookup");
   if (!assignment) throw new ApiError(404, "assignment_not_found", "Assignment is unavailable");
   await requirePublishedCourse(client, body.courseId);
-  const { previous, coverage, eligibility } = await readAssignmentEligibility(client, user.id, body.courseId, body.assignmentId);
+  // Recover an acknowledged submission before checking today's mutable execution conditions.
+  if (body.action === 'submit-assignment' && body.idempotencyKey) {
+    const savedResult = await client.from('learning_attempts').select('id,response,action_run_id').eq('user_id', user.id).eq('course_id', body.courseId).eq('assignment_id', body.assignmentId).eq('idempotency_key', body.idempotencyKey).maybeSingle();
+    const saved = dataOrThrow(savedResult.data, savedResult.error, 'Saved Action submission');
+    if (saved) {
+      if ((saved.action_run_id??null) !== (body.actionRunId??null) || !isDeepStrictEqual(Object.fromEntries(Object.entries(saved.response).filter(([key])=>key!=="submissionMode")), JSON.parse(JSON.stringify(parseAssignmentResponse(body.response))))) throw new ApiError(409, 'assignment_idempotency_conflict', 'This idempotency key belongs to a different execution or response');
+      const result = await client.from('performance_results').select('id,outcome,feedback').eq('attempt_id', saved.id).order('version', { ascending: false }).limit(1).single();
+      const persisted = dataOrThrow(result.data, result.error, 'Saved Action result');
+      json(response, 200, { status: persisted.outcome === 'passed' ? 'accepted' : persisted.outcome === 'failed' ? 'needs_revision' : 'submitted', accepted: persisted.outcome === 'passed', attemptId: saved.id, resultId: persisted.id, outcome: persisted.outcome, duplicate: true, feedback: persisted.feedback }); return;
+    }
+  }
+  if (!isArtifactPracticeExecutor(assignment) && (assignment.experience as {type?:string}|null)?.type !== 'workflow' && assignment.mode !== 'workflow') throw new ApiError(422, 'practice_executor_unavailable', '理解检查不属于成果实践，请使用微学习。');
+  const actionRun = body.actionRunId ? await requireAssignmentActionRun(client, user.id, body.courseId, body.assignmentId, body.actionRunId) : null;
+  let repeatAssignment=false;
+  if(body.action==='start-assignment' && body.repeatAttemptId && !actionRun) {
+    const latest=await client.from('learning_attempts').select('id,action_run_id').eq('user_id',user.id).eq('course_id',body.courseId).eq('assignment_id',body.assignmentId).order('attempt_number',{ascending:false}).limit(1).maybeSingle();
+    const previousAttempt=dataOrThrow(latest.data,latest.error,'Repeated Assignment');
+    repeatAssignment=previousAttempt?.id===body.repeatAttemptId && !previousAttempt.action_run_id;
+    if(!repeatAssignment) throw new ApiError(409,'repeat_attempt_conflict','This attempt is no longer the latest standalone practice. Read its saved result.');
+  }
+  const { previous, eligibility } = await readAssignmentEligibility(client, user.id, body.courseId, body.assignmentId, actionRun ? {
+    targetId: actionRun.execution_snapshot.targetId,
+    reachableNodeIds:actionRun.executionReachableNodeIds,
+    status: actionRun.status === 'in_progress' ? 'started' : actionRun.status === 'completed' ? 'completed' : 'not_started',
+  } : undefined, repeatAssignment ? 'started' : undefined);
+  if (body.action === 'start-assignment' && actionRun?.status === 'completed') { json(response, 200, { status: 'completed' }); return; }
   if (eligibility.reason) throw new ApiError(403, "assignment_prerequisite_required", eligibility.reason);
   const now = new Date().toISOString();
   if (body.action === "start-assignment") {
     if (!eligibility.canStart) throw new ApiError(409, "assignment_state_conflict", "This Assignment is submitted or complete; view its saved result instead");
     await activateCourse(client, user.id, body.courseId);
-    if (!previous || ["not_started", "needs_revision"].includes(text(previous, "status"))) {
+    if (actionRun) {
+      const started = await createServerSupabase().rpc('transition_route_action_v3', { p_user_id: user.id, p_run_id: actionRun.id, p_operation: 'start',p_expected_version_id:(await readActiveVersion(client,user.id,body.courseId))?.id??null });
+      dataOrThrow(started.data, started.error, 'Start Assignment Action');
+      // Starting execution is not capability evidence. Do not set practicing.
+      json(response, 200, { status: 'started' }); return;
+    }
+    if (repeatAssignment || !previous || ["not_started", "needs_revision"].includes(text(previous, "status"))) {
       const write = await createServerSupabase().from("user_assignment_states").upsert({ user_id: user.id, course_id: body.courseId, assignment_id: body.assignmentId, status: "started", progress: 1, started_at: previous?.started_at ?? now, updated_at: now });
       dataOrThrow(write.data, write.error, "Assignment start");
     }
-    await Promise.all(coverage.map((item) => updateKnowledgeAtLeast(createServerSupabase(), user.id, text(item, "node_id"), "practicing")));
+
     json(response, 200, { status: "started" }); return;
   }
   const submission = parseAssignmentResponse(body.response);
@@ -103,13 +153,23 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const retry = dataOrThrow(retryResult.data as Row | null, retryResult.error, "Assignment retry lookup");
     if (!retry) throw new ApiError(409, "assignment_not_started", "Start an eligible Assignment before submitting; submitted or completed work cannot be resubmitted");
   }
+  if (submission.kind !== 'workflow') {
+    const ids = submission.attachmentSourceIds ?? [];
+    if (submission.kind==='code' && !submission.code?.trim() && !ids.length) throw new ApiError(400, 'file_content_required', '请提交实际代码或已上传的文件。');
+    if (ids.length) {
+      const sources = await client.from('user_evidence_sources').select('id,source_sha256').in('id', ids).eq('user_id',user.id).eq('parse_status','ready').is('archived_at',null);
+      const rows = dataOrThrow(sources.data,sources.error,'Practice attachment ownership');
+      if (rows.length !== ids.length || rows.some(source => !source.source_sha256)) throw new ApiError(404,'practice_attachment_unavailable','请选择本人已解析且未归档的文件。');
+    }
+  }
   const evaluation = evaluateAssignmentResponse(assignment, submission);
-  const recorded = await createServerSupabase().rpc("record_assignment_attempt", {
-    p_learner_user_id: user.id, p_course_id: body.courseId, p_assignment_id: body.assignmentId, p_idempotency_key: body.idempotencyKey,
-    p_response: submission, p_outcome: evaluation.outcome, p_score: evaluation.score ?? null,
+  const recorded = await createServerSupabase().rpc(actionRun ? 'record_conversation_action_assignment_attempt' : 'record_conversation_assignment_attempt', {
+    ...(actionRun ? { p_user_id: user.id, p_run_id: actionRun.id } : { p_learner_user_id: user.id, p_course_id: body.courseId, p_assignment_id: body.assignmentId }), p_idempotency_key: body.idempotencyKey,
+    p_response: {...submission,submissionMode:"conversation"}, p_outcome: evaluation.outcome, p_score: evaluation.score ?? null,
     p_feedback: evaluation.feedback, p_evaluator_kind: evaluation.evaluatorKind
   });
   if (recorded.error?.code === "23505") throw new ApiError(409, "assignment_idempotency_conflict", "This idempotency key was already used with a different response");
+  if (actionRun && ['23514', 'PT409'].includes(recorded.error?.code ?? '')) throw new ApiError(409, 'assignment_action_changed', '行动条件或本次提交状态已变化，请刷新执行记录。');
   const result = dataOrThrow(recorded.data as Row[] | null, recorded.error, "Assignment Attempt and PerformanceResult write")[0];
   if (!result) throw new Error("Assignment result write returned no result");
   const persistedResult = await createServerSupabase().from("performance_results").select("outcome,feedback").eq("id", text(result,"result_id")).single();

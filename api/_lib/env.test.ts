@@ -30,6 +30,13 @@ describe("server environment", () => {
     });
   });
 
+  it("accepts the configured Aliyun embedding contract without weakening dimension validation", () => {
+    const config = { EMBEDDING_PROVIDER: "aliyun", EMBEDDING_BASE_URL: "https://example.aliyuncs.com/compatible-mode/v1/", EMBEDDING_API_KEY: "server-only", EMBEDDING_MODEL: "qwen3.7-text-embedding", EMBEDDING_DIMENSIONS: "1024" };
+    expect(readEmbeddingEnvironment(config)).toMatchObject({ embeddingProvider: "aliyun", embeddingModel: "qwen3.7-text-embedding", embeddingDimensions: 1024 });
+    expect(() => readEmbeddingEnvironment({ ...config, EMBEDDING_DIMENSIONS: "768" })).toThrow(/EMBEDDING_DIMENSIONS/);
+    expect(() => readEmbeddingEnvironment({ ...config, EMBEDDING_MODEL: "text-embedding-3-small" })).toThrow(/EMBEDDING_MODEL/);
+  });
+
   it("does not accept an absent server secret", () => {
     expect(() => readServerEnvironment({ SUPABASE_URL: "url", VITE_SUPABASE_PUBLISHABLE_KEY: "public" })).toThrow(/SUPABASE_SECRET_KEY/);
   });

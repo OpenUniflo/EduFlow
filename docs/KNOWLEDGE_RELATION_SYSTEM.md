@@ -75,9 +75,13 @@ Agentic AI and Python Engineering demo relations are manually reviewed static ca
 
 Domain-specific node and edge fixtures are organized under `src/demo/knowledge`. Ordinary genuine relations that span current Domain assignments live in a shared Demo fixture; they have no special cross-domain business status. Demo relation tuple types, stable fixture ID construction, and tuple-to-edge parsing are owned by the Demo edge factory in that directory. The resulting `KnowledgeEdge` model and generic relation validation remain Core responsibilities. These fixtures are prototype/reference data, not a production repository. `pnpm audit:knowledge` prints the current quality report and performs relation validation.
 
-## Future Relation Candidate Generation
+## Relation Candidate Generation
 
-Future systems may retrieve candidates with embeddings, classify relation and direction with an LLM, attach confidence and provenance, and submit proposals for administrator accept/reject/edit review. They must not write authoritative KnowledgeEdges without governance. Candidate generation, CRUD, history, and approval workflow are outside the current implementation.
+The current user-course ingestion retrieves candidate pairs, classifies prerequisite/enables/related/none with direction and source evidence, validates reasons and graph invariants, and persists approved ingestion output through the generation repository/RPC. Evidence-classified enables is retained; the conservative automatic policy still suppresses related and document-order-only prerequisites. This is distinct from governed Global catalog repair: generated user ingestion does not silently create Global authority.
+
+After relation reconstruction, the project structure audit reports prerequisite + enables degree-zero targets, degree-one targets and components. Generation stores review warnings and returns the audit; Course Creator exposes scope warnings. Missing structure calls for renewed source-backed candidate review or a course-design correction, never automatic fake edges. Multiple components are legitimate. The AI Agent catalog repair is reproducible in `scripts/data-repairs/project-capability-relations-v22.sql`, with exact baseline/identity guards and book-page evidence.
+
+Project Capability Model consumes prerequisite + enables as directed support; related remains Atlas-only for this view. Hard prerequisite alone controls necessary-route closure, Navigation and Micro eligibility. Soft and enables may explain current gray gaps, but do not become learning gates.
 
 ## Cross-domain Relations
 
@@ -89,3 +93,10 @@ Real cross-domain KnowledgeEdges are allowed and behave exactly like other facts
 - Same-domain fake links or attraction that implies a fact.
 - Forced cross-domain bridges or a special cross-domain edge model.
 - Using Chapter, Course, cluster, community, island, or composite legacy nodes as topology.
+
+
+## Executable alternatives on factual edges
+
+`knowledge_edge_actions` is governed by a Global administrator and references an existing active Global prerequisite/enables Edge. It is neither a KnowledgeNode nor a KnowledgeEdge. V1 alternatives are only `micro_learning` and `practice_task`; no Action graph or sequence is introduced. Projects read the same templates and supply resource-only `course_action_bindings` through existing teacher/admin authority. Templates are archiveable after their underlying fact becomes unavailable; they cannot be reactivated until valid again.
+
+Cost is deterministic: minutes + 15 × (difficulty − 1) + 30 preparation units when the source is not yet acquired. Missing execution capabilities/resources prevents execution. Micro also requires published teaching content, an initialized valid selected route and existing hard-prerequisite readiness. Costs and explanatory reasons never modify KnowledgeEdge facts or weights. Course bindings and Action state never participate in graph layout.

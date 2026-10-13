@@ -1,0 +1,101 @@
+{
+  "preview": "https://edu-flow-cyat6shyn-july-nanas-projects.vercel.app",
+  "actions": [
+    {
+      "id": "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+      "edge_id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+      "type": "practice_task",
+      "title": "推导订单停线与恢复窗口",
+      "description": "把已量化物料缺口映射到具体工单，使用单位消耗量、产线速率与到货时点计算停线区间和完工影响，再整理恢复优先级输入。",
+      "estimated_minutes": 40,
+      "difficulty": 3,
+      "resource_requirements": [
+        "work-order-schedule"
+      ],
+      "required_capability_ids": [
+        "supply-shortage-exposure"
+      ],
+      "expected_evidence": "上传包含输入来源、各工单用料耗尽时点、停线起止、恢复后完工时间、交付影响和优先级依据的 UTF-8 txt/md/csv。区分计算演练与真实企业执行；完成任务后仍需证据判断与确认。",
+      "status": "active",
+      "provenance": {
+        "kind": "admin",
+        "actor_id": "54cd7725-ae57-464b-beba-18e950546f0b"
+      },
+      "created_at": "2026-10-03T20:11:38.116438+00:00",
+      "updated_at": "2026-10-03T20:11:38.116438+00:00"
+    }
+  ],
+  "weights": [
+    [
+      {
+        "actionId": "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+        "available": true,
+        "weight": 70,
+        "reasons": [
+          {
+            "code": "time",
+            "cost": 40,
+            "message": "预计 40 分钟"
+          },
+          {
+            "code": "difficulty",
+            "cost": 30,
+            "message": "难度 3/5"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "actionId": "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+        "available": false,
+        "weight": 100,
+        "reasons": [
+          {
+            "code": "time",
+            "cost": 40,
+            "message": "预计 40 分钟"
+          },
+          {
+            "code": "difficulty",
+            "cost": 30,
+            "message": "难度 3/5"
+          },
+          {
+            "code": "missing_capability",
+            "message": "尚未具备执行条件：supply-shortage-exposure",
+            "cost": 0
+          },
+          {
+            "code": "source_unacquired",
+            "cost": 30,
+            "message": "起点能力尚未具备，包含额外准备成本"
+          }
+        ]
+      }
+    ]
+  ],
+  "bindings": [
+    {
+      "id": "794fc242-5f28-48c3-88f3-10689497a264",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "action_id": "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+      "context": "海外工厂供应链协同项目。以下为验收用虚构项目资料，不代表已完成真实企业作业。",
+      "contact": "验收场景：计划负责人（无真实个人联系方式）",
+      "instructions": "按提供的工单时点逐项计算，不以日末总量替代停线时段。每条产线独立、物料已指定到工单，禁止跨单重复使用。列出优先级输入而非声称已完成调度；有假设或资料不足必须注明。",
+      "resources": [
+        {
+          "key": "work-order-schedule",
+          "label": "工单、消耗与到货计划（模拟输入）",
+          "available": true,
+          "reference": "教学演练，非真实工厂承诺。2026-10-09，两条独立产线均08:00启动，连续生产无班次限制，每件产品消耗1件关键物料。O1：40件，产线A每小时10件，已分配可用料10件，交付截止12:00，延期成本200元/小时。O2：20件，产线B每小时5件，已分配可用料5件，截止15:00，延期成本50元/小时。确认11:00同时收到并验收可用的物料O1专用30件、O2专用15件，不能跨工单挪用；无其他在途或库存。缺料即停线，到货即可恢复，忽略切换和运输延迟。请计算各自停线、完成时间、交期影响，并整理恢复优先级输入；如建议真实调度，说明仍需核验的数据。"
+        }
+      ],
+      "available": true,
+      "created_at": "2026-10-03T20:11:39.010235+00:00",
+      "updated_at": "2026-10-03T20:11:38.971+00:00"
+    }
+  ],
+  "apiGovernance": "PASS: ordinary A/B writes denied, admin template and binding writes accepted",
+  "syntheticContext": true
+}

@@ -1,0 +1,212 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-correct-calculation",
+      "line": 1,
+      "quote": "我独立核算 M92 的单期物料净需求：确认订单需求100件，盘点实物库存50件、其中隔离10件不可用，因此可用库存40件；确认期内到货0件。净需求max(0,100-40-0)=60件。我复算100-40=60，核对隔离10件确实未计入可用库存，全部数据与订单、仓储及到货确认单一致。",
+      "observation": "写下 M92 单期物料净需求核算：确认订单需求100件，盘点实物库存50件、隔离10件不可用，得到可用库存40件、到货0件；计算 max(0,100-40-0)=60件，并复算 100-40=60、核对隔离10件未计入可用库存及数据与订单、仓储、到货确认单一致。",
+      "capability": "物料净需求计算与复核"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "partial",
+      "confidence": 0.95,
+      "reason": "partial: 原文独立核算 M92 单期净需求：订单需求100件，实物库存50件扣除隔离不可用10件后得可用库存40件，确认期内到货0件，净需求 max(0,100-40-0)=60件，并复算100-40=60、核对隔离10件未计入可用库存。这正确支持“根据订单需求、可用库存及确认到货计算净需求并正确排除不可用库存”的子动作。但候选标准限定为“分时段净需求”，原文明确仅为“单期物料净需求”，未展示按期/时段展开的分时段计算，不能删除“分时段”限定后认定完全满足标准，故只能判为 partial。\n原判断：原文独立核算M92单期净需求：订单需求100件、实盘50件并正确排除隔离10件不可用，得到可用40件；确认到货0件，计算max(0,100-40-0)=60件，并复算100-40=60、核对隔离未计入可用库存，结果与订单、仓储、到货确认单一致。覆盖按订单需求、可用库存、确认到货计算净需求并排除不可用库存的要求。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "insufficient",
+      "confidence": 0.9,
+      "reason": "原文只计算M92单期净需求60件，未使用补货交期窗口，也未计算最早缺料日、缺口量或交期敏感性；净需求只是该方法的一项前置输入，未见交期窗口缺料暴露评估的标准动作。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "579576b5-7e73-43fd-b9a6-92fc7c5c8511",
+      "generatedAt": "2026-10-03T17:05:16.798Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 426,
+      "completionTokens": 1507
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "e2ba43cc-b068-40e8-8d5c-7ecd8202d8a7",
+      "generatedAt": "2026-10-03T17:05:42.937Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1377,
+      "completionTokens": 5454
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v11",
+      "schemaVersion": "evidence-factual-verification-v1",
+      "requestId": "d47925d5-7bc7-4578-9a3c-babc7ff1147a",
+      "generatedAt": "2026-10-03T17:05:47.148Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 716,
+      "completionTokens": 905
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "原文独立核算M92单期净需求：订单需求100件、实盘50件并正确排除隔离10件不可用，得到可用40件；确认到货0件，计算max(0,100-40-0)=60件，并复算100-40=60、核对隔离未计入可用库存，结果与订单、仓储、到货确认单一致。覆盖按订单需求、可用库存、确认到货计算净需求并排除不可用库存的要求。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.95
+            },
+            "supply-shortage-exposure": {
+              "reason": "原文只计算M92单期净需求60件，未使用补货交期窗口，也未计算最早缺料日、缺口量或交期敏感性；净需求只是该方法的一项前置输入，未见交期窗口缺料暴露评估的标准动作。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.9
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文只涉及M92物料净需求与库存/到货，没有瓶颈、良率、已承诺负荷、期间可交付量或名义产能误用的核验与计算，不能对应供应商交付产能核验标准。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "supply-critical-material-identification": {
+              "reason": "原文只涉及M92单期净需求核算，未给定BOM、替代性或停线影响，也未按明确准则识别关键物料并说明排除理由，无该标准的组成动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "原文只计算M92净需求，未将已量化缺口映射到受影响订单、停线时段或恢复优先级输入，缺少缺料中断影响评估的标准动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-supplier-delivery-capacity",
+          "supply-critical-material-identification",
+          "supply-shortage-impact-assessment"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-correct-calculation",
+          "line": 1,
+          "quote": "我独立核算 M92 的单期物料净需求：确认订单需求100件，盘点实物库存50件、其中隔离10件不可用，因此可用库存40件；确认期内到货0件。净需求max(0,100-40-0)=60件。我复算100-40=60，核对隔离10件确实未计入可用库存，全部数据与订单、仓储及到货确认单一致。",
+          "observation": "写下 M92 单期物料净需求核算：确认订单需求100件，盘点实物库存50件、隔离10件不可用，得到可用库存40件、到货0件；计算 max(0,100-40-0)=60件，并复算 100-40=60、核对隔离10件未计入可用库存及数据与订单、仓储、到货确认单一致。",
+          "capability": "物料净需求计算与复核"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.837045456082984
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.674584806673363
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.604627549648285
+        },
+        {
+          "node_id": "supply-critical-material-identification",
+          "revision_id": "supply-critical-material-identification:v1",
+          "title": "关键物料识别",
+          "description": "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。",
+          "mastery_criteria": [
+            "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。"
+          ],
+          "similarity": 0.54327666759491
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.538503170013428
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-net-material-requirement": {
+              "verdict": "partial",
+              "reason": "原文独立核算 M92 单期净需求：订单需求100件，实物库存50件扣除隔离不可用10件后得可用库存40件，确认期内到货0件，净需求 max(0,100-40-0)=60件，并复算100-40=60、核对隔离10件未计入可用库存。这正确支持“根据订单需求、可用库存及确认到货计算净需求并正确排除不可用库存”的子动作。但候选标准限定为“分时段净需求”，原文明确仅为“单期物料净需求”，未展示按期/时段展开的分时段计算，不能删除“分时段”限定后认定完全满足标准，故只能判为 partial。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "retrievalCount": 1
+}

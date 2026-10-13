@@ -1,0 +1,156 @@
+{
+  "date": "2026-10-02",
+  "timezone": "Asia/Shanghai",
+  "role": "Independent User Acceptance / Hosted E2E",
+  "accountRole": "ordinary learner",
+  "courseId": "ai-agents-in-depth",
+  "initialPreview": {
+    "url": "https://edu-flow-34ihto2cd-july-nanas-projects.vercel.app",
+    "commit": "be5f580669d0f9c35fef0fb331f42c944d9594d6",
+    "deployment": "dpl_8KTmD6yxUBmX2e7zFKG5FkvpaJYr",
+    "status": "READY independently confirmed"
+  },
+  "finalPreview": {
+    "url": "https://edu-flow-choo6yult-july-nanas-projects.vercel.app",
+    "commit": "5d9475654baf3d1cbf847097e33692a5a41ad7ef",
+    "deployment": "dpl_Gtvse5qNW6B4JHv8hsoTJUcqKUJr",
+    "status": "READY independently confirmed"
+  },
+  "method": "Native Chrome UI through CUA. Genuine hosted APIs and persisted data. No test fixtures, no direct progress writes, no credential storage. Implementation agent independently captured database snapshots and API security tests.",
+  "cases": [
+    {
+      "id": "initial",
+      "result": "PASS",
+      "observation": "Ordinary user signed in, opened existing course and capability model. Current V1, five acquired capabilities; blue/green/gray visible and no old role rings.",
+      "evidence": [
+        "01-model-v1.png"
+      ]
+    },
+    {
+      "id": "soft-details",
+      "result": "PASS",
+      "observation": "Classical Agent Architecture shows Agent and Task Environment as recommended prerequisites that may be skipped.",
+      "evidence": [
+        "02-soft-detail.png"
+      ]
+    },
+    {
+      "id": "draft-preview",
+      "result": "PASS",
+      "observation": "Include Classical Agent Architecture; exclude Task Environment. Preview has 122 abilities, +1/-0, current V1 unchanged. Independent DB check count=1 and active V1 unchanged.",
+      "evidence": [
+        "03-preview-before-apply.png"
+      ]
+    },
+    {
+      "id": "adopt",
+      "result": "PASS",
+      "observation": "Adoption creates V2. Normal view hides Include/Exclude annotations. Course route now shows added Classical Agent Architecture and honestly reports missing learning content; Agent Harness remains learnable.",
+      "evidence": [
+        "04-adopted-v2-stable.png",
+        "05-navigation-active-v2.png"
+      ]
+    },
+    {
+      "id": "real-learning",
+      "result": "PASS",
+      "observation": "Opened Agent Harness (AGC02) Micro from course route and completed all six actual steps: four explanations, correct runtime-permission judgment, summary. Completion page shown. Returned model shows six acquired capabilities and AGC02 blue with target identity; current route remains V2. Implementation DB independently confirms six attempts, one completion evidence, learned state and no new route version.",
+      "evidence": [
+        "06-micro-judgment.png",
+        "07-micro-completed.png",
+        "08-learned-blue-v2.png"
+      ]
+    },
+    {
+      "id": "hard-conflict",
+      "result": "PASS",
+      "observation": "Dense Retrieval detail identifies Embedding as required. Excluding Embedding gives specific unreachable Dense Retrieval and Hybrid Retrieval explanations; adoption disabled. Draft exclusion reverted without adopting.",
+      "evidence": [
+        "09-hard-detail.png",
+        "10-draft-before-preview.png",
+        "11-hard-exclusion-conflict.png"
+      ]
+    },
+    {
+      "id": "include-hard",
+      "result": "PASS_WITH_SCOPE",
+      "observation": "Included Tool Execution, whose detail names Tool Arguments as required. Preview includes Tool Arguments before newly added Tool Execution (123 nodes); adopted V3. Tool Arguments was already present in necessary route, so this UI case proves preserved closure/order, not newly added hard ancestor. Real local Supabase integration test covers newly required closure; Hosted API did not create a new graph.",
+      "evidence": [
+        "12-include-hard-detail.png",
+        "13-include-hard-preview.png",
+        "14-adopted-v3.png"
+      ]
+    },
+    {
+      "id": "history-restore",
+      "result": "PASS",
+      "observation": "History lists V1/V2/V3 distinctly. View V1 displays original snapshot:121 abilities/117 targets. Restore V1 creates new V4 with historical restore label; learning remains acquired. Independent DB comparison confirms V1/V2 unchanged; V3 first full database capture occurred after restore, so no earlier independent byte comparison claimed.",
+      "evidence": [
+        "15-historical-v1.png",
+        "16-restored-v4.png"
+      ]
+    },
+    {
+      "id": "two-tabs-concurrency",
+      "result": "PASS",
+      "observation": "Two actual Chrome tabs independently load V4, draft Include Classical Agent Architecture and preview. A adopts V5; B stays V4 and adoption rejected with message to reload because another page updated route. DB confirms count=5 and no V6 from stale attempt.",
+      "evidence": [
+        "17-tab-a-v4-preview.png",
+        "18-tab-b-v4-preview.png",
+        "19-tab-a-adopted-v5.png",
+        "20-tab-b-stale-rejected.png",
+        "21-stale-message-visible.png"
+      ]
+    },
+    {
+      "id": "graph-visible-stability",
+      "result": "PASS_WITH_SCOPE",
+      "observation": "Comparing screenshots18 and20 shows selected A01/Agent/Task Environment and visible neighbor positions unchanged across tab return and stale response; screenshots03/04 preserve Task Environment focus through adoption. No visible simulation reheat or camera jump observed. Native CUA did not inspect internal force coordinates or structure key; automated tests provide those assertions.",
+      "evidence": [
+        "03-preview-before-apply.png",
+        "04-adopted-v2-stable.png",
+        "18-tab-b-v4-preview.png",
+        "20-tab-b-stale-rejected.png"
+      ]
+    },
+    {
+      "id": "final-preview-smoke",
+      "result": "PASS",
+      "observation": "Final READY deployment independently confirmed. New authenticated tab opens course/model with six acquired, current V5. Restored original V1 to new V6. Course route then recommends Agentic Workflow and AGC02 remains completed. Final database evidence confirms V6 restoreFromV1 with empty constraints, preserved V1–V4 saved snapshots, and AGC02 state/progress/evidence equal to the post-learning snapshot.",
+      "evidence": [
+        "22-final-preview-restored-v6.png",
+        "23-final-navigation.png"
+      ]
+    },
+    {
+      "id": "browser-console",
+      "result": "PASS_WITH_ENVIRONMENT_WARNINGS",
+      "observation": "Native DevTools inspected final active course tab. Fifteen observed messages attributed to chrome-extension sources (wallet injection/listener conflicts, userscript unload, translation LanguageDetector). No EduFlow app-source exception observed in that console capture.",
+      "evidence": [
+        "console-final.txt"
+      ]
+    }
+  ],
+  "issues": [
+    {
+      "severity": "Minor",
+      "subject": "Graph labels can overlay right detail card",
+      "observation": "A graph label renders across the detail card/button area in screenshot18.",
+      "baseline": "Implementation compared baseline b6b4ee3: same label z-index3 and detail without z-index; pre-existing issue, not expanded in this task.",
+      "blocking": false
+    },
+    {
+      "severity": "Observation",
+      "subject": "Final Preview login delayed in one tab",
+      "observation": "One tab remained on login/then blank after authentication and reload. Opening a fresh tab on same final domain worked with established session. No state reset or credential change. Root cause undetermined; not reproduced in fresh tab."
+    }
+  ],
+  "limits": [
+    "Security/API attacks and database integrity snapshots were executed independently by Implementation agent; see adjacent project-capability-v2 evidence files.",
+    "Actual learner statuses observed: learned and practicing. Hosted mastered-specific coloring not separately exercised.",
+    "A newly unlearned soft predecessor scenario is absent for available published Micro paths; actual nonblocking soft replay and recommendation regression are separately documented by Implementation.",
+    "All-target exclusion is covered by Hosted admin API acceptance, not bulk UI clicking in this report.",
+    "No synthetic graph/course/user or direct UserKnowledgeState update was used.",
+    "No passwords or tokens are stored in evidence."
+  ]
+}

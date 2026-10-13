@@ -1,0 +1,38 @@
+{
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "8dad2287-e67d-4f6e-850f-3df8599e9ccf",
+      "generatedAt": "2026-10-03T16:38:37.906Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 426,
+      "completionTokens": 1164
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [],
+    "extraction": {
+      "type": "json_object",
+      "units": [
+        {
+          "sourceId": "local-correct-calculation",
+          "line": 1,
+          "quote": "我独立核算 M92 的单期物料净需求：确认订单需求100件，盘点实物库存50件、其中隔离10件不可用，因此可用库存40件；确认期内到货0件。净需求max(0,100-40-0)=60件。我复算100-40=60，核对隔离10件确实未计入可用库存，全部数据与订单、仓储及到货确认单一致。",
+          "observation": "独立完成 M92 单期物料净需求核算：依据订单需求100件、实物库存50件、隔离不可用10件，先得出可用库存40件，并结合期内到货0件计算净需求 max(0,100-40-0)=60件；随后复算100-40=60，核对隔离10件未计入可用库存，并称全部数据与订单、仓储及到货确认单一致。",
+          "capability": "单期物料净需求计算与复核"
+        }
+      ]
+    },
+    "retrieved": []
+  },
+  "retrievalCount": 0,
+  "topK": 5,
+  "sourceCount": 1,
+  "llmCalls": 1
+}

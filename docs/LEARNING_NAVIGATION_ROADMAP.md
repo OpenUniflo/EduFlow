@@ -6,6 +6,12 @@
 
 This document supersedes older Phase 4 execution sequencing where it conflicts with the product direction below. Historical completed Phase 4 work remains valid; do not rewrite completed issue history as if it had a different original scope.
 
+## Current V2 route execution (2026-10-02)
+
+[Project Capability / Personal Route V2](PROJECT_CAPABILITY_MODEL_V2.md) now separates candidate space from the selected hard-necessary subgraph and deterministic execution order. Navigation reads current active route constraints, replans against current graph/course/user state, and uses only hard prerequisites for `blockedBy`. Soft can explain order but cannot gate candidates or Micro. Project targets remain active CurriculumCoverage identities; an explicitly empty target commitment does not fall back to Course membership.
+
+`api/learner.ts?resource=route-plan` owns current/history, Preview, adoption and restore. Navigation still answers the next action and does not own version editing. My Knowledge refresh updates execution without creating a route version. Adoption/restore atomically append an immutable version with a checked `baseVersionId`; stale tabs receive 409. Historical snapshots and learning evidence are never rewritten. Current policy version is `course-rule-v6`.
+
 ## 1. Product model
 
 EduFlow is a learning navigation system built on a shared Knowledge Graph.

@@ -24,6 +24,7 @@ export type AtlasSceneNode = {
   isCore: boolean;
   progress: number;
   featured?: boolean;
+  capabilityRoles?: { current: boolean; course: boolean; bridge: boolean };
   knowledge?: KnowledgeNode;
   source?: PersonalKnowledgeNode;
   courseContexts: AtlasCourseContext[];

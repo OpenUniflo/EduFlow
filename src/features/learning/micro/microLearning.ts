@@ -105,7 +105,7 @@ export interface MicroLearningRepository extends MicroLearningProvider {
   getUnitProgress(unitId:string):MicroUnitProgress|undefined;
   start(pathId:string, contextCourseId?:string):Promise<void>;
   resolveH5PContent(pathId:string,unitId:string,stepId:string,contentRef:string):Promise<H5PContentDescriptor>;
-  completeStep(pathId:string, unitId:string, stepId:string, submission?:MicroLearningSubmission,contextCourseId?:string,metadata?:{decisionId?:string;clientDurationMs?:number}):Promise<{correct:boolean; completed:boolean}>;
+  completeStep(pathId:string, unitId:string, stepId:string, submission?:MicroLearningSubmission,contextCourseId?:string,metadata?:{decisionId?:string;clientDurationMs?:number;actionRunId?:string}):Promise<{correct:boolean; completed:boolean;actionStepIds?:string[]}>;
   subscribe(listener:()=>void):()=>void;
 }
 

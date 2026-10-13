@@ -74,6 +74,7 @@ export type CandidatePair = {
 };
 
 export type GenerationDiagnostics = {
+  projectStructureAudit?: ReturnType<typeof import('@/shared/learning/projectStructureAudit').auditProjectStructure>;
   embeddingRequestCount: number;
   extractedCandidateCount: number;
   afterExactDedupCount: number;
@@ -110,6 +111,8 @@ export type ModelExecutionMetadata = {
   maxTokens?: number;
   promptTokens?: number;
   completionTokens?: number;
+  thinking?: boolean;
+  requestedReasoningEffort?: 'low' | 'high' | 'max';
   validationWarnings?: string[];
 };
 
@@ -121,6 +124,8 @@ export type StructuredGenerationRequest = {
   user: string;
   maxTokens: number;
   temperature: number;
+  thinking?: boolean;
+  reasoningEffort?: 'low' | 'high' | 'max';
 };
 
 export type StructuredGenerationResult = {

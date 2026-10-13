@@ -1,0 +1,15 @@
+{
+  "preview": "https://edu-flow-b4jcw7u4v-july-nanas-projects.vercel.app",
+  "deployment": "dpl_AeMqJaVQwDv2d4nQCEmTTHpdPicj",
+  "capturedAt": "2026-10-03T09:32:37.978991+00:00",
+  "window": "15m",
+  "http5xx": 0,
+  "errorLevelEntries": 5,
+  "onlyKnownDeprecation": true,
+  "browserErrors": 0,
+  "browserEvidence": "Independent A/B real browser checks; main browser errors/console empty",
+  "limits": [
+    "Time-window sample, not a guarantee beyond observed requests.",
+    "Main login redirect during concurrent account usage not reproduced by independent reviewer."
+  ]
+}

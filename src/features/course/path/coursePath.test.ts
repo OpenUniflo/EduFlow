@@ -9,7 +9,7 @@ const graph = { knowledgeNodes: [
   { id:"a", title:"A", primaryCoverage:{lessonOrder:1,order:0} },
   { id:"b", title:"B", primaryCoverage:{lessonOrder:2,order:0} },
   { id:"c", title:"C", primaryCoverage:{lessonOrder:3,order:0} }
-], knowledgeEdges:[{id:"a-b",source:"a",target:"b",relation:"prerequisite"},{id:"b-c",source:"b",target:"c",relation:"prerequisite"}] } as unknown as CourseGraphData;
+], knowledgeEdges:[{id:"a-b",source:"a",target:"b",relation:"prerequisite",strength:"hard"},{id:"b-c",source:"b",target:"c",relation:"prerequisite",strength:"hard"}] } as unknown as CourseGraphData;
 
 describe("Course Path", () => {
   it("uses curriculum order while factual prerequisites explain blocking", () => {
@@ -35,7 +35,7 @@ it.each(["explore", "learning", "learned", "practicing", "mastered"] as const)("
   const satisfied = ["learned", "practicing", "mastered"].includes(status);
   const records = [{ nodeId: "a", status }] as UserKnowledgeRecord[];
   const path = buildCoursePath(graph, records);
-  const plan = computeNavigationPlan({ courseId: "course", targetNodeIds: [], nodes: graph.knowledgeNodes.map((node)=>({id:node.id,title:node.title,lessonOrder:node.primaryCoverage.lessonOrder,coverageOrder:node.primaryCoverage.order})), prerequisiteEdges: graph.knowledgeEdges, knowledgeStatuses: { a: status }, microPaths: [], completedMicroPathIds: [], assignments: [], assignmentOutcomes: {}, materials: [] });
+  const plan = computeNavigationPlan({ courseId: "course", targetNodeIds: [], nodes: graph.knowledgeNodes.map((node)=>({id:node.id,title:node.title,lessonOrder:node.primaryCoverage.lessonOrder,coverageOrder:node.primaryCoverage.order})), prerequisiteEdges: graph.knowledgeEdges.filter(edge => edge.relation === 'prerequisite'), knowledgeStatuses: { a: status }, microPaths: [], completedMicroPathIds: [], assignments: [], assignmentOutcomes: {}, materials: [] });
   expect(evaluatePrerequisiteReachability(undefined,[status])).toBe(satisfied ? "available" : "locked");
   expect(path[1].state).toBe(satisfied ? "available" : "blocked");
   expect(plan.path[1].state).toBe(satisfied ? "eligible" : "blocked");
@@ -43,4 +43,11 @@ it.each(["explore", "learning", "learned", "practicing", "mastered"] as const)("
 it("does not gate a Course Path on an external prerequisite", () => {
   const external = { ...graph, knowledgeEdges: [{ ...graph.knowledgeEdges[0], id:"external-a",source:"external",target:"a" }] };
   expect(buildCoursePath(external, [])[0]).toMatchObject({state:"available",blockedBy:[]});
+});
+
+it("soft prerequisites do not block Path or Navigation", () => {
+  const soft = { ...graph, knowledgeEdges: graph.knowledgeEdges.filter(edge => edge.relation === "prerequisite").map(edge => ({ ...edge, strength: "soft" as const })) };
+  expect(buildCoursePath(soft, []).map(item => item.state)).toEqual(["available", "available", "available"]);
+  const plan = computeNavigationPlan({ courseId: "course", targetNodeIds: [], nodes: soft.knowledgeNodes.map(node => ({id: node.id, title: node.title, lessonOrder: node.primaryCoverage.lessonOrder, coverageOrder: node.primaryCoverage.order})), prerequisiteEdges: soft.knowledgeEdges, knowledgeStatuses: {}, microPaths: [], completedMicroPathIds: [], assignments: [], assignmentOutcomes: {}, materials: [] });
+  expect(plan.path.every(item => item.state === "eligible" && item.blockedBy.length === 0)).toBe(true);
 });

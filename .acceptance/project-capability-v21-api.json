@@ -1,0 +1,44 @@
+{
+  "preview": "https://edu-flow-2srra5p50-july-nanas-projects.vercel.app",
+  "role": "administrator",
+  "checks": [
+    "Administrator current route valid; 117 targets / 4 acquired",
+    "Historical now-outside Include explicit conflict",
+    "Invalid adoption writes no version",
+    "Include and Exclude Preview / diff remains valid",
+    "Preview does not append route version",
+    "Adopt appends one version",
+    "Version History contains adopted snapshot",
+    "Navigation executes adopted current route",
+    "Stale version rejected",
+    "Completed Micro reopens through active route",
+    "Micro reopening does not create route version",
+    "Restore appends version and restores initial constraints",
+    "Navigation valid after Restore",
+    "All seven existing administrator versions byte-equivalent canonically",
+    "UserKnowledgeState preserved across route editing / Restore"
+  ],
+  "passed": 15,
+  "initialVersion": 7,
+  "finalVersion": 9,
+  "excludedTarget": "AGC02",
+  "model": {
+    "targets": 117,
+    "acquired": 4,
+    "intermediates": 0
+  },
+  "oldVersionsUnchanged": 7,
+  "correctedPreview": "https://edu-flow-nv8d14sgh-july-nanas-projects.vercel.app",
+  "correctedPreviewSmoke": {
+    "/api/learner?resource=route-plan&courseId=ai-agents-in-depth": {
+      "status": 200,
+      "valid": true,
+      "version": 9
+    },
+    "/api/navigation?courseId=ai-agents-in-depth": {
+      "status": 200,
+      "valid": null,
+      "version": null
+    }
+  }
+}

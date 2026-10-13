@@ -1,0 +1,58 @@
+{
+  "capturedAt": "2026-10-04T18:01:50.470Z",
+  "preview": "https://edu-flow-17oeux0v5-july-nanas-projects.vercel.app",
+  "runs": [
+    {
+      "id": "32e6d5f5-d16f-4c0c-a1f4-2e43bd2917d3",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+      "action_id": "905947b9-07f4-528a-a2d8-9abd385d1d4e",
+      "status": "completed",
+      "micro_path_id": "enterprise-route-action-v3-quality",
+      "assignment_id": null,
+      "route_version_id": "b26d1555-247a-4e9d-b787-0b1d7fddab56",
+      "repeated_from_run_id": null,
+      "accepted_micro_steps": 3
+    },
+    {
+      "id": "ce46cd08-5ee4-438d-8233-fd753ee72e28",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+      "action_id": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+      "status": "completed",
+      "micro_path_id": null,
+      "assignment_id": "enterprise-route-action-v3-quality-trace",
+      "route_version_id": "0608e192-a134-4739-802f-551ba03d30b3",
+      "repeated_from_run_id": null,
+      "accepted_micro_steps": 0
+    },
+    {
+      "id": "3bb6f4ea-2e8b-4e0f-a42a-8712fd4d0e9c",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+      "action_id": "34b9b2f4-c4ae-5997-a70e-e048359c71ce",
+      "status": "completed",
+      "micro_path_id": null,
+      "assignment_id": "enterprise-route-action-v3-quality-trace",
+      "route_version_id": "0608e192-a134-4739-802f-551ba03d30b3",
+      "repeated_from_run_id": "ce46cd08-5ee4-438d-8233-fd753ee72e28",
+      "accepted_micro_steps": 0
+    },
+    {
+      "id": "65b5d45f-ec43-4169-af1d-7294f0607c48",
+      "user_id": "54cd7725-ae57-464b-beba-18e950546f0b",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "edge_id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+      "action_id": "de9d5146-77da-54c6-a02e-f4ae02b62bde",
+      "status": "completed",
+      "micro_path_id": "enterprise-route-action-v3-admission",
+      "assignment_id": null,
+      "route_version_id": "9c427293-05a0-4d67-bcfd-79d8e51b4422",
+      "repeated_from_run_id": null,
+      "accepted_micro_steps": 3
+    }
+  ]
+}

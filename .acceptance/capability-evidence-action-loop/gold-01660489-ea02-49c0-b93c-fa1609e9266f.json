@@ -1,0 +1,58 @@
+{
+  "preview": "https://edu-flow-7qp23ppvs-july-nanas-projects.vercel.app",
+  "sourceIds": [
+    "b6f3dc6d-0753-49ec-870c-592536fa70ba"
+  ],
+  "runId": "01660489-ea02-49c0-b93c-fa1609e9266f",
+  "sources": [
+    {
+      "title": "unrelated.txt",
+      "text": "周末聚餐记录：我们讨论周六午饭地点，暂定十二点集合。没有任何工作测量、评估、计算或已完成的学习任务。\n"
+    }
+  ],
+  "beforeUserKnowledge": [],
+  "afterUserKnowledge": [],
+  "units": [],
+  "proposals": [],
+  "run": {
+    "id": "01660489-ea02-49c0-b93c-fa1609e9266f",
+    "user_id": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+    "source_ids": [
+      "b6f3dc6d-0753-49ec-870c-592536fa70ba"
+    ],
+    "status": "completed",
+    "model": "deepseek-v4-flash",
+    "prompt_version": "personal-evidence-v1",
+    "diagnostics": {
+      "topK": 5,
+      "llmCalls": 1,
+      "metadata": [
+        {
+          "model": "deepseek-flash",
+          "stage": "extraction",
+          "provider": "deepseek",
+          "maxTokens": 6000,
+          "requestId": "8d9376eb-67c8-40e7-99b9-cbd36e347dae",
+          "generatedAt": "2026-10-03T15:45:04.634Z",
+          "temperature": 0,
+          "promptTokens": 220,
+          "promptVersion": "personal-evidence-v1",
+          "schemaVersion": "evidence-units-v1",
+          "completionTokens": 5
+        }
+      ],
+      "artifacts": {
+        "retrieved": [],
+        "extraction": {
+          "units": []
+        }
+      },
+      "sourceCount": 1,
+      "retrievalCount": 0
+    },
+    "error": null,
+    "created_at": "2026-10-03T15:45:03.846352+00:00",
+    "completed_at": "2026-10-03T15:45:04.634+00:00"
+  },
+  "formalStateUnchanged": true
+}

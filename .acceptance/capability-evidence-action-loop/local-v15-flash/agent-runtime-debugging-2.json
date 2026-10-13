@@ -1,0 +1,382 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-agent-runtime-debugging",
+      "line": 1,
+      "quote": "我调试实际运行的库存核查 Agent。运行轨迹 run-r73 显示 Agent 发起 inventory_check 工具调用后失败；工具日志包含 NameError: available_stock is not defined，退出码1。我沿该次 Agent 执行轨迹定位到工具脚本第18行，把拼错的 available_stock 改为已经定义的 available_quantity，保留原输入重新执行同一 Agent 任务；工具返回可用库存40件、退出码0，Agent 输出库存核查报告，轨迹显示工具调用成功且任务完成。我核对报告中的40件与盘点表一致，其他输出没有改变。",
+      "observation": "实际运行库存核查 Agent 并观察到 run-r73 中 inventory_check 工具调用失败，工具日志出现 NameError: available_stock is not defined 且退出码为1；随后沿执行轨迹定位到工具脚本第18行，将拼错的 available_stock 改为已定义的 available_quantity，保留原输入重新执行同一 Agent 任务，得到工具返回可用库存40件、退出码0、Agent 输出库存核查报告且轨迹显示工具调用成功和任务完成；最后核对报告中40件与盘点表一致，其他输出未改变。",
+      "capability": "基于 Agent 运行轨迹、工具错误日志和退出码定位并修复工具脚本变量错误，用同输入重跑同一 Agent 任务并通过结果核对验证修复。"
+    },
+    {
+      "sourceId": "local-agent-runtime-debugging",
+      "line": 2,
+      "quote": "我据此确认故障在 Agent 运行时工具执行而非任务规划：Runtime Debugging 依据轨迹、错误日志与退出信号定位本次执行故障；不能仅改 Agent 提示词掩盖代码错误，也不能把未执行的静态代码检查当作运行修复。我先复现失败，再沿运行信号定位，最后用同输入完整重跑验证修复。",
+      "observation": "根据前述轨迹、错误日志与退出信号确认故障在 Agent 运行时工具执行而非任务规划，并提出不能仅改 Agent 提示词掩盖代码错误、不能把未执行的静态代码检查当作运行修复；同时描述实际采用先复现失败、再沿运行信号定位、最后用同输入完整重跑验证修复的流程。",
+      "capability": "依据轨迹、错误日志与退出信号诊断 Agent 运行时工具执行故障，并按复现失败—运行信号定位—同输入完整重跑验证的流程进行运行时调试。"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0,
+        1
+      ],
+      "nodeId": "E07",
+      "sufficiency": "supported",
+      "confidence": 0.96,
+      "reason": "单元0实际运行库存核查 Agent，观察到 run-r73 中 inventory_check 工具调用失败、NameError: available_stock is not defined 且退出码1，并沿轨迹定位到工具脚本第18行，将其改为已定义的 available_quantity，保留原输入重跑后得到可用库存40件、退出码0、Agent 输出报告且任务完成，最后核对40件与盘点表一致且其他输出未变。单元1进一步确认故障在 Agent 运行时工具执行而非任务规划，明确不能仅改提示词掩盖代码错误、不能把未执行静态代码检查当作运行修复，并给出先复现失败、再沿运行信号定位、最后同输入完整重跑验证修复的流程。这些证据覆盖 Runtime Debugging 的核心目标、边界、正确用法与常见误用，并有可检查过程与结果。",
+      "revisionId": "E07-r1",
+      "proposedStatus": "learned"
+    },
+    {
+      "unitIndexes": [
+        0,
+        1
+      ],
+      "nodeId": "EVO01",
+      "sufficiency": "partial",
+      "confidence": 0.84,
+      "reason": "partial: 定义限定为从真实运行轨迹、成功失败结果和人工反馈中提取可用于后续改进的学习信号。第1行有真实失败/成功轨迹与退出信号，第2行由此得出“故障在 Agent 运行时工具执行而非任务规划”的诊断，可算失败信号；但原文未明确将该诊断抽取、保存或复用为后续改进的学习信号，也未涉及人工反馈，三项验收中的“区分原始日志与可用于更新的学习信号”和“把失败案例转化为后续改进输入”仅部分体现。至少一个失败信号定位属该能力，故 partial。\n原判断：单元0提供真实运行轨迹 run-r73、失败工具日志 NameError 与退出码1、修复后退出码0和任务完成的成功结果，构成可检查的成功/失败信号来源。单元1从这些轨迹、错误日志与退出信号中确认故障在 Agent 运行时工具执行而非任务规划，并提炼出不能仅改提示词掩盖代码错误、不能把未执行静态代码检查当作运行修复等可复用边界，以及复现失败—运行信号定位—同输入完整重跑验证的改进流程。这覆盖从轨迹定位成功/失败信号、区分原始日志与学习信号、把失败案例转化为后续改进输入。",
+      "revisionId": "EVO01-r1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "CODE01",
+      "sufficiency": "partial",
+      "confidence": 0.86,
+      "reason": "partial: 定义限定为 Coding Agent 在代码库中定位相关文件、检索上下文并以受控方式修改目标文件。第1行显示沿运行轨迹定位到工具脚本第18行，把 available_stock 改为已定义的 available_quantity，保留原输入重跑且其他输出未变，属于受控文件修改并避免无关改动；但原文没有说明搜索范围的选择和修改前局部上下文的系统收集，仅由运行轨迹和已定义变量支撑。至少一个正确子动作属该能力，故 partial。\n原判断：单元0沿 Agent 执行轨迹定位到工具脚本第18行，将拼错的 available_stock 改为已定义的 available_quantity，并保留原输入重跑验证，工具返回40件、退出码0、任务完成，且其他输出未改变，覆盖了可检查的文件修改与避免无关改动。但原文没有展示在代码库中选择搜索范围检索相关文件，也没有明确说明修改前收集足够局部上下文的步骤，因此只部分匹配 Codebase Search and File Editing。",
+      "revisionId": "CODE01-r1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        1
+      ],
+      "nodeId": "E14",
+      "sufficiency": "partial",
+      "confidence": 0.78,
+      "reason": "partial: 定义限定为评测计划、工具调用和中间步骤。第2行根据轨迹确认故障在运行时工具执行而非任务规划，第1行观察工具调用失败/成功与任务完成，属于对计划和工具调用的局部评测；但原文未完整评测中间步骤，也未展示 Trajectory Evaluation 正确用法与常见误用的完整边界。至少一个子动作属该能力，故 partial。\n原判断：单元1基于轨迹、错误日志与退出信号确认故障在 Agent 运行时工具执行而非任务规划，并识别不能仅改提示词掩盖代码错误、不能把未执行静态代码检查当作运行修复等误用，属于对工具调用和中间步骤的评测/归因。但可用单元只给出归因结论和调试流程，未展示对计划、工具调用和中间步骤的完整评测过程或可检查评分结果，因此只部分匹配 Trajectory Evaluation。",
+      "revisionId": "E14-r1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        1
+      ],
+      "nodeId": "RT14",
+      "sufficiency": "partial",
+      "confidence": 0.76,
+      "reason": "partial: 定义限定为识别可恢复与不可恢复的运行失败，并通过重试、回退、恢复或安全终止使 Agent 从失败状态中受控继续。第1行失败后修改已定位代码并保留原输入重跑，退出码0且任务完成，属于恢复性继续；但原文未区分暂时性/终止性失败，未说明选择有界重试、回退、恢复或终止的策略依据，也未说明恢复时状态保留和避免重复副作用的分析。至少一个恢复子动作属该能力，故 partial。\n原判断：单元1描述先复现失败、沿运行信号定位、最后用同输入完整重跑验证修复，属于修复根因后恢复执行并保留原输入，使 Agent 任务受控继续。但原文没有区分暂时性失败与终止性失败，也没有说明有界重试、回退或安全终止等策略选择，且未说明恢复执行时如何避免重复副作用，因此只部分匹配 Failure Recovery。",
+      "revisionId": "RT14-r2",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v15",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "7a0e8d29-b7e0-43fd-aead-c425794e52d2",
+      "generatedAt": "2026-10-03T17:38:51.164Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 544,
+      "completionTokens": 4519
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v15",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "8f77e739-e37e-49f3-b79a-22bbaa0e5571",
+      "generatedAt": "2026-10-03T17:39:45.421Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 2020,
+      "completionTokens": 11281
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v15",
+      "schemaVersion": "evidence-factual-verification-v3",
+      "requestId": "e45cdab9-d13b-4ca1-99b7-eee46de875d4",
+      "generatedAt": "2026-10-03T17:40:36.378Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1313,
+      "completionTokens": 11028
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "E07": {
+              "reason": "单元0实际运行库存核查 Agent，观察到 run-r73 中 inventory_check 工具调用失败、NameError: available_stock is not defined 且退出码1，并沿轨迹定位到工具脚本第18行，将其改为已定义的 available_quantity，保留原输入重跑后得到可用库存40件、退出码0、Agent 输出报告且任务完成，最后核对40件与盘点表一致且其他输出未变。单元1进一步确认故障在 Agent 运行时工具执行而非任务规划，明确不能仅改提示词掩盖代码错误、不能把未执行静态代码检查当作运行修复，并给出先复现失败、再沿运行信号定位、最后同输入完整重跑验证修复的流程。这些证据覆盖 Runtime Debugging 的核心目标、边界、正确用法与常见误用，并有可检查过程与结果。",
+              "unitIndexes": [
+                0,
+                1
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.96
+            },
+            "T08": {
+              "reason": "原文是在工具报 NameError 后先修改工具脚本变量，再保留原输入重跑同一 Agent 任务，属于修复根因后的验证性重跑，不是对可恢复工具失败实施有界重试。失败原因是代码变量错误，不是可通过原样重试恢复的暂时性工具失败；也没有最大重试次数、退避、重试边界等 Tool Retry 策略。不能把修复后重跑等同于 Tool Retry。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.93
+            },
+            "EVO01": {
+              "reason": "单元0提供真实运行轨迹 run-r73、失败工具日志 NameError 与退出码1、修复后退出码0和任务完成的成功结果，构成可检查的成功/失败信号来源。单元1从这些轨迹、错误日志与退出信号中确认故障在 Agent 运行时工具执行而非任务规划，并提炼出不能仅改提示词掩盖代码错误、不能把未执行静态代码检查当作运行修复等可复用边界，以及复现失败—运行信号定位—同输入完整重跑验证的改进流程。这覆盖从轨迹定位成功/失败信号、区分原始日志与学习信号、把失败案例转化为后续改进输入。",
+              "unitIndexes": [
+                0,
+                1
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.84
+            },
+            "CODE01": {
+              "reason": "单元0沿 Agent 执行轨迹定位到工具脚本第18行，将拼错的 available_stock 改为已定义的 available_quantity，并保留原输入重跑验证，工具返回40件、退出码0、任务完成，且其他输出未改变，覆盖了可检查的文件修改与避免无关改动。但原文没有展示在代码库中选择搜索范围检索相关文件，也没有明确说明修改前收集足够局部上下文的步骤，因此只部分匹配 Codebase Search and File Editing。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.86
+            },
+            "CODE02": {
+              "reason": "单元0是运行调试和修复工具脚本变量错误，虽然执行了 inventory_check 工具并修改脚本，但目的不是通过编写和执行代码完成计算、验证、搜索或中间推导，也不是把代码作为思考过程的一部分来修正推理。库存工具调用属于任务执行而非 Code as a Reasoning Tool 的组成动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "E14": {
+              "reason": "单元1基于轨迹、错误日志与退出信号确认故障在 Agent 运行时工具执行而非任务规划，并识别不能仅改提示词掩盖代码错误、不能把未执行静态代码检查当作运行修复等误用，属于对工具调用和中间步骤的评测/归因。但可用单元只给出归因结论和调试流程，未展示对计划、工具调用和中间步骤的完整评测过程或可检查评分结果，因此只部分匹配 Trajectory Evaluation。",
+              "unitIndexes": [
+                1
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.78
+            },
+            "RT14": {
+              "reason": "单元1描述先复现失败、沿运行信号定位、最后用同输入完整重跑验证修复，属于修复根因后恢复执行并保留原输入，使 Agent 任务受控继续。但原文没有区分暂时性失败与终止性失败，也没有说明有界重试、回退或安全终止等策略选择，且未说明恢复执行时如何避免重复副作用，因此只部分匹配 Failure Recovery。",
+              "unitIndexes": [
+                1
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.76
+            }
+          }
+        },
+        "nodeIds": [
+          "E07",
+          "T08",
+          "EVO01",
+          "CODE01",
+          "CODE02",
+          "E14",
+          "RT14"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-agent-runtime-debugging",
+          "line": 1,
+          "quote": "我调试实际运行的库存核查 Agent。运行轨迹 run-r73 显示 Agent 发起 inventory_check 工具调用后失败；工具日志包含 NameError: available_stock is not defined，退出码1。我沿该次 Agent 执行轨迹定位到工具脚本第18行，把拼错的 available_stock 改为已经定义的 available_quantity，保留原输入重新执行同一 Agent 任务；工具返回可用库存40件、退出码0，Agent 输出库存核查报告，轨迹显示工具调用成功且任务完成。我核对报告中的40件与盘点表一致，其他输出没有改变。",
+          "observation": "实际运行库存核查 Agent 并观察到 run-r73 中 inventory_check 工具调用失败，工具日志出现 NameError: available_stock is not defined 且退出码为1；随后沿执行轨迹定位到工具脚本第18行，将拼错的 available_stock 改为已定义的 available_quantity，保留原输入重新执行同一 Agent 任务，得到工具返回可用库存40件、退出码0、Agent 输出库存核查报告且轨迹显示工具调用成功和任务完成；最后核对报告中40件与盘点表一致，其他输出未改变。",
+          "capability": "基于 Agent 运行轨迹、工具错误日志和退出码定位并修复工具脚本变量错误，用同输入重跑同一 Agent 任务并通过结果核对验证修复。"
+        },
+        {
+          "sourceId": "local-agent-runtime-debugging",
+          "line": 2,
+          "quote": "我据此确认故障在 Agent 运行时工具执行而非任务规划：Runtime Debugging 依据轨迹、错误日志与退出信号定位本次执行故障；不能仅改 Agent 提示词掩盖代码错误，也不能把未执行的静态代码检查当作运行修复。我先复现失败，再沿运行信号定位，最后用同输入完整重跑验证修复。",
+          "observation": "根据前述轨迹、错误日志与退出信号确认故障在 Agent 运行时工具执行而非任务规划，并提出不能仅改 Agent 提示词掩盖代码错误、不能把未执行的静态代码检查当作运行修复；同时描述实际采用先复现失败、再沿运行信号定位、最后用同输入完整重跑验证修复的流程。",
+          "capability": "依据轨迹、错误日志与退出信号诊断 Agent 运行时工具执行故障，并按复现失败—运行信号定位—同输入完整重跑验证的流程进行运行时调试。"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "E07",
+          "revision_id": "E07-r1",
+          "title": "Runtime Debugging",
+          "description": "依据运行信号定位 Agent 执行故障。",
+          "mastery_criteria": [
+            "能独立完成Runtime Debugging的核心目标与边界",
+            "能在具体场景中识别Runtime Debugging的正确用法与常见误用",
+            "能用可检查的示例证明对Runtime Debugging的掌握"
+          ],
+          "similarity": 0.669192711662813
+        },
+        {
+          "node_id": "T08",
+          "revision_id": "T08-r1",
+          "title": "Tool Retry",
+          "description": "对可恢复工具失败实施有界重试。",
+          "mastery_criteria": [
+            "能独立完成Tool Retry的核心目标与边界",
+            "能在具体场景中识别Tool Retry的正确用法与常见误用",
+            "能用可检查的示例证明对Tool Retry的掌握"
+          ],
+          "similarity": 0.579711387123035
+        },
+        {
+          "node_id": "EVO01",
+          "revision_id": "EVO01-r1",
+          "title": "Learning Signals from Runtime Trajectories",
+          "description": "从 Agent 的真实运行轨迹、成功失败结果和人工反馈中提取可用于后续改进的学习信号。",
+          "mastery_criteria": [
+            "能从一条运行轨迹中定位可复用的成功或失败信号",
+            "能区分原始日志与可用于更新的学习信号",
+            "能把一个失败案例转化为后续改进输入"
+          ],
+          "similarity": 0.565163042237586
+        },
+        {
+          "node_id": "CODE01",
+          "revision_id": "CODE01-r1",
+          "title": "Codebase Search and File Editing",
+          "description": "让 Coding Agent 在代码库中定位相关文件、检索上下文并以受控方式修改目标文件。",
+          "mastery_criteria": [
+            "能选择搜索范围定位与任务相关的代码",
+            "能在修改前收集足够的局部上下文",
+            "能执行可检查的文件修改并避免无关改动"
+          ],
+          "similarity": 0.550112161046992
+        },
+        {
+          "node_id": "CODE02",
+          "revision_id": "CODE02-r1",
+          "title": "Code as a Reasoning Tool",
+          "description": "让 Agent 通过编写和执行代码完成计算、验证、搜索或中间推导，把代码作为思考过程的一部分。",
+          "mastery_criteria": [
+            "能识别比纯自然语言推理更适合用代码解决的步骤",
+            "能编写一个用于验证或计算中间结论的小程序",
+            "能根据执行结果修正原先的推理或计划"
+          ],
+          "similarity": 0.547908696407599
+        }
+      ],
+      [
+        {
+          "node_id": "E07",
+          "revision_id": "E07-r1",
+          "title": "Runtime Debugging",
+          "description": "依据运行信号定位 Agent 执行故障。",
+          "mastery_criteria": [
+            "能独立完成Runtime Debugging的核心目标与边界",
+            "能在具体场景中识别Runtime Debugging的正确用法与常见误用",
+            "能用可检查的示例证明对Runtime Debugging的掌握"
+          ],
+          "similarity": 0.838505625724792
+        },
+        {
+          "node_id": "EVO01",
+          "revision_id": "EVO01-r1",
+          "title": "Learning Signals from Runtime Trajectories",
+          "description": "从 Agent 的真实运行轨迹、成功失败结果和人工反馈中提取可用于后续改进的学习信号。",
+          "mastery_criteria": [
+            "能从一条运行轨迹中定位可复用的成功或失败信号",
+            "能区分原始日志与可用于更新的学习信号",
+            "能把一个失败案例转化为后续改进输入"
+          ],
+          "similarity": 0.670821348330819
+        },
+        {
+          "node_id": "E14",
+          "revision_id": "E14-r1",
+          "title": "Trajectory Evaluation",
+          "description": "评测计划、工具调用和中间步骤。",
+          "mastery_criteria": [
+            "能独立完成Trajectory Evaluation的核心目标与边界",
+            "能在具体场景中识别Trajectory Evaluation的正确用法与常见误用",
+            "能用可检查的示例证明对Trajectory Evaluation的掌握"
+          ],
+          "similarity": 0.555944161294227
+        },
+        {
+          "node_id": "T08",
+          "revision_id": "T08-r1",
+          "title": "Tool Retry",
+          "description": "对可恢复工具失败实施有界重试。",
+          "mastery_criteria": [
+            "能独立完成Tool Retry的核心目标与边界",
+            "能在具体场景中识别Tool Retry的正确用法与常见误用",
+            "能用可检查的示例证明对Tool Retry的掌握"
+          ],
+          "similarity": 0.549497100680895
+        },
+        {
+          "node_id": "RT14",
+          "revision_id": "RT14-r2",
+          "title": "Failure Recovery",
+          "description": "识别可恢复与不可恢复的运行失败，并通过重试、回退、恢复或安全终止使 Agent 从失败状态中受控继续。",
+          "mastery_criteria": [
+            "能区分暂时性失败与终止性失败",
+            "能为不同失败选择有界重试、回退、恢复或终止策略",
+            "能说明恢复执行时需要保留哪些状态并避免重复副作用"
+          ],
+          "similarity": 0.543884873390198
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "E07",
+          "EVO01",
+          "CODE01",
+          "E14",
+          "RT14"
+        ],
+        "value": {
+          "verdicts": {
+            "E07": {
+              "definitionScopePreserved": true,
+              "verdict": "supported",
+              "reason": "定义限定为“依据运行信号定位 Agent 执行故障”。第1行显示 run-r73 中 inventory_check 工具调用失败、日志含 NameError: available_stock is not defined、退出码1，随后沿该次轨迹定位到工具脚本第18行，将拼错变量改为已定义的 available_quantity，保留原输入重跑得到40件、退出码0，Agent 输出报告且任务完成；第2行明确用轨迹、错误日志与退出信号定位，区分运行时工具故障与任务规划，并给出不可仅改提示词掩盖错误、不可用静态检查替代运行修复的边界。本人执行且结果可复核，满足核心目标、边界、正确/误用识别与可检查示例，故 supported。"
+            },
+            "EVO01": {
+              "definitionScopePreserved": true,
+              "verdict": "partial",
+              "reason": "定义限定为从真实运行轨迹、成功失败结果和人工反馈中提取可用于后续改进的学习信号。第1行有真实失败/成功轨迹与退出信号，第2行由此得出“故障在 Agent 运行时工具执行而非任务规划”的诊断，可算失败信号；但原文未明确将该诊断抽取、保存或复用为后续改进的学习信号，也未涉及人工反馈，三项验收中的“区分原始日志与可用于更新的学习信号”和“把失败案例转化为后续改进输入”仅部分体现。至少一个失败信号定位属该能力，故 partial。"
+            },
+            "CODE01": {
+              "definitionScopePreserved": true,
+              "verdict": "partial",
+              "reason": "定义限定为 Coding Agent 在代码库中定位相关文件、检索上下文并以受控方式修改目标文件。第1行显示沿运行轨迹定位到工具脚本第18行，把 available_stock 改为已定义的 available_quantity，保留原输入重跑且其他输出未变，属于受控文件修改并避免无关改动；但原文没有说明搜索范围的选择和修改前局部上下文的系统收集，仅由运行轨迹和已定义变量支撑。至少一个正确子动作属该能力，故 partial。"
+            },
+            "E14": {
+              "definitionScopePreserved": true,
+              "verdict": "partial",
+              "reason": "定义限定为评测计划、工具调用和中间步骤。第2行根据轨迹确认故障在运行时工具执行而非任务规划，第1行观察工具调用失败/成功与任务完成，属于对计划和工具调用的局部评测；但原文未完整评测中间步骤，也未展示 Trajectory Evaluation 正确用法与常见误用的完整边界。至少一个子动作属该能力，故 partial。"
+            },
+            "RT14": {
+              "definitionScopePreserved": true,
+              "verdict": "partial",
+              "reason": "定义限定为识别可恢复与不可恢复的运行失败，并通过重试、回退、恢复或安全终止使 Agent 从失败状态中受控继续。第1行失败后修改已定位代码并保留原输入重跑，退出码0且任务完成，属于恢复性继续；但原文未区分暂时性/终止性失败，未说明选择有界重试、回退、恢复或终止的策略依据，也未说明恢复时状态保留和避免重复副作用的分析。至少一个恢复子动作属该能力，故 partial。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "llmCalls": 3,
+  "retrievalCount": 2
+}

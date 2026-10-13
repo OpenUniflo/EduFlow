@@ -1,0 +1,2419 @@
+[
+  {
+    "version": {
+      "id": "8cd78213-9ab5-4098-8725-4978e8b69b7a",
+      "source": "initial",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "route_id": "dfcbbeaa-fe62-47ce-9acc-9d9bdfd611ae",
+      "snapshot": {
+        "valid": true,
+        "titles": {
+          "A02": "LLM Agent Architecture",
+          "C03": "Agent State",
+          "E05": "Regression Test",
+          "E06": "Observability",
+          "E14": "Trajectory Evaluation",
+          "H02": "Workflow",
+          "K01": "Document Parsing",
+          "K04": "Working State",
+          "K05": "Long-term Memory",
+          "K12": "Chunking",
+          "K13": "Embedding",
+          "R10": "ReAct",
+          "S01": "Guardrail",
+          "S02": "Sandbox",
+          "S03": "Least Privilege",
+          "S08": "Service Deployment",
+          "T11": "Tool Interface",
+          "T12": "Function Calling",
+          "T14": "Tool Arguments",
+          "CU01": "Computer Use Action Space",
+          "CU02": "GUI Visual Grounding",
+          "CU03": "Computer Use Multimodal Perception",
+          "CU04": "Computer Use World Model",
+          "CU05": "Mobile Agent Ecosystem Constraints",
+          "MA03": "Tool",
+          "MA04": "Skill",
+          "MA06": "Model Context Protocol",
+          "MM01": "Speech Agent Interaction Timing",
+          "MM02": "Cascading Voice Pipeline",
+          "MM03": "End-to-End Omni Model",
+          "MM04": "Full-Duplex Interaction",
+          "MM05": "Real-Time Interaction and Deep-Thinking Timing",
+          "MM06": "Natural Speech Synthesis",
+          "RT01": "Agent Loop",
+          "RT06": "Audit Trail",
+          "RT14": "Failure Recovery",
+          "WF05": "Agentic Workflow",
+          "AGC01": "Observation and Action Spaces",
+          "AGC02": "Agent Harness",
+          "AGC03": "Agent Model Selection",
+          "CTX01": "LLM Message Context",
+          "CTX02": "Chat Template",
+          "CTX03": "KV Cache",
+          "CTX04": "Prompt Cache",
+          "CTX05": "Cache-Aware Context Architecture",
+          "CTX06": "System Prompt Design",
+          "CTX07": "Few-shot Example Design",
+          "CTX08": "Prompt Injection",
+          "CTX09": "Context Compression",
+          "CTX10": "Sub-Agent Context Isolation",
+          "EVO01": "Learning Signals from Runtime Trajectories",
+          "EVO02": "Experience-to-Knowledge Update",
+          "EVO03": "Experience-to-Instruction Update",
+          "EVO04": "Experience-to-Program Update",
+          "EVO05": "Experience-to-Parameter Update",
+          "EVO06": "Self-Improving Update Method",
+          "EVO07": "Continual Agent Evolution Loop",
+          "EVO08": "Sleep Learning",
+          "MAC01": "Shared Context and Collaboration Topology",
+          "MAC02": "When Multi-Agent Outperforms Single-Agent",
+          "MAC03": "Shared-Context Multi-Agent Collaboration",
+          "MAC04": "Non-Shared-Context Multi-Agent Collaboration",
+          "MAC05": "Filesystem as Agent Collaboration Medium",
+          "MAC06": "Inter-Agent Communication and Control",
+          "MAC07": "Shared Resource Concurrency Conflict",
+          "MAC08": "Multi-Agent Error Cascade",
+          "MAC09": "Multi-Agent Premature Termination and Loop Runaway",
+          "MAC10": "Understanding Debt and Cognitive Surrender",
+          "MAC11": "Agent Society and Long-Term Social Simulation",
+          "MEM01": "Memory Representation",
+          "MEM02": "Executable Code as Knowledge Representation",
+          "MEM03": "Memory Compression and Consolidation",
+          "MEM04": "Memory Privacy and Log Redaction",
+          "RAG01": "Dense Retrieval",
+          "RAG02": "Sparse Retrieval",
+          "RAG03": "Hybrid Retrieval",
+          "RAG04": "Structured Knowledge Indexing",
+          "RAG05": "Knowledge Update Mechanism",
+          "RAG06": "Agentic RAG",
+          "RAG07": "Context-Aware Retrieval",
+          "RAG08": "Multimodal Memory",
+          "ROB01": "Robot Hardware–Algorithm Division",
+          "CODE01": "Codebase Search and File Editing",
+          "CODE02": "Code as a Reasoning Tool",
+          "CODE03": "Code as Business Rule Constraint",
+          "CODE04": "Code as System Adapter",
+          "CODE05": "Generative UI",
+          "CODE06": "Agent Self-Bootstrap",
+          "EVAL01": "Agent Evaluation Metric System",
+          "EVAL02": "Pass@k",
+          "EVAL03": "Pass^k",
+          "EVAL04": "Safety, Robustness, and Trajectory Coverage Evaluation",
+          "EVAL05": "Human Sampling and Adversarial Review",
+          "EVAL06": "Automated Evaluation Environment",
+          "EVAL07": "Evaluation Dataset Design",
+          "EVAL08": "LLM-as-a-Judge",
+          "EVAL09": "Pairwise Comparison and Model Ranking",
+          "EVAL10": "Evaluation Statistical Significance",
+          "EVAL11": "Evaluation-Driven Model and Architecture Decisions",
+          "EVAL12": "Simulation Fidelity and Domain Randomization",
+          "TOOL01": "Tool Granularity Design",
+          "TOOL02": "Tool Generality Design",
+          "TOOL03": "Tool Description Design",
+          "TOOL04": "Event-Driven Asynchronous Agent",
+          "TOOL05": "Event Trigger and User Communication",
+          "TOOL06": "Virtual Identity",
+          "TOOL07": "Interruptible Agent Execution",
+          "TOOL08": "Progressive Tool Disclosure",
+          "TRAIN01": "Pretraining, SFT, and RL Framework",
+          "TRAIN02": "SFT Objective and Loss Masking",
+          "TRAIN03": "SFT vs RL Selection and Training Sequence",
+          "TRAIN04": "LoRA Parameter-Efficient Fine-Tuning",
+          "TRAIN05": "SFT Data Synthesis and Trainable Trajectories",
+          "TRAIN06": "Single-Turn RL Memory and Generalization",
+          "TRAIN07": "RL Rollout-to-Update Loop",
+          "TRAIN08": "RL Environment and Model-Simulated Environment",
+          "TRAIN09": "Training Task Distribution and Evaluation Isolation",
+          "TRAIN10": "Multi-Turn RL and Credit Assignment",
+          "CDS525-K020": "Distributional Word Representation",
+          "CDS525-K073": "Pretrained Language Model",
+          "CDS525-K078": "Pretrained LM Fine-Tuning"
+        },
+        "conflicts": [],
+        "orderedNodeIds": [
+          "A02",
+          "AGC01",
+          "R10",
+          "AGC02",
+          "AGC03",
+          "H02",
+          "WF05",
+          "S01",
+          "S02",
+          "S03",
+          "CTX01",
+          "RT01",
+          "CTX02",
+          "CTX03",
+          "CTX04",
+          "CTX05",
+          "CTX06",
+          "CTX07",
+          "CTX08",
+          "MA04",
+          "C03",
+          "RT06",
+          "CTX09",
+          "CTX10",
+          "K04",
+          "K05",
+          "MEM01",
+          "MEM02",
+          "MEM03",
+          "MEM04",
+          "K01",
+          "K12",
+          "CDS525-K020",
+          "K13",
+          "RAG01",
+          "RAG02",
+          "RAG03",
+          "RAG04",
+          "RAG05",
+          "T11",
+          "RAG06",
+          "RAG07",
+          "RAG08",
+          "MA03",
+          "T12",
+          "TOOL01",
+          "TOOL02",
+          "TOOL03",
+          "T14",
+          "MA06",
+          "TOOL04",
+          "TOOL05",
+          "TOOL06",
+          "TOOL07",
+          "TOOL08",
+          "RT14",
+          "CODE01",
+          "CODE02",
+          "CODE03",
+          "CODE04",
+          "CODE05",
+          "CODE06",
+          "EVAL01",
+          "EVAL02",
+          "EVAL03",
+          "E14",
+          "EVAL04",
+          "EVAL05",
+          "EVAL06",
+          "EVAL07",
+          "EVAL08",
+          "E05",
+          "EVAL09",
+          "EVAL10",
+          "EVAL11",
+          "E06",
+          "EVAL12",
+          "TRAIN01",
+          "TRAIN02",
+          "TRAIN03",
+          "CDS525-K073",
+          "CDS525-K078",
+          "TRAIN04",
+          "TRAIN05",
+          "TRAIN06",
+          "TRAIN07",
+          "TRAIN08",
+          "TRAIN09",
+          "TRAIN10",
+          "EVO01",
+          "EVO02",
+          "EVO03",
+          "EVO04",
+          "EVO05",
+          "EVO06",
+          "EVO07",
+          "S08",
+          "EVO08",
+          "MM01",
+          "MM02",
+          "MM03",
+          "MM04",
+          "MM05",
+          "MM06",
+          "CU01",
+          "CU02",
+          "CU03",
+          "CU04",
+          "CU05",
+          "ROB01",
+          "MAC01",
+          "MAC02",
+          "MAC03",
+          "MAC04",
+          "MAC05",
+          "MAC06",
+          "MAC07",
+          "MAC08",
+          "MAC09",
+          "MAC10",
+          "MAC11"
+        ],
+        "selectedNodeIds": [
+          "A02",
+          "AGC01",
+          "AGC02",
+          "AGC03",
+          "C03",
+          "CDS525-K020",
+          "CDS525-K073",
+          "CDS525-K078",
+          "CODE01",
+          "CODE02",
+          "CODE03",
+          "CODE04",
+          "CODE05",
+          "CODE06",
+          "CTX01",
+          "CTX02",
+          "CTX03",
+          "CTX04",
+          "CTX05",
+          "CTX06",
+          "CTX07",
+          "CTX08",
+          "CTX09",
+          "CTX10",
+          "CU01",
+          "CU02",
+          "CU03",
+          "CU04",
+          "CU05",
+          "E05",
+          "E06",
+          "E14",
+          "EVAL01",
+          "EVAL02",
+          "EVAL03",
+          "EVAL04",
+          "EVAL05",
+          "EVAL06",
+          "EVAL07",
+          "EVAL08",
+          "EVAL09",
+          "EVAL10",
+          "EVAL11",
+          "EVAL12",
+          "EVO01",
+          "EVO02",
+          "EVO03",
+          "EVO04",
+          "EVO05",
+          "EVO06",
+          "EVO07",
+          "EVO08",
+          "H02",
+          "K01",
+          "K04",
+          "K05",
+          "K12",
+          "K13",
+          "MA03",
+          "MA04",
+          "MA06",
+          "MAC01",
+          "MAC02",
+          "MAC03",
+          "MAC04",
+          "MAC05",
+          "MAC06",
+          "MAC07",
+          "MAC08",
+          "MAC09",
+          "MAC10",
+          "MAC11",
+          "MEM01",
+          "MEM02",
+          "MEM03",
+          "MEM04",
+          "MM01",
+          "MM02",
+          "MM03",
+          "MM04",
+          "MM05",
+          "MM06",
+          "R10",
+          "RAG01",
+          "RAG02",
+          "RAG03",
+          "RAG04",
+          "RAG05",
+          "RAG06",
+          "RAG07",
+          "RAG08",
+          "ROB01",
+          "RT01",
+          "RT06",
+          "RT14",
+          "S01",
+          "S02",
+          "S03",
+          "S08",
+          "T11",
+          "T12",
+          "T14",
+          "TOOL01",
+          "TOOL02",
+          "TOOL03",
+          "TOOL04",
+          "TOOL05",
+          "TOOL06",
+          "TOOL07",
+          "TOOL08",
+          "TRAIN01",
+          "TRAIN02",
+          "TRAIN03",
+          "TRAIN04",
+          "TRAIN05",
+          "TRAIN06",
+          "TRAIN07",
+          "TRAIN08",
+          "TRAIN09",
+          "TRAIN10",
+          "WF05"
+        ],
+        "prerequisiteEdges": [
+          {
+            "id": "book-gold-v1-prerequisite-a02-agc01",
+            "source": "A02",
+            "target": "AGC01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-agc03",
+            "source": "A02",
+            "target": "AGC03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-code01",
+            "source": "A02",
+            "target": "CODE01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-code02",
+            "source": "A02",
+            "target": "CODE02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-code03",
+            "source": "A02",
+            "target": "CODE03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-code04",
+            "source": "A02",
+            "target": "CODE04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-ctx01",
+            "source": "A02",
+            "target": "CTX01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-eval01",
+            "source": "A02",
+            "target": "EVAL01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-agc01-cu01",
+            "source": "AGC01",
+            "target": "CU01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-agc01-cu04",
+            "source": "AGC01",
+            "target": "CU04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-agc01-mm01",
+            "source": "AGC01",
+            "target": "MM01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-agc01-r10",
+            "source": "AGC01",
+            "target": "R10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-agc01-rob01",
+            "source": "AGC01",
+            "target": "ROB01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-code02-code06",
+            "source": "CODE02",
+            "target": "CODE06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-code04-code05",
+            "source": "CODE04",
+            "target": "CODE05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-code04-code06",
+            "source": "CODE04",
+            "target": "CODE06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx01-ctx02",
+            "source": "CTX01",
+            "target": "CTX02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx01-ctx06",
+            "source": "CTX01",
+            "target": "CTX06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx01-ctx08",
+            "source": "CTX01",
+            "target": "CTX08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx01-ctx09",
+            "source": "CTX01",
+            "target": "CTX09",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx01-rag07",
+            "source": "CTX01",
+            "target": "RAG07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx02-ctx03",
+            "source": "CTX02",
+            "target": "CTX03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx03-ctx04",
+            "source": "CTX03",
+            "target": "CTX04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx03-ctx05",
+            "source": "CTX03",
+            "target": "CTX05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx04-ctx05",
+            "source": "CTX04",
+            "target": "CTX05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx06-ctx07",
+            "source": "CTX06",
+            "target": "CTX07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx09-ctx10",
+            "source": "CTX09",
+            "target": "CTX10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-cu01-cu02",
+            "source": "CU01",
+            "target": "CU02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-cu01-cu05",
+            "source": "CU01",
+            "target": "CU05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-cu02-cu03",
+            "source": "CU02",
+            "target": "CU03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-cu03-cu04",
+            "source": "CU03",
+            "target": "CU04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-e14-eval04",
+            "source": "E14",
+            "target": "EVAL04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-e14-evo01",
+            "source": "E14",
+            "target": "EVO01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval02",
+            "source": "EVAL01",
+            "target": "EVAL02",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval03",
+            "source": "EVAL01",
+            "target": "EVAL03",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval04",
+            "source": "EVAL01",
+            "target": "EVAL04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval05",
+            "source": "EVAL01",
+            "target": "EVAL05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval06",
+            "source": "EVAL01",
+            "target": "EVAL06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval07",
+            "source": "EVAL01",
+            "target": "EVAL07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval11",
+            "source": "EVAL01",
+            "target": "EVAL11",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval06-eval08",
+            "source": "EVAL06",
+            "target": "EVAL08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval06-eval12",
+            "source": "EVAL06",
+            "target": "EVAL12",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval07-eval08",
+            "source": "EVAL07",
+            "target": "EVAL08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval07-eval10",
+            "source": "EVAL07",
+            "target": "EVAL10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval08-eval09",
+            "source": "EVAL08",
+            "target": "EVAL09",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval10-eval11",
+            "source": "EVAL10",
+            "target": "EVAL11",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval11-evo07",
+            "source": "EVAL11",
+            "target": "EVO07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval12-train08",
+            "source": "EVAL12",
+            "target": "TRAIN08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo01-evo02",
+            "source": "EVO01",
+            "target": "EVO02",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo01-evo03",
+            "source": "EVO01",
+            "target": "EVO03",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo01-evo04",
+            "source": "EVO01",
+            "target": "EVO04",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo01-evo05",
+            "source": "EVO01",
+            "target": "EVO05",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo01-evo07",
+            "source": "EVO01",
+            "target": "EVO07",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo07-evo08",
+            "source": "EVO07",
+            "target": "EVO08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-k01-rag04",
+            "source": "K01",
+            "target": "RAG04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-k05-mem01",
+            "source": "K05",
+            "target": "MEM01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-k05-mem03",
+            "source": "K05",
+            "target": "MEM03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-k05-rag08",
+            "source": "K05",
+            "target": "RAG08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-k13-rag01",
+            "source": "K13",
+            "target": "RAG01",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ma03-tool01",
+            "source": "MA03",
+            "target": "TOOL01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ma03-tool02",
+            "source": "MA03",
+            "target": "TOOL02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ma04-tool08",
+            "source": "MA04",
+            "target": "TOOL08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac01-mac02",
+            "source": "MAC01",
+            "target": "MAC02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac01-mac03",
+            "source": "MAC01",
+            "target": "MAC03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac01-mac04",
+            "source": "MAC01",
+            "target": "MAC04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac03-mac07",
+            "source": "MAC03",
+            "target": "MAC07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac03-mac08",
+            "source": "MAC03",
+            "target": "MAC08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac03-mac09",
+            "source": "MAC03",
+            "target": "MAC09",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac03-mac10",
+            "source": "MAC03",
+            "target": "MAC10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac03-mac11",
+            "source": "MAC03",
+            "target": "MAC11",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac05",
+            "source": "MAC04",
+            "target": "MAC05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac06",
+            "source": "MAC04",
+            "target": "MAC06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac08",
+            "source": "MAC04",
+            "target": "MAC08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac09",
+            "source": "MAC04",
+            "target": "MAC09",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac10",
+            "source": "MAC04",
+            "target": "MAC10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac11",
+            "source": "MAC04",
+            "target": "MAC11",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mem01-mem02",
+            "source": "MEM01",
+            "target": "MEM02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mem01-mem04",
+            "source": "MEM01",
+            "target": "MEM04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mem03-evo08",
+            "source": "MEM03",
+            "target": "EVO08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mm01-mm02",
+            "source": "MM01",
+            "target": "MM02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mm01-mm03",
+            "source": "MM01",
+            "target": "MM03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mm01-mm04",
+            "source": "MM01",
+            "target": "MM04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mm01-mm06",
+            "source": "MM01",
+            "target": "MM06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mm04-mm05",
+            "source": "MM04",
+            "target": "MM05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-r10-agc02",
+            "source": "R10",
+            "target": "AGC02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag01-rag03",
+            "source": "RAG01",
+            "target": "RAG03",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag02-rag03",
+            "source": "RAG02",
+            "target": "RAG03",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag03-rag06",
+            "source": "RAG03",
+            "target": "RAG06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag03-rag07",
+            "source": "RAG03",
+            "target": "RAG07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag04-rag05",
+            "source": "RAG04",
+            "target": "RAG05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag04-rag08",
+            "source": "RAG04",
+            "target": "RAG08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rt01-tool04",
+            "source": "RT01",
+            "target": "TOOL04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-s01-eval04",
+            "source": "S01",
+            "target": "EVAL04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-t11-rag06",
+            "source": "T11",
+            "target": "RAG06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-t11-tool03",
+            "source": "T11",
+            "target": "TOOL03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-t11-tool08",
+            "source": "T11",
+            "target": "TOOL08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-tool04-tool05",
+            "source": "TOOL04",
+            "target": "TOOL05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-tool04-tool07",
+            "source": "TOOL04",
+            "target": "TOOL07",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train01-train02",
+            "source": "TRAIN01",
+            "target": "TRAIN02",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train01-train03",
+            "source": "TRAIN01",
+            "target": "TRAIN03",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train01-train06",
+            "source": "TRAIN01",
+            "target": "TRAIN06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train01-train07",
+            "source": "TRAIN01",
+            "target": "TRAIN07",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train02-train04",
+            "source": "TRAIN02",
+            "target": "TRAIN04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train02-train05",
+            "source": "TRAIN02",
+            "target": "TRAIN05",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train07-train08",
+            "source": "TRAIN07",
+            "target": "TRAIN08",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train07-train10",
+            "source": "TRAIN07",
+            "target": "TRAIN10",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train08-train09",
+            "source": "TRAIN08",
+            "target": "TRAIN09",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train08-train10",
+            "source": "TRAIN08",
+            "target": "TRAIN10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-wf05-mac01",
+            "source": "WF05",
+            "target": "MAC01",
+            "strength": "soft"
+          },
+          {
+            "id": "cds525-kg-v1-020",
+            "source": "CDS525-K020",
+            "target": "K13",
+            "strength": "hard"
+          },
+          {
+            "id": "cds525-kg-v1-091",
+            "source": "CDS525-K073",
+            "target": "CDS525-K078",
+            "strength": "hard"
+          },
+          {
+            "id": "cds525-kg-v1-101",
+            "source": "CDS525-K078",
+            "target": "TRAIN04",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-k01-k12",
+            "source": "K01",
+            "target": "K12",
+            "strength": "hard"
+          }
+        ],
+        "bridgeKnowledgeIds": [
+          "K01",
+          "CDS525-K020",
+          "CDS525-K073",
+          "CDS525-K078"
+        ],
+        "currentKnowledgeIds": [
+          "A02",
+          "AGC01",
+          "R10",
+          "AGC03",
+          "H02"
+        ],
+        "effectiveTargetNodeIds": [
+          "A02",
+          "AGC01",
+          "AGC02",
+          "AGC03",
+          "C03",
+          "CODE01",
+          "CODE02",
+          "CODE03",
+          "CODE04",
+          "CODE05",
+          "CODE06",
+          "CTX01",
+          "CTX02",
+          "CTX03",
+          "CTX04",
+          "CTX05",
+          "CTX06",
+          "CTX07",
+          "CTX08",
+          "CTX09",
+          "CTX10",
+          "CU01",
+          "CU02",
+          "CU03",
+          "CU04",
+          "CU05",
+          "E05",
+          "E06",
+          "E14",
+          "EVAL01",
+          "EVAL02",
+          "EVAL03",
+          "EVAL04",
+          "EVAL05",
+          "EVAL06",
+          "EVAL07",
+          "EVAL08",
+          "EVAL09",
+          "EVAL10",
+          "EVAL11",
+          "EVAL12",
+          "EVO01",
+          "EVO02",
+          "EVO03",
+          "EVO04",
+          "EVO05",
+          "EVO06",
+          "EVO07",
+          "EVO08",
+          "H02",
+          "K04",
+          "K05",
+          "K12",
+          "K13",
+          "MA03",
+          "MA04",
+          "MA06",
+          "MAC01",
+          "MAC02",
+          "MAC03",
+          "MAC04",
+          "MAC05",
+          "MAC06",
+          "MAC07",
+          "MAC08",
+          "MAC09",
+          "MAC10",
+          "MAC11",
+          "MEM01",
+          "MEM02",
+          "MEM03",
+          "MEM04",
+          "MM01",
+          "MM02",
+          "MM03",
+          "MM04",
+          "MM05",
+          "MM06",
+          "R10",
+          "RAG01",
+          "RAG02",
+          "RAG03",
+          "RAG04",
+          "RAG05",
+          "RAG06",
+          "RAG07",
+          "RAG08",
+          "ROB01",
+          "RT01",
+          "RT06",
+          "RT14",
+          "S01",
+          "S02",
+          "S03",
+          "S08",
+          "T11",
+          "T12",
+          "T14",
+          "TOOL01",
+          "TOOL02",
+          "TOOL03",
+          "TOOL04",
+          "TOOL05",
+          "TOOL06",
+          "TOOL07",
+          "TOOL08",
+          "TRAIN01",
+          "TRAIN02",
+          "TRAIN03",
+          "TRAIN04",
+          "TRAIN05",
+          "TRAIN06",
+          "TRAIN07",
+          "TRAIN08",
+          "TRAIN09",
+          "TRAIN10",
+          "WF05"
+        ]
+      },
+      "course_id": "ai-agents-in-depth",
+      "created_at": "2026-10-02T06:40:35.960937+00:00",
+      "version_number": 1,
+      "exclude_node_ids": [],
+      "include_node_ids": [],
+      "parent_version_id": null,
+      "structure_fingerprint": "815d5a11a6c5fab120c1e8eae79c9587bf7585f68e5bea528c6a631494e00e48",
+      "restored_from_version_id": null
+    }
+  },
+  {
+    "version": {
+      "id": "19c8c417-fa45-46a7-8607-3be55970ca20",
+      "source": "adjustment",
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "route_id": "dfcbbeaa-fe62-47ce-9acc-9d9bdfd611ae",
+      "snapshot": {
+        "valid": true,
+        "titles": {
+          "A01": "Classical Agent Architecture",
+          "A02": "LLM Agent Architecture",
+          "C03": "Agent State",
+          "E05": "Regression Test",
+          "E06": "Observability",
+          "E14": "Trajectory Evaluation",
+          "H02": "Workflow",
+          "K01": "Document Parsing",
+          "K04": "Working State",
+          "K05": "Long-term Memory",
+          "K12": "Chunking",
+          "K13": "Embedding",
+          "P01": "Task Environment",
+          "R10": "ReAct",
+          "S01": "Guardrail",
+          "S02": "Sandbox",
+          "S03": "Least Privilege",
+          "S08": "Service Deployment",
+          "T11": "Tool Interface",
+          "T12": "Function Calling",
+          "T14": "Tool Arguments",
+          "CU01": "Computer Use Action Space",
+          "CU02": "GUI Visual Grounding",
+          "CU03": "Computer Use Multimodal Perception",
+          "CU04": "Computer Use World Model",
+          "CU05": "Mobile Agent Ecosystem Constraints",
+          "MA03": "Tool",
+          "MA04": "Skill",
+          "MA06": "Model Context Protocol",
+          "MM01": "Speech Agent Interaction Timing",
+          "MM02": "Cascading Voice Pipeline",
+          "MM03": "End-to-End Omni Model",
+          "MM04": "Full-Duplex Interaction",
+          "MM05": "Real-Time Interaction and Deep-Thinking Timing",
+          "MM06": "Natural Speech Synthesis",
+          "RT01": "Agent Loop",
+          "RT06": "Audit Trail",
+          "RT14": "Failure Recovery",
+          "WF05": "Agentic Workflow",
+          "AGC01": "Observation and Action Spaces",
+          "AGC02": "Agent Harness",
+          "AGC03": "Agent Model Selection",
+          "CTX01": "LLM Message Context",
+          "CTX02": "Chat Template",
+          "CTX03": "KV Cache",
+          "CTX04": "Prompt Cache",
+          "CTX05": "Cache-Aware Context Architecture",
+          "CTX06": "System Prompt Design",
+          "CTX07": "Few-shot Example Design",
+          "CTX08": "Prompt Injection",
+          "CTX09": "Context Compression",
+          "CTX10": "Sub-Agent Context Isolation",
+          "EVO01": "Learning Signals from Runtime Trajectories",
+          "EVO02": "Experience-to-Knowledge Update",
+          "EVO03": "Experience-to-Instruction Update",
+          "EVO04": "Experience-to-Program Update",
+          "EVO05": "Experience-to-Parameter Update",
+          "EVO06": "Self-Improving Update Method",
+          "EVO07": "Continual Agent Evolution Loop",
+          "EVO08": "Sleep Learning",
+          "MAC01": "Shared Context and Collaboration Topology",
+          "MAC02": "When Multi-Agent Outperforms Single-Agent",
+          "MAC03": "Shared-Context Multi-Agent Collaboration",
+          "MAC04": "Non-Shared-Context Multi-Agent Collaboration",
+          "MAC05": "Filesystem as Agent Collaboration Medium",
+          "MAC06": "Inter-Agent Communication and Control",
+          "MAC07": "Shared Resource Concurrency Conflict",
+          "MAC08": "Multi-Agent Error Cascade",
+          "MAC09": "Multi-Agent Premature Termination and Loop Runaway",
+          "MAC10": "Understanding Debt and Cognitive Surrender",
+          "MAC11": "Agent Society and Long-Term Social Simulation",
+          "MEM01": "Memory Representation",
+          "MEM02": "Executable Code as Knowledge Representation",
+          "MEM03": "Memory Compression and Consolidation",
+          "MEM04": "Memory Privacy and Log Redaction",
+          "RAG01": "Dense Retrieval",
+          "RAG02": "Sparse Retrieval",
+          "RAG03": "Hybrid Retrieval",
+          "RAG04": "Structured Knowledge Indexing",
+          "RAG05": "Knowledge Update Mechanism",
+          "RAG06": "Agentic RAG",
+          "RAG07": "Context-Aware Retrieval",
+          "RAG08": "Multimodal Memory",
+          "ROB01": "Robot Hardware–Algorithm Division",
+          "CODE01": "Codebase Search and File Editing",
+          "CODE02": "Code as a Reasoning Tool",
+          "CODE03": "Code as Business Rule Constraint",
+          "CODE04": "Code as System Adapter",
+          "CODE05": "Generative UI",
+          "CODE06": "Agent Self-Bootstrap",
+          "EVAL01": "Agent Evaluation Metric System",
+          "EVAL02": "Pass@k",
+          "EVAL03": "Pass^k",
+          "EVAL04": "Safety, Robustness, and Trajectory Coverage Evaluation",
+          "EVAL05": "Human Sampling and Adversarial Review",
+          "EVAL06": "Automated Evaluation Environment",
+          "EVAL07": "Evaluation Dataset Design",
+          "EVAL08": "LLM-as-a-Judge",
+          "EVAL09": "Pairwise Comparison and Model Ranking",
+          "EVAL10": "Evaluation Statistical Significance",
+          "EVAL11": "Evaluation-Driven Model and Architecture Decisions",
+          "EVAL12": "Simulation Fidelity and Domain Randomization",
+          "TOOL01": "Tool Granularity Design",
+          "TOOL02": "Tool Generality Design",
+          "TOOL03": "Tool Description Design",
+          "TOOL04": "Event-Driven Asynchronous Agent",
+          "TOOL05": "Event Trigger and User Communication",
+          "TOOL06": "Virtual Identity",
+          "TOOL07": "Interruptible Agent Execution",
+          "TOOL08": "Progressive Tool Disclosure",
+          "TRAIN01": "Pretraining, SFT, and RL Framework",
+          "TRAIN02": "SFT Objective and Loss Masking",
+          "TRAIN03": "SFT vs RL Selection and Training Sequence",
+          "TRAIN04": "LoRA Parameter-Efficient Fine-Tuning",
+          "TRAIN05": "SFT Data Synthesis and Trainable Trajectories",
+          "TRAIN06": "Single-Turn RL Memory and Generalization",
+          "TRAIN07": "RL Rollout-to-Update Loop",
+          "TRAIN08": "RL Environment and Model-Simulated Environment",
+          "TRAIN09": "Training Task Distribution and Evaluation Isolation",
+          "TRAIN10": "Multi-Turn RL and Credit Assignment",
+          "CDS525-K020": "Distributional Word Representation",
+          "CDS525-K073": "Pretrained Language Model",
+          "CDS525-K078": "Pretrained LM Fine-Tuning"
+        },
+        "conflicts": [],
+        "orderedNodeIds": [
+          "A01",
+          "A02",
+          "AGC01",
+          "R10",
+          "AGC02",
+          "AGC03",
+          "H02",
+          "WF05",
+          "S01",
+          "S02",
+          "S03",
+          "CTX01",
+          "RT01",
+          "CTX02",
+          "CTX03",
+          "CTX04",
+          "CTX05",
+          "CTX06",
+          "CTX07",
+          "CTX08",
+          "MA04",
+          "C03",
+          "RT06",
+          "CTX09",
+          "CTX10",
+          "K04",
+          "K05",
+          "MEM01",
+          "MEM02",
+          "MEM03",
+          "MEM04",
+          "K01",
+          "K12",
+          "CDS525-K020",
+          "K13",
+          "RAG01",
+          "RAG02",
+          "RAG03",
+          "RAG04",
+          "RAG05",
+          "T11",
+          "RAG06",
+          "RAG07",
+          "RAG08",
+          "MA03",
+          "T12",
+          "TOOL01",
+          "TOOL02",
+          "TOOL03",
+          "T14",
+          "MA06",
+          "TOOL04",
+          "TOOL05",
+          "TOOL06",
+          "TOOL07",
+          "TOOL08",
+          "RT14",
+          "CODE01",
+          "CODE02",
+          "CODE03",
+          "CODE04",
+          "CODE05",
+          "CODE06",
+          "EVAL01",
+          "EVAL02",
+          "EVAL03",
+          "E14",
+          "EVAL04",
+          "EVAL05",
+          "EVAL06",
+          "EVAL07",
+          "EVAL08",
+          "E05",
+          "EVAL09",
+          "EVAL10",
+          "EVAL11",
+          "E06",
+          "EVAL12",
+          "TRAIN01",
+          "TRAIN02",
+          "TRAIN03",
+          "CDS525-K073",
+          "CDS525-K078",
+          "TRAIN04",
+          "TRAIN05",
+          "TRAIN06",
+          "TRAIN07",
+          "TRAIN08",
+          "TRAIN09",
+          "TRAIN10",
+          "EVO01",
+          "EVO02",
+          "EVO03",
+          "EVO04",
+          "EVO05",
+          "EVO06",
+          "EVO07",
+          "S08",
+          "EVO08",
+          "MM01",
+          "MM02",
+          "MM03",
+          "MM04",
+          "MM05",
+          "MM06",
+          "CU01",
+          "CU02",
+          "CU03",
+          "CU04",
+          "CU05",
+          "ROB01",
+          "MAC01",
+          "MAC02",
+          "MAC03",
+          "MAC04",
+          "MAC05",
+          "MAC06",
+          "MAC07",
+          "MAC08",
+          "MAC09",
+          "MAC10",
+          "MAC11"
+        ],
+        "selectedNodeIds": [
+          "A01",
+          "A02",
+          "AGC01",
+          "AGC02",
+          "AGC03",
+          "C03",
+          "CDS525-K020",
+          "CDS525-K073",
+          "CDS525-K078",
+          "CODE01",
+          "CODE02",
+          "CODE03",
+          "CODE04",
+          "CODE05",
+          "CODE06",
+          "CTX01",
+          "CTX02",
+          "CTX03",
+          "CTX04",
+          "CTX05",
+          "CTX06",
+          "CTX07",
+          "CTX08",
+          "CTX09",
+          "CTX10",
+          "CU01",
+          "CU02",
+          "CU03",
+          "CU04",
+          "CU05",
+          "E05",
+          "E06",
+          "E14",
+          "EVAL01",
+          "EVAL02",
+          "EVAL03",
+          "EVAL04",
+          "EVAL05",
+          "EVAL06",
+          "EVAL07",
+          "EVAL08",
+          "EVAL09",
+          "EVAL10",
+          "EVAL11",
+          "EVAL12",
+          "EVO01",
+          "EVO02",
+          "EVO03",
+          "EVO04",
+          "EVO05",
+          "EVO06",
+          "EVO07",
+          "EVO08",
+          "H02",
+          "K01",
+          "K04",
+          "K05",
+          "K12",
+          "K13",
+          "MA03",
+          "MA04",
+          "MA06",
+          "MAC01",
+          "MAC02",
+          "MAC03",
+          "MAC04",
+          "MAC05",
+          "MAC06",
+          "MAC07",
+          "MAC08",
+          "MAC09",
+          "MAC10",
+          "MAC11",
+          "MEM01",
+          "MEM02",
+          "MEM03",
+          "MEM04",
+          "MM01",
+          "MM02",
+          "MM03",
+          "MM04",
+          "MM05",
+          "MM06",
+          "R10",
+          "RAG01",
+          "RAG02",
+          "RAG03",
+          "RAG04",
+          "RAG05",
+          "RAG06",
+          "RAG07",
+          "RAG08",
+          "ROB01",
+          "RT01",
+          "RT06",
+          "RT14",
+          "S01",
+          "S02",
+          "S03",
+          "S08",
+          "T11",
+          "T12",
+          "T14",
+          "TOOL01",
+          "TOOL02",
+          "TOOL03",
+          "TOOL04",
+          "TOOL05",
+          "TOOL06",
+          "TOOL07",
+          "TOOL08",
+          "TRAIN01",
+          "TRAIN02",
+          "TRAIN03",
+          "TRAIN04",
+          "TRAIN05",
+          "TRAIN06",
+          "TRAIN07",
+          "TRAIN08",
+          "TRAIN09",
+          "TRAIN10",
+          "WF05"
+        ],
+        "prerequisiteEdges": [
+          {
+            "id": "book-gold-v1-prerequisite-a02-agc01",
+            "source": "A02",
+            "target": "AGC01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-agc03",
+            "source": "A02",
+            "target": "AGC03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-code01",
+            "source": "A02",
+            "target": "CODE01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-code02",
+            "source": "A02",
+            "target": "CODE02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-code03",
+            "source": "A02",
+            "target": "CODE03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-code04",
+            "source": "A02",
+            "target": "CODE04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-ctx01",
+            "source": "A02",
+            "target": "CTX01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-a02-eval01",
+            "source": "A02",
+            "target": "EVAL01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-agc01-cu01",
+            "source": "AGC01",
+            "target": "CU01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-agc01-cu04",
+            "source": "AGC01",
+            "target": "CU04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-agc01-mm01",
+            "source": "AGC01",
+            "target": "MM01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-agc01-r10",
+            "source": "AGC01",
+            "target": "R10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-agc01-rob01",
+            "source": "AGC01",
+            "target": "ROB01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-code02-code06",
+            "source": "CODE02",
+            "target": "CODE06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-code04-code05",
+            "source": "CODE04",
+            "target": "CODE05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-code04-code06",
+            "source": "CODE04",
+            "target": "CODE06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx01-ctx02",
+            "source": "CTX01",
+            "target": "CTX02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx01-ctx06",
+            "source": "CTX01",
+            "target": "CTX06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx01-ctx08",
+            "source": "CTX01",
+            "target": "CTX08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx01-ctx09",
+            "source": "CTX01",
+            "target": "CTX09",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx01-rag07",
+            "source": "CTX01",
+            "target": "RAG07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx02-ctx03",
+            "source": "CTX02",
+            "target": "CTX03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx03-ctx04",
+            "source": "CTX03",
+            "target": "CTX04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx03-ctx05",
+            "source": "CTX03",
+            "target": "CTX05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx04-ctx05",
+            "source": "CTX04",
+            "target": "CTX05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx06-ctx07",
+            "source": "CTX06",
+            "target": "CTX07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ctx09-ctx10",
+            "source": "CTX09",
+            "target": "CTX10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-cu01-cu02",
+            "source": "CU01",
+            "target": "CU02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-cu01-cu05",
+            "source": "CU01",
+            "target": "CU05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-cu02-cu03",
+            "source": "CU02",
+            "target": "CU03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-cu03-cu04",
+            "source": "CU03",
+            "target": "CU04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-e14-eval04",
+            "source": "E14",
+            "target": "EVAL04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-e14-evo01",
+            "source": "E14",
+            "target": "EVO01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval02",
+            "source": "EVAL01",
+            "target": "EVAL02",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval03",
+            "source": "EVAL01",
+            "target": "EVAL03",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval04",
+            "source": "EVAL01",
+            "target": "EVAL04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval05",
+            "source": "EVAL01",
+            "target": "EVAL05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval06",
+            "source": "EVAL01",
+            "target": "EVAL06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval07",
+            "source": "EVAL01",
+            "target": "EVAL07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval01-eval11",
+            "source": "EVAL01",
+            "target": "EVAL11",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval06-eval08",
+            "source": "EVAL06",
+            "target": "EVAL08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval06-eval12",
+            "source": "EVAL06",
+            "target": "EVAL12",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval07-eval08",
+            "source": "EVAL07",
+            "target": "EVAL08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval07-eval10",
+            "source": "EVAL07",
+            "target": "EVAL10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval08-eval09",
+            "source": "EVAL08",
+            "target": "EVAL09",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval10-eval11",
+            "source": "EVAL10",
+            "target": "EVAL11",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval11-evo07",
+            "source": "EVAL11",
+            "target": "EVO07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-eval12-train08",
+            "source": "EVAL12",
+            "target": "TRAIN08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo01-evo02",
+            "source": "EVO01",
+            "target": "EVO02",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo01-evo03",
+            "source": "EVO01",
+            "target": "EVO03",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo01-evo04",
+            "source": "EVO01",
+            "target": "EVO04",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo01-evo05",
+            "source": "EVO01",
+            "target": "EVO05",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo01-evo07",
+            "source": "EVO01",
+            "target": "EVO07",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-evo07-evo08",
+            "source": "EVO07",
+            "target": "EVO08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-k01-rag04",
+            "source": "K01",
+            "target": "RAG04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-k05-mem01",
+            "source": "K05",
+            "target": "MEM01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-k05-mem03",
+            "source": "K05",
+            "target": "MEM03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-k05-rag08",
+            "source": "K05",
+            "target": "RAG08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-k13-rag01",
+            "source": "K13",
+            "target": "RAG01",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ma03-tool01",
+            "source": "MA03",
+            "target": "TOOL01",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ma03-tool02",
+            "source": "MA03",
+            "target": "TOOL02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-ma04-tool08",
+            "source": "MA04",
+            "target": "TOOL08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac01-mac02",
+            "source": "MAC01",
+            "target": "MAC02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac01-mac03",
+            "source": "MAC01",
+            "target": "MAC03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac01-mac04",
+            "source": "MAC01",
+            "target": "MAC04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac03-mac07",
+            "source": "MAC03",
+            "target": "MAC07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac03-mac08",
+            "source": "MAC03",
+            "target": "MAC08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac03-mac09",
+            "source": "MAC03",
+            "target": "MAC09",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac03-mac10",
+            "source": "MAC03",
+            "target": "MAC10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac03-mac11",
+            "source": "MAC03",
+            "target": "MAC11",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac05",
+            "source": "MAC04",
+            "target": "MAC05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac06",
+            "source": "MAC04",
+            "target": "MAC06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac08",
+            "source": "MAC04",
+            "target": "MAC08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac09",
+            "source": "MAC04",
+            "target": "MAC09",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac10",
+            "source": "MAC04",
+            "target": "MAC10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mac04-mac11",
+            "source": "MAC04",
+            "target": "MAC11",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mem01-mem02",
+            "source": "MEM01",
+            "target": "MEM02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mem01-mem04",
+            "source": "MEM01",
+            "target": "MEM04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mem03-evo08",
+            "source": "MEM03",
+            "target": "EVO08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mm01-mm02",
+            "source": "MM01",
+            "target": "MM02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mm01-mm03",
+            "source": "MM01",
+            "target": "MM03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mm01-mm04",
+            "source": "MM01",
+            "target": "MM04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mm01-mm06",
+            "source": "MM01",
+            "target": "MM06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-mm04-mm05",
+            "source": "MM04",
+            "target": "MM05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-r10-agc02",
+            "source": "R10",
+            "target": "AGC02",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag01-rag03",
+            "source": "RAG01",
+            "target": "RAG03",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag02-rag03",
+            "source": "RAG02",
+            "target": "RAG03",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag03-rag06",
+            "source": "RAG03",
+            "target": "RAG06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag03-rag07",
+            "source": "RAG03",
+            "target": "RAG07",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag04-rag05",
+            "source": "RAG04",
+            "target": "RAG05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rag04-rag08",
+            "source": "RAG04",
+            "target": "RAG08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-rt01-tool04",
+            "source": "RT01",
+            "target": "TOOL04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-s01-eval04",
+            "source": "S01",
+            "target": "EVAL04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-t11-rag06",
+            "source": "T11",
+            "target": "RAG06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-t11-tool03",
+            "source": "T11",
+            "target": "TOOL03",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-t11-tool08",
+            "source": "T11",
+            "target": "TOOL08",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-tool04-tool05",
+            "source": "TOOL04",
+            "target": "TOOL05",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-tool04-tool07",
+            "source": "TOOL04",
+            "target": "TOOL07",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train01-train02",
+            "source": "TRAIN01",
+            "target": "TRAIN02",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train01-train03",
+            "source": "TRAIN01",
+            "target": "TRAIN03",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train01-train06",
+            "source": "TRAIN01",
+            "target": "TRAIN06",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train01-train07",
+            "source": "TRAIN01",
+            "target": "TRAIN07",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train02-train04",
+            "source": "TRAIN02",
+            "target": "TRAIN04",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train02-train05",
+            "source": "TRAIN02",
+            "target": "TRAIN05",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train07-train08",
+            "source": "TRAIN07",
+            "target": "TRAIN08",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train07-train10",
+            "source": "TRAIN07",
+            "target": "TRAIN10",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train08-train09",
+            "source": "TRAIN08",
+            "target": "TRAIN09",
+            "strength": "hard"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-train08-train10",
+            "source": "TRAIN08",
+            "target": "TRAIN10",
+            "strength": "soft"
+          },
+          {
+            "id": "book-gold-v1-prerequisite-wf05-mac01",
+            "source": "WF05",
+            "target": "MAC01",
+            "strength": "soft"
+          },
+          {
+            "id": "cds525-kg-v1-020",
+            "source": "CDS525-K020",
+            "target": "K13",
+            "strength": "hard"
+          },
+          {
+            "id": "cds525-kg-v1-091",
+            "source": "CDS525-K073",
+            "target": "CDS525-K078",
+            "strength": "hard"
+          },
+          {
+            "id": "cds525-kg-v1-101",
+            "source": "CDS525-K078",
+            "target": "TRAIN04",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-a01-a02",
+            "source": "A01",
+            "target": "A02",
+            "strength": "soft"
+          },
+          {
+            "id": "knowledge-prerequisite-k01-k12",
+            "source": "K01",
+            "target": "K12",
+            "strength": "hard"
+          }
+        ],
+        "bridgeKnowledgeIds": [
+          "A01",
+          "K01",
+          "CDS525-K020",
+          "CDS525-K073",
+          "CDS525-K078"
+        ],
+        "currentKnowledgeIds": [
+          "A02",
+          "AGC01",
+          "R10",
+          "AGC03",
+          "H02"
+        ],
+        "effectiveTargetNodeIds": [
+          "A02",
+          "AGC01",
+          "AGC02",
+          "AGC03",
+          "C03",
+          "CODE01",
+          "CODE02",
+          "CODE03",
+          "CODE04",
+          "CODE05",
+          "CODE06",
+          "CTX01",
+          "CTX02",
+          "CTX03",
+          "CTX04",
+          "CTX05",
+          "CTX06",
+          "CTX07",
+          "CTX08",
+          "CTX09",
+          "CTX10",
+          "CU01",
+          "CU02",
+          "CU03",
+          "CU04",
+          "CU05",
+          "E05",
+          "E06",
+          "E14",
+          "EVAL01",
+          "EVAL02",
+          "EVAL03",
+          "EVAL04",
+          "EVAL05",
+          "EVAL06",
+          "EVAL07",
+          "EVAL08",
+          "EVAL09",
+          "EVAL10",
+          "EVAL11",
+          "EVAL12",
+          "EVO01",
+          "EVO02",
+          "EVO03",
+          "EVO04",
+          "EVO05",
+          "EVO06",
+          "EVO07",
+          "EVO08",
+          "H02",
+          "K04",
+          "K05",
+          "K12",
+          "K13",
+          "MA03",
+          "MA04",
+          "MA06",
+          "MAC01",
+          "MAC02",
+          "MAC03",
+          "MAC04",
+          "MAC05",
+          "MAC06",
+          "MAC07",
+          "MAC08",
+          "MAC09",
+          "MAC10",
+          "MAC11",
+          "MEM01",
+          "MEM02",
+          "MEM03",
+          "MEM04",
+          "MM01",
+          "MM02",
+          "MM03",
+          "MM04",
+          "MM05",
+          "MM06",
+          "R10",
+          "RAG01",
+          "RAG02",
+          "RAG03",
+          "RAG04",
+          "RAG05",
+          "RAG06",
+          "RAG07",
+          "RAG08",
+          "ROB01",
+          "RT01",
+          "RT06",
+          "RT14",
+          "S01",
+          "S02",
+          "S03",
+          "S08",
+          "T11",
+          "T12",
+          "T14",
+          "TOOL01",
+          "TOOL02",
+          "TOOL03",
+          "TOOL04",
+          "TOOL05",
+          "TOOL06",
+          "TOOL07",
+          "TOOL08",
+          "TRAIN01",
+          "TRAIN02",
+          "TRAIN03",
+          "TRAIN04",
+          "TRAIN05",
+          "TRAIN06",
+          "TRAIN07",
+          "TRAIN08",
+          "TRAIN09",
+          "TRAIN10",
+          "WF05"
+        ]
+      },
+      "course_id": "ai-agents-in-depth",
+      "created_at": "2026-10-02T06:42:22.022824+00:00",
+      "version_number": 2,
+      "exclude_node_ids": [
+        "P01"
+      ],
+      "include_node_ids": [
+        "A01"
+      ],
+      "parent_version_id": "8cd78213-9ab5-4098-8725-4978e8b69b7a",
+      "structure_fingerprint": "815d5a11a6c5fab120c1e8eae79c9587bf7585f68e5bea528c6a631494e00e48",
+      "restored_from_version_id": null
+    }
+  }
+]

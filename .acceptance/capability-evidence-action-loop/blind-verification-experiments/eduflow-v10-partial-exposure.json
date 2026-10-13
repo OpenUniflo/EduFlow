@@ -1,0 +1,217 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-partial-exposure",
+      "line": 1,
+      "quote": "我将需求日期与补货窗口逐日对齐：10月12日需求120件，可用库存80件，补货50件最早10月14日到达。我计算10月12日至13日窗口内缺口120-80=40件，首次缺料日为10月12日；10月14日补货到达填补40件后剩余10件。我核对了用料日期、库存和确认到货日。",
+      "observation": "将10月12日需求120件、可用库存80件与10月14日最早到达的补货50件逐日对齐；计算10月12日至13日窗口缺口为40件，判定首次缺料日为10月12日；计算10月14日补货填补40件后剩余10件；并核对用料日期、库存和确认到货日。该任务未包含到货日期变动时的敏感性计算。",
+      "capability": "按日对齐需求与补货窗口，计算缺口、首次缺料日、补货后余量并核对基础日期与库存"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "partial",
+      "confidence": 0.95,
+      "reason": "partial: 原文正确对齐了需求日期与补货窗口，并计算10月12日至13日缺口120-80=40件、首次缺料日10月12日、10月14日补货50件到达后填补40件剩10件，这些子动作有明确证据且计算一致。但标准还要求计算交期敏感性，原文明确写“尚未计算到货日期变动时的敏感性”，因此缺少该标准子动作，不能判为supported；已有正确子动作应保留为partial。\n原判断：原文实际执行了需求与补货窗口逐日对齐，并计算10月12日至13日缺口120-80=40件、首次缺料日10月12日、10月14日补货后剩余10件；但原文明确“尚未计算到货日期变动时的敏感性”，故缺少标准要求的交期敏感性计算。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "partial",
+      "confidence": 0.86,
+      "reason": "原文按10月12日需求120件、可用库存80件、10月14日确认到货50件进行了分时段净需求/缺口计算：10月12日至13日缺口40件，补货后余10件，并核对用料日期、库存和确认到货日；这覆盖了根据需求、可用库存及确认到货计算分时段净需求，但未明确展示或说明“正确排除不可用库存”的动作，故不能判为完全掌握。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v10",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "3fff718a-5c1b-4ec6-bb5e-904c74b90e5c",
+      "generatedAt": "2026-10-03T16:51:13.087Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 434,
+      "completionTokens": 1665
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v10",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "3a58c424-e8be-463a-8c34-7131c8914f9f",
+      "generatedAt": "2026-10-03T16:51:33.514Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1420,
+      "completionTokens": 4483
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v10",
+      "schemaVersion": "evidence-factual-verification-v1",
+      "requestId": "8c4612e7-fc03-465f-90b0-c862057c32b7",
+      "generatedAt": "2026-10-03T16:51:44.398Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 845,
+      "completionTokens": 2318
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-shortage-exposure": {
+              "reason": "原文实际执行了需求与补货窗口逐日对齐，并计算10月12日至13日缺口120-80=40件、首次缺料日10月12日、10月14日补货后剩余10件；但原文明确“尚未计算到货日期变动时的敏感性”，故缺少标准要求的交期敏感性计算。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.95
+            },
+            "supply-net-material-requirement": {
+              "reason": "原文按10月12日需求120件、可用库存80件、10月14日确认到货50件进行了分时段净需求/缺口计算：10月12日至13日缺口40件，补货后余10件，并核对用料日期、库存和确认到货日；这覆盖了根据需求、可用库存及确认到货计算分时段净需求，但未明确展示或说明“正确排除不可用库存”的动作，故不能判为完全掌握。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.86
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "原文只量化了缺口40件和首次缺料日10月12日，未将该已量化缺口映射到受影响订单、停线时段或恢复优先级输入；缺口量只是该标准所需输入，不是映射动作本身。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.92
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文仅提及补货50件最早10月14日到达，没有依据瓶颈、良率、已承诺负荷计算期间可交付量，也没有识别名义产能误用。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-cross-border-lead-time": {
+              "reason": "原文仅给出补货最早10月14日到达这一到货日，未分解生产、运输、通关和收货环节，未给出有依据的交期区间及不确定性，未处理重复计时。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-shortage-exposure",
+          "supply-net-material-requirement",
+          "supply-shortage-impact-assessment",
+          "supply-supplier-delivery-capacity",
+          "supply-cross-border-lead-time"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-partial-exposure",
+          "line": 1,
+          "quote": "我将需求日期与补货窗口逐日对齐：10月12日需求120件，可用库存80件，补货50件最早10月14日到达。我计算10月12日至13日窗口内缺口120-80=40件，首次缺料日为10月12日；10月14日补货到达填补40件后剩余10件。我核对了用料日期、库存和确认到货日。",
+          "observation": "将10月12日需求120件、可用库存80件与10月14日最早到达的补货50件逐日对齐；计算10月12日至13日窗口缺口为40件，判定首次缺料日为10月12日；计算10月14日补货填补40件后剩余10件；并核对用料日期、库存和确认到货日。该任务未包含到货日期变动时的敏感性计算。",
+          "capability": "按日对齐需求与补货窗口，计算缺口、首次缺料日、补货后余量并核对基础日期与库存"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.778276777914875
+        },
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.665226876864422
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.609723435673308
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.549769097594134
+        },
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "revision_id": "supply-cross-border-lead-time:v1",
+          "title": "跨境补货交期估计",
+          "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+          "mastery_criteria": [
+            "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+          ],
+          "similarity": 0.541415149996863
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-shortage-exposure",
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-shortage-exposure": {
+              "verdict": "partial",
+              "reason": "原文正确对齐了需求日期与补货窗口，并计算10月12日至13日缺口120-80=40件、首次缺料日10月12日、10月14日补货50件到达后填补40件剩10件，这些子动作有明确证据且计算一致。但标准还要求计算交期敏感性，原文明确写“尚未计算到货日期变动时的敏感性”，因此缺少该标准子动作，不能判为supported；已有正确子动作应保留为partial。"
+            },
+            "supply-net-material-requirement": {
+              "verdict": "supported",
+              "reason": "原文根据10月12日需求120件、可用库存80件、补货50件最早10月14日到达，按10月12日至13日窗口计算缺口120-80=40件，并在10月14日补货到达后计算填补40件、剩余10件；同时核对了用料日期、库存和确认到货日。未到货补货未被计入10月12日至13日窗口，体现了按分时段和确认到货计算净需求并排除不可用库存。标准要求的对象、方法和结果均有原文支持。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "retrievalCount": 1
+}

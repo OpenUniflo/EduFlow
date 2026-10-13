@@ -159,3 +159,18 @@ describe("Course foundation contract", () => {
     expect(validateCourseRuntime({ ...routeOnlyRuntime, materials: [managedPdf] }, knowledgeRepository, globalKnowledgeAccess)).toBe(true);
   });
 });
+
+it('allows Assignment coverage of factual Bridge ancestors while preserving curriculum and rejecting unrelated Knowledge',()=>{
+ const root=routeOnlyKnowledgeGraph.nodes[0];
+ const graph={...routeOnlyKnowledgeGraph,nodes:[root,{...root,id:'bridge'},{...root,id:'upstream'},{...root,id:'unrelated'}],edges:[{id:'support',source:'bridge',target:root.id,relation:'enables' as const,strength:0.8,reason:'Real support'},{id:'hard',source:'upstream',target:'bridge',relation:'prerequisite' as const,strength:'hard' as const,reason:'Real prerequisite'}]};
+ const runtime={...routeOnlyRuntime,assignments:[{id:'prepare',courseId:routeOnlyRuntime.course.id,order:0,title:'Prepare support',description:'Trace support',requirements:[],expectedOutput:'Trace',acceptanceCriteria:[],mode:'instruction' as const}],assignmentCoverages:[{id:'support-coverage',assignmentId:'prepare',nodeId:'upstream',role:'practice' as const}]};
+ const repository=new InMemoryKnowledgeRepository(graph);expect(validateCourseRuntime(runtime,repository,globalKnowledgeAccess)).toBe(true);expect(buildCourseGraphData(runtime,undefined,graph).knowledgeNodes.map(n=>n.id)).toEqual([root.id]);
+ for(const nodeId of ['unrelated','missing'])expect(()=>validateCourseRuntime({...runtime,assignmentCoverages:[{...runtime.assignmentCoverages[0],nodeId}]},repository,globalKnowledgeAccess)).toThrow(/outside the Course/);
+ expect(()=>validateCourseRuntime(runtime,new InMemoryKnowledgeRepository({...graph,nodes:graph.nodes.map(n=>n.id==='upstream'?{...n,status:'deprecated' as const}:n)}),globalKnowledgeAccess)).toThrow(/invisible KnowledgeNode/);
+});
+
+it('rejects related-only Bridge and Bridge ancestry through an inaccessible intermediate node',()=>{
+ const root=routeOnlyKnowledgeGraph.nodes[0];const runtime={...routeOnlyRuntime,assignments:[{id:'prepare',courseId:routeOnlyRuntime.course.id,order:0,title:'Prepare support',description:'Trace support',requirements:[],expectedOutput:'Trace',acceptanceCriteria:[],mode:'instruction' as const}],assignmentCoverages:[{id:'coverage',assignmentId:'prepare',nodeId:'upstream',role:'practice' as const}]};
+ const related={...routeOnlyKnowledgeGraph,nodes:[root,{...root,id:'upstream'}],edges:[{id:'related',source:'upstream',target:root.id,relation:'related' as const,strength:0.8,reason:'Related only'}]};expect(()=>validateCourseRuntime(runtime,new InMemoryKnowledgeRepository(related),globalKnowledgeAccess)).toThrow(/outside the Course/);
+ const hidden={...routeOnlyKnowledgeGraph,nodes:[root,{...root,id:'upstream'},{...root,id:'middle',scope:'user' as const,ownerId:'another-user'}],edges:[{id:'a',source:'upstream',target:'middle',relation:'enables' as const,strength:0.8,reason:'Support'},{id:'b',source:'middle',target:root.id,relation:'enables' as const,strength:0.8,reason:'Support'}]};expect(()=>validateCourseRuntime(runtime,new InMemoryKnowledgeRepository(hidden),globalKnowledgeAccess)).toThrow(/outside the Course/);
+});

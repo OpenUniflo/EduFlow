@@ -1,0 +1,332 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-input-only-boundary",
+      "line": 1,
+      "quote": "我为订单 V104 独立核对并计算计划补货需求。D1、D2 都是库存计划时段，不是订单编号：D1需求100件、D2需求80件，实物50件中隔离10件不可用，可用40件，确认到货D1为20件、D2为30件。D1净需求max(0,100-40-20)=40件、可用结余0；D2净需求max(0,80-0-30)=50件。隔离10件未计入，以上逐项复算一致。",
+      "observation": "针对订单 V104，区分 D1/D2 为库存计划时段，基于 D1 需求100、D2 需求80、实物50中隔离10不可用后可用40、确认到货 D1 20/D2 30，逐时段计算：D1 净需求 max(0,100-40-20)=40 且可用结余0，D2 净需求 max(0,80-0-30)=50，隔离10未计入，并称逐项复算一致。",
+      "capability": "按库存计划时段计算净需求并复算"
+    },
+    {
+      "sourceId": "local-input-only-boundary",
+      "line": 3,
+      "quote": "另一个独立任务 V209 中，我核对并估计跨境补货交期：生产5至6天、运输3至4天、通关2至3天、验收1天均串行，总计11至14天；海关查验另加2天时最迟16天，运输未含通关且没有重复计时。这是V209的交期估计，尚未和V104的任何需求或缺口关联，未开展交期窗口内缺料暴露计算。",
+      "observation": "针对独立任务 V209，按生产5-6天、运输3-4天、通关2-3天、验收1天串行相加，得出总交期11-14天；若海关查验另加2天则最迟16天，并检查运输未含通关且无重复计时。该估计尚未与 V104 需求或缺口关联，也未开展交期窗口内缺料暴露计算。",
+      "capability": "估算跨境串行补货交期并检查重复计时"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "supported",
+      "confidence": 0.95,
+      "reason": "unit0 明确针对 V104 执行：D1/D2 为库存计划时段，需求100/80，实物50中隔离10不可用后可用40，确认到货20/30；计算 D1 净需求 max(0,100-40-20)=40、可用结余0，D2 净需求 max(0,80-0-30)=50，且隔离10未计入并逐项复算一致。覆盖按分时段计算净需求并正确排除不可用库存。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learned"
+    },
+    {
+      "unitIndexes": [
+        0,
+        1
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "insufficient",
+      "confidence": 0.93,
+      "reason": "unit0 只给出 V104 分时段净需求，unit1 只给出 V209 跨境交期估计；原文明确净需求尚未与交期关联，未开展交期窗口内缺料暴露计算，未计算最早缺料日、缺口量或交期敏感性。两者仅为所需输入，未执行本标准动作。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-shortage-impact-assessment",
+      "sufficiency": "insufficient",
+      "confidence": 0.94,
+      "reason": "unit0 仅有 V104 净需求计算，不是已量化缺口到受影响订单、停线时段或恢复优先级的映射；原文明确未核实交付日期、未判断延期、未映射订单受影响数量/停线时段/恢复优先级。未见本标准动作。unit1 为 V209 交期估计，与本标准无关。",
+      "revisionId": "supply-shortage-impact-assessment:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        1
+      ],
+      "nodeId": "supply-cross-border-lead-time",
+      "sufficiency": "supported",
+      "confidence": 0.96,
+      "reason": "unit1 针对 V209 实际分解生产5-6天、运输3-4天、通关2-3天、验收1天并串行加总为11-14天，海关查验另加2天得最迟16天，且说明运输未含通关、无重复计时；覆盖环节分解、交期区间与不确定性、避免重复计时。",
+      "revisionId": "supply-cross-border-lead-time:v1",
+      "proposedStatus": "learned"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "f464c03e-1722-4b31-9857-3b293872cbb9",
+      "generatedAt": "2026-10-03T17:20:01.598Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 611,
+      "completionTokens": 3525
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "e1c0c087-6160-4436-9873-c225d6c69faa",
+      "generatedAt": "2026-10-03T17:20:27.349Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 2085,
+      "completionTokens": 5628
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-factual-verification-v2",
+      "requestId": "a7a17d22-924c-408d-a24e-213af3b9d2eb",
+      "generatedAt": "2026-10-03T17:20:43.647Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1338,
+      "completionTokens": 3541
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "unit0 明确针对 V104 执行：D1/D2 为库存计划时段，需求100/80，实物50中隔离10不可用后可用40，确认到货20/30；计算 D1 净需求 max(0,100-40-20)=40、可用结余0，D2 净需求 max(0,80-0-30)=50，且隔离10未计入并逐项复算一致。覆盖按分时段计算净需求并正确排除不可用库存。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.95
+            },
+            "supply-shortage-exposure": {
+              "reason": "unit0 只给出 V104 分时段净需求，unit1 只给出 V209 跨境交期估计；原文明确净需求尚未与交期关联，未开展交期窗口内缺料暴露计算，未计算最早缺料日、缺口量或交期敏感性。两者仅为所需输入，未执行本标准动作。",
+              "unitIndexes": [
+                0,
+                1
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.93
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "unit0 仅有 V104 净需求计算，不是已量化缺口到受影响订单、停线时段或恢复优先级的映射；原文明确未核实交付日期、未判断延期、未映射订单受影响数量/停线时段/恢复优先级。未见本标准动作。unit1 为 V209 交期估计，与本标准无关。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.94
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "unit0 只涉及 V104 库存净需求计算，未提及瓶颈、良率、已承诺负荷、期间可交付量或名义产能误用，与供应商交付产能核验标准无对应组成动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "R06": {
+              "reason": "unit0 仅记录库存净需求计算；未说明 Replanning 触发条件、保留已完成步骤、根据新 Observation 调整剩余计划，也未区分 Replanning 与完整重新规划。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "supply-cross-border-lead-time": {
+              "reason": "unit1 针对 V209 实际分解生产5-6天、运输3-4天、通关2-3天、验收1天并串行加总为11-14天，海关查验另加2天得最迟16天，且说明运输未含通关、无重复计时；覆盖环节分解、交期区间与不确定性、避免重复计时。",
+              "unitIndexes": [
+                1
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.96
+            },
+            "supply-site-switch-feasibility": {
+              "reason": "unit1 仅为 V209 跨境补货交期估计，未使用替代基地可用产能与到达时间检验候选切换是否满足订单约束，也未区分不可行与缺失证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-supplier-delivery-capacity",
+          "R06",
+          "supply-cross-border-lead-time",
+          "supply-site-switch-feasibility"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-input-only-boundary",
+          "line": 1,
+          "quote": "我为订单 V104 独立核对并计算计划补货需求。D1、D2 都是库存计划时段，不是订单编号：D1需求100件、D2需求80件，实物50件中隔离10件不可用，可用40件，确认到货D1为20件、D2为30件。D1净需求max(0,100-40-20)=40件、可用结余0；D2净需求max(0,80-0-30)=50件。隔离10件未计入，以上逐项复算一致。",
+          "observation": "针对订单 V104，区分 D1/D2 为库存计划时段，基于 D1 需求100、D2 需求80、实物50中隔离10不可用后可用40、确认到货 D1 20/D2 30，逐时段计算：D1 净需求 max(0,100-40-20)=40 且可用结余0，D2 净需求 max(0,80-0-30)=50，隔离10未计入，并称逐项复算一致。",
+          "capability": "按库存计划时段计算净需求并复算"
+        },
+        {
+          "sourceId": "local-input-only-boundary",
+          "line": 3,
+          "quote": "另一个独立任务 V209 中，我核对并估计跨境补货交期：生产5至6天、运输3至4天、通关2至3天、验收1天均串行，总计11至14天；海关查验另加2天时最迟16天，运输未含通关且没有重复计时。这是V209的交期估计，尚未和V104的任何需求或缺口关联，未开展交期窗口内缺料暴露计算。",
+          "observation": "针对独立任务 V209，按生产5-6天、运输3-4天、通关2-3天、验收1天串行相加，得出总交期11-14天；若海关查验另加2天则最迟16天，并检查运输未含通关且无重复计时。该估计尚未与 V104 需求或缺口关联，也未开展交期窗口内缺料暴露计算。",
+          "capability": "估算跨境串行补货交期并检查重复计时"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.803941214202083
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.664942800844565
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.558498978614807
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.527696192264557
+        },
+        {
+          "node_id": "R06",
+          "revision_id": "R06-r1",
+          "title": "Replanning",
+          "description": "根据新观察保留已完成步骤并调整剩余计划。",
+          "mastery_criteria": [
+            "能说明什么时候需要触发 Replanning",
+            "能保留已完成步骤并修改剩余计划",
+            "能根据新的 Observation 调整后续计划",
+            "能区分 Replanning 与完整重新规划"
+          ],
+          "similarity": 0.503656714936692
+        }
+      ],
+      [
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "revision_id": "supply-cross-border-lead-time:v1",
+          "title": "跨境补货交期估计",
+          "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+          "mastery_criteria": [
+            "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+          ],
+          "similarity": 0.809930289087603
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.611368252202065
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.581533389733237
+        },
+        {
+          "node_id": "supply-site-switch-feasibility",
+          "revision_id": "supply-site-switch-feasibility:v1",
+          "title": "跨基地供给切换可行性判断",
+          "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+          "mastery_criteria": [
+            "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+          ],
+          "similarity": 0.531301808538877
+        },
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.513320238192096
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-cross-border-lead-time"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-net-material-requirement": {
+              "criterionScopePreserved": true,
+              "verdict": "supported",
+              "reason": "标准限定为根据订单需求、可用库存及确认到货计算分时段净需求，并正确排除不可用库存。原文第1行已执行：为订单V104计算D1/D2计划时段净需求；D1需求100、可用40、确认到货20，D1净需求max(0,100-40-20)=40且结余0；D2需求80、D1结余0、确认到货30，D2净需求max(0,80-0-30)=50；实物50中隔离10件不可用并明确未计入。逐项复算结果正确，且保留了分时段、可用库存、确认到货和排除不可用库存的限定，故全部标准有明确证据支持。"
+            },
+            "supply-cross-border-lead-time": {
+              "criterionScopePreserved": true,
+              "verdict": "supported",
+              "reason": "标准限定为分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，并避免重复计时。原文第3行已执行：V209中生产5至6天、运输3至4天、通关2至3天、验收1天串行，合计11至14天；海关查验另加2天时最迟16天；且说明运输未含通关、没有重复计时。最小值5+3+2+1=11、最大值6+4+3+1=14正确，查验附加2天形成不确定性。该子动作覆盖了所需环节分解、区间与不确定性及避免重复计时限定，故标准有明确证据支持。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "llmCalls": 3,
+  "retrievalCount": 2
+}

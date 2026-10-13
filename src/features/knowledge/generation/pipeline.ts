@@ -1,3 +1,4 @@
+import { auditProjectStructure } from '../../../shared/learning/projectStructureAudit.js';
 import type { SourceLocation, StructuredMaterialChunk } from "@/features/material/parsing/types";
 import { deduplicateWithinIngestion } from "./normalization";
 import { candidateAdmissionPrompt, coverageAuditPrompt, curriculumPrompt, equivalencePrompt, extractionPrompt, KNOWLEDGE_GENERATION_PROMPT_VERSION, pairClassificationPrompt } from "./prompts";
@@ -285,7 +286,7 @@ export async function classifyRelations(candidates: KnowledgeCandidate[], chunks
     relations: publishedRelations,
     classifiedRelationCount: relations.length,
     suppressedDocumentOrderPrerequisiteCount: relations.filter(isDocumentOrderOnlyPrerequisite).length,
-    suppressedEnablesCount: relations.filter((relation) => relation.relation === "enables").length,
+    suppressedEnablesCount: 0,
     suppressedRelatedCount: relations.filter((relation) => relation.relation === "related").length,
     executions,
     batchCount: batches.length
@@ -297,9 +298,9 @@ function isDocumentOrderOnlyPrerequisite(relation: CandidateKnowledgeRelation) {
   return /\b(?:introduc(?:e[sd]?|ing)|present(?:ed|ing)?|discuss(?:ed|ing)?|appear(?:s|ed|ing)?)\b.{0,120}\b(?:before|after|following)\b|\bfollowing\s+the\s+introduction\b|\bsource\s+order\b|\bdocument\s+order\b|(?:先介绍|随后讨论|文档顺序|材料顺序)/iu.test(relation.reason);
 }
 
-/** Phase 4.2 automatic generation publishes only its reliable teaching-path relation. */
+/** Evidence-classified support is preserved; related remains a conservative publication boundary. */
 export function applyMvpRelationPolicy(relations: CandidateKnowledgeRelation[]) {
-  return relations.filter((relation) => relation.relation === "prerequisite" && !isDocumentOrderOnlyPrerequisite(relation));
+  return relations.filter((relation) => relation.relation !== "related" && !isDocumentOrderOnlyPrerequisite(relation));
 }
 
 export async function generateCurriculum(candidates: KnowledgeCandidate[], relations: CandidateKnowledgeRelation[], input: KnowledgeGenerationInput, client: StructuredGenerationClient) {
@@ -396,6 +397,14 @@ export async function runKnowledgeGenerationPipeline(input: KnowledgeGenerationI
   const relationCandidatePairs = await retrieveRelationCandidatePairs(candidates, embeddingCache);
   const relationExtraction = await classifyRelations(candidates, input.material.chunks, relationCandidatePairs, client, retryCounter);
   const curriculumGeneration = await generateCurriculum(candidates, relationExtraction.relations, input, client);
+  const projectStructureAudit = auditProjectStructure(candidates.map(candidate => candidate.id), relationExtraction.relations.map(relation => ({
+    source: relation.sourceCandidateId, target: relation.targetCandidateId, relation: relation.relation,
+  })));
+  if (projectStructureAudit.isolatedTargetIds.length) {
+    const execution = curriculumGeneration.executions[curriculumGeneration.executions.length - 1];
+    execution.validationWarnings = [...(execution.validationWarnings ?? []),
+      `Project structure review required: isolated targets ${projectStructureAudit.isolatedTargetIds.join(', ')}. Revisit source-backed relation candidates or curriculum scope; do not manufacture edges.`];
+  }
   const allRelationPairCount = candidates.length * (candidates.length - 1) / 2;
   return {
     courseId: input.courseId,
@@ -409,6 +418,7 @@ export async function runKnowledgeGenerationPipeline(input: KnowledgeGenerationI
     admissionReviews: admission.reviews,
     relationCandidatePairs,
     diagnostics: {
+      projectStructureAudit,
       embeddingRequestCount: embeddingCache.requestCount,
       extractedCandidateCount: extraction.candidates.length,
       afterExactDedupCount: exact.candidates.length,

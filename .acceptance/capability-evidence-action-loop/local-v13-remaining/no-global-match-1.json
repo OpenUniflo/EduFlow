@@ -1,0 +1,179 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-no-global-match",
+      "line": 1,
+      "quote": "我完成小提琴琴桥弧度调整，并逐弦检查运弓接触，记录调整前后相邻弦误触次数从 8 降至 1。",
+      "observation": "完成小提琴琴桥弧度调整，逐弦检查运弓接触，并记录调整前后相邻弦误触次数由8次降至1次。",
+      "capability": "小提琴琴桥弧度调整与运弓接触效果检查及数据记录"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": null,
+      "sufficiency": "unmatched",
+      "confidence": 0,
+      "reason": "本次Top-K候选未与该单元的实际能力表现对应；候选判断保留在诊断记录中。",
+      "revisionId": null,
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "3b87ca0f-cb6d-4bee-a147-dc8f30009a3e",
+      "generatedAt": "2026-10-03T17:22:04.025Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 367,
+      "completionTokens": 449
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "d98b0800-4b37-441b-9f68-08a5c1ad55a1",
+      "generatedAt": "2026-10-03T17:22:10.432Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1190,
+      "completionTokens": 1011
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "T14": {
+              "reason": "原文仅记录小提琴琴桥弧度调整、逐弦检查运弓接触及相邻弦误触次数由8降至1，未涉及Tool Interface参数构造、传递、字段/类型校验或Schema验证等工具参数动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.99
+            },
+            "supply-corrective-action-verification": {
+              "reason": "原文未涉及供应商异常基线、复验数据或复发数据，也未判断供应商纠正措施有效性；其内容为小提琴维护记录。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.99
+            },
+            "I05": {
+              "reason": "原文没有进行Schema Validation，也没有验证结构化输出或报告可定位错误；仅描述小提琴琴桥调整与效果记录。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.99
+            },
+            "R09": {
+              "reason": "原文没有Evaluator反馈、Optimizer迭代或二者交互过程；仅记录小提琴维修及误触次数变化。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.99
+            },
+            "R11": {
+              "reason": "原文记录了调整前后相邻弦误触次数从8降至1，但未比较计划预期与实际观察，也未识别计划偏差或执行Plan Monitoring；前后计数变化不足以按相似动作匹配计划监控。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            }
+          }
+        },
+        "nodeIds": [
+          "T14",
+          "supply-corrective-action-verification",
+          "I05",
+          "R09",
+          "R11"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-no-global-match",
+          "line": 1,
+          "quote": "我完成小提琴琴桥弧度调整，并逐弦检查运弓接触，记录调整前后相邻弦误触次数从 8 降至 1。",
+          "observation": "完成小提琴琴桥弧度调整，逐弦检查运弓接触，并记录调整前后相邻弦误触次数由8次降至1次。",
+          "capability": "小提琴琴桥弧度调整与运弓接触效果检查及数据记录"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "T14",
+          "revision_id": "T14-r2",
+          "title": "Tool Arguments",
+          "description": "根据工具接口生成、传递并校验参数，保持字段、类型和结构在模型到执行器之间的语义一致性。",
+          "mastery_criteria": [
+            "能依据 Tool Interface 构造合法参数",
+            "能识别字段缺失、类型错误和有损字符串转换等参数问题",
+            "能在执行前用 Schema 或等价规则验证工具参数"
+          ],
+          "similarity": 0.378258086546774
+        },
+        {
+          "node_id": "supply-corrective-action-verification",
+          "revision_id": "supply-corrective-action-verification:v1",
+          "title": "供应商纠正措施有效性验证",
+          "description": "根据已判定异常基线、复验及复发数据判断纠正措施是否有效。",
+          "mastery_criteria": [
+            "根据已判定异常基线、复验及复发数据判断纠正措施是否有效。"
+          ],
+          "similarity": 0.370785564184189
+        },
+        {
+          "node_id": "I05",
+          "revision_id": "I05-r1",
+          "title": "Schema Validation",
+          "description": "验证结构化输出并报告可定位的错误。",
+          "mastery_criteria": [
+            "能独立完成Schema Validation的核心目标与边界",
+            "能在具体场景中识别Schema Validation的正确用法与常见误用",
+            "能用可检查的示例证明对Schema Validation的掌握"
+          ],
+          "similarity": 0.365250514119805
+        },
+        {
+          "node_id": "R09",
+          "revision_id": "R09-r1",
+          "title": "Evaluator-Optimizer",
+          "description": "让 Evaluator 反馈驱动 Optimizer 迭代输出。",
+          "mastery_criteria": [
+            "能独立完成Evaluator-Optimizer的核心目标与边界",
+            "能在具体场景中识别Evaluator-Optimizer的正确用法与常见误用",
+            "能用可检查的示例证明对Evaluator-Optimizer的掌握"
+          ],
+          "similarity": 0.361805192339731
+        },
+        {
+          "node_id": "R11",
+          "revision_id": "R11-r1",
+          "title": "Plan Monitoring",
+          "description": "比较计划预期与实际观察并识别偏差。",
+          "mastery_criteria": [
+            "能判断适用条件并运用Plan Monitoring的核心目标与边界",
+            "能在具体场景中识别Plan Monitoring的正确用法与常见误用",
+            "能用可检查的示例证明对Plan Monitoring的掌握"
+          ],
+          "similarity": 0.36166146650864
+        }
+      ]
+    ],
+    "verifications": []
+  },
+  "llmCalls": 2,
+  "retrievalCount": 1
+}

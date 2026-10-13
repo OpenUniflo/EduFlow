@@ -64,11 +64,11 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
     return apiRequest<H5PContentDescriptor>("/api/micro",{method:"POST",body:JSON.stringify({action:"resolve-h5p",pathId,unitId,stepId,contentRef})});
   }
 
-  async completeStep(pathId: string, unitId: string, stepId: string, submission?: MicroLearningSubmission,contextCourseId?:string,metadata?:{decisionId?:string;clientDurationMs?:number}) {
-    const identity = JSON.stringify([this.userId,pathId,unitId,stepId,submission,contextCourseId,metadata?.decisionId]);
+  async completeStep(pathId: string, unitId: string, stepId: string, submission?: MicroLearningSubmission,contextCourseId?:string,metadata?:{decisionId?:string;clientDurationMs?:number;actionRunId?:string}) {
+    const identity = JSON.stringify([this.userId,pathId,unitId,stepId,submission,contextCourseId,metadata?.decisionId,metadata?.actionRunId]);
     const idempotencyKey = this.pendingAttempts.get(identity) ?? crypto.randomUUID();
     this.pendingAttempts.set(identity,idempotencyKey);
-    const result = await apiRequest<{ correct: boolean; completed: boolean; pathProgress?: MicroPathProgress }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "complete-step", pathId, unitId, stepId, submission,contextCourseId,idempotencyKey,...metadata }) });
+    const result = await apiRequest<{ correct: boolean; completed: boolean; pathProgress?: MicroPathProgress; actionStepIds?: string[] }>("/api/micro", { method: "POST", body: JSON.stringify({ action: "complete-step", pathId, unitId, stepId, submission,contextCourseId,idempotencyKey,...metadata }) });
     // An answered retry is new work; a network failure retains this exact identity.
     this.pendingAttempts.delete(identity);
     if (!this.userId) {
@@ -89,7 +89,7 @@ export class ApiMicroLearningRepository implements MicroLearningRepository {
     }
     if (result.pathProgress) this.pathProgress.set(pathId, result.pathProgress);
     await this.hydrate(this.userId);
-    return { correct: result.correct, completed: result.completed };
+    return { correct: result.correct, completed: result.completed, actionStepIds: result.actionStepIds };
   }
 
   subscribe(listener: () => void) { this.listeners.add(listener); return () => this.listeners.delete(listener); }

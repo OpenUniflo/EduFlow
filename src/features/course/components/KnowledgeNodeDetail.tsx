@@ -1,0 +1,62 @@
+import { isNodeScope, type RouteExecutionStep } from '@/shared/learning/routeExecution';
+import { EduFlowAssistant } from '@/features/assistant/components/EduFlowAssistant';
+import type { AssistantContext } from '@/features/assistant/assistantContext';
+import { ActionRunHistory } from '@/features/actions/ActionRunHistory';
+import { useState } from 'react';
+import type { KnowledgeGraph, KnowledgeNode } from '@/features/knowledge/types';
+import type { UserKnowledgeRecord } from '@/features/profile/types';
+import type { CourseSkillTreeNode } from '../types';
+import type { CourseRuntimeData } from '../runtime/courseRuntime';
+import { actionAlternatives, EdgeActionPanel, type useEdgeActions } from '@/features/actions/EdgeActionPanel';
+import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequisites';
+import { relationLabel } from '@/shared/learning/routePresentation';
+import type { CapabilityRelation } from '@/shared/learning/routePlanning';
+import { buildMaterialDeepLink, resolveKnowledgeMaterialEntry } from '@/features/material/materialNavigation';
+import { Link } from 'react-router-dom';
+
+export const knowledgeStateLabel = { explore: '尚未具备', learning: '学习中', learned: '已学会', practicing: '实践中', mastered: '已掌握' };
+export function KnowledgeNodeDetail({ node, courseNode, runtime, graph, knowledge, relations, context, actions, onSelect, initialEdgeId, initialActionId, learningPath, assistantIdentity, routeVersionId,routeSteps,onAdjustRoute }: {
+  routeSteps?:RouteExecutionStep[];onAdjustRoute?():void;assistantIdentity?: Pick<AssistantContext, "userRole" | "capabilities">; routeVersionId?: string;
+  learningPath?: { id: string; title: string }; initialEdgeId?: string | null; initialActionId?:string|null; node: KnowledgeNode; courseNode?: CourseSkillTreeNode | null; runtime: CourseRuntimeData; graph: KnowledgeGraph;
+  knowledge: UserKnowledgeRecord[]; relations: readonly CapabilityRelation[];
+  context: 'skill-tree' | 'personal-route' | 'project-capability'; actions: ReturnType<typeof useEdgeActions>; onSelect(id: string): void;
+}) {
+  const [expandedEdge, setExpandedEdge] = useState<string | null>(initialEdgeId ?? null);
+  const [focusedAction, setFocusedAction] = useState<string | null>(context==='personal-route'?initialActionId??routeSteps?.find(step=>step.edgeId===initialEdgeId)?.actionId??null:null);
+  const title = (id: string) => graph.nodes.find(item => item.id === id)?.title ?? id;
+  const current = knowledge.find(record => record.nodeId === node.id);
+  const acquired = new Set(knowledge.filter(record => satisfiesTeachingPrerequisite(record.status)).map(record => record.nodeId));
+  const scopedRelations=context==='personal-route'?relations.filter(edge=>routeSteps?.some(step=>step.edgeId===edge.id && step.sourceNodeId===edge.source && step.targetNodeId===edge.target)):relations;
+  const outgoing = scopedRelations.filter(edge => edge.source === node.id);
+  const incoming = scopedRelations.filter(edge => edge.target === node.id);
+  const runs = actions.runs.filter(run => run.execution_snapshot.sourceId === node.id || run.execution_snapshot.targetId === node.id);
+  const activeEdge = outgoing.find(edge => edge.id === expandedEdge);
+  const nodeChoices=routeSteps?.filter(step=>isNodeScope(step)&&step.nodeId===node.id)??[];
+  const nodeAlternatives=actionAlternatives(runtime.course.id,{nodeId:node.id},actions,acquired);
+  const formalNodeAlternatives=context==='personal-route'?nodeChoices.flatMap(step=>nodeAlternatives.filter(item=>item.action.id===step.actionId)):nodeAlternatives;
+  const activeAction = !activeEdge ? actions.actions.find(action=>action.id===focusedAction&&action.node_id===node.id) : activeEdge ? actions.actions.find(action => action.id === focusedAction && action.edge_id === activeEdge.id) : undefined;
+  return <div className="knowledge-node-detail" data-context={context}>
+    {assistantIdentity ? <EduFlowAssistant context={{...assistantIdentity, workspace:'courses', experienceMode:'learn', presentation:context, courseId:runtime.course.id, knowledgeId:node.id, edgeId:activeEdge?.id, actionId:activeAction?.id, ...(context === 'personal-route' ? {routeVersionId} : {})}} contextLabel={activeEdge ? `${node.title} → ${title(activeEdge.target)}` : node.title} drawerOpen /> : null}
+    <section className="atlas-drawer-section"><h3>当前能力</h3><strong>{knowledgeStateLabel[current?.status ?? 'explore']}</strong><p>{node.description}</p>{node.masteryCriteria.length ? <details><summary>能力要求</summary><ul>{node.masteryCriteria.map(item => <li key={item}>{item}</li>)}</ul></details> : null}</section>
+    {learningPath && context!=='personal-route' ? <section className="atlas-drawer-section"><h3>已有学习内容</h3><p>{learningPath.title}</p><Link className="atlas-secondary" to={`/learn/micro/${encodeURIComponent(node.id)}?courseId=${encodeURIComponent(runtime.course.id)}&pathId=${encodeURIComponent(learningPath.id)}`}>打开这份学习内容</Link><small>学习前置条件仍由正式路线核验。</small></section> : null}
+    {(context==='personal-route'?nodeChoices.length:!relations.some(edge=>edge.target===node.id)&&nodeAlternatives.length)?<section className="atlas-drawer-section"><h3>根能力行动</h3><EdgeActionPanel embedded formalChoice={context==='personal-route'} routeVersionId={routeVersionId} planningOnly={context!=='personal-route'} onAdjust={onAdjustRoute} alternatives={formalNodeAlternatives} title={node.title} control={actions} courseId={runtime.course.id} focusedId={focusedAction} onFocus={setFocusedAction}/></section>:null}
+    <section className="atlas-drawer-section"><h3>{context === 'personal-route' ? '沿当前路线继续' : '从这里出发'}</h3>
+      {!outgoing.length ? <p>当前范围没有从此能力出发的关系。</p> : outgoing.map(edge => {
+        const chosen=routeSteps?.filter(step=>step.edgeId===edge.id).map(step=>step.actionId)??[];
+        const all=actionAlternatives(runtime.course.id, edge, actions, acquired);
+        const alternatives=context==='personal-route'?chosen.flatMap(id=>all.filter(item=>item.action.id===id)):all;
+        return <div key={edge.id} className="knowledge-relation-card"><button className="atlas-secondary" aria-expanded={expandedEdge === edge.id} onClick={() => { setExpandedEdge(expandedEdge === edge.id ? null : edge.id); setFocusedAction(alternatives[0]?.action.id ?? null); }}><span>{node.title} → {title(edge.target)}</span><small>{relationLabel(edge)} · {context==='personal-route'?'正式已选行动':`${alternatives.length} 个行动方案`}</small></button>
+          {expandedEdge === edge.id ? <EdgeActionPanel embedded formalChoice={context==='personal-route'} routeVersionId={routeVersionId} planningOnly={context!=='personal-route'} onAdjust={onAdjustRoute} alternatives={alternatives} title={title(edge.target)} control={actions} courseId={runtime.course.id} focusedId={focusedAction} onFocus={setFocusedAction} /> : null}
+        </div>;
+      })}
+    </section>
+    {incoming.length ? <details className="atlas-drawer-section"><summary>通向这里的关系 · {incoming.length}</summary>{incoming.map(edge => <button className="atlas-requirement interactive" key={edge.id} onClick={() => onSelect(edge.source)}><span>{title(edge.source)} → {node.title}<small>{relationLabel(edge)}</small></span></button>)}</details> : null}
+    {courseNode ? <details className="atlas-drawer-section" open={context === 'skill-tree'}><summary>课程内容与实训</summary>
+      <ul>{courseNode.curriculumContexts.map(item => <li key={item.id}>{runtime.lessons.find(lesson => lesson.id === item.lessonId)?.title} · {item.role}</li>)}</ul>
+      <h3>学习材料</h3>{courseNode.materialContexts.length ? courseNode.materialContexts.map(item => { const material = runtime.materials.find(material => material.id === item.materialId); return material ? <p key={material.id}><Link to={buildMaterialDeepLink({ courseId: runtime.course.id, materialId: material.id, segmentId: resolveKnowledgeMaterialEntry(runtime, node.id, material.id)?.segmentId })}>{material.title}</Link></p> : null; }) : <p>暂无关联材料。</p>}
+      <h3>对应实训</h3>{courseNode.assignmentContexts.length ? courseNode.assignmentContexts.map(item => <p key={item.assignment.id}><Link to={`/courses/${encodeURIComponent(runtime.course.id)}/assignments/${encodeURIComponent(item.assignment.id)}`}>{item.assignment.title}</Link></p>) : <p>暂无关联实训。</p>}
+    </details> : context==='skill-tree'?<p className="atlas-drawer-section">此能力未配置本课程教学覆盖。</p>:null}
+    <ActionRunHistory runs={runs} control={actions} courseId={runtime.course.id} acquiredIds={acquired} title={title} visibleEdgeIds={new Set(relations.map(edge => edge.id))}/>
+    {actions.error ? <p role="alert">{actions.error}</p> : null}
+  </div>;
+}

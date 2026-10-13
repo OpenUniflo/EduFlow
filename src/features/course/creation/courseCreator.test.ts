@@ -24,6 +24,14 @@ describe("fixed Course Creator pipeline contracts", () => {
     expect(result.warnings).toHaveLength(3);
   });
 
+  it("reports isolated covered capabilities without fabricating same-course relations", () => {
+    const design = createInitialCourseDesign(brief, graph, null);
+    const next = applyCourseCreatorProposal(design, { id: "extra", stage: "scope", title: "Extra", summary: "Review", operations: [{ type: "includeKnowledge", nodeId: "extra", role: "optional" }] }, graph);
+    const result = validateCourseCreatorDesign(next, graph);
+    expect(result.technicalDetails).toContain("Isolated project targets: extra");
+    expect(graph.edges).toHaveLength(1);
+  });
+
   it("keeps Reference Material optional and in the same design contract", () => {
     const design = createInitialCourseDesign({ ...brief, referenceMaterialIntent: "upload_in_creator" }, graph, null, ["reference.pdf"]);
     expect(design.requirements.referenceMaterialNames).toEqual(["reference.pdf"]);

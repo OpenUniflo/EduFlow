@@ -1,0 +1,380 @@
+{
+  "failure": {
+    "message": "LLM response was truncated: provider=deepseek, model=deepseek-v4-flash"
+  },
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v14",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "2ff7e486-d7db-412a-bf48-865b60c44972",
+      "generatedAt": "2026-10-03T17:35:13.067Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 539,
+      "completionTokens": 4440
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-python-runtime",
+          "line": 1,
+          "quote": "我在独立终端用 CPython 3.12 运行文件 demo.py，内容为 print(2+3)，命令 python demo.py 得到标准输出5，退出码0",
+          "observation": "在独立终端使用 CPython 3.12 运行文件 demo.py，其中内容为 print(2+3)，执行命令 python demo.py，得到标准输出 5 和退出码 0。",
+          "capability": "运行 Python 脚本并读取标准输出与退出码"
+        },
+        {
+          "sourceId": "local-python-runtime",
+          "line": 1,
+          "quote": "再运行 python -c \"import sys; print(sys.version_info.major); print(sys.executable)\" 得到主版本3和当前虚拟环境的解释器路径",
+          "observation": "运行 python -c 命令执行 import sys、print(sys.version_info.major) 和 print(sys.executable)，得到主版本 3 和当前虚拟环境的解释器路径。",
+          "capability": "通过 sys 模块检查 Python 主版本和解释器路径"
+        },
+        {
+          "sourceId": "local-python-runtime",
+          "line": 2,
+          "quote": "我在终端直接输入 Python 表达式 print(2+3) 会被 shell 当作 shell 语法，不能代替 python demo.py；我改为显式调用对应 Python 可执行文件后成功。",
+          "observation": "尝试在终端直接输入 Python 表达式 print(2+3)，shell 将其当作 shell 语法，不能代替 python demo.py；改为显式调用对应 Python 可执行文件后成功。",
+          "capability": "识别 shell 与 Python 解释器边界，显式调用 Python 可执行文件"
+        },
+        {
+          "sourceId": "local-python-runtime",
+          "line": 2,
+          "quote": "另将文件改为 print(undefined_name)，运行得到 NameError 和退出码1，我根据栈追踪定位未定义变量并改为已定义值，再运行输出5、退出码0。",
+          "observation": "将文件改为 print(undefined_name)，运行得到 NameError 和退出码 1；根据栈追踪定位未定义变量并改为已定义值，再运行输出 5、退出码 0。",
+          "capability": "通过栈追踪调试 NameError 并修正后验证运行结果"
+        },
+        {
+          "sourceId": "local-python-runtime",
+          "line": 2,
+          "quote": "验证时始终使用同一个解释器路径，避免系统 Python 与虚拟环境 Python 混用。",
+          "observation": "在验证时始终使用同一个解释器路径，避免系统 Python 与虚拟环境 Python 混用。",
+          "capability": "保持验证解释器路径一致，避免环境混用"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.533365293342911
+        },
+        {
+          "node_id": "BR01",
+          "revision_id": "BR01-r1",
+          "title": "Async Tool Execution",
+          "description": "在异步 Runtime 中可靠执行外部工具并处理结果、超时与生命周期。",
+          "mastery_criteria": [
+            "能独立完成Async Tool Execution的核心目标与边界",
+            "能在具体场景中识别Async Tool Execution的正确用法与常见误用",
+            "能用可检查的示例证明对Async Tool Execution的掌握"
+          ],
+          "similarity": 0.455202685141485
+        },
+        {
+          "node_id": "T06",
+          "revision_id": "T06-r1",
+          "title": "Tool Result",
+          "description": "解析、归一化并注入工具执行结果。",
+          "mastery_criteria": [
+            "能正确解释并使用Tool Result的核心目标与边界",
+            "能在具体场景中识别Tool Result的正确用法与常见误用",
+            "能用可检查的示例证明对Tool Result的掌握"
+          ],
+          "similarity": 0.422979154257103
+        },
+        {
+          "node_id": "E13",
+          "revision_id": "E13-r1",
+          "title": "Outcome Evaluation",
+          "description": "依据验收标准评测最终结果。",
+          "mastery_criteria": [
+            "能独立完成Outcome Evaluation的核心目标与边界",
+            "能在具体场景中识别Outcome Evaluation的正确用法与常见误用",
+            "能用可检查的示例证明对Outcome Evaluation的掌握"
+          ],
+          "similarity": 0.406280445865381
+        },
+        {
+          "node_id": "PY08",
+          "revision_id": "PY08-r1",
+          "title": "Module",
+          "description": "用模块组织和复用 Python 代码。",
+          "mastery_criteria": [
+            "能独立完成Module的核心目标与边界",
+            "能在具体场景中识别Module的正确用法与常见误用",
+            "能用可检查的示例证明对Module的掌握"
+          ],
+          "similarity": 0.405464195716607
+        }
+      ],
+      [
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.512988029362198
+        },
+        {
+          "node_id": "PY82",
+          "revision_id": "PY82-r1",
+          "title": "Dynamic Import",
+          "description": "在运行时动态加载 Python 模块。",
+          "mastery_criteria": [
+            "能独立完成Dynamic Import的核心目标与边界",
+            "能在具体场景中识别Dynamic Import的正确用法与常见误用",
+            "能用可检查的示例证明对Dynamic Import的掌握"
+          ],
+          "similarity": 0.433299988508228
+        },
+        {
+          "node_id": "PY37",
+          "revision_id": "PY37-r1",
+          "title": "pytest",
+          "description": "使用 pytest 编写和运行自动化测试。",
+          "mastery_criteria": [
+            "能独立完成pytest的核心目标与边界",
+            "能在具体场景中识别pytest的正确用法与常见误用",
+            "能用可检查的示例证明对pytest的掌握"
+          ],
+          "similarity": 0.415568369163027
+        },
+        {
+          "node_id": "PY08",
+          "revision_id": "PY08-r1",
+          "title": "Module",
+          "description": "用模块组织和复用 Python 代码。",
+          "mastery_criteria": [
+            "能独立完成Module的核心目标与边界",
+            "能在具体场景中识别Module的正确用法与常见误用",
+            "能用可检查的示例证明对Module的掌握"
+          ],
+          "similarity": 0.413459733701993
+        },
+        {
+          "node_id": "PY55",
+          "revision_id": "PY55-r1",
+          "title": "Global Interpreter Lock",
+          "description": "解释 GIL 对 Python 线程执行的影响。",
+          "mastery_criteria": [
+            "能清楚解释Global Interpreter Lock的核心目标与边界",
+            "能在具体场景中识别Global Interpreter Lock的正确用法与常见误用",
+            "能用可检查的示例证明对Global Interpreter Lock的掌握"
+          ],
+          "similarity": 0.394721704878758
+        }
+      ],
+      [
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.575708270072941
+        },
+        {
+          "node_id": "T15",
+          "revision_id": "T15-r1",
+          "title": "Tool Execution",
+          "description": "调用外部能力并管理一次执行。",
+          "mastery_criteria": [
+            "能独立完成Tool Execution的核心目标与边界",
+            "能在具体场景中识别Tool Execution的正确用法与常见误用",
+            "能用可检查的示例证明对Tool Execution的掌握"
+          ],
+          "similarity": 0.486394417427808
+        },
+        {
+          "node_id": "PY102",
+          "revision_id": "PY102-r1",
+          "title": "Python Plugin",
+          "description": "定义并加载可插拔 Python 能力。",
+          "mastery_criteria": [
+            "能独立完成Python Plugin的核心目标与边界",
+            "能在具体场景中识别Python Plugin的正确用法与常见误用",
+            "能用可检查的示例证明对Python Plugin的掌握"
+          ],
+          "similarity": 0.48595586335396
+        },
+        {
+          "node_id": "PY82",
+          "revision_id": "PY82-r1",
+          "title": "Dynamic Import",
+          "description": "在运行时动态加载 Python 模块。",
+          "mastery_criteria": [
+            "能独立完成Dynamic Import的核心目标与边界",
+            "能在具体场景中识别Dynamic Import的正确用法与常见误用",
+            "能用可检查的示例证明对Dynamic Import的掌握"
+          ],
+          "similarity": 0.445773654672343
+        },
+        {
+          "node_id": "MA03",
+          "revision_id": "MA03-r1",
+          "title": "Tool",
+          "description": "理解可调用、具有输入输出契约的原子外部能力。",
+          "mastery_criteria": [
+            "能清楚解释Tool的核心目标与边界",
+            "能在具体场景中识别Tool的正确用法与常见误用",
+            "能用可检查的示例证明对Tool的掌握"
+          ],
+          "similarity": 0.440003603696826
+        }
+      ],
+      [
+        {
+          "node_id": "E07",
+          "revision_id": "E07-r1",
+          "title": "Runtime Debugging",
+          "description": "依据运行信号定位 Agent 执行故障。",
+          "mastery_criteria": [
+            "能独立完成Runtime Debugging的核心目标与边界",
+            "能在具体场景中识别Runtime Debugging的正确用法与常见误用",
+            "能用可检查的示例证明对Runtime Debugging的掌握"
+          ],
+          "similarity": 0.542527134117234
+        },
+        {
+          "node_id": "PY91",
+          "revision_id": "PY91-r1",
+          "title": "Trace / Span",
+          "description": "追踪跨组件执行路径。",
+          "mastery_criteria": [
+            "能独立完成Trace / Span的核心目标与边界",
+            "能在具体场景中识别Trace / Span的正确用法与常见误用",
+            "能用可检查的示例证明对Trace / Span的掌握"
+          ],
+          "similarity": 0.452954414310796
+        },
+        {
+          "node_id": "PY01",
+          "revision_id": "PY01-r1",
+          "title": "Python Runtime",
+          "description": "理解 Python 程序的运行环境与执行模型。",
+          "mastery_criteria": [
+            "能清楚解释Python Runtime的核心目标与边界",
+            "能在具体场景中识别Python Runtime的正确用法与常见误用",
+            "能用可检查的示例证明对Python Runtime的掌握"
+          ],
+          "similarity": 0.433960479385768
+        },
+        {
+          "node_id": "MAC08",
+          "revision_id": "MAC08-r1",
+          "title": "Multi-Agent Error Cascade",
+          "description": "一个 Agent 的错误输出被后续 Agent 当作可信输入继续传播，使局部错误放大为系统级失败。",
+          "mastery_criteria": [
+            "能从多 Agent 轨迹中定位错误开始传播的位置",
+            "能解释角色链越长为什么可能放大未验证假设",
+            "能设计一个中间验证点阻止错误级联"
+          ],
+          "similarity": 0.432213323348373
+        },
+        {
+          "node_id": "PY09",
+          "revision_id": "PY09-r1",
+          "title": "Exception",
+          "description": "使用异常表达和处理失败。",
+          "mastery_criteria": [
+            "能独立完成Exception的核心目标与边界",
+            "能在具体场景中识别Exception的正确用法与常见误用",
+            "能用可检查的示例证明对Exception的掌握"
+          ],
+          "similarity": 0.424804611539017
+        }
+      ],
+      [
+        {
+          "node_id": "EVAL06",
+          "revision_id": "EVAL06-r1",
+          "title": "Automated Evaluation Environment",
+          "description": "提供可重置的任务环境、工具、状态与验证器，使 Agent 能在一致条件下重复执行并自动判断结果。",
+          "mastery_criteria": [
+            "能列出自动评估环境中的任务、状态、工具和验证器等基本组成",
+            "能解释环境可重置和可复现的重要性",
+            "能为一个工具调用任务设计最小自动评估环境"
+          ],
+          "similarity": 0.522173570588849
+        },
+        {
+          "node_id": "MAC08",
+          "revision_id": "MAC08-r1",
+          "title": "Multi-Agent Error Cascade",
+          "description": "一个 Agent 的错误输出被后续 Agent 当作可信输入继续传播，使局部错误放大为系统级失败。",
+          "mastery_criteria": [
+            "能从多 Agent 轨迹中定位错误开始传播的位置",
+            "能解释角色链越长为什么可能放大未验证假设",
+            "能设计一个中间验证点阻止错误级联"
+          ],
+          "similarity": 0.489078162798663
+        },
+        {
+          "node_id": "S02",
+          "revision_id": "S02-r1",
+          "title": "Sandbox",
+          "description": "在隔离环境限制代码与工具副作用。",
+          "mastery_criteria": [
+            "能独立完成Sandbox的核心目标与边界",
+            "能在具体场景中识别Sandbox的正确用法与常见误用",
+            "能用可检查的示例证明对Sandbox的掌握"
+          ],
+          "similarity": 0.479662520855295
+        },
+        {
+          "node_id": "PY95",
+          "revision_id": "PY95-r1",
+          "title": "Docker",
+          "description": "使用容器打包一致运行环境。",
+          "mastery_criteria": [
+            "能独立完成Docker的核心目标与边界",
+            "能在具体场景中识别Docker的正确用法与常见误用",
+            "能用可检查的示例证明对Docker的掌握"
+          ],
+          "similarity": 0.473908989066421
+        },
+        {
+          "node_id": "TRAIN08",
+          "revision_id": "TRAIN08-r1",
+          "title": "RL Environment and Model-Simulated Environment",
+          "description": "为强化学习提供可重复试错的环境，并在真实环境昂贵时用模型模拟工具或环境动态生成交互。",
+          "mastery_criteria": [
+            "能说明 RL 环境相对评估环境增加的训练需求",
+            "能解释模型模拟环境的价值与偏差风险",
+            "能判断何时需要真实环境交互来校准模拟器"
+          ],
+          "similarity": 0.470234422101642
+        }
+      ]
+    ]
+  },
+  "llmCalls": 2,
+  "retrievalCount": 5,
+  "topK": 5,
+  "sourceCount": 1
+}

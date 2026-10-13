@@ -1,0 +1,170 @@
+{
+  "scope": "Local real provider / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-similar-not-same",
+      "line": 1,
+      "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。",
+      "observation": "在60分钟内完成600箱分拣，计算平均10箱/分钟，并重复两次得到595箱和605箱。",
+      "capability": "测量并计算仓库分拣线吞吐量，进行重复测量"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "E12",
+      "sufficiency": "partial",
+      "confidence": 0.6,
+      "reason": "原文记录了一次可重复的吞吐量测量（60分钟600箱，重复两次595和605箱），属于可重复执行、结果可比较的基准任务示例，但未说明独立完成核心目标与边界、识别正确用法与常见误用，也未用可检查示例证明掌握，仅覆盖部分可检查子步骤。",
+      "revisionId": "E12-r1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v5",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "dd48337a-e69f-496a-8d61-7815712fd421",
+      "generatedAt": "2026-10-03T16:10:54.149Z",
+      "temperature": 0,
+      "maxTokens": 6000,
+      "promptTokens": 246,
+      "completionTokens": 107
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v5",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "d335d3bf-aa2d-4b2c-9738-10114d646b2f",
+      "generatedAt": "2026-10-03T16:10:57.552Z",
+      "temperature": 0,
+      "maxTokens": 7000,
+      "promptTokens": 1088,
+      "completionTokens": 362
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文仅记录仓库分拣线吞吐量测量，明确不涉及供应商生产瓶颈、良率或已承诺订单，未执行依据瓶颈、良率和已承诺负荷计算可交付量或识别名义产能误用的任何组成动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-net-material-requirement": {
+              "reason": "原文仅记录分拣线吞吐量测量，未涉及订单需求、可用库存、确认到货或分时段净需求计算，也无排除不可用库存的动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "E12": {
+              "reason": "原文记录了一次可重复的吞吐量测量（60分钟600箱，重复两次595和605箱），属于可重复执行、结果可比较的基准任务示例，但未说明独立完成核心目标与边界、识别正确用法与常见误用，也未用可检查示例证明掌握，仅覆盖部分可检查子步骤。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.6
+            },
+            "supply-cross-border-lead-time": {
+              "reason": "原文仅涉及仓内分拣吞吐量，未分解生产、运输、通关和收货环节，未给出交期区间或不确定性，也未涉及避免重复计时。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-incoming-quality-anomaly": {
+              "reason": "原文仅记录分拣线吞吐量测量，未依据任何检验标准区分批次异常、测量误差或证据不足。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-supplier-delivery-capacity",
+          "supply-net-material-requirement",
+          "E12",
+          "supply-cross-border-lead-time",
+          "supply-incoming-quality-anomaly"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-similar-not-same",
+          "line": 1,
+          "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。",
+          "observation": "在60分钟内完成600箱分拣，计算平均10箱/分钟，并重复两次得到595箱和605箱。",
+          "capability": "测量并计算仓库分拣线吞吐量，进行重复测量"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.516668319702148
+        },
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.492808058643581
+        },
+        {
+          "node_id": "E12",
+          "revision_id": "E12-r1",
+          "title": "Benchmark Task",
+          "description": "设计可重复执行、结果可比较的基准任务。",
+          "mastery_criteria": [
+            "能独立完成Benchmark Task的核心目标与边界",
+            "能在具体场景中识别Benchmark Task的正确用法与常见误用",
+            "能用可检查的示例证明对Benchmark Task的掌握"
+          ],
+          "similarity": 0.492555543558465
+        },
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "revision_id": "supply-cross-border-lead-time:v1",
+          "title": "跨境补货交期估计",
+          "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+          "mastery_criteria": [
+            "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+          ],
+          "similarity": 0.466431349515915
+        },
+        {
+          "node_id": "supply-incoming-quality-anomaly",
+          "revision_id": "supply-incoming-quality-anomaly:v1",
+          "title": "来料质量异常判定",
+          "description": "依据给定检验标准区分批次异常、测量误差及证据不足。",
+          "mastery_criteria": [
+            "依据给定检验标准区分批次异常、测量误差及证据不足。"
+          ],
+          "similarity": 0.457537263631821
+        }
+      ]
+    ]
+  },
+  "retrievalCount": 1
+}

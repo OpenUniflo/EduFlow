@@ -1,3 +1,4 @@
+import { auditProjectStructure } from '@/shared/learning/projectStructureAudit';
 import { computePrerequisiteClosure } from "@/features/course/goal/goalPlanning";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import type { KnowledgeGraph } from "@/features/knowledge/types";
@@ -240,6 +241,11 @@ export function validateCourseCreatorDesign(design: CourseCreatorDesign, graph: 
     if (closure.cycleDetected) technicalDetails.push(`Prerequisite cycle: ${closure.cycleNodeIds.join(", ")}`);
     if (nonFactual.length) technicalDetails.push(`Non-factual prerequisites: ${nonFactual.join(", ")}`);
     if (missingFactual.length) technicalDetails.push(`Missing factual prerequisites: ${missingFactual.join(", ")}`);
+  }
+  const structureAudit = auditProjectStructure(included.filter(id => visible.has(id)), graph.edges);
+  if (structureAudit.isolatedTargetIds.length) {
+    warnings.push('部分课程能力缺少前置或支撑关系，请核对关系证据或课程范围。');
+    technicalDetails.push(`Isolated project targets: ${structureAudit.isolatedTargetIds.join(', ')}`);
   }
   const placements = design.curriculum.chapters.flatMap((chapter) => chapter.knowledgeIds);
   if (new Set(design.curriculum.chapters.map((chapter) => chapter.id)).size !== design.curriculum.chapters.length) fatal.push("章节 ID 必须唯一。");

@@ -1,0 +1,175 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-incorrect-paraphrase",
+      "line": 1,
+      "quote": "我尝试核算 M91 单期净需求：需求为 150 件，已核实可用库存 70 件，没有确认到货。我在草稿记录 150 减 70 等于 90，所以写下净需求 90 件，尚未复算。",
+      "observation": "尝试核算 M91 单期净需求，使用需求 150 件、已核实可用库存 70 件、未确认到货；在草稿记录 150 减 70 等于 90，并写下净需求 90 件；尚未复算。",
+      "capability": "单期净需求核算（输入汇总、计算草稿、结果填写，并保留未复算局限）"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "insufficient",
+      "confidence": 0.9,
+      "reason": "原文仅提供M91单期净需求尝试：需求150、已核实可用库存70、无确认到货；但草稿记录150-70=90并写下净需求90，实际应为80，属错误结果，且明确尚未复算。未正确完成净需求计算，也未体现分时段净需求，故不足以证明掌握该标准。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v15",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "eb689e3e-d3ef-40d6-b9de-7fef026881b9",
+      "generatedAt": "2026-10-03T17:40:58.126Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 397,
+      "completionTokens": 804
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v15",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "7483c73c-2b3f-46ec-acd9-1d9505c45e6e",
+      "generatedAt": "2026-10-03T17:41:22.126Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1342,
+      "completionTokens": 5360
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "原文仅提供M91单期净需求尝试：需求150、已核实可用库存70、无确认到货；但草稿记录150-70=90并写下净需求90，实际应为80，属错误结果，且明确尚未复算。未正确完成净需求计算，也未体现分时段净需求，故不足以证明掌握该标准。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.9
+            },
+            "supply-shortage-exposure": {
+              "reason": "原文只尝试计算净需求，未使用补货交期窗口，也未计算最早缺料日、缺口量或交期敏感性，与该标准要求的组成动作无直接对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "CDS525-K005": {
+              "reason": "原文为供应链净需求核算，未解释人工神经元的核心作用、适用边界或相邻概念，也未实现weighted sum + activation前向计算或提交neuron.py/output，与该标准无对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文未涉及供应商交付产能、瓶颈、良率、已承诺负荷计算期间可交付量或识别名义产能误用，与该标准无直接对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            },
+            "CDS525-K017": {
+              "reason": "原文为净需求核算，未涉及前向传播、按网络连接方向逐层计算中间表示和输出，也未记录各层输出或提交forward_trace.json，与该标准无对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 1
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "CDS525-K005",
+          "supply-supplier-delivery-capacity",
+          "CDS525-K017"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-incorrect-paraphrase",
+          "line": 1,
+          "quote": "我尝试核算 M91 单期净需求：需求为 150 件，已核实可用库存 70 件，没有确认到货。我在草稿记录 150 减 70 等于 90，所以写下净需求 90 件，尚未复算。",
+          "observation": "尝试核算 M91 单期净需求，使用需求 150 件、已核实可用库存 70 件、未确认到货；在草稿记录 150 减 70 等于 90，并写下净需求 90 件；尚未复算。",
+          "capability": "单期净需求核算（输入汇总、计算草稿、结果填写，并保留未复算局限）"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.710167208010938
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.601625222016139
+        },
+        {
+          "node_id": "CDS525-K005",
+          "revision_id": "CDS525-K005-r1",
+          "title": "Artificial Neuron",
+          "description": "对输入进行加权求和并经激活函数产生输出的基本计算单元。",
+          "mastery_criteria": [
+            "能准确解释「Artificial Neuron」的核心作用、适用边界及与相邻概念的区别",
+            "能完成对应最小可执行任务：实现单个神经元的 weighted sum + activation 前向计算，并提交 neuron.py + example output"
+          ],
+          "similarity": 0.50610087793765
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.503393500841052
+        },
+        {
+          "node_id": "CDS525-K017",
+          "revision_id": "CDS525-K017-r1",
+          "title": "Forward Propagation",
+          "description": "按照网络连接方向从输入逐层计算中间表示和最终输出的过程。",
+          "mastery_criteria": [
+            "能准确解释「Forward Propagation」的核心作用、适用边界及与相邻概念的区别",
+            "能完成对应最小可执行任务：对一个小网络完成一次完整前向计算，记录各层输出，并提交 forward_trace.json"
+          ],
+          "similarity": 0.48499740526058
+        }
+      ]
+    ],
+    "verifications": []
+  },
+  "llmCalls": 2,
+  "retrievalCount": 1
+}

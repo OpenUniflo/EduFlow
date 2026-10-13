@@ -1,0 +1,34 @@
+{
+  "reviewer": "graph_ux_reviewer",
+  "commit": "5ab83f2",
+  "preview": "https://edu-flow-6pbjj7qeo-july-nanas-projects.vercel.app",
+  "viewport": [
+    1280,
+    633
+  ],
+  "method": "Authenticated A, actual mouse on graph edge; selected and started Micro, returned without completing any Micro steps, selected Practice alternative, started, uploaded actual shortage-window-result.md using file input. No console API calls or state injection.",
+  "passed": [
+    "Micro opens existing runtime with 3 steps, real lesson title 缺口会不会在下一期自动消失？.",
+    "Returning to Project retains cyan Micro execution state.",
+    "Selecting Practice replaces chosen alternative, starting shows cyan Practice action arc.",
+    "File upload succeeds and automatic Evidence Workspace shows selected parsed shortage-window-result.md, 1 source selected.",
+    "Closing Evidence Workspace shows emerald completed Practice arc and text completion does not equal acquired capability.",
+    "Project acquired3/intermediate2/targets4 unchanged before evidence confirmation.",
+    "Browser errors empty."
+  ],
+  "findings": [
+    {
+      "id": "UX-C01",
+      "severity": "P2",
+      "finding": "Upload label text squeezed to one Chinese character per line next to native file input; purple upload control ~163px tall. Functional but visibly broken.",
+      "recommendation": "Separate file input from label text or hide native input and use regular full-width upload button."
+    },
+    {
+      "id": "UX-C02",
+      "severity": "P2",
+      "finding": "New upload Evidence Workspace shows previous diagnosis failure message though this new source has not been diagnosed.",
+      "recommendation": "Scope displayed diagnosis status to selected sources / current run, preserve historical errors in history."
+    }
+  ],
+  "next": "No diagnosis or confirmation clicked. Parent notified to perform real diagnosis. Follow-up confirmation/recompute pending."
+}

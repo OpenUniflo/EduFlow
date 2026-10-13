@@ -1,0 +1,323 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-valid-partial-unrelated-error",
+      "line": 1,
+      "quote": "我完成 R30 的库存盘点：实物 80 件，隔离且不可领用的 20 件，复核可用量 80-20=60 件，并与库位记录一致。订单需求和到货尚未确认，本次未做净需求计算。",
+      "observation": "完成 R30 库存盘点，记录实物 80 件、隔离且不可领用 20 件，并复核可用量 80-20=60 件，与库位记录一致；同时说明订单需求和到货尚未确认，本次未做净需求计算。",
+      "capability": "库存盘点与可用量核算"
+    },
+    {
+      "sourceId": "local-valid-partial-unrelated-error",
+      "line": 2,
+      "quote": "另一个与库存无关的练习里，我误写圆面积为周长的平方，已经标记为错误待改；该练习未用于库存核算。",
+      "observation": "在与库存无关的练习中写出圆面积为周长的平方，并标记为错误待改；该练习未用于库存核算。",
+      "capability": "圆面积公式书写"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "insufficient",
+      "confidence": 0.86,
+      "reason": "insufficient: 标准要求“根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存”，其任务对象是物料净需求，专门方法是分时段净需求计算，条件包括订单需求与确认到货。原文第1行仅记载“完成 R30 的库存盘点：实物 80 件，隔离且不可领用的 20 件，复核可用量 80-20=60 件，并与库位记录一致”，并明确“订单需求和到货尚未确认，本次未做净需求计算”。因此虽已正确排除隔离且不可领用库存并算出可用量 60 件，但该动作属于库存盘点/可用量复核，未执行标准要求的分时段净需求计算，也未保留订单需求、确认到货等条件。第2行无关数学错误与库存核算无关，不构成支持或额外否定。故未保留标准对象、专门方法及条件，判定为 insufficient。\n原判断：单元0记录本人完成R30库存盘点：隔离且不可领用的20件被排除，复核可用量80-20=60件并与库位记录一致，这直接对应标准中“正确排除不可用库存”的组成动作且有正确结果。但订单需求和到货尚未确认，且明确未做净需求计算，缺少依据订单需求、可用库存及确认到货计算分时段净需求的步骤，故仅部分满足。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        1
+      ],
+      "nodeId": null,
+      "sufficiency": "unmatched",
+      "confidence": 0,
+      "reason": "本次Top-K候选未与该单元的实际能力表现对应；候选判断保留在诊断记录中。",
+      "revisionId": null,
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "d7464f08-0036-4d49-98e8-6fd982ab21ba",
+      "generatedAt": "2026-10-03T17:15:58.752Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 433,
+      "completionTokens": 2960
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "5d91a6fe-ded1-4f2e-b567-d890ddd8c8f1",
+      "generatedAt": "2026-10-03T17:16:28.081Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1975,
+      "completionTokens": 6078
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v12",
+      "schemaVersion": "evidence-factual-verification-v2",
+      "requestId": "64e6f461-23c1-423e-ac00-7931e570a6b6",
+      "generatedAt": "2026-10-03T17:16:34.997Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 846,
+      "completionTokens": 1456
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "单元0记录本人完成R30库存盘点：隔离且不可领用的20件被排除，复核可用量80-20=60件并与库位记录一致，这直接对应标准中“正确排除不可用库存”的组成动作且有正确结果。但订单需求和到货尚未确认，且明确未做净需求计算，缺少依据订单需求、可用库存及确认到货计算分时段净需求的步骤，故仅部分满足。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.86
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "单元0仅涉及库存盘点与可用量核算，未涉及供应商瓶颈、良率、已承诺负荷、期间可交付量计算或名义产能误用识别，与标准无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-shortage-exposure": {
+              "reason": "单元0未计算净需求，并明确订单需求和到货尚未确认、本次未做净需求计算；也没有补货交期窗口、最早缺料日、缺口量或交期敏感性。库存可用量只是上游前置数据，不是该标准要求的组成动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.92
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "单元0没有已量化缺口，也未映射受影响订单、停线时段或恢复优先级输入，与标准无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-alternate-site-capacity": {
+              "reason": "单元0未涉及替代基地负荷、产品兼容性、转换损失或可释放产能估算，也无不确定性说明，与标准无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "CODE02": {
+              "reason": "单元1是圆面积公式误写并标记待改，未编写或执行代码，未把代码作为计算、验证、搜索或中间推导工具，也无根据执行结果修正推理的表现，与标准无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "PY19": {
+              "reason": "单元1不涉及文件读写或路径操作，没有File/Path的核心动作或可检查示例，与标准无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "PY04": {
+              "reason": "单元1是几何公式误写且已标为错误，不是Python表达式组合、运算或调用的正确用法，也没有可检查示例；不能按“公式/表达式”相似词匹配Expressions标准。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.94
+            },
+            "CDS525-K002": {
+              "reason": "单元1未将真实问题表述为input、target、task type、evaluation target，也未提交problem_spec.json，与Learning Problem Formulation无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "R01": {
+              "reason": "单元1只记录一个与库存无关的公式错误待改，没有可观察的推理、行动与反馈循环，与Reasoning Loop无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-supplier-delivery-capacity",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-alternate-site-capacity",
+          "CODE02",
+          "PY19",
+          "PY04",
+          "CDS525-K002",
+          "R01"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-valid-partial-unrelated-error",
+          "line": 1,
+          "quote": "我完成 R30 的库存盘点：实物 80 件，隔离且不可领用的 20 件，复核可用量 80-20=60 件，并与库位记录一致。订单需求和到货尚未确认，本次未做净需求计算。",
+          "observation": "完成 R30 库存盘点，记录实物 80 件、隔离且不可领用 20 件，并复核可用量 80-20=60 件，与库位记录一致；同时说明订单需求和到货尚未确认，本次未做净需求计算。",
+          "capability": "库存盘点与可用量核算"
+        },
+        {
+          "sourceId": "local-valid-partial-unrelated-error",
+          "line": 2,
+          "quote": "另一个与库存无关的练习里，我误写圆面积为周长的平方，已经标记为错误待改；该练习未用于库存核算。",
+          "observation": "在与库存无关的练习中写出圆面积为周长的平方，并标记为错误待改；该练习未用于库存核算。",
+          "capability": "圆面积公式书写"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.645818687352345
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.531339291493812
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.491348667128106
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.434523872676361
+        },
+        {
+          "node_id": "supply-alternate-site-capacity",
+          "revision_id": "supply-alternate-site-capacity:v1",
+          "title": "替代基地可用产能评估",
+          "description": "根据给定基地负荷、产品兼容性和转换损失估算可释放产能并指出不确定性。",
+          "mastery_criteria": [
+            "根据给定基地负荷、产品兼容性和转换损失估算可释放产能并指出不确定性。"
+          ],
+          "similarity": 0.430075232695825
+        }
+      ],
+      [
+        {
+          "node_id": "CODE02",
+          "revision_id": "CODE02-r1",
+          "title": "Code as a Reasoning Tool",
+          "description": "让 Agent 通过编写和执行代码完成计算、验证、搜索或中间推导，把代码作为思考过程的一部分。",
+          "mastery_criteria": [
+            "能识别比纯自然语言推理更适合用代码解决的步骤",
+            "能编写一个用于验证或计算中间结论的小程序",
+            "能根据执行结果修正原先的推理或计划"
+          ],
+          "similarity": 0.380800760936692
+        },
+        {
+          "node_id": "PY19",
+          "revision_id": "PY19-r1",
+          "title": "File / Path",
+          "description": "可靠读写文件并操作路径。",
+          "mastery_criteria": [
+            "能独立完成File / Path的核心目标与边界",
+            "能在具体场景中识别File / Path的正确用法与常见误用",
+            "能用可检查的示例证明对File / Path的掌握"
+          ],
+          "similarity": 0.366958395605279
+        },
+        {
+          "node_id": "PY04",
+          "revision_id": "PY04-r1",
+          "title": "Expressions",
+          "description": "使用表达式组合值、运算和调用。",
+          "mastery_criteria": [
+            "能清楚解释Expressions的核心目标与边界",
+            "能在具体场景中识别Expressions的正确用法与常见误用",
+            "能用可检查的示例证明对Expressions的掌握"
+          ],
+          "similarity": 0.365663343847393
+        },
+        {
+          "node_id": "CDS525-K002",
+          "revision_id": "CDS525-K002-r1",
+          "title": "Learning Problem Formulation",
+          "description": "将真实问题明确为输入、目标、任务类型、数据与评价指标的建模过程。",
+          "mastery_criteria": [
+            "能准确解释「Learning Problem Formulation」的核心作用、适用边界及与相邻概念的区别",
+            "能完成对应最小可执行任务：把问题明确写成 input、target、task type、evaluation target，并提交 problem_spec.json"
+          ],
+          "similarity": 0.360358552889996
+        },
+        {
+          "node_id": "R01",
+          "revision_id": "R01-r1",
+          "title": "Reasoning Loop",
+          "description": "组织可观察的推理、行动与反馈循环。",
+          "mastery_criteria": [
+            "能判断适用条件并运用Reasoning Loop的核心目标与边界",
+            "能在具体场景中识别Reasoning Loop的正确用法与常见误用",
+            "能用可检查的示例证明对Reasoning Loop的掌握"
+          ],
+          "similarity": 0.347495128289012
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-net-material-requirement": {
+              "criterionScopePreserved": false,
+              "verdict": "insufficient",
+              "reason": "标准要求“根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存”，其任务对象是物料净需求，专门方法是分时段净需求计算，条件包括订单需求与确认到货。原文第1行仅记载“完成 R30 的库存盘点：实物 80 件，隔离且不可领用的 20 件，复核可用量 80-20=60 件，并与库位记录一致”，并明确“订单需求和到货尚未确认，本次未做净需求计算”。因此虽已正确排除隔离且不可领用库存并算出可用量 60 件，但该动作属于库存盘点/可用量复核，未执行标准要求的分时段净需求计算，也未保留订单需求、确认到货等条件。第2行无关数学错误与库存核算无关，不构成支持或额外否定。故未保留标准对象、专门方法及条件，判定为 insufficient。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "llmCalls": 3,
+  "retrievalCount": 2
+}

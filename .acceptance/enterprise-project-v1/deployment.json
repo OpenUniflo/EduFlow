@@ -1,0 +1,13 @@
+{
+  "validatedCodeCommit": "840ffbd15c45254164f7621efb8d01ea0c84ab90",
+  "validatedDeployment": "dpl_AeMqJaVQwDv2d4nQCEmTTHpdPicj",
+  "validatedPreview": "https://edu-flow-b4jcw7u4v-july-nanas-projects.vercel.app",
+  "productionSourceTrees": {
+    "src": "6ac8dd1e109aa38e11a0159f7636e4f6f31152f8",
+    "api": "a83524a89e99a646f60373de507e5d0457e53ea3",
+    "public": "422b52c6b00fc63bb7cd3be173caeeedc17126ec",
+    "pnpm-lock.yaml": "4115fa3af48208a10dc208f94980d9d767afd38e",
+    "package.json": "465cce59f3782087bd30dc8e40126e1caaee5b97",
+    "vercel.json": "e049a9c4362ae7a41e2faa011be58293c4a8a597"
+  }
+}

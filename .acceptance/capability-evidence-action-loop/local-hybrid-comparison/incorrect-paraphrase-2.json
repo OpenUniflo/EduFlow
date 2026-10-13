@@ -1,0 +1,230 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-incorrect-paraphrase",
+      "line": 1,
+      "quote": "我尝试核算 M91 单期净需求：需求为 150 件，已核实可用库存 70 件，没有确认到货。我在草稿记录 150 减 70 等于 90，所以写下净需求 90 件",
+      "observation": "尝试核算 M91 单期净需求：需求 150 件、已核实可用库存 70 件、没有确认到货；在草稿中记录 150 减 70 等于 90，并写下净需求 90 件。",
+      "capability": "单期净需求核算与草稿记录"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "insufficient",
+      "confidence": 0.9,
+      "reason": "原文称核算M91单期净需求：需求150、已核实可用库存70、无确认到货，草稿记录150减70等于90并写下净需求90。但150-70应为80，结果为错误；未体现分时段，未明确执行排除不可用库存，且尚未复算。虽有计算尝试，但无正确执行的标准动作，故为insufficient。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "insufficient",
+      "confidence": 0.85,
+      "reason": "原文只有M91单期净需求草稿计算，且算错；没有补货交期窗口、最早缺料日、缺口量或交期敏感性等交期窗口缺料暴露评估动作。净需求仅为前置输入，未用于缺料暴露，故为insufficient。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "RT06",
+      "sufficiency": "insufficient",
+      "confidence": 0.65,
+      "reason": "insufficient: 原文第1行记录的动作是净需求核算：需求150件、库存70件、无到货，并写下净需求90件，但150-70=80而非90，计算错误且尚未复算。该行为只是一般核算/草稿记录，未体现Audit Trail所要求的可追溯输入、决策、动作与结果的专门审计方法或边界；也无法满足“能正确解释并使用Audit Trail的核心目标与边界”或“用可检查的示例证明掌握”。因此无可独立核查的正确标准子动作，scope不成立。\n原判断：原文在草稿记录需求150、可用库存70、无确认到货、动作150减70和结果净需求90，属于可追溯记录输入/动作/结果的部分表现；但未解释Audit Trail核心目标与边界，未识别正确用法与常见误用，且结果算错并明确尚未复算，不能支持掌握，故为partial。",
+      "revisionId": "RT06-r1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v14",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "c2e0eb43-40af-4a2c-8986-a2f1a05411f6",
+      "generatedAt": "2026-10-03T17:32:18.871Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 397,
+      "completionTokens": 1253
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v14",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "d55ceccd-ee10-49f3-add4-927d2a5e264d",
+      "generatedAt": "2026-10-03T17:33:09.007Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1283,
+      "completionTokens": 10433
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "promptVersion": "personal-evidence-v14",
+      "schemaVersion": "evidence-factual-verification-v2",
+      "requestId": "0ae4d530-5956-4971-bce2-57e83eb3451e",
+      "generatedAt": "2026-10-03T17:33:47.227Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 867,
+      "completionTokens": 3437
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "原文称核算M91单期净需求：需求150、已核实可用库存70、无确认到货，草稿记录150减70等于90并写下净需求90。但150-70应为80，结果为错误；未体现分时段，未明确执行排除不可用库存，且尚未复算。虽有计算尝试，但无正确执行的标准动作，故为insufficient。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.9
+            },
+            "supply-shortage-exposure": {
+              "reason": "原文只有M91单期净需求草稿计算，且算错；没有补货交期窗口、最早缺料日、缺口量或交期敏感性等交期窗口缺料暴露评估动作。净需求仅为前置输入，未用于缺料暴露，故为insufficient。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.85
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文只涉及需求、可用库存和净需求草稿，未出现瓶颈、良率、已承诺负荷、期间可交付量或名义产能误用等供应商交付产能核验内容，无对应动作或输入。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "原文未形成已量化缺口，也未将缺口映射到受影响订单、停线时段或恢复优先级输入；仅有净需求草稿，无法对应缺料中断影响评估。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "RT06": {
+              "reason": "原文在草稿记录需求150、可用库存70、无确认到货、动作150减70和结果净需求90，属于可追溯记录输入/动作/结果的部分表现；但未解释Audit Trail核心目标与边界，未识别正确用法与常见误用，且结果算错并明确尚未复算，不能支持掌握，故为partial。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.65
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-supplier-delivery-capacity",
+          "supply-shortage-impact-assessment",
+          "RT06"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-incorrect-paraphrase",
+          "line": 1,
+          "quote": "我尝试核算 M91 单期净需求：需求为 150 件，已核实可用库存 70 件，没有确认到货。我在草稿记录 150 减 70 等于 90，所以写下净需求 90 件",
+          "observation": "尝试核算 M91 单期净需求：需求 150 件、已核实可用库存 70 件、没有确认到货；在草稿中记录 150 减 70 等于 90，并写下净需求 90 件。",
+          "capability": "单期净需求核算与草稿记录"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.727703549632327
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.609043497116677
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.50989410222208
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.469694228786575
+        },
+        {
+          "node_id": "RT06",
+          "revision_id": "RT06-r1",
+          "title": "Audit Trail",
+          "description": "记录可追溯的输入、决策、动作与结果。",
+          "mastery_criteria": [
+            "能正确解释并使用Audit Trail的核心目标与边界",
+            "能在具体场景中识别Audit Trail的正确用法与常见误用",
+            "能用可检查的示例证明对Audit Trail的掌握"
+          ],
+          "similarity": 0.459588752401212
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "RT06"
+        ],
+        "value": {
+          "verdicts": {
+            "RT06": {
+              "criterionScopePreserved": false,
+              "verdict": "insufficient",
+              "reason": "原文第1行记录的动作是净需求核算：需求150件、库存70件、无到货，并写下净需求90件，但150-70=80而非90，计算错误且尚未复算。该行为只是一般核算/草稿记录，未体现Audit Trail所要求的可追溯输入、决策、动作与结果的专门审计方法或边界；也无法满足“能正确解释并使用Audit Trail的核心目标与边界”或“用可检查的示例证明掌握”。因此无可独立核查的正确标准子动作，scope不成立。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "llmCalls": 3,
+  "retrievalCount": 1
+}

@@ -1,0 +1,199 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-partial-paraphrase",
+      "line": 1,
+      "quote": "我已逐个库位复点共 90 件，剔除封存不可领用的 15 件，核实可领用数为 75 件，并把数量与仓储记录核对一致。",
+      "observation": "实际逐个库位复点库存，统计90件，剔除封存不可领用15件，得出可领用75件，并将数量与仓储记录核对一致。",
+      "capability": "库存盘点、可领用量核算与仓储记录核对"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "partial",
+      "confidence": 0.92,
+      "reason": "partial: 原文明确批次R27需求量和后续到货尚未确认，因此没有算出净需求；同时原文确实逐个库位复点90件、剔除封存不可领用15件、核实可领用75件并核对仓储记录，正确完成了“排除不可用库存/确定可用库存”这一标准子动作。但缺少订单需求与确认到货，未完成按订单需求、可用库存及确认到货计算分时段净需求，故仅部分支持，不能认定为完整净需求计算。\n原判断：原文实际逐个库位复点90件，剔除封存不可领用15件，核实可领用75件并核对仓储记录，正确执行了“排除不可用库存/确定可用库存”这一净需求计算组成动作；但订单需求和确认到货未确认，未计算分时段净需求，故仅部分覆盖。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "05efbbd9-5c93-410a-bb48-c6206f5601b8",
+      "generatedAt": "2026-10-03T16:44:53.279Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 397,
+      "completionTokens": 775
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "f05c12d2-efb1-4621-80d4-a6eefb70ef8f",
+      "generatedAt": "2026-10-03T16:45:02.788Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1263,
+      "completionTokens": 1825
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-factual-verification-v1",
+      "requestId": "b3d84dbd-1c4d-4255-8678-71db61488a05",
+      "generatedAt": "2026-10-03T16:45:25.585Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 756,
+      "completionTokens": 4861
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "原文实际逐个库位复点90件，剔除封存不可领用15件，核实可领用75件并核对仓储记录，正确执行了“排除不可用库存/确定可用库存”这一净需求计算组成动作；但订单需求和确认到货未确认，未计算分时段净需求，故仅部分覆盖。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.92
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "该单元仅为库存盘点、可领用量核算与仓储记录核对，未依据瓶颈、良率和已承诺负荷计算期间可交付量，也未识别名义产能误用，与供应商交付产能核验无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "supply-shortage-exposure": {
+              "reason": "该单元未使用净需求，也未涉及补货交期窗口、最早缺料日、缺口量或交期敏感性计算，只做了可领用库存盘点核对；与交期窗口缺料暴露评估无直接组成动作对应。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "supply-landed-cost-calculation": {
+              "reason": "该单元未汇总采购、运输、税费、检验等费用，也未识别漏项或重复项，仅库存盘点核算；与到岸总成本计算无对应组成动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "该单元未将已量化缺口映射到受影响订单、停线时段或恢复优先级，仅库存盘点核对；与缺料中断影响评估无对应组成动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.98
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-supplier-delivery-capacity",
+          "supply-shortage-exposure",
+          "supply-landed-cost-calculation",
+          "supply-shortage-impact-assessment"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-partial-paraphrase",
+          "line": 1,
+          "quote": "我已逐个库位复点共 90 件，剔除封存不可领用的 15 件，核实可领用数为 75 件，并把数量与仓储记录核对一致。",
+          "observation": "实际逐个库位复点库存，统计90件，剔除封存不可领用15件，得出可领用75件，并将数量与仓储记录核对一致。",
+          "capability": "库存盘点、可领用量核算与仓储记录核对"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.587271171428894
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.527309119701385
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.463560622652827
+        },
+        {
+          "node_id": "supply-landed-cost-calculation",
+          "revision_id": "supply-landed-cost-calculation:v1",
+          "title": "到岸总成本计算",
+          "description": "依据给定费率汇总采购、运输、税费和检验等可比总成本，识别漏项和重复项。",
+          "mastery_criteria": [
+            "依据给定费率汇总采购、运输、税费和检验等可比总成本，识别漏项和重复项。"
+          ],
+          "similarity": 0.415903270244598
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.410727500915527
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-net-material-requirement": {
+              "verdict": "partial",
+              "reason": "原文明确批次R27需求量和后续到货尚未确认，因此没有算出净需求；同时原文确实逐个库位复点90件、剔除封存不可领用15件、核实可领用75件并核对仓储记录，正确完成了“排除不可用库存/确定可用库存”这一标准子动作。但缺少订单需求与确认到货，未完成按订单需求、可用库存及确认到货计算分时段净需求，故仅部分支持，不能认定为完整净需求计算。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "retrievalCount": 1
+}

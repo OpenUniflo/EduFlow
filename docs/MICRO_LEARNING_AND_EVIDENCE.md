@@ -24,7 +24,7 @@ Knowledge state transitions are monotonic: starting learning reaches `learning`,
 
 The MVP mastery policy is intentionally conservative. Every required Learn Path must be completed and every explicitly required Assignment must be `accepted`. If no Assignment is explicitly required, path completion remains `learned`. `submitted` is never acceptance or mastery.
 
-Evidence is owned by EduFlow and idempotent by `(user, knowledge, event type, source entity)`. It records `micro_path_completed`, `assignment_accepted`, and `workflow_passed` with source identity, outcome, context, and timestamp. This is intentionally shaped for future xAPI export without making xAPI the canonical internal model.
+Evidence is a long-term user-owned asset and is idempotent by `(user, knowledge, event type, source entity)`. It records `micro_path_completed`, `assignment_accepted`, `workflow_passed`, and explicitly user-confirmed `capability_confirmed` with source identity, outcome, context, and timestamp. This is intentionally shaped for future xAPI export without making xAPI the canonical internal model.
 
 Golden Agent, Workflow, and Failure Recovery paths are seeded/imported into canonical tables and are always read through `/api/micro`. TypeScript Demo providers remain local fixtures only and are not consulted by the production composition root.
 
@@ -106,7 +106,7 @@ Local ordinary-user acceptance completed all 52 screens, checked 1440/390 layout
 
 ## Completion context and instructional continuation
 
-Micro completed = `learned`; `learned != mastered`. Existing stronger mastery evidence may still satisfy the unchanged mastery policy. Teaching prerequisites accept `learned | practicing | mastered`, not `explore | learning`. Course Path/Graph and Navigation share the pure teaching policy. Only factual edges between Course-route Knowledge gate the Course; external Knowledge facts are retained without creating invisible entry requirements.
+Micro completed = `learned`; `learned != mastered`. Existing stronger mastery evidence may still satisfy the unchanged mastery policy. Teaching prerequisites accept `learned | practicing | mastered`, not `explore | learning`. Course Path/Graph and Navigation share the pure teaching policy. Only factual hard prerequisites between selected Course-route Knowledge gate the Course; soft prerequisites never block; external Knowledge facts are retained without creating invisible entry requirements.
 
 One Micro Experience supports optional Course context. Historical `scope`, `course_id` and course-first fallback remain compatibility storage, with physical cleanup deferred to #32. Micro body teaches through Summary; the system shell resolves post-Micro context. The completion resolver projects only real Material coverage/Segments, Assignment coverage and Navigation next Knowledge. Practice is secondary and does not block teaching continuation; future competency remediation and Attempt/Performance work remain #22.
 
@@ -129,3 +129,31 @@ Attempts store user, optional Course, Knowledge, Path/Unit/Step IDs, path revisi
 A browser submission has one UUID retained across transport failure; a received wrong answer permits a new attempt key. Conflicting reuse is rejected; identical concurrent retries produce one fact. Legacy callers without a key receive a deterministic request-content key rather than silently duplicating facts. Replaying an already completed Step and presentation-local Review do not create new formal performance. Anonymous answers remain ephemeral.
 
 Criteria and attempt identities survive content history. Publishing retains Criterion mappings only for stable Step/Knowledge identity with unchanged kind/interaction; changed teaching checks need explicit remapping instead of inheriting an unreviewed evaluation meaning. Attempt source identities deliberately remain historical references rather than cascading through content replacement. Criterion definition edits require a new version; old evidence retains the old version.
+
+
+## Personal Course Route V2 Micro authorization
+
+Authenticated Course-context Micro start and attempt/completion reload Published Course, RLS-visible graph, current user Knowledge state and active personal route constraints. `requirePersonalCourseRouteKnowledge` authorizes only the valid freshly selected route: original CurriculumCoverage is no longer a bypass, and excluded targets or bridges cannot start. Invalid constraints return structured conflict details. Client role flags, selected/ordered/bridge node lists and user identities never grant membership.
+
+Only unmet hard prerequisites can return `teaching_prerequisite_required`; soft remains recommended and skippable. `learned | practicing | mastered` satisfies the shared teaching policy without changing mastery authority. The service passes server-computed membership and expected active version to the database. `assert_personal_route_micro_v2` locks the route, rejects stale versions, checks exclusion, visibility and live hard eligibility before learning mutations. Standalone Micro retains its existing separate context checks.
+
+Migration `20261002061940_personal_course_route_versions_v2.sql` replaces the V1 wrappers with service-only `start_micro_for_route_v2`, `record_micro_step_attempt_v2` and `record_micro_step_completion_v2`. It also adds immutable route persistence and atomic adoption. No V1/V2 parallel membership path remains. Existing content snapshot, criterion evidence, completion and decision-lineage protections are retained. Ordinary authenticated/anon clients cannot execute these functions.
+
+`scripts/verify-personal-route.ts` remains local-only: it uses disposable identities/content, formal Micro completion, concurrency, excluded membership, hard/soft eligibility and RLS/RPC attacks. Never run its fixture workflow on Hosted. `scripts/verify-route-version-schema.sql` provides rollback-only Hosted schema checks; actual Preview HTTP/UI learning is a separate acceptance gate. See [V2](PROJECT_CAPABILITY_MODEL_V2.md).
+
+## Evidence-driven capability discovery
+
+Personal sources do not become Course Materials. Phase A accepts actual UTF-8 TXT/Markdown/CSV uploads into private `user-evidence` Storage, with random object names beneath the owner ID and signed access. It limits each source to 24,000 characters and each diagnosis to five sources. PDF/DOCX online personal parsing is not claimed: the existing Docling converter remains the reuse boundary, but its Hosted invocation has not been established.
+
+The pipeline discovers observations from sources first (up to 12 per source), validates quotations against original lines, retrieves five current active Global Knowledge revisions per observed capability, and judges only those candidates with original source context. Every extracted unit must receive a judgment, including insufficient/unmatched. The two model stages are bounded by the selected evidence, not by the Global graph size. `knowledge_node_revision_embeddings` stores configured-provider vectors (currently 1024 dimensions) keyed by revision/model; administrator indexing is separate from user diagnosis. Diagnosis rejects an incomplete/stale index instead of silently ignoring missing revisions.
+
+Candidate generation cannot write formal evidence or state. See `USER_LEARNING_STATE.md` for the transaction and authority. Practice results use this same pipeline through an owner-scoped ActionRun; there is no parallel Practice mastery authority.
+
+
+## Edge Action execution and result evidence
+
+Global `knowledge_edge_actions` describes Micro/practice alternatives on a factual prerequisite/enables Edge. Course bindings provide concrete resources. `edge_action_runs` preserves owner, course, selected template/edge/binding, immutable execution context, execution times and source/path references. Service-only transitions revalidate active facts, resources and existing instructional readiness (`learned | practicing | mastered`). Repeated selection requests and result submissions are idempotent; switching alternatives cancels the previous active run while retaining history.
+
+Practice starts explicitly and accepts an actual new UTF-8 result file through `uploadEvidence`. Only a parsed, checksummed, nonarchived source owned by the same user and created after execution began can be submitted. Submission atomically links the source and execution provenance and marks the action completed. It does not produce formal KnowledgeEvidence or update capability. The existing Evidence workspace opens with that source selected: diagnosis → candidate proposals → explicit confirmation → normal learner repository refresh. A result may support several KnowledgeNodes.
+
+Micro actions resolve an existing published path for the target and compatible course context, then use the existing Micro UI, assessment, evidence and deterministic completion authority. Readiness checks do not initialize route history. Existing Micro completion may update learned through its pre-existing rules; the Action observer merely mirrors the genuine path completion and does not add a second state write. It never synthesizes a successful step or assessment.

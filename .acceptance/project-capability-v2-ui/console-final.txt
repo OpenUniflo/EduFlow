@@ -1,0 +1,155 @@
+										37 container 控制台面板
+											38 container console
+												39 container
+													40 工具栏
+														41 container 显示控制台边栏
+															42 按钮 显示控制台边栏
+														43 container 清除控制台, Help: 清除控制台 - Ctrl L - ⌘ K
+															44 按钮 清除控制台 - Ctrl L - ⌘ K
+														45 container 全部展开
+															46 按钮 全部展开
+														47 按钮 JavaScript 上下文：top
+														48 container 创建实时表达式
+															49 按钮 创建实时表达式
+														50 文本输入区 (settable) 过滤
+															51 文本 过滤
+														52 弹出式按钮 日志级别：默认级别
+															53 文本 默认级别
+														54 container 某些问题不再生成控制台消息，但会显示在“问题”标签页中。 点击即可查看 1 个可以改进的问题
+															55 按钮 某些问题不再生成控制台消息，但会显示在“问题”标签页中。 点击即可查看 1 个可以改进的问题
+														56 container 控制台设置
+															57 切换按钮 控制台设置, Value: 0
+														58 container 控制台中有 15 条消息
+													59 container
+														60 container
+															61 container MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 close listeners added. Use emitter.setMaxListeners() to increase limit
+																62 container
+																	63 container 警告
+																	64 container  堆栈表格已收起
+																		65 container
+																			66 按钮 contentscript.js:14083, Help: chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14083
+																			67 文本  
+																			68 文本 MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 close listeners added. Use emitter.setMaxListeners() to increase limit
+															69 container MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 end listeners added. Use emitter.setMaxListeners() to increase limit
+																70 container
+																	71 container 警告
+																	72 container  堆栈表格已收起
+																		73 container
+																			74 按钮 contentscript.js:14083, Help: chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14083
+																			75 文本  
+																			76 文本 MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 end listeners added. Use emitter.setMaxListeners() to increase limit
+															77 container ObjectMultiplex - orphaned data for stream "app-init-liveness"
+																78 container 警告，已重复 2 次
+																	79 文本 2
+																80 container  ObjectMultiplex - orphaned data for stream "app-init-liveness" 堆栈表格已收起
+																	81 container
+																		82 按钮 contentscript.js:14083, Help: chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14083
+																		83 文本  
+																		84 文本 ObjectMultiplex - orphaned data for stream "app-init-liveness"
+															85 container ObjectMultiplex - orphaned data for stream "background-liveness"
+																86 container 警告，已重复 2 次
+																	87 文本 2
+																88 container  ObjectMultiplex - orphaned data for stream "background-liveness" 堆栈表格已收起
+																	89 container
+																		90 按钮 contentscript.js:14083, Help: chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14083
+																		91 文本  
+																		92 文本 ObjectMultiplex - orphaned data for stream "background-liveness"
+															93 container Unable to set window.solana, try uninstalling Phantom.
+																94 container
+																	95 container 错误
+																	96 container  Unable to set window.solana, try uninstalling Phantom. 堆栈表格已收起
+																		97 container
+																			98 按钮 inpage.js:26, Help: chrome-extension://ojbcfhjmpigfobfclfflafhblgemeidi/realms/inpage.js:26
+																			99 文本  
+																			100 文本 Unable to set window.solana, try uninstalling Phantom.
+															101 container Unable to set window.phantom.solana, try uninstalling Phantom.
+																102 container
+																	103 container 错误
+																	104 container  Unable to set window.phantom.solana, try uninstalling Phantom. 堆栈表格已收起
+																		105 container
+																			106 按钮 inpage.js:26, Help: chrome-extension://ojbcfhjmpigfobfclfflafhblgemeidi/realms/inpage.js:26
+																			107 文本  
+																			108 文本 Unable to set window.phantom.solana, try uninstalling Phantom.
+															109 container MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 close listeners added. Use emitter.setMaxListeners() to increase limit
+																110 container
+																	111 container 警告
+																	112 container  堆栈表格已收起
+																		113 container
+																			114 按钮 contentscript.js:14083, Help: chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14083
+																			115 文本  
+																			116 文本 MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 close listeners added. Use emitter.setMaxListeners() to increase limit
+															117 container MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 end listeners added. Use emitter.setMaxListeners() to increase limit
+																118 container
+																	119 container 警告
+																	120 container  堆栈表格已收起
+																		121 container
+																			122 按钮 contentscript.js:14083, Help: chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14083
+																			123 文本  
+																			124 文本 MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 end listeners added. Use emitter.setMaxListeners() to increase limit
+															125 container Uncaught TypeError: Cannot redefine property: ethereum
+																126 container
+																	127 container 错误
+																	128 container chrome-extension://b…koljpa/evmAsk.js:15 Uncaught 堆栈表格已收起
+																		129 container
+																			130 按钮 evmAsk.js:15, Help: chrome-extension://bfnaelmomeimhlpmgjnjophhpkkoljpa/evmAsk.js:15
+																			131 text Uncaught TypeError: Cannot redefine property: ethereum     at  Object.defineProperty  ( <anonymous> )     at  r.inject  (
+																			132 链接 evmAsk.js:15:5093, Help: chrome-extension://bfnaelmomeimhlpmgjnjophhpkkoljpa/evmAsk.js:15:5093
+																				133 文本 evmAsk.js:15:5093
+																			134 text )     at  window.addEventListener.once  (
+																			135 链接 evmAsk.js:15:9013, Help: chrome-extension://bfnaelmomeimhlpmgjnjophhpkkoljpa/evmAsk.js:15:9013
+																				136 文本 evmAsk.js:15:9013
+																			137 文本 )
+															138 container Permissions policy violation: unload is not allowed in this document.
+																139 container
+																	140 container 错误
+																	141 container  [Violation] Permissions policy violation: unload is not allowed in this document. 堆栈表格已收起
+																		142 container
+																			143 链接 userscript.html?name…9c65-7d26e715e507:3, Help: chrome-extension://dhdgffkkebhmkfjojejmpbldmpobfkfo/userscript.html?name=%25E6%258A%2596%25E9%259F%25B3%25E8%25A7%2586%25E9%25A2%2591%25E4%25B8%258B%25E8%25BD%25BD%25E6%258F%2592%25E4%25BB%25B6.user.js&id=b8027321-0d07-4239-9c65-7d26e715e507:3
+																				144 文本 userscript.html?name
+																				145 文本 …
+																				146 文本 9c65-7d26e715e507:3
+																			147 文本  
+																			148 文本 [Violation] Permissions policy violation: unload is not allowed in this document.
+															149 container ObjectMultiplex - orphaned data for stream "app-init-liveness"
+																150 container 警告，已重复 2 次
+																	151 文本 2
+																152 container  ObjectMultiplex - orphaned data for stream "app-init-liveness" 堆栈表格已收起
+																	153 container
+																		154 按钮 contentscript.js:14083, Help: chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14083
+																		155 文本  
+																		156 文本 ObjectMultiplex - orphaned data for stream "app-init-liveness"
+															157 container ObjectMultiplex - orphaned data for stream "background-liveness"
+																158 container 警告，已重复 2 次
+																	159 文本 2
+																160 container  ObjectMultiplex - orphaned data for stream "background-liveness" 堆栈表格已收起
+																	161 container
+																		162 按钮 contentscript.js:14083, Help: chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn/scripts/contentscript.js:14083
+																		163 文本  
+																		164 文本 ObjectMultiplex - orphaned data for stream "background-liveness"
+															165 container This page uses Chrome's Built-In AI features (LanguageDetector)! We're always improving our models; please submit your feedback here: https://issues.chromium.org/issues/new?component=1583316
+																166 container  This page uses Chrome's Built-In AI features (LanguageDetector)! We're always improving our models; please submit your feedback here: https://issues.chromium.org/issues/new?component=1583316 堆栈表格已收起
+																	167 container
+																		168 链接 content_main.js:5272, Help: chrome-extension://bpoadfkcbjbfhfodiogcnhhhpibjhbnh/content_main.js:5272
+																			169 文本 content_main.js:5272
+																		170 text This page uses Chrome's Built-In AI features (LanguageDetector)! We're always improving our models; please submit your feedback here: 
+																		171 链接 https://issues.chromium.org/issues/new?component=1583316
+																			172 文本 https://issues.chromium.org/issues/new?component=1583316
+															173 container This page uses Chrome's Built-In AI features (LanguageDetector)! We're always improving our models; please submit your feedback here: https://issues.chromium.org/issues/new?component=1583316
+																174 container  This page uses Chrome's Built-In AI features (LanguageDetector)! We're always improving our models; please submit your feedback here: https://issues.chromium.org/issues/new?component=1583316 堆栈表格已收起
+																	175 container
+																		176 链接 content_main.js:5272, Help: chrome-extension://bpoadfkcbjbfhfodiogcnhhhpibjhbnh/content_main.js:5272
+																			177 文本 content_main.js:5272
+																		178 text This page uses Chrome's Built-In AI features (LanguageDetector)! We're always improving our models; please submit your feedback here: 
+																		179 链接 https://issues.chromium.org/issues/new?component=1583316
+																			180 文本 https://issues.chromium.org/issues/new?component=1583316
+															181 container This page uses Chrome's Built-In AI features (LanguageDetector)! We're always improving our models; please submit your feedback here: https://issues.chromium.org/issues/new?component=1583316
+																182 container  This page uses Chrome's Built-In AI features (LanguageDetector)! We're always improving our models; please submit your feedback here: https://issues.chromium.org/issues/new?component=1583316 堆栈表格已收起
+																	183 container
+																		184 链接 content_main.js:5272, Help: chrome-extension://bpoadfkcbjbfhfodiogcnhhhpibjhbnh/content_main.js:5272
+																			185 文本 content_main.js:5272
+																		186 text This page uses Chrome's Built-In AI features (LanguageDetector)! We're always improving our models; please submit your feedback here: 
+																		187 链接 https://issues.chromium.org/issues/new?component=1583316
+																			188 文本 https://issues.chromium.org/issues/new?component=1583316
+														189 container
+															190 container
+																191 文本输入区 (settable) 控制台提示, Value: 

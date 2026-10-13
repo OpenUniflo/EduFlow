@@ -1,0 +1,507 @@
+{
+  "scope": "Local real provider / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-explicit-work-record",
+      "line": 1,
+      "quote": "我独立完成了订单V104的分时段物料核算并把结果登记到核算表：D1订单100件、D2订单80件；实物库存50件，其中10件隔离不可用，可用40件；确认到货D1为20件、D2为30件。D1净需求=max(0,100-40-20)=40件，D1剩余可用库存0；D2净需求=max(0,80-0-30)=50件。将隔离的10件纳入可用库存会低估D1缺口10件，我明确排除了这一项。",
+      "observation": "独立完成订单V104分时段物料核算并登记结果，正确计算D1净需求40件、D2净需求50件，并明确排除隔离库存。",
+      "capability": "分时段物料需求核算与净需求计算"
+    },
+    {
+      "sourceId": "local-explicit-work-record",
+      "line": 2,
+      "quote": "我独立估计并记录跨境补货总交期：生产5至6天、运输3至4天、通关2至3天、收货验收1天，各阶段串行，运输报价未含通关，总计11至14天。我用发运节点核对了时间区间，没有重复计算通关；待核验因素是海关查验可能额外增加2天，因此压力情景为16天，而不是保证到货日期。",
+      "observation": "独立估计并记录跨境补货总交期11至14天，用发运节点核对时间区间，未重复计算通关，并给出压力情景16天。",
+      "capability": "跨境补货交期估算与时间区间核对"
+    },
+    {
+      "sourceId": "local-explicit-work-record",
+      "line": 3,
+      "quote": "我完成可比100件物料的到岸总成本核算：采购每件20元共2000元，整批运输300元，税费以2300元计税基数按5%为115元，检验85元，总成本2500元，单位25元。报价另列的300元物流费已包含在运输中，我已剔除，未重复计费；统一批量和币种后与发票逐项对账无差异。",
+      "observation": "完成100件物料到岸总成本核算，正确计算总成本2500元、单位25元，剔除已包含的物流费避免重复计费，并与发票逐项对账无差异。",
+      "capability": "到岸总成本核算与费用去重对账"
+    },
+    {
+      "sourceId": "local-explicit-work-record",
+      "line": 4,
+      "quote": "我编写并运行Python列表推导式，将输入[1,2,3,4]筛选偶数再平方，表达式[x*x for x in values if x%2==0]输出[4,16]；空输入输出[]。我用等价for循环和断言逐一核对了这两个测试，明确过滤发生在平方之前。",
+      "observation": "编写并运行Python列表推导式筛选偶数再平方，输出[4,16]，空输入输出[]，并用等价for循环和断言核对测试。",
+      "capability": "Python列表推导式编写与测试验证"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "supported",
+      "confidence": 0.95,
+      "reason": "单元0明确独立完成订单V104分时段物料核算，正确计算D1净需求40件、D2净需求50件，并明确排除隔离的10件不可用库存，完全覆盖mastery_criteria。单元2为到岸成本核算，与净需求计算无关。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learned"
+    },
+    {
+      "unitIndexes": [
+        0,
+        1
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "partial",
+      "confidence": 0.7,
+      "reason": "单元0提供了净需求计算结果，单元1提供了补货交期窗口，但原文未将两者结合计算最早缺料日、缺口量及交期敏感性，缺少直接组成动作。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        0,
+        1
+      ],
+      "nodeId": "supply-shortage-impact-assessment",
+      "sufficiency": "insufficient",
+      "confidence": 0.6,
+      "reason": "单元0和单元1分别涉及净需求和交期，但原文未将已量化缺口映射到受影响订单、停线时段及恢复优先级输入，缺少直接组成动作。",
+      "revisionId": "supply-shortage-impact-assessment:v1",
+      "proposedStatus": null
+    },
+    {
+      "unitIndexes": [
+        1
+      ],
+      "nodeId": "supply-cross-border-lead-time",
+      "sufficiency": "supported",
+      "confidence": 0.95,
+      "reason": "单元1明确分解生产、运输、通关和收货环节，给出交期区间11至14天，说明不确定性（海关查验可能增加2天，压力情景16天），并避免重复计时，完全覆盖mastery_criteria。单元2为成本核算，与交期估计无关。",
+      "revisionId": "supply-cross-border-lead-time:v1",
+      "proposedStatus": "learned"
+    },
+    {
+      "unitIndexes": [
+        2
+      ],
+      "nodeId": "supply-landed-cost-calculation",
+      "sufficiency": "supported",
+      "confidence": 0.95,
+      "reason": "单元2明确完成100件物料到岸总成本核算，汇总采购、运输、税费和检验费用，正确计算总成本2500元、单位25元，剔除已包含的物流费避免重复计费，并与发票逐项对账无差异，完全覆盖mastery_criteria。",
+      "revisionId": "supply-landed-cost-calculation:v1",
+      "proposedStatus": "learned"
+    },
+    {
+      "unitIndexes": [
+        3
+      ],
+      "nodeId": "CODE02",
+      "sufficiency": "partial",
+      "confidence": 0.7,
+      "reason": "单元3编写并运行Python列表推导式，用等价for循环和断言核对测试，体现了用代码验证中间结论，但未明确展示根据执行结果修正推理或计划，部分覆盖mastery_criteria。",
+      "revisionId": "CODE02-r1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v5",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "cfc62ec5-a1f8-40c7-ab13-91fad80a465c",
+      "generatedAt": "2026-10-03T16:11:01.366Z",
+      "temperature": 0,
+      "maxTokens": 6000,
+      "promptTokens": 583,
+      "completionTokens": 660
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v5",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "6b1fb402-20d9-4cba-805d-8b9730ce29dc",
+      "generatedAt": "2026-10-03T16:11:08.040Z",
+      "temperature": 0,
+      "maxTokens": 7000,
+      "promptTokens": 3052,
+      "completionTokens": 1169
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-net-material-requirement": {
+              "reason": "单元0明确独立完成订单V104分时段物料核算，正确计算D1净需求40件、D2净需求50件，并明确排除隔离的10件不可用库存，完全覆盖mastery_criteria。单元2为到岸成本核算，与净需求计算无关。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.95
+            },
+            "supply-shortage-exposure": {
+              "reason": "单元0提供了净需求计算结果，单元1提供了补货交期窗口，但原文未将两者结合计算最早缺料日、缺口量及交期敏感性，缺少直接组成动作。",
+              "unitIndexes": [
+                0,
+                1
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.7
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "单元0和单元1分别涉及净需求和交期，但原文未将已量化缺口映射到受影响订单、停线时段及恢复优先级输入，缺少直接组成动作。",
+              "unitIndexes": [
+                0,
+                1
+              ],
+              "sufficiency": "insufficient",
+              "confidence": 0.6
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "单元0、1、2均未涉及依据瓶颈、良率和已承诺负荷计算期间可交付量或识别名义产能误用，无直接相关证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "supply-critical-material-identification": {
+              "reason": "单元0涉及物料核算，但未给定BOM、替代性及停线影响，也未按明确准则识别关键物料并说明排除理由，无直接相关证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "supply-cross-border-lead-time": {
+              "reason": "单元1明确分解生产、运输、通关和收货环节，给出交期区间11至14天，说明不确定性（海关查验可能增加2天，压力情景16天），并避免重复计时，完全覆盖mastery_criteria。单元2为成本核算，与交期估计无关。",
+              "unitIndexes": [
+                1
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.95
+            },
+            "supply-site-switch-feasibility": {
+              "reason": "单元1仅涉及跨境补货交期估计，未涉及替代基地可用产能和到达时间检验候选切换是否满足订单约束，无直接相关证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "supply-landed-cost-calculation": {
+              "reason": "单元2明确完成100件物料到岸总成本核算，汇总采购、运输、税费和检验费用，正确计算总成本2500元、单位25元，剔除已包含的物流费避免重复计费，并与发票逐项对账无差异，完全覆盖mastery_criteria。",
+              "unitIndexes": [
+                2
+              ],
+              "sufficiency": "supported",
+              "confidence": 0.95
+            },
+            "supply-cost-lead-time-tradeoff": {
+              "reason": "单元2仅涉及成本核算，未比较备选方案的总成本和交期，也未在给定质量及合规约束下说明取舍和敏感参数，无直接相关证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "PY37": {
+              "reason": "单元3使用等价for循环和断言核对测试，但未使用pytest编写和运行自动化测试，无直接相关证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "CODE02": {
+              "reason": "单元3编写并运行Python列表推导式，用等价for循环和断言核对测试，体现了用代码验证中间结论，但未明确展示根据执行结果修正推理或计划，部分覆盖mastery_criteria。",
+              "unitIndexes": [
+                3
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.7
+            },
+            "PY85": {
+              "reason": "单元3使用断言核对测试，但未明确展示隔离验证函数和模块的局部行为，无直接相关证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "R04": {
+              "reason": "单元3编写并运行代码，但未先生成可检查计划再按步骤执行并收集结果，无直接相关证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "CDS525-K015": {
+              "reason": "单元3涉及Python列表推导式测试，未涉及数据划分训练、验证和测试集合，无直接相关证据。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-supplier-delivery-capacity",
+          "supply-critical-material-identification",
+          "supply-cross-border-lead-time",
+          "supply-site-switch-feasibility",
+          "supply-landed-cost-calculation",
+          "supply-cost-lead-time-tradeoff",
+          "PY37",
+          "CODE02",
+          "PY85",
+          "R04",
+          "CDS525-K015"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-explicit-work-record",
+          "line": 1,
+          "quote": "我独立完成了订单V104的分时段物料核算并把结果登记到核算表：D1订单100件、D2订单80件；实物库存50件，其中10件隔离不可用，可用40件；确认到货D1为20件、D2为30件。D1净需求=max(0,100-40-20)=40件，D1剩余可用库存0；D2净需求=max(0,80-0-30)=50件。将隔离的10件纳入可用库存会低估D1缺口10件，我明确排除了这一项。",
+          "observation": "独立完成订单V104分时段物料核算并登记结果，正确计算D1净需求40件、D2净需求50件，并明确排除隔离库存。",
+          "capability": "分时段物料需求核算与净需求计算"
+        },
+        {
+          "sourceId": "local-explicit-work-record",
+          "line": 2,
+          "quote": "我独立估计并记录跨境补货总交期：生产5至6天、运输3至4天、通关2至3天、收货验收1天，各阶段串行，运输报价未含通关，总计11至14天。我用发运节点核对了时间区间，没有重复计算通关；待核验因素是海关查验可能额外增加2天，因此压力情景为16天，而不是保证到货日期。",
+          "observation": "独立估计并记录跨境补货总交期11至14天，用发运节点核对时间区间，未重复计算通关，并给出压力情景16天。",
+          "capability": "跨境补货交期估算与时间区间核对"
+        },
+        {
+          "sourceId": "local-explicit-work-record",
+          "line": 3,
+          "quote": "我完成可比100件物料的到岸总成本核算：采购每件20元共2000元，整批运输300元，税费以2300元计税基数按5%为115元，检验85元，总成本2500元，单位25元。报价另列的300元物流费已包含在运输中，我已剔除，未重复计费；统一批量和币种后与发票逐项对账无差异。",
+          "observation": "完成100件物料到岸总成本核算，正确计算总成本2500元、单位25元，剔除已包含的物流费避免重复计费，并与发票逐项对账无差异。",
+          "capability": "到岸总成本核算与费用去重对账"
+        },
+        {
+          "sourceId": "local-explicit-work-record",
+          "line": 4,
+          "quote": "我编写并运行Python列表推导式，将输入[1,2,3,4]筛选偶数再平方，表达式[x*x for x in values if x%2==0]输出[4,16]；空输入输出[]。我用等价for循环和断言逐一核对了这两个测试，明确过滤发生在平方之前。",
+          "observation": "编写并运行Python列表推导式筛选偶数再平方，输出[4,16]，空输入输出[]，并用等价for循环和断言核对测试。",
+          "capability": "Python列表推导式编写与测试验证"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.896509394569805
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.697823700503401
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.571946995506237
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.571480529639635
+        },
+        {
+          "node_id": "supply-critical-material-identification",
+          "revision_id": "supply-critical-material-identification:v1",
+          "title": "关键物料识别",
+          "description": "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。",
+          "mastery_criteria": [
+            "给定 BOM、替代性及停线影响，按明确准则识别关键物料并说明排除理由。"
+          ],
+          "similarity": 0.529271269570967
+        }
+      ],
+      [
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "revision_id": "supply-cross-border-lead-time:v1",
+          "title": "跨境补货交期估计",
+          "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+          "mastery_criteria": [
+            "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+          ],
+          "similarity": 0.88190770149231
+        },
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.617922778539909
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.543200790882111
+        },
+        {
+          "node_id": "supply-site-switch-feasibility",
+          "revision_id": "supply-site-switch-feasibility:v1",
+          "title": "跨基地供给切换可行性判断",
+          "description": "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。",
+          "mastery_criteria": [
+            "独立用替代基地可用产能和到达时间检验候选切换是否满足订单约束，区分不可行和缺失证据。"
+          ],
+          "similarity": 0.541350300151078
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.502385973930359
+        }
+      ],
+      [
+        {
+          "node_id": "supply-landed-cost-calculation",
+          "revision_id": "supply-landed-cost-calculation:v1",
+          "title": "到岸总成本计算",
+          "description": "依据给定费率汇总采购、运输、税费和检验等可比总成本，识别漏项和重复项。",
+          "mastery_criteria": [
+            "依据给定费率汇总采购、运输、税费和检验等可比总成本，识别漏项和重复项。"
+          ],
+          "similarity": 0.797658658446326
+        },
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.450955860174329
+        },
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "revision_id": "supply-cross-border-lead-time:v1",
+          "title": "跨境补货交期估计",
+          "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+          "mastery_criteria": [
+            "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+          ],
+          "similarity": 0.448709050051747
+        },
+        {
+          "node_id": "supply-cost-lead-time-tradeoff",
+          "revision_id": "supply-cost-lead-time-tradeoff:v1",
+          "title": "供给备选方案成本交期权衡",
+          "description": "独立比较备选方案的总成本和交期，在给定质量及合规约束下说明取舍和敏感参数。",
+          "mastery_criteria": [
+            "独立比较备选方案的总成本和交期，在给定质量及合规约束下说明取舍和敏感参数。"
+          ],
+          "similarity": 0.433883589407763
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.419692679698591
+        }
+      ],
+      [
+        {
+          "node_id": "PY37",
+          "revision_id": "PY37-r1",
+          "title": "pytest",
+          "description": "使用 pytest 编写和运行自动化测试。",
+          "mastery_criteria": [
+            "能独立完成pytest的核心目标与边界",
+            "能在具体场景中识别pytest的正确用法与常见误用",
+            "能用可检查的示例证明对pytest的掌握"
+          ],
+          "similarity": 0.562934705948713
+        },
+        {
+          "node_id": "CODE02",
+          "revision_id": "CODE02-r1",
+          "title": "Code as a Reasoning Tool",
+          "description": "让 Agent 通过编写和执行代码完成计算、验证、搜索或中间推导，把代码作为思考过程的一部分。",
+          "mastery_criteria": [
+            "能识别比纯自然语言推理更适合用代码解决的步骤",
+            "能编写一个用于验证或计算中间结论的小程序",
+            "能根据执行结果修正原先的推理或计划"
+          ],
+          "similarity": 0.508259712665119
+        },
+        {
+          "node_id": "PY85",
+          "revision_id": "PY85-r1",
+          "title": "Unit Test",
+          "description": "隔离验证函数和模块的局部行为。",
+          "mastery_criteria": [
+            "能独立完成Unit Test的核心目标与边界",
+            "能在具体场景中识别Unit Test的正确用法与常见误用",
+            "能用可检查的示例证明对Unit Test的掌握"
+          ],
+          "similarity": 0.469514191150679
+        },
+        {
+          "node_id": "R04",
+          "revision_id": "R04-r1",
+          "title": "Plan-and-Execute",
+          "description": "先生成可检查计划，再按步骤执行并收集结果。",
+          "mastery_criteria": [
+            "能独立完成Plan-and-Execute的核心目标与边界",
+            "能在具体场景中识别Plan-and-Execute的正确用法与常见误用",
+            "能用可检查的示例证明对Plan-and-Execute的掌握"
+          ],
+          "similarity": 0.456693984861258
+        },
+        {
+          "node_id": "CDS525-K015",
+          "revision_id": "CDS525-K015-r1",
+          "title": "Train/Validation/Test Split",
+          "description": "将数据划分为训练、验证和测试集合以支持训练、调参与泛化评估。",
+          "mastery_criteria": [
+            "能准确解释「Train/Validation/Test Split」的核心作用、适用边界及与相邻概念的区别",
+            "能完成对应最小可执行任务：对当前数据生成不重叠的 train/validation/test split，并提交 split_manifest.json"
+          ],
+          "similarity": 0.450765019564033
+        }
+      ]
+    ]
+  },
+  "retrievalCount": 4
+}

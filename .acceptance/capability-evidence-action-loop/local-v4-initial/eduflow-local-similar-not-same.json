@@ -1,0 +1,173 @@
+{
+  "scope": "Local real provider / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-similar-not-same",
+      "line": 1,
+      "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。",
+      "observation": "在60分钟内完成600箱分拣，计算平均10箱/分钟，并重复两次得到595箱和605箱。",
+      "capability": "测量并计算仓库分拣线吞吐量，进行重复测量以评估稳定性"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "EVAL10",
+      "sufficiency": "insufficient",
+      "confidence": 0.95,
+      "reason": "唯一证据是仓库分拣线吞吐量测量（60分钟600箱、重复595/605箱），属于物理吞吐量重复测量，未涉及评估分数差异、抽样波动、统计不确定性、置信信息或上线决策证据。mastery_criteria三项均无对应可检查内容，故证据不足。",
+      "revisionId": "EVAL10-r1",
+      "proposedStatus": null
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v4",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "2c9197d2-e33d-4ad1-b753-8346161f0335",
+      "generatedAt": "2026-10-03T16:08:21.741Z",
+      "temperature": 0,
+      "maxTokens": 6000,
+      "promptTokens": 246,
+      "completionTokens": 110
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v4",
+      "schemaVersion": "evidence-semantic-choices-v1",
+      "requestId": "85a07daa-3710-4e75-8207-601e1c7d1712",
+      "generatedAt": "2026-10-03T16:08:23.724Z",
+      "temperature": 0,
+      "maxTokens": 6000,
+      "promptTokens": 911,
+      "completionTokens": 88
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v4",
+      "schemaVersion": "evidence-sufficiency-v1",
+      "requestId": "a1293489-daa2-48bd-bfb7-dc694a9fcf1b",
+      "generatedAt": "2026-10-03T16:08:24.985Z",
+      "temperature": 0,
+      "maxTokens": 7000,
+      "promptTokens": 564,
+      "completionTokens": 87
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "EVAL10": {
+              "sufficiency": "insufficient",
+              "confidence": 0.95,
+              "reason": "唯一证据是仓库分拣线吞吐量测量（60分钟600箱、重复595/605箱），属于物理吞吐量重复测量，未涉及评估分数差异、抽样波动、统计不确定性、置信信息或上线决策证据。mastery_criteria三项均无对应可检查内容，故证据不足。"
+            }
+          }
+        }
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-similar-not-same",
+          "line": 1,
+          "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。",
+          "observation": "在60分钟内完成600箱分拣，计算平均10箱/分钟，并重复两次得到595箱和605箱。",
+          "capability": "测量并计算仓库分拣线吞吐量，进行重复测量以评估稳定性"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.518380255602614
+        },
+        {
+          "node_id": "E12",
+          "revision_id": "E12-r1",
+          "title": "Benchmark Task",
+          "description": "设计可重复执行、结果可比较的基准任务。",
+          "mastery_criteria": [
+            "能独立完成Benchmark Task的核心目标与边界",
+            "能在具体场景中识别Benchmark Task的正确用法与常见误用",
+            "能用可检查的示例证明对Benchmark Task的掌握"
+          ],
+          "similarity": 0.510122583221428
+        },
+        {
+          "node_id": "EVAL10",
+          "revision_id": "EVAL10-r1",
+          "title": "Evaluation Statistical Significance",
+          "description": "判断观测到的评估差异是否可能只是抽样波动，并用统计不确定性约束模型或系统改进结论。",
+          "mastery_criteria": [
+            "能说明为什么小样本分数差异不能直接视为真实提升",
+            "能为评估结果报告基本的不确定性或置信信息",
+            "能判断一次改动是否有足够证据支持上线决策"
+          ],
+          "similarity": 0.508307577169845
+        },
+        {
+          "node_id": "EVAL01",
+          "revision_id": "EVAL01-r1",
+          "title": "Agent Evaluation Metric System",
+          "description": "从结果、过程、安全、可靠性等维度组织可重复的 Agent 评估指标，而不是依赖单一成功率。",
+          "mastery_criteria": [
+            "能为一个 Agent 任务区分结果指标与过程指标",
+            "能选择至少两类互补指标描述系统能力",
+            "能识别单一平均分掩盖可靠性或安全问题的情况"
+          ],
+          "similarity": 0.491138964363276
+        },
+        {
+          "node_id": "supply-incoming-quality-anomaly",
+          "revision_id": "supply-incoming-quality-anomaly:v1",
+          "title": "来料质量异常判定",
+          "description": "依据给定检验标准区分批次异常、测量误差及证据不足。",
+          "mastery_criteria": [
+            "依据给定检验标准区分批次异常、测量误差及证据不足。"
+          ],
+          "similarity": 0.487336932858047
+        }
+      ]
+    ],
+    "matching": {
+      "choices": {
+        "0": {
+          "nodeIds": [
+            "EVAL10"
+          ],
+          "confidence": 0.72,
+          "reason": "该单元进行了重复测量（595、605箱）并计算平均值，直接涉及评估结果的不确定性与抽样波动，对应“能为评估结果报告基本的不确定性或置信信息”这一子步骤；但未涉及供应商交付产能、基准任务设计或来料质量异常判定，故不匹配其他候选。"
+        }
+      }
+    },
+    "judgment": {
+      "judgments": {
+        "EVAL10": {
+          "sufficiency": "insufficient",
+          "confidence": 0.95,
+          "reason": "唯一证据是仓库分拣线吞吐量测量（60分钟600箱、重复595/605箱），属于物理吞吐量重复测量，未涉及评估分数差异、抽样波动、统计不确定性、置信信息或上线决策证据。mastery_criteria三项均无对应可检查内容，故证据不足。"
+        }
+      }
+    }
+  },
+  "retrievalCount": 1
+}

@@ -1,0 +1,206 @@
+{
+  "capturedAt": "2026-10-04T16:37:37.753Z",
+  "courseId": "enterprise-vietnam-supply-collaboration",
+  "projectNodes": 18,
+  "projectEdges": 23,
+  "newActions": 49,
+  "totalActiveActions": 52,
+  "microActions": 24,
+  "practiceActions": 28,
+  "missingActionEdges": 0,
+  "noExecutorActions": 0,
+  "knowledgeFactsUnchanged": true,
+  "states": [
+    {
+      "user_id": "4eee17e2-6fe7-4de2-b0ba-3a177fe235f0",
+      "acquired": [
+        "supply-critical-material-identification",
+        "supply-cross-border-lead-time",
+        "supply-incoming-quality-anomaly",
+        "supply-landed-cost-calculation",
+        "supply-net-material-requirement",
+        "supply-supplier-screening-criteria"
+      ]
+    },
+    {
+      "user_id": "54cd7725-ae57-464b-beba-18e950546f0b",
+      "acquired": [
+        "supply-cross-border-lead-time",
+        "supply-incoming-quality-anomaly",
+        "supply-landed-cost-calculation",
+        "supply-sample-quality-interpretation",
+        "supply-shortage-exposure",
+        "supply-supplier-delivery-capacity",
+        "supply-supplier-qualification-review"
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-corrective-action-verification-supply-recovery-option-ranking",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-critical-material-identification-supply-material-risk-identification",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-material-risk-identification-supply-shortage-impact-assessment",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-sample-quality-interpretation-supply-incoming-quality-anomaly",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-shortage-exposure-supply-cost-lead-time-tradeoff",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-supplier-delivery-capacity-supply-alternate-site-capacity",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-sample-quality-interpretation",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-delivery-capacity",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-enables-supply-supplier-screening-criteria-supply-supplier-qualification-review",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-incoming-quality-anomaly-supply-corrective-action-verification",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+      "practice": 2,
+      "no_executor": 0,
+      "active_actions": 3
+    },
+    {
+      "micro": 2,
+      "edge_id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+      "practice": 3,
+      "no_executor": 0,
+      "active_actions": 5
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+      "practice": 3,
+      "no_executor": 0,
+      "active_actions": 4
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    },
+    {
+      "micro": 1,
+      "edge_id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+      "practice": 1,
+      "no_executor": 0,
+      "active_actions": 2
+    }
+  ],
+  "graph_hash": {
+    "edges": "af36c1468f5aff1ed527c8765d897340",
+    "nodes": "a68a3be5f2287dd518bc80bd5353c4b8"
+  },
+  "migrations": 61
+}

@@ -1,0 +1,240 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-partial-impact",
+      "line": 1,
+      "quote": "我审查订单 Q117：承诺10月12日交付120件成品，每件使用1件物料，确认按期可用物料100件、缺口20件。我逐项将这20件缺口关联到Q117，标记原交期只能满足100件、余下20件要待10月15日补料后才能交付，已在订单交付表登记这个数量和日期变化。尚未分析车间停线时段，也未确定恢复优先级。",
+      "observation": "已完成订单Q117的物料可用性核对与交付影响登记：按10月12日交付120件成品、每件1件物料，确认按期可用100件、缺口20件；逐项将20件缺口关联到Q117；标记原交期只能满足100件、余下20件需待10月15日补料后交付；已在订单交付表登记该数量和日期变化。该单元同时保留局限：尚未分析车间停线时段，也未确定恢复优先级。",
+      "capability": "订单物料缺口核对、缺口关联与交期变更登记"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-shortage-exposure",
+      "sufficiency": "partial",
+      "confidence": 0.72,
+      "reason": "原文有Q117需求120件、可用100件、缺口20件，并标记原交期只能满足100件、余下20件待10月15日补料后交付，已登记数量和日期变化，可对应缺口量与交期敏感性；但未明确计算最早缺料日，也未体现独立使用补货交期窗口计算，未覆盖全部mastery_criteria。",
+      "revisionId": "supply-shortage-exposure:v1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-shortage-impact-assessment",
+      "sufficiency": "partial",
+      "confidence": 0.9,
+      "reason": "partial: 原文第1行将已量化缺口20件逐项关联到Q117，并登记数量和日期变化，属于将缺口映射到受影响订单，计算与对象均正确。但原文同句明确尚未分析车间停线时段，也未确定恢复优先级，因此未完成停线时段及恢复优先级输入映射。已正确保留一个子动作，故仅能判partial。\n原判断：原文将已量化缺口20件逐项关联到受影响订单Q117，并登记原交期满足100件、余20件延至10月15日补料后交付；但明确尚未分析车间停线时段、未确定恢复优先级，标准三项只覆盖受影响订单映射一项。",
+      "revisionId": "supply-shortage-impact-assessment:v1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "supply-net-material-requirement",
+      "sufficiency": "partial",
+      "confidence": 0.68,
+      "reason": "partial: 原文第1行按订单需求120件成品×1件物料=120件物料，并结合确认按期可用物料100件，计算缺口20件；原交期仅满足100件、余20件待10月15日补料后交付，体现了订单需求、可用库存和日期段的净需求计算，且用按期可用排除了不可按期使用部分。但未明确确认到货数量或确认到货，也未给出完整分时段净需求，只能核实该净需求计算子动作，不能支持全部标准。\n原判断：原文根据订单Q117需求120件、每件1件物料与按期可用100件算出缺口20件，并含10月12日原交期与10月15日补料日的时间影响；但未明确按分时段净需求计算，未说明确认到货，也未说明正确排除不可用库存，只完成基本缺口计算。",
+      "revisionId": "supply-net-material-requirement:v1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "c0889c9a-ad9f-4760-9e62-8c1532c5129e",
+      "generatedAt": "2026-10-03T17:23:08.509Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 426,
+      "completionTokens": 3275
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "410c453a-ba05-4e6d-b062-9805d1e45de2",
+      "generatedAt": "2026-10-03T17:23:31.438Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1405,
+      "completionTokens": 4800
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-factual-verification-v2",
+      "requestId": "74e71c60-ce8a-4ea5-98d3-483bf8f6569d",
+      "generatedAt": "2026-10-03T17:24:29.767Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1119,
+      "completionTokens": 12327
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-shortage-exposure": {
+              "reason": "原文有Q117需求120件、可用100件、缺口20件，并标记原交期只能满足100件、余下20件待10月15日补料后交付，已登记数量和日期变化，可对应缺口量与交期敏感性；但未明确计算最早缺料日，也未体现独立使用补货交期窗口计算，未覆盖全部mastery_criteria。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.72
+            },
+            "supply-shortage-impact-assessment": {
+              "reason": "原文将已量化缺口20件逐项关联到受影响订单Q117，并登记原交期满足100件、余20件延至10月15日补料后交付；但明确尚未分析车间停线时段、未确定恢复优先级，标准三项只覆盖受影响订单映射一项。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.9
+            },
+            "supply-net-material-requirement": {
+              "reason": "原文根据订单Q117需求120件、每件1件物料与按期可用100件算出缺口20件，并含10月12日原交期与10月15日补料日的时间影响；但未明确按分时段净需求计算，未说明确认到货，也未说明正确排除不可用库存，只完成基本缺口计算。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.68
+            },
+            "supply-material-risk-identification": {
+              "reason": "原文仅记录订单物料缺口20件及交期延至10月15日补料后交付，未识别集中供应、交期波动、替代限制等关键物料供应暴露，也未区别事实、假设及待核验证据；不能按“交期变化”相似词强配。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.82
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文未涉及供应商、瓶颈、良率、已承诺负荷、期间可交付量或名义产能误用，无法匹配供应商交付产能核验。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-net-material-requirement",
+          "supply-material-risk-identification",
+          "supply-supplier-delivery-capacity"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-partial-impact",
+          "line": 1,
+          "quote": "我审查订单 Q117：承诺10月12日交付120件成品，每件使用1件物料，确认按期可用物料100件、缺口20件。我逐项将这20件缺口关联到Q117，标记原交期只能满足100件、余下20件要待10月15日补料后才能交付，已在订单交付表登记这个数量和日期变化。尚未分析车间停线时段，也未确定恢复优先级。",
+          "observation": "已完成订单Q117的物料可用性核对与交付影响登记：按10月12日交付120件成品、每件1件物料，确认按期可用100件、缺口20件；逐项将20件缺口关联到Q117；标记原交期只能满足100件、余下20件需待10月15日补料后交付；已在订单交付表登记该数量和日期变化。该单元同时保留局限：尚未分析车间停线时段，也未确定恢复优先级。",
+          "capability": "订单物料缺口核对、缺口关联与交期变更登记"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-shortage-exposure",
+          "revision_id": "supply-shortage-exposure:v1",
+          "title": "交期窗口缺料暴露评估",
+          "description": "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。",
+          "mastery_criteria": [
+            "独立使用净需求和补货交期窗口，计算最早缺料日、缺口量及交期敏感性。"
+          ],
+          "similarity": 0.730929261231061
+        },
+        {
+          "node_id": "supply-shortage-impact-assessment",
+          "revision_id": "supply-shortage-impact-assessment:v1",
+          "title": "缺料中断影响评估",
+          "description": "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。",
+          "mastery_criteria": [
+            "独立将已量化缺口映射到受影响订单、停线时段及恢复优先级输入。"
+          ],
+          "similarity": 0.718982040882111
+        },
+        {
+          "node_id": "supply-net-material-requirement",
+          "revision_id": "supply-net-material-requirement:v1",
+          "title": "物料净需求计算",
+          "description": "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。",
+          "mastery_criteria": [
+            "根据订单需求、可用库存及确认到货计算分时段净需求，正确排除不可用库存。"
+          ],
+          "similarity": 0.626692790588522
+        },
+        {
+          "node_id": "supply-material-risk-identification",
+          "revision_id": "supply-material-risk-identification:v1",
+          "title": "关键物料供应风险识别",
+          "description": "识别集中供应、交期波动和替代限制等暴露，区别事实、假设及待核验证据。",
+          "mastery_criteria": [
+            "识别集中供应、交期波动和替代限制等暴露，区别事实、假设及待核验证据。"
+          ],
+          "similarity": 0.562172446380404
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.553052663803101
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-net-material-requirement"
+        ],
+        "value": {
+          "verdicts": {
+            "supply-shortage-exposure": {
+              "criterionScopePreserved": true,
+              "verdict": "supported",
+              "reason": "原文第1行：Q117承诺10月12日交付120件，每件耗1件物料，按期可用100件；核对得净需求120件、缺口20件。文本用10月15日补料日期，标记原交期只能满足100件、余20件待10月15日补料后交付，并登记数量和日期变化，对应计算了缺口量20、原交期缺料日（10月12日）及交期敏感性（交付日期变化）。未分析停线不影响本标准的已执行内容，故全部标准有明确证据。"
+            },
+            "supply-shortage-impact-assessment": {
+              "criterionScopePreserved": true,
+              "verdict": "partial",
+              "reason": "原文第1行将已量化缺口20件逐项关联到Q117，并登记数量和日期变化，属于将缺口映射到受影响订单，计算与对象均正确。但原文同句明确尚未分析车间停线时段，也未确定恢复优先级，因此未完成停线时段及恢复优先级输入映射。已正确保留一个子动作，故仅能判partial。"
+            },
+            "supply-net-material-requirement": {
+              "criterionScopePreserved": true,
+              "verdict": "partial",
+              "reason": "原文第1行按订单需求120件成品×1件物料=120件物料，并结合确认按期可用物料100件，计算缺口20件；原交期仅满足100件、余20件待10月15日补料后交付，体现了订单需求、可用库存和日期段的净需求计算，且用按期可用排除了不可按期使用部分。但未明确确认到货数量或确认到货，也未给出完整分时段净需求，只能核实该净需求计算子动作，不能支持全部标准。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "llmCalls": 3,
+  "retrievalCount": 1
+}

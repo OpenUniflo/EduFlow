@@ -1,0 +1,576 @@
+{
+  "security": {
+    "result": {
+      "lints": [
+        {
+          "name": "rls_enabled_no_policy",
+          "title": "RLS Enabled No Policy",
+          "level": "INFO",
+          "facing": "EXTERNAL",
+          "categories": [
+            "SECURITY"
+          ],
+          "description": "Detects cases where row level security (RLS) has been enabled on a table but no RLS policies have been created.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy",
+          "count": 4,
+          "findings": [
+            {
+              "detail": "Table \\`public.course_mapping_runs\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "course_mapping_runs",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:51.965Z"
+            },
+            {
+              "detail": "Table \\`public.course_recommendation_policies\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "course_recommendation_policies",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:51.965Z"
+            },
+            {
+              "detail": "Table \\`public.knowledge_generation_runs\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "knowledge_generation_runs",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:51.965Z"
+            },
+            {
+              "detail": "Table \\`public.material_parsing_jobs\\` has RLS enabled, but no policies exist",
+              "metadata": {
+                "name": "material_parsing_jobs",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:51.965Z"
+            }
+          ]
+        },
+        {
+          "name": "anon_security_definer_function_executable",
+          "title": "Public Can Execute SECURITY DEFINER Function",
+          "level": "WARN",
+          "facing": "EXTERNAL",
+          "categories": [
+            "SECURITY"
+          ],
+          "description": "Detects `SECURITY DEFINER` functions that are callable without signing in. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if it is not meant to be public.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+          "count": 1,
+          "findings": [
+            {
+              "detail": "Function `public.can_read_course(p_course_id text)` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/can_read_course`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+              "metadata": {
+                "name": "can_read_course",
+                "schema": "public",
+                "language": "sql",
+                "arguments": "p_course_id text",
+                "security_definer": true
+              },
+              "observed_at": "2026-10-02T05:51:51.965Z"
+            }
+          ]
+        },
+        {
+          "name": "authenticated_security_definer_function_executable",
+          "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+          "level": "WARN",
+          "facing": "EXTERNAL",
+          "categories": [
+            "SECURITY"
+          ],
+          "description": "Detects `SECURITY DEFINER` functions that are callable by signed-in users. Revoke `EXECUTE`, switch the function to `SECURITY INVOKER`, or move it out of your exposed API schema if signed-in users should not call it.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+          "count": 1,
+          "findings": [
+            {
+              "detail": "Function `public.can_read_course(p_course_id text)` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/can_read_course`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not intentional.",
+              "metadata": {
+                "name": "can_read_course",
+                "schema": "public",
+                "language": "sql",
+                "arguments": "p_course_id text",
+                "security_definer": true
+              },
+              "observed_at": "2026-10-02T05:51:51.965Z"
+            }
+          ]
+        },
+        {
+          "name": "auth_leaked_password_protection",
+          "title": "Leaked Password Protection Disabled",
+          "level": "WARN",
+          "facing": "EXTERNAL",
+          "categories": [
+            "SECURITY"
+          ],
+          "description": "Leaked password protection is currently disabled.",
+          "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection",
+          "count": 1,
+          "findings": [
+            {
+              "detail": "Supabase Auth prevents the use of compromised passwords by checking against HaveIBeenPwned.org. Enable this feature to enhance security.",
+              "metadata": {
+                "type": "auth",
+                "entity": "Auth"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "performance": {
+    "result": {
+      "lints": [
+        {
+          "name": "unindexed_foreign_keys",
+          "title": "Unindexed foreign keys",
+          "level": "INFO",
+          "facing": "EXTERNAL",
+          "categories": [
+            "PERFORMANCE"
+          ],
+          "description": "Identifies foreign key constraints without a covering index, which can impact database performance.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys",
+          "count": 20,
+          "findings": [
+            {
+              "detail": "Table \\`public.course_authoring_drafts\\` has a foreign key \\`course_authoring_drafts_author_user_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "course_authoring_drafts",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "course_authoring_drafts_author_user_id_fkey",
+                "fkey_columns": [
+                  2
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.course_mapping_runs\\` has a foreign key \\`course_mapping_runs_owner_user_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "course_mapping_runs",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "course_mapping_runs_owner_user_id_fkey",
+                "fkey_columns": [
+                  3
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.courses\\` has a foreign key \\`courses_author_user_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "courses",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "courses_author_user_id_fkey",
+                "fkey_columns": [
+                  12
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.final_project_outcome_compositions\\` has a foreign key \\`final_project_outcome_compositions_course_id_outcome_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "final_project_outcome_compositions",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "final_project_outcome_compositions_course_id_outcome_id_fkey",
+                "fkey_columns": [
+                  1,
+                  4
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.h5p_contents\\` has a foreign key \\`h5p_contents_created_by_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "h5p_contents",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "h5p_contents_created_by_fkey",
+                "fkey_columns": [
+                  14
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.knowledge_evidence\\` has a foreign key \\`knowledge_evidence_node_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "knowledge_evidence",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "knowledge_evidence_node_id_fkey",
+                "fkey_columns": [
+                  3
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.knowledge_generation_runs\\` has a foreign key \\`knowledge_generation_runs_course_id_material_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "knowledge_generation_runs",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "knowledge_generation_runs_course_id_material_id_fkey",
+                "fkey_columns": [
+                  2,
+                  3
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.learning_attempts\\` has a foreign key \\`learning_attempts_course_id_assignment_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "learning_attempts",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "learning_attempts_course_id_assignment_id_fkey",
+                "fkey_columns": [
+                  3,
+                  4
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.learning_events\\` has a foreign key \\`learning_events_attempt_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "learning_events",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "learning_events_attempt_id_fkey",
+                "fkey_columns": [
+                  6
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.learning_events\\` has a foreign key \\`learning_events_result_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "learning_events",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "learning_events_result_id_fkey",
+                "fkey_columns": [
+                  7
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.navigation_decisions\\` has a foreign key \\`navigation_decisions_course_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "navigation_decisions",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "navigation_decisions_course_id_fkey",
+                "fkey_columns": [
+                  3
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.performance_results\\` has a foreign key \\`performance_results_course_id_assignment_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "performance_results",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "performance_results_course_id_assignment_id_fkey",
+                "fkey_columns": [
+                  4,
+                  5
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.performance_results\\` has a foreign key \\`performance_results_evaluated_by_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "performance_results",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "performance_results_evaluated_by_fkey",
+                "fkey_columns": [
+                  11
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.user_micro_path_progress\\` has a foreign key \\`user_micro_path_progress_current_step_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "user_micro_path_progress",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "user_micro_path_progress_current_step_id_fkey",
+                "fkey_columns": [
+                  5
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.user_micro_path_progress\\` has a foreign key \\`user_micro_path_progress_current_unit_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "user_micro_path_progress",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "user_micro_path_progress_current_unit_id_fkey",
+                "fkey_columns": [
+                  4
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.user_micro_path_progress\\` has a foreign key \\`user_micro_path_progress_path_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "user_micro_path_progress",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "user_micro_path_progress_path_id_fkey",
+                "fkey_columns": [
+                  2
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.user_micro_unit_progress\\` has a foreign key \\`user_micro_unit_progress_current_step_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "user_micro_unit_progress",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "user_micro_unit_progress_current_step_id_fkey",
+                "fkey_columns": [
+                  5
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.user_micro_unit_progress\\` has a foreign key \\`user_micro_unit_progress_path_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "user_micro_unit_progress",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "user_micro_unit_progress_path_id_fkey",
+                "fkey_columns": [
+                  3
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.user_micro_unit_progress\\` has a foreign key \\`user_micro_unit_progress_path_id_fkey1\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "user_micro_unit_progress",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "user_micro_unit_progress_path_id_fkey1",
+                "fkey_columns": [
+                  3
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Table \\`public.user_micro_unit_progress\\` has a foreign key \\`user_micro_unit_progress_unit_id_fkey\\` without a covering index. This can lead to suboptimal query performance.",
+              "metadata": {
+                "name": "user_micro_unit_progress",
+                "type": "table",
+                "schema": "public",
+                "fkey_name": "user_micro_unit_progress_unit_id_fkey",
+                "fkey_columns": [
+                  2
+                ]
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            }
+          ]
+        },
+        {
+          "name": "unused_index",
+          "title": "Unused Index",
+          "level": "INFO",
+          "facing": "EXTERNAL",
+          "categories": [
+            "PERFORMANCE"
+          ],
+          "description": "Detects if an index has never been used and may be a candidate for removal.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index",
+          "count": 14,
+          "findings": [
+            {
+              "detail": "Index \\`course_assignments_workflow_template_idx\\` on table \\`public.course_assignments\\` has not been used",
+              "metadata": {
+                "name": "course_assignments",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`domain_assignment_candidates_domain_idx\\` on table \\`public.domain_assignment_candidates\\` has not been used",
+              "metadata": {
+                "name": "domain_assignment_candidates",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`knowledge_node_revisions_previous_idx\\` on table \\`public.knowledge_node_revisions\\` has not been used",
+              "metadata": {
+                "name": "knowledge_node_revisions",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`materials_uploaded_by_idx\\` on table \\`public.materials\\` has not been used",
+              "metadata": {
+                "name": "materials",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`knowledge_generation_runs_owner_idx\\` on table \\`public.knowledge_generation_runs\\` has not been used",
+              "metadata": {
+                "name": "knowledge_generation_runs",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`user_course_states_active_updated_idx\\` on table \\`public.user_course_states\\` has not been used",
+              "metadata": {
+                "name": "user_course_states",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`learning_events_user_idx\\` on table \\`public.learning_events\\` has not been used",
+              "metadata": {
+                "name": "learning_events",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`micro_step_criteria_criterion_idx\\` on table \\`public.micro_step_criteria\\` has not been used",
+              "metadata": {
+                "name": "micro_step_criteria",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`micro_step_attempts_decision_idx\\` on table \\`public.micro_step_attempts\\` has not been used",
+              "metadata": {
+                "name": "micro_step_attempts",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`courses_owner_idx\\` on table \\`public.courses\\` has not been used",
+              "metadata": {
+                "name": "courses",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`courses_source_idx\\` on table \\`public.courses\\` has not been used",
+              "metadata": {
+                "name": "courses",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`course_target_knowledge_node_idx\\` on table \\`public.course_target_knowledge\\` has not been used",
+              "metadata": {
+                "name": "course_target_knowledge",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`course_recommendation_policies_updated_by_idx\\` on table \\`public.course_recommendation_policies\\` has not been used",
+              "metadata": {
+                "name": "course_recommendation_policies",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            },
+            {
+              "detail": "Index \\`mastery_criteria_revision_idx\\` on table \\`public.mastery_criteria\\` has not been used",
+              "metadata": {
+                "name": "mastery_criteria",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            }
+          ]
+        },
+        {
+          "name": "multiple_permissive_policies",
+          "title": "Multiple Permissive Policies",
+          "level": "WARN",
+          "facing": "EXTERNAL",
+          "categories": [
+            "PERFORMANCE"
+          ],
+          "description": "Detects if multiple permissive row level security policies are present on a table for the same \\`role\\` and \\`action\\` (e.g. insert). Multiple permissive policies are suboptimal for performance as each policy must be executed for every relevant query.",
+          "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies",
+          "count": 1,
+          "findings": [
+            {
+              "detail": "Table \\`public.course_authoring_drafts\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{course_authoring_drafts_teacher_read,course_authoring_drafts_teacher_write}\\`",
+              "metadata": {
+                "name": "course_authoring_drafts",
+                "type": "table",
+                "schema": "public"
+              },
+              "observed_at": "2026-10-02T05:51:47.282Z"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

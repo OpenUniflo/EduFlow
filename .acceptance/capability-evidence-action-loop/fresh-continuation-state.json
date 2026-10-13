@@ -1,0 +1,498 @@
+{
+  "user_knowledge_states": [
+    {
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-cross-border-lead-time",
+      "status": "learned",
+      "mastery": null,
+      "mastery_origin": "direct",
+      "source_node_id": null,
+      "source_node_ids": null,
+      "evidence": null,
+      "updated_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-landed-cost-calculation",
+      "status": "learned",
+      "mastery": null,
+      "mastery_origin": "direct",
+      "source_node_id": null,
+      "source_node_ids": null,
+      "evidence": null,
+      "updated_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-net-material-requirement",
+      "status": "learned",
+      "mastery": null,
+      "mastery_origin": "direct",
+      "source_node_id": null,
+      "source_node_ids": null,
+      "evidence": null,
+      "updated_at": "2026-10-03T19:59:27.978145+00:00"
+    },
+    {
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-shortage-exposure",
+      "status": "learned",
+      "mastery": null,
+      "mastery_origin": "direct",
+      "source_node_id": null,
+      "source_node_ids": null,
+      "evidence": null,
+      "updated_at": "2026-10-03T19:59:27.978145+00:00"
+    },
+    {
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-shortage-impact-assessment",
+      "status": "learning",
+      "mastery": null,
+      "mastery_origin": "direct",
+      "source_node_id": null,
+      "source_node_ids": null,
+      "evidence": null,
+      "updated_at": "2026-10-03T19:59:35.300216+00:00"
+    }
+  ],
+  "knowledge_evidence": [
+    {
+      "id": "3e63c640-d918-40db-9dec-722df97e5b5e",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-landed-cost-calculation",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "57979760-efd0-45e2-a60f-f2896a27f135",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "e78b2677-1026-4017-8057-460a6e77aeed"
+        ],
+        "proposalId": "57979760-efd0-45e2-a60f-f2896a27f135",
+        "revisionId": "supply-landed-cost-calculation:v1",
+        "diagnosisId": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learned"
+      },
+      "occurred_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "id": "6dddfead-8180-4f22-90ca-72685e150ddb",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-shortage-exposure",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "1967e7dd-088e-4e9d-b85e-c18f496f68e3",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "92e5706f-2564-4c69-b515-4989e3a044ee",
+          "5c4690f6-004d-4be0-acea-2fe176a4813c"
+        ],
+        "proposalId": "1967e7dd-088e-4e9d-b85e-c18f496f68e3",
+        "revisionId": "supply-shortage-exposure:v1",
+        "diagnosisId": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learning"
+      },
+      "occurred_at": "2026-10-03T19:55:05.521089+00:00"
+    },
+    {
+      "id": "93cbe50a-4045-4e70-8172-07d155fc071c",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-shortage-impact-assessment",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "d97472f6-f6de-4804-ba26-46d36ea5037c",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "86560103-f766-4125-af34-40ffbf7377f1",
+          "df7a909e-c512-4dee-9f53-cf00f74e459d",
+          "4ba58a52-4a71-48f7-9af3-d5729e256a0d",
+          "da76efec-f0da-4ed2-bb93-bc5b838fc304",
+          "9c279aab-7d91-42a1-b5a7-a5fb8ab3fd40",
+          "b8b3384e-ae1a-46c1-ac25-f86a31322d29",
+          "83ae2c32-68a5-4439-bef6-69f22a618628",
+          "784f899e-9134-47de-a043-f18093cc1636"
+        ],
+        "proposalId": "d97472f6-f6de-4804-ba26-46d36ea5037c",
+        "revisionId": "supply-shortage-impact-assessment:v1",
+        "diagnosisId": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learning"
+      },
+      "occurred_at": "2026-10-03T19:59:35.300216+00:00"
+    },
+    {
+      "id": "a8c176be-abde-44b2-94b5-dce0be0db9d1",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-shortage-exposure",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "7d26b0a0-70f0-4d77-be00-005357e563a3",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "86560103-f766-4125-af34-40ffbf7377f1",
+          "df7a909e-c512-4dee-9f53-cf00f74e459d",
+          "4ba58a52-4a71-48f7-9af3-d5729e256a0d",
+          "da76efec-f0da-4ed2-bb93-bc5b838fc304",
+          "9c279aab-7d91-42a1-b5a7-a5fb8ab3fd40",
+          "b8b3384e-ae1a-46c1-ac25-f86a31322d29",
+          "83ae2c32-68a5-4439-bef6-69f22a618628"
+        ],
+        "proposalId": "7d26b0a0-70f0-4d77-be00-005357e563a3",
+        "revisionId": "supply-shortage-exposure:v1",
+        "diagnosisId": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learned"
+      },
+      "occurred_at": "2026-10-03T19:59:27.978145+00:00"
+    },
+    {
+      "id": "dab4671a-5ac5-4e25-9038-eb88dd41f130",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-cross-border-lead-time",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "5642cde4-3772-4216-9736-2c76f8f3d049",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "5c4690f6-004d-4be0-acea-2fe176a4813c"
+        ],
+        "proposalId": "5642cde4-3772-4216-9736-2c76f8f3d049",
+        "revisionId": "supply-cross-border-lead-time:v1",
+        "diagnosisId": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learned"
+      },
+      "occurred_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "id": "f6bd5779-ec59-46ca-9019-8a7c11efdc05",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-net-material-requirement",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "d8364550-ed4a-4191-9227-b700eedcd465",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "92e5706f-2564-4c69-b515-4989e3a044ee"
+        ],
+        "proposalId": "d8364550-ed4a-4191-9227-b700eedcd465",
+        "revisionId": "supply-net-material-requirement:v1",
+        "diagnosisId": "40e8bd71-fc69-41ef-ab36-52828b67e612",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learned"
+      },
+      "occurred_at": "2026-10-03T19:54:53.346714+00:00"
+    },
+    {
+      "id": "f75c4327-1ba7-4ec2-ac42-35b3f0989cd3",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "node_id": "supply-net-material-requirement",
+      "event_type": "capability_confirmed",
+      "source_entity_id": "6428f193-6ddf-4382-9250-ae59a0a233ab",
+      "outcome": "accepted",
+      "context": {
+        "unitIds": [
+          "86560103-f766-4125-af34-40ffbf7377f1",
+          "df7a909e-c512-4dee-9f53-cf00f74e459d",
+          "4ba58a52-4a71-48f7-9af3-d5729e256a0d",
+          "da76efec-f0da-4ed2-bb93-bc5b838fc304",
+          "9c279aab-7d91-42a1-b5a7-a5fb8ab3fd40"
+        ],
+        "proposalId": "6428f193-6ddf-4382-9250-ae59a0a233ab",
+        "revisionId": "supply-net-material-requirement:v1",
+        "diagnosisId": "80219482-d0ff-4bab-bfbf-75d1804ed87d",
+        "confirmation": "explicit-user",
+        "proposedStatus": "learned"
+      },
+      "occurred_at": "2026-10-03T19:59:27.978145+00:00"
+    }
+  ],
+  "personal_course_route_versions": [
+    {
+      "id": "ac86b54e-103b-43a1-bdb1-95a54ed226a6",
+      "route_id": "f6f35b17-e387-43b6-a495-3ce22530eb0f",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "version_number": 1,
+      "parent_version_id": null,
+      "source": "initial",
+      "include_node_ids": [],
+      "exclude_node_ids": [],
+      "snapshot": {
+        "valid": true,
+        "titles": {
+          "supply-shortage-exposure": "交期窗口缺料暴露评估",
+          "supply-cross-border-lead-time": "跨境补货交期估计",
+          "supply-alternate-site-capacity": "替代基地可用产能评估",
+          "supply-cost-lead-time-tradeoff": "供给备选方案成本交期权衡",
+          "supply-landed-cost-calculation": "到岸总成本计算",
+          "supply-recovery-option-ranking": "供应恢复备选方案排序",
+          "supply-site-switch-feasibility": "跨基地供给切换可行性判断",
+          "supply-net-material-requirement": "物料净需求计算",
+          "supply-shortage-impact-assessment": "缺料中断影响评估",
+          "supply-supplier-delivery-capacity": "供应商交付产能核验",
+          "supply-supplier-admission-decision": "供应商准入证据判定",
+          "supply-sample-quality-interpretation": "供应商样品质量证据判读",
+          "supply-supplier-qualification-review": "供应商资质证据审查"
+        },
+        "conflicts": [],
+        "orderedNodeIds": [
+          "supply-sample-quality-interpretation",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review",
+          "supply-supplier-admission-decision",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-cost-lead-time-tradeoff",
+          "supply-alternate-site-capacity",
+          "supply-site-switch-feasibility",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-recovery-option-ranking"
+        ],
+        "selectedNodeIds": [
+          "supply-alternate-site-capacity",
+          "supply-cost-lead-time-tradeoff",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-net-material-requirement",
+          "supply-recovery-option-ranking",
+          "supply-sample-quality-interpretation",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review"
+        ],
+        "prerequisiteEdges": [
+          {
+            "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+            "source": "supply-alternate-site-capacity",
+            "target": "supply-site-switch-feasibility",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-cost-lead-time-tradeoff",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-shortage-exposure",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-site-switch-feasibility",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+            "source": "supply-landed-cost-calculation",
+            "target": "supply-cost-lead-time-tradeoff",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+            "source": "supply-net-material-requirement",
+            "target": "supply-shortage-exposure",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+            "source": "supply-sample-quality-interpretation",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+            "source": "supply-shortage-exposure",
+            "target": "supply-shortage-impact-assessment",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+            "source": "supply-shortage-impact-assessment",
+            "target": "supply-recovery-option-ranking",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+            "source": "supply-supplier-delivery-capacity",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+            "source": "supply-supplier-qualification-review",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          }
+        ],
+        "bridgeKnowledgeIds": [
+          "supply-sample-quality-interpretation",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-alternate-site-capacity",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment"
+        ],
+        "currentKnowledgeIds": [
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-net-material-requirement"
+        ],
+        "effectiveTargetNodeIds": [
+          "supply-cost-lead-time-tradeoff",
+          "supply-recovery-option-ranking",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision"
+        ]
+      },
+      "structure_fingerprint": "006e1e16ec44e1129f7647f5e6ab44773a2970e8a5a6be16cf8e974def5af12c",
+      "created_at": "2026-10-03T19:55:26.405843+00:00",
+      "restored_from_version_id": null
+    }
+  ],
+  "edge_action_runs": [
+    {
+      "id": "e295728b-fb7a-4832-ae4e-5c3b61b47b93",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "action_id": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+      "edge_id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+      "binding_id": "56b73693-92ee-465e-a639-94eaed74425e",
+      "status": "completed",
+      "selection_key": "4bdbbc49-3884-4e99-9bfa-b71a85be5942",
+      "execution_snapshot": {
+        "action": {
+          "id": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+          "type": "practice_task",
+          "title": "核算缺料暴露窗口",
+          "status": "active",
+          "edge_id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+          "created_at": "2026-10-03T19:00:29.835461+00:00",
+          "difficulty": 3,
+          "provenance": {
+            "kind": "admin",
+            "actor_id": "54cd7725-ae57-464b-beba-18e950546f0b"
+          },
+          "updated_at": "2026-10-03T19:02:08.36043+00:00",
+          "description": "根据可用库存、逐期需求与确认到货，计算每期净需求、缺口和持续时间，并说明所影响的订单。",
+          "estimated_minutes": 45,
+          "expected_evidence": "提交包含原始输入、逐期计算、缺料起止和订单影响的 UTF-8 txt/md/csv 工作记录。完成任务不等于已具备能力。",
+          "resource_requirements": [
+            "planning-records"
+          ],
+          "required_capability_ids": [
+            "supply-net-material-requirement"
+          ]
+        },
+        "binding": {
+          "id": "56b73693-92ee-465e-a639-94eaed74425e",
+          "contact": "验收场景：计划负责人（无真实个人联系方式）",
+          "context": "海外工厂供应链协同项目。以下为验收用虚构项目资料，不代表已完成真实企业作业。",
+          "action_id": "3680f15d-f70b-4100-8cdc-7c281207a94d",
+          "available": true,
+          "course_id": "enterprise-vietnam-supply-collaboration",
+          "resources": [
+            {
+              "key": "planning-records",
+              "label": "逐期计划输入",
+              "available": true,
+              "reference": "验收数据：初始可用库存70；第1/2/3期需求150/100/80；各期确认到货0/120/100。请解释积欠是否跨期及缺口解除时间。"
+            }
+          ],
+          "created_at": "2026-10-03T19:00:30.460257+00:00",
+          "updated_at": "2026-10-03T19:02:09.04+00:00",
+          "instructions": "使用自己的工作记录或明确标注的验收资料。逐期列出库存、需求、到货、缺口与受影响订单，再上传包含计算过程的结果。"
+        },
+        "sourceId": "supply-net-material-requirement",
+        "targetId": "supply-shortage-exposure"
+      },
+      "micro_path_id": null,
+      "evidence_source_id": "08f6d044-8fe2-4f25-9b76-1be62b3bee3a",
+      "created_at": "2026-10-03T19:56:27.82773+00:00",
+      "started_at": "2026-10-03T19:56:35.947567+00:00",
+      "completed_at": "2026-10-03T19:56:51.675698+00:00",
+      "updated_at": "2026-10-03T19:56:51.675698+00:00"
+    },
+    {
+      "id": "f07327ba-5fe5-4cc4-81f2-ba77885572a9",
+      "user_id": "75228168-e00c-48df-8f2a-3e3d8e1f841a",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "action_id": "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+      "edge_id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+      "binding_id": "794fc242-5f28-48c3-88f3-10689497a264",
+      "status": "in_progress",
+      "selection_key": "24dbe648-25bd-4cce-a24d-91711b94ff9e",
+      "execution_snapshot": {
+        "action": {
+          "id": "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+          "type": "practice_task",
+          "title": "推导订单停线与恢复窗口",
+          "status": "active",
+          "edge_id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+          "created_at": "2026-10-03T20:11:38.116438+00:00",
+          "difficulty": 3,
+          "provenance": {
+            "kind": "admin",
+            "actor_id": "54cd7725-ae57-464b-beba-18e950546f0b"
+          },
+          "updated_at": "2026-10-03T20:11:38.116438+00:00",
+          "description": "把已量化物料缺口映射到具体工单，使用单位消耗量、产线速率与到货时点计算停线区间和完工影响，再整理恢复优先级输入。",
+          "estimated_minutes": 40,
+          "expected_evidence": "上传包含输入来源、各工单用料耗尽时点、停线起止、恢复后完工时间、交付影响和优先级依据的 UTF-8 txt/md/csv。区分计算演练与真实企业执行；完成任务后仍需证据判断与确认。",
+          "resource_requirements": [
+            "work-order-schedule"
+          ],
+          "required_capability_ids": [
+            "supply-shortage-exposure"
+          ]
+        },
+        "binding": {
+          "id": "794fc242-5f28-48c3-88f3-10689497a264",
+          "contact": "验收场景：计划负责人（无真实个人联系方式）",
+          "context": "海外工厂供应链协同项目。以下为验收用虚构项目资料，不代表已完成真实企业作业。",
+          "action_id": "d4878d21-3971-4a70-bed6-0b31c3f43baa",
+          "available": true,
+          "course_id": "enterprise-vietnam-supply-collaboration",
+          "resources": [
+            {
+              "key": "work-order-schedule",
+              "label": "工单、消耗与到货计划（模拟输入）",
+              "available": true,
+              "reference": "教学演练，非真实工厂承诺。2026-10-09，两条独立产线均08:00启动，连续生产无班次限制，每件产品消耗1件关键物料。O1：40件，产线A每小时10件，已分配可用料10件，交付截止12:00，延期成本200元/小时。O2：20件，产线B每小时5件，已分配可用料5件，截止15:00，延期成本50元/小时。确认11:00同时收到并验收可用的物料O1专用30件、O2专用15件，不能跨工单挪用；无其他在途或库存。缺料即停线，到货即可恢复，忽略切换和运输延迟。请计算各自停线、完成时间、交期影响，并整理恢复优先级输入；如建议真实调度，说明仍需核验的数据。"
+            }
+          ],
+          "created_at": "2026-10-03T20:11:39.010235+00:00",
+          "updated_at": "2026-10-03T20:11:38.971+00:00",
+          "instructions": "按提供的工单时点逐项计算，不以日末总量替代停线时段。每条产线独立、物料已指定到工单，禁止跨单重复使用。列出优先级输入而非声称已完成调度；有假设或资料不足必须注明。"
+        },
+        "sourceId": "supply-shortage-exposure",
+        "targetId": "supply-shortage-impact-assessment"
+      },
+      "micro_path_id": null,
+      "evidence_source_id": null,
+      "created_at": "2026-10-03T20:15:21.594571+00:00",
+      "started_at": "2026-10-03T20:15:30.71943+00:00",
+      "completed_at": null,
+      "updated_at": "2026-10-03T20:15:30.71943+00:00"
+    }
+  ],
+  "verdict": "PASS",
+  "checks": [
+    "real follow-on run in_progress",
+    "all official capability/evidence/route-version rows unchanged"
+  ]
+}

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildCourseNavigator, pathX } from './courseNavigatorProjection';
+import { buildCourseNavigator } from './courseNavigatorProjection';
 import { routeOnlyRuntime, routeOnlyKnowledgeGraph } from '../runtime/courseFoundation.fixture';
 import { buildCourseGraphData } from '../runtime/courseRuntime';
 import type { CourseAssignment, UserCourseState } from '../types';
 import type { NavigationDecision } from '@/shared/learning/navigation';
+import type { RoutePlanView } from '@/shared/learning/routeVersion';
 import type { UserKnowledgeRecord } from '@/features/profile/types';
 
 const graph = buildCourseGraphData(routeOnlyRuntime, undefined, routeOnlyKnowledgeGraph, []);
@@ -11,11 +12,19 @@ const id = 'route-knowledge';
 const assignment = (name: string, order: number): CourseAssignment => ({ id: name, courseId: routeOnlyRuntime.course.id, title: name, order, description: 'Task', requirements: [], expectedOutput: 'Output', acceptanceCriteria: [], mode: 'instruction' });
 const runtime = { ...routeOnlyRuntime, assignments: [assignment('second', 2), assignment('first', 1), assignment('third', 3), assignment('fourth', 4)], assignmentCoverages: ['first','second','third','fourth'].map(name => ({ id: name, assignmentId: name, nodeId: id, role: 'practice' as const })) };
 const knowledge = [{ nodeId: id, status: 'learned' }] as UserKnowledgeRecord[];
-const decision: NavigationDecision = { decisionId: 'd', decidedAt: '', policyVersion: 'course-rule-v4', courseId: runtime.course.id, path: [{ nodeId: id, title: 'Route', state: 'underway', blockedBy: [] }], skippedNodeIds: [], nextAction: { kind: 'next', resourceKind: 'micro', resourceId: 'micro', nodeId: id, reasonCode: 'begin_required_micro', reason: 'Learn' } };
+const decision: NavigationDecision = { decisionId: 'd', decidedAt: '', policyVersion: 'course-rule-v6', courseId: runtime.course.id, path: [{ nodeId: id, title: 'Route', state: 'underway', blockedBy: [] }], skippedNodeIds: [], nextAction: { kind: 'next', resourceKind: 'micro', resourceId: 'micro', nodeId: id, reasonCode: 'begin_required_micro', reason: 'Learn' } };
 const state = (statuses: Record<string, string>) => ({ assignmentStates: Object.fromEntries(Object.entries(statuses).map(([assignmentId, status]) => [assignmentId, { assignmentId, status }])) }) as UserCourseState;
 const project = (options: Partial<Parameters<typeof buildCourseNavigator>[0]> = {}) => buildCourseNavigator({ graph, runtime, knowledge, decision, learningContent: [{ nodeId: id, pathId: 'micro', estimatedMinutes: 8 }], ...options });
 
 describe('Course navigator projection', () => {
+  it('shows confirmed capability separately from unfinished required teaching without bypassing navigation', () => {
+    const result = project({ knowledge: [{ nodeId: id, status: 'learned', updatedAt: '2026-10-04T00:00:00Z' }] });
+    expect(result.route[0]).toMatchObject({ acquired: true, mastered: false, state: 'current' });
+    expect(result.nextAction?.action.pathId).toBe('micro');
+    expect(result.complete).toBe(false);
+    expect(result.recentKnowledgeUpdates.map(item => item.nodeId)).toEqual([id]);
+    expect(project({ knowledge: [{ nodeId: id, status: 'learning' }] }).route[0].acquired).toBe(false);
+  });
   it('maps only actual Decision reasons and preserves unrecognized server explanations', () => {
     expect(project().nextAction?.reason).toBe('按当前课程顺序继续学习。');
     const withReason = (reasonCode: string, reason: string) => project({ decision: { ...decision, nextAction: { ...decision.nextAction, reasonCode, reason } } });
@@ -85,15 +94,51 @@ describe('Course navigator projection', () => {
   });
   it('never mistakes missing assets, empty routes or contradictory completion for success', () => {
     const missing = { ...decision, nextAction: { kind: 'next' as const, resourceKind: 'course' as const, nodeId: id, reasonCode: 'learning_content_unavailable', reason: 'Missing' } };
-    expect(project({ decision: missing }).emptyState.title).toBe('当前没有可继续的学习内容');
+    expect(project({ decision: missing }).emptyState.title).toBe('下一步能力：Route Knowledge');
+    expect(project({ decision: missing }).nextAction).toBeNull();
     expect(project({ decision: missing }).emptyState.reason).toContain('4 项实训仍保留在下方');
     expect(project({ decision: { ...missing, nextAction: { ...missing.nextAction, reasonCode: 'course_route_complete' } } }).complete).toBe(false);
     expect(project({ decision: { ...missing, path: [], nextAction: { ...missing.nextAction, reasonCode: 'course_route_complete' } } }).complete).toBe(false);
+  });
+  it('shows dated acquired records from the current route without inferring an acquisition event', () => {
+    const acquiredDecision = { ...decision, path: [{ ...decision.path[0], state: 'learned' as const }], nextAction: { ...decision.nextAction, nodeId: undefined } };
+    const records: UserKnowledgeRecord[] = [
+      { nodeId: 'outside-route', status: 'mastered', updatedAt: '2026-10-04T00:00:00Z' },
+      { nodeId: id, status: 'learned', updatedAt: '2026-10-03T10:00:00Z' },
+    ];
+    expect(project({ decision: acquiredDecision, knowledge: records }).recentKnowledgeUpdates.map(item => item.nodeId)).toEqual([id]);
+    expect(project({ decision: acquiredDecision, knowledge: [{ nodeId: id, status: 'learned', updatedAt: 'invalid' }] }).recentKnowledgeUpdates).toEqual([]);
+    expect(project({ decision, knowledge: records }).recentKnowledgeUpdates.map(item => item.nodeId)).toEqual([id]);
   });
   it('handles no decision, empty assets and foreign course decisions', () => {
     expect(project({ runtime: routeOnlyRuntime, decision: null }).pendingPractices).toEqual([]);
     expect(project({ decision: null }).nextAction).toBeNull();
     expect(project({ decision: { ...decision, courseId: 'other' } }).nextAction).toBeNull();
+  });
+  it('preserves factual fallback edges and rejects another course route view', () => {
+    const second = { ...graph.knowledgeNodes[0], id: 'next', primaryCoverage: { ...graph.knowledgeNodes[0].primaryCoverage, lessonOrder: -1 } };
+    const edge = { id: 'fact', source: id, target: 'next', relation: 'prerequisite', strength: 'hard', reason: 'Required'  } as typeof graph.knowledgeEdges[number];
+    const fallbackGraph = { ...graph, knowledgeNodes: [...graph.knowledgeNodes, second], knowledgeEdges: [edge] };
+    expect(project({ graph: fallbackGraph, decision: null }).relations).toEqual([edge]);
+    expect(project({ graph: fallbackGraph, decision: null }).route.map(item => item.node.id)).toEqual([id, 'next']);
+    const enabling = { ...edge, id: 'a-enable', relation: 'enables' as const, strength: 1 };
+    expect(project({ graph: { ...fallbackGraph, knowledgeEdges: [edge, enabling] }, decision: null }).relations).toEqual(project({ graph: { ...fallbackGraph, knowledgeEdges: [enabling, edge] }, decision: null }).relations);
+    const foreign = { activeVersion: { courseId: 'other' }, plan: { valid: true, route: { orderedNodeIds: ['foreign'] } } } as RoutePlanView;
+    expect(project({ graph: fallbackGraph, decision: null, routeView: foreign }).route.map(item => item.node.id)).not.toContain('foreign');
+  });
+  it('computes new bridge eligibility from formal hard facts while navigation is stale', () => {
+    const routeView = { activeVersion: { courseId: runtime.course.id, snapshot: { titles: { bridge: 'Bridge', target: 'Target' } } }, model: { supportEdges: [] }, plan: { valid: true, route: { orderedNodeIds: ['bridge', 'target'], selectedNodeIds: ['bridge','target'], prerequisiteEdges: [{ id: 'bt', source: 'bridge', target: 'target', strength: 'hard' }] } } } as unknown as RoutePlanView;
+    const result = project({ decision: null, routeView, knowledge: [] });
+    expect(result.route.find(item => item.node.id === 'target')).toMatchObject({ state: 'locked', blockedBy: ['Bridge'] });
+    expect(result.relations.map(edge => edge.id)).toEqual(['bt']);
+  });
+  it('keeps real enables between retained acquired route nodes after candidate pruning', () => {
+    const routeView = { activeVersion: { courseId: runtime.course.id, snapshot: { titles: { bridge: 'Bridge', target: 'Target' } } }, model: { supportEdges: [] }, plan: { valid: true, route: { orderedNodeIds: ['bridge', 'target'], selectedNodeIds: ['bridge', 'target'], prerequisiteEdges: [] } } } as unknown as RoutePlanView;
+    const enabling = { id: 'enable', source: 'bridge', target: 'target', relation: 'enables' as const, strength: .8 };
+    const outside = { ...enabling, id: 'outside', source: 'other' };
+    const result = project({ decision: null, routeView, supportEdges: [outside, enabling], knowledge: [{ nodeId: 'bridge', status: 'learned' }, { nodeId: 'target', status: 'learned' }] });
+    expect(result.relations).toEqual([enabling]);
+    expect(result.route.every(item => item.state !== 'locked')).toBe(true);
   });
   it('groups chapters without changing server route order', () => {
     const second = { ...graph.knowledgeNodes[0], id: 'next', chapterId: 'chapter-2' };
@@ -101,10 +146,16 @@ describe('Course navigator projection', () => {
     expect(result.sections.map(section => section.title)).toEqual(['Route','Second chapter']);
     expect(result.route.map(item => item.node.id)).toEqual([id,'next']);
   });
-  it('positions identical route indices deterministically inside mobile-safe bounds', () => {
-    const positions = Array.from({ length: 80 }, (_, index) => pathX(index));
-    expect(positions).toEqual(Array.from({ length: 80 }, (_, index) => pathX(index)));
-    expect(positions.slice(0,5)).toEqual([50,68,50,32,50]);
-    expect(positions.every(x => x >= 32 && x <= 68)).toBe(true);
+
+});
+
+describe('personal route bridge presentation', () => {
+  it('keeps server route bridges without fabricating curriculum context and launches the exact asset', () => {
+    const bridgeDecision: NavigationDecision = { ...decision, path: [{ nodeId: 'bridge', title: 'Bridge', state: 'eligible', blockedBy: [] }, ...decision.path], nextAction: { ...decision.nextAction, nodeId: 'bridge', resourceId: 'bridge-micro' } };
+    const model = project({ decision: bridgeDecision, learningContent: [{ nodeId: 'bridge', pathId: 'bridge-micro' }] });
+    expect(model.route.map(item => item.node.id)).toEqual(['bridge', id]);
+    expect(model.route[0].node).toEqual({ id: 'bridge', title: 'Bridge' });
+    expect(model.sections[0]).toMatchObject({ bridge: true, title: '补充前置能力' });
+    expect(model.nextAction?.action).toEqual({ knowledgeId: 'bridge', pathId: 'bridge-micro' });
   });
 });

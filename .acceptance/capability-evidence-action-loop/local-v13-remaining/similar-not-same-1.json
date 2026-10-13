@@ -1,0 +1,206 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-similar-not-same",
+      "line": 1,
+      "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+      "observation": "实际执行了仓库分拣线吞吐量测定：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别得到 595 和 605 箱，并明确本次仅测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+      "capability": "仓库分拣线吞吐量测量与重复测量，计算平均吞吐量，并界定测量范围。"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "E12",
+      "sufficiency": "partial",
+      "confidence": 0.64,
+      "reason": "partial: 原文第1行记录“我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱”，并限定“本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单”。该已执行子动作保留了吞吐量基准测量的对象（仓库分拣线吞吐量）、专门方法（60分钟计数并重复两次）及条件（仅仓内分拣），因此可作为可重复、结果可比较的基准任务要素，支持E12中“完成核心目标与边界”和“用可检查示例证明掌握”的部分要求；但原文没有识别Benchmark Task正确用法与常见误用的证据，也未完整覆盖全部掌握标准。因此判partial。\n原判断：单元0显示本人执行了60分钟仓库分拣线吞吐量测定，重复两次得到595和605箱，平均10箱/分钟，并界定只测仓内分拣，提供了可重复执行与结果可比较的样例和边界。但未说明如何设计Benchmark Task，未识别其正确用法与常见误用，也未覆盖核心目标与边界的完整要求，因此仅部分匹配。",
+      "revisionId": "E12-r1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "6b21cad7-fd7b-4e89-a434-ba2f7fe44a9f",
+      "generatedAt": "2026-10-03T17:22:13.305Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 396,
+      "completionTokens": 560
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "4716c3cd-16b0-4e8f-b425-0a6b75325ea7",
+      "generatedAt": "2026-10-03T17:22:34.432Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1304,
+      "completionTokens": 4410
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v13",
+      "schemaVersion": "evidence-factual-verification-v2",
+      "requestId": "44aeafbb-f40e-4d8c-8fe5-8480aac59322",
+      "generatedAt": "2026-10-03T17:23:07.725Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 818,
+      "completionTokens": 6699
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-supplier-delivery-capacity": {
+              "reason": "单元0仅记录仓库分拣线吞吐量测量，并明确不涉及供应商生产瓶颈、良率或已承诺订单；没有依据瓶颈、良率和已承诺负荷计算期间可交付量，也没有识别名义产能误用，未执行该能力任何组成动作。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-incoming-quality-anomaly": {
+              "reason": "单元0测量分拣线吞吐量并重复两次，但没有给定检验标准，也未做批次异常、测量误差与证据不足的区分；来料质量异常判定所需的检验对象与判定动作均未出现。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "E12": {
+              "reason": "单元0显示本人执行了60分钟仓库分拣线吞吐量测定，重复两次得到595和605箱，平均10箱/分钟，并界定只测仓内分拣，提供了可重复执行与结果可比较的样例和边界。但未说明如何设计Benchmark Task，未识别其正确用法与常见误用，也未覆盖核心目标与边界的完整要求，因此仅部分匹配。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.64
+            },
+            "EVAL02": {
+              "reason": "单元0是分拣线吞吐量的重复测量，不涉及尝试成功率、最多k次尝试中至少一次成功、能力上限或业务可靠性判断，未解释或区分Pass@k的任何组成概念。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            },
+            "supply-cross-border-lead-time": {
+              "reason": "单元0仅测仓内分拣吞吐量，明确不涉及供应商生产瓶颈等，未分解生产、运输、通关、收货环节，也未给出交期区间、不确定性或避免重复计时，属于不同任务。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.96
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-supplier-delivery-capacity",
+          "supply-incoming-quality-anomaly",
+          "E12",
+          "EVAL02",
+          "supply-cross-border-lead-time"
+        ]
+      }
+    ],
+    "formatFailures": [],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-similar-not-same",
+          "line": 1,
+          "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+          "observation": "实际执行了仓库分拣线吞吐量测定：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别得到 595 和 605 箱，并明确本次仅测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+          "capability": "仓库分拣线吞吐量测量与重复测量，计算平均吞吐量，并界定测量范围。"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.529232175900471
+        },
+        {
+          "node_id": "supply-incoming-quality-anomaly",
+          "revision_id": "supply-incoming-quality-anomaly:v1",
+          "title": "来料质量异常判定",
+          "description": "依据给定检验标准区分批次异常、测量误差及证据不足。",
+          "mastery_criteria": [
+            "依据给定检验标准区分批次异常、测量误差及证据不足。"
+          ],
+          "similarity": 0.496972083864933
+        },
+        {
+          "node_id": "E12",
+          "revision_id": "E12-r1",
+          "title": "Benchmark Task",
+          "description": "设计可重复执行、结果可比较的基准任务。",
+          "mastery_criteria": [
+            "能独立完成Benchmark Task的核心目标与边界",
+            "能在具体场景中识别Benchmark Task的正确用法与常见误用",
+            "能用可检查的示例证明对Benchmark Task的掌握"
+          ],
+          "similarity": 0.493751361407462
+        },
+        {
+          "node_id": "EVAL02",
+          "revision_id": "EVAL02-r1",
+          "title": "Pass@k",
+          "description": "衡量在最多 k 次尝试中至少一次成功的概率，用于观察 Agent 在多次采样下的能力上限。",
+          "mastery_criteria": [
+            "能解释 Pass@k 衡量的事件",
+            "能区分一次成功率与多次尝试至少一次成功的含义",
+            "能判断何时 Pass@k 更适合用于探索能力上限而非业务可靠性"
+          ],
+          "similarity": 0.471438257183926
+        },
+        {
+          "node_id": "supply-cross-border-lead-time",
+          "revision_id": "supply-cross-border-lead-time:v1",
+          "title": "跨境补货交期估计",
+          "description": "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。",
+          "mastery_criteria": [
+            "分解生产、运输、通关和收货环节，给出有依据的交期区间及不确定性，避免重复计时。"
+          ],
+          "similarity": 0.469984440206555
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "E12"
+        ],
+        "value": {
+          "verdicts": {
+            "E12": {
+              "criterionScopePreserved": true,
+              "verdict": "partial",
+              "reason": "原文第1行记录“我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱”，并限定“本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单”。该已执行子动作保留了吞吐量基准测量的对象（仓库分拣线吞吐量）、专门方法（60分钟计数并重复两次）及条件（仅仓内分拣），因此可作为可重复、结果可比较的基准任务要素，支持E12中“完成核心目标与边界”和“用可检查示例证明掌握”的部分要求；但原文没有识别Benchmark Task正确用法与常见误用的证据，也未完整覆盖全部掌握标准。因此判partial。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "llmCalls": 3,
+  "retrievalCount": 1
+}

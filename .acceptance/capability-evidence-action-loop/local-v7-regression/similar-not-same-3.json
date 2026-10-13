@@ -1,0 +1,187 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-similar-not-same",
+      "line": 1,
+      "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+      "observation": "实际进行了仓库分拣线吞吐量测定：60分钟完成600箱，平均10箱/分钟，并重复两次得到595箱和605箱；同时将记录范围限定为仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+      "capability": "仓库分拣线吞吐量测量与重复测试，并明确测量范围边界"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "E12",
+      "sufficiency": "partial",
+      "confidence": 0.68,
+      "reason": "原文实际执行了仓库分拣线吞吐量基准式测量：以60分钟为窗口完成600箱，平均10箱/分钟，并重复两次得到595和605箱，结果可比较，且说明只测仓内分拣的边界。但未体现设计可重复执行、结果可比较的基准任务的完整过程，也未证明识别Benchmark Task正确用法与常见误用，仅能对应部分核心目标/边界和可检查示例。",
+      "revisionId": "E12-r1",
+      "proposedStatus": "learning"
+    },
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "RT03",
+      "sufficiency": "partial",
+      "confidence": 0.62,
+      "reason": "原文在吞吐量测量中使用了60分钟的时间窗口并重复两次，可对应为时间和次数设置运行边界的一部分；但没有体现为步骤或资源设置运行边界，也没有证明Runtime Limit的正确用法、常见误用及完整掌握。",
+      "revisionId": "RT03-r1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v7",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "7c96b593-d2b3-4007-9195-6045ce63a337",
+      "generatedAt": "2026-10-03T16:31:21.619Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 396,
+      "completionTokens": 657
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v7",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "21290890-d6f0-4815-8809-49ed6502cee2",
+      "generatedAt": "2026-10-03T16:31:50.262Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1272,
+      "completionTokens": 6162
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-supplier-screening-criteria": {
+              "reason": "原文仅记录仓内分拣线吞吐量测量与重复测试，并明确不涉及供应商生产瓶颈、良率或已承诺订单；没有将物料规格与交付要求转成可验证筛选准则，也没有区分必须满足的门槛和评分项。不构成供应商筛选准则定义。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "E12": {
+              "reason": "原文实际执行了仓库分拣线吞吐量基准式测量：以60分钟为窗口完成600箱，平均10箱/分钟，并重复两次得到595和605箱，结果可比较，且说明只测仓内分拣的边界。但未体现设计可重复执行、结果可比较的基准任务的完整过程，也未证明识别Benchmark Task正确用法与常见误用，仅能对应部分核心目标/边界和可检查示例。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.68
+            },
+            "supply-incoming-quality-anomaly": {
+              "reason": "原文是关于仓库分拣线吞吐量测量，未涉及来料检验标准，也未区分批次异常、测量误差或证据不足；重复值595/605只是吞吐量重复测试，不是来料质量异常判定。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文明确本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单；没有依据瓶颈、良率和已承诺负荷计算期间可交付量，也没有识别名义产能误用。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.97
+            },
+            "RT03": {
+              "reason": "原文在吞吐量测量中使用了60分钟的时间窗口并重复两次，可对应为时间和次数设置运行边界的一部分；但没有体现为步骤或资源设置运行边界，也没有证明Runtime Limit的正确用法、常见误用及完整掌握。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.62
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-supplier-screening-criteria",
+          "E12",
+          "supply-incoming-quality-anomaly",
+          "supply-supplier-delivery-capacity",
+          "RT03"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-similar-not-same",
+          "line": 1,
+          "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+          "observation": "实际进行了仓库分拣线吞吐量测定：60分钟完成600箱，平均10箱/分钟，并重复两次得到595箱和605箱；同时将记录范围限定为仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+          "capability": "仓库分拣线吞吐量测量与重复测试，并明确测量范围边界"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-supplier-screening-criteria",
+          "revision_id": "supply-supplier-screening-criteria:v1",
+          "title": "供应商筛选准则定义",
+          "description": "将物料规格与交付要求转成可验证筛选准则，区别必须满足的门槛和评分项。",
+          "mastery_criteria": [
+            "将物料规格与交付要求转成可验证筛选准则，区别必须满足的门槛和评分项。"
+          ],
+          "similarity": 0.522607533776319
+        },
+        {
+          "node_id": "E12",
+          "revision_id": "E12-r1",
+          "title": "Benchmark Task",
+          "description": "设计可重复执行、结果可比较的基准任务。",
+          "mastery_criteria": [
+            "能独立完成Benchmark Task的核心目标与边界",
+            "能在具体场景中识别Benchmark Task的正确用法与常见误用",
+            "能用可检查的示例证明对Benchmark Task的掌握"
+          ],
+          "similarity": 0.515499995544553
+        },
+        {
+          "node_id": "supply-incoming-quality-anomaly",
+          "revision_id": "supply-incoming-quality-anomaly:v1",
+          "title": "来料质量异常判定",
+          "description": "依据给定检验标准区分批次异常、测量误差及证据不足。",
+          "mastery_criteria": [
+            "依据给定检验标准区分批次异常、测量误差及证据不足。"
+          ],
+          "similarity": 0.511786193358076
+        },
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.502011031032267
+        },
+        {
+          "node_id": "RT03",
+          "revision_id": "RT03-r1",
+          "title": "Runtime Limit",
+          "description": "为步骤、次数、时间和资源设置运行边界。",
+          "mastery_criteria": [
+            "能独立完成Runtime Limit的核心目标与边界",
+            "能在具体场景中识别Runtime Limit的正确用法与常见误用",
+            "能用可检查的示例证明对Runtime Limit的掌握"
+          ],
+          "similarity": 0.480146111241222
+        }
+      ]
+    ]
+  },
+  "retrievalCount": 1
+}

@@ -1,0 +1,266 @@
+{
+  "protectedTables": [
+    {
+      "table_name": "user_course_states",
+      "rows": 9,
+      "hash": "c24d3a4b131e0d45cc0fa435b055ea99"
+    },
+    {
+      "table_name": "user_assignment_states",
+      "rows": 4,
+      "hash": "11b270be2440e9e134942338b95affc3"
+    },
+    {
+      "table_name": "user_micro_path_progress",
+      "rows": 19,
+      "hash": "2bce0168270f02d11f87705118d039c4"
+    },
+    {
+      "table_name": "user_micro_unit_progress",
+      "rows": 18,
+      "hash": "41eeca846be33dd8c2c7928473fc8c06"
+    },
+    {
+      "table_name": "personal_course_routes",
+      "rows": 9,
+      "hash": "881580e283197531b22e3cdeb648fe50"
+    },
+    {
+      "table_name": "personal_course_route_versions",
+      "rows": 44,
+      "hash": "f2455b6e889ddadd4f90d8f69b0aafcd"
+    },
+    {
+      "table_name": "user_knowledge_states",
+      "rows": 40,
+      "hash": "16a1ffc57e4e96f9eedac19e874ca2a4"
+    },
+    {
+      "table_name": "edge_action_runs",
+      "rows": 12,
+      "hash": "fd4bc00da7c58a08e92d665753f52efb"
+    },
+    {
+      "table_name": "learning_attempts",
+      "rows": 6,
+      "hash": "fe5c060324d2840c1c9c0fe7d0c5876d"
+    },
+    {
+      "table_name": "performance_results",
+      "rows": 7,
+      "hash": "8fb738d61e1ef115e2f42ab2df8a0e6c"
+    },
+    {
+      "table_name": "learning_events",
+      "rows": 13,
+      "hash": "6ebb21980298f93492fc0a887d00e6b8"
+    },
+    {
+      "table_name": "micro_step_attempts",
+      "rows": 70,
+      "hash": "0cc129e70f8876179d44d763a87a2c68"
+    },
+    {
+      "table_name": "user_evidence_sources",
+      "rows": 33,
+      "hash": "b91373de56b02e9f06c122f03e4be62c"
+    },
+    {
+      "table_name": "capability_diagnosis_runs",
+      "rows": 38,
+      "hash": "1fc8aa805d6a59ac339d79adb2c4cf45"
+    },
+    {
+      "table_name": "capability_state_proposals",
+      "rows": 61,
+      "hash": "7b1c815350d8b7576d8ffec440a4fc4f"
+    },
+    {
+      "table_name": "knowledge_evidence",
+      "rows": 31,
+      "hash": "fe2d574ee6beabee97692207a60abed6"
+    },
+    {
+      "table_name": "evidence_units",
+      "rows": 54,
+      "hash": "375828cbaa9e5d41eab66f0d5cfdbfb2"
+    },
+    {
+      "table_name": "assistant_sessions",
+      "rows": 42,
+      "hash": "73e147002e4b0905e7c3326cf1442a38"
+    },
+    {
+      "table_name": "knowledge_nodes",
+      "rows": 350,
+      "hash": "654dd03d2a9b9e317b97eb304b9195b6"
+    },
+    {
+      "table_name": "knowledge_node_revisions",
+      "rows": 360,
+      "hash": "c5063fa17e43758f034ac3ebccdf79bf"
+    },
+    {
+      "table_name": "knowledge_edges",
+      "rows": 481,
+      "hash": "f26d1ee34d586e2ae39bfd1a645a798e"
+    },
+    {
+      "table_name": "knowledge_edge_actions",
+      "rows": 54,
+      "hash": "eefc04f945928cac5eb6cc33193c2b16"
+    },
+    {
+      "table_name": "course_action_bindings",
+      "rows": 54,
+      "hash": "4a7ac245662fc1f4486ed5745ee36084"
+    },
+    {
+      "table_name": "courses",
+      "rows": 20,
+      "hash": "fcd985ffd3fa5057e8412cc7bc4b8a7c"
+    },
+    {
+      "table_name": "course_assignments",
+      "rows": 324,
+      "hash": "271654ade2831406c81dd6b070e1d864"
+    },
+    {
+      "table_name": "curriculum_coverages",
+      "rows": 478,
+      "hash": "b8e0ab5757b35ff4079f117122923339"
+    }
+  ],
+  "all26CompleteRowsUnchanged": true,
+  "protectedExtra": {
+    "pass": true,
+    "rows": [
+      {
+        "table_name": "assistant_messages",
+        "rows": 194,
+        "hash": "c6c5af271df458a43b81aed2265e5e48"
+      },
+      {
+        "table_name": "protected-storage",
+        "rows": 33,
+        "hash": "535d1b1f3b62b26e8bc4e561d20df501"
+      }
+    ]
+  },
+  "finalResetReportsIdentical": true,
+  "finalReset": {
+    "pass": true,
+    "manifest": ".acceptance/conversation-workbench/acceptance-ab-baseline.json",
+    "outsideHash": "dd998207261f1896f0b877a9320ee0c3",
+    "retainedSessionIds": [
+      "738b9b70-1f7d-4e9d-8d61-3ad424d25e0c",
+      "8048c0fe-0f2f-47a0-923f-9de5e8290146",
+      "caa6a47e-060d-46a4-8e4c-3c81a9d7aefc"
+    ],
+    "accounts": [
+      {
+        "email": "project-capability-a@eduflow.test",
+        "routeVersion": 8,
+        "selectedNodes": 18,
+        "executionSteps": 23,
+        "UKS": [
+          {
+            "nodeId": "supply-net-material-requirement",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-cross-border-lead-time",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-landed-cost-calculation",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-supplier-screening-criteria",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-incoming-quality-anomaly",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-critical-material-identification",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-shortage-exposure",
+            "status": "learned"
+          }
+        ],
+        "Evidence": 0,
+        "Diagnosis": 0,
+        "ActionRun": 0
+      },
+      {
+        "email": "project-capability-b@eduflow.test",
+        "routeVersion": 8,
+        "selectedNodes": 14,
+        "executionSteps": 17,
+        "UKS": [
+          {
+            "nodeId": "supply-sample-quality-interpretation",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-shortage-exposure",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-cross-border-lead-time",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-landed-cost-calculation",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-incoming-quality-anomaly",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-supplier-qualification-review",
+            "status": "learned"
+          },
+          {
+            "nodeId": "supply-supplier-delivery-capacity",
+            "status": "learned"
+          }
+        ],
+        "Evidence": 0,
+        "Diagnosis": 0,
+        "ActionRun": 0
+      }
+    ]
+  },
+  "migrationVersionAndNameExactMatch": true,
+  "migrationCount": 63,
+  "securityFindingsBaselineExactUnchanged": true,
+  "securityCounts": [
+    {
+      "name": "rls_enabled_no_policy",
+      "level": "INFO",
+      "count": 5
+    },
+    {
+      "name": "anon_security_definer_function_executable",
+      "level": "WARN",
+      "count": 1
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "count": 1
+    },
+    {
+      "name": "auth_leaked_password_protection",
+      "level": "WARN",
+      "count": 1
+    }
+  ]
+}

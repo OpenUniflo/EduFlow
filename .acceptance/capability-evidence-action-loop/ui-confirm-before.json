@@ -1,0 +1,473 @@
+{
+  "preview": "https://edu-flow-fwgdyj2ej-july-nanas-projects.vercel.app",
+  "route": {
+    "activeVersion": {
+      "id": "09f446f8-bc6d-44a2-8256-809fdbfb4976",
+      "routeId": "a69026ac-08ce-4826-9d68-178b252644b9",
+      "userId": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+      "courseId": "enterprise-vietnam-supply-collaboration",
+      "versionNumber": 1,
+      "parentVersionId": null,
+      "source": "initial",
+      "constraints": {
+        "includeNodeIds": [],
+        "excludeNodeIds": []
+      },
+      "snapshot": {
+        "valid": true,
+        "titles": {
+          "supply-shortage-exposure": "交期窗口缺料暴露评估",
+          "supply-cross-border-lead-time": "跨境补货交期估计",
+          "supply-alternate-site-capacity": "替代基地可用产能评估",
+          "supply-cost-lead-time-tradeoff": "供给备选方案成本交期权衡",
+          "supply-landed-cost-calculation": "到岸总成本计算",
+          "supply-recovery-option-ranking": "供应恢复备选方案排序",
+          "supply-site-switch-feasibility": "跨基地供给切换可行性判断",
+          "supply-net-material-requirement": "物料净需求计算",
+          "supply-shortage-impact-assessment": "缺料中断影响评估",
+          "supply-supplier-delivery-capacity": "供应商交付产能核验",
+          "supply-supplier-admission-decision": "供应商准入证据判定",
+          "supply-sample-quality-interpretation": "供应商样品质量证据判读",
+          "supply-supplier-qualification-review": "供应商资质证据审查"
+        },
+        "conflicts": [],
+        "orderedNodeIds": [
+          "supply-sample-quality-interpretation",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review",
+          "supply-supplier-admission-decision",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-cost-lead-time-tradeoff",
+          "supply-alternate-site-capacity",
+          "supply-site-switch-feasibility",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-recovery-option-ranking"
+        ],
+        "selectedNodeIds": [
+          "supply-alternate-site-capacity",
+          "supply-cost-lead-time-tradeoff",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-net-material-requirement",
+          "supply-recovery-option-ranking",
+          "supply-sample-quality-interpretation",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review"
+        ],
+        "prerequisiteEdges": [
+          {
+            "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+            "source": "supply-alternate-site-capacity",
+            "target": "supply-site-switch-feasibility",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-cost-lead-time-tradeoff",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-shortage-exposure",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-site-switch-feasibility",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+            "source": "supply-landed-cost-calculation",
+            "target": "supply-cost-lead-time-tradeoff",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+            "source": "supply-net-material-requirement",
+            "target": "supply-shortage-exposure",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+            "source": "supply-sample-quality-interpretation",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+            "source": "supply-shortage-exposure",
+            "target": "supply-shortage-impact-assessment",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+            "source": "supply-shortage-impact-assessment",
+            "target": "supply-recovery-option-ranking",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+            "source": "supply-supplier-delivery-capacity",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+            "source": "supply-supplier-qualification-review",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          }
+        ],
+        "bridgeKnowledgeIds": [
+          "supply-sample-quality-interpretation",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-alternate-site-capacity",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment"
+        ],
+        "currentKnowledgeIds": [],
+        "effectiveTargetNodeIds": [
+          "supply-cost-lead-time-tradeoff",
+          "supply-recovery-option-ranking",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision"
+        ]
+      },
+      "structureFingerprint": "006e1e16ec44e1129f7647f5e6ab44773a2970e8a5a6be16cf8e974def5af12c",
+      "createdAt": "2026-10-03T15:51:08.34537+00:00",
+      "restoredFromVersionId": null
+    },
+    "model": {
+      "orderedNodeIds": [
+        "supply-supplier-admission-decision",
+        "supply-cost-lead-time-tradeoff",
+        "supply-site-switch-feasibility",
+        "supply-recovery-option-ranking"
+      ],
+      "prerequisiteEdges": [],
+      "supportEdges": [
+        {
+          "id": "knowledge-enables-supply-site-switch-feasibility-supply-recovery-option-ranking",
+          "source": "supply-site-switch-feasibility",
+          "target": "supply-recovery-option-ranking",
+          "relation": "enables",
+          "strength": 0.85
+        },
+        {
+          "id": "knowledge-enables-supply-supplier-admission-decision-supply-cost-lead-time-tradeoff",
+          "source": "supply-supplier-admission-decision",
+          "target": "supply-cost-lead-time-tradeoff",
+          "relation": "enables",
+          "strength": 0.85
+        }
+      ],
+      "courseKnowledgeIds": [
+        "supply-cost-lead-time-tradeoff",
+        "supply-recovery-option-ranking",
+        "supply-site-switch-feasibility",
+        "supply-supplier-admission-decision"
+      ],
+      "currentKnowledgeIds": [],
+      "bridgeKnowledgeIds": [],
+      "actionableNodeIds": [],
+      "connectedCourseKnowledgeIds": [],
+      "disconnectedCourseKnowledgeIds": [
+        "supply-cost-lead-time-tradeoff",
+        "supply-recovery-option-ranking",
+        "supply-site-switch-feasibility",
+        "supply-supplier-admission-decision"
+      ]
+    },
+    "plan": {
+      "valid": true,
+      "conflicts": [],
+      "route": {
+        "orderedNodeIds": [
+          "supply-sample-quality-interpretation",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review",
+          "supply-supplier-admission-decision",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-cost-lead-time-tradeoff",
+          "supply-alternate-site-capacity",
+          "supply-site-switch-feasibility",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-recovery-option-ranking"
+        ],
+        "selectedNodeIds": [
+          "supply-alternate-site-capacity",
+          "supply-cost-lead-time-tradeoff",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-net-material-requirement",
+          "supply-recovery-option-ranking",
+          "supply-sample-quality-interpretation",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review"
+        ],
+        "effectiveTargetNodeIds": [
+          "supply-cost-lead-time-tradeoff",
+          "supply-recovery-option-ranking",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision"
+        ],
+        "prerequisiteEdges": [
+          {
+            "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+            "source": "supply-alternate-site-capacity",
+            "target": "supply-site-switch-feasibility",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-cost-lead-time-tradeoff",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-shortage-exposure",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-site-switch-feasibility",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+            "source": "supply-landed-cost-calculation",
+            "target": "supply-cost-lead-time-tradeoff",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+            "source": "supply-net-material-requirement",
+            "target": "supply-shortage-exposure",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+            "source": "supply-sample-quality-interpretation",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+            "source": "supply-shortage-exposure",
+            "target": "supply-shortage-impact-assessment",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+            "source": "supply-shortage-impact-assessment",
+            "target": "supply-recovery-option-ranking",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+            "source": "supply-supplier-delivery-capacity",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+            "source": "supply-supplier-qualification-review",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          }
+        ],
+        "currentKnowledgeIds": [],
+        "bridgeKnowledgeIds": [
+          "supply-sample-quality-interpretation",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-alternate-site-capacity",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment"
+        ]
+      }
+    },
+    "structureChanged": false
+  },
+  "personal_course_route_versions": [
+    {
+      "id": "09f446f8-bc6d-44a2-8256-809fdbfb4976",
+      "route_id": "a69026ac-08ce-4826-9d68-178b252644b9",
+      "user_id": "7834ab1e-c2f6-4f32-b327-34877ae031a8",
+      "course_id": "enterprise-vietnam-supply-collaboration",
+      "version_number": 1,
+      "parent_version_id": null,
+      "source": "initial",
+      "include_node_ids": [],
+      "exclude_node_ids": [],
+      "snapshot": {
+        "valid": true,
+        "titles": {
+          "supply-shortage-exposure": "交期窗口缺料暴露评估",
+          "supply-cross-border-lead-time": "跨境补货交期估计",
+          "supply-alternate-site-capacity": "替代基地可用产能评估",
+          "supply-cost-lead-time-tradeoff": "供给备选方案成本交期权衡",
+          "supply-landed-cost-calculation": "到岸总成本计算",
+          "supply-recovery-option-ranking": "供应恢复备选方案排序",
+          "supply-site-switch-feasibility": "跨基地供给切换可行性判断",
+          "supply-net-material-requirement": "物料净需求计算",
+          "supply-shortage-impact-assessment": "缺料中断影响评估",
+          "supply-supplier-delivery-capacity": "供应商交付产能核验",
+          "supply-supplier-admission-decision": "供应商准入证据判定",
+          "supply-sample-quality-interpretation": "供应商样品质量证据判读",
+          "supply-supplier-qualification-review": "供应商资质证据审查"
+        },
+        "conflicts": [],
+        "orderedNodeIds": [
+          "supply-sample-quality-interpretation",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review",
+          "supply-supplier-admission-decision",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-cost-lead-time-tradeoff",
+          "supply-alternate-site-capacity",
+          "supply-site-switch-feasibility",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-recovery-option-ranking"
+        ],
+        "selectedNodeIds": [
+          "supply-alternate-site-capacity",
+          "supply-cost-lead-time-tradeoff",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-net-material-requirement",
+          "supply-recovery-option-ranking",
+          "supply-sample-quality-interpretation",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review"
+        ],
+        "prerequisiteEdges": [
+          {
+            "id": "knowledge-prerequisite-supply-alternate-site-capacity-supply-site-switch-feasibility",
+            "source": "supply-alternate-site-capacity",
+            "target": "supply-site-switch-feasibility",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-cost-lead-time-tradeoff",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-cost-lead-time-tradeoff",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-shortage-exposure",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-shortage-exposure",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-cross-border-lead-time-supply-site-switch-feasibility",
+            "source": "supply-cross-border-lead-time",
+            "target": "supply-site-switch-feasibility",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-landed-cost-calculation-supply-cost-lead-time-tradeoff",
+            "source": "supply-landed-cost-calculation",
+            "target": "supply-cost-lead-time-tradeoff",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-net-material-requirement-supply-shortage-exposure",
+            "source": "supply-net-material-requirement",
+            "target": "supply-shortage-exposure",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-sample-quality-interpretation-supply-supplier-admission-decision",
+            "source": "supply-sample-quality-interpretation",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-shortage-exposure-supply-shortage-impact-assessment",
+            "source": "supply-shortage-exposure",
+            "target": "supply-shortage-impact-assessment",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-shortage-impact-assessment-supply-recovery-option-ranking",
+            "source": "supply-shortage-impact-assessment",
+            "target": "supply-recovery-option-ranking",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-supplier-delivery-capacity-supply-supplier-admission-decision",
+            "source": "supply-supplier-delivery-capacity",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          },
+          {
+            "id": "knowledge-prerequisite-supply-supplier-qualification-review-supply-supplier-admission-decision",
+            "source": "supply-supplier-qualification-review",
+            "target": "supply-supplier-admission-decision",
+            "strength": "hard"
+          }
+        ],
+        "bridgeKnowledgeIds": [
+          "supply-sample-quality-interpretation",
+          "supply-supplier-delivery-capacity",
+          "supply-supplier-qualification-review",
+          "supply-cross-border-lead-time",
+          "supply-landed-cost-calculation",
+          "supply-alternate-site-capacity",
+          "supply-net-material-requirement",
+          "supply-shortage-exposure",
+          "supply-shortage-impact-assessment"
+        ],
+        "currentKnowledgeIds": [],
+        "effectiveTargetNodeIds": [
+          "supply-cost-lead-time-tradeoff",
+          "supply-recovery-option-ranking",
+          "supply-site-switch-feasibility",
+          "supply-supplier-admission-decision"
+        ]
+      },
+      "structure_fingerprint": "006e1e16ec44e1129f7647f5e6ab44773a2970e8a5a6be16cf8e974def5af12c",
+      "created_at": "2026-10-03T15:51:08.34537+00:00",
+      "restored_from_version_id": null
+    }
+  ],
+  "user_knowledge_states": [],
+  "knowledge_evidence": []
+}

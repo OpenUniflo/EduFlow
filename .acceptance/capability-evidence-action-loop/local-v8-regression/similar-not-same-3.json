@@ -1,0 +1,203 @@
+{
+  "scope": "Local thinking-enabled 16000-token experiment / read-only Hosted retrieval; not Hosted diagnosis",
+  "units": [
+    {
+      "sourceId": "local-similar-not-same",
+      "line": 1,
+      "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+      "observation": "测定仓库分拣线吞吐量，记录60分钟完成600箱、平均10箱/分钟，并重复两次得到595箱与605箱；明确本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+      "capability": "仓库分拣线吞吐量测定（含重复观测与范围界定）"
+    }
+  ],
+  "matches": [
+    {
+      "unitIndexes": [
+        0
+      ],
+      "nodeId": "E12",
+      "sufficiency": "partial",
+      "confidence": 0.62,
+      "reason": "partial: 原文核验：600箱/60分钟=10箱/分钟计算正确；重复两次得595箱和605箱，能与600箱比较；且明确只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单，边界事实成立。这些只构成可重复观测、结果比较和范围界定的部分正确子动作。但未体现“设计”基准任务，也未体现识别Benchmark Task的正确用法与常见误用，无法满足全部掌握标准；因此只能判为partial，不能升级为完整支持。\n原判断：原文有可重复执行（重复两次）和结果可比较（600、595、605箱及10箱/分钟）的测量记录，并界定了“只测仓内分拣”的边界；但未体现设计基准任务、识别正确用法与常见误用，故仅部分涉及。",
+      "revisionId": "E12-r1",
+      "proposedStatus": "learning"
+    }
+  ],
+  "metadata": [
+    {
+      "stage": "extraction",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-units-v1",
+      "requestId": "845dfc7b-ca0a-4d0f-8c66-022d7fdce511",
+      "generatedAt": "2026-10-03T16:44:56.952Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 396,
+      "completionTokens": 845
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-sufficiency-v2",
+      "requestId": "567b9470-bc5f-4e32-8976-1d2e91cc9590",
+      "generatedAt": "2026-10-03T16:45:18.308Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 1282,
+      "completionTokens": 4628
+    },
+    {
+      "stage": "admission",
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "promptVersion": "personal-evidence-v8",
+      "schemaVersion": "evidence-factual-verification-v1",
+      "requestId": "149ca5a4-336d-4154-b2eb-decefd1e40d9",
+      "generatedAt": "2026-10-03T16:45:35.942Z",
+      "temperature": 0,
+      "maxTokens": 16000,
+      "thinking": true,
+      "promptTokens": 774,
+      "completionTokens": 3566
+    }
+  ],
+  "artifacts": {
+    "judgmentAttempts": [
+      {
+        "value": {
+          "judgments": {
+            "supply-supplier-delivery-capacity": {
+              "reason": "原文仅记录仓内分拣线吞吐量（600/595/605箱，10箱/分钟），并明确“不涉及供应商生产瓶颈、良率或已承诺订单”；未依据瓶颈、良率、已承诺负荷计算供应商期间可交付量，也未识别名义产能误用。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "EVAL10": {
+              "reason": "原文给出重复吞吐量观测值（600、595、605箱），但未说明小样本分数差异为何不能视为真实提升，未报告评估结果的不确定性/置信信息，也未判断改动是否有足够证据支持上线决策；不是评估统计显著性判断。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.9
+            },
+            "supply-incoming-quality-anomaly": {
+              "reason": "原文只测仓内分拣吞吐量，没有给定检验标准，也未区分来料批次异常、测量误差或证据不足。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            },
+            "E12": {
+              "reason": "原文有可重复执行（重复两次）和结果可比较（600、595、605箱及10箱/分钟）的测量记录，并界定了“只测仓内分拣”的边界；但未体现设计基准任务、识别正确用法与常见误用，故仅部分涉及。",
+              "unitIndexes": [
+                0
+              ],
+              "sufficiency": "partial",
+              "confidence": 0.62
+            },
+            "supply-supplier-screening-criteria": {
+              "reason": "原文只测仓内分拣吞吐量，未将物料规格与交付要求转成可验证筛选准则，也未区分必须满足的门槛和评分项。",
+              "unitIndexes": [],
+              "sufficiency": "unmatched",
+              "confidence": 0.95
+            }
+          }
+        },
+        "nodeIds": [
+          "supply-supplier-delivery-capacity",
+          "EVAL10",
+          "supply-incoming-quality-anomaly",
+          "E12",
+          "supply-supplier-screening-criteria"
+        ]
+      }
+    ],
+    "extraction": {
+      "units": [
+        {
+          "sourceId": "local-similar-not-same",
+          "line": 1,
+          "quote": "我测定仓库分拣线吞吐量：60 分钟完成 600 箱，平均 10 箱/分钟；重复两次分别为 595 和 605 箱。本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+          "observation": "测定仓库分拣线吞吐量，记录60分钟完成600箱、平均10箱/分钟，并重复两次得到595箱与605箱；明确本记录只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单。",
+          "capability": "仓库分拣线吞吐量测定（含重复观测与范围界定）"
+        }
+      ]
+    },
+    "retrieved": [
+      [
+        {
+          "node_id": "supply-supplier-delivery-capacity",
+          "revision_id": "supply-supplier-delivery-capacity:v1",
+          "title": "供应商交付产能核验",
+          "description": "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。",
+          "mastery_criteria": [
+            "依据瓶颈、良率和已承诺负荷计算期间可交付量，识别名义产能误用。"
+          ],
+          "similarity": 0.519200205802917
+        },
+        {
+          "node_id": "EVAL10",
+          "revision_id": "EVAL10-r1",
+          "title": "Evaluation Statistical Significance",
+          "description": "判断观测到的评估差异是否可能只是抽样波动，并用统计不确定性约束模型或系统改进结论。",
+          "mastery_criteria": [
+            "能说明为什么小样本分数差异不能直接视为真实提升",
+            "能为评估结果报告基本的不确定性或置信信息",
+            "能判断一次改动是否有足够证据支持上线决策"
+          ],
+          "similarity": 0.517939002391041
+        },
+        {
+          "node_id": "supply-incoming-quality-anomaly",
+          "revision_id": "supply-incoming-quality-anomaly:v1",
+          "title": "来料质量异常判定",
+          "description": "依据给定检验标准区分批次异常、测量误差及证据不足。",
+          "mastery_criteria": [
+            "依据给定检验标准区分批次异常、测量误差及证据不足。"
+          ],
+          "similarity": 0.512861251831055
+        },
+        {
+          "node_id": "E12",
+          "revision_id": "E12-r1",
+          "title": "Benchmark Task",
+          "description": "设计可重复执行、结果可比较的基准任务。",
+          "mastery_criteria": [
+            "能独立完成Benchmark Task的核心目标与边界",
+            "能在具体场景中识别Benchmark Task的正确用法与常见误用",
+            "能用可检查的示例证明对Benchmark Task的掌握"
+          ],
+          "similarity": 0.505402818483198
+        },
+        {
+          "node_id": "supply-supplier-screening-criteria",
+          "revision_id": "supply-supplier-screening-criteria:v1",
+          "title": "供应商筛选准则定义",
+          "description": "将物料规格与交付要求转成可验证筛选准则，区别必须满足的门槛和评分项。",
+          "mastery_criteria": [
+            "将物料规格与交付要求转成可验证筛选准则，区别必须满足的门槛和评分项。"
+          ],
+          "similarity": 0.498212874148745
+        }
+      ]
+    ],
+    "verifications": [
+      {
+        "nodeIds": [
+          "E12"
+        ],
+        "value": {
+          "verdicts": {
+            "E12": {
+              "verdict": "partial",
+              "reason": "原文核验：600箱/60分钟=10箱/分钟计算正确；重复两次得595箱和605箱，能与600箱比较；且明确只测仓内分拣，不涉及供应商生产瓶颈、良率或已承诺订单，边界事实成立。这些只构成可重复观测、结果比较和范围界定的部分正确子动作。但未体现“设计”基准任务，也未体现识别Benchmark Task的正确用法与常见误用，无法满足全部掌握标准；因此只能判为partial，不能升级为完整支持。"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "retrievalCount": 1
+}
