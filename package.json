@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:workflow:services": "docker compose -f tests/workflow-integration/compose.yaml up -d wiremock",
     "test:workflow:smoke": "bash tests/workflow-integration/scripts/smoke_test.sh",
+    "test:workflow:mcp": "pnpm dlx @modelcontextprotocol/inspector@2.11.0 --config tests/workflow-integration/mcp-inspector.json",
     "audit:knowledge": "node scripts/audit-knowledge-relations.mjs",
     "audit:client-secrets": "node scripts/audit-client-secrets.mjs",
     "auth:bootstrap-local": "node --env-file=.env.local --import tsx scripts/bootstrap-local-users.ts",

@@ -39,17 +39,30 @@ DeepSeek discontinued the legacy `deepseek-chat` and `deepseek-reasoner` model I
 
 The official Everything MCP server is a protocol conformance fixture, not a useful production business tool:
 
-```bash
-npx -y @modelcontextprotocol/server-everything@1.0.0
-```
-
-The default uses stdio and occupies the terminal. To open an independent graphical tool inspector:
+Run these commands from `tests/workflow-integration/`. EduFlow requires pnpm;
+`npx` uses npm and is rejected by the repository's `devEngines.packageManager` check.
 
 ```bash
-npx -y @modelcontextprotocol/inspector
+pnpm dlx @modelcontextprotocol/server-everything@1.0.0
 ```
 
-In Inspector, configure an stdio server using `npx` as the command and arguments `-y`, `@modelcontextprotocol/server-everything@1.0.0`. Test tools/list and a harmless tool call. The EduFlow Python Worker (not Vercel browser code) should ultimately be the MCP client.
+The default uses stdio and occupies the terminal. To open the graphical Inspector
+with EduFlow's ready-to-use server configuration (from the repository root or this directory):
+
+```bash
+pnpm test:workflow:mcp
+```
+
+The startup script loads `mcp-inspector.json` as a read-only session. It shows
+`eduflow-everything`, using `pnpm dlx @modelcontextprotocol/server-everything@1.0.0`.
+Connect that server, list its tools, then call `echo` with
+`{"message":"eduflow-mcp-acceptance"}` or `get-sum` with `{"a":17,"b":25}`.
+Expected results: `Echo: eduflow-mcp-acceptance` and `The sum of 17 and 25 is 42.`
+
+Launching Inspector without `--config` loads its personal catalog, whose built-in
+sample servers use `npx`. Use `pnpm test:workflow:mcp` on each launch to load the
+repository configuration. Edit `mcp-inspector.json` to change the project defaults.
+The EduFlow Python Worker (not Vercel browser code) should ultimately be the MCP client.
 
 Official sources:
 - https://github.com/modelcontextprotocol/servers/tree/main/src/everything

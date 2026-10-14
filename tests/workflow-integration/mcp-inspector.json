@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "eduflow-everything": {
+      "type": "stdio",
+      "command": "pnpm",
+      "args": ["dlx", "@modelcontextprotocol/server-everything@1.0.0"]
+    }
+  }
+}
