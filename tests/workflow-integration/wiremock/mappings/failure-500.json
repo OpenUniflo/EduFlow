@@ -1,0 +1,15 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/fail/server-error"
+  },
+  "response": {
+    "status": 500,
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8"
+    },
+    "jsonBody": {
+      "error": "upstream_failure"
+    }
+  }
+}

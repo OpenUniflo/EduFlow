@@ -1,0 +1,30 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/orders/A1001"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8"
+    },
+    "jsonBody": {
+      "order_id": "A1001",
+      "status": "shipped",
+      "currency": "CNY",
+      "items": [
+        {
+          "sku": "BOOK-1",
+          "quantity": 2,
+          "unit_price": 59.0
+        },
+        {
+          "sku": "SHIP-1",
+          "quantity": 1,
+          "unit_price": 10.0
+        }
+      ],
+      "total": 128.0
+    }
+  }
+}

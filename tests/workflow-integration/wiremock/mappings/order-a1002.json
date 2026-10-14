@@ -1,0 +1,18 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/orders/A1002"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8"
+    },
+    "jsonBody": {
+      "order_id": "A1002",
+      "status": "pending",
+      "currency": "CNY",
+      "total": 30.5
+    }
+  }
+}

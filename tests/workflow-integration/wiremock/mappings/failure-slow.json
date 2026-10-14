@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/fail/slow"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8"
+    },
+    "jsonBody": {
+      "ok": true,
+      "waited_ms": 4000
+    },
+    "fixedDelayMilliseconds": 4000
+  }
+}

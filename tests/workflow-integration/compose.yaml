@@ -1,0 +1,28 @@
+services:
+  wiremock:
+    image: wiremock/wiremock:3.13.2
+    ports:
+      - "127.0.0.1:18080:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings:ro
+    command: ["--verbose"]
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["state"]
+    environment:
+      POSTGRES_USER: eduflow_test
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eduflow_local_only_change_me}
+      POSTGRES_DB: eduflow_runtime
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - eduflow_runtime_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eduflow_test -d eduflow_runtime"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  eduflow_runtime_postgres:

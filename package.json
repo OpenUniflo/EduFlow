@@ -17,6 +17,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src api scripts tests",
     "test": "vitest run",
+    "test:workflow:services": "docker compose -f tests/workflow-integration/compose.yaml up -d wiremock",
+    "test:workflow:smoke": "bash tests/workflow-integration/scripts/smoke_test.sh",
     "audit:knowledge": "node scripts/audit-knowledge-relations.mjs",
     "audit:client-secrets": "node scripts/audit-client-secrets.mjs",
     "auth:bootstrap-local": "node --env-file=.env.local --import tsx scripts/bootstrap-local-users.ts",

@@ -1,0 +1,15 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/orders/NOT-FOUND"
+  },
+  "response": {
+    "status": 404,
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8"
+    },
+    "jsonBody": {
+      "error": "order_not_found"
+    }
+  }
+}

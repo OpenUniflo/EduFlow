@@ -1,0 +1,6 @@
+[
+  {"id":"pr3-router","prompt":"查询订单 A1001 的发货状态及金额，必须使用工具核实。","expected_tools":["get_order_status"]},
+  {"id":"pr3-error","prompt":"查询一个不存在的订单 NOT-FOUND。","expected_outcome":"not_found"},
+  {"id":"pr5-skill","prompt":"用 data-analysis Skill 分析提供的 CSV 并生成 JSON 结果。","expected_file":"analysis.json"},
+  {"id":"pr6-auth","request":"GET /secure/orders/A1001","expected_without_key":401,"expected_with_key":200}
+]

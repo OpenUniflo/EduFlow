@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/secure/admin"
+  },
+  "response": {
+    "status": 401,
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8"
+    },
+    "jsonBody": {
+      "error": "invalid_tool_key"
+    }
+  },
+  "priority": 10
+}

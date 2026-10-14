@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/webhooks/order-completed"
+  },
+  "response": {
+    "status": 202,
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8"
+    },
+    "jsonBody": {
+      "received": true,
+      "webhook_id": "wh-test-001"
+    }
+  }
+}
