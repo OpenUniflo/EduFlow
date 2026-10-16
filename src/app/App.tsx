@@ -12,6 +12,7 @@ import { applicationServices, hydrateApplicationServices, hydratePublicApplicati
 import { attachWorkflowAssignmentMetadata, resolveWorkflowAssignmentContext, completeWorkflowAssignmentRun } from "@/app/integrations/workflowAssignmentIntegration";
 import { ExplorePage } from "@/features/explore/pages/ExplorePage";
 import { LearningPage } from "@/features/learning/pages/LearningPage";
+import { DynamicWorkspacePage } from "@/features/workspace/DynamicWorkspacePage";
 import { MicroLearningExperience } from "@/features/learning/micro/MicroLearningExperience";
 import { CourseCenterPage } from "@/features/course/pages/CoursePages";
 import { CourseManagementPage } from "@/features/course/pages/CourseManagementPage";
@@ -246,6 +247,7 @@ export default function App() {
           <RouterRoute path="/login" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
           <RouterRoute path="/register" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
           <RouterRoute path="/" element={session ? <LearningPage session={session} onLogout={logout} /> : <PublicHomePage />} />
+          <RouterRoute path="/workspace" element={protectedElement(session ? <DynamicWorkspacePage session={session} onLogout={logout} /> : null)} />
           <RouterRoute path="/explore" element={<ExplorePage session={session} onLogout={logout} />} />
           <RouterRoute path="/learn/micro/:knowledgeId" element={<MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} />} />
           <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="canvas" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />

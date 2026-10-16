@@ -1,0 +1,46 @@
+.dynamic-workspace {
+  min-height: 100dvh;
+  background: #fff;
+  color: #17191d;
+}
+.dynamic-workspace-stage {
+  width: min(920px, calc(100% - 48px));
+  margin: 96px auto 32px;
+  background: transparent;
+}
+.dynamic-workspace-stage header p {
+  margin: 0 0 12px;
+  color: #727780;
+  font-size: 13px;
+}
+.dynamic-workspace-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+.dynamic-workspace-views button {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 8px 14px;
+  color: #525861;
+  cursor: pointer;
+  font: inherit;
+}
+.dynamic-workspace-views button[aria-pressed="true"] {
+  background: #1c1915;
+  color: #fff;
+}
+.dynamic-workspace-graph {
+  width: 100%;
+  height: min(640px, calc(100dvh - 220px));
+  border: 0;
+  background: #fff;
+  display: block;
+}
+.dynamic-workspace-note {
+  margin: 8px 0 0;
+  color: #8b9198;
+  font-size: 12px;
+}

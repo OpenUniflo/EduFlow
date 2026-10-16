@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>知行</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=8" />
+  <script>const q=new URLSearchParams(location.search);if(q.get("embed")==="1")document.documentElement.classList.add("embed");if(q.get("bare")==="1")document.documentElement.classList.add("bare");</script>
+</head>
+<body>
+  <canvas id="world"></canvas>
+  <nav id="lenses">
+    <button type="button" data-view="world">知识世界</button>
+    <button type="button" data-view="ability">能力路线</button>
+    <button type="button" class="on" data-view="lane">课程泳道</button>
+  </nav>
+  <p id="viewnote">课程泳道：同一批节点按篇章排开。看见、搭起来、训出来、交付。</p>
+  <p class="orbit-hint">拖动旋转 · 滚轮缩放 · 单击一颗星</p>
+  <aside class="legend">
+    <b>知识世界</b>
+    <p>上面三块是知识世界。说一个目标之后，切到能力路线或课程泳道，看的是同一批节点的另外两种排法。底部那一排是学习路径。</p>
+  </aside>
+  <p id="score" hidden></p>
+  <p id="link" hidden></p>
+  <div id="board" hidden></div>
+  <div id="path" hidden></div>
+  <article id="card" hidden></article>
+  <form id="saybar">
+    <input id="say" value="做一个可运行、可评测的智能体系统" autocomplete="off" />
+    <button id="mic" type="button">说</button>
+    <button id="send" type="submit">发送</button>
+  </form>
+  <script src="app.js?v=9"></script>
+</body>
+</html>

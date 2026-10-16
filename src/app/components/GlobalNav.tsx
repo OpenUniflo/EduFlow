@@ -1,20 +1,20 @@
-import { BookOpen, Compass, GraduationCap, LogIn, LogOut, Network, ShieldCheck, UserPlus, Workflow } from "lucide-react";
+import { BookOpen, Compass, GraduationCap, LogIn, LogOut, MessagesSquare, Network, ShieldCheck, UserPlus, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
 import { canManageCourses, canManageKnowledgeDomains } from "@/features/auth/capabilities";
 
-export type GlobalNavActive="learning"|"explore"|"courses"|"canvas"|"teaching"|"system";
+export type GlobalNavActive="learning"|"workspace"|"explore"|"courses"|"canvas"|"teaching"|"system";
 export type GlobalNavItem={id:GlobalNavActive;to:string;label:string};
 
 export function getPrimaryNavigationItems(session?:MockSession|null):GlobalNavItem[]{
-  const items:GlobalNavItem[]=[{id:"learning",to:"/",label:"学习"},{id:"explore",to:"/explore",label:"探索"},{id:"courses",to:"/courses",label:"课程"},{id:"canvas",to:"/workflows",label:"画布"}];
+  const items:GlobalNavItem[]=[{id:"learning",to:"/",label:"学习"},{id:"workspace",to:"/workspace",label:"工作台"},{id:"explore",to:"/explore",label:"探索"},{id:"courses",to:"/courses",label:"课程"},{id:"canvas",to:"/workflows",label:"画布"}];
   if(canManageCourses(session))items.push({id:"teaching",to:"/teaching",label:"教学管理"});
   if(canManageKnowledgeDomains(session))items.push({id:"system",to:"/system",label:"系统管理"});
   return items;
 }
 
-const icons={learning:GraduationCap,explore:Compass,courses:BookOpen,canvas:Workflow,teaching:BookOpen,system:ShieldCheck};
+const icons={learning:GraduationCap,workspace:MessagesSquare,explore:Compass,courses:BookOpen,canvas:Workflow,teaching:BookOpen,system:ShieldCheck};
 function initials(name:string){return name.trim().slice(0,2).toUpperCase()||"ED";}
 
 export function GlobalNav({active,session,onLogout}:{active:GlobalNavActive;session?:MockSession|null;onLogout?:()=>void}){
