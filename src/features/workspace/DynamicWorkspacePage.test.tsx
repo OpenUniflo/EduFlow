@@ -1,21 +1,15 @@
 import { expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
 import { DynamicWorkspacePage } from "./DynamicWorkspacePage";
-import { graphFrameSrc } from "./graphFrame";
-import type { MockSession } from "@/features/auth/types";
 
-const session: MockSession = { userId: "student", name: "student", email: "student@example.com", role: "student", capabilities: [], createdAt: "2026-01-01" };
-
-it("maps the three workspace entries onto one white graph", () => {
-  expect(graphFrameSrc("ability")).toBe("/dynamic-workspace/graph/index.html?embed=1&bare=1&view=ability");
-  expect(graphFrameSrc("world")).toContain("view=world");
-  expect(graphFrameSrc("lane")).toContain("view=lane");
-  const html = renderToStaticMarkup(<MemoryRouter><DynamicWorkspacePage session={session} onLogout={() => undefined} /></MemoryRouter>);
-  expect(html).toContain("/dynamic-workspace/graph/index.html?embed=1&amp;bare=1&amp;view=ability");
-  expect(html).toContain("课程技能树");
-  expect(html).toContain("能力模型");
-  expect(html).toContain("课程路线");
-  expect(html).toContain("不会另起一个模型");
+it("shows the chat workspace prototype instead of a bare graph", () => {
+  const html = renderToStaticMarkup(<DynamicWorkspacePage />);
+  expect(html).toContain('src="/dynamic-workspace/prototype.html"');
   expect(html).not.toContain("127.0.0.1:8765");
+  const prototype = readFileSync("public/dynamic-workspace/prototype.html", "utf8");
+  expect(prototype).toContain("工作台");
+  expect(prototype).toContain("目标与进展");
+  expect(prototype).toContain("/dynamic-workspace/graph/index.html?embed=1&view=");
+  expect(prototype).not.toContain("127.0.0.1:8765");
 });
