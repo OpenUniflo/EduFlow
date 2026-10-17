@@ -87,52 +87,25 @@ if (canvas) {
 function rebuildLayout() {
   layout.clear();
   if (view === "world") {
-    nodes.forEach((n) => layout.set(n.id, { x: n.x, y: n.y, z: n.z }));
-    return;
-  }
-  const order = ["ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7"];
-  if (view === "ability") {
-    order.forEach((id, i) => layout.set(id, { x: 0, y: 1.25 - i * 0.42, z: 0 }));
-    const buckets = {};
-    nodes.filter((n) => n.region === "agent" && !n.lane).forEach((n) => {
-      const parent = (n.requires || [])[0];
-      (buckets[parent] = buckets[parent] || []).push(n);
-    });
-    Object.entries(buckets).forEach(([pid, list]) => {
-      const base = layout.get(pid);
-      if (!base) return;
+    ["dl", "agent", "biz"].forEach((region, index) => {
+      const list = nodes.filter((n) => n.region === region);
       list.forEach((n, i) => {
-        const side = pid === "ch3" || pid === "ch5" ? -1 : 1;
-        layout.set(n.id, {
-          x: base.x + side * 0.82,
-          y: base.y + (i - (list.length - 1) / 2) * 0.28,
-          z: 0,
-        });
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        layout.set(n.id, { x: (index - 1) * 1.85 + (col === 0 ? -0.38 : 0.38), y: -1.05 + row * 0.46, z: 0 });
       });
     });
     return;
   }
-  const lanes = ["看见", "搭起来", "训出来", "交付"];
-  const chapters = ["ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7"];
-  lanes.forEach((lane, col) => {
-    const heads = chapters.filter((id) => byId(id).lane === lane);
-    let y = -1.05;
-    heads.forEach((id) => {
-      const x = (col - 1.5) * 1.35;
-      layout.set(id, { x, y, z: 0 });
-      const kids = nodes.filter((s) => !s.lane && (s.requires || [])[0] === id);
-      kids.forEach((n, i) => layout.set(n.id, { x: x + 0.42, y: y + 0.34 * (i + 1), z: 0 }));
-      y += 0.4 * (kids.length + 1) + 0.22;
-    });
-  });
+  const order = ["ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7"];
+  order.forEach((id, i) => layout.set(id, { x: 0, y: 1.5 - i * 0.46, z: 0 }));
 }
 
 function project(n) {
   const pos = layout.get(n.id);
   if (!pos) return null;
-  const use3d = view === "world";
-  const ry = use3d ? rotY : 0;
-  const rx = use3d ? rotX : 0;
+  const ry = 0;
+  const rx = 0;
   const cosY = Math.cos(ry);
   const sinY = Math.sin(ry);
   const x1 = pos.x * cosY - pos.z * sinY;
@@ -141,16 +114,157 @@ function project(n) {
   const sinX = Math.sin(rx);
   const y1 = pos.y * cosX - z1 * sinX;
   const z2 = pos.y * sinX + z1 * cosX;
-  const p = zoom / (z2 + 3.4);
+  const p = zoom * (view === "world" ? 0.58 : 1) / (z2 + 3.4);
   return {
     x: innerWidth * 0.5 + x1 * p,
-    y: (view === "world" ? innerHeight * 0.46 : embed ? innerHeight * 0.58 : innerHeight * 0.5) + y1 * p,
+    y: innerHeight * (embed ? 0.5 : 0.48) + y1 * p,
     r: Math.max(view === "world" ? 3.5 : 8, p * (view === "world" ? 0.055 : 0.07)),
     z: z2,
     a: Math.max(0.25, Math.min(1, (z2 + 1.6) / 2.4)),
   };
 }
 
+function tone(n) {
+  const ready = n.id === readyId() && !n.lit;
+  return {
+    ready,
+    fill: n.lit ? "#e7f1f6" : n.target ? "#eef6f1" : ready ? "#fff6ef" : "#fff",
+    stroke: n.lit ? "#2f6f96" : n.target ? "#2f6b4f" : ready ? "#c46a32" : "rgba(60,48,32,0.14)",
+    width: ready ? 2.4 : 1,
+  };
+}
+function childNames(id) {
+  return nodes.filter((n) => !n.lane && (n.requires || [])[0] === id).map((n) => n.title);
+}
+function contentTop() {
+  return document.documentElement.classList.contains("bare") ? 16 : embed ? 62 : 96;
+}
+function paintCard(n, x, y, w, h, caption) {
+  const t = tone(n);
+  const p = { x: x + w / 2, y: y + h / 2, r: 18, hit: { x, y, w, h } };
+  projected.set(n.id, p);
+  ctx.fillStyle = t.fill;
+  ctx.strokeStyle = t.stroke;
+  ctx.lineWidth = t.width;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 14);
+  ctx.fill();
+  ctx.stroke();
+  ctx.textAlign = "center";
+  let titleY = y + (caption ? 24 : h / 2 + 4);
+  if (t.ready) {
+    ctx.fillStyle = "#8c4e28";
+    ctx.font = "11px 'Noto Serif SC', serif";
+    ctx.fillText("现在这一步", p.x, y + 16);
+    titleY = y + (caption ? 34 : 30);
+  }
+  ctx.fillStyle = "#1c1915";
+  ctx.font = "600 13px 'Noto Serif SC', serif";
+  ctx.fillText(n.title, p.x, titleY);
+  if (caption) {
+    ctx.fillStyle = "#6d6458";
+    ctx.font = "11px 'Noto Serif SC', serif";
+    ctx.fillText(caption, p.x, titleY + 16);
+  }
+  ctx.textAlign = "left";
+}
+function drawMap() {
+  const regions = [
+    { id: "dl", name: "深度学习", fill: "rgba(47,107,79,0.12)" },
+    { id: "agent", name: "智能体", fill: "rgba(47,111,150,0.12)" },
+    { id: "biz", name: "经营能力", fill: "rgba(109,91,140,0.12)" },
+  ];
+  const gap = 18;
+  const colW = Math.min(220, (innerWidth - 28 - gap * 2) / 3);
+  const left = (innerWidth - (colW * 3 + gap * 2)) / 2;
+  const top = contentTop();
+  const placed = [];
+  regions.forEach((region, index) => {
+    const list = nodes.filter((n) => n.region === region.id);
+    const x = left + index * (colW + gap);
+    const landH = 52 + list.length * 24;
+    ctx.fillStyle = region.fill;
+    ctx.beginPath();
+    ctx.ellipse(x + colW / 2, top + landH / 2, colW / 2, landH / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#6d6458";
+    ctx.font = "600 16px 'Noto Serif SC', serif";
+    ctx.textAlign = "center";
+    ctx.fillText(region.name, x + colW / 2, top + 28);
+    list.forEach((n, i) => {
+      const y = top + 52 + i * 24;
+      placed.push({ n, x: x + 22, y });
+      projected.set(n.id, { x: x + 22, y, r: 10, hit: { x: x + 8, y: y - 12, w: colW - 16, h: 22 } });
+    });
+  });
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(55,45,32,0.22)";
+  edges.forEach(([a, b]) => {
+    const pa = projected.get(a);
+    const pb = projected.get(b);
+    if (!pa || !pb || Math.abs(pa.x - pb.x) < 24) return;
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.stroke();
+  });
+  placed.forEach(({ n, x, y }) => {
+    ctx.beginPath();
+    ctx.fillStyle = regionColor[n.region];
+    ctx.arc(x, y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#1c1915";
+    ctx.font = "13px 'Noto Serif SC', serif";
+    ctx.textAlign = "left";
+    ctx.fillText(n.title, x + 10, y + 4);
+  });
+}
+function drawRoad() {
+  const order = ["ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7"];
+  const cardW = Math.min(260, innerWidth - 72);
+  const x = (innerWidth - cardW) / 2;
+  const gap = 12;
+  const top = contentTop();
+  const heights = order.map((id) => {
+    const n = byId(id);
+    const ready = n.id === readyId() && !n.lit;
+    return (childNames(id).length ? 58 : 44) + (ready ? 14 : 0);
+  });
+  const roadH = heights.reduce((sum, item) => sum + item, 0) + (order.length - 1) * gap;
+  ctx.fillStyle = "#f3efe6";
+  ctx.beginPath();
+  ctx.roundRect(x + cardW / 2 - 16, top - 8, 32, roadH + 16, 16);
+  ctx.fill();
+  let y = top;
+  for (let index = order.length - 1; index >= 0; index -= 1) {
+    const n = byId(order[index]);
+    paintCard(n, x, y, cardW, heights[index], childNames(n.id).join(" · "));
+    y += heights[index] + gap;
+  }
+}
+function drawLaneCards() {
+  const lanes = ["看见", "搭起来", "训出来", "交付"];
+  const chapters = ["ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7"];
+  const gap = 10;
+  const colW = Math.min(190, (innerWidth - 28 - gap * 3) / 4);
+  const left = (innerWidth - (colW * 4 + gap * 3)) / 2;
+  const top = contentTop();
+  lanes.forEach((lane, col) => {
+    const x = left + col * (colW + gap);
+    ctx.fillStyle = "#6d6458";
+    ctx.font = "600 14px 'Noto Serif SC', serif";
+    ctx.fillText(lane, x, top + 16);
+    let y = top + 26;
+    chapters.filter((id) => byId(id).lane === lane).forEach((id) => {
+      const n = byId(id);
+      const kids = childNames(id);
+      const ready = n.id === readyId() && !n.lit;
+      const h = (kids.length ? 64 : 46) + (ready ? 14 : 0);
+      paintCard(byId(id), x, y, colW, h, kids.join(" · "));
+      y += h + 8;
+    });
+  });
+}
 function draw() {
   try {
   const w = innerWidth;
@@ -158,136 +272,10 @@ function draw() {
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = embed ? "#ffffff" : "#f4f0e6";
   ctx.fillRect(0, 0, w, h);
-  if (auto) rotY += 0.0018;
-
   projected.clear();
-  const pts = nodes.map((n) => ({ n, p: project(n) })).filter((item) => item.p);
-  pts.forEach(({ n, p }) => projected.set(n.id, p));
-  pts.sort((a, b) => a.p.z - b.p.z);
-
-  if (view === "world") {
-    ["agent", "dl", "biz"].forEach((region) => {
-      const group = pts.filter(({ n }) => n.region === region);
-      if (!group.length) return;
-      const xs = group.map(({ p }) => p.x);
-      const ys = group.map(({ p }) => p.y);
-      const pad = 36;
-      const x = Math.min(...xs) - pad;
-      const y = Math.min(...ys) - pad;
-      if (!embed) {
-        ctx.fillStyle = regionWash[region];
-        ctx.beginPath();
-        ctx.roundRect(x, y, Math.max(...xs) - Math.min(...xs) + pad * 2, Math.max(...ys) - Math.min(...ys) + pad * 2, 28);
-        ctx.fill();
-      }
-      ctx.fillStyle = "#6d6458";
-      ctx.font = "13px 'Noto Serif SC', serif";
-      ctx.fillText(region === "agent" ? "智能体" : region === "dl" ? "深度学习" : "经营能力", x + 14, y + 22);
-    });
-  } else if (view === "lane") {
-    ["看见", "搭起来", "训出来", "交付"].forEach((lane) => {
-      const group = pts.filter(({ n }) => n.lane === lane || ((byId((n.requires || [])[0] || "") || {}).lane === lane));
-      if (!group.length) return;
-      const xs = group.map(({ p }) => p.x);
-      const ys = group.map(({ p }) => p.y);
-      const pad = 28;
-      const x = Math.min(...xs) - pad;
-      const y = Math.min(...ys) - 46;
-      if (!embed) {
-        ctx.fillStyle = "rgba(63,115,148,0.07)";
-        ctx.beginPath();
-        ctx.roundRect(x, y, Math.max(...xs) - Math.min(...xs) + pad * 2, Math.max(...ys) - y + pad, 22);
-        ctx.fill();
-      }
-      ctx.fillStyle = "#1c1915";
-      ctx.font = "15px 'Noto Serif SC', serif";
-      ctx.fillText(lane, x + 12, y + 24);
-    });
-  }
-
-  ctx.lineWidth = 1.4;
-  edges.forEach(([a, b]) => {
-    const pa = projected.get(a);
-    const pb = projected.get(b);
-    if (!pa || !pb) return;
-    const hot = focusIds.size === 0 || focusIds.has(a) || focusIds.has(b);
-    ctx.strokeStyle = hot ? "rgba(55,45,32,0.38)" : "rgba(55,45,32,0.12)";
-    ctx.beginPath();
-    ctx.moveTo(pa.x, pa.y);
-    ctx.lineTo(pb.x, pb.y);
-    ctx.stroke();
-  });
-
-  const labels = [];
-  pts.forEach(({ n, p }) => {
-    const hot = focusIds.size === 0 || focusIds.has(n.id);
-    const ready = n.id === readyId() && !n.lit;
-    const locked = !n.lit && !ready;
-    const onRoute = view === "ability" || view === "lane";
-    const color = n.lit ? "#2f6f96" : n.target ? "#2f6b4f" : ready ? "#c46a32" : (onRoute ? "#c8c0b4" : regionColor[n.region]);
-    const radius = (n.lane || !onRoute ? p.r * 1.25 : p.r * 0.85) * (n.id === hoverId ? 1.2 : 1);
-    ctx.globalAlpha = hot ? 1 : 0.4;
-    ctx.fillStyle = locked && onRoute ? "#f7f3ea" : color;
-    ctx.strokeStyle = ready ? "#c46a32" : (n.lit ? "#2f6f96" : "#b7aea2");
-    ctx.lineWidth = ready ? 3 : 1.5;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    if (n.lit) {
-      ctx.fillStyle = "#fff";
-      ctx.font = `${Math.max(11, radius)}px 'Noto Serif SC', serif`;
-      ctx.textAlign = "center";
-      ctx.fillText("亮", p.x, p.y + radius * 0.35);
-      ctx.textAlign = "left";
-    }
-    if (n.burst) {
-      const t = (Date.now() - n.burst) / 800;
-      if (t < 1) {
-        ctx.globalAlpha = 1 - t;
-        ctx.strokeStyle = "#c46a32";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, radius + 6 + t * 26, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-    if (n.miss && Date.now() - n.miss < 500) {
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = "#8c3d32";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, radius + 4, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    if (ready) {
-      ctx.globalAlpha = 0.85;
-      ctx.strokeStyle = "#c46a32";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, radius + 7 + Math.sin(Date.now() / 280) * 2, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = "#8c4e28";
-      ctx.font = "12px 'Noto Serif SC', serif";
-      ctx.fillText("点这颗", p.x + radius + 8, p.y - radius - 8);
-    }
-    if (n.title && hot && radius > 6) {
-      ctx.font = "12px 'Noto Serif SC', serif";
-      const label = n.title;
-      const box = { x: p.x + radius + 4, y: p.y - 6, w: ctx.measureText(label).width, h: 14 };
-      const hitLabel = view !== "lane" && labels.some((b) => Math.abs(b.x - box.x) < 80 && Math.abs(b.y - box.y) < 16);
-      if (!hitLabel) {
-        labels.push(box);
-        ctx.globalAlpha = 0.92;
-        ctx.fillStyle = "#1c1915";
-        ctx.fillText(label, box.x, p.y + 4);
-        if (view === "ability" && n.lane) {
-          ctx.fillText(String(["ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7"].indexOf(n.id) + 1), p.x - 4, p.y - radius - 4);
-        }
-      }
-    }
-    ctx.globalAlpha = 1;
-  });
+  if (view === "ability") drawRoad();
+  else if (view === "lane") drawLaneCards();
+  else drawMap();
   placeCard();
   window.__frames = (window.__frames || 0) + 1;
   } catch (err) {
@@ -337,13 +325,9 @@ if (canvas) canvas.addEventListener("click", (e) => {
 
 function hit(x, y) {
   let best = null;
-  let bestD = 18;
   projected.forEach((p, id) => {
-    const d = Math.hypot(p.x - x, p.y - y);
-    if (d < Math.max(bestD, p.r) && (!best || d < bestD)) {
-      best = id;
-      bestD = d;
-    }
+    const box = p.hit;
+    if (box && x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h) best = id;
   });
   return best;
 }
@@ -653,9 +637,9 @@ function findChoice(text) {
 }
 
 const VIEW_NOTES = {
-  world: "这三块是知识世界里的模块，不是课程本身。",
-  ability: "技能树就是这次的能力路线。从下往上点，铜圈那颗现在能点。做对才点亮，旁边的小天赋跟着亮。",
-  lane: "课程泳道：同一批节点按篇章排开。看见、搭起来、训出来、交付。",
+  world: "三块地。地名是节点，细线只表示这块依赖那块。",
+  ability: "从下往上走。蓝色是已经会的，铜色是现在这一步，绿色是终点。",
+  lane: "四列卡片。看见、搭起来、训出来、交付。",
 };
 
 function setView(next) {
