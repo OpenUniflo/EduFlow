@@ -3,14 +3,19 @@
 .ws-side strong { display: block; padding: 0 10px 16px; font-size: 18px; }
 .ws-side button { display: block; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 8px; padding: 10px 12px; color: #525861; cursor: pointer; }
 .ws-side button.on { background: #f3f4f5; color: #17191d; font-weight: 650; }
-.ws-main { flex: 1; min-width: 0; padding: 28px 32px 80px; }
+.ws-main { flex: 1; min-width: 0; padding: 22px 28px 40px; }
+.ws-stage { min-height: calc(100dvh - 44px); display: flex; flex-direction: column; }
+.ws-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 22px; }
+.ws-head h1 { margin: 0; font-size: 20px; font-weight: 650; }
+.ws-head select { margin-top: 6px; border: 0; background: transparent; color: #727780; font: inherit; }
 .ws-main h1 { margin: 0 0 8px; font-size: 22px; }
 .ws-main p { margin: 0 0 16px; color: #727780; }
-.ws-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.ws-row { display: flex; gap: 4px; margin: 0; }
 .ws-row button, .ws-link { border: 0; background: #f6f7f8; border-radius: 999px; padding: 8px 12px; cursor: pointer; color: inherit; text-decoration: none; }
 .ws-row button.on { background: #1c1915; color: #fff; }
-.ws-lands, .ws-lanes { display: flex; gap: 18px; align-items: flex-start; }
-.ws-land { flex: 1; min-width: 0; border-radius: 28px; padding: 16px 14px 18px; }
+.ws-lands, .ws-lanes { display: flex; gap: 28px; align-items: flex-start; flex: 1; }
+.ws-lanes > section { flex: 1; min-width: 0; }
+.ws-land { flex: 1; min-width: 0; border-radius: 40px; padding: 22px 18px 24px; background: #f7f8f8; }
 .ws-land b, .ws-lane b { display: block; margin-bottom: 10px; color: #6d6458; }
 .ws-place, .ws-card { display: block; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 12px; padding: 8px 10px; margin: 0 0 6px; cursor: pointer; }
 .ws-road { width: min(420px, 100%); }

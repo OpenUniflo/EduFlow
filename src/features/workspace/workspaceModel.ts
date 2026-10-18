@@ -19,7 +19,7 @@ export function laneColumns(places: WorkspacePlace[]) {
   const columns = [];
   for (let index = 0; index < places.length; index += size) {
     const cards = places.slice(index, index + size);
-    columns.push({ title: cards[0]?.title ?? "", cards });
+    columns.push({ title: `第 ${columns.length + 1} 段`, cards });
   }
   return columns;
 }

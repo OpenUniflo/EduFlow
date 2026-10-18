@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { applicationServices } from "@/app/services/applicationServices";
-import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
 import type { MockSession } from "@/features/auth/types";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import { resolveNodeDomain } from "@/features/knowledge/domain/domainResolution";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
-import { laneColumns, mapLands, markChapters, type PlaceState, type WorkspaceChapter } from "./workspaceModel";
+import { laneColumns, mapLands, markChapters, type WorkspaceChapter } from "./workspaceModel";
 import "./dynamicWorkspace.css";
 
 type PageId = "work" | "progress" | "resources" | "ability";
@@ -42,16 +41,12 @@ export function DynamicWorkspacePage({ session }: { session: MockSession }) {
   const selectedId = courseId && snapshot.runtimes.some((runtime) => runtime.course.id === courseId) ? courseId : snapshot.runtimes[0]?.course.id ?? null;
   const runtime = snapshot.runtimes.find((item) => item.course.id === selectedId);
   const places = runtime ? markChapters(chaptersOf(runtime), snapshot.known) : [];
-  const placeState = new Map(places.map((place) => [place.id, place.state]));
-  const nodeState = (id: string): PlaceState => {
-    if (snapshot.known.has(id)) return "done";
-    const chapter = runtime ? chaptersOf(runtime).find((item) => item.nodeIds.includes(id)) : undefined;
-    return chapter ? placeState.get(chapter.id) ?? "ahead" : "ahead";
-  };
-  const lands = runtime ? mapLands(runtime.curriculumCoverages.map((coverage) => {
-    const node = snapshot.knowledgeGraph.nodes.find((item) => item.id === coverage.nodeId);
-    return { id: coverage.nodeId, title: node?.title ?? coverage.nodeId, domain: resolveNodeDomain(coverage.nodeId, snapshot.governance).domain?.name ?? "未分类", state: nodeState(coverage.nodeId) };
-  }).filter((node, index, list) => list.findIndex((item) => item.id === node.id) === index)) : [];
+  const chapters = runtime ? chaptersOf(runtime) : [];
+  const lands = mapLands(places.map((place) => {
+    const nodeId = chapters.find((chapter) => chapter.id === place.id)?.nodeIds[0];
+    const domain = nodeId ? resolveNodeDomain(nodeId, snapshot.governance).domain?.name ?? runtime?.course.title ?? "本课程" : runtime?.course.title ?? "本课程";
+    return { id: place.id, title: place.title, domain, state: place.state };
+  }));
   const stateLabel = runtime ? applicationServices.learningProgressRepository.getCourseState(session.userId, runtime.course.id) : undefined;
   const doneAssignments = stateLabel ? Object.values(stateLabel.assignmentStates).filter((item) => item.status === "accepted" || item.status === "completed").length : 0;
 
@@ -66,13 +61,14 @@ export function DynamicWorkspacePage({ session }: { session: MockSession }) {
     </aside>
     <main className="ws-main">
       {!runtime ? <section><h1>还没有已发布课程</h1><p>发布一门课程后，这里会显示它的资源、进度和能力。</p><button className="ws-link" type="button" onClick={() => navigate("/courses")}>去课程</button></section> : <>
-        <div className="ws-row">
-          {snapshot.runtimes.map((item) => <button className={item.course.id === runtime.course.id ? "on" : ""} key={item.course.id} type="button" onClick={() => setCourseId(item.course.id)}>{item.course.title}</button>)}
-        </div>
-        {page === "work" ? <section>
-          <h1>{runtime.course.title}</h1>
-          <p>下面三张图用的是这门课的章节和你已经形成的能力，不是写死的示例。</p>
-          <div className="ws-row">{graphs.map(([id, label]) => <button className={graph === id ? "on" : ""} key={id} type="button" onClick={() => setGraph(id)}>{label}</button>)}</div>
+        {page === "work" ? <section className="ws-stage">
+          <header className="ws-head">
+            <div>
+              <h1>{runtime.course.title}</h1>
+              {snapshot.runtimes.length > 1 ? <select aria-label="选择课程" value={runtime.course.id} onChange={(event) => setCourseId(event.target.value)}>{snapshot.runtimes.map((item) => <option key={item.course.id} value={item.course.id}>{item.course.title}</option>)}</select> : null}
+            </div>
+            <div className="ws-row">{graphs.map(([id, label]) => <button className={graph === id ? "on" : ""} key={id} type="button" onClick={() => setGraph(id)}>{label}</button>)}</div>
+          </header>
           {graph === "map" ? <div className="ws-lands">{lands.map((land) => <section className="ws-land" key={land.name}><b>{land.name}</b>{land.places.map((place) => <button className={`ws-place ${place.state}`} key={place.id} type="button" onClick={() => navigate(`/courses/${runtime.course.id}`)}>{place.title}</button>)}</section>)}</div> : null}
           {graph === "path" ? <div className="ws-road">{[...places].reverse().map((place) => <button className={`ws-card ${place.state}`} key={place.id} type="button" onClick={() => openChapter(place.id)}>{place.state === "now" ? "现在这一步 · " : ""}{place.title}</button>)}</div> : null}
           {graph === "lanes" ? <div className="ws-lanes">{laneColumns(places).map((column) => <section key={column.title}><b>{column.title}</b>{column.cards.map((card) => <button className={`ws-card ${card.state}`} key={card.id} type="button" onClick={() => openChapter(card.id)}>{card.title}</button>)}</section>)}</div> : null}
@@ -95,7 +91,6 @@ export function DynamicWorkspacePage({ session }: { session: MockSession }) {
           <p>{runtime.course.title} · 已形成 {places.filter((place) => place.state === "done").length} / {places.length} 个篇章。成果 {doneAssignments} / {runtime.assignments.length}。</p>
           <div className="ws-list">{places.map((place) => <article key={place.id}><strong>{place.title}</strong><span>{place.state === "done" ? "已形成" : place.state === "now" ? "当前这一步" : place.state === "goal" ? "目标" : "尚未形成"}</span></article>)}</div>
         </section> : null}
-        <EduFlowAssistant context={{ workspace: "courses", experienceMode: "learn", presentation: "skill-tree", userRole: session.role, capabilities: session.capabilities, courseId: runtime.course.id }} contextLabel={runtime.course.title} />
       </>}
     </main>
   </div>;

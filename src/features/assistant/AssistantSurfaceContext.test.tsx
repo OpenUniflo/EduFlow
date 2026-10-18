@@ -10,4 +10,8 @@ describe('global authenticated Assistant surface',()=>{
   expect(html.match(/aria-label="EduFlow Assistant"/g)).toHaveLength(1);
   expect(html.match(/aria-label="打开 EduFlow Assistant"/g)).toHaveLength(1);
  });
+ it("stays off the workspace so the course picture is the only surface",()=>{
+  const html=renderToString(<MemoryRouter initialEntries={["/workspace"]}><GlobalAssistantSurface session={session} onUpdateCapabilities={()=>undefined}><main/></GlobalAssistantSurface></MemoryRouter>);
+  expect(html).not.toContain("EduFlow Assistant");
+ });
 });

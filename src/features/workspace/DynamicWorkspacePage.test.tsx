@@ -4,7 +4,6 @@ import { MemoryRouter } from "react-router-dom";
 import { DynamicWorkspacePage } from "./DynamicWorkspacePage";
 import type { MockSession } from "@/features/auth/types";
 
-vi.mock("@/features/assistant/components/EduFlowAssistant", () => ({ EduFlowAssistant: () => null }));
 vi.mock("@/app/services/applicationServices", () => ({
   applicationServices: {
     courseRepository: { listCourseRuntimes: () => [{
