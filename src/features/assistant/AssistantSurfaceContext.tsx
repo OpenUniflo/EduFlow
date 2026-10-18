@@ -23,6 +23,5 @@ export function GlobalAssistantSurface({session,children,onUpdateCapabilities,fo
   },[location.pathname,session]);
   const props=foreground ?? (registration?.route===location.pathname?registration.props:fallback);
   const surface=<AssistantSurface {...props} locked={false} onUpdateCapabilities={()=>onUpdateCapabilities(props.context?.courseId)}/>;
-  const showSurface=location.pathname!=="/workspace";
-  return <RegistrationContext.Provider value={register}>{children}{showSurface?portalContainer?createPortal(surface,portalContainer):surface:null}</RegistrationContext.Provider>;
+  return <RegistrationContext.Provider value={register}>{children}{portalContainer?createPortal(surface,portalContainer):surface}</RegistrationContext.Provider>;
 }
