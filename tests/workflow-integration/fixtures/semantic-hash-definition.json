@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "2.0",
+  "workflowId": "",
+  "revision": 0,
+  "name": "Cross-language semantic hash fixture",
+  "description": "non-provider acceptance",
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": [],
+    "additionalProperties": false
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "answer": {}
+    },
+    "required": [
+      "answer"
+    ],
+    "additionalProperties": false
+  },
+  "state": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "answer": {}
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "initial": {},
+    "inputBindings": {},
+    "reducers": {}
+  },
+  "entryNodeId": "start",
+  "nodes": [
+    {
+      "id": "start",
+      "label": "start",
+      "type": "core.start",
+      "typeVersion": 1,
+      "config": {},
+      "inputs": {},
+      "writes": {}
+    },
+    {
+      "id": "calc",
+      "label": "calc",
+      "type": "core.transform",
+      "typeVersion": 1,
+      "config": {
+        "operationRef": "core.add",
+        "operationVersion": 1
+      },
+      "inputs": {
+        "left": {
+          "source": "literal",
+          "value": 17
+        },
+        "right": {
+          "source": "literal",
+          "value": 25
+        }
+      },
+      "writes": {
+        "answer": "/value"
+      }
+    },
+    {
+      "id": "end",
+      "label": "end",
+      "type": "core.end",
+      "typeVersion": 1,
+      "config": {},
+      "inputs": {},
+      "writes": {}
+    }
+  ],
+  "transitions": [
+    {
+      "id": "start-next-calc",
+      "from": "start",
+      "outlet": "next",
+      "to": "calc"
+    },
+    {
+      "id": "calc-next-end",
+      "from": "calc",
+      "outlet": "next",
+      "to": "end"
+    }
+  ],
+  "outputBindings": {
+    "answer": {
+      "source": "state",
+      "pointer": "/answer",
+      "onMissing": {
+        "mode": "error"
+      }
+    }
+  },
+  "policy": {
+    "timeoutMs": 120000,
+    "nodeTimeoutMs": 30000,
+    "maxNodeExecutions": 50,
+    "maxToolCalls": 10,
+    "maxInputBytes": 65536,
+    "maxStateBytes": 1048576,
+    "maxEventBytes": 65536,
+    "maxOutputTokens": 2048,
+    "maxAttempts": 1
+  },
+  "requiredCapabilities": []
+}

@@ -1,0 +1,519 @@
+{
+  "definition": {
+    "name": "P6 · 并行实时输出",
+    "nodes": [
+      {
+        "id": "start",
+        "type": "core.start",
+        "label": "开始",
+        "config": {},
+        "inputs": {},
+        "writes": {},
+        "typeVersion": 1
+      },
+      {
+        "id": "send",
+        "type": "control.send",
+        "label": "分发两项分析",
+        "config": {
+          "items": "/items",
+          "target": "worker",
+          "itemKey": "item",
+          "concurrency": 2
+        },
+        "inputs": {},
+        "writes": {},
+        "typeVersion": 1
+      },
+      {
+        "id": "worker",
+        "type": "core.subgraph",
+        "label": "分析任务",
+        "config": {
+          "graph": {
+            "name": "每项分析任务",
+            "nodes": [
+              {
+                "id": "start",
+                "type": "core.start",
+                "label": "开始",
+                "config": {},
+                "inputs": {},
+                "writes": {},
+                "typeVersion": 1
+              },
+              {
+                "id": "analyse",
+                "type": "core.subgraph",
+                "label": "单项分析子图",
+                "config": {
+                  "graph": {
+                    "name": "单项分析",
+                    "nodes": [
+                      {
+                        "id": "start",
+                        "type": "core.start",
+                        "label": "开始",
+                        "config": {},
+                        "inputs": {},
+                        "writes": {},
+                        "typeVersion": 1
+                      },
+                      {
+                        "id": "model",
+                        "type": "core.llm",
+                        "label": "生成本项结论",
+                        "config": {
+                          "modelRef": "deepseek-flash",
+                          "authoring": {
+                            "timeoutMs": 120000
+                          },
+                          "providerRef": "deepseek",
+                          "allowedToolRefs": [],
+                          "modelParameters": {
+                            "thinking": {
+                              "type": "disabled"
+                            }
+                          }
+                        },
+                        "inputs": {
+                          "messages": {
+                            "source": "state",
+                            "pointer": "/messages",
+                            "onMissing": {
+                              "mode": "error"
+                            }
+                          }
+                        },
+                        "writes": {
+                          "messages": "/messages"
+                        },
+                        "typeVersion": 1
+                      },
+                      {
+                        "id": "end",
+                        "type": "core.end",
+                        "label": "结束",
+                        "config": {},
+                        "inputs": {},
+                        "writes": {},
+                        "typeVersion": 1
+                      }
+                    ],
+                    "state": {
+                      "schema": {
+                        "type": "object",
+                        "required": [
+                          "messages"
+                        ],
+                        "properties": {
+                          "messages": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            }
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "initial": {
+                        "messages": []
+                      },
+                      "reducers": {},
+                      "inputBindings": {
+                        "messages": {
+                          "source": "input",
+                          "pointer": "/messages",
+                          "onMissing": {
+                            "mode": "error"
+                          }
+                        }
+                      }
+                    },
+                    "policy": {
+                      "timeoutMs": 180000,
+                      "maxAttempts": 1,
+                      "maxToolCalls": 10,
+                      "maxEventBytes": 65536,
+                      "maxInputBytes": 65536,
+                      "maxStateBytes": 1048576,
+                      "nodeTimeoutMs": 120000,
+                      "maxOutputTokens": 512,
+                      "maxNodeExecutions": 100
+                    },
+                    "revision": 0,
+                    "workflowId": "",
+                    "description": "P6 bounded two-level model composition",
+                    "entryNodeId": "start",
+                    "inputSchema": {
+                      "type": "object",
+                      "required": [
+                        "messages"
+                      ],
+                      "properties": {
+                        "messages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "transitions": [
+                      {
+                        "id": "start:next:model",
+                        "to": "model",
+                        "from": "start",
+                        "outlet": "next"
+                      },
+                      {
+                        "id": "model:next:end",
+                        "to": "end",
+                        "from": "model",
+                        "outlet": "next"
+                      }
+                    ],
+                    "outputSchema": {
+                      "type": "object",
+                      "required": [
+                        "messages"
+                      ],
+                      "properties": {
+                        "messages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "schemaVersion": "2.0",
+                    "outputBindings": {
+                      "messages": {
+                        "source": "state",
+                        "pointer": "/messages",
+                        "onMissing": {
+                          "mode": "error"
+                        }
+                      }
+                    },
+                    "requiredCapabilities": []
+                  },
+                  "stateMode": "independent",
+                  "persistence": "per-invocation"
+                },
+                "inputs": {
+                  "messages": {
+                    "source": "state",
+                    "pointer": "/messages",
+                    "onMissing": {
+                      "mode": "error"
+                    }
+                  }
+                },
+                "writes": {
+                  "messages": "/messages"
+                },
+                "typeVersion": 1
+              },
+              {
+                "id": "end",
+                "type": "core.end",
+                "label": "结束",
+                "config": {},
+                "inputs": {},
+                "writes": {},
+                "typeVersion": 1
+              }
+            ],
+            "state": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "messages"
+                ],
+                "properties": {
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "initial": {
+                "messages": []
+              },
+              "reducers": {},
+              "inputBindings": {
+                "messages": {
+                  "source": "input",
+                  "pointer": "/messages",
+                  "onMissing": {
+                    "mode": "error"
+                  }
+                }
+              }
+            },
+            "policy": {
+              "timeoutMs": 180000,
+              "maxAttempts": 1,
+              "maxToolCalls": 10,
+              "maxEventBytes": 65536,
+              "maxInputBytes": 65536,
+              "maxStateBytes": 1048576,
+              "nodeTimeoutMs": 120000,
+              "maxOutputTokens": 512,
+              "maxNodeExecutions": 100
+            },
+            "revision": 0,
+            "workflowId": "",
+            "description": "P6 bounded two-level model composition",
+            "entryNodeId": "start",
+            "inputSchema": {
+              "type": "object",
+              "required": [
+                "messages"
+              ],
+              "properties": {
+                "messages": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "transitions": [
+              {
+                "id": "start:next:analyse",
+                "to": "analyse",
+                "from": "start",
+                "outlet": "next"
+              },
+              {
+                "id": "analyse:next:end",
+                "to": "end",
+                "from": "analyse",
+                "outlet": "next"
+              }
+            ],
+            "outputSchema": {
+              "type": "object",
+              "required": [
+                "messages"
+              ],
+              "properties": {
+                "messages": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "schemaVersion": "2.0",
+            "outputBindings": {
+              "messages": {
+                "source": "state",
+                "pointer": "/messages",
+                "onMissing": {
+                  "mode": "error"
+                }
+              }
+            },
+            "requiredCapabilities": []
+          },
+          "stateMode": "independent",
+          "persistence": "per-invocation"
+        },
+        "inputs": {
+          "messages": {
+            "source": "state",
+            "pointer": "/item",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "results": "/messages"
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "collect",
+        "type": "core.progress",
+        "label": "汇合两项结论",
+        "config": {
+          "message": "两项分析已汇合",
+          "percent": 100,
+          "authoring": {
+            "defer": true
+          }
+        },
+        "inputs": {},
+        "writes": {},
+        "typeVersion": 1
+      },
+      {
+        "id": "end",
+        "type": "core.end",
+        "label": "结束",
+        "config": {},
+        "inputs": {},
+        "writes": {},
+        "typeVersion": 1
+      }
+    ],
+    "state": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "items",
+          "item",
+          "results"
+        ],
+        "properties": {
+          "item": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "initial": {
+        "item": [],
+        "items": [
+          [
+            {
+              "id": "p6-cost",
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "只写一句总长不超过25个汉字的结论，以“成本：”开头，说明两人团队开发小工具的主要成本。不分点，不展开解释。"
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "id": "p6-risk",
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "只写一句总长不超过25个汉字的结论，以“风险：”开头，说明两人团队开发小工具的主要风险。不分点，不展开解释。"
+                }
+              ]
+            }
+          ]
+        ],
+        "results": []
+      },
+      "reducers": {
+        "results": {
+          "name": "messages",
+          "version": 1
+        }
+      },
+      "inputBindings": {}
+    },
+    "policy": {
+      "timeoutMs": 180000,
+      "maxAttempts": 1,
+      "maxToolCalls": 10,
+      "maxEventBytes": 65536,
+      "maxInputBytes": 65536,
+      "maxStateBytes": 1048576,
+      "nodeTimeoutMs": 120000,
+      "maxOutputTokens": 512,
+      "maxNodeExecutions": 100
+    },
+    "revision": 3,
+    "workflowId": "36a18ba0-9bd5-4cca-a67d-83d9aae85809",
+    "description": "两项任务分别经两层子图生成带主题的简短结论，然后汇合。",
+    "entryNodeId": "start",
+    "inputSchema": {
+      "type": "object",
+      "required": [],
+      "properties": {},
+      "additionalProperties": false
+    },
+    "transitions": [
+      {
+        "id": "start:next:send",
+        "to": "send",
+        "from": "start",
+        "outlet": "next"
+      },
+      {
+        "id": "send:next:end",
+        "to": "end",
+        "from": "send",
+        "outlet": "next"
+      },
+      {
+        "id": "worker:next:collect",
+        "to": "collect",
+        "from": "worker",
+        "outlet": "next"
+      },
+      {
+        "id": "collect:next:end",
+        "to": "end",
+        "from": "collect",
+        "outlet": "next"
+      }
+    ],
+    "outputSchema": {
+      "type": "object",
+      "required": [
+        "results"
+      ],
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "schemaVersion": "2.0",
+    "outputBindings": {
+      "results": {
+        "source": "state",
+        "pointer": "/results",
+        "onMissing": {
+          "mode": "error"
+        }
+      }
+    },
+    "requiredCapabilities": []
+  }
+}

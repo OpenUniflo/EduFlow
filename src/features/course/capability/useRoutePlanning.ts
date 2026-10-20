@@ -6,6 +6,14 @@ import type { RouteConstraints, RoutePlan } from '@/shared/learning/routePlannin
 import type { ExecutionRoutePlan, RoutePlanView, RouteVersion } from '@/shared/learning/routeVersion';
 import { routeModelChanges } from '@/shared/learning/routeModelReconciliation';
 const empty = (): RouteConstraints => ({ includeNodeIds: [], excludeNodeIds: [] });
+const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+function isRoutePlanView(value: unknown): value is RoutePlanView {
+  if (!record(value) || !record(value.plan) || typeof value.plan.valid !== 'boolean' || !Array.isArray(value.plan.conflicts)
+    || typeof value.structureChanged !== 'boolean' || !(value.activeVersion === null || record(value.activeVersion)) || !(value.model === null || record(value.model))) return false;
+  if (!value.plan.valid) return value.plan.route === null;
+  const route = value.plan.route;
+  return record(route) && ['selectedNodeIds', 'orderedNodeIds', 'effectiveTargetNodeIds', 'currentKnowledgeIds', 'bridgeKnowledgeIds'].every(key => Array.isArray(route[key]) && (route[key] as unknown[]).every(id => typeof id === 'string')) && Array.isArray(route.prerequisiteEdges);
+}
 export function useRoutePlanning(courseId: string, authenticated: boolean, knowledgeKey: string) {
   const path = `/api/learner?resource=route-plan&courseId=${encodeURIComponent(courseId)}`;
   const [view, setView] = useState<RoutePlanView | null>(null);
@@ -50,7 +58,8 @@ export function useRoutePlanning(courseId: string, authenticated: boolean, knowl
   const requestGeneration = useRef(0);
   const load = useCallback(async () => {
     const generation = ++requestGeneration.current;
-    const result = await apiRequest<RoutePlanView>(path);
+    const result = await apiRequest<unknown>(path);
+    if (!isRoutePlanView(result)) throw new Error('路线服务返回的数据不完整，请重新读取。');
     if (generation === requestGeneration.current) setView(result);
     return result;
   }, [path]);

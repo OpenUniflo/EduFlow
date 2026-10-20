@@ -1,0 +1,36 @@
+[project]
+name = "eduflow-workflow"
+version = "0.1.0"
+description = "EduFlow Workflow V2 Compiler and isolated LangGraph worker"
+requires-python = ">=3.12"
+dependencies = [
+  "langgraph==1.2.15",
+  "langchain-deepseek>=1.0,<2",
+  "mcp>=1.16,<2",
+  "httpx[socks]>=0.28,<1",
+  "jsonschema>=4.25,<5",
+  "rfc8785>=0.1.4,<1",
+  "psycopg[binary,pool]>=3.2,<4",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.35,<1",
+  "langgraph-checkpoint-postgres==3.2.0",
+  "vercel-oidc>=0.10.0",
+  "vercel-sandbox==0.9.1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.4,<10", "pytest-asyncio>=1,<2"]
+
+[project.scripts]
+eduflow-workflow = "eduflow_workflow.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eduflow_workflow"]

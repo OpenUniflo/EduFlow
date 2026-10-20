@@ -1,28 +1,61 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["sin1"],
+  "regions": [
+    "sin1"
+  ],
   "functions": {
-    "api/learner.ts": { "maxDuration": 300 },
+    "api/workflows.ts": {
+      "maxDuration": 120
+    },
+    "api/learner.ts": {
+      "maxDuration": 300
+    },
     "api/knowledge-generation.ts": {
       "maxDuration": 300
     },
     "api/assistant.ts": {
       "maxDuration": 120,
-      "regions": ["sin1"]
+      "regions": [
+        "sin1"
+      ]
     },
     "api/**/*.ts": {
       "maxDuration": 30
     }
   },
   "rewrites": [
-    { "source": "/api/edge-actions", "destination": "/api/learner?resource=edge-actions" },
-    { "source": "/api/evidence", "destination": "/api/learner?resource=evidence" },
-    { "source": "/api/courses", "destination": "/api/course?resource=courses" },
-    { "source": "/api/course-authoring", "destination": "/api/course?resource=authoring" },
-    { "source": "/api/learning", "destination": "/api/learner?resource=learning" },
-    { "source": "/api/micro", "destination": "/api/learner?resource=micro" },
-    { "source": "/api/progress", "destination": "/api/learner?resource=progress" },
-    { "source": "/api/navigation", "destination": "/api/learner?resource=navigation" },
+    {
+      "source": "/api/edge-actions",
+      "destination": "/api/learner?resource=edge-actions"
+    },
+    {
+      "source": "/api/evidence",
+      "destination": "/api/learner?resource=evidence"
+    },
+    {
+      "source": "/api/courses",
+      "destination": "/api/course?resource=courses"
+    },
+    {
+      "source": "/api/course-authoring",
+      "destination": "/api/course?resource=authoring"
+    },
+    {
+      "source": "/api/learning",
+      "destination": "/api/learner?resource=learning"
+    },
+    {
+      "source": "/api/micro",
+      "destination": "/api/learner?resource=micro"
+    },
+    {
+      "source": "/api/progress",
+      "destination": "/api/learner?resource=progress"
+    },
+    {
+      "source": "/api/navigation",
+      "destination": "/api/learner?resource=navigation"
+    },
     {
       "source": "/api/:path*",
       "destination": "/api/:path*"

@@ -1,7 +1,8 @@
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { ArrowRight, BookOpen, Network, Sparkles, Workflow } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
+import { API_AUTHENTICATION_FAILURE_TTL_MS, getApiAuthenticationFailure, subscribeApiAuthenticationFailure } from "@/shared/api/apiClient";
 
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const navigate = useNavigate();
@@ -11,7 +12,19 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [authenticationFailure, setAuthenticationFailure] = useState(getApiAuthenticationFailure);
   const isRegister = mode === "register";
+
+  useEffect(() => {
+    const unsubscribe = subscribeApiAuthenticationFailure(setAuthenticationFailure);
+    setAuthenticationFailure(getApiAuthenticationFailure());
+    return unsubscribe;
+  }, []);
+  useEffect(() => {
+    if (!authenticationFailure) return;
+    const timer = setTimeout(() => setAuthenticationFailure(getApiAuthenticationFailure()), Math.max(0, authenticationFailure.occurredAt + API_AUTHENTICATION_FAILURE_TTL_MS - Date.now()));
+    return () => clearTimeout(timer);
+  }, [authenticationFailure]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,6 +68,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
         <div className="atlas-pill"><Sparkles size={13} />Supabase 安全账号</div>
         <h2>{isRegister ? "创建学习账号" : "欢迎回来"}</h2>
         <p>{isRegister ? "创建安全账号，开始探索知识、课程与实训。" : "登录后进入学习空间，继续你的课程与实训。"}</p>
+        {!isRegister && authenticationFailure ? <div role="alert" aria-label="登录状态提醒"><p>登录状态已失效，刚才的请求未能完成。请重新登录后确认原操作状态，避免重复提交。</p><small>HTTP 401{authenticationFailure.requestId ? ` · 请求编号：${authenticationFailure.requestId}` : ""}</small></div> : null}
         <form onSubmit={submit}>
           {isRegister ? <label><span>姓名</span><input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" /></label> : null}
           <label><span>邮箱</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" /></label>

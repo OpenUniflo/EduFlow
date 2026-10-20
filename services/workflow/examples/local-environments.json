@@ -1,0 +1,214 @@
+{
+  "environments": [
+    {
+      "ref": "local",
+      "name": "Local acceptance",
+      "ownerIds": [
+        "*"
+      ],
+      "localFixtures": true,
+      "providers": [
+        {
+          "ref": "deepseek",
+          "name": "DeepSeek",
+          "modelRefs": [
+            "deepseek-flash"
+          ],
+          "secretRef": "LLM_PROVIDER_KEY",
+          "baseUrl": "https://api.deepseek.com"
+        }
+      ],
+      "connectors": [
+        {
+          "ref": "everything",
+          "name": "Everything MCP",
+          "transport": "stdio",
+          "command": "pnpm",
+          "args": [
+            "dlx",
+            "@modelcontextprotocol/server-everything@1.0.0"
+          ],
+          "allowedToolNames": [
+            "echo",
+            "get-sum"
+          ],
+          "sideEffect": "read"
+        }
+      ],
+      "tools": [
+        {
+          "ref": "identity",
+          "name": "identity",
+          "description": "Return a supplied value without side effects",
+          "version": 1,
+          "adapter": "function",
+          "operationRef": "core.identity",
+          "sideEffect": "none",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "value": {}
+            },
+            "required": [
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "value": {}
+            },
+            "required": [
+              "value"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "ref": "order_lookup",
+          "name": "order_lookup",
+          "description": "Retrieve an order by its exact orderId",
+          "version": 1,
+          "adapter": "http",
+          "baseUrl": "http://127.0.0.1:18080",
+          "method": "GET",
+          "path": "/orders/{orderId}",
+          "sideEffect": "read",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "orderId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "orderId"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object"
+          }
+        },
+        {
+          "ref": "fault_500",
+          "name": "fault_500",
+          "description": "Registered acceptance fault endpoint fault_500",
+          "version": 1,
+          "adapter": "http",
+          "baseUrl": "http://127.0.0.1:18080",
+          "method": "GET",
+          "path": "/fail/server-error",
+          "sideEffect": "read",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object"
+          }
+        },
+        {
+          "ref": "fault_429",
+          "name": "fault_429",
+          "description": "Registered acceptance fault endpoint fault_429",
+          "version": 1,
+          "adapter": "http",
+          "baseUrl": "http://127.0.0.1:18080",
+          "method": "GET",
+          "path": "/fail/rate-limited",
+          "sideEffect": "read",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object"
+          }
+        },
+        {
+          "ref": "fault_slow",
+          "name": "fault_slow",
+          "description": "Registered acceptance fault endpoint fault_slow",
+          "version": 1,
+          "adapter": "http",
+          "baseUrl": "http://127.0.0.1:18080",
+          "method": "GET",
+          "path": "/fail/slow",
+          "sideEffect": "read",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object"
+          }
+        },
+        {
+          "ref": "fault_401",
+          "name": "fault_401",
+          "description": "Registered acceptance fault endpoint fault_401",
+          "version": 1,
+          "adapter": "http",
+          "baseUrl": "http://127.0.0.1:18080",
+          "method": "GET",
+          "path": "/secure/orders/A1001",
+          "sideEffect": "read",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object"
+          }
+        },
+        {
+          "ref": "fault_403",
+          "name": "fault_403",
+          "description": "Registered acceptance fault endpoint fault_403",
+          "version": 1,
+          "adapter": "http",
+          "baseUrl": "http://127.0.0.1:18080",
+          "method": "GET",
+          "path": "/secure/admin",
+          "sideEffect": "read",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object"
+          },
+          "headerSecretRefs": {
+            "X-Tool-Key": "WORKFLOW_FIXTURE_TOOL_KEY"
+          }
+        },
+        {
+          "ref": "fault_404",
+          "name": "fault_404",
+          "description": "Registered acceptance fault endpoint fault_404",
+          "version": 1,
+          "adapter": "http",
+          "baseUrl": "http://127.0.0.1:18080",
+          "method": "GET",
+          "path": "/missing",
+          "sideEffect": "read",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object"
+          }
+        }
+      ]
+    }
+  ]
+}

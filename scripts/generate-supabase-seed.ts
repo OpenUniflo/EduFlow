@@ -1,3 +1,5 @@
+import { workspaceWorkflowExamples } from "../src/demo/workflow/workspaceWorkflowTemplates";
+import { courseWorkflowTemplates } from "../src/demo/workflow/courseWorkflowTemplates";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { demoGlobalKnowledgeGraph } from "../src/demo/knowledge/demoGlobalKnowledgeGraph.fixture";
@@ -6,7 +8,6 @@ import { demoDomainAssignments } from "../src/demo/domains/demoDomainAssignments
 import { agenticAiRuntime } from "../src/demo/courses/agenticAiRuntime.seed";
 import { goldenAgenticAiRuntime } from "../src/demo/scenarios/agenticAiBook/goldenCourse.seed";
 import { pythonEngineeringRuntime } from "../src/demo/courses/pythonEngineeringCourse.seed";
-import { demoWorkflowTemplates } from "../src/demo/workflows/demoWorkflowTemplates";
 import type { CourseRuntimeData } from "../src/features/course/runtime/courseRuntime";
 
 function literal(value: unknown): string {
@@ -28,6 +29,8 @@ const lines = [
   "set constraints all deferred;",
   ""
 ];
+
+for (const template of [...courseWorkflowTemplates,...workspaceWorkflowExamples().map(item=>item.definition)]) lines.push(insert("workflow_templates", ["id","name","description","definition"], [template.workflowId,template.name,template.description,template]));
 
 for (const node of demoGlobalKnowledgeGraph.nodes) {
   lines.push(insert("knowledge_nodes", [
@@ -75,9 +78,7 @@ for (const assignment of demoDomainAssignments.filter((item) => globalNodeIds.ha
   ]));
 }
 
-for (const template of demoWorkflowTemplates) {
-  lines.push(insert("workflow_templates", ["id", "name", "description", "definition"], [template.id, template.name, template.description, template]));
-}
+
 
 function seedCourse(runtime: CourseRuntimeData) {
   const { course, curriculum } = runtime;

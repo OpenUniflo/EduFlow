@@ -5,9 +5,11 @@ on:
     branches:
       - main
       - prototype
+      - feat/workflow
   push:
     branches:
       - main
+      - feat/workflow
 
 permissions:
   contents: read
@@ -44,6 +46,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Validate workflow layout
+        run: pnpm workflow:check-layout
 
       - name: Typecheck
         run: pnpm typecheck
@@ -82,4 +87,28 @@ jobs:
 
       - name: Test real parser fixtures
         working-directory: services/parser
+        run: uv run pytest -q
+
+  workflow-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.26"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: services/workflow/uv.lock
+      - name: Install workflow runtime
+        working-directory: services/workflow
+        run: uv sync --locked
+      - name: Prepare pinned isolated code runtimes
+        run: |
+          docker pull python@sha256:f6a589d43c42b9e7f7dc67a12d37132491f362859a5d750607710cc56da3bc72
+          docker pull node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+      - name: Validate contracts and LangGraph execution
+        working-directory: services/workflow
         run: uv run pytest -q

@@ -1,0 +1,619 @@
+{
+  "definition": {
+    "schemaVersion": "2.0",
+    "workflowId": "",
+    "revision": 0,
+    "name": "场景 A · 订单客服与人工审批",
+    "description": "完整业务演示；真实模型和本地受控工具；不写入课程或学习领域。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "title": "订单号",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "question": {
+          "type": "string",
+          "title": "客户诉求",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "orderId",
+        "question"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "draft": {
+          "type": "string"
+        },
+        "approved": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        },
+        "receipt": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "draft",
+        "approved",
+        "status",
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    "state": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "pendingCalls": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "draft": {
+            "type": "string"
+          },
+          "approved": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "receipt": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "messages",
+          "pendingCalls",
+          "draft",
+          "approved",
+          "status",
+          "receipt"
+        ],
+        "additionalProperties": false
+      },
+      "initial": {
+        "messages": [],
+        "pendingCalls": [],
+        "draft": "",
+        "approved": false,
+        "status": "",
+        "receipt": {}
+      },
+      "inputBindings": {},
+      "reducers": {
+        "messages": {
+          "name": "messages",
+          "version": 1
+        }
+      }
+    },
+    "entryNodeId": "start",
+    "nodes": [
+      {
+        "id": "start",
+        "label": "开始",
+        "type": "core.start",
+        "typeVersion": 1,
+        "config": {},
+        "inputs": {},
+        "writes": {}
+      },
+      {
+        "id": "prepare",
+        "label": "组织客服任务与工具约束",
+        "type": "core.function",
+        "typeVersion": 1,
+        "config": {
+          "implementation": "code",
+          "language": "python",
+          "code": "import uuid\ndef process(input, context):\n    system = \"你是订单客服处理智能体。必须先调用一次 order_lookup 查询给定订单号；拿到工具响应后不要重复调用。只依据工具事实，用中文写不超过100字的处理建议；不能声称已退款、已发货或已联系客户。不得编造数据。\"\n    user = \"订单号：\" + input[\"orderId\"] + \"；客户诉求：\" + input[\"question\"]\n    return {\"messages\": [{\"id\": str(uuid.uuid4()), \"role\": role, \"content\": [{\"type\":\"text\",\"text\":text}]} for role,text in [(\"system\",system),(\"user\",user)]], \"pendingCalls\":[], \"approved\":False, \"status\":\"待分析\", \"receipt\":{}}",
+          "authoring": {
+            "overwrite": [
+              "messages"
+            ]
+          }
+        },
+        "inputs": {
+          "orderId": {
+            "source": "input",
+            "pointer": "/orderId",
+            "onMissing": {
+              "mode": "error"
+            }
+          },
+          "question": {
+            "source": "input",
+            "pointer": "/question",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "messages": "/messages",
+          "pendingCalls": "/pendingCalls",
+          "approved": "/approved",
+          "status": "/status",
+          "receipt": "/receipt"
+        }
+      },
+      {
+        "id": "agent",
+        "label": "客服智能体：决定工具或回复",
+        "type": "core.llm",
+        "typeVersion": 1,
+        "config": {
+          "providerRef": "deepseek",
+          "modelRef": "deepseek-flash",
+          "modelParameters": {
+            "thinking": {
+              "type": "disabled"
+            }
+          },
+          "allowedToolRefs": [
+            "order_lookup"
+          ]
+        },
+        "inputs": {
+          "messages": {
+            "source": "state",
+            "pointer": "/messages",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "messages": "/messages",
+          "pendingCalls": "/toolCalls"
+        }
+      },
+      {
+        "id": "has_calls",
+        "label": "是否需要调用查询工具",
+        "type": "core.router",
+        "typeVersion": 1,
+        "config": {
+          "cases": [
+            {
+              "id": "tools",
+              "priority": 1,
+              "predicate": {
+                "op": "nonEmpty",
+                "source": "state",
+                "pointer": "/pendingCalls"
+              }
+            }
+          ],
+          "defaultOutlet": "review"
+        },
+        "inputs": {},
+        "writes": {}
+      },
+      {
+        "id": "tools",
+        "label": "执行模型选择的订单查询",
+        "type": "core.tool_dispatch",
+        "typeVersion": 1,
+        "config": {
+          "allowedToolRefs": [
+            "order_lookup"
+          ]
+        },
+        "inputs": {
+          "toolCalls": {
+            "source": "state",
+            "pointer": "/pendingCalls",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "messages": "/toolMessages"
+        }
+      },
+      {
+        "id": "extract",
+        "label": "提取完整客服建议",
+        "type": "core.function",
+        "typeVersion": 1,
+        "config": {
+          "implementation": "code",
+          "language": "python",
+          "code": "def process(input, context):\n    answers = [m for m in input[\"messages\"] if m[\"role\"] == \"assistant\" and not m.get(\"toolCalls\")]\n    text = \"\".join(c[\"text\"] for c in answers[-1][\"content\"] if c[\"type\"] == \"text\") if answers else \"\"\n    if not text.strip():\n        raise ValueError(\"No complete assistant answer\")\n    return {\"draft\": text}"
+        },
+        "inputs": {
+          "messages": {
+            "source": "state",
+            "pointer": "/messages",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "draft": "/draft"
+        }
+      },
+      {
+        "id": "review",
+        "label": "请审核客服建议",
+        "type": "core.transform",
+        "typeVersion": 1,
+        "config": {
+          "operationRef": "core.identity",
+          "operationVersion": 1,
+          "authoring": {
+            "interrupt": {
+              "title": "请审核客服建议",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "approved": {
+                    "type": "boolean",
+                    "title": "同意生成演示回执？"
+                  }
+                },
+                "required": [
+                  "approved"
+                ],
+                "additionalProperties": false
+              },
+              "resumeWrites": {
+                "approved": "approved"
+              }
+            }
+          }
+        },
+        "inputs": {
+          "value": {
+            "source": "literal",
+            "value": true
+          }
+        },
+        "writes": {}
+      },
+      {
+        "id": "route",
+        "label": "按人工确认分支",
+        "type": "core.router",
+        "typeVersion": 1,
+        "config": {
+          "cases": [
+            {
+              "id": "approved",
+              "priority": 1,
+              "predicate": {
+                "op": "eq",
+                "left": {
+                  "source": "state",
+                  "pointer": "/approved",
+                  "onMissing": {
+                    "mode": "error"
+                  }
+                },
+                "right": {
+                  "source": "literal",
+                  "value": true
+                }
+              }
+            }
+          ],
+          "defaultOutlet": "rejected"
+        },
+        "inputs": {},
+        "writes": {}
+      },
+      {
+        "id": "receipt_args",
+        "label": "准备确认回执",
+        "type": "core.function",
+        "typeVersion": 1,
+        "config": {
+          "implementation": "code",
+          "language": "python",
+          "code": "def process(input, context):\n    return {\"arguments\":{\"message\":\"订单客服建议已人工确认（仅本地演示）：\"+input[\"draft\"]}}"
+        },
+        "inputs": {
+          "draft": {
+            "source": "state",
+            "pointer": "/draft",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "receipt": "/arguments"
+        }
+      },
+      {
+        "id": "ack",
+        "label": "通过 MCP 生成演示回执",
+        "type": "core.tool",
+        "typeVersion": 1,
+        "config": {
+          "toolRef": "everything:echo",
+          "contractDigest": "562b15ea914f4b19ce5433493060c14b0d318bba48ad124829a09efb23400c83"
+        },
+        "inputs": {
+          "arguments": {
+            "source": "state",
+            "pointer": "/receipt",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "receipt": "/result"
+        }
+      },
+      {
+        "id": "accepted",
+        "label": "标记已确认",
+        "type": "core.transform",
+        "typeVersion": 1,
+        "config": {
+          "operationRef": "core.identity",
+          "operationVersion": 1
+        },
+        "inputs": {
+          "value": {
+            "source": "literal",
+            "value": "已确认，已生成本地演示回执"
+          }
+        },
+        "writes": {
+          "status": "/value"
+        }
+      },
+      {
+        "id": "rejected",
+        "label": "转人工处理，不生成回执",
+        "type": "core.transform",
+        "typeVersion": 1,
+        "config": {
+          "operationRef": "core.identity",
+          "operationVersion": 1
+        },
+        "inputs": {
+          "value": {
+            "source": "literal",
+            "value": "未批准，需人工处理"
+          }
+        },
+        "writes": {
+          "status": "/value"
+        }
+      },
+      {
+        "id": "end",
+        "label": "结束",
+        "type": "core.end",
+        "typeVersion": 1,
+        "config": {},
+        "inputs": {},
+        "writes": {}
+      }
+    ],
+    "transitions": [
+      {
+        "id": "start-next-prepare",
+        "from": "start",
+        "to": "prepare",
+        "outlet": "next"
+      },
+      {
+        "id": "prepare-next-agent",
+        "from": "prepare",
+        "to": "agent",
+        "outlet": "next"
+      },
+      {
+        "id": "agent-next-has_calls",
+        "from": "agent",
+        "to": "has_calls",
+        "outlet": "next"
+      },
+      {
+        "id": "has_calls-tools-tools",
+        "from": "has_calls",
+        "to": "tools",
+        "outlet": "tools"
+      },
+      {
+        "id": "tools-next-agent",
+        "from": "tools",
+        "to": "agent",
+        "outlet": "next"
+      },
+      {
+        "id": "has_calls-review-extract",
+        "from": "has_calls",
+        "to": "extract",
+        "outlet": "review"
+      },
+      {
+        "id": "extract-next-review",
+        "from": "extract",
+        "to": "review",
+        "outlet": "next"
+      },
+      {
+        "id": "review-next-route",
+        "from": "review",
+        "to": "route",
+        "outlet": "next"
+      },
+      {
+        "id": "route-approved-receipt_args",
+        "from": "route",
+        "to": "receipt_args",
+        "outlet": "approved"
+      },
+      {
+        "id": "receipt_args-next-ack",
+        "from": "receipt_args",
+        "to": "ack",
+        "outlet": "next"
+      },
+      {
+        "id": "ack-next-accepted",
+        "from": "ack",
+        "to": "accepted",
+        "outlet": "next"
+      },
+      {
+        "id": "accepted-next-end",
+        "from": "accepted",
+        "to": "end",
+        "outlet": "next"
+      },
+      {
+        "id": "route-rejected-rejected",
+        "from": "route",
+        "to": "rejected",
+        "outlet": "rejected"
+      },
+      {
+        "id": "rejected-next-end",
+        "from": "rejected",
+        "to": "end",
+        "outlet": "next"
+      }
+    ],
+    "outputBindings": {
+      "draft": {
+        "source": "state",
+        "pointer": "/draft",
+        "onMissing": {
+          "mode": "error"
+        }
+      },
+      "approved": {
+        "source": "state",
+        "pointer": "/approved",
+        "onMissing": {
+          "mode": "error"
+        }
+      },
+      "status": {
+        "source": "state",
+        "pointer": "/status",
+        "onMissing": {
+          "mode": "error"
+        }
+      },
+      "receipt": {
+        "source": "state",
+        "pointer": "/receipt",
+        "onMissing": {
+          "mode": "error"
+        }
+      }
+    },
+    "policy": {
+      "timeoutMs": 180000,
+      "nodeTimeoutMs": 120000,
+      "maxNodeExecutions": 60,
+      "maxToolCalls": 4,
+      "maxInputBytes": 65536,
+      "maxStateBytes": 1048576,
+      "maxEventBytes": 65536,
+      "maxOutputTokens": 512,
+      "maxAttempts": 1,
+      "authoring": {
+        "checkpoint": "superstep",
+        "recursionLimit": 50,
+        "waitTimeoutMs": 86400000
+      }
+    },
+    "requiredCapabilities": []
+  },
+  "editor": {
+    "schemaVersion": 1,
+    "workflowId": "",
+    "editorRevision": 0,
+    "definitionRevision": 0,
+    "nodes": {
+      "start": {
+        "x": 60,
+        "y": 220
+      },
+      "prepare": {
+        "x": 360,
+        "y": 220
+      },
+      "agent": {
+        "x": 680,
+        "y": 220
+      },
+      "has_calls": {
+        "x": 1000,
+        "y": 220
+      },
+      "tools": {
+        "x": 1000,
+        "y": 540
+      },
+      "extract": {
+        "x": 1320,
+        "y": 220
+      },
+      "review": {
+        "x": 1640,
+        "y": 220
+      },
+      "route": {
+        "x": 1960,
+        "y": 220
+      },
+      "receipt_args": {
+        "x": 2280,
+        "y": 80
+      },
+      "ack": {
+        "x": 2600,
+        "y": 80
+      },
+      "accepted": {
+        "x": 2920,
+        "y": 80
+      },
+      "rejected": {
+        "x": 2280,
+        "y": 540
+      },
+      "end": {
+        "x": 3240,
+        "y": 220
+      }
+    },
+    "edges": {}
+  },
+  "suggestedInput": {
+    "orderId": "A1001",
+    "question": "请核对订单状态，并建议我下一步如何处理，不要替我执行退款。"
+  }
+}

@@ -1,0 +1,640 @@
+{
+  "definition": {
+    "schemaVersion": "2.0",
+    "workflowId": "",
+    "revision": 0,
+    "name": "场景 C · 项目跟进与跨会话记忆",
+    "description": "完整业务演示；真实模型和本地受控工具；不写入课程或学习领域。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "projectKey": {
+          "type": "string",
+          "title": "项目记忆键",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "update": {
+          "type": "string",
+          "title": "本轮进展与问题",
+          "minLength": 1,
+          "maxLength": 1500
+        }
+      },
+      "required": [
+        "projectKey",
+        "update"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "previous": {},
+        "draft": {
+          "type": "string"
+        },
+        "record": {
+          "type": "object"
+        },
+        "status": {
+          "type": "string"
+        },
+        "savedVersion": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "previous",
+        "draft",
+        "record",
+        "status",
+        "savedVersion"
+      ],
+      "additionalProperties": false
+    },
+    "state": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "previous": {},
+          "memoryVersion": {
+            "type": "integer"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "draft": {
+            "type": "string"
+          },
+          "approved": {
+            "type": "boolean"
+          },
+          "finalNote": {
+            "type": "string"
+          },
+          "record": {
+            "type": "object"
+          },
+          "status": {
+            "type": "string"
+          },
+          "savedVersion": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "previous",
+          "memoryVersion",
+          "messages",
+          "draft",
+          "approved",
+          "finalNote",
+          "record",
+          "status",
+          "savedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "initial": {
+        "previous": null,
+        "memoryVersion": 0,
+        "messages": [],
+        "draft": "",
+        "approved": false,
+        "finalNote": "",
+        "record": {},
+        "status": "",
+        "savedVersion": 0
+      },
+      "inputBindings": {},
+      "reducers": {}
+    },
+    "entryNodeId": "start",
+    "nodes": [
+      {
+        "id": "start",
+        "label": "开始",
+        "type": "core.start",
+        "typeVersion": 1,
+        "config": {},
+        "inputs": {},
+        "writes": {}
+      },
+      {
+        "id": "recall",
+        "label": "读取本项目已确认记录",
+        "type": "core.memory",
+        "typeVersion": 1,
+        "config": {
+          "operation": "get",
+          "scope": "workflow",
+          "collection": "projects",
+          "ttlMinutes": 1440
+        },
+        "inputs": {
+          "key": {
+            "source": "input",
+            "pointer": "/projectKey",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "previous": "/value",
+          "memoryVersion": "/version"
+        }
+      },
+      {
+        "id": "prepare",
+        "label": "结合历史与本轮输入组织任务",
+        "type": "core.function",
+        "typeVersion": 1,
+        "config": {
+          "implementation": "code",
+          "language": "python",
+          "code": "import json,uuid\ndef process(input, context):\n    text = \"你是项目跟进记录整理智能体，不是学习助手。仅根据以下用户提交内容与已确认历史，给出本轮进展摘要和下一步建议，共不超过100个汉字。不创造已完成事实，不执行操作。历史：\"+json.dumps(input[\"previous\"],ensure_ascii=False)+\"；本轮：\"+input[\"update\"]\n    return {\"messages\":[{\"id\":str(uuid.uuid4()),\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":text}]}],\"approved\":False,\"finalNote\":\"\",\"record\":{},\"status\":\"待确认\"}"
+        },
+        "inputs": {
+          "previous": {
+            "source": "state",
+            "pointer": "/previous",
+            "onMissing": {
+              "mode": "error"
+            }
+          },
+          "update": {
+            "source": "input",
+            "pointer": "/update",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "messages": "/messages",
+          "approved": "/approved",
+          "finalNote": "/finalNote",
+          "record": "/record",
+          "status": "/status"
+        }
+      },
+      {
+        "id": "assistant",
+        "label": "生成本轮项目摘要与建议",
+        "type": "core.llm",
+        "typeVersion": 1,
+        "config": {
+          "providerRef": "deepseek",
+          "modelRef": "deepseek-flash",
+          "modelParameters": {
+            "thinking": {
+              "type": "disabled"
+            }
+          },
+          "allowedToolRefs": []
+        },
+        "inputs": {
+          "messages": {
+            "source": "state",
+            "pointer": "/messages",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "messages": "/messages"
+        }
+      },
+      {
+        "id": "extract",
+        "label": "提取待确认记录",
+        "type": "core.function",
+        "typeVersion": 1,
+        "config": {
+          "implementation": "code",
+          "language": "python",
+          "code": "def process(input, context):\n    answers = [m for m in input[\"messages\"] if m[\"role\"] == \"assistant\" and not m.get(\"toolCalls\")]\n    text = \"\".join(c[\"text\"] for c in answers[-1][\"content\"] if c[\"type\"] == \"text\") if answers else \"\"\n    if not text.strip():\n        raise ValueError(\"No complete assistant answer\")\n    return {\"draft\": text}"
+        },
+        "inputs": {
+          "messages": {
+            "source": "state",
+            "pointer": "/messages",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "draft": "/draft"
+        }
+      },
+      {
+        "id": "review",
+        "label": "确认后才保存项目记忆",
+        "type": "core.transform",
+        "typeVersion": 1,
+        "config": {
+          "operationRef": "core.identity",
+          "operationVersion": 1,
+          "authoring": {
+            "interrupt": {
+              "title": "确认后才保存项目记忆",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "approved": {
+                    "type": "boolean",
+                    "title": "保存为本项目的长期记忆？"
+                  },
+                  "finalNote": {
+                    "type": "string",
+                    "title": "最终记录（留空采用模型草稿）",
+                    "maxLength": 1500
+                  }
+                },
+                "required": [
+                  "approved",
+                  "finalNote"
+                ],
+                "additionalProperties": false
+              },
+              "resumeWrites": {
+                "approved": "approved",
+                "finalNote": "finalNote"
+              }
+            }
+          }
+        },
+        "inputs": {
+          "value": {
+            "source": "literal",
+            "value": true
+          }
+        },
+        "writes": {}
+      },
+      {
+        "id": "route",
+        "label": "按人工确认分支",
+        "type": "core.router",
+        "typeVersion": 1,
+        "config": {
+          "cases": [
+            {
+              "id": "approved",
+              "priority": 1,
+              "predicate": {
+                "op": "eq",
+                "left": {
+                  "source": "state",
+                  "pointer": "/approved",
+                  "onMissing": {
+                    "mode": "error"
+                  }
+                },
+                "right": {
+                  "source": "literal",
+                  "value": true
+                }
+              }
+            }
+          ],
+          "defaultOutlet": "rejected"
+        },
+        "inputs": {},
+        "writes": {}
+      },
+      {
+        "id": "record",
+        "label": "构造人工确认后的项目记录",
+        "type": "core.function",
+        "typeVersion": 1,
+        "config": {
+          "implementation": "code",
+          "language": "python",
+          "code": "def process(input, context):\n    previous=input[\"previous\"] if isinstance(input[\"previous\"],dict) else {}\n    return {\"record\":{\"projectKey\":input[\"projectKey\"],\"rounds\":previous.get(\"rounds\",0)+1,\"latestUpdate\":input[\"update\"],\"confirmedNote\":input[\"finalNote\"].strip() or input[\"draft\"]}}"
+        },
+        "inputs": {
+          "projectKey": {
+            "source": "input",
+            "pointer": "/projectKey",
+            "onMissing": {
+              "mode": "error"
+            }
+          },
+          "update": {
+            "source": "input",
+            "pointer": "/update",
+            "onMissing": {
+              "mode": "error"
+            }
+          },
+          "previous": {
+            "source": "state",
+            "pointer": "/previous",
+            "onMissing": {
+              "mode": "error"
+            }
+          },
+          "draft": {
+            "source": "state",
+            "pointer": "/draft",
+            "onMissing": {
+              "mode": "error"
+            }
+          },
+          "finalNote": {
+            "source": "state",
+            "pointer": "/finalNote",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "record": "/record"
+        }
+      },
+      {
+        "id": "remember",
+        "label": "按版本保存已确认的记录",
+        "type": "core.memory",
+        "typeVersion": 1,
+        "config": {
+          "operation": "put",
+          "scope": "workflow",
+          "collection": "projects",
+          "ttlMinutes": 1440
+        },
+        "inputs": {
+          "key": {
+            "source": "input",
+            "pointer": "/projectKey",
+            "onMissing": {
+              "mode": "error"
+            }
+          },
+          "value": {
+            "source": "state",
+            "pointer": "/record",
+            "onMissing": {
+              "mode": "error"
+            }
+          },
+          "expectedVersion": {
+            "source": "state",
+            "pointer": "/memoryVersion",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "savedVersion": "/version"
+        }
+      },
+      {
+        "id": "saved",
+        "label": "标记记录已保存",
+        "type": "core.transform",
+        "typeVersion": 1,
+        "config": {
+          "operationRef": "core.identity",
+          "operationVersion": 1
+        },
+        "inputs": {
+          "value": {
+            "source": "literal",
+            "value": "已确认并保存项目记忆"
+          }
+        },
+        "writes": {
+          "status": "/value"
+        }
+      },
+      {
+        "id": "rejected",
+        "label": "保留草稿，不写入长期记忆",
+        "type": "core.transform",
+        "typeVersion": 1,
+        "config": {
+          "operationRef": "core.identity",
+          "operationVersion": 1
+        },
+        "inputs": {
+          "value": {
+            "source": "literal",
+            "value": "未批准，长期记忆未修改"
+          }
+        },
+        "writes": {
+          "status": "/value"
+        }
+      },
+      {
+        "id": "end",
+        "label": "结束",
+        "type": "core.end",
+        "typeVersion": 1,
+        "config": {},
+        "inputs": {},
+        "writes": {}
+      }
+    ],
+    "transitions": [
+      {
+        "id": "start-next-recall",
+        "from": "start",
+        "to": "recall",
+        "outlet": "next"
+      },
+      {
+        "id": "recall-next-prepare",
+        "from": "recall",
+        "to": "prepare",
+        "outlet": "next"
+      },
+      {
+        "id": "prepare-next-assistant",
+        "from": "prepare",
+        "to": "assistant",
+        "outlet": "next"
+      },
+      {
+        "id": "assistant-next-extract",
+        "from": "assistant",
+        "to": "extract",
+        "outlet": "next"
+      },
+      {
+        "id": "extract-next-review",
+        "from": "extract",
+        "to": "review",
+        "outlet": "next"
+      },
+      {
+        "id": "review-next-route",
+        "from": "review",
+        "to": "route",
+        "outlet": "next"
+      },
+      {
+        "id": "route-approved-record",
+        "from": "route",
+        "to": "record",
+        "outlet": "approved"
+      },
+      {
+        "id": "record-next-remember",
+        "from": "record",
+        "to": "remember",
+        "outlet": "next"
+      },
+      {
+        "id": "remember-next-saved",
+        "from": "remember",
+        "to": "saved",
+        "outlet": "next"
+      },
+      {
+        "id": "saved-next-end",
+        "from": "saved",
+        "to": "end",
+        "outlet": "next"
+      },
+      {
+        "id": "route-rejected-rejected",
+        "from": "route",
+        "to": "rejected",
+        "outlet": "rejected"
+      },
+      {
+        "id": "rejected-next-end",
+        "from": "rejected",
+        "to": "end",
+        "outlet": "next"
+      }
+    ],
+    "outputBindings": {
+      "previous": {
+        "source": "state",
+        "pointer": "/previous",
+        "onMissing": {
+          "mode": "error"
+        }
+      },
+      "draft": {
+        "source": "state",
+        "pointer": "/draft",
+        "onMissing": {
+          "mode": "error"
+        }
+      },
+      "record": {
+        "source": "state",
+        "pointer": "/record",
+        "onMissing": {
+          "mode": "error"
+        }
+      },
+      "status": {
+        "source": "state",
+        "pointer": "/status",
+        "onMissing": {
+          "mode": "error"
+        }
+      },
+      "savedVersion": {
+        "source": "state",
+        "pointer": "/savedVersion",
+        "onMissing": {
+          "mode": "error"
+        }
+      }
+    },
+    "policy": {
+      "timeoutMs": 180000,
+      "nodeTimeoutMs": 120000,
+      "maxNodeExecutions": 60,
+      "maxToolCalls": 4,
+      "maxInputBytes": 65536,
+      "maxStateBytes": 1048576,
+      "maxEventBytes": 65536,
+      "maxOutputTokens": 512,
+      "maxAttempts": 1,
+      "authoring": {
+        "checkpoint": "superstep",
+        "recursionLimit": 50,
+        "waitTimeoutMs": 86400000
+      }
+    },
+    "requiredCapabilities": []
+  },
+  "editor": {
+    "schemaVersion": 1,
+    "workflowId": "",
+    "editorRevision": 0,
+    "definitionRevision": 0,
+    "nodes": {
+      "start": {
+        "x": 60,
+        "y": 220
+      },
+      "recall": {
+        "x": 380,
+        "y": 220
+      },
+      "prepare": {
+        "x": 700,
+        "y": 220
+      },
+      "assistant": {
+        "x": 1020,
+        "y": 220
+      },
+      "extract": {
+        "x": 1340,
+        "y": 220
+      },
+      "review": {
+        "x": 1660,
+        "y": 220
+      },
+      "route": {
+        "x": 1960,
+        "y": 220
+      },
+      "record": {
+        "x": 2280,
+        "y": 80
+      },
+      "remember": {
+        "x": 2600,
+        "y": 80
+      },
+      "saved": {
+        "x": 2920,
+        "y": 80
+      },
+      "rejected": {
+        "x": 2280,
+        "y": 540
+      },
+      "end": {
+        "x": 3240,
+        "y": 220
+      }
+    },
+    "edges": {}
+  },
+  "suggestedInput": {
+    "projectKey": "demo_project_a",
+    "update": "活动报名工具已完成需求访谈；目前还没有开始编码，下周先确认数据字段和报名流程。"
+  }
+}

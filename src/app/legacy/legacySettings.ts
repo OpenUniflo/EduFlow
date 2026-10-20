@@ -1,4 +1,4 @@
-const settingsStorageKey = "knowledge-atlas.workflow-settings.v2";
+const settingsStorageKey = "knowledge-atlas.preferences.v1";
 
 export type LegacySettings = {
   dailyReminder: boolean;

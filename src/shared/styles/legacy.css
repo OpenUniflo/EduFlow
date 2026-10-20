@@ -89,7 +89,6 @@ button {
 .toolbar-actions,
 .panel-heading,
 .inspector-title,
-.run-panel-handle,
 .tool-button,
 .palette-item,
 .group-title,
@@ -159,134 +158,12 @@ h1 {
   letter-spacing: 0;
 }
 
-.workflow-name-input {
-  display: block;
-  width: clamp(190px, 18vw, 310px);
-  height: 28px;
-  padding: 0 6px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  outline: 0;
-  background: transparent;
-  color: #172033;
-  font-size: 18px;
-  font-weight: 720;
-  letter-spacing: 0;
-}
-
-.workflow-name-input:hover,
-.workflow-name-input:focus {
-  border-color: rgba(79, 124, 255, 0.28);
-  background: rgba(255, 255, 255, 0.64);
-  box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.08);
-}
-
 .toolbar-actions {
   flex: 0 1 auto;
   min-width: 0;
   gap: 7px;
   flex-wrap: nowrap;
   justify-content: flex-end;
-}
-
-.workflow-status {
-  position: relative;
-  z-index: 25;
-  flex: 1 1 300px;
-  max-width: 430px;
-  min-width: 210px;
-}
-
-.workflow-status-trigger {
-  display: flex;
-  width: 100%;
-  height: 38px;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  border: 1px solid rgba(211, 218, 231, 0.82);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.66);
-  color: #33415f;
-  font-size: 13px;
-  font-weight: 720;
-  text-align: left;
-  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-
-.workflow-status-trigger span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.workflow-status.ready .workflow-status-trigger {
-  color: #257358;
-  border-color: rgba(63, 185, 132, 0.28);
-  background: rgba(239, 250, 246, 0.84);
-}
-
-.workflow-status.warning .workflow-status-trigger {
-  color: #8b6022;
-  border-color: rgba(229, 164, 67, 0.34);
-  background: rgba(255, 248, 235, 0.86);
-}
-
-.workflow-status.blocked .workflow-status-trigger {
-  color: #9a403f;
-  border-color: rgba(226, 93, 93, 0.32);
-  background: rgba(255, 242, 242, 0.86);
-}
-
-.workflow-status.open .workflow-status-trigger,
-.workflow-status-trigger:hover {
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 10px 28px rgba(47, 61, 92, 0.12);
-}
-
-.workflow-status-popover {
-  position: absolute;
-  top: calc(100% + 12px);
-  left: 0;
-  display: grid;
-  width: min(460px, calc(100vw - 40px));
-  max-height: min(620px, calc(100vh - 116px));
-  gap: 12px;
-  overflow: auto;
-  padding: 14px;
-  border-radius: 18px;
-}
-
-.workflow-status-guidance {
-  display: flex;
-  gap: 9px;
-  padding: 12px;
-  border-radius: 15px;
-  color: #31529b;
-  background: rgba(79, 124, 255, 0.1);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.workflow-status-guidance.ready {
-  color: #257358;
-  background: rgba(63, 185, 132, 0.12);
-}
-
-.workflow-status-guidance.warning {
-  color: #8b6022;
-  background: rgba(229, 164, 67, 0.13);
-}
-
-.workflow-status-guidance.blocked {
-  color: #31529b;
-  background: rgba(79, 124, 255, 0.11);
-}
-
-.workflow-status-checks {
-  display: grid;
-  gap: 8px;
 }
 
 .tool-button {
@@ -619,134 +496,6 @@ h1 {
   box-shadow: 0 10px 24px rgba(79, 124, 255, 0.2);
 }
 
-.workflow-library {
-  min-height: 0;
-  overflow: auto;
-  padding: 2px 4px 12px;
-}
-
-.workflow-library.gallery {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  align-content: start;
-}
-
-.workflow-library.list {
-  display: grid;
-  gap: 10px;
-  align-content: start;
-}
-
-.workflow-entry {
-  position: relative;
-  min-height: 154px;
-  border-radius: 22px;
-  text-align: left;
-  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-}
-
-.workflow-library.gallery .workflow-entry {
-  align-items: stretch;
-}
-
-.workflow-entry:hover,
-.workflow-entry.active {
-  transform: translateY(-2px);
-  border-color: rgba(79, 124, 255, 0.34);
-  background: rgba(255, 255, 255, 0.88);
-}
-
-.workflow-open-button {
-  display: grid;
-  grid-template-columns: 182px minmax(0, 1fr) 28px;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
-  min-height: 154px;
-  padding: 14px;
-  border-radius: 22px;
-  background: transparent;
-  text-align: left;
-}
-
-.workflow-library.gallery .workflow-open-button {
-  grid-template-columns: 1fr;
-  align-items: stretch;
-}
-
-.workflow-open-button > svg {
-  justify-self: end;
-  color: #8a95a8;
-}
-
-.workflow-library.gallery .workflow-open-button > svg {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-}
-
-.workflow-delete-button {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid rgba(226, 93, 93, 0.2);
-  border-radius: 12px;
-  color: var(--red);
-  background: rgba(255, 255, 255, 0.72);
-  opacity: 0;
-  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
-}
-
-.workflow-entry:hover .workflow-delete-button,
-.workflow-delete-button:focus-visible {
-  opacity: 1;
-}
-
-.workflow-delete-button:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 245, 245, 0.96);
-}
-
-.workflow-entry-copy {
-  display: grid;
-  min-width: 0;
-  gap: 14px;
-}
-
-.workflow-entry-copy span {
-  display: block;
-  color: #172033;
-  font-size: 18px;
-  font-weight: 760;
-}
-
-.workflow-entry-copy p {
-  margin-top: 7px;
-  color: #667188;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.workflow-entry-copy small {
-  color: #7c879c;
-  font-size: 12px;
-  font-weight: 690;
-}
-
-.workflow-preview {
-  position: relative;
-  height: 116px;
-  overflow: hidden;
-  border: 1px solid rgba(211, 218, 231, 0.72);
-  border-radius: 16px;
-  background: rgba(247, 250, 255, 0.72);
-}
-
 .preview-grid {
   position: absolute;
   inset: 0;
@@ -820,10 +569,6 @@ h1 {
 .chapter-hero {
   grid-template-columns: 42px minmax(0, 1fr) 230px;
   align-items: start;
-}
-
-.course-detail-hero .workflow-preview {
-  height: 150px;
 }
 
 .course-hero h2,
@@ -1557,7 +1302,6 @@ h1 {
 }
 
 .sidebar,
-.canvas-shell,
 .inspector {
   min-height: 0;
   border-radius: 22px;
@@ -1753,25 +1497,6 @@ h1 {
   background: rgba(255, 255, 255, 0.9);
 }
 
-.canvas-shell {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  overflow: hidden;
-  border-radius: 0;
-}
-
-.workflow-assistant {
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
-  z-index: 18;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
-  pointer-events: auto;
-}
-
 .assistant-trigger {
   display: grid;
   width: 54px;
@@ -1782,14 +1507,6 @@ h1 {
   color: #fff;
   box-shadow: 0 18px 42px rgba(79, 124, 255, 0.32);
   transition: transform 0.18s ease, opacity 0.18s ease;
-}
-
-.workflow-assistant:hover .assistant-trigger,
-.workflow-assistant:focus-within .assistant-trigger,
-.workflow-assistant.open .assistant-trigger {
-  transform: translateY(3px) scale(0.94);
-  opacity: 0;
-  pointer-events: none;
 }
 
 .assistant-panel {
@@ -1808,14 +1525,6 @@ h1 {
   transform: translateY(12px) scale(0.98);
   transform-origin: bottom right;
   transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.workflow-assistant:hover .assistant-panel,
-.workflow-assistant:focus-within .assistant-panel,
-.workflow-assistant.open .assistant-panel {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0) scale(1);
 }
 
 .assistant-head {
@@ -1998,86 +1707,6 @@ h1 {
   z-index: 1000 !important;
 }
 
-.workflow-edge .react-flow__edge-path {
-  stroke: rgba(116, 137, 154, 0.34);
-  stroke-dasharray: 0.1 13;
-  stroke-linecap: round;
-  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.62));
-  transition: stroke 0.2s ease, filter 0.2s ease, opacity 0.2s ease, stroke-width 0.2s ease;
-}
-
-.workflow-edge.control-outlet .react-flow__edge-path {
-  stroke: rgba(84, 210, 60, 0.5);
-}
-
-.workflow-edge.target-function .react-flow__edge-path {
-  stroke: rgba(25, 151, 221, 0.46);
-}
-
-.workflow-edge.target-transform .react-flow__edge-path {
-  stroke: rgba(122, 94, 225, 0.48);
-}
-
-.workflow-edge.target-output .react-flow__edge-path {
-  stroke: rgba(229, 170, 51, 0.52);
-}
-
-.workflow-edge.target-llm .react-flow__edge-path {
-  stroke: rgba(224, 126, 78, 0.52);
-}
-
-.workflow-edge.target-agent .react-flow__edge-path {
-  stroke: rgba(218, 79, 124, 0.5);
-}
-
-.workflow-edge.target-tool .react-flow__edge-path {
-  stroke: rgba(142, 92, 226, 0.52);
-}
-
-.workflow-edge.target-http .react-flow__edge-path {
-  stroke: rgba(11, 163, 184, 0.5);
-}
-
-.workflow-edge.target-database .react-flow__edge-path {
-  stroke: rgba(38, 119, 216, 0.5);
-}
-
-.workflow-edge.target-file .react-flow__edge-path {
-  stroke: rgba(117, 141, 30, 0.5);
-}
-
-.workflow-edge.target-router .react-flow__edge-path {
-  stroke: rgba(84, 210, 60, 0.52);
-}
-
-.workflow-edge.target-loop .react-flow__edge-path {
-  stroke: rgba(44, 203, 135, 0.52);
-}
-
-.workflow-edge.target-system .react-flow__edge-path {
-  stroke: rgba(49, 66, 91, 0.42);
-}
-
-.workflow-edge.source-router .react-flow__edge-path,
-.workflow-edge.source-loop .react-flow__edge-path {
-  stroke-dasharray: 0.1 15;
-}
-
-.workflow-edge.selected .react-flow__edge-path,
-.workflow-edge.active .react-flow__edge-path {
-  stroke: rgba(79, 124, 255, 0.82);
-  stroke-dasharray: 0.1 12;
-  filter: drop-shadow(0 0 9px rgba(79, 124, 255, 0.48));
-}
-
-.workflow-edge.active .react-flow__edge-path {
-  stroke-dasharray: 0.1 10;
-}
-
-.workflow-edge .react-flow__edge-interaction {
-  stroke-width: 28;
-}
-
 .react-flow__edge-textbg,
 .react-flow__edge-text {
   display: none;
@@ -2104,7 +1733,6 @@ h1 {
   box-shadow: var(--shadow);
 }
 
-.flow-node,
 .system-node {
   position: relative;
   box-sizing: border-box;
@@ -2121,24 +1749,16 @@ h1 {
   transition: transform 0.22s ease, filter 0.22s ease;
 }
 
-.flow-node {
-  padding: 0 4px;
-  text-align: center;
-}
-
 .system-node {
   padding: 0 4px;
 }
 
-.flow-node:hover,
-.flow-node.selected,
 .system-node:hover,
 .system-node.selected {
   transform: translateY(-2px);
   filter: drop-shadow(0 18px 22px rgba(45, 57, 86, 0.16));
 }
 
-.flow-node.active,
 .system-node.active {
   filter: drop-shadow(0 0 18px rgba(79, 124, 255, 0.4));
   animation: nodePulse 1.1s ease-in-out infinite;
@@ -2156,7 +1776,6 @@ h1 {
   transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
-.flow-node:hover .perimeter-handle,
 .system-node:hover .perimeter-handle {
   opacity: 0.86;
 }
@@ -2218,18 +1837,14 @@ h1 {
   padding-left: 8px;
 }
 
-.flow-node:hover .quick-add-top,
 .system-node:hover .quick-add-top,
-.flow-node:hover .quick-add-bottom,
 .system-node:hover .quick-add-bottom {
   opacity: 1;
   pointer-events: auto;
   transform: translate(-50%, 0);
 }
 
-.flow-node:hover .quick-add-left,
 .system-node:hover .quick-add-left,
-.flow-node:hover .quick-add-right,
 .system-node:hover .quick-add-right {
   opacity: 1;
   pointer-events: auto;
@@ -2612,9 +2227,7 @@ h1 {
   transform: translateY(-50%) rotate(180deg);
 }
 
-.flow-node.selected .node-orb,
 .system-node.selected .node-orb,
-.flow-node:hover .node-orb,
 .system-node:hover .node-orb {
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.36), inset 0 -9px 16px rgba(18, 47, 92, 0.24), 0 0 0 5px rgba(79, 124, 255, 0.14), 0 18px 30px rgba(45, 57, 86, 0.2);
 }
@@ -2758,7 +2371,6 @@ h1 {
   background: rgba(17, 38, 66, 0.2);
 }
 
-.layout-pulse .flow-node,
 .layout-pulse .system-node {
   animation: arrange 0.72s ease both;
 }
@@ -3562,23 +3174,6 @@ h1 {
 .health-list {
   display: grid;
   gap: 8px;
-}
-
-.config-popover {
-  position: fixed;
-  z-index: 32;
-  display: flex;
-  width: 360px;
-  max-height: calc(100vh - 220px);
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: 22px;
-}
-
-.config-popover.expanded {
-  width: min(920px, calc(100vw - 96px));
-  height: calc(100vh - 120px);
-  max-height: none;
 }
 
 .popover-head {
@@ -4420,36 +4015,6 @@ h1 {
 
 .status-line.error {
   color: var(--red);
-}
-
-.run-panel {
-  position: absolute;
-  left: 354px;
-  right: 402px;
-  bottom: 18px;
-  z-index: 18;
-  height: 46px;
-  margin-top: 0;
-  padding: 0 16px;
-  border-radius: 22px;
-  overflow: hidden;
-  transition: height 0.32s ease;
-}
-
-.run-panel.open {
-  height: 254px;
-  padding-bottom: 14px;
-}
-
-.run-panel-handle {
-  justify-content: flex-start;
-  gap: 8px;
-  width: 100%;
-  height: 44px;
-  padding: 0;
-  background: transparent;
-  color: #35425d;
-  font-weight: 740;
 }
 
 .run-tabs {

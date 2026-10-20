@@ -1,0 +1,17 @@
+[
+  {
+    "file": "01-scenario-a-input.png",
+    "sha256": "8eacbd992fcbb7d1cff395f9f8ba6c49273a34d10ef8cf23e70b9c52a2f772a2",
+    "source": "User-provided screenshot; unedited"
+  },
+  {
+    "file": "02-scenario-b-history.png",
+    "sha256": "630ace23838b14b3f8a5a6adcbb7d6a56b3ceeb122f26c577c7c7995a50e9b2f",
+    "source": "User-provided screenshot; unedited"
+  },
+  {
+    "file": "03-scenario-c-blank.png",
+    "sha256": "7ca76380f02aad16560eb00c68d21555f3d3400cc62fdce66596bac048bc3591",
+    "source": "User-provided screenshot; unedited"
+  }
+]

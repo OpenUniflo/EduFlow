@@ -48,15 +48,6 @@ function assertStatus(result: Invocation, expected: number, operation: string) {
   assert.equal(result.status, expected, `${operation}: expected ${expected}, received ${result.status} (${JSON.stringify(result.body)})`);
 }
 
-function workflowRun(workflowId: string, id: string, createdAt: string, provenance = true) {
-  return {
-    id, workflowId, workflowTemplateId: workflowId,
-    ...(provenance ? { courseId: "python-engineering", assignmentId: "py-runtime-model" } : {}),
-    workflowName: "Local verifier", createdAt, status: "success", nodeCount: 0,
-    outputSummary: id, finalState: {}, nodes: []
-  };
-}
-
 const supabaseUrl = assertLocalSupabaseUrl(required("SUPABASE_URL"));
 const secretKey = required("SUPABASE_SECRET_KEY");
 const publishableKey = required("VITE_SUPABASE_PUBLISHABLE_KEY");
@@ -465,70 +456,11 @@ try {
   const crossUserWrite = await ordinaryUser.client.from("user_course_states").insert({ user_id: adminUser.user.id, course_id: "agentic-ai" });
   assert.ok(crossUserWrite.error, "RLS must reject cross-user progress writes");
 
-  const workflowId = `local-workflow-${suffix}`;
-  const secondWorkflowId = `local-workflow-independent-${suffix}`;
-  const runStart = Date.now() - 30_000;
-  const workflowRuns = Array.from({ length: 25 }, (_, index) => workflowRun(
-    workflowId, `local-run-${suffix}-${index}`, new Date(runStart + index * 1_000).toISOString()
-  ));
-  const independentRuns = Array.from({ length: 3 }, (_, index) => workflowRun(
-    secondWorkflowId, `local-independent-run-${suffix}-${index}`, new Date(runStart + index * 1_000).toISOString(), false
-  ));
-  const workflowBody = {
-    builtinWorkflowIds: [],
-    settings: { runtime: "local-verifier" },
-    state: {
-      workflows: [
-        { id: workflowId, name: "Local verifier", description: "Persistence proof", nodes: [], edges: [], runOrder: [], result: "", code: "" },
-        { id: secondWorkflowId, name: "Independent verifier", description: "Isolation proof", nodes: [], edges: [], runOrder: [], result: "", code: "" }
-      ],
-      activeTemplateId: workflowId,
-      schemaSaved: true,
-      nodePositions: {},
-      stateValues: {},
-      runHistory: { [workflowId]: workflowRuns, [secondWorkflowId]: independentRuns }
-    }
-  };
-  assertStatus(await invoke(workflowsHandler, "PUT", adminUser.token, workflowBody), 200, "workflow write");
-  let adminWorkflows = await invoke(workflowsHandler, "GET", adminUser.token);
-  assertStatus(adminWorkflows, 200, "workflow read");
-  assert.ok(adminWorkflows.body.state.workflows.some((item: any) => item.id === workflowId));
-  assert.equal(adminWorkflows.body.state.runHistory[workflowId].length, 20, "25 persisted runs must be pruned to 20");
-  assert.equal(adminWorkflows.body.state.runHistory[workflowId][0].id, workflowRuns[24].id);
-  assert.ok(adminWorkflows.body.state.runHistory[workflowId].every((run: any) =>
-    run.courseId === "python-engineering" && run.assignmentId === "py-runtime-model" && run.workflowTemplateId === workflowId
-  ), "run provenance must survive pruning");
-  assert.equal(adminWorkflows.body.state.runHistory[secondWorkflowId].length, 3, "another workflow must not be pruned");
-  assert.ok(adminWorkflows.body.state.runHistory[secondWorkflowId].every((run: any) =>
-    run.courseId === undefined && run.assignmentId === undefined
-  ), "independent runs must not infer assignment provenance");
-
-  const newestRun = workflowRun(workflowId, `local-run-${suffix}-25`, new Date(runStart + 25_000).toISOString());
-  workflowBody.state.runHistory[workflowId] = [newestRun, ...adminWorkflows.body.state.runHistory[workflowId]];
-  assertStatus(await invoke(workflowsHandler, "PUT", adminUser.token, workflowBody), 200, "workflow 26th run write");
-  adminWorkflows = await invoke(workflowsHandler, "GET", adminUser.token);
-  assertStatus(adminWorkflows, 200, "workflow reload after 26th run");
-  assert.equal(adminWorkflows.body.state.runHistory[workflowId].length, 20);
-  assert.equal(adminWorkflows.body.state.runHistory[workflowId][0].id, newestRun.id);
-  assert.equal(adminWorkflows.body.state.runHistory[secondWorkflowId].length, 3);
-  const adminPersistedRuns = await server.from("workflow_runs").select("id").eq("owner_user_id", adminUser.user.id).eq("workflow_id", workflowId);
-  assert.ifError(adminPersistedRuns.error);
-  assert.equal(adminPersistedRuns.data?.length, 20, "database must physically retain only 20 runs");
-
-  const ordinaryBody = structuredClone(workflowBody);
-  ordinaryBody.state.runHistory = {
-    [workflowId]: Array.from({ length: 22 }, (_, index) => workflowRun(
-      workflowId, `ordinary-run-${suffix}-${index}`, new Date(runStart + index * 1_000).toISOString(), false
-    ))
-  };
-  assertStatus(await invoke(workflowsHandler, "PUT", ordinaryUser.token, ordinaryBody), 200, "second-user workflow write");
-  const ordinaryWorkflows = await invoke(workflowsHandler, "GET", ordinaryUser.token);
-  assertStatus(ordinaryWorkflows, 200, "second-user workflow read");
-  assert.equal(ordinaryWorkflows.body.state.runHistory[workflowId].length, 20, "second user receives an independent cap");
-  const adminAfterOrdinaryWrite = await invoke(workflowsHandler, "GET", adminUser.token);
-  assertStatus(adminAfterOrdinaryWrite, 200, "first-user workflow isolation read");
-  assert.equal(adminAfterOrdinaryWrite.body.state.runHistory[workflowId].length, 20);
-  assert.equal(adminAfterOrdinaryWrite.body.state.runHistory[workflowId][0].id, newestRun.id, "another user must not alter the first user's runs");
+  // The old client-authored simulation writer is gone. Formal Run retention/execution
+  // is covered by the Workflow Worker suite and scripts/workflow/checks/verify-unified.ts.
+  assertStatus(await invoke(workflowsHandler,"GET",adminUser.token,undefined,{resource:"configuration"}),200,"Workflow configuration read");
+  assertStatus(await invoke(workflowsHandler,"GET",ordinaryUser.token,undefined,{resource:"configuration"}),200,"isolated Workflow configuration read");
+  assertStatus(await invoke(workflowsHandler,"PUT",adminUser.token,{state:{workflows:[]}}),404,"retired Legacy Workflow write denial");
 
   const uploadRequest = { courseId: "python-engineering", filename: "local-verifier.pdf", contentType: "application/pdf", size: 120_000 };
   assertStatus(await invoke(materialsHandler, "POST", ordinaryUser.token, uploadRequest), 403, "non-admin upload denial");

@@ -27,7 +27,7 @@ The signed-in product is organized around six capability-aware workspaces: **Lea
 - Round 4: Core Teaching Loop — implemented in the current prototype.
 - Current prototype: Learning / Explore / Unified Assistant product-structure validation.
 
-Round 4 scope and exit criteria are defined in [`docs/ROUND4_CORE_TEACHING_LOOP.md`](docs/ROUND4_CORE_TEACHING_LOOP.md).
+Round 4 scope and exit criteria are defined in [`artifacts/archive/document-history-20261020/files/docs/ROUND4_CORE_TEACHING_LOOP.md`](artifacts/archive/document-history-20261020/files/docs/ROUND4_CORE_TEACHING_LOOP.md).
 
 ## Architecture
 
@@ -113,9 +113,9 @@ Start with:
 - [`docs/COURSE_ASSIGNMENT_SYSTEM.md`](docs/COURSE_ASSIGNMENT_SYSTEM.md) — Assignment and course-practice mapping.
 - [`docs/MATERIAL_SYSTEM.md`](docs/MATERIAL_SYSTEM.md) — Material and knowledge coverage model.
 - [`docs/USER_LEARNING_STATE.md`](docs/USER_LEARNING_STATE.md) — progression, versioned Criterion State, and Fixed/Rule recommendation boundaries.
-- [Learning Data & Recommendation acceptance](.acceptance/learning-data-recommendation-foundation.md) — real Micro State–Action–Outcome proof; run `pnpm verify:learning-data:local` against Local Supabase.
+- [Learning Data & Recommendation acceptance](artifacts/archive/document-history-20261020/files/docs/acceptance/historical/learning-data-recommendation-foundation.md) — real Micro State–Action–Outcome proof; run `pnpm verify:learning-data:local` against Local Supabase.
 - [`docs/WORKFLOW_ARCHITECTURE.md`](docs/WORKFLOW_ARCHITECTURE.md) — Workflow domain, editor, runtime, and persistence boundaries.
-- [`docs/ROUND4_CORE_TEACHING_LOOP.md`](docs/ROUND4_CORE_TEACHING_LOOP.md) — current development-round scope and exit contract.
+- [`artifacts/archive/document-history-20261020/files/docs/ROUND4_CORE_TEACHING_LOOP.md`](artifacts/archive/document-history-20261020/files/docs/ROUND4_CORE_TEACHING_LOOP.md) — current development-round scope and exit contract.
 
 ## Deployment
 

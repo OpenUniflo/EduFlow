@@ -102,7 +102,7 @@ Validate authored interactions with the existing native validator and check the 
 
 The reviewed Lesson 1 source is `data/gold-courses/ai-agents-in-depth-lesson1.json`; primary/supporting source fields are offline metadata. `scripts/dev/generate-agent-lesson1-migration.ts` reuses native validation and emits the CLI-created `20260906161347_agent_lesson1_teaching_content.sql` with `--content-only`. It publishes ten new Course Learn Paths, ten Units and 52 Steps through the existing database/API. This is initial-publication tooling: later published revisions require a new forward migration and appropriate revision handling, not editing migration history. If Course definitions are bootstrapped separately after migrations, replay this content SQL after that Course exists. Shared Hosted rollout remains incremental and compares complete learning-history snapshots before and after applying the reviewed SQL.
 
-Local ordinary-user acceptance completed all 52 screens, checked 1440/390 layouts and source access, and passed independent Teacher grading of nine post-learning closed-book answers. The actual evidence, revisions, observed limitations and separate Remote verdict are maintained in `.acceptance/learning-loop.md`.
+Local ordinary-user acceptance completed all 52 screens, checked 1440/390 layouts and source access, and passed independent Teacher grading of nine post-learning closed-book answers. The actual evidence, revisions, observed limitations and separate Remote verdict are maintained in `artifacts/archive/document-history-20261020/files/docs/acceptance/historical/learning-loop.md`.
 
 ## Completion context and instructional continuation
 
@@ -139,7 +139,7 @@ Only unmet hard prerequisites can return `teaching_prerequisite_required`; soft 
 
 Migration `20261002061940_personal_course_route_versions_v2.sql` replaces the V1 wrappers with service-only `start_micro_for_route_v2`, `record_micro_step_attempt_v2` and `record_micro_step_completion_v2`. It also adds immutable route persistence and atomic adoption. No V1/V2 parallel membership path remains. Existing content snapshot, criterion evidence, completion and decision-lineage protections are retained. Ordinary authenticated/anon clients cannot execute these functions.
 
-`scripts/verify-personal-route.ts` remains local-only: it uses disposable identities/content, formal Micro completion, concurrency, excluded membership, hard/soft eligibility and RLS/RPC attacks. Never run its fixture workflow on Hosted. `scripts/verify-route-version-schema.sql` provides rollback-only Hosted schema checks; actual Preview HTTP/UI learning is a separate acceptance gate. See [V2](PROJECT_CAPABILITY_MODEL_V2.md).
+`scripts/verify-personal-route.ts` remains local-only: it uses disposable identities/content, formal Micro completion, concurrency, excluded membership, hard/soft eligibility and RLS/RPC attacks. Never run its fixture workflow on Hosted. `scripts/verify-route-version-schema.sql` provides rollback-only Hosted schema checks; actual Preview HTTP/UI learning is a separate acceptance gate. See [current V3 contract](PROJECT_CAPABILITY_MODEL_V3.md).
 
 ## Evidence-driven capability discovery
 

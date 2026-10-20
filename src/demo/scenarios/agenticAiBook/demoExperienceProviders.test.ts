@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { demoLessonAssistantProvider } from "./lessonAssistantScripts";
 import { goldenMaterials } from "./goldenCourse.seed";
-import { demoWorkflowAssessmentProvider } from "./workflowAssessment";
 import { demoCourseCreationScenarioResolver } from "./scenario";
 import { agenticAiNativeMaterials } from "@/demo/courses/agenticAiRuntime.seed";
 import { demoCourseDesignAssistantProvider } from "./courseDesignAssistantScripts";
@@ -20,10 +19,6 @@ describe("Agentic AI Demo experience providers",()=>{
     expect(demoLessonAssistantProvider.listActions(oldAgenticArticle)).toEqual([]);
     expect(demoLessonAssistantProvider.listActions({...goldenArticle,id:"other-article",courseId:"other-course"})).toEqual([]);
     expect(demoLessonAssistantProvider.listActions({...goldenArticle,id:"golden-pdf",type:"pdf"})).toEqual([]);
-  });
-  it("scopes the fixed assessment to the exact launch context",()=>{
-    expect(demoWorkflowAssessmentProvider.resolve({courseId:"agentic-ai-golden",assignmentId:"golden-chapter-assignment-6",workflowTemplateId:"multi-agent-workflow"})?.score).toBe(86);
-    expect(demoWorkflowAssessmentProvider.resolve({courseId:"another-course",assignmentId:"golden-chapter-assignment-6",workflowTemplateId:"multi-agent-workflow"})).toBeNull();
   });
   it("uses the documented filename fallback and rejects unrelated PDFs",async()=>{
     expect((await demoCourseCreationScenarioResolver.resolve([new File(["not-the-book"],"AI-Agents-in-Depth-zh-CN(2).pdf",{type:"application/pdf"})]))?.courseId).toBe("agentic-ai-golden");

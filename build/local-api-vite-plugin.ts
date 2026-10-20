@@ -17,6 +17,7 @@ const handlers = new Map([
   ["/api/knowledge", knowledgeHandler],
   ["/api/courses", courseHandler],
   ["/api/course-authoring", courseHandler],
+  ["/api/learner", learnerHandler],
   ["/api/evidence", learnerHandler],
   ["/api/edge-actions", learnerHandler],
   ["/api/learning", learnerHandler],

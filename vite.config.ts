@@ -29,6 +29,10 @@ export default defineConfig(({ mode }) => {
         "@": fileURLToPath(new URL("./src", import.meta.url))
       }
     },
+    // Collect maintained tests only; ignored archives may contain historical .test files.
+    test: {
+      include: ["src/**/*.test.{ts,tsx,js,mjs}", "api/**/*.test.{ts,tsx,js,mjs}", "scripts/**/*.test.{ts,tsx,js,mjs}", "tests/**/*.test.{ts,tsx,js,mjs}", "build/**/*.test.{ts,tsx,js,mjs}"]
+    },
     server: {
       port: 5173
     }

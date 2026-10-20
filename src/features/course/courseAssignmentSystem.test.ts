@@ -17,8 +17,6 @@ import { resolveInitialMaterialSegment, resolveKnowledgeMaterialEntries, resolve
 import { classifySegmentQueryChange, selectPageAtReadingAnchor } from "@/features/material/reader/materialReaderState";
 import { createMaterialKnowledgeContextState, reduceMaterialKnowledgeContextState, resolveEffectiveKnowledgeId } from "@/features/material/reader/materialKnowledgeContextState";
 import { buildKnowledgeAssignmentContexts, buildMaterialKnowledgeContext, buildMaterialKnowledgeRoles, buildMaterialSegmentProjection } from "@/features/material/materialProjection";
-import type { Template } from "@/features/workflow/domain/types";
-import { DemoWorkflowRuntime } from "@/demo/workflows/DemoWorkflowRuntime";
 import { InMemoryKnowledgeRepository } from "@/features/knowledge/repository/InMemoryKnowledgeRepository";
 import type { KnowledgeGraph, KnowledgeNode } from "@/features/knowledge/types";
 import { buildPersonalKnowledgeGraph } from "@/features/profile/profileGraph";
@@ -504,13 +502,13 @@ describe("Material and progress generalization", () => {
     expect(existsSync(join(process.cwd(), "src/features/lessonData.ts"))).toBe(false);
   });
 
-  it("uses the dedicated Assignment modal class without changing Workflow Library cards", () => {
+  it("keeps the Assignment modal distinct from the unified Workflow Library", () => {
     const lessonPage = readFileSync(join(process.cwd(), "src/features/material/pages/LessonPage.tsx"), "utf8");
     const workflowLibrary = readFileSync(join(process.cwd(), "src/features/workflow/pages/WorkflowLibraryPage.tsx"), "utf8");
     expect(lessonPage).toContain('className="atlas-workflow-modal"');
     expect(lessonPage).toContain('className="atlas-workflow-modal-card glass-v2"');
     expect(lessonPage).not.toContain('className="atlas-workflow-card glass-v2"');
-    expect(workflowLibrary).toContain("atlas-workflow-card glass-v2");
+    expect(workflowLibrary).toContain("wf-v2-library-card");
   });
 
   it("keeps Knowledge mastery independent from Assignment completion", () => {
@@ -550,15 +548,6 @@ describe("Material and progress generalization", () => {
     expect(buildCourseGraphData(runtime, demoUserCourseStateSeed("user-1", "scoped-course"), scopedRepository.getVisibleGraph(scopedAccess)).knowledgeNodes).toHaveLength(3);
   });
 
-  it("keeps shared WorkflowTemplate runtime records Course-independent", () => {
-    const template: Template = { id: "same-template", name: "Shared", description: "Shared", nodes: [], edges: [], runOrder: [], result: "ok", code: "" };
-    const demoRuntime = new DemoWorkflowRuntime();
-    const runA = demoRuntime.createRunRecord(template, {}, 1);
-    const runB = demoRuntime.createRunRecord(template, {}, 2);
-    expect(runA.workflowTemplateId).toBe(runB.workflowTemplateId);
-    expect(runA).not.toHaveProperty("assignmentId");
-    expect(runB).not.toHaveProperty("courseId");
-  });
 
   it("projects different Personal Atlas state for different users", () => {
     const governance = getDomainGovernanceSnapshot();

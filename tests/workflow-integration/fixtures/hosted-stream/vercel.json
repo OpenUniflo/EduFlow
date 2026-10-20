@@ -1,0 +1,1 @@
+{"version":2,"regions":["sin1"],"functions":{"api/chat/completions.mjs":{"maxDuration":120}}}

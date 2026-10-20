@@ -558,16 +558,16 @@
 
 ## Workflow Module Boundaries
 
-- Pure Workflow Domain types, factories, and graph operations live under `src/features/workflow/domain` and MUST NOT depend on React, browser storage, Demo fixtures, `src/app`, or the `applicationServices` singleton.
-- Workflow Editor UI and editor-only state live under `src/features/workflow/editor` and `src/features/workflow/pages`. App MUST NOT own node, edge, branch, selection, canvas-position, Schema, Environment, Run, or Run History behavior.
-- Workflow execution uses the `WorkflowRuntime` contract. The current timed simulation is a Demo adapter under `src/demo/workflows`; the Runtime contract MUST NOT reference Course or Assignment types.
-- Workflow Runtime creates Course-independent base Run records. Validated `courseId` and `assignmentId` are optional application/persistence metadata attached before Run History persistence and MUST NOT become Runtime inputs.
-- Workflow persistence uses the `WorkflowPersistence` contract. Application runtime uses the API adapter; the LocalStorage adapter and v2 keys remain compatibility/test contracts.
-- Any compatibility writer sharing the v2 workflow-settings key MUST preserve Environment, active Environment, and unknown current payload fields when updating legacy preferences.
-- Concrete Workflow templates, description-to-template selection, Demo runtime behavior, Demo Environment defaults, and template-specific code exports live under `src/demo/workflows` and depend inward on Workflow contracts.
-- Course integration belongs to the application integration layer. Assignment completion requires a validated explicit `courseId`, `assignmentId`, and `workflowTemplateId`; independent runs MUST NOT complete an Assignment, and template identity MUST NOT be used to infer one.
-- Assignment metadata is frozen at Workflow Run launch. Completion MUST use that launch snapshot rather than the current route or callback context.
-- Generate from Description may select a Demo Template in the Workflow application layer, but the App/page routing layer owns synchronizing `/workflows/:workflowId` and removing stale Assignment query context.
+- Workflow uses one V2 Definition, API repository, server-side LangGraph execution boundary and React Flow editor. Legacy editor/simulation/persistence/migration paths MUST NOT be reintroduced.
+- Pure Workflow types, factories and graph operations live under `src/features/workflow/domain/v2` and MUST NOT depend on React, browser storage, Demo fixtures, `src/app` or application singletons.
+- Workflow Editor and presentation state belong to the Workflow Feature. App owns assembly and navigation only.
+- Production definitions and Runs use authenticated APIs. Removed Legacy browser storage keys MUST NOT become authority or compatibility fallback.
+- Concrete Course starting templates live under `src/demo/workflow` and are database seed input. Production MUST NOT import them as a fallback.
+- Ordinary environment variables, State and managed credentials remain distinct. Variable Bindings are structural; Runs freeze ordinary variable values/configuration revisions at launch while server authorization/revocation is revalidated.
+- Node tests reuse the actual execution boundary with isolated test State and MUST NOT create formal Runs, progress, completion or mastery evidence. External writes require explicit test confirmation.
+- Course integration belongs to the application/API boundary. Run metadata freezes validated `courseId`, `assignmentId` and `workflowTemplateId`. Runtime MUST NOT receive or infer Course/Assignment entities. Live success MUST NOT automatically complete an Assignment or grant mastery.
+- History viewing is read-only and MUST NOT replace the editing draft. Execution details use Run/Step/invocation/attempt identity. Presentation changes MUST NOT re-fit or relayout the canvas.
+- Exported configuration MUST NOT be presented as a standalone executable package unless that packaging capability actually exists.
 
 ## Backend and Data Runtime
 
@@ -584,7 +584,7 @@
 - Assignment completion remains separate from Knowledge mastery in database writes. Workflow Runs preserve explicit launch-time `courseId`, `assignmentId`, and `workflowTemplateId`; independent Runs MUST NOT infer Course provenance.
 - Backend persistence adapters MUST recover serial write sequencing after a rejected request. A failed write remains caller-visible through `flush()`, but MUST NOT permanently prevent later queued writes from executing.
 - Workflow Run History is bounded to the newest 20 Runs per `(owner_user_id, workflow_id)` in both application state and backend persistence. The API MUST physically prune obsolete rows without affecting another Workflow or user.
-- `DemoWorkflowRuntime` remains the execution adapter until a future runtime round. Backend persistence MUST NOT introduce Course or Assignment dependencies into the Workflow Runtime contract.
+- Workflow V2 Live execution uses the server-side Python LangGraph Worker. Legacy simulation is retired; Live failure MUST NOT fall back to fabricated success. Backend persistence MUST NOT introduce Course or Assignment dependencies into the Workflow Runtime contract. Live success MUST NOT automatically complete an Assignment or grant Knowledge mastery.
 
 ## Micro Completion Context
 

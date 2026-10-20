@@ -350,7 +350,7 @@ Only hard prerequisites gate learning. Selected soft edges may explain determini
 
 Personal route constraints and immutable snapshots are user-owned persistence, separate from Knowledge and Course definitions. Current execution replans active constraints against today's graph/course/state. History shows its saved snapshot; restore uses old constraints to create a new version in the current world. Neither action rolls back learning. Server-loaded data and service-only atomic RPCs own membership/concurrency; browser projections never authorize Micro.
 
-Project Atlas reuses KnowledgeAtlasScene with blue acquired, green pending target, gray pending intermediate, no role rings, and Domain metadata in details. Structure-only force keys exclude state, colors, drafts, Preview and version identity. Candidate node/edge set changes may recompute layout; presentation changes on identical structure may not. See [V2 decisions and evidence](PROJECT_CAPABILITY_MODEL_V2.md).
+Project Atlas reuses KnowledgeAtlasScene with blue acquired, green pending target, gray pending intermediate, no role rings, and Domain metadata in details. Structure-only force keys exclude state, colors, drafts, Preview and version identity. Candidate node/edge set changes may recompute layout; presentation changes on identical structure may not. See [current Project model](PROJECT_CAPABILITY_MODEL_V3.md).
 
 ## Project support projection
 

@@ -1,0 +1,190 @@
+{
+  "scope": "Offline schema probe with current fixture schemas and frontend Ajv options; no API Run, no model call, no UI submission",
+  "date": "2026-10-20",
+  "results": [
+    {
+      "name": "A required input absent",
+      "value": {},
+      "expectedValid": false,
+      "valid": false,
+      "matched": true,
+      "errors": [
+        {
+          "instancePath": "",
+          "schemaPath": "#/required",
+          "keyword": "required",
+          "params": {
+            "missingProperty": "orderId"
+          },
+          "message": "must have required property 'orderId'"
+        },
+        {
+          "instancePath": "",
+          "schemaPath": "#/required",
+          "keyword": "required",
+          "params": {
+            "missingProperty": "question"
+          },
+          "message": "must have required property 'question'"
+        }
+      ]
+    },
+    {
+      "name": "A required text empty",
+      "value": {
+        "orderId": "",
+        "question": ""
+      },
+      "expectedValid": false,
+      "valid": false,
+      "matched": true,
+      "errors": [
+        {
+          "instancePath": "/orderId",
+          "schemaPath": "#/properties/orderId/minLength",
+          "keyword": "minLength",
+          "params": {
+            "limit": 1
+          },
+          "message": "must NOT have fewer than 1 characters"
+        },
+        {
+          "instancePath": "/question",
+          "schemaPath": "#/properties/question/minLength",
+          "keyword": "minLength",
+          "params": {
+            "limit": 1
+          },
+          "message": "must NOT have fewer than 1 characters"
+        }
+      ]
+    },
+    {
+      "name": "A valid input",
+      "value": {
+        "orderId": "A1001",
+        "question": "请核对订单"
+      },
+      "expectedValid": true,
+      "valid": true,
+      "matched": true,
+      "errors": []
+    },
+    {
+      "name": "B untouched blank omitted",
+      "value": {
+        "accepted": true
+      },
+      "expectedValid": false,
+      "valid": false,
+      "matched": true,
+      "errors": [
+        {
+          "instancePath": "",
+          "schemaPath": "#/required",
+          "keyword": "required",
+          "params": {
+            "missingProperty": "comment"
+          },
+          "message": "must have required property 'comment'"
+        }
+      ]
+    },
+    {
+      "name": "B explicit empty string",
+      "value": {
+        "accepted": true,
+        "comment": ""
+      },
+      "expectedValid": true,
+      "valid": true,
+      "matched": true,
+      "errors": []
+    },
+    {
+      "name": "B null is different",
+      "value": {
+        "accepted": true,
+        "comment": null
+      },
+      "expectedValid": false,
+      "valid": false,
+      "matched": true,
+      "errors": [
+        {
+          "instancePath": "/comment",
+          "schemaPath": "#/properties/comment/type",
+          "keyword": "type",
+          "params": {
+            "type": "string"
+          },
+          "message": "must be string"
+        }
+      ]
+    },
+    {
+      "name": "C untouched blank omitted",
+      "value": {
+        "approved": true
+      },
+      "expectedValid": false,
+      "valid": false,
+      "matched": true,
+      "errors": [
+        {
+          "instancePath": "",
+          "schemaPath": "#/required",
+          "keyword": "required",
+          "params": {
+            "missingProperty": "finalNote"
+          },
+          "message": "must have required property 'finalNote'"
+        }
+      ]
+    },
+    {
+      "name": "C explicit empty string",
+      "value": {
+        "approved": true,
+        "finalNote": ""
+      },
+      "expectedValid": true,
+      "valid": true,
+      "matched": true,
+      "errors": []
+    },
+    {
+      "name": "C false is valid",
+      "value": {
+        "approved": false,
+        "finalNote": ""
+      },
+      "expectedValid": true,
+      "valid": true,
+      "matched": true,
+      "errors": []
+    },
+    {
+      "name": "C null is different",
+      "value": {
+        "approved": true,
+        "finalNote": null
+      },
+      "expectedValid": false,
+      "valid": false,
+      "matched": true,
+      "errors": [
+        {
+          "instancePath": "/finalNote",
+          "schemaPath": "#/properties/finalNote/type",
+          "keyword": "type",
+          "params": {
+            "type": "string"
+          },
+          "message": "must be string"
+        }
+      ]
+    }
+  ],
+  "passed": true
+}

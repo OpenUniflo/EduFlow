@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Navigate, Route as RouterRoute, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import { AuthProvider } from "@/features/auth/AuthContext";
 import type { MockSession } from "@/features/auth/types";
@@ -9,7 +9,7 @@ import { GlobalNav } from "@/app/components/GlobalNav";
 import { NotFoundPage } from "@/app/pages/PlaceholderPages";
 import { PublicHomePage } from "@/app/pages/PublicHomePage";
 import { applicationServices, hydrateApplicationServices, hydratePublicApplicationServices, resetAuthenticatedApplicationServices } from "@/app/services/applicationServices";
-import { attachWorkflowAssignmentMetadata, resolveWorkflowAssignmentContext, completeWorkflowAssignmentRun } from "@/app/integrations/workflowAssignmentIntegration";
+import { resolveWorkflowAssignmentContext } from "@/app/integrations/workflowAssignmentIntegration";
 import { ExplorePage } from "@/features/explore/pages/ExplorePage";
 import { LearningPage } from "@/features/learning/pages/LearningPage";
 import { MicroLearningExperience } from "@/features/learning/micro/MicroLearningExperience";
@@ -21,18 +21,11 @@ import { AssignmentExperiencePage } from "@/features/course/pages/AssignmentExpe
 import { LessonPage } from "@/features/material/pages/LessonPage";
 import { DomainManagementPage } from "@/features/admin/domains/DomainManagementPage";
 import { WorkflowLibraryPage } from "@/features/workflow/pages/WorkflowLibraryPage";
-import { WorkflowEditorPage } from "@/features/workflow/pages/WorkflowEditorPage";
-import { useWorkflowController } from "@/features/workflow/application/useWorkflowController";
-import { ApiWorkflowPersistence } from "@/features/workflow/repository/ApiWorkflowPersistence";
-import { demoWorkflowTemplates } from "@/demo/workflows/demoWorkflowTemplates";
-import { demoWorkflowSettings } from "@/demo/workflows/demoWorkflowSettings";
-import { DemoWorkflowRuntime } from "@/demo/workflows/DemoWorkflowRuntime";
-import { inferDemoWorkflowTemplateId } from "@/demo/workflows/descriptionWorkflowGenerator";
-import { DemoWorkflowCodeExporter } from "@/demo/workflows/demoWorkflowCode";
+import { retireLegacyWorkflowStorage } from "@/features/workflow/editor/v2/retireLegacyStorage";
+import { WorkflowV2Route } from "@/features/workflow/pages/WorkflowV2Entry";
 import { supabaseClient } from "@/shared/api/supabaseClient";
 import { demoCourseCreationScenarioResolver } from "@/demo/scenarios/agenticAiBook/scenario";
 import { demoLessonAssistantProvider } from "@/demo/scenarios/agenticAiBook/lessonAssistantScripts";
-import { demoWorkflowAssessmentProvider } from "@/demo/scenarios/agenticAiBook/workflowAssessment";
 import { demoCourseDesignAssistantProvider } from "@/demo/scenarios/agenticAiBook/courseDesignAssistantScripts";
 import { resolveLegacyRoute } from "@/app/legacyRoutes";
 import { ApiRequestError } from "@/shared/api/apiClient";
@@ -57,20 +50,9 @@ export default function App() {
   const [session, setSession] = useState<MockSession | null>(null);
   const [ready, setReady] = useState(false);
   const [startupError, setStartupError] = useState("");
-  const [workflowVersion, setWorkflowVersion] = useState(0);
-  const [workflowPersistence] = useState(() => new ApiWorkflowPersistence(demoWorkflowSettings));
-  const [workflowRuntime] = useState(() => new DemoWorkflowRuntime());
-  const [workflowCodeExporter] = useState(() => new DemoWorkflowCodeExporter());
-  const workflowDependencies = useMemo(() => ({
-    builtinWorkflows: demoWorkflowTemplates,
-    persistence: workflowPersistence,
-    runtime: workflowRuntime,
-    codeExporter: workflowCodeExporter,
-    inferTemplateId: inferDemoWorkflowTemplateId,
-    hydrationKey: workflowVersion
-  }), [workflowCodeExporter, workflowPersistence, workflowRuntime, workflowVersion]);
 
   useEffect(() => {
+    try { retireLegacyWorkflowStorage(localStorage); } catch { /* Storage may be unavailable; no runtime reads old keys. */ }
     let active = true;
     async function restore() {
       const { data } = await supabaseClient.auth.getSession();
@@ -79,16 +61,14 @@ export default function App() {
       try {
         await hydratePublicApplicationServices();
         if (!authSession) return;
-        const [profile] = await Promise.all([hydrateApplicationServices(authSession.user.id), workflowPersistence.hydrate()]);
+        const profile = await hydrateApplicationServices(authSession.user.id);
         if (!active) return;
         const name = profile.displayName || authSession.user.email?.split("@")[0] || "学习者";
         setSession({ userId: authSession.user.id, name, email: authSession.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: authSession.user.created_at });
-        setWorkflowVersion((version) => version + 1);
       } catch (error) {
         console.error("Post-login application initialization failed", error);
         if (authSession && error instanceof ApiRequestError && error.status === 401) {
           resetAuthenticatedApplicationServices();
-          workflowPersistence.resetAuthenticatedState();
           setSession(null);
           await hydratePublicApplicationServices();
           if (active) navigate("/login", { replace: true, state: authGateState(location) });
@@ -102,50 +82,19 @@ export default function App() {
     void restore();
     const { data } = supabaseClient.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT" && active) {
-        workflow.stopRun();
         resetAuthenticatedApplicationServices();
-        workflowPersistence.resetAuthenticatedState();
         setSession(null);
-        setWorkflowVersion((version) => version + 1);
         void hydratePublicApplicationServices().catch((error) => { console.error("Public catalog rehydration failed", error); setStartupError("公开学习内容加载失败，请重试。"); });
       }
     });
     return () => { active = false; data.subscription.unsubscribe(); };
-  }, [workflowPersistence]);
+  }, []);
   const assignmentContext = useMemo(
     () => routeWorkflowId ? resolveWorkflowAssignmentContext(applicationServices.courseRepository, routeWorkflowId, location.search) : null,
     [location.search, routeWorkflowId]
   );
-  const finalizeRunRecord = useCallback(
-    (record: Parameters<typeof attachWorkflowAssignmentMetadata>[0]) => attachWorkflowAssignmentMetadata(record, assignmentContext),
-    [assignmentContext]
-  );
-  const onRunCompleted = useCallback((record: Parameters<typeof completeWorkflowAssignmentRun>[2]) => {
-    if (session) completeWorkflowAssignmentRun(applicationServices.learningProgressRepository, session.userId, record);
-  }, [session]);
-  const workflow = useWorkflowController(workflowDependencies, {
-    routeWorkflowId,
-    finalizeRunRecord,
-    onRunCompleted
-  });
-
-  function openWorkflow(templateId: string) {
-    workflow.switchTemplate(templateId);
-    navigate(`/workflows/${templateId}`);
-  }
-
-  function createWorkflow() {
-    navigate(`/workflows/${workflow.createWorkflow()}`);
-  }
-
-  function deleteWorkflow(templateId: string) {
-    workflow.deleteWorkflow(templateId);
-  }
-
   async function logout() {
-    workflow.stopRun();
     await Promise.all([
-      workflowPersistence.flush(),
       (applicationServices.learningProgressRepository as { flush?: () => Promise<unknown> }).flush?.()
     ]);
     await supabaseClient.auth.signOut();
@@ -162,7 +111,7 @@ export default function App() {
     }
     let profile: Awaited<ReturnType<typeof hydrateApplicationServices>>;
     try {
-      [profile] = await Promise.all([hydrateApplicationServices(data.user.id), workflowPersistence.hydrate()]);
+      profile = await hydrateApplicationServices(data.user.id);
     } catch (initializationError) {
       console.error("Post-login application initialization failed", initializationError);
       setStartupError("部分学习数据加载失败，请重试。");
@@ -170,7 +119,6 @@ export default function App() {
     }
     const name = profile.displayName || data.user.email?.split("@")[0] || "学习者";
     setSession({ userId: data.user.id, name, email: data.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: data.user.created_at });
-    setWorkflowVersion((version) => version + 1);
     navigate(resolveAuthRedirect(location.state), { replace: true });
   }
 
@@ -189,15 +137,13 @@ export default function App() {
       const { data } = await supabaseClient.auth.getSession();
       await hydratePublicApplicationServices();
       if (!data.session) { setSession(null); return; }
-      const [profile] = await Promise.all([hydrateApplicationServices(data.session.user.id), workflowPersistence.hydrate()]);
+      const profile = await hydrateApplicationServices(data.session.user.id);
       const name = profile.displayName || data.session.user.email?.split("@")[0] || "学习者";
       setSession({ userId: data.session.user.id, name, email: data.session.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: data.session.user.created_at });
-      setWorkflowVersion((version) => version + 1);
     } catch (error) {
       console.error("Post-login application initialization retry failed", error);
       if (error instanceof ApiRequestError && error.status === 401) {
         resetAuthenticatedApplicationServices();
-        workflowPersistence.resetAuthenticatedState();
         setSession(null);
         await hydratePublicApplicationServices();
         navigate("/login", { replace: true, state: authGateState(location) });
@@ -223,17 +169,7 @@ export default function App() {
     onGoMessages: () => navigate("/messages"),
     onLogout: logout
   };
-  const workflowAssessment = useMemo(() => demoWorkflowAssessmentProvider.resolve(assignmentContext), [assignmentContext]);
-  const editor = workflow.routeTemplate && session ? (
-    <WorkflowEditorPage
-      key={workflow.routeTemplate.id}
-      controller={workflow}
-      navigation={<div className="atlas-canvas-nav"><GlobalNav active="canvas" session={session} onLogout={logout} /></div>}
-      onBack={() => navigate("/workflows")}
-      onWorkflowGenerated={(templateId) => navigate(`/workflows/${templateId}`)}
-      assessment={workflowAssessment}
-    />
-  ) : <NotFoundPage onHome={() => navigate("/")} />;
+  const editor = routeWorkflowId && session ? <WorkflowV2Route key={`${session.userId}:${routeWorkflowId}`} ownerId={session.userId} workflowId={routeWorkflowId} navigation={<div className="atlas-canvas-nav"><GlobalNav active="canvas" session={session} onLogout={logout} /></div>} onBack={() => navigate(typeof location.state?.workflowLibraryReturn === "string" && /^\/workflows(?:\?|$)/.test(location.state.workflowLibraryReturn) ? location.state.workflowLibraryReturn : "/workflows")} onOpen={(id) => navigate(`/workflows/${id}`, {state:location.state})} launchContext={assignmentContext ?? undefined} /> : <NotFoundPage onHome={() => navigate("/")} />;
 
   if (!ready) return <main className="atlas-auth-page"><section className="atlas-auth-panel glass-v2"><h2>正在连接 EduFlow…</h2></section></main>;
   if (startupError) return <main className="atlas-auth-page"><section className="atlas-auth-panel glass-v2"><h2>数据连接失败</h2><p>{startupError}</p><button className="atlas-primary" onClick={() => void retryStartup()}>重新加载</button></section></main>;
@@ -248,7 +184,7 @@ export default function App() {
           <RouterRoute path="/" element={session ? <LearningPage session={session} onLogout={logout} /> : <PublicHomePage />} />
           <RouterRoute path="/explore" element={<ExplorePage session={session} onLogout={logout} />} />
           <RouterRoute path="/learn/micro/:knowledgeId" element={<MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} />} />
-          <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="canvas" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} workflows={workflow.workflows} activeTemplateId={workflow.activeTemplateId} onOpenWorkflow={openWorkflow} onCreateWorkflow={createWorkflow} onDeleteWorkflow={deleteWorkflow} /> : null)} />
+          <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="canvas" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} onOpenWorkflow={(id, returnTo) => navigate(`/workflows/${id}`, {state:{workflowLibraryReturn:returnTo}})} /> : null)} />
           <RouterRoute path="/workflows/:workflowId" element={protectedElement(editor)} />
           <RouterRoute path="/courses" element={<CourseCenterPage session={session} onLogout={logout} />} />
           <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} resolver={demoCourseCreationScenarioResolver} entryMode="learner" /> : null)} />

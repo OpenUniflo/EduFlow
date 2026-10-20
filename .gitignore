@@ -1,8 +1,11 @@
 node_modules/
 dist/
 .DS_Store
-.env.local
-.env.*.local
+# Local environment credentials; sanitized templates remain versioned.
+.env
+.env.*
+!.env.example
+!.env.*.example
 .vercel/
 
 /fixtures/phase4-agentic-ai/corpus/*.pdf
@@ -13,6 +16,22 @@ dist/
 /docs/local/AI-Agents-in-Depth-zh-CN.pdf
 /tmp/gold-course-sync/
 .vercel
+# Private local accounts, processes and temporary acceptance state.
 /.acceptance/
 /output/
 /.playwright-cli/
+
+# Generated reports, raw captures and immutable local evidence archives.
+# Reusable inputs belong in fixtures/acceptance; conclusions in docs/acceptance.
+/artifacts/
+
+# Local compiler/interpreter caches, including those outside service folders.
+**/__pycache__/
+*.pyc
+*.pyo
+*.tsbuildinfo
+.pytest_cache/
+
+# Retired phase acceptance source trees; current regressions live under tests/.
+/scripts/acceptance/
+/tests/workflow-integration/acceptance/

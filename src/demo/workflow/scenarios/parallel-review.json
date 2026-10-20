@@ -1,0 +1,831 @@
+{
+  "definition": {
+    "schemaVersion": "2.0",
+    "workflowId": "",
+    "revision": 0,
+    "name": "场景 B · 并行方案评审与逐项确认",
+    "description": "完整业务演示；真实模型和本地受控工具；不写入课程或学习领域。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "brief": {
+          "type": "string",
+          "title": "项目说明",
+          "minLength": 1,
+          "maxLength": 1500
+        },
+        "dimensions": {
+          "type": "array",
+          "title": "评审维度",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "title": "维度",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        }
+      },
+      "required": [
+        "brief",
+        "dimensions"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dimension": {
+                "type": "string"
+              },
+              "draft": {
+                "type": "string"
+              },
+              "accepted": {
+                "type": "boolean"
+              },
+              "comment": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "dimension",
+              "draft",
+              "accepted",
+              "comment"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "report": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "results",
+        "report"
+      ],
+      "additionalProperties": false
+    },
+    "state": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimension": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dimension"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "item": {
+            "type": "object",
+            "properties": {
+              "dimension": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "dimension"
+            ],
+            "additionalProperties": false
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimension": {
+                  "type": "string"
+                },
+                "draft": {
+                  "type": "string"
+                },
+                "accepted": {
+                  "type": "boolean"
+                },
+                "comment": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "dimension",
+                "draft",
+                "accepted",
+                "comment"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "report": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "item",
+          "results",
+          "report"
+        ],
+        "additionalProperties": false
+      },
+      "initial": {
+        "items": [],
+        "item": {
+          "dimension": ""
+        },
+        "results": [],
+        "report": ""
+      },
+      "inputBindings": {},
+      "reducers": {
+        "results": {
+          "name": "append",
+          "version": 1
+        }
+      }
+    },
+    "entryNodeId": "start",
+    "nodes": [
+      {
+        "id": "start",
+        "label": "开始",
+        "type": "core.start",
+        "typeVersion": 1,
+        "config": {},
+        "inputs": {},
+        "writes": {}
+      },
+      {
+        "id": "prepare",
+        "label": "按输入生成评审任务",
+        "type": "core.function",
+        "typeVersion": 1,
+        "config": {
+          "implementation": "code",
+          "language": "python",
+          "code": "def process(input, context):\n    if len(set(input[\"dimensions\"])) != len(input[\"dimensions\"]):\n        raise ValueError(\"Review dimensions must be distinct\")\n    return {\"items\":[{\"dimension\":x} for x in input[\"dimensions\"]],\"results\":[]}",
+          "authoring": {
+            "overwrite": [
+              "results"
+            ]
+          }
+        },
+        "inputs": {
+          "dimensions": {
+            "source": "input",
+            "pointer": "/dimensions",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "items": "/items",
+          "results": "/results"
+        }
+      },
+      {
+        "id": "send",
+        "label": "并行分发各维度评审",
+        "type": "control.send",
+        "typeVersion": 1,
+        "config": {
+          "items": "/items",
+          "target": "reviewer",
+          "itemKey": "item",
+          "concurrency": 3
+        },
+        "inputs": {},
+        "writes": {}
+      },
+      {
+        "id": "reviewer",
+        "label": "独立评审与人工确认子图",
+        "type": "core.subgraph",
+        "typeVersion": 1,
+        "config": {
+          "graph": {
+            "schemaVersion": "2.0",
+            "workflowId": "",
+            "revision": 0,
+            "name": "单项方案评审智能体",
+            "description": "完整业务演示；真实模型和本地受控工具；不写入课程或学习领域。",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "dimension": {
+                  "type": "string",
+                  "title": "评审维度",
+                  "minLength": 1,
+                  "maxLength": 40
+                },
+                "brief": {
+                  "type": "string",
+                  "title": "项目说明",
+                  "minLength": 1,
+                  "maxLength": 1500
+                }
+              },
+              "required": [
+                "dimension",
+                "brief"
+              ],
+              "additionalProperties": false
+            },
+            "outputSchema": {
+              "type": "object",
+              "properties": {
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "dimension": {
+                        "type": "string"
+                      },
+                      "draft": {
+                        "type": "string"
+                      },
+                      "accepted": {
+                        "type": "boolean"
+                      },
+                      "comment": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "dimension",
+                      "draft",
+                      "accepted",
+                      "comment"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "results"
+              ],
+              "additionalProperties": false
+            },
+            "state": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "draft": {
+                    "type": "string"
+                  },
+                  "accepted": {
+                    "type": "boolean"
+                  },
+                  "comment": {
+                    "type": "string"
+                  },
+                  "results": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "dimension": {
+                          "type": "string"
+                        },
+                        "draft": {
+                          "type": "string"
+                        },
+                        "accepted": {
+                          "type": "boolean"
+                        },
+                        "comment": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dimension",
+                        "draft",
+                        "accepted",
+                        "comment"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "messages",
+                  "draft",
+                  "accepted",
+                  "comment",
+                  "results"
+                ],
+                "additionalProperties": false
+              },
+              "initial": {
+                "messages": [],
+                "draft": "",
+                "accepted": false,
+                "comment": "",
+                "results": []
+              },
+              "inputBindings": {},
+              "reducers": {}
+            },
+            "entryNodeId": "start",
+            "nodes": [
+              {
+                "id": "start",
+                "label": "开始",
+                "type": "core.start",
+                "typeVersion": 1,
+                "config": {},
+                "inputs": {},
+                "writes": {}
+              },
+              {
+                "id": "prompt",
+                "label": "构造本维度评审任务",
+                "type": "core.function",
+                "typeVersion": 1,
+                "config": {
+                  "implementation": "code",
+                  "language": "python",
+                  "code": "import uuid\ndef process(input, context):\n    text = \"你负责方案评审的【\" + input[\"dimension\"] + \"】维度。项目：\" + input[\"brief\"] + \"。用中文给出不超过80字的结论，包含一条具体建议；开头写明维度。只使用提供的信息，不编造已发生事实。\"\n    return {\"messages\":[{\"id\":str(uuid.uuid4()),\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":text}]}]}"
+                },
+                "inputs": {
+                  "dimension": {
+                    "source": "input",
+                    "pointer": "/dimension",
+                    "onMissing": {
+                      "mode": "error"
+                    }
+                  },
+                  "brief": {
+                    "source": "input",
+                    "pointer": "/brief",
+                    "onMissing": {
+                      "mode": "error"
+                    }
+                  }
+                },
+                "writes": {
+                  "messages": "/messages"
+                }
+              },
+              {
+                "id": "analyst",
+                "label": "生成本维度评审意见",
+                "type": "core.llm",
+                "typeVersion": 1,
+                "config": {
+                  "providerRef": "deepseek",
+                  "modelRef": "deepseek-flash",
+                  "modelParameters": {
+                    "thinking": {
+                      "type": "disabled"
+                    }
+                  },
+                  "allowedToolRefs": []
+                },
+                "inputs": {
+                  "messages": {
+                    "source": "state",
+                    "pointer": "/messages",
+                    "onMissing": {
+                      "mode": "error"
+                    }
+                  }
+                },
+                "writes": {
+                  "messages": "/messages"
+                }
+              },
+              {
+                "id": "extract",
+                "label": "提取本维度结论",
+                "type": "core.function",
+                "typeVersion": 1,
+                "config": {
+                  "implementation": "code",
+                  "language": "python",
+                  "code": "def process(input, context):\n    answers = [m for m in input[\"messages\"] if m[\"role\"] == \"assistant\" and not m.get(\"toolCalls\")]\n    text = \"\".join(c[\"text\"] for c in answers[-1][\"content\"] if c[\"type\"] == \"text\") if answers else \"\"\n    if not text.strip():\n        raise ValueError(\"No complete assistant answer\")\n    return {\"draft\": text}"
+                },
+                "inputs": {
+                  "messages": {
+                    "source": "state",
+                    "pointer": "/messages",
+                    "onMissing": {
+                      "mode": "error"
+                    }
+                  }
+                },
+                "writes": {
+                  "draft": "/draft"
+                }
+              },
+              {
+                "id": "review",
+                "label": "请审核这一项评审意见",
+                "type": "core.transform",
+                "typeVersion": 1,
+                "config": {
+                  "operationRef": "core.identity",
+                  "operationVersion": 1,
+                  "authoring": {
+                    "interrupt": {
+                      "title": "请审核这一项评审意见",
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "accepted": {
+                            "type": "boolean",
+                            "title": "是否采用本项建议？"
+                          },
+                          "comment": {
+                            "type": "string",
+                            "title": "人工审核备注（可留空）",
+                            "maxLength": 300
+                          }
+                        },
+                        "required": [
+                          "accepted",
+                          "comment"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "resumeWrites": {
+                        "accepted": "accepted",
+                        "comment": "comment"
+                      }
+                    }
+                  }
+                },
+                "inputs": {
+                  "value": {
+                    "source": "literal",
+                    "value": true
+                  }
+                },
+                "writes": {}
+              },
+              {
+                "id": "package",
+                "label": "封装已审核意见",
+                "type": "core.function",
+                "typeVersion": 1,
+                "config": {
+                  "implementation": "code",
+                  "language": "python",
+                  "code": "def process(input, context):\n    return {\"results\":[{\"dimension\":input[\"dimension\"],\"draft\":input[\"draft\"],\"accepted\":input[\"accepted\"],\"comment\":input[\"comment\"]}]}"
+                },
+                "inputs": {
+                  "dimension": {
+                    "source": "input",
+                    "pointer": "/dimension",
+                    "onMissing": {
+                      "mode": "error"
+                    }
+                  },
+                  "draft": {
+                    "source": "state",
+                    "pointer": "/draft",
+                    "onMissing": {
+                      "mode": "error"
+                    }
+                  },
+                  "accepted": {
+                    "source": "state",
+                    "pointer": "/accepted",
+                    "onMissing": {
+                      "mode": "error"
+                    }
+                  },
+                  "comment": {
+                    "source": "state",
+                    "pointer": "/comment",
+                    "onMissing": {
+                      "mode": "error"
+                    }
+                  }
+                },
+                "writes": {
+                  "results": "/results"
+                }
+              },
+              {
+                "id": "end",
+                "label": "结束",
+                "type": "core.end",
+                "typeVersion": 1,
+                "config": {},
+                "inputs": {},
+                "writes": {}
+              }
+            ],
+            "transitions": [
+              {
+                "id": "start-next-prompt",
+                "from": "start",
+                "to": "prompt",
+                "outlet": "next"
+              },
+              {
+                "id": "prompt-next-analyst",
+                "from": "prompt",
+                "to": "analyst",
+                "outlet": "next"
+              },
+              {
+                "id": "analyst-next-extract",
+                "from": "analyst",
+                "to": "extract",
+                "outlet": "next"
+              },
+              {
+                "id": "extract-next-review",
+                "from": "extract",
+                "to": "review",
+                "outlet": "next"
+              },
+              {
+                "id": "review-next-package",
+                "from": "review",
+                "to": "package",
+                "outlet": "next"
+              },
+              {
+                "id": "package-next-end",
+                "from": "package",
+                "to": "end",
+                "outlet": "next"
+              }
+            ],
+            "outputBindings": {
+              "results": {
+                "source": "state",
+                "pointer": "/results",
+                "onMissing": {
+                  "mode": "error"
+                }
+              }
+            },
+            "policy": {
+              "timeoutMs": 180000,
+              "nodeTimeoutMs": 120000,
+              "maxNodeExecutions": 60,
+              "maxToolCalls": 4,
+              "maxInputBytes": 65536,
+              "maxStateBytes": 1048576,
+              "maxEventBytes": 65536,
+              "maxOutputTokens": 512,
+              "maxAttempts": 1,
+              "authoring": {
+                "checkpoint": "superstep",
+                "recursionLimit": 50,
+                "waitTimeoutMs": 86400000
+              }
+            },
+            "requiredCapabilities": []
+          },
+          "stateMode": "independent",
+          "persistence": "per-invocation"
+        },
+        "inputs": {
+          "dimension": {
+            "source": "state",
+            "pointer": "/item/dimension",
+            "onMissing": {
+              "mode": "error"
+            }
+          },
+          "brief": {
+            "source": "input",
+            "pointer": "/brief",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "results": "/results"
+        }
+      },
+      {
+        "id": "collect",
+        "label": "等待全部评审完成",
+        "type": "core.progress",
+        "typeVersion": 1,
+        "config": {
+          "message": "各维度评审与人工确认已完成",
+          "percent": 100,
+          "authoring": {
+            "defer": true
+          }
+        },
+        "inputs": {},
+        "writes": {}
+      },
+      {
+        "id": "report",
+        "label": "汇总意见与人工决定",
+        "type": "core.function",
+        "typeVersion": 1,
+        "config": {
+          "implementation": "code",
+          "language": "python",
+          "code": "def process(input, context):\n    rows = sorted(input[\"results\"], key=lambda x:x[\"dimension\"])\n    text = \"\\n\".join(\"【\"+x[\"dimension\"]+\"】\"+(\"采用\" if x[\"accepted\"] else \"不采用\")+\"：\"+x[\"draft\"]+\"；审核备注：\"+x[\"comment\"] for x in rows)\n    return {\"report\":text}"
+        },
+        "inputs": {
+          "results": {
+            "source": "state",
+            "pointer": "/results",
+            "onMissing": {
+              "mode": "error"
+            }
+          }
+        },
+        "writes": {
+          "report": "/report"
+        }
+      },
+      {
+        "id": "end",
+        "label": "结束",
+        "type": "core.end",
+        "typeVersion": 1,
+        "config": {},
+        "inputs": {},
+        "writes": {}
+      }
+    ],
+    "transitions": [
+      {
+        "id": "start-next-prepare",
+        "from": "start",
+        "to": "prepare",
+        "outlet": "next"
+      },
+      {
+        "id": "prepare-next-send",
+        "from": "prepare",
+        "to": "send",
+        "outlet": "next"
+      },
+      {
+        "id": "send-next-collect",
+        "from": "send",
+        "to": "collect",
+        "outlet": "next"
+      },
+      {
+        "id": "reviewer-next-collect",
+        "from": "reviewer",
+        "to": "collect",
+        "outlet": "next"
+      },
+      {
+        "id": "collect-next-report",
+        "from": "collect",
+        "to": "report",
+        "outlet": "next"
+      },
+      {
+        "id": "report-next-end",
+        "from": "report",
+        "to": "end",
+        "outlet": "next"
+      }
+    ],
+    "outputBindings": {
+      "results": {
+        "source": "state",
+        "pointer": "/results",
+        "onMissing": {
+          "mode": "error"
+        }
+      },
+      "report": {
+        "source": "state",
+        "pointer": "/report",
+        "onMissing": {
+          "mode": "error"
+        }
+      }
+    },
+    "policy": {
+      "timeoutMs": 180000,
+      "nodeTimeoutMs": 120000,
+      "maxNodeExecutions": 60,
+      "maxToolCalls": 4,
+      "maxInputBytes": 65536,
+      "maxStateBytes": 1048576,
+      "maxEventBytes": 65536,
+      "maxOutputTokens": 512,
+      "maxAttempts": 1,
+      "authoring": {
+        "checkpoint": "superstep",
+        "recursionLimit": 50,
+        "waitTimeoutMs": 86400000
+      }
+    },
+    "requiredCapabilities": []
+  },
+  "editor": {
+    "schemaVersion": 1,
+    "workflowId": "",
+    "editorRevision": 0,
+    "definitionRevision": 0,
+    "nodes": {
+      "start": {
+        "x": 60,
+        "y": 220
+      },
+      "prepare": {
+        "x": 360,
+        "y": 220
+      },
+      "send": {
+        "x": 680,
+        "y": 220
+      },
+      "reviewer": {
+        "x": 1000,
+        "y": 550
+      },
+      "collect": {
+        "x": 1320,
+        "y": 220
+      },
+      "report": {
+        "x": 1640,
+        "y": 220
+      },
+      "end": {
+        "x": 1960,
+        "y": 220
+      }
+    },
+    "edges": {},
+    "graphs": {
+      "[\"reviewer\"]": {
+        "nodes": {
+          "start": {
+            "x": 60,
+            "y": 220
+          },
+          "prompt": {
+            "x": 380,
+            "y": 220
+          },
+          "analyst": {
+            "x": 700,
+            "y": 220
+          },
+          "extract": {
+            "x": 1020,
+            "y": 220
+          },
+          "review": {
+            "x": 1340,
+            "y": 220
+          },
+          "package": {
+            "x": 1660,
+            "y": 220
+          },
+          "end": {
+            "x": 1980,
+            "y": 220
+          }
+        },
+        "edges": {}
+      }
+    }
+  },
+  "suggestedInput": {
+    "brief": "两人团队希望两周内上线一个社团活动报名小工具，预算3000元，先支持报名和名单导出。",
+    "dimensions": [
+      "成本",
+      "风险",
+      "执行计划"
+    ]
+  }
+}
