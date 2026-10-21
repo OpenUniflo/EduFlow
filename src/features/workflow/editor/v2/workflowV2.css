@@ -104,6 +104,7 @@ body:has(.wf-library-page){min-width:0}
 .wf-template-search{display:flex;gap:7px;align-items:center;margin:16px 3px 10px;border:1px solid #dfe4ee;border-radius:8px;padding:0 10px}.wf-template-search input{width:100%;min-width:0;border:0;background:transparent;padding:10px 0;font:inherit;color:inherit}
 .wf-dialog-name{display:grid;gap:8px;margin:20px 0 12px}.wf-dialog-name input{border:1px solid #dfe4ee;border-radius:8px;padding:11px;font:inherit;color:inherit;width:100%;box-sizing:border-box;background:white}
 .wf-dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;border-top:1px solid #edf0f5;padding-top:12px}
+.wf-v2-migration:not(.wf-library-dialog) .wf-dialog-actions{position:sticky;bottom:-22px;z-index:6;background:#fff}
 @media(max-width:600px){.wf-template-grid{grid-template-columns:1fr;max-height:280px}.wf-library-hero h1{font-size:25px}.wf-library-hero>button{white-space:nowrap;font-size:12px}.wf-library-pagination{gap:6px}}
 .wf-library-page{padding:0}
 .wf-v2-migration.wf-library-dialog[open]{display:flex;flex-direction:column}
