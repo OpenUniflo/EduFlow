@@ -38,6 +38,19 @@ it("shows the actual review object, related state, output and write target witho
   expect(html).not.toContain("hidden");
 });
 
+it("does not block a simple confirmation that has no expected execution facts", () => {
+  const simple = createWorkflowV2("简单确认");
+  simple.nodes.push({
+    ...createNodeV2("core.transform", "confirm"),
+    label: "确认继续",
+    config: { operationRef: "core.identity", operationVersion: 1, authoring: { interrupt: { title: "确认继续", schema, resumeWrites: {} } } },
+  });
+  const simpleThread: WorkflowThreadV2 = { ...thread, state: {}, interrupts: [{ id: "interrupt-2", nodeId: "confirm", title: "确认继续", schema }] };
+  const html = renderToStaticMarkup(createElement(ReviewContext, { definition: simple, thread: simpleThread, interrupt: simpleThread.interrupts[0], steps: [] }));
+  expect(html).not.toContain("缺少依据");
+  expect(html).not.toContain("当前没有可用的审核依据");
+});
+
 it("warns when no related output or State fact is available", () => {
   const emptyThread: WorkflowThreadV2 = { ...thread, state: {}, checkpointId: "checkpoint-5678" };
   const html = renderToStaticMarkup(createElement(ReviewContext, { definition, thread: emptyThread, interrupt: emptyThread.interrupts[0], steps: [] }));

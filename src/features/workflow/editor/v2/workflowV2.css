@@ -149,3 +149,4 @@ main.atlas-page-shell.wf-library-page{padding:0}
 .wf-review-context .wf-data-fields>div{grid-template-columns:minmax(70px,1fr) minmax(0,2fr)}
 .wf-review-values{margin:0;padding-left:17px}
 .wf-review-values li{margin:4px 0;overflow-wrap:anywhere;min-width:0}
+.wf-review-blocked{padding:8px 10px;border:1px solid #f0c9d1;border-radius:7px;background:#fff1f3;color:#a14454;overflow-wrap:anywhere}

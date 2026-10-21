@@ -12,7 +12,7 @@ function pointerName(pointer: string): string {
   return pointer.replace(/^\//, "").replace(/~1/g, "/").replace(/~0/g, "~");
 }
 
-export function ReviewContext({ definition, thread, interrupt, steps }: { definition: WorkflowDefinitionV2; thread: WorkflowThreadV2; interrupt: Interrupt; steps: WorkflowStepV2[] }) {
+export function reviewContextFacts(definition: WorkflowDefinitionV2, thread: WorkflowThreadV2, interrupt: Interrupt, steps: WorkflowStepV2[]) {
   const node = definition.nodes.find(item => item.id === interrupt.nodeId);
   const authoring = node ? nodeAuthoring(node) : {};
   const mapping = authoring.interrupt?.resumeWrites ?? {};
@@ -24,20 +24,32 @@ export function ReviewContext({ definition, thread, interrupt, steps }: { defini
   ])];
   const related = [...steps].filter(step => step.nodeId === interrupt.nodeId && step.output !== undefined).sort((left, right) => right.invocation - left.invocation || right.attempt - left.attempt)[0];
   const available = fields.filter(field => state[field] !== undefined);
-  const missing = !related && !available.length;
-  const task = interrupt.taskId ? interrupt.taskId.slice(0, 8) : "未提供";
-  const path = interrupt.graphPath?.length ? interrupt.graphPath.join(" / ") : "主图";
+  return {
+    node,
+    mapping,
+    state,
+    fields,
+    related,
+    available,
+    missing: fields.length > 0 && !related && !available.length,
+    task: interrupt.taskId ? interrupt.taskId.slice(0, 8) : "未提供",
+    path: interrupt.graphPath?.length ? interrupt.graphPath.join(" / ") : "主图",
+  };
+}
+
+export function ReviewContext({ definition, thread, interrupt, steps }: { definition: WorkflowDefinitionV2; thread: WorkflowThreadV2; interrupt: Interrupt; steps: WorkflowStepV2[] }) {
+  const facts = reviewContextFacts(definition, thread, interrupt, steps);
   return <details className="wf-review-context">
-    <summary>审核依据 · {interrupt.title} · {node?.label ?? interrupt.nodeId} · Run {thread.currentRunId.slice(0, 8)}{missing ? " · 缺少依据" : ""}</summary>
+    <summary>审核依据 · {interrupt.title} · {facts.node?.label ?? interrupt.nodeId} · Run {thread.currentRunId.slice(0, 8)}{facts.missing ? " · 缺少依据" : ""}</summary>
     <p className="wf-field-note">以下来自本次冻结修订与当前执行记录，不是其他任务或最新草稿。</p>
     <dl className="wf-data-fields">
-      <div><dt>待审对象</dt><dd>{interrupt.title}{node ? ` · ${node.label}` : ""}</dd></div>
-      <div><dt>执行身份</dt><dd>修订 {definition.revision} · 检查点 {thread.checkpointId.slice(0, 8)} · 任务 {task} · {path}</dd></div>
-      <div><dt>相关共享状态</dt><dd>{fields.length ? <ul className="wf-review-values">{fields.slice(0, 4).map(field => <li key={field}><strong>{field}</strong><StructuredValue value={state[field] ?? null}/></li>)}</ul> : "此回应没有关联的 State 读取或写入字段。"}</dd></div>
-      <div><dt>关联输出</dt><dd>{related ? <StructuredValue value={related.output ?? null}/> : "暂无已完成步骤输出；请先核对执行记录，再决定是否批准。"}</dd></div>
-      <div><dt>提交后写入</dt><dd>{Object.entries(mapping).length ? Object.entries(mapping).map(([source, target]) => `${source} → State.${target}`).join("；") : "此回应只继续流程，不写入 State。"}</dd></div>
+      <div><dt>待审对象</dt><dd>{interrupt.title}{facts.node ? ` · ${facts.node.label}` : ""}</dd></div>
+      <div><dt>执行身份</dt><dd>修订 {definition.revision} · 检查点 {thread.checkpointId.slice(0, 8)} · 任务 {facts.task} · {facts.path}</dd></div>
+      <div><dt>相关共享状态</dt><dd>{facts.fields.length ? <ul className="wf-review-values">{facts.fields.slice(0, 4).map(field => <li key={field}><strong>{field}</strong><StructuredValue value={facts.state[field] ?? null}/></li>)}</ul> : "此回应没有关联的 State 读取或写入字段。"}</dd></div>
+      <div><dt>关联输出</dt><dd>{facts.related ? <StructuredValue value={facts.related.output ?? null}/> : "暂无已完成步骤输出；请先核对执行记录，再决定是否批准。"}</dd></div>
+      <div><dt>提交后写入</dt><dd>{Object.entries(facts.mapping).length ? Object.entries(facts.mapping).map(([source, target]) => `${source} → State.${target}`).join("；") : "此回应只继续流程，不写入 State。"}</dd></div>
     </dl>
-    {missing ? <p role="alert">当前没有可用的审核依据。请先核对运行状态或检查点，不要仅凭空表单批准。</p> : null}
-    {fields.length > 4 ? <details><summary>其余 {fields.length - 4} 个相关状态字段</summary><ul>{fields.slice(4).map(field => <li key={field}><strong>{field}</strong><StructuredValue value={state[field] ?? null}/></li>)}</ul></details> : null}
+    {facts.missing ? <p role="alert">当前没有可用的审核依据。请先核对运行状态或检查点，不要仅凭空表单批准。</p> : null}
+    {facts.fields.length > 4 ? <details><summary>其余 {facts.fields.length - 4} 个相关状态字段</summary><ul>{facts.fields.slice(4).map(field => <li key={field}><strong>{field}</strong><StructuredValue value={facts.state[field] ?? null}/></li>)}</ul></details> : null}
   </details>;
 }

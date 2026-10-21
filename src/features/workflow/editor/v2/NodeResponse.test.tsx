@@ -14,6 +14,12 @@ const definition=createWorkflowV2();definition.nodes.push({...createNodeV2('core
 const editor=createEditorV2(definition);
 
 describe('node response placement',()=>{
+  it('blocks approval and offers cancellation when review evidence is missing',()=>{
+    const html=renderToStaticMarkup(<NodeResponseForm title="请确认费用" schema={schema} value={{accommodation:0}} onChange={()=>undefined} onInvalid={()=>undefined} onSubmit={()=>true} contextMissing onCancel={()=>undefined}/>);
+    expect(html).toContain('缺少可核对的执行依据');
+    expect(html).toContain('取消本次执行');
+    expect(html).toMatch(/class="primary" disabled/);
+  });
   it('shows an interrupted node without a completed step and keeps it visible when ordinary bubbles are off',()=>{
     const html=renderToStaticMarkup(<ExecutionBubbles definition={definition} editor={editor} steps={[]} events={[]} sizes={{}} onOpen={()=>undefined} showCompleted={false} waiting={{runId:'selected-run',nodeId:'total',content:<NodeResponseForm title="请补充住宿费用" schema={schema} value={{accommodation:0}} onChange={()=>undefined} onInvalid={()=>undefined} onSubmit={()=>true}/>}}/>);
     expect(html).toContain('data-bubble-node="total"');
