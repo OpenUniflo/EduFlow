@@ -36,3 +36,9 @@ it("explains when no reusable snapshot exists", () => {
   const html = renderToStaticMarkup(createElement(RunInputSnapshot, { run: empty, currentRevision: 2 }));
   expect(html).toContain("没有可展示的输入快照");
 });
+
+it("explains that caller-provided input is read-only and is not reused from a redacted snapshot", () => {
+  const html = renderToStaticMarkup(createElement(RunInputSnapshot, { run: base, currentRevision: 3, readOnly: true }));
+  expect(html).toContain("调用方输入");
+  expect(html).toContain("不会复用脱敏字段");
+});
