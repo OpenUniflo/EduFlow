@@ -212,3 +212,13 @@ D 修复：环境选择最小宽度提高到 160px。修复后实测宽度 160px
 - 该修复迁移已应用到 Hosted KnowledgeAtlas，并校验发布函数包含 upsert 写入。
 - 本地测试 Course 的 Assignment 已恢复 `workflow_input = NULL`；测试草稿计数为 0。
 - 未在 Hosted 执行端到端发布（无 Hosted 管理员会话），未提升 production。
+
+## Hosted 预览更新（2026-10-22，bc5ce19）
+
+- 推送最新 `feat/workflow` 到 origin（`97aa0e8..bc5ce19`），创建新预览：
+  - deployment `dpl_7FWkpyeEa9vu45sNDUHYZgY9NSSb`
+  - URL `edu-flow-a48qnb1bc-july-nanas-projects.vercel.app`
+  - commit `bc5ce19f8af0a60d5653b480e65acd4b3057e445`
+- 部署状态 **READY**。
+- Hosted 公开首页冒烟：标题 EduFlow，公开学习世界可见，333 个知识点 / 8 门课程，登录按钮可用，控制台 0 error。
+- 本次包含对话焦点环修复和发布 upsert 修复；仍未提升 production，且无 Hosted 账号做登录后 Workflow 冒烟。
