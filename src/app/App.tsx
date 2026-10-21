@@ -91,7 +91,7 @@ export default function App() {
   }, []);
   const assignmentContext = useMemo(
     () => routeWorkflowId ? resolveWorkflowAssignmentContext(applicationServices.courseRepository, routeWorkflowId, location.search) : null,
-    [location.search, routeWorkflowId]
+    [location.search, routeWorkflowId, ready]
   );
   async function logout() {
     await Promise.all([

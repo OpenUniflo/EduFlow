@@ -100,13 +100,13 @@ async function validateLaunch(client: SupabaseClient, owner: string, workflowId:
   if (context.workflowTemplateId !== workflowId) throw new ApiError(403, "INVALID_LAUNCH_CONTEXT", "Copied workflows cannot claim Assignment template authority");
   const course = result(await client.from("courses").select("id,lifecycle,owner_user_id,course_type").eq("id", context.courseId).maybeSingle()) as WorkflowRow | null;
   if (!course || course.lifecycle !== "published" || course.course_type === "personal" && course.owner_user_id !== owner) throw new ApiError(404, "NOT_FOUND", "Course not found");
-  const assignment = result(await client.from("course_assignments").select("id,workflow_template_id,mode").eq("course_id", context.courseId).eq("id", context.assignmentId).maybeSingle()) as WorkflowRow | null;
+  const assignment = result(await client.from("course_assignments").select("*").eq("course_id", context.courseId).eq("id", context.assignmentId).maybeSingle()) as WorkflowRow | null;
   if (!assignment || assignment.mode !== "workflow" || assignment.workflow_template_id !== workflowId) throw new ApiError(403, "INVALID_LAUNCH_CONTEXT", "Assignment does not authorize this template");
   const { eligibility } = await readAssignmentEligibility(client, owner, String(context.courseId), String(context.assignmentId));
   if (eligibility.reason) throw new ApiError(403, "ASSIGNMENT_PREREQUISITE_REQUIRED", eligibility.reason);
   if (!eligibility.canStart) throw new ApiError(409, "ASSIGNMENT_STATE_CONFLICT", "This Assignment is submitted or complete; view its saved result instead");
   // Freeze identities only; Runtime never receives product entities or context.
-  return context;
+  return { context, workflowInput: assignment.workflow_input === null || assignment.workflow_input === undefined ? undefined : assignment.workflow_input };
 }
 
 export async function handleWorkflowV2(request: VercelRequest, response: VercelResponse, owner: string) {
@@ -309,9 +309,13 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       const workflowId = workflowString(body.workflowId); const doc = await readWorkflowDocument(client, owner, workflowId, workflowInteger(body.revision));
       if (doc.archived) throw new ApiError(409, "WORKFLOW_ARCHIVED", "Archived workflows cannot start new runs");
       const launch = await validateLaunch(client, owner, workflowId, body.launchContext);
+      if (launch?.workflowInput !== undefined) {
+        const [clientInputHash, assignmentInputHash] = await Promise.all([workflowDigest(body.input), workflowDigest(launch.workflowInput)]);
+        if (clientInputHash !== assignmentInputHash) throw new ApiError(409, "INVALID_LAUNCH_CONTEXT", "Assignment authorizes a different Workflow startup input");
+      }
       const validation = await workflowCompiler("/v1/validate", { ownerId: owner, environmentRef: workflowString(body.environmentRef), definition: doc.definition, input: body.input });
       if (!validation.valid) { const correlation = workflowDiagnosticCorrelation(); throw new ApiError(422, "GRAPH_INVALID", "Workflow execution validation failed", { ...correlation, diagnostics: workflowScopedDiagnostics(validation.diagnostics, correlation) }); }
-      json(response, 202, await rpc(client, "workflow_v2_enqueue", { p_owner: owner, p_workflow: workflowId, p_revision: body.revision, p_input: body.input, p_environment: body.environmentRef, p_environment_revision: validation.environmentRevision, p_registry: validation.registrySnapshot, p_semantic: validation.semanticHash, p_fingerprint: validation.compileFingerprint, p_request_hash: requestHash, p_key: key, p_launch: launch })); return true;
+      json(response, 202, await rpc(client, "workflow_v2_enqueue", { p_owner: owner, p_workflow: workflowId, p_revision: body.revision, p_input: body.input, p_environment: body.environmentRef, p_environment_revision: validation.environmentRevision, p_registry: validation.registrySnapshot, p_semantic: validation.semanticHash, p_fingerprint: validation.compileFingerprint, p_request_hash: requestHash, p_key: key, p_launch: launch?.context ?? null })); return true;
     }
     if (request.method === "GET" && id) { json(response, 200, workflowRunDto(await liveRun(client, owner, id), true)); return true; }
     if (request.method === "GET") {

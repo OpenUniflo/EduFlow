@@ -108,7 +108,8 @@ export class WorkflowApiV2 {
     return { items };
   }
   async createRun(workflowId: string, revision: number, input: JsonValue, environmentRef: string, idempotencyKey: string, launchContext?: WorkflowLaunchContext) {
-    const result = await apiRequest<unknown>(endpoint("runs"), { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ workflowId, revision, input, environmentRef, ...(launchContext ? { launchContext } : {}) }) });
+    const context = launchContext ? { courseId: launchContext.courseId, assignmentId: launchContext.assignmentId, workflowTemplateId: launchContext.workflowTemplateId } : undefined;
+    const result = await apiRequest<unknown>(endpoint("runs"), { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ workflowId, revision, input, environmentRef, ...(context ? { launchContext: context } : {}) }) });
     const receipt = runSubmissionReceipt.safeParse(result);
     if (!receipt.success || receipt.data.revision !== revision) throw new ApiResponseError();
     return receipt.data;

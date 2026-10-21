@@ -31,3 +31,20 @@
 - 不实现“界面看起来很只读、实际仍可改写”的假象。
 - 不把现有空输入当成调用方输入。
 - 待产品确认方案 A 或 B 后，再进入实现与验收；在此之前 P1a 保持未完成。
+
+## 2026-10-22 方案 A 首切片
+
+产品已选择方案 A。当前已实现：
+
+- `CourseAssignment.workflowInput` 与 `CourseJsonValue` 类型；Assignment 创建编辑器增加“Workflow 启动输入 JSON”字段。
+- 迁移 `20261022000000_course_assignment_workflow_input.sql`：新增 `course_assignments.workflow_input`，并让 `publish_course_authoring_draft_base` 在发布时写入该字段。
+- `/api/courses` 投影 `workflowInput`；`WorkflowLaunchContext` / Assignment resolver 携带该值。
+- 运行范围：存在调用方输入时直接开始运行，不打开可编辑的运行准备；图设置的输入按钮显示“调用方输入只读”，运行 tab 显示只读快照。
+- 服务端 `validateLaunch` 从 `course_assignments.workflow_input` 读取权威值，并与提交 `input` 做摘要比较；不一致返回 409 `INVALID_LAUNCH_CONTEXT`，不创建 Run。
+- 本地实测：1024×768 运行 tab 显示只读输入；用不匹配输入调用 API 返回 409；测试后已恢复本地 Assignment 并删除临时 template。
+
+仍待完成：
+
+- Hosted Supabase 尚未应用该迁移；Hosted 验收前按迁移纪律增量应用。
+- 现有 Assignment 的“编辑”弹窗仍只改标题/说明/输出，尚未编辑已保存的 `workflowInput`；新建时已可录入。
+- 发布函数与作者草稿的完整端到端验收（创建→保存草稿→发布→重新加载→启动）尚未执行。

@@ -38,7 +38,7 @@ export type WorkflowRunV2 = {
 };
 export type WorkflowEventV2 = { protocolVersion: "1"; eventId: string; runId: string; seq: number; type: string; occurredAt: string; stepId?: string; nodeId?: string; attempt?: number; stateVersion?: number; payload: JsonValue };
 export type WorkflowStepV2 = { execution?: { taskId: string; namespace: string; checkpointId: string; attempt: number }; taskId?: string; graphPath?: string[]; namespace?: string[]; parentStepId?: string; stepId: string; runId: string; nodeId: string; invocation: number; attempt: number; status: string; input?: JsonValue; output?: JsonValue; inputRef?: string; outputRef?: string; stateVersionBefore?: number; stateVersionAfter?: number; startedAt?: string; finishedAt?: string; error?: { code: string; message: string }; toolCallIds?: string[] };
-export type WorkflowLaunchContext = { courseId: string; assignmentId: string; workflowTemplateId: string };
+export type WorkflowLaunchContext = { courseId: string; assignmentId: string; workflowTemplateId: string; workflowInput?: JsonValue };
 
 
 export type WorkflowRevisionSummary = { revision: number; name: string; createdAt: string; definitionHash: string; availability: "available" };

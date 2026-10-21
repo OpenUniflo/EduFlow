@@ -1,9 +1,11 @@
 import type { CourseRepository } from "@/features/course/repository/CourseRepository";
+import type { JsonValue } from "@/features/workflow/domain/v2/types";
 
 export type WorkflowAssignmentContext = {
   courseId: string;
   assignmentId: string;
   workflowTemplateId: string;
+  workflowInput?: JsonValue;
 };
 
 export function resolveWorkflowAssignmentContext(
@@ -18,5 +20,6 @@ export function resolveWorkflowAssignmentContext(
   const runtime = courseRepository.getCourse(courseId);
   const assignment = runtime?.assignments.find((item) => item.id === assignmentId);
   if (!assignment || assignment.mode !== "workflow" || assignment.workflowTemplateId !== workflowTemplateId) return null;
-  return { courseId, assignmentId, workflowTemplateId };
+  const context = { courseId, assignmentId, workflowTemplateId };
+  return assignment.workflowInput === undefined ? context : { ...context, workflowInput: assignment.workflowInput as JsonValue };
 }

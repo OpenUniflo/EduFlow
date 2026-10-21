@@ -1,5 +1,7 @@
 import type { KnowledgeEdge, KnowledgeNode, KnowledgeScope } from "@/features/knowledge/types";
 
+export type CourseJsonValue = null | boolean | number | string | CourseJsonValue[] | { [key: string]: CourseJsonValue };
+
 export type LearningStatus = "completed" | "learning" | "available" | "locked";
 export type CourseLifecycle = "draft" | "published" | "archived";
 export type CourseType = "standard" | "personal";
@@ -130,6 +132,8 @@ export type CourseAssignment = {
   acceptanceCriteria: string[];
   mode: AssignmentMode;
   workflowTemplateId?: string;
+  /** Caller-provided Workflow startup input. The canvas displays it read-only once launched from this Assignment. */
+  workflowInput?: CourseJsonValue;
   estimatedMinutes?: number;
   projectContribution?: string;
   /** Generic execution/presentation metadata; concrete teaching content is supplied by Course fixtures. */
