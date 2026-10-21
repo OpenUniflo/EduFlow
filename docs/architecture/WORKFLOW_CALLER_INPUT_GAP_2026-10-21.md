@@ -37,7 +37,7 @@
 产品已选择方案 A。当前已实现：
 
 - `CourseAssignment.workflowInput` 与 `CourseJsonValue` 类型；Assignment 创建编辑器增加“Workflow 启动输入 JSON”字段。
-- 迁移 `20261022000000_course_assignment_workflow_input.sql`：新增 `course_assignments.workflow_input`，并让 `publish_course_authoring_draft_base` 在发布时写入该字段。
+- 迁移 `20261021163208_course_assignment_workflow_input.sql`：新增 `course_assignments.workflow_input`，并让 `publish_course_authoring_draft_base` 在发布时写入该字段。
 - `/api/courses` 投影 `workflowInput`；`WorkflowLaunchContext` / Assignment resolver 携带该值。
 - 运行范围：存在调用方输入时直接开始运行，不打开可编辑的运行准备；图设置的输入按钮显示“调用方输入只读”，运行 tab 显示只读快照。
 - 服务端 `validateLaunch` 从 `course_assignments.workflow_input` 读取权威值，并与提交 `input` 做摘要比较；不一致返回 409 `INVALID_LAUNCH_CONTEXT`，不创建 Run。
@@ -45,6 +45,6 @@
 
 仍待完成：
 
-- Hosted Supabase 尚未应用该迁移；Hosted 验收前按迁移纪律增量应用。
+- Hosted Supabase 已应用该迁移（记录版本 `20261021163208`，项目 KnowledgeAtlas），并校验列与发布函数存在。
 - 现有 Assignment 的“编辑”弹窗已可修改 `workflowInput`（留空表示删除调用方输入）。
 - 发布函数与作者草稿的完整端到端验收（创建→保存草稿→发布→重新加载→启动）尚未执行。
