@@ -3,7 +3,7 @@ import { graphAtPath } from "../../domain/v2/authoring";
 import type { WorkflowDefinitionV2, WorkflowStepV2 } from "../../domain/v2/types";
 import { executionStatus } from "./executionPresentation";
 import { StructuredValue } from "./RunOutput";
-import { subgraphInvocations } from "./subgraphInvocations";
+import { subgraphInvocations, type SubgraphInvocation } from "./subgraphInvocations";
 
 function childDefinition(definition: WorkflowDefinitionV2, path: string[]): WorkflowDefinitionV2 {
   try { return graphAtPath(definition, path); } catch { return definition; }
@@ -36,7 +36,7 @@ function when(value: string | undefined): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-export function SubgraphInvocationHistory({ definition, steps }: { definition: WorkflowDefinitionV2; steps: WorkflowStepV2[] }) {
+export function SubgraphInvocationHistory({ definition, steps, onSelect }: { definition: WorkflowDefinitionV2; steps: WorkflowStepV2[]; onSelect?: (group: SubgraphInvocation) => void }) {
   const groups = subgraphInvocations(steps);
   const [selectedKey, setSelectedKey] = useState("");
   if (!groups.length) return null;
@@ -46,8 +46,8 @@ export function SubgraphInvocationHistory({ definition, steps }: { definition: W
   const ordered = [...selected.steps].sort((left, right) => (left.startedAt ?? "").localeCompare(right.startedAt ?? "") || left.invocation - right.invocation || left.attempt - right.attempt);
   return <details className="wf-subgraph-invocations">
     <summary>子图调用实例（{groups.length}）</summary>
-    <p className="wf-field-note">按执行记录中的子图路径与 checkpoint namespace 分组；同一路径的并发调用会分别列出。时间只用于识别，不代表调度顺序。</p>
-    <label>选择调用实例<select aria-label="选择子图调用实例" value={selected.key} onChange={event => setSelectedKey(event.target.value)}>{groups.map((group, groupIndex) => <option key={group.key} value={group.key}>实例 {String.fromCharCode(65 + groupIndex)} · {pathLabel(definition, group.graphPath)} · {group.steps.length} 步 · {when(group.startedAt)}</option>)}</select></label>
+    <p className="wf-field-note">按执行记录中的子图路径与 checkpoint namespace 分组；同一路径的并发调用会分别列出。时间只用于识别，不代表调度顺序。{onSelect ? "选择实例会切换到对应子图并过滤画布步骤。" : ""}</p>
+    <label>选择调用实例<select aria-label="选择子图调用实例" value={selected.key} onChange={event => { setSelectedKey(event.target.value); const group = groups.find(item => item.key === event.target.value); if (group) onSelect?.(group); }}>{groups.map((group, groupIndex) => <option key={group.key} value={group.key}>实例 {String.fromCharCode(65 + groupIndex)} · {pathLabel(definition, group.graphPath)} · {group.steps.length} 步 · {when(group.startedAt)}</option>)}</select></label>
     <section aria-label={`子图调用实例 ${letter}`}>
       <p><strong>实例 {letter}</strong> · 路径 {pathLabel(definition, selected.graphPath)} · 任务 {short(selected.taskId)} · namespace {short(selected.namespace)}</p>
       <p className="wf-field-note">时间：{when(selected.startedAt)} → {when(selected.finishedAt)}</p>

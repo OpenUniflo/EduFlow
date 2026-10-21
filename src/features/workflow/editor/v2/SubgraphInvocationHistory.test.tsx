@@ -4,16 +4,20 @@ import { expect, it } from "vitest";
 import { createNodeV2, createWorkflowV2 } from "../../domain/v2/factory";
 import type { WorkflowStepV2 } from "../../domain/v2/types";
 import { SubgraphInvocationHistory } from "./SubgraphInvocationHistory";
-import { subgraphInvocations } from "./subgraphInvocations";
+import { stepInvocationIdentity, subgraphInvocations } from "./subgraphInvocations";
 
 function step(id: string, graphPath: string[], namespace: string, startedAt: string, invocation = 1): WorkflowStepV2 {
   return { stepId: id, runId: "run", nodeId: "inner", invocation, attempt: 1, status: "completed", graphPath, execution: { taskId: `task-${id}`, namespace, checkpointId: `checkpoint-${id}`, attempt: 1 }, startedAt, finishedAt: startedAt } as WorkflowStepV2;
 }
 
 it("groups steps by child graph path and namespace, ignoring root steps", () => {
+  const root = step("root", [], "", "2026-10-21T00:00:00Z");
+  const first = step("a1", ["sub"], "ns-a", "2026-10-21T00:00:01Z");
+  expect(stepInvocationIdentity(root)).toBeUndefined();
+  expect(stepInvocationIdentity(first)?.key).toContain("ns-a");
   const groups = subgraphInvocations([
-    step("root", [], "", "2026-10-21T00:00:00Z"),
-    step("a1", ["sub"], "ns-a", "2026-10-21T00:00:01Z"),
+    root,
+    first,
     step("a2", ["sub"], "ns-a", "2026-10-21T00:00:02Z", 2),
     step("b1", ["sub"], "ns-b", "2026-10-21T00:00:03Z"),
   ]);
