@@ -1,4 +1,5 @@
 import type { JsonValue, WorkflowEventV2, WorkflowRunV2, WorkflowStepV2 } from "../../domain/v2/types";
+import { summaryFields } from "./executionPresentation";
 import { externalEffectNotice, toolActivities } from "./toolActivity";
 
 function record(value: JsonValue | undefined) { return value && typeof value === "object" && !Array.isArray(value) ? value : undefined; }
@@ -30,11 +31,11 @@ export function ReadableRunOutput({ value, text }: { value: JsonValue | undefine
 export function ToolStepOutput({ step }: { step: WorkflowStepV2 }) {
   const messages = record(step.output)?.toolMessages;
   const calls = record(step.input)?.toolCalls;
-  if (!Array.isArray(messages)) return step.output === undefined ? null : <section aria-label="步骤输出"><h4>步骤输出</h4><ReadableRunOutput value={step.output} text={typeof step.output==="string"?step.output:""}/></section>;
+  if (!Array.isArray(messages)) return step.output === undefined ? null : <section aria-label="步骤输出"><h4>步骤输出 · 第 {step.invocation} 次调用</h4><ReadableRunOutput value={step.output} text={typeof step.output==="string"?step.output:""}/></section>;
   return <section aria-label="实际工具返回">{messages.map((message, index) => {
     const item = record(message); const call = Array.isArray(calls) ? calls.map(record).find(candidate => candidate?.id === item?.toolCallId) : undefined;
     const blocks = Array.isArray(item?.content) ? item.content : [];
-    return <article key={typeof item?.id === "string" ? item.id : index}><h4>{typeof call?.name === "string" ? call.name : "工具"} · 实际返回</h4>{blocks.map((block, blockIndex) => {
+    return <article key={typeof item?.id === "string" ? item.id : index}><h4>{typeof call?.name === "string" ? call.name : "工具"} · 第 {step.invocation} 次调用 · 实际返回</h4>{step.input !== undefined ? <small className="wf-record-summary">输入摘要：{summaryFields(step.input)}</small> : null}{blocks.map((block, blockIndex) => {
       const text = record(block)?.text;
       if (typeof text !== "string") return <p key={blockIndex}>此返回不是文本，请查看步骤技术详情。</p>;
       let value: JsonValue = text; try { value = JSON.parse(text); } catch { /* Ordinary tool text is readable as supplied. */ }
