@@ -128,5 +128,6 @@ D 修复：环境选择最小宽度提高到 160px。修复后实测宽度 160px
 - `/api/courses` 投影 `workflowInput`；启动上下文携带该值；画布在存在调用方输入时直接运行，不打开可编辑运行准备。
 - 证据 `assets/workflow-preacceptance-20261021/caller-input-readonly-1024.png`：1024×768 运行 tab 显示“启动输入由课程实训提供，运行时只读”，图设置按钮为“调用方输入只读”。
 - 服务端权威校验：用不匹配输入 POST 创建 Run 返回 `409 INVALID_LAUNCH_CONTEXT`（requestId `835be1b8-4efa-404d-80a7-03764adce2b1`），未创建 Run。
+- API 测试覆盖：Assignment 输入与客户端输入键序不同仍接受；输入不一致在编译器校验/入队前返回 409；无调用方值时仍接受手动输入。
 - 本地测试后已恢复 Assignment 的 `workflow_template_id` 并删除临时 template；未保留伪造测试数据。
 - 待完成：Hosted 迁移、已有 Assignment 的输入编辑、创建→发布→重新加载的完整端到端验收。
