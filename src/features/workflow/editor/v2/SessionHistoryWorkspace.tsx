@@ -13,7 +13,7 @@ type Checkpoint = {parentCheckpointId?:string;checkpointId:string;namespace:stri
 type Prepared = {threadId:string;checkpointId:string;before:JsonValue;after:JsonValue;next:string[];sourceCheckpointId:string};
 type MemoryItem = {key:string;value:JsonValue;version:number;found:boolean};
 const key = () => crypto.randomUUID();
-export function SessionHistoryWorkspace({definition,environmentRef,run,input,onObserve}:{definition:WorkflowDefinitionV2;environmentRef:string;run:WorkflowRunV2|null;input:JsonValue;onObserve:(run:WorkflowRunV2)=>void}) {
+export function SessionHistoryWorkspace({definition,environmentRef,run,input,onObserve,focusedNamespace}:{definition:WorkflowDefinitionV2;environmentRef:string;run:WorkflowRunV2|null;input:JsonValue;onObserve:(run:WorkflowRunV2)=>void;focusedNamespace?:string}) {
  const [threads,setThreads]=useState<Thread[]>([]),[selected,setSelected]=useState(""),[checkpoints,setCheckpoints]=useState<Checkpoint[]>([]),[nextCursor,setNextCursor]=useState<string|null>(null),[checkpoint,setCheckpoint]=useState<Checkpoint|null>(null);
  const [namespace,setNamespace]=useState(""),[scopes,setScopes]=useState<Scope[]>([]),[historyInterface,setHistoryInterface]=useState<HistoryInterface|null>(null);
  const [updates,setUpdates]=useState<{values:Record<string,JsonValue>;afterNodeId:string;overwrite?:string[]}[]>([]),[patch,setPatch]=useState<Record<string,JsonValue>>({}),[after,setAfter]=useState(""),[prepared,setPrepared]=useState<Prepared|null>(null),[confirmed,setConfirmed]=useState(false),[roundInput,setRoundInput]=useState<JsonValue>(input),[patchField,setPatchField]=useState(""),[patchValue,setPatchValue]=useState<JsonValue>(0);
@@ -32,6 +32,7 @@ export function SessionHistoryWorkspace({definition,environmentRef,run,input,onO
    setSelected(current.thread_id);setHistoryInterface(data.interface);setScopes(data.scopes);setNamespace('');setCheckpoints(data.items);setNextCursor(data.nextCursor);
   }
  }).catch(reason=>{if(alive){setStatus(workflowErrorMessage(reason));setFailed(true);}});return()=>{alive=false;};},[definition.workflowId,run?.runId,run?.status,selected]);
+ useEffect(()=>{if(!focusedNamespace||!selected||namespace===focusedNamespace)return;void act(()=>history(selected,undefined,focusedNamespace));},[focusedNamespace,selected]);
  async function act(task:()=>Promise<void>){setBusy(true);setStatus("");setFailed(false);try{await task();await refresh();}catch(reason){setStatus(workflowErrorMessage(reason));setFailed(true);}finally{setBusy(false);}}
  async function history(id:string,before?:string,ns=namespace){const data=await request<{items:Checkpoint[];nextCursor:string|null;scopes:Scope[];interface:HistoryInterface}>({action:"history",threadId:id,namespace:ns,...(before?{before}:{})});setHistoryInterface(data.interface);setScopes(data.scopes);setNamespace(ns);setCheckpoints(current=>before?[...current,...data.items]:data.items);setNextCursor(data.nextCursor);setSelected(id);setPrepared(null);setConfirmed(false);if(!before){setCheckpoint(null);setUpdates([]);setPatch({});setAfter("");setPatchField("");}}
  const fields=historyInterface?.stateSchema??definition.state.schema;
