@@ -203,3 +203,12 @@ D 修复：环境选择最小宽度提高到 160px。修复后实测宽度 160px
 - Escape 关闭后焦点回到顶部“运行”按钮。
 - 首次测试发现 Tab 会短暂落到 BODY；已在共享 `WorkflowDialog` 增加显式 Tab/Shift+Tab 焦点环修复，并复测通过。
 - 截图工具超时，保留焦点顺序与可访问性树证据。
+
+## 本地发布链路（P1a 端到端）
+
+- 使用本地管理员会话调用课程创作 API：从已发布 Course runtime 构造 draft `state.assignments`（含 `workflowInput`）和 `previewRuntime`，保存草稿并发布。
+- 保存返回 `200`、草稿 revision `1`；发布返回 `200`；随后 `/api/courses` 中该 Assignment 的 `workflowInput` 为 `{ "e2ePublished": true }`，证明发布链路已持久化调用方输入。
+- 首次发布发现 upsert 更新分支缺少 `workflow_input=excluded.workflow_input`，已有 Assignment 保留旧 NULL；新增迁移 `20261021165505_course_assignment_workflow_input_upsert.sql` 修复更新分支，重新保存/发布后通过。
+- 该修复迁移已应用到 Hosted KnowledgeAtlas，并校验发布函数包含 upsert 写入。
+- 本地测试 Course 的 Assignment 已恢复 `workflow_input = NULL`；测试草稿计数为 0。
+- 未在 Hosted 执行端到端发布（无 Hosted 管理员会话），未提升 production。
