@@ -222,3 +222,14 @@ D 修复：环境选择最小宽度提高到 160px。修复后实测宽度 160px
 - 部署状态 **READY**。
 - Hosted 公开首页冒烟：标题 EduFlow，公开学习世界可见，333 个知识点 / 8 门课程，登录按钮可用，控制台 0 error。
 - 本次包含对话焦点环修复和发布 upsert 修复；仍未提升 production，且无 Hosted 账号做登录后 Workflow 冒烟。
+
+## 发布后启动全链路（本地）
+
+- 管理员通过课程创作 API 将测试 Assignment 的模板指向本地工作流夹具，并发布 `workflowInput: { "query": "hello" }`；课程 API 返回该值。
+- 以本地学生打开带 `courseId/assignmentId` 的 Assignment 路由：
+  - 图设置按钮显示“调用方输入只读”；
+  - 点击顶部“运行”直接启动，没有打开可编辑运行准备；
+  - 运行完成 3 个节点，最终输出 `queryOut: hello`；
+  - 运行历史记录显示“课程实训 · course-cc…:assignment:1”。
+- 测试夹具、模板、Run/Thread 已删除；definitions/revisions/runs/templates 计数均为 **0**；测试 Assignment 已恢复模板 `agent`、`workflow_input = NULL`。
+- 该链路验证了“保存草稿→发布→课程 API→只读输入→启动→完成”的本地闭环；Hosted 登录后链路仍未验证。

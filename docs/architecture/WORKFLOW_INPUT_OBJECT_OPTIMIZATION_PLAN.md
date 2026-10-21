@@ -367,7 +367,7 @@ P0 独立运行 `pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`、`p
 - **真实并行分支（本地夹具）**：临时 `开始 → 并行分发（a/b）→ 分支 A/B → 等待两支完成 → 结束` 在 Local acceptance 真实执行完成，6 个节点依次完成，画布两个分支均显示“已执行”并有执行气泡；未调用模型或工具。夹具已清理；真实子图内部等待由下一条本地夹具单独验证。
 - **前端预览并行/子图节点**：场景 B 前端预览完成，画布显示“并行分发各维度评审”已执行及“独立评审与人工确认子图”节点；预览执行列表完成，但预览明确不执行子图内部节点、模型或工具，不能替代真实并行子图验收。
 - **缺少依据审批门禁（本地夹具）**：临时 `开始 → 无依据审批 → 结束` 工作流运行后，等待气泡显示“缺少依据”，提示“当前不能提交批准”；回应字段与提交按钮 disabled，“取消本次执行”可用。夹具已取消并从本地数据库清理（definitions/revisions/runs 均为 0）。
-- **P1a 调用方输入（方案 A 首切片）**：`CourseAssignment.workflowInput`、Assignment 创建/编辑器的启动输入 JSON、`course_assignments.workflow_input` 迁移、发布函数写入、`/api/courses` 投影、launch context 传递、画布只读快照与服务端摘要比对均已实现。存在调用方输入时直接运行，不再打开可编辑运行准备；重跑直接使用当前 Assignment 的权威输入，不复用脱敏快照；服务端以 Assignment 值为权威，提交输入不一致返回 409 `INVALID_LAUNCH_CONTEXT`。本地 1024 截图与 API 409 已留证；服务端摘要校验已有 API 测试覆盖键序等价、输入不一致 409、无调用方值时仍可手动输入。本地创建→保存草稿→发布→重新加载的端到端已通过；修复发布 upsert 遗漏后，Hosted 修复迁移已应用并校验；Hosted 端到端仍待完成。
+- **P1a 调用方输入（方案 A 首切片）**：`CourseAssignment.workflowInput`、Assignment 创建/编辑器的启动输入 JSON、`course_assignments.workflow_input` 迁移、发布函数写入、`/api/courses` 投影、launch context 传递、画布只读快照与服务端摘要比对均已实现。存在调用方输入时直接运行，不再打开可编辑运行准备；重跑直接使用当前 Assignment 的权威输入，不复用脱敏快照；服务端以 Assignment 值为权威，提交输入不一致返回 409 `INVALID_LAUNCH_CONTEXT`。本地 1024 截图与 API 409 已留证；服务端摘要校验已有 API 测试覆盖键序等价、输入不一致 409、无调用方值时仍可手动输入。本地创建→保存草稿→发布→重新加载→Assignment 启动→完成的全链路已通过；Hosted 修复迁移已应用并校验；Hosted 登录后链路仍待完成。
 - **P1b 语义气泡**：消息优先显示正文、工具显示名称/参数/结果、评审显示维度/结论；函数与子图显示具体处理；`false`、`0`、`null` 保留，完整结构仍可展开。
 - **P1b 子图调用实例历史**：按子图路径 + checkpoint namespace 分组，支持实例选择、任务/时间身份、逐步输入/返回；选择实例会切换到对应子图并过滤画布步骤，等待回复优先匹配同一 namespace，会话检查点历史自动聚焦同一 namespace；时间只用于识别，不冒充调度序号。
 - **P2 部分**：执行记录选择显示任务身份、状态与输入摘要，不用展开读取数据即可区分同名调用；工具返回卡显示第几次调用与输入摘要，实际工具执行列表同步显示调用序号/输入摘要，避免同名输出无法归属；历史分支批量更新超过 20 项时就地说明禁用原因；分支预览显示副本范围（主图/子图 namespace），未勾选确认时就地说明；移动端执行视图右栏下移到历史状态条下方，状态条及“返回流程编辑”不再被右栏覆盖；连接草稿就地校验标识、版本、地址和模型凭据，保存按钮随原因禁用；连接卡标记只读/写入，写入测试未勾选确认或连接已停用时禁用并说明原因；运行准备与下一轮输入的空必填错误延迟到用户交互后显示，错误定位入口仍主动显示；历史只读节点配置提供“前往历史分支预览”入口，指向运行 tab 的会话与历史操作；共享 Dialog 增加显式 Tab/Shift+Tab 焦点环，运行准备键盘顺序与 Escape 焦点恢复通过。
@@ -377,7 +377,7 @@ P0 独立运行 `pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`、`p
 
 尚未完成：
 
-1. P1a 方案 A 本地端到端完成（新建/编辑、保存草稿、发布、重新读取均验证 `workflowInput`），并修复发布 upsert 遗漏；Hosted 修复迁移已应用，但 Hosted 端到端发布与启动仍未完成；见 `docs/architecture/WORKFLOW_CALLER_INPUT_GAP_2026-10-21.md`。
+1. P1a 方案 A 本地全链路完成（新建/编辑、保存草稿、发布、重新读取、Assignment 启动并完成）；Hosted 修复迁移已应用，但 Hosted 登录后发布/启动仍未验证；见 `docs/architecture/WORKFLOW_CALLER_INPUT_GAP_2026-10-21.md`。
 2. P2 剩余：F05 其余分支状态说明、布局剩余场景、共享 Dialog 之外的键盘全量矩阵、工具配置剩余场景、输出卡同名归属的其他视图。
 3. 视觉验收已完成 P5 本地受控模型等待、真实并行分支、子图内部等待与缺少依据禁止批准；生产模型、完整无背景预验收、视觉矩阵仍未完成。Hosted 最新预览已 READY 并完成公开首页冒烟，但未提升 production，且无 Hosted 账号做登录后 Workflow 冒烟。
 
@@ -490,3 +490,4 @@ P0 独立运行 `pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`、`p
 - 2026-10-22：本地 P1a 端到端发布通过（保存草稿/发布/重新读取 `workflowInput`）；修复发布 upsert 遗漏，迁移 `20261021165505` 已应用 Hosted 并校验。
 - 2026-10-22：推送最新修复并创建 Hosted 预览 `dpl_7FWkpyeEa9vu45sNDUHYZgY9NSSb`（bc5ce19），READY；公开首页冒烟 333 知识点/8 课程、0 console error。
 - 2026-10-22：生成最终验收包，汇总交付范围、测试/视觉/Hosted 证据、残余风险与产品负责人验收清单。
+- 2026-10-22：本地 P1a 全链路通过：发布 Assignment 后带参数进入 Workflow，只读调用方输入，直接运行并完成，输出 queryOut=hello；夹具清理计数为 0。
