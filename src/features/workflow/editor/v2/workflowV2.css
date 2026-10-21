@@ -142,3 +142,10 @@ main.atlas-page-shell.wf-library-page{padding:0}
 }
 
 .wf-p5-workspace fieldset{min-width:0;border:0;padding:0}.wf-p5-workspace label{display:block;margin:.5rem 0}.wf-p5-workspace input,.wf-p5-workspace select{max-width:100%;box-sizing:border-box}.wf-readable-output{max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}.wf-bubble-summary>span>span{max-height:180px;overflow:auto;overflow-wrap:anywhere}
+
+/* Read-only review evidence stays inside the waiting entry; it never edits execution data. */
+.wf-review-context{margin:0 0 10px;border:1px solid #e0e5ef;border-radius:9px;padding:8px 10px;background:#f8f9fc;font-size:12px;max-height:280px;overflow:auto}
+.wf-review-context>summary{cursor:pointer;font-weight:600;overflow-wrap:anywhere}
+.wf-review-context .wf-data-fields>div{grid-template-columns:minmax(70px,1fr) minmax(0,2fr)}
+.wf-review-values{margin:0;padding-left:17px}
+.wf-review-values li{margin:4px 0;overflow-wrap:anywhere;min-width:0}

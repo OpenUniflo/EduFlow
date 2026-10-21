@@ -21,7 +21,8 @@ const path='artifacts/workflow/acceptance/evidence/workflow-agent-scenarios-2026
 const report=existsSync(path)?JSON.parse(readFileSync(path)):{environment:'Local',account:process.env.LOCAL_STUDENT_EMAIL,ownerId:login.data.user.id,executorDigest:capability.dependencyManifest.executorDigest,automaticModelCalls:0,examples:[]};
 if(report.ownerId!==login.data.user.id)throw Error('Existing manifest belongs to another owner');
 const save=()=>writeFileSync(path,JSON.stringify(report,null,2)+'\n');
-const obj=p=>({type:'object',properties:p,required:Object.keys(p),additionalProperties:false});
+// Required is explicit: a future optional field can be omitted without also changing the UI copy.
+const obj=(p,required=Object.keys(p))=>({type:'object',properties:p,required,additionalProperties:false});
 const str=(title,maxLength=1500)=>({type:'string',title,minLength:1,maxLength});
 const arr=items=>({type:'array',items});const messages=arr({type:'object'});
 const lit=value=>({source:'literal',value});

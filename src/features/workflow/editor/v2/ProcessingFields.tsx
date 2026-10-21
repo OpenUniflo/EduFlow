@@ -13,7 +13,7 @@ export function ProcessingFields({ node, environment, tools, onChange, onEnviron
   const update = (patch: Record<string, JsonValue>) => onChange({ config: { ...config, ...patch } });
   const refs = Array.isArray(config.allowedToolRefs) ? config.allowedToolRefs as string[] : [];
   return <section className="wf-config-section"><h3><span>2</span>处理</h3>
-    {node.type === "core.start" ? <p>图的开始标记；根据图输入映射建立初始 State。</p> : node.type === "core.end" ? <p>结束当前分支；所有待执行任务结束后，整图才按输出绑定返回最终结果。</p> : null}
+    {node.type === "core.start" ? <p>图的开始标记；根据启动输入映射建立初始 State。</p> : node.type === "core.end" ? <p>结束当前分支；所有待执行任务结束后，整图才按输出绑定返回最终结果。</p> : null}
     {node.type === "core.llm" ? <>
       <label data-config-field="config/providerRef">模型连接<select aria-label="模型连接" value={String(config.providerRef ?? "")} onChange={e => update({ providerRef: e.target.value, modelRef: "" })}><option value="">选择模型连接</option>{config.providerRef && !environment?.providers.some(p => p.ref === config.providerRef) ? <option value={String(config.providerRef)} disabled>原连接不可用</option> : null}{environment?.providers.map(p => <option key={p.ref} value={p.ref}>{p.name}</option>)}</select></label>
       <label data-config-field="config/modelRef">模型<select aria-label="模型" value={String(config.modelRef ?? "")} onChange={e => update({ modelRef: e.target.value })}><option value="">选择模型</option>{environment?.providers.find(p => p.ref === config.providerRef)?.modelRefs.map(ref => <option key={ref}>{ref}</option>)}</select></label>

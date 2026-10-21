@@ -15,7 +15,7 @@ function render(pointer: string, fallback?: JsonValue) {
 }
 it("makes the whole input object a named choice instead of an empty field placeholder", () => {
   const { html } = render("");
-  expect(html).toContain("全部图调用数据（对象）");
+  expect(html).toContain("全部启动输入（对象）");
   expect(html).toContain("工具参数（整个对象）");
   expect(html).not.toContain("请选择字段");
 });
