@@ -182,3 +182,14 @@ D 修复：环境选择最小宽度提高到 160px。修复后实测宽度 160px
 - 未调用外部模型或工具；P5 是本地受控服务，不等同于生产模型验收。
 - 已取消并清理夹具；definitions / revisions / runs 计数均为 **0**。
 - 截图工具超时，保留可访问性树与执行输出证据。
+
+## Hosted 预览部署尝试（2026-10-22）
+
+- 已将当前 `feat/workflow` 推送到 origin（`55d7f15..97aa0e8`）。
+- 通过 Vercel MCP 创建 `edu-flow` 预览部署：
+  - deployment `dpl_GDysaHfoRFtDfhsnLGa2vj21oDX3`
+  - URL `edu-flow-22mrq6zvt-july-nanas-projects.vercel.app`
+  - commit `97aa0e8591ebafbe77a82eb1a6c73363c6d90919`
+  - 初始状态 `QUEUED`，未提升 production。
+- 随后 Vercel MCP 和 `vercel.com` 网络请求均失败（`fetch failed` / TLS 连接失败），无法继续查询部署状态或做 Hosted 冒烟。
+- 因此 Hosted 预览是否 READY、Hosted 应用代码是否生效、Hosted 冒烟结果均未验证；不能记为 Hosted 验收通过。
