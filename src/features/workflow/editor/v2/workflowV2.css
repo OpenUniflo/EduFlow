@@ -153,3 +153,7 @@ main.atlas-page-shell.wf-library-page{padding:0}
 .wf-run-input-snapshot{margin:8px 0;border:1px solid #e0e5ef;border-radius:9px;padding:8px 10px;background:#fbfcfe;font-size:12px}
 .wf-run-input-snapshot>summary{cursor:pointer;font-weight:600;overflow-wrap:anywhere}
 .wf-run-input-snapshot .wf-data-fields>div{grid-template-columns:minmax(70px,1fr) minmax(0,2fr)}
+.wf-subgraph-invocations{margin:10px 0;border:1px solid #e0e5ef;border-radius:9px;padding:8px 10px;background:#fbfcfe;font-size:12px}
+.wf-subgraph-invocations>summary{cursor:pointer;font-weight:600;overflow-wrap:anywhere}
+.wf-subgraph-step-list{margin:8px 0;padding-left:18px}
+.wf-subgraph-step-list>li{margin:5px 0;overflow-wrap:anywhere}
