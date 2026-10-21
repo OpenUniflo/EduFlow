@@ -157,3 +157,4 @@ main.atlas-page-shell.wf-library-page{padding:0}
 .wf-subgraph-invocations>summary{cursor:pointer;font-weight:600;overflow-wrap:anywhere}
 .wf-subgraph-step-list{margin:8px 0;padding-left:18px}
 .wf-subgraph-step-list>li{margin:5px 0;overflow-wrap:anywhere}
+.wf-record-summary{display:block;margin-top:4px;overflow-wrap:anywhere;color:#6b7385}
