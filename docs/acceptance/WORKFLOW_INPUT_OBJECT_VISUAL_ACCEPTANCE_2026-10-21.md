@@ -106,3 +106,11 @@
 D 修复：环境选择最小宽度提高到 160px。修复后实测宽度 160px，关闭态完整显示 `Local acceptance`，页面无横向滚动。证据：`assets/workflow-preacceptance-20261021/env-select-1024-final.png`。
 
 待完成：第三次 fresh 窄复测 D 项，确认无回归。
+
+## 第三轮 fresh 窄复测
+
+- 1024×768 “运行环境”下拉：选中文本 `Local acceptance` 完整显示；控件宽 160px（clientWidth 158，12px 文本宽约 99px），3× 放大截图无截断。
+- `document.documentElement.scrollWidth = clientWidth = 1024`，强制横向滚动后 scrollX 仍为 0。
+- 顶部“运行”按钮完整在视口内；运行历史折叠条/展开列表与“就绪”可命中。
+- Assistant 悬浮按钮仍覆盖运行历史右上角空白与 React Flow attribution 的一小块，但未遮挡折叠开关、状态文字或记录文本；不作为本轮阻断。
+- 结论：第二轮发现的 D 项复测通过；首轮 A/B/C/E 修复项在第二轮已通过。首轮/第二轮所列高、中、低问题在复测范围内已关闭。
