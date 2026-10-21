@@ -381,7 +381,7 @@ P0 独立运行 `pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`、`p
 2. P2 剩余：F05 其余分支状态说明、布局剩余场景、共享 Dialog 之外的键盘全量矩阵、工具配置剩余场景、输出卡同名归属的其他视图。
 3. 视觉验收已完成 P5 本地受控模型等待、真实并行分支、子图内部等待与缺少依据禁止批准；生产模型、完整无背景预验收、视觉矩阵仍未完成。Hosted 最新预览已 READY 并完成公开首页冒烟，但未提升 production，且无 Hosted 账号做登录后 Workflow 冒烟。
 
-下一步：完成 P1a 剩余项与 P2 剩余项，并补齐视觉/无背景验收证据；每阶段按 4.1/4.2/4.3 留证。
+下一步：完成 P1a 剩余项与 P2 剩余项，并补齐视觉/无背景验收证据；每阶段按 4.1/4.2/4.3 留证。最终验收包见 `docs/acceptance/WORKFLOW_FINAL_ACCEPTANCE_PACKET_2026-10-22.md`。
 
 ## 10. 当前 DSH 实施与验收适配评估
 
@@ -489,3 +489,4 @@ P0 独立运行 `pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`、`p
 - 2026-10-22：共享 WorkflowDialog 增加显式 Tab/Shift+Tab 焦点环；运行准备焦点顺序、反向回绕、Escape 恢复通过；全量测试 1261 项、生产构建通过。
 - 2026-10-22：本地 P1a 端到端发布通过（保存草稿/发布/重新读取 `workflowInput`）；修复发布 upsert 遗漏，迁移 `20261021165505` 已应用 Hosted 并校验。
 - 2026-10-22：推送最新修复并创建 Hosted 预览 `dpl_7FWkpyeEa9vu45sNDUHYZgY9NSSb`（bc5ce19），READY；公开首页冒烟 333 知识点/8 课程、0 console error。
+- 2026-10-22：生成最终验收包，汇总交付范围、测试/视觉/Hosted 证据、残余风险与产品负责人验收清单。
