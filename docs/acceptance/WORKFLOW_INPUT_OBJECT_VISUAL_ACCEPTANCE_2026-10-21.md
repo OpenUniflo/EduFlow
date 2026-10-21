@@ -191,5 +191,6 @@ D 修复：环境选择最小宽度提高到 160px。修复后实测宽度 160px
   - URL `edu-flow-22mrq6zvt-july-nanas-projects.vercel.app`
   - commit `97aa0e8591ebafbe77a82eb1a6c73363c6d90919`
   - 初始状态 `QUEUED`，未提升 production。
-- 随后 Vercel MCP 和 `vercel.com` 网络请求均失败（`fetch failed` / TLS 连接失败），无法继续查询部署状态或做 Hosted 冒烟。
-- 因此 Hosted 预览是否 READY、Hosted 应用代码是否生效、Hosted 冒烟结果均未验证；不能记为 Hosted 验收通过。
+- 随后 Vercel MCP 短暂不可用；恢复后查询为 **READY**。
+- Hosted 冒烟：预览首页加载成功，显示“公开学习世界”、333 个知识点、8 门课程；登录/注册按钮可用；控制台 0 error。
+- 未提升 production；没有 Hosted 账号，未做登录后的 Workflow/调用方输入 Hosted 冒烟，不能记为完整 Hosted 验收通过。
