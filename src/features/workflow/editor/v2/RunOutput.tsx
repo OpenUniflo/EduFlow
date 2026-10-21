@@ -51,12 +51,12 @@ export function RunEffectNotice({ run, events, complete }: RunActivityProps) {
   return notice ? <p role={run.status === "success" ? "status" : "alert"} className="wf-v2-notice warning">{notice}</p> : null;
 }
 
-export function RunToolActivity({ run, events, complete, revealResults = false }: RunActivityProps & { revealResults?: boolean }) {
+export function RunToolActivity({ run, events, complete, revealResults = false, steps = [] }: RunActivityProps & { revealResults?: boolean; steps?: WorkflowStepV2[] }) {
   const calls = toolActivities(run.runId, events);
   if (!calls.length && complete) return null;
   const terminal = ["success", "failed", "cancelled", "continued"].includes(run.status);
   const statuses = { running: "执行中，结果待确认", success: "已执行成功", failed: "执行失败", skipped: "未开始（前项失败后跳过）" };
   return <section aria-label="工具执行记录"><h3>实际工具执行</h3>
-    {!calls.length ? <p>正在读取工具执行记录…</p> : <ol>{calls.map((call, index) => <li key={call.key}><strong>{call.toolRef ?? `工具调用 ${index + 1}`} · {terminal && call.status === "running" ? "调用已开始，结果未确认" : statuses[call.status]}</strong>{call.effect === "confirmed" ? <p>外部写入已成功，流程失败或取消不会自动撤回。</p> : call.effect === "unknown" ? <p>外部操作是否已发生需要核对。</p> : null}{call.result !== undefined ? <details open={revealResults || undefined}><summary>查看实际返回</summary><StructuredValue value={call.result}/></details> : null}<details><summary>工具调用身份</summary><small>Step {call.stepId} · {call.toolCallId}</small></details></li>)}</ol>}
+    {!calls.length ? <p>正在读取工具执行记录…</p> : <ol>{calls.map((call, index) => { const step = steps.find(item => item.stepId === call.stepId); return <li key={call.key}><strong>{call.toolRef ?? `工具调用 ${index + 1}`}{step ? ` · 第 ${step.invocation} 次调用` : ""} · {terminal && call.status === "running" ? "调用已开始，结果未确认" : statuses[call.status]}</strong>{call.effect === "confirmed" ? <p>外部写入已成功，流程失败或取消不会自动撤回。</p> : call.effect === "unknown" ? <p>外部操作是否已发生需要核对。</p> : null}{call.result !== undefined ? <details open={revealResults || undefined}><summary>查看实际返回</summary><StructuredValue value={call.result}/></details> : null}<details><summary>工具调用身份</summary><small>Step {call.stepId} · {call.toolCallId}</small>{step ? <small className="wf-record-summary">输入摘要：{summaryFields(step.input)}</small> : null}</details></li>; })}</ol>}
   </section>;
 }

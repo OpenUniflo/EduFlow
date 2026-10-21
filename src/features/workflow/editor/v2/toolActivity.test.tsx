@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { JsonValue, WorkflowEventV2, WorkflowRunV2 } from "../../domain/v2/types";
+import type { JsonValue, WorkflowEventV2, WorkflowRunV2, WorkflowStepV2 } from "../../domain/v2/types";
 import { toolActivities, externalEffectNotice } from "./toolActivity";
 import { RunEffectNotice, RunToolActivity } from "./RunOutput";
 
@@ -17,9 +17,11 @@ it("retains a confirmed write when a later read fails and no batch State or Step
   ];
   expect(toolActivities("run", events).map(call => call.status)).toEqual(["success", "failed", "skipped"]);
   expect(externalEffectNotice(run, events, true)).toContain("已有 1 项外部写入成功");
-  const html = renderToStaticMarkup(<><RunEffectNotice run={run} events={events} complete/><RunToolActivity run={run} events={events} complete/></>);
+  const step = { stepId: "batch-1", runId: "run", nodeId: "tools", invocation: 2, attempt: 1, status: "failed", input: { toolCalls: [{ id: "first", name: "counter_write" }] } } as WorkflowStepV2;
+  const html = renderToStaticMarkup(<><RunEffectNotice run={run} events={events} complete/><RunToolActivity run={run} events={events} complete steps={[step]}/></>);
   expect(html).toContain("流程失败或取消不会撤回"); expect(html).toContain("已执行成功");
   expect(html).toContain("执行失败"); expect(html).toContain("未开始"); expect(html).toContain("count");
+  expect(html).toContain("第 2 次调用"); expect(html).toContain("输入摘要");
 });
 
 it("isolates a selected Run and separates repeated tool-call identities in loop invocations", () => {
