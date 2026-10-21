@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { JsonSchema, JsonValue } from "../../domain/v2/types";
 import { validateSchemaValue } from "../../domain/v2/validation";
 import { SchemaForm } from "./SchemaForm";
@@ -20,16 +21,19 @@ export function RunPreparationDialog({ draftId, schema, value, onChange, onInval
   onRun: () => void;
   onRunEmpty: () => void;
 }) {
+  const [touched, setTouched] = useState(false);
   const validation = validateSchemaValue(schema, value);
   const emptyValid = validateSchemaValue(schema, {}).valid;
   const valid = validation.valid && !inputInvalid;
+  const hasDraft = Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length);
+  const showIssue = !valid && !inputInvalid && (touched || focusErrorRequest > 0 || hasDraft);
   return <WorkflowDialog title="运行准备" error={inputInvalid || undefined} onClose={onCancel}>
     <p className="wf-dialog-intro">填写本次启动输入。校验通过后才会创建 Run；取消不会创建运行。启动输入不随工作流定义保存。</p>
     {dirty ? <p className="wf-field-note">当前有未保存修改；运行前会先保存。</p> : null}
     {warning ? <p role="alert">{warning}</p> : null}
     {consumers.length ? <details className="wf-run-consumers"><summary>谁在使用启动输入</summary><ul className="wf-data-list">{consumers.map((item, index) => <li key={index}>{item}</li>)}</ul></details> : null}
-    <SchemaForm draftId={draftId} draftKind="run-input" label="启动输入" schema={schema} value={value} onChange={onChange} onInvalid={onInvalid} focusErrorRequest={focusErrorRequest} focusPointer={focusPointer} />
-    {!valid && !inputInvalid ? <p role="alert">请先补齐或修正启动输入；当前不会创建 Run。</p> : null}
+    <SchemaForm draftId={draftId} draftKind="run-input" label="启动输入" schema={schema} value={value} onChange={next => { setTouched(true); onChange(next); }} onInvalid={onInvalid} showValidation={touched || focusErrorRequest > 0 || hasDraft} focusErrorRequest={focusErrorRequest} focusPointer={focusPointer} />
+    {showIssue ? <p role="alert">请先补齐或修正启动输入；当前不会创建 Run。</p> : null}
     <div className="wf-dialog-actions">
       <button type="button" onClick={onCancel}>取消</button>
       {emptyValid ? <button type="button" disabled={busy} onClick={onRunEmpty}>使用空对象运行</button> : null}

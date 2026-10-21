@@ -27,14 +27,26 @@ it("allows an explicit empty required text value and enables Run", () => {
   expect(html).not.toMatch(/class="primary" disabled/);
 });
 
-it("blocks Run when a required property is missing", () => {
+it("keeps Run disabled without showing a required-field error before interaction", () => {
   const html = renderToStaticMarkup(createElement(RunPreparationDialog, {
     ...base,
     schema: { type: "object", properties: { finalNote: { type: "string", title: "最终记录" } }, required: ["finalNote"], additionalProperties: false },
     value: {},
   }));
-  expect(html).toContain("请填写此必填字段");
+  expect(html).not.toContain("请填写此必填字段");
+  expect(html).not.toContain("请先补齐或修正启动输入");
   expect(html).toMatch(/class="primary" disabled/);
+});
+
+it("reveals required-field validation when locating an input error", () => {
+  const html = renderToStaticMarkup(createElement(RunPreparationDialog, {
+    ...base,
+    schema: { type: "object", properties: { finalNote: { type: "string", title: "最终记录" } }, required: ["finalNote"], additionalProperties: false },
+    value: {},
+    focusErrorRequest: 1,
+  }));
+  expect(html).toContain("请填写此必填字段");
+  expect(html).toContain("请先补齐或修正启动输入");
 });
 
 it("offers an empty-object run for an all-optional schema and labels dirty runs", () => {
