@@ -4,7 +4,7 @@ import { workflowErrorMessage } from "../../repository/v2/WorkflowApiV2";
 import type { JsonValue, WorkflowNodeV2 } from "../../domain/v2/types";
 import { JsonField } from "./JsonField";
 export type FunctionVersion = {ref:string;version:number;name?:string;language:string;disabled?:boolean;purpose?:string};
-export type Extensions = {functions:FunctionVersion[];reducers:{name:string;version:number}[];runtime:{available:Record<string,boolean>;limits:Record<string,number>};connections:{ref:string;version:number;disabled:boolean;hasCredential:boolean;content:Record<string,JsonValue>}[]};
+export type Extensions = {functions:FunctionVersion[];reducers:{name:string;version:number}[];runtime:{available:Record<string,boolean>;limits:Record<string,number>};connections:{connectionKey:string;ref:string;version:number;disabled:boolean;hasCredential:boolean;content:Record<string,JsonValue>}[]};
 export function useExtensions(environmentRef?:string) {
   const [data,setData]=useState<Extensions|null>(null);const [error,setError]=useState("");const [generation,refresh]=useState(0);
   useEffect(()=>{let active=true;if(!environmentRef)return;workflowApiV2.extensions<Extensions>(environmentRef).then(value=>{if(active){setData(value);setError("");}}).catch(reason=>{if(active)setError(workflowErrorMessage(reason));});return()=>{active=false;};},[environmentRef,generation]);
