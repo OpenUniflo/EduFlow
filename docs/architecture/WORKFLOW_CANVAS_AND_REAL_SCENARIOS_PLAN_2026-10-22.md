@@ -273,10 +273,11 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 | S2 依赖健康检查 | 成功；API + 浏览器 UI 技术证据，非正式验收 | PyPI 完整 JSON 触发 `EVENT_TOO_LARGE`，改用 pypistats 下载统计；API workflow `ffaf3615…`、run `f080c8ee…` 成功；UI workflow `36153215…`、run `0c69c9b0…` 成功，输出 3 条使用/版本/升级风险；截图已入库 |
 | S3 社区问题分流 | 成功；API + 浏览器 UI 技术证据，非正式验收 | 固定社区问题 HN 连接 + DeepSeek；API workflow `15bac484…`、run `8675b3e7…` 成功；UI workflow `dfdf322c…`、run `8036cb00…` 成功，输出归纳/分流/回应；首次输出截断后收紧 200 字 |
 | S4 内容事实核对 | 成功；API + 浏览器 UI 技术证据，非正式验收 | 仅 DeepSeek；API workflow `2bc165d7…`、run `ad8804a6…` 成功；UI workflow `598b087e…`、run `261ef403…` 成功；三条主张均标为缺少依据，给出保守发布版与补证模板 |
-| Hosted 环境审计 | 通过（只读）；部署/迁移未执行 | Supabase `uyljtdbvlivxniililay`：迁移 117 条与本地 digest `4abc4c45…` 一致、无 Local 用户、16 个历史模板但四产品模板缺失；Worker Production `dpl_Dy382…`、前端 Preview `dpl_9Sr9…` 均 READY；最近 Run 成功，Sandbox 固定镜像 `eduflow-isolated@sha256:fb27a073…`；前端 12/12 API 入口；env/log 读取被团队 scope 403，未读秘密 |
+| Hosted 环境审计 | 通过（只读）；部署已开始、迁移未执行 | Supabase `uyljtdbvlivxniililay`：迁移 117 条与本地 digest `4abc4c45…` 一致、无 Local 用户、16 个历史模板但四产品模板缺失；Worker Production `dpl_Dy382…`、前端 Preview `dpl_9Sr9…` 均 READY；最近 Run 成功，Sandbox 固定镜像 `eduflow-isolated@sha256:fb27a073…`；前端 12/12 API 入口；env/log 读取被团队 scope 403，未读秘密 |
+| Hosted 部署/冒烟 | **未通过 Hosted 技术门** | 前端 Preview `dpl_8ZDWpav…`（`5ecf96a`）READY；Hosted S1 run `ccc24dd1…` 失败 `SANDBOX_UNAVAILABLE`；S4 run `85c8e7a4…` 失败 `NODE_EXECUTION_FAILED`；临时 workflow/连接已清理；模板内容迁移未执行 |
 | S1–S4、Hosted 正式验收 | 未开始 | 见 §3/§5 |
 
-验证：新增 2 项产品模板草案测试；四套 Definition 经 compiler `validate_structure` 全部通过；6 项 connection + 1 项 template capability + 3 项服务端模板绑定单测通过；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 171 文件 / 1280 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。S1 已取得 API 三来源、UI 四视口/125% 等效视口、控制台 0 error、跨账号 404 与清理证据；S2、S3、S4 已取得 API + UI 成功；Hosted 只读审计完成（迁移一致、无 Local 用户、产品模板缺失、Function 12/12、最近 Run 成功），仍未部署、未做 Hosted 四场景、未投放内容；真实浏览器 zoom 与 Wikipedia/arXiv 适配仍缺，不能据本节签通过。
+验证：新增 2 项产品模板草案测试；四套 Definition 经 compiler `validate_structure` 全部通过；6 项 connection + 1 项 template capability + 3 项服务端模板绑定单测通过；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 171 文件 / 1280 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。S1 已取得 API 三来源、UI 四视口/125% 等效视口、控制台 0 error、跨账号 404 与清理证据；S2、S3、S4 已取得 API + UI 成功；Hosted 只读审计完成，前端 Preview 已部署，但 Hosted S1 因 `SANDBOX_UNAVAILABLE`、S4 因 `NODE_EXECUTION_FAILED` 失败，Hosted 技术门未通过、内容迁移未执行；真实浏览器 zoom 与 Wikipedia/arXiv 适配仍缺，不能据本节签通过。
 
 ## 6. 确认状态 / 工程待核实（不重开 D1–D3）
 
@@ -322,3 +323,5 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 - 2026-10-22：S3 社区问题分流技术验收：新增固定问题 HN 连接；API workflow `15bac484…`、run `8675b3e7…` 与 UI workflow `dfdf322c…`、run `8036cb00…` 均成功，输出归纳/分流/回应；首次输出截断后约束 200 字。S4、Hosted、真实 zoom 仍未做。
 - 2026-10-22：S4 内容事实核对技术验收：API workflow `2bc165d7…`、run `ad8804a6…` 与 UI workflow `598b087e…`、run `261ef403…` 均成功；三条主张均标为缺少依据，输出保守发布版与补证模板。S1–S4 本地技术路径全部完成；Hosted、内容迁移与真实 zoom 仍未做。
 - 2026-10-22：Hosted 只读审计完成（未部署/未迁移）：Supabase 迁移 117 条与本地 digest 完全一致、无 Local 用户、16 个历史模板但四产品模板缺失；Worker Production `dpl_Dy382…`、前端 Preview `dpl_9Sr9…` READY；最近 Run 成功，Sandbox 固定镜像 digest 已读回；前端 12/12 API 入口，Function 预算已满；项目 env/logs 因团队 scope 403 未读。下一步：部署新 Preview/Worker 后先认证 API 读回环境与四场景，再执行模板 INSERT 迁移。
+
+- 2026-10-23：Hosted 首次部署与冒烟：推送 `5ecf96a` 后前端 Preview `dpl_8ZDWpav…` READY；Hosted 认证与环境目录可用，但 S1（3 工具 + 函数 + 模型）run `ccc24dd1…` 因 `SANDBOX_UNAVAILABLE` 失败，S4（仅模型）run `85c8e7a4…` 因 `NODE_EXECUTION_FAILED` 失败；已删除临时 Workflow/禁用临时连接，未执行模板内容迁移。Hosted 技术门仍阻塞。

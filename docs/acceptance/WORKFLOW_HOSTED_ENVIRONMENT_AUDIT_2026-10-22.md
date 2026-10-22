@@ -4,7 +4,7 @@
 
 ## 结论
 
-**审计结论：可以进入 Hosted 直接部署与 Preview 技术验收，但不能宣称 Hosted 已通过，也不能现在执行模板内容迁移。**
+**审计结论：只读审计门通过，可以部署 Preview；部署后的 Hosted 冒烟发现 Sandbox 与模型节点阻塞，Hosted 技术门未通过，不能执行模板内容迁移。**
 
 - Supabase 迁移历史与仓库**完全一致**：117 条、最新 `20261021165505`、digest `4abc4c45617385b0d7194785d52104f0`。
 - Hosted Worker 与 Sandbox 已实际工作：最近 Run `79d06ba2…` 成功，环境 revision `66fb60ce…`，registry digest `9a8a3cbe…`，执行后端为 Vercel 固定镜像 `eduflow-isolated@sha256:fb27a073…`。
@@ -80,3 +80,45 @@
 - Vercel MCP：`list_projects`、`list_deployments`、`get_deployment`、`list_deployment_files`、`list_aliases`、`get_auth_user`。
 - 本地：`git show/merge-base`、`api/` 入口计数、`services/workflow/vercel.json`。
 - 未使用：部署、迁移、数据库写、秘密读取、环境变量导出。
+
+## 7. 2026-10-23 部署与 Hosted 冒烟结果
+
+### 7.1 部署
+
+- 已将 `5ecf96a` 推送到 `origin/feat/workflow`；前端 Preview `dpl_8ZDWpavXLsGiq6oLeBK3PUtansT3` 构建 READY，URL `edu-flow-95gvfuppl-july-nanas-projects.vercel.app` 返回 200。
+- Worker 未随本次 push 触发新部署，最新 Production 仍为 `dpl_Dy382C45…`（commit `c3cb2a4`）；本次前端改动不要求 Worker 代码更新。
+- 前端顶层 API 入口仍为 12/12；未新增 Function。
+
+### 7.2 Hosted 认证与环境
+
+- Hosted 测试管理员登录成功；`/api/workflows?resource=environments` 返回 `hosted` 环境，名称 `Hosted · P6`，provider `deepseek`/`deepseek-flash`，connector `deepwiki`。
+- 冒烟期间环境 revision：`805f77bcf4521a1174e720036fd3a7ab49868cb09bf57d6610103a0a9d9a7e07`。
+- 四套产品模板仍不存在；没有执行模板 INSERT 迁移。
+
+### 7.3 自建只读公开连接与真实运行
+
+为验证真实公开 HTTP 路径，测试管理员发布了 3 个只读、固定 URL 的临时连接（HN / StackExchange / npm，`s1-*-mvjqh4zu`），未写共享 Runtime。
+
+| 用例 | Workflow | Run | 结果 |
+| --- | --- | --- | --- |
+| S1 技术简报（3 工具 + 隔离函数 + 模型） | `56668353-db4d-4aa1-b943-ebdbbe0aaa30` | `ccc24dd1-e963-4e63-ade9-6ffce7d1099a` | **failed** `SANDBOX_UNAVAILABLE`：`The hosted isolated execution environment is unavailable` |
+| S4 内容事实核对（仅模型） | `13797634-9c70-44cd-9b1d-217518ba5680` | `85c8e7a4-2c24-441b-b604-036695603ed8` | **failed** `NODE_EXECUTION_FAILED`；start/prompt 完成，`review` 节点失败，错误为通用基础设施错误 |
+
+S1 说明 Worker 能读取环境/工具目录并排队执行，但函数节点无法创建 Hosted Sandbox；S4 说明模型节点也未被 Hosted 验证。两者都不能由 READY 部署或既有 46 条 model-free Run 推断为已通过。
+
+### 7.4 清理
+
+- 删除上述 2 个临时 Workflow（`baseRevision=1`），返回 200。
+- 禁用 3 个临时连接；未删除共享 Runtime、历史模板或任何既有用户数据。
+- 未提升前端 Preview 到 production；未执行模板内容迁移。
+
+### 7.5 阻塞与下一步
+
+| 阻塞 | 证据 | 需要 |
+| --- | --- | --- |
+| Hosted Sandbox 不可用 | S1 run `ccc24dd1…` 的 `SANDBOX_UNAVAILABLE` | 核对 Worker env 的 `WORKFLOW_SANDBOX_IMAGE`、Vercel SDK/OIDC 与 Sandbox 配额；读取 env/log 需团队 scope 授权 |
+| Hosted 模型节点失败 | S4 run `85c8e7a4…` 的 `NODE_EXECUTION_FAILED` | 核对 DeepSeek provider 凭据/egress 与 Worker 日志；不能把 provider 出现在目录当作可用 |
+| 产品模板缺失 | `workflow_templates` 仍只有 16 条历史模板 | 四场景技术门通过后执行仅 INSERT 的内容迁移 |
+| Function 预算满 | 前端 12/12 API 入口 | 保持不新增 Function；下个 Preview 仍复核生成产物 |
+
+**因此当前准确分层结论是：Local S1–S4 技术路径通过；Hosted 部署与认证目录通过；Hosted S1/S4 真实运行失败（Sandbox/模型），Hosted 技术门未通过，模板内容迁移未执行。**
