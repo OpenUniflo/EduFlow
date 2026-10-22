@@ -494,3 +494,4 @@ P0 独立运行 `pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`、`p
 - 2026-10-22：本地 P1a 全链路通过：发布 Assignment 后带参数进入 Workflow，只读调用方输入，直接运行并完成，输出 queryOut=hello；夹具清理计数为 0。
 - 2026-10-22：修复画布“没有可用环境”提示被左上工具条遮挡：提示移至右上/移动端下方并加重新加载按钮；确认 Hosted 环境目录对该账号为空，owner 授权待配置。
 - 2026-10-22：按用户确认把 `admin@eduflow.test` 加入 Hosted `hosted` 环境 ownerIds，重部署 workflow 服务；环境目录返回 `Hosted · P6`，模板工作流真实运行完成 2 个节点。
+- 2026-10-22：新增[工作流画布下一轮优化计划](WORKFLOW_CANVAS_NEXT_ROUND_PLAN_2026-10-22.md)：环境定为 P0（授权可见性、连接→节点闭环、Hosted 真实调用、授权运维），画布细节降为 P1/P2；列出 D1–D3 三项决策；核对代码后确认 required/optional 仍按第 8 节冻结的 A 执行，不重开。
