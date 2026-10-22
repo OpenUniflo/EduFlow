@@ -241,3 +241,6 @@ D 修复：环境选择最小宽度提高到 160px。修复后实测宽度 160px
 - 根因二：Hosted 登录账号调用 `/api/workflows?resource=environments` 返回 `{"items":[]}`，环境选择器只有“选择环境”；因此提示是真实的状态，不是残影。
 - 修复：提示移到画布右上（桌面 `top:64px;right:16px`，移动端 `top:112px;right:12px`），z-index 提到 10，并增加“重新加载环境”按钮；环境刷新成功时自动选择第一个环境。
 - 注意：Hosted 环境目录为空属于账号/环境授权配置问题，需在 `WORKFLOW_ENVIRONMENTS_JSON` 的 owner 范围中加入当前账号，或使用环境 owner 账号；仅改前端不能变出环境。
+- Hosted 登录账号（admin@eduflow.test）的 `/api/workflows?resource=environments` 实测返回 `{"items":[]}`，环境选择器只有“选择环境”；该账号 UUID 为 `54cd7725-ae57-464b-beba-18e950546f0b`。
+- 修复后 Hosted 预览实测：提示位于 `x≈1148, y≈196`，宽 306、高 52，z-index 10；左上工具条 `x=16,y=148,w=201,h=42`；两者无重叠。提示文字完整可见，并带“重新加载环境”按钮。
+- 证据：`assets/workflow-preacceptance-20261021/hosted-env-notice-fixed.png`。
