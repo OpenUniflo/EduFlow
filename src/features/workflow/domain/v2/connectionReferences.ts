@@ -28,6 +28,20 @@ export type ConnectionUpdate = ConnectionReference & {
   contractDigest?: string;
 };
 
+export type UnresolvedCapability = {
+  nodeId: string;
+  graphPath: string[];
+  field: "providerRef" | "toolRef";
+  kind: "provider" | "tool";
+  label: string;
+};
+
+export type CapabilityBinding = UnresolvedCapability & {
+  reference: string;
+  modelRef?: string;
+  contractDigest?: string;
+};
+
 const USER_REF = "p4:";
 
 function walk(definition: WorkflowDefinitionV2, graphPath: string[], references: ConnectionReference[]) {
@@ -73,6 +87,46 @@ export function connectionReferences(definition: WorkflowDefinitionV2): Connecti
   const references: ConnectionReference[] = [];
   walk(definition, [], references);
   return references;
+}
+
+function walkUnresolved(definition: WorkflowDefinitionV2, graphPath: string[], unresolved: UnresolvedCapability[]) {
+  for (const node of definition.nodes) {
+    const config = node.config;
+    if (node.type === "core.llm" && typeof config.providerRef === "string" && !config.providerRef.trim()) {
+      unresolved.push({ nodeId: node.id, graphPath, field: "providerRef", kind: "provider", label: node.label });
+    }
+    if (node.type === "core.tool" && typeof config.toolRef === "string" && !config.toolRef.trim()) {
+      unresolved.push({ nodeId: node.id, graphPath, field: "toolRef", kind: "tool", label: node.label });
+    }
+    if (node.type === "core.subgraph") {
+      const graph = node.config.graph;
+      if (graph && typeof graph === "object" && Array.isArray((graph as unknown as WorkflowDefinitionV2).nodes)) {
+        walkUnresolved(graph as unknown as WorkflowDefinitionV2, [...graphPath, node.id], unresolved);
+      }
+    }
+  }
+}
+
+export function unresolvedCapabilities(definition: WorkflowDefinitionV2): UnresolvedCapability[] {
+  const unresolved: UnresolvedCapability[] = [];
+  walkUnresolved(definition, [], unresolved);
+  return unresolved;
+}
+
+export function applyCapabilityBindings(definition: WorkflowDefinitionV2, bindings: readonly CapabilityBinding[]): WorkflowDefinitionV2 {
+  const next = structuredClone(definition);
+  for (const binding of bindings) {
+    const node = findNode(next, binding.graphPath, binding.nodeId);
+    if (!node) continue;
+    if (binding.field === "providerRef") {
+      node.config.providerRef = binding.reference;
+      if (binding.modelRef) node.config.modelRef = binding.modelRef;
+    } else {
+      node.config.toolRef = binding.reference;
+      if (binding.contractDigest) node.config.contractDigest = binding.contractDigest;
+    }
+  }
+  return next;
 }
 
 export function connectionUpdates({ definition, connections, tools }: {

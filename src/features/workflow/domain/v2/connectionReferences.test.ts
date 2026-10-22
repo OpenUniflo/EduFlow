@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JsonValue, WorkflowDefinitionV2, WorkflowNodeV2, WorkflowTool } from "./types";
-import { applyConnectionUpdates, connectionReferences, connectionUpdates, type ConnectionCatalogEntry } from "./connectionReferences";
+import { applyCapabilityBindings, applyConnectionUpdates, connectionReferences, connectionUpdates, unresolvedCapabilities, type CapabilityBinding, type ConnectionCatalogEntry } from "./connectionReferences";
 
 const policy = { timeoutMs: 120000, nodeTimeoutMs: 30000, maxNodeExecutions: 50, maxToolCalls: 10, maxInputBytes: 65536, maxStateBytes: 1048576, maxEventBytes: 65536, maxOutputTokens: 2048, maxAttempts: 1 };
 
@@ -97,5 +97,28 @@ describe("connection references", () => {
     expect(toolNode?.config.contractDigest).toBe("new");
     expect(updated.nodes.find(item => item.id === "environment")?.config.providerRef).toBe("deepseek");
     expect(definition.nodes.find(item => item.id === "llm")?.config.providerRef).toBe("p4:owner:model:1");
+  });
+
+  it("binds unset template capabilities in the root and a nested subgraph", () => {
+    const definition = emptyDefinition();
+    const child = emptyDefinition();
+    child.nodes = [node("tool", "core.tool", { toolRef: "", contractDigest: "" })];
+    definition.nodes = [
+      node("model", "core.llm", { providerRef: "", modelRef: "" }),
+      node("sub", "core.subgraph", { graph: child as unknown as JsonValue }),
+    ];
+    const unresolved = unresolvedCapabilities(definition);
+    expect(unresolved.map(item => `${item.nodeId}:${item.field}`)).toEqual(["model:providerRef", "tool:toolRef"]);
+    const bindings: CapabilityBinding[] = [
+      { ...unresolved[0], reference: "p4:owner:model:1", modelRef: "deepseek-flash" },
+      { ...unresolved[1], reference: "p4:owner:search:1", contractDigest: "digest" },
+    ];
+    const bound = applyCapabilityBindings(definition, bindings);
+    expect(bound.nodes.find(item => item.id === "model")?.config.providerRef).toBe("p4:owner:model:1");
+    expect(bound.nodes.find(item => item.id === "model")?.config.modelRef).toBe("deepseek-flash");
+    const childTool = (bound.nodes.find(item => item.id === "sub")?.config.graph as unknown as WorkflowDefinitionV2).nodes.find(item => item.id === "tool");
+    expect(childTool?.config.toolRef).toBe("p4:owner:search:1");
+    expect(childTool?.config.contractDigest).toBe("digest");
+    expect(unresolvedCapabilities(definition)).toHaveLength(2);
   });
 });
