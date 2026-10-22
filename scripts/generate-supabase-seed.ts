@@ -1,4 +1,5 @@
 import { workspaceWorkflowExamples } from "../src/demo/workflow/workspaceWorkflowTemplates";
+import { productWorkflowTemplates } from "../src/demo/workflow/productWorkflowTemplates";
 import { courseWorkflowTemplates } from "../src/demo/workflow/courseWorkflowTemplates";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -30,7 +31,7 @@ const lines = [
   ""
 ];
 
-for (const template of [...courseWorkflowTemplates,...workspaceWorkflowExamples().map(item=>item.definition)]) lines.push(insert("workflow_templates", ["id","name","description","definition"], [template.workflowId,template.name,template.description,template]));
+for (const template of [...courseWorkflowTemplates,...workspaceWorkflowExamples().map(item=>item.definition),...productWorkflowTemplates().map(item=>item.definition)]) lines.push(insert("workflow_templates", ["id","name","description","definition"], [template.workflowId,template.name,template.description,template]));
 
 for (const node of demoGlobalKnowledgeGraph.nodes) {
   lines.push(insert("knowledge_nodes", [

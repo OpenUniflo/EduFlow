@@ -268,10 +268,10 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 | P0-5 共享 Runtime access 拆分 | 后端代码完成；owner/shared 兼容测试通过；双修订字段与旧 Thread 兼容待核实 | `registry.environment_allowed`、`public_environment.access`、`operations.assert_hosted_configuration`；owner 环境不新增 `access` 字段以保持 revision；shared env 拒绝 ownerIds/能力/secret；新增 backend tests |
 | P0-2b 连接来源/版本投影与标识 | 代码完成；单测通过；同连接版本选择/升级提示已接 P0-2c | `capabilityOrigins` 仅用于投影、不进入 revision；provider/connector/tool 返回 origin/connectionRef/version；面板显示“我的连接 · vN”或“执行端管理凭据” |
 | P0-2c 连接版本扫描与安全更新 | 代码完成；浏览器/真实连接待验收 | `connectionReferences.ts` 递归扫描子图/providerRef/toolRef/allowedToolRefs；最新启用版本提案、合同变化/模型不匹配转人工；`ConnectionVersionPanel` 写入草稿；`connectionKey` 投影；节点内提示原连接不可用/新版本；compiler 工具诊断补 `pointer`；5 项单测 + contract pointer 断言 |
-| P0-6 模板能力前置 | 前端需求/绑定面板 + 服务端绑定校验完成；模板定义/内容迁移/创建对话框直连绑定待做 | `templateCapabilities.ts` 四套需求；`WorkflowCreateDialog` 展示“这个模板需要”；`unresolvedCapabilities`/`applyCapabilityBindings`；`CapabilityBindingPanel`；Live 顶部未绑定提示；`workflowTemplateBinding.ts` 服务端递归绑定/owner 目录校验/合同变化拒绝；`template POST` 接受 `environmentRef+bindings` |
+| P0-6 模板能力前置 | 四套模板草案 + Local seed 生成 + 前端/服务端绑定完成；创建对话框直连绑定、内容迁移、真实连接验收待做 | `templateCapabilities.ts` 四套需求；`WorkflowCreateDialog` 需求提示；`unresolvedCapabilities`/`applyCapabilityBindings`/`CapabilityBindingPanel`；`workflowTemplateBinding.ts` 服务端递归绑定/owner 目录校验/合同变化拒绝；`template POST` 接受 `environmentRef+bindings`；`productWorkflowTemplates.ts` 四套草案（模型/工具留空绑定）；compiler `validate_structure` 4/4 通过；seed 生成器与 `supabase/seed.sql` 已包含四套模板 |
 | S1–S4、Hosted | 未开始 | 见 §3/§5 |
 
-验证：新增 6 项 connection 单测 + 1 项 template capability 单测 + 3 项服务端模板绑定单测 + contract pointer 断言；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 170 文件 / 1278 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。未运行真实模型/公开工具、浏览器视觉、Hosted 部署；这些仍属于验收门，不能据本节签通过。
+验证：新增 2 项产品模板草案测试；四套 Definition 经 compiler `validate_structure` 全部通过；6 项 connection + 1 项 template capability + 3 项服务端模板绑定单测通过；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 171 文件 / 1280 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。未运行真实模型/公开工具、浏览器视觉、Hosted 部署；这些仍属于验收门，不能据本节签通过。
 
 ## 6. 确认状态 / 工程待核实（不重开 D1–D3）
 
@@ -304,3 +304,4 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 - 2026-10-22：完成 P0-2c 收尾：`ProcessingFields` 对 `p4:` provider/tool 显示“原连接不可用/有新版本”并指向“环境 → 连接版本”；compiler 的 `TOOL_UNAVAILABLE`/`TOOL_CONTRACT_CHANGED` 补 `pointer`，widget 定位可落到节点配置；contract 测试断言 pointer。前端 168/1273、worker 220/12、typecheck/lint/build 通过；浏览器/真实连接验收未做。
 - 2026-10-22：实施 P0-6 前置：四套产品模板的需求元数据、创建对话框需求提示、未绑定能力扫描与绑定面板；模板定义、服务端需求投影、创建时服务端绑定及内容迁移仍未做。前端 169/1275、worker 220/12、typecheck/lint/build 通过。
 - 2026-10-22：补 P0-6 服务端绑定：`workflowTemplateBinding.ts` 递归应用绑定、拒绝错误节点类型/重复目标，按当前 owner 的 catalog 校验连接与模型、工具合同变化；`definitions?op=template` 接受 `environmentRef+bindings` 并先绑定再 `/v1/document` 校验。新增 3 项单测；前端 170/1278、worker 220/12、typecheck/lint/build 通过；模板定义/内容迁移/创建对话框直连仍未做。
+- 2026-10-22：补 P0-6 模板草案与 Local seed：`productWorkflowTemplates.ts` 四套（简报、依赖、社区、核对）保留模型/工具空引用供绑定；compiler `validate_structure` 4/4 通过；seed 生成器与 `supabase/seed.sql` 加入四套模板。新增 2 项草案单测；前端 171/1280、worker 220/12、typecheck/lint/build 通过；创建对话框直连、内容迁移、真实连接验收未做。
