@@ -74,12 +74,12 @@ const hnCode = `def process(input, context):
     return {"messages": [{"id": "tech-brief", "role": "user", "content": [{"type": "text", "text": text}]}]}
 `;
 const dependencyCode = `def process(input, context):
-    pypi = input.get("pypi") or {}
+    stats = input.get("pypi") or {}
+    data = stats.get("data") or {}
     npm = input.get("npm") or {}
-    info = pypi.get("info") or {}
-    text = "请根据以下公开元数据解释依赖版本、维护状态与升级风险：\\n"
-    text += "PyPI：" + str(info.get("name") or "") + " " + str(info.get("version") or "") + "\\n"
-    text += "npm：" + str(npm.get("name") or "") + " " + str(npm.get("version") or "")
+    text = "请用不超过 200 字、3 条要点解释以下依赖的使用、版本与升级风险：\\n"
+    text += "PyPI langgraph 最近下载：日 " + str(data.get("last_day")) + " / 月 " + str(data.get("last_month")) + "\\n"
+    text += "npm zod：" + str(npm.get("name") or "") + " " + str(npm.get("version") or "")
     return {"messages": [{"id": "dependency-brief", "role": "user", "content": [{"type": "text", "text": text}]}]}
 `;
 const triageCode = `def process(input, context):
@@ -131,20 +131,20 @@ export function productWorkflowTemplates(): WorkflowDocumentV2[] {
     build({
       id: "product-dependency-health",
       name: "依赖健康检查",
-      description: "读取 PyPI 与 npm 的公开 JSON 元数据，由隔离函数整理后交给模型解释版本与维护风险。工具连接需返回 JSON 对象。",
+      description: "读取 PyPI 下载统计与 npm 公开 JSON 元数据，由隔离函数整理后交给模型解释版本、使用与维护风险。工具连接需返回 JSON 对象。",
       nodes: [
-        toolField("pypi", "读取 PyPI 元数据", "pypiInfo", "/result"),
+        toolField("pypi", "读取 PyPI 下载统计", "pypiStats", "/result"),
         toolField("npm", "读取 npm 元数据", "npmInfo", "/result"),
-        normalize("combine", "整理依赖元数据", dependencyCode, { pypi: stateBinding("/pypiInfo"), npm: stateBinding("/npmInfo") }, {
+        normalize("combine", "整理依赖元数据", dependencyCode, { pypi: stateBinding("/pypiStats"), npm: stateBinding("/npmInfo") }, {
           pypi: { type: "object" },
           npm: { type: "object" },
         }),
         model("assess", "评估依赖风险"),
       ],
       state: retrievalState({
-        pypiInfo: { type: "object" },
+        pypiStats: { type: "object" },
         npmInfo: { type: "object" },
-      }, { pypiInfo: {}, npmInfo: {} }),
+      }, { pypiStats: {}, npmInfo: {} }),
       requiredCapabilities: ["llm", "http", "function"],
     }),
     build({

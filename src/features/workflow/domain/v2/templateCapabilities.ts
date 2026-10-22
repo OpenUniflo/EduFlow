@@ -17,7 +17,7 @@ export const templateCapabilities: Record<string, TemplateCapability[]> = {
   ],
   "product-dependency-health": [
     { kind: "model", label: "DeepSeek 模型连接", detail: "解释依赖风险与升级建议" },
-    { kind: "tool", label: "PyPI 元数据", detail: "公开 JSON 接口；模板读取 result 对象" },
+    { kind: "tool", label: "PyPI 下载统计", detail: "公开 JSON 接口；模板读取 result.data 下载量" },
     { kind: "tool", label: "npm 元数据", detail: "公开 JSON 接口；模板读取 result 对象" },
   ],
   "product-community-triage": [

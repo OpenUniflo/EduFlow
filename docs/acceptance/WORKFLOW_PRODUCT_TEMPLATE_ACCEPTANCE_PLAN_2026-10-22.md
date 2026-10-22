@@ -24,9 +24,11 @@
 | S1 拒绝 | 成功 | 伪造他人 `p4:` 连接引用创建模板返回 `409 MISSING_CAPABILITY`，未写入副本 |
 | S1 幂等 | 成功 | 同一 `Idempotency-Key` 连续提交返回同一 run `6035ca25…`，未产生第二次执行 |
 | S1 受控失败 | 成功 | 将 HN 绑定到公开 404 连接，run `b23dd2aa-6ffd-4e23-8ecb-c53840ee7db1` 失败为 `HTTP_TOOL_FAILED / HTTP 404` |
+| S2 依赖健康检查 API | 成功 | PyPI 完整 JSON 会触发 `EVENT_TOO_LARGE`，改用 pypistats 最近下载统计；绑定 `pypistats_langgraph` + `npm_zod` + DeepSeek；workflow `ffaf3615-7093-4bd0-afa9-e1ee895bd3f2`、run `f080c8ee-70d6-4695-a5b6-e8426b6dedd5` · `success`，输出 3 条使用/版本/升级风险 |
+| S2 依赖健康检查 UI | 成功（1440） | 新建对话框绑定 PyPI 下载统计 + npm + DeepSeek；workflow `36153215-44dc-4013-9b45-05b675cb360c`、run `0c69c9b0-3232-4ff0-9d6f-6ddce7a122a4` · `success`，6 个节点完成；截图 [s2-dependency-ui-1440.png](evidence/workflow-s1-round13/s2-dependency-ui-1440.png) |
 | 环境问题 | 已绕过 | 本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常；启动 Local 服务时归一为 `localhost,127.0.0.1` 后模型可用。该问题不是代码失败，但需在验收环境说明 |
 
-探针使用普通认证 API 与 Local Worker；随后完成浏览器 UI 路径、四视口、125% 等效视口、三来源 UI 复跑、控制台检查、跨账号读取/Run 拒绝与清理。S1 三来源 API 与 UI 运行均已成功；真实浏览器 zoom、Wikipedia/arXiv 适配与 Hosted 仍未完成。`hn_ai_agents`、`npm_zod`、`se_workflow` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限从 4096 调为 3072，并把提示约束为 250 字后成功，避免节点 120s 超时与输出截断。
+探针使用普通认证 API 与 Local Worker；随后完成 S1 浏览器 UI 路径、四视口、125% 等效视口、三来源 UI 复跑、控制台检查、跨账号读取/Run 拒绝与清理；S2 依赖健康检查 API 与 UI 也已成功。真实浏览器 zoom、Wikipedia/arXiv 适配、S3–S4 与 Hosted 仍未完成。`hn_ai_agents`、`npm_zod`、`se_workflow`、`pypistats_langgraph` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限从 4096 调为 3072，并把提示约束为 250/200 字后成功，避免节点 120s 超时与输出截断。
 
 ## 1. 范围、冻结决策与阶段门
 
