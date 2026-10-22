@@ -1,4 +1,4 @@
-import { createEditorV2, createNodeV2, createWorkflowV2, stateBinding } from "@/features/workflow/domain/v2/factory";
+import { createEditorV2, createNodeV2, createWorkflowV2, stateBinding, workflowPolicy } from "@/features/workflow/domain/v2/factory";
 import type { Binding, JsonSchema, JsonValue, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowNodeV2 } from "@/features/workflow/domain/v2/types";
 
 const obj = (properties: Record<string, JsonSchema>, required = Object.keys(properties)): JsonSchema => ({ type: "object", properties, required, additionalProperties: false });
@@ -47,6 +47,8 @@ function build(spec: Spec): WorkflowDocumentV2 {
   definition.transitions = chain.slice(0, -1).map((node, index) => edge(node.id, chain[index + 1].id));
   definition.outputBindings = { messages: stateBinding("/messages") };
   definition.requiredCapabilities = spec.requiredCapabilities;
+  // Real model calls in Local acceptance exceeded the 30s default; keep a bounded but practical node budget.
+  definition.policy = { ...workflowPolicy, timeoutMs: 180000, nodeTimeoutMs: 120000 };
   return { definition, editor: createEditorV2(definition) };
 }
 
