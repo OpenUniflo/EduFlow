@@ -45,25 +45,23 @@ function build(spec: Spec): WorkflowDocumentV2 {
   definition.outputBindings = { messages: stateBinding("/messages") };
   definition.requiredCapabilities = spec.requiredCapabilities;
   // Real model calls in Local acceptance exceeded the 30s default; keep a bounded but practical node budget.
-  definition.policy = { ...workflowPolicy, timeoutMs: 180000, nodeTimeoutMs: 120000 };
+  definition.policy = { ...workflowPolicy, timeoutMs: 180000, nodeTimeoutMs: 120000, maxOutputTokens: 3072 };
   return { definition, editor: createEditorV2(definition) };
 }
 
 const hnCode = `def process(input, context):
     hits = input.get("hn") or []
     lines = []
-    for item in hits[:6]:
+    for item in hits[:4]:
         title = item.get("title") or item.get("story_title") or ""
         url = item.get("url") or item.get("story_url") or ""
         if title:
             lines.append("- " + title + " " + url)
-    wiki = str(input.get("wiki") or "")[:1500]
     npm = input.get("npm") or {}
     package = str(npm.get("name") or "npm package")
     version = str(npm.get("version") or "")
-    text = "请根据以下公开资料写一段中文技术简报，必须引用来源：\\n"
+    text = "请用不超过 250 字的中文技术简报概括以下公开资料，必须引用来源：\\n"
     text += "Hacker News：\\n" + "\\n".join(lines) + "\\n"
-    text += "Wikipedia：" + wiki + "\\n"
     text += "npm：" + package + " " + version
     return {"messages": [{"id": "tech-brief", "role": "user", "content": [{"type": "text", "text": text}]}]}
 `;
@@ -103,23 +101,20 @@ export function productWorkflowTemplates(): WorkflowDocumentV2[] {
     build({
       id: "product-tech-brief",
       name: "技术周报简报",
-      description: "检索 Hacker News、Wikipedia 与 npm 的公开 JSON，由隔离函数整理后交给模型生成技术简报。工具连接需返回 JSON 对象；arXiv XML 适配待补。",
+      description: "检索 Hacker News 与 npm 的公开 JSON，由隔离函数整理后交给模型生成技术简报。工具连接需返回 JSON 对象；Wikipedia/arXiv 适配仍待补。",
       nodes: [
         toolField("hn", "检索 Hacker News", "hnHits", "/result/hits"),
-        toolField("wiki", "读取 Wikipedia 摘要", "wikiExtract", "/result/extract"),
         toolField("npm", "读取 npm 包信息", "npmInfo", "/result"),
-        normalize("combine", "整理公开资料", hnCode, { hn: stateBinding("/hnHits"), wiki: stateBinding("/wikiExtract"), npm: stateBinding("/npmInfo") }, {
+        normalize("combine", "整理公开资料", hnCode, { hn: stateBinding("/hnHits"), npm: stateBinding("/npmInfo") }, {
           hn: { type: "array", items: { type: "object" } },
-          wiki: { type: "string" },
           npm: { type: "object" },
         }),
         model("write", "生成技术简报"),
       ],
       state: retrievalState({
         hnHits: { type: "array", items: { type: "object" } },
-        wikiExtract: { type: "string" },
         npmInfo: { type: "object" },
-      }, { hnHits: [], wikiExtract: "", npmInfo: {} }),
+      }, { hnHits: [], npmInfo: {} }),
       requiredCapabilities: ["llm", "http", "function"],
     }),
     build({

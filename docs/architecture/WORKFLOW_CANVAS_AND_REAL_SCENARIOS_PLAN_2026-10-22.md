@@ -269,10 +269,10 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 | P0-2b 连接来源/版本投影与标识 | 代码完成；单测通过；同连接版本选择/升级提示已接 P0-2c | `capabilityOrigins` 仅用于投影、不进入 revision；provider/connector/tool 返回 origin/connectionRef/version；面板显示“我的连接 · vN”或“执行端管理凭据” |
 | P0-2c 连接版本扫描与安全更新 | 代码完成；浏览器/真实连接待验收 | `connectionReferences.ts` 递归扫描子图/providerRef/toolRef/allowedToolRefs；最新启用版本提案、合同变化/模型不匹配转人工；`ConnectionVersionPanel` 写入草稿；`connectionKey` 投影；节点内提示原连接不可用/新版本；compiler 工具诊断补 `pointer`；5 项单测 + contract pointer 断言 |
 | P0-6 模板能力前置 | 四套模板草案（含真实 HTTP result 包装对齐）+ Local seed + 创建时直连绑定完成；内容迁移、真实连接验收待做 | `templateCapabilities.ts` 四套需求；`WorkflowCreateDialog` 读取模板定义、展示未绑定项、创建前选择环境/模型/工具并随 `useTemplate` 发送 bindings；`workflowTemplateBinding.ts` 服务端递归绑定/owner 目录校验/合同变化拒绝；`template POST` 接受 `environmentRef+bindings`；`productWorkflowTemplates.ts` 四套草案读取 `result.hits`/`result.extract`/`result`；compiler `validate_structure` 4/4 通过；seed 已重生成 |
-| S1 本地技术探针 | 成功；非正式验收 | 普通认证 API + Local Worker：run `92f68fae-246a-45af-aeb6-edf933c8347a`，HN Algolia 只读公开检索 + 隔离函数 + `deepseek-flash` 生成中文简报；30s 节点超时失败，120s 后成功；产品模板策略与 result 包装同步调整 |
+| S1 本地技术探针 | 成功；API 级技术证据，非正式验收 | 自定义探针 run `92f68fae…` 成功；产品模板 `product-tech-brief` 创建/绑定/运行 workflow `67a50f22…`、run `6035ca25…` 成功；伪造绑定 `409 MISSING_CAPABILITY`；同幂等键同 run；公开 404 受控失败 run `b23dd2aa…` 为 `HTTP_TOOL_FAILED` |
 | S1–S4、Hosted 正式验收 | 未开始 | 见 §3/§5 |
 
-验证：新增 2 项产品模板草案测试；四套 Definition 经 compiler `validate_structure` 全部通过；6 项 connection + 1 项 template capability + 3 项服务端模板绑定单测通过；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 171 文件 / 1280 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。S1 本地技术探针已成功（run `92f68fae-246a-45af-aeb6-edf933c8347a`），但未做正式拒绝/失败/幂等/清理、浏览器视觉或 Hosted 验收，不能据本节签 S1 通过。
+验证：新增 2 项产品模板草案测试；四套 Definition 经 compiler `validate_structure` 全部通过；6 项 connection + 1 项 template capability + 3 项服务端模板绑定单测通过；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 171 文件 / 1280 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。S1 已取得 API 级创建/绑定/成功/拒绝/幂等/受控失败证据（见验收计划 §0），但未走浏览器 UI、未做跨账号/清理/S1 三来源/Hosted 验收，不能据本节签 S1 通过。
 
 ## 6. 确认状态 / 工程待核实（不重开 D1–D3）
 
@@ -309,3 +309,4 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 - 2026-10-22：补 P0-6 创建时直连绑定：模板 GET 支持单条定义，创建对话框读取定义、扫描未绑定项、选择环境/模型/工具后随 `useTemplate` 发送 `environmentRef+bindings`；未全部绑定或读取失败时禁止创建。content migration 仍待技术门；前端 171/1280、worker 220/12、typecheck/lint/build 通过。
 - 2026-10-22：S1 本地技术探针成功（非正式验收）：run `92f68fae-246a-45af-aeb6-edf933c8347a`，HN Algolia 只读公开检索 + 隔离函数 + 真实 `deepseek-flash` 生成中文简报；发现 30s 节点超时不足，120s 后成功；四套产品模板草案同步调整节点/总超时。未走浏览器、未验证拒绝/失败/幂等/清理，不能据此签 S1 验收。
 - 2026-10-22：按真实探针回灌产品模板：HTTP 工具输出为 `{"result": <json>}`，S1/S2/S3 改为写入 `result.hits`/`result.extract`/`result` 并由隔离函数整理；S1 第三来源暂用 npm（arXiv XML 适配待补）；四套模板复查 `validate_structure` 4/4，seed 重新生成；未做模板端到端真实运行。
+- 2026-10-22：产品模板端到端 API 验收：`product-tech-brief` 用 HN/npm/DeepSeek 绑定创建（workflow `67a50f22…`）并运行成功（run `6035ca25…`）；伪造绑定 409；同幂等键同 run；公开 404 受控失败为 `HTTP_TOOL_FAILED`。S1 收窄为 HN+npm 两来源，Wikipedia Worker 超时/arXiv XML 适配仍缺；模型输出上限与提示长度调整后稳定在 120s 内。未走浏览器 UI、跨账号、清理或 Hosted。

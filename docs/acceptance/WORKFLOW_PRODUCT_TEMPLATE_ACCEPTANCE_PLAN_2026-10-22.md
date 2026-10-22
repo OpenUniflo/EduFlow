@@ -12,10 +12,14 @@
 | Local 真实模型调用 | 成功 | 经普通认证 API 创建并运行 `workspace-question` 变体；run `7bbd21ba-87a5-4e19-b10a-61e51f0b0127`，status `success`；provider `deepseek` / `deepseek-flash`，未记录密钥 |
 | S1 公开检索 + 函数 + 模型 | 成功 | 普通认证 API 创建自定义探针 `608b80bb-8455-4778-8909-4a58e8b29710`；run `92f68fae-246a-45af-aeb6-edf933c8347a`，status `success`，输出 1 条中文简报；Hacker News Algolia 只读连接返回 5 条 story，经隔离函数整理后由真实模型生成 |
 | 真实超时发现 | 已修正 | 首次 30s 节点超时导致模型节点失败；将探针节点超时提高到 120s 后成功。四套产品模板草案同步改为 `nodeTimeoutMs:120000` / `timeoutMs:180000` |
-| S1 模板对齐 | 草案完成 | 产品模板改为读取 HTTP 适配器的 `result` 包装：HN `result.hits`、Wikipedia `result.extract`、npm `result` 对象，再由隔离函数整理后交给模型；compiler 结构校验 4/4 通过。arXiv XML 不是 JSON，暂由 npm 公开元数据替代第三个来源，arXiv 适配仍是缺口 |
+| S1 模板对齐 | 草案完成 | 产品模板改为读取 HTTP 适配器的 `result` 包装：HN `result.hits`、npm `result` 对象，再由隔离函数整理后交给模型；compiler 结构校验 4/4 通过。Wikipedia 响应在本机 Worker 超时、arXiv XML 不是 JSON，二者适配仍是缺口；S1 暂用 HN + npm 两来源 |
+| S1 产品模板创建/绑定/运行 | 成功（技术） | `product-tech-brief` 用 HN `hn_ai_agents`、npm `npm_zod`、`deepseek`/`deepseek-flash` 绑定创建；workflow `67a50f22-9cdd-44e9-9f2e-0be93e33197d`；run `6035ca25-2ced-41a4-a014-354de0dfb33b`，status `success`，输出中文简报并带来源 |
+| S1 拒绝 | 成功 | 伪造他人 `p4:` 连接引用创建模板返回 `409 MISSING_CAPABILITY`，未写入副本 |
+| S1 幂等 | 成功 | 同一 `Idempotency-Key` 连续提交返回同一 run `6035ca25…`，未产生第二次执行 |
+| S1 受控失败 | 成功 | 将 HN 绑定到公开 404 连接，run `b23dd2aa-6ffd-4e23-8ecb-c53840ee7db1` 失败为 `HTTP_TOOL_FAILED / HTTP 404` |
 | 环境问题 | 已绕过 | 本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常；启动 Local 服务时归一为 `localhost,127.0.0.1` 后模型可用。该问题不是代码失败，但需在验收环境说明 |
 
-探针使用普通认证 API 与 Local Worker，未走浏览器、未使用产品模板创建对话框、未执行正式 UI 视觉；未验证拒绝、受控失败、重复提交、清理或跨账号隔离。`hn_ai_agents` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。
+探针使用普通认证 API 与 Local Worker，未走浏览器、未使用产品模板创建对话框、未执行正式 UI 视觉；拒绝/失败/幂等已有 API 级证据，但跨账号隔离、清理、S1 三来源和 Hosted 尚未验证。`hn_ai_agents`、`npm_zod`、`hn_fail_404` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限从 4096 调为 3072，并把提示约束为 250 字后成功，避免节点 120s 超时与输出截断。
 
 ## 1. 范围、冻结决策与阶段门
 

@@ -21,9 +21,9 @@ describe("local product workflow template drafts", () => {
   it("writes concrete fields out of the HTTP result wrapper and normalizes before the model", () => {
     const [brief] = productWorkflowTemplates();
     const tools = brief.definition.nodes.filter(node => node.type === "core.tool");
-    expect(tools).toHaveLength(3);
+    expect(tools).toHaveLength(2);
     expect(tools.every(node => node.config.toolRef === "" && (node.inputs.arguments as { value: unknown }).value !== undefined)).toBe(true);
-    expect(tools.map(node => Object.values(node.writes)[0])).toEqual(["/result/hits", "/result/extract", "/result"]);
+    expect(tools.map(node => Object.values(node.writes)[0])).toEqual(["/result/hits", "/result"]);
     expect(brief.definition.nodes.filter(node => node.type === "core.function")).toHaveLength(1);
     expect(brief.definition.nodes.filter(node => node.type === "core.llm")).toHaveLength(1);
   });
