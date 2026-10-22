@@ -5,6 +5,7 @@ import pytest
 
 from eduflow_workflow import operations, server
 from eduflow_workflow.contracts import ExecutionError
+from eduflow_workflow.extensions import hydrate_connections
 from eduflow_workflow.registry import Registry
 
 
@@ -79,3 +80,26 @@ def test_hosted_rejects_unknown_access_mode(monkeypatch):
     configure_hosted(monkeypatch, [{'ref': 'legacy', 'access': 'public', 'ownerIds': [str(uuid.uuid4())]}])
     with pytest.raises(RuntimeError):
         operations.assert_hosted_configuration()
+
+
+def test_capability_metadata_does_not_change_owner_environment_revision():
+    registry = Registry({'environments': [{'ref': 'restricted', 'ownerIds': ['a']}]})
+    environment = registry.environment('restricted', 'a')
+    revision = environment['revision']
+    environment['capabilityOrigins'] = {'p4:a:model:2': {'origin': 'user', 'connectionRef': 'model', 'version': 2}}
+    registry.update(environment)
+    assert environment['revision'] == revision
+
+
+def test_user_connection_metadata_is_projected_for_display():
+    registry = Registry({'environments': [{'ref': 'restricted', 'ownerIds': ['a']}]})
+    environment = registry.environment('restricted', 'a')
+    hydrate_connections(environment, 'a', [
+        {'kind': 'connection', 'ref': 'model', 'version': 2, 'disabled': False, 'content': {'type': 'deepseek', 'name': 'My model', 'modelRefs': ['deepseek-flash'], 'secretRef': 'vault:1'}},
+        {'kind': 'connection', 'ref': 'search', 'version': 3, 'disabled': False, 'content': {'type': 'http', 'name': 'Search', 'baseUrl': 'https://example.com', 'path': '/search', 'method': 'GET', 'sideEffect': 'read', 'inputSchema': {'type': 'object'}, 'outputSchema': {'type': 'object'}}},
+    ])
+    registry.update(environment)
+    provider = next(item for item in registry.public_environment(environment)['providers'] if item['connectionRef'] == 'model')
+    tool = next(item for item in registry.public_tools(environment) if item['connectionRef'] == 'search')
+    assert provider['origin'] == 'user' and provider['version'] == 2
+    assert tool['origin'] == 'user' and tool['version'] == 3

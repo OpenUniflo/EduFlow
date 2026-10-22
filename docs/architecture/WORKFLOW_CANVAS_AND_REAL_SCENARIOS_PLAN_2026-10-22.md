@@ -265,10 +265,11 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 | --- | --- | --- |
 | P0-1 环境三态、布局横幅、账号 UUID 复制、重试、移动端不再绝对定位重叠 | 代码完成；单测通过；浏览器视觉待验收 | `src/features/workflow/application/v2/environmentAvailability.ts` 与其测试；`LiveWorkflowEditor` 的 `wf-v2-env-notice` 布局条；`useWorkflowV2Controller` 的 `environmentError` |
 | P0-2a 保存连接后刷新环境与工具 | 代码完成；单测通过；跨 owner/真实连接待验收 | `loadTools` 请求代次、`refreshEnvironmentResources`、`EnvironmentPanel onSaved`；controller 测试覆盖工具刷新与刷新失败 |
-| P0-5 共享 Runtime access 拆分 | 后端代码完成；owner/shared 兼容测试通过；双修订字段与旧 Thread 兼容待核实 | `registry.environment_allowed`、`public_environment.access`、`operations.assert_hosted_configuration`；owner 环境不新增 `access` 字段以保持 revision；shared env 拒绝 ownerIds/能力/secret；新增 6 项 backend tests |
-| P0-2b/c、P0-6、S1–S4、Hosted | 未开始 | 见 §3/§5 |
+| P0-5 共享 Runtime access 拆分 | 后端代码完成；owner/shared 兼容测试通过；双修订字段与旧 Thread 兼容待核实 | `registry.environment_allowed`、`public_environment.access`、`operations.assert_hosted_configuration`；owner 环境不新增 `access` 字段以保持 revision；shared env 拒绝 ownerIds/能力/secret；新增 backend tests |
+| P0-2b 连接来源/版本投影与标识 | 代码完成；单测通过；同连接版本选择/升级提示待 P0-2c | `capabilityOrigins` 仅用于投影、不进入 revision；provider/connector/tool 返回 origin/connectionRef/version；面板显示“我的连接 · vN”或“执行端管理凭据” |
+| P0-2c、P0-6、S1–S4、Hosted | 未开始 | 见 §3/§5 |
 
-验证：定向 37 项前端 + 6 项后端通过；worker 218 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 167 文件 / 1268 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。未运行真实模型/公开工具、浏览器视觉、Hosted 部署；这些仍属于验收门，不能据本节签通过。
+验证：定向 37 项前端 + 8 项后端通过；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 167 文件 / 1268 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。未运行真实模型/公开工具、浏览器视觉、Hosted 部署；这些仍属于验收门，不能据本节签通过。
 
 ## 6. 确认状态 / 工程待核实（不重开 D1–D3）
 
@@ -296,3 +297,4 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 - 2026-10-22：基于 `67c1a2c` 完整任务书复核：统一 Runtime/Capability 与双修订冻结，补模板 API 绑定、内容迁移与保留式回滚；抽出独立验收计划；澄清 D3 仅撤旧环境授权；范围 A、R1–R4 共 10–17 人日及无剩余产品决策。仅文档更新，未实施、未提交、未部署、未运行测试。
 - 2026-10-22：实施 P0-1（环境三态布局横幅、UUID 复制、重试）与 P0-2a（保存连接后刷新环境+工具、请求代次防旧响应）；新增 availability/controller 测试。定向 37 项、全量 167 文件/1268 项、typecheck/lint/build 通过；浏览器视觉、P0-2b/c、P0-5/6、真实场景与 Hosted 仍未执行。
 - 2026-10-22：实施 P0-5 共享 Runtime access 拆分：`access:"authenticated"` 目录放行、shared env 禁止 ownerIds/provider/tool/secret、owner 环境不新增 `access` 字段以保持 revision；新增 6 项 backend tests。Worker 218 passed/12 skipped，前端 167/1268，typecheck/lint/build 通过；双修订/旧 Thread、视觉、真实场景未做。
+- 2026-10-22：实施 P0-2b 连接来源/版本投影：`capabilityOrigins` 仅用于公共投影、不进入 environment revision；provider/connector/tool 返回 origin/connectionRef/version；面板区分“我的连接 · vN”与执行端凭据。Worker 220 passed/12 skipped，前端 167/1268，typecheck/lint/build 通过；P0-2c 版本选择/升级尚未做。

@@ -86,9 +86,11 @@ async def catalog_operation(body,registry):
     return await store.call('p4_connection_save',owner,ref,name,version,c,credential)
 
 def hydrate_connections(env,owner,rows):
+    env.setdefault('capabilityOrigins',{})
     for r in rows:
         if r['kind']!='connection' or r['disabled']: continue
         c=r['content'];key='p4:'+owner+':'+r['ref']+':'+str(r['version']);headers={c.get('credentialHeader','Authorization'):c['secretRef']} if c.get('secretRef') else {}
+        env['capabilityOrigins'][key]={'origin':'user','connectionRef':r['ref'],'version':r['version']}
         if c['type']=='deepseek': env['providers'].append({'ref':key,'name':c.get('name',r['ref']),'modelRefs':c['modelRefs'],'baseUrl':'https://api.deepseek.com','secretRef':c['secretRef']})
         elif c['type']=='http': env['tools'].append({'ref':key,'name':r['ref'],'description':c.get('name',r['ref']),'version':r['version'],'adapter':'http','baseUrl':c['baseUrl'],'path':c.get('path','/'),'method':c.get('method','GET'),'bodyArguments':c.get('method')=='POST','headerSecretRefs':headers,'sideEffect':c['sideEffect'],'inputSchema':c.get('inputSchema',{'type':'object'}),'outputSchema':c.get('outputSchema',{'type':'object'})})
         else: env['connectors'].append({'ref':key,'name':c.get('name',r['ref']),'transport':'streamable-http','url':c['url'],'headerSecretRefs':headers,'allowedToolNames':c['allowedToolNames'],'sideEffect':'write'})

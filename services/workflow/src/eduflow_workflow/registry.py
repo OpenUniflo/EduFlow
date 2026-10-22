@@ -91,7 +91,7 @@ class Registry:
             except Exception as error:
                 tool["available"]=False;tool["diagnostics"]=[{"code":getattr(error,"code","INVALID_TOOL_SCHEMA"),"severity":"error","message":"Tool Schema is unsupported or invalid in M1"}]
             tool["contractDigest"]=digest({key:value for key,value in tool.items() if key not in ("contractDigest","available","diagnostics")})
-        env["revision"] = digest({key:value for key,value in env.items() if key not in ("revision","functions","variables","configurationRevision")})
+        env["revision"] = digest({key:value for key,value in env.items() if key not in ("revision","functions","variables","configurationRevision","capabilityOrigins")})
     def environment_allowed(self, env, owner):
         if not owner or env.get("disabled"): return False
         return env.get("access","owners")=="authenticated" or owner in env.get("ownerIds",[]) or "*" in env.get("ownerIds",[])
@@ -135,6 +135,14 @@ class Registry:
             content['executionBackend']={'type':'vercel','image':os.environ.get('WORKFLOW_SANDBOX_IMAGE','')}
         return {**content,"digest":digest(content),"functions":env.get("functions",[])}
     def public_environment(self, env):
-        return {"environmentRef":env["ref"],"environmentRevision":env["revision"],"name":env.get("name",env["ref"]),"access":env.get("access","owners"),"capabilities":env["capabilities"],"providers":[{k:v for k,v in p.items() if k in ("ref","modelRefs","name")} for p in env["providers"]],"connectors":[{k:v for k,v in c.items() if k in ("ref","name","transport")} for c in env["connectors"]],"limits":env["limits"],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0)}
+        origins=env.get("capabilityOrigins",{})
+        def meta(ref):
+            value=origins.get(ref,{})
+            return {"origin":value.get("origin","environment"), **({"connectionRef":value["connectionRef"],"version":value["version"]} if "connectionRef" in value else {})}
+        return {"environmentRef":env["ref"],"environmentRevision":env["revision"],"name":env.get("name",env["ref"]),"access":env.get("access","owners"),"capabilities":env["capabilities"],"providers":[{"ref":p["ref"],"modelRefs":p["modelRefs"],"name":p.get("name",p["ref"]),**meta(p["ref"])} for p in env["providers"]],"connectors":[{"ref":c["ref"],"name":c.get("name",c["ref"]),"transport":c.get("transport","streamable-http"),**meta(c["ref"])} for c in env["connectors"]],"limits":env["limits"],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0)}
     def public_tools(self, env):
-        return [{k:v for k,v in tool.items() if k in ("ref","name","description","version","inputSchema","outputSchema","contractDigest","sideEffect","available","adapter","connectorRef","diagnostics") or k=="group" and v in ("test","general")} for tool in env["tools"]]
+        origins=env.get("capabilityOrigins",{})
+        def meta(ref):
+            value=origins.get(ref,{})
+            return {"origin":value.get("origin","environment"), **({"connectionRef":value["connectionRef"]} if "connectionRef" in value else {})}
+        return [{**{k:v for k,v in tool.items() if k in ("ref","name","description","version","inputSchema","outputSchema","contractDigest","sideEffect","available","adapter","connectorRef","diagnostics") or k=="group" and v in ("test","general")},**meta(tool["ref"])} for tool in env["tools"]]
