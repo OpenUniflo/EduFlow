@@ -115,6 +115,12 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
   const op = queryString(request, "op"); const id = queryString(request, "id"); const client = createServerSupabase();
   if (resource === "capabilities" && request.method === "GET") { json(response, 200, await workflowCompiler("/capabilities")); return true; }
   if (resource === "templates" && request.method === "GET") {
+    if (id) {
+      const templateId = workflowString(id);
+      const row = result(await client.from("workflow_templates").select("id,name,description,definition").eq("id", templateId).eq("definition->>schemaVersion", "2.0").maybeSingle()) as WorkflowRow | null;
+      if (!row) throw new ApiError(404, "NOT_FOUND", "Workflow template not found");
+      json(response, 200, { workflowId: row.id, name: row.name, description: row.description, definition: row.definition }); return true;
+    }
     const rows = result(await client.from("workflow_templates").select("id,name,description,definition").eq("definition->>schemaVersion", "2.0").order("id")) as WorkflowRow[];
     json(response, 200, { items: rows.map(row => ({ workflowId: row.id, name: row.name, description: row.description })) }); return true;
   }

@@ -23,6 +23,7 @@ export type WorkflowSummaryV2 = { workflowId: string; revision: number; name: st
 export type WorkflowLibraryQuery = { search: string; scope: "all" | "personal" | "course"; sort: "updated" | "name"; page: number; pageSize: number };
 export type WorkflowLibraryPage = { items: WorkflowSummaryV2[]; total: number; page: number; pageSize: number };
 export type WorkflowTemplateSummary = { workflowId: string; name: string; description: string };
+export type WorkflowTemplateDetail = WorkflowTemplateSummary & { definition: WorkflowDefinitionV2 };
 export type WorkflowDeleteImpact = { revision: number; revisions: number; runs: number; activeRuns: number };
 export type WorkflowEnvironment = { environmentRef: string; environmentRevision: string; name: string; access?: "owners" | "authenticated"; capabilities: string[]; providers: { ref: string; name: string; modelRefs: string[]; origin?: "environment" | "user"; connectionRef?: string; version?: number }[]; connectors: { ref: string; name: string; transport: string; origin?: "environment" | "user"; connectionRef?: string; version?: number }[]; limits?: JsonValue; variables?: Record<string,string|number|boolean>; configurationRevision?: number };
 export type WorkflowTool = { ref: string; name: string; description?: string; contractDigest: string; inputSchema: JsonSchema; outputSchema?: JsonSchema; available?: boolean; adapter?: string; sideEffect?: string; diagnostics?: WorkflowDiagnostic[]; connectorRef?: string; origin?: "environment" | "user"; connectionRef?: string; version?: number; group?: string };
