@@ -6,7 +6,7 @@
 - 本次唯一新增文件为本文；没有读取秘密文件、私有账号页、环境文件或 dump。引用中出现凭据管理概念不代表已取得凭据。
 - 继承 [上一轮基线](WORKFLOW_CANVAS_NEXT_ROUND_PLAN_2026-10-22.md)：P0 环境与能力先行，P1 画布体验随后，P2 按门槛处理；本文替代其中“决策待确认”的状态。
 - **D1=A**：共享 Runtime Environment + 每用户连接；不做账号独立环境、provisioning UI。**D2=A**：节点显式更新连接版本并保存新修订；不引入逻辑连接身份迁移。**D3=A**：验收后移除测试管理员 ownerIds。
-- **费用与 Hosted 已确认（2026-10-22）**：真实调用按 10 次实际 Run / 估算 ¥5 软上限（§2.6）；测试阶段直接部署 `edu-flow-workflow` 与 Preview，不设维护窗口。
+- **Hosted 已确认（2026-10-22）**：测试阶段直接部署 `edu-flow-workflow` 与 Preview，不设维护窗口；不做费用核算，也不设 ¥5 上限。
 - required/optional 已按 [输入优化计划 §8](WORKFLOW_INPUT_OBJECT_OPTIMIZATION_PLAN.md#8-已冻结决策2026-10-21) 的 A 冻结并实现，不再提请决定；缺失与空文本、false、0 的区别继续保留。
 - 后续实施：单写作者串行，热点文件不并行；无新增 Vercel Function、无数据库迁移。若 D2 改 C，停止本计划并另行评审，不把迁移夹入执行。
 - 只用一个 V2 Definition、API Repository、LangGraph Worker、React Flow editor；不引入 Legacy，不把 Live 失败降级成预览成功。
@@ -26,7 +26,7 @@
 | 能力 | 代码支持与证据（文件:行，函数/符号） | Hosted / 缺口 |
 | --- | --- | --- |
 | 入口/结束 | W `registry.py:28` NODE_DESCRIPTORS；`runtime.py:309–311` _process_node | 既有文档记载 2 节点成功；当前部署需再核对 |
-| 模型 | W `registry.py:31` core.llm；`runtime.py:144` llm，`:322` 调用 | DeepSeek 文档记载配置；凭据、模型身份、实流与费用待核实 |
+| 模型 | W `registry.py:31` core.llm；`runtime.py:144` llm，`:322` 调用 | DeepSeek 文档记载配置；凭据、模型身份、实流待核实 |
 | 工具 | W `registry.py:32` core.tool；`runtime.py:324` _process_node；`server.py:94` discovery | DeepWiki/GitHub 文档记载；具体操作、可见性和限额待核实 |
 | 模型工具分发 | W `registry.py:33` core.tool_dispatch；`runtime.py:92` tools，`:323` 分发 | 白名单调用；业务场景需实测工具消息回合，不要求模型一定选工具 |
 | 路由/条件 | W `graph_control.py:67,119–121` build_control_graph；`runtime.py:312` router | first/all/default；Hosted 能力目录与实跑待核实 |
@@ -95,7 +95,7 @@
 
 公开检索的验收快照：每次运行记录**查询词 + 时间 + 前 N 条结果（标题/URL/短摘录）**；断言“引用存在且来自本次检索”，不要求两次结果逐字相同。结果变化、限流、来源不可达必须显式写入 `limitations`，不能补造。
 
-重试默认最多 2 次（含首次），只读暂态/429 按允许分类退避；auth/权限/合同失败立即停止。新 Run 可读取变化后的外部数据；幂等指提交去重与无重复副作用，不承诺模型字句或外部数据相同。费用口径见 §2.6。
+重试默认最多 2 次（含首次），只读暂态/429 按允许分类退避；auth/权限/合同失败立即停止。新 Run 可读取变化后的外部数据；幂等指提交去重与无重复副作用，不承诺模型字句或外部数据相同。运行记录见 §2.6。
 
 ### 2.2 S1 技术动态简报（首个公开检索场景）
 
@@ -120,7 +120,7 @@
 - 审核断言：拒绝保留草稿；刷新后仍能定位；缺 citation 禁批准；重复 resume 返回原回执。
 - 幂等/重跑：同 caseKey 只一个 Run；新 Run 重新检索并记录新快照；原历史只读。
 - UI 演示：复制场景→选环境→填主题→运行→看三路→进子图核对来源→拒绝一次→新 Run 批准→导出。
-- 耗时/预算：3–8 分钟；模型 2–3 次、工具 6–12 次；输入 10k–30k、输出 2k–6k token；计入全轮 10 Run/¥5。
+- 耗时/调用规模：3–8 分钟；模型 2–3 次、工具 6–12 次；输入 10k–30k、输出 2k–6k token；按实际 Run 记录，不单独核算费用。
 
 ### 2.3 S2 开源依赖健康检查
 
@@ -142,7 +142,7 @@
 - 审核断言：回应一项刷新，其他仍 waiting；全部审核才可完成；拒绝备注保留；不同包不串审。
 - 幂等/重跑：同包同版本去重；重复响应不产生重复行；新 Run 重新取数并记录快照。
 - UI 演示：填 2–3 个包→运行→进各子图看 API 来源→批准一项→刷新→拒绝一项→看矩阵→重跑核对。
-- 耗时/预算：6–15 分钟；模型 3–4 次、工具 6–12 次；输入 12k–40k、输出 3k–8k token；计入全轮 10 Run/¥5。
+- 耗时/调用规模：6–15 分钟；模型 3–4 次、工具 6–12 次；输入 12k–40k、输出 3k–8k token；按实际 Run 记录，不单独核算费用。
 
 ### 2.4 S3 社区问题分诊
 
@@ -164,7 +164,7 @@
 - 审核断言：审批前可见原问题与草稿；拒绝不产生客户消息；多次工具调用按调用序号对应参数/结果。
 - 幂等/重跑：重试恢复不重复消费同一响应；新 Run 若问题更新时间变化需重新审核，不沿用旧批准。
 - UI 演示：选真实公开问题→运行→展开第一次工具请求→看工具消息与第二轮→拒绝/升级→新 Run 批准草稿→确认社区未被写入。
-- 耗时/预算：4–10 分钟；模型 2–4 次、工具 2–6 次；输入 5k–20k、输出 1k–5k token；计入全轮 10 Run/¥5。
+- 耗时/调用规模：4–10 分钟；模型 2–4 次、工具 2–6 次；输入 5k–20k、输出 1k–5k token；按实际 Run 记录，不单独核算费用。
 
 ### 2.5 S4 内容事实审校
 
@@ -186,18 +186,17 @@
 - 审核断言：退回后旧批准不复用；拒绝不写 Store；缺来源禁批准；最多两轮。
 - 幂等/重跑：重复 resume 不增加保存次数；新 Thread 读已确认版本；历史分支不回滚 Store，新写仍做当下 CAS。
 - UI 演示：填公开/脱敏文案→看声明与来源→退回修改→第二轮→批准保存→新 Thread 读回→拒绝一轮确认版本未变。
-- 耗时/预算：5–12 分钟；模型 2–4 次、工具 2–5 次；输入 8k–25k、输出 2k–7k token；计入全轮 10 Run/¥5。
+- 耗时/调用规模：5–12 分钟；模型 2–4 次、工具 2–5 次；输入 8k–25k、输出 2k–7k token；按实际 Run 记录，不单独核算费用。
 
-### 2.6 费用统计方式（10 次 Run / ¥5 软上限）
+### 2.6 运行记录与停止条件（不做费用核算）
 
-**没有按 Run 的直接计费 API**；下面是估算与停止规则，不是供应商账单。
+**不设 ¥5 上限、不做价格表/费用换算。** 正常几轮的花费相对验收价值可以忽略；单次 Run 已由 `maxOutputTokens`、`maxToolCalls`、`maxNodeExecutions`、`timeoutMs` 等策略上限约束，不需要再叠一层金额预算。
 
-- **数据来源**：模型每次调用的 `usage`（input/output tokens）由运行时记录在 Step（`services/workflow/src/eduflow_workflow/runtime.py:159-160`、`step_complete`），API 以 `step.usage` 暴露（`api/_lib/workflowV2.ts:73`）。工具调用没有 token 账单；T2–T6、T8 为免费/限额公开 API（待逐项核实），T7 DeepWiki 的凭据与限额待核实，本轮没有付费工具。
-- **估算公式**：`run_cost = Σ_steps(inputTokens × inputPrice + outputTokens × outputPrice) + paidToolCost`。单价来自一份可审计的**价格表**（模型、输入/输出单价、币种、汇率、版本）；汇率固定并记录，不随实时汇率漂移。缓存命中、推理 token、供应商调价都可能造成偏差，因此一律标“估算”。
-- **账本**：每次 Run 结束后把 `{runId, scenario, env, tokens, estimatedCost, cumulativeCost, priceTableVersion, timestamp}` 追加到验收 ledger；每个 Round 汇报一次。账本与最终报告放在证据目录，不进入生产运行路径。
-- **停止规则**：`Run 数达到 10` 或 `估算累计 ≥ ¥5`，先到先停；达到后不新建 Run，先报告再决定是否追加。Run 数按**实际创建并进入执行**的 Run 计（含失败）；预检失败未创建 Run 不计。Local + Hosted 合计；建议 Local 用 6–8 次，给 Hosted 留 2–4 次。
-- **执行时点**：usage 只能在调用后读取，所以最后一轮可能轻微超出 ¥5；单次 Run 受 `maxOutputTokens`、`maxToolCalls`、`maxNodeExecutions` 等策略上限约束，超出幅度有界。若需要真正硬停，应在 DeepSeek 控制台设置余额/限额；该动作不在本计划内，也不由 API 完成。
-- **口径声明**：最终以供应商账单为准；若估算与账单不一致，报告两者并说明差异。不把估算写成“已结算”，不把 10 次 Run 写成“无限调用”。
+- **运行清单**：每次 Run 记录 `{runId, scenario, env, revision, status, startedAt, finishedAt}`，作为验收证据和复现索引；不计算金额，不维护 token 价格表。
+- **token usage**：Step 里仍有 `usage`，只作为“模型实际调用过、规模正常”的观测；需要时在证据里写 token 数，不折算费用。
+- **停止条件**：同一失败连续出现 2 次，先停下定位，不静默重跑；单次 Run 若卡住/循环，按现有取消与超时机制终止；不把“多跑几次碰成功”当验收。
+- **费用可见性**：如果账户 owner 想看花费，以供应商控制台账单为准；本项目不做计费系统，也不把估算写成已结算。
+- **成功定义**：Run 完成、无报错只是必要条件；通过标准是 §4.2 的场景断言（真实来源、引用、审核门禁、失败路径、无外部写），不是“跑绿了”。
 
 ## 3. 文件级实施清单（后续获准才执行）
 
@@ -210,7 +209,7 @@
 | P0-2a，0.5–1日 | controller 拟增 `refreshTools(envRef)` 与统一 `refreshEnvironmentResources`；取消过期响应；Live onSaved、EnvironmentPanel onDiscover 串行发现后刷新 | controller 测试保存 HTTP 即出现、MCP discovery 后出现、切环境竞态与失败重试；S1/S2 无页面刷新 | 回退接线，用显式刷新资源按钮暂替；不得假称工具已更新 |
 | P0-2b，0.5–1日 | W `registry.py` public_environment/public_tools、`extensions.py` 补结构化 origin/connectionRef/version/availability；F `domain/v2/types.ts`、`repository/v2/WorkflowApiV2.ts` 接收；EnvironmentPanel/ProcessingFields/WorkflowConnections 展示“我的连接·vN”与内置来源 | 投影仅暴露安全字段；同名不同连接可区分、同连接最新可用优先，旧已选版本仍显示；S1/S2 | 可选元数据兼容旧前端；无元数据明确来源待确认，不误标执行端 |
 | P0-2c，1–1.5日 | F 拟增 domain `connectionReferences.ts`：递归扫描子图 providerRef/toolRef/allowedToolRefs；生成旧→新提案；重取工具 contractDigest；ProcessingFields/Live 做预览、确认、保存新修订；W compiler 现有工具诊断只有 nodeId、无 pointer，需补 pointer/graphPath 或由前端按 nodeId 定位；`api/_lib/workflowV2.ts` 仅透传，不新增 Function | 旧版仍可用也提示可更新，停用旧版阻断；映射歧义/Schema 改变不自动绑定；子图/dispatch/白名单覆盖；S1–S4 各取一节点，S3 子图必测 | 未确认零修改；已保存通过新修订恢复原引用；旧连接仍须有效，禁改历史 Run/冻结 Thread |
-| P0-3，0.5–1日+等待 | 后续新增明确开关的场景验证脚本置 `scripts/workflow/checks/`，复用 `verify-agent-scenarios.mjs` 计数/ledger 思路；不默认调用；文档记录真实环境与 Run | Local S1 先成功，再四场景，最后 Hosted 模型+公开检索/DeepWiki 真实调用与一条失败证据 | 关停自建 Thread、停用临时连接；保留失败证据，不重放未知外部效果 |
+| P0-3，0.5–1日+等待 | 后续新增明确开关的场景验证脚本置 `scripts/workflow/checks/`，复用 `verify-agent-scenarios.mjs` 计数/运行清单思路；不默认调用；文档记录真实环境与 Run | Local S1 先成功，再四场景，最后 Hosted 模型+公开检索/DeepWiki 真实调用与一条失败证据 | 关停自建 Thread、停用临时连接；保留失败证据，不重放未知外部效果 |
 | P0-4，0.5日 | 后续更新 Hosted runbook：共享环境授权责任人、脱敏结构快照、CI 发布、D3 清理；不恢复归档裸部署脚本 | 部署前后自检、兼容候选、owner 移除前后读回；授权撤销不能继续原 Thread；保留账号不受影响 | 仅授权后恢复原 owner 清单；不恢复秘密到文档、不回滚共享数据库 |
 | P1 输入，0.5日 | `LiveWorkflowEditor.tsx:509` 移除可编辑入口；RunInputSnapshot/RunPreparationDialog 保留只读摘要及顶部运行唯一入口 | 调用方输入仍只读；required/optional 与历史重跑不回归；S1/S4 | 回退局部展示提交，不能改变冻结输入语义 |
 | P1 布局，1–2日 | `WorkflowGraph.tsx`/Live/CSS 统一顶部、palette、inspector、底部工具插槽；互斥与滚动；禁止由面板开关触发布局/fit | S3 多等待+历史条+子图；S4 长审核；视口矩阵中按钮可点击、节点坐标/视口稳定 | 回退布局提交；阻塞窄屏功能保持明确限制，不签通过 |
@@ -259,13 +258,13 @@ Chrome 全路径，Safari/Firefox 冒烟；截图+DOM 几何+elementFromPoint �
 
 - 后续证据根：`artifacts/workflow/acceptance/evidence/canvas-real-20261022/<round>/<local|hosted>/<S1..S4>/<caseId>/`；索引在 `docs/acceptance/`，本次不创建这些目录或文件。
 - 命名：`manifest.json`、`assertions.json`、`calls.redacted.json`、`review-<n>.json`、`ui-<viewport>-<step>.png`、`cleanup.json`；失败保留 `failure-<code>-<attempt>.json`，复验证据另建 caseId。
-- manifest：commit/部署/执行器/环境修订/工具合同、workflow/revision/run/thread/step/task/namespace/checkpoint、开始结束时间、客户端、caseKey 与预算；未知项明确 null+原因。
-- 真工具证据：实际工具名/ref/版本、目标公开 URL/查询词/时间/SHA（如有）、外部状态码、耗时/attempt、结果短摘要/散列与 Step 关联；模型 provider/model、流片段时序、usage。无供应商账单只能写 token 估算费用，不写已结算费用。
+- manifest：commit/部署/执行器/环境修订/工具合同、workflow/revision/run/thread/step/task/namespace/checkpoint、开始结束时间、客户端、caseKey 与运行身份；未知项明确 null+原因。
+- 真工具证据：实际工具名/ref/版本、目标公开 URL/查询词/时间/SHA（如有）、外部状态码、耗时/attempt、结果短摘要/散列与 Step 关联；模型 provider/model、流片段时序、usage。token usage 只作观测，不折算费用或写成已结算。
 - 禁止证据包含 Authorization/Cookie、真实凭据、完整 State/客户正文、私有仓库源码或网络原始 HAR；公开索引使用脱敏身份，完整 UUID 如运维必要只在授权受限证据中留存。截图先检查账号/连接字段。
 - 受控 429/timeout/断流用于分类与重试边界，另标 controlled；不篡改真实凭据制造故障，不用本地 echo 替代真工具成功。真远端失败有则如实记录，无则不虚构。
 - 失败循环：原失败→定位原因→单写作者修复→相关门复验→新 fresh 会话重走失败路径及邻接路径→产品再审；不覆盖旧失败证据。恢复未知提交先查原幂等回执，禁止重发。
-- 同一阻塞两轮无进展即给产品负责人差距/选项/成本；涉及秘密泄露、跨 owner、unknown 外部效果立即停受影响路径并升级；超过授权费用立即停止新调用。不得降门槛换通过。
-- ledger 只列自建对象精确 ID、owner、用途、保留期和清理回执；先终结 waiting/active，再用支持的认证接口清理自建 workflow/thread/记忆/连接。无删除接口则标待人工运维，不直接广删 SQL。
+- 同一阻塞两轮无进展即给产品负责人差距/选项/成本；涉及秘密泄露、跨 owner、unknown 外部效果立即停受影响路径并升级；同一失败连续两次或出现异常循环立即停止排查。不得降门槛换通过。
+- 清理清单只列自建对象精确 ID、owner、用途、保留期和清理回执；先终结 waiting/active，再用支持的认证接口清理自建 workflow/thread/记忆/连接。无删除接口则标待人工运维，不直接广删 SQL。
 - D3 在产品验收与证据收齐后实施：管理员授权维护、保存受控 owner 清单、移除测试管理员、按 runbook 发布读回；验证该账号环境不可用、保留 owner 正常。UUID 清单不放公开文档。
 - 保留正常用户与既有四个 Hosted 示例；不按名字模糊删除。未知外部写先核对目标回执/计数，取消不代表撤销，清理也不自动撤销业务操作。
 
@@ -274,7 +273,7 @@ Chrome 全路径，Safari/Firefox 冒烟；截图+DOM 几何+elementFromPoint �
 | 动作 | 授权应包含 | 未授权默认 |
 | --- | --- | --- |
 | 真实外部写 | 目标仓库/对象、操作/内容、账号、幂等/回执、回撤方式 | 只产草稿；人工审核按钮不替代用户给工程执行者的授权 |
-| 费用 | 10 次实际 Run / 估算 ¥5 上限（§2.6），先到先停 | 不发起付费实模；达到上限先报告，不静默追加 |
+| 真实调用 | 使用已授权的模型与公开工具；按实际 Run 记录 | 不发起未授权付费工具；同一失败两次先排查 |
 | 真实凭据 | 用户在受控连接界面/服务端秘密管理中配置及许可范围 | 不请求粘贴到聊天，不读私有文件，不扩大 token scope |
 | ownerIds | 执行账号、目标环境、增删集合、回退责任人 | D3 决策已定；具体变更执行须有目标与运维授权，不能扩大授权 |
 | production 提升/后台更新 | 项目、候选、兼容回退与操作员 | 测试阶段可直接部署 workflow 服务 + Preview（2026-10-22 已确认）；主站 production 不自动提升；后台 Production 更新按授权执行 |
@@ -283,10 +282,10 @@ Chrome 全路径，Safari/Firefox 冒烟；截图+DOM 几何+elementFromPoint �
 
 | Round / 估时 | 目标与交付物 | 门禁/依赖 | 风险、可停止条件 |
 | --- | --- | --- | --- |
-| R1，3–5日 | P0-1、P0-2；连接诊断/刷新/轮换；**Local S1 首个真实公开检索（HN/arXiv/Wikipedia）+DeepSeek**，版本提案与最小成功/失败证据 | 10 Run/¥5 预算与凭据；目录映射落实；相关测试与局部视觉，S1 成功/拒绝/失败/幂等通过 | 目录缺操作/预算未确认停在候选；不扩四场景；可交付连接闭环后等待真实验收 |
-| R2，3–5日 | Local S2–S4，显式 demo seed/普通 API 创建；P1 画布与必要 P2；技术/视觉与 fresh 预验收 | R1 真工具通过；四套合同、预算、清理 ledger；类型/全量基线与构建按 §4 执行 | Send 屏障、循环/消息、CAS 为风险；缺业务工具先停该场景，不改成 echo；可停在 Local 完整套件 |
+| R1，3–5日 | P0-1、P0-2；连接诊断/刷新/轮换；**Local S1 首个真实公开检索（HN/arXiv/Wikipedia）+DeepSeek**，版本提案与最小成功/失败证据 | 模型/公开工具凭据；按实际 Run 记录；目录映射落实；相关测试与局部视觉，S1 成功/拒绝/失败/幂等通过 | 目录缺操作/凭据未就绪停在候选；不扩四场景；可交付连接闭环后等待真实验收 |
+| R2，3–5日 | Local S2–S4，显式 demo seed/普通 API 创建；P1 画布与必要 P2；技术/视觉与 fresh 预验收 | R1 真工具通过；四套合同、运行清单、清理清单；类型/全量基线与构建按 §4 执行 | Send 屏障、循环/消息、CAS 为风险；缺业务工具先停该场景，不改成 echo；可停在 Local 完整套件 |
 | R3，1–3日 | Hosted 对账与直接部署；P0-3/4，四场景真实调用、失败与跨视口证据 | R2 通过；真实环境、schema、digest、Function 产物≤12；部署前后自检通过 | 平台限流/不兼容/部署异常即停；不重置共享库；可停在已验证 Preview，不提升主生产 |
-| R4，1–2日+返工 | fresh Hosted 预验收→产品负责人最终验收；D3 移除授权、精确清理、签署残余风险 | 四套所有必过项、0 阻塞视觉、费用/调用账齐；产品签署与运维授权 | 失败按 §4 循环；移除 owner 后再读回；可接受“Local 通过/Hosted 阻塞”明确结论，不假签完成 |
+| R4，1–2日+返工 | fresh Hosted 预验收→产品负责人最终验收；D3 移除授权、精确清理、签署残余风险 | 四套所有必过项、0 阻塞视觉、运行清单/清理清单齐；产品签署与运维授权 | 失败按 §4 循环；移除 owner 后再读回；可接受“Local 通过/Hosted 阻塞”明确结论，不假签完成 |
 
 总粗估 8–15 人日，另计外部授权与失败返工；不承诺供应商延迟。每轮独立冻结候选与可回滚提交，单作者串行修改 Live/controller/registry/API 等热点。
 回退保留历史、Run、检查点；应用回退不等于数据库回退；后端改动可能改变 executorDigest，升级前先验证旧 waiting 恢复资格，无兼容候选就明确拒绝继续并保留旧身份。
@@ -297,12 +296,12 @@ Chrome 全路径，Safari/Firefox 冒烟；截图+DOM 几何+elementFromPoint �
 | --- | --- | --- |
 | 1 | 必须你决定 | 真实数据目标：公开检索主题、包名或待审文案；建议公开数据，避免私有内容；S1 先选你熟悉的主题。 |
 | 2 | 必须你决定 | 外部写范围：建议本轮全部只读，交付草稿；评论/Release/CMS/工单写留下一轮逐项授权。 |
-| 3 | 已确认 | 费用：10 次实际 Run / 估算 ¥5（§2.6），先到先停，超出前报告。 |
+| 3 | 已确认 | 不做费用核算，不设 ¥5 上限；按实际 Run 记录，单次 Run 受现有策略上限约束（§2.6）。 |
 | 4 | 已确认 | Hosted：测试阶段直接部署 workflow 服务 + Preview，不设维护窗口；主站 production 不自动提升。 |
 | 5 | 工程待核实 | 当前 Hosted 项目/部署、schema/digest/实际 Function 数与 ready：默认未核实不进 Hosted。 |
 | 6 | 工程待核实 | 公开检索 API/DeepWiki/GitHub 的实际目录、Schema、限流、副作用与凭据可用：逐项读回，缺项出差距单并决定是否新增连接。 |
 | 7 | 工程待核实 | 连接元数据、MCP 发现版本映射、前后端兼容及旧 Thread 行为：默认只扩现有投影，不迁移；歧义要求人工重选。 |
-| 8 | 工程待核实 | 实际 token 单价/工具收费/限流、运行上限及清理 API：默认并发≤2、重试≤2、四场景有界；未知收费/清理权限阻塞对应动作。 |
+| 8 | 工程待核实 | 公开 API 限流、运行上限及清理 API：默认并发≤2、重试≤2、四场景有界；未知限流/清理权限阻塞对应动作。 |
 
 ## 7. 本次规划核查记录
 
@@ -312,4 +311,5 @@ Chrome 全路径，Safari/Firefox 冒烟；截图+DOM 几何+elementFromPoint �
 ## 8. 复核与变更记录
 
 - 2026-10-22：Codex 只读子智能体起草；Lead 复核后补充场景覆盖矩阵与场景落地方式，更正连接轮换表述（旧版本在停用/移除前仍可用），并把工具诊断 pointer 缺口改为“复用 nodeId 或补 pointer”。未实施、未提交、未部署。
-- 2026-10-22：按用户反馈改为公开检索为主（HN/arXiv/Wikipedia/npm/PyPI/StackExchange，GitHub 仅 S2 可选）；费用改为 10 次实际 Run / ¥5 估算上限并补充 §2.6 统计方式；Hosted 改为测试阶段直接部署、不设维护窗口。
+- 2026-10-22：按用户反馈改为公开检索为主（HN/arXiv/Wikipedia/npm/PyPI/StackExchange，GitHub 仅 S2 可选）；Hosted 改为测试阶段直接部署、不设维护窗口。
+- 2026-10-22：按用户反馈取消费用核算与 ¥5 上限；不维护价格表/金额账本，只保留运行清单与“同一失败两次先停查”的规则。
