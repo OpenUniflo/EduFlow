@@ -12,6 +12,7 @@
 | Local 真实模型调用 | 成功 | 经普通认证 API 创建并运行 `workspace-question` 变体；run `7bbd21ba-87a5-4e19-b10a-61e51f0b0127`，status `success`；provider `deepseek` / `deepseek-flash`，未记录密钥 |
 | S1 公开检索 + 函数 + 模型 | 成功 | 普通认证 API 创建自定义探针 `608b80bb-8455-4778-8909-4a58e8b29710`；run `92f68fae-246a-45af-aeb6-edf933c8347a`，status `success`，输出 1 条中文简报；Hacker News Algolia 只读连接返回 5 条 story，经隔离函数整理后由真实模型生成 |
 | 真实超时发现 | 已修正 | 首次 30s 节点超时导致模型节点失败；将探针节点超时提高到 120s 后成功。四套产品模板草案同步改为 `nodeTimeoutMs:120000` / `timeoutMs:180000` |
+| S1 模板对齐 | 草案完成 | 产品模板改为读取 HTTP 适配器的 `result` 包装：HN `result.hits`、Wikipedia `result.extract`、npm `result` 对象，再由隔离函数整理后交给模型；compiler 结构校验 4/4 通过。arXiv XML 不是 JSON，暂由 npm 公开元数据替代第三个来源，arXiv 适配仍是缺口 |
 | 环境问题 | 已绕过 | 本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常；启动 Local 服务时归一为 `localhost,127.0.0.1` 后模型可用。该问题不是代码失败，但需在验收环境说明 |
 
 探针使用普通认证 API 与 Local Worker，未走浏览器、未使用产品模板创建对话框、未执行正式 UI 视觉；未验证拒绝、受控失败、重复提交、清理或跨账号隔离。`hn_ai_agents` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。
