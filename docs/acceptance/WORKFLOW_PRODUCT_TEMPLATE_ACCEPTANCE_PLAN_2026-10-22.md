@@ -15,7 +15,8 @@
 | S1 模板对齐 | 草案完成 | 产品模板读取 HTTP 适配器的 `result` 包装：HN `result.hits`、StackExchange `result.items`、npm `result` 对象，再由隔离函数整理后交给模型；compiler 结构校验 4/4 通过。Wikipedia mobile 在本机 Worker 超时；PyPI 完整 JSON 触发 `EVENT_TOO_LARGE`；arXiv 是 XML。S1 现用 HN + StackExchange + npm 三来源，Wikipedia/arXiv 仍是缺口 |
 | S1 产品模板创建/绑定/运行 | 成功（技术） | `product-tech-brief` 用 HN `hn_ai_agents`、npm `npm_zod`、`deepseek`/`deepseek-flash` 绑定创建；workflow `67a50f22-9cdd-44e9-9f2e-0be93e33197d`；run `6035ca25-2ced-41a4-a014-354de0dfb33b`，status `success`，输出中文简报并带来源 |
 | S1 三来源产品模板运行 | 成功（技术） | 三来源绑定 HN `hn_ai_agents`、StackExchange `se_workflow`、npm `npm_zod`；workflow `f526d1dc-d2cb-4b66-a30f-a65b25c6273a`；run `27e5285f-22d0-482d-a3e5-92513be50d57` · `success`，输出引用 4 条 HN、3 条 StackExchange 问题与 npm `zod 4.6.7` |
-| S1 浏览器 UI 路径 | 成功（390/768/1024/1440；旧两来源模板） | 从工作流库打开新建对话框，选择“技术周报简报”，环境 `Local acceptance` + HN/npm/模型绑定后创建 workflow `f65535a3-f73b-4014-947f-e91c5b641e2e`；run `fa281044-c056-4088-aae8-6a3c527f35a0` · `success`，HN/npm 工具“已执行成功”，最终输出带来源。顶栏/历史与画布在四视口均不重叠，顶栏按钮均可见；390 初始视口裁掉最左 HN 节点（可用“适应画布”恢复）。截图：[390](evidence/workflow-s1-round13/s1-390.png)、[768](evidence/workflow-s1-round13/s1-768.png)、[1024](evidence/workflow-s1-round13/s1-1024.png)、[1440](evidence/workflow-s1-round13/s1-1440.png)；三来源模板 UI 复跑待补 |
+| S1 浏览器 UI 路径 | 成功（390/768/1024/1440；旧两来源模板） | 从工作流库打开新建对话框，选择“技术周报简报”，环境 `Local acceptance` + HN/npm/模型绑定后创建 workflow `f65535a3-f73b-4014-947f-e91c5b641e2e`；run `fa281044-c056-4088-aae8-6a3c527f35a0` · `success`，HN/npm 工具“已执行成功”，最终输出带来源。顶栏/历史与画布在四视口均不重叠，顶栏按钮均可见；390 初始视口裁掉最左 HN 节点（可用“适应画布”恢复）。截图：[390](evidence/workflow-s1-round13/s1-390.png)、[768](evidence/workflow-s1-round13/s1-768.png)、[1024](evidence/workflow-s1-round13/s1-1024.png)、[1440](evidence/workflow-s1-round13/s1-1440.png)；三来源 UI 复跑见下一行 |
+| S1 三来源浏览器 UI 路径 | 成功（1440） | 新建对话框绑定 `Local acceptance` + HN `hn_ai_agents` + StackExchange `se_workflow` + npm `npm_zod` + DeepSeek；workflow `ccdd6f3a-401c-4e64-a039-265bacd206d0`；run `b3e7923a-cd95-4e8e-887b-1687b3a6575f` · `success`；最终输出同时引用 HN、StackExchange 与 npm，7 个节点全部完成；截图 [s1-three-source-ui-1440.png](evidence/workflow-s1-round13/s1-three-source-ui-1440.png) |
 | S1 125% 等效视口 | 通过（模拟） | 以 1440/1.25 = 1152×720 CSS 视口模拟 125% 浏览器缩放下 1440×900 布局；顶栏 64–175、画布 175–675、历史 675–720，无重叠，保存/校验/运行均可见；截图 [s1-zoom125-1152.png](evidence/workflow-s1-round13/s1-zoom125-1152.png)。未用真实浏览器 zoom 控件 |
 | S1 浏览器控制台 | 当前路径 0 error | 服务重启后新导航到该 workflow，`browser_console_messages` 返回 0 条 error；旧标签页在服务停机期间产生的 `ERR_CONNECTION_REFUSED` 未计入当前路径 |
 | S1 跨账号隔离 | 通过（API） | Local 管理员读取学生 workflow `f65535a3…` → `404 NOT_FOUND`；用该 ID 发起 Run → `404`；管理员库搜索“技术周报简报”匹配 0 条 |
@@ -25,7 +26,7 @@
 | S1 受控失败 | 成功 | 将 HN 绑定到公开 404 连接，run `b23dd2aa-6ffd-4e23-8ecb-c53840ee7db1` 失败为 `HTTP_TOOL_FAILED / HTTP 404` |
 | 环境问题 | 已绕过 | 本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常；启动 Local 服务时归一为 `localhost,127.0.0.1` 后模型可用。该问题不是代码失败，但需在验收环境说明 |
 
-探针使用普通认证 API 与 Local Worker；随后完成浏览器 UI 路径、四视口、125% 等效视口、控制台检查、跨账号读取/Run 拒绝与清理。S1 三来源 API 运行已成功；三来源模板的 UI 复跑、真实浏览器 zoom、Wikipedia/arXiv 适配与 Hosted 仍未完成。`hn_ai_agents`、`npm_zod`、`se_workflow` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限从 4096 调为 3072，并把提示约束为 250 字后成功，避免节点 120s 超时与输出截断。
+探针使用普通认证 API 与 Local Worker；随后完成浏览器 UI 路径、四视口、125% 等效视口、三来源 UI 复跑、控制台检查、跨账号读取/Run 拒绝与清理。S1 三来源 API 与 UI 运行均已成功；真实浏览器 zoom、Wikipedia/arXiv 适配与 Hosted 仍未完成。`hn_ai_agents`、`npm_zod`、`se_workflow` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限从 4096 调为 3072，并把提示约束为 250 字后成功，避免节点 120s 超时与输出截断。
 
 ## 1. 范围、冻结决策与阶段门
 
