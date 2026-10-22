@@ -78,6 +78,11 @@ class Registry:
             env.setdefault("capabilities",["serial","bounded-loop","llm","http","mcp","function"])
             env["capabilities"]=list(dict.fromkeys([*env["capabilities"],"checkpoint","interrupt","parallel","join","send","command","subgraph","node-retry","node-cache","node-error-handler","custom-reducer","runtime-context","store","model-token-stream","thread-continuation","replay-fork","state-update","bulk-state-update"]))
             env.setdefault("revocationEpoch",0)
+            access=env.get("access","owners")
+            if access not in ("owners","authenticated"): raise ExecutionError("INVALID_ENVIRONMENT","Unsupported environment access","policy")
+            if access=="authenticated":
+                if env.get("ownerIds"): raise ExecutionError("INVALID_ENVIRONMENT","Authenticated environments must not declare ownerIds","policy")
+                if any(env.get(field) for field in ("providers","connectors","tools","variables","functions")): raise ExecutionError("INVALID_ENVIRONMENT","Authenticated environments must not carry capabilities or secrets","policy")
             self.update(env)
     def update(self, env):
         for tool in env["tools"]:
@@ -87,8 +92,11 @@ class Registry:
                 tool["available"]=False;tool["diagnostics"]=[{"code":getattr(error,"code","INVALID_TOOL_SCHEMA"),"severity":"error","message":"Tool Schema is unsupported or invalid in M1"}]
             tool["contractDigest"]=digest({key:value for key,value in tool.items() if key not in ("contractDigest","available","diagnostics")})
         env["revision"] = digest({key:value for key,value in env.items() if key not in ("revision","functions","variables","configurationRevision")})
+    def environment_allowed(self, env, owner):
+        if not owner or env.get("disabled"): return False
+        return env.get("access","owners")=="authenticated" or owner in env.get("ownerIds",[]) or "*" in env.get("ownerIds",[])
     def environment(self, ref, owner):
-        matches = [env for env in self.environments if env["ref"]==ref and not env.get("disabled") and (owner in env["ownerIds"] or "*" in env["ownerIds"])]
+        matches = [env for env in self.environments if env["ref"]==ref and self.environment_allowed(env,owner)]
         if not matches: raise ExecutionError("ENVIRONMENT_FORBIDDEN","Environment is not authorized", "auth")
         env=copy.deepcopy(matches[0])
         env["variables"]={};env["configurationRevision"]=0
@@ -127,6 +135,6 @@ class Registry:
             content['executionBackend']={'type':'vercel','image':os.environ.get('WORKFLOW_SANDBOX_IMAGE','')}
         return {**content,"digest":digest(content),"functions":env.get("functions",[])}
     def public_environment(self, env):
-        return {"environmentRef":env["ref"],"environmentRevision":env["revision"],"name":env.get("name",env["ref"]),"capabilities":env["capabilities"],"providers":[{k:v for k,v in p.items() if k in ("ref","modelRefs","name")} for p in env["providers"]],"connectors":[{k:v for k,v in c.items() if k in ("ref","name","transport")} for c in env["connectors"]],"limits":env["limits"],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0)}
+        return {"environmentRef":env["ref"],"environmentRevision":env["revision"],"name":env.get("name",env["ref"]),"access":env.get("access","owners"),"capabilities":env["capabilities"],"providers":[{k:v for k,v in p.items() if k in ("ref","modelRefs","name")} for p in env["providers"]],"connectors":[{k:v for k,v in c.items() if k in ("ref","name","transport")} for c in env["connectors"]],"limits":env["limits"],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0)}
     def public_tools(self, env):
         return [{k:v for k,v in tool.items() if k in ("ref","name","description","version","inputSchema","outputSchema","contractDigest","sideEffect","available","adapter","connectorRef","diagnostics") or k=="group" and v in ("test","general")} for tool in env["tools"]]

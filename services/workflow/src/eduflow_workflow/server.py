@@ -84,7 +84,7 @@ async def capabilities(): return {"protocolVersion":"1","nodes":registry.nodes,"
 @app.post("/v1/catalog")
 async def catalog(body:dict):
     owner=body["ownerId"]
-    envs=[env for env in registry.environments if not env.get("disabled") and (owner in env["ownerIds"] or "*" in env["ownerIds"])]
+    envs=[env for env in registry.environments if registry.environment_allowed(env,owner)]
     if body.get("environmentRef"):
         env=registry.environment(body["environmentRef"],owner)
         return {"items":registry.public_tools(env),"nextCursor":None,"environment":registry.public_environment(env)}

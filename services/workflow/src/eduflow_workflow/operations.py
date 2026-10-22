@@ -99,7 +99,14 @@ def assert_hosted_configuration():
         environments = json.loads(os.environ['WORKFLOW_ENVIRONMENTS_JSON'])['environments']
         if not environments: raise ValueError()
         for env in environments:
-            if env.get('localFixtures') or not env.get('ownerIds'): raise ValueError()
+            if env.get('localFixtures'): raise ValueError()
+            access = env.get('access', 'owners')
+            if access not in {'owners', 'authenticated'}: raise ValueError()
+            if access == 'authenticated':
+                if env.get('ownerIds'): raise ValueError()
+                if any(env.get(field) for field in ('providers', 'connectors', 'tools', 'variables', 'functions')): raise ValueError()
+                continue
+            if not env.get('ownerIds'): raise ValueError()
             for owner in env['ownerIds']: UUID(owner)
             for item in [*env.get('providers', []), *env.get('connectors', []), *env.get('tools', [])]:
                 for key in ('baseUrl', 'url'):
