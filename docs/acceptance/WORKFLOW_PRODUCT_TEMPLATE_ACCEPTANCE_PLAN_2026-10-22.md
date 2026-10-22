@@ -1,6 +1,6 @@
 # 工作流产品模板验收计划（2026-10-22）
 
-状态：**未执行**。本文是后续验收任务书，所有用例结果、部署身份、证据与签字均待实施后填写；不代表测试通过。
+状态：**Local 已通过并签字（2026-10-23）；Hosted 按用户决定暂缓。** Local 技术/视觉/隔离/自建 DeepSeek 能力与精确清理见 [Local 最终验收](WORKFLOW_LOCAL_FINAL_SIGNOFF_2026-10-23.md)；Hosted 四场景与模板内容迁移未签。
 对应[开发计划](../architecture/WORKFLOW_CANVAS_AND_REAL_SCENARIOS_PLAN_2026-10-22.md)，基线 `feat/workflow` @ `67c1a2c`。实现文件、场景合同与 R1–R4 路线以开发计划为准，验收矩阵集中在本文。
 
 ## 0. 本地技术探针（2026-10-22，不计入正式验收）
@@ -34,6 +34,7 @@
 | Hosted 部署/冒烟 | **按用户决定暂缓 Hosted 门** | 前端 Preview `dpl_8ZDWpav…` READY；Worker 重部署 `dpl_CrYMiVk…` 后 Sandbox 冒烟 run `cd2fc9e2…` 成功；S4 模型 run `85c8e7a4…` / `e729f38a…` 仍 `NODE_EXECUTION_FAILED`；临时 workflow/连接已清理；模板内容迁移未执行。用户 2026-10-23 决定先以 Local 验收为准 |
 | 本地执行能力自配置 | **成功** | Local 测试账号通过“环境与连接 → 连接”自建 DeepSeek 模型连接 `my_deepseek_round22`（凭据加密、返回只显示已配置），连接测试成功；环境 provider 显示 `origin=user`；用该连接运行 workflow `ddada551-25ef-4871-b629-e1a1497fada4`、run `e44be04a-55e5-41d4-9e0f-6649e40d3427` · `success`；截图 [round22-selfservice-deepseek.png](evidence/workflow-s1-round13/round22-selfservice-deepseek.png) |
 | Local S1–S4 汇总复验 | **全部 success** | S1 三来源 `b3e7923a…`、S2 `0c69c9b0…`、S3 `8036cb00…`、S4 `261ef403…`、自建模型 `e44be04a…` 在 Local DB 中均为 `success`，environmentRef `local`，error `null` |
+| Local 最终签字 | **通过** | 清理后 active test connections = 0、禁用 12 个测试连接、保留 24 个模板；Local 技术/视觉/隔离/自建 DeepSeek 均通过；Hosted 按用户决定暂缓。见 [Local 最终验收](WORKFLOW_LOCAL_FINAL_SIGNOFF_2026-10-23.md) |
 | 环境问题 | 已绕过 | 本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常；启动 Local 服务时归一为 `localhost,127.0.0.1` 后模型可用。该问题不是代码失败，但需在验收环境说明 |
 
 探针使用普通认证 API 与 Local Worker；S1 已完成浏览器 UI、四视口、125% 等效视口、三来源 UI、控制台、跨账号与清理；S2、S3、S4 的 API 与 UI 均已成功；Local 自建 DeepSeek 模型连接、加密凭据、连接测试与真实运行也已成功。Hosted 按用户 2026-10-23 决定暂缓：Worker 重部署后 Sandbox 冒烟成功，但模型节点仍失败，故未投放模板内容。真实浏览器 zoom 与 Wikipedia/arXiv 适配仍为已知缺口。`hn_ai_agents`、`hn_community_question`、`npm_zod`、`se_workflow`、`pypistats_langgraph` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限 3072，提示约束为 250/200 字后成功，避免节点 120s 超时与输出截断。

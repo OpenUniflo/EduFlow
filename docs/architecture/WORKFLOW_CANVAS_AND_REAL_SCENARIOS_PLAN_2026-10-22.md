@@ -276,7 +276,7 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 | Hosted 环境审计 | 通过（只读）；部署已开始、迁移未执行 | Supabase `uyljtdbvlivxniililay`：迁移 117 条与本地 digest `4abc4c45…` 一致、无 Local 用户、16 个历史模板但四产品模板缺失；Worker Production `dpl_Dy382…`、前端 Preview `dpl_9Sr9…` 均 READY；最近 Run 成功，Sandbox 固定镜像 `eduflow-isolated@sha256:fb27a073…`；前端 12/12 API 入口；env/log 读取被团队 scope 403，未读秘密 |
 | Hosted 部署/冒烟 | **按用户决定暂缓 Hosted 门** | 前端 Preview `dpl_8ZDWpav…` READY；Worker 重部署 `dpl_CrYMiVk…` 后 Sandbox smoke run `cd2fc9e2…` 成功；S4 模型仍 `NODE_EXECUTION_FAILED`；临时 workflow/连接已清理；模板内容迁移未执行；用户 2026-10-23 决定先以 Local 验收为准 |
 | 本地执行能力自配置 | **成功** | 测试账号通过 UI/API 创建加密 DeepSeek 连接 `my_deepseek_round22`，连接测试成功，环境 provider `origin=user`；真实运行 workflow `ddada551…`、run `e44be04a…` 成功；截图 [round22-selfservice-deepseek.png](evidence/workflow-s1-round13/round22-selfservice-deepseek.png) |
-| S1–S4、Hosted 正式验收 | **Local 通过；Hosted 暂缓** | Local S1–S4 API+UI 与自建模型能力均通过；Hosted 未签，内容迁移未执行 |
+| S1–S4、Hosted 正式验收 | **Local 通过；Hosted 暂缓** | Local S1–S4 API+UI 与自建模型能力均通过并完成精确清理；Hosted 未签，内容迁移未执行；见 [Local 最终验收](../acceptance/WORKFLOW_LOCAL_FINAL_SIGNOFF_2026-10-23.md) |
 
 验证：新增 2 项产品模板草案测试；四套 Definition 经 compiler `validate_structure` 全部通过；6 项 connection + 1 项 template capability + 3 项服务端模板绑定单测通过；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 171 文件 / 1280 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。S1 已取得 API 三来源、UI 四视口/125% 等效视口、控制台 0 error、跨账号 404 与清理证据；S2、S3、S4 已取得 API + UI 成功；Local 五项 run（含自建 DeepSeek）均 success；Hosted Sandbox 在 Worker 重部署后 smoke 成功，但模型节点仍失败，按用户决定暂缓 Hosted 门、内容迁移未执行；真实浏览器 zoom 与 Wikipedia/arXiv 适配仍缺。
 
@@ -328,3 +328,4 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 - 2026-10-23：Hosted 首次部署与冒烟：推送 `5ecf96a` 后前端 Preview `dpl_8ZDWpav…` READY；Hosted 认证与环境目录可用，但 S1（3 工具 + 函数 + 模型）run `ccc24dd1…` 因 `SANDBOX_UNAVAILABLE` 失败，S4（仅模型）run `85c8e7a4…` 因 `NODE_EXECUTION_FAILED` 失败；已删除临时 Workflow/禁用临时连接，未执行模板内容迁移。Hosted 技术门仍阻塞。
 - 2026-10-23：读取 Hosted daemon 日志确认 Sandbox `create` 阶段 `SandboxApiError`、watchdog `SANDBOX_REAP_FAILED`；重部署 Worker `dpl_CrYMiVk…`（commit `6a94040`）后最小 Sandbox smoke run `cd2fc9e2…` 成功，但 S4 模型仍 `NODE_EXECUTION_FAILED`。
 - 2026-10-23：用户决定先以 Local 验收为准，不把 Hosted 门作为当前阻塞；Local 自建 DeepSeek 连接（加密凭据、连接测试、`origin=user`）与真实模型 run `e44be04a…` 成功，S1–S4 五项 Local run 均为 success；Hosted 临时数据已清理，模板内容迁移保持暂停。
+- 2026-10-23：Local 最终验收签字：S1–S4 与自建 DeepSeek 五项 run 均 success；精确删除 10 个验收 Workflow、禁用 12 个测试连接，清理后 active connections=0、templates=24；Hosted 按用户决定暂缓、模板内容迁移未执行。见 [Local 最终验收](../acceptance/WORKFLOW_LOCAL_FINAL_SIGNOFF_2026-10-23.md)。
