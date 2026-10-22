@@ -233,3 +233,11 @@ D 修复：环境选择最小宽度提高到 160px。修复后实测宽度 160px
   - 运行历史记录显示“课程实训 · course-cc…:assignment:1”。
 - 测试夹具、模板、Run/Thread 已删除；definitions/revisions/runs/templates 计数均为 **0**；测试 Assignment 已恢复模板 `agent`、`workflow_input = NULL`。
 - 该链路验证了“保存草稿→发布→课程 API→只读输入→启动→完成”的本地闭环；Hosted 登录后链路仍未验证。
+
+## Hosted 画布左上角遮挡定位（2026-10-22）
+
+- 用户截图背后文字确认是 `.wf-canvas-notice`：“没有可用环境，请检查环境与连接。”
+- 根因一：该提示原定位 `top:14px;left:15px`，与 `top:16px;left:16px` 的“添加组件/主流程”浮层重叠，且 z-index 较低，被工具条压住，只露出“请…”片段。
+- 根因二：Hosted 登录账号调用 `/api/workflows?resource=environments` 返回 `{"items":[]}`，环境选择器只有“选择环境”；因此提示是真实的状态，不是残影。
+- 修复：提示移到画布右上（桌面 `top:64px;right:16px`，移动端 `top:112px;right:12px`），z-index 提到 10，并增加“重新加载环境”按钮；环境刷新成功时自动选择第一个环境。
+- 注意：Hosted 环境目录为空属于账号/环境授权配置问题，需在 `WORKFLOW_ENVIRONMENTS_JSON` 的 owner 范围中加入当前账号，或使用环境 owner 账号；仅改前端不能变出环境。
