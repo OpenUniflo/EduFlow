@@ -12,6 +12,7 @@ export const templateCapabilities: Record<string, TemplateCapability[]> = {
   "product-tech-brief": [
     { kind: "model", label: "DeepSeek 模型连接", detail: "归纳检索结果并生成技术简报" },
     { kind: "tool", label: "Hacker News 检索", detail: "公开 JSON 接口；模板读取 result.hits" },
+    { kind: "tool", label: "StackExchange 检索", detail: "公开 JSON 接口；模板读取 result.items" },
     { kind: "tool", label: "npm 包信息", detail: "公开 JSON 接口；模板读取 result 对象" },
   ],
   "product-dependency-health": [
