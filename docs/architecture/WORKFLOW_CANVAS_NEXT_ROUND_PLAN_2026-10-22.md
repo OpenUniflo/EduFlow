@@ -20,7 +20,7 @@
 | 4 | 模型节点只从 `environment.providers` 取选项 | `src/features/workflow/editor/v2/ProcessingFields.tsx:18-19` | 用户 DeepSeek 连接能出现在下拉，但依赖环境列表刷新 |
 | 5 | 工具节点只读 `controller.tools`，而工具只在 `environmentRef` 变化时重新拉取（依赖数组仅 `[environmentRef]`） | `src/features/workflow/application/v2/useWorkflowV2Controller.ts:131-134` | **保存 HTTP/MCP 连接后，新工具要刷新页面或切换环境才出现** |
 | 6 | 连接保存只触发环境列表刷新，不刷新工具 | `src/features/workflow/editor/v2/LiveWorkflowEditor.tsx:503` | 与 #5 共同造成“连接配了但节点选不到” |
-| 7 | 连接版本不可变，`providerRef/toolRef` 里带版本号 | `extensions.py` 的 `key = p4:owner:ref:version`；迁移 `20261018143955_workflow_p4_managed_secrets.sql` 的 `IMMUTABLE_VERSION` | 轮换版本 = 换引用键，已配置节点会显示“原连接不可用”，目前没有修复路径 |
+| 7 | 连接版本不可变，`providerRef/toolRef` 里带版本号 | `extensions.py` 的 `key = p4:owner:ref:version`；迁移 `20261018143955_workflow_p4_managed_secrets.sql` 的 `IMMUTABLE_VERSION` | 新版本不会自动替换节点引用；旧版本在停用/移除前仍可用，但停用旧版会让节点显示“原连接不可用”，目前没有升级/重绑路径 |
 | 8 | 环境面板把所有 provider 标为“由执行端管理凭据” | `src/features/workflow/editor/v2/EnvironmentPanel.tsx:7` | 用户自建模型连接被错误描述，用户会以为不能自己维护 |
 | 9 | 画布提示在 `<=900px` 与组件库、历史条、图说明同为 `top:112px` | `src/features/workflow/editor/v2/workflowV2.css` 的 `@media(max-width:900px)` | 桌面遮挡已修，**移动端仍会重叠** |
 | 10 | 运行 tab 仍有“查看/编辑启动输入”按钮 | `src/features/workflow/editor/v2/LiveWorkflowEditor.tsx:509` | 与“启动输入只在 Start 与运行对话框”存在重复入口（调用方输入模式已隐藏） |
@@ -55,14 +55,14 @@
 已具备：创建连接、加密凭据、测试、停用、按 owner 注入环境。缺的是下面四个断点，按影响排序：
 
 1. **保存连接后工具不刷新**：连接保存后同时刷新环境与工具（新增 `refreshTools()`，在 `onSaved` 调用），保证新 HTTP/MCP 工具立即可选。
-2. **轮换版本后节点失联**：版本不可变而引用键含版本。需要“受影响节点发现 + 一键更新到最新版本”，并在 `preflight` 阶段生成可定位诊断，而不是只在运行时失败。若产品选择更强方案，见决策 D2。
+2. **轮换版本后节点不会自动跟随**：版本不可变而引用键含版本；旧版本在停用/移除前仍可用，但停用旧版会让已配置节点失联。需要“可升级提示 + 受影响节点发现 + 一键更新到最新版本”，并在 `preflight` 阶段生成可定位诊断，而不是只在运行时失败。若产品选择更强方案，见决策 D2。
 3. **模型连接标识错误且轮换后无法区分**：环境面板把所有 provider 标成“执行端管理凭据”；旧版本连接未停用时会与新版本同时出现在下拉里，名称相同、只能靠 `p4:...` 引用区分。需要显示“我的连接 · 版本 N”，默认只呈现最新可用版本，并保留只读/写入与凭据状态。
 4. **节点内跳转不回流（可选）**：从模型节点进入“管理环境与连接”，保存后返回节点并自动选中新连接；时间不足可只做提示。
 
 **验收**：
 
 - 新建 HTTP 连接后，**无需刷新页面**即可在工具节点选中并运行（Local）。
-- DeepSeek `v1 → v2` 轮换后：节点显示“连接已更新，需重新绑定”，一键更新后 preflight 通过；未更新时 preflight 明确列出受影响节点。
+- DeepSeek `v1 → v2` 轮换后：旧节点默认仍可用但提示“有新版本可更新”，一键更新后 preflight 通过；停用 v1 后未更新的节点在 preflight 明确列出并给出修复入口。
 - 环境面板对用户连接显示“我的连接 · vN”，对环境内置显示“执行端管理凭据”；模型节点下拉不再出现两个同名同款的连接选项。
 - 单测：工具刷新、受影响节点发现、preflight 诊断；API/控制台无新增错误。
 
