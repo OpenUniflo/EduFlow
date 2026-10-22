@@ -2,14 +2,15 @@
 
 ## 0. 状态、决策与执行边界
 
-- 状态：仅规划；只读核查 `feat/workflow` @ `8fbbd79`，未运行测试、构建、真实模型/工具、平台或数据库操作。
-- 本次唯一新增文件为本文；没有读取秘密文件、私有账号页、环境文件或 dump。引用中出现凭据管理概念不代表已取得凭据。
+- 状态：仅规划；只读核查 `feat/workflow` @ `67c1a2c`，未运行测试、构建、真实模型/工具、平台或数据库操作。
+- 本轮更新本文、新建独立验收计划，并仅在上一轮计划文首加替代指针；没有读取秘密文件、私有账号页、环境文件或 dump。引用中出现凭据管理概念不代表已取得凭据。
 - 继承 [上一轮基线](WORKFLOW_CANVAS_NEXT_ROUND_PLAN_2026-10-22.md)：P0 环境与能力先行，P1 画布体验随后，P2 按门槛处理；本文替代其中“决策待确认”的状态。
-- **D1=A**：共享 Runtime Environment + 每用户连接；不做账号独立环境、provisioning UI。**D2=A**：节点显式更新连接版本并保存新修订；不引入逻辑连接身份迁移。**D3=A**：验收后移除测试管理员 ownerIds。
+- **D1=A**：共享 Runtime Environment + 每用户连接；不做账号独立环境、provisioning UI。**D2=A**：节点显式更新连接版本并保存新修订；不引入逻辑连接身份迁移。**D3=A**：验收后从旧受限环境 ownerIds 移除测试管理员；不删除账号，不撤销所有登录用户对共享 Runtime 的访问。
 - **Hosted 已确认（2026-10-22）**：测试阶段直接部署 `edu-flow-workflow` 与 Preview，不设维护窗口；不做费用核算，也不设 ¥5 上限。
 - **四套场景=产品模板（B，2026-10-22）**：共享 Runtime Environment（`access:"authenticated"`，无 Key）+ 用户自建执行能力；模板创建时绑定当前用户连接；Hosted 技术验收后用一条内容迁移投放，模板保留。
 - required/optional 已按 [输入优化计划 §8](WORKFLOW_INPUT_OBJECT_OPTIMIZATION_PLAN.md#8-已冻结决策2026-10-21) 的 A 冻结并实现，不再提请决定；缺失与空文本、false、0 的区别继续保留。
-- 后续实施：单写作者串行，热点文件不并行；无新增 Vercel Function、无数据库迁移。若 D2 改 C，停止本计划并另行评审，不把迁移夹入执行。
+- 后续实施：单写作者串行，热点文件不并行；无新增 Vercel Function、无 schema 迁移；仅在四场景 Hosted 技术验收通过后执行一条只插入 `workflow_templates` 的内容迁移。D2=A，不引入逻辑连接身份迁移。
+- **画布范围 A**：P0 环境闭环 + S1–S4 + P1（运行 tab 去重、窄屏插槽、键盘、归属、历史分支）；R1/R2/R3/R4 分别 4–6/4–6/1–3/1–2 日，总 10–17 人日。
 - 只用一个 V2 Definition、API Repository、LangGraph Worker、React Flow editor；不引入 Legacy，不把 Live 失败降级成预览成功。
 - `AGENTS.md:559–571,587`、`README.md:18,124–132`：历史只读，展示不重排画布；课程身份留在应用/API 边界，成功 Run 不自动完成 Assignment、不授予 mastery；不替代 Global Assistant。
 - 本文的函数名若标“拟新增”，是实施设计而非现有能力；未来命令、门禁和预期结果均不是本次执行记录。
@@ -18,7 +19,7 @@
 
 ### 1.1 证据读法与 Hosted 边界
 
-路径均相对仓库根，行号固定于本次 HEAD。表中 W=`services/workflow/src/eduflow_workflow/`，F=`src/features/workflow/`。
+路径均相对仓库根。原能力表代码证据保留；未逐行重核的历史定位标为待核实，不代表本轮验证通过。本轮直接复核了环境装配/快照、Hosted 校验、连接注入与模板创建边界（下表及 P0-5/6）；其余能力行号/行为待实施时核实。表中 W=`services/workflow/src/eduflow_workflow/`，F=`src/features/workflow/`。
 “代码支持”只证明实现入口存在；“Hosted 配置”必须由未来普通认证目录读回并实际 Run 证明，不能拿开发助手的 MCP 权限冒充 Worker 的工具权限。
 [最终验收包 §3](../acceptance/WORKFLOW_FINAL_ACCEPTANCE_PACKET_2026-10-22.md#3-残余风险--未覆盖) 只证明此前 Hosted 入口→结束；未证明真实模型/工具。
 上一轮计划 §1/§2 记载 DeepSeek、DeepWiki、GitHub；**当前实际部署、具体 toolRef/合同、约 24 capabilities 数量均待核实**，本次未联网读回。
@@ -55,7 +56,9 @@
 | 版本与轮换 | 同上；`catalog_operation:24` 版本键；上一轮计划 §1.7 记载不可变版本 | 旧版本不必立即失效；停用或目录不再提供时不可用。新版本出现也须明确提示可升级，不能宣称所有轮换必然失联 |
 | 工具刷新断点 | F `application/v2/useWorkflowV2Controller.ts:129–134` useEffect 仅依赖 environmentRef；`editor/v2/LiveWorkflowEditor.tsx:503` onSaved | 保存只拉环境，须补工具刷新、取消旧响应和发现后的同步 |
 | 凭据来源标识错误 | F `editor/v2/EnvironmentPanel.tsx:7` 所有 provider 固定同一文案；W `registry.py:130` public_environment | 公共投影尚无结构化来源/版本，不能仅靠名字判断“我的连接” |
-| 环境/能力耦合 | W `registry.py:31,91,130`；`operations.py:102–103` | 当前 environment 同时含 provider/tool/ownerIds；目标拆为共享 Runtime（无 Key）+ 用户 Capability（§2.7） |
+| 环境/能力耦合 | W `registry.py:72–79,90–133`；`operations.py:102–103` | 当前 environment 同时含 provider/tool/ownerIds；目标拆为共享 Runtime（无 Key）+ 用户 Capability（§2.7） |
+| 模板创建缺口 | `api/_lib/workflowV2.ts:116–118,158–171`；F `pages/WorkflowCreateDialog.tsx`、`domain/v2/types.ts:25` | 目录仅返回名称/描述，创建直接复制定义；尚无能力需求投影、绑定或服务端连接归属校验，P0-6 补齐 |
+| 修订冻结缺口 | W `registry.py:83–89,125–131`；`api/_lib/workflowV2.ts:318` | 当前 environmentRevision/configurationRevision 与 registrySnapshot 需明确承载 Runtime/Capability 两者修订，不能只加 access 字段 |
 | 移动端重叠 | F `editor/v2/workflowV2.css:74–75` notice/palette/banner/overview top:112px | 需要共享插槽，不是再加一个局部 top 偏移 |
 | 账号与输入入口 | F `editor/v2/LiveWorkflowEditor.tsx:140` ownerId；`:509` 运行 tab 可编辑按钮 | 可展示本人 UUID；移除重复编辑入口、保留只读摘要 |
 | API 可复用 | `api/_lib/workflowV2.ts:127–154,256–275` extensions/catalog/preflight | 扩展现有 handler 与投影，不新增 Function；权限继续由服务器 owner 决定 |
@@ -86,9 +89,9 @@
 | T5 | npm registry / PyPI JSON | **用户自建 HTTP 连接**；官方公开 API，无密钥 | S2 元数据 |
 | T6 | Stack Exchange API | **用户自建 HTTP 连接**；公开 API，无密钥但配额有限 | S3 备选 |
 | T7 | DeepWiki | 测试环境 connector；产品模板不依赖 | S1/S3 可选 |
-| T8 | GitHub 只读 | 测试环境工具；产品模板不依赖 | 仓库元数据 |
+| T8 | GitHub 只读 | 测试环境工具；产品模板不依赖 | 仅 S2 可选仓库元数据 |
 | T9 | 文件产物 | 函数节点生成 Markdown/JSON/CSV | 交付物 |
-| T10 | 外部写 | **本轮默认关闭**；仅在你指定一次性测试仓库后授权 | 不做 |
+| T10 | 外部写 | **本轮关闭**；外部写不在本轮范围 | 不做 |
 | T11 | 通用网页搜索 | Tavily/Brave/Serper 等需 Key；可选后续 | 不做 |
 
 产品模板只声明**能力需求**（模型类型、工具类型），不写死 `p4:` 引用；创建时绑定当前用户自己的连接，见 §2.7。
@@ -98,6 +101,8 @@
 统一合同：对象 `additionalProperties:false`；输入有界；来源内容是不可信数据；State 至少 `caseKey,sourceVersion,evidence[],errors[],review,status`；并行只 append 独立结果，汇总按稳定业务键去重排序；`review={approved:boolean,comment:string}` 按冻结语义；`output={caseKey,status,report,evidenceRefs,limitations}`。模型只产出候选，确定性函数校验来源/枚举；不假设模型有强制 JSON Schema 输出。
 
 公开检索的验收快照：每次运行记录**查询词 + 时间 + 前 N 条结果（标题/URL/短摘录）**；断言“引用存在且来自本次检索”，不要求两次结果逐字相同。结果变化、限流、来源不可达必须显式写入 `limitations`，不能补造。
+
+详细成功/拒绝/失败/重复提交用例统一见[验收计划](../acceptance/WORKFLOW_PRODUCT_TEMPLATE_ACCEPTANCE_PLAN_2026-10-22.md)。
 
 重试默认最多 2 次（含首次），只读暂态/429 按允许分类退避；auth/权限/合同失败立即停止。新 Run 可读取变化后的外部数据；幂等指提交去重与无重复副作用，不承诺模型字句或外部数据相同。运行记录见 §2.6。
 
@@ -119,10 +124,6 @@
 | 归一→T1 汇总→人工审核 | 每条结论必须带 citation；无来源不得进入批准 |
 | 审核→批准简报 / 拒绝草稿→End | 只输出文本，不发布 |
 
-- 成功断言：三路各一份结果；每条结论能对上本次检索的 URL/时间；时间窗正确；join 前不显示完整简报；批准后内容与所审版本一致。
-- 失败断言：429/超时最多两次并显式降级；任何一路未完成不显示“完整成功”；无结果写“未检索到”，不能补造；来源内容里的指令不执行。
-- 审核断言：拒绝保留草稿；刷新后仍能定位；缺 citation 禁批准；重复 resume 返回原回执。
-- 幂等/重跑：同 caseKey 只一个 Run；新 Run 重新检索并记录新快照；原历史只读。
 - UI 演示：复制场景→选环境→填主题→运行→看三路→进子图核对来源→拒绝一次→新 Run 批准→导出。
 - 耗时/调用规模：3–8 分钟；模型 2–3 次、工具 6–12 次；输入 10k–30k、输出 2k–6k token；按实际 Run 记录，不单独核算费用。
 
@@ -141,10 +142,6 @@
 | 子图输出一个 assessment→父图 defer 汇总 | 按动态任务全量完成语义汇总，不伪装成静态 join 前驱 |
 | 汇总→完整性核验→T1 比较→End | 覆盖全部 requiredFeatures；不足写 unknown |
 
-- 成功断言：每包恰一份结果；包名/版本/日期与 API 一致；矩阵覆盖全部约束；不存在遗漏包的完整报告。
-- 失败断言：404/429 明确 unknown 或跳过；不伪造星数/下载量；一个包失败不静默变成 zero；无完整矩阵不宣称完成。
-- 审核断言：回应一项刷新，其他仍 waiting；全部审核才可完成；拒绝备注保留；不同包不串审。
-- 幂等/重跑：同包同版本去重；重复响应不产生重复行；新 Run 重新取数并记录快照。
 - UI 演示：填 2–3 个包→运行→进各子图看 API 来源→批准一项→刷新→拒绝一项→看矩阵→重跑核对。
 - 耗时/调用规模：6–15 分钟；模型 3–4 次、工具 6–12 次；输入 12k–40k、输出 3k–8k token；按实际 Run 记录，不单独核算费用。
 
@@ -163,10 +160,6 @@
 | router(完成/证据不足/超预算) | 完成去人工；不足输出升级草稿；预算耗尽明确停止 |
 | 人工审核→批准回复草稿 / 拒绝升级→End | 覆盖子图、循环、分支、人工审核；默认不发评论 |
 
-- 成功断言：分类/优先级是建议；引用真实问题/文档；toolCalls 均消费且消息匹配；未知版本列入待补资料。
-- 失败断言：无搜索结果不是“无此问题”；auth/404 不重试；超过回合显式终止；不出现无界模型循环。
-- 审核断言：审批前可见原问题与草稿；拒绝不产生客户消息；多次工具调用按调用序号对应参数/结果。
-- 幂等/重跑：重试恢复不重复消费同一响应；新 Run 若问题更新时间变化需重新审核，不沿用旧批准。
 - UI 演示：选真实公开问题→运行→展开第一次工具请求→看工具消息与第二轮→拒绝/升级→新 Run 批准草稿→确认社区未被写入。
 - 耗时/调用规模：4–10 分钟；模型 2–4 次、工具 2–6 次；输入 5k–20k、输出 1k–5k token；按实际 Run 记录，不单独核算费用。
 
@@ -185,22 +178,18 @@
 | 审核→router(批准/退回/拒绝) | 退回附意见→修订→复核，最多 2 轮；超过结束草稿 |
 | 批准→memory.put(expectedVersion)→End | CAS 保存已审内容；冲突明确失败；不调用 CMS |
 
-- 成功断言：每个保留声明有对应公开来源；批准内容等于人工所审文本；新 Thread 读回版本匹配。
-- 失败断言：无来源声明被标记；不静默批准；CAS 冲突不覆盖；第二轮仍有问题只能拒绝/结束；记忆节点不配置 retry/handler 绕过事务保护。
-- 审核断言：退回后旧批准不复用；拒绝不写 Store；缺来源禁批准；最多两轮。
-- 幂等/重跑：重复 resume 不增加保存次数；新 Thread 读已确认版本；历史分支不回滚 Store，新写仍做当下 CAS。
 - UI 演示：填公开/脱敏文案→看声明与来源→退回修改→第二轮→批准保存→新 Thread 读回→拒绝一轮确认版本未变。
 - 耗时/调用规模：5–12 分钟；模型 2–4 次、工具 2–5 次；输入 8k–25k、输出 2k–7k token；按实际 Run 记录，不单独核算费用。
 
 ### 2.6 运行记录与停止条件（不做费用核算）
 
-**不设 ¥5 上限、不做价格表/费用换算。** 正常几轮的花费相对验收价值可以忽略；单次 Run 已由 `maxOutputTokens`、`maxToolCalls`、`maxNodeExecutions`、`timeoutMs` 等策略上限约束，不需要再叠一层金额预算。
+**不做费用核算、不设 ¥5 上限、不设 10 次 Run 上限、不维护价格表/金额账本。** 单次 Run 已由 `maxOutputTokens`、`maxToolCalls`、`maxNodeExecutions`、`timeoutMs` 等策略上限约束，不需要再叠一层金额预算。
 
 - **运行清单**：每次 Run 记录 `{runId, scenario, env, revision, status, startedAt, finishedAt}`，作为验收证据和复现索引；不计算金额，不维护 token 价格表。
 - **token usage**：Step 里仍有 `usage`，只作为“模型实际调用过、规模正常”的观测；需要时在证据里写 token 数，不折算费用。
 - **停止条件**：同一失败连续出现 2 次，先停下定位，不静默重跑；单次 Run 若卡住/循环，按现有取消与超时机制终止；不把“多跑几次碰成功”当验收。
 - **费用可见性**：如果账户 owner 想看花费，以供应商控制台账单为准；本项目不做计费系统，也不把估算写成已结算。
-- **成功定义**：Run 完成、无报错只是必要条件；通过标准是 §4.2 的场景断言（真实来源、引用、审核门禁、失败路径、无外部写），不是“跑绿了”。
+- **成功定义**：Run 完成、无报错只是必要条件；通过标准是[验收计划](../acceptance/WORKFLOW_PRODUCT_TEMPLATE_ACCEPTANCE_PLAN_2026-10-22.md)的场景断言（真实来源、引用、审核门禁、失败路径、无外部写），不是“跑绿了”。
 
 ### 2.7 产品模板化：共享运行环境 + 用户执行能力
 
@@ -208,17 +197,17 @@
 
 | 层 | 内容 | 访问 |
 | --- | --- | --- |
-| Runtime Environment（共享） | 镜像、网络、资源/超时、基础 capabilities | `access:"authenticated"`；所有登录用户，无需 ownerIds |
+| Runtime Environment（共享） | 镜像、网络、资源/超时、基础 capabilities | `access:"authenticated"`；所有登录用户，不使用 ownerIds |
 | Capability（用户） | DeepSeek/HTTP/MCP 连接、函数、变量 | 按 owner 隔离（`p4:`），用户自建 |
 | 有效配置 | Runtime + 当前用户 Capability，Run 冻结二者修订 | — |
 
 - 共享运行环境**不含** provider/connector/tool/secret；平台 Key 不进入共享层。测试管理员的 DeepSeek 连接是私有能力，可临时用现有平台 Key 创建，仅用于本轮验收。
-- 模板不写死 `p4:` 引用，只声明能力需求（模型类型、工具类型/用途）；创建时检测需求，让用户选择或新建自己的连接，再写入副本。缺连接时显示“需配置执行能力”，不允许假运行。
+- 模板及嵌套子图不写死 `p4:` 引用，只声明能力需求（模型类型、工具类型/用途）；创建时检测需求，让用户选择或新建自己的连接，再写入副本。缺连接时显示“需配置执行能力”，不允许假运行。
 - 对无密钥公开 API，绑定向导可提供“创建推荐连接”一键创建（用户确认），仍属于用户能力，不进入共享环境。
 - 模板 Local 先验证；Hosted 在四场景技术验收通过后，用一条**只插入 `workflow_templates` 的数据迁移**投放，不提前暴露半成品。
 - 模板验收后保留；只清理测试 Run/Thread/临时连接。现有 `hosted`（带平台 Key）保持 owner 限制，仅作测试与既有 owner 使用。
 
-## 3. 文件级实施清单（后续获准才执行）
+## 3. 文件级实施清单（后续实施，本轮只改文档）
 
 下表路径 F/W 同 §1；各项均有独立提交/候选冻结点。测试留在现有 Feature/worker 测试目录，不放 `api/` 顶层。
 所有新状态保持 loading/error/empty 独立，HTTP/MCP 发现也不能被环境列表成功掩盖；结果落地前核对仍是同一个 owner/env/请求代次。
@@ -230,9 +219,9 @@
 | P0-2b，0.5–1日 | W `registry.py` public_environment/public_tools、`extensions.py` 补结构化 origin/connectionRef/version/availability；F `domain/v2/types.ts`、`repository/v2/WorkflowApiV2.ts` 接收；EnvironmentPanel/ProcessingFields/WorkflowConnections 展示“我的连接·vN”与内置来源 | 投影仅暴露安全字段；同名不同连接可区分、同连接最新可用优先，旧已选版本仍显示；S1/S2 | 可选元数据兼容旧前端；无元数据明确来源待确认，不误标执行端 |
 | P0-2c，1–1.5日 | F 拟增 domain `connectionReferences.ts`：递归扫描子图 providerRef/toolRef/allowedToolRefs；生成旧→新提案；重取工具 contractDigest；ProcessingFields/Live 做预览、确认、保存新修订；W compiler 现有工具诊断只有 nodeId、无 pointer，需补 pointer/graphPath 或由前端按 nodeId 定位；`api/_lib/workflowV2.ts` 仅透传，不新增 Function | 旧版仍可用也提示可更新，停用旧版阻断；映射歧义/Schema 改变不自动绑定；子图/dispatch/白名单覆盖；S1–S4 各取一节点，S3 子图必测 | 未确认零修改；已保存通过新修订恢复原引用；旧连接仍须有效，禁改历史 Run/冻结 Thread |
 | P0-3，0.5–1日+等待 | 后续新增明确开关的场景验证脚本置 `scripts/workflow/checks/`，复用 `verify-agent-scenarios.mjs` 计数/运行清单思路；不默认调用；文档记录真实环境与 Run | Local S1 先成功，再四场景，最后 Hosted 模型+公开检索/DeepWiki 真实调用与一条失败证据 | 关停自建 Thread、停用临时连接；保留失败证据，不重放未知外部效果 |
-| P0-4，0.5日 | 后续更新 Hosted runbook：共享环境授权责任人、脱敏结构快照、CI 发布、D3 清理；不恢复归档裸部署脚本 | 部署前后自检、兼容候选、owner 移除前后读回；授权撤销不能继续原 Thread；保留账号不受影响 | 仅授权后恢复原 owner 清单；不恢复秘密到文档、不回滚共享数据库 |
-| P0-5，1–2日 | 运行环境/能力拆分：W `server.py`/`registry.py`/`operations.py` 增加 `access:"authenticated"` 校验与目录放行；共享环境不接受 provider/tool/secret；F `domain/v2/types.ts`、`WorkflowApiV2.ts` 接收 access；EnvironmentPanel 只展示当前用户能力 | 所有登录用户可见共享环境；无 Key 环境不能有 provider；旧 ownerIds 环境不回归；模板节点只看到自己的连接；S1 建立连接→绑定→运行 | 回退 access 模式并保留 owner 过滤；不把平台 Key 写进共享环境 |
-| P0-6，1–3日 | 模板化：F `WorkflowCreateDialog`/Live 增加能力需求检测、绑定当前用户连接、缺失引导、推荐公开连接创建；模板定义迁入 seed 与一条内容迁移；W 无新增；测试覆盖跨 owner 不泄漏 | 创建模板→绑定→运行；用户 A 的连接不出现在用户 B；缺连接明确提示；Local 先通过，Hosted 验收后投放 | 回退模板投放提交；模板定义保留在 seed，不删用户副本；不提前 Hosted 写入 |
+| P0-4，0.5日 | 后续更新 Hosted runbook：共享 Runtime 配置责任人、旧环境 ownerIds 脱敏结构快照、CI 发布、D3 清理；不恢复归档裸部署脚本 | 部署前后自检、兼容候选、owner 移除前后读回；旧受限环境撤权不能继续原 Thread；保留账号及共享 Runtime 不受影响 | 仅授权后恢复原 owner 清单；不恢复秘密到文档、不回滚共享数据库 |
+| P0-5，1–2日 | W `server.py:catalog`、`registry.py:environment/update/snapshot/public_environment`、`operations.py:assert_hosted_configuration`：校验共享 Runtime 的 `access:"authenticated"`，不使用 ownerIds，拒绝 provider/connector/tool/secret；`extensions.py:hydrate_connections` 只装配当前 owner 能力。沿 `compiler.py:compile_definition` → `api/_lib/workflowV2.ts` enqueue 的现有 registrySnapshot 冻结 Runtime/Capability 修订；F `domain/v2/types.ts`、`repository/v2/WorkflowApiV2.ts`、`editor/v2/EnvironmentPanel.tsx` 区分共享配置与本人有效能力。双修订字段承载及旧 Thread 兼容待核实，复用现有 JSON，不改 schema | `services/workflow/tests/` 下 `test_hosted_operations.py`、`test_preflight.py`、`test_runtime.py` 补匿名拒绝、登录可见、非法共享配置拒绝、跨 owner 隔离、轮换不改旧快照、旧 ownerIds 恢复限制；F `repository/v2/WorkflowApiV2.test.ts` 覆盖投影；双修订可读回才进 S1 | 回退前后端兼容候选及共享配置；保留用户连接和冻结快照。旧候选不能识别新 Thread 时停止恢复、保留记录，不降为通配 owner 或偷偷换 pin；不往共享层放 Key |
+| P0-6，1–3日 | F `pages/WorkflowCreateDialog.tsx`、`domain/v2/types.ts`、`repository/v2/WorkflowApiV2.ts`：需求→选择/新建→绑定→创建，缺项显示“需配置执行能力”；拟新增 `domain/v2/templateCapabilities.ts` 管理结构化需求/节点路径映射。`api/_lib/workflowV2.ts` templates 与 template POST 投影需求、重新校验当前 owner 的连接版本/合同、递归绑定后 document 校验再 saveCreation；复用 W catalog/preflight，必要校验扩现有边界。拟新增 `src/demo/workflow/productWorkflowTemplates.ts` 作为 seed 输入（生产不 import），及 `supabase/migrations/<生成时间戳>_workflow_product_templates.sql`（拟新增，仅 INSERT workflow_templates）；需求载体与文档校验兼容待核实，不新建表 | 拟增同目录 `templateCapabilities.test.ts`、`pages/WorkflowCreateDialog.test.tsx`、`tests/api/workflow-template-binding.test.ts`；扩 `repository/v2/WorkflowApiV2.test.ts`：缺能力、取消/确认推荐连接、A/B 隔离、伪造绑定、嵌套引用、重复 creationId；比对 seed/迁移摘要，仅插入四个新 ID，冲突停查。Local→Hosted 四场景技术门→迁移→发布后复制运行 | 投放前失败不执行迁移；应用回退不撤销已插入行。发布后先停放量/回退兼容候选，保留模板、用户副本及历史；若必须下架或修订已投放内容，记录工程阻塞并另案处理，禁广删、禁以回退提交冒充数据库回退 |
 | P1 输入，0.5日 | `LiveWorkflowEditor.tsx:509` 移除可编辑入口；RunInputSnapshot/RunPreparationDialog 保留只读摘要及顶部运行唯一入口 | 调用方输入仍只读；required/optional 与历史重跑不回归；S1/S4 | 回退局部展示提交，不能改变冻结输入语义 |
 | P1 布局，1–2日 | `WorkflowGraph.tsx`/Live/CSS 统一顶部、palette、inspector、底部工具插槽；互斥与滚动；禁止由面板开关触发布局/fit | S3 多等待+历史条+子图；S4 长审核；视口矩阵中按钮可点击、节点坐标/视口稳定 | 回退布局提交；阻塞窄屏功能保持明确限制，不签通过 |
 | P1 键盘，1–2日 | WorkflowGraph、ExecutionBubbles、SubgraphInvocationHistory、WorkflowDialog 的选择/移动/Tab/焦点返回；运行状态 aria-live | S2 调用选择、S3 部分回应全键盘可用；历史只读时禁移动；焦点不被轮询夺走 | 分批回退快捷键；保留已验证可访问名称与焦点环 |
@@ -243,64 +232,20 @@
 D2 特别门：新增版本不改旧定义；显式确认前展示所有受影响节点/子图路径、字段与合同差异；确认仅改当前编辑草稿，再走验证→保存新修订。
 新旧工具不是同一合同或工具名映射不唯一时要求人工重选；MCP 工具通过结构化 connector 身份与发现合同关联，不能只按 ref 字符串替换。
 正在执行、等待 Thread、历史修订保留原 pin；权限/环境变更仍按既有兼容检查拒绝或明确恢复，不能把“更新节点”伪装成热修复旧 Run。
-后端若无法安全提供元数据，先形成差距，不从显示文案推断 owner/version，也不借机加数据库迁移。
+后端若无法安全提供元数据，先形成差距，不从显示文案推断 owner/version，也不借机加 schema 迁移。P0-5/6 的实现细节待核实不重开产品决策；若现有 JSON/校验边界无法兼容，停在该门，不擅自扩大范围。
 
 ## 4. 分层验收与证据规则
 
-### 4.1 Local → Hosted，四段验收
+详细用例、模板/画布矩阵、命令、证据、失败循环、D3 与签字统一维护在[产品模板验收计划](../acceptance/WORKFLOW_PRODUCT_TEMPLATE_ACCEPTANCE_PLAN_2026-10-22.md)，本文只保留阶段门。该计划所有结果均未执行、待填。
 
-1. 实施者冻结候选：记录 commit、锁文件、变更清单；只在后续授权执行中跑相关单测/worker 用例，收尾按基线跑 `pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`、`pnpm test:workflow:worker`。
-2. 技术/自动视觉自验：Local 真实 Worker + 普通认证 API + 普通 UI；先 S1 真工具成功，再 S2–S4；可控故障证明边界，必须标 controlled，不能代替真实远端成功证据。
-3. fresh agent 模拟无背景预验收：只给业务目标、入口、非秘密测试输入和通过标准，不给开发排障步骤/实现解释；普通 UI 操作。允许后续专门启动只读验收 agent，单写作者继续独占代码。
-4. 产品负责人最终验收：看完整证据索引并亲自走关键路径，签通过/有条件通过/不通过；fresh agent 不冒充无背景人类，记录真实人类缺席风险。
-
-Hosted 进入前：先只读核对目标前后端 deployment、Supabase 项目/迁移历史、执行器 digest、环境/工具目录修订、/ready、Worker/watchdog/Sandbox、实际生成 Function 数每部署≤12。
-本轮预期无迁移：若 Hosted 已缺仓库既有迁移或与候选不兼容，标阻塞并另列维护项，不能擅自补库或重置。READY 前端不能代替后端就绪。
-后台 Daemons 的 Production 平台约束与产品 production 提升分开说明；若新 Worker 必须更新后台 Production，按已确认的直接部署执行，但仍在部署前后核对后台 Production 状态，不能称“只是 Preview”规避风险。
-Hosted 先普通认证 API 冒烟再 UI，复跑四套真实场景；保留模型最小成功、只读工具最小成功、一条可读失败记录，不用入口→结束或旧证据充数。
-Hosted 按 2026-10-22 用户确认：测试阶段**直接部署** `edu-flow-workflow` 与 Preview 前端，不设正式维护窗口；仍执行部署前后 `/ready`、Function 数、环境修订、Worker 状态检查，不 reset 共享库、不删除其他用户/示例数据；若发现其他用户活跃运行，暂停并报告。主站 production 前端不自动提升；后台 Production 更新按用户授权执行。
-
-### 4.2 通过与失败阈值
-
-| 场景/横切项 | 必须通过 | 任一即失败 |
+| 阶段 | 进入与退出门 | 可停点 |
 | --- | --- | --- |
-| S1 | 真公开检索+实模；三路全到；每条结论有本次检索来源；批准/拒绝各覆盖；无外部写 | 编造来源、缺支路报告成功、审后版本漂移 |
-| S2 | 2–4 个包各一份结果；版本/日期/维护状态与 registry API 一致；矩阵覆盖约束 | 伪造下载量/星数、遗漏包却报告完整、跨包串审 |
-| S3 | 真实公开问题；至少一个真实工具回合；白名单与回合上限生效；回复有引用 | 未调用却声称查询、工具消息错配、无界循环、社区被写入 |
-| S4 | 一次退回→再审→批准；新 Thread 读回；拒绝不增版本；CAS 冲突可读 | 未审稿持久为已批准、绕过冲突、分支回滚 Store |
-| 模板绑定 | 创建模板时检测能力需求、绑定当前用户连接；缺连接明确提示；用户 A 的连接不出现在用户 B 的副本 | 写死 `p4:` 引用、跨 owner 连接、缺连接静默失败 |
-| 模板投放 | Hosted 技术验收后发布；全局可见；半成品不提前出现 | 提前暴露、内容泄漏、模板依赖测试环境工具 |
-| 连接/权限 | 新工具无需刷新、轮换提案可定位/确认、新修订可审计、撤权生效 | 跨 owner 可见、秘密泄露、自动改冻结历史/Thread |
-| UI/技术 | 类型/构建及相关测试门全过；无新增 console error；关键控件可见可点 | 关键审核/运行控件遮挡、无法恢复、保存丢失、未知提交被重发 |
+| Local 技术/自动视觉 | 冻结候选；P0-1/2/5 → S1 → S2–S4/P0-6/P1；类型、测试、构建及阻塞视口通过 | 缺连接、合同或归属证据就停该场景，禁止以 preview/echo 代替真实成功 |
+| Local fresh 预验收 | 仅提供业务目标、入口、非秘密输入与标准；普通 UI 完成关键路径 | 修复后重新预验收，不用开发解释代替可用性 |
+| Hosted 技术与投放 | 核对目标项目、迁移历史、digest、目录、ready、Worker、实际 Function≤12；直接部署服务与 Preview，先认证 API 后 UI；四场景技术通过后才执行一条模板内容迁移并读回复验 | 不设维护窗口，不 reset 共享库；已有迁移缺口按仓库 Hosted 纪律增量对账处理，不由 Preview 自动迁库；schema/兼容性不明就停 |
+| Hosted fresh → 产品最终验收 | 发布后可见/复制/绑定/真实运行与跨 owner 验证；产品负责人签字；收齐证据后 D3 与精确清理 | 主站 production 前端不自动提升；残余阻塞只能记未通过，不假签 |
 
-语义断言基于真实来源与状态，不按模型句子逐字比较；证据不足不得产品签通过。各场景成功/失败/拒绝/重复提交各至少一个明确记录。
-视口：1280×800、1440×900、1920×1080 按原冻结基线阻塞；本轮触碰的 1024×768、768×1024、390×844 插槽/审核功能也升级为阻塞，超出变更面记风险。
-Chrome 全路径，Safari/Firefox 冒烟；截图+DOM 几何+elementFromPoint 命中+Tab/Escape 焦点；侧栏/历史/等待打开关闭前后节点坐标与视口不变。
-每个视口检查无环境三态、连接列表、运行输入、长审核、S3 多任务、子图与历史条共存；截图工具超时重采，不能仅靠文本宣称视觉通过。
-
-### 4.3 证据、失败循环与清理
-
-- 后续证据根：`artifacts/workflow/acceptance/evidence/canvas-real-20261022/<round>/<local|hosted>/<S1..S4>/<caseId>/`；索引在 `docs/acceptance/`，本次不创建这些目录或文件。
-- 命名：`manifest.json`、`assertions.json`、`calls.redacted.json`、`review-<n>.json`、`ui-<viewport>-<step>.png`、`cleanup.json`；失败保留 `failure-<code>-<attempt>.json`，复验证据另建 caseId。
-- manifest：commit/部署/执行器/环境修订/工具合同、workflow/revision/run/thread/step/task/namespace/checkpoint、开始结束时间、客户端、caseKey 与运行身份；未知项明确 null+原因。
-- 真工具证据：实际工具名/ref/版本、目标公开 URL/查询词/时间/SHA（如有）、外部状态码、耗时/attempt、结果短摘要/散列与 Step 关联；模型 provider/model、流片段时序、usage。token usage 只作观测，不折算费用或写成已结算。
-- 禁止证据包含 Authorization/Cookie、真实凭据、完整 State/客户正文、私有仓库源码或网络原始 HAR；公开索引使用脱敏身份，完整 UUID 如运维必要只在授权受限证据中留存。截图先检查账号/连接字段。
-- 受控 429/timeout/断流用于分类与重试边界，另标 controlled；不篡改真实凭据制造故障，不用本地 echo 替代真工具成功。真远端失败有则如实记录，无则不虚构。
-- 失败循环：原失败→定位原因→单写作者修复→相关门复验→新 fresh 会话重走失败路径及邻接路径→产品再审；不覆盖旧失败证据。恢复未知提交先查原幂等回执，禁止重发。
-- 同一阻塞两轮无进展即给产品负责人差距/选项/成本；涉及秘密泄露、跨 owner、unknown 外部效果立即停受影响路径并升级；同一失败连续两次或出现异常循环立即停止排查。不得降门槛换通过。
-- 清理清单只列自建对象精确 ID、owner、用途、保留期和清理回执；先终结 waiting/active，再用支持的认证接口清理自建 workflow/thread/记忆/连接。无删除接口则标待人工运维，不直接广删 SQL。
-- D3 在产品验收与证据收齐后实施：管理员授权维护、保存受控 owner 清单、移除测试管理员、按 runbook 发布读回；验证该账号环境不可用、保留 owner 正常。UUID 清单不放公开文档。
-- 保留正常用户与既有四个 Hosted 示例；不按名字模糊删除。未知外部写先核对目标回执/计数，取消不代表撤销，清理也不自动撤销业务操作。
-
-### 4.4 必须显式授权的动作
-
-| 动作 | 授权应包含 | 未授权默认 |
-| --- | --- | --- |
-| 真实外部写 | 目标仓库/对象、操作/内容、账号、幂等/回执、回撤方式 | 只产草稿；人工审核按钮不替代用户给工程执行者的授权 |
-| 真实调用 | 使用已授权的模型与公开工具；按实际 Run 记录 | 不发起未授权付费工具；同一失败两次先排查 |
-| 真实凭据 | 用户在受控连接界面/服务端秘密管理中配置及许可范围 | 不请求粘贴到聊天，不读私有文件，不扩大 token scope |
-| ownerIds（仅旧 hosted） | 执行账号、目标环境、增删集合、回退责任人 | 共享 Runtime 不使用 ownerIds；D3 决策已定；旧环境变更须授权 |
-| production 提升/后台更新 | 项目、候选、兼容回退与操作员 | 测试阶段可直接部署 workflow 服务 + Preview（2026-10-22 已确认）；主站 production 不自动提升；后台 Production 更新按授权执行 |
+本次仅编写计划；后续部署 `edu-flow-workflow` 可能影响后台 Production，必须记录实际目标及前后自检，不能用 Preview 名称掩盖后台影响。回滚保护旧 waiting/active Thread、用户副本及历史。
 
 ## 5. 下一轮路线与可停点
 
@@ -309,29 +254,26 @@ Chrome 全路径，Safari/Firefox 冒烟；截图+DOM 几何+elementFromPoint �
 | R1，4–6日 | P0-1、P0-2、P0-5；连接诊断/刷新/轮换、共享环境 access 拆分；**Local S1 首个真实公开检索（HN/arXiv/Wikipedia）+测试管理员私有 DeepSeek 连接**，版本提案与最小成功/失败证据 | 模型/公开工具凭据；按实际 Run 记录；目录映射落实；相关测试与局部视觉，S1 成功/拒绝/失败/幂等通过 | 目录缺操作/凭据未就绪停在候选；不扩四场景；可交付连接闭环后等待真实验收 |
 | R2，4–6日 | Local S2–S4、P0-6 模板绑定与模板内容；P1 画布与必要 P2；技术/视觉与 fresh 预验收 | R1 真工具通过；四套合同、运行清单、清理清单；模板跨 owner 不泄漏；类型/全量基线与构建按 §4 执行 | Send 屏障、循环/消息、CAS、绑定为风险；缺业务工具先停该场景，不改成 echo；可停在 Local 完整套件 |
 | R3，1–3日 | Hosted 对账与直接部署；P0-3/4；四场景真实调用；技术验收通过后投放四套模板（一条数据迁移） | R2 通过；真实环境、schema、digest、Function 产物≤12；部署前后自检通过；模板投放前技术门通过 | 平台限流/不兼容/部署异常即停；不重置共享库；可停在已验证 Preview，不提升主生产 |
-| R4，1–2日+返工 | fresh Hosted 预验收→产品负责人最终验收；D3 移除授权、精确清理、签署残余风险 | 四套所有必过项、0 阻塞视觉、运行清单/清理清单齐；产品签署与运维授权 | 失败按 §4 循环；移除 owner 后再读回；可接受“Local 通过/Hosted 阻塞”明确结论，不假签完成 |
+| R4，1–2日 | fresh Hosted 预验收→产品负责人最终验收；D3 移除旧环境测试管理员授权、精确清理、签署残余风险 | 四套所有必过项、0 阻塞视觉、运行清单/清理清单齐；产品签署与运维记录 | 失败按验收计划 §6 循环；移除旧环境 owner 后验证旧环境拒绝、共享 Runtime 仍可见；可接受“Local 通过/Hosted 阻塞”明确结论，不假签完成 |
 
 总粗估 10–17 人日，另计外部授权与失败返工；不承诺供应商延迟。每轮独立冻结候选与可回滚提交，单作者串行修改 Live/controller/registry/API 等热点。
 回退保留历史、Run、检查点；应用回退不等于数据库回退；后端改动可能改变 executorDigest，升级前先验证旧 waiting 恢复资格，无兼容候选就明确拒绝继续并保留旧身份。
 
 ## 6. 确认状态 / 工程待核实（不重开 D1–D3）
 
-没有剩余产品决策；1–5 已确认或默认，6–8 是工程核实项，不需要你回答。
+**无剩余产品决策**：D1/D2/D3=A、required/optional=A、产品模板=B、画布范围=A 均已冻结。这里只列工程核实项，不要求重新选方案。
 
-| # | 类型 | 事项与默认值 |
-| --- | --- | --- |
-| 1 | 已默认 | 数据目标由 Lead 选（S1 主题、S2 包名、S3 公开问题、S4 公开/脱敏文案），运行前发给产品负责人确认。 |
-| 2 | 已确认 | 外部写全只读，交付草稿；评论/Release/CMS/工单写留下一轮。 |
-| 3 | 已确认 | 不做费用核算，不设 ¥5 上限；按实际 Run 记录（§2.6）。 |
-| 4 | 已确认 | Hosted 测试阶段直接部署 workflow 服务 + Preview；主站 production 不自动提升。 |
-| 5 | 已确认 | 四个场景作为产品模板（B）；共享 Runtime Environment + 用户执行能力；创建模板时绑定当前用户连接（§2.7）。 |
-| 6 | 工程待核实 | 当前 Hosted 项目/部署、schema/digest/实际 Function 数与 ready：默认未核实不进 Hosted。 |
-| 7 | 工程待核实 | 公开检索 API/DeepWiki/GitHub 的实际目录、Schema、限流、副作用与凭据；HTTP 连接 UI 能否表达查询参数：缺项出差距单。 |
-| 8 | 工程待核实 | `access:"authenticated"` 的前后端兼容、旧 Thread 行为、模板内容迁移与连接绑定实现：默认只扩现有边界，不新增 Function、不改 schema。 |
+| 工程核实项 | 落点 / 未满足时的处理 |
+| --- | --- |
+| Hosted 项目、部署、迁移历史、digest、Function 数与 ready | R3 进入门；对不上先停，不凭前端 READY 签后端可用 |
+| 公开 API 实际合同、查询参数、限流与只读性质；T7/T8 测试能力 | R1 工具准入；缺项出差距单，不把可选工具变成模板依赖 |
+| access 校验、Runtime/Capability 修订与旧 Thread 兼容 | P0-5；复用已有快照 JSON，无法兼容停该门、不加 schema |
+| 模板需求 JSON 载体、绑定校验、推荐连接与内容迁移一致性 | P0-6；不硬编码 owner 引用，不绕开 document/preflight |
+| 场景输入与证据、精确清理接口、旧环境 D3 回执 | 按验收计划准备公开/脱敏数据；无安全删除接口标待运维，保留对象不广删 |
 
 ## 7. 本次规划核查记录
 
-只执行本地只读文件/代码检索、分支与 HEAD 查询，并新建本文；未运行任何测试/build/场景脚本，未联网、未访问秘密、未创建验收数据、未部署。
+只执行本地只读文件/代码检索、分支与 HEAD 查询，并更新两份计划、新建独立验收计划；未运行任何测试/build/场景脚本，未联网、未访问秘密、未创建验收数据、未部署。
 旧文档里的测试数量、部署 READY、实模记录均是历史材料，不是本次验证结论。后续执行者必须逐条形成自己的证据和签署。
 
 ## 8. 复核与变更记录
@@ -340,3 +282,4 @@ Chrome 全路径，Safari/Firefox 冒烟；截图+DOM 几何+elementFromPoint �
 - 2026-10-22：按用户反馈改为公开检索为主（HN/arXiv/Wikipedia/npm/PyPI/StackExchange，GitHub 仅 S2 可选）；Hosted 改为测试阶段直接部署、不设维护窗口。
 - 2026-10-22：按用户反馈取消费用核算与 ¥5 上限；不维护价格表/金额账本，只保留运行清单与“同一失败两次先停查”的规则。
 - 2026-10-22：按用户确认把四套场景升级为产品模板（B）：共享 Runtime Environment（`access:"authenticated"`，无 Key）+ 用户自建执行能力；模板创建时绑定用户连接；Hosted 技术验收后用一条内容迁移投放并保留模板。
+- 2026-10-22：基于 `67c1a2c` 完整任务书复核：统一 Runtime/Capability 与双修订冻结，补模板 API 绑定、内容迁移与保留式回滚；抽出独立验收计划；澄清 D3 仅撤旧环境授权；范围 A、R1–R4 共 10–17 人日及无剩余产品决策。仅文档更新，未实施、未提交、未部署、未运行测试。
