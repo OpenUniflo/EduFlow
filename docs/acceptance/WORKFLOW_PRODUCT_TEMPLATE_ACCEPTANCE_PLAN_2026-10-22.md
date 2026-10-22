@@ -14,13 +14,16 @@
 | 真实超时发现 | 已修正 | 首次 30s 节点超时导致模型节点失败；将探针节点超时提高到 120s 后成功。四套产品模板草案同步改为 `nodeTimeoutMs:120000` / `timeoutMs:180000` |
 | S1 模板对齐 | 草案完成 | 产品模板改为读取 HTTP 适配器的 `result` 包装：HN `result.hits`、npm `result` 对象，再由隔离函数整理后交给模型；compiler 结构校验 4/4 通过。Wikipedia 响应在本机 Worker 超时、arXiv XML 不是 JSON，二者适配仍是缺口；S1 暂用 HN + npm 两来源 |
 | S1 产品模板创建/绑定/运行 | 成功（技术） | `product-tech-brief` 用 HN `hn_ai_agents`、npm `npm_zod`、`deepseek`/`deepseek-flash` 绑定创建；workflow `67a50f22-9cdd-44e9-9f2e-0be93e33197d`；run `6035ca25-2ced-41a4-a014-354de0dfb33b`，status `success`，输出中文简报并带来源 |
-| S1 浏览器 UI 路径 | 成功（390×844） | 从工作流库打开新建对话框，选择“技术周报简报”，环境 `Local acceptance` + HN/npm/模型三项绑定后创建 workflow `f65535a3-f73b-4014-947f-e91c5b641e2e`；运行历史 run `fa281044-c056-4088-aae8-6a3c527f35a0` · `success`；HN/npm 两个工具记录“已执行成功”，最终输出带来源。390 几何：顶栏 58–201、工具条 261–303、画布 201–724、inspector 373–712、历史 724–844；顶栏/历史与画布不重叠，工具条/inspector 为画布内浮层。未保存截图，未测 768/1024/1440 或控制台错误 |
+| S1 浏览器 UI 路径 | 成功（390/768/1024/1440） | 从工作流库打开新建对话框，选择“技术周报简报”，环境 `Local acceptance` + HN/npm/模型三项绑定后创建 workflow `f65535a3-f73b-4014-947f-e91c5b641e2e`；run `fa281044-c056-4088-aae8-6a3c527f35a0` · `success`，HN/npm 工具“已执行成功”，最终输出带来源。顶栏/历史与画布在四视口均不重叠，顶栏按钮均可见；390 初始视口裁掉最左 HN 节点（可用“适应画布”恢复）。截图：[390](evidence/workflow-s1-round13/s1-390.png)、[768](evidence/workflow-s1-round13/s1-768.png)、[1024](evidence/workflow-s1-round13/s1-1024.png)、[1440](evidence/workflow-s1-round13/s1-1440.png)；未测 125% zoom |
+| S1 浏览器控制台 | 当前路径 0 error | 服务重启后新导航到该 workflow，`browser_console_messages` 返回 0 条 error；旧标签页在服务停机期间产生的 `ERR_CONNECTION_REFUSED` 未计入当前路径 |
+| S1 跨账号隔离 | 通过（API） | Local 管理员读取学生 workflow `f65535a3…` → `404 NOT_FOUND`；用该 ID 发起 Run → `404`；管理员库搜索“技术周报简报”匹配 0 条 |
+| S1 清理 | 完成 | 删除 12 个 `S1 …` 探针副本；禁用 `wiki_workflow_engine`、`hn_fail_404` 测试连接；保留 UI 证据 workflow 与 `hn_ai_agents`/`npm_zod`/`deepseek` 供复验；未删除共享模板 |
 | S1 拒绝 | 成功 | 伪造他人 `p4:` 连接引用创建模板返回 `409 MISSING_CAPABILITY`，未写入副本 |
 | S1 幂等 | 成功 | 同一 `Idempotency-Key` 连续提交返回同一 run `6035ca25…`，未产生第二次执行 |
 | S1 受控失败 | 成功 | 将 HN 绑定到公开 404 连接，run `b23dd2aa-6ffd-4e23-8ecb-c53840ee7db1` 失败为 `HTTP_TOOL_FAILED / HTTP 404` |
 | 环境问题 | 已绕过 | 本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常；启动 Local 服务时归一为 `localhost,127.0.0.1` 后模型可用。该问题不是代码失败，但需在验收环境说明 |
 
-探针使用普通认证 API 与 Local Worker；随后完成一次真实浏览器 UI 路径（390×844）创建/绑定/运行。仍未覆盖 768/1024/1440 视口、截图证据、跨账号隔离、清理、S1 三来源和 Hosted。`hn_ai_agents`、`npm_zod`、`hn_fail_404` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限从 4096 调为 3072，并把提示约束为 250 字后成功，避免节点 120s 超时与输出截断。
+探针使用普通认证 API 与 Local Worker；随后完成真实浏览器 UI 路径（390/768/1024/1440）创建/绑定/运行、控制台检查、跨账号读取/Run 拒绝与清理。仍未覆盖 125% zoom、S1 第三个公开来源和 Hosted。`hn_ai_agents`、`npm_zod` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限从 4096 调为 3072，并把提示约束为 250 字后成功，避免节点 120s 超时与输出截断。
 
 ## 1. 范围、冻结决策与阶段门
 
