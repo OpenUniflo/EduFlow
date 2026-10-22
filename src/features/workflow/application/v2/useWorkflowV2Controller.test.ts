@@ -17,7 +17,7 @@ vi.mock("../../repository/v2/WorkflowApiV2", () => ({
 
 import { ApiRequestError } from "@/shared/api/apiClient";
 import { createEditorV2, createWorkflowV2 } from "../../domain/v2/factory";
-import type { WorkflowDocumentV2, WorkflowLaunchContext, WorkflowRunV2 } from "../../domain/v2/types";
+import type { WorkflowDocumentV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowTool } from "../../domain/v2/types";
 import { useWorkflowV2Controller } from "./useWorkflowV2Controller";
 import type { WorkflowControllerRecovery } from "./editorHistory";
 
@@ -80,8 +80,27 @@ describe("initial data and submission feedback", () => {
     api.environments.mockRejectedValueOnce(new Error("环境读取中断"));
     await boot();
     expect(render().initialLoadStatus).toBe("failed");
+    expect(render().environmentError).toBe("环境读取中断");
     expect(render().error).toBe("环境读取中断");
     expect(api.createRun).not.toHaveBeenCalled();
+  });
+
+  it("refreshes tools with environment resources without changing the selected environment", async () => {
+    const tool = { ref: "http-tool", name: "HTTP tool" } as WorkflowTool;
+    api.tools.mockResolvedValueOnce({ items: [] }).mockResolvedValue({ items: [tool] });
+    await boot();
+    expect(render().tools).toEqual([]);
+    await render().refreshEnvironmentResources(); await flush();
+    expect(render().environmentRef).toBe("local");
+    expect(render().tools).toEqual([tool]);
+  });
+
+  it("marks a failed environment refresh and keeps the error available to the banner", async () => {
+    api.environments.mockResolvedValueOnce({ items: [{ environmentRef: "local" }] }).mockRejectedValueOnce(new Error("刷新失败"));
+    await boot();
+    await render().refreshEnvironments(); await flush();
+    expect(render().initialLoadStatus).toBe("failed");
+    expect(render().environmentError).toBe("刷新失败");
   });
 
   it("retires the accepted-submission notice once the same Run reaches a failed terminal state", async () => {

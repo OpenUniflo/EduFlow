@@ -259,6 +259,16 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 总粗估 10–17 人日，另计外部授权与失败返工；不承诺供应商延迟。每轮独立冻结候选与可回滚提交，单作者串行修改 Live/controller/registry/API 等热点。
 回退保留历史、Run、检查点；应用回退不等于数据库回退；后端改动可能改变 executorDigest，升级前先验证旧 waiting 恢复资格，无兼容候选就明确拒绝继续并保留旧身份。
 
+### 5.1 本轮实施进展（2026-10-22）
+
+| 项 | 状态 | 证据 |
+| --- | --- | --- |
+| P0-1 环境三态、布局横幅、账号 UUID 复制、重试、移动端不再绝对定位重叠 | 代码完成；单测通过；浏览器视觉待验收 | `src/features/workflow/application/v2/environmentAvailability.ts` 与其测试；`LiveWorkflowEditor` 的 `wf-v2-env-notice` 布局条；`useWorkflowV2Controller` 的 `environmentError` |
+| P0-2a 保存连接后刷新环境与工具 | 代码完成；单测通过；跨 owner/真实连接待验收 | `loadTools` 请求代次、`refreshEnvironmentResources`、`EnvironmentPanel onSaved`；controller 测试覆盖工具刷新与刷新失败 |
+| P0-2b/c、P0-5、P0-6、S1–S4、Hosted | 未开始 | 见 §3/§5 |
+
+验证：定向 37 项通过；`pnpm test` 167 文件 / 1268 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。未运行真实模型/公开工具、浏览器视觉、Hosted 部署；这些仍属于验收门，不能据本节签通过。
+
 ## 6. 确认状态 / 工程待核实（不重开 D1–D3）
 
 **无剩余产品决策**：D1/D2/D3=A、required/optional=A、产品模板=B、画布范围=A 均已冻结。这里只列工程核实项，不要求重新选方案。
@@ -283,3 +293,4 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 - 2026-10-22：按用户反馈取消费用核算与 ¥5 上限；不维护价格表/金额账本，只保留运行清单与“同一失败两次先停查”的规则。
 - 2026-10-22：按用户确认把四套场景升级为产品模板（B）：共享 Runtime Environment（`access:"authenticated"`，无 Key）+ 用户自建执行能力；模板创建时绑定用户连接；Hosted 技术验收后用一条内容迁移投放并保留模板。
 - 2026-10-22：基于 `67c1a2c` 完整任务书复核：统一 Runtime/Capability 与双修订冻结，补模板 API 绑定、内容迁移与保留式回滚；抽出独立验收计划；澄清 D3 仅撤旧环境授权；范围 A、R1–R4 共 10–17 人日及无剩余产品决策。仅文档更新，未实施、未提交、未部署、未运行测试。
+- 2026-10-22：实施 P0-1（环境三态布局横幅、UUID 复制、重试）与 P0-2a（保存连接后刷新环境+工具、请求代次防旧响应）；新增 availability/controller 测试。定向 37 项、全量 167 文件/1268 项、typecheck/lint/build 通过；浏览器视觉、P0-2b/c、P0-5/6、真实场景与 Hosted 仍未执行。

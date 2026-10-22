@@ -52,6 +52,7 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
   const [diagnostics, setDiagnostics] = useState<WorkflowDiagnostic[]>(recovery ? [] : initial.diagnostics ?? []);
   const [environments, setEnvironments] = useState<WorkflowEnvironment[]>([]);
   const [initialLoadStatus, setInitialLoadStatus] = useState<"loading" | "ready" | "failed">("loading");
+  const [environmentError, setEnvironmentError] = useState("");
   const environmentChoice = useRef(recovery?.environmentRef ?? "");
   const [environmentRef, publishEnvironment] = useState(environmentChoice.current);
   function setEnvironmentRef(update: string | ((current: string) => string)) {
@@ -60,6 +61,18 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
   }
   function changeEnvironment(value: string) { setEnvironmentRef(value); edits.current += 1; setDiagnostics([]); setNotice(""); }
   const [tools, setTools] = useState<WorkflowTool[]>([]);
+  const toolsRequest = useRef(0);
+  const loadTools = useCallback(async (ref: string) => {
+    const request = toolsRequest.current + 1;
+    toolsRequest.current = request;
+    if (!ref) { setTools([]); return; }
+    try {
+      const data = await workflowApiV2.tools(ref);
+      if (request === toolsRequest.current) setTools(data.items);
+    } catch (reason) {
+      if (request === toolsRequest.current) setError(workflowErrorMessage(reason));
+    }
+  }, [setError]);
   const [run, setRun] = useState<WorkflowRunV2 | null>(null);
   const observationIdentity = useRef({ runId: recovery?.observedRunId ?? null, origin: recovery?.runOrigin ?? null as WorkflowRunOrigin });
   const [runOrigin, publishRunOrigin] = useState<WorkflowRunOrigin>(observationIdentity.current.origin);
@@ -115,23 +128,32 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     let alive = true;
     const generation = observationGeneration.current;
     setInitialLoadStatus("loading");
-    void Promise.all([workflowApiV2.environments(), workflowApiV2.history(activeWorkflowId),workflowApiV2.threads(activeWorkflowId)]).then(([environmentData, runData,threadData]) => {
+    setEnvironmentError("");
+    void workflowApiV2.environments().then(environmentData => {
       if (!alive) return;
-      setEnvironments(environmentData.items); setEnvironmentRef(current => current || environmentData.items[0]?.environmentRef || "");
+      setEnvironments(environmentData.items);
+      setEnvironmentRef(current => current || environmentData.items[0]?.environmentRef || "");
       setInitialLoadStatus("ready");
+      setEnvironmentError("");
+    }).catch(reason => {
+      if (!alive) return;
+      setInitialLoadStatus("failed");
+      setEnvironmentError(workflowErrorMessage(reason));
+      setError(workflowErrorMessage(reason));
+    });
+    void Promise.all([workflowApiV2.history(activeWorkflowId),workflowApiV2.threads(activeWorkflowId)]).then(([runData,threadData]) => {
+      if (!alive) return;
       setHistory(runData.items);setThreads(threadData.items);
       const active = runData.items.find(item => !terminal.has(item.status));
       if (active && !recovery?.observedRunId && !pendingRunRequest.current && generation === observationGeneration.current) { clearRunObservation("current"); setRun(active); setObservedRunId(active.runId); observationThread.current=active.threadId??null; }
       else if(!recovery?.observedRunId&&!pendingRunRequest.current&&generation===observationGeneration.current){const waiting=threadData.items.find(item=>item.status==='waiting');if(waiting)selectThread(waiting);}
-    }).catch(reason => { if (alive) { setInitialLoadStatus("failed"); setError(workflowErrorMessage(reason)); } });
+    }).catch(reason => { if (alive) setError(workflowErrorMessage(reason)); });
     return () => { alive = false; };
   }, [activeWorkflowId]);
   useEffect(() => {
-    let alive = true;
-    if (!environmentRef) { setTools([]); return; }
-    void workflowApiV2.tools(environmentRef).then(data => { if (alive) setTools(data.items); }).catch(reason => { if (alive) setError(workflowErrorMessage(reason)); });
-    return () => { alive = false; };
-  }, [environmentRef]);
+    void loadTools(environmentRef);
+    return () => { toolsRequest.current += 1; };
+  }, [environmentRef, loadTools]);
   useEffect(()=>{
     let alive=true;let timer:ReturnType<typeof setTimeout>;
     async function read(){
@@ -350,5 +372,25 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     }
   }); }
   function discover(connectorRef: string) { return operation(async () => { const result = await workflowApiV2.discover(environmentRef, connectorRef); setTools(result.items); setNotice("已读取实际工具目录。"); }); }
-  return { definition, editor, observedRunId, observedThreadId: observationThread.current, threads, threadsError, historyExpired, currentThread:threadView?.currentRunId===observedRunId?threadView:null, threadView, selectThread, exitObservation:()=>clearRunObservation(), captureSessionRecovery, editDefinition, editEditor, editDocument, endEditGroup, undo, redo, discard, canUndo: historyVersion >= 0 && timeline.current.past.length > 0, canRedo: timeline.current.future.length > 0, definitionDirty, inputDirty, inputInvalid, setInputInvalid: changeInputInvalid, submitUnknown, confirmSubmission, runPreparationFailure, runPreparationStage, awaitingRunRecord: Boolean(observedRunId) && !run && !historyExpired, dirty, busy, cancelPending: cancelPendingRunId !== null && cancelPendingRunId === run?.runId, error, saveConflict: failure.code === "REVISION_CONFLICT", notice:runNotice?.runId===observedRunId&&!terminal.has(run?.status??"")?runNotice.text:notice, setError, diagnostics, environments, initialLoadStatus, environmentRef, setEnvironmentRef: changeEnvironment, tools, input, setInput: changeInput, replaceInput, clearInvocationInput, inputResetVersion, run, runOrigin, runSnapshot, events, steps, observationComplete, history, refreshEnvironments: () => operation(async () => {const items=(await workflowApiV2.environments()).items;setEnvironments(items);setEnvironmentRef(current=>current||items[0]?.environmentRef||"");}), saveDocument, restoreDocument, rejectRunPreparation, validate, startRun, selectRun, resumeThread, cancel, discover, operation };
+  async function reloadEnvironments() {
+    setInitialLoadStatus("loading");
+    setEnvironmentError("");
+    try {
+      const items = (await workflowApiV2.environments()).items;
+      setEnvironments(items);
+      setEnvironmentRef(current => current || items[0]?.environmentRef || "");
+      setInitialLoadStatus("ready");
+    } catch (reason) {
+      setInitialLoadStatus("failed");
+      setEnvironmentError(workflowErrorMessage(reason));
+      throw reason;
+    }
+  }
+  const refreshEnvironments = () => operation(reloadEnvironments);
+  const refreshTools = () => loadTools(environmentRef);
+  const refreshEnvironmentResources = () => operation(async () => {
+    await reloadEnvironments();
+    await loadTools(environmentChoice.current);
+  });
+  return { definition, editor, observedRunId, observedThreadId: observationThread.current, threads, threadsError, historyExpired, currentThread:threadView?.currentRunId===observedRunId?threadView:null, threadView, selectThread, exitObservation:()=>clearRunObservation(), captureSessionRecovery, editDefinition, editEditor, editDocument, endEditGroup, undo, redo, discard, canUndo: historyVersion >= 0 && timeline.current.past.length > 0, canRedo: timeline.current.future.length > 0, definitionDirty, inputDirty, inputInvalid, setInputInvalid: changeInputInvalid, submitUnknown, confirmSubmission, runPreparationFailure, runPreparationStage, awaitingRunRecord: Boolean(observedRunId) && !run && !historyExpired, dirty, busy, cancelPending: cancelPendingRunId !== null && cancelPendingRunId === run?.runId, error, saveConflict: failure.code === "REVISION_CONFLICT", notice:runNotice?.runId===observedRunId&&!terminal.has(run?.status??"")?runNotice.text:notice, setError, diagnostics, environments, initialLoadStatus, environmentError, environmentRef, setEnvironmentRef: changeEnvironment, tools, input, setInput: changeInput, replaceInput, clearInvocationInput, inputResetVersion, run, runOrigin, runSnapshot, events, steps, observationComplete, history, refreshEnvironments, refreshTools, refreshEnvironmentResources, saveDocument, restoreDocument, rejectRunPreparation, validate, startRun, selectRun, resumeThread, cancel, discover, operation };
 }
