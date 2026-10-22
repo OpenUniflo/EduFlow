@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerSupabase } from "./supabase.js";
 import { ApiError, json } from "./http.js";
 import { workflowCompiler, workflowDigest, workflowStrictBody, workflowObject, workflowString, workflowInteger, workflowUuid, workflowProjection, workflowSecretProjection, validateWorkflowEditor, workflowNewId, workflowInputReuse, workflowDiagnosticCorrelation, workflowScopedDiagnostics, type WorkflowRow } from "./workflowV2Protocol.js";
+import { applyTemplateBindings, TemplateBindingError, validateTemplateBindings } from "./workflowTemplateBinding.js";
 import { readAssignmentEligibility } from "./assignmentEligibility.js";
 
 type Result<T> = { data: T | null; error: { message: string; code?: string } | null };
@@ -156,7 +157,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
   }
   if (resource === "definitions") {
     if (request.method === "POST" && op === "template") {
-      const body = workflowStrictBody(request.body, ["templateId", "name", "creationId", "fresh"], ["templateId"]);
+      const body = workflowStrictBody(request.body, ["templateId", "name", "creationId", "fresh", "environmentRef", "bindings"], ["templateId"]);
       if (body.fresh !== undefined && typeof body.fresh !== "boolean") throw new ApiError(400,"INVALID_REQUEST","Invalid template creation mode");
       const templateId = workflowString(body.templateId);
       const template = result(await client.from("workflow_templates").select("definition").eq("id",templateId).eq("definition->>schemaVersion","2.0").maybeSingle()) as WorkflowRow | null;
@@ -165,10 +166,36 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       const existing = body.fresh === true ? null : result(await client.from("workflow_v2_definitions").select("workflow_id,current_revision").eq("owner_user_id",owner).eq("workflow_id",templateId).maybeSingle()) as WorkflowRow | null;
       if(existing) { json(response,200,{workflowId:templateId,revision:existing.current_revision}); return true; }
       const definition: WorkflowRow = { ...workflowObject(template.definition), workflowId, revision:1, ...(body.name !== undefined ? {name:libraryName(body.name)} : {}) };
-      const nodes = definition.nodes as WorkflowRow[];
+      const bindings = z.array(z.object({
+        nodeId: z.string().min(1).max(200),
+        graphPath: z.array(z.string().max(200)).max(8),
+        field: z.enum(["providerRef", "toolRef"]),
+        reference: z.string().min(1).max(500),
+        modelRef: z.string().max(200).optional(),
+        contractDigest: z.string().max(200).optional(),
+      })).max(100).safeParse(body.bindings ?? []);
+      if (!bindings.success) throw new ApiError(400, "INVALID_REQUEST", "Invalid template bindings");
+      let boundDefinition = definition;
+      if (bindings.data.length) {
+        const environmentRef = workflowString(body.environmentRef);
+        const catalog = await workflowCompiler<{ items?: unknown[]; environment?: { providers?: unknown[] } }>("/v1/catalog", { ownerId: owner, environmentRef });
+        const providers = Array.isArray(catalog.environment?.providers) ? catalog.environment.providers as WorkflowRow[] : [];
+        const tools = Array.isArray(catalog.items) ? catalog.items as WorkflowRow[] : [];
+        try {
+          validateTemplateBindings(bindings.data, {
+            providers: providers.map(item => ({ ref: String(item.ref), modelRefs: Array.isArray(item.modelRefs) ? item.modelRefs.map(String) : [] })),
+            tools: tools.map(item => ({ ref: String(item.ref), available: item.available !== false, ...(typeof item.contractDigest === "string" ? { contractDigest: item.contractDigest } : {}) })),
+          });
+          boundDefinition = applyTemplateBindings(definition, bindings.data) as WorkflowRow;
+        } catch (reason) {
+          if (reason instanceof TemplateBindingError) throw new ApiError(409, reason.code, reason.message);
+          throw reason;
+        }
+      }
+      const nodes = boundDefinition.nodes as WorkflowRow[];
       const editor = { schemaVersion:1,workflowId,editorRevision:1,definitionRevision:1,nodes:Object.fromEntries(nodes.map((node,index)=>[String(node.id),{x:80+index*280,y:180}])),edges:{} };
-      const validation = await workflowCompiler("/v1/document",{definition});
-      json(response,201,await saveCreation(client,owner,definition,editor,validation.definitionHash,{sourceTemplateId:templateId,libraryGroup:"general"})); return true;
+      const validation = await workflowCompiler("/v1/document",{definition:boundDefinition});
+      json(response,201,await saveCreation(client,owner,boundDefinition,editor,validation.definitionHash,{sourceTemplateId:templateId,libraryGroup:"general"})); return true;
     }
     if (request.method === "GET" && op === "library") {
       const params = z.object({search:z.string().max(200),scope:z.enum(["all","personal","course"]),sort:z.enum(["updated","name"]),page:z.coerce.number().int().min(1).max(1000000),pageSize:z.coerce.number().int().min(1).max(48)}).safeParse({search:queryString(request,"search")??"",scope:queryString(request,"scope")??"all",sort:queryString(request,"sort")??"updated",page:queryString(request,"page")??1,pageSize:queryString(request,"pageSize")??12});
