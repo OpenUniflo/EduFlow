@@ -28,9 +28,11 @@
 | S2 依赖健康检查 UI | 成功（1440） | 新建对话框绑定 PyPI 下载统计 + npm + DeepSeek；workflow `36153215-44dc-4013-9b45-05b675cb360c`、run `0c69c9b0-3232-4ff0-9d6f-6ddce7a122a4` · `success`，6 个节点完成；截图 [s2-dependency-ui-1440.png](evidence/workflow-s1-round13/s2-dependency-ui-1440.png) |
 | S3 社区问题分流 API | 成功 | 使用固定问题查询的 HN 连接 + DeepSeek；workflow `15bac484-97de-425a-8335-efeaa1f7cbcf`、run `8675b3e7-b5ed-41e3-b232-73778eaef96e` · `success`，输出归纳/分流/回应三部分；首次输出截断后收紧为 200 字 |
 | S3 社区问题分流 UI | 成功（1440） | 新建对话框绑定 `hn_community_question` + DeepSeek；workflow `dfdf322c-8a70-4f69-bec8-255a9fd25200`、run `8036cb00-3365-4ef5-a6b1-ae91d2018fd4` · `success`，5 个节点完成；截图 [s3-community-triage-ui-1440.png](evidence/workflow-s1-round13/s3-community-triage-ui-1440.png) |
+| S4 内容事实核对 API | 成功 | 仅绑定 DeepSeek；workflow `2bc165d7-108d-4dce-b987-0e8c830e1c4d`、run `ad8804a6-f714-45b8-a995-b5c3a419b34f` · `success`；逐条标出三条主张缺少依据，给出保守可发布版本与补证模板 |
+| S4 内容事实核对 UI | 成功（1440） | 新建对话框绑定 DeepSeek；workflow `598b087e-3f92-4515-a6ea-d067c44529ee`、run `261ef403-bf8a-4e0d-a774-349d536bd85c` · `success`，4 个节点完成；截图 [s4-content-review-ui-1440.png](evidence/workflow-s1-round13/s4-content-review-ui-1440.png) |
 | 环境问题 | 已绕过 | 本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常；启动 Local 服务时归一为 `localhost,127.0.0.1` 后模型可用。该问题不是代码失败，但需在验收环境说明 |
 
-探针使用普通认证 API 与 Local Worker；随后完成 S1 浏览器 UI、四视口、125% 等效视口、三来源 UI、控制台检查、跨账号与清理；S2、S3 的 API 与 UI 也已成功。真实浏览器 zoom、Wikipedia/arXiv 适配、S4 与 Hosted 仍未完成。`hn_ai_agents`、`hn_community_question`、`npm_zod`、`se_workflow`、`pypistats_langgraph` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限 3072，提示约束为 250/200 字后成功，避免节点 120s 超时与输出截断。
+探针使用普通认证 API 与 Local Worker；S1 已完成浏览器 UI、四视口、125% 等效视口、三来源 UI、控制台、跨账号与清理；S2、S3、S4 的 API 与 UI 均已成功。真实浏览器 zoom、Wikipedia/arXiv 适配、Hosted 与内容迁移仍未完成。`hn_ai_agents`、`hn_community_question`、`npm_zod`、`se_workflow`、`pypistats_langgraph` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限 3072，提示约束为 250/200 字后成功，避免节点 120s 超时与输出截断。
 
 ## 1. 范围、冻结决策与阶段门
 
