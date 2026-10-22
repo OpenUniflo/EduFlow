@@ -271,9 +271,10 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 | P0-6 模板能力前置 | 四套模板草案（含真实 HTTP result 包装对齐）+ Local seed + 创建时直连绑定完成；内容迁移、真实连接验收待做 | `templateCapabilities.ts` 四套需求；`WorkflowCreateDialog` 读取模板定义、展示未绑定项、创建前选择环境/模型/工具并随 `useTemplate` 发送 bindings；`workflowTemplateBinding.ts` 服务端递归绑定/owner 目录校验/合同变化拒绝；`template POST` 接受 `environmentRef+bindings`；`productWorkflowTemplates.ts` 四套草案读取 `result.hits`/`result.extract`/`result`；compiler `validate_structure` 4/4 通过；seed 已重生成 |
 | S1 本地技术探针 | 成功；API + 浏览器 UI 技术证据，非正式验收 | API：run `92f68fae…`、两来源产品模板 run `6035ca25…`、三来源 HN/StackExchange/npm run `27e5285f…` 成功；UI 三来源 workflow `ccdd6f3a…`、run `b3e7923a…` 成功；四视口/125% 等效视口、控制台 0 error、跨账号 404、清理与拒绝/失败/幂等均已有证据 |
 | S2 依赖健康检查 | 成功；API + 浏览器 UI 技术证据，非正式验收 | PyPI 完整 JSON 触发 `EVENT_TOO_LARGE`，改用 pypistats 下载统计；API workflow `ffaf3615…`、run `f080c8ee…` 成功；UI workflow `36153215…`、run `0c69c9b0…` 成功，输出 3 条使用/版本/升级风险；截图已入库 |
+| S3 社区问题分流 | 成功；API + 浏览器 UI 技术证据，非正式验收 | 固定社区问题 HN 连接 + DeepSeek；API workflow `15bac484…`、run `8675b3e7…` 成功；UI workflow `dfdf322c…`、run `8036cb00…` 成功，输出归纳/分流/回应；首次输出截断后收紧 200 字 |
 | S1–S4、Hosted 正式验收 | 未开始 | 见 §3/§5 |
 
-验证：新增 2 项产品模板草案测试；四套 Definition 经 compiler `validate_structure` 全部通过；6 项 connection + 1 项 template capability + 3 项服务端模板绑定单测通过；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 171 文件 / 1280 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。S1 已取得 API 三来源、UI 四视口/125% 等效视口、控制台 0 error、跨账号 404 与清理证据；S2 已取得 API + UI 成功；仍缺真实浏览器 zoom、Wikipedia/arXiv 适配、S3–S4 与 Hosted 验收，不能据本节签通过。
+验证：新增 2 项产品模板草案测试；四套 Definition 经 compiler `validate_structure` 全部通过；6 项 connection + 1 项 template capability + 3 项服务端模板绑定单测通过；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 171 文件 / 1280 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。S1 已取得 API 三来源、UI 四视口/125% 等效视口、控制台 0 error、跨账号 404 与清理证据；S2、S3 已取得 API + UI 成功；仍缺真实浏览器 zoom、Wikipedia/arXiv 适配、S4 与 Hosted 验收，不能据本节签通过。
 
 ## 6. 确认状态 / 工程待核实（不重开 D1–D3）
 
@@ -316,3 +317,4 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 - 2026-10-22：S1 三来源落地：Wikipedia mobile 在 Worker 超时、PyPI 完整 JSON 触发 `EVENT_TOO_LARGE`、arXiv 为 XML，改用 StackExchange `result.items` 作为第三来源；三来源产品模板 workflow `f526d1dc…`、run `27e5285f…` 成功。125% 以 1152×720 等效视口截图通过；三来源 UI 复跑与 Hosted 仍未做。
 - 2026-10-22：S1 三来源浏览器 UI 复跑成功：新建对话框绑定 HN/StackExchange/npm/DeepSeek，workflow `ccdd6f3a…`、run `b3e7923a…` 成功，最终输出同时引用三来源；1440 截图存入验收证据。真实浏览器 zoom、Wikipedia/arXiv 适配、Hosted 仍未做。
 - 2026-10-22：S2 依赖健康检查技术验收：PyPI 完整 JSON 触发事件过大，改用 pypistats 最近下载；API workflow `ffaf3615…`、run `f080c8ee…` 与 UI workflow `36153215…`、run `0c69c9b0…` 均成功，输出 3 条风险要点。S3–S4、Hosted、真实 zoom 仍未做。
+- 2026-10-22：S3 社区问题分流技术验收：新增固定问题 HN 连接；API workflow `15bac484…`、run `8675b3e7…` 与 UI workflow `dfdf322c…`、run `8036cb00…` 均成功，输出归纳/分流/回应；首次输出截断后约束 200 字。S4、Hosted、真实 zoom 仍未做。

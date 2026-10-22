@@ -90,7 +90,7 @@ const triageCode = `def process(input, context):
         url = item.get("url") or item.get("story_url") or ""
         if title:
             lines.append("- " + title + " " + url)
-    text = "请归纳以下社区问题并给出可执行分流建议，引用来源：\\n" + "\\n".join(lines)
+    text = "请用不超过 200 字给出社区问题归纳、分流建议与回应草稿三部分，引用来源：\\n" + "\\n".join(lines)
     return {"messages": [{"id": "triage-brief", "role": "user", "content": [{"type": "text", "text": text}]}]}
 `;
 

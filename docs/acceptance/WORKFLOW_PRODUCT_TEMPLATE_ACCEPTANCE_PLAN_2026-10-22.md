@@ -26,9 +26,11 @@
 | S1 受控失败 | 成功 | 将 HN 绑定到公开 404 连接，run `b23dd2aa-6ffd-4e23-8ecb-c53840ee7db1` 失败为 `HTTP_TOOL_FAILED / HTTP 404` |
 | S2 依赖健康检查 API | 成功 | PyPI 完整 JSON 会触发 `EVENT_TOO_LARGE`，改用 pypistats 最近下载统计；绑定 `pypistats_langgraph` + `npm_zod` + DeepSeek；workflow `ffaf3615-7093-4bd0-afa9-e1ee895bd3f2`、run `f080c8ee-70d6-4695-a5b6-e8426b6dedd5` · `success`，输出 3 条使用/版本/升级风险 |
 | S2 依赖健康检查 UI | 成功（1440） | 新建对话框绑定 PyPI 下载统计 + npm + DeepSeek；workflow `36153215-44dc-4013-9b45-05b675cb360c`、run `0c69c9b0-3232-4ff0-9d6f-6ddce7a122a4` · `success`，6 个节点完成；截图 [s2-dependency-ui-1440.png](evidence/workflow-s1-round13/s2-dependency-ui-1440.png) |
+| S3 社区问题分流 API | 成功 | 使用固定问题查询的 HN 连接 + DeepSeek；workflow `15bac484-97de-425a-8335-efeaa1f7cbcf`、run `8675b3e7-b5ed-41e3-b232-73778eaef96e` · `success`，输出归纳/分流/回应三部分；首次输出截断后收紧为 200 字 |
+| S3 社区问题分流 UI | 成功（1440） | 新建对话框绑定 `hn_community_question` + DeepSeek；workflow `dfdf322c-8a70-4f69-bec8-255a9fd25200`、run `8036cb00-3365-4ef5-a6b1-ae91d2018fd4` · `success`，5 个节点完成；截图 [s3-community-triage-ui-1440.png](evidence/workflow-s1-round13/s3-community-triage-ui-1440.png) |
 | 环境问题 | 已绕过 | 本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常；启动 Local 服务时归一为 `localhost,127.0.0.1` 后模型可用。该问题不是代码失败，但需在验收环境说明 |
 
-探针使用普通认证 API 与 Local Worker；随后完成 S1 浏览器 UI 路径、四视口、125% 等效视口、三来源 UI 复跑、控制台检查、跨账号读取/Run 拒绝与清理；S2 依赖健康检查 API 与 UI 也已成功。真实浏览器 zoom、Wikipedia/arXiv 适配、S3–S4 与 Hosted 仍未完成。`hn_ai_agents`、`npm_zod`、`se_workflow`、`pypistats_langgraph` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限从 4096 调为 3072，并把提示约束为 250/200 字后成功，避免节点 120s 超时与输出截断。
+探针使用普通认证 API 与 Local Worker；随后完成 S1 浏览器 UI、四视口、125% 等效视口、三来源 UI、控制台检查、跨账号与清理；S2、S3 的 API 与 UI 也已成功。真实浏览器 zoom、Wikipedia/arXiv 适配、S4 与 Hosted 仍未完成。`hn_ai_agents`、`hn_community_question`、`npm_zod`、`se_workflow`、`pypistats_langgraph` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限 3072，提示约束为 250/200 字后成功，避免节点 120s 超时与输出截断。
 
 ## 1. 范围、冻结决策与阶段门
 
