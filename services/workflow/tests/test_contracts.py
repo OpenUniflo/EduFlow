@@ -165,12 +165,14 @@ def test_document_structure_does_not_claim_environment_readiness():
     unavailable=compile_definition(definition,registry())
     assert not unavailable["valid"]
     assert {d["code"] for d in unavailable["diagnostics"]}=={"TOOL_UNAVAILABLE"}
+    assert unavailable["diagnostics"][0]["pointer"]=="/nodes/"+definition["nodes"][1]["id"]+"/config/toolRef"
     environment=registry()
     environment["tools"]=[{"ref":"registered-reference","name":"trusted","contractDigest":"frozen-contract","available":True}]
     assert compile_definition(definition,environment)["valid"]
     environment["tools"][0]["contractDigest"]="changed-contract"
     changed=compile_definition(definition,environment)
     assert not changed["valid"] and "TOOL_CONTRACT_CHANGED" in {d["code"] for d in changed["diagnostics"]}
+    assert changed["diagnostics"][0]["pointer"]=="/nodes/"+definition["nodes"][1]["id"]+"/config/toolRef"
 
 
 def test_structure_still_reports_broken_tool_configuration():

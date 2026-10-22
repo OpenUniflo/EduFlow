@@ -202,9 +202,10 @@ def _validate_definition(definition, registry_snapshot, environment_checks, pare
             outlets[nid]=ids+[config.get("defaultOutlet")]
         if node["type"]=="core.transform" and config.get("operationRef") not in operations: diagnostics.append({"code":"UNKNOWN_OPERATION","severity":"error","nodeId":nid,"message":"Operation not registered"})
         refs=config.get("allowedToolRefs",[]) if node["type"] in ("core.llm","core.tool_dispatch") else [config.get("toolRef")] if node["type"]=="core.tool" else []
-        for ref in refs if environment_checks else []:
-            if ref not in tools or not tools[ref].get("available",True): diagnostics.append({"code":"TOOL_UNAVAILABLE","severity":"error","nodeId":nid,"message":"Tool unavailable or unsupported Schema"})
-            elif node["type"]=="core.tool" and config.get("contractDigest")!=tools[ref]["contractDigest"]: diagnostics.append({"code":"TOOL_CONTRACT_CHANGED","severity":"error","nodeId":nid,"message":"Tool contract has changed"})
+        for index, ref in enumerate(refs if environment_checks else []):
+            pointer="/nodes/"+nid+"/config/"+("toolRef" if node["type"]=="core.tool" else "allowedToolRefs/"+str(index))
+            if ref not in tools or not tools[ref].get("available",True): diagnostics.append({"code":"TOOL_UNAVAILABLE","severity":"error","nodeId":nid,"pointer":pointer,"message":"Tool unavailable or unsupported Schema"})
+            elif node["type"]=="core.tool" and config.get("contractDigest")!=tools[ref]["contractDigest"]: diagnostics.append({"code":"TOOL_CONTRACT_CHANGED","severity":"error","nodeId":nid,"pointer":pointer,"message":"Tool contract has changed"})
     outgoing={nid:[] for nid in nodes}
     for edge in definition["transitions"]:
         if set(edge)!={"id","from","outlet","to"} or edge.get("from") not in nodes or edge.get("to") not in nodes:
