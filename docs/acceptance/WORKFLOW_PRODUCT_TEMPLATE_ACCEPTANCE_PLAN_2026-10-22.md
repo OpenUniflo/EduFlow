@@ -31,10 +31,12 @@
 | S4 内容事实核对 API | 成功 | 仅绑定 DeepSeek；workflow `2bc165d7-108d-4dce-b987-0e8c830e1c4d`、run `ad8804a6-f714-45b8-a995-b5c3a419b34f` · `success`；逐条标出三条主张缺少依据，给出保守可发布版本与补证模板 |
 | S4 内容事实核对 UI | 成功（1440） | 新建对话框绑定 DeepSeek；workflow `598b087e-3f92-4515-a6ea-d067c44529ee`、run `261ef403-bf8a-4e0d-a774-349d536bd85c` · `success`，4 个节点完成；截图 [s4-content-review-ui-1440.png](evidence/workflow-s1-round13/s4-content-review-ui-1440.png) |
 | Hosted 环境审计 | 通过（只读）；部署已开始、迁移未执行 | 项目 `uyljtdbvlivxniililay`；迁移 117 条与本地 digest 一致；无 Local 账号；16 个历史模板、四产品模板缺失；Worker Production / 前端 Preview READY；最近 Run 成功并使用固定 Sandbox 镜像；前端 12/12 API 入口；env/log 读取被 403 拒绝。详见 [Hosted 审计](WORKFLOW_HOSTED_ENVIRONMENT_AUDIT_2026-10-22.md) |
-| Hosted 部署/冒烟 | **未通过 Hosted 技术门** | 前端 Preview `dpl_8ZDWpav…` READY；Hosted S1 run `ccc24dd1…` `SANDBOX_UNAVAILABLE`；S4 run `85c8e7a4…` `NODE_EXECUTION_FAILED`；临时 workflow/连接已清理；模板内容迁移未执行。详见 Hosted 审计 §7 |
+| Hosted 部署/冒烟 | **按用户决定暂缓 Hosted 门** | 前端 Preview `dpl_8ZDWpav…` READY；Worker 重部署 `dpl_CrYMiVk…` 后 Sandbox 冒烟 run `cd2fc9e2…` 成功；S4 模型 run `85c8e7a4…` / `e729f38a…` 仍 `NODE_EXECUTION_FAILED`；临时 workflow/连接已清理；模板内容迁移未执行。用户 2026-10-23 决定先以 Local 验收为准 |
+| 本地执行能力自配置 | **成功** | Local 测试账号通过“环境与连接 → 连接”自建 DeepSeek 模型连接 `my_deepseek_round22`（凭据加密、返回只显示已配置），连接测试成功；环境 provider 显示 `origin=user`；用该连接运行 workflow `ddada551-25ef-4871-b629-e1a1497fada4`、run `e44be04a-55e5-41d4-9e0f-6649e40d3427` · `success`；截图 [round22-selfservice-deepseek.png](evidence/workflow-s1-round13/round22-selfservice-deepseek.png) |
+| Local S1–S4 汇总复验 | **全部 success** | S1 三来源 `b3e7923a…`、S2 `0c69c9b0…`、S3 `8036cb00…`、S4 `261ef403…`、自建模型 `e44be04a…` 在 Local DB 中均为 `success`，environmentRef `local`，error `null` |
 | 环境问题 | 已绕过 | 本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常；启动 Local 服务时归一为 `localhost,127.0.0.1` 后模型可用。该问题不是代码失败，但需在验收环境说明 |
 
-探针使用普通认证 API 与 Local Worker；S1 已完成浏览器 UI、四视口、125% 等效视口、三来源 UI、控制台、跨账号与清理；S2、S3、S4 的 API 与 UI 均已成功。Hosted 只读审计完成并已部署 Preview，但 Hosted S1/S4 真实运行因 Sandbox/模型失败，Hosted 技术验收未通过、未投放模板内容；真实浏览器 zoom 与 Wikipedia/arXiv 适配仍未完成。`hn_ai_agents`、`hn_community_question`、`npm_zod`、`se_workflow`、`pypistats_langgraph` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限 3072，提示约束为 250/200 字后成功，避免节点 120s 超时与输出截断。
+探针使用普通认证 API 与 Local Worker；S1 已完成浏览器 UI、四视口、125% 等效视口、三来源 UI、控制台、跨账号与清理；S2、S3、S4 的 API 与 UI 均已成功；Local 自建 DeepSeek 模型连接、加密凭据、连接测试与真实运行也已成功。Hosted 按用户 2026-10-23 决定暂缓：Worker 重部署后 Sandbox 冒烟成功，但模型节点仍失败，故未投放模板内容。真实浏览器 zoom 与 Wikipedia/arXiv 适配仍为已知缺口。`hn_ai_agents`、`hn_community_question`、`npm_zod`、`se_workflow`、`pypistats_langgraph` 连接为当前 Local 测试账号私有、只读、固定查询；没有写入共享 Runtime，也没有提交任何密钥。模型输出上限 3072，提示约束为 250/200 字后成功，避免节点 120s 超时与输出截断。
 
 ## 1. 范围、冻结决策与阶段门
 

@@ -122,3 +122,11 @@ S1 说明 Worker 能读取环境/工具目录并排队执行，但函数节点�
 | Function 预算满 | 前端 12/12 API 入口 | 保持不新增 Function；下个 Preview 仍复核生成产物 |
 
 **因此当前准确分层结论是：Local S1–S4 技术路径通过；Hosted 部署与认证目录通过；Hosted S1/S4 真实运行失败（Sandbox/模型），Hosted 技术门未通过，模板内容迁移未执行。**
+
+## 8. 2026-10-23 用户决定：先以 Local 验收为准
+
+- 用户明确要求：**远程部署版本无法验收时，先保证 Local 验收通过**；不同用户的执行能力由用户登录后自行创建/配置，例如 DeepSeek Key 与模型。
+- Worker 已重新以 Production 部署 `dpl_CrYMiVk1f24pGkwuNMav3DPTML6K`（commit `6a94040`）；重部署后最小 Sandbox smoke run `cd2fc9e2-c3da-469d-89c3-50f3f639d9a7` **success**，说明 Sandbox 创建路径已恢复。
+- S4 模型节点在重部署后仍 `NODE_EXECUTION_FAILED`（run `e729f38a-620e-42bc-af32-69409f13353b`）；具体 provider 凭据/运行日志仍未定位。Hosted 四场景技术门不再作为当前阻塞，模板内容迁移继续暂停。
+- Local 侧已验证自建执行能力：测试账号可创建加密 DeepSeek 连接 `my_deepseek_round22`，连接测试成功，环境显示 `origin=user`，并用该连接真实运行 workflow `ddada551…` / run `e44be04a…` 成功。UI 截图见 [round22-selfservice-deepseek.png](evidence/workflow-s1-round13/round22-selfservice-deepseek.png)。
+- Hosted 临时 Workflow 已删除；Hosted 数据仍为 5 definitions / 47 live runs / 16 templates；未执行模板 INSERT 迁移，未提升前端 production。
