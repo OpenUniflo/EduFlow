@@ -244,3 +244,17 @@ D 修复：环境选择最小宽度提高到 160px。修复后实测宽度 160px
 - Hosted 登录账号（admin@eduflow.test）的 `/api/workflows?resource=environments` 实测返回 `{"items":[]}`，环境选择器只有“选择环境”；该账号 UUID 为 `54cd7725-ae57-464b-beba-18e950546f0b`。
 - 修复后 Hosted 预览实测：提示位于 `x≈1148, y≈196`，宽 306、高 52，z-index 10；左上工具条 `x=16,y=148,w=201,h=42`；两者无重叠。提示文字完整可见，并带“重新加载环境”按钮。
 - 证据：`assets/workflow-preacceptance-20261021/hosted-env-notice-fixed.png`。
+
+## Hosted 环境授权与真实运行（2026-10-22）
+
+- 用户确认采用“加入现有环境”方案。已把 Hosted 管理员 `admin@eduflow.test`（UUID `54cd7725-ae57-464b-beba-18e950546f0b`）加入现有 `hosted` 环境的 `ownerIds`，保留原有两个 owner、DeepSeek provider、DeepWiki connector、GitHub tool、能力与 limits。
+- 更新 `WORKFLOW_ENVIRONMENTS_JSON` 后重新部署 `edu-flow-workflow` 生产服务；服务启动校验通过。
+- Hosted `GET /api/workflows?resource=environments` 现返回 1 个环境：
+  - `environmentRef: hosted`
+  - `name: Hosted · P6`
+  - provider `deepseek`；connector `deepwiki`；24 项 capabilities；timeout 600000ms、maxToolCalls 50、maxOutputTokens 8192 等 limits
+- 浏览器登录 Hosted，运行环境选择器显示并选中 `Hosted · P6`；“没有可用环境”提示消失。
+- 对模板工作流执行一次真实运行：完成 2 个节点，运行历史显示“已完成 · 修订 1”，环境 `Hosted · P6`。
+- 连接面板显示 DeepSeek 模型连接（`deepseek-flash`，执行端管理凭据）、DeepWiki connector 和 2 个可用工具；执行视图中连接编辑按预期禁用。
+- 截图：`assets/workflow-preacceptance-20261021/hosted-run-with-environment.png`。
+- 本次运行仅覆盖入口→结束，未调用模型或外部工具；Hosted 模型/工具调用与 Hosted Assignment 调用方输入链路仍需单独验收。
