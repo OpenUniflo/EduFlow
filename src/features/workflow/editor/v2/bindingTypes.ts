@@ -2,9 +2,8 @@ import type { JsonSchema, JsonValue } from "../../domain/v2/types";
 import { resolveFormSchema } from "./SchemaForm";
 
 /**
- * Binding type helpers extracted from `BindingFields.tsx` (M8). These are the single
- * implementation the unified node panel uses; `BindingFields` keeps its local copy until
- * the lead rewires it, so its existing tests stay untouched.
+ * Binding type helpers for the unified node panel (M8). They were extracted from the retired
+ * `BindingFields` section editor; `VariablePicker` and `NodeParamsTable` are the only callers.
  */
 
 const typeNames: Record<string, string> = { object: "对象", string: "文本", number: "数字", integer: "整数", boolean: "是或否", array: "列表", null: "空值" };
