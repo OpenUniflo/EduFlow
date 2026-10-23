@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import type { WorkflowConfiguration } from "../domain/v2/types";
+import type { VariableEnvironment, WorkflowConfiguration } from "../domain/v2/types";
 import { VariableTable, VariableTableEditor, type VariableTableEditorProps } from "./VariableTable";
 
 const configuration: WorkflowConfiguration = {
@@ -13,6 +13,21 @@ const configuration: WorkflowConfiguration = {
   ],
 };
 
+const environments: VariableEnvironment[] = [
+  { id: "dev", name: "开发", description: "本地调试", order: 0 },
+  { id: "prod", name: "正式", description: "线上", order: 1 },
+];
+
+const environmentConfiguration: WorkflowConfiguration = {
+  revision: 4,
+  variables: [
+    { key: "API_BASE", value: "https://example.com", overrides: { dev: "https://dev.example.com" }, description: "接口地址" },
+    { key: "RETRY_COUNT", value: 2, overrides: { prod: 5 } },
+  ],
+  environments,
+  defaultEnvironmentId: "dev",
+};
+
 const editorProps = (patch: Partial<VariableTableEditorProps> = {}): VariableTableEditorProps => ({
   configuration,
   baseline: configuration,
@@ -22,6 +37,22 @@ const editorProps = (patch: Partial<VariableTableEditorProps> = {}): VariableTab
   conflict: "",
   error: "",
   notice: "",
+  activeTab: "default",
+  editingEnvironmentId: null,
+  pendingDeleteEnvironmentId: null,
+  onSelectTab: () => undefined,
+  onOpenEnvironment: () => undefined,
+  onCloseEnvironment: () => undefined,
+  onCreateEnvironment: () => undefined,
+  onRenameEnvironment: () => undefined,
+  onChangeEnvironmentDescription: () => undefined,
+  onMoveEnvironment: () => undefined,
+  onSetDefaultEnvironment: () => undefined,
+  onRequestDeleteEnvironment: () => undefined,
+  onConfirmDeleteEnvironment: () => undefined,
+  onCancelDeleteEnvironment: () => undefined,
+  onSetEnvironmentValue: () => undefined,
+  onClearEnvironmentValue: () => undefined,
   referenceRows: [],
   referencesLoading: false,
   referenceError: "",
@@ -36,9 +67,10 @@ const editorProps = (patch: Partial<VariableTableEditorProps> = {}): VariableTab
 });
 
 describe("VariableTable", () => {
-  it("renders the six columns, the single default-value tab and editable values", () => {
+  it("renders the six columns, both variable tabs and editable default values", () => {
     const html = renderToStaticMarkup(createElement(VariableTable, { configuration }));
     expect(html).toContain("默认值");
+    expect(html).toContain("变量环境");
     for (const heading of ["名称", "类型", "默认值", "说明", "引用", "删除"]) expect(html).toContain(`<th>${heading}</th>`);
     expect(html).toContain("API_BASE");
     expect(html).toContain("接口地址");
@@ -48,11 +80,11 @@ describe("VariableTable", () => {
     expect(html).toContain("保存变量");
   });
 
-  it("does not offer per-run-environment overrides", () => {
-    const html = renderToStaticMarkup(createElement(VariableTable, { configuration }));
+  it("uses only the user-visible variable-environment concept", () => {
+    const html = renderToStaticMarkup(createElement(VariableTable, { configuration: environmentConfiguration }));
     expect(html).not.toContain("运行环境");
-    expect(html).not.toContain("覆盖");
-    expect(html).toContain("变量环境切换将在后续版本提供");
+    expect(html).toContain("变量环境");
+    expect(html).toContain("默认值");
   });
 
   it("shows the empty state and load errors", () => {
@@ -86,7 +118,7 @@ describe("VariableTableEditor", () => {
     const dirty = renderToStaticMarkup(createElement(VariableTableEditor, editorProps({
       configuration: { ...configuration, variables: [...configuration.variables, { key: "NEW_KEY", value: "", overrides: {} }] },
     })));
-    expect(dirty).toContain("有未保存的修改");
+    expect(dirty).toContain("默认值、变量环境与覆盖值会一次保存");
     const busy = renderToStaticMarkup(createElement(VariableTableEditor, editorProps({ busy: true })));
     expect(busy).toContain("正在保存…");
   });
@@ -95,6 +127,46 @@ describe("VariableTableEditor", () => {
     const html = renderToStaticMarkup(createElement(VariableTableEditor, editorProps({ create: true })));
     expect(html).toContain("新增变量");
     expect(html).toContain("正在为节点新增变量");
+  });
+
+  it("manages variable environments with rename, description, order, default and delete controls", () => {
+    const html = renderToStaticMarkup(createElement(VariableTableEditor, editorProps({ configuration: environmentConfiguration, activeTab: "environments" })));
+    expect(html).toContain("变量环境（2）");
+    expect(html).toContain('data-environment-id="dev"');
+    expect(html).toContain('data-environment-field="name"');
+    expect(html).toContain("开发");
+    expect(html).toContain("本地调试");
+    expect(html).toContain("覆盖 1 个变量");
+    expect(html).toContain("编辑取值");
+    expect(html).toContain("设为默认变量环境 开发");
+    expect(html).toContain("上移变量环境 开发");
+    expect(html).toContain("不使用默认环境");
+    expect(html).toContain("新建变量环境");
+    expect(html).toContain("+ 新建环境");
+  });
+
+  it("edits one environment's values and offers inheritance recovery", () => {
+    const html = renderToStaticMarkup(createElement(VariableTableEditor, editorProps({
+      configuration: environmentConfiguration,
+      activeTab: "environments",
+      editingEnvironmentId: "dev",
+    })));
+    for (const heading of ["名称", "类型", "该环境值", "继承默认值"]) expect(html).toContain(`<th>${heading}</th>`);
+    expect(html).toContain("返回环境列表");
+    expect(html).toContain("默认变量环境");
+    expect(html).toContain("https://dev.example.com");
+    expect(html).toContain("恢复继承");
+    expect(html).toContain("继承默认值（2）");
+    expect(html).toContain("是 · 默认值 2");
+    expect(html).toContain('data-environment-value="RETRY_COUNT"');
+  });
+
+  it("shows the delete confirmation with the override count", () => {
+    const html = renderToStaticMarkup(createElement(VariableTableEditor, editorProps({ configuration: environmentConfiguration, activeTab: "environments", pendingDeleteEnvironmentId: "dev" })));
+    expect(html).toContain("删除变量环境「开发」");
+    expect(html).toContain("1 个覆盖值");
+    expect(html).toContain("默认环境会改为剩余第一个");
+    expect(html).toContain("确认删除");
   });
 
   it("renders reference counts and opens a reference list", () => {

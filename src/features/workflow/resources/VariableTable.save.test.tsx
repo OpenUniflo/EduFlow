@@ -36,13 +36,49 @@ import { VariableTable, type VariableTableProps } from "./VariableTable";
 
 const configuration: WorkflowConfiguration = { revision: 2, variables: [{ key: "API_BASE", value: "https://x", overrides: {}, description: "接口" }] };
 
+const environmentConfiguration: WorkflowConfiguration = {
+  revision: 5,
+  variables: [{ key: "API_BASE", value: "https://x", overrides: { dev: "https://dev", prod: "https://prod" }, description: "接口" }],
+  environments: [
+    { id: "dev", name: "开发", description: "本地", order: 0 },
+    { id: "prod", name: "正式", description: "线上", order: 1 },
+  ],
+  defaultEnvironmentId: "dev",
+};
+
 type Element = { type: unknown; props: Record<string, any> };
 
-function render(overrides: Partial<VariableTableProps> = {}): Element {
+function renderWith(value: WorkflowConfiguration, overrides: Partial<VariableTableProps> = {}): Element {
   host.cursor = 0;
-  const tree = VariableTable({ configuration, ...overrides });
+  const tree = VariableTable({ configuration: value, ...overrides });
   host.effects.splice(0).forEach(effect => effect());
   return tree as Element;
+}
+
+function render(overrides: Partial<VariableTableProps> = {}): Element {
+  return renderWith(configuration, overrides);
+}
+
+function walk(node: unknown, visit: (element: Element) => void) {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) { node.forEach(child => walk(child, visit)); return; }
+  const element = node as Element;
+  if (!("props" in element) || !element.props || typeof element.props !== "object") return;
+  visit(element);
+  walk(element.props.children, visit);
+}
+
+function find(node: unknown, predicate: (element: Element) => boolean): Element | undefined {
+  let found: Element | undefined;
+  walk(node, element => { if (!found && predicate(element)) found = element; });
+  return found;
+}
+
+function textOf(node: unknown): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join(" ");
+  if (!node || typeof node !== "object") return "";
+  return textOf((node as Element).props?.children);
 }
 
 async function flush() { for (let index = 0; index < 8; index += 1) await Promise.resolve(); }
@@ -77,9 +113,12 @@ describe("VariableTable save flow", () => {
     (editor.props.onSave as () => void)();
     await flush();
     editor = render({ onConfigurationSaved, onCreated });
-    expect(api.saveConfiguration).toHaveBeenCalledWith(expect.objectContaining({ revision: 2, variables: expect.arrayContaining([expect.objectContaining({ key: "NEW_KEY", value: 0 })]) }));
+    expect(api.saveConfiguration).toHaveBeenCalledWith(expect.objectContaining({
+      revision: 2, environments: [], defaultEnvironmentId: null,
+      variables: expect.arrayContaining([expect.objectContaining({ key: "NEW_KEY", value: 0 })]),
+    }));
     expect(editor.props.notice).toContain("修订 v3");
-    expect(onConfigurationSaved).toHaveBeenCalledWith(saved);
+    expect(onConfigurationSaved).toHaveBeenCalledWith(expect.objectContaining({ revision: 3, environments: [], defaultEnvironmentId: null }));
     expect(onCreated).toHaveBeenCalledWith("NEW_KEY", 3, { key: "NEW_KEY", value: 0 });
   });
 
@@ -95,6 +134,77 @@ describe("VariableTable save flow", () => {
     expect(editor.props.conflict).toContain("刷新");
     expect(editor.props.error).toBe("");
     expect(editor.props.configuration.variables).toHaveLength(1);
+  });
+
+  it("creates an environment, sets it as default, overrides a value and saves one payload", async () => {
+    const saved: WorkflowConfiguration = { revision: 6, variables: [{ key: "API_BASE", value: "https://x", overrides: {}, description: "接口" }] };
+    api.saveConfiguration.mockResolvedValue(saved);
+    const onConfigurationSaved = vi.fn();
+    renderWith(configuration, { onConfigurationSaved });
+    await flush();
+    let editor = renderWith(configuration, { onConfigurationSaved });
+    (editor.props.onCreateEnvironment as (name: string) => void)("开发");
+    editor = renderWith(configuration, { onConfigurationSaved });
+    const environmentId = editor.props.configuration.environments[0].id as string;
+    (editor.props.onSetDefaultEnvironment as (id: string) => void)(environmentId);
+    editor = renderWith(configuration, { onConfigurationSaved });
+    (editor.props.onSetEnvironmentValue as (index: number, id: string, raw: string) => void)(0, environmentId, "dev-value");
+    editor = renderWith(configuration, { onConfigurationSaved });
+    (editor.props.onSave as () => void)();
+    await flush();
+    editor = renderWith(configuration, { onConfigurationSaved });
+    expect(api.saveConfiguration).toHaveBeenCalledWith(expect.objectContaining({
+      revision: 2,
+      defaultEnvironmentId: environmentId,
+      environments: [expect.objectContaining({ id: environmentId, name: "开发", description: "", order: 0 })],
+      variables: [expect.objectContaining({ key: "API_BASE", overrides: { [environmentId]: "dev-value" } })],
+    }));
+    expect(onConfigurationSaved).toHaveBeenCalledWith(expect.objectContaining({ defaultEnvironmentId: environmentId }));
+    expect(editor.props.configuration.environments).toHaveLength(1);
+  });
+
+  it("confirms deletion, clears that environment's overrides and falls back from a deleted default", async () => {
+    renderWith(environmentConfiguration);
+    await flush();
+    let editor = renderWith(environmentConfiguration);
+    (editor.props.onSelectTab as (tab: string) => void)("environments");
+    editor = renderWith(environmentConfiguration);
+    (editor.props.onRequestDeleteEnvironment as (id: string) => void)("dev");
+    editor = renderWith(environmentConfiguration);
+    expect(editor.props.pendingDeleteEnvironmentId).toBe("dev");
+    (editor.props.onConfirmDeleteEnvironment as () => void)();
+    editor = renderWith(environmentConfiguration);
+    expect(editor.props.configuration.environments.map((environment: { id: string }) => environment.id)).toEqual(["prod"]);
+    expect(editor.props.configuration.defaultEnvironmentId).toBe("prod");
+    expect(editor.props.configuration.variables[0].overrides).toEqual({ prod: "https://prod" });
+  });
+
+  it("recovers inheritance by deleting one environment override", async () => {
+    renderWith(environmentConfiguration);
+    await flush();
+    let editor = renderWith(environmentConfiguration);
+    (editor.props.onSelectTab as (tab: string) => void)("environments");
+    editor = renderWith(environmentConfiguration);
+    (editor.props.onOpenEnvironment as (id: string) => void)("dev");
+    editor = renderWith(environmentConfiguration);
+    (editor.props.onClearEnvironmentValue as (index: number, id: string) => void)(0, "dev");
+    editor = renderWith(environmentConfiguration);
+    expect(editor.props.configuration.variables[0].overrides).toEqual({ prod: "https://prod" });
+    expect(editor.props.editingEnvironmentId).toBe("dev");
+  });
+
+  it("keeps environment edits in the draft when the save conflicts", async () => {
+    api.saveConfiguration.mockRejectedValue(new ApiRequestError("REVISION_CONFLICT", "Configuration revision changed", 409));
+    renderWith(environmentConfiguration);
+    await flush();
+    let editor = renderWith(environmentConfiguration);
+    (editor.props.onRenameEnvironment as (id: string, name: string) => void)("dev", "开发环境");
+    editor = renderWith(environmentConfiguration);
+    (editor.props.onSave as () => void)();
+    await flush();
+    editor = renderWith(environmentConfiguration);
+    expect(editor.props.conflict).toContain("保存冲突");
+    expect(editor.props.configuration.environments[0].name).toBe("开发环境");
   });
 
   it("reports ordinary save failures without a conflict banner", async () => {

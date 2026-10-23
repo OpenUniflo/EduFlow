@@ -136,7 +136,7 @@ import { handleWorkflowV2 } from "./workflowV2.js";
 
 type Fixture = { workflowId: string; currentRevision: number; archived?: boolean; definition: Row };
 
-function mockClient(fixtures: Fixture[], configuration?: Row) {
+function mockClient(fixtures: Fixture[], configuration?: Row, rpcHandlers: Record<string, (args: Row) => unknown> = {}) {
   const reads: { table: string; filters: Row }[] = [];
   const writes: { operation: string; value: unknown }[] = [];
   const client = {
@@ -180,7 +180,11 @@ function mockClient(fixtures: Fixture[], configuration?: Row) {
       };
       return query;
     },
-    rpc: vi.fn(() => { throw new Error("unexpected rpc"); }),
+    rpc(name: string, args: Row) {
+      const handler = rpcHandlers[name];
+      if (!handler) throw new Error(`unexpected rpc: ${name}`);
+      return Promise.resolve({ data: handler(args), error: null });
+    },
   } as unknown as SupabaseClient;
   return { client, reads, writes };
 }
@@ -236,30 +240,82 @@ describe("resource reference endpoints", () => {
   });
 });
 
-describe("configuration descriptions", () => {
-  const body = { baseRevision: 2, variables: [{ key: "API_URL", value: "https://example.test", overrides: {}, description: "接口地址" }] };
+describe("variable configuration", () => {
+  const development = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "开发", description: "", order: 0 };
+  const production = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "正式", description: "", order: 1 };
+  const stored = { revision: 2, variables: [{ key: "API_URL", value: "https://example.test", overrides: { [development.id]: "https://dev" }, description: "接口地址" }], environments: [development, production], defaultEnvironmentId: development.id };
 
-  it("accepts, persists and returns a bounded variable description", async () => {
-    const { client, writes } = mockClient([], { revision: 2, variables: [{ key: "API_URL", value: "https://example.test", overrides: {}, description: "接口地址" }] });
-    dependencies.server = client;
-    dependencies.compiler.mockResolvedValue({ items: [] });
-    const state = vercelResponse();
-    await handleWorkflowV2(request("PUT", "configuration", {}, body), state.response, "owner");
-    expect(state.output()).toEqual({ revision: 3, variables: body.variables });
-    expect(writes).toMatchObject([{ operation: "update", value: { owner_user_id: "owner", revision: 3, variables: body.variables } }]);
-  });
-
-  it("returns the stored description on read", async () => {
-    const { client } = mockClient([], { revision: 3, variables: [{ key: "API_URL", value: "https://example.test", overrides: {}, description: "接口地址" }] });
-    dependencies.server = client;
+  it("returns revision, variables, environments and the default environment", async () => {
+    dependencies.server = mockClient([], undefined, { workflow_v2_configuration_read: () => stored }).client;
     const state = vercelResponse();
     await handleWorkflowV2(request("GET", "configuration"), state.response, "owner");
-    expect(state.output()).toEqual({ revision: 3, variables: [{ key: "API_URL", value: "https://example.test", overrides: {}, description: "接口地址" }] });
+    expect(state.output()).toEqual({ revision: 2, variables: stored.variables, environments: [development, production], defaultEnvironmentId: development.id });
+  });
+
+  it("normalizes missing environments and a missing default pointer", async () => {
+    dependencies.server = mockClient([], undefined, { workflow_v2_configuration_read: () => ({ revision: 4, variables: [] }) }).client;
+    const state = vercelResponse();
+    await handleWorkflowV2(request("GET", "configuration"), state.response, "owner");
+    expect(state.output()).toEqual({ revision: 4, variables: [], environments: [], defaultEnvironmentId: null });
+  });
+
+  it("saves the whole environment table, prunes deleted overrides and falls back the default", async () => {
+    let saved: Row | undefined;
+    const client = mockClient([], undefined, {
+      workflow_v2_configuration_read: () => ({ ...stored, environments: [development, production], variables: [{ key: "API_URL", value: "https://default", overrides: { [development.id]: "dev", [production.id]: "prod" } }] }),
+      workflow_v2_configuration_save: (args) => {
+        saved = args;
+        return { revision: 3, variables: args.p_variables, environments: [{ ...production, order: 0 }], defaultEnvironmentId: production.id };
+      },
+    }).client;
+    dependencies.server = client;
+    const state = vercelResponse();
+    const body = {
+      baseRevision: 2,
+      variables: [{ key: "API_URL", value: "https://default", overrides: { [development.id]: "dev", [production.id]: "prod" }, description: "接口地址" }],
+      environments: [{ ...production, order: 0 }],
+      defaultEnvironmentId: null,
+    };
+    await handleWorkflowV2(request("PUT", "configuration", {}, body), state.response, "owner");
+    expect(saved).toMatchObject({
+      p_owner: "owner",
+      p_base: 2,
+      p_variables: [{ key: "API_URL", value: "https://default", overrides: { [production.id]: "prod" }, description: "接口地址" }],
+      p_environments: [{ id: production.id, name: "正式", description: "", order: 0 }],
+      p_default: production.id,
+    });
+    expect(state.output()).toEqual({ revision: 3, variables: saved?.p_variables, environments: [{ ...production, order: 0 }], defaultEnvironmentId: production.id });
+  });
+
+  it("preserves environments when an older client saves only variables", async () => {
+    let saved: Row | undefined;
+    dependencies.server = mockClient([], undefined, {
+      workflow_v2_configuration_read: () => ({ ...stored }),
+      workflow_v2_configuration_save: (args) => { saved = args; return { revision: 3, variables: args.p_variables, environments: [development, production], defaultEnvironmentId: development.id }; },
+    }).client;
+    const state = vercelResponse();
+    await handleWorkflowV2(request("PUT", "configuration", {}, { baseRevision: 2, variables: [{ key: "API_URL", value: "x", overrides: {} }] }), state.response, "owner");
+    expect(saved).toMatchObject({ p_environments: [development, production], p_default: development.id });
+  });
+
+  it("rejects incoherent environments, unknown defaults and non-uuid overrides", async () => {
+    dependencies.server = mockClient([], undefined, { workflow_v2_configuration_read: () => stored }).client;
+    const duplicateNames = { baseRevision: 2, variables: [], environments: [{ name: "开发" }, { name: "开发" }] };
+    await expect(handleWorkflowV2(request("PUT", "configuration", {}, duplicateNames), vercelResponse().response, "owner")).rejects.toMatchObject({ status: 400, code: "INVALID_CONFIGURATION" });
+    const unknownDefault = { baseRevision: 2, variables: [], environments: [{ name: "开发" }], defaultEnvironmentId: development.id };
+    await expect(handleWorkflowV2(request("PUT", "configuration", {}, unknownDefault), vercelResponse().response, "owner")).rejects.toMatchObject({ status: 400, code: "INVALID_CONFIGURATION" });
+    const legacyOverride = { baseRevision: 2, variables: [{ key: "API_URL", value: "x", overrides: { local: "legacy" } }] };
+    await expect(handleWorkflowV2(request("PUT", "configuration", {}, legacyOverride), vercelResponse().response, "owner")).rejects.toMatchObject({ status: 400, code: "INVALID_CONFIGURATION" });
+  });
+
+  it("rejects credential-shaped environment names and descriptions", async () => {
+    dependencies.server = mockClient([], undefined, { workflow_v2_configuration_read: () => stored }).client;
+    const secretName = { baseRevision: 2, variables: [], environments: [{ name: "api_key=abcdef123456" }] };
+    await expect(handleWorkflowV2(request("PUT", "configuration", {}, secretName), vercelResponse().response, "owner")).rejects.toMatchObject({ status: 400, code: "SECRET_IN_DEFINITION" });
   });
 
   it("rejects an over-long or credential-shaped description", async () => {
-    const { client } = mockClient([]);
-    dependencies.server = client;
+    dependencies.server = mockClient([], undefined, { workflow_v2_configuration_read: () => stored }).client;
     const tooLong = { baseRevision: 2, variables: [{ key: "API_URL", value: "x", overrides: {}, description: "字".repeat(301) }] };
     await expect(handleWorkflowV2(request("PUT", "configuration", {}, tooLong), vercelResponse().response, "owner")).rejects.toMatchObject({ status: 400, code: "INVALID_CONFIGURATION" });
     const credential = { baseRevision: 2, variables: [{ key: "API_URL", value: "x", overrides: {}, description: "api_key=abcdef123456" }] };

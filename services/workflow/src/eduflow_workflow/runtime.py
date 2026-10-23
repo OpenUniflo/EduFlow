@@ -13,7 +13,7 @@ from langgraph.errors import GraphInterrupt
 from .compiler import compile_definition, graph_for, NodeResult, encode_state, decode_state, SDK_EXECUTION, SDK_MESSAGES, SDK_SCOPE
 from .contracts import ExecutionError, bind, validate_value, canonical, pointer, apply_patch, predicate, reduce_field
 from .messages import from_langchain, to_langchain
-from .registry import OPERATIONS
+from .registry import OPERATIONS, restore_frozen_environment
 from .tools import invoke_tool, model_http_client, secret
 
 LOCAL_MODEL_KEY_PLACEHOLDER='local-fixture-no-credential'
@@ -44,9 +44,7 @@ class RunExecution:
         self._static_waits = {}
         self._stream_attempts = {}
         self.env=registry.environment(self.run["environment_ref"],self.run["owner_user_id"])
-        snapshot=self.run.get("registry_snapshot",{})
-        self.env["variables"]=copy.deepcopy(snapshot.get("variables",self.env.get("variables",{})))
-        self.env["configurationRevision"]=snapshot.get("configurationRevision",self.env.get("configurationRevision",0))
+        restore_frozen_environment(self.env,self.run.get("registry_snapshot",{}))
     @property
     def definition(self):
         scope=SDK_SCOPE.get()

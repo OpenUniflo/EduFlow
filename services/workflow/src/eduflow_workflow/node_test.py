@@ -15,7 +15,8 @@ class TestStorage:
         return None
 
 async def test_node(body,registry):
-    env=registry.environment(body["environmentRef"],body["ownerId"])
+    from .registry import requested_variable_environment
+    env=registry.environment(body["environmentRef"],body["ownerId"],requested_variable_environment(body))
     definition=copy.deepcopy(body["definition"])
     selected=next((node for node in definition["nodes"] if node["id"]==body["nodeId"]),None)
     if not selected: raise ExecutionError("NODE_NOT_FOUND","Node does not exist")

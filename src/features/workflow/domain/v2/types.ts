@@ -30,6 +30,8 @@ export type WorkflowTool = { ref: string; name: string; description?: string; co
 export type WorkflowExecutionError = { code: string; category?: string; message: string; retryable?: boolean; externalStatus?: number; effect?: string; graphPath?:string[]; nodeId?: string; invocation?: number; stage?: "input_resolution"; pointer?: string };
 export type WorkflowRunV2 = {
   operation?: "initial" | "next" | "branch" | null;
+  variableEnvironment?: string | null;
+  variableEnvironmentId?: string | null;
   threadId?:string; resumeOfRunId?:string; continuationRunId?:string; runId: string; workflowId: string; revision: number; mode: "live"; verification: "unverified" | "passed" | "failed";
   status: "queued" | "running" | "waiting" | "continued" | "success" | "failed" | "cancelled";
   definitionHash: string; semanticHash: string; compileFingerprint: string; environmentRef: string; environmentRevision: string; policyVersion: string;
@@ -46,7 +48,7 @@ export type WorkflowRevisionSummary = { revision: number; name: string; createdA
 
 export type WorkflowVariable = {key:string;value:string|number|boolean;overrides:Record<string,string|number|boolean>;description?:string};
 /** Workspace-level variable environment (M13). Kept optional here so existing callers remain valid until the API returns it. */
-export type VariableEnvironment = {id:string;name:string};
+export type VariableEnvironment = {id:string;name:string;description?:string;order?:number};
 export type WorkflowConfiguration = {revision:number;variables:WorkflowVariable[];environments?:VariableEnvironment[];defaultEnvironmentId?:string|null};
 
 export type WorkflowThreadV2={threadId:string;workflowId:string;revision:number;status:'active'|'waiting'|'closed'|'expired';currentRunId:string;checkpointId:string;state:JsonValue;stateVersion:number;interrupts:{id:string;nodeId:string;title:string;schema:JsonSchema;graphPath?:string[];taskId?:string;namespace?:string;breakpoint?:boolean}[];waitExpiresAt?:string;updatedAt:string;lastError?:{code:string};nodeExecutions:number;toolCalls:number;computeMs:number};

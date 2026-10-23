@@ -56,6 +56,57 @@ def transform(ref, arguments):
     if ref == "core.message": return {"messages":[{"id":str(uuid.uuid4()),"role":arguments.get("role","user"),"content":[{"type":"text","text":arguments["text"]}]}]}
     raise ExecutionError("UNKNOWN_OPERATION","Unregistered operation")
 
+def restore_frozen_environment(env, frozen):
+    """Reapply frozen ordinary values and variable environment selection to a fresh environment."""
+    frozen=frozen if isinstance(frozen,dict) else {}
+    if "variables" in frozen: env["variables"]=copy.deepcopy(frozen["variables"])
+    if "configurationRevision" in frozen: env["configurationRevision"]=frozen["configurationRevision"]
+    env["variableEnvironment"]=copy.deepcopy(frozen.get("variableEnvironment"))
+    env["variableEnvironmentId"]=frozen.get("variableEnvironmentId")
+    return env
+
+def requested_variable_environment(body):
+    """Optional request field shared by every endpoint that resolves workspace variables."""
+    value=body.get("variableEnvironmentId") if isinstance(body,dict) else None
+    if value is None: return None
+    if not isinstance(value,str) or not value or len(value)>128: raise ExecutionError("INVALID_VARIABLE_ENVIRONMENT","Variable environment is unavailable","policy")
+    return value
+
+def resolve_variable_configuration(configuration, variable_environment_id=None):
+    """Resolve ordinary variables for one owner-visible variable environment.
+
+    RPC contract (workflow_private.environment_variables): revision, variables
+    [{key,value,overrides}], environments [{id,name}], default_environment_id.
+    A function that predates variable environments omits environments/default;
+    resolution then keeps pure default values. An explicitly requested id that
+    is not present in this owner's configuration is rejected.
+    """
+    configuration=configuration if isinstance(configuration,dict) else {}
+    raw_variables=configuration.get("variables")
+    raw_environments=configuration.get("environments")
+    variables=raw_variables if isinstance(raw_variables,list) else []
+    environments=raw_environments if isinstance(raw_environments,list) else []
+    known={item["id"]:item for item in environments if isinstance(item,dict) and isinstance(item.get("id"),str) and item["id"]}
+    default_id=configuration.get("default_environment_id",configuration.get("defaultEnvironmentId"))
+    if not isinstance(default_id,str) or default_id not in known: default_id=None
+    if variable_environment_id is not None:
+        if not isinstance(variable_environment_id,str) or variable_environment_id not in known:
+            raise ExecutionError("INVALID_VARIABLE_ENVIRONMENT","Variable environment is unavailable","policy")
+        selected=known[variable_environment_id]
+    else: selected=known[default_id] if default_id else None
+    selected_id=selected["id"] if selected else None
+    name=selected.get("name") if selected else None
+    resolved={}
+    for variable in variables:
+        if not isinstance(variable,dict) or not isinstance(variable.get("key"),str): continue
+        overrides=variable.get("overrides") if isinstance(variable.get("overrides"),dict) else {}
+        resolved[variable["key"]]=overrides[selected_id] if selected_id is not None and selected_id in overrides else variable.get("value")
+    revision=configuration.get("revision",0)
+    if isinstance(revision,bool) or not isinstance(revision,int): revision=0
+    return {"revision":revision,"variables":resolved,
+            "variableEnvironment":({"id":selected_id,"name":name if isinstance(name,str) and name else selected_id} if selected else None),
+            "variableEnvironmentId":selected_id,"defaultVariableEnvironmentId":default_id}
+
 class Registry:
     def __init__(self, configuration=None):
         if configuration is None:
@@ -100,25 +151,37 @@ class Registry:
             except Exception as error:
                 tool["available"]=False;tool["diagnostics"]=[{"code":getattr(error,"code","INVALID_TOOL_SCHEMA"),"severity":"error","message":"Tool Schema is unsupported or invalid in M1"}]
             tool["contractDigest"]=digest({key:value for key,value in tool.items() if key not in ("contractDigest","available","diagnostics")})
-        env["revision"] = digest({key:value for key,value in env.items() if key not in ("revision","functions","variables","configurationRevision","capabilityOrigins")})
+        env["revision"] = digest({key:value for key,value in env.items() if key not in ("revision","functions","variables","configurationRevision","capabilityOrigins","variableEnvironment","variableEnvironmentId","defaultVariableEnvironmentId")})
     def environment_allowed(self, env, owner):
         if not owner or env.get("disabled"): return False
         return env.get("access","owners")=="authenticated" or owner in env.get("ownerIds",[]) or "*" in env.get("ownerIds",[])
-    def environment(self, ref, owner):
+    def variable_configuration(self, owner):
+        database=os.environ.get("WORKFLOW_DATABASE_URL")
+        if not database: return None
+        import psycopg
+        with psycopg.connect(database,connect_timeout=5,tcp_user_timeout=20000,options='-c statement_timeout=15000 -c lock_timeout=3000') as connection:
+            row=connection.execute("select workflow_private.environment_variables(%s::uuid)",(owner,)).fetchone()
+        return row[0] if row and row[0] else None
+    def environment(self, ref, owner, variable_environment_id=None):
         matches = [env for env in self.environments if env["ref"]==ref and self.environment_allowed(env,owner)]
         if not matches: raise ExecutionError("ENVIRONMENT_FORBIDDEN","Environment is not authorized", "auth")
         env=copy.deepcopy(matches[0])
         env["variables"]={};env["configurationRevision"]=0
+        env["variableEnvironment"]=None;env["variableEnvironmentId"]=None;env["defaultVariableEnvironmentId"]=None
         database=os.environ.get("WORKFLOW_DATABASE_URL")
-        if database:
-            import psycopg
-            with psycopg.connect(database,connect_timeout=5,tcp_user_timeout=20000,options='-c statement_timeout=15000 -c lock_timeout=3000') as connection:
-                row=connection.execute("select workflow_private.environment_variables(%s::uuid)",(owner,)).fetchone()
-                if row and row[0]:
-                    env["configurationRevision"]=row[0]["revision"]
-                    env["variables"]={v["key"]:v.get("overrides",{}).get(ref,v["value"]) for v in row[0]["variables"]}
+        configuration=self.variable_configuration(owner)
+        if configuration:
+            resolution=resolve_variable_configuration(configuration,variable_environment_id)
+            env["configurationRevision"]=resolution["revision"]
+            env["variables"]=resolution["variables"]
+            env["variableEnvironment"]=resolution["variableEnvironment"]
+            env["variableEnvironmentId"]=resolution["variableEnvironmentId"]
+            env["defaultVariableEnvironmentId"]=resolution["defaultVariableEnvironmentId"]
+        elif variable_environment_id is not None:
+            raise ExecutionError("INVALID_VARIABLE_ENVIRONMENT","Variable environment is unavailable","policy")
         env['functions']=[]
         if database:
+            import psycopg
             with psycopg.connect(database,connect_timeout=5,tcp_user_timeout=20000,options='-c statement_timeout=15000 -c lock_timeout=3000') as connection:
                 rows=connection.execute('select workflow_private.p4_catalog_read(%s::uuid,%s)',(owner,ref)).fetchone()[0]
                 for row in rows:
@@ -139,7 +202,7 @@ class Registry:
                 self.update(env)
         return env
     def snapshot(self, env):
-        content = {"id":env["ref"],"nodes":self.nodes,"tools":env["tools"],"operations":self.operations,"capabilities":env["capabilities"],"environmentRevision":env["revision"],"providers":[{"ref":p["ref"],"modelRefs":p.get("modelRefs",[])} for p in env.get("providers",[])],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0),"dependencyManifest":DEPENDENCY_MANIFEST}
+        content = {"id":env["ref"],"nodes":self.nodes,"tools":env["tools"],"operations":self.operations,"capabilities":env["capabilities"],"environmentRevision":env["revision"],"providers":[{"ref":p["ref"],"modelRefs":p.get("modelRefs",[])} for p in env.get("providers",[])],"variables":env.get("variables",{}),"variableEnvironment":copy.deepcopy(env.get("variableEnvironment")),"variableEnvironmentId":env.get("variableEnvironmentId"),"configurationRevision":env.get("configurationRevision",0),"dependencyManifest":DEPENDENCY_MANIFEST}
         if os.environ.get('WORKFLOW_SANDBOX_BACKEND')=='vercel':
             content['executionBackend']={'type':'vercel','image':os.environ.get('WORKFLOW_SANDBOX_IMAGE','')}
         return {**content,"digest":digest(content),"functions":env.get("functions",[])}

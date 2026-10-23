@@ -6,7 +6,7 @@ import os
 from fastapi import FastAPI, Request, HTTPException
 from .compiler import compile_definition, envelope, validate_structure
 from .contracts import ExecutionError, VERSION, digest, validate_value, canonical, bind, DEPENDENCY_MANIFEST
-from .registry import Registry, HARD_LIMITS, OPERATIONS
+from .registry import Registry, HARD_LIMITS, OPERATIONS, requested_variable_environment, restore_frozen_environment
 from .tools import discover
 from .credentials import assert_no_secrets
 from .support import stategraph_support
@@ -85,14 +85,15 @@ async def capabilities(): return {"protocolVersion":"1","nodes":registry.nodes,"
 async def catalog(body:dict):
     owner=body["ownerId"]
     envs=[env for env in registry.environments if registry.environment_allowed(env,owner)]
+    variable_environment_id=requested_variable_environment(body)
     if body.get("environmentRef"):
-        env=registry.environment(body["environmentRef"],owner)
+        env=registry.environment(body["environmentRef"],owner,variable_environment_id)
         return {"items":registry.public_tools(env),"nextCursor":None,"environment":registry.public_environment(env)}
-    return {"items":[registry.public_environment(registry.environment(env["ref"],owner)) for env in envs]}
+    return {"items":[registry.public_environment(registry.environment(env["ref"],owner,variable_environment_id)) for env in envs]}
 
 @app.post("/v1/discover")
 async def discovery(body:dict):
-    env=registry.environment(body["environmentRef"],body["ownerId"])
+    env=registry.environment(body["environmentRef"],body["ownerId"],requested_variable_environment(body))
     try:
         tools=await discover(registry,env,body["connectorRef"])
     except ExecutionError:
@@ -130,7 +131,7 @@ async def hash_value(body:dict): return {"digest":digest(body["value"])}
 async def validation(body:dict):
     # Authorization is always fresh. This endpoint performs no save, enqueue,
     # provider construction, model invocation, discovery or tool execution.
-    env=registry.environment(body["environmentRef"],body["ownerId"])
+    env=registry.environment(body["environmentRef"],body["ownerId"],requested_variable_environment(body))
     definition=body["definition"]
     assert_no_secrets(definition,env)
     snapshot=registry.snapshot(env)
@@ -168,7 +169,7 @@ async def validation(body:dict):
             if error.pointer is not None: diagnostic["pointer"]=("/state/initial" if error.code=="INVALID_INITIAL_STATE" else "")+error.pointer
             diagnostics.append(diagnostic)
     valid=structure["valid"] and environment_ready and input_check is not False
-    return {**result,"valid":valid,"diagnostics":diagnostics,"checks":{"structure":structure["valid"],"environment":environment_ready,"input":input_check},"environmentReadiness":"ready" if environment_ready else "not_ready","environmentRevision":env["revision"],"registrySnapshot":snapshot,**({"definitionHash":digest(definition)} if structure["valid"] else {})}
+    return {**result,"valid":valid,"diagnostics":diagnostics,"checks":{"structure":structure["valid"],"environment":environment_ready,"input":input_check},"environmentReadiness":"ready" if environment_ready else "not_ready","environmentRevision":env["revision"],"variableEnvironment":env.get("variableEnvironment"),"variableEnvironmentId":env.get("variableEnvironmentId"),"registrySnapshot":snapshot,**({"definitionHash":digest(definition)} if structure["valid"] else {})}
 
 _node_test_slots=None
 @app.post("/v1/test-node")
@@ -187,10 +188,9 @@ async def resume_validation(body:dict):
     from .interrupts import validate_resume
     thread=body['thread']; snapshot=thread['snapshot']; definition=body['definition']
     env=registry.environment(snapshot['environment_ref'],body['ownerId'])
-    # Ordinary workspace values are frozen; authorization/catalog identity stays fresh.
-    frozen=snapshot['registry_snapshot']
-    env['variables']=copy.deepcopy(frozen.get('variables',{}))
-    env['configurationRevision']=frozen.get('configurationRevision',0)
+    # Ordinary workspace values and the variable environment selection are frozen;
+    # authorization/catalog identity stays fresh.
+    restore_frozen_environment(env,snapshot['registry_snapshot'])
     result=compile_definition(definition,registry.snapshot(env))
     if not result['valid'] or result['compileFingerprint']!=snapshot['compile_fingerprint'] or env['revision']!=snapshot['environment_revision']:
         raise ExecutionError('COMPILE_FINGERPRINT_CHANGED','Frozen checkpoint executor or authorization has changed')

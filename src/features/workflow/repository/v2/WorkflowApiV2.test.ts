@@ -124,3 +124,40 @@ describe("Resource center reference and test requests (M3)", () => {
     expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ action: "test", kind: "connection", ref: "price", version: 2, arguments: { q: "a" }, confirmExternalEffect: false, environmentRef: "local-env" });
   });
 });
+
+describe("Variable environment contract (M13)", () => {
+  beforeEach(() => request.mockReset());
+  const environment = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "开发", description: "", order: 0 };
+
+  it("normalizes a configuration read that omits environments", async () => {
+    request.mockResolvedValueOnce({ revision: 2, variables: [] });
+    await expect(new WorkflowApiV2().configuration()).resolves.toEqual({ revision: 2, variables: [], environments: [], defaultEnvironmentId: null });
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=configuration");
+  });
+
+  it("saves the whole environment table and normalizes the response", async () => {
+    request.mockResolvedValueOnce({ revision: 3, variables: [], environments: [environment], defaultEnvironmentId: environment.id });
+    const result = await new WorkflowApiV2().saveConfiguration({ revision: 2, variables: [], environments: [environment], defaultEnvironmentId: environment.id });
+    expect(result).toEqual({ revision: 3, variables: [], environments: [environment], defaultEnvironmentId: environment.id });
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=configuration");
+    expect(request.mock.calls[0][1].method).toBe("PUT");
+    expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ baseRevision: 2, variables: [], environments: [environment], defaultEnvironmentId: environment.id });
+  });
+
+  it("sends a variableEnvironmentId only when one was selected", async () => {
+    const receipt = { runId: "ca72a44b-7a80-47b1-a93b-451775c03ddb", revision: 1, status: "queued" };
+    request.mockResolvedValueOnce(receipt);
+    await new WorkflowApiV2().createRun("workflow", 1, {}, "environment", "key", undefined, environment.id);
+    expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ workflowId: "workflow", revision: 1, input: {}, environmentRef: "environment", variableEnvironmentId: environment.id });
+    request.mockResolvedValueOnce(receipt);
+    await new WorkflowApiV2().createRun("workflow", 1, {}, "environment", "key");
+    expect(JSON.parse(request.mock.calls[1][1].body)).toEqual({ workflowId: "workflow", revision: 1, input: {}, environmentRef: "environment" });
+  });
+
+  it("passes frozen variable environment fields through Run reads", async () => {
+    const run = { runId: "ca72a44b-7a80-47b1-a93b-451775c03ddb", workflowId: "workflow", revision: 1, variableEnvironmentId: environment.id, variableEnvironment: "开发" };
+    request.mockResolvedValueOnce(run);
+    await expect(new WorkflowApiV2().run(run.runId)).resolves.toEqual(run);
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=runs&id=ca72a44b-7a80-47b1-a93b-451775c03ddb");
+  });
+});

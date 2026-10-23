@@ -70,6 +70,15 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   try { return await sharedApiRequest<T>(path, init); }
   catch (reason) { if (reason instanceof ApiRequestError) throw reason; throw new WorkflowRequestError(reason); }
 }
+/** Normalizes the configuration contract: environments default to [] and the default id to null. */
+function normalizeConfiguration(value: WorkflowConfiguration): WorkflowConfiguration {
+  return {
+    revision: value.revision,
+    variables: value.variables ?? [],
+    environments: value.environments ?? [],
+    defaultEnvironmentId: value.defaultEnvironmentId ?? null,
+  };
+}
 const jsonRequest = <T>(resource: string, method: string, body: unknown, query?: Record<string, string | number | undefined>) => apiRequest<T>(endpoint(resource, query), { method, body: JSON.stringify(body) });
 export class WorkflowApiV2 {
   p5<T>(body:Record<string,unknown>) { return jsonRequest<T>("p5","POST",body); }
@@ -100,8 +109,16 @@ export class WorkflowApiV2 {
   variableReferences() { return apiRequest<{items:ResourceReferenceRow[]}>(endpoint("configuration",{view:"references"})); }
   /** Connection test; the Worker returns the shared ConnectionTestResult contract. */
   testExtension(environmentRef:string,body:{ref:string;version:number;arguments?:Record<string,JsonValue>;confirmExternalEffect?:boolean}) { return jsonRequest<ConnectionTestResult>("extensions","POST",{action:"test",kind:"connection",...body,environmentRef}); }
-  configuration() { return apiRequest<WorkflowConfiguration>(endpoint("configuration")); }
-  saveConfiguration(config: WorkflowConfiguration) { return jsonRequest<WorkflowConfiguration>("configuration","PUT",{baseRevision:config.revision,variables:config.variables}); }
+  async configuration() { return normalizeConfiguration(await apiRequest<WorkflowConfiguration>(endpoint("configuration"))); }
+  async saveConfiguration(config: WorkflowConfiguration) {
+    const normalized = normalizeConfiguration(config);
+    return normalizeConfiguration(await jsonRequest<WorkflowConfiguration>("configuration","PUT",{
+      baseRevision: normalized.revision,
+      variables: normalized.variables,
+      environments: normalized.environments,
+      defaultEnvironmentId: normalized.defaultEnvironmentId,
+    }));
+  }
   environments() { return apiRequest<{ items: WorkflowEnvironment[] }>(endpoint("environments")); }
   tools(environmentRef: string) { return apiRequest<{ items: WorkflowTool[] }>(endpoint("tools", { environmentRef })); }
   discover(environmentRef: string, connectorRef: string) { return jsonRequest<{ items: WorkflowTool[] }>("tools", "POST", { environmentRef, connectorRef }, { op: "discover" }); }
@@ -114,9 +131,9 @@ export class WorkflowApiV2 {
     do { const page = await apiRequest<{ items: WorkflowRevisionSummary[]; nextCursor?: number | null }>(endpoint("revisions", { workflowId, cursor, limit: 100 })); items.push(...page.items); cursor = page.nextCursor ?? undefined; } while (cursor !== undefined);
     return { items };
   }
-  async createRun(workflowId: string, revision: number, input: JsonValue, environmentRef: string, idempotencyKey: string, launchContext?: WorkflowLaunchContext) {
+  async createRun(workflowId: string, revision: number, input: JsonValue, environmentRef: string, idempotencyKey: string, launchContext?: WorkflowLaunchContext, variableEnvironmentId?: string) {
     const context = launchContext ? { courseId: launchContext.courseId, assignmentId: launchContext.assignmentId, workflowTemplateId: launchContext.workflowTemplateId } : undefined;
-    const result = await apiRequest<unknown>(endpoint("runs"), { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ workflowId, revision, input, environmentRef, ...(context ? { launchContext: context } : {}) }) });
+    const result = await apiRequest<unknown>(endpoint("runs"), { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ workflowId, revision, input, environmentRef, ...(context ? { launchContext: context } : {}), ...(variableEnvironmentId ? { variableEnvironmentId } : {}) }) });
     const receipt = runSubmissionReceipt.safeParse(result);
     if (!receipt.success || receipt.data.revision !== revision) throw new ApiResponseError();
     return receipt.data;

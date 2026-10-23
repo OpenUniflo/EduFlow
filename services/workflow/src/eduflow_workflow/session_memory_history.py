@@ -150,6 +150,10 @@ async def load(owner,thread,registry):
     from .storage import Storage
     data=await Storage(os.environ['WORKFLOW_DATABASE_URL']).call('p5_read',owner,'thread',thread)
     t=data['thread'];definition=data['definition'];env=registry.environment(t['snapshot']['environment_ref'],owner)
+    # Variables and the variable environment selection are frozen with the thread;
+    # restore them before recompiling so the stored compile fingerprint still matches.
+    from .registry import restore_frozen_environment
+    restore_frozen_environment(env,t.get('snapshot',{}).get('registry_snapshot') or {})
     if data['archived']:fail('WORKFLOW_ARCHIVED','Workflow is archived')
     from .compiler import compile_definition
     accepted=compile_definition(definition,registry.snapshot(env))
@@ -249,7 +253,8 @@ async def operation(body,registry):
         items=await storage.call('p5_read',owner,'threads',body['workflowId'])
         return {'items':items,'limits':LIMITS}
     if action in ('memory.list','memory.put','memory.delete'):
-        env=registry.environment(body['environmentRef'],owner)
+        from .registry import requested_variable_environment
+        env=registry.environment(body['environmentRef'],owner,requested_variable_environment(body))
         workflow=body['workflowId']
         # Even shared memory management requires an owner-visible workflow identity.
         allowed=await storage.call('p5_workflow',owner,workflow)

@@ -386,7 +386,7 @@ describe("same-tab recovery after authentication interruption", () => {
     expect(api.createRun).toHaveBeenCalledTimes(1); expect(render().submitUnknown).toBe(true);
     await render().startRun(); expect(api.createRun).toHaveBeenCalledTimes(1);
     await render().confirmSubmission();
-    expect(api.createRun.mock.calls[1]).toEqual(["workflow", 3, { question: "original A" }, "local", originalKey, originalContext]);
+    expect(api.createRun.mock.calls[1]).toEqual(["workflow", 3, { question: "original A" }, "local", originalKey, originalContext, undefined]);
     expect(render().input).toEqual({ question: "newer B" });
     await render().startRun(); expect(api.createRun.mock.calls[2][5]).toEqual(otherContext);
   });

@@ -7,13 +7,14 @@ import { workflowCompiler, workflowDigest, workflowStrictBody, workflowObject, w
 import { applyTemplateBindings, TemplateBindingError, validateTemplateBindings } from "./workflowTemplateBinding.js";
 import { readAssignmentEligibility } from "./assignmentEligibility.js";
 import { connectionReferenceRows, variableReferenceRows, type ReferenceWorkflow } from "./workflowV2References.js";
+import { cleanVariableOverrides, configurationSaveIssue, configurationSaveSchema, frozenVariableEnvironment, normalizeConfiguration, resolveDefaultEnvironmentId, withFrozenVariableEnvironment } from "./workflowVariableEnvironments.js";
 
 type Result<T> = { data: T | null; error: { message: string; code?: string } | null };
 function result<T>(query: Result<T>): T {
   if (query.error) {
     const message = query.error.message;
-    const code = ["REVISION_CONFLICT", "IDEMPOTENCY_CONFLICT", "WORKFLOW_ARCHIVED", "WORKFLOW_BUSY", "SOURCE_CHANGED", "RUN_QUOTA_EXCEEDED", "LAUNCH_CONTEXT_CHANGED", "THREAD_QUOTA_EXCEEDED", "THREAD_STATE_CONFLICT", "THREAD_NOT_RESUMABLE", "WAIT_EXPIRED", "INTERRUPT_ID_CONFLICT", "NOT_FOUND"].find((code) => message.includes(code));
-    if (code) throw new ApiError(code === "NOT_FOUND" ? 404 : ["RUN_QUOTA_EXCEEDED","THREAD_QUOTA_EXCEEDED"].includes(code) ? 429 : 409, code, code.split("_").join(" "));
+    const code = ["REVISION_CONFLICT", "IDEMPOTENCY_CONFLICT", "WORKFLOW_ARCHIVED", "WORKFLOW_BUSY", "SOURCE_CHANGED", "RUN_QUOTA_EXCEEDED", "LAUNCH_CONTEXT_CHANGED", "THREAD_QUOTA_EXCEEDED", "THREAD_STATE_CONFLICT", "THREAD_NOT_RESUMABLE", "WAIT_EXPIRED", "INTERRUPT_ID_CONFLICT", "INVALID_CONFIGURATION", "VARIABLE_ENVIRONMENT_NOT_FOUND", "NOT_FOUND"].find((code) => message.includes(code));
+    if (code) throw new ApiError(code === "NOT_FOUND" ? 404 : ["INVALID_CONFIGURATION", "VARIABLE_ENVIRONMENT_NOT_FOUND"].includes(code) ? 400 : ["RUN_QUOTA_EXCEEDED","THREAD_QUOTA_EXCEEDED"].includes(code) ? 429 : 409, code, code.split("_").join(" "));
     throw new ApiError(500, "WORKFLOW_STORAGE_ERROR", "Workflow persistence request failed");
   }
   return query.data as T;
@@ -105,8 +106,44 @@ async function liveRun(client: SupabaseClient, owner: string, id: string) {
   }
   return row;
 }
-export function workflowRunDto(row: WorkflowRow, includeInputReuse = false) {
-  const projected = workflowProjection({ runId: row.run_id, threadId: row.thread_id, resumeOfRunId: row.resume_of_run_id, continuationRunId: row.continuation_run_id, workflowId: row.workflow_id, revision: row.revision, mode: row.mode, verification: row.verification, status: row.status, launchContext: row.launch_context ?? undefined, definitionHash: row.definition_hash, semanticHash: row.semantic_hash, compileFingerprint: row.compile_fingerprint, environmentRef: row.environment_ref, environmentRevision: row.environment_revision, operation: row.operation, policyVersion: row.policy_version, inputRef: `run:${row.run_id}:input`, ...(row.output === null ? {} : { output: row.output, outputRef: `run:${row.run_id}:output` }), finalState: row.raw_state, error: row.error ? { ...workflowObject(row.error), scope: "run", runId: row.run_id } : undefined, createdAt: row.created_at, startedAt: row.started_at, finishedAt: row.finished_at, cancelRequestedAt: row.cancel_requested_at, lastSeq: row.last_seq }) as WorkflowRow;
+/** Current variable-environment names for display fallback when a Run has no frozen name. */
+async function variableEnvironmentNames(client: SupabaseClient, owner: string, ids: readonly (string | null | undefined)[]) {
+  const unique = [...new Set(ids.filter((id): id is string => typeof id === "string" && id.length > 0))];
+  if (!unique.length) return new Map<string, string>();
+  const rows = result(await client.from("workflow_variable_environments").select("id,name").eq("owner_user_id", owner).in("id", unique)) as WorkflowRow[];
+  return new Map(rows.map((row) => [String(row.id), String(row.name)]));
+}
+/** Reads the normalized workspace configuration; the RPC lazily creates the default environment. */
+async function readConfiguration(client: SupabaseClient, owner: string) {
+  return normalizeConfiguration(await rpc(client, "workflow_v2_configuration_read", { p_owner: owner }));
+}
+/**
+ * Resolves the Run's effective variable environment. An explicit id must be owned by the
+ * caller; otherwise the owner's default environment is used (the Worker would resolve the
+ * same default when no id is sent, but freezing it here keeps the Run deterministic).
+ */
+async function selectedVariableEnvironment(client: SupabaseClient, owner: string, requested?: string) {
+  if (requested !== undefined) {
+    const row = result(await client.from("workflow_variable_environments").select("id,name").eq("owner_user_id", owner).eq("id", workflowUuid(requested)).maybeSingle()) as WorkflowRow | null;
+    if (!row) throw new ApiError(400, "INVALID_VARIABLE_ENVIRONMENT", "Variable environment not found");
+    return { id: String(row.id), name: String(row.name) };
+  }
+  const configuration = result(await client.from("workflow_workspace_configuration").select("default_environment_id").eq("owner_user_id", owner).maybeSingle()) as WorkflowRow | null;
+  const defaultId = typeof configuration?.default_environment_id === "string" ? configuration.default_environment_id : "";
+  if (!defaultId) return null;
+  const row = result(await client.from("workflow_variable_environments").select("id,name").eq("owner_user_id", owner).eq("id", defaultId).maybeSingle()) as WorkflowRow | null;
+  return row ? { id: String(row.id), name: String(row.name) } : null;
+}
+/**
+ * Run projection. The selected variable environment is returned as frozen identity (id) and
+ * display name; the name is preferred from the frozen registry snapshot so historical Runs
+ * keep it after the environment is deleted, with the current row name as a fallback.
+ */
+export function workflowRunDto(row: WorkflowRow, includeInputReuse = false, environmentNames?: ReadonlyMap<string, string>) {
+  const frozen = frozenVariableEnvironment(row.registry_snapshot);
+  const variableEnvironmentId = typeof row.variable_environment_id === "string" && row.variable_environment_id ? row.variable_environment_id : frozen.id;
+  const variableEnvironment = frozen.name ?? (variableEnvironmentId ? environmentNames?.get(variableEnvironmentId) ?? null : null);
+  const projected = workflowProjection({ runId: row.run_id, threadId: row.thread_id, resumeOfRunId: row.resume_of_run_id, continuationRunId: row.continuation_run_id, workflowId: row.workflow_id, revision: row.revision, mode: row.mode, verification: row.verification, status: row.status, variableEnvironmentId: variableEnvironmentId ?? null, variableEnvironment: variableEnvironment ?? null, launchContext: row.launch_context ?? undefined, definitionHash: row.definition_hash, semanticHash: row.semantic_hash, compileFingerprint: row.compile_fingerprint, environmentRef: row.environment_ref, environmentRevision: row.environment_revision, operation: row.operation, policyVersion: row.policy_version, inputRef: `run:${row.run_id}:input`, ...(row.output === null ? {} : { output: row.output, outputRef: `run:${row.run_id}:output` }), finalState: row.raw_state, error: row.error ? { ...workflowObject(row.error), scope: "run", runId: row.run_id } : undefined, createdAt: row.created_at, startedAt: row.started_at, finishedAt: row.finished_at, cancelRequestedAt: row.cancel_requested_at, lastSeq: row.last_seq }) as WorkflowRow;
   return { ...projected, ...(includeInputReuse ? { inputReuse: workflowInputReuse(row.input) } : {}) };
 }
 function eventDto(row: WorkflowRow) { return workflowProjection({ protocolVersion: "1", eventId: row.event_id, runId: row.run_id, seq: row.seq, type: row.type, occurredAt: row.occurred_at, stepId: row.step_id, nodeId: row.node_id, attempt: row.attempt, stateVersion: row.state_version, payload: row.payload }); }
@@ -189,23 +226,35 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
         const workflows = await loadReferenceWorkflows(userClient ?? client, owner);
         json(response,200,{items:variableReferenceRows(workflows)});return true;
       }
-      const row=result(await client.from("workflow_workspace_configuration").select("revision,variables").eq("owner_user_id",owner).maybeSingle());json(response,200,row??{revision:0,variables:[]});return true;
+      json(response,200,await readConfiguration(client,owner));return true;
     }
     if(request.method === "PUT") {
-      const parsed=z.object({baseRevision:z.number().int().nonnegative(),variables:z.array(z.object({key:z.string().min(1).max(80).regex(/^[A-Z][A-Z0-9_]*$/),value:z.union([z.string().max(8000),z.number().finite(),z.boolean()]),overrides:z.record(z.string(),z.union([z.string().max(8000),z.number().finite(),z.boolean()])),description:z.string().max(300).optional()}).strict()).max(100)}).strict().safeParse(request.body);
+      const parsed=configurationSaveSchema.safeParse(request.body);
       if(!parsed.success)throw new ApiError(400,"INVALID_CONFIGURATION","Invalid variable configuration");
-      const body=parsed.data;if(new Set(body.variables.map(v=>v.key)).size!==body.variables.length)throw new ApiError(400,"INVALID_CONFIGURATION","Variable names must be unique");
+      const body=parsed.data;
+      if(new Set(body.variables.map(v=>v.key)).size!==body.variables.length)throw new ApiError(400,"INVALID_CONFIGURATION","Variable names must be unique");
       if(JSON.stringify(body.variables)!==JSON.stringify(workflowSecretProjection(body.variables)))throw new ApiError(400,"SECRET_IN_DEFINITION","Use managed connections for credentials");
       // Descriptions are ordinary prose, but they still must not smuggle credential material.
       if(body.variables.some(v=>v.description!==undefined&&v.description!==workflowSecretProjection(v.description)))throw new ApiError(400,"SECRET_IN_DEFINITION","Secrets belong in connections");
       // key is a value in the array: also inspect the effective keyed object to reject credential names.
       const keyed=Object.fromEntries(body.variables.map(v=>[v.key,v.value]));if(JSON.stringify(keyed)!==JSON.stringify(workflowSecretProjection(keyed)))throw new ApiError(400,"SECRET_IN_DEFINITION","Secrets belong in connections");
-      const environmentData=await workflowCompiler("/v1/catalog",{ownerId:owner});const available=new Set((environmentData.items as WorkflowRow[]).map(item=>String(item.environmentRef)));
-      if(body.variables.some(v=>Object.keys(v.overrides).some(ref=>!available.has(ref))))throw new ApiError(403,"ENVIRONMENT_FORBIDDEN","Variable override environment unavailable");
-      const payload={owner_user_id:owner,revision:body.baseRevision+1,variables:body.variables,updated_at:new Date().toISOString()};
-      if(body.baseRevision===0) { const saved=await client.from("workflow_workspace_configuration").insert(payload);if(saved.error?.code==="23505")throw new ApiError(409,"REVISION_CONFLICT","Configuration revision changed");result(saved); }
-      else {const saved=result(await client.from("workflow_workspace_configuration").update(payload).eq("owner_user_id",owner).eq("revision",body.baseRevision).select("revision")) as WorkflowRow[];if(!saved.length)throw new ApiError(409,"REVISION_CONFLICT","Configuration revision changed");}
-      json(response,200,{revision:payload.revision,variables:body.variables});return true;
+      const current=await readConfiguration(client,owner);
+      // Older clients that only send variables keep the existing environments instead of
+      // deleting them.
+      const environments = body.environments === undefined
+        ? current.environments.map(({id,name,description,order})=>({id,name,description,order}))
+        : body.environments;
+      const issue=configurationSaveIssue({environments,defaultEnvironmentId:body.defaultEnvironmentId});
+      if(issue)throw new ApiError(400,"INVALID_CONFIGURATION",issue);
+      if(environments.some(environment=>environment.name!==workflowSecretProjection(environment.name)||(environment.description??"")!==workflowSecretProjection(environment.description??"")))throw new ApiError(400,"SECRET_IN_DEFINITION","Secrets belong in connections");
+      // Whole-table save: overrides owned by removed environments are dropped, and the
+      // default pointer falls back to the first remaining environment.
+      const environmentIds=new Set(environments.map(environment=>environment.id).filter((id):id is string => typeof id==="string"&&id.length>0));
+      const variables=cleanVariableOverrides(body.variables,environmentIds);
+      const requestedDefault=body.defaultEnvironmentId===undefined?current.defaultEnvironmentId:body.defaultEnvironmentId;
+      const defaultEnvironmentId=resolveDefaultEnvironmentId(environments,requestedDefault);
+      const saved=await rpc(client,"workflow_v2_configuration_save",{p_owner:owner,p_base:body.baseRevision,p_variables:variables,p_environments:environments.map((environment,index)=>({...(environment.id!==undefined?{id:environment.id}:{}),name:environment.name,description:environment.description??"",order:environment.order??index})),p_default:defaultEnvironmentId});
+      json(response,200,normalizeConfiguration(saved));return true;
     }
   }
   if (resource === "environments" && request.method === "GET") { json(response, 200, await workflowCompiler("/v1/catalog", { ownerId: owner })); return true; }
@@ -384,7 +433,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
     if (request.method === "POST" && id && op === "resume") { const run=await liveRun(client,owner,id); const body=workflowStrictBody(request.body,['checkpointId','responses','currentRunId'],['checkpointId','responses']);json(response,202,await resumeThread(client,owner,String(run.thread_id),body));return true; }
     if (request.method === "POST" && id && op === "cancel") { workflowStrictBody(request.body, []); const cancelled = await rpc(client, "workflow_v2_cancel", { p_owner: owner, p_run: workflowUuid(id) }); json(response, cancelled.terminal ? 200 : 202, cancelled); return true; }
     if (request.method === "POST" && !id) {
-      const body = workflowStrictBody(request.body, ["workflowId", "revision", "input", "environmentRef", "launchContext"], ["workflowId", "revision", "input", "environmentRef"]); const key = workflowString(request.headers["idempotency-key"]); const requestHash = await workflowDigest(body);
+      const body = workflowStrictBody(request.body, ["workflowId", "revision", "input", "environmentRef", "launchContext", "variableEnvironmentId"], ["workflowId", "revision", "input", "environmentRef"]); const variableEnvironmentId = body.variableEnvironmentId === undefined ? undefined : workflowUuid(body.variableEnvironmentId); const key = workflowString(request.headers["idempotency-key"]); const requestHash = await workflowDigest(body);
       const prior = result(await client.from("workflow_idempotency").select("*").eq("owner_user_id", owner).eq("key", key).gt("expires_at", new Date().toISOString()).maybeSingle()) as WorkflowRow | null;
       if (prior) {
         if (prior.request_hash !== requestHash) throw new ApiError(409, "IDEMPOTENCY_CONFLICT", "Idempotency key was used for another request");
@@ -399,15 +448,21 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
         const [clientInputHash, assignmentInputHash] = await Promise.all([workflowDigest(body.input), workflowDigest(launch.workflowInput)]);
         if (clientInputHash !== assignmentInputHash) throw new ApiError(409, "INVALID_LAUNCH_CONTEXT", "Assignment authorizes a different Workflow startup input");
       }
-      const validation = await workflowCompiler("/v1/validate", { ownerId: owner, environmentRef: workflowString(body.environmentRef), definition: doc.definition, input: body.input });
+      const variableEnvironment = await selectedVariableEnvironment(client, owner, variableEnvironmentId);
+      const validation = await workflowCompiler("/v1/validate", { ownerId: owner, environmentRef: workflowString(body.environmentRef), definition: doc.definition, input: body.input, ...(variableEnvironment ? { variableEnvironmentId: variableEnvironment.id } : {}) });
       if (!validation.valid) { const correlation = workflowDiagnosticCorrelation(); throw new ApiError(422, "GRAPH_INVALID", "Workflow execution validation failed", { ...correlation, diagnostics: workflowScopedDiagnostics(validation.diagnostics, correlation) }); }
-      json(response, 202, await rpc(client, "workflow_v2_enqueue", { p_owner: owner, p_workflow: workflowId, p_revision: body.revision, p_input: body.input, p_environment: body.environmentRef, p_environment_revision: validation.environmentRevision, p_registry: validation.registrySnapshot, p_semantic: validation.semanticHash, p_fingerprint: validation.compileFingerprint, p_request_hash: requestHash, p_key: key, p_launch: launch?.context ?? null })); return true;
+      json(response, 202, await rpc(client, "workflow_v2_enqueue", { p_owner: owner, p_workflow: workflowId, p_revision: body.revision, p_input: body.input, p_environment: body.environmentRef, p_environment_revision: validation.environmentRevision, p_registry: withFrozenVariableEnvironment(validation.registrySnapshot, variableEnvironment), p_semantic: validation.semanticHash, p_fingerprint: validation.compileFingerprint, p_request_hash: requestHash, p_key: key, p_launch: launch?.context ?? null, p_variable_environment: variableEnvironment?.id ?? null })); return true;
     }
-    if (request.method === "GET" && id) { json(response, 200, workflowRunDto(await liveRun(client, owner, id), true)); return true; }
+    if (request.method === "GET" && id) {
+      const run = await liveRun(client, owner, id);
+      const names = await variableEnvironmentNames(client, owner, [typeof run.variable_environment_id === "string" ? run.variable_environment_id : frozenVariableEnvironment(run.registry_snapshot).id]);
+      json(response, 200, workflowRunDto(run, true, names)); return true;
+    }
     if (request.method === "GET") {
       const workflowId = workflowString(queryString(request, "workflowId")); await head(client, owner, workflowId); await rpc(client, "workflow_v2_prune", { p_owner: owner, p_workflow: workflowId });
       const rows = result(await client.from("workflow_live_runs").select("*").eq("owner_user_id", owner).eq("workflow_id", workflowId).order("created_at", { ascending: false }).limit(pageLimit(request))) as WorkflowRow[];
-      json(response, 200, { items: rows.map((row) => workflowRunDto(row)), nextCursor: null }); return true;
+      const names = await variableEnvironmentNames(client, owner, rows.map((row) => typeof row.variable_environment_id === "string" ? row.variable_environment_id : frozenVariableEnvironment(row.registry_snapshot).id));
+      json(response, 200, { items: rows.map((row) => workflowRunDto(row, false, names)), nextCursor: null }); return true;
     }
   }
   if (["events", "steps"].includes(resource) && request.method === "GET") {

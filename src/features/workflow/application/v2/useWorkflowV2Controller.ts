@@ -74,6 +74,7 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     }
   }, [setError]);
   const [run, setRun] = useState<WorkflowRunV2 | null>(null);
+  const variableEnvironmentRef = useRef<string | null>(null);
   const observationIdentity = useRef({ runId: recovery?.observedRunId ?? null, origin: recovery?.runOrigin ?? null as WorkflowRunOrigin });
   const [runOrigin, publishRunOrigin] = useState<WorkflowRunOrigin>(observationIdentity.current.origin);
   function setRunOrigin(value: WorkflowRunOrigin) { observationIdentity.current.origin = value; publishRunOrigin(value); }
@@ -315,13 +316,13 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
     try { saved = dirty ? await save(snapshot) : { revision: snapshot.definition.revision }; }
     catch (reason) { setRunPreparationFailure("save"); throw reason; }
     requireAuthentication();
-    const request = { workflowId: activeWorkflowId, revision: saved.revision, input: runInput, environmentRef: runEnvironment, launchContext };
+    const request = { workflowId: activeWorkflowId, revision: saved.revision, input: runInput, environmentRef: runEnvironment, launchContext, variableEnvironmentId: variableEnvironmentRef.current ?? undefined };
     const fingerprint = JSON.stringify(request);
     pendingRunRequest.current = { fingerprint, key: crypto.randomUUID() };
     changePreparationStage("submit");
     const attempt = pendingRunRequest.current;
     try {
-      const created = await workflowApiV2.createRun(activeWorkflowId, saved.revision, runInput, runEnvironment, pendingRunRequest.current.key, launchContext);
+      const created = await workflowApiV2.createRun(activeWorkflowId, saved.revision, runInput, runEnvironment, pendingRunRequest.current.key, launchContext, variableEnvironmentRef.current ?? undefined);
       pendingRunRequest.current = null; setSubmitUnknown(false);
       if (JSON.stringify(inputRef.current) === JSON.stringify(runInput)) setInputDirty(false);
       clearRunObservation("current"); setObservedRunId(created.historyExpired ? null : created.runId);
@@ -333,8 +334,8 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
   }); }
   function confirmSubmission() { return operation(async () => {
     const pending = pendingRunRequest.current; if (!pending) return;
-    const request = JSON.parse(pending.fingerprint) as { workflowId: string; revision: number; input: JsonValue; environmentRef: string; launchContext?: WorkflowLaunchContext };
-    const created = await workflowApiV2.createRun(request.workflowId, request.revision, request.input, request.environmentRef, pending.key, request.launchContext);
+    const request = JSON.parse(pending.fingerprint) as { workflowId: string; revision: number; input: JsonValue; environmentRef: string; launchContext?: WorkflowLaunchContext; variableEnvironmentId?: string };
+    const created = await workflowApiV2.createRun(request.workflowId, request.revision, request.input, request.environmentRef, pending.key, request.launchContext, request.variableEnvironmentId);
     if (JSON.stringify(inputRef.current) === JSON.stringify(request.input)) setInputDirty(false);
     pendingRunRequest.current = null; setSubmitUnknown(false); clearRunObservation("current"); setObservedRunId(created.historyExpired ? null : created.runId); setObservationEpoch(current => current + 1); if(created.historyExpired)setNotice("原提交的运行历史已清理；没有重复执行。");else setRunNotice({runId:created.runId,text:"已确认原提交；没有创建重复运行。"});
   }); }
@@ -386,11 +387,12 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
       throw reason;
     }
   }
+  const setVariableEnvironment = (id: string | null) => { variableEnvironmentRef.current = id; };
   const refreshEnvironments = () => operation(reloadEnvironments);
   const refreshTools = () => loadTools(environmentRef);
   const refreshEnvironmentResources = () => operation(async () => {
     await reloadEnvironments();
     await loadTools(environmentChoice.current);
   });
-  return { definition, editor, observedRunId, observedThreadId: observationThread.current, threads, threadsError, historyExpired, currentThread:threadView?.currentRunId===observedRunId?threadView:null, threadView, selectThread, exitObservation:()=>clearRunObservation(), captureSessionRecovery, editDefinition, editEditor, editDocument, endEditGroup, undo, redo, discard, canUndo: historyVersion >= 0 && timeline.current.past.length > 0, canRedo: timeline.current.future.length > 0, definitionDirty, inputDirty, inputInvalid, setInputInvalid: changeInputInvalid, submitUnknown, confirmSubmission, runPreparationFailure, runPreparationStage, awaitingRunRecord: Boolean(observedRunId) && !run && !historyExpired, dirty, busy, cancelPending: cancelPendingRunId !== null && cancelPendingRunId === run?.runId, error, saveConflict: failure.code === "REVISION_CONFLICT", notice:runNotice?.runId===observedRunId&&!terminal.has(run?.status??"")?runNotice.text:notice, setError, diagnostics, environments, initialLoadStatus, environmentError, environmentRef, setEnvironmentRef: changeEnvironment, tools, input, setInput: changeInput, replaceInput, clearInvocationInput, inputResetVersion, run, runOrigin, runSnapshot, events, steps, observationComplete, history, refreshEnvironments, refreshTools, refreshEnvironmentResources, saveDocument, restoreDocument, rejectRunPreparation, validate, startRun, selectRun, resumeThread, cancel, discover, operation };
+  return { definition, editor, observedRunId, observedThreadId: observationThread.current, threads, threadsError, historyExpired, currentThread:threadView?.currentRunId===observedRunId?threadView:null, threadView, selectThread, exitObservation:()=>clearRunObservation(), captureSessionRecovery, editDefinition, editEditor, editDocument, endEditGroup, undo, redo, discard, canUndo: historyVersion >= 0 && timeline.current.past.length > 0, canRedo: timeline.current.future.length > 0, definitionDirty, inputDirty, inputInvalid, setInputInvalid: changeInputInvalid, submitUnknown, confirmSubmission, runPreparationFailure, runPreparationStage, awaitingRunRecord: Boolean(observedRunId) && !run && !historyExpired, dirty, busy, cancelPending: cancelPendingRunId !== null && cancelPendingRunId === run?.runId, error, saveConflict: failure.code === "REVISION_CONFLICT", notice:runNotice?.runId===observedRunId&&!terminal.has(run?.status??"")?runNotice.text:notice, setError, diagnostics, environments, initialLoadStatus, environmentError, environmentRef, setEnvironmentRef: changeEnvironment, tools, input, setInput: changeInput, replaceInput, clearInvocationInput, inputResetVersion, run, runOrigin, runSnapshot, events, steps, observationComplete, history, refreshEnvironments, setVariableEnvironment, refreshTools, refreshEnvironmentResources, saveDocument, restoreDocument, rejectRunPreparation, validate, startRun, selectRun, resumeThread, cancel, discover, operation };
 }

@@ -423,7 +423,7 @@ class FakeRegistry:
     def __init__(self, environment):
         self.env = environment
 
-    def environment(self, ref, owner):
+    def environment(self, ref, owner, variable_environment_id=None):
         assert (ref, owner) == ('local', 'a')
         return copy.deepcopy(self.env)
 

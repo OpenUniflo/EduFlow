@@ -12,8 +12,9 @@ const courseId = 'course';
 const assignmentId = 'assignment';
 const input = { query: 'A1001' };
 
-function setup(assignmentInput: unknown) {
+function setup(assignmentInput: unknown, options: { environment?: Record<string, unknown>; defaultEnvironmentId?: string; run?: Record<string, unknown> } = {}) {
   const reads: { table: string; filters: Record<string, unknown> }[] = [];
+  const environments = options.environment ? [options.environment] : [];
   deps.client = {
     from(table: string) {
       const filters: Record<string, unknown> = {};
@@ -22,13 +23,25 @@ function setup(assignmentInput: unknown) {
         select() { return query; },
         eq(key: string, value: unknown) { filters[key] = value; return query; },
         gt() { return query; },
+        in(key: string, values: unknown[]) { filters[`in:${key}`] = values; return query; },
         async maybeSingle() {
           const data = table === 'workflow_v2_definitions' ? { current_revision: 1, archived: false }
             : table === 'workflow_revisions' ? { definition: { schemaVersion: '2.0', workflowId, revision: 1, name: 'Test' }, editor_snapshot: {} }
               : table === 'courses' ? { id: courseId, lifecycle: 'published', course_type: 'standard' }
                 : table === 'course_assignments' ? { id: assignmentId, workflow_template_id: workflowId, mode: 'workflow', workflow_input: assignmentInput }
-                  : null;
+                  : table === 'workflow_workspace_configuration' ? (options.defaultEnvironmentId ? { default_environment_id: options.defaultEnvironmentId } : null)
+                    : table === 'workflow_variable_environments' ? environments.find((item) => item.id === filters.id) ?? null
+                      : table === 'workflow_live_runs' ? (options.run ?? null)
+                        : null;
           return { data, error: null };
+        },
+        then(resolve: (value: unknown) => unknown) {
+          if (table === 'workflow_variable_environments') {
+            const wanted = filters['in:id'];
+            const rows = environments.filter((item) => !Array.isArray(wanted) || wanted.includes(item.id));
+            return Promise.resolve({ data: rows, error: null }).then(resolve);
+          }
+          return Promise.resolve({ data: [], error: null }).then(resolve);
         },
       };
       return query;
@@ -39,11 +52,11 @@ function setup(assignmentInput: unknown) {
   return { response, reads };
 }
 
-function request(value: unknown) {
+function request(value: unknown, extra: Record<string, unknown> = {}) {
   return {
     method: 'POST',
     query: { resource: 'runs' },
-    body: { workflowId, revision: 1, input: value, environmentRef: 'local', launchContext: { courseId, assignmentId, workflowTemplateId: workflowId } },
+    body: { workflowId, revision: 1, input: value, environmentRef: 'local', launchContext: { courseId, assignmentId, workflowTemplateId: workflowId }, ...extra },
     headers: { 'idempotency-key': 'test-idempotency' },
   } as unknown as VercelRequest;
 }
@@ -70,4 +83,49 @@ it('keeps manual input for Assignments without a caller-provided value', async (
   const state = setup(null);
   await handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner');
   expect(deps.rpc).toHaveBeenCalledWith('workflow_v2_enqueue', expect.objectContaining({ p_input: { query: 'manual' } }));
+});
+
+const environment = { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', name: '开发' };
+
+it('forwards an explicit variable environment to Worker validation and freezes it on the Run', async () => {
+  const state = setup(null, { environment });
+  await handleWorkflowV2(request({ query: 'manual' }, { variableEnvironmentId: environment.id }), state.response, 'owner');
+  expect(deps.compiler).toHaveBeenCalledWith('/v1/validate', expect.objectContaining({ variableEnvironmentId: environment.id }));
+  expect(deps.rpc).toHaveBeenCalledWith('workflow_v2_enqueue', expect.objectContaining({
+    p_variable_environment: environment.id,
+    p_registry: { variableEnvironment: { id: environment.id, name: environment.name } },
+  }));
+});
+
+it('uses the owner default environment when the request omits one', async () => {
+  const state = setup(null, { environment, defaultEnvironmentId: environment.id });
+  await handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner');
+  expect(deps.compiler).toHaveBeenCalledWith('/v1/validate', expect.objectContaining({ variableEnvironmentId: environment.id }));
+  expect(deps.rpc).toHaveBeenCalledWith('workflow_v2_enqueue', expect.objectContaining({ p_variable_environment: environment.id }));
+});
+
+it('rejects an unknown or malformed variable environment before validation', async () => {
+  const missing = setup(null, { environment });
+  await expect(handleWorkflowV2(request({ query: 'manual' }, { variableEnvironmentId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' }), missing.response, 'owner'))
+    .rejects.toMatchObject({ status: 400, code: 'INVALID_VARIABLE_ENVIRONMENT' });
+  expect(deps.compiler).not.toHaveBeenCalled();
+  const malformed = setup(null, { environment });
+  await expect(handleWorkflowV2(request({ query: 'manual' }, { variableEnvironmentId: 'not-a-uuid' }), malformed.response, 'owner'))
+    .rejects.toMatchObject({ status: 400, code: 'INVALID_REQUEST' });
+  expect(deps.compiler).not.toHaveBeenCalled();
+});
+
+it('returns the frozen variable environment name on a Run after the environment was deleted', async () => {
+  const runId = '11111111-1111-4111-8111-111111111111';
+  const state = setup(null, {
+    run: {
+      run_id: runId, workflow_id: workflowId, revision: 1, mode: 'live', verification: 'unverified', status: 'success',
+      definition_hash: 'hash', semantic_hash: 'semantic', compile_fingerprint: 'fingerprint', environment_ref: 'local', environment_revision: '1',
+      policy_version: 'm1.1', variable_environment_id: null, registry_snapshot: { variableEnvironment: { id: environment.id, name: '开发' } },
+      input: {}, output: {}, raw_state: {}, created_at: '2026-10-23T00:00:00Z', last_seq: 0,
+    },
+  });
+  const response = { status: vi.fn().mockReturnThis(), json: vi.fn() } as unknown as VercelResponse;
+  await handleWorkflowV2({ method: 'GET', query: { resource: 'runs', id: runId }, headers: {} } as unknown as VercelRequest, response, 'owner');
+  expect(vi.mocked(response.json).mock.calls[0][0]).toMatchObject({ variableEnvironmentId: environment.id, variableEnvironment: '开发' });
 });

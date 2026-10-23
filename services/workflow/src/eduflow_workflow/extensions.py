@@ -134,7 +134,8 @@ async def http_test_preview(tool,env,arguments,timeout=10):
     return {'ok':200<=status<300,'status':status,'preview':preview_text(text)}
 
 async def catalog_operation(body,registry):
-    owner=body['ownerId'];ref=body['environmentRef'];env=registry.environment(ref,owner)
+    from .registry import requested_variable_environment
+    owner=body['ownerId'];ref=body['environmentRef'];env=registry.environment(ref,owner,requested_variable_environment(body))
     store=Storage(os.environ['WORKFLOW_DATABASE_URL'])
     action=body.get('action','list');kind=body.get('kind');name=body.get('ref');version=body.get('version')
     if action=='list':
