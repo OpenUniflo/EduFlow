@@ -122,16 +122,15 @@ export function WorkflowCreateDialog({ initialTemplate, courseLaunch = false, on
         {detailError ? <p role="alert">无法读取模板定义：{detailError}</p> : null}
         {!detailLoading && !detailError ? <>
           <p>{unresolved.length} 项需要绑定到当前账号；绑定只写入你的副本。</p>
-          <label>运行环境<select aria-label="创建时运行环境" value={environmentRef} onChange={event => { setEnvironmentRef(event.target.value); setSelections({}); }}><option value="">选择运行环境</option>{environments.map(item => <option key={item.environmentRef} value={item.environmentRef}>{item.name}</option>)}</select></label>
-          {environmentError ? <p role="alert">运行环境加载失败：{environmentError}</p> : null}
+          {environmentError ? <p role="alert">工作流服务暂时不可用，无法校验连接。</p> : null}
           {unresolved.map(item => <label key={bindingKey(item)}>{item.kind === "provider" ? "模型" : "工具"} · {item.label}
             <select aria-label={`为 ${item.label} 选择执行能力`} value={selections[bindingKey(item)] ?? ""} onChange={event => setSelections(current => ({ ...current, [bindingKey(item)]: event.target.value }))}>
               <option value="">选择{item.kind === "provider" ? "模型连接" : "工具连接"}</option>
               {item.kind === "provider" ? providerOptions.map(provider => <option key={provider.ref} value={provider.ref}>{provider.name}{provider.version ? ` · v${provider.version}` : ""}</option>) : toolOptions.map(tool => <option key={tool.ref} value={tool.ref}>{tool.name}{tool.version ? ` · v${tool.version}` : ""}</option>)}
             </select>
-            {(item.kind === "provider" ? providerOptions : toolOptions).length ? null : <small>当前账号没有可用{item.kind === "provider" ? "模型连接" : "工具连接"}；请先在“环境与连接”中配置。</small>}
+            {(item.kind === "provider" ? providerOptions : toolOptions).length ? null : <small>当前账号没有可用{item.kind === "provider" ? "模型连接" : "工具连接"}；请先在资源中心配置。</small>}
           </label>)}
-          {!environmentRef ? <small>没有可用运行环境；请先配置共享运行环境。</small> : null}
+          {!environmentRef ? <small>工作流服务暂时不可用，无法创建带模板的工作流。</small> : null}
           {environmentRef && !allBound ? <small>请为每一项选择连接后再创建。</small> : null}
         </> : null}
       </section> : null}

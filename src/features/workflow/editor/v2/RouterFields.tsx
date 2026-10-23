@@ -2,12 +2,12 @@ import type { JsonSchema, JsonValue, WorkflowNodeV2 } from "../../domain/v2/type
 import { nodeAuthoring } from "../../domain/v2/authoring";
 import { JsonField } from "./JsonField";
 type Case = { id: string; priority: number; predicate: Record<string, JsonValue> };
-export function RouterFields({ node, stateSchema, onChange, onRemoveOutlet }: { node: WorkflowNodeV2; stateSchema: JsonSchema; onChange: (patch: Partial<WorkflowNodeV2>) => void; onRemoveOutlet: (id: string) => void }) {
+export function RouterFields({ node, stateSchema, onChange, onRemoveOutlet, hideHeading = false }: { node: WorkflowNodeV2; stateSchema: JsonSchema; onChange: (patch: Partial<WorkflowNodeV2>) => void; onRemoveOutlet: (id: string) => void; hideHeading?: boolean }) {
   const cases = (Array.isArray(node.config.cases) ? node.config.cases : []) as Case[];
   const update = (next: Case[]) => onChange({ config: { ...node.config, cases: next as unknown as JsonValue } });
   const modify = (index: number, predicate: Record<string, JsonValue>) => update(cases.map((item, i) => i === index ? { ...item, predicate } : item));
   const fields = Object.keys(stateSchema.properties ?? {});
-  return <section className="wf-config-section"><h3>条件路由</h3><p>按列表顺序判断；可选择首个满足条件的出口或全部匹配出口。没有匹配时走“否则”。出口标识保持稳定。</p><label>匹配方式<select aria-label="路由匹配方式" value={String(node.config.mode??"first")} onChange={e=>onChange({config:{...node.config,mode:e.target.value}})}><option value="first">首个匹配出口</option><option value="all">全部匹配出口（并行）</option></select></label>{cases.map((item, index) => {
+  return <section className="wf-config-section">{hideHeading ? null : <h3>条件路由</h3>}<p>按列表顺序判断；可选择首个满足条件的出口或全部匹配出口。没有匹配时走“否则”。出口标识保持稳定。</p><label>匹配方式<select aria-label="路由匹配方式" value={String(node.config.mode??"first")} onChange={e=>onChange({config:{...node.config,mode:e.target.value}})}><option value="first">首个匹配出口</option><option value="all">全部匹配出口（并行）</option></select></label>{cases.map((item, index) => {
     const predicate = item.predicate ?? {}; const left = predicate.left as Record<string, JsonValue> | undefined;
     const simple = ["eq", "ne", "gt", "gte", "lt", "lte", "exists", "nonEmpty"].includes(String(predicate.op));
     const pointer = String(predicate.pointer ?? left?.pointer ?? ""); const right = predicate.right as Record<string, JsonValue> | undefined;

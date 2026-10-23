@@ -19,7 +19,7 @@ export function ConnectionVersionPanel({ definition, environmentRef, tools, onAp
     <h3>连接版本</h3>
     <p>旧版本在停用前仍可用；更新只写入当前草稿，保存后生成新修订，不改历史 Run。</p>
     {error ? <p role="alert">{error}</p> : null}
-    {!environmentRef ? <p>请先选择运行环境。</p> : !data ? <p>正在读取连接版本…</p> : <>
+    {!environmentRef ? <p>工作流服务暂时不可用。</p> : !data ? <p>正在读取连接版本…</p> : <>
       <p>{safe.length} 项可自动更新 · {manual.length} 项需人工确认</p>
       {safe.length ? <button type="button" onClick={() => { onApply(safe); setStatus(`已写入草稿 ${safe.length} 项；请保存生成新修订。`); }}>更新可自动绑定的连接</button> : null}
       {proposals.map(update => <article className="wf-connection-card" key={`${update.graphPath.join("/")}:${update.nodeId}:${update.field}:${update.index ?? ""}`}>

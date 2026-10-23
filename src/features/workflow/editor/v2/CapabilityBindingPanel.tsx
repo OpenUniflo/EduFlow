@@ -35,7 +35,7 @@ export function CapabilityBindingPanel({ definition, environment, tools, onApply
   return <section className="wf-config-section">
     <h3>未绑定执行能力</h3>
     <p>模板只声明需要的能力；绑定写入你的副本，不会修改模板或其他账号。</p>
-    {!environment ? <p role="alert">需配置执行能力：当前没有可用运行环境。</p> : unresolved.map(item => {
+    {!environment ? <p role="alert">工作流服务暂时不可用，无法校验执行能力；请稍后重试。</p> : unresolved.map(item => {
       const options = item.kind === "provider" ? environment.providers : tools.filter(tool => tool.available !== false);
       return <label key={key(item.nodeId, item.graphPath)} data-config-field={`${item.field}/${item.nodeId}`}>
         {item.kind === "provider" ? "模型" : "工具"} · {item.label}

@@ -5,11 +5,11 @@ import type { JsonSchema, JsonValue, WorkflowDefinitionV2, WorkflowNodeV2 } from
 import { nodeAuthoring, type NodeAuthoring } from "../../domain/v2/authoring";
 import { JsonField } from "./JsonField";
 
-export function AuthoringProcessing({ node, graph, onChange, environmentRef }: { environmentRef?:string; node: WorkflowNodeV2; graph: WorkflowDefinitionV2; onChange: (patch: Partial<WorkflowNodeV2>) => void }) {
+export function AuthoringProcessing({ node, graph, onChange, environmentRef, hideHeading = false }: { environmentRef?:string; node: WorkflowNodeV2; graph: WorkflowDefinitionV2; onChange: (patch: Partial<WorkflowNodeV2>) => void; hideHeading?: boolean }) {
   const config = node.config;
   const update = (patch: Record<string, JsonValue>) => onChange({ config: { ...config, ...patch } });
   const peers = graph.nodes.filter(item => item.id !== node.id && !["core.start", "core.end"].includes(item.type));
-  return <section className="wf-config-section"><h3>{node.type.startsWith("control.") ? "控制流配置" : "处理"}</h3><p className="wf-capability-note">并行、子图与函数均通过所选环境真实执行。</p>
+  return <section className="wf-config-section">{hideHeading ? null : <h3>{node.type.startsWith("control.") ? "控制流配置" : "处理"}</h3>}<p className="wf-capability-note">并行、子图与函数均通过所选环境真实执行。</p>
     {node.type === "core.progress" ? <><p>发布有界自报进度，用于说明当前阶段；不会将State或流程标为完成。</p><label>进度说明<input maxLength={500} value={String(config.message??"")} onChange={e=>update({message:e.target.value})}/></label><label>进度百分比<input type="number" min={0} max={100} value={Number(config.percent??0)} onChange={e=>update({percent:Number(e.target.value)})}/></label></> : null}
     {node.type === "core.memory" ? <><p>通过服务器读取或提交长期记忆。写入与检查点同事务提交；读取value可写回State供后续模型或函数使用。</p><label>记忆操作<select value={String(config.operation)} onChange={e=>update({operation:e.target.value})}><option value="get">读取</option><option value="put">保存</option><option value="delete">删除</option></select></label><label>记忆范围<select value={String(config.scope)} onChange={e=>update({scope:e.target.value})}><option value="workflow">此工作流私有</option><option value="shared">当前账号与环境共享</option></select></label><label>记忆集合<input value={String(config.collection)} onChange={e=>update({collection:e.target.value})}/></label><label>记忆键<input value={String(config.key??"value")} onChange={e=>update({key:e.target.value})}/></label><small>读取项可配置key；保存项配置value，可选expectedVersion用于条件更新。返回value、version、found。</small><label>保留分钟<input type="number" min={1} max={10080} value={Number(config.ttlMinutes??1440)} onChange={e=>update({ttlMinutes:Number(e.target.value)})}/></label></> : null}
     {node.type === "core.function" ? <FunctionExecutionFields key={node.id} node={node} environmentRef={environmentRef} onChange={onChange}/> : null}

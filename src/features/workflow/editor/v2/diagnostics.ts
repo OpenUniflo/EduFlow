@@ -51,7 +51,7 @@ export function diagnosticText(item: WorkflowDiagnostic, definition: WorkflowDef
   const input = item.scope === "input";
   const state = !input && tokens[0] === "state";
   const output = !input && ["outputSchema", "outputBindings"].includes(tokens[0]);
-  let location = node?.label ?? (input ? "外部调用数据" : state ? "共享状态" : output ? "输出结构" : tokens[0] === "inputSchema" ? "输入结构" : item.scope === "environment" ? "运行环境" : "工作流配置");
+  let location = node?.label ?? (input ? "外部调用数据" : state ? "共享状态" : output ? "输出结构" : tokens[0] === "inputSchema" ? "输入结构" : item.scope === "environment" ? "环境变量" : "工作流配置");
   if (node && tokens[0] === "nodes" && tokens[2] === "inputs" && tokens[3]) location += ` · ${tokens[3] === "arguments" ? "工具参数" : tokens[3]}`;
   const valuePath = input ? tokens : state && tokens[1] === "initial" ? tokens.slice(2) : undefined;
   const expected = valuePath ? fieldSchema(input ? definition.inputSchema : definition.state.schema, valuePath) : undefined;
@@ -92,7 +92,7 @@ export function diagnosticTarget(item: WorkflowDiagnostic, definition: WorkflowD
     const fields = ["INVALID_OUTLETS", "DANGLING_NODE", "DANGLING_TRANSITION"].includes(item.code) ? ["outlets"]
       : section === "inputs" ? [...(name ? [`inputs/${name}`] : []), "输入绑定"]
       : section === "writes" ? [...(name ? [`writes/${name}`] : []), "状态写入"]
-      : section === "config" ? [...(name === "allowedToolRefs" ? ["工具授权"] : name ? [`config/${name}`] : []), "节点参数"]
+      : section === "config" ? [...(name === "allowedToolRefs" ? ["工具授权"] : name === "prompt" ? ["提示词", "config/prompt"] : name ? [`config/${name}`] : []), "节点参数"]
       : item.code === "UNKNOWN_OPERATION" && node.type === "core.transform" ? ["config/operationRef", "节点参数"] : [];
     return { panel: "node" as const, nodeId: node.id, transitionId: edge?.id, fields: [...fields, "节点配置"] };
   }

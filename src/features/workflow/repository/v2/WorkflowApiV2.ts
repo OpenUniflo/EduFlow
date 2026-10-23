@@ -40,8 +40,8 @@ export function workflowErrorMessage(reason: unknown): string {
     REVISION_CONFLICT: "保存冲突：服务器修订已变化，本地草稿已保留。请查看服务器版本。",
     INVALID_EDITOR: "布局配置与节点不一致，请检查节点与连线后重试。",
     GRAPH_INVALID: "配置或输入校验未通过，请点击问题列表定位并修正。",
-    SECRET_IN_DEFINITION: "工作流中不能保存密钥，请改用运行环境中的安全引用。",
-    SECRET_IN_RUN_INPUT: "外部调用数据中不能包含密钥，请改用运行环境中的安全引用。",
+    SECRET_IN_DEFINITION: "工作流中不能保存密钥，请改用连接中的安全引用。",
+    SECRET_IN_RUN_INPUT: "外部调用数据中不能包含密钥，请改用连接中的安全引用。",
     INVALID_LAUNCH_CONTEXT: "当前实训与工作流不匹配，请从对应课程实训重新进入。",
     ASSIGNMENT_PREREQUISITE_REQUIRED: "此实训的前置要求尚未满足，请返回课程查看。",
     ASSIGNMENT_STATE_CONFLICT: "此实训已提交或完成，请返回课程查看已保存的结果。",
@@ -56,7 +56,7 @@ export function workflowErrorMessage(reason: unknown): string {
     SOURCE_CHANGED: "旧版本来源已变化，请重新预览迁移。",
   };
   const message = byCode[reason.code ?? ""] ?? (reason.status === 401 ? "登录状态已失效，请重新登录后继续。"
-    : reason.status === 403 ? "当前账号或运行环境没有此操作权限，请检查授权。"
+    : reason.status === 403 ? "当前账号没有此操作权限，请检查授权。"
     : reason.status === 404 ? "所需工作流或运行记录不存在，请返回列表检查。"
     : reason.status === 410 ? "此运行的调试历史已清理，不会因此重新执行。"
     : reason.status === 429 ? "当前运行数量或请求频率已达上限，请等待已有运行结束后重试。"
