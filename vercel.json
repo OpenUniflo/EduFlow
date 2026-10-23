@@ -1,8 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": [
-    "sin1"
-  ],
+  "regions": ["sin1"],
   "functions": {
     "api/workflows.ts": {
       "maxDuration": 120
@@ -21,6 +19,10 @@
     },
     "api/**/*.ts": {
       "maxDuration": 30
+    },
+    "api/workflow-compiler.py": {
+      "maxDuration": 120,
+      "includeFiles": "services/workflow/src/**"
     }
   },
   "rewrites": [
@@ -57,6 +59,10 @@
       "destination": "/api/learner?resource=navigation"
     },
     {
+      "source": "/api/workflow-compiler/:path*",
+      "destination": "/api/workflow-compiler"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/:path*"
     },
@@ -64,5 +70,9 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "daemons": {
+    "worker": { "root": "services/workflow", "entrypoint": "Dockerfile", "command": ["eduflow-workflow", "worker"], "instances": { "sin1": 1 }, "resources": { "requests": { "memory": "1Gi" } }, "terminationGracePeriodSeconds": 660 },
+    "watchdog": { "root": "services/workflow", "entrypoint": "Dockerfile", "command": ["eduflow-workflow", "watchdog"], "instances": { "sin1": 1 }, "resources": { "requests": { "memory": "1Gi" } }, "terminationGracePeriodSeconds": 15 }
+  }
 }

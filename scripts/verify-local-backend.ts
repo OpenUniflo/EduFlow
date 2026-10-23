@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import healthHandler from "../api/health";
+import healthHandler from "../api/_handlers/health";
 import knowledgeHandler from "../api/knowledge";
 import coursesHandler from "../api/_handlers/courses";
 import courseAuthoringHandler from "../api/_handlers/course-authoring";

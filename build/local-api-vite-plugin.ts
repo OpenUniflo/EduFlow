@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import healthHandler from "../api/health";
+import healthHandler from "../api/_handlers/health";
 import knowledgeHandler from "../api/knowledge";
 import courseHandler from "../api/course";
 import learnerHandler from "../api/learner";

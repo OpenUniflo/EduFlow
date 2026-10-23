@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { workflowRedact, workflowStrictBody, validateWorkflowEditor } from "./workflowV2Protocol.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { workflowCompiler, workflowCompilerUrl, workflowRedact, workflowStrictBody, validateWorkflowEditor } from "./workflowV2Protocol.js";
 
 describe("Workflow V2 authenticated boundary", () => {
   it("rejects authority supplied in public Run requests", () => {
@@ -85,4 +85,60 @@ it("validates subgraph layouts against their scoped node identities", () => {
   expect(() => validateWorkflowEditor(editor, definition)).not.toThrow();
   expect(() => validateWorkflowEditor({ ...editor, graphs: { '["unknown"]': editor.graphs['["sub"]'] } }, definition)).toThrow("unknown subgraph");
   expect(() => validateWorkflowEditor({ ...editor, graphs: { '["sub"]': { nodes: { outside: { x: 1, y: 2 } }, edges: {} } } }, definition)).toThrow("unknown node");
+});
+
+describe("Compiler URL composition across deployment topologies", () => {
+  it.each([
+    ["http://127.0.0.1:18110", "/v1/extensions", "http://127.0.0.1:18110/v1/extensions"],
+    ["http://127.0.0.1:18110/", "/v1/extensions", "http://127.0.0.1:18110/v1/extensions"],
+    ["https://edu-flow.example.com", "/v1/extensions", "https://edu-flow.example.com/v1/extensions"],
+    ["https://edu-flow.example.com/api/workflow-compiler", "/v1/extensions", "https://edu-flow.example.com/api/workflow-compiler/v1/extensions"],
+    ["https://edu-flow.example.com/api/workflow-compiler/", "/v1/extensions", "https://edu-flow.example.com/api/workflow-compiler/v1/extensions"],
+    ["https://edu-flow.example.com/api/workflow-compiler", "v1/extensions", "https://edu-flow.example.com/api/workflow-compiler/v1/extensions"],
+  ])("resolves %s with %s", (base, path, expected) => {
+    expect(workflowCompilerUrl(base, path).toString()).toBe(expected);
+  });
+
+  it("keeps a trailing query on the internal path only", () => {
+    expect(workflowCompilerUrl("https://edu-flow.example.com/api/workflow-compiler?build=1", "/v1/catalog?owner=me").toString())
+      .toBe("https://edu-flow.example.com/api/workflow-compiler/v1/catalog?owner=me");
+  });
+});
+
+describe("Service-authenticated compiler requests", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+  it("addresses the prefixed Hosted compiler with the service token", async () => {
+    const fetchMock = vi.fn(async (_url: URL, _init: RequestInit) => ({ ok: true, status: 200, json: async () => ({ valid: true }) }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("WORKFLOW_COMPILER_URL", "https://edu-flow.example.com/api/workflow-compiler");
+    vi.stubEnv("WORKFLOW_INTERNAL_TOKEN", "internal-token");
+    await expect(workflowCompiler("/v1/document", { definition: {} })).resolves.toEqual({ valid: true });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url.toString()).toBe("https://edu-flow.example.com/api/workflow-compiler/v1/document");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toEqual({ Authorization: "Bearer internal-token", "Content-Type": "application/json" });
+    expect(init.body).toBe('{"definition":{}}');
+  });
+
+  it("keeps the standalone Local compiler working without a base path prefix", async () => {
+    const fetchMock = vi.fn(async (_url: URL, _init: RequestInit) => ({ ok: true, status: 200, json: async () => ({ status: "ok" }) }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("WORKFLOW_COMPILER_URL", "http://127.0.0.1:18110");
+    vi.stubEnv("WORKFLOW_INTERNAL_TOKEN", "internal-token");
+    await workflowCompiler("/capabilities");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url.toString()).toBe("http://127.0.0.1:18110/capabilities");
+    expect(init.method).toBe("GET");
+    expect(init.body).toBeUndefined();
+  });
+
+  it("fails closed before issuing a request when the compiler identity is unconfigured", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("WORKFLOW_COMPILER_URL", "");
+    vi.stubEnv("WORKFLOW_INTERNAL_TOKEN", "");
+    await expect(workflowCompiler("/v1/document")).rejects.toMatchObject({ status: 503, code: "WORKFLOW_SERVICE_UNAVAILABLE" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

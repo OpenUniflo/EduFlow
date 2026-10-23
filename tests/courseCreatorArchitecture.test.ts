@@ -49,8 +49,11 @@ describe("Course Creator persistence and authority boundaries", () => {
   });
 
   it("adds zero physical Vercel Function entrypoints", () => {
-    const entries = readdirSync(resolve(process.cwd(), "api"), { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith(".ts"));
+    // M14 moved api/health.ts into api/_handlers (not a deployable entrypoint) and added the
+    // Python compiler Function: 11 TypeScript entries + 1 Python entry = the Hobby budget of 12.
+    const entries = readdirSync(resolve(process.cwd(), "api"), { withFileTypes: true }).filter((entry) => entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".py")));
     expect(entries).toHaveLength(12);
+    expect(entries.filter((entry) => entry.name.endsWith(".py")).map((entry) => entry.name)).toEqual(["workflow-compiler.py"]);
     expect(entries.map((entry) => entry.name)).not.toContain("course-creator.ts");
   });
 

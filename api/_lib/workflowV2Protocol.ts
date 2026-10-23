@@ -4,13 +4,25 @@ import { isDeepStrictEqual } from "node:util";
 import { ApiError } from "./http.js";
 
 export type WorkflowRow = Record<string, unknown>;
+/**
+ * Resolves an internal compiler path against the configured base URL while preserving any
+ * base path prefix (the merged Hosted deployment serves the compiler under
+ * `/api/workflow-compiler`). A root base URL (`http://127.0.0.1:18110`) keeps its historic
+ * shape, so the standalone Local compiler is unaffected.
+ */
+export function workflowCompilerUrl(base: string, path: string): URL {
+  const url = new URL(base);
+  const prefix = url.pathname.replace(/\/+$/, "");
+  const relative = path.startsWith("/") ? path : `/${path}`;
+  return new URL(`${prefix}${relative}`, url);
+}
 export async function workflowCompiler<T = WorkflowRow>(path: string, body?: unknown): Promise<T> {
   const url = process.env.WORKFLOW_COMPILER_URL;
   const token = process.env.WORKFLOW_INTERNAL_TOKEN;
   if (!url || !token) throw new ApiError(503, "WORKFLOW_SERVICE_UNAVAILABLE", "Workflow execution service is not configured");
   let response: Response;
   try {
-    response = await fetch(new URL(path, url), { method: body === undefined ? "GET" : "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(path === "/v1/discover" ? 60000 : path === "/v1/test-node" ? 45000 : path === "/v1/p5" ? 45000 : 15000) });
+    response = await fetch(workflowCompilerUrl(url, path), { method: body === undefined ? "GET" : "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(path === "/v1/discover" ? 60000 : path === "/v1/test-node" ? 45000 : path === "/v1/p5" ? 45000 : 15000) });
   } catch { throw new ApiError(503, "WORKFLOW_SERVICE_UNAVAILABLE", "Workflow execution service is unavailable"); }
   const result = await response.json() as { error?: { code: string; message: string; category?: string } };
   if (!response.ok) throw new ApiError(result.error?.category === "auth" ? 403 : response.status === 422 ? 422 : 503, result.error?.code ?? "WORKFLOW_SERVICE_ERROR", result.error?.message ?? "Workflow service request failed");

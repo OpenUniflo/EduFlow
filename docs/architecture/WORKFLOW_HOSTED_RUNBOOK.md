@@ -1,19 +1,21 @@
 # Workflow Hosted 部署与运维
 
-本部署按用户要求仅使用 Vercel 与 Supabase。配置和容量决策见 [ADR 0006](decisions/0006-workflow-p6-hosted.md)，能力与历史验收限制见 [当前交付摘要](../acceptance/DELIVERY_STATUS.md)。执行新验收须检查实际部署与就绪状态，不能以某次 READY 或 Local 测试代替。
+本部署按用户要求仅使用 Vercel 与 Supabase。配置和容量决策见 [ADR 0006](decisions/0006-workflow-p6-hosted.md)（历史 P6 记录）；自 M14 起单一 Vercel 项目的部署决定见 [ADR 0007](decisions/0007-workflow-backend-in-main-project.md)，能力与历史验收限制见 [当前交付摘要](../acceptance/DELIVERY_STATUS.md)。执行新验收须检查实际部署与就绪状态，不能以某次 READY 或 Local 测试代替。
 
 当前兼容发布对为7b65执行器：A `dpl_BQPdKjWiXZV95xWgwGZZM1BMo441`、B `dpl_jQ1dsHSgfTrAS253RygGeFu3byYk`，正常入口指向B；主前端为`dpl_DbSCNySXWbvQiBqbHA1Q6phQBs2T`。完整675文件manifest、实际Function12+1和各Daemon身份分别留证。8566及400b是历史证据/恢复范围，不把旧身份改写成新执行器。
 
 ## 部署和版本
 
-- 主应用：`edu-flow`，认证 Node API 与前端；后台：`edu-flow-workflow`，FastAPI Compiler、独立 Worker/watchdog Daemons。两者分别核对真实 Function 产物，最多12个/部署。后台 Daemons 公共 Beta 当前仅 Production 运行，不能声称 Preview 同等可用。
+- 主应用：`edu-flow`，前端、认证 Node API、Python Compiler Function 与独立 `worker`/`watchdog` Daemons 同属这一个项目（M14，[ADR 0007](decisions/0007-workflow-backend-in-main-project.md)）。每次部署核对真实 Function 产物，最多12个（11 个 TypeScript 入口 + `api/workflow-compiler.py`）。Daemons 公共 Beta 当前仅 Production 运行，不能声称 Preview 同等可用；原 `edu-flow-workflow` 项目在合并部署验收通过并由用户确认后删除。
 - Supabase `uyljtdbvlivxniililay`，session pooler SSL，受限 `workflow_worker`；数据库是队列、State、官方 checkpoint/Store 和共享发现目录权威。不得用开发机进程或临时磁盘补 Hosted 运行。
-- 使用 pnpm/uv 锁文件。Vercel CLI 部署必须显式给出该项目的绝对 `--local-config`，同时给 `--cwd`；本轮发现只给子目录会误用主应用路由。核对实际 `/health`、`/ready`、认证 capabilities，不能只看部署状态。
-- backend `services/workflow/vercel.json`，frontend 根 `vercel.json`。保留清单包含源码散列、两个 deployment ID、执行器 digest、镜像 digest、迁移清单、环境/发现目录修订。SDK 或受执行器指纹覆盖的代码变化使旧检查点不兼容，不静默改写旧快照。
+- 使用 pnpm/uv 锁文件。Vercel CLI 部署在**仓库根**执行（`--cwd` 仓库根，`--local-config <root>/vercel.json`）；不要再用 `--cwd services/workflow`，否则既缺根配置也会误判项目路由。核对实际 `/api/workflow-compiler` 的认证 capabilities、真实 Function 数量与 Worker/watchdog 实例，不能只看部署状态。
+- 部署配置只有仓库根 `vercel.json`：Python Compiler Function（`api/workflow-compiler.py`，`includeFiles: services/workflow/src/**`，`maxDuration` 120）、`/api/workflow-compiler/:path*` 改写，以及 `worker`/`watchdog` Daemons（`root: services/workflow`、`entrypoint: Dockerfile`、sin1 各 1 实例、1Gi 内存、660s/15s 终止宽限）都在此声明。Python 依赖来自根 `requirements.txt`，由 `scripts/workflow/export-requirements.mjs` 从 `services/workflow/uv.lock` 生成并由 `pnpm test:workflow` 检查漂移；根 `.python-version` 固定 `3.13`。不要手改 `requirements.txt`，也不要把 `services/workflow` 当作独立 Vercel 项目部署（其 `vercel.json` 已删除）。Hosted 不再提供 `api/health.ts` 的 `/api/health`；仓库内只有本地工具使用它。保留清单包含源码散列、deployment ID、执行器 digest、镜像 digest、迁移清单、环境/发现目录修订。SDK 或受执行器指纹覆盖的代码变化使旧检查点不兼容，不静默改写旧快照。
 
 ## 环境和秘密
 
-后台必须配置 `WORKFLOW_DEPLOYMENT_MODE=hosted`、`WORKFLOW_DATABASE_URL`、`WORKFLOW_INTERNAL_TOKEN`、`WORKFLOW_ENVIRONMENTS_JSON`、`WORKFLOW_SANDBOX_BACKEND=vercel`、固定 `WORKFLOW_SANDBOX_IMAGE`，以及可信目录引用的提供方/工具秘密。主应用服务端配置同一内部令牌及 `WORKFLOW_COMPILER_URL=https://edu-flow-workflow.vercel.app`。内部令牌至少32字符，禁止放入 VITE 变量。
+`edu-flow` 必须配置 `WORKFLOW_DEPLOYMENT_MODE=hosted`、`WORKFLOW_DATABASE_URL`、`WORKFLOW_INTERNAL_TOKEN`、`WORKFLOW_ENVIRONMENTS_JSON`、`WORKFLOW_SANDBOX_BACKEND=vercel`、固定 `WORKFLOW_SANDBOX_IMAGE`，以及可信目录引用的提供方/工具秘密；同一项目的服务端配置同一内部令牌及 `WORKFLOW_COMPILER_URL=https://<edu-flow 生产域名>/api/workflow-compiler`（Production 与 Preview 均指向生产，因为 Worker 只在生产运行）。内部令牌至少32字符，禁止放入 VITE 变量。
+
+平台运行环境（R12/R13）：每个部署只配置一个 `access: "authenticated"` 的公共环境，不写 `ownerIds`，且不得包含 `providers`/`connectors`/`tools`/`variables`/`functions`；所有登录用户通过资源中心建立自己的连接。公共环境只改内容、不改 `ref`（用户连接与函数按“用户 + 运行环境标识”存放，改标识会失联），平台 DeepSeek / DeepWiki 不再提供；界面上不出现运行环境选择。
 
 JSON环境只授予明确 owner UUID、HTTPS目的地和许可工具/模型。不得复制 Local 通配 owner、回环 fixture 或 fixture 密钥。普通值、Secret 引用、Context、学习身份保持独立。托管连接的密码经 Vault 写入；浏览器不能读取秘密。环境/权限/工具目录变化会更新修订，旧 Thread 的继续/分支需要重新授权和编译，不能绕过不兼容保护。
 
@@ -24,12 +26,12 @@ Vercel Daemon 使用平台定期轮换的 `VERCEL_OIDC_TOKEN_FILE`，官方 SDK 
 1. 对账目标 ref、仓库与 Hosted 迁移历史；共享库不 reset，Preview build 不自动迁移。
 2. 备份并列出保护对象。旧 Legacy 工作流先归档，再执行退役迁移；归档保留完整 JSON+SHA，不是运行 fallback。只增量应用仓库原始 SQL；已应用版本不得改写。
 3. 先应用向前兼容迁移，确认认证 API、官方 Saver/Store 同事务及回滚；再发布兼容候选。初次/不兼容升级先停止验收新提交，等待已执行 Run 排空；等待 Thread 保留原身份，不强行升级。
-4. 前后端候选成对管理。`/ready` 为服务身份接口，须数据库、当前 digest 的 Worker/watchdog 和 Sandbox 均通过；`/health` 只是存活检查。
+4. 前端、API、Compiler 与 Daemon 现在同属一次 `edu-flow` 部署，不再有跨项目成对发布；仍按候选→排空→提升处理，并读回同一部署的 Function 数量与 Worker/watchdog 实例。`/ready` 为服务身份接口，须数据库、当前 digest 的 Worker/watchdog 和 Sandbox 均通过；`/health` 只是存活检查。
 5. 发布后读回真实部署与实例、迁移、Function数量、普通认证运行和深链刷新。保留原失败与复验证据。
 
-回退只选择已验证且 schema/执行器兼容的 deployment。Vercel promotion/rollback 会同时更新该后台项目的 Daemons。Worker实现SIGTERM后停止领取、尝试完成当前工作，配置660秒；但本轮真实带活跃计算promote仍出现WORKER_LOST，平台退出根因未确认，不能把该配置当活跃无损保证。schema 采用向前修复，不能把应用回退当数据库回退。无兼容二进制时保留历史并明确拒绝继续。
+回退只选择已验证且 schema/执行器兼容的 deployment。Vercel promotion/rollback 会同时更新同一项目的 Daemons。Worker实现SIGTERM后停止领取、尝试完成当前工作，配置660秒；但本轮真实带活跃计算promote仍出现WORKER_LOST，平台退出根因未确认，不能把该配置当活跃无损保证。schema 采用向前修复，不能把应用回退当数据库回退。无兼容二进制时保留历史并明确拒绝继续。
 
-日常发布仍必须使用受控维护窗口：暂停所有目标用户的 start/next/resume/branch 提交，让既有 queued/running 自然终态，保留 waiting。历史验收只覆盖两个授权 owner，不能推广为开放流量下的安全保证。操作员须核对目标后台项目、Production READY 候选和实际部署身份；使用受限角色查询全局 queued/running，任一非零或读取失败均不得提升。候选先不切换域名构建，通过排空、就绪和执行器兼容性检查后才允许平台提升，发布后读回实际 Worker/watchdog 实例。
+日常发布仍必须使用受控维护窗口：暂停所有目标用户的 start/next/resume/branch 提交，让既有 queued/running 自然终态，保留 waiting。历史验收只覆盖两个授权 owner，不能推广为开放流量下的安全保证。操作员须核对目标项目、Production READY 候选和实际部署身份；使用受限角色查询全局 queued/running，任一非零或读取失败均不得提升。候选先不切换域名构建，通过排空、就绪和执行器兼容性检查后才允许平台提升，发布后读回实际 Worker/watchdog 实例。
 
 原 P6 部署、preflight、提升和就绪脚本绑定历史项目 ID、私密文件和故障演练配置，现已[归档](../../artifacts/archive/runtime-naming-20261021/files/scripts/workflow/operations)。仓库当前没有通用自动发布入口；归档脚本仅供追溯，不应直接用于新发布。恢复自动化需先显式配置目标身份、凭据来源和维护约束并重新验收，不能以裸 promote 绕过上述检查。
 这是操作员暂停提交前提下的保守维护流程，不是原子admission gate；计数检查和平台切换间存在竞态。因此不承诺开放流量、多用户不断提交时自动安全发布；要开放该承诺，必须先实现覆盖start/next/resume/branch的原子维护闸并独立验收。失联按既有显式恢复协议处理，不自动重做外部写。
@@ -40,7 +42,7 @@ Vercel Daemon 使用平台定期轮换的 `VERCEL_OIDC_TOKEN_FILE`，官方 SDK 
 
 ## 监测与处置
 
-Vercel 后台项目 Logs 是本交付的运维告警接收位置，source=`daemon`；没有宣称已向任何人发送邮件/消息或配置外部值班平台。CLI64可查询 `logs --project edu-flow-workflow --query 'source == "daemon"'`；旧CLI58不支持这一来源。
+`edu-flow` 项目的 Logs 是本交付的运维告警接收位置，source=`daemon`；没有宣称已向任何人发送邮件/消息或配置外部值班平台。CLI64可查询 `logs --project edu-flow --query 'source == "daemon"'`；旧CLI58不支持这一来源。构建日志与运行日志同项目查看。
 
 - 新受限连接设置连接5秒、TCP未确认数据20秒，专用角色statement timeout15秒、lock timeout3秒；官方Saver/Store使用同一角色。watchdog每批最多处理128个到期/取消/失联Thread，清理每集合最多128行，跳过被锁行，下次tick继续；不扫描无限活跃Thread。
 - Worker每5秒续租/信号，空队列每3秒轮询；watchdog每5秒巡检租约/生命周期；VM回收是独立异步子任务，每轮最多检查20对象/尝试删除5个（404/410也计次数），4秒超时、失败固定SANDBOX_REAP_FAILED并停止续健康信号，不阻断数据库巡检。健康信号20秒到期。进程自动重启不等于Run自动接管。

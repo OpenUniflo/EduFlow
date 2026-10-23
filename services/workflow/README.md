@@ -11,6 +11,7 @@ cd services/workflow
 uv sync --frozen
 uv run pytest -q
 cd ../..
+node scripts/workflow/export-requirements.mjs --check
 WORKFLOW_TEST_LOCAL_DB=1 uv run --project services/workflow --frozen pytest -q services/workflow/tests
 ```
 
@@ -94,11 +95,15 @@ The existing frontend design is retained. Changes address actual Hosted findings
 
 Before signing a release, verify actual generated Function counts, authenticated APIs, browser flows, upgrade/drain/rollback, credential revocation, isolated backup restoration, bounded cleanup and the final stability window. Retention boundary tests do not establish seven days of continuous operation. See the [Hosted runbook](../../docs/architecture/WORKFLOW_HOSTED_RUNBOOK.md) for operator procedures.
 
-## Actual P6 Hosted topology
+## Hosted topology (one `edu-flow` project)
 
-Per user instruction, Hosted uses only Vercel and Supabase. FastAPI Compiler, Worker and independent watchdog use the `edu-flow-workflow` Vercel project; frontend/authenticated APIs remain `edu-flow`. Daemons currently require Production. The restricted SSL session-pooler connection owns official checkpoints/Store; shared SQL signals/catalog replace ephemeral-file authority. Python/JavaScript execute in pinned, deny-all Vercel Sandbox microVMs with inner non-root cgroup/mount limits. Use `WORKFLOW_ENVIRONMENTS_JSON`, `WORKFLOW_DEPLOYMENT_MODE=hosted`, `WORKFLOW_SANDBOX_BACKEND=vercel` and pinned `WORKFLOW_SANDBOX_IMAGE`. Secrets stay server-side.
+Per user instruction, Hosted uses only Vercel and Supabase. Since M14 ([ADR 0007](../../docs/architecture/decisions/0007-workflow-backend-in-main-project.md), which supersedes the two-project deployment decision in [ADR 0006](../../docs/architecture/decisions/0006-workflow-p6-hosted.md)) the Vite frontend, the authenticated TypeScript APIs, the Python Compiler Function and the `worker`/`watchdog` Daemons all belong to the single `edu-flow` project. `api/workflow-compiler.py` adds this service's bundled `src` to `sys.path`, applies the same `assert_hosted_configuration()` as `main.py`, and mounts the authenticated FastAPI app under `/api/workflow-compiler`, so Hosted clients call `https://<edu-flow domain>/api/workflow-compiler/v1/...`. The retired `edu-flow-workflow` project is deleted only after the merged deployment passes its own acceptance.
 
-Always specify the absolute project-specific `--local-config` along with `--cwd` when deploying. `/ready` is internally authenticated and checks DB, current-build Worker/watchdog and Sandbox; `/health` alone is only liveness. See [ADR 0006](../../docs/architecture/decisions/0006-workflow-p6-hosted.md) and the [Hosted runbook](../../docs/architecture/WORKFLOW_HOSTED_RUNBOOK.md). The [current delivery scope](../../docs/acceptance/DELIVERY_STATUS.md) preserves the limits of the historical acceptance; inspect `/ready` and the current deployment when performing new Hosted acceptance.
+Hosted packaging is owned by the root `vercel.json`: it declares the Python Function (`maxDuration` 120, `includeFiles: services/workflow/src/**`), the `/api/workflow-compiler/:path*` rewrite and the two Daemons (`root: services/workflow`, `entrypoint: Dockerfile`, `sin1` × 1, 1Gi memory, 660s/15s termination grace). Dependencies are installed from the root `requirements.txt`, which is generated from `uv.lock` by `scripts/workflow/export-requirements.mjs` and checked by `pnpm test:workflow`; the root `.python-version` pins 3.13 to match the Docker image. Do not edit `requirements.txt` by hand, and keep the Function count at 12 (11 TypeScript entries plus the Python entry). Local development keeps `pnpm workflow:local` and this service's own tooling unchanged.
+
+Daemons currently require a Production deployment. The restricted SSL session-pooler connection owns official checkpoints/Store; shared SQL signals/catalog replace ephemeral-file authority. Python/JavaScript execute in pinned, deny-all Vercel Sandbox microVMs with inner non-root cgroup/mount limits. Use `WORKFLOW_ENVIRONMENTS_JSON`, `WORKFLOW_DEPLOYMENT_MODE=hosted`, `WORKFLOW_SANDBOX_BACKEND=vercel` and pinned `WORKFLOW_SANDBOX_IMAGE`. Secrets stay server-side.
+
+Deploy the repository root with the root `vercel.json`; never deploy this directory as an independent Vercel project. `/ready` is internally authenticated and checks DB, current-build Worker/watchdog and Sandbox; `/health` alone is only liveness. See the [Hosted runbook](../../docs/architecture/WORKFLOW_HOSTED_RUNBOOK.md). The [current delivery scope](../../docs/acceptance/DELIVERY_STATUS.md) preserves the limits of the historical acceptance; inspect `/ready` and the current deployment when performing new Hosted acceptance.
 
 ## 运行模块命名
 
