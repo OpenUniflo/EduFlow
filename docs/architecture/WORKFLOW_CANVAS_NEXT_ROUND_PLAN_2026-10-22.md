@@ -3,7 +3,7 @@
 > 本文中待决策、环境授权/ownerIds 的 P0 目标、费用上限、无迁移及部署门槛已被 [2026-10-22 开发计划](WORKFLOW_CANVAS_AND_REAL_SCENARIOS_PLAN_2026-10-22.md)取代：D1/D2/D3=A；共享 Runtime `access:"authenticated"` + 用户 Capability；无费用核算；Hosted 直接部署服务与 Preview、不设维护窗口；技术验收后仅插入模板内容迁移。D3 只移除旧受限环境的测试管理员 ownerIds，共享 Runtime 仍向所有登录用户开放；下文仅作历史依据。
 
 状态：**待确认范围与三项决策；尚未实施。**
-依据：`feat/workflow` @ `1ff4c74` 的只读核查；[输入对象优化计划](WORKFLOW_INPUT_OBJECT_OPTIMIZATION_PLAN.md) 第 8/9 节；[最终验收包](../acceptance/WORKFLOW_FINAL_ACCEPTANCE_PACKET_2026-10-22.md)；用户确认“环境问题应优先于画布细节”。
+依据：`feat/workflow` @ `1ff4c74` 的只读核查；[输入对象优化计划](WORKFLOW_INPUT_OBJECT_OPTIMIZATION_PLAN.md) 第 8/9 节；[最终验收包](../../artifacts/archive/acceptance-process-20261023/WORKFLOW_FINAL_ACCEPTANCE_PACKET_2026-10-22.md)；用户确认“环境问题应优先于画布细节”。
 
 ## 0. 结论
 

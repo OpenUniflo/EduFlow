@@ -21,7 +21,7 @@
 
 路径均相对仓库根。原能力表代码证据保留；未逐行重核的历史定位标为待核实，不代表本轮验证通过。本轮直接复核了环境装配/快照、Hosted 校验、连接注入与模板创建边界（下表及 P0-5/6）；其余能力行号/行为待实施时核实。表中 W=`services/workflow/src/eduflow_workflow/`，F=`src/features/workflow/`。
 “代码支持”只证明实现入口存在；“Hosted 配置”必须由未来普通认证目录读回并实际 Run 证明，不能拿开发助手的 MCP 权限冒充 Worker 的工具权限。
-[最终验收包 §3](../acceptance/WORKFLOW_FINAL_ACCEPTANCE_PACKET_2026-10-22.md#3-残余风险--未覆盖) 只证明此前 Hosted 入口→结束；未证明真实模型/工具。
+[最终验收包 §3](../../artifacts/archive/acceptance-process-20261023/WORKFLOW_FINAL_ACCEPTANCE_PACKET_2026-10-22.md#3-残余风险--未覆盖) 只证明此前 Hosted 入口→结束；未证明真实模型/工具。
 上一轮计划 §1/§2 记载 DeepSeek、DeepWiki、GitHub；**当前实际部署、具体 toolRef/合同、约 24 capabilities 数量均待核实**，本次未联网读回。
 [场景手册](../acceptance/WORKFLOW_AGENT_SCENARIOS_GUIDE.md) 的本地 A/B/C 曾有实模记录，但 A 的订单是受控 HTTP、MCP 是 echo；不能据此签署真实业务工具或 Hosted 可用。
 
@@ -102,7 +102,7 @@
 
 公开检索的验收快照：每次运行记录**查询词 + 时间 + 前 N 条结果（标题/URL/短摘录）**；断言“引用存在且来自本次检索”，不要求两次结果逐字相同。结果变化、限流、来源不可达必须显式写入 `limitations`，不能补造。
 
-详细成功/拒绝/失败/重复提交用例统一见[验收计划](../acceptance/WORKFLOW_PRODUCT_TEMPLATE_ACCEPTANCE_PLAN_2026-10-22.md)。
+详细成功/拒绝/失败/重复提交用例统一见[验收计划](../../artifacts/archive/acceptance-process-20261023/WORKFLOW_PRODUCT_TEMPLATE_ACCEPTANCE_PLAN_2026-10-22.md)。
 
 重试默认最多 2 次（含首次），只读暂态/429 按允许分类退避；auth/权限/合同失败立即停止。新 Run 可读取变化后的外部数据；幂等指提交去重与无重复副作用，不承诺模型字句或外部数据相同。运行记录见 §2.6。
 
@@ -189,7 +189,7 @@
 - **token usage**：Step 里仍有 `usage`，只作为“模型实际调用过、规模正常”的观测；需要时在证据里写 token 数，不折算费用。
 - **停止条件**：同一失败连续出现 2 次，先停下定位，不静默重跑；单次 Run 若卡住/循环，按现有取消与超时机制终止；不把“多跑几次碰成功”当验收。
 - **费用可见性**：如果账户 owner 想看花费，以供应商控制台账单为准；本项目不做计费系统，也不把估算写成已结算。
-- **成功定义**：Run 完成、无报错只是必要条件；通过标准是[验收计划](../acceptance/WORKFLOW_PRODUCT_TEMPLATE_ACCEPTANCE_PLAN_2026-10-22.md)的场景断言（真实来源、引用、审核门禁、失败路径、无外部写），不是“跑绿了”。
+- **成功定义**：Run 完成、无报错只是必要条件；通过标准是[验收计划](../../artifacts/archive/acceptance-process-20261023/WORKFLOW_PRODUCT_TEMPLATE_ACCEPTANCE_PLAN_2026-10-22.md)的场景断言（真实来源、引用、审核门禁、失败路径、无外部写），不是“跑绿了”。
 
 ### 2.7 产品模板化：共享运行环境 + 用户执行能力
 
@@ -236,7 +236,7 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 
 ## 4. 分层验收与证据规则
 
-详细用例、模板/画布矩阵、命令、证据、失败循环、D3 与签字统一维护在[产品模板验收计划](../acceptance/WORKFLOW_PRODUCT_TEMPLATE_ACCEPTANCE_PLAN_2026-10-22.md)，本文只保留阶段门。该计划所有结果均未执行、待填。
+详细用例、模板/画布矩阵、命令、证据、失败循环、D3 与签字统一维护在[产品模板验收计划](../../artifacts/archive/acceptance-process-20261023/WORKFLOW_PRODUCT_TEMPLATE_ACCEPTANCE_PLAN_2026-10-22.md)，本文只保留阶段门。该计划所有结果均未执行、待填。
 
 | 阶段 | 进入与退出门 | 可停点 |
 | --- | --- | --- |
@@ -275,8 +275,8 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 | S4 内容事实核对 | 成功；API + 浏览器 UI 技术证据，非正式验收 | 仅 DeepSeek；API workflow `2bc165d7…`、run `ad8804a6…` 成功；UI workflow `598b087e…`、run `261ef403…` 成功；三条主张均标为缺少依据，给出保守发布版与补证模板 |
 | Hosted 环境审计 | 通过（只读）；部署已开始、迁移未执行 | Supabase `uyljtdbvlivxniililay`：迁移 117 条与本地 digest `4abc4c45…` 一致、无 Local 用户、16 个历史模板但四产品模板缺失；Worker Production `dpl_Dy382…`、前端 Preview `dpl_9Sr9…` 均 READY；最近 Run 成功，Sandbox 固定镜像 `eduflow-isolated@sha256:fb27a073…`；前端 12/12 API 入口；env/log 读取被团队 scope 403，未读秘密 |
 | Hosted 部署/冒烟 | **按用户决定暂缓 Hosted 门** | 前端 Preview `dpl_8ZDWpav…` READY；Worker 重部署 `dpl_CrYMiVk…` 后 Sandbox smoke run `cd2fc9e2…` 成功；S4 模型仍 `NODE_EXECUTION_FAILED`；临时 workflow/连接已清理；模板内容迁移未执行；用户 2026-10-23 决定先以 Local 验收为准 |
-| 本地执行能力自配置 | **成功** | 测试账号通过 UI/API 创建加密 DeepSeek 连接 `my_deepseek_round22`，连接测试成功，环境 provider `origin=user`；真实运行 workflow `ddada551…`、run `e44be04a…` 成功；截图 [round22-selfservice-deepseek.png](evidence/workflow-s1-round13/round22-selfservice-deepseek.png) |
-| S1–S4、Hosted 正式验收 | **Local 通过；Hosted 暂缓** | Local S1–S4 API+UI 与自建模型能力均通过并完成精确清理；Hosted 未签，内容迁移未执行；见 [Local 最终验收](../acceptance/WORKFLOW_LOCAL_FINAL_SIGNOFF_2026-10-23.md) |
+| 本地执行能力自配置 | **成功** | 测试账号通过 UI/API 创建加密 DeepSeek 连接 `my_deepseek_round22`，连接测试成功，环境 provider `origin=user`；真实运行 workflow `ddada551…`、run `e44be04a…` 成功；截图 [round22-selfservice-deepseek.png](../../artifacts/archive/acceptance-process-20261023/evidence/workflow-s1-round13/round22-selfservice-deepseek.png) |
+| S1–S4、Hosted 正式验收 | **Local 通过；Hosted 暂缓** | Local S1–S4 API+UI 与自建模型能力均通过并完成精确清理；Hosted 未签，内容迁移未执行；见 [Local 最终验收](../../artifacts/archive/acceptance-process-20261023/WORKFLOW_LOCAL_FINAL_SIGNOFF_2026-10-23.md) |
 
 验证：新增 2 项产品模板草案测试；四套 Definition 经 compiler `validate_structure` 全部通过；6 项 connection + 1 项 template capability + 3 项服务端模板绑定单测通过；worker 220 passed / 12 skipped（本机 `NO_PROXY` 含 `[::1]` 会触发 httpx2 解析异常，归一为 `localhost,127.0.0.1` 后通过）；`pnpm test` 171 文件 / 1280 项通过；`pnpm typecheck`、`pnpm lint`、`pnpm build` 通过。S1 已取得 API 三来源、UI 四视口/125% 等效视口、控制台 0 error、跨账号 404 与清理证据；S2、S3、S4 已取得 API + UI 成功；Local 五项 run（含自建 DeepSeek）均 success；Hosted Sandbox 在 Worker 重部署后 smoke 成功，但模型节点仍失败，按用户决定暂缓 Hosted 门、内容迁移未执行；真实浏览器 zoom 与 Wikipedia/arXiv 适配仍缺。
 
@@ -328,5 +328,5 @@ D2 特别门：新增版本不改旧定义；显式确认前展示所有受影�
 - 2026-10-23：Hosted 首次部署与冒烟：推送 `5ecf96a` 后前端 Preview `dpl_8ZDWpav…` READY；Hosted 认证与环境目录可用，但 S1（3 工具 + 函数 + 模型）run `ccc24dd1…` 因 `SANDBOX_UNAVAILABLE` 失败，S4（仅模型）run `85c8e7a4…` 因 `NODE_EXECUTION_FAILED` 失败；已删除临时 Workflow/禁用临时连接，未执行模板内容迁移。Hosted 技术门仍阻塞。
 - 2026-10-23：读取 Hosted daemon 日志确认 Sandbox `create` 阶段 `SandboxApiError`、watchdog `SANDBOX_REAP_FAILED`；重部署 Worker `dpl_CrYMiVk…`（commit `6a94040`）后最小 Sandbox smoke run `cd2fc9e2…` 成功，但 S4 模型仍 `NODE_EXECUTION_FAILED`。
 - 2026-10-23：用户决定先以 Local 验收为准，不把 Hosted 门作为当前阻塞；Local 自建 DeepSeek 连接（加密凭据、连接测试、`origin=user`）与真实模型 run `e44be04a…` 成功，S1–S4 五项 Local run 均为 success；Hosted 临时数据已清理，模板内容迁移保持暂停。
-- 2026-10-23：Local 最终验收签字：S1–S4 与自建 DeepSeek 五项 run 均 success；精确删除 10 个验收 Workflow、禁用 12 个测试连接，清理后 active connections=0、templates=24；Hosted 按用户决定暂缓、模板内容迁移未执行。见 [Local 最终验收](../acceptance/WORKFLOW_LOCAL_FINAL_SIGNOFF_2026-10-23.md)。
+- 2026-10-23：Local 最终验收签字：S1–S4 与自建 DeepSeek 五项 run 均 success；精确删除 10 个验收 Workflow、禁用 12 个测试连接，清理后 active connections=0、templates=24；Hosted 按用户决定暂缓、模板内容迁移未执行。见 [Local 最终验收](../../artifacts/archive/acceptance-process-20261023/WORKFLOW_LOCAL_FINAL_SIGNOFF_2026-10-23.md)。
 - 2026-10-23：定位本地 S3 失败与连接 UX：用户看到的 `S3 community triage real run` 是旧验收副本 `ad7ffe1d…`，其 prompt 早于 200 字收敛，run `715d6072…` 因 `MODEL_OUTPUT_TRUNCATED` 失败；随后精确清理停用了它引用的 `hn_community_question` v1，故又显示工具不可用。MCP Everything 在受限环境中因 PATH/cache 缺失启动失败，discovery 500 是未捕获异常。已修复 stdio MCP 环境传递、结构化 `CONNECTOR_UNAVAILABLE`、Local cache 目录；删除 4 个旧失败副本，恢复 active 连接并新建 S3 修复副本 workflow `5577a678…`，run `5673df3b…` success。UI 移除连接版本面板/旧版本提示/函数版本管理，仅展示最新连接。更大的“URL + API Key 统一凭据、请求与函数写在节点”重构仍待做。
