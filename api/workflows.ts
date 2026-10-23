@@ -4,8 +4,8 @@ import { ApiError, handleApi, json } from "./_lib/http.js";
 import { handleWorkflowV2 } from "./_lib/workflowV2.js";
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
-  const { user } = await createUserSupabase(request);
-  try { if (await handleWorkflowV2(request, response, user.id)) return; }
+  const { client, user } = await createUserSupabase(request);
+  try { if (await handleWorkflowV2(request, response, user.id, client)) return; }
   catch (error) {
     if (!(error instanceof ApiError)) throw error;
     const details = error.details as { diagnostics?: unknown; requestId?: string; clientRequestId?: string; draftGeneration?: number; scope?: string } | undefined;

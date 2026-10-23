@@ -6,6 +6,7 @@ import { ApiError, json } from "./http.js";
 import { workflowCompiler, workflowDigest, workflowStrictBody, workflowObject, workflowString, workflowInteger, workflowUuid, workflowProjection, workflowSecretProjection, validateWorkflowEditor, workflowNewId, workflowInputReuse, workflowDiagnosticCorrelation, workflowScopedDiagnostics, type WorkflowRow } from "./workflowV2Protocol.js";
 import { applyTemplateBindings, TemplateBindingError, validateTemplateBindings } from "./workflowTemplateBinding.js";
 import { readAssignmentEligibility } from "./assignmentEligibility.js";
+import { connectionReferenceRows, variableReferenceRows, type ReferenceWorkflow } from "./workflowV2References.js";
 
 type Result<T> = { data: T | null; error: { message: string; code?: string } | null };
 function result<T>(query: Result<T>): T {
@@ -38,6 +39,44 @@ export async function readWorkflowDocument(client: SupabaseClient, owner: string
   let editor = row.editor_snapshot;
   if (layout === "current" && selected === Number(current.current_revision)) editor = (result(await client.from("workflow_editor_documents").select("document").eq("owner_user_id", owner).eq("workflow_id", id).single()) as WorkflowRow).document;
   return { definition: workflowObject(row.definition), editor: workflowObject(editor), archived: current.archived === true, provenance: current.provenance };
+}
+const REFERENCE_PAGE_SIZE = 100;
+/**
+ * Loads every non-archived Workflow's current definition for the resource reference scans.
+ * Callers pass the authenticated user client so the reads remain RLS-scoped; the owner
+ * filter is kept as defense in depth. Definitions are read from their current revision so
+ * the scan never depends on unsaved editor layout.
+ */
+async function loadReferenceWorkflows(client: SupabaseClient, owner: string): Promise<ReferenceWorkflow[]> {
+  const workflows: ReferenceWorkflow[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    let query = client.from("workflow_v2_definitions").select("workflow_id,current_revision,archived").eq("owner_user_id", owner).eq("archived", false).order("workflow_id").limit(REFERENCE_PAGE_SIZE);
+    if (cursor) query = query.gt("workflow_id", cursor);
+    const heads = result(await query) as WorkflowRow[];
+    const active = heads.filter((row) => row.archived !== true && Number(row.current_revision) > 0);
+    const definitions: (ReferenceWorkflow | null)[] = [];
+    // Bound concurrent revision reads for owners with many Workflows.
+    for (let index = 0; index < active.length; index += 10) {
+      definitions.push(...await Promise.all(active.slice(index, index + 10).map(async (row): Promise<ReferenceWorkflow | null> => {
+        const workflowId = String(row.workflow_id);
+        const revision = result(await client.from("workflow_revisions").select("revision,definition").eq("owner_user_id", owner).eq("workflow_id", workflowId).eq("revision", Number(row.current_revision)).maybeSingle()) as WorkflowRow | null;
+        if (!revision) return null;
+        const definition = workflowObject(revision.definition);
+        const revisionNumber = Number(revision.revision);
+        return {
+          workflowId,
+          workflowName: typeof definition.name === "string" && definition.name.trim() ? definition.name : workflowId,
+          revision: Number.isSafeInteger(revisionNumber) && revisionNumber > 0 ? revisionNumber : Number(row.current_revision),
+          definition,
+        };
+      })));
+    }
+    workflows.push(...definitions.filter((row): row is ReferenceWorkflow => row !== null));
+    if (heads.length < REFERENCE_PAGE_SIZE) break;
+    cursor = String(heads[heads.length - 1].workflow_id);
+  }
+  return workflows;
 }
 function libraryName(value: unknown) {
   const name = workflowString(value).trim();
@@ -110,7 +149,7 @@ async function validateLaunch(client: SupabaseClient, owner: string, workflowId:
   return { context, workflowInput: assignment.workflow_input === null || assignment.workflow_input === undefined ? undefined : assignment.workflow_input };
 }
 
-export async function handleWorkflowV2(request: VercelRequest, response: VercelResponse, owner: string) {
+export async function handleWorkflowV2(request: VercelRequest, response: VercelResponse, owner: string, userClient?: SupabaseClient) {
   const resource = queryString(request, "resource"); if (!resource) return false;
   const op = queryString(request, "op"); const id = queryString(request, "id"); const client = createServerSupabase();
   if (resource === "capabilities" && request.method === "GET") { json(response, 200, await workflowCompiler("/capabilities")); return true; }
@@ -131,6 +170,12 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
     json(response,200,workflowProjection(data));return true;
   }
   if(resource === "extensions") {
+    if(request.method === "GET" && queryString(request,"view") === "references") {
+      // Read-only reference scan; the user client keeps the query RLS-scoped to its owner.
+      const ref = workflowString(queryString(request,"ref"));
+      const workflows = await loadReferenceWorkflows(userClient ?? client, owner);
+      json(response,200,{items:connectionReferenceRows(workflows,ref)});return true;
+    }
     if(request.method === "GET") json(response,200,await workflowCompiler("/v1/extensions",{ownerId:owner,environmentRef:workflowString(queryString(request,"environmentRef"))}));
     else if(request.method === "POST") {
       const body=workflowStrictBody(request.body,["environmentRef","action","kind","ref","version","content","credential","arguments","confirmExternalEffect"],["environmentRef","action","kind","ref","version"]);
@@ -139,12 +184,20 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
     return true;
   }
   if(resource === "configuration") {
-    if(request.method === "GET") { const row=result(await client.from("workflow_workspace_configuration").select("revision,variables").eq("owner_user_id",owner).maybeSingle());json(response,200,row??{revision:0,variables:[]});return true; }
+    if(request.method === "GET") {
+      if(queryString(request,"view") === "references") {
+        const workflows = await loadReferenceWorkflows(userClient ?? client, owner);
+        json(response,200,{items:variableReferenceRows(workflows)});return true;
+      }
+      const row=result(await client.from("workflow_workspace_configuration").select("revision,variables").eq("owner_user_id",owner).maybeSingle());json(response,200,row??{revision:0,variables:[]});return true;
+    }
     if(request.method === "PUT") {
-      const parsed=z.object({baseRevision:z.number().int().nonnegative(),variables:z.array(z.object({key:z.string().min(1).max(80).regex(/^[A-Z][A-Z0-9_]*$/),value:z.union([z.string().max(8000),z.number().finite(),z.boolean()]),overrides:z.record(z.string(),z.union([z.string().max(8000),z.number().finite(),z.boolean()]))}).strict()).max(100)}).strict().safeParse(request.body);
+      const parsed=z.object({baseRevision:z.number().int().nonnegative(),variables:z.array(z.object({key:z.string().min(1).max(80).regex(/^[A-Z][A-Z0-9_]*$/),value:z.union([z.string().max(8000),z.number().finite(),z.boolean()]),overrides:z.record(z.string(),z.union([z.string().max(8000),z.number().finite(),z.boolean()])),description:z.string().max(300).optional()}).strict()).max(100)}).strict().safeParse(request.body);
       if(!parsed.success)throw new ApiError(400,"INVALID_CONFIGURATION","Invalid variable configuration");
       const body=parsed.data;if(new Set(body.variables.map(v=>v.key)).size!==body.variables.length)throw new ApiError(400,"INVALID_CONFIGURATION","Variable names must be unique");
       if(JSON.stringify(body.variables)!==JSON.stringify(workflowSecretProjection(body.variables)))throw new ApiError(400,"SECRET_IN_DEFINITION","Use managed connections for credentials");
+      // Descriptions are ordinary prose, but they still must not smuggle credential material.
+      if(body.variables.some(v=>v.description!==undefined&&v.description!==workflowSecretProjection(v.description)))throw new ApiError(400,"SECRET_IN_DEFINITION","Secrets belong in connections");
       // key is a value in the array: also inspect the effective keyed object to reject credential names.
       const keyed=Object.fromEntries(body.variables.map(v=>[v.key,v.value]));if(JSON.stringify(keyed)!==JSON.stringify(workflowSecretProjection(keyed)))throw new ApiError(400,"SECRET_IN_DEFINITION","Secrets belong in connections");
       const environmentData=await workflowCompiler("/v1/catalog",{ownerId:owner});const available=new Set((environmentData.items as WorkflowRow[]).map(item=>String(item.environmentRef)));

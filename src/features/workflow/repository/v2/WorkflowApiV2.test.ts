@@ -87,3 +87,40 @@ describe("Workflow request failures", () => {
     expect(message).toContain("已提交或完成"); expect(message).not.toContain("保存冲突");
   });
 });
+
+describe("Resource center reference and test requests (M3)", () => {
+  beforeEach(() => request.mockReset());
+
+  it("queries connection references for the selected environment", async () => {
+    const items = [{ workflowId: "wf", workflowName: "流程", revision: 4, graphPath: [], nodeId: "model", nodeLabel: "模型", version: 2, modelRef: "deepseek-chat" }];
+    request.mockResolvedValueOnce({ items });
+    const result = await new WorkflowApiV2().extensionReferences("price_service", "local-env");
+    expect(result).toEqual({ items });
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=price_service&environmentRef=local-env");
+    expect(request.mock.calls[0][1]).toBeUndefined();
+  });
+
+  it("omits the environment when none is supplied", async () => {
+    request.mockResolvedValueOnce({ items: [] });
+    await new WorkflowApiV2().extensionReferences("price_service");
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions&view=references&ref=price_service");
+  });
+
+  it("queries variable references without a Workflow identity", async () => {
+    const items = [{ workflowId: "wf", workflowName: "流程", revision: 1, graphPath: [], nodeId: "node", nodeLabel: "节点", variableKey: "API_URL" }];
+    request.mockResolvedValueOnce({ items });
+    const result = await new WorkflowApiV2().variableReferences();
+    expect(result).toEqual({ items });
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=configuration&view=references");
+  });
+
+  it("posts a connection test and preserves the Worker test fields", async () => {
+    const outcome = { ok: true, elapsedMs: 321, status: 200, preview: "{\"answer\":42}", models: ["deepseek-chat"], tools: [{ name: "lookup", description: "查询价格" }] };
+    request.mockResolvedValueOnce(outcome);
+    const result = await new WorkflowApiV2().testExtension("local-env", { ref: "price", version: 2, arguments: { q: "a" }, confirmExternalEffect: false });
+    expect(result).toEqual(outcome);
+    expect(request.mock.calls[0][0]).toBe("/api/workflows?resource=extensions");
+    expect(request.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({ action: "test", kind: "connection", ref: "price", version: 2, arguments: { q: "a" }, confirmExternalEffect: false, environmentRef: "local-env" });
+  });
+});

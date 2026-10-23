@@ -1,6 +1,6 @@
 import { apiRequest as sharedApiRequest, ApiRequestError, ApiResponseError } from "@/shared/api/apiClient";
 import { z } from "zod";
-import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail } from "../../domain/v2/types";
+import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail, ConnectionTestResult, ResourceReferenceRow } from "../../domain/v2/types";
 
 const endpoint = (resource: string, query: Record<string, string | number | undefined> = {}) => `/api/workflows?${new URLSearchParams({ resource, ...Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])) })}`;
 const runSubmissionReceipt = z.object({
@@ -94,6 +94,12 @@ export class WorkflowApiV2 {
   testNode(body: {workflowId:string;baseRevision:number;definition:WorkflowDefinitionV2;nodeId:string;input:JsonValue;state:JsonValue;environmentRef:string;confirmExternalEffect:boolean}) { return jsonRequest<{mode:string;input:JsonValue;output:JsonValue;writes:JsonValue;stateBefore:JsonValue;stateAfter:JsonValue}>("node-tests","POST",body); }
   extensions<T>(environmentRef:string) { return apiRequest<T>(endpoint("extensions",{environmentRef})); }
   extension<T>(environmentRef:string,body:Record<string,unknown>) { return jsonRequest<T>("extensions","POST",{...body,environmentRef}); }
+  /** Read-only "who uses this connection" scan across the current user's current definitions. */
+  extensionReferences(ref:string,environmentRef?:string) { return apiRequest<{items:ResourceReferenceRow[]}>(endpoint("extensions",{view:"references",ref,environmentRef})); }
+  /** Read-only "who reads this variable" scan across the current user's current definitions. */
+  variableReferences() { return apiRequest<{items:ResourceReferenceRow[]}>(endpoint("configuration",{view:"references"})); }
+  /** Connection test; the Worker returns the shared ConnectionTestResult contract. */
+  testExtension(environmentRef:string,body:{ref:string;version:number;arguments?:Record<string,JsonValue>;confirmExternalEffect?:boolean}) { return jsonRequest<ConnectionTestResult>("extensions","POST",{action:"test",kind:"connection",...body,environmentRef}); }
   configuration() { return apiRequest<WorkflowConfiguration>(endpoint("configuration")); }
   saveConfiguration(config: WorkflowConfiguration) { return jsonRequest<WorkflowConfiguration>("configuration","PUT",{baseRevision:config.revision,variables:config.variables}); }
   environments() { return apiRequest<{ items: WorkflowEnvironment[] }>(endpoint("environments")); }
