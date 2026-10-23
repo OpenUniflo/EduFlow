@@ -1,8 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { JsonSchema } from "../../domain/v2/types";
-import { commitNewStateField, NodeOutputsTable, outputPointerFor, reducerLabel, stateFieldNameIssue } from "./NodeOutputsTable";
+import { commitNewStateField, inferStateSchemaFromSample, NodeOutputsTable, outputPointerFor, reducerLabel, stateFieldNameIssue } from "./NodeOutputsTable";
 
 const stateSchema: JsonSchema = { type: "object", properties: { answer: { type: "string" }, mentions: { type: "array", items: { type: "string" } } } };
 
