@@ -33,8 +33,14 @@ for (const tool of configuration.environments[0].tools) {
 }
 const configurationPath = resolve(outputDirectory, "local-environments.json");
 writeFileSync(configurationPath, JSON.stringify(configuration, null, 2), { mode: 0o600 });
+const cacheDirectory = resolve(outputDirectory, "cache");
+const pnpmHome = resolve(outputDirectory, "pnpm-home");
+mkdirSync(cacheDirectory, { recursive: true, mode: 0o700 });
+mkdirSync(pnpmHome, { recursive: true, mode: 0o700 });
 const environment = {
   ...process.env,
+  XDG_CACHE_HOME: process.env.XDG_CACHE_HOME ?? cacheDirectory,
+  PNPM_HOME: process.env.PNPM_HOME ?? pnpmHome,
   WORKFLOW_DATABASE_URL: `postgresql://workflow_worker:${password}@127.0.0.1:54322/postgres`,
   WORKFLOW_INTERNAL_TOKEN: internalToken,
   WORKFLOW_ENVIRONMENTS_FILE: configurationPath,

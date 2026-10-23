@@ -27,7 +27,9 @@ def declared_effect(node, tools):
 async def mcp_session(connector,env=None):
     if connector["transport"]=="stdio":
         # This command is exclusively from an admin-owned environment file.
-        params=StdioServerParameters(command=connector["command"],args=connector.get("args",[]),env={key:os.environ[key] for key in connector.get("envRefs",[]) if key in os.environ},cwd=connector.get("cwd"))
+        child_env={key:os.environ[key] for key in ("PATH","HOME","XDG_CACHE_HOME","PNPM_HOME","TMPDIR") if key in os.environ}
+        child_env.update({key:os.environ[key] for key in connector.get("envRefs",[]) if key in os.environ})
+        params=StdioServerParameters(command=connector["command"],args=connector.get("args",[]),env=child_env,cwd=connector.get("cwd"))
         async with stdio_client(params,errlog=open(os.devnull,"w")) as (read,write):
             async with ClientSession(read,write) as session:
                 await session.initialize(); yield session

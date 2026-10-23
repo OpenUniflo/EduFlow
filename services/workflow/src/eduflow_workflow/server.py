@@ -93,7 +93,12 @@ async def catalog(body:dict):
 @app.post("/v1/discover")
 async def discovery(body:dict):
     env=registry.environment(body["environmentRef"],body["ownerId"])
-    tools=await discover(registry,env,body["connectorRef"])
+    try:
+        tools=await discover(registry,env,body["connectorRef"])
+    except ExecutionError:
+        raise
+    except Exception:
+        raise ExecutionError("CONNECTOR_UNAVAILABLE","MCP connector cannot be reached","infrastructure",effect="none") from None
     path=os.environ.get("WORKFLOW_CATALOG_FILE")
     if os.environ.get('WORKFLOW_DEPLOYMENT_MODE') == 'hosted':
         from .storage import Storage
