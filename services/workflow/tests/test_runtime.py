@@ -92,9 +92,9 @@ async def test_prepared_wrapper_preserves_complete_tool_input_and_sdk_result(nod
         async def session(connector,env):yield Session()
         monkeypatch.setattr("eduflow_workflow.tools.mcp_session",session)
     run=execution(tools=[tool]);run.env["connectors"]=[{"ref":"mcp"}]
-    node=copy.deepcopy(run.definition["nodes"][1]);node.update(type=node_type,writes={})
+    node=copy.deepcopy(run.definition["nodes"][1]);node.update(type=node_type,typeVersion=2 if node_type=="core.tool" else 1,writes={})
     if node_type=="core.tool":
-        node.update(config={"toolRef":"f"},inputs={"arguments":{"source":"input","pointer":"","onMissing":{"mode":"error"}}})
+        node.update(config={"toolRef":"f"},inputs={"value":{"source":"input","pointer":"/value","onMissing":{"mode":"error"}}})
         run.input={"value":"wrapper-marker"}
     else:
         node.update(config={"allowedToolRefs":["f"]},inputs={"toolCalls":{"source":"input","pointer":"/calls","onMissing":{"mode":"error"}}})
@@ -102,7 +102,7 @@ async def test_prepared_wrapper_preserves_complete_tool_input_and_sdk_result(nod
     result=await run.execute(node,{"value":0})
     assert result=={"values":{"value":0},"outlet":"next"} and run.state_version==0
     assert [name for name,_ in run.storage.calls]==["step_start","emit","emit","step_complete"]
-    assert run.storage.calls[0][1][5]==({"arguments":{"value":"wrapper-marker"}} if node_type=="core.tool" else {"toolCalls":run.input["calls"]})
+    assert run.storage.calls[0][1][5]==({"value":"wrapper-marker"} if node_type=="core.tool" else {"toolCalls":run.input["calls"]})
     output=run.storage.completed[0][3]
     if node_type=="core.tool":assert output=={"result":expected}
     else:

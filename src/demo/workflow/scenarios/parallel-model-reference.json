@@ -65,19 +65,30 @@
                         "label": "生成本项结论",
                         "config": {
                           "modelRef": "deepseek-flash",
-                          "authoring": {
-                            "timeoutMs": 120000
-                          },
                           "providerRef": "deepseek",
                           "allowedToolRefs": [],
                           "modelParameters": {
                             "thinking": {
                               "type": "disabled"
                             }
+                          },
+                          "prompt": {
+                            "system": [],
+                            "messages": [
+                              {
+                                "role": "user",
+                                "content": [
+                                  {
+                                    "type": "text",
+                                    "text": "请处理以上对话并给出结论。"
+                                  }
+                                ]
+                              }
+                            ]
                           }
                         },
                         "inputs": {
-                          "messages": {
+                          "history": {
                             "source": "state",
                             "pointer": "/messages",
                             "onMissing": {
@@ -88,7 +99,7 @@
                         "writes": {
                           "messages": "/messages"
                         },
-                        "typeVersion": 1
+                        "typeVersion": 2
                       },
                       {
                         "id": "end",

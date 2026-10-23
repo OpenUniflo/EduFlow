@@ -6,10 +6,14 @@ const messagesSchema: JsonSchema = { type: "object", properties: { messages: { t
 const text = (value: string): Binding => ({ source: "literal", value });
 const edge = (from: string, to: string) => ({ id: `${from}:next:${to}`, from, to, outlet: "next" });
 
-/** The HTTP adapter wraps the parsed response as {"result": <json>}; each template writes a concrete field out of it. */
-function toolField(id: string, label: string, stateField: string, outputPath: string): WorkflowNodeV2 {
+/**
+ * Tool nodes are typeVersion 2: one input per tool argument. These templates start unbound
+ * (`toolRef: ""`) because the public JSON tool is created by the user; no Schema is known here, so
+ * the parameter table starts empty and M11 fills it from the selected tool's inputSchema.
+ */
+function toolField(id: string, label: string, stateField: string, outputPath: string, inputs: Record<string, Binding> = {}): WorkflowNodeV2 {
   const node = createNodeV2("core.tool", id);
-  return { ...node, label, config: { toolRef: "", contractDigest: "" }, inputs: { arguments: { source: "literal", value: {} } }, writes: { [stateField]: outputPath } };
+  return { ...node, label, typeVersion: 2, config: { toolRef: "", contractDigest: "" }, inputs, writes: { [stateField]: outputPath } };
 }
 
 function normalize(id: string, label: string, code: string, inputs: Record<string, Binding>, inputProperties: Record<string, JsonSchema>): WorkflowNodeV2 {
@@ -17,8 +21,30 @@ function normalize(id: string, label: string, code: string, inputs: Record<strin
   return { ...node, label, config: { implementation: "code", language: "python", code, inputSchema: obj(inputProperties), outputSchema: messagesSchema }, inputs, writes: { messages: "/messages" } };
 }
 
-function model(id: string, label: string): WorkflowNodeV2 {
-  return { ...createNodeV2("core.llm", id), label, config: { providerRef: "", modelRef: "", modelParameters: {}, allowedToolRefs: [] }, writes: { messages: "/messages" } };
+/**
+ * Model nodes are typeVersion 2: the transcript is read through the reserved `history` binding, and
+ * `config.prompt` carries the instruction. Prompt segments stay declarative (`text` / `param`);
+ * the previous normalize function only supplies data, so the instruction lives here exactly once.
+ */
+function model(id: string, label: string, system: string, instruction: string): WorkflowNodeV2 {
+  const node = createNodeV2("core.llm", id);
+  return {
+    ...node,
+    label,
+    typeVersion: 2,
+    config: {
+      providerRef: "",
+      modelRef: "",
+      modelParameters: {},
+      allowedToolRefs: [],
+      prompt: {
+        system: [{ type: "text", text: system }],
+        messages: [{ role: "user", content: [{ type: "text", text: instruction }] }],
+      },
+    },
+    inputs: { history: stateBinding("/messages") },
+    writes: { messages: "/messages" },
+  };
 }
 
 type Spec = {
@@ -67,8 +93,7 @@ const hnCode = `def process(input, context):
         link = str(item.get("link") or "")
         if title:
             seLines.append("- " + title + " " + link)
-    text = "请用不超过 250 字的中文技术简报概括以下公开资料，必须引用来源：\\n"
-    text += "Hacker News：\\n" + "\\n".join(lines) + "\\n"
+    text = "Hacker News：\\n" + "\\n".join(lines) + "\\n"
     text += "StackExchange：\\n" + "\\n".join(seLines) + "\\n"
     text += "npm：" + package + " " + version
     return {"messages": [{"id": "tech-brief", "role": "user", "content": [{"type": "text", "text": text}]}]}
@@ -77,8 +102,7 @@ const dependencyCode = `def process(input, context):
     stats = input.get("pypi") or {}
     data = stats.get("data") or {}
     npm = input.get("npm") or {}
-    text = "请用不超过 200 字、3 条要点解释以下依赖的使用、版本与升级风险：\\n"
-    text += "PyPI langgraph 最近下载：日 " + str(data.get("last_day")) + " / 月 " + str(data.get("last_month")) + "\\n"
+    text = "PyPI langgraph 最近下载：日 " + str(data.get("last_day")) + " / 月 " + str(data.get("last_month")) + "\\n"
     text += "npm zod：" + str(npm.get("name") or "") + " " + str(npm.get("version") or "")
     return {"messages": [{"id": "dependency-brief", "role": "user", "content": [{"type": "text", "text": text}]}]}
 `;
@@ -90,7 +114,7 @@ const triageCode = `def process(input, context):
         url = item.get("url") or item.get("story_url") or ""
         if title:
             lines.append("- " + title + " " + url)
-    text = "请用不超过 200 字给出社区问题归纳、分流建议与回应草稿三部分，引用来源：\\n" + "\\n".join(lines)
+    text = "Hacker News 社区问题：\\n" + "\\n".join(lines)
     return {"messages": [{"id": "triage-brief", "role": "user", "content": [{"type": "text", "text": text}]}]}
 `;
 
@@ -119,7 +143,7 @@ export function productWorkflowTemplates(): WorkflowDocumentV2[] {
           se: { type: "array", items: { type: "object" } },
           npm: { type: "object" },
         }),
-        model("write", "生成技术简报"),
+        model("write", "生成技术简报", "你是严谨的中文技术编辑，只依据提供的公开资料写作，必须引用来源，不编造事实。", "请用不超过 250 字的中文技术简报概括以上公开资料，必须引用来源。"),
       ],
       state: retrievalState({
         hnHits: { type: "array", items: { type: "object" } },
@@ -139,7 +163,7 @@ export function productWorkflowTemplates(): WorkflowDocumentV2[] {
           pypi: { type: "object" },
           npm: { type: "object" },
         }),
-        model("assess", "评估依赖风险"),
+        model("assess", "评估依赖风险", "你是依赖维护顾问，只依据提供的公开数据解释使用、版本与升级风险。", "请用不超过 200 字、3 条要点解释以上依赖的使用、版本与升级风险。"),
       ],
       state: retrievalState({
         pypiStats: { type: "object" },
@@ -156,7 +180,7 @@ export function productWorkflowTemplates(): WorkflowDocumentV2[] {
         normalize("combine", "整理社区问题", triageCode, { hn: stateBinding("/hnHits") }, {
           hn: { type: "array", items: { type: "object" } },
         }),
-        model("triage", "归纳并起草回应"),
+        model("triage", "归纳并起草回应", "你是社区运营助理，只依据提供的公开资料归纳问题并起草回应。", "请用不超过 200 字给出社区问题归纳、分流建议与回应草稿三部分，并引用来源。"),
       ],
       state: retrievalState({ hnHits: { type: "array", items: { type: "object" } } }, { hnHits: [] }),
       requiredCapabilities: ["llm", "http", "function"],
@@ -168,9 +192,9 @@ export function productWorkflowTemplates(): WorkflowDocumentV2[] {
       nodes: [
         (() => {
           const node = createNodeV2("core.transform", "prompt");
-          return { ...node, label: "准备核对请求", config: { operationRef: "core.message", operationVersion: 1 }, inputs: { text: text("请核对这段产品更新：本次更新优化了工作流画布，支持 12 种新节点，并已提升 300% 性能。请逐条标出有依据与缺少依据的主张，并给出可发布版本。"), role: text("user") }, writes: { messages: "/messages" } };
+          return { ...node, label: "准备核对请求", config: { operationRef: "core.message", operationVersion: 1 }, inputs: { text: text("本次更新优化了工作流画布，支持 12 种新节点，并已提升 300% 性能。"), role: text("user") }, writes: { messages: "/messages" } };
         })(),
-        model("review", "核对事实主张"),
+        model("review", "核对事实主张", "你是事实核对编辑，只标出有依据与缺少依据的主张，不替产品补充未提供的证据。", "请核对以上产品更新草稿中的事实主张，逐条标出有依据与缺少依据的说法，并给出可发布版本。"),
       ],
       state: retrievalState({}, {}),
       requiredCapabilities: ["llm"],

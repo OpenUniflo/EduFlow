@@ -21,8 +21,8 @@ export const nodeTypesV2 = [
 export const stateBinding = (pointer: string): Binding => ({ source: "state", pointer, onMissing: { mode: "error" } });
 export function createNodeV2(type: string, id: string): WorkflowNodeV2 {
   const common: WorkflowNodeV2 = { id, label: nodeTypesV2.find(item => item.type === type)?.label ?? type, type, typeVersion: 1, config: {}, inputs: {}, writes: {} };
-  if (type === "core.llm") return { ...common, config: { providerRef: "", modelRef: "", modelParameters: {}, allowedToolRefs: [] }, inputs: { messages: stateBinding("/messages") }, writes: { messages: "/messages", pendingCalls: "/toolCalls" } };
-  if (type === "core.tool") return { ...common, config: { toolRef: "", contractDigest: "" }, inputs: { arguments: { source: "literal", value: {} } }, writes: {} };
+  if (type === "core.llm") return { ...common, typeVersion: 2, config: { providerRef: "", modelRef: "", modelParameters: {}, allowedToolRefs: [], prompt: { system: [], messages: [{ role: "user", content: [] }] } }, inputs: {}, writes: { answer: "/text" } };
+  if (type === "core.tool") return { ...common, typeVersion: 2, config: { toolRef: "", contractDigest: "" }, inputs: {}, writes: {} };
   if (type === "core.tool_dispatch") return { ...common, config: { allowedToolRefs: [] }, inputs: { toolCalls: stateBinding("/pendingCalls") }, writes: { messages: "/toolMessages" } };
   if (type === "core.router") return { ...common, config: { cases: [{ id: "has_calls", priority: 1, predicate: { op: "nonEmpty", source: "state", pointer: "/pendingCalls" } }], defaultOutlet: "default" } };
   if (type === "core.transform") return { ...common, config: { operationRef: "core.identity", operationVersion: 1 }, inputs: { value: { source: "literal", value: {} } } };

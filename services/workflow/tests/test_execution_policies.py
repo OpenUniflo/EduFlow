@@ -24,7 +24,7 @@ async def test_native_deadline_cannot_retry_or_handle_an_uncertain_write(monkeyp
  run=execution(tools=[tool]);run.env['functions']=[{'ref':'handler','version':1,'purpose':'handler','language':'builtin'}]
  settings={'timeoutMs':20,'retry':{'maxAttempts':2,'intervalMs':0,'retryOn':['timeout']}}
  if with_handler:settings['errorHandler']={'functionRef':'handler','functionVersion':1}
- node=copy.deepcopy(run.definition['nodes'][1]);node.update(type='core.tool',config={'toolRef':'external','authoring':settings},inputs={'arguments':{'source':'literal','value':{}}},writes={'value':'/result/value'} if with_handler else {})
+ node=copy.deepcopy(run.definition['nodes'][1]);node.update(type='core.tool',typeVersion=2,config={'toolRef':'external','authoring':settings},inputs={},writes={'value':'/result/value'} if with_handler else {})
  if side_effect=='read' and with_handler:
   await run.execute(node,{'value':0})
   assert len(handled)==1

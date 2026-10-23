@@ -9,8 +9,8 @@ from test_runtime import MemoryStorage, execution
 
 def tool_node(run, node_id):
     node = copy.deepcopy(run.definition['nodes'][1])
-    node.update(id=node_id, type='core.tool', config={'toolRef': 'f'},
-                inputs={'arguments': {'source': 'literal', 'value': {'value': node_id}}}, writes={})
+    node.update(id=node_id, type='core.tool', typeVersion=2, config={'toolRef': 'f'},
+                inputs={'value': {'source': 'literal', 'value': node_id}}, writes={})
     return node
 
 

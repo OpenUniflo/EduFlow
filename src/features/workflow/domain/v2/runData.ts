@@ -1,4 +1,3 @@
-import { pointerFieldName } from "./dataFlow";
 import type { JsonValue, WorkflowDefinitionV2, WorkflowNodeV2 } from "./types";
 
 /** The subset of a Run Step (or frontend preview step) that node run data needs. */
@@ -50,9 +49,23 @@ function elapsedMs(step: RunStepInput): number | undefined {
   return finished - started;
 }
 
-function outputValue(output: JsonValue | undefined, outputKey: string): JsonValue | undefined {
-  if (!output || typeof output !== "object" || Array.isArray(output)) return undefined;
-  return Object.prototype.hasOwnProperty.call(output, outputKey) ? (output as Record<string, JsonValue>)[outputKey] : undefined;
+/** Reads the step output at a node write pointer; an empty pointer means the whole output. */
+export function readOutputPointer(output: JsonValue | undefined, pointer: string): JsonValue | undefined {
+  if (pointer === "") return output;
+  if (typeof pointer !== "string" || !pointer.startsWith("/")) return undefined;
+  let current: JsonValue | undefined = output;
+  for (const raw of pointer.slice(1).split("/")) {
+    const token = raw.replace(/~1/g, "/").replace(/~0/g, "~");
+    if (current === null || current === undefined) return undefined;
+    if (Array.isArray(current)) {
+      if (!/^(0|[1-9][0-9]*)$/.test(token)) return undefined;
+      current = current[Number(token)];
+    } else if (typeof current === "object") {
+      if (!Object.prototype.hasOwnProperty.call(current, token)) return undefined;
+      current = (current as Record<string, JsonValue>)[token];
+    } else return undefined;
+  }
+  return current;
 }
 
 /**
@@ -83,11 +96,10 @@ export function nodeRunData(definition: WorkflowDefinitionV2, steps: readonly Ru
 
   const reducers = definition.state && typeof definition.state === "object" ? definition.state.reducers : undefined;
   const writes: NodeRunWrite[] = [];
-  for (const [outputKey, pointer] of Object.entries(node.writes ?? {})) {
-    const field = pointerFieldName(pointer);
-    if (!field) continue;
+  for (const [field, pointer] of Object.entries(node.writes ?? {})) {
+    if (!field || typeof pointer !== "string") continue;
     const reducer = reducers && typeof reducers === "object" && reducers[field] && typeof reducers[field].name === "string" ? reducers[field].name : "replace";
-    writes.push({ field, pointer, value: outputValue(selected.output, outputKey), reducer });
+    writes.push({ field, pointer, value: readOutputPointer(selected.output, pointer), reducer });
   }
 
   const elapsed = elapsedMs(selected);

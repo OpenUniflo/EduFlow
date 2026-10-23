@@ -160,7 +160,7 @@
         "id": "agent",
         "label": "客服智能体：决定工具或回复",
         "type": "core.llm",
-        "typeVersion": 1,
+        "typeVersion": 2,
         "config": {
           "providerRef": "deepseek",
           "modelRef": "deepseek-flash",
@@ -171,10 +171,24 @@
           },
           "allowedToolRefs": [
             "order_lookup"
-          ]
+          ],
+          "prompt": {
+            "system": [],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "请按系统提示完成本次订单客服处理，给出最终处理建议。"
+                  }
+                ]
+              }
+            ]
+          }
         },
         "inputs": {
-          "messages": {
+          "history": {
             "source": "state",
             "pointer": "/messages",
             "onMissing": {
@@ -351,15 +365,15 @@
         "id": "ack",
         "label": "通过 MCP 生成演示回执",
         "type": "core.tool",
-        "typeVersion": 1,
+        "typeVersion": 2,
         "config": {
           "toolRef": "everything:echo",
           "contractDigest": "562b15ea914f4b19ce5433493060c14b0d318bba48ad124829a09efb23400c83"
         },
         "inputs": {
-          "arguments": {
+          "message": {
             "source": "state",
-            "pointer": "/receipt",
+            "pointer": "/receipt/message",
             "onMissing": {
               "mode": "error"
             }

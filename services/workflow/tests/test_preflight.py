@@ -31,7 +31,7 @@ async def test_structure_and_environment_diagnostics_have_separate_scope(preflig
     assert result["checks"]=={"structure":False,"environment":False,"input":"unchecked"}
     assert all(d["scope"]=="definition" for d in result["diagnostics"])
     preflight["definition"]=sample()
-    preflight["definition"]["nodes"][1].update(type="core.tool",config={"toolRef":"absent","contractDigest":"unavailable"},inputs={"arguments":{"source":"literal","value":{}}},writes={})
+    preflight["definition"]["nodes"][1].update(type="core.tool",typeVersion=2,config={"toolRef":"absent","contractDigest":"unavailable"},inputs={},writes={})
     preflight["input"]={}
     result=await server.validation(preflight)
     assert result["checks"]=={"structure":True,"environment":False,"input":True}
@@ -53,7 +53,7 @@ async def test_model_preflight_never_constructs_sdk_or_invokes_tools(preflight,m
     monkeypatch.setenv("SYNTHETIC_PREFLIGHT_KEY","synthetic-offline-key")
     monkeypatch.setattr(server,"registry",Registry({"environments":[{"ref":"test","ownerIds":["a"],"providers":[{"ref":"p","modelRefs":["m"],"secretRef":"SYNTHETIC_PREFLIGHT_KEY"}]}]}))
     node=preflight["definition"]["nodes"][1]
-    node.update(type="core.llm",config={"providerRef":"p","modelRef":"m","modelParameters":{},"allowedToolRefs":[]},inputs={"messages":{"source":"literal","value":[{"id":"q","role":"user","content":[{"type":"text","text":"hello"}]}]}},writes={})
+    node.update(type="core.llm",typeVersion=2,config={"providerRef":"p","modelRef":"m","modelParameters":{},"allowedToolRefs":[],"prompt":{"system":[],"messages":[{"role":"user","content":[{"type":"text","text":"hello"}]}]}},inputs={},writes={})
     preflight["input"]={}
     assert (await server.validation(preflight))["valid"]
 

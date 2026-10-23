@@ -187,7 +187,7 @@
         "id": "assistant",
         "label": "生成本轮项目摘要与建议",
         "type": "core.llm",
-        "typeVersion": 1,
+        "typeVersion": 2,
         "config": {
           "providerRef": "deepseek",
           "modelRef": "deepseek-flash",
@@ -196,10 +196,24 @@
               "type": "disabled"
             }
           },
-          "allowedToolRefs": []
+          "allowedToolRefs": [],
+          "prompt": {
+            "system": [],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "请给出本轮进展摘要与下一步建议。"
+                  }
+                ]
+              }
+            ]
+          }
         },
         "inputs": {
-          "messages": {
+          "history": {
             "source": "state",
             "pointer": "/messages",
             "onMissing": {

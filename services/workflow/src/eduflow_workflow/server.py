@@ -140,16 +140,18 @@ async def validation(body:dict):
     environment_ready=False
     if structure["valid"]:
         result=compile_definition(definition,snapshot)
-        diagnostics.extend({**item,"scope":"environment"} for item in result["diagnostics"])
+        # Authoring warnings are already reported by structure validation; only
+        # blocking environment diagnostics decide readiness.
+        diagnostics.extend({**item,"scope":"environment"} for item in result["diagnostics"] if item.get("severity","error")=="error")
         for node in definition["nodes"]:
             if node["type"]=="core.llm":
                 config=node["config"]
-                if not any(p["ref"]==config["providerRef"] and config["modelRef"] in p["modelRefs"] and (p["secretRef"].startswith("vault:") or os.environ.get(p["secretRef"])) for p in env["providers"]):
+                if not any(p["ref"]==config["providerRef"] and config["modelRef"] in p["modelRefs"] and (not p.get("secretRef") or p["secretRef"].startswith("vault:") or os.environ.get(p["secretRef"])) for p in env["providers"]):
                     diagnostics.append({"code":"MODEL_UNAVAILABLE","severity":"error","scope":"environment","nodeId":node["id"],"pointer":"/nodes/"+node["id"]+"/config/modelRef","message":"Model or credential reference unavailable"})
         for key,limit in env["limits"].items():
             if definition["policy"].get(key,0)>limit:
                 diagnostics.append({"code":"POLICY_LIMIT_EXCEEDED","severity":"error","scope":"environment","pointer":"/policy/"+key,"message":"Environment limit exceeded"})
-        environment_ready=not any(item["scope"]=="environment" for item in diagnostics)
+        environment_ready=not any(item["scope"]=="environment" and item.get("severity","error")=="error" for item in diagnostics)
     input_check="unchecked"
     if "input" in body and structure["valid"]:
         input_check=True

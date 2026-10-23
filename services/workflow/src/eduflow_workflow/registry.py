@@ -8,14 +8,23 @@ from .contracts import digest, schema_check, ExecutionError, HARD_LIMITS, DEPEND
 OBJ = {"type":"object", "properties":{}, "additionalProperties":False}
 ANY_OBJ = {"type":"object"}
 STRING = {"type":"string"}
+def obj(properties, required=None): return {"type":"object","properties":properties,"required":required if required is not None else list(properties),"additionalProperties":False}
 MESSAGE_SCHEMA = {"type":"object", "properties":{"id":STRING, "role":{"enum":["system","user","assistant","tool","remove"]}, "content":{"type":"array","items":{"type":"object","properties":{"type":{"const":"text"},"text":STRING},"required":["type","text"],"additionalProperties":False}}, "toolCalls":{"type":"array","items":{"type":"object","properties":{"id":STRING,"name":STRING,"arguments":ANY_OBJ},"required":["id","name","arguments"],"additionalProperties":False}},"toolCallId":STRING},"required":["id","role","content"],"additionalProperties":False}
 MESSAGES = {"type":"array", "items":MESSAGE_SCHEMA}
 CALLS = {"type":"array","items":{"type":"object","properties":{"id":STRING,"name":STRING,"arguments":ANY_OBJ},"required":["id","name","arguments"],"additionalProperties":False}}
+PROMPT_SEGMENT = {"oneOf":[
+    {"type":"object","properties":{"type":{"const":"text"},"text":STRING},"required":["type","text"],"additionalProperties":False},
+    {"type":"object","properties":{"type":{"const":"param"},"name":STRING,"format":{"enum":["text","json"]}},"required":["type","name"],"additionalProperties":False},
+]}
+PROMPT_MESSAGE = {"type":"object","properties":{"role":{"enum":["user","assistant"]},"content":{"type":"array","items":PROMPT_SEGMENT}},"required":["role","content"],"additionalProperties":False}
+PROMPT = {"type":"object","properties":{"system":{"type":"array","items":PROMPT_SEGMENT},"messages":{"type":"array","minItems":1,"items":PROMPT_MESSAGE}},"required":["messages"],"additionalProperties":False}
+LLM_CONFIG = obj({"providerRef":STRING,"modelRef":STRING,"modelParameters":ANY_OBJ,"allowedToolRefs":{"type":"array","items":STRING},"prompt":PROMPT})
+# Declared parameters plus the optional reserved history binding; open object keeps both dynamic.
+LLM_INPUTS = {"type":"object","properties":{"history":MESSAGES},"additionalProperties":True}
+LLM_OUTPUT = obj({"messages":MESSAGES,"toolCalls":CALLS,"text":STRING})
 
-def obj(properties, required=None): return {"type":"object","properties":properties,"required":required if required is not None else list(properties),"additionalProperties":False}
-
-def descriptor(kind, config, inputs=OBJ, output=OBJ, side_effect="none", outlets=None):
-    return {"type":kind,"version":1,"configSchema":config,"inputSchema":inputs,"outputSchema":output,"outlets":["next"] if outlets is None else outlets,"sideEffect":side_effect,"requiredCapabilities":[]}
+def descriptor(kind, config, inputs=OBJ, output=OBJ, side_effect="none", outlets=None, version=1):
+    return {"type":kind,"version":version,"configSchema":config,"inputSchema":inputs,"outputSchema":output,"outlets":["next"] if outlets is None else outlets,"sideEffect":side_effect,"requiredCapabilities":[]}
 
 NODE_DESCRIPTORS = [
     descriptor("core.progress",obj({"message":{"type":"string","maxLength":500},"percent":{"type":"number","minimum":0,"maximum":100}},["message"]),ANY_OBJ,obj({"message":{"type":"string"},"percent":{"type":"number"}})),
@@ -28,8 +37,8 @@ NODE_DESCRIPTORS = [
     descriptor("core.start", OBJ), descriptor("core.end", OBJ, outlets=[]),
     descriptor("core.router", obj({"cases":{"type":"array","items":{"type":"object"}},"defaultOutlet":STRING,"mode":{"enum":["first","all"]}}, ["cases","defaultOutlet"]), output=obj({"outlet":{"type":["string","array"],"items":STRING}})),
     descriptor("core.transform", obj({"operationRef":STRING,"operationVersion":{"const":1}}), ANY_OBJ, ANY_OBJ),
-    descriptor("core.llm", obj({"providerRef":STRING,"modelRef":STRING,"modelParameters":ANY_OBJ,"allowedToolRefs":{"type":"array","items":STRING}}),obj({"messages":MESSAGES}),obj({"messages":MESSAGES,"toolCalls":CALLS}), "read"),
-    descriptor("core.tool", obj({"toolRef":STRING,"contractDigest":STRING}),obj({"arguments":ANY_OBJ}),obj({"result":{}}),"write"),
+    descriptor("core.llm", LLM_CONFIG, LLM_INPUTS, LLM_OUTPUT, "read", version=2),
+    descriptor("core.tool", obj({"toolRef":STRING,"contractDigest":STRING}), ANY_OBJ, obj({"result":{}}), "write", version=2),
     descriptor("core.tool_dispatch", obj({"allowedToolRefs":{"type":"array","items":STRING}}),obj({"toolCalls":CALLS}),obj({"toolMessages":MESSAGES}),"write"),
 ]
 OPERATIONS = {

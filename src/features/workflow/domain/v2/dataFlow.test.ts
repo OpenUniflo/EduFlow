@@ -92,26 +92,27 @@ describe("stateFieldProducers", () => {
 
   it("maps written State fields to root and subgraph node ids without duplicates", () => {
     const producers = stateFieldProducers(graph());
-    expect([...producers.keys()].sort()).toEqual(["answer", "messages", "toolCalls"]);
-    expect(producers.get("messages")).toEqual(["model", "child-shared"]);
-    expect(producers.get("toolCalls")).toEqual(["model"]);
-    expect(producers.get("answer")).toEqual(["child-model"]);
+    expect([...producers.keys()].sort()).toEqual(["message", "messages", "pendingCalls", "text"]);
+    expect(producers.get("messages")).toEqual(["model"]);
+    expect(producers.get("pendingCalls")).toEqual(["model"]);
+    expect(producers.get("text")).toEqual(["child-model"]);
+    expect(producers.get("message")).toEqual(["child-shared"]);
   });
 
   it("returns an empty map for a definition without nodes or writes", () => {
     expect(stateFieldProducers(emptyDefinition()).size).toBe(0);
   });
 
-  it("skips empty, root-only and malformed write pointers", () => {
+  it("treats write keys as State fields and skips only non-string output pointers", () => {
     const root = emptyDefinition();
     root.nodes = [
-      writer("empty", { value: "" }),
-      writer("root", { value: "" }),
+      writer("whole-output", { value: "" }),
       { ...writer("bad", {}), writes: { field: 42 as unknown as string } },
       writer("nested", { summary: "/summary/items/0" }),
     ];
     const producers = stateFieldProducers(root);
-    expect(producers.size).toBe(1);
+    expect([...producers.keys()].sort()).toEqual(["summary", "value"]);
+    expect(producers.get("value")).toEqual(["whole-output"]);
     expect(producers.get("summary")).toEqual(["nested"]);
   });
 

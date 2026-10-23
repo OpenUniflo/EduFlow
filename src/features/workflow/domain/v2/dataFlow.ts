@@ -62,15 +62,18 @@ function addOwner(map: Map<string, string[]>, field: string, nodeId: string) {
   else if (!owners.includes(nodeId)) owners.push(nodeId);
 }
 
-/** State fields written by nodes: writes values are JSON Pointers into State. */
+/**
+ * State fields written by nodes. `node.writes` maps a State field to the JSON Pointer of the step
+ * output to store (see the Worker's `pointer(output, path)` patch); the map key is the field.
+ */
 export function stateFieldProducers(definition: WorkflowDefinitionV2): Map<string, string[]> {
   const producers = new Map<string, string[]>();
   for (const scope of definitionScopes(definition)) {
     for (const node of scope.definition.nodes) {
       if (!node || !node.writes || typeof node.writes !== "object") continue;
-      for (const pointer of Object.values(node.writes)) {
-        const field = pointerFieldName(pointer);
-        if (field) addOwner(producers, field, node.id);
+      for (const [field, pointer] of Object.entries(node.writes)) {
+        if (typeof pointer !== "string" || !field) continue;
+        addOwner(producers, field, node.id);
       }
     }
   }

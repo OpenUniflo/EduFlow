@@ -36,16 +36,15 @@ def test_dynamic_binding_rejects_only_proven_disjoint_declared_root_types(source
         diagnostic=next(d for d in result["diagnostics"] if d["code"]=="BINDING_TYPE_MISMATCH")
         assert diagnostic["nodeId"]=="a" and diagnostic["pointer"]=="/nodes/a/inputs/left"
 
-def test_generic_tool_arguments_require_an_object_binding_without_inventing_object_assembly():
-    from eduflow_workflow.compiler import validate_structure
-    from eduflow_workflow.registry import NODE_DESCRIPTORS, OPERATIONS
+def test_tool_argument_binding_uses_the_selected_tool_parameter_schema():
     definition=sample();definition["inputSchema"]=obj({"orderId":{"type":"string"}})
     node=definition["nodes"][1]
-    node.update(type="core.tool",config={"toolRef":"trusted","contractDigest":"contract"},inputs={"arguments":{"source":"input","pointer":"/orderId","onMissing":{"mode":"error"}}},writes={})
-    result=validate_structure(definition,NODE_DESCRIPTORS,OPERATIONS)
-    assert any(d["code"]=="BINDING_TYPE_MISMATCH" and d["pointer"]=="/nodes/a/inputs/arguments" for d in result["diagnostics"])
-    node["inputs"]["arguments"]["pointer"]=""
-    assert validate_structure(definition,NODE_DESCRIPTORS,OPERATIONS)["valid"]
+    node.update(type="core.tool",typeVersion=2,config={"toolRef":"trusted","contractDigest":"contract"},inputs={"orderId":{"source":"input","pointer":"/orderId","onMissing":{"mode":"error"}}},writes={})
+    snapshot=registry();snapshot["tools"]=[{"ref":"trusted","contractDigest":"contract","available":True,"inputSchema":obj({"orderId":{"type":"object"}})}]
+    result=compile_definition(definition,snapshot)
+    assert any(d["code"]=="BINDING_TYPE_MISMATCH" and d["pointer"]=="/nodes/a/inputs/orderId" for d in result["diagnostics"])
+    snapshot["tools"][0]["inputSchema"]=obj({"orderId":{"type":"string"}})
+    assert compile_definition(definition,snapshot)["valid"]
 
 def test_binding_default_with_compatible_root_type_remains_a_runtime_decision():
     definition=sample();definition["inputSchema"]=obj({"value":{"type":"string"}},[])
@@ -66,11 +65,11 @@ def test_state_binding_type_diagnostic_uses_escaped_definition_identity():
     assert any(d["code"]=="BINDING_TYPE_MISMATCH" and d["nodeId"]=="a/b~c" and d["pointer"]=="/nodes/a~1b~0c/inputs/left" for d in result["diagnostics"])
 
 def test_authorized_tool_literal_arguments_use_its_jsonschema_contract():
-    definition=sample();definition["nodes"][1].update(type="core.tool",config={"toolRef":"trusted","contractDigest":"contract"},inputs={"arguments":{"source":"literal","value":{"orderId":7}}},writes={})
+    definition=sample();definition["nodes"][1].update(type="core.tool",typeVersion=2,config={"toolRef":"trusted","contractDigest":"contract"},inputs={"orderId":{"source":"literal","value":7}},writes={})
     snapshot=registry();snapshot["tools"]=[{"ref":"trusted","contractDigest":"contract","available":True,"inputSchema":obj({"orderId":{"type":"string"}})}]
     result=compile_definition(definition,snapshot)
-    assert any(d["code"]=="INVALID_NODE_INPUT" and d["nodeId"]=="a" and d["pointer"].startswith("/nodes/a/inputs/arguments") for d in result["diagnostics"])
-    definition["nodes"][1]["inputs"]["arguments"]["value"]={"orderId":"A1001"}
+    assert any(d["code"]=="INVALID_NODE_INPUT" and d["nodeId"]=="a" and d["pointer"].startswith("/nodes/a/inputs/orderId") for d in result["diagnostics"])
+    definition["nodes"][1]["inputs"]["orderId"]["value"]="A1001"
     assert compile_definition(definition,snapshot)["valid"]
 
 @pytest.mark.parametrize("mutate,code",[
@@ -158,7 +157,7 @@ def test_document_structure_does_not_claim_environment_readiness():
     from eduflow_workflow.compiler import validate_structure
     from eduflow_workflow.registry import NODE_DESCRIPTORS, OPERATIONS
     definition=sample()
-    definition["nodes"][1].update(type="core.tool",config={"toolRef":"registered-reference","contractDigest":"frozen-contract"},inputs={"arguments":{"source":"literal","value":{"value":1}}},writes={"value":"/result/value"})
+    definition["nodes"][1].update(type="core.tool",typeVersion=2,config={"toolRef":"registered-reference","contractDigest":"frozen-contract"},inputs={"value":{"source":"literal","value":1}},writes={"value":"/result/value"})
     structure=validate_structure(definition,NODE_DESCRIPTORS,OPERATIONS)
     assert structure["valid"] and not structure["diagnostics"]
     assert "compileFingerprint" not in structure
@@ -167,7 +166,7 @@ def test_document_structure_does_not_claim_environment_readiness():
     assert {d["code"] for d in unavailable["diagnostics"]}=={"TOOL_UNAVAILABLE"}
     assert unavailable["diagnostics"][0]["pointer"]=="/nodes/"+definition["nodes"][1]["id"]+"/config/toolRef"
     environment=registry()
-    environment["tools"]=[{"ref":"registered-reference","name":"trusted","contractDigest":"frozen-contract","available":True}]
+    environment["tools"]=[{"ref":"registered-reference","name":"trusted","contractDigest":"frozen-contract","available":True,"inputSchema":obj({"value":{}})}]
     assert compile_definition(definition,environment)["valid"]
     environment["tools"][0]["contractDigest"]="changed-contract"
     changed=compile_definition(definition,environment)
@@ -179,7 +178,7 @@ def test_structure_still_reports_broken_tool_configuration():
     from eduflow_workflow.compiler import validate_structure
     from eduflow_workflow.registry import NODE_DESCRIPTORS, OPERATIONS
     definition=sample()
-    definition["nodes"][1].update(type="core.tool",config={},inputs={"arguments":{"source":"literal","value":{}}})
+    definition["nodes"][1].update(type="core.tool",typeVersion=2,config={},inputs={})
     result=validate_structure(definition,NODE_DESCRIPTORS,OPERATIONS)
     assert not result["valid"]
     assert any(d.get("nodeId")=="a" and d["code"]=="SCHEMA_VALIDATION_FAILED" for d in result["diagnostics"])

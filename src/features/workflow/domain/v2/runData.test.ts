@@ -26,10 +26,10 @@ describe("nodeRunData", () => {
     const root = emptyDefinition();
     root.state.reducers = {
       messages: { name: "messages", version: 1 },
-      toolCalls: { name: "append", version: 1 },
+      pendingCalls: { name: "append", version: 1 },
       answer: { name: "replace", version: 1 },
     };
-    root.nodes = [node("model", "core.llm", { messages: "/messages", pendingCalls: "/toolCalls", text: "/answer" })];
+    root.nodes = [node("model", "core.llm", { messages: "/messages", pendingCalls: "/pendingCalls", answer: "/text" })];
     return root;
   }
 
@@ -47,8 +47,8 @@ describe("nodeRunData", () => {
       output: { messages: [{ role: "assistant" }], pendingCalls: [], text: "hi" },
       writes: [
         { field: "messages", pointer: "/messages", value: [{ role: "assistant" }], reducer: "messages" },
-        { field: "toolCalls", pointer: "/toolCalls", value: [], reducer: "append" },
-        { field: "answer", pointer: "/answer", value: "hi", reducer: "replace" },
+        { field: "pendingCalls", pointer: "/pendingCalls", value: [], reducer: "append" },
+        { field: "answer", pointer: "/text", value: "hi", reducer: "replace" },
       ],
       elapsedMs: 1250,
       stepIndex: 0,
@@ -81,7 +81,7 @@ describe("nodeRunData", () => {
   it("separates root and subgraph steps that share a node id", () => {
     const child = emptyDefinition();
     child.state.reducers = { answer: { name: "replace", version: 1 } };
-    child.nodes = [node("model", "core.llm", { text: "/answer" })];
+    child.nodes = [node("model", "core.llm", { answer: "/text" })];
     const root = definition();
     root.nodes.push({ id: "sub", label: "sub", type: "core.subgraph", typeVersion: 1, config: { graph: child as unknown as JsonValue }, inputs: {}, writes: {} });
     const steps = [
@@ -89,7 +89,7 @@ describe("nodeRunData", () => {
       step({ stepId: "child", nodeId: "model", graphPath: ["sub"], output: { text: "child" } as unknown as JsonValue }),
     ];
     expect(nodeRunData(root, steps, "model")?.stepId).toBe("root");
-    expect(nodeRunData(root, steps, "model", ["sub"])?.writes[0]).toEqual({ field: "answer", pointer: "/answer", value: "child", reducer: "replace" });
+    expect(nodeRunData(root, steps, "model", ["sub"])?.writes[0]).toEqual({ field: "answer", pointer: "/text", value: "child", reducer: "replace" });
     expect(nodeRunData(root, steps, "model", ["missing"])).toBeNull();
   });
 
@@ -108,7 +108,10 @@ describe("nodeRunData", () => {
       startedAt: "not-a-date", finishedAt: "also-not",
     })], "model");
     expect(data?.elapsedMs).toBeUndefined();
-    expect(data?.writes).toEqual([{ field: "answer", pointer: "/answer", value: undefined, reducer: "replace" }]);
+    expect(data?.writes).toEqual([
+      { field: "answer", pointer: "/answer", value: undefined, reducer: "replace" },
+      { field: "broken", pointer: "", value: { other: 1 }, reducer: "replace" },
+    ]);
   });
 
   it("skips malformed step entries and treats a missing graphPath as the root scope", () => {

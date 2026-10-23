@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createWorkflowV2, createEditorV2 } from "./factory";
-import { canonicalSemanticJson, validateSchemaValue, schemaDiagnostics } from "./validation";
+import { canonicalSemanticJson, validateSchemaValue, schemaDiagnostics, validateWorkflowDraft } from "./validation";
 
 it("exposes structured AJV field pointers without interpreting error prose or filling values", () => {
   const schema = { type:"object",properties:{"a/b~c":{type:"integer"},enabled:{type:"boolean"}},required:["a/b~c"] };
@@ -65,5 +65,38 @@ describe("Workflow V2 Schema boundary", () => {
     expect(schemaDiagnostics(schema)).toEqual([]);
     expect(validateSchemaValue(schema,{result:['Overview']}).valid).toBe(true);
     expect(validateSchemaValue(schema,{result:42}).valid).toBe(false);
+  });
+});
+
+describe("v2 node diagnostics", () => {
+  it("reports retired core.llm / core.tool nodes without converting them", () => {
+    const definition = createWorkflowV2();
+    definition.nodes = [
+      { id: "start", label: "入口", type: "core.start", typeVersion: 1, config: {}, inputs: {}, writes: {} },
+      { id: "old-model", label: "旧模型", type: "core.llm", typeVersion: 1, config: { providerRef: "", modelRef: "", modelParameters: {}, allowedToolRefs: [] }, inputs: {}, writes: {} },
+      { id: "old-tool", label: "旧工具", type: "core.tool", typeVersion: 1, config: { toolRef: "", contractDigest: "" }, inputs: {}, writes: {} },
+    ];
+    const diagnostics = validateWorkflowDraft(definition);
+    expect(diagnostics.filter(item => item.code === "NODE_VERSION_RETIRED").map(item => item.nodeId)).toEqual(["old-model", "old-tool"]);
+    expect(definition.nodes[1]?.typeVersion).toBe(1);
+  });
+  it("locates undeclared prompt parameters at the segment pointer", () => {
+    const definition = createWorkflowV2();
+    definition.nodes = [
+      { id: "start", label: "入口", type: "core.start", typeVersion: 1, config: {}, inputs: {}, writes: {} },
+      { id: "model", label: "模型", type: "core.llm", typeVersion: 2, config: { providerRef: "", modelRef: "", modelParameters: {}, allowedToolRefs: [], prompt: { system: [{ type: "text", text: "hi" }], messages: [{ role: "user", content: [{ type: "param", name: "topic" }] }] } }, inputs: {}, writes: { answer: "/text" } },
+    ];
+    const diagnostics = validateWorkflowDraft(definition);
+    const undeclared = diagnostics.find(item => item.code === "PROMPT_PARAM_UNDECLARED");
+    expect(undeclared?.nodeId).toBe("model");
+    expect(undeclared?.pointer).toBe("/nodes/1/config/prompt/messages/0/content/0");
+  });
+  it("rejects a malformed v2 prompt configuration", () => {
+    const definition = createWorkflowV2();
+    definition.nodes = [
+      { id: "start", label: "入口", type: "core.start", typeVersion: 1, config: {}, inputs: {}, writes: {} },
+      { id: "model", label: "模型", type: "core.llm", typeVersion: 2, config: { providerRef: "", modelRef: "", modelParameters: {}, allowedToolRefs: [], prompt: { system: [], messages: [] } }, inputs: {}, writes: {} },
+    ];
+    expect(validateWorkflowDraft(definition).some(item => item.code === "INVALID_LLM_CONFIG")).toBe(true);
   });
 });

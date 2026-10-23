@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { createEditorV2, createNodeV2, createWorkflowV2 } from "./factory";
-import { insertAuthoringNode, messageAuthoringIssue, withModelState } from "./messageAuthoring";
+import { insertAuthoringNode, withModelState } from "./messageAuthoring";
 import { liveQuestionExample } from "./authoringExamples";
 
 it("adds model State without replacing existing declarations or reducer values", () => {
@@ -14,15 +14,15 @@ it("adds model State without replacing existing declarations or reducer values",
   expect(result.state.reducers.messages.name).toBe("registered-custom");
   expect(definition.state.initial.pendingCalls).toBeUndefined();
 });
-it("gives a blank model graph editable messages, output mapping and actionable empty validation", () => {
+it("gives a blank model graph the model answer state and output mapping", () => {
   const definition = createWorkflowV2();
   const document = insertAuthoringNode({ definition, editor: createEditorV2(definition) }, createNodeV2("core.llm", "model"), 200, 100);
-  expect(document.definition.outputBindings.messages).toMatchObject({ source: "state", pointer: "/messages" });
-  expect(messageAuthoringIssue(document.definition.nodes[2])).toContain("添加至少一条");
+  expect(document.definition.outputBindings.answer).toMatchObject({ source: "state", pointer: "/answer" });
+  expect((document.definition.state.schema.properties as Record<string, unknown>)?.answer).toMatchObject({ type: "string" });
   const example = liveQuestionExample(definition, "provider", "model");
   const model = example.definition.nodes.find(node => node.id === "model")!;
-  expect(messageAuthoringIssue(model)).toBeUndefined();
-  expect(model.inputs.messages).toMatchObject({ source: "state", pointer: "/messages" });
+  expect((model.config.prompt as { messages: unknown[] }).messages.length).toBeGreaterThan(0);
+  expect(model.inputs.history).toMatchObject({ source: "state", pointer: "/messages" });
   expect(example.definition.inputSchema.required).toBeUndefined();
   const prepare=example.definition.nodes.find(node=>node.id==="prepare")!;
   expect(prepare.type).toBe("core.transform");

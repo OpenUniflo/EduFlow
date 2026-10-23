@@ -385,7 +385,7 @@ async def test_thinking_remains_deepseek_only(monkeypatch):
 
 def llm_definition(model_ref='model-a', provider_ref='provider'):
     definition = sample()
-    definition['nodes'][1].update(type='core.llm', config={'providerRef': provider_ref, 'modelRef': model_ref, 'modelParameters': {}, 'allowedToolRefs': []}, inputs={'messages': {'source': 'literal', 'value': [{'id': 'q', 'role': 'user', 'content': [{'type': 'text', 'text': 'hello'}]}]}}, writes={})
+    definition['nodes'][1].update(type='core.llm', typeVersion=2, config={'providerRef': provider_ref, 'modelRef': model_ref, 'modelParameters': {}, 'allowedToolRefs': [], 'prompt': {'system': [], 'messages': [{'role': 'user', 'content': [{'type': 'text', 'text': 'hello'}]}]}}, inputs={}, writes={})
     return definition
 
 

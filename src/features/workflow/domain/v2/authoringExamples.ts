@@ -20,7 +20,7 @@ export function authoringExample(kind: "parallel" | "batch", base: WorkflowDefin
     const risk = createAuthoringNode("core.subgraph", "risk"); risk.label = "风险检查子图"; risk.config.graph = child as unknown as JsonValue; risk.inputs = { order_id: stateBinding("/order_id") }; risk.writes = { risk: "/risk" };
     const join = createAuthoringNode("control.join", "join"); join.config.waitFor = ["stock", "risk"];
     const route = createNodeV2("core.router", "route"); route.config = { cases: [{ id: "approved", priority: 1, predicate: { op: "eq", left: stateBinding("/approved"), right: { source: "literal", value: true } } }], defaultOutlet: "default" };
-    graph.nodes = [createNodeV2("core.start", "start"), request("request", "提供订单信息", "order_id"), createAuthoringNode("control.fork", "parallel"), fixture({ ...createNodeV2("core.tool", "stock"), label: "查询库存（演示）", inputs: { order_id: stateBinding("/order_id") } }, { stock: "库存充足（演示值）" }, { stock: "/stock" }), risk, join, request("review", "确认处理建议", "approved", "boolean"), route, fixture({ ...createNodeV2("core.tool", "execute"), label: "生成回执（演示）" }, { receipt: "DEMO-001（未创建真实订单）" }, { receipt: "/receipt" }), createNodeV2("core.end", "end")];
+    graph.nodes = [createNodeV2("core.start", "start"), request("request", "提供订单信息", "order_id"), createAuthoringNode("control.fork", "parallel"), fixture({ ...createNodeV2("core.tool", "stock"), label: "查询库存（演示）", config: { toolRef: "", contractDigest: "" }, inputs: { order_id: stateBinding("/order_id") } }, { stock: "库存充足（演示值）" }, { stock: "/stock" }), risk, join, request("review", "确认处理建议", "approved", "boolean"), route, fixture({ ...createNodeV2("core.tool", "execute"), label: "生成回执（演示）" }, { receipt: "DEMO-001（未创建真实订单）" }, { receipt: "/receipt" }), createNodeV2("core.end", "end")];
     graph.transitions = [edge("start", "request"), edge("request", "parallel"), edge("parallel", "stock", "branch_1"), edge("parallel", "risk", "branch_2"), edge("stock", "join"), edge("risk", "join"), edge("join", "review"), edge("review", "route"), edge("route", "execute", "approved"), edge("route", "end", "default"), edge("execute", "end")];
     graph.state = { schema: { type: "object", properties: { order_id: { type: "string" }, stock: { type: "string" }, risk: { type: "string" }, approved: { type: "boolean" }, receipt: { type: "string" } } }, initial: { order_id: "", stock: "", risk: "", approved: false, receipt: "" }, inputBindings: {}, reducers: {} };
     graph.outputSchema = { type: "object", properties: { receipt: { type: "string" } } }; graph.outputBindings = { receipt: stateBinding("/receipt") };
@@ -43,7 +43,16 @@ export function liveQuestionExample(base: WorkflowDefinitionV2, providerRef: str
   const prepare = createNodeV2("core.transform", "prepare"); prepare.label = "构建用户消息";
   prepare.config = { operationRef: "core.message", operationVersion: 1, authoring: { interrupt: { title: "你想问什么？", schema: { type: "object", properties: { question: { type: "string", title: "你的问题", description: "填写你希望模型回答的问题。提交后会继续调用模型。", minLength: 1 } }, required: ["question"], additionalProperties: false }, resumeWrites: { question: "question" } } } };
   prepare.inputs = { text: stateBinding("/question") }; prepare.writes = { messages: "/messages" };
-  const model = createNodeV2("core.llm", "model"); model.config = { ...model.config, providerRef, modelRef };
+  const model = createNodeV2("core.llm", "model"); model.label = "回答用户问题";
+  model.config = {
+    providerRef, modelRef, modelParameters: {}, allowedToolRefs: [],
+    prompt: {
+      system: [{ type: "text", text: "你是 EduFlow 的通用学习助理，请直接、准确地回答用户的问题。" }],
+      messages: [{ role: "user", content: [{ type: "text", text: "请回答用户提出的问题。" }] }],
+    },
+  };
+  model.inputs = { history: stateBinding("/messages") };
+  model.writes = { messages: "/messages" };
   graph.nodes = [createNodeV2("core.start", "start"), prepare, model, createNodeV2("core.end", "end")];
   graph.transitions = [edge("start", "prepare"), edge("prepare", "model"), edge("model", "end")];
   graph.outputSchema = { type: "object", properties: { messages: { type: "array", items: { type: "object" } } }, required: ["messages"], additionalProperties: false };

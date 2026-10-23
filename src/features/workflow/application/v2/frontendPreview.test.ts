@@ -99,3 +99,43 @@ it("streams one invocation incrementally and commits output and State only at co
   expect(done.states["[]"].answer).toBe("abcdefghijklmno");
   expect(frontendPreviewEvents(done).filter(event => event.type === "node.output.delta").map(event => (event.payload as {text:string}).text).join("")).toBe("abcdefghijklmno");
 });
+it("renders a v2 model prompt request with declared params and history without calling a provider", () => {
+  const definition = createWorkflowV2();
+  definition.state.schema.properties = { question: { type: "string" }, messages: { type: "array", items: { type: "object" } }, answer: { type: "string" } };
+  definition.state.initial = { question: "为什么", messages: [{ id: "h1", role: "user", content: [{ type: "text", text: "历史消息" }] }], answer: "" };
+  const model = createNodeV2("core.llm", "model");
+  model.config = {
+    providerRef: "deepseek", modelRef: "deepseek-flash", modelParameters: {}, allowedToolRefs: [],
+    prompt: { system: [{ type: "text", text: "你是助手。" }], messages: [{ role: "user", content: [{ type: "text", text: "问题：" }, { type: "param", name: "question" }] }] },
+    authoring: { previewOutput: { messages: [{ id: "m1", role: "assistant", content: [{ type: "text", text: "回答" }] }], toolCalls: [], text: "回答" } },
+  };
+  model.inputs = { question: { source: "state", pointer: "/question", onMissing: { mode: "error" } }, history: { source: "state", pointer: "/messages", onMissing: { mode: "error" } } };
+  model.writes = { answer: "/text" };
+  definition.nodes.splice(1, 0, model);
+  definition.transitions = [{ id: "a", from: "start", to: "model", outlet: "next" }, { id: "b", from: "model", to: "end", outlet: "next" }];
+  const done = finish(createFrontendPreview({ definition, editor: createEditorV2(definition) }, "v2-model"));
+  const step = done.steps.find(item => item.nodeId === "model")!;
+  expect(step.input).toEqual({
+    system: "你是助手。",
+    messages: [
+      { id: "h1", role: "user", content: [{ type: "text", text: "历史消息" }] },
+      { role: "user", content: [{ type: "text", text: "问题：为什么" }] },
+    ],
+  });
+  expect(done.states["[]"].answer).toBe("回答");
+});
+it("assembles v2 tool arguments from declared inputs before applying the fixture result", () => {
+  const definition = createWorkflowV2();
+  definition.state.schema.properties = { query: { type: "string" }, hits: { type: "array", items: { type: "object" } } };
+  definition.state.initial = { query: "工作流", hits: [] };
+  const tool = createNodeV2("core.tool", "tool");
+  tool.config = { toolRef: "p4:owner:search:1", contractDigest: "digest", authoring: { previewOutput: { result: { hits: [{ title: "命中" }] } } } };
+  tool.inputs = { query: { source: "state", pointer: "/query", onMissing: { mode: "error" } }, limit: { source: "literal", value: 3 } };
+  tool.writes = { hits: "/result/hits" };
+  definition.nodes.splice(1, 0, tool);
+  definition.transitions = [{ id: "a", from: "start", to: "tool", outlet: "next" }, { id: "b", from: "tool", to: "end", outlet: "next" }];
+  const done = finish(createFrontendPreview({ definition, editor: createEditorV2(definition) }, "v2-tool"));
+  const step = done.steps.find(item => item.nodeId === "tool")!;
+  expect(step.input).toEqual({ arguments: { query: "工作流", limit: 3 } });
+  expect(done.states["[]"].hits).toEqual([{ title: "命中" }]);
+});

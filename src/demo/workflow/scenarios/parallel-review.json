@@ -394,7 +394,7 @@
                 "id": "analyst",
                 "label": "生成本维度评审意见",
                 "type": "core.llm",
-                "typeVersion": 1,
+                "typeVersion": 2,
                 "config": {
                   "providerRef": "deepseek",
                   "modelRef": "deepseek-flash",
@@ -403,10 +403,24 @@
                       "type": "disabled"
                     }
                   },
-                  "allowedToolRefs": []
+                  "allowedToolRefs": [],
+                  "prompt": {
+                    "system": [],
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": [
+                          {
+                            "type": "text",
+                            "text": "请按上述评审要求给出本维度结论。"
+                          }
+                        ]
+                      }
+                    ]
+                  }
                 },
                 "inputs": {
-                  "messages": {
+                  "history": {
                     "source": "state",
                     "pointer": "/messages",
                     "onMissing": {

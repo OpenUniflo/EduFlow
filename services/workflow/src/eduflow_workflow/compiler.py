@@ -102,6 +102,63 @@ def predicate_check(spec):
         binding_check(spec["left"],("input","state","literal")); binding_check(spec["right"],("input","state","literal"))
     else: raise ExecutionError("INVALID_PREDICATE","Unknown predicate operation")
 
+def escape_token(value):
+    return str(value).replace("~","~0").replace("/","~1")
+
+def node_pointer(node_id):
+    return "/nodes/"+escape_token(node_id)
+
+def unsupported_node_version(node, current_versions):
+    """A registered type whose older immutable version is retired by the current registry."""
+    current = current_versions.get(node["type"])
+    return current is not None and isinstance(node["typeVersion"], int) and not isinstance(node["typeVersion"], bool) and node["typeVersion"] < current
+
+def validate_llm_authoring(node, definition, diagnostics):
+    """core.llm v2: declared parameters and structured prompt references."""
+    from .prompts import PARAM_NAME, RESERVED_PARAM, estimate_prompt_bytes, prompt_param_positions
+    nid = node["id"]; pointer = node_pointer(nid); inputs = node["inputs"]
+    parameters = [name for name in inputs if name != RESERVED_PARAM]
+    for name in parameters:
+        if not PARAM_NAME.fullmatch(name): diagnostics.append({"code":"INVALID_PROMPT_PARAMETER","severity":"error","nodeId":nid,"pointer":pointer+"/inputs/"+escape_token(name),"message":"Parameter names must match ^[A-Za-z_][A-Za-z0-9_]{0,63}$"})
+    prompt = node["config"].get("prompt")
+    if not isinstance(prompt, dict): return
+    referenced = set()
+    for name, position in prompt_param_positions(prompt):
+        if not isinstance(name, str) or name == RESERVED_PARAM or name not in parameters:
+            diagnostics.append({"code":"PROMPT_PARAM_UNDECLARED","severity":"error","nodeId":nid,"pointer":pointer+position,"message":"Prompt references a parameter that is not declared in node inputs"})
+        else: referenced.add(name)
+    for name in parameters:
+        if name not in referenced: diagnostics.append({"code":"PROMPT_PARAM_UNUSED","severity":"warning","nodeId":nid,"pointer":pointer+"/inputs/"+escape_token(name),"message":"Parameter is declared but never referenced by the prompt"})
+    limit = definition["policy"].get("maxInputBytes")
+    if isinstance(limit, int) and not isinstance(limit, bool) and estimate_prompt_bytes(prompt, inputs) > limit:
+        diagnostics.append({"code":"INPUT_TOO_LARGE","severity":"error","nodeId":nid,"pointer":pointer+"/config/prompt","message":"Estimated rendered prompt exceeds maxInputBytes"})
+
+def validate_tool_authoring(node, definition, registry_snapshot, tools, diagnostics):
+    """core.tool v2: one input per declared tool argument, checked against its sub-schema."""
+    nid = node["id"]; pointer = node_pointer(nid); tool = tools.get(node["config"].get("toolRef"))
+    if not tool or not tool.get("available", True): return
+    schema = tool.get("inputSchema") if isinstance(tool.get("inputSchema"), dict) else {}
+    properties = schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
+    for name, value in node["inputs"].items():
+        location = pointer + "/inputs/" + escape_token(name)
+        if name not in properties:
+            diagnostics.append({"code":"TOOL_ARGUMENT_UNKNOWN","severity":"error","nodeId":nid,"pointer":location,"message":"Tool does not declare this argument"})
+            continue
+        if not isinstance(value, dict) or value.get("source") not in ("input", "state", "literal", "environment"): continue
+        target = properties.get(name) or {}
+        try:
+            if value["source"] == "literal": validate_value(target, value.get("value"), "INVALID_NODE_INPUT")
+            else: binding_schema_check(value, definition, target)
+            if value["source"] == "environment":
+                from .contracts import resolve
+                validate_value(target, resolve(value, {}, {}, registry_snapshot.get("variables", {})), "INVALID_NODE_INPUT")
+        except ExecutionError as error:
+            diagnostics.append({"code":error.code,"severity":"error","nodeId":nid,"pointer":location+(getattr(error,"pointer",None) or ""),"message":str(error)})
+    required = schema.get("required")
+    for name in required if isinstance(required, list) else []:
+        if name not in node["inputs"]:
+            diagnostics.append({"code":"TOOL_ARGUMENT_REQUIRED","severity":"error","nodeId":nid,"pointer":pointer+"/inputs/"+escape_token(name),"message":"A required tool argument has no input binding"})
+
 def _validate_definition(definition, registry_snapshot, environment_checks, parent=None, depth=0):
     diagnostics=[]
     if depth>8: return {'valid':False,'diagnostics':[{'code':'SUBGRAPH_DEPTH_EXCEEDED','severity':'error','message':'Subgraphs support at most 8 nesting levels'}],'requiredCapabilities':[]}
@@ -146,9 +203,14 @@ def _validate_definition(definition, registry_snapshot, environment_checks, pare
     unsupported=set(definition["requiredCapabilities"])-set(registry_snapshot["capabilities"])
     if unsupported: diagnostics.append({"code":"UNSUPPORTED_CAPABILITY","severity":"error","message":"Unsupported capabilities: "+",".join(sorted(unsupported))})
     nodes={node["id"]:node for node in definition["nodes"]}
+    current_versions={item["type"]:item["version"] for item in registry_snapshot["nodes"]}
     outlets={}
     for node in nodes.values():
-        nid=node["id"]; desc=descriptors.get((node["type"],node["typeVersion"]))
+        nid=node["id"]
+        if unsupported_node_version(node,current_versions):
+            diagnostics.append({"code":"NODE_VERSION_RETIRED","severity":"error","nodeId":nid,"pointer":node_pointer(nid),"message":"This node type version is retired; remove and re-add the node"})
+            continue
+        desc=descriptors.get((node["type"],node["typeVersion"]))
         if not desc:
             diagnostics.append({"code":"UNKNOWN_NODE_TYPE","severity":"error","nodeId":nid,"message":"Unknown node executor"}); continue
         if node['config'].get('authoring',{}).get('command',{}).get('graph')=='parent' and parent is None:
@@ -158,11 +220,13 @@ def _validate_definition(definition, registry_snapshot, environment_checks, pare
         from .interrupts import interaction_check
         inspect(lambda:interaction_check(definition,node),'/nodes/'+nid+'/config/authoring',nid)
         inspect(lambda:validate_value(desc["configSchema"],{k:v for k,v in node['config'].items() if k!='authoring'}),"/nodes/"+nid+"/config",nid)
+        if node["type"]=="core.llm": validate_llm_authoring(node,definition,diagnostics)
+        if node["type"]=="core.tool": validate_tool_authoring(node,definition,registry_snapshot,tools,diagnostics)
         if environment_checks and node["type"]=="core.llm":
             providers={provider["ref"]:provider for provider in registry_snapshot.get("providers",[])}
             configured=providers.get(node["config"].get("providerRef"))
             if not configured or node["config"].get("modelRef") not in configured.get("modelRefs",[]):
-                diagnostics.append({"code":"MODEL_NOT_ENABLED","severity":"error","nodeId":nid,"pointer":"/nodes/"+nid.replace("~","~0").replace("/","~1")+"/config/modelRef","message":"Model is not enabled on the selected provider"})
+                diagnostics.append({"code":"MODEL_NOT_ENABLED","severity":"error","nodeId":nid,"pointer":node_pointer(nid)+"/config/modelRef","message":"Model is not enabled on the selected provider"})
         operation=operations.get(config_ref,{}) if (config_ref:=node["config"].get("operationRef")) else {}
         input_schema=operation.get("inputSchema",desc["inputSchema"])
         if node['type']=='core.function':
@@ -184,9 +248,6 @@ def _validate_definition(definition, registry_snapshot, environment_checks, pare
             if valid and environment_checks and value.get("source")=="environment":
                 from .contracts import resolve
                 valid=inspect(lambda value=value:validate_value(target_schema,resolve(value,{}, {},registry_snapshot.get("variables",{})),"INVALID_NODE_INPUT"),location,nid)
-            tool_schema=tools.get(node["config"].get("toolRef"),{}).get("inputSchema") if environment_checks and node["type"]=="core.tool" and field=="arguments" else None
-            if valid and tool_schema is not None:
-                inspect(lambda value=value:validate_value(tool_schema,value["value"],"INVALID_NODE_INPUT") if value.get("source")=="literal" else binding_schema_check(value,definition,tool_schema),location,nid)
         for field,path in node["writes"].items():
             if field not in fields or not isinstance(path,str) or path and not path.startswith("/"): diagnostics.append({"code":"INVALID_STATE_WRITE","severity":"error","nodeId":nid,"pointer":"/nodes/"+nid+"/writes/"+field,"message":"Write requires declared top-level field and JSON Pointer"})
         outlets[nid]=desc["outlets"]
@@ -232,7 +293,7 @@ def _validate_definition(definition, registry_snapshot, environment_checks, pare
             pending.extend(t for cn in nodes[nid]['config']['graph']['nodes'] for t in cn['config'].get('authoring',{}).get('command',{}).get('destinations',[]) if cn['config'].get('authoring',{}).get('command',{}).get('graph')=='parent')
     for nid in set(nodes)-seen: diagnostics.append({"code":"UNREACHABLE_NODE","severity":"error","nodeId":nid,"message":"Node is unreachable"})
     if not any(nodes[nid]["type"]=="core.end" for nid in seen if nid in nodes): diagnostics.append({"code":"MISSING_END","severity":"error","message":"Reachable end required"})
-    result={"valid":not diagnostics,"diagnostics":diagnostics,"requiredCapabilities":definition["requiredCapabilities"]}
+    result={"valid":not any(item.get("severity")=="error" for item in diagnostics),"diagnostics":diagnostics,"requiredCapabilities":definition["requiredCapabilities"]}
     if result["valid"]:
         result["semanticHash"]=semantic_hash(definition)
         if environment_checks:

@@ -152,10 +152,19 @@ class RunExecution:
         except Exception:
             raise ExecutionError("MODEL_ADAPTER_FAILED","Model adapter initialization or tool binding failed","infrastructure",effect="none") from None
     async def llm(self,node,resolved):
-        model=self.model_adapter(node["config"])
+        from .prompts import render_prompt
+        config=node["config"]
+        parameters={name:value for name,value in resolved.items() if name!="history"}
+        system,payloads=render_prompt(config["prompt"],parameters)
+        model=self.model_adapter(config)
         from langchain_core.messages import messages_from_dict
         persisted={key:messages_from_dict([value])[0] for key,value in SDK_MESSAGES.get().items()}
-        messages=[self.messages_private.get(m['id'],persisted.get(m['id'],to_langchain(m))) for m in resolved['messages']]
+        def convert(message):
+            return self.messages_private.get(message["id"],persisted.get(message["id"],to_langchain(message)))
+        messages=[]
+        if system: messages.append(to_langchain({"id":str(uuid.uuid4()),"role":"system","content":[{"type":"text","text":system}]}))
+        messages.extend(convert(message) for message in resolved.get("history") or [])
+        messages.extend(to_langchain({"id":str(uuid.uuid4()),"role":payload["role"],"content":[{"type":"text","text":payload["content"]}]}) for payload in payloads)
         try:
             from .session_memory_history import stream_model
             response=await stream_model(self,model,messages)
@@ -167,7 +176,8 @@ class RunExecution:
         if response.invalid_tool_calls: raise ExecutionError("INVALID_MODEL_TOOL_CALL","Provider returned an invalid structured tool call","provider")
         message=from_langchain(response); self.messages_private[message["id"]]=response
         usage=response.usage_metadata or {}
-        return {"messages":[message],"toolCalls":message.get("toolCalls",[])},{"inputTokens":usage.get("input_tokens"),"outputTokens":usage.get("output_tokens")}
+        text="".join(block["text"] for block in message.get("content",[]) if isinstance(block,dict) and block.get("type")=="text")
+        return {"messages":[message],"toolCalls":message.get("toolCalls",[]),"text":text},{"inputTokens":usage.get("input_tokens"),"outputTokens":usage.get("output_tokens")}
     async def execute(self,node,state):
         # Bind the version before the first await: guard can yield while another
         # invocation commits. The supplied state must not acquire that new version.
@@ -333,7 +343,7 @@ class RunExecution:
         elif node["type"]=="core.tool_dispatch": output={"toolMessages":await self.tools(resolved["toolCalls"],node["config"]["allowedToolRefs"])}
         elif node["type"]=="core.tool":
             tool=next(t for t in self.env["tools"] if t["ref"]==node["config"]["toolRef"])
-            messages=await self.tools([{"id":str(uuid.uuid4()),"name":tool["name"],"arguments":resolved["arguments"]}],[tool["ref"]]); output={"result":json.loads(messages[0]["content"][0]["text"])}
+            messages=await self.tools([{"id":str(uuid.uuid4()),"name":tool["name"],"arguments":dict(resolved)}],[tool["ref"]]); output={"result":json.loads(messages[0]["content"][0]["text"])}
         elif node['type']=='core.progress':
             from langgraph.config import get_stream_writer
             output={'message':node['config']['message'],'percent':node['config'].get('percent',0)}

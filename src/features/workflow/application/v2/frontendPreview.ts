@@ -1,6 +1,9 @@
 import { graphAtPath, graphInNode, interactionResponseIssue, nodeAuthoring } from "../../domain/v2/authoring";
 import { validateSchemaValue } from "../../domain/v2/validation";
-import type { Binding, Predicate, JsonValue, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowStepV2, WorkflowEventV2 } from "../../domain/v2/types";
+import { renderPromptPreview } from "../../domain/v2/promptAuthoring";
+import { promptConfigV2Schema } from "../../domain/v2/schema";
+import { assembleToolArguments } from "../../domain/v2/toolParams";
+import type { Binding, Predicate, JsonValue, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowNodeV2, WorkflowStepV2, WorkflowEventV2 } from "../../domain/v2/types";
 
 // A frontend event tape, not a LangGraph executor. It never evaluates node code,
 // invokes providers/tools, reads credentials, persists Runs or creates evidence.
@@ -46,6 +49,30 @@ export function createFrontendPreview(snapshot: WorkflowDocumentV2, id: string, 
   return { id, mode: "preview", snapshot: structuredClone(snapshot), tasks: planPreview(snapshot.definition), cursor: 0, steps: [], states: { "[]": state }, inputs: {"[]": structuredClone(input)}, status: "running", scenario, failureInjected: false, events:[] };
 }
 export function previewNode(session: FrontendPreview) { const task = session.tasks[session.cursor]; return task ? graphAtPath(session.snapshot.definition, task.path).nodes.find(node => node.id === task.nodeId) : undefined; }
+
+/**
+ * Effective request for a typeVersion 2 model node: declared parameters resolved from bindings,
+ * structured prompt rendered with the Worker's rules, and the reserved `history` messages spliced
+ * in front of the prompt messages. Returns undefined when the node is not a valid v2 model config.
+ */
+function previewModelRequest(node: WorkflowNodeV2, resolved: Record<string, JsonValue>): JsonValue | undefined {
+  const parsed = promptConfigV2Schema.safeParse(node.config.prompt);
+  if (!parsed.success) return undefined;
+  const params: Record<string, JsonValue | undefined> = {};
+  for (const name of Object.keys(node.inputs ?? {})) if (name !== "history") params[name] = resolved[name];
+  const rendered = renderPromptPreview(parsed.data, params);
+  const history = Array.isArray(resolved.history) ? resolved.history.filter(message => Boolean(message) && typeof message === "object" && !Array.isArray(message)) : [];
+  return {
+    ...(rendered.system ? { system: rendered.system } : {}),
+    messages: [...history, ...rendered.messages.map(message => ({ role: message.role, content: [{ type: "text", text: message.content }] }))],
+  };
+}
+
+/** Effective arguments for a typeVersion 2 tool node, matching the Worker's M11 assembly rule. */
+function previewToolRequest(node: WorkflowNodeV2, resolved: Record<string, JsonValue>): JsonValue | undefined {
+  if (!(node.typeVersion >= 2)) return undefined;
+  return { arguments: assembleToolArguments(node.inputs, resolved) };
+}
 export function advancePreview(current: FrontendPreview): FrontendPreview {
   if (current.status !== "running") return current;
   const session = structuredClone(current); if(session.steps.length>=100)return {...session,status:"failed",error:"已达到前端演示的 100 步上限；未执行真实请求。"}; const task = session.tasks[session.cursor];
@@ -72,10 +99,12 @@ export function advancePreview(current: FrontendPreview): FrontendPreview {
   }
   const input: Record<string, JsonValue> = task.item === undefined ? {} : { [task.itemKey ?? "item"]: task.item };
   for (const [name, binding] of Object.entries(node.inputs)) input[name] = previewBinding(binding, state, session.inputs[scope] ?? {});
+  // Preview what the Worker would send: a rendered v2 prompt request or assembled tool arguments.
+  const requestInput = node.type === "core.llm" && node.typeVersion >= 2 ? previewModelRequest(node, input) : node.type === "core.tool" && node.typeVersion >= 2 ? previewToolRequest(node, input) : undefined;
 
   const before = session.steps.filter(step => step.taskId === task.id).length;
   const previousInvocation = session.steps.filter(step=>step.nodeId===node.id&&previewScope(step.path)===scope).reduce((value,step)=>Math.max(value,step.invocation),0);
-  const step: PreviewStep = { stepId: `${session.id}:${task.id}:${before + 1}`, taskId: task.id, runId: session.id, nodeId: node.id, path: task.path, invocation: session.steps.find(step=>step.taskId===task.id)?.invocation ?? previousInvocation + 1, attempt: before + 1, status: "completed", input, output: {}, startedAt: now, finishedAt: now, beforeState:structuredClone(state), checkpoint: structuredClone(state), checkpointStates: structuredClone(session.states), parallelGroup: task.parallelGroup };
+  const step: PreviewStep = { stepId: `${session.id}:${task.id}:${before + 1}`, taskId: task.id, runId: session.id, nodeId: node.id, path: task.path, invocation: session.steps.find(step=>step.taskId===task.id)?.invocation ?? previousInvocation + 1, attempt: before + 1, status: "completed", input: requestInput ?? input, output: {}, startedAt: now, finishedAt: now, beforeState:structuredClone(state), checkpoint: structuredClone(state), checkpointStates: structuredClone(session.states), parallelGroup: task.parallelGroup };
   if (settings.interrupt && !task.after) { step.status = "waiting"; delete step.finishedAt; session.status = "waiting"; session.steps.push(step); return session; }
   if (session.scenario !== "normal" && !session.failureInjected && !["core.start", "core.end"].includes(node.type) && !node.type.startsWith("control.")) {
     session.failureInjected = true; step.status = "failed"; step.error = { code: "PREVIEW_FAILURE", message: "演示事件：此节点发生错误，未调用真实服务。" };
@@ -151,7 +180,7 @@ export function frontendPreviewEvents(session: FrontendPreview) {
   return [...(session.events??[]),...states].sort((a,b)=>a.occurredAt.localeCompare(b.occurredAt)).map((event,index)=>({...event,seq:index+1}));
 }
 
-function applyPreviewWrites(graph: WorkflowDefinitionV2, node: import("../../domain/v2/types").WorkflowNodeV2, output: JsonValue, state: Record<string, JsonValue>) {
+function applyPreviewWrites(graph: WorkflowDefinitionV2, node: WorkflowNodeV2, output: JsonValue, state: Record<string, JsonValue>) {
   for(const [field,pointer] of Object.entries(node.writes)) {
     let value:JsonValue|undefined=output;
     for(const token of pointer.split("/").slice(1))value=value&&typeof value==="object"?(value as Record<string,JsonValue>)[token.replace(/~1/g,"/").replace(/~0/g,"~")]:undefined;

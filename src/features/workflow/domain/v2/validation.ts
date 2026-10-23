@@ -1,7 +1,8 @@
 import Ajv2020 from "ajv/dist/2020";
 import canonicalize from "canonicalize";
-import { jsonValueSchema } from "./schema";
-import type { JsonSchema, WorkflowDefinitionV2, WorkflowDiagnostic } from "./types";
+import { jsonValueSchema, llmConfigV2Schema } from "./schema";
+import { isRetiredNode } from "./nodeVersions";
+import type { JsonSchema, LlmConfigV2, WorkflowDefinitionV2, WorkflowDiagnostic } from "./types";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false, coerceTypes: false, useDefaults: false, validateFormats: false });
 // $schema is a retained annotation in the V2 subset, not a request to change validators.
@@ -59,6 +60,11 @@ export function validateWorkflowDraft(definition: WorkflowDefinitionV2): Workflo
   for (const node of definition.nodes) {
     if (!node.id || ids.has(node.id)) diagnostics.push({ code: "DUPLICATE_NODE_ID", severity: "error", nodeId: node.id, message: "节点 ID 必须存在且唯一。" });
     ids.add(node.id);
+    if (isRetiredNode(node)) {
+      diagnostics.push({ code: "NODE_VERSION_RETIRED", severity: "error", nodeId: node.id, pointer: `/nodes/${definition.nodes.indexOf(node)}/typeVersion`, message: "此节点是旧版本，请删除后重新添加。" });
+      continue;
+    }
+    if (node.type === "core.llm" && node.typeVersion === 2) diagnostics.push(...llmConfigDiagnostics(node, definition));
   }
   for (const edge of definition.transitions) if (!ids.has(edge.from) || !ids.has(edge.to)) diagnostics.push({ code: "DANGLING_NODE", severity: "error", transitionId: edge.id, message: "连线引用了不存在的节点。" });
   return diagnostics;
@@ -75,4 +81,25 @@ export function canonicalSemanticJson(definition: WorkflowDefinitionV2): string 
   const result = canonicalize(semantic);
   if (!result) throw new Error("定义无法规范化。");
   return result;
+}
+
+/** Frontend mirror of the Worker's core.llm v2 validation: structure plus declared prompt parameters. */
+export function llmConfigDiagnostics(node: WorkflowDefinitionV2["nodes"][number], definition: WorkflowDefinitionV2): WorkflowDiagnostic[] {
+  const diagnostics: WorkflowDiagnostic[] = [];
+  const index = definition.nodes.indexOf(node);
+  const parsed = llmConfigV2Schema.safeParse(node.config);
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) diagnostics.push({ code: "INVALID_LLM_CONFIG", severity: "error", nodeId: node.id, pointer: `/nodes/${index}/config/${issue.path.join("/")}`, message: issue.message });
+    return diagnostics;
+  }
+  const config = parsed.data as unknown as LlmConfigV2;
+  const declared = new Set(Object.keys(node.inputs));
+  const checkSegments = (segments: LlmConfigV2["prompt"]["system"], pointer: string) => {
+    segments.forEach((segment, segmentIndex) => {
+      if (segment && segment.type === "param" && !declared.has(segment.name) && segment.name !== "history") diagnostics.push({ code: "PROMPT_PARAM_UNDECLARED", severity: "error", nodeId: node.id, pointer: `${pointer}/${segmentIndex}`, message: `提示词引用了未声明的参数「${segment.name}」，请先在输入中声明。` });
+    });
+  };
+  checkSegments(config.prompt.system, `/nodes/${index}/config/prompt/system`);
+  config.prompt.messages.forEach((message, messageIndex) => checkSegments(message.content, `/nodes/${index}/config/prompt/messages/${messageIndex}/content`));
+  return diagnostics;
 }
