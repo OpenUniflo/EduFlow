@@ -19,10 +19,10 @@
 | 变量 | 必需 | 说明 |
 | --- | --- | --- |
 | `WORKFLOW_DEPLOYMENT_MODE` | 是 | `hosted` |
-| `WORKFLOW_DATABASE_URL` | 是 | Hosted Supabase session pooler，`workflow_worker` 受限用户，`sslmode=require/verify-ca/verify-full` |
-| `WORKFLOW_ENVIRONMENTS_JSON` | 是 | 用下方第 3 节的单一公共环境 JSON 替换旧值；**`ref` 不变** |
+| `WORKFLOW_DATABASE_URL` | 是 | Hosted Supabase session pooler，`workflow_worker` 受限用户，`sslmode=require/verify-ca/verify-full`；密码只在旧项目环境变量中，需从旧项目面板复制或重置该角色密码 |
+| `WORKFLOW_ENVIRONMENTS_JSON` | 是 | 用下方第 3 节的单一公共环境 JSON 替换旧值；`ref` 已从 Hosted `workflow_private.p4_catalog.environment_ref` 确认为 `hosted`，保持不变 |
 | `WORKFLOW_SANDBOX_BACKEND` | 是 | `vercel` |
-| `WORKFLOW_SANDBOX_IMAGE` | 是 | 形如 `registry/image@sha256:<64 hex>`，沿用旧项目已验证的镜像摘要 |
+| `WORKFLOW_SANDBOX_IMAGE` | 是 | 形如 `registry/image@sha256:<64 hex>`，沿用旧项目已验证的沙箱镜像摘要（旧项目 Daemon 镜像摘要可从 Vercel Daemons API 读取，但沙箱镜像不同，需从旧项目环境变量面板复制） |
 | `WORKFLOW_INTERNAL_TOKEN` | 已存在 | 保持现值（API 与 Worker 同项目共享，无需从旧项目复制） |
 | `WORKFLOW_COMPILER_URL` | 已存在 | 改为 `https://edu-flow-six-phi.vercel.app/api/workflow-compiler`（Production 与 Preview 均指向生产，Worker 只在生产运行） |
 | `LLM_PROVIDER_KEY` | 可选 | 旧项目用于平台提供方；公共环境不含 providers，如 Worker 启动不读取可省略 |
@@ -35,7 +35,7 @@
 {
   "environments": [
     {
-      "ref": "<保持旧值中的公共环境标识>",
+      "ref": "hosted",
       "name": "公共环境",
       "access": "authenticated",
       "capabilities": [],
