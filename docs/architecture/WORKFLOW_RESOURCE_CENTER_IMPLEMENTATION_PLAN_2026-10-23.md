@@ -672,26 +672,24 @@ M10 在本地执行一次、M12 在 Hosted 执行一次，规则相同：
 | M2 | done | `6a5b3c9` | worker pytest 262 passed / 12 skipped；uv.lock `uv lock --check` 通过且包集合不变 | openai-compatible 校验与 test 回显、hydrate adapter、ChatOpenAI 分流、MODEL_NOT_ENABLED；新增本地 seed 脚本与假 OpenAI 端点；含偏差 V6（推理模型流式 guard 节流） |
 | M3 | done | `d1da418` | typecheck/lint 全绿；api+repository 46 文件 403 用例；api 顶层入口仍 12 | `extensions?view=references`、`configuration?view=references`、变量 `description`；repository 返回 `{items}` 包裹（偏差 V9） |
 | M4 | done | `cb5cf1b` | typecheck/lint/test/build 全绿；1440/768/390 无横向滚动、无控制台错误 | 胶囊改为 数据｜资源｜运行｜导出；Inspector 浮动卡片 + 360–720 拖宽（State 默认 640，宽度存 localStorage）；历史栏改浮动抽屉（展开时隐藏左下视图工具与 Controls/MiniMap）；去掉顶栏运行环境下拉；查看历史运行提示条；视口 transform 在开关面板/切换 Tab/拖宽/展开抽屉前后保持一致 |
-| M5 | doing | | | 资源中心组件（`resources/` 新目录）并行实施中 |
-| M6 | todo | | | |
-| M7 | todo | | | |
-| M8 | doing | | | 统一节点面板组件（新文件）并行实施中 |
-| M9 | todo | | | |
-| M10 | doing | | | Worker 部分（core.llm v2）并行实施中 |
-| M11 | doing | | | Worker 部分（core.tool v2）并行实施中 |
-| M13 | todo | | | |
-| M14 | doing | | | 代码与配置部分并行实施中（Hosted 切换待用户确认） |
-| M12 | todo | | | |
-| M5 | todo | | | |
-| M6 | todo | | | |
-| M7 | todo | | | |
-| M8 | todo | | | |
-| M9 | todo | | | |
-| M10 | todo | | | |
-| M11 | todo | | | |
-| M13 | todo | | | |
-| M14 | todo | | | |
-| M12 | todo | | | |
+| M5 | done | `be78396` | typecheck/lint/resources 63 用例；`pnpm build` | 新 `resources/` 目录（21 文件：ResourceCenterDialog、Provider/Api/Mcp/Function、VariableTable、ResourceModel、ResourceTestPanel、ResourceReferences + 测试）；LiveWorkflowEditor 挂载悬窗、节点内 intent 创建后自动回填 `p4:owner:ref:version`；删除 WorkflowConnections/EnvironmentVariables。浏览器验收：节点内新建供应商 v1 → 节点 `providerRef` 自动指向新版本、模型自动选中；`onCreated` 增加可选 `content` 参数（偏差 V14） |
+| M6 | done | `be78396` | typecheck/lint；resources 15 文件 114 用例；全量 test/build | 供应商总览（卡片/模型表/启用开关暂存/新发现/版本历史/引用/停用/搜索）+ AddModelDialog（预设网格、测试拉取模型、勾选、v1 或新版本汇总）；平台供应商只读；节点侧升级提示与「N 个资源有新版本」胶囊已接线。偏差 V15（未保存内容测试用隐藏探针）、V16（新版本不继承凭据需重输） |
+| M7 | done | `be78396` | typecheck/lint/test | 数据面板改表格式（字段/类型/初始值/更新方式/写入节点/读取节点，点节点定位）；「本流程资源」面板（引用列表 + 未绑定能力 + 变量只读值 + 打开资源中心），删除当前环境下拉；工作流说明/运行限制/MCP 发现移到图设置；`git grep 运行环境 src/features/workflow` 为空；product-community-triage 新建流程字段读写正确 |
+| M8 | done | `be78396` | typecheck/lint/editor 131 用例 | NodePanel/NodeParamsTable/NodeOutputsTable/VariablePicker/bindingTypes（26 新用例）；LiveWorkflowEditor 节点区替换为 NodePanel 四段 + 页脚；所有节点类型结构一致（截图核对）；隐藏运行数据 Tab 由 M9 打开（偏差 V12 说明） |
+| M9 | done | `be78396` | typecheck/lint/editor 131 用例 | NodeRunDataTab（跟随历史选中运行，默认最近一次；输入/输出/写入 State/耗时/来源条/在历史中查看/复制 JSON）；NodeDebugDialog 三栏 + 拖放绑定/键盘绑定；浏览器验收：切换两次运行数据同步、拖字段到中栏新增参数（关闭后侧面板可见、可撤销） |
+| M10 | done | `38b001d` | worker pytest 299 passed/12 skipped（含 test_llm_v2 25）；typecheck/lint/test/build；本地 Live Run 真实 DeepSeek 成功 | Worker：core.llm 仅 v2（prompt/history/text）、旧版 NODE_VERSION_RETIRED、PROMPT_PARAM_UNDECLARED/UNUSED、渲染规则与 `[system?]+history?+prompt.messages`；前端：factory v2、PromptEditor、模型参数、对话历史、重命名联动、删除 MessageComposer。验收：社区问题分流 v2 Live Run 成功（8s）；text 写入 State answer 成功（run a2f7e933）；未声明参数定位到 `/nodes/triage/config/prompt/system/1` 并高亮提示词面板 |
+| M11 | done | `38b001d` | worker test_tool_v2 12；typecheck/lint；本地 MCP echo Live Run 成功 | Worker：core.tool 仅 v2（inputs=参数名）、TOOL_ARGUMENT_UNKNOWN/REQUIRED、literal/变量按子 Schema 校验、运行时组装 arguments；前端：Schema 模式可编辑、切换/升级工具 reconcileToolInputs、诊断定位到参数行。验收：echo 必填 message 缺失时校验报 TOOL_ARGUMENT_REQUIRED（pointer `/nodes/<id>/inputs/message`，参数行标红），填固定值后校验通过、运行返回 `Echo: hello-everything` |
+| M13 | done | `7e07c67` | 迁移本地应用；worker 329 passed/12 skipped（test_variable_environments 30）；typecheck/lint/test 全绿；resources 135 用例；本地真实 Run 两环境各一次 | 迁移 `20261023184824_workflow_variable_environments.sql`（新表+default_environment_id+runs 列+配置 RPC+enqueue 13 参；偏差 V19）；API configuration GET/PUT 环境整表保存、run 接受 variableEnvironmentId 并冻结名称；Worker registry 解析/冻结；前端顶栏 VariableEnvironmentSelect（localStorage 记忆）、资源中心变量环境标签页、环境面板/调试使用选中值。验收：开发=简洁风格、正式=详细风格，两次 Run 冻结不同 env id，Run 详情/历史显示「变量环境 正式/开发」 |
+| M14 | done | `baa150c` | typecheck/lint/test（199/1542）/build；test:workflow 10/10；worker 299 passed；Function 12（11 TS + 1 py） | api/health 移入 `_handlers`、新增 `api/workflow-compiler.py`（sys.path + mount + TestClient 本地实测 401/200/405/未知路由）、vercel functions/rewrite/daemons、`workflowCompilerUrl` 前缀拼接（+8 用例）、requirements.txt 导出与 `--check` 防漂移、`.python-version` 3.13、ADR 0007、单项目 README/Runbook、删除 services/workflow/vercel.json。Hosted 发布/环境变量/删除 edu-flow-workflow 待用户确认（ADR 必验项：真实认证 Compiler 调用验证 rewrite 子路径）。当前用户决定先跳过 Hosted 发布，仅推送 `feat/workflow` 做 Preview；生产 Worker 未切换前 Hosted 冒烟不执行 |
+| M12 | doing | `35e6fab` | 本地 + Hosted DB 已完成；Hosted 部署/冒烟待用户确认 | 旧版节点生成脚本已改 v2（3 文件，偏差 V18）；editor/v2 死代码删除（BindingFields + 测试、ConnectionVersionPanel）与死 CSS `.wf-write-row`；本地旧数据清理脚本 `clean-legacy-workflows.ts` 已执行（512 定义 / 537 运行已删，模板 24 行按新夹具重写）；`probe__` 本地无残留。Hosted（项目 KnowledgeAtlas `uyljtdbvlivxniililay`）：已按 §5.0 预检并清理 5 定义/8 修订/5 编辑器/47 运行（192 步骤、1051 事件、47 作业、17 墓碑）/62 线程/59 幂等/389 checkpoints，证据回执 0、无外部表引用，连接目录 3 条/Vault/变量/课程与学习数据保留；已应用 M13 迁移（记录版本 `20261023184824`）；模板 16→23 行（补 7 个 workspace/product 模板；原有 16 行均为 start/end 空白图，无旧版节点），全库模板旧版节点扫描为 0。用户决定：本轮只推送 `feat/workflow` 触发 Preview，生产部署/环境变量/删除 `edu-flow-workflow`/Hosted 冒烟待另行确认。 |
+
+### Hosted 执行记录（2026-10-24）
+
+- 目标 Supabase：KnowledgeAtlas（`uyljtdbvlivxniililay`，ap-southeast-1）；迁移历史与仓库对比：唯一缺口为 M13 `20261023184824_workflow_variable_environments.sql`，其余已应用。
+- 清理（用户已确认）：在单个事务内删除 5 定义 / 8 修订 / 5 编辑器 / 47 运行 / 192 步骤 / 1051 事件 / 47 作业 / 17 墓碑 / 62 线程 / 59 幂等 / 389 checkpoints（含 blobs/writes）；`workflow_run_evidence_receipts` 为 0，`pg_constraint` 无外部表引用 `workflow_live_runs`；保留 `p4_catalog` 3 条、Vault、变量配置、课程与学习数据（21 课程 / 55 用户知识状态等）。
+- 迁移：M13 已应用；`supabase_migrations.schema_migrations` 记录版本修正为仓库版本 `20261023184824`（name `workflow_variable_environments`）。验证：`workflow_variable_environments` 表、`workflow_workspace_configuration.default_environment_id`、`workflow_live_runs.variable_environment_id`、`workflow_v2_configuration_read/save`、`workflow_v2_enqueue` 均存在。
+- 模板：`workflow_templates` 16 → 23 行；新增 `workspace-expense`、`workspace-question`、`workspace-order-preview`、`product-tech-brief`、`product-dependency-health`、`product-community-triage`、`product-content-review`；原有 16 行均为 `core.start`/`core.end` 空白图，无需版本转换。全库模板中 `core.llm`/`core.tool` 的 `typeVersion:1` 扫描为 0。
+- 未执行（等待用户确认）：`edu-flow` 生产部署（Worker/watchdog 仅在 Production 运行）、Hosted 环境变量配置、Hosted 冒烟（资源中心/变量环境/校验/`core.transform` 双环境运行）、删除 `edu-flow-workflow`。
 
 ### 人工验收（用户填写）
 
@@ -719,3 +717,16 @@ Hosted 上需要模型的验收不由智能体执行，也不作为任何阶段�
 | V7 | M0、M12 | 基线 `workflow:check-layout` 为红：`docs/acceptance` 下 5 份阶段过程文档与截图仍被 git 跟踪。已把过程材料移到本地 `artifacts/archive/acceptance-process-20261023/`（不跟踪）并修正 2 份架构文档中的链接 | 仓库既有约定要求过程材料放本地归档，跟踪状态与约定冲突，导致所有门禁无法执行；本地副本与 git 历史均可恢复 | 否 |
 | V8 | M0、M2 | 沙箱环境事实：`uv` 需要 `UV_CACHE_DIR`（`~/.cache/uv` 不可写）；宿主 `no_proxy` 含 `[::1]` 会破坏 httpx 构造 | 属本机 harness 限制，非仓库缺陷；pytest 侧已用 `services/workflow/tests/conftest.py` 隔离，独立契约脚本仍需清代理运行 | 否 |
 | V9 | M3 | `extensionReferences` / `variableReferences` 返回 `{ items: ResourceReferenceRow[] }` 包裹，而不是裸数组 | 与仓库其他 list 接口一致；M5 资源中心按此接线 | 否 |
+| V10 | M1、M7、M8、M10、M11 | `node.writes` 语义按代码修正为「State 字段 → 步骤输出 JSON Pointer」（计划 F1/M10 的措辞是反的）。`stateFieldProducers`、`nodeRunData`、`NodeOutputsTable`、模板/夹具一并按此实现 | Worker `runtime.py` 的 `patch={field:pointer(output,path) ...}` 与既有模板 `{messages:"/messages", pendingCalls:"/toolCalls"}` 只支持这一种读法；按计划字面实现会写错字段 | 否 |
+| V11 | M5 | `ResourceCenterProps.intent.onCreated` 增加可选第三参 `content`（已发布连接的 content） | 新建连接后要立即把节点的 `providerRef/modelRef`（或 `toolRef/contractDigest`）指到新版本，仅凭 ref/version 需要额外一次目录请求；第三参是兼容的超集 | 否 |
+| V12 | M8 | M8 阶段 NodePanel 的「运行数据」Tab 先隐藏，M9 完成后启用；原来的「执行详情」Tab 在 M9 前暂时不可达 | 计划 M8 要求本阶段先隐藏运行数据 Tab，M9 实现后取代旧执行详情 | 否 |
+| V13 | M9 | 调试悬窗的拖放目标为「参数行」与「新增参数区」（而非空行）；另提供左栏选中 + 目标下拉的键盘绑定 | 参数行本身已有 `data-param-name`，落点语义与计划一致；键盘替代是计划要求的可访问性路径 | 否 |
+| V14 | M9 | VariablePicker 的样例推断数据来自 controller 已观察运行的 Steps；未选中历史运行时不加载样例 | 未观察运行时不下载 Steps（避免打开编辑器即拉取历史）；选中运行后即有样例，声明 Schema 的推断不受影响 | 否 |
+| V15 | M6 | 新建供应商的「测试连接」会先发布一个隐藏探针连接 `probe__<uuid>` 并立即停用（Worker 只能测试已保存连接），资源列表过滤 `probe__`；p4_catalog 会留下少量已停用隐藏行 | 不改后端 test 语义的前提下让「先测试再保存」可用；M12 本地清理删除 `probe__%` 行，Hosted 后续如有需要同样清理 | 否 |
+| V16 | M6 | 远程供应商（含已存过凭据的本地供应商）发布新版本时必须重新输入凭据 | 后端 `p4_connection_save` 不在新版本继承 secretRef，UI 已明确提示；属现有安全语义，未改后端 | 否 |
+| V17 | M10/M11 | 旧版节点只做诊断：前端 `NODE_VERSION_RETIRED` + 面板提示，不做重建/转换；Worker 编译返回同一 code | R3/R10 明确旧版直接废弃、不重建；本地旧数据已按 5.0 清理 | 否 |
+| V18 | M10/M11 | `scripts/workflow/examples/create-agent-scenarios.mjs`、`prepare-manual-demo.mjs`、`tests/workflow-integration/live/verify-unified.ts` 仍构造 v1 core.llm/core.tool | 不在本轮编写范围且不在门禁路径；M12 前需改为 v2 或删除，避免本地演示/在线验收触发 NODE_VERSION_RETIRED | 否 |
+| V19 | M13 | 变量环境实体放在新表 `workflow_variable_environments`，配置只保存 `default_environment_id`；计划文字里的 `configuration.environments jsonb` 不再存在。API 读取时组装 `environments` 返回。客户端生成的 env UUID 在首次保存时按 id 插入（RPC upsert-by-id），避免“先保存再拿 id”的额外往返 | 同一状态只存一份，避免 jsonb 与实体表双写；与 `variables.overrides` 的 uuid 键一致；前端可以在保存前稳定引用新环境 | 否 |
+| V20 | M13 | `WorkflowRunV2` 增加 `variableEnvironmentId`；Run 详情/历史的 `variableEnvironment` 名称优先取冻结快照，环境删除后历史仍显示原名 | Worker 在 `registry_snapshot` 冻结 `{id,name}`，API 投影；删除环境不应让历史 Run 失去来源标注 | 否 |
+| V21 | M13 | 顶栏 `VariableEnvironmentSelect` 由编辑器加载 `configuration()` 并记忆到 `localStorage[eduflow.workflow.variableEnvironment.<workflowId>]`；切换仅影响变量取值展示与后续 Run，不改布局/草稿。环境面板、调试悬窗与变量选择器使用选中环境的合并值；前端预览仍用默认值（预览不注入变量环境，计划未要求） | 选择是本地呈现偏好，不写入工作流定义；Run 时把 id 交给 API 冻结；预览为纯前端演示路径，不产生正式 Run | 否 |
+| V22 | M12 | 本地数据清理用新增脚本 `scripts/workflow/local/clean-legacy-workflows.ts`（预检行数/证据引用 → `--apply` 白名单删除 → 按夹具重写 24 行模板），不删除连接、Vault、变量默认值、课程与学习数据；`probe__` 本地无残留 | 计划 5.0 要求先查后删并保留连接/凭据；脚本只在 127.0.0.1:54321 运行；Hosted 清理仍需用户确认目标与范围 | 否 |
