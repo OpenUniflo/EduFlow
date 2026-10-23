@@ -69,6 +69,18 @@
    - 模型相关验收由用户人工完成并填计划 §8「人工验收」表。
 5. 验证通过后删除 `edu-flow-workflow`：先确认其 Daemon 不领取任务（当前 ready 0），再删除项目；删除后重跑第 3 步的登录/编译/运行冒烟。
 
+## 4.1 Preview 运行时证据（2026-10-24）
+
+直接请求 `https://edu-flow-ih1akkhmz-july-nanas-projects.vercel.app`（无需保护绕过）：
+
+- `/` → 200 HTML；
+- `/api/health` → 200 HTML（SPA 回退，说明 Hosted 已无 health Function）；
+- 11 个 TS 入口 POST 均被函数处理（401/405/500，非 SPA HTML）：assistant、course-intent、course-mapping、course、domains、knowledge-generation、knowledge、learner、material-parsing-jobs、materials、workflows；
+- `/api/workflow-compiler/health` → 401 `{"code":"UNAUTHORIZED","message":"Service identity required"}`；`/api/workflow-compiler/openapi.json` → 401；裸 `/api/workflow-compiler` → 307（FastAPI mount 的尾斜杠重定向）。路径后缀被转发到内层 FastAPI，说明 Vercel rewrite 保留了子路径（ADR 0007 必验项在 Preview 已验证，生产需再用认证请求复核）；
+- 因此 Preview 实际存在 12 个 Function（11 TS + 1 Python），与预算一致。
+
+注意：Preview 环境缺少生产变量，`course-mapping`/`knowledge-generation` 对空 POST 返回 500，属 Preview 环境差异，生产发布后需再核验。
+
 ## 5. 回滚
 
 - 生产发布前保留当前生产部署 ID；Vercel promotion/rollback 会同时更新同项目 Daemons。
