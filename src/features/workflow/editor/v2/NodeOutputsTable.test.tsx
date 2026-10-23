@@ -64,3 +64,13 @@ it("labels reducers with the StateFields wording", () => {
   expect(reducerLabel("messages")).toBe("合并消息");
   expect(reducerLabel("custom.reducer")).toBe("custom.reducer");
 });
+
+describe("inferStateSchemaFromSample", () => {
+  it("infers a new State field type from the observed output item", () => {
+    expect(inferStateSchemaFromSample({ messages: [{ text: "hi" }] }, "/messages")).toEqual({ type: "array", items: { type: "object" } });
+    expect(inferStateSchemaFromSample({ items: { count: 2 } }, "/items")).toEqual({ type: "object" });
+    expect(inferStateSchemaFromSample({ total: 3 }, "/total")).toEqual({ type: "number" });
+    expect(inferStateSchemaFromSample({ ok: true }, "/ok")).toEqual({ type: "boolean" });
+    expect(inferStateSchemaFromSample(undefined, "/messages")).toEqual({ type: "string" });
+  });
+});

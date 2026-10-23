@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Binding, JsonSchema, JsonValue } from "../../domain/v2/types";
 import { pointerFieldName } from "../../domain/v2/dataFlow";
+import { readOutputPointer } from "../../domain/v2/runData";
 import { escapePointer } from "./SchemaForm";
 import { VariablePicker } from "./VariablePicker";
 
@@ -24,7 +25,7 @@ export type NodeOutputsTableProps = {
   nodeLabels?: Record<string, string>;
   environmentSchema?: JsonSchema;
   samples?: Record<string, JsonValue>;
-  onCreateStateField?: (field: string) => void;
+  onCreateStateField?: (field: string, schema?: JsonSchema) => void;
   readOnly?: boolean;
 };
 
@@ -60,11 +61,27 @@ export function commitNewStateField(args: {
   writes: Record<string, string>;
   stateField: string;
   outputPointer: string;
-  onCreateStateField?: (field: string) => void;
+  schema?: JsonSchema;
+  onCreateStateField?: (field: string, schema?: JsonSchema) => void;
   onChangeWrites: (writes: Record<string, string>) => void;
 }) {
-  args.onCreateStateField?.(args.stateField);
+  if (args.schema) args.onCreateStateField?.(args.stateField, args.schema);
+  else args.onCreateStateField?.(args.stateField);
   args.onChangeWrites({ ...args.writes, [args.stateField]: args.outputPointer });
+}
+
+/**
+ * Infers a new State field schema from an already observed output sample. A new `summary`
+ * field fed by an array output must be an array; hard-coding string made the first run fail
+ * with INVALID_STATE_UPDATE (M12 acceptance item 5).
+ */
+export function inferStateSchemaFromSample(samples: Record<string, JsonValue> | undefined, outputPointer: string): JsonSchema {
+  const value = samples ? readOutputPointer(samples as JsonValue, outputPointer) : undefined;
+  if (Array.isArray(value)) return { type: "array", items: { type: "object" } };
+  if (value !== null && typeof value === "object") return { type: "object" };
+  if (typeof value === "number") return { type: "number" };
+  if (typeof value === "boolean") return { type: "boolean" };
+  return { type: "string" };
 }
 
 function outputPointerLabel(pointer: string, outputKeys: string[]): string {
@@ -132,7 +149,7 @@ export function NodeOutputsTable(props: NodeOutputsTableProps) {
     if (mapping.createField) {
       const issue = stateFieldNameIssue(stateSchema, mapping.stateField);
       if (issue) { setMappingError(issue); return; }
-      commitNewStateField({ writes, stateField: mapping.stateField.trim(), outputPointer: mapping.outputPointer, ...(onCreateStateField ? { onCreateStateField } : {}), onChangeWrites });
+      commitNewStateField({ writes, stateField: mapping.stateField.trim(), outputPointer: mapping.outputPointer, schema: inferStateSchemaFromSample(samples, mapping.outputPointer), ...(onCreateStateField ? { onCreateStateField } : {}), onChangeWrites });
     } else {
       onChangeWrites({ ...writes, [mapping.stateField]: mapping.outputPointer });
     }

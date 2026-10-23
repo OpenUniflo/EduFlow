@@ -691,6 +691,23 @@ M10 在本地执行一次、M12 在 Hosted 执行一次，规则相同：
 - 模板：`workflow_templates` 16 → 23 行；新增 `workspace-expense`、`workspace-question`、`workspace-order-preview`、`product-tech-brief`、`product-dependency-health`、`product-community-triage`、`product-content-review`；原有 16 行均为 `core.start`/`core.end` 空白图，无需版本转换。全库模板中 `core.llm`/`core.tool` 的 `typeVersion:1` 扫描为 0。
 - 未执行（等待用户确认）：`edu-flow` 生产部署（Worker/watchdog 仅在 Production 运行）、Hosted 环境变量配置、Hosted 冒烟（资源中心/变量环境/校验/`core.transform` 双环境运行）、删除 `edu-flow-workflow`。
 
+### 本地端到端验收记录（M12，2026-10-24）
+
+1. 编辑器画布铺满、浮层与三档宽度无横向滚动：M4 已核对，view transform 未因面板宽度变化。
+2. 资源中心 → 添加模型 → 自定义 OpenAI 兼容：Base URL `http://127.0.0.1:56121/v1`、Key `test-key-local`，测试连接 77ms 拉取 2 个模型，勾选后保存为「本地假端点」v1；真实 DeepSeek 连接在 M10 的 Live Run 中已成功调用。
+3. 模型节点选中该供应商后，模型下拉仅 `fake-openai-chat`、`fake-openai-reasoner` 两项。
+4. 资源中心启用第 3 个模型 `fake-openai-embedding` → 发布 v2；画布出现「已有 1 个资源新版本」胶囊，节点处理段出现「已有 v2，本节点使用 v1」；升级 → v1→v2、撤销 → v2→v1、再升级 → v2，模型下拉变为 3 项。
+5. 函数节点不打开「高级」，用「新建字段」把输出项 `messages` 写入新建 `summary` 字段（新字段类型按观测输出推断为 array；初次硬编码 string 导致 `INVALID_STATE_UPDATE`，已修复为按输出样例推断，见偏差 V23）。
+6. 模型节点声明 `question`（启动输入）、`topics`（节点输出）、`course`（环境变量）三个参数并在 System/User 提示词引用；额外参数删除后校验报 `PROMPT_PARAM_UNDECLARED`（pointer `/nodes/triage/config/prompt/messages/0/content/3`），点问题定位高亮提示词面板；重新声明后校验通过。
+7. 真实 Worker 运行（本地假模型端点，run `f7aab2e4`）成功：入口→检索（2.7s）→整理（3.5s）→模型（1.4s）→结束；历史抽屉选中该运行后，检索/整理/模型三个节点的「运行数据」分别显示输入、输出、写入 State 与耗时。
+8. 调试悬窗拖拽已在 M9 验收：从左侧栏拖字段到中栏新增参数，关闭后侧面板可见且可撤销。
+9. State 表显示字段/类型/初始值/更新方式/写入节点/读取节点；未使用的 `answer` 显示写入但无读取，可删除字段。
+10. 变量表新增变量并带说明；变量环境「开发」「正式」各设覆盖值（`STYLE`：简洁风格 / 详细风格），引用列显示 1 处。
+11. 顶栏切换变量环境各运行一次（真实 DeepSeek）：开发 → `简洁风格`，正式 → `详细风格`；两次 Run 冻结不同环境 id，运行详情与历史显示「变量环境 开发/正式」。
+12. 工具节点 v2：Everything MCP `echo` 必填 `message` 缺失时校验报 `TOOL_ARGUMENT_REQUIRED`（pointer `/nodes/<id>/inputs/message`，参数行标红），填固定值后校验通过并运行返回 `Echo: hello-everything`；平台 HTTP 工具 `order_lookup` 只有单参数，未覆盖「一固定值一变量」的双参数 HTTP 场景（偏差 V23）。
+13. 本地清理后工作流库无改造前数据；连接目录、变量默认值保留；真实 DeepSeek 连接可用；通过 API 对含旧版 `core.llm` 节点的定义执行校验，返回 `NODE_VERSION_RETIRED`（nodeId `triage`，pointer `/nodes/triage`）。
+14. 编辑器与资源中心无「运行环境」文案，唯一环境控件为顶栏/变量表的「变量环境」；`grep` 生产代码中仅测试断言保留该词。
+
 ### 人工验收（用户填写）
 
 Hosted 上需要模型的验收不由智能体执行，也不作为任何阶段的门禁。M12 完成后由用户在 Hosted 用自己在资源中心建立的模型连接人工验收，并在下表填写结果。
@@ -730,3 +747,4 @@ Hosted 上需要模型的验收不由智能体执行，也不作为任何阶段�
 | V20 | M13 | `WorkflowRunV2` 增加 `variableEnvironmentId`；Run 详情/历史的 `variableEnvironment` 名称优先取冻结快照，环境删除后历史仍显示原名 | Worker 在 `registry_snapshot` 冻结 `{id,name}`，API 投影；删除环境不应让历史 Run 失去来源标注 | 否 |
 | V21 | M13 | 顶栏 `VariableEnvironmentSelect` 由编辑器加载 `configuration()` 并记忆到 `localStorage[eduflow.workflow.variableEnvironment.<workflowId>]`；切换仅影响变量取值展示与后续 Run，不改布局/草稿。环境面板、调试悬窗与变量选择器使用选中环境的合并值；前端预览仍用默认值（预览不注入变量环境，计划未要求） | 选择是本地呈现偏好，不写入工作流定义；Run 时把 id 交给 API 冻结；预览为纯前端演示路径，不产生正式 Run | 否 |
 | V22 | M12 | 本地数据清理用新增脚本 `scripts/workflow/local/clean-legacy-workflows.ts`（预检行数/证据引用 → `--apply` 白名单删除 → 按夹具重写 24 行模板），不删除连接、Vault、变量默认值、课程与学习数据；`probe__` 本地无残留 | 计划 5.0 要求先查后删并保留连接/凭据；脚本只在 127.0.0.1:54321 运行；Hosted 清理仍需用户确认目标与范围 | 否 |
+| V23 | M12 | 新建 State 字段时按已观察输出样例推断类型（array/object/number/boolean/string），不再固定 string；工具验收用 MCP `echo` 覆盖必填参数流程，平台 HTTP 工具只有单参数，未构造双参数 HTTP 连接 | `summary ← /messages` 若固定 string 会导致首次运行 `INVALID_STATE_UPDATE`；MCP 与 HTTP 工具共享同一 v2 参数/校验/运行路径 | 否 |

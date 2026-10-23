@@ -145,7 +145,7 @@ export function connectionUpdates({ definition, connections, tools }: {
       .sort((left, right) => right.version - left.version)[0];
     if (!next) continue;
     const type = String(next.content.type ?? "");
-    if (reference.kind === "provider" && type !== "deepseek") continue;
+    if (reference.kind === "provider" && type !== "deepseek" && type !== "openai-compatible") continue;
     if (reference.kind === "tool" && type !== "http" && type !== "mcp-http") continue;
 
     const tool = reference.kind === "tool" ? toolCatalog.get(next.connectionKey) : undefined;

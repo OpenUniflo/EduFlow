@@ -56,6 +56,16 @@ describe("connection references", () => {
     expect(references.some(reference => reference.oldRef === "environment-tool")).toBe(false);
   });
 
+  it("offers upgrades for openai-compatible providers, not only DeepSeek", () => {
+    const definition = emptyDefinition();
+    definition.nodes = [node("llm", "core.llm", { providerRef: "p4:owner:custom:1", modelRef: "m" })];
+    const catalog = [
+      connection("custom", 1, { type: "openai-compatible", modelRefs: ["m"] }),
+      connection("custom", 2, { type: "openai-compatible", modelRefs: ["m", "new"] }),
+    ];
+    expect(connectionUpdates({ definition, connections: catalog, tools: [] })).toHaveLength(1);
+  });
+
   it("carries modelRef for user model references and keeps it on proposed updates", () => {
     const definition = graph();
     const provider = connectionReferences(definition).find(reference => reference.field === "providerRef" && reference.nodeId === "llm");
