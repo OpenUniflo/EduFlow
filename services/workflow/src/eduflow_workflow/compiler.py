@@ -158,6 +158,11 @@ def _validate_definition(definition, registry_snapshot, environment_checks, pare
         from .interrupts import interaction_check
         inspect(lambda:interaction_check(definition,node),'/nodes/'+nid+'/config/authoring',nid)
         inspect(lambda:validate_value(desc["configSchema"],{k:v for k,v in node['config'].items() if k!='authoring'}),"/nodes/"+nid+"/config",nid)
+        if environment_checks and node["type"]=="core.llm":
+            providers={provider["ref"]:provider for provider in registry_snapshot.get("providers",[])}
+            configured=providers.get(node["config"].get("providerRef"))
+            if not configured or node["config"].get("modelRef") not in configured.get("modelRefs",[]):
+                diagnostics.append({"code":"MODEL_NOT_ENABLED","severity":"error","nodeId":nid,"pointer":"/nodes/"+nid.replace("~","~0").replace("/","~1")+"/config/modelRef","message":"Model is not enabled on the selected provider"})
         operation=operations.get(config_ref,{}) if (config_ref:=node["config"].get("operationRef")) else {}
         input_schema=operation.get("inputSchema",desc["inputSchema"])
         if node['type']=='core.function':

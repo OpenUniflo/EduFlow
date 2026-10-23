@@ -106,8 +106,15 @@ async def stream_model(execution,model,messages):
     response=None;text='';sent=0;sequence=0;last=time.monotonic();stream=str(uuid.uuid4())
     try:
         from langchain_core.messages import message_chunk_to_message
+        # Reasoning providers can emit thousands of chunks per response. Revalidate the
+        # lease/environment at a bounded cadence instead of once per chunk so provider
+        # streaming stays within the node budget; revocation still dominates each chunk.
+        last_guard=0.0
         async for chunk in model.astream(messages,stream_usage=True):
-            await execution.guard()
+            now=time.monotonic()
+            if now-last_guard>=0.5:
+                await execution.guard()
+                last_guard=now
             response=chunk if response is None else response+chunk
             # Text blocks only: reasoning/private provider fields are never streamed.
             value=chunk.content

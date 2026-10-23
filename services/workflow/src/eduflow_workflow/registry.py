@@ -130,7 +130,7 @@ class Registry:
                 self.update(env)
         return env
     def snapshot(self, env):
-        content = {"id":env["ref"],"nodes":self.nodes,"tools":env["tools"],"operations":self.operations,"capabilities":env["capabilities"],"environmentRevision":env["revision"],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0),"dependencyManifest":DEPENDENCY_MANIFEST}
+        content = {"id":env["ref"],"nodes":self.nodes,"tools":env["tools"],"operations":self.operations,"capabilities":env["capabilities"],"environmentRevision":env["revision"],"providers":[{"ref":p["ref"],"modelRefs":p.get("modelRefs",[])} for p in env.get("providers",[])],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0),"dependencyManifest":DEPENDENCY_MANIFEST}
         if os.environ.get('WORKFLOW_SANDBOX_BACKEND')=='vercel':
             content['executionBackend']={'type':'vercel','image':os.environ.get('WORKFLOW_SANDBOX_IMAGE','')}
         return {**content,"digest":digest(content),"functions":env.get("functions",[])}

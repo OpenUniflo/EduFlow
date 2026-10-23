@@ -95,6 +95,23 @@ class PinnedTransport(httpx.AsyncHTTPTransport):
                 return await super().connect_tcp(ip if host==hostname else host,port,timeout,local_address,socket_options)
         self._pool=AsyncConnectionPool(network_backend=Backend(),retries=0)
 
+class LazyPinnedTransport(httpx.AsyncBaseTransport):
+    """Resolve and pin a registered model base URL on first use, under the tool SSRF policy."""
+    def __init__(self,base_url,env):
+        self.base_url=base_url;self.environment=env;self.transport=None
+    async def handle_async_request(self,request):
+        if self.transport is None:
+            url,ip=await safe_http_url({'baseUrl':self.base_url,'path':'/'},self.environment,{})
+            self.transport=PinnedTransport(urlparse(url).hostname,ip)
+        return await self.transport.handle_async_request(request)
+    async def aclose(self):
+        if self.transport is not None: await self.transport.aclose()
+
+def model_http_client(base_url,env):
+    """Model traffic shares the tool outbound limits: pinned destination, no proxy, no redirects."""
+    return httpx.AsyncClient(transport=LazyPinnedTransport(base_url,env),timeout=30,follow_redirects=False,trust_env=False)
+
+
 async def invoke_tool(tool, env, arguments, timeout):
     assert_no_secrets(arguments,env)
     validate_value(tool["inputSchema"],arguments,"INVALID_TOOL_ARGUMENTS")

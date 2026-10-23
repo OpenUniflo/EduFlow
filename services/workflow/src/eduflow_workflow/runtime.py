@@ -8,12 +8,15 @@ import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from langchain_deepseek import ChatDeepSeek
+from langchain_openai import ChatOpenAI
 from langgraph.errors import GraphInterrupt
 from .compiler import compile_definition, graph_for, NodeResult, encode_state, decode_state, SDK_EXECUTION, SDK_MESSAGES, SDK_SCOPE
 from .contracts import ExecutionError, bind, validate_value, canonical, pointer, apply_patch, predicate, reduce_field
 from .messages import from_langchain, to_langchain
 from .registry import OPERATIONS
-from .tools import invoke_tool, secret
+from .tools import invoke_tool, model_http_client, secret
+
+LOCAL_MODEL_KEY_PLACEHOLDER='local-fixture-no-credential'
 
 @dataclass(frozen=True)
 class InvocationContext:
@@ -131,8 +134,15 @@ class RunExecution:
         thinking=parameters.pop("thinking",None)
         if "thinking" in config["modelParameters"] and (not isinstance(thinking,dict) or set(thinking)!={"type"} or thinking["type"] not in ("enabled","disabled")):
             raise ExecutionError("UNSUPPORTED_MODEL_PARAMETER","Thinking must explicitly select enabled or disabled")
+        adapter=provider.get("adapter","deepseek")
         try:
-            model=ChatDeepSeek(model=config["modelRef"],api_key=secret(provider["secretRef"]),api_base=provider.get("baseUrl","https://api.deepseek.com"),max_tokens=self.definition["policy"]["maxOutputTokens"],timeout=self.remaining(),max_retries=0,**({"extra_body":{"thinking":thinking}} if thinking is not None else {}),**parameters)
+            if adapter=="openai":
+                if thinking is not None: raise ExecutionError("UNSUPPORTED_MODEL_PARAMETER","Thinking is only available on DeepSeek connections")
+                api_key=secret(provider["secretRef"]) if provider.get("secretRef") else LOCAL_MODEL_KEY_PLACEHOLDER
+                model=ChatOpenAI(model=config["modelRef"],api_key=api_key,base_url=provider.get("baseUrl",""),max_tokens=self.definition["policy"]["maxOutputTokens"],timeout=self.remaining(),max_retries=0,http_async_client=model_http_client(provider.get("baseUrl",""),self.env),**parameters)
+            elif adapter=="deepseek":
+                model=ChatDeepSeek(model=config["modelRef"],api_key=secret(provider["secretRef"]),api_base=provider.get("baseUrl","https://api.deepseek.com"),max_tokens=self.definition["policy"]["maxOutputTokens"],timeout=self.remaining(),max_retries=0,**({"extra_body":{"thinking":thinking}} if thinking is not None else {}),**parameters)
+            else: raise ExecutionError("MODEL_ADAPTER_FAILED","Unsupported model adapter","infrastructure",effect="none")
             refs=config["allowedToolRefs"]
             if refs:
                 functions=[{"type":"function","function":{"name":t["name"],"description":t.get("description",""),"parameters":t["inputSchema"]}} for t in self.env["tools"] if t["ref"] in refs and t["available"]]
