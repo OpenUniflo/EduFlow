@@ -44,7 +44,17 @@ export type WorkflowLaunchContext = { courseId: string; assignmentId: string; wo
 
 export type WorkflowRevisionSummary = { revision: number; name: string; createdAt: string; definitionHash: string; availability: "available" };
 
-export type WorkflowVariable = {key:string;value:string|number|boolean;overrides:Record<string,string|number|boolean>};
-export type WorkflowConfiguration = {revision:number;variables:WorkflowVariable[]};
+export type WorkflowVariable = {key:string;value:string|number|boolean;overrides:Record<string,string|number|boolean>;description?:string};
+/** Workspace-level variable environment (M13). Kept optional here so existing callers remain valid until the API returns it. */
+export type VariableEnvironment = {id:string;name:string};
+export type WorkflowConfiguration = {revision:number;variables:WorkflowVariable[];environments?:VariableEnvironment[];defaultEnvironmentId?:string|null};
 
 export type WorkflowThreadV2={threadId:string;workflowId:string;revision:number;status:'active'|'waiting'|'closed'|'expired';currentRunId:string;checkpointId:string;state:JsonValue;stateVersion:number;interrupts:{id:string;nodeId:string;title:string;schema:JsonSchema;graphPath?:string[];taskId?:string;namespace?:string;breakpoint?:boolean}[];waitExpiresAt?:string;updatedAt:string;lastError?:{code:string};nodeExecutions:number;toolCalls:number;computeMs:number};
+
+/** Resource center and node configuration contracts (M1). These describe persisted definitions, never runtime answers. */
+export type ToolConfigV2 = { toolRef: string; contractDigest: string };
+export type PromptSegment = { type: "text"; text: string } | { type: "param"; name: string; format?: "text" | "json" };
+export type PromptMessageV2 = { role: "user" | "assistant"; content: PromptSegment[] };
+export type LlmConfigV2 = { providerRef: string; modelRef: string; modelParameters: Record<string, JsonValue>; allowedToolRefs: string[]; prompt: { system: PromptSegment[]; messages: PromptMessageV2[] } };
+export type ConnectionTestResult = { ok: boolean; elapsedMs?: number; status?: number; preview?: string; models?: string[]; tools?: { name: string; description?: string }[]; error?: { code: string; message: string } };
+export type ResourceReferenceRow = { workflowId: string; workflowName: string; revision: number; graphPath: string[]; nodeId: string; nodeLabel: string; version?: number; modelRef?: string; variableKey?: string };

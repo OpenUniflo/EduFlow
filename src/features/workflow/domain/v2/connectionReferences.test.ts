@@ -56,6 +56,25 @@ describe("connection references", () => {
     expect(references.some(reference => reference.oldRef === "environment-tool")).toBe(false);
   });
 
+  it("carries modelRef for user model references and keeps it on proposed updates", () => {
+    const definition = graph();
+    const provider = connectionReferences(definition).find(reference => reference.field === "providerRef" && reference.nodeId === "llm");
+    expect(provider?.modelRef).toBe("deepseek-flash");
+    expect(connectionReferences(definition).every(reference => reference.field === "providerRef" || reference.modelRef === undefined)).toBe(true);
+
+    const update = connectionUpdates({ definition, connections, tools: [] }).find(item => item.kind === "provider");
+    expect(update?.modelRef).toBe("deepseek-flash");
+    expect(update?.newRef).toBe("p4:owner:model:2");
+  });
+
+  it("omits modelRef when the model node does not declare one", () => {
+    const definition = emptyDefinition();
+    definition.nodes = [node("llm", "core.llm", { providerRef: "p4:owner:model:1" })];
+    const provider = connectionReferences(definition).find(reference => reference.field === "providerRef");
+    expect(provider).toBeDefined();
+    expect(provider && "modelRef" in provider).toBe(false);
+  });
+
   it("proposes the latest enabled version and requires confirmation when the tool contract changed", () => {
     const updates = connectionUpdates({ definition: graph(), connections, tools: [tool("p4:owner:search:2", "new")] });
     const provider = updates.find(update => update.kind === "provider");
