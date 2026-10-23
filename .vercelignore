@@ -17,8 +17,13 @@ dist/
 /output/
 /.playwright-cli/
 
-# Independently deployed Python service and local infrastructure state.
-/services/
+# Python worker sources are part of the single edu-flow deployment (M14): the
+# compiler Function uses services/workflow/src/** and the worker/watchdog daemons
+# build services/workflow/Dockerfile. Only local-only artifacts are excluded.
+/services/**/.venv/
+/services/**/__pycache__/
+/services/workflow/.pytest_cache/
+/services/workflow/tests/
 /supabase/.temp/
 /supabase/.branches/
 /.pytest_cache/
