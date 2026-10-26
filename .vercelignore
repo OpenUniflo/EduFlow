@@ -16,6 +16,9 @@ dist/
 /.acceptance/
 /output/
 /.playwright-cli/
+/.cache/
+/.pnpm-store/
+/.vercel_python_packages/
 
 # Python worker sources are part of the single edu-flow deployment (M14): the
 # compiler Function uses services/workflow/src/** and the worker/watchdog daemons

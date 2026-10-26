@@ -2,17 +2,20 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 const deps = vi.hoisted(() => ({ client: undefined as unknown as SupabaseClient, compiler: vi.fn(), rpc: vi.fn() }));
+const queue = vi.hoisted(() => ({ send: vi.fn() }));
+vi.mock('@vercel/queue', () => ({ send: queue.send }));
 vi.mock('./supabase.js', () => ({ createServerSupabase: () => deps.client }));
 vi.mock('./assignmentEligibility.js', () => ({ readAssignmentEligibility: vi.fn().mockResolvedValue({ eligibility: { canStart: true } }) }));
 vi.mock('./workflowV2Protocol.js', async original => ({ ...await original<typeof import('./workflowV2Protocol.js')>(), workflowCompiler: deps.compiler }));
 import { handleWorkflowV2 } from './workflowV2';
+import { workflowDigest } from './workflowV2Protocol';
 
 const workflowId = 'workflow';
 const courseId = 'course';
 const assignmentId = 'assignment';
 const input = { query: 'A1001' };
 
-function setup(assignmentInput: unknown, options: { environment?: Record<string, unknown>; defaultEnvironmentId?: string; run?: Record<string, unknown> } = {}) {
+function setup(assignmentInput: unknown, options: { environment?: Record<string, unknown>; defaultEnvironmentId?: string; run?: Record<string, unknown>; prior?: Record<string, unknown> } = {}) {
   const reads: { table: string; filters: Record<string, unknown> }[] = [];
   const environments = options.environment ? [options.environment] : [];
   deps.client = {
@@ -32,7 +35,8 @@ function setup(assignmentInput: unknown, options: { environment?: Record<string,
                   : table === 'workflow_workspace_configuration' ? (options.defaultEnvironmentId ? { default_environment_id: options.defaultEnvironmentId } : null)
                     : table === 'workflow_variable_environments' ? environments.find((item) => item.id === filters.id) ?? null
                       : table === 'workflow_live_runs' ? (options.run ?? null)
-                        : null;
+                        : table === 'workflow_idempotency' ? (options.prior ?? null)
+                          : null;
           return { data, error: null };
         },
         then(resolve: (value: unknown) => unknown) {
@@ -64,6 +68,8 @@ function request(value: unknown, extra: Record<string, unknown> = {}) {
 const validated = { valid: true, environmentRevision: 1, registrySnapshot: {}, semanticHash: 'semantic', compileFingerprint: 'fingerprint' };
 
 beforeEach(() => {
+  delete process.env.WORKFLOW_RUNNER_MODE;
+  queue.send.mockReset().mockResolvedValue({ messageId: 'message-id' });
   deps.compiler.mockReset().mockImplementation(async (path: string) => path === '/v1/runner-status' ? { online: true } : validated);
   deps.rpc.mockReset().mockResolvedValue({ data: { runId: '11111111-1111-4111-8111-111111111111', revision: 1, status: 'queued' }, error: null });
 });
@@ -160,4 +166,50 @@ it('admits a Run when any Worker is online even if its executor digest differs',
     : validated);
   await handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner');
   expect(deps.rpc).toHaveBeenCalledWith('workflow_v2_enqueue', expect.objectContaining({ p_input: { query: 'manual' } }));
+});
+
+it('admits a Run in queue mode without a Worker heartbeat and publishes its runId', async () => {
+  process.env.WORKFLOW_RUNNER_MODE = 'queue';
+  try {
+    const runId = '22222222-2222-4222-8222-222222222222';
+    deps.rpc.mockResolvedValue({ data: { runId, revision: 1, status: 'queued' }, error: null });
+    const state = setup(null);
+    await handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner');
+    expect(deps.compiler).not.toHaveBeenCalledWith('/v1/runner-status');
+    expect(queue.send).toHaveBeenCalledWith('workflow-runs', { runId }, { idempotencyKey: `run:${runId}` });
+  } finally {
+    delete process.env.WORKFLOW_RUNNER_MODE;
+  }
+});
+
+it('keeps the queued Run and returns a retryable error when the queue publish fails', async () => {
+  process.env.WORKFLOW_RUNNER_MODE = 'queue';
+  try {
+    const runId = '33333333-3333-4333-8333-333333333333';
+    deps.rpc.mockResolvedValue({ data: { runId, revision: 1, status: 'queued' }, error: null });
+    queue.send.mockRejectedValueOnce(new Error('queue unavailable'));
+    const state = setup(null);
+    await expect(handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner'))
+      .rejects.toMatchObject({ status: 503, code: 'WORKFLOW_QUEUE_DISPATCH_FAILED', details: { runId, retryable: true } });
+    expect(deps.rpc).toHaveBeenCalledWith('workflow_v2_enqueue', expect.anything());
+  } finally {
+    delete process.env.WORKFLOW_RUNNER_MODE;
+  }
+});
+
+it('re-publishes a still-queued Run on an idempotent replay', async () => {
+  process.env.WORKFLOW_RUNNER_MODE = 'queue';
+  try {
+    const runId = '44444444-4444-4444-8444-444444444444';
+    const value = request({ query: 'manual' });
+    const state = setup(null, {
+      prior: { run_id: runId, revision: 1, request_hash: await workflowDigest(value.body) },
+      run: { status: 'queued', last_seq: 3 },
+    });
+    await handleWorkflowV2(value, state.response, 'owner');
+    expect(deps.rpc).not.toHaveBeenCalled();
+    expect(queue.send).toHaveBeenCalledWith('workflow-runs', { runId }, { idempotencyKey: `run:${runId}` });
+  } finally {
+    delete process.env.WORKFLOW_RUNNER_MODE;
+  }
 });

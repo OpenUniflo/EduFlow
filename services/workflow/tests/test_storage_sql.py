@@ -334,3 +334,94 @@ def test_p6_cleanup_batches_preserve_live_rows_and_finish_on_later_ticks():
     end $$;
     rollback;
     """)
+
+
+def test_queue_claim_run_is_scoped_to_one_run_and_never_reclaims_running_work():
+    owner,run_a,run_b=[str(uuid.uuid4()) for _ in range(3)]
+    workflow='queue-claim-'+str(uuid.uuid4());definition=sample();definition['workflowId']=workflow
+    editor={'schemaVersion':1,'workflowId':workflow,'definitionRevision':1,'editorRevision':1,'nodes':{},'edges':{}}
+    q=lambda value:"'"+json.dumps(value).replace("'","''")+"'::jsonb"
+    run_sql(f"""
+    begin;
+    insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+    select public.workflow_v2_save('{owner}','{workflow}',null,null,{q(definition)},{q(editor)},'hash',null);
+    insert into public.workflow_live_runs(run_id,owner_user_id,workflow_id,revision,status,definition_hash,semantic_hash,compile_fingerprint,environment_ref,environment_revision,input,registry_snapshot)
+    values('{run_a}','{owner}','{workflow}',1,'queued','d','s','c','env','1','{{}}','{{}}'),
+          ('{run_b}','{owner}','{workflow}',1,'queued','d','s','c','env','1','{{}}','{{}}');
+    insert into public.workflow_run_jobs(run_id,queue_msg_id) values('{run_a}',pgmq.send('workflow_v2','{{}}'));
+    insert into public.workflow_run_jobs(run_id,queue_msg_id) values('{run_b}',pgmq.send('workflow_v2','{{}}'));
+    do $$ declare result jsonb; begin
+      result:=workflow_private.claim_run('{run_a}','queue-test');
+      if result->>'kind'<>'claimed' then raise exception 'FAILED named claim %',result;end if;
+      if result->>'token' is null then raise exception 'FAILED missing fence';end if;
+    end $$;
+    do $$ declare fenced bigint; begin
+      select fencing_token into fenced from public.workflow_run_jobs where run_id='{run_a}';
+      if fenced<>1 then raise exception 'FAILED first claim fence';end if;
+      if (select status from public.workflow_live_runs where run_id='{run_a}')<>'running' then raise exception 'FAILED claimed status';end if;
+      if (select status from public.workflow_live_runs where run_id='{run_b}')<>'queued' then raise exception 'FAILED unrelated run claimed';end if;
+    end $$;
+    do $$ declare result jsonb; begin
+      result:=workflow_private.claim_run('{run_a}','queue-test-duplicate');
+      if result->>'kind'<>'running' then raise exception 'FAILED duplicate claim %',result;end if;
+    end $$;
+    do $$ begin
+      if (select fencing_token from public.workflow_run_jobs where run_id='{run_a}')<>1 then raise exception 'FAILED duplicate fence';end if;
+      if (select count(*) from public.workflow_run_events where run_id='{run_a}' and type='run.started')<>1 then raise exception 'FAILED duplicate start event';end if;
+    end $$;
+    rollback;
+    """)
+
+def test_queue_claim_run_seals_stale_lease_and_expires_wait_without_reexecution():
+    owner,stale,waiting=[str(uuid.uuid4()) for _ in range(3)]
+    workflow='queue-stale-'+str(uuid.uuid4());definition=sample();definition['workflowId']=workflow
+    editor={'schemaVersion':1,'workflowId':workflow,'definitionRevision':1,'editorRevision':1,'nodes':{},'edges':{}}
+    q=lambda value:"'"+json.dumps(value).replace("'","''")+"'::jsonb"
+    run_sql(f"""
+    begin;
+    insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+    select public.workflow_v2_save('{owner}','{workflow}',null,null,{q(definition)},{q(editor)},'hash',null);
+    insert into public.workflow_execution_threads(thread_id,owner_user_id,workflow_id,revision,snapshot,status,current_run_id)
+      values('{stale}','{owner}','{workflow}',1,'{{}}','active','{stale}');
+    insert into public.workflow_live_runs(run_id,owner_user_id,workflow_id,revision,status,definition_hash,semantic_hash,compile_fingerprint,environment_ref,environment_revision,input,registry_snapshot,thread_id)
+      values('{stale}','{owner}','{workflow}',1,'running','d','s','c','env','1','{{}}','{{}}','{stale}');
+    insert into public.workflow_run_jobs(run_id,queue_msg_id,fencing_token,worker_id,lease_until)
+      values('{stale}',pgmq.send('workflow_v2','{{}}'),7,'dead-worker',now()-interval '1 second');
+    insert into public.workflow_execution_threads(thread_id,owner_user_id,workflow_id,revision,snapshot,status,current_run_id,wait_expires_at)
+      values('{waiting}','{owner}','{workflow}',1,'{{}}','waiting','{waiting}',now()-interval '1 second');
+    insert into public.workflow_live_runs(run_id,owner_user_id,workflow_id,revision,status,definition_hash,semantic_hash,compile_fingerprint,environment_ref,environment_revision,input,registry_snapshot,thread_id)
+      values('{waiting}','{owner}','{workflow}',1,'waiting','d','s','c','env','1','{{}}','{{}}','{waiting}');
+    insert into public.workflow_run_jobs(run_id,queue_msg_id) values('{waiting}',pgmq.send('workflow_v2','{{}}'));
+    do $$ declare result jsonb; begin
+      result:=workflow_private.claim_run('{stale}','queue-test');
+      if result->>'kind'<>'sealed' then raise exception 'FAILED stale seal %',result;end if;
+      result:=workflow_private.claim_run('{waiting}','queue-test');
+      if result->>'kind'<>'expired' then raise exception 'FAILED wait expiry %',result;end if;
+    end $$;
+    do $$ begin
+      if (select status from public.workflow_live_runs where run_id='{stale}')<>'failed' or (select error->>'code' from public.workflow_live_runs where run_id='{stale}')<>'WORKER_LOST' then raise exception 'FAILED stale run outcome';end if;
+      if (select status from public.workflow_execution_threads where thread_id='{stale}')<>'closed' then raise exception 'FAILED stale thread outcome';end if;
+      if (select status from public.workflow_live_runs where run_id='{waiting}')<>'failed' or (select error->>'code' from public.workflow_live_runs where run_id='{waiting}')<>'WAIT_EXPIRED' then raise exception 'FAILED wait outcome';end if;
+      if (select status from public.workflow_execution_threads where thread_id='{waiting}')<>'expired' then raise exception 'FAILED wait thread outcome';end if;
+    end $$;
+    do $$ declare result jsonb; begin
+      result:=workflow_private.claim_run('{waiting}','queue-test');
+      if result->>'kind'<>'terminal' then raise exception 'FAILED terminal replay %',result;end if;
+    end $$;
+    rollback;
+    """)
+
+def test_queue_claim_functions_are_worker_only_and_seal_is_private():
+    run_sql("""
+    begin;
+    do $$ begin
+      if has_function_privilege('authenticated','workflow_private.claim_run(uuid,text)','execute')
+        or has_function_privilege('anon','workflow_private.claim_run(uuid,text)','execute')
+        or has_function_privilege('authenticated','workflow_private.expire_wait(uuid)','execute')
+        or has_function_privilege('anon','workflow_private.expire_wait(uuid)','execute') then raise exception 'FAILED browser queue authority';end if;
+      if not has_function_privilege('workflow_worker','workflow_private.claim_run(uuid,text)','execute')
+        or not has_function_privilege('workflow_worker','workflow_private.expire_wait(uuid)','execute') then raise exception 'FAILED worker queue authority';end if;
+      if has_function_privilege('workflow_worker','workflow_private.seal_run(uuid,text,text,text,text,boolean)','execute') then raise exception 'FAILED seal authority';end if;
+    end $$;
+    rollback;
+    """)

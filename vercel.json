@@ -17,6 +17,21 @@
         "sin1"
       ]
     },
+    "api/course.ts": {
+      "maxDuration": 300
+    },
+    "api/workflow-run-consumer.py": {
+      "maxDuration": 300,
+      "includeFiles": "services/workflow/src/**",
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "workflow-runs",
+          "retryAfterSeconds": 60,
+          "maxDeliveries": 5
+        }
+      ]
+    },
     "api/**/*.ts": {
       "maxDuration": 30
     },
@@ -41,6 +56,14 @@
     {
       "source": "/api/course-authoring",
       "destination": "/api/course?resource=authoring"
+    },
+    {
+      "source": "/api/course-intent",
+      "destination": "/api/course?resource=intent"
+    },
+    {
+      "source": "/api/course-mapping",
+      "destination": "/api/course?resource=mapping"
     },
     {
       "source": "/api/learning",

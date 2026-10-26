@@ -2,21 +2,21 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import healthHandler from "../api/_handlers/health";
+import coursesHandler from "../api/_handlers/courses";
+import courseAuthoringHandler from "../api/_handlers/course-authoring";
 import knowledgeHandler from "../api/knowledge";
-import courseHandler from "../api/course";
 import learnerHandler from "../api/learner";
 import workflowsHandler from "../api/workflows";
 import materialsHandler from "../api/materials";
 import domainsHandler from "../api/domains";
 import knowledgeGenerationHandler from "../api/knowledge-generation";
-import courseIntentHandler from "../api/course-intent";
 import assistantHandler from "../api/assistant";
 
 const handlers = new Map([
   ["/api/health", healthHandler],
   ["/api/knowledge", knowledgeHandler],
-  ["/api/courses", courseHandler],
-  ["/api/course-authoring", courseHandler],
+  ["/api/courses", coursesHandler],
+  ["/api/course-authoring", courseAuthoringHandler],
   ["/api/learner", learnerHandler],
   ["/api/evidence", learnerHandler],
   ["/api/edge-actions", learnerHandler],
@@ -28,14 +28,18 @@ const handlers = new Map([
   ["/api/materials", materialsHandler],
   ["/api/domains", domainsHandler],
   ["/api/knowledge-generation", knowledgeGenerationHandler],
-  ["/api/course-intent", courseIntentHandler],
   ["/api/assistant", assistantHandler]
 ]);
 
+/** Loaded on demand so feature code with the `@/` alias never enters the Vite config bundle. */
+const lazyCoursePaths = new Set(["/api/course-intent", "/api/course-mapping"]);
+
 /** Public client paths must match the resource injected by the Vercel rewrite. */
-export const consolidatedResourceForPath: Record<string, "courses" | "authoring" | "learning" | "micro" | "progress" | "navigation" | "evidence" | "edge-actions"> = {
+export const consolidatedResourceForPath: Record<string, "courses" | "authoring" | "intent" | "mapping" | "learning" | "micro" | "progress" | "navigation" | "evidence" | "edge-actions"> = {
   "/api/evidence": "evidence", "/api/edge-actions": "edge-actions",
-  "/api/courses": "courses", "/api/course-authoring": "authoring", "/api/learning": "learning", "/api/micro": "micro", "/api/progress": "progress", "/api/navigation": "navigation"
+  "/api/courses": "courses", "/api/course-authoring": "authoring",
+  "/api/course-intent": "intent", "/api/course-mapping": "mapping",
+  "/api/learning": "learning", "/api/micro": "micro", "/api/progress": "progress", "/api/navigation": "navigation"
 };
 
 async function readBody(request: IncomingMessage) {
@@ -68,13 +72,20 @@ export function localApiPlugin(): Plugin {
       server.middlewares.use(async (request, response, next) => {
         const url = new URL(request.url ?? "/", "http://localhost");
         const handler = handlers.get(url.pathname);
-        if (!handler) return next();
+        const lazy = lazyCoursePaths.has(url.pathname);
+        if (!handler && !lazy) return next();
         const query = Object.fromEntries(url.searchParams.entries());
         // Mirror Vercel's rewrite contract while retaining the public client URL.
         const resource = consolidatedResourceForPath[url.pathname];
         if (resource) query.resource = resource;
         const vercelRequest = Object.assign(request, { body: await readBody(request), query }) as unknown as VercelRequest;
-        await handler(vercelRequest, createResponse(response));
+        const vercelResponse = createResponse(response);
+        if (lazy) {
+          const module = await server.ssrLoadModule("/api/course.ts");
+          await (module.default as (req: VercelRequest, res: VercelResponse) => Promise<void>)(vercelRequest, vercelResponse);
+          return;
+        }
+        await handler!(vercelRequest, vercelResponse);
       });
     }
   };

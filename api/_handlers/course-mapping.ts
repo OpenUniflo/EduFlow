@@ -1,14 +1,12 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createJsonGenerationClient } from "./_lib/llm.js";
-import { readLlmEnvironment } from "./_lib/env.js";
-import { createServerSupabase, createUserSupabase, requireCapability } from "./_lib/supabase.js";
-import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
-import { SupabaseCourseMappingRepository } from "./_lib/courseMappingRepository.js";
-import { runCourseMappingPipeline } from "../src/features/course/mapping/pipeline.js";
-import { buildCourseMappingPlan } from "../src/features/course/mapping/mappingPlan.js";
-import { COURSE_MAPPING_PROMPT_VERSION } from "../src/features/course/mapping/prompts.js";
-
-export const maxDuration = 300;
+import { createJsonGenerationClient } from "../_lib/llm.js";
+import { readLlmEnvironment } from "../_lib/env.js";
+import { createServerSupabase, createUserSupabase, requireCapability } from "../_lib/supabase.js";
+import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
+import { SupabaseCourseMappingRepository } from "../_lib/courseMappingRepository.js";
+import { runCourseMappingPipeline } from "../../src/features/course/mapping/pipeline.js";
+import { buildCourseMappingPlan } from "../../src/features/course/mapping/mappingPlan.js";
+import { COURSE_MAPPING_PROMPT_VERSION } from "../../src/features/course/mapping/prompts.js";
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   if (request.method !== "POST") return methodNotAllowed(response, ["POST"]);
