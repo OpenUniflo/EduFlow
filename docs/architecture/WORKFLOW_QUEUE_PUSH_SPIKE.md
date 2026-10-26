@@ -10,6 +10,8 @@
 - 没有运行时零常驻消耗；每个 Preview 用自己的部署代码执行。
 - 消息只含 `{ "runId": "..." }`，数据库仍是排队/租约/终态权威。
 - 本地 `pnpm workflow:local` 继续使用 Daemon 模式，行为不变。
+- 本次按要求保留 `vercel.json` 的 `daemons`；Preview 不运行 Daemon，Production 真正切换后应删除
+  `worker`/`watchdog`，否则仍会有常驻 Daemon 消耗。
 
 ## 运行模式开关
 
@@ -120,10 +122,44 @@ Step/Checkpoint 边界（每次消费执行一段并重新入队），或迁移�
 - 说明：本地仍是 daemon 模式，证明抽取 `execute_claim` 没有破坏旧 Worker；队列消费者本身需要
   Preview 部署 + Hosted 迁移后才能做端到端验证。
 
-## Preview 证据（待填）
+## Preview 证据
 
-- Deployment ID / URL：
-- Function 数量证据：
-- Queue consumer 调用日志 / duration：
-- Active CPU：待用 Vercel Observability 或消费者日志中的 `durationMs` 补充；模型等待是 I/O，
-  Active CPU 预计明显低于墙钟时长。
+- Deployment ID：`dpl_Ad9C1DnkPiEGg3aduDkUCLpp4Qaw`
+- URL：`https://edu-flow-539247dwq-july-nanas-projects.vercel.app`
+- 分支/提交：`spike/workflow-queue` / `c7636924997e6ccac0a45643888fe233e071b711`
+- Function 数量证据：部署 `builds[0].output` 共 **11 个 lambda**：
+  `api/assistant`、`api/course`、`api/domains`、`api/knowledge`、`api/knowledge-generation`、
+  `api/learner`、`api/material-parsing-jobs`、`api/materials`、`api/workflow-compiler`、
+  `api/workflows`、`api/workflow-run-consumer`；部署 `lambdaRuntimeStats` 为
+  `{"nodejs":9,"python":2}`。消费者是第 11 个 Function，确实计入名额。
+- 同一提交的干净 `vercel build` 产物也是 11 个 function；`api/workflow-run-consumer.func/.vc-config.json`
+  含 `experimentalTriggers: [{type:"queue/v2beta", topic:"workflow-runs", ...}]` 和
+  `maxDuration: 300`，证明触发器落在真实 Function 产物上，不是只看 rewrite。
+- 公网路由冒烟：
+  - `GET /` → 200；
+  - `GET /api/workflow-compiler/health` → 401（编译服务公网路由仍可达）；
+  - `POST /api/workflow-run-consumer` → 405 + `index.html`（没有公网 URL，落 SPA fallback）；
+  - `POST /api/course-intent` → 401；`POST /api/course-mapping` → 500（Preview 缺 LLM 环境变量，
+    与合并前一致）；`GET /api/workflows?resource=capabilities` → 401。
+- Hosted 迁移：本分支新增 `20261026120000_workflow_queue_claim_by_run.sql` **未应用**。按任务约束，
+  在应用 Hosted 迁移前不做真实 Hosted 运行；因此没有 Vercel 端的真实模型运行/Active CPU 数据。
+
+## 本地消费者路径验证（补充）
+
+除 `pnpm workflow:local` 的 Worker 运行外，还停掉本地 Worker，直接用 `queue_consumer.consume_run`
+对一个 Local DB 中真实 queued Run 执行：
+
+- `claim_run` 成功领取指定 Run，未领取其它旧 queued Run；
+- 真实 DeepSeek 运行 `success`，3 个 step（start/model/end），`started_at→finished_at` 约 3.7s，
+  17 input / 5 output tokens；
+- 这说明 `claim_run` + `execute_claim` + `finish` 的消费者执行边界可用；它不是 Vercel Queues
+  传输层验证，传输层由 Preview 的 Function 触发器产物证明。
+
+## CPU / 时长
+
+- 本地 Worker 真实 DeepSeek：约 **2.9s** 墙钟，3 steps，19 input / 2 output tokens。
+- 本地消费者路径真实 DeepSeek：约 **3.7s** 墙钟，3 steps，17 input / 5 output tokens。
+- Vercel Active CPU 未测：Hosted 迁移未应用，未产生 Preview 真实运行。消费者每次调用会输出
+  `{"event":"workflow.queue.consumer","runId":...,"outcome":...,"durationMs":...}`，迁移应用后
+  可直接从 Vercel Runtime Logs 读取 duration；模型等待属于 I/O，Active CPU 预期明显低于墙钟。
+
