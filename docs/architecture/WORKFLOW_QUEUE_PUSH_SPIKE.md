@@ -42,10 +42,11 @@ Worker 需要心跳。Queue 模式只跳过“是否在线”，编译/验证仍
 `experimentalTriggers` 订阅 `workflow-runs`，没有公网 URL。它使用官方 Python SDK 的
 `accept_and_handle` 接收回调，并调用 `eduflow_workflow.queue_consumer`。
 
-文件式 Function 没有生成的 Python subscriber 元数据，因此触发器与 `@subscribe` 必须显式共享
-consumer group：`queue/v1beta` 的 `consumer: "workflow-runs"` 对应
-`@subscribe(consumer_group="workflow-runs")`。若使用 `queue/v2beta`，其 consumer group 由
-生成的 subscriber 派生，与本手工入口不匹配。
+文件式 Function 没有生成的 Python subscriber 元数据。`queue/v2beta` 由平台按 Function 路径派生
+consumer group（`sanitizeConsumerName("api/workflow-run-consumer.py")` =
+`api_Sworkflow-run-consumer_Dpy`），因此 `@subscribe` 必须钉住同一个 group；否则
+`accept_and_handle` 找不到 subscriber，消息会重试。若改用 `queue/v1beta` 可以显式写
+`consumer`，但该版本的消费者有公网入口，本 spike 不使用。
 
 为保持 Hobby 12 个 Function 预算：
 
@@ -138,8 +139,9 @@ Step/Checkpoint 边界（每次消费执行一段并重新入队），或迁移�
   `api/workflows`、`api/workflow-run-consumer`；部署 `lambdaRuntimeStats` 为
   `{"nodejs":9,"python":2}`。消费者是第 11 个 Function，确实计入名额。
 - 同一提交的干净 `vercel build` 产物也是 11 个 function；`api/workflow-run-consumer.func/.vc-config.json`
-  含 `experimentalTriggers: [{type:"queue/v1beta", topic:"workflow-runs", consumer:"workflow-runs", ...}]`
-  和 `maxDuration: 300`，证明触发器落在真实 Function 产物上，不是只看 rewrite。
+  含 `experimentalTriggers: [{type:"queue/v2beta", topic:"workflow-runs", ...}]` 和生成的
+  `consumer: "api_Sworkflow-run-consumer_Dpy"`，以及 `maxDuration: 300`，证明触发器落在真实
+  Function 产物上，不是只看 rewrite。
 - 公网路由冒烟：
   - `GET /` → 200；
   - `GET /api/workflow-compiler/health` → 401（编译服务公网路由仍可达）；

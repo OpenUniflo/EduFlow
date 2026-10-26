@@ -12,13 +12,13 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from vercel.queue import Message, RetryAfter, accept_and_handle, send as send_message, subscribe
+from vercel.queue import Message, RetryAfter, SanitizedName, accept_and_handle, send as send_message, subscribe
 
 TOPIC = "workflow-runs"
-# A file-based Function has no generated Python subscriber metadata, so the trigger and
-# the SDK subscriber must share an explicit consumer group. v1beta accepts `consumer`;
-# v2beta derives it from the generated subscriber instead.
-CONSUMER_GROUP = "workflow-runs"
+# For a file-based Python Function the platform derives the v2beta consumer group from the
+# Function path. `sanitizeConsumerName("api/workflow-run-consumer.py")` is stable for this
+# entrypoint; the SDK subscriber must use the same group or push delivery is unhandled.
+CONSUMER_GROUP = "api_Sworkflow-run-consumer_Dpy"
 DEFAULT_BUDGET_SECONDS = 270
 MAX_BUDGET_SECONDS = 290
 MAX_DELAY_SECONDS = 604800  # Vercel Queues maximum delay/retention.
@@ -112,7 +112,7 @@ async def consume_run(run_id):
     return result.get("status", "failed")
 
 
-@subscribe(topic=TOPIC, consumer_group=CONSUMER_GROUP)
+@subscribe(topic=TOPIC, consumer_group=SanitizedName(CONSUMER_GROUP))
 async def consume(message: Message[dict[str, object]]) -> None:
     payload = message.payload if isinstance(message.payload, dict) else {}
     run_id = _run_id(payload.get("runId"))
