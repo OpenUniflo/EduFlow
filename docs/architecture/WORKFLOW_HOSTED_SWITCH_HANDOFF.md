@@ -75,9 +75,17 @@
    - 运行超过预算时进入 failed + `RUN_TIMEOUT`，不长期停在 running。
 4. 旧项目 `edu-flow-workflow` 不再需要承接当前运行；删除与否由用户确认，本次任务不删除项目。
 
-## 4.1 Preview 运行时证据
+## 4.1 Preview 运行时证据（2026-10-26）
 
-本次推送后的 Preview 由 `feat/workflow` 触发。记录项：部署 ID、URL、commit、Function 数量、`daemons` 缺失、queue 触发器、公网路由冒烟。具体值见本次交付输出；若本文档未填，以 Vercel 部署读回为准。
+- commit：`bb89bbf02847937a7fcb578f1d13b28d64702aa5`（`feat/workflow`）。
+- GitHub Deployment：`7332374098`，state `success`（`vercel[bot]`）。
+- 部署 URL：`https://edu-flow-p852e92aw-july-nanas-projects.vercel.app`；分支别名：`https://edu-flow-git-feat-workflow-july-nanas-projects.vercel.app`（两者 ETag 一致）。
+- Vercel CLI 当前登录 token 已过期，未能读取 `dpl_...` 控制面 ID；上列 GitHub Deployment ID 与部署 URL hash `p852e92aw` 是本轮可读回的部署身份。
+- Function 数量：仓库 `api/` 为 **11** 个物理入口（9 TS + `workflow-compiler.py` + `workflow-run-consumer.py`）；`tests/courseCreatorArchitecture.test.ts` 断言 11。Preview 实测 9 个 TS 入口均由 Function 处理（401/405/500 JSON，不是 SPA HTML），`/api/workflow-compiler/health` 返回 401 JSON；consumer 无公网入口（POST 405 / SPA fallback）。
+- `daemons`：`vercel.json` 不再声明；该 Preview 成功构建自上述 commit。Vercel 控制面构建日志原文因 CLI token 过期未读取，未把本地 `vercel build` 的 2.2GB 依赖错误当作部署失败。
+- 前端产物包含本轮文案：`运行已排队超过 30 秒`、`运行超过时长上限`、`排队超时`，证明部署执行的是本轮代码。
+- 公网冒烟：`GET /` 200；`/api/workflow-compiler/health` 401 JSON；`/api/assistant`、`/api/workflows?resource=capabilities`、`/api/materials`、`/api/material-parsing-jobs` 401 JSON；`/api/course`、`/api/domains`、`/api/knowledge`、`/api/learner` 405 JSON；`/api/course-intent` 401、`/api/course-mapping` 500（Preview 缺 LLM 变量，属环境差异）。
+- 真实 Hosted 模型运行由仓库所有者执行；本次不登录、不填/打印 API Key。
 
 ## 5. 回滚
 

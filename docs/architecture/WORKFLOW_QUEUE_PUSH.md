@@ -112,4 +112,14 @@ Hosted 中 10-26 08:22–08:24 有 4 条旧 queued Run，没有对应的 Vercel 
 
 ## 10. 历史可行性验证与本次 Preview
 
-2026-10-26 的 spike 在 `spike/workflow-queue` 上验证了：Vercel Queues 触发、`claim_run` 指定 Run、真实 DeepSeek 执行成功、Function 11 个、queue 触发器落在真实产物上。正式切换的 Preview 证据（部署 ID、URL、commit、Function 数量、无 daemons、构建/路由冒烟）在推送后读回并记录到交付输出与 [切换交接](WORKFLOW_HOSTED_SWITCH_HANDOFF.md)。
+2026-10-26 的 spike 在 `spike/workflow-queue` 上验证了：Vercel Queues 触发、`claim_run` 指定 Run、真实 DeepSeek 执行成功、Function 11 个、queue 触发器落在真实产物上。
+
+正式切换的 Preview：
+
+- commit `bb89bbf02847937a7fcb578f1d13b28d64702aa5`；GitHub Deployment `7332374098`（success）；
+- URL `https://edu-flow-p852e92aw-july-nanas-projects.vercel.app`，分支别名 `https://edu-flow-git-feat-workflow-july-nanas-projects.vercel.app`；
+- 仓库 `api/` 11 个物理入口（9 TS + 2 Python），`vercel.json` 无 `daemons`；
+- 前端产物含本轮 30 秒排队提示、`RUN_TIMEOUT`/`QUEUE_TIMEOUT` 文案；9 个 TS 入口与 Compiler 均返回 Function JSON，consumer 无公网入口；
+- Hosted 真实模型运行由仓库所有者执行，本次不登录、不填/打印 API Key。
+
+Vercel CLI 登录 token 已过期，未读取 `dpl_...` 控制面 ID 或构建日志原文；以上部署身份取自 GitHub Deployment 与公开 URL 读回。详见 [切换交接](WORKFLOW_HOSTED_SWITCH_HANDOFF.md)。
