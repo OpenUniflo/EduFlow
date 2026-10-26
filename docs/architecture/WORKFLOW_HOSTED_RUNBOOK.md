@@ -13,7 +13,9 @@
 
 ## 环境和秘密
 
-`edu-flow` 必须配置 `WORKFLOW_DEPLOYMENT_MODE=hosted`、`WORKFLOW_DATABASE_URL`、`WORKFLOW_INTERNAL_TOKEN`、`WORKFLOW_ENVIRONMENTS_JSON`、`WORKFLOW_SANDBOX_BACKEND=vercel`、固定 `WORKFLOW_SANDBOX_IMAGE`，以及可信目录引用的提供方/工具秘密；同一项目的服务端配置同一内部令牌。Production 仍需配置 `WORKFLOW_COMPILER_URL=https://<edu-flow 生产域名>/api/workflow-compiler`；Preview 自动使用本次部署的 `https://$VERCEL_URL/api/workflow-compiler`，不需要配置 `WORKFLOW_COMPILER_URL`。Preview 与 Production 共用 Hosted 数据库。内部令牌至少32字符，禁止放入 VITE 变量。
+`edu-flow` 必须配置 `WORKFLOW_DEPLOYMENT_MODE=hosted`、`WORKFLOW_DATABASE_URL`、`WORKFLOW_INTERNAL_TOKEN`、`WORKFLOW_ENVIRONMENTS_JSON`、`WORKFLOW_SANDBOX_BACKEND=vercel`、固定 `WORKFLOW_SANDBOX_IMAGE`，以及可信目录引用的提供方/工具秘密；同一项目的服务端配置同一内部令牌。所有 Vercel 部署（Production 与 Preview）都自动调用本次部署的 `https://$VERCEL_URL/api/workflow-compiler`，因此 Production 不再需要 `WORKFLOW_COMPILER_URL`；该变量只用于本地和非 Vercel 环境。Preview 与 Production 共用 Hosted 数据库和 Production Worker。内部令牌至少32字符，禁止放入 VITE 变量。
+
+分支改了执行代码时，Preview 的 Compiler 与 API 来自分支版本，而实际执行仍是 Production Worker 的版本；校验/编译通过不代表 Worker 已具备同样的执行语义。涉及 Worker 执行代码的分支必须先合并并提升 Production，再以同一次部署验收，不能只用 Preview 验证新执行行为。
 
 平台运行环境（R12/R13）：每个部署只配置一个 `access: "authenticated"` 的公共环境，不写 `ownerIds`，且不得包含 `providers`/`connectors`/`tools`/`variables`/`functions`；所有登录用户通过资源中心建立自己的连接。公共环境只改内容、不改 `ref`（用户连接与函数按“用户 + 运行环境标识”存放，改标识会失联），平台 DeepSeek / DeepWiki 不再提供；界面上不出现运行环境选择。
 
@@ -22,6 +24,8 @@ JSON环境只授予明确 owner UUID、HTTPS目的地和许可工具/模型。�
 Vercel Daemon 使用平台定期轮换的 `VERCEL_OIDC_TOKEN_FILE`，官方 SDK 每次读取；镜像构建不消费平台/业务秘密。发布源、静态资源和 Function 产物都检查 `.env*`、私有验收目录及本地 Supabase 临时数据；不要把“未进入静态包”等同“未上传部署源”。
 
 ## 迁移和发布
+
+本轮新增 `20261024120000_workflow_runner_liveness.sql`（`workflow_private.p6_worker_status()`）；必须先按增量迁移应用，否则 `/v1/runner-status` 会按离线处理并拒绝新运行。
 
 1. 对账目标 ref、仓库与 Hosted 迁移历史；共享库不 reset，Preview build 不自动迁移。
 2. 备份并列出保护对象。旧 Legacy 工作流先归档，再执行退役迁移；归档保留完整 JSON+SHA，不是运行 fallback。只增量应用仓库原始 SQL；已应用版本不得改写。
@@ -46,6 +50,7 @@ Vercel Daemon 使用平台定期轮换的 `VERCEL_OIDC_TOKEN_FILE`，官方 SDK 
 
 - 新受限连接设置连接5秒、TCP未确认数据20秒，专用角色statement timeout15秒、lock timeout3秒；官方Saver/Store使用同一角色。watchdog每批最多处理128个到期/取消/失联Thread，清理每集合最多128行，跳过被锁行，下次tick继续；不扫描无限活跃Thread。
 - Worker每5秒续租/信号，空队列每3秒轮询；watchdog每5秒巡检租约/生命周期；VM回收是独立异步子任务，每轮最多检查20对象/尝试删除5个（404/410也计次数），4秒超时、失败固定SANDBOX_REAP_FAILED并停止续健康信号，不阻断数据库巡检。健康信号20秒到期。进程自动重启不等于Run自动接管。
+- 新运行提交前通过 Compiler 的 `/v1/runner-status` 读取 `workflow_private.p6_worker_status()`：只要求任一 Worker 在20秒内有 `ok` 心跳，不要求 executor digest 与当前部署一致；digest 不一致只写 `workflow.runner.digest_mismatch` 运维日志，不阻止运行。没有在线 Worker 时 API 返回 `WORKFLOW_RUNNER_OFFLINE`，不创建排队运行。排队超过30秒的前端提示只解释等待，不改变运行状态。
 - 受限 `p6_metrics` 只返回队列/运行/等待计数、最旧排队秒数及服务健康，不返回产品内容。watchdog对 Worker陈旧、排队超过40秒发固定JSON告警，每种30秒最多一条；存储与回收失败有独立错误信号。
 - 官方Sandbox context先stop再destroy；watchdog对刚停止实例留5秒宽限，避免与正常cleanup争用。重复删除404/410幂等。仅对已有有效纯代码结果、cleanup404/410且再次确认目标已不存在/已deleted的情况保留结果；任何500、仍running或确认失败仍失败。
 - Sandbox诊断仅含阶段、异常类、cause类、数字HTTP状态、随机diagnostic ID、关联Run/Step，禁止原始SDK异常文本、凭据或代码/输入进入运维日志。失败记录继续存在产品Run事件中。

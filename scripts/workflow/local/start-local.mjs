@@ -49,6 +49,7 @@ const environment = {
   WORKFLOW_INTERNAL_TOKEN: internalToken,
   WORKFLOW_ENVIRONMENTS_FILE: configurationPath,
   WORKFLOW_CATALOG_FILE: resolve(outputDirectory, "catalog.json"),
+  WORKFLOW_HEALTH_DIRECTORY: outputDirectory,
   WORKFLOW_ALLOW_LOCAL_FIXTURES: "1",
   WORKFLOW_COMPILER_URL: "http://127.0.0.1:18110",
   LLM_PROVIDER_KEY: process.env.LLM_API_KEY,

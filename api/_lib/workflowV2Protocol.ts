@@ -17,13 +17,14 @@ export function workflowCompilerUrl(base: string, path: string): URL {
   return new URL(`${prefix}${relative}`, url);
 }
 /**
- * Resolves the compiler base URL for the current deployment. A Vercel Preview always calls
- * its own `/api/workflow-compiler`, so a branch preview is never redirected to the global
- * `WORKFLOW_COMPILER_URL` host. Production and local development keep the configured URL.
+ * Resolves the compiler base URL for the current deployment. Every Vercel deployment
+ * (Preview and Production) calls its own `/api/workflow-compiler`, so the compiler and
+ * the API always come from the same build. `WORKFLOW_COMPILER_URL` is only for local
+ * and non-Vercel environments.
  */
 export function resolveWorkflowCompilerBase(env: Record<string, string | undefined>): string | undefined {
   const vercelUrl = env.VERCEL_URL?.trim();
-  if (env.VERCEL_ENV === "preview" && vercelUrl) {
+  if ((env.VERCEL_ENV === "preview" || env.VERCEL_ENV === "production") && vercelUrl) {
     const host = vercelUrl.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
     if (host) return `https://${host}/api/workflow-compiler`;
   }

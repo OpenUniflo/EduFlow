@@ -61,8 +61,10 @@ function request(value: unknown, extra: Record<string, unknown> = {}) {
   } as unknown as VercelRequest;
 }
 
+const validated = { valid: true, environmentRevision: 1, registrySnapshot: {}, semanticHash: 'semantic', compileFingerprint: 'fingerprint' };
+
 beforeEach(() => {
-  deps.compiler.mockReset().mockResolvedValue({ valid: true, environmentRevision: 1, registrySnapshot: {}, semanticHash: 'semantic', compileFingerprint: 'fingerprint' });
+  deps.compiler.mockReset().mockImplementation(async (path: string) => path === '/v1/runner-status' ? { online: true } : validated);
   deps.rpc.mockReset().mockResolvedValue({ data: { runId: '11111111-1111-4111-8111-111111111111', revision: 1, status: 'queued' }, error: null });
 });
 
@@ -139,4 +141,23 @@ it('projects safe structured provider error context without changing the error c
     error: { code: 'MODEL_REQUEST_FAILED', category: 'auth', message: 'Model request failed', reason: 'auth_failed', provider: 'DeepSeek', model: 'deepseek-chat', host: 'api.deepseek.com', httpStatus: 401 },
   } as never);
   expect((dto as Record<string, unknown>).error).toMatchObject({ code: 'MODEL_REQUEST_FAILED', reason: 'auth_failed', provider: 'DeepSeek', model: 'deepseek-chat', host: 'api.deepseek.com', httpStatus: 401 });
+});
+
+it('rejects a new Run without leaving it queued when no Worker is online', async () => {
+  const state = setup(null);
+  deps.compiler.mockImplementation(async (path: string) => path === '/v1/runner-status' ? { online: false } : validated);
+  await expect(handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner'))
+    .rejects.toMatchObject({ status: 503, code: 'WORKFLOW_RUNNER_OFFLINE' });
+  expect(deps.rpc).not.toHaveBeenCalled();
+  expect(deps.compiler).toHaveBeenCalledWith('/v1/runner-status');
+  expect(deps.compiler).not.toHaveBeenCalledWith('/v1/validate', expect.anything());
+});
+
+it('admits a Run when any Worker is online even if its executor digest differs', async () => {
+  const state = setup(null);
+  deps.compiler.mockImplementation(async (path: string) => path === '/v1/runner-status'
+    ? { online: true, executorDigest: 'different-from-preview' }
+    : validated);
+  await handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner');
+  expect(deps.rpc).toHaveBeenCalledWith('workflow_v2_enqueue', expect.objectContaining({ p_input: { query: 'manual' } }));
 });

@@ -24,10 +24,12 @@
 | `WORKFLOW_SANDBOX_BACKEND` | 是 | `vercel` |
 | `WORKFLOW_SANDBOX_IMAGE` | 是 | 形如 `registry/image@sha256:<64 hex>`，沿用旧项目已验证的沙箱镜像摘要（旧项目 Daemon 镜像摘要可从 Vercel Daemons API 读取，但沙箱镜像不同，需从旧项目环境变量面板复制） |
 | `WORKFLOW_INTERNAL_TOKEN` | 已存在 | 保持现值（API 与 Worker 同项目共享，无需从旧项目复制） |
-| `WORKFLOW_COMPILER_URL` | 已存在 | 仅 Production 需改为 `https://edu-flow-six-phi.vercel.app/api/workflow-compiler`；Preview 自动使用本次部署的 `/api/workflow-compiler`，无需配置（Preview 与 Production 共用 Hosted 数据库） |
+| `WORKFLOW_COMPILER_URL` | 不再需要 | 仅本地/非 Vercel 环境使用。所有 Vercel 部署（Production 与 Preview）都自动调用本次部署的 `https://$VERCEL_URL/api/workflow-compiler`，保证前后端版本一致（Production 现有值可移除） |
 | `LLM_PROVIDER_KEY` | 可选 | 旧项目用于平台提供方；公共环境不含 providers，如 Worker 启动不读取可省略 |
 
 `WORKFLOW_ALLOW_LOCAL_FIXTURES` 不得设置为 `1`；`assert_hosted_configuration()` 会 fail closed。
+
+Preview 与 Production 共用 Hosted 数据库和 Production Worker。分支修改了 Worker 执行代码时，Preview 的 Compiler/API 与 Production Worker 版本可能不同；编译校验通过不代表执行语义一致。此类分支必须先合并并提升 Production，再以同一次部署验收，不能只依赖 Preview。
 
 ## 3. 公共运行环境 JSON（替换 `WORKFLOW_ENVIRONMENTS_JSON`）
 

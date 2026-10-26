@@ -81,6 +81,13 @@ describe("Workflow request failures", () => {
     expect(rejection.details).toBe(details); expect(rejection.message).toBe("Internal English detail");
   });
 
+  it("explains an offline run service without internal terms", () => {
+    const message = workflowErrorMessage(new ApiRequestError("WORKFLOW_RUNNER_OFFLINE", "Workflow runner is offline", 503));
+    expect(message).toContain("运行服务暂时没有启动");
+    expect(message).toContain("这次运行没有开始");
+    for (const term of ["Worker", "队列", "Daemon", "心跳", "部署", "digest"]) expect(message).not.toContain(term);
+  });
+
   it("distinguishes a save revision conflict from an Assignment state conflict", () => {
     expect(workflowErrorMessage(new ApiRequestError("REVISION_CONFLICT", "Conflict", 409))).toContain("保存冲突");
     const message = workflowErrorMessage(new ApiRequestError("ASSIGNMENT_STATE_CONFLICT", "Conflict", 409));

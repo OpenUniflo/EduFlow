@@ -332,7 +332,10 @@ export function useWorkflowV2Controller(initial: WorkflowDocumentV2, launchConte
       clearRunObservation("current"); setObservedRunId(created.historyExpired ? null : created.runId);
       if(created.historyExpired)setNotice("该请求已执行，运行历史已清理；没有重新执行。");else setRunNotice({runId:created.runId,text:runSubmittedNotice});
     } catch (reason) {
-      if (!(reason instanceof ApiRequestError) || reason.status >= 500 || reason.status === 408) { setSubmitUnknown(true); setError("提交状态待确认：网络响应中断，请确认原请求，避免重复执行。"); }
+      // An explicit runner-offline rejection proves that no Run was created; it is not
+      // an uncertain transport failure and must surface its own plain explanation.
+      const definitive = reason instanceof ApiRequestError && (reason.code === "WORKFLOW_RUNNER_OFFLINE" || reason.status < 500 && reason.status !== 408);
+      if (!definitive) { setSubmitUnknown(true); setError("提交状态待确认：网络响应中断，请确认原请求，避免重复执行。"); }
       else { if (reason.status === 401) onRecoverySubmissionRejected?.(attempt.key); pendingRunRequest.current = null; setSubmitUnknown(false); setRunPreparationFailure("submit"); throw reason; }
     }
   }); }

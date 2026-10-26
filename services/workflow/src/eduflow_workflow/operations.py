@@ -55,18 +55,51 @@ def signal(role, status='ok', code=None):
         print(json.dumps(payload), file=sys.stderr, flush=True)
 
 
-def service_signal(role, now=None):
+def service_status(role, now=None):
+    """Reads one local role signal without requiring the caller's executor digest."""
     directory = os.environ.get('WORKFLOW_HEALTH_DIRECTORY')
     if not directory:
-        return False
+        return None
     try:
         payload = json.loads((Path(directory) / (role + '.json')).read_text())
         age = (time.time() if now is None else now) - payload['observedAt']
-        return (payload['role'] == role and payload['status'] == 'ok'
-                and payload['executorDigest'] == DEPENDENCY_MANIFEST['executorDigest']
-                and 0 <= age <= 20)
+        if payload['role'] == role and payload['status'] == 'ok' and 0 <= age <= 20:
+            return payload
     except (OSError, ValueError, TypeError, KeyError):
-        return False
+        pass
+    return None
+
+
+def service_signal(role, now=None):
+    payload = service_status(role, now)
+    return bool(payload and payload.get('executorDigest') == DEPENDENCY_MANIFEST['executorDigest'])
+
+
+def _log_runner_digest_mismatch(worker_digest):
+    """Version skew is expected between a Preview compiler and the Production Worker."""
+    if worker_digest and worker_digest != DEPENDENCY_MANIFEST['executorDigest']:
+        print(json.dumps({'event': 'workflow.runner.digest_mismatch',
+                          'compilerDigest': DEPENDENCY_MANIFEST['executorDigest'],
+                          'workerDigest': worker_digest}), file=sys.stderr, flush=True)
+
+
+async def runner_status():
+    """Returns whether any Worker recently signalled health; executor digest is not a gate."""
+    if os.environ.get('WORKFLOW_DEPLOYMENT_MODE') == 'hosted':
+        from .storage import Storage
+        try:
+            state = await asyncio.wait_for(Storage(os.environ['WORKFLOW_DATABASE_URL']).call('p6_worker_status'), 4)
+        except Exception:
+            return {'online': False}
+        if not isinstance(state, dict):
+            return {'online': False}
+        _log_runner_digest_mismatch(state.get('executorDigest'))
+        return {'online': state.get('online') is True}
+    state = service_status('worker')
+    if not state:
+        return {'online': False}
+    _log_runner_digest_mismatch(state.get('executorDigest'))
+    return {'online': True}
 
 
 async def publish(role, status='ok', code=None):

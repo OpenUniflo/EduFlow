@@ -114,11 +114,11 @@ describe("Deployment-scoped compiler resolution", () => {
     })).toBe("https://edu-flow-pr-42.vercel.app/api/workflow-compiler");
   });
 
-  it("uses the configured compiler URL in production", () => {
+  it("uses production's own deployment even when a global compiler URL is configured", () => {
     expect(resolveWorkflowCompilerBase({
       VERCEL_ENV: "production",
       VERCEL_URL: "edu-flow.example.com",
-      WORKFLOW_COMPILER_URL: "https://edu-flow.example.com/api/workflow-compiler",
+      WORKFLOW_COMPILER_URL: "https://legacy.example.com/api/workflow-compiler",
     })).toBe("https://edu-flow.example.com/api/workflow-compiler");
   });
 
@@ -128,9 +128,9 @@ describe("Deployment-scoped compiler resolution", () => {
     })).toBe("http://127.0.0.1:18110");
   });
 
-  it("falls back to the configured compiler URL when a preview has no deployment host", () => {
+  it.each(["preview", "production"])("falls back to the configured compiler URL when %s has no deployment host", (environment) => {
     expect(resolveWorkflowCompilerBase({
-      VERCEL_ENV: "preview",
+      VERCEL_ENV: environment,
       VERCEL_URL: "",
       WORKFLOW_COMPILER_URL: "https://edu-flow.example.com/api/workflow-compiler",
     })).toBe("https://edu-flow.example.com/api/workflow-compiler");

@@ -207,6 +207,18 @@ describe("current attempt and selected history", () => {
     expect(api.get).toHaveBeenCalledWith("workflow", 3);
   });
 
+  it("treats an offline runner rejection as definitive and never asks to confirm the submission", async () => {
+    await boot();
+    api.createRun.mockRejectedValueOnce(new ApiRequestError("WORKFLOW_RUNNER_OFFLINE", "Workflow runner is offline", 503));
+    await render().startRun();
+    expect(render().submitUnknown).toBe(false);
+    expect(render().runPreparationFailure).toBe("submit");
+    // This suite injects the plain translator; the repository suite verifies the
+    // production offline copy. The important part here is the definitive rejection.
+    expect(render().error).toBe("Workflow runner is offline");
+    expect(render().error).not.toContain("提交状态待确认");
+  });
+
   it("keeps the original uncertain key/input and confirms it after a local rejection", async () => {
     (await boot()).setInput({ question: "A" });
     api.createRun.mockRejectedValueOnce(new Error("response was not JSON"));
