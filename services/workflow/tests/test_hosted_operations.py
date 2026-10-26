@@ -143,56 +143,28 @@ async def test_cloud_reaper_caps_total_scan_and_delete_not_only_page_size(monkey
     assert len(deleted)==5 and len(seen)<=20
 
 
-async def test_runner_status_accepts_any_online_worker_and_logs_digest_mismatch(monkeypatch, capsys):
-    from eduflow_workflow import storage
-    calls = []
-
-    class Store:
-        def __init__(self, url):
-            assert url == 'synthetic-database'
-
-        async def call(self, name):
-            calls.append(name)
-            return {'online': True, 'executorDigest': 'b' * 64}
-
+async def test_hosted_readiness_uses_queue_mode_without_daemon_signals(monkeypatch):
+    from eduflow_workflow import sandbox
+    async def database_ready(): return True
+    async def available(): return {'python': True, 'javascript': True}
     monkeypatch.setenv('WORKFLOW_DEPLOYMENT_MODE', 'hosted')
-    monkeypatch.setenv('WORKFLOW_DATABASE_URL', 'synthetic-database')
-    monkeypatch.setattr(storage, 'Storage', Store)
-    assert await operations.runner_status() == {'online': True}
-    assert calls == ['p6_worker_status']
-    event = json.loads(capsys.readouterr().err)
-    assert event['event'] == 'workflow.runner.digest_mismatch'
-    assert set(event) == {'event', 'compilerDigest', 'workerDigest'}
-    assert event['workerDigest'] == 'b' * 64
+    monkeypatch.setattr(operations, 'database_ready', database_ready)
+    monkeypatch.setattr(sandbox, 'available', available)
+    result = await operations.readiness()
+    assert result['status'] == 'ready'
+    assert result['checks'] == {'database': True, 'sandbox': True}
+    assert result['executionMode'] == 'queue'
 
 
-async def test_runner_status_reports_offline_without_logging(monkeypatch, capsys):
-    from eduflow_workflow import storage
-
-    class Store:
-        def __init__(self, url):
-            pass
-
-        async def call(self, name):
-            assert name == 'p6_worker_status'
-            return {'online': False, 'executorDigest': None}
-
-    monkeypatch.setenv('WORKFLOW_DEPLOYMENT_MODE', 'hosted')
-    monkeypatch.setenv('WORKFLOW_DATABASE_URL', 'synthetic-database')
-    monkeypatch.setattr(storage, 'Storage', Store)
-    assert await operations.runner_status() == {'online': False}
-    assert capsys.readouterr().err == ''
-
-
-async def test_local_runner_status_uses_the_signal_file_and_does_not_gate_on_digest(monkeypatch, tmp_path, capsys):
-    import time
+async def test_local_readiness_keeps_worker_and_watchdog_signals(monkeypatch):
+    from eduflow_workflow import sandbox
+    async def database_ready(): return True
+    async def available(): return {'python': True, 'javascript': True}
     monkeypatch.delenv('WORKFLOW_DEPLOYMENT_MODE', raising=False)
-    monkeypatch.setenv('WORKFLOW_HEALTH_DIRECTORY', str(tmp_path))
-    (tmp_path / 'worker.json').write_text(json.dumps({
-        'role': 'worker', 'status': 'ok', 'observedAt': time.time(), 'executorDigest': 'c' * 64,
-    }))
-    assert await operations.runner_status() == {'online': True}
-    event = json.loads(capsys.readouterr().err)
-    assert event['event'] == 'workflow.runner.digest_mismatch'
-    (tmp_path / 'worker.json').unlink()
-    assert await operations.runner_status() == {'online': False}
+    monkeypatch.setattr(operations, 'database_ready', database_ready)
+    monkeypatch.setattr(operations, 'service_signal', lambda role: False)
+    monkeypatch.setattr(sandbox, 'available', available)
+    result = await operations.readiness()
+    assert result['status'] == 'not_ready'
+    assert result['checks'] == {'database': True, 'worker': False, 'watchdog': False, 'sandbox': True}
+    assert result['executionMode'] == 'daemon'

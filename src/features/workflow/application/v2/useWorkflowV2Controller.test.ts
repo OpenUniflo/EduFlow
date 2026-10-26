@@ -207,15 +207,13 @@ describe("current attempt and selected history", () => {
     expect(api.get).toHaveBeenCalledWith("workflow", 3);
   });
 
-  it("treats an offline runner rejection as definitive and never asks to confirm the submission", async () => {
+  it("treats a bounded rejection as definitive and never asks to confirm the submission", async () => {
     await boot();
-    api.createRun.mockRejectedValueOnce(new ApiRequestError("WORKFLOW_RUNNER_OFFLINE", "Workflow runner is offline", 503));
+    api.createRun.mockRejectedValueOnce(new ApiRequestError("WORKFLOW_ARCHIVED", "Archived workflows cannot start new runs", 409));
     await render().startRun();
     expect(render().submitUnknown).toBe(false);
     expect(render().runPreparationFailure).toBe("submit");
-    // This suite injects the plain translator; the repository suite verifies the
-    // production offline copy. The important part here is the definitive rejection.
-    expect(render().error).toBe("Workflow runner is offline");
+    expect(render().error).toBe("Archived workflows cannot start new runs");
     expect(render().error).not.toContain("提交状态待确认");
   });
 

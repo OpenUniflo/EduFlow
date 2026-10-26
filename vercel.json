@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["sin1"],
+  "regions": [
+    "sin1"
+  ],
   "functions": {
     "api/workflows.ts": {
       "maxDuration": 120
@@ -93,9 +95,5 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "daemons": {
-    "worker": { "root": "services/workflow", "entrypoint": "Dockerfile", "command": ["eduflow-workflow", "worker"], "instances": { "sin1": 1 }, "resources": { "requests": { "memory": "1Gi" } }, "terminationGracePeriodSeconds": 660 },
-    "watchdog": { "root": "services/workflow", "entrypoint": "Dockerfile", "command": ["eduflow-workflow", "watchdog"], "instances": { "sin1": 1 }, "resources": { "requests": { "memory": "1Gi" } }, "terminationGracePeriodSeconds": 15 }
-  }
+  ]
 }

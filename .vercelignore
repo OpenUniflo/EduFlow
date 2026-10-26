@@ -20,9 +20,10 @@ dist/
 /.pnpm-store/
 /.vercel_python_packages/
 
-# Python worker sources are part of the single edu-flow deployment (M14): the
-# compiler Function uses services/workflow/src/** and the worker/watchdog daemons
-# build services/workflow/Dockerfile. Only local-only artifacts are excluded.
+# Python worker sources are part of the single edu-flow deployment: the compiler
+# and queue-consumer Functions use services/workflow/src/**. The Dockerfile and
+# worker/watchdog CLI commands remain local-only tooling, not Vercel daemons.
+# Only local-only artifacts are excluded.
 /services/**/.venv/
 /services/**/__pycache__/
 /services/workflow/.pytest_cache/

@@ -8,7 +8,7 @@ import { applyTemplateBindings, TemplateBindingError, validateTemplateBindings }
 import { readAssignmentEligibility } from "./assignmentEligibility.js";
 import { connectionReferenceRows, variableReferenceRows, type ReferenceWorkflow } from "./workflowV2References.js";
 import { cleanVariableOverrides, configurationSaveIssue, configurationSaveSchema, frozenVariableEnvironment, normalizeConfiguration, resolveDefaultEnvironmentId, withFrozenVariableEnvironment } from "./workflowVariableEnvironments.js";
-import { dispatchQueuedWorkflow, resolveWorkflowRunnerMode } from "./workflowQueue.js";
+import { dispatchQueuedWorkflow } from "./workflowQueue.js";
 
 type Result<T> = { data: T | null; error: { message: string; code?: string } | null };
 function result<T>(query: Result<T>): T {
@@ -172,19 +172,6 @@ async function resumeThread(client:SupabaseClient,owner:string,id:string,body:Wo
   const resumed=await rpc(client,'workflow_v2_resume',{p_owner:owner,p_thread:id,p_checkpoint:checkpoint,p_responses:responses,p_hash:hash,p_key:key,...(expectedRun?{p_expected_run:expectedRun}:{})});
   await dispatchQueuedWorkflow(resumed);
   return resumed;
-}
-/**
- * Run admission. Daemon mode requires a recently signalled Worker; Queue push mode has no
- * standing Worker and admits Runs because the deployment's own consumer executes them.
- * The compiler ignores executor-digest differences so a Preview can still use the
- * Production Worker in daemon mode.
- */
-async function ensureWorkflowRunnerOnline() {
-  // Queue push mode has no standing Worker to heartbeat; the deployment itself is the
-  // executor. Daemon mode keeps the historical fail-closed admission check.
-  if (resolveWorkflowRunnerMode() === "queue") return;
-  const status = await workflowCompiler<{ online?: boolean }>("/v1/runner-status");
-  if (status?.online !== true) throw new ApiError(503, "WORKFLOW_RUNNER_OFFLINE", "Workflow runner is offline");
 }
 async function validateLaunch(client: SupabaseClient, owner: string, workflowId: string, value: unknown) {
   if (value === undefined) return null;
@@ -468,7 +455,6 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
         if (clientInputHash !== assignmentInputHash) throw new ApiError(409, "INVALID_LAUNCH_CONTEXT", "Assignment authorizes a different Workflow startup input");
       }
       const variableEnvironment = await selectedVariableEnvironment(client, owner, variableEnvironmentId);
-      await ensureWorkflowRunnerOnline();
       const validation = await workflowCompiler("/v1/validate", { ownerId: owner, environmentRef: workflowString(body.environmentRef), definition: doc.definition, input: body.input, ...(variableEnvironment ? { variableEnvironmentId: variableEnvironment.id } : {}) });
       if (!validation.valid) { const correlation = workflowDiagnosticCorrelation(); throw new ApiError(422, "GRAPH_INVALID", "Workflow execution validation failed", { ...correlation, diagnostics: workflowScopedDiagnostics(validation.diagnostics, correlation) }); }
       const accepted = await rpc(client, "workflow_v2_enqueue", { p_owner: owner, p_workflow: workflowId, p_revision: body.revision, p_input: body.input, p_environment: body.environmentRef, p_environment_revision: validation.environmentRevision, p_registry: withFrozenVariableEnvironment(validation.registrySnapshot, variableEnvironment), p_semantic: validation.semanticHash, p_fingerprint: validation.compileFingerprint, p_request_hash: requestHash, p_key: key, p_launch: launch?.context ?? null, p_variable_environment: variableEnvironment?.id ?? null });

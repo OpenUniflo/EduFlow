@@ -65,13 +65,6 @@ async def ready():
     result = await readiness()
     return JSONResponse(status_code=200 if result["status"]=="ready" else 503,content=result)
 
-@app.get("/v1/runner-status")
-async def runner_status():
-    # New Run admission only needs "any Worker recently signalled"; version skew
-    # between a Preview compiler and the Production Worker must not block it.
-    from .operations import runner_status as read_runner_status
-    return await read_runner_status()
-
 @app.get("/v1/cache-info")
 async def worker_cache_info():
     from pathlib import Path

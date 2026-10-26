@@ -1,7 +1,6 @@
 import { apiRequest as sharedApiRequest, ApiRequestError, ApiResponseError } from "@/shared/api/apiClient";
 import { z } from "zod";
 import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail, ConnectionTestResult, ResourceReferenceRow } from "../../domain/v2/types";
-import { workflowRunnerOfflineMessage } from "../../domain/v2/runMessages";
 
 const endpoint = (resource: string, query: Record<string, string | number | undefined> = {}) => `/api/workflows?${new URLSearchParams({ resource, ...Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])) })}`;
 const runSubmissionReceipt = z.object({
@@ -19,7 +18,6 @@ export class WorkflowRequestError extends Error {
 export function workflowErrorMessage(reason: unknown): string {
   if (!(reason instanceof ApiRequestError)) return reason instanceof Error ? reason.message : "操作未完成，请检查连接后重试。";
   const byCode: Record<string, string> = {
-    WORKFLOW_RUNNER_OFFLINE: workflowRunnerOfflineMessage,
     MEMORY_VERSION_CONFLICT: "记忆已更新，请先读取最新版本再保存。",
     P5_OPERATION_FAILED: "此操作暂未完成，原历史保持不变，请刷新后检查。",
     CHECKPOINT_MISSING: "来源检查点已不存在，不能从初始状态代替重放。",

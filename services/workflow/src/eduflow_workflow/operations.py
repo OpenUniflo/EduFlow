@@ -75,33 +75,6 @@ def service_signal(role, now=None):
     return bool(payload and payload.get('executorDigest') == DEPENDENCY_MANIFEST['executorDigest'])
 
 
-def _log_runner_digest_mismatch(worker_digest):
-    """Version skew is expected between a Preview compiler and the Production Worker."""
-    if worker_digest and worker_digest != DEPENDENCY_MANIFEST['executorDigest']:
-        print(json.dumps({'event': 'workflow.runner.digest_mismatch',
-                          'compilerDigest': DEPENDENCY_MANIFEST['executorDigest'],
-                          'workerDigest': worker_digest}), file=sys.stderr, flush=True)
-
-
-async def runner_status():
-    """Returns whether any Worker recently signalled health; executor digest is not a gate."""
-    if os.environ.get('WORKFLOW_DEPLOYMENT_MODE') == 'hosted':
-        from .storage import Storage
-        try:
-            state = await asyncio.wait_for(Storage(os.environ['WORKFLOW_DATABASE_URL']).call('p6_worker_status'), 4)
-        except Exception:
-            return {'online': False}
-        if not isinstance(state, dict):
-            return {'online': False}
-        _log_runner_digest_mismatch(state.get('executorDigest'))
-        return {'online': state.get('online') is True}
-    state = service_status('worker')
-    if not state:
-        return {'online': False}
-    _log_runner_digest_mismatch(state.get('executorDigest'))
-    return {'online': True}
-
-
 async def publish(role, status='ok', code=None):
     signal(role, status, code)
     if os.environ.get('WORKFLOW_DEPLOYMENT_MODE') != 'hosted':
@@ -167,18 +140,18 @@ async def database_ready():
 
 async def readiness():
     from .sandbox import available
-    checks = {'database': await database_ready(), 'worker': service_signal('worker'),
-              'watchdog': service_signal('watchdog')}
-    if os.environ.get('WORKFLOW_DEPLOYMENT_MODE') == 'hosted' and checks['database']:
-        from .storage import Storage
-        try:
-            checks.update(await asyncio.wait_for(Storage(os.environ['WORKFLOW_DATABASE_URL']).call(
-                'p6_health', DEPENDENCY_MANIFEST['executorDigest']), 4))
-        except Exception:
-            checks['worker'] = checks['watchdog'] = False
+    # Hosted execution is queue push: the deployment's own consumer is the executor, so
+    # there is no standing Worker/watchdog signal to require. Local development keeps the
+    # independent worker/watchdog processes and their signal files.
+    queue_mode = os.environ.get('WORKFLOW_DEPLOYMENT_MODE') == 'hosted'
+    checks = {'database': await database_ready()}
+    if not queue_mode:
+        checks['worker'] = service_signal('worker')
+        checks['watchdog'] = service_signal('watchdog')
     try:
         checks['sandbox'] = all((await asyncio.wait_for(available(), 5)).values())
     except Exception:
         checks['sandbox'] = False
     return {'status': 'ready' if all(checks.values()) else 'not_ready', 'checks': checks,
+            'executionMode': 'queue' if queue_mode else 'daemon',
             'executorDigest': DEPENDENCY_MANIFEST['executorDigest']}

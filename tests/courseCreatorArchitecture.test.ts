@@ -60,7 +60,11 @@ describe("Course Creator persistence and authority boundaries", () => {
     expect(entries.map((entry) => entry.name)).not.toContain("course-intent.ts");
     expect(entries.map((entry) => entry.name)).not.toContain("course-mapping.ts");
     const config = JSON.parse(read("vercel.json"));
-    expect(config.functions["api/workflow-run-consumer.py"].experimentalTriggers[0]).toMatchObject({ type: "queue/v2beta", topic: "workflow-runs" });
+    expect(config).not.toHaveProperty("daemons");
+    expect(config.functions["api/workflow-run-consumer.py"]).toMatchObject({
+      maxDuration: 300,
+      experimentalTriggers: [{ type: "queue/v2beta", topic: "workflow-runs" }],
+    });
   });
 
   it("keeps database Functions and the existing Assistant in Singapore", () => {
