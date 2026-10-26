@@ -4,7 +4,7 @@ The pre-release Legacy Workflow editor, canned simulation, migration UI/API and 
 
 ## Deployment and acceptance scope
 
-The supported deployment uses Vercel and Supabase with an authenticated Python compiler/executor, independent Worker/watchdog, official PostgreSQL checkpoints/Store and queue authority. Hosted Sandbox and Local Docker adapt the same bounded code contract. Exact operational procedures and supported combinations are defined in the [Hosted runbook](architecture/WORKFLOW_HOSTED_RUNBOOK.md), [runtime contract](architecture/WORKFLOW_STATEGRAPH_RUNTIME_CONTRACT.md) and [deployment decision](architecture/decisions/0006-workflow-p6-hosted.md).
+The supported deployment uses Vercel and Supabase with an authenticated Python compiler/executor, Vercel Queues push execution, official PostgreSQL checkpoints/Store and queue authority. Hosted has no standing Worker/watchdog; a delayed queue-timeout message and each Run's bounded maintenance advance the same watchdog/cleanup work only while a Run is active. `pnpm workflow:local` keeps the independent local worker/watchdog. Hosted Sandbox and Local Docker adapt the same bounded code contract. Exact operational procedures and supported combinations are defined in the [Hosted runbook](architecture/WORKFLOW_HOSTED_RUNBOOK.md), [queue execution](architecture/WORKFLOW_QUEUE_PUSH.md), [runtime contract](architecture/WORKFLOW_STATEGRAPH_RUNTIME_CONTRACT.md) and [deployment decision](architecture/decisions/0006-workflow-p6-hosted.md).
 
 Historical Hosted acceptance covers a bounded Production configuration, not current live health, Preview readiness, multi-day uptime or open-traffic zero-loss deployment. Releases require a controlled maintenance window and a fail-closed preflight. See [delivery scope and limitations](acceptance/DELIVERY_STATUS.md).
 
@@ -16,7 +16,7 @@ Historical Hosted acceptance covers a bounded Production configuration, not curr
 - `editor/v2`: the sole React Flow editor, node processing forms, Read/Process/Write binding forms, execution bubbles/details, State, environment variables, node tests and history.
 - `pages`: library and route loading. Unknown identities render load/not-found states, never a Demo fallback.
 - `api/workflows.ts`: one Function entrypoint. Shared handler supports definitions/layout, templates, environments/configuration, tools, validation, node tests, Runs/Steps/Events/artifacts.
-- `services/workflow`: server-side Python LangGraph compiler/executor, provider/MCP/HTTP adapters, fenced jobs and watchdog.
+- `services/workflow`: server-side Python LangGraph compiler/executor, provider/MCP/HTTP adapters, fenced jobs, local worker/watchdog, and the queue consumer boundary.
 
 Course/Assignment identity is authenticated and revalidated at the application/API boundary, frozen into Run metadata, and stripped from runtime claims. Success alone never completes an Assignment or grants mastery.
 

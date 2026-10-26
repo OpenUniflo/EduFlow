@@ -1,10 +1,12 @@
 """Vercel entrypoint for the Workflow V2 queue push consumer.
 
-Vercel Queues invokes this private Function with a ``runId``-only message. The Function
-adds the authoritative ``services/workflow`` source (bundled with ``includeFiles``), applies
-the same fail-closed Hosted configuration assertion as the compiler, and exposes the ASGI app
-from ``eduflow_workflow.queue_consumer``. The consumer claims exactly that Run; it never uses
-the shared PGMQ ``claim`` rotation.
+Vercel Queues invokes this private Function with a ``runId``-only message (and, for the
+delayed watchdog check, ``kind=timeout``). The Function adds the authoritative
+``services/workflow`` source (bundled with ``includeFiles``), applies the same fail-closed
+Hosted configuration assertion as the compiler, and exposes the ASGI app from
+``eduflow_workflow.queue_consumer``. The consumer claims exactly that Run; it never uses the
+shared PGMQ ``claim`` rotation. A finished Run or a timeout check performs one bounded
+watchdog/p5_sweep/reap pass, so no standing daemon is required.
 """
 import sys
 from pathlib import Path

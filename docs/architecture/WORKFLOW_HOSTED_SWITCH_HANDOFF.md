@@ -1,6 +1,6 @@
-# Hosted 切换交接（M14 / M12）
+# Hosted 切换交接：队列推送执行（2026-10-26）
 
-状态：本地实施、Hosted 数据库迁移与清理、模板更新已完成；`edu-flow` 的 **Preview 构建**已成功（`dpl_Ccjn21Sfv6t7SjDrPsWH8G23eDBh`，commit `538c63e`，含 Python Compiler Function 与 worker/watchdog Daemon 镜像构建）。生产切换只差环境变量、生产部署、Hosted 冒烟与删除旧项目。
+状态：`feat/workflow` 已完成队列推送运行、删除 Vercel Daemon、补齐有界 watchdog 缺口与文档更新；本次不新增 Hosted 迁移，也不执行 Hosted SQL。Preview 由本次推送触发，真实运行验收由仓库所有者完成。下文的 Preview 证据在推送后读回。
 
 ## 1. 目标与现状
 
@@ -8,28 +8,34 @@
 | --- | --- |
 | Vercel 项目 | `edu-flow`（`prj_po8NNFg8tIXZJnanYCDR8uxGnpDz`，team `july-nanas-projects`） |
 | 生产域名 | `https://edu-flow-six-phi.vercel.app` |
-| Hosted Supabase | KnowledgeAtlas `uyljtdbvlivxniililay`（M13 迁移已应用，旧画布数据已清理，模板 23 行） |
-| 旧 Vercel 项目 | `edu-flow-workflow`（`prj_tDaQ3riDUpFHggr8rtBye9jJcFyd`），Daemon `worker`/`watchdog` 当前 desired 1 / ready 0 |
-| Preview 证据 | `dpl_Ccjn21Sfv6t7SjDrPsWH8G23eDBh` READY；构建日志含 CPython 3.13、`api/workflow-compiler.py` bundle、`daemon.worker` / `daemon.watchdog` 镜像推送 |
+| Hosted Supabase | KnowledgeAtlas `uyljtdbvlivxniililay` |
+| 执行方式 | Vercel Queues push；数据库写入 Run 后发送仅含 `runId` 的消息，由当前部署的 `api/workflow-run-consumer.py` 认领执行 |
+| 常驻进程 | 无 `worker`/`watchdog` Daemon；`vercel.json` 不再声明 `daemons` |
+| Function 数量 | 11（9 个 TypeScript + `workflow-compiler.py` + `workflow-run-consumer.py`） |
+| 已应用迁移 | `20261026120000_workflow_queue_claim_by_run.sql`（`claim_run`、`expire_wait`、`seal_run`），不得改写 |
+| 本次新增迁移 | 无 |
 
-## 2. `edu-flow` 缺少的 Production 环境变量
+- 每个 Preview 用自己的 Compiler、API 和 queue consumer 执行自己收到的消息；不再依赖 Production Worker。
+- 额度消耗只在队列消息或运行活动时发生；没有常驻进程空转。
+- 单次函数上限 300 秒；图执行预算默认 250 秒（可调到 270 秒），超时明确封存为 `RUN_TIMEOUT`。
 
-以下名称来自旧项目 `edu-flow-workflow` 与环境变量表对比；**值由用户填写，不要提交到仓库**。
+## 2. `edu-flow` 的 Production 环境变量
+
+以下只列名称和用途；**值由用户填写，不要提交到仓库**。
 
 | 变量 | 必需 | 说明 |
 | --- | --- | --- |
 | `WORKFLOW_DEPLOYMENT_MODE` | 是 | `hosted` |
-| `WORKFLOW_DATABASE_URL` | 是 | Hosted Supabase session pooler，`workflow_worker` 受限用户，`sslmode=require/verify-ca/verify-full`；密码只在旧项目环境变量中，需从旧项目面板复制或重置该角色密码 |
-| `WORKFLOW_ENVIRONMENTS_JSON` | 是 | 用下方第 3 节的单一公共环境 JSON 替换旧值；`ref` 已从 Hosted `workflow_private.p4_catalog.environment_ref` 确认为 `hosted`，保持不变 |
+| `WORKFLOW_DATABASE_URL` | 是 | Hosted Supabase session pooler，`workflow_worker` 受限用户，`sslmode=require/verify-ca/verify-full` |
+| `WORKFLOW_ENVIRONMENTS_JSON` | 是 | 用第 3 节的单一公共环境 JSON；`ref` 保持 `hosted` |
 | `WORKFLOW_SANDBOX_BACKEND` | 是 | `vercel` |
-| `WORKFLOW_SANDBOX_IMAGE` | 是 | 形如 `registry/image@sha256:<64 hex>`，沿用旧项目已验证的沙箱镜像摘要（旧项目 Daemon 镜像摘要可从 Vercel Daemons API 读取，但沙箱镜像不同，需从旧项目环境变量面板复制） |
-| `WORKFLOW_INTERNAL_TOKEN` | 已存在 | 保持现值（API 与 Worker 同项目共享，无需从旧项目复制） |
-| `WORKFLOW_COMPILER_URL` | 不再需要 | 仅本地/非 Vercel 环境使用。所有 Vercel 部署（Production 与 Preview）都自动调用本次部署的 `https://$VERCEL_URL/api/workflow-compiler`，保证前后端版本一致（Production 现有值可移除） |
-| `LLM_PROVIDER_KEY` | 可选 | 旧项目用于平台提供方；公共环境不含 providers，如 Worker 启动不读取可省略 |
+| `WORKFLOW_SANDBOX_IMAGE` | 是 | 形如 `registry/image@sha256:<64 hex>` 的固定沙箱镜像 |
+| `WORKFLOW_INTERNAL_TOKEN` | 是 | API、Compiler 与消费者共享的内部身份；至少 32 字符 |
+| `WORKFLOW_COMPILER_URL` | 不再需要 | 仅本地/非 Vercel 环境使用；Vercel 部署自动调用本次部署的 `https://$VERCEL_URL/api/workflow-compiler` |
+| `WORKFLOW_QUEUE_FUNCTION_BUDGET_SECONDS` | 可选 | 默认 250，允许 30–270；用于给 300 秒函数限制留出 finish/清理余量 |
+| `WORKFLOW_RUNNER_MODE` | 不再需要 | Vercel 上强制 queue；该变量只在本地开发选择 `queue`/`daemon` |
 
 `WORKFLOW_ALLOW_LOCAL_FIXTURES` 不得设置为 `1`；`assert_hosted_configuration()` 会 fail closed。
-
-Preview 与 Production 共用 Hosted 数据库和 Production Worker。分支修改了 Worker 执行代码时，Preview 的 Compiler/API 与 Production Worker 版本可能不同；编译校验通过不代表执行语义一致。此类分支必须先合并并提升 Production，再以同一次部署验收，不能只依赖 Preview。
 
 ## 3. 公共运行环境 JSON（替换 `WORKFLOW_ENVIRONMENTS_JSON`）
 
@@ -51,40 +57,37 @@ Preview 与 Production 共用 Hosted 数据库和 Production Worker。分支修�
 }
 ```
 
-规则（`services/workflow/src/eduflow_workflow/operations.py · assert_hosted_configuration`）：只能有一个或多个 `access:"authenticated"` 公共环境时，不得带 `ownerIds`、`providers`、`connectors`、`tools`、`variables`、`functions`、`localFixtures`；`ref` 一经使用不再修改（用户连接与函数按 “用户 + 运行环境标识” 存放，改标识会失联）。平台 DeepSeek/DeepWiki 不再提供，所有连接由用户在资源中心自建。
+规则（`services/workflow/src/eduflow_workflow/operations.py · assert_hosted_configuration`）：只能有一个或多个 `access:"authenticated"` 公共环境时，不得带 `ownerIds`、`providers`、`connectors`、`tools`、`variables`、`functions`、`localFixtures`；`ref` 一经使用不再修改（用户连接与函数按“用户 + 运行环境标识”存放，改标识会失联）。平台 DeepSeek/DeepWiki 不再提供，所有连接由用户在资源中心自建。
 
-## 4. 生产发布与验证（需要用户确认后执行）
+## 4. 发布与验证
 
-1. 用户完成第 2 节环境变量（Production 环境）。
-2. 发布生产：把 `feat/workflow` 合入生产分支（当前项目未显式设置 productionBranch，默认应为 `main`）并推送，或以受控方式 `vercel --prod`；发布后读回部署 ID。
-3. 读回证据：
+1. 由用户把 `feat/workflow` 合入生产分支并推送，或以受控方式 `vercel --prod`；本次任务不执行 `--prod`。
+2. 读回证据：
    - 部署 `readyState=READY`、target=production；
-   - Function 数量 12（11 TS + `workflow-compiler.py`；以真实构建产物/项目 Functions 面板为准）；
-   - `GET /v1/projects/<edu-flow>/daemons`：`worker`、`watchdog` 各 1 个 ready 实例；
-   - `POST /api/workflow-compiler/v1/document`（带认证）返回编译结果而不是 404/折叠路径错误（ADR 0007 必验项）；
-   - `/api/workflows?resource=environments` 登录后 200，响应不出现「运行环境」；
-   - 普通登录账号可打开编辑器、资源中心、校验与运行（无需 owner 名单）。
-4. Hosted 冒烟（仅生产部署后）：
-   - 资源中心新建两个变量环境、编辑覆盖值并保存，刷新仍在；顶栏可切换；
-   - 编译校验（含工具必填参数）；
-   - `入口 → 数据转换（读取环境变量）→ 结束` 在两个变量环境下各跑一次，Run 成功且冻结不同环境/值；
-   - 模型相关验收由用户人工完成并填计划 §8「人工验收」表。
-5. 验证通过后删除 `edu-flow-workflow`：先确认其 Daemon 不领取任务（当前 ready 0），再删除项目；删除后重跑第 3 步的登录/编译/运行冒烟。
+   - Function 数量 11，`vercel.json`/部署产物没有 `daemons`；
+   - `api/workflow-run-consumer.py` 带 `queue/v2beta` 触发器、topic `workflow-runs`、`maxDuration` 300；
+   - `/api/workflow-compiler/health` 与认证 capabilities 正常；
+   - 普通登录账号可打开编辑器、资源中心、校验与运行。
+3. Hosted 冒烟（由用户执行）：
+   - 资源中心变量环境保存/刷新；
+   - 编译校验；
+   - 真实 DeepSeek Run 成功，数据库中 worker 为 `queue:...`，由该部署的消费者执行；
+   - 运行超过预算时进入 failed + `RUN_TIMEOUT`，不长期停在 running。
+4. 旧项目 `edu-flow-workflow` 不再需要承接当前运行；删除与否由用户确认，本次任务不删除项目。
 
-## 4.1 Preview 运行时证据（2026-10-24）
+## 4.1 Preview 运行时证据
 
-直接请求 `https://edu-flow-ih1akkhmz-july-nanas-projects.vercel.app`（无需保护绕过）：
-
-- `/` → 200 HTML；
-- `/api/health` → 200 HTML（SPA 回退，说明 Hosted 已无 health Function）；
-- 11 个 TS 入口 POST 均被函数处理（401/405/500，非 SPA HTML）：assistant、course-intent、course-mapping、course、domains、knowledge-generation、knowledge、learner、material-parsing-jobs、materials、workflows；
-- `/api/workflow-compiler/health` → 401 `{"code":"UNAUTHORIZED","message":"Service identity required"}`；`/api/workflow-compiler/openapi.json` → 401；裸 `/api/workflow-compiler` → 307（FastAPI mount 的尾斜杠重定向）。路径后缀被转发到内层 FastAPI，说明 Vercel rewrite 保留了子路径（ADR 0007 必验项在 Preview 已验证，生产需再用认证请求复核）；
-- 因此 Preview 实际存在 12 个 Function（11 TS + 1 Python），与预算一致。
-
-注意：Preview 环境缺少生产变量，`course-mapping`/`knowledge-generation` 对空 POST 返回 500，属 Preview 环境差异，生产发布后需再核验。
+本次推送后的 Preview 由 `feat/workflow` 触发。记录项：部署 ID、URL、commit、Function 数量、`daemons` 缺失、queue 触发器、公网路由冒烟。具体值见本次交付输出；若本文档未填，以 Vercel 部署读回为准。
 
 ## 5. 回滚
 
-- 生产发布前保留当前生产部署 ID；Vercel promotion/rollback 会同时更新同项目 Daemons。
-- 数据库只向前修复，不回滚迁移；M13 已应用的 `20261023184824` 与仓库一致。
-- 若 Compiler rewrite 子路径在 Hosted 被折叠（404/405），按 ADR 0007 调整为读取原始路径头的入口实现，并登记计划 §9。
+- 回退只选择已验证且 schema/执行器兼容的 deployment；Vercel promotion/rollback 只切换 Function 代码，不再有 Daemons 需要同步。
+- 数据库只向前修复，不回滚迁移；`20261026120000_workflow_queue_claim_by_run.sql` 已在 Hosted 应用。
+- 滚动期间在途消息可能由旧/新部署消费；`claim_run` 只领取命名 Run，有效租约不会被第二次执行，stale 租约由 `claim_run`/`watchdog` 封闭。
+- 若 Compiler rewrite 子路径在 Hosted 被折叠（404/405），按 ADR 0007 调整为读取原始路径头的入口实现，并登记问题。
+
+## 6. 已知限制与后续
+
+- 超过 300 秒的长运行不能靠单次函数完成；本次不做分步续跑。后续需要把长 Workflow 拆成可续跑的 Step/Checkpoint 边界（每次消费执行一段并重新入队），或迁移到支持更长执行的产品。
+- 长时间完全没有队列活动时，过期 Thread/Store/临时请求清理、遗留 sandbox 回收会延后到下一次活动；当前没有 Hobby 可用的每分钟 Cron，故不依赖 Cron 补洞。
+- Hosted 中 10-26 08:22–08:24 的 4 条旧 queued Run 没有队列消息；它们不会被专门删除/改写，第一次队列活动（运行结束或 75 秒延迟 timeout 检查）触发有界 `watchdog` 后，预期被封为 failed + `QUEUE_TIMEOUT`（前提是其 Thread 仍为 active/waiting）。若 Thread 已不满足条件，则保持原状等待人工核对；若期间完全没有活动，会继续显示 queued 直到下一次活动。

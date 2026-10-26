@@ -369,9 +369,9 @@ queued 可进入 running、failed（预检失败/排队超时）或 cancelled；
 
 Worker 通过服务端受控任务存储适配器领取租约并 heartbeat。租约含 fencing token；事件写入必须验证当前 token，旧 Worker 不能提交新结果。M1 租约过期将已启动运行标记 failed/WORKER_LOST，不自动重放执行；返回状态查询保留已产生证据。M2 再通过 Checkpoint 实现可恢复重调度。
 
-M1 服务端必须有独立于浏览器的 watchdog/reconciler，处理无 Worker、队列滞留、租约过期、取消和总超时。Local 适配使用租约 30 秒、heartbeat 5 秒、独立 watchdog 每 5 秒扫描（契约要求不超过 10 秒）；排队最长 60 秒，到期 QUEUE_TIMEOUT。Run timeoutMs 从 running 开始计算，queued 另受排队上限约束。maxOutputTokens 是每次模型请求上限，maxToolCalls/maxNodeExecutions 按 Run 累积且在调用前检查。maxCost 在 M1 不开放（提供值返回 UNSUPPORTED_CAPABILITY）；真实费用可得时展示，不能以估算声称硬预算。每用户默认最多 2 个运行中、5 个排队，资源策略可调低；原子入队校验防止并发绕过。
+服务端必须有独立于浏览器的 watchdog/reconciler，处理无 Worker、队列滞留、租约过期、取消和总超时。Local 使用租约 30 秒、heartbeat 5 秒、独立 watchdog 每 5 秒扫描（契约要求不超过 10 秒）；Hosted 队列模式没有常驻进程，由延迟 timeout 消息、运行结束维护和 `claim_run` 在有活动时执行同一有界 SQL watchdog。排队最长 60 秒，到期 QUEUE_TIMEOUT。Run timeoutMs 从 running 开始计算，queued 另受排队上限约束。maxOutputTokens 是每次模型请求上限，maxToolCalls/maxNodeExecutions 按 Run 累积且在调用前检查。maxCost 在 M1 不开放（提供值返回 UNSUPPORTED_CAPABILITY）；真实费用可得时展示，不能以估算声称硬预算。每用户默认最多 2 个运行中、5 个排队，资源策略可调低；原子入队校验防止并发绕过。
 
-停止/取消提交需要同时封禁新的 Step 和工具调用。Worker 在每个外部调用前检查租约/取消，丢失存储连接即停止调度；不能保证撤回已发出的网络请求。所有 Worker 消失时 watchdog 仍负责收敛终态，不能依赖死进程把自己标失败。
+停止/取消提交需要同时封禁新的 Step 和工具调用。Worker/消费者在每个外部调用前检查租约/取消，丢失存储连接即停止调度；不能保证撤回已发出的网络请求。Hosted 中函数被杀后由下一次投递的 `claim_run` 或下一次活动触发的 watchdog 收敛终态，不能依赖死进程把自己标失败。
 
 ### 7.3 存储与安全
 

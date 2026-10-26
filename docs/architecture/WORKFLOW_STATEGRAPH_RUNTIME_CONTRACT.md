@@ -64,7 +64,7 @@ P6模型响应补充：官方SDK聚合响应必须明确成功终止（stop、to
 
 SDK task namespace 包含节点／调用后缀，不能与图 checkpoint namespace 混用。P3 独立维护 graphNamespace、graphPath、parentTaskId；子图 checkpoint 与其 Step 完成／事件在同一事务提交到私有 scope 提交索引，绝不改写根 Thread 的 checkpoint／State。任务结果已保存、超步已提交、整图完成分别展示。父图通过原始输出映射提交根状态。
 
-运行中 Worker 失联由 watchdog 封为 WORKER_LOST，用户从可发现失败记录显式尝试检查点继续；本阶段没有新增自动接管。实际停止进程、租约收尾、人工恢复以及已有子图回应结果跨重启均有独立证据。cancel、过期或成功不能被新回应复活。
+运行中消费者或本地 Worker 失联由 `claim_run`/`watchdog` 封闭为 WORKER_LOST，用户从可发现失败记录显式尝试检查点继续；本阶段没有新增自动接管。实际停止进程、租约收尾、人工恢复以及已有子图回应结果跨重启均有独立证据。cancel、过期或成功不能被新回应复活。
 
 前端沿用原画布设计：任务选择与批量提交在现有节点气泡；父图子图气泡提供内部等待提示／定位；执行与历史按 graphPath、task 和调用序号区分，面板与状态更新不重排节点。孤立节点测试不执行控制流／子图，提示运行完整流程。配置导出仍不是独立运行程序。
 
@@ -79,7 +79,7 @@ SDK task namespace 包含节点／调用后缀，不能与图 checkpoint namespa
 | 发布用途 | purpose node／handler隔离，函数版本不可改写；可信predicate为edu.positive／edu.truthy@1，可信Reducer为edu.sum／edu.max／edu.unique@1，由代码发布扩展 |
 | Runtime Context | 服务端ownerId／workflowId／nodeId／graphPath及累计attempt；不注入完整环境、产品实体或凭据 |
 | retry | 最大1–10次包含首次，间隔／倍率／上限／分类显式配置；SQL按thread/task跨Run累计。额外尝试及handler扣节点预算，模型SDK／HTTP transport不叠加重试 |
-| timeoutMs | 处理节点1–120000ms，受整图剩余预算限制；SDK协作超时＋容器硬期限＋独立watchdog回收。人工等待不算失败或计算时间 |
+| timeoutMs | 处理节点1–120000ms，受整图剩余预算限制；SDK协作超时＋容器硬期限＋有界 watchdog 回收（本地独立进程；Hosted 在队列活动时执行）。人工等待不算失败或计算时间 |
 | cache ttlMs | 仅纯函数／确定性转换；1–3600整秒；官方Worker进程内缓存最多512条，重启失效。含interrupt／Command／handler及模型／工具／控制流／子图整体明确拒绝 |
 | 缓存命中 | 键含owner、环境／版本、安全Context和输入；仍执行外层权限、当前task审计、具体输出Schema和原始patch提交，不复用旧身份。缓存损坏／不可用失败，不伪造成功 |
 | errorHandler | functionRef＋functionVersion引用purpose handler；重试耗尽后最多一次，输入为error.code及原解析input。原失败保留；处理器失败有界结束 |
@@ -175,15 +175,15 @@ Context与依赖访问边界在P4交付，跨Thread长期Store的完整持久化
 
 ## Hosted 执行边界（P6）
 
-按用户授权仅使用Vercel与Supabase：主应用认证API→内部FastAPI Compiler→Supabase PGMQ→独立Daemon Worker→官方Saver/Store；另一个Daemon watchdog处理失联、保留和隔离VM回收。Daemon公共Beta只在Production运行，不能由Preview前端READY推断后台可用。实际环境、版本与最终签署见[P6计划](../../artifacts/archive/document-history-20261020/files/docs/architecture/WORKFLOW_STATEGRAPH_P6_PLAN.md)、[ADR0006](decisions/0006-workflow-p6-hosted.md)和[运维手册](WORKFLOW_HOSTED_RUNBOOK.md)。
+按用户授权仅使用Vercel与Supabase：主应用认证API→内部FastAPI Compiler→数据库写入Run/Job和幂等记录→Vercel Queues push（仅runId）→当前部署的队列消费者→官方Saver/Store。Hosted没有常驻Worker/watchdog Daemon；本地`pnpm workflow:local`保留独立Worker/watchdog。延迟timeout消息、运行结束维护和`claim_run`在活动时执行有界失联/保留/VM回收。实际环境、版本与最终签署见[P6计划](../../artifacts/archive/document-history-20261020/files/docs/architecture/WORKFLOW_STATEGRAPH_P6_PLAN.md)、[ADR0006](decisions/0006-workflow-p6-hosted.md)、[队列执行](WORKFLOW_QUEUE_PUSH.md)和[运维手册](WORKFLOW_HOSTED_RUNBOOK.md)。
 
 Local Docker与Hosted Vercel Sandbox是同一Code节点契约的适配器，不是不同学习/工作流领域。Hosted固定镜像、无网络、无秘密，每调用新VM，内部非root且限制资源，失败不降级到宿主执行。许可模型/HTTP/MCP在服务端可信目录执行，不把网络权限交给隔离代码。
 
-身份与运行状态以数据库为准；共享SQL健康信号和发现目录不能由浏览器或临时文件替代。`/health`只是存活，内部认证`/ready`要求当前执行器的DB/Worker/watchdog/隔离服务全部就绪。仅显式授权owner可用环境；验收账号与示例不扩大为所有用户权限。
+身份与运行状态以数据库为准；共享SQL健康信号和发现目录不能由浏览器或临时文件替代。`/health`只是存活；Hosted 的内部认证`/ready`检查DB与隔离服务并返回`executionMode: "queue"`，本地开发才同时要求worker/watchdog信号。仅显式授权owner可用环境；验收账号与示例不扩大为所有用户权限。
 
-所有Runtime和官方Saver/Store连接显式设置连接超时5秒（ready3秒）、TCP未确认数据20秒、statement15秒、锁等待3秒，保留SDK search_path；不能只依赖连接池未实际采用的角色默认值。watchdog只处理有待处置的Thread，每批最多128；过期集合各清理128、skip locked，失败下次重试。Sandbox回收与DB巡检分为独立异步任务；每轮处理20对象/尝试删除5个、4秒超时，失败不续健康信号，也不阻断Run失联封闭。7天保留边界与15分钟稳定性观察不是多日连续运行证明。
+所有Runtime和官方Saver/Store连接显式设置连接超时5秒（ready3秒）、TCP未确认数据20秒、statement15秒、锁等待3秒，保留SDK search_path；不能只依赖连接池未实际采用的角色默认值。watchdog只处理有待处置的Thread，每批最多128；过期集合各清理128、skip locked，失败下次重试。Hosted 中 watchdog/p5_sweep/reap 由队列消息或运行结束触发；Sandbox回收与DB巡检分开、各自有4–6秒超时，失败不阻断Run失联封闭。7天保留边界与15分钟稳定性观察不是多日连续运行证明。
 
-Worker进程重启不自动接管失联Run。显式恢复保留累积预算与已提交State/Store；执行器或目录不兼容时保留旧历史并拒绝继续，不重写指纹。备份恢复必须匹配旧应用与schema，秘密单独重新配置；应用回退不是共享数据库回退。
+消费者进程被杀或本地 Worker 重启都不自动接管失联Run。显式恢复保留累积预算与已提交State/Store；执行器或目录不兼容时保留旧历史并拒绝继续，不重写指纹。备份恢复必须匹配旧应用与schema，秘密单独重新配置；应用回退不是共享数据库回退。
 
 ## 验收与证据
 

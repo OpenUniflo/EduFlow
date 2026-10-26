@@ -129,7 +129,7 @@ A READY Vercel deployment does not apply or validate Hosted Supabase migrations.
 4. synchronize only required, hosted-safe fixture rows without resetting or replacing user data;
 5. smoke the authenticated APIs before browser acceptance.
 
-Shared Hosted databases must not be migrated automatically from every Preview build. Keep physical Vercel function entrypoints consolidated and check the active deployment limits before adding a new top-level `api/*.ts` entrypoint.
+Shared Hosted databases must not be migrated automatically from every Preview build. Keep physical Vercel function entrypoints consolidated and check the active deployment limits before adding a new top-level `api/*.ts` entrypoint. Workflow Runs on Vercel use Vercel Queues push and are executed by the deployment that receives the message; there are no worker/watchdog Daemons. `pnpm workflow:local` keeps the local worker/watchdog. See [Workflow 队列推送执行](docs/architecture/WORKFLOW_QUEUE_PUSH.md).
 
 Do not commit secrets. Browser code may use only the Supabase URL and publishable key; privileged Supabase credentials remain server-only.
 

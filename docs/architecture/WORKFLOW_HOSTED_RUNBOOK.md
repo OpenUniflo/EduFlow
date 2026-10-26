@@ -1,63 +1,62 @@
 # Workflow Hosted 部署与运维
 
-本部署按用户要求仅使用 Vercel 与 Supabase。配置和容量决策见 [ADR 0006](decisions/0006-workflow-p6-hosted.md)（历史 P6 记录）；自 M14 起单一 Vercel 项目的部署决定见 [ADR 0007](decisions/0007-workflow-backend-in-main-project.md)，能力与历史验收限制见 [当前交付摘要](../acceptance/DELIVERY_STATUS.md)。执行新验收须检查实际部署与就绪状态，不能以某次 READY 或 Local 测试代替。
+本部署按用户要求仅使用 Vercel 与 Supabase。当前执行方式是 Vercel Queues push：Run 先写入数据库，API 再发送仅含 `runId` 的队列消息，由该部署自己的 `/api/workflow-run-consumer` 认领并执行；**没有常驻 `worker`/`watchdog` Daemon**。设计、缺口处理和已知限制见 [Workflow 队列推送执行](WORKFLOW_QUEUE_PUSH.md)。配置和容量决策见 [ADR 0006](decisions/0006-workflow-p6-hosted.md)（历史 P6 记录）；自 M14 起单一 Vercel 项目的部署决定见 [ADR 0007](decisions/0007-workflow-backend-in-main-project.md)，能力与历史验收限制见 [当前交付摘要](../acceptance/DELIVERY_STATUS.md)。执行新验收须检查实际部署与就绪状态，不能以某次 READY 或 Local 测试代替。
 
-当前兼容发布对为7b65执行器：A `dpl_BQPdKjWiXZV95xWgwGZZM1BMo441`、B `dpl_jQ1dsHSgfTrAS253RygGeFu3byYk`，正常入口指向B；主前端为`dpl_DbSCNySXWbvQiBqbHA1Q6phQBs2T`。完整675文件manifest、实际Function12+1和各Daemon身份分别留证。8566及400b是历史证据/恢复范围，不把旧身份改写成新执行器。
+历史兼容发布对为 7b65 执行器：A `dpl_BQPdKjWiXZV95xWgwGZZM1BMo441`、B `dpl_jQ1dsHSgfTrAS253RygGeFu3byYk`，主前端为 `dpl_DbSCNySXWbvQiBqbHA1Q6phQBs2T`。这些是历史证据/恢复范围，不把旧身份改写成当前执行器。
 
 ## 部署和版本
 
-- 主应用：`edu-flow`，前端、认证 Node API、Python Compiler Function 与独立 `worker`/`watchdog` Daemons 同属这一个项目（M14，[ADR 0007](decisions/0007-workflow-backend-in-main-project.md)）。每次部署核对真实 Function 产物，最多12个（11 个 TypeScript 入口 + `api/workflow-compiler.py`）。Daemons 公共 Beta 当前仅 Production 运行，不能声称 Preview 同等可用；原 `edu-flow-workflow` 项目在合并部署验收通过并由用户确认后删除。
-- Supabase `uyljtdbvlivxniililay`，session pooler SSL，受限 `workflow_worker`；数据库是队列、State、官方 checkpoint/Store 和共享发现目录权威。不得用开发机进程或临时磁盘补 Hosted 运行。
-- 使用 pnpm/uv 锁文件。Vercel CLI 部署在**仓库根**执行（`--cwd` 仓库根，`--local-config <root>/vercel.json`）；不要再用 `--cwd services/workflow`，否则既缺根配置也会误判项目路由。核对实际 `/api/workflow-compiler` 的认证 capabilities、真实 Function 数量与 Worker/watchdog 实例，不能只看部署状态。
-- 部署配置只有仓库根 `vercel.json`：Python Compiler Function（`api/workflow-compiler.py`，`includeFiles: services/workflow/src/**`，`maxDuration` 120）、`/api/workflow-compiler/:path*` 改写，以及 `worker`/`watchdog` Daemons（`root: services/workflow`、`entrypoint: Dockerfile`、sin1 各 1 实例、1Gi 内存、660s/15s 终止宽限）都在此声明。Python 依赖来自根 `requirements.txt`，由 `scripts/workflow/export-requirements.mjs` 从 `services/workflow/uv.lock` 生成并由 `pnpm test:workflow` 检查漂移；根 `.python-version` 固定 `3.13`。不要手改 `requirements.txt`，也不要把 `services/workflow` 当作独立 Vercel 项目部署（其 `vercel.json` 已删除）。Hosted 不再提供 `api/health.ts` 的 `/api/health`；仓库内只有本地工具使用它。保留清单包含源码散列、deployment ID、执行器 digest、镜像 digest、迁移清单、环境/发现目录修订。SDK 或受执行器指纹覆盖的代码变化使旧检查点不兼容，不静默改写旧快照。
+- 主应用：`edu-flow`。前端、认证 Node API、Python Compiler Function 与队列消费者同属这一个项目（M14，[ADR 0007](decisions/0007-workflow-backend-in-main-project.md)）。每次部署核对真实 Function 产物，最多 12 个；当前为 **9 个 TypeScript 入口 + 2 个 Python 入口 = 11**（`api/workflow-compiler.py`、`api/workflow-run-consumer.py`）。`vercel.json` 不再声明 `daemons`；原 `edu-flow-workflow` 项目不再承载当前运行。
+- Supabase `uyljtdbvlivxniililay`，session pooler SSL，受限 `workflow_worker`；数据库是排队、租约、State、官方 checkpoint/Store 和共享发现目录权威。不得用开发机进程或临时磁盘补 Hosted 运行。
+- 使用 pnpm/uv 锁文件。Vercel CLI 部署在**仓库根**执行（`--cwd` 仓库根，`--local-config <root>/vercel.json`）；不要再用 `--cwd services/workflow`，否则既缺根配置也会误判项目路由。核对实际 `/api/workflow-compiler` 的认证 capabilities、真实 Function 数量、queue consumer 的 `queue/v2beta` 触发器和 `maxDuration`，不能只看部署状态，也不再核对 Worker/watchdog 实例。
+- 部署配置只有仓库根 `vercel.json`：Python Compiler Function（`api/workflow-compiler.py`，`includeFiles: services/workflow/src/**`，`maxDuration` 120）、队列消费者（`api/workflow-run-consumer.py`，同一 `includeFiles`，`maxDuration` 300，topic `workflow-runs`，`retryAfterSeconds` 60，`maxDeliveries` 5）与 `/api/workflow-compiler/:path*` 改写都在此声明。Python 依赖来自根 `requirements.txt`，由 `scripts/workflow/export-requirements.mjs` 从 `services/workflow/uv.lock` 生成并由 `pnpm test:workflow` 检查漂移；根 `.python-version` 固定 `3.13`。不要手改 `requirements.txt`，也不要把 `services/workflow` 当作独立 Vercel 项目部署（其 `vercel.json` 已删除）。Hosted 不再提供 `api/health.ts` 的 `/api/health`；仓库内只有本地工具使用它。保留清单包含源码散列、deployment ID、执行器 digest、迁移清单、环境/发现目录修订。SDK 或受执行器指纹覆盖的代码变化使旧检查点不兼容，不静默改写旧快照。
 
 ## 环境和秘密
 
-`edu-flow` 必须配置 `WORKFLOW_DEPLOYMENT_MODE=hosted`、`WORKFLOW_DATABASE_URL`、`WORKFLOW_INTERNAL_TOKEN`、`WORKFLOW_ENVIRONMENTS_JSON`、`WORKFLOW_SANDBOX_BACKEND=vercel`、固定 `WORKFLOW_SANDBOX_IMAGE`，以及可信目录引用的提供方/工具秘密；同一项目的服务端配置同一内部令牌。所有 Vercel 部署（Production 与 Preview）都自动调用本次部署的 `https://$VERCEL_URL/api/workflow-compiler`，因此 Production 不再需要 `WORKFLOW_COMPILER_URL`；该变量只用于本地和非 Vercel 环境。Preview 与 Production 共用 Hosted 数据库和 Production Worker。内部令牌至少32字符，禁止放入 VITE 变量。
+`edu-flow` 必须配置 `WORKFLOW_DEPLOYMENT_MODE=hosted`、`WORKFLOW_DATABASE_URL`、`WORKFLOW_INTERNAL_TOKEN`、`WORKFLOW_ENVIRONMENTS_JSON`、`WORKFLOW_SANDBOX_BACKEND=vercel`、固定 `WORKFLOW_SANDBOX_IMAGE`，以及可信目录引用的提供方/工具秘密；同一项目的服务端配置同一内部令牌。所有 Vercel 部署（Production 与 Preview）都自动调用本次部署的 `https://$VERCEL_URL/api/workflow-compiler`，因此 Production 不再需要 `WORKFLOW_COMPILER_URL`；该变量只用于本地和非 Vercel 环境。Preview 与 Production 共用 Hosted 数据库，但每个部署用自己的代码执行自己收到的队列消息；没有 Production Worker 依赖。内部令牌至少32字符，禁止放入 VITE 变量。
 
-分支改了执行代码时，Preview 的 Compiler 与 API 来自分支版本，而实际执行仍是 Production Worker 的版本；校验/编译通过不代表 Worker 已具备同样的执行语义。涉及 Worker 执行代码的分支必须先合并并提升 Production，再以同一次部署验收，不能只用 Preview 验证新执行行为。
+因此改动执行代码的分支可以直接用该分支的 Preview 消费者验证，不必先提升 Production；数据库迁移仍必须先按增量应用，且 Preview build 不得自动迁移。消息只含 `runId`，认领、租约和终态都由数据库收敛，跨部署重复投递不会再次执行同一 Run。
 
 平台运行环境（R12/R13）：每个部署只配置一个 `access: "authenticated"` 的公共环境，不写 `ownerIds`，且不得包含 `providers`/`connectors`/`tools`/`variables`/`functions`；所有登录用户通过资源中心建立自己的连接。公共环境只改内容、不改 `ref`（用户连接与函数按“用户 + 运行环境标识”存放，改标识会失联），平台 DeepSeek / DeepWiki 不再提供；界面上不出现运行环境选择。
 
 JSON环境只授予明确 owner UUID、HTTPS目的地和许可工具/模型。不得复制 Local 通配 owner、回环 fixture 或 fixture 密钥。普通值、Secret 引用、Context、学习身份保持独立。托管连接的密码经 Vault 写入；浏览器不能读取秘密。环境/权限/工具目录变化会更新修订，旧 Thread 的继续/分支需要重新授权和编译，不能绕过不兼容保护。
 
-Vercel Daemon 使用平台定期轮换的 `VERCEL_OIDC_TOKEN_FILE`，官方 SDK 每次读取；镜像构建不消费平台/业务秘密。发布源、静态资源和 Function 产物都检查 `.env*`、私有验收目录及本地 Supabase 临时数据；不要把“未进入静态包”等同“未上传部署源”。
+Vercel Queues 与 Sandbox SDK 使用平台定期轮换的 `VERCEL_OIDC_TOKEN_FILE`，每次调用时读取；构建不消费平台/业务秘密。发布源、静态资源和 Function 产物都检查 `.env*`、私有验收目录及本地 Supabase 临时数据；不要把“未进入静态包”等同“未上传部署源”。
 
 ## 迁移和发布
 
-本轮新增 `20261024120000_workflow_runner_liveness.sql`（`workflow_private.p6_worker_status()`）；必须先按增量迁移应用，否则 `/v1/runner-status` 会按离线处理并拒绝新运行。
+切换所需迁移 `20261026120000_workflow_queue_claim_by_run.sql`（`claim_run`、`expire_wait`、`seal_run`）已在 Hosted 应用，仓库不得改写。本次移除 Daemon **不新增迁移**。
 
 1. 对账目标 ref、仓库与 Hosted 迁移历史；共享库不 reset，Preview build 不自动迁移。
 2. 备份并列出保护对象。旧 Legacy 工作流先归档，再执行退役迁移；归档保留完整 JSON+SHA，不是运行 fallback。只增量应用仓库原始 SQL；已应用版本不得改写。
 3. 先应用向前兼容迁移，确认认证 API、官方 Saver/Store 同事务及回滚；再发布兼容候选。初次/不兼容升级先停止验收新提交，等待已执行 Run 排空；等待 Thread 保留原身份，不强行升级。
-4. 前端、API、Compiler 与 Daemon 现在同属一次 `edu-flow` 部署，不再有跨项目成对发布；仍按候选→排空→提升处理，并读回同一部署的 Function 数量与 Worker/watchdog 实例。`/ready` 为服务身份接口，须数据库、当前 digest 的 Worker/watchdog 和 Sandbox 均通过；`/health` 只是存活检查。
-5. 发布后读回真实部署与实例、迁移、Function数量、普通认证运行和深链刷新。保留原失败与复验证据。
+4. 前端、API、Compiler 与队列消费者同属一次 `edu-flow` 部署；没有 Daemon 需要发布或提升。`/ready` 为服务身份接口，Hosted 只检查数据库与 Sandbox（`executionMode: "queue"`）；本地仍检查 worker/watchdog 信号。`/health` 只是存活检查。
+5. 发布后读回真实部署、迁移、Function 数量（当前 11）、`daemons` 缺失、queue 触发器和普通认证运行；保留原失败与复验证据。
 
-回退只选择已验证且 schema/执行器兼容的 deployment。Vercel promotion/rollback 会同时更新同一项目的 Daemons。Worker实现SIGTERM后停止领取、尝试完成当前工作，配置660秒；但本轮真实带活跃计算promote仍出现WORKER_LOST，平台退出根因未确认，不能把该配置当活跃无损保证。schema 采用向前修复，不能把应用回退当数据库回退。无兼容二进制时保留历史并明确拒绝继续。
+回退只选择已验证且 schema/执行器兼容的 deployment。Vercel promotion/rollback 只切换 Function 代码，不再有 Daemons 需要同步。滚动期间在途消息可能由旧/新部署消费；`claim_run` 只领取命名 Run，有效租约不会被第二次执行，stale 租约由 `claim_run`/`watchdog` 封闭。schema 采用向前修复，不能把应用回退当数据库回退。无兼容二进制时保留历史并明确拒绝继续。
 
-日常发布仍必须使用受控维护窗口：暂停所有目标用户的 start/next/resume/branch 提交，让既有 queued/running 自然终态，保留 waiting。历史验收只覆盖两个授权 owner，不能推广为开放流量下的安全保证。操作员须核对目标项目、Production READY 候选和实际部署身份；使用受限角色查询全局 queued/running，任一非零或读取失败均不得提升。候选先不切换域名构建，通过排空、就绪和执行器兼容性检查后才允许平台提升，发布后读回实际 Worker/watchdog 实例。
+日常发布仍建议使用受控维护窗口：暂停目标用户的 start/next/resume/branch 提交，让既有 queued/running 自然终态，保留 waiting。历史验收只覆盖两个授权 owner，不能推广为开放流量下的安全保证。操作员须核对目标项目、Production READY 候选和实际部署身份；使用受限角色查询全局 queued/running，任一非零或读取失败均不得提升。发布后读回 Function 数量与队列触发器，不再读回 Worker/watchdog 实例。
 
 原 P6 部署、preflight、提升和就绪脚本绑定历史项目 ID、私密文件和故障演练配置，现已[归档](../../artifacts/archive/runtime-naming-20261021/files/scripts/workflow/operations)。仓库当前没有通用自动发布入口；归档脚本仅供追溯，不应直接用于新发布。恢复自动化需先显式配置目标身份、凭据来源和维护约束并重新验收，不能以裸 promote 绕过上述检查。
 这是操作员暂停提交前提下的保守维护流程，不是原子admission gate；计数检查和平台切换间存在竞态。因此不承诺开放流量、多用户不断提交时自动安全发布；要开放该承诺，必须先实现覆盖start/next/resume/branch的原子维护闸并独立验收。失联按既有显式恢复协议处理，不自动重做外部写。
 
-历史受控故障演练使用 grace-zero 与 stopped 候选验证失联和恢复；这些不是日常发布配置。重新演练必须明确目标、维护窗口与恢复候选，读回平台真实部署及实例，再记录停止和恢复时间；构建时间不计作停止时间。恢复正常配置后仍须检查队列终态和就绪，660 秒退出宽限不是活跃运行无损保证。
+历史 Daemon 故障演练（grace-zero/stopped 候选）不再是当前部署配置；队列模式没有 Daemon 终止宽限。重新演练应验证消息重投、`claim_run` 幂等、stale lease 封存、延迟 timeout sweep 和 `/ready` 的 queue 模式；再记录停止与恢复时间，构建时间不计作停止时间。
 
 内部身份轮换后还需撤销本轮旧不可变HTTP部署，避免旧URL继续接受旧身份；不要删除无关主应用历史。恢复所需匹配旧检查点的镜像按digest另存，恢复时注入新凭据。迁移维持向前兼容，不回滚共享库。
 
 ## 监测与处置
 
-`edu-flow` 项目的 Logs 是本交付的运维告警接收位置，source=`daemon`；没有宣称已向任何人发送邮件/消息或配置外部值班平台。CLI64可查询 `logs --project edu-flow --query 'source == "daemon"'`；旧CLI58不支持这一来源。构建日志与运行日志同项目查看。
+`edu-flow` 项目的 Logs 是运维观察位置。队列消费者输出结构化 `workflow.queue.consumer`（`runId`、`kind`、`outcome`、`durationMs`）和 `workflow.queue.maintenance`（阶段与失败）事件；没有常驻 `source=daemon`，也没有宣称配置外部值班平台。构建日志与运行日志同项目查看。
 
-- 新受限连接设置连接5秒、TCP未确认数据20秒，专用角色statement timeout15秒、lock timeout3秒；官方Saver/Store使用同一角色。watchdog每批最多处理128个到期/取消/失联Thread，清理每集合最多128行，跳过被锁行，下次tick继续；不扫描无限活跃Thread。
-- Worker每5秒续租/信号，空队列每3秒轮询；watchdog每5秒巡检租约/生命周期；VM回收是独立异步子任务，每轮最多检查20对象/尝试删除5个（404/410也计次数），4秒超时、失败固定SANDBOX_REAP_FAILED并停止续健康信号，不阻断数据库巡检。健康信号20秒到期。进程自动重启不等于Run自动接管。
-- 新运行提交前通过 Compiler 的 `/v1/runner-status` 读取 `workflow_private.p6_worker_status()`：只要求任一 Worker 在20秒内有 `ok` 心跳，不要求 executor digest 与当前部署一致；digest 不一致只写 `workflow.runner.digest_mismatch` 运维日志，不阻止运行。没有在线 Worker 时 API 返回 `WORKFLOW_RUNNER_OFFLINE`，不创建排队运行。排队超过30秒的前端提示只解释等待，不改变运行状态。
-- 受限 `p6_metrics` 只返回队列/运行/等待计数、最旧排队秒数及服务健康，不返回产品内容。watchdog对 Worker陈旧、排队超过40秒发固定JSON告警，每种30秒最多一条；存储与回收失败有独立错误信号。
-- 官方Sandbox context先stop再destroy；watchdog对刚停止实例留5秒宽限，避免与正常cleanup争用。重复删除404/410幂等。仅对已有有效纯代码结果、cleanup404/410且再次确认目标已不存在/已deleted的情况保留结果；任何500、仍running或确认失败仍失败。
-- Sandbox诊断仅含阶段、异常类、cause类、数字HTTP状态、随机diagnostic ID、关联Run/Step，禁止原始SDK异常文本、凭据或代码/输入进入运维日志。失败记录继续存在产品Run事件中。
-- 队列积压先检查Worker、lease、连接数、供应方延迟与Hobby配额，不增加无界并发。数据库连接不足恢复后由watchdog封闭过期lease；不要重置队列或直接重做外部写。
-- `WORKER_LOST`仅显式恢复检查点并沿用累计预算。未知外部效果先核对实际目标计数/回执；已prepare分支也要在正式执行前再验，不因重试/分支绕过。
-- SDK节点deadline同样受外部效果约束：声明可能写外部的工具节点超时按unknown处理，不能经retry或错误handler转为安全重做。受控计数首轮曾实际重复写入3次，修复与同用例复验必须保留；代码/只读节点的许可超时策略单独验证。
-- Vercel Daemon缩放覆盖会跨部署保留；使用平台已文档化的配置发布/控制台操作，验收停止后核对实际Worker=1、watchdog=1和配置宽限值，不能据此推断无损排空。不得把取消构建当停止已运行Daemon。
+- 新受限连接设置连接 5 秒、TCP 未确认数据 20 秒，专用角色 statement timeout 15 秒、lock timeout 3 秒；官方 Saver/Store 使用同一角色。`watchdog` 每批最多处理 128 个到期/取消/失联 Thread，`p5_sweep` 每个集合最多 128 行，跳过被锁行，下次活动继续；不扫描无限活跃 Thread。
+- 消费者每次认领使用 30 秒租约、5 秒 heartbeat；单次函数 `maxDuration` 300 秒，图执行预算默认 250 秒（可调到上限 270 秒），为 claim、finish、维护和冷启动留出余量。正常结束、`sealed`/`expired` 和延迟 timeout 消息都会做一次有界 watchdog + `p5_sweep` + sandbox `reap`。
+- 新运行提交不再检查 Worker 心跳，也没有 `/v1/runner-status` 门禁。消息只含 `runId`；`claim_run` 只领取该 Run。排队超过 30 秒的前端提示只解释等待；75 秒延迟消息让 `watchdog` 把仍超过 60 秒的 queued Run 封为 `QUEUE_TIMEOUT`。
+- 受限 `p6_metrics` 仍可手动查询队列/运行/等待计数与最旧排队秒数；不再有每 5 秒的 watchdog 告警循环。队列积压先检查 Vercel Queues 投递/重试、消费者日志、数据库连接数、供应方延迟与 Hobby 配额，不增加无界并发。
+- 官方 Sandbox context 先 stop 再 destroy；消费者维护对刚停止实例留 5 秒宽限，每轮最多检查 20 个对象、尝试删除 5 个（404/410 也计次数），4 秒超时。重复删除 404/410 幂等。仅对已有有效纯代码结果、cleanup 404/410 且再次确认目标已不存在/已 deleted 的情况保留结果；任何 500、仍 running 或确认失败仍失败。
+- Sandbox 诊断仅含阶段、异常类、cause 类、数字 HTTP 状态、随机 diagnostic ID、关联 Run/Step，禁止原始 SDK 异常文本、凭据或代码/输入进入运维日志。失败记录继续存在产品 Run 事件中。
+- `WORKER_LOST` 仅显式恢复检查点并沿用累计预算。未知外部效果先核对实际目标计数/回执；已 prepare 分支也要在正式执行前再验，不因重试/分支绕过。
+- SDK 节点 deadline 同样受外部效果约束：声明可能写外部的工具节点超时按 unknown 处理，不能经 retry 或错误 handler 转为安全重做。受控计数首轮曾实际重复写入 3 次，修复与同用例复验必须保留；代码/只读节点的许可超时策略单独验证。
+- 当前没有 Daemon 缩放或终止宽限；部署滚动以队列重投、有效租约和 `claim_run` 幂等为准。不得把取消构建当成停止已运行 Daemon，也不应依赖常驻进程来推进清理。
 
 ## 备份、恢复与轮换
 
@@ -81,7 +80,7 @@ Vault密文依赖源项目加密能力，跨项目恢复应从受控秘密保管
 
 ## 保留与清理
 
-Run最新20条与Thread/官方检查点生命周期分开；Thread最多20轮、7天，Store权限、TTL、CAS与配额不变。watchdog承担服务端清理，无开发机定时任务依赖。边界时间注入仅对精确自建UUID，不能冒称已连续观察7天。
+Run 最新 20 条与 Thread/官方检查点生命周期分开；Thread 最多 20 轮、7 天，Store 权限、TTL、CAS 与配额不变。清理由 `watchdog`/`p5_sweep` 承担，但只在队列消息或运行结束时触发，没有开发机定时任务或常驻进程。长时间完全没有运行时，过期 Thread/Store/临时请求的清理会延后到下一次活动；这是当前已知限制。边界时间注入仅对精确自建 UUID，不能冒称已连续观察 7 天。
 
 验收结束按ledger精确删除自建临时workflow/thread/namespace/连接及Vault秘密；保留四个Hosted示例和其正常运行，不按名称模糊删除用户数据。临时受控外部计数/合成协议Vercel项目及专用SQL对象另行移除；它们只用于故障和脱敏证明，不能成为运行配置fallback。清理后重验保留例、受限权限、就绪状态和遗留VM=0，保留失败证据和清理前后结果。
 

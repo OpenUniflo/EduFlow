@@ -2,6 +2,8 @@
 
 日期：2026-10-23。状态：代码与配置已实施；Hosted 项目切换、生产发布与删除 `edu-flow-workflow` 待用户确认后执行。
 
+> 2026-10-26 更新：Hosted 已改为 Vercel Queues push 执行并删除 `worker`/`watchdog` Daemons；本 ADR 中关于 Daemon 迁移、发布和实例的部分是历史记录。当前运行方式见 [Workflow 队列推送执行](../WORKFLOW_QUEUE_PUSH.md)。
+
 本 ADR 取代 [ADR 0006](0006-workflow-p6-hosted.md) 中“前端/认证 API 与 Python Compiler/Worker 分成两个 Vercel 项目”的部署决定。ADR 0006 的其他结论（仅用 Vercel + Supabase、受限 `workflow_worker`/SSL、Daemon 生产限制、Sandbox 隔离、验收与回退纪律）继续有效。
 
 ## 背景
