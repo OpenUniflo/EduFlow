@@ -5,6 +5,7 @@ from .contracts import ExecutionError
 def secret_values(environment):
     refs={provider["secretRef"] for provider in environment["providers"] if provider.get("secretRef")}
     refs.update(ref for tool in environment["tools"] for ref in tool.get("headerSecretRefs",{}).values())
+    refs.update(tool["authSecretRef"] for tool in environment["tools"] if tool.get("authSecretRef"))
     refs.update(ref for connector in environment["connectors"] for ref in connector.get("headerSecretRefs",{}).values())
     values=[os.environ[ref] for ref in refs if os.environ.get(ref)]
     from .tools import secret

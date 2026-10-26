@@ -11,7 +11,8 @@ from .execution_policies import catalog,REDUCERS
 from .sandbox import IMAGES,LIMITS,available
 
 CONNECTION_TYPES=('http','deepseek','mcp-http','openai-compatible')
-CONNECTION_FIELDS={'type','name','baseUrl','path','method','sideEffect','inputSchema','outputSchema','modelRefs','url','allowedToolNames','credentialHeader','description','secretRef'}
+CONNECTION_FIELDS={'type','name','baseUrl','path','method','sideEffect','inputSchema','outputSchema','modelRefs','url','allowedToolNames','credentialHeader','description','secretRef',
+                   'params','headers','body','auth','settings','outputMap'}
 OPENAI_COMPATIBLE_FIELDS={'type','name','baseUrl','modelRefs','credentialHeader','description','secretRef'}
 MODEL_CONNECTION_TYPES=('deepseek','openai-compatible')
 MODEL_REF_PATTERN=re.compile(r'^[\w.:/-]+$',re.ASCII)
@@ -19,6 +20,94 @@ MAX_MODEL_REFS=50
 PREVIEW_BYTES=4096
 LOCAL_LOOPBACK_HOSTS=('localhost','127.0.0.1')
 DEEPSEEK_BASE_URL='https://api.deepseek.com'
+HTTP_METHODS=('GET','POST','PUT','PATCH','DELETE')
+HTTP_BODY_MODES=('none','json','form-data','x-www-form-urlencoded','raw')
+HTTP_AUTH_TYPES=('none','api-key-header','api-key-query','bearer','basic')
+HTTP_PARAM_SOURCES=('node','fixed','variable')
+HTTP_PARAM_NAME=re.compile(r'^[A-Za-z_][A-Za-z0-9_.-]{0,79}$')
+HTTP_HEADER_NAME=re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,80}$")
+
+def _bounded_text(value,max_length,label):
+    if not isinstance(value,str) or len(value)>max_length or len(value.strip())==0: raise ExecutionError('INVALID_CONNECTION',f'{label} must be 1–{max_length} characters')
+    return value.strip()
+
+def http_params(value):
+    """Ordered, user-visible request parameters. Node parameters become required tool inputs."""
+    if value is None: return []
+    if not isinstance(value,list) or len(value)>50: raise ExecutionError('INVALID_CONNECTION','Request parameters must be a list of at most 50 rows')
+    rows=[]
+    for row in value:
+        if not isinstance(row,dict): raise ExecutionError('INVALID_CONNECTION','Each request parameter must be an object')
+        name=row.get('name');source=row.get('source','node');text=row.get('value','');description=row.get('description','')
+        if not isinstance(name,str) or not HTTP_PARAM_NAME.fullmatch(name): raise ExecutionError('INVALID_CONNECTION','Request parameter names must be 1–80 letters, digits, "_", "." or "-"')
+        if source not in HTTP_PARAM_SOURCES: raise ExecutionError('INVALID_CONNECTION','Choose a supported request parameter source')
+        if not isinstance(text,str) or len(text)>2000: raise ExecutionError('INVALID_CONNECTION','Request parameter values must be at most 2000 characters')
+        if not isinstance(description,str) or len(description)>200: raise ExecutionError('INVALID_CONNECTION','Request parameter descriptions must be at most 200 characters')
+        if source!='node' and len(text.strip())==0: raise ExecutionError('INVALID_CONNECTION',f'Request parameter {name} needs a value')
+        rows.append({'name':name,'source':source,'value':text,'required':row.get('required') is not False,'description':description})
+    if len({row['name'] for row in rows})!=len(rows): raise ExecutionError('INVALID_CONNECTION','Request parameter names must be unique')
+    return rows
+
+def http_headers(value):
+    if value is None: return []
+    if not isinstance(value,list) or len(value)>50: raise ExecutionError('INVALID_CONNECTION','Headers must be a list of at most 50 rows')
+    rows=[]
+    for row in value:
+        if not isinstance(row,dict) or not isinstance(row.get('name'),str) or not HTTP_HEADER_NAME.fullmatch(row['name'].strip()):
+            raise ExecutionError('INVALID_CONNECTION','Provide a valid header name')
+        text=row.get('value','')
+        if not isinstance(text,str) or len(text)>2000 or '\n' in text or '\r' in text: raise ExecutionError('INVALID_CONNECTION','Header values must be single-line text')
+        rows.append({'name':row['name'].strip(),'value':text})
+    if len({row['name'].lower() for row in rows})!=len(rows): raise ExecutionError('INVALID_CONNECTION','Header names must be unique')
+    return rows
+
+def http_body(value):
+    if value is None: return {'mode':'none'}
+    if not isinstance(value,dict) or value.get('mode','none') not in HTTP_BODY_MODES: raise ExecutionError('INVALID_CONNECTION','Choose a supported request body mode')
+    text=value.get('text','')
+    if not isinstance(text,str) or len(text)>16384: raise ExecutionError('INVALID_CONNECTION','Request body text must be at most 16384 characters')
+    return {'mode':value.get('mode','none'),'text':text}
+
+def http_auth(value):
+    if value is None: return {'type':'none'}
+    if not isinstance(value,dict) or value.get('type','none') not in HTTP_AUTH_TYPES: raise ExecutionError('INVALID_CONNECTION','Choose a supported authentication type')
+    auth={'type':value.get('type','none')}
+    if auth['type'] in ('api-key-header','api-key-query'):
+        name=value.get('name')
+        if not isinstance(name,str) or not HTTP_HEADER_NAME.fullmatch(name.strip()): raise ExecutionError('INVALID_CONNECTION','Provide a credential header or query name')
+        auth['name']=name.strip()
+    return auth
+
+def http_settings(value):
+    if value is None: return {}
+    if not isinstance(value,dict): raise ExecutionError('INVALID_CONNECTION','Settings must be an object')
+    settings={}
+    timeout_ms=value.get('timeoutMs')
+    if timeout_ms is not None:
+        if isinstance(timeout_ms,bool) or not isinstance(timeout_ms,int) or not 1000<=timeout_ms<=120000: raise ExecutionError('INVALID_CONNECTION','Timeout must be 1000–120000 milliseconds')
+        settings['timeoutMs']=timeout_ms
+    retries=value.get('retries')
+    if retries is not None:
+        if isinstance(retries,bool) or not isinstance(retries,int) or not 0<=retries<=3: raise ExecutionError('INVALID_CONNECTION','Retries must be 0–3')
+        settings['retries']=retries
+    result_path=value.get('resultPath')
+    if result_path is not None:
+        if not isinstance(result_path,str) or len(result_path)>300: raise ExecutionError('INVALID_CONNECTION','Result path must be at most 300 characters')
+        settings['resultPath']=result_path.strip()
+    return settings
+
+def http_output_map(value):
+    if value is None: return []
+    if not isinstance(value,list) or len(value)>50: raise ExecutionError('INVALID_CONNECTION','Response fields must be a list of at most 50 rows')
+    rows=[]
+    for row in value:
+        if not isinstance(row,dict): raise ExecutionError('INVALID_CONNECTION','Each response field must be an object')
+        name=row.get('name');path=row.get('path','');kind=row.get('type','')
+        if not isinstance(name,str) or not HTTP_PARAM_NAME.fullmatch(name): raise ExecutionError('INVALID_CONNECTION','Response field names must be 1–80 letters, digits, "_", "." or "-"')
+        if not isinstance(path,str) or len(path)>300 or not isinstance(kind,str) or len(kind)>40: raise ExecutionError('INVALID_CONNECTION','Response field paths and types must be bounded text')
+        rows.append({'name':name,'path':path.strip(),'type':kind})
+    if len({row['name'] for row in rows})!=len(rows): raise ExecutionError('INVALID_CONNECTION','Response field names must be unique')
+    return rows
 
 def local_fixtures_allowed(env):
     """Plain-HTTP localhost destinations require both the fixture environment and the process opt-in."""
@@ -57,11 +146,20 @@ async def validate_connection(content,credential,env):
     raw=c.get('baseUrl' if ctype=='http' else 'url','');parsed=urlparse(raw)
     if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment: raise ExecutionError('INVALID_CONNECTION','Provide a valid HTTP endpoint without credentials')
     if ctype=='http' and (not isinstance(c.get('path','/'),str) or len(c.get('path','/'))>2000): raise ExecutionError('INVALID_CONNECTION','Provide a bounded HTTP path')
-    await assert_destination(parsed.scheme+'://'+parsed.netloc,env,(c.get('path','/') if ctype=='http' else parsed.path or '/'))
+    await assert_destination(parsed.scheme+'://'+parsed.netloc,env,('/' if ctype=='http' else parsed.path or '/'))
     if c.get('credentialHeader','Authorization') not in ('Authorization','X-API-Key'): raise ExecutionError('INVALID_CONNECTION','Unsupported credential header')
     if ctype=='http':
-        if c.get('method','GET') not in ('GET','POST') or c.get('sideEffect') not in ('read','write') or c.get('method','GET')=='POST' and c['sideEffect']!='write': raise ExecutionError('INVALID_CONNECTION','HTTP POST is treated as an external write')
+        method=c.get('method','GET')
+        if method not in HTTP_METHODS or c.get('sideEffect') not in ('read','write') or method!='GET' and c['sideEffect']!='write': raise ExecutionError('INVALID_CONNECTION','HTTP methods other than GET are treated as external writes')
         for key in ('inputSchema','outputSchema'): schema_check(c.get(key,{'type':'object'}))
+        c['method']=method
+        c['params']=http_params(c.get('params'))
+        c['headers']=http_headers(c.get('headers'))
+        c['body']=http_body(c.get('body'))
+        c['auth']=http_auth(c.get('auth'))
+        c['settings']=http_settings(c.get('settings'))
+        c['outputMap']=http_output_map(c.get('outputMap'))
+        if c['body']['mode']!='none' and method=='GET': raise ExecutionError('INVALID_CONNECTION','GET requests cannot carry a body')
     elif not isinstance(c.get('allowedToolNames'),list) or not c['allowedToolNames'] or any(not isinstance(v,str) for v in c['allowedToolNames']): raise ExecutionError('INVALID_CONNECTION','Select allowed MCP tool names')
     return c
 
@@ -107,21 +205,53 @@ async def fetch_model_ids(base_url,secret_ref,env,timeout=10):
     except Exception: raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint returned invalid JSON') from None
     return parse_model_ids(payload)
 
+async def fetch_model_reply(base_url,secret_ref,model,message,env,timeout=30):
+    """Send one short chat message through the same pinned destination policy.
+
+    This is an explicit connection test: it returns only the first reply text and
+    never persists a run, message, State value or provider payload.
+    """
+    from .tools import model_http_client,secret
+    if not isinstance(message,str) or not 1<=len(message)<=2000: raise ExecutionError('CONNECTION_TEST_FAILED','Provide a bounded test message')
+    base=base_url.rstrip('/')
+    headers={'Authorization':'Bearer '+secret(secret_ref)} if secret_ref else {}
+    payload={'model':model,'messages':[{'role':'user','content':message}],'max_tokens':64,'stream':False}
+    try:
+        async with model_http_client(base,env) as client:
+            response=await client.post(base+'/chat/completions',headers=headers,json=payload)
+    except httpx.TimeoutException: raise ExecutionError('CONNECTION_TEST_TIMEOUT','Model endpoint timed out') from None
+    except ExecutionError: raise
+    except Exception: raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint is unreachable') from None
+    if response.status_code!=200: raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint returned HTTP '+str(response.status_code))
+    try: body=response.json()
+    except Exception: raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint returned invalid JSON') from None
+    choices=body.get('choices') if isinstance(body,dict) else None
+    message_body=choices[0].get('message') if isinstance(choices,list) and choices and isinstance(choices[0],dict) else None
+    reply=message_body.get('content') if isinstance(message_body,dict) else None
+    if not isinstance(reply,str): raise ExecutionError('CONNECTION_TEST_FAILED','Model endpoint did not return reply text')
+    return reply[:500]
+
 def preview_text(content):
     return content.encode('utf-8')[:PREVIEW_BYTES].decode('utf-8','ignore')
 
 async def http_test_preview(tool,env,arguments,timeout=10):
     """Registered HTTP test: raw bounded body, credentials redacted before the preview is returned."""
     from .credentials import assert_no_secrets
-    from .tools import PinnedTransport,safe_http_url,secret
+    from .tools import PinnedTransport,safe_http_url,_http_auth,_http_body,_http_headers
     assert_no_secrets(arguments,env)
     validate_value(tool['inputSchema'],arguments,'INVALID_TOOL_ARGUMENTS')
     url,ip=await safe_http_url(tool,env,arguments)
-    headers={name:secret(ref) for name,ref in tool.get('headerSecretRefs',{}).items()}
+    headers=_http_headers(tool,env)
+    kwargs=_http_body(tool,arguments)
+    _,secret_query=_http_auth(tool,env)
+    if secret_query:
+        from urllib.parse import urlencode,parse_qsl,urlunparse
+        parts=urlparse(url); query=dict(parse_qsl(parts.query)); query.update(secret_query)
+        url=urlunparse(parts._replace(query=urlencode(query)))
     content=bytearray();status=None
     try:
         async with httpx.AsyncClient(transport=PinnedTransport(urlparse(url).hostname,ip),timeout=timeout,follow_redirects=False,trust_env=False) as client:
-            async with client.stream(tool['method'],url,headers=headers,json=arguments if tool.get('bodyArguments') else None) as response:
+            async with client.stream(tool['method'],url,headers=headers,**kwargs) as response:
                 status=response.status_code
                 async for chunk in response.aiter_bytes():
                     content.extend(chunk)
@@ -149,7 +279,25 @@ async def catalog_operation(body,registry):
     if action=='disable': return await store.call('p4_catalog_save',owner,ref,kind,name,version,{},True)
     if action=='test':
         key='p4:'+owner+':'+name+':'+str(version)
-        if kind!='connection': raise ExecutionError('INVALID_EXTENSION','Test functions through the node test')
+        started=time.monotonic()
+        if kind=='function':
+            rows=await store.call('p4_catalog_read',owner,ref)
+            saved=next((r for r in rows if r['kind']=='function' and r['ref']==name and r['version']==version and not r['disabled']),None)
+            draft=body.get('content')
+            if isinstance(draft,dict) and isinstance(draft.get('code'),str) and draft.get('language') in IMAGES:
+                schema_check(draft.get('inputSchema',{'type':'object'}))
+                schema_check(draft.get('outputSchema',{'type':'object'}))
+                f={**draft,'inputSchema':draft.get('inputSchema',{'type':'object'}),'outputSchema':draft.get('outputSchema',{'type':'object'})}
+            elif saved:
+                f=saved['content']
+            else:
+                raise ExecutionError('FUNCTION_UNAVAILABLE','Function version is missing or disabled','auth')
+            from .execution_policies import invoke_function
+            try:
+                output=await invoke_function(f,body.get('arguments',{}),{'phase':'extension-test','runId':'extension-test','stepId':'extension-test'},10,None)
+            except ExecutionError as error:
+                return {'ok':False,'elapsedMs':elapsed_ms(started),'error':{'code':error.code,'message':str(error)}}
+            return {'ok':True,'elapsedMs':elapsed_ms(started),'output':output}
         rows=await store.call('p4_catalog_read',owner,ref)
         saved=next((r for r in rows if r['kind']=='connection' and r['ref']==name and r['version']==version and not r['disabled']),None)
         if not saved: raise ExecutionError('CONNECTION_UNAVAILABLE','Connection unavailable','auth')
@@ -161,7 +309,14 @@ async def catalog_operation(body,registry):
         started=time.monotonic()
         try:
             if c['type'] in MODEL_CONNECTION_TYPES:
-                models=await fetch_model_ids(c.get('baseUrl',DEEPSEEK_BASE_URL) if c['type']=='openai-compatible' else DEEPSEEK_BASE_URL,c.get('secretRef'),env)
+                base_url=c.get('baseUrl',DEEPSEEK_BASE_URL) if c['type']=='openai-compatible' else DEEPSEEK_BASE_URL
+                message=body.get('testMessage')
+                model=body.get('testModel')
+                if isinstance(message,str):
+                    if not isinstance(model,str) or not model.strip(): raise ExecutionError('CONNECTION_TEST_FAILED','Choose a model to test')
+                    reply=await fetch_model_reply(base_url,c.get('secretRef'),model.strip(),message,env)
+                    return {'ok':True,'elapsedMs':elapsed_ms(started),'reply':reply,'models':[model.strip()]}
+                models=await fetch_model_ids(base_url,c.get('secretRef'),env)
                 return {'ok':True,'elapsedMs':elapsed_ms(started),'models':models}
             if c['type']=='http':
                 result=await http_test_preview(tool,env,body.get('arguments',{}))
@@ -187,7 +342,8 @@ async def catalog_operation(body,registry):
     if not isinstance(credential,str) or len(credential)>8000: raise ExecutionError('INVALID_CREDENTIAL','Credential must be bounded text')
     if credential and credential in json.dumps(c): raise ExecutionError('CREDENTIAL_IN_CONFIGURATION','Place credentials only in the protected credential field','policy')
     if kind=='function':
-        if set(c)-{'name','language','code','inputSchema','outputSchema','purpose'} or c.get('language') not in IMAGES or not isinstance(c.get('code'),str) or not 1<=len(c['code'])<=32768: raise ExecutionError('INVALID_FUNCTION','Provide supported code and schemas')
+        if set(c)-{'name','language','code','inputSchema','outputSchema','purpose','description'} or c.get('language') not in IMAGES or not isinstance(c.get('code'),str) or not 1<=len(c['code'])<=32768: raise ExecutionError('INVALID_FUNCTION','Provide supported code and schemas')
+        if 'description' in c and (not isinstance(c['description'],str) or len(c['description'])>500): raise ExecutionError('INVALID_FUNCTION','Description must be at most 500 characters')
         if c.get('purpose','node') not in ('node','handler'): raise ExecutionError('INVALID_FUNCTION_PURPOSE','Choose node or handler purpose')
         from .credentials import assert_no_secrets
         assert_no_secrets(c,env)
@@ -199,6 +355,52 @@ async def catalog_operation(body,registry):
     c=await validate_connection(c,credential,env)
     return await store.call('p4_connection_save',owner,ref,name,version,c,credential)
 
+def http_connection_tool(c,r,key,headers,env):
+    """Project one immutable HTTP connection version into the Worker tool descriptor.
+
+    Node-sourced parameters become required inputs. Fixed and variable parameters
+    are resolved here so the runtime never receives ordinary variable authority.
+    """
+    params=c.get('params') or []
+    path=c.get('path','/') or '/'
+    base_schema=c.get('inputSchema') if isinstance(c.get('inputSchema'),dict) else {'type':'object'}
+    properties=dict(base_schema.get('properties') or {})
+    required=[name for name in (base_schema.get('required') or []) if isinstance(name,str)]
+    body=c.get('body') or {'mode':'none'}
+    body_mode=body.get('mode','none')
+    query_params={}
+    query_argument_names=[]
+    body_argument_names=[]
+    for row in params:
+        name=row['name']
+        if row['source']=='node':
+            properties[name]={'type':'string','title':name,'description':row.get('description','')}
+            if row.get('required') and name not in required: required.append(name)
+            if '{{'+name+'}}' in path or '{'+name+'}' in path:
+                continue
+            if body_mode!='none' and c.get('method')!='GET': body_argument_names.append(name)
+            else: query_argument_names.append(name)
+        else:
+            value=row.get('value','')
+            if row['source']=='variable':
+                variables=env.get('variables') or {}
+                if row['value'] not in variables: raise ExecutionError('INVALID_CONNECTION','Variable '+row['value']+' is unavailable','policy')
+                value=variables[row['value']]
+            query_params[name]=str(value)
+    input_schema={**base_schema,'type':'object','properties':properties}
+    if required: input_schema['required']=required
+    tool={'ref':key,'name':c.get('name') or r['ref'],'description':c.get('description') or c.get('name',r['ref']),'version':r['version'],'adapter':'http',
+          'baseUrl':c['baseUrl'],'path':path,'method':c.get('method','GET'),'bodyArguments':c.get('method')!='GET' and body_mode=='none',
+          'headerSecretRefs':headers,'sideEffect':c['sideEffect'],'inputSchema':input_schema,
+          'outputSchema':c.get('outputSchema',{'type':'object'}),
+          'requestHeaders':{row['name']:row['value'] for row in (c.get('headers') or [])},
+          'queryParams':query_params,'queryArgumentNames':query_argument_names,'bodyArgumentNames':body_argument_names,
+          'body':body if body_mode!='none' else None,'auth':c.get('auth') or {'type':'none'},
+          'settings':c.get('settings') or {},'outputMap':c.get('outputMap') or [],
+          **({'fixture':True} if c.get('fixture') is True else {})}
+    if c.get('secretRef'): tool['authSecretRef']=c['secretRef']
+    return tool
+
 def hydrate_connections(env,owner,rows):
     env.setdefault('capabilityOrigins',{})
     for r in rows:
@@ -209,6 +411,6 @@ def hydrate_connections(env,owner,rows):
             provider={'ref':key,'name':c.get('name',r['ref']),'modelRefs':c['modelRefs'],'baseUrl':DEEPSEEK_BASE_URL if c['type']=='deepseek' else c['baseUrl'],'adapter':'deepseek' if c['type']=='deepseek' else 'openai'}
             if c.get('secretRef'): provider['secretRef']=c['secretRef']
             env['providers'].append(provider)
-        elif c['type']=='http': env['tools'].append({'ref':key,'name':r['ref'],'description':c.get('name',r['ref']),'version':r['version'],'adapter':'http','baseUrl':c['baseUrl'],'path':c.get('path','/'),'method':c.get('method','GET'),'bodyArguments':c.get('method')=='POST','headerSecretRefs':headers,'sideEffect':c['sideEffect'],'inputSchema':c.get('inputSchema',{'type':'object'}),'outputSchema':c.get('outputSchema',{'type':'object'})})
-        else: env['connectors'].append({'ref':key,'name':c.get('name',r['ref']),'transport':'streamable-http','url':c['url'],'headerSecretRefs':headers,'allowedToolNames':c['allowedToolNames'],'sideEffect':'write'})
+        elif c['type']=='http': env['tools'].append(http_connection_tool(c,r,key,headers,env))
+        else: env['connectors'].append({'ref':key,'name':c.get('name',r['ref']),'transport':'streamable-http','url':c['url'],'headerSecretRefs':headers,'allowedToolNames':c['allowedToolNames'],'sideEffect':'write',**({'fixture':True} if c.get('fixture') is True else {})})
     return env

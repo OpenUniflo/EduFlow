@@ -49,3 +49,11 @@ async def test_formal_run_uses_frozen_variables_after_workspace_edit(setup_node,
     result=await executor.execute(node,{"answer":0})
     assert result["values"]=={"answer":7}
     assert env["variables"]=={"FACTOR":99}
+
+@pytest.mark.asyncio
+async def test_tool_executes_the_resolved_query_without_prose_rewriting():
+    """Chinese queries are translated by a model node, never by a tool-side regex."""
+    from eduflow_workflow.tools import invoke_tool
+    tool={"ref":"hn_search","name":"Hacker News 搜索","adapter":"function","operationRef":"core.identity","inputSchema":{"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":False},"outputSchema":{"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":False},"sideEffect":"read"}
+    query="大家怎么看 AI 编程助手？"
+    assert await invoke_tool(tool,{"providers":[],"tools":[],"connectors":[]},{"value":query},1)=={"value":query}

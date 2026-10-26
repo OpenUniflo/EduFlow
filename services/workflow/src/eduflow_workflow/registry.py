@@ -19,9 +19,13 @@ PROMPT_SEGMENT = {"oneOf":[
 PROMPT_MESSAGE = {"type":"object","properties":{"role":{"enum":["user","assistant"]},"content":{"type":"array","items":PROMPT_SEGMENT}},"required":["role","content"],"additionalProperties":False}
 PROMPT = {"type":"object","properties":{"system":{"type":"array","items":PROMPT_SEGMENT},"messages":{"type":"array","minItems":1,"items":PROMPT_MESSAGE}},"required":["messages"],"additionalProperties":False}
 LLM_CONFIG = obj({"providerRef":STRING,"modelRef":STRING,"modelParameters":ANY_OBJ,"allowedToolRefs":{"type":"array","items":STRING},"prompt":PROMPT})
+STRUCTURED_OUTPUT = {"type":"object","properties":{"fields":{"type":"array","maxItems":20,"items":{"type":"object","properties":{"name":STRING,"type":{"enum":["string","number","boolean","array","object"]},"description":STRING},"required":["name","type"],"additionalProperties":False}}},"required":["fields"],"additionalProperties":False}
+LLM_CONFIG["properties"]["structuredOutput"] = STRUCTURED_OUTPUT
 # Declared parameters plus the optional reserved history binding; open object keeps both dynamic.
 LLM_INPUTS = {"type":"object","properties":{"history":MESSAGES},"additionalProperties":True}
-LLM_OUTPUT = obj({"messages":MESSAGES,"toolCalls":CALLS,"text":STRING})
+# Structured fields are returned as top-level output items (`/<field>`), so the
+# shape stays open while the base items remain fixed.
+LLM_OUTPUT = {**obj({"messages":MESSAGES,"toolCalls":CALLS,"text":STRING}),"additionalProperties":True}
 
 def descriptor(kind, config, inputs=OBJ, output=OBJ, side_effect="none", outlets=None, version=1):
     return {"type":kind,"version":version,"configSchema":config,"inputSchema":inputs,"outputSchema":output,"outlets":["next"] if outlets is None else outlets,"sideEffect":side_effect,"requiredCapabilities":[]}
@@ -35,11 +39,28 @@ NODE_DESCRIPTORS = [
     descriptor("core.subgraph",obj({"graph":ANY_OBJ,"stateMode":{"enum":["independent","shared"]},"persistence":{"enum":["per-invocation","stateless","per-thread"]}},["graph"]),ANY_OBJ,ANY_OBJ),
     descriptor("core.function", obj({"implementation":{"enum":["registered","code"]},"functionRef":STRING,"functionVersion":{"type":"integer","minimum":1},"language":{"enum":["python","javascript"]},"code":STRING,"inputSchema":ANY_OBJ,"outputSchema":ANY_OBJ},["implementation"]),ANY_OBJ,ANY_OBJ),
     descriptor("core.start", OBJ), descriptor("core.end", OBJ, outlets=[]),
-    descriptor("core.router", obj({"cases":{"type":"array","items":{"type":"object"}},"defaultOutlet":STRING,"mode":{"enum":["first","all"]}}, ["cases","defaultOutlet"]), output=obj({"outlet":{"type":["string","array"],"items":STRING}})),
+    descriptor("core.router", obj({"cases":{"type":"array","items":{"type":"object"}},"defaultOutlet":STRING,"defaultLabel":STRING,"mode":{"enum":["first","all"]}}, ["cases","defaultOutlet"]), output=obj({"outlet":{"type":["string","array"],"items":STRING}})),
     descriptor("core.transform", obj({"operationRef":STRING,"operationVersion":{"const":1}}), ANY_OBJ, ANY_OBJ),
     descriptor("core.llm", LLM_CONFIG, LLM_INPUTS, LLM_OUTPUT, "read", version=2),
     descriptor("core.tool", obj({"toolRef":STRING,"contractDigest":STRING}), ANY_OBJ, obj({"result":{}}), "write", version=2),
     descriptor("core.tool_dispatch", obj({"allowedToolRefs":{"type":"array","items":STRING}}),obj({"toolCalls":CALLS}),obj({"toolMessages":MESSAGES}),"write"),
+]
+# Product tools are real, read-only public services available without a user
+# connection. They keep the first-run flow runnable with only a model connection.
+BUILTIN_TOOLS = [
+    {
+        "ref": "hn_search",
+        "name": "Hacker News 搜索",
+        "description": "搜索 Hacker News 的公开讨论（Algolia 搜索）",
+        "version": 1,
+        "adapter": "http",
+        "baseUrl": "https://hn.algolia.com",
+        "method": "GET",
+        "path": "/api/v1/search?query={query}&tags=story&hitsPerPage=5&optionalWords={query}&typoTolerance=false",
+        "sideEffect": "read",
+        "inputSchema": obj({"query": {"type": "string", "title": "搜索关键词", "description": "要搜索的关键词；纯中文问题先由模型转成英文关键词。", "minLength": 1, "maxLength": 200}}),
+        "outputSchema": {"type": "object", "properties": {"hits": {"type": "array", "items": {"type": "object"}}}, "required": ["hits"]},
+    },
 ]
 OPERATIONS = {
     "core.identity": {"inputSchema":obj({"value":{}}),"outputSchema":obj({"value":{}})},
@@ -107,6 +128,23 @@ def resolve_variable_configuration(configuration, variable_environment_id=None):
             "variableEnvironment":({"id":selected_id,"name":name if isinstance(name,str) and name else selected_id} if selected else None),
             "variableEnvironmentId":selected_id,"defaultVariableEnvironmentId":default_id}
 
+def fixture_tool_refs():
+    """Local acceptance-only tools are hidden from the user-facing catalog.
+
+    The environment may mark tools explicitly; a local launcher may also name
+    legacy fixture refs without editing or deleting the owner's catalog rows.
+    """
+    return {item.strip() for item in os.environ.get("WORKFLOW_FIXTURE_TOOL_REFS","").split(",") if item.strip()}
+
+def is_fixture_tool(tool, hidden=None):
+    if tool.get("fixture") is True: return True
+    hidden = fixture_tool_refs() if hidden is None else hidden
+    ref = str(tool.get("ref") or "")
+    if ref in hidden: return True
+    # Owner catalog tools carry identity as p4:<owner>:<logicalRef>:<version>.
+    parts = ref.split(":")
+    return len(parts) >= 4 and parts[0] == "p4" and parts[2] in hidden
+
 class Registry:
     def __init__(self, configuration=None):
         if configuration is None:
@@ -143,6 +181,10 @@ class Registry:
             if access=="authenticated":
                 if env.get("ownerIds"): raise ExecutionError("INVALID_ENVIRONMENT","Authenticated environments must not declare ownerIds","policy")
                 if any(env.get(field) for field in ("providers","connectors","tools","variables","functions")): raise ExecutionError("INVALID_ENVIRONMENT","Authenticated environments must not carry capabilities or secrets","policy")
+            elif access=="owners":
+                # Built-in real public tools do not require a user-managed connection.
+                known={tool.get("ref") for tool in env["tools"]}
+                env["tools"]=[*env["tools"], *[copy.deepcopy(tool) for tool in BUILTIN_TOOLS if tool["ref"] not in known]]
             self.update(env)
     def update(self, env):
         for tool in env["tools"]:
@@ -211,10 +253,11 @@ class Registry:
         def meta(ref):
             value=origins.get(ref,{})
             return {"origin":value.get("origin","environment"), **({"connectionRef":value["connectionRef"],"version":value["version"]} if "connectionRef" in value else {})}
-        return {"environmentRef":env["ref"],"environmentRevision":env["revision"],"name":env.get("name",env["ref"]),"access":env.get("access","owners"),"capabilities":env["capabilities"],"providers":[{"ref":p["ref"],"modelRefs":p["modelRefs"],"name":p.get("name",p["ref"]),**meta(p["ref"])} for p in env["providers"]],"connectors":[{"ref":c["ref"],"name":c.get("name",c["ref"]),"transport":c.get("transport","streamable-http"),**meta(c["ref"])} for c in env["connectors"]],"limits":env["limits"],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0)}
+        return {"environmentRef":env["ref"],"environmentRevision":env["revision"],"name":env.get("name",env["ref"]),"access":env.get("access","owners"),"capabilities":env["capabilities"],"providers":[{"ref":p["ref"],"modelRefs":p["modelRefs"],"name":p.get("name",p["ref"]),**meta(p["ref"])} for p in env["providers"]],"connectors":[{"ref":c["ref"],"name":c.get("name",c["ref"]),"transport":c.get("transport","streamable-http"),**meta(c["ref"])} for c in env["connectors"] if c.get("fixture") is not True],"limits":env["limits"],"variables":env.get("variables",{}),"configurationRevision":env.get("configurationRevision",0)}
     def public_tools(self, env):
         origins=env.get("capabilityOrigins",{})
+        hidden=fixture_tool_refs()
         def meta(ref):
             value=origins.get(ref,{})
             return {"origin":value.get("origin","environment"), **({"connectionRef":value["connectionRef"]} if "connectionRef" in value else {})}
-        return [{**{k:v for k,v in tool.items() if k in ("ref","name","description","version","inputSchema","outputSchema","contractDigest","sideEffect","available","adapter","connectorRef","diagnostics") or k=="group" and v in ("test","general")},**meta(tool["ref"])} for tool in env["tools"]]
+        return [{**{k:v for k,v in tool.items() if k in ("ref","name","description","version","inputSchema","outputSchema","contractDigest","sideEffect","available","adapter","connectorRef","diagnostics") or k=="group" and v in ("test","general")},**meta(tool["ref"])} for tool in env["tools"] if not is_fixture_tool(tool,hidden)]

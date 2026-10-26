@@ -215,7 +215,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
     }
     if(request.method === "GET") json(response,200,await workflowCompiler("/v1/extensions",{ownerId:owner,environmentRef:workflowString(queryString(request,"environmentRef"))}));
     else if(request.method === "POST") {
-      const body=workflowStrictBody(request.body,["environmentRef","action","kind","ref","version","content","credential","arguments","confirmExternalEffect"],["environmentRef","action","kind","ref","version"]);
+      const body=workflowStrictBody(request.body,["environmentRef","action","kind","ref","version","content","credential","arguments","confirmExternalEffect","testModel","testMessage"],["environmentRef","action","kind","ref","version"]);
       workflowString(body.environmentRef);json(response,200,await workflowCompiler("/v1/extensions",{...body,ownerId:owner}));
     } else throw new ApiError(405,"METHOD_NOT_ALLOWED","Unsupported extension operation");
     return true;
@@ -462,7 +462,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       const workflowId = workflowString(queryString(request, "workflowId")); await head(client, owner, workflowId); await rpc(client, "workflow_v2_prune", { p_owner: owner, p_workflow: workflowId });
       const rows = result(await client.from("workflow_live_runs").select("*").eq("owner_user_id", owner).eq("workflow_id", workflowId).order("created_at", { ascending: false }).limit(pageLimit(request))) as WorkflowRow[];
       const names = await variableEnvironmentNames(client, owner, rows.map((row) => typeof row.variable_environment_id === "string" ? row.variable_environment_id : frozenVariableEnvironment(row.registry_snapshot).id));
-      json(response, 200, { items: rows.map((row) => workflowRunDto(row, false, names)), nextCursor: null }); return true;
+      json(response, 200, { items: rows.map((row) => workflowRunDto(row, true, names)), nextCursor: null }); return true;
     }
   }
   if (["events", "steps"].includes(resource) && request.method === "GET") {

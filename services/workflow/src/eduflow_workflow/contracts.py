@@ -17,15 +17,29 @@ DEFAULT_POLICY = {"timeoutMs": 120000, "nodeTimeoutMs": 30000, "maxNodeExecution
 HARD_LIMITS = {**DEFAULT_POLICY, "timeoutMs": 600000, "nodeTimeoutMs": 120000, "maxNodeExecutions": 200, "maxToolCalls": 50, "maxOutputTokens": 8192}
 
 class ExecutionError(Exception):
-    def __init__(self, code, message, category="validation", retryable=False, external_status=None, effect=None, pointer=None, node_id=None, invocation=None, stage=None):
+    """Bounded runtime error.
+
+    ``reason`` and the provider/tool identity fields are safe, user-presentable
+    context. They never contain credentials, request bodies or query strings.
+    """
+    def __init__(self, code, message, category="validation", retryable=False, external_status=None, effect=None, pointer=None, node_id=None, invocation=None, stage=None, reason=None, provider=None, model=None, host=None, tool=None, http_status=None, elapsed_ms=None, timeout_ms=None):
         super().__init__(message)
         self.code, self.category, self.retryable = code, category, retryable
         self.external_status, self.effect = external_status, effect
         self.pointer = pointer
         self.node_id, self.invocation, self.stage = node_id, invocation, stage
+        self.reason, self.provider, self.model = reason, provider, model
+        self.host, self.tool = host, tool
+        self.http_status = http_status if http_status is not None else external_status
+        # Bounded timing context only: never request bodies or provider prose.
+        self.elapsed_ms, self.timeout_ms = elapsed_ms, timeout_ms
     def dto(self):
-        context = {"nodeId":self.node_id,"invocation":self.invocation,"stage":self.stage,"pointer":self.pointer} if self.stage=="input_resolution" else {}
-        return {"code": self.code, "category": self.category, "message": str(self), "retryable": self.retryable, **({"externalStatus": self.external_status} if self.external_status is not None else {}), **({"effect": self.effect} if self.effect else {}), **context, **({"graphPath":self.graph_path} if hasattr(self,"graph_path") else {})}
+        context = {"nodeId":self.node_id,"invocation":self.invocation,"stage":self.stage,"pointer":self.pointer} if self.stage=="input_resolution" else ({"pointer":self.pointer} if self.pointer else {})
+        safe = {"reason":self.reason,"provider":self.provider,"model":self.model,"host":self.host,"tool":self.tool,"httpStatus":self.http_status,"elapsedMs":self.elapsed_ms,"timeoutMs":self.timeout_ms}
+        # A State write mismatch is rendered as a concrete field/type pair so the
+        # UI can offer "change the field to <actual type>" without parsing prose.
+        write = {"field":self.field,"expectedType":self.expected_type,"actualType":self.actual_type,"expectedLabel":self.expected_label,"actualLabel":self.actual_label,"valueSource":self.value_source} if hasattr(self,"field") else {}
+        return {"code": self.code, "category": self.category, "message": str(self), "retryable": self.retryable, **({"externalStatus": self.external_status} if self.external_status is not None else {}), **({"effect": self.effect} if self.effect else {}), **context, **({"graphPath":self.graph_path} if hasattr(self,"graph_path") else {}), **write, **{key:value for key,value in safe.items() if value is not None}}
 
 def canonical(value):
     check_json(value)

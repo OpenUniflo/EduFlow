@@ -100,6 +100,6 @@ def test_user_connection_metadata_is_projected_for_display():
     ])
     registry.update(environment)
     provider = next(item for item in registry.public_environment(environment)['providers'] if item['connectionRef'] == 'model')
-    tool = next(item for item in registry.public_tools(environment) if item['connectionRef'] == 'search')
+    tool = next(item for item in registry.public_tools(environment) if item.get('connectionRef') == 'search')
     assert provider['origin'] == 'user' and provider['version'] == 2
     assert tool['origin'] == 'user' and tool['version'] == 3

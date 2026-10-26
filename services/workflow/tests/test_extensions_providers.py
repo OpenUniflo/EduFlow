@@ -479,3 +479,120 @@ async def test_catalog_test_returns_mcp_tool_names(monkeypatch):
     result = await extensions.catalog_operation(catalog_body('mcp'), FakeRegistry(environment))
     assert result['ok'] is True and result['tools'] == [{'name': 'echo', 'description': 'Echo tool'}, {'name': 'get-sum', 'description': 'Sum'}]
     assert set(result) == {'ok', 'elapsedMs', 'tools'}
+
+
+# --- Generic API editor contract -----------------------------------------
+
+async def test_generic_http_connection_validates_params_headers_auth_and_output_map(local_fixtures):
+    with local_http(lambda request, body: (200, b'{}', {})) as base:
+        content = await validate_connection({
+            'type': 'http', 'name': 'GitHub', 'baseUrl': base,
+            'path': '/repos/{{owner}}/{{repo}}', 'method': 'GET', 'sideEffect': 'read',
+            'params': [
+                {'name': 'owner', 'source': 'node', 'value': '', 'required': True, 'description': '所有者'},
+                {'name': 'page', 'source': 'fixed', 'value': '2', 'required': False, 'description': ''},
+            ],
+            'headers': [{'name': 'Accept', 'value': 'application/json'}],
+            'auth': {'type': 'api-key-header', 'name': 'X-API-Key'},
+            'settings': {'timeoutMs': 5000, 'retries': 1, 'resultPath': 'data'},
+            'outputMap': [{'name': 'items', 'path': 'items', 'type': 'array'}],
+        }, 'synthetic-key', local_env())
+    assert content['params'][1] == {'name': 'page', 'source': 'fixed', 'value': '2', 'required': False, 'description': ''}
+    assert content['headers'] == [{'name': 'Accept', 'value': 'application/json'}]
+    assert content['auth'] == {'type': 'api-key-header', 'name': 'X-API-Key'}
+    assert content['settings'] == {'timeoutMs': 5000, 'retries': 1, 'resultPath': 'data'}
+    assert content['outputMap'] == [{'name': 'items', 'path': 'items', 'type': 'array'}]
+
+
+async def test_generic_http_connection_rejects_duplicate_params_and_get_body(local_fixtures):
+    with local_http(lambda request, body: (200, b'{}', {})) as base:
+        with pytest.raises(ExecutionError) as duplicate:
+            await validate_connection({'type': 'http', 'name': 'x', 'baseUrl': base, 'path': '/x', 'method': 'GET', 'sideEffect': 'read',
+                'params': [{'name': 'q', 'source': 'node'}, {'name': 'q', 'source': 'fixed', 'value': '1'}]}, '', local_env())
+        assert duplicate.value.code == 'INVALID_CONNECTION'
+        with pytest.raises(ExecutionError) as body:
+            await validate_connection({'type': 'http', 'name': 'x', 'baseUrl': base, 'path': '/x', 'method': 'GET', 'sideEffect': 'read', 'body': {'mode': 'json', 'text': '{}'}}, '', local_env())
+        assert body.value.code == 'INVALID_CONNECTION'
+
+
+def test_hydrate_generic_http_connection_builds_required_inputs_and_server_side_values():
+    environment = local_env(variables={'OWNER': 'openai'})
+    content = {
+        'type': 'http', 'name': 'GitHub', 'baseUrl': 'https://api.github.com', 'path': '/repos/{{owner}}/{{repo}}',
+        'method': 'GET', 'sideEffect': 'read', 'params': [
+            {'name': 'owner', 'source': 'node', 'value': '', 'required': True, 'description': '所有者'},
+            {'name': 'repo', 'source': 'node', 'value': '', 'required': True, 'description': '仓库'},
+            {'name': 'tags', 'source': 'fixed', 'value': 'story', 'required': False, 'description': ''},
+            {'name': 'account', 'source': 'variable', 'value': 'OWNER', 'required': False, 'description': ''},
+        ], 'headers': [{'name': 'Accept', 'value': 'application/json'}],
+        'auth': {'type': 'bearer'}, 'settings': {'timeoutMs': 8000}, 'outputMap': [{'name': 'hits', 'path': 'hits', 'type': 'array'}],
+        'secretRef': 'TEST_GITHUB_TOKEN',
+    }
+    environment = hydrate_connections(environment, 'a', [{'kind': 'connection', 'ref': 'github', 'version': 1, 'disabled': False, 'content': content}])
+    tool = next(item for item in environment['tools'] if item['ref'] == 'p4:a:github:1')
+    assert tool['inputSchema']['required'] == ['owner', 'repo']
+    assert tool['inputSchema']['properties']['owner']['description'] == '所有者'
+    assert tool['queryParams'] == {'tags': 'story', 'account': 'openai'}
+    assert tool['queryArgumentNames'] == []
+    assert tool['requestHeaders'] == {'Accept': 'application/json'}
+    assert tool['authSecretRef'] == 'TEST_GITHUB_TOKEN'
+    assert tool['outputMap'] == [{'name': 'hits', 'path': 'hits', 'type': 'array'}]
+
+
+async def test_invoke_generic_http_connection_sends_bearer_path_query_and_maps_output(local_fixtures, monkeypatch):
+    monkeypatch.setenv('TEST_GITHUB_TOKEN', 'private-api-token')
+    seen = {}
+
+    def handler(request, body):
+        seen['path'] = request.path
+        seen['authorization'] = request.headers.get('Authorization')
+        seen['accept'] = request.headers.get('Accept')
+        seen['body'] = body.decode()
+        return 200, json.dumps({'data': {'items': [{'title': 'A'}]}}).encode(), {}
+
+    with local_http(handler) as base:
+        environment = local_env(providers=[{'ref': 'p', 'secretRef': 'TEST_GITHUB_TOKEN'}])
+        content = {
+            'type': 'http', 'name': 'GitHub', 'baseUrl': base, 'path': '/repos/{{owner}}/items', 'method': 'POST', 'sideEffect': 'write',
+            'params': [
+                {'name': 'owner', 'source': 'node', 'value': '', 'required': True, 'description': ''},
+                {'name': 'repo', 'source': 'node', 'value': '', 'required': True, 'description': ''},
+                {'name': 'page', 'source': 'fixed', 'value': '2', 'required': False, 'description': ''},
+            ], 'headers': [{'name': 'Accept', 'value': 'application/json'}],
+            'body': {'mode': 'json', 'text': '{"repo": "{{repo}}"}'}, 'auth': {'type': 'bearer'},
+            'settings': {'timeoutMs': 5000}, 'outputMap': [{'name': 'items', 'path': 'data.items', 'type': 'array'}],
+            'secretRef': 'TEST_GITHUB_TOKEN',
+        }
+        environment = hydrate_connections(environment, 'a', [{'kind': 'connection', 'ref': 'github', 'version': 1, 'disabled': False, 'content': content}])
+        tool = next(item for item in environment['tools'] if item['ref'] == 'p4:a:github:1')
+        result = await tools.invoke_tool(tool, environment, {'owner': 'openai', 'repo': 'openai-python'}, 5)
+    assert seen['path'] == '/repos/openai/items?page=2'
+    assert seen['authorization'] == 'Bearer private-api-token'
+    assert seen['accept'] == 'application/json'
+    assert json.loads(seen['body']) == {'repo': 'openai-python'}
+    assert result == {'items': [{'title': 'A'}]}
+
+
+async def test_fetch_model_reply_returns_first_reply_text(local_fixtures):
+    seen = {}
+
+    def handler(request, body):
+        seen['path'] = request.path
+        seen['body'] = json.loads(body.decode())
+        return 200, json.dumps({'choices': [{'message': {'content': '连接可用。'}}]}).encode(), {}
+
+    with local_http(handler) as base:
+        reply = await extensions.fetch_model_reply(base, None, 'deepseek-flash', '请确认连接。', local_env())
+    assert reply == '连接可用。'
+    assert seen['path'] == '/chat/completions'
+    assert seen['body']['model'] == 'deepseek-flash'
+    assert seen['body']['messages'] == [{'role': 'user', 'content': '请确认连接。'}]
+
+
+def test_builtin_hacker_news_search_uses_optional_words_without_typo_fallback():
+    from eduflow_workflow.registry import BUILTIN_TOOLS
+    hn = next(tool for tool in BUILTIN_TOOLS if tool['ref'] == 'hn_search')
+    assert 'optionalWords={query}' in hn['path']
+    assert 'typoTolerance=false' in hn['path']
+    assert 'removeWordsIfNoResults' not in hn['path']
+    assert 'hitsPerPage=5' in hn['path']

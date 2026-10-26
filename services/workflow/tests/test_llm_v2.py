@@ -18,6 +18,11 @@ class FakeStreamModel:
     def __init__(self, text='assistant-answer'):
         self.text = text
         self.seen = []
+        self.bound = None
+
+    def bind(self, **kwargs):
+        self.bound = kwargs
+        return self
 
     async def astream(self, messages, stream_usage=True):
         self.seen = list(messages)
@@ -144,6 +149,60 @@ async def test_llm_text_output_writes_into_state(monkeypatch):
     assert result['values']['answer'] == 'final text'
 
 
+def structured_config(fields):
+    config = llm_config()
+    config['structuredOutput'] = {'fields': fields}
+    return config
+
+
+async def test_structured_output_requests_json_and_returns_each_field(monkeypatch):
+    run, fake = llm_run(monkeypatch, text='{"keywords":"ai agents","count":2}')
+    config = structured_config([{'name': 'keywords', 'type': 'string'}, {'name': 'count', 'type': 'number', 'description': '结果数量'}])
+    output, _ = await run.llm(llm_node(config, {}), {})
+    assert fake.bound == {'response_format': {'type': 'json_object'}}
+    assert fake.seen[0].content.endswith('JSON 字段') is False
+    assert 'keywords（文本）' in fake.seen[0].content and 'count（数字）：结果数量' in fake.seen[0].content
+    assert output['keywords'] == 'ai agents' and output['count'] == 2
+    assert output['text'] == '{"keywords":"ai agents","count":2}'
+
+
+async def test_structured_output_missing_field_fails_without_fabricating(monkeypatch):
+    run, _ = llm_run(monkeypatch, text='{"keywords":"ai agents"}')
+    config = structured_config([{'name': 'keywords', 'type': 'string'}, {'name': 'count', 'type': 'number'}])
+    with pytest.raises(ExecutionError) as caught:
+        await run.llm(llm_node(config, {}), {})
+    assert caught.value.code == 'INVALID_MODEL_OUTPUT'
+    assert '缺少字段「count」' in str(caught.value)
+    assert caught.value.pointer == '/count'
+
+
+async def test_structured_output_wrong_field_type_fails(monkeypatch):
+    run, _ = llm_run(monkeypatch, text='{"keywords":3}')
+    config = structured_config([{'name': 'keywords', 'type': 'string'}])
+    with pytest.raises(ExecutionError) as caught:
+        await run.llm(llm_node(config, {}), {})
+    assert caught.value.code == 'INVALID_MODEL_OUTPUT'
+    assert '字段「keywords」应为文本' in str(caught.value)
+
+
+async def test_structured_output_non_json_text_fails(monkeypatch):
+    run, _ = llm_run(monkeypatch, text='not json')
+    config = structured_config([{'name': 'keywords', 'type': 'string'}])
+    with pytest.raises(ExecutionError) as caught:
+        await run.llm(llm_node(config, {}), {})
+    assert caught.value.code == 'INVALID_MODEL_OUTPUT'
+    assert '不符合输出字段要求' in str(caught.value)
+
+
+async def test_structured_field_write_into_matching_state_field(monkeypatch):
+    run, _ = llm_run(monkeypatch, text='{"keywords":"ai agents"}')
+    run.definition['state']['schema'] = obj({'value': {'type': 'number'}, 'keywords': {'type': 'string'}})
+    run.definition['state']['initial']['keywords'] = ''
+    node = llm_node(structured_config([{'name': 'keywords', 'type': 'string'}]), {}, writes={'keywords': '/keywords'})
+    result = await run.execute(node, {'value': 0, 'keywords': ''})
+    assert result['values']['keywords'] == 'ai agents'
+
+
 async def test_llm_missing_required_binding_fails_before_the_provider(monkeypatch):
     run, fake = llm_run(monkeypatch)
     node = llm_node(llm_config(), {'tone': {'source': 'state', 'pointer': '/missing', 'onMissing': {'mode': 'error'}}})
@@ -263,3 +322,42 @@ async def test_unused_parameter_warning_keeps_environment_validation_ready(monke
     assert result['valid'] is True and result['checks'] == {'structure': True, 'environment': True, 'input': 'unchecked'}
     warnings = [item for item in result['diagnostics'] if item['code'] == 'PROMPT_PARAM_UNUSED']
     assert len(warnings) == 1 and warnings[0]['severity'] == 'warning' and warnings[0]['scope'] == 'definition'
+
+
+def test_structured_output_contract_rejects_duplicate_and_reserved_names():
+    registry, environment = provider_registry()
+    config = structured_config([
+        {'name': 'keywords', 'type': 'string'},
+        {'name': 'keywords', 'type': 'number'},
+        {'name': 'text', 'type': 'string'},
+    ])
+    result = compile_definition(llm_definition(config), registry.snapshot(environment))
+    assert not result['valid']
+    diagnostics = [item for item in result['diagnostics'] if item['code'] == 'INVALID_STRUCTURED_OUTPUT']
+    assert len(diagnostics) == 2
+    assert {item['pointer'] for item in diagnostics} == {
+        '/nodes/a/config/structuredOutput/fields/1/name',
+        '/nodes/a/config/structuredOutput/fields/2/name',
+    }
+
+
+def test_structured_output_contract_accepts_unique_fields():
+    registry, environment = provider_registry()
+    config = structured_config([
+        {'name': 'keywords', 'type': 'string', 'description': '搜索关键词'},
+        {'name': 'language', 'type': 'string'},
+    ])
+    result = compile_definition(llm_definition(config), registry.snapshot(environment))
+    assert result['valid'], result['diagnostics']
+
+
+def test_structured_output_write_type_mismatch_is_a_compile_error():
+    registry, environment = provider_registry()
+    definition = llm_definition(structured_config([{'name': 'keywords', 'type': 'string'}]))
+    definition['state']['schema'] = obj({'value': {'type': 'number'}, 'keywords': {'type': 'number'}})
+    definition['state']['initial']['keywords'] = 0
+    definition['nodes'][1]['writes'] = {'keywords': '/keywords'}
+    result = compile_definition(definition, registry.snapshot(environment))
+    assert not result['valid']
+    diagnostic = next(item for item in result['diagnostics'] if item['code'] == 'INVALID_STATE_WRITE_TYPE')
+    assert diagnostic['nodeId'] == 'a' and diagnostic['pointer'] == '/nodes/a/writes/keywords'

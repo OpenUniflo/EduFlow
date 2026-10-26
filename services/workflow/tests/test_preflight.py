@@ -81,4 +81,4 @@ async def test_input_diagnostics_do_not_echo_failing_private_values(preflight):
 def test_catalog_groups_are_operator_metadata_only():
     registry=Registry({"environments":[{"ref":"test","ownerIds":["a"],"tools":[{"ref":"fault_named_but_general","name":"Fault","inputSchema":{},"group":"general"},{"ref":"plain","name":"Plain","inputSchema":{},"group":"test"},{"ref":"test_without_metadata","name":"Test tool","inputSchema":{}}]}]})
     tools=registry.public_tools(registry.environment("test","a"))
-    assert [tool.get("group") for tool in tools]==["general","test",None]
+    assert [tool.get("group") for tool in tools]==["general","test",None,None]

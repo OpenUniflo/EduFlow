@@ -129,3 +129,14 @@ it('returns the frozen variable environment name on a Run after the environment 
   await handleWorkflowV2({ method: 'GET', query: { resource: 'runs', id: runId }, headers: {} } as unknown as VercelRequest, response, 'owner');
   expect(vi.mocked(response.json).mock.calls[0][0]).toMatchObject({ variableEnvironmentId: environment.id, variableEnvironment: '开发' });
 });
+
+it('projects safe structured provider error context without changing the error code', async () => {
+  const { workflowRunDto } = await import('./workflowV2');
+  const dto = workflowRunDto({
+    run_id: '11111111-1111-4111-8111-111111111111', workflow_id: 'workflow', revision: 3, mode: 'live', verification: 'unverified', status: 'failed',
+    definition_hash: 'd', semantic_hash: 's', compile_fingerprint: 'f', environment_ref: 'local', environment_revision: 'e', policy_version: '1',
+    registry_snapshot: {}, created_at: '2026-10-24T10:16:00Z', last_seq: 2,
+    error: { code: 'MODEL_REQUEST_FAILED', category: 'auth', message: 'Model request failed', reason: 'auth_failed', provider: 'DeepSeek', model: 'deepseek-chat', host: 'api.deepseek.com', httpStatus: 401 },
+  } as never);
+  expect((dto as Record<string, unknown>).error).toMatchObject({ code: 'MODEL_REQUEST_FAILED', reason: 'auth_failed', provider: 'DeepSeek', model: 'deepseek-chat', host: 'api.deepseek.com', httpStatus: 401 });
+});

@@ -71,7 +71,10 @@ async def compute(executor,node,resolved,body):
     from .tools import declared_effect
     timeout_effect='unknown' if declared_effect(node,executor.env.get('tools',[]))=='write' else 'none'
     def timeout_error():
-        return ExecutionError('NODE_TIMEOUT','Node exceeded configured timeout','timeout',effect=timeout_effect)
+        if node['type']=='core.llm':
+            provider=next((p for p in executor.env.get('providers',[]) if p['ref']==node['config'].get('providerRef')),{})
+            return ExecutionError('MODEL_TIMEOUT','Model response exceeded the node time limit','timeout',retryable=True,effect=timeout_effect,reason='timeout',provider=provider.get('name') or provider.get('ref'),model=node['config'].get('modelRef'),timeout_ms=round(timeout*1000))
+        return ExecutionError('NODE_TIMEOUT','Node exceeded configured timeout','timeout',effect=timeout_effect,reason='timeout',timeout_ms=round(timeout*1000))
     s=node['config'].get('authoring',{});retry=s.get('retry',{});calls=0
     max_attempts=retry.get('maxAttempts',1)
     context={'ownerId':executor.run['owner_user_id'],'workflowId':executor.run.get('workflow_id',executor.root_definition['workflowId']),'nodeId':node['id'],'graphPath':(executor._invocation.get().sdk_execution or {}).get('graphPath',[])}

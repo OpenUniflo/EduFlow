@@ -132,6 +132,34 @@ def validate_llm_authoring(node, definition, diagnostics):
     limit = definition["policy"].get("maxInputBytes")
     if isinstance(limit, int) and not isinstance(limit, bool) and estimate_prompt_bytes(prompt, inputs) > limit:
         diagnostics.append({"code":"INPUT_TOO_LARGE","severity":"error","nodeId":nid,"pointer":pointer+"/config/prompt","message":"Estimated rendered prompt exceeds maxInputBytes"})
+    structured = node["config"].get("structuredOutput")
+    if structured is not None:
+        fields = structured.get("fields") if isinstance(structured, dict) else None
+        if not isinstance(fields, list):
+            diagnostics.append({"code":"INVALID_STRUCTURED_OUTPUT","severity":"error","nodeId":nid,"pointer":pointer+"/config/structuredOutput","message":"structuredOutput.fields must be an array"})
+        else:
+            seen = set()
+            state_properties = ((definition.get("state") or {}).get("schema") or {}).get("properties") or {}
+            for index, field in enumerate(fields):
+                location = pointer+"/config/structuredOutput/fields/"+str(index)
+                if not isinstance(field, dict) or not isinstance(field.get("name"), str) or not PARAM_NAME.fullmatch(field["name"]):
+                    diagnostics.append({"code":"INVALID_STRUCTURED_OUTPUT","severity":"error","nodeId":nid,"pointer":location+"/name","message":"Structured output field names must match ^[A-Za-z_][A-Za-z0-9_]{0,63}$"})
+                    continue
+                name = field["name"]
+                if name in seen:
+                    diagnostics.append({"code":"INVALID_STRUCTURED_OUTPUT","severity":"error","nodeId":nid,"pointer":location+"/name","message":"Structured output field names must be unique"})
+                seen.add(name)
+                if name in ("text", "messages", "toolCalls"):
+                    diagnostics.append({"code":"INVALID_STRUCTURED_OUTPUT","severity":"error","nodeId":nid,"pointer":location+"/name","message":"Structured output field name collides with a built-in model output"})
+                target = state_properties.get(name)
+                pointer_value = node.get("writes", {}).get(name)
+                if isinstance(target, dict) and pointer_value == "/"+name and isinstance(field.get("type"), str):
+                    expected = target.get("type")
+                    expected = expected[0] if isinstance(expected, list) and expected else expected
+                    expected = "number" if expected == "integer" else expected
+                    actual = field["type"]
+                    if expected in ("string", "number", "boolean", "array", "object") and expected != actual:
+                        diagnostics.append({"code":"INVALID_STATE_WRITE_TYPE","severity":"error","nodeId":nid,"pointer":pointer+"/writes/"+escape_token(name),"message":"Written field type does not match the structured output field type"})
 
 def validate_tool_authoring(node, definition, registry_snapshot, tools, diagnostics):
     """core.tool v2: one input per declared tool argument, checked against its sub-schema."""

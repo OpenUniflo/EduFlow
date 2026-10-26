@@ -5,6 +5,8 @@ import json
 import os
 import time
 import uuid
+from urllib.parse import urlsplit
+import httpx
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from langchain_deepseek import ChatDeepSeek
@@ -27,6 +29,108 @@ class InvocationContext:
     step_id: str | None = None
     sdk_execution: dict | None = None
 
+
+def _safe_host(url):
+    """Hostname only: never leak paths, query strings or embedded credentials."""
+    try:
+        host = urlsplit(str(url or "")).hostname
+    except ValueError:
+        return None
+    return host or None
+
+def _provider_host(provider):
+    return _safe_host(provider.get("baseUrl") or ("https://api.deepseek.com" if provider.get("adapter", "deepseek") == "deepseek" else ""))
+
+def _reason_for_status(status):
+    if status in (401, 403): return "auth_failed"
+    if status == 404: return "model_not_found"
+    if status == 429: return "rate_limited"
+    if status in (400, 422): return "bad_request"
+    if status in (408, 504): return "timeout"
+    if isinstance(status, int) and status >= 500: return "provider_error"
+    return None
+
+def _reason_for_exception(error, status=None, model_call=False):
+    reason = _reason_for_status(status)
+    if reason: return reason
+    if isinstance(error, (httpx.TimeoutException, asyncio.TimeoutError)): return "timeout"
+    if isinstance(error, httpx.ConnectError): return "connection_refused"
+    if isinstance(error, httpx.HTTPError): return "provider_error"
+    return "provider_error" if model_call else "provider_error"
+
+def _value_type_label(value):
+    if isinstance(value,bool): return "是否"
+    if isinstance(value,list): return "列表"
+    if isinstance(value,dict): return "对象"
+    if isinstance(value,(int,float)): return "数字"
+    if isinstance(value,str): return "文本"
+    if value is None: return "空值"
+    return "其他类型"
+
+def _schema_type_name(schema):
+    if not isinstance(schema,dict): return None
+    value=schema.get("type")
+    if isinstance(value,list): value=next((item for item in value if item!="null"),None)
+    if value=="integer": return "number"
+    return value if value in ("string","number","boolean","array","object") else None
+
+def _schema_type_label(schema):
+    return {"string":"文本","number":"数字","boolean":"是否","array":"列表","object":"对象"}.get(_schema_type_name(schema))
+
+def _value_type_name(value):
+    if isinstance(value,bool): return "boolean"
+    if isinstance(value,list): return "array"
+    if isinstance(value,dict): return "object"
+    if isinstance(value,(int,float)): return "number"
+    if isinstance(value,str): return "string"
+    if value is None: return "null"
+    return None
+
+def _write_source_label(node):
+    return {"core.tool":"工具","core.llm":"模型","core.function":"函数","core.transform":"处理"}.get(node.get("type"),"节点")
+
+_STRUCTURED_FIELD_TYPES = {
+    "string": ({"type":"string"},"文本"),
+    "number": ({"type":"number"},"数字"),
+    "boolean": ({"type":"boolean"},"是否"),
+    "array": ({"type":"array"},"列表"),
+    "object": ({"type":"object"},"对象"),
+}
+
+def _structured_fields(config):
+    structured = config.get("structuredOutput")
+    fields = structured.get("fields") if isinstance(structured, dict) else None
+    return fields if isinstance(fields, list) else []
+
+def _structured_instruction(fields):
+    lines = ["请只返回一个 JSON 对象，不要 Markdown 代码块，不要额外说明。JSON 字段如下："]
+    for field in fields:
+        label = _STRUCTURED_FIELD_TYPES[field["type"]][1]
+        description = field.get("description") or ""
+        lines.append(f"- {field['name']}（{label}）{('：' + description) if description else ''}")
+    return "\n".join(lines)
+
+def _parse_structured_output(text, fields):
+    raw = (text or "").strip()
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+        if lines and lines[0].startswith("```"): lines = lines[1:]
+        if lines and lines[-1].strip() == "```": lines = lines[:-1]
+        raw = "\n".join(lines).strip()
+    try: parsed = json.loads(raw)
+    except (TypeError, ValueError): raise ExecutionError("INVALID_MODEL_OUTPUT", "模型返回的内容不符合输出字段要求", "validation", effect="none") from None
+    if not isinstance(parsed, dict): raise ExecutionError("INVALID_MODEL_OUTPUT", "模型返回的内容不符合输出字段要求", "validation", effect="none")
+    values = {}
+    for field in fields:
+        name = field["name"]
+        if name not in parsed:
+            raise ExecutionError("INVALID_MODEL_OUTPUT", f"模型返回的内容不符合输出字段要求：缺少字段「{name}」", "validation", effect="none", pointer="/"+name)
+        schema, label = _STRUCTURED_FIELD_TYPES[field["type"]]
+        try: validate_value(schema, parsed[name], "INVALID_MODEL_OUTPUT")
+        except ExecutionError:
+            raise ExecutionError("INVALID_MODEL_OUTPUT", f"模型返回的内容不符合输出字段要求：字段「{name}」应为{label}", "validation", effect="none", pointer="/"+name) from None
+        values[name] = parsed[name]
+    return values
 
 class RunExecution:
     def __init__(self,claim,registry,storage):
@@ -116,6 +220,12 @@ class RunExecution:
                 messages.append({"id":str(uuid.uuid4()),"role":"tool","content":[{"type":"text","text":json.dumps(result,ensure_ascii=False)}],"toolCallId":call["id"]})
             except Exception as error:
                 error=error if isinstance(error,ExecutionError) else ExecutionError("TOOL_TIMEOUT","Tool call interrupted","timeout",effect="unknown")
+                if not error.tool:
+                    error.tool=tool.get("name") or tool.get("ref")
+                if not error.host:
+                    error.host=_safe_host(tool.get("baseUrl"))
+                if not error.reason:
+                    error.reason="timeout" if error.code in ("TOOL_TIMEOUT","TOOL_BUDGET_EXCEEDED") else "auth_failed" if error.code in ("TOOL_FORBIDDEN","SECRET_REVOKED") else "provider_error"
                 await self.event("tool.failed",{"callId":call_id,"toolCallId":call["id"],"error":error.dto()})
                 for pending in calls[index+1:]: await self.event("tool.skipped",{"toolCallId":pending["id"],"reason":"previous_tool_failed"})
                 raise error
@@ -124,7 +234,9 @@ class RunExecution:
     def model_adapter(self,config):
         """Initialize the mature provider SDK; never expose raw proxy/SDK exceptions."""
         providers=[p for p in self.env["providers"] if p["ref"]==config["providerRef"] and config["modelRef"] in p["modelRefs"]]
-        if not providers: raise ExecutionError("MODEL_FORBIDDEN","Model is not authorized","auth")
+        if not providers:
+            configured=next((p for p in self.env["providers"] if p["ref"]==config["providerRef"]),None)
+            raise ExecutionError("MODEL_FORBIDDEN","Model is not authorized","auth",reason="model_not_found",provider=(configured or {}).get("name") or config.get("providerRef"),model=config.get("modelRef"),host=_provider_host(configured or {}))
         provider=providers[0]
         allowed_parameters={"temperature","top_p","frequency_penalty","presence_penalty","thinking"}
         if set(config["modelParameters"])-allowed_parameters: raise ExecutionError("UNSUPPORTED_MODEL_PARAMETER","Unsupported model parameter")
@@ -146,15 +258,26 @@ class RunExecution:
                 functions=[{"type":"function","function":{"name":t["name"],"description":t.get("description",""),"parameters":t["inputSchema"]}} for t in self.env["tools"] if t["ref"] in refs and t["available"]]
                 model=model.bind_tools(functions)
             return model
-        except ExecutionError: raise
-        except Exception:
-            raise ExecutionError("MODEL_ADAPTER_FAILED","Model adapter initialization or tool binding failed","infrastructure",effect="none") from None
+        except ExecutionError as error:
+            if not error.reason:
+                error.reason = "auth_failed" if error.code in ("SECRET_REVOKED", "MODEL_FORBIDDEN") else "provider_error"
+            error.provider = error.provider or provider.get("name") or provider.get("ref")
+            error.model = error.model or config.get("modelRef")
+            error.host = error.host or _provider_host(provider)
+            raise
+        except Exception as exc:
+            raise ExecutionError("MODEL_ADAPTER_FAILED","Model adapter initialization or tool binding failed","infrastructure",effect="none",reason=_reason_for_exception(exc,None,True),provider=provider.get("name") or provider.get("ref"),model=config.get("modelRef"),host=_provider_host(provider)) from None
     async def llm(self,node,resolved):
         from .prompts import render_prompt
         config=node["config"]
         parameters={name:value for name,value in resolved.items() if name!="history"}
         system,payloads=render_prompt(config["prompt"],parameters)
+        fields=_structured_fields(config)
+        if fields:
+            instruction=_structured_instruction(fields)
+            system=f"{system}\n\n{instruction}" if system else instruction
         model=self.model_adapter(config)
+        if fields: model=model.bind(response_format={"type":"json_object"})
         from langchain_core.messages import messages_from_dict
         persisted={key:messages_from_dict([value])[0] for key,value in SDK_MESSAGES.get().items()}
         def convert(message):
@@ -163,19 +286,32 @@ class RunExecution:
         if system: messages.append(to_langchain({"id":str(uuid.uuid4()),"role":"system","content":[{"type":"text","text":system}]}))
         messages.extend(convert(message) for message in resolved.get("history") or [])
         messages.extend(to_langchain({"id":str(uuid.uuid4()),"role":payload["role"],"content":[{"type":"text","text":payload["content"]}]}) for payload in payloads)
+        provider=next((p for p in self.env["providers"] if p["ref"]==config.get("providerRef")),{})
+        started=time.monotonic()
+        def elapsed_ms(): return round((time.monotonic()-started)*1000)
         try:
             from .session_memory_history import stream_model
             response=await stream_model(self,model,messages)
-        except ExecutionError:raise
+        except ExecutionError as error:
+            if not error.reason:
+                error.reason="auth_failed" if error.code=="SECRET_REVOKED" else "provider_error"
+            error.provider=error.provider or provider.get("name") or provider.get("ref")
+            error.model=error.model or config.get("modelRef")
+            error.host=error.host or _provider_host(provider)
+            if error.elapsed_ms is None: error.elapsed_ms=elapsed_ms()
+            raise
         except Exception as error:
-            status=getattr(error,"status_code",None)
-            category="auth" if status in (401,403) else "rate_limit" if status==429 else "timeout" if isinstance(error,asyncio.TimeoutError) else "provider"
-            raise ExecutionError("MODEL_REQUEST_FAILED","Model request failed","provider" if category=="provider" else category,external_status=status) from None
+            status=getattr(error,"status_code",None) or getattr(getattr(error,"response",None),"status_code",None)
+            category="auth" if status in (401,403) else "rate_limit" if status==429 else "timeout" if isinstance(error,(asyncio.TimeoutError,httpx.TimeoutException)) else "provider"
+            reason=_reason_for_exception(error,status,True)
+            raise ExecutionError("MODEL_REQUEST_FAILED","Model request failed","provider" if category=="provider" else category,external_status=status,reason=reason,provider=provider.get("name") or provider.get("ref"),model=config.get("modelRef"),host=_provider_host(provider),http_status=status,elapsed_ms=elapsed_ms()) from None
         if response.invalid_tool_calls: raise ExecutionError("INVALID_MODEL_TOOL_CALL","Provider returned an invalid structured tool call","provider")
         message=from_langchain(response); self.messages_private[message["id"]]=response
         usage=response.usage_metadata or {}
         text="".join(block["text"] for block in message.get("content",[]) if isinstance(block,dict) and block.get("type")=="text")
-        return {"messages":[message],"toolCalls":message.get("toolCalls",[]),"text":text},{"inputTokens":usage.get("input_tokens"),"outputTokens":usage.get("output_tokens")}
+        output={"messages":[message],"toolCalls":message.get("toolCalls",[]),"text":text}
+        if fields: output.update(_parse_structured_output(text,fields))
+        return output,{"inputTokens":usage.get("input_tokens"),"outputTokens":usage.get("output_tokens")}
     async def execute(self,node,state):
         # Bind the version before the first await: guard can yield while another
         # invocation commits. The supplied state must not acquire that new version.
@@ -280,7 +416,21 @@ class RunExecution:
             if command.get('enabled'): patch.update(bind(command.get('update',{}),self.input,state,self.env.get('variables',{})))
             if node['type']=='core.subgraph' and node['config'].get('stateMode')=='shared': patch.update(shared_patch)
             if parent_command: patch.update(decode_state(self.definition,parent_command.update))
-            candidate=self.apply_node_patch(node,state,patch)
+            try: candidate=self.apply_node_patch(node,state,patch)
+            except ExecutionError as error:
+                if error.code=="INVALID_STATE_UPDATE":
+                    field=(error.pointer or "").split("/")[1:2]
+                    field=field[0].replace("~1","/").replace("~0","~") if field else None
+                    if field in patch:
+                        field_schema=(self.definition.get("state",{}).get("schema",{}).get("properties") or {}).get(field)
+                        expected_name=_schema_type_name(field_schema);actual_name=_value_type_name(patch[field])
+                        expected_label=_schema_type_label(field_schema);actual_label=_value_type_label(patch[field])
+                        if expected_name and actual_name and expected_name!=actual_name:
+                            error.field=field;error.expected_type=expected_name;error.actual_type=actual_name
+                            error.expected_label=expected_label;error.actual_label=actual_label;error.value_source=_write_source_label(node)
+                            error.message=f"{field} 字段是{expected_label}，但{error.value_source}返回的是{actual_label}"
+                            error.args=(error.message,)
+                raise
             # Compose two raw updates inside this task before the SDK reducer sees them once.
             combined=dict(response_patch or {})
             for field,value in patch.items():
@@ -337,7 +487,15 @@ class RunExecution:
             output=transform(node["config"]["operationRef"],resolved)
         elif node['type']=='core.subgraph':
             output=await self.subgraph(node,resolved,state)
-        elif node["type"]=="core.llm": output,usage=await asyncio.wait_for(self.llm(node,resolved),timeout=self.remaining())
+        elif node["type"]=="core.llm":
+            # Reserve a bounded node slice, but report expiry as a model timeout
+            # instead of the generic infrastructure wrapper. The provider may be
+            # thinking/reasoning before any visible token, so this is a real wait.
+            limit=self.remaining(); started=time.monotonic()
+            provider=next((p for p in self.env["providers"] if p["ref"]==node["config"].get("providerRef")),{})
+            try: output,usage=await asyncio.wait_for(self.llm(node,resolved),timeout=limit)
+            except asyncio.TimeoutError:
+                raise ExecutionError("MODEL_TIMEOUT","Model response exceeded the node time limit","timeout",retryable=True,effect="none",reason="timeout",provider=provider.get("name") or provider.get("ref"),model=node["config"].get("modelRef"),host=_provider_host(provider),elapsed_ms=round((time.monotonic()-started)*1000),timeout_ms=round(limit*1000)) from None
         elif node["type"]=="core.tool_dispatch": output={"toolMessages":await self.tools(resolved["toolCalls"],node["config"]["allowedToolRefs"])}
         elif node["type"]=="core.tool":
             tool=next(t for t in self.env["tools"] if t["ref"]==node["config"]["toolRef"])

@@ -1,4 +1,5 @@
 """Product policies around official streaming, saver and PostgreSQL Store APIs."""
+import asyncio
 import copy
 import json
 import os
@@ -22,6 +23,9 @@ class HistorySaver(AsyncPostgresSaver):
         return BaseCheckpointSaver.get_next_version(self,current,channel)
 
 LIMITS={'rounds':20,'threadDays':7,'streamEvents':2048,'streamBytes':1048576,'textBytes':65536,'itemBytes':16384,'storeItems':1000,'storeTtlMinutes':10080,'historyPage':20,'bulkUpdates':20}
+# A completed socket can still stall between chunks. Distinguish this from the
+# node's overall time budget so the UI can explain a genuinely interrupted stream.
+STREAM_IDLE_SECONDS=30.0
 
 def fail(code,message,category='validation'):
     raise ExecutionError(code,message,category,effect='none')
@@ -103,14 +107,20 @@ async def emit(execution,kind,payload):
 async def stream_model(execution,model,messages):
     from .credentials import secret_values
     keep=max([0,*[len(s) for s in secret_values(execution.env)]])
-    response=None;text='';sent=0;sequence=0;last=time.monotonic();stream=str(uuid.uuid4())
+    response=None;text='';sent=0;sequence=0;last=time.monotonic();stream=str(uuid.uuid4());started=time.monotonic()
+    def elapsed_ms(): return round((time.monotonic()-started)*1000)
     try:
         from langchain_core.messages import message_chunk_to_message
         # Reasoning providers can emit thousands of chunks per response. Revalidate the
         # lease/environment at a bounded cadence instead of once per chunk so provider
         # streaming stays within the node budget; revocation still dominates each chunk.
         last_guard=0.0
-        async for chunk in model.astream(messages,stream_usage=True):
+        iterator=model.astream(messages,stream_usage=True).__aiter__()
+        while True:
+            try: chunk=await asyncio.wait_for(iterator.__anext__(),timeout=STREAM_IDLE_SECONDS)
+            except StopAsyncIteration: break
+            except asyncio.TimeoutError:
+                raise ExecutionError('MODEL_STREAM_INTERRUPTED','Model stream stopped producing output','timeout',retryable=True,effect='none',reason='stream_interrupted',elapsed_ms=elapsed_ms(),timeout_ms=round(STREAM_IDLE_SECONDS*1000)) from None
             now=time.monotonic()
             if now-last_guard>=0.5:
                 await execution.guard()
@@ -130,9 +140,9 @@ async def stream_model(execution,model,messages):
         if response is None:fail('EMPTY_MODEL_RESPONSE','Model returned no response','provider')
         message=message_chunk_to_message(response)
         reason=(message.response_metadata or {}).get('finish_reason')
-        if reason=='length':fail('MODEL_OUTPUT_TRUNCATED','Model reached its output limit before completing the response','provider')
+        if reason=='length':raise ExecutionError('MODEL_OUTPUT_TRUNCATED','Model reached its output limit before completing the response','provider',retryable=True,effect='none',reason='output_truncated',elapsed_ms=elapsed_ms())
         if reason not in ('stop','tool_calls','function_call'):
-            fail('MODEL_RESPONSE_INCOMPLETE','Model did not complete an accepted response','provider')
+            raise ExecutionError('MODEL_RESPONSE_INCOMPLETE','Model did not complete an accepted response','provider',retryable=True,effect='none',reason='stream_interrupted',elapsed_ms=elapsed_ms())
         if message.invalid_tool_calls:fail('INVALID_MODEL_TOOL_CALL','Provider returned an invalid structured tool call','provider')
         if not text.strip() and not message.tool_calls:
             fail('EMPTY_MODEL_RESPONSE','Model returned no visible response or valid tool call','provider')
