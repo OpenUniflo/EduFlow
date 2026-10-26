@@ -25,8 +25,8 @@ export function interactionResponseIssue(schema: JsonSchema, response: JsonValue
   }
   return undefined;
 }
-export type NodeAuthoring = { previewBranch?: string; interrupt?: NodeInteraction; retry?: { maxAttempts: number; intervalMs: number; backoffFactor?:number; maxIntervalMs?:number; retryOn?:string[] }; timeoutMs?: number; cache?: { ttlMs: number }; errorHandler?: { functionRef: string; functionVersion?:number }; overwrite?:string[]; defer?:boolean; command?: { enabled: boolean; destinations: string[]; graph?:"current"|"parent"; update?:Record<string, import("./types").Binding> }; previewOutput?: Record<string, JsonValue> };
-const nodeAuthoringSchema = z.object({ previewBranch:z.string().optional(), previewOutput:z.record(z.string(),jsonValueSchema).optional(), interrupt:z.object({title:z.string(),schema:z.record(z.string(),jsonValueSchema),resumeWrites:z.record(z.string(),z.string())}), retry:z.object({maxAttempts:z.number().int().min(1).max(10),intervalMs:z.number().nonnegative(),backoffFactor:z.number().min(1).optional(),maxIntervalMs:z.number().nonnegative().optional(),retryOn:z.array(z.string()).optional()}).optional(), timeoutMs:z.number().positive().optional(),cache:z.object({ttlMs:z.number().positive()}).optional(),overwrite:z.array(z.string()).optional(),errorHandler:z.object({functionRef:z.string(),functionVersion:z.number().int().positive().optional()}).optional(),defer:z.boolean().optional(),command:z.object({enabled:z.boolean(),destinations:z.array(z.string()),graph:z.enum(["current","parent"]).optional(),update:z.record(z.string(),bindingSchema).optional()}).optional() }).partial().passthrough();
+export type NodeAuthoring = { interrupt?: NodeInteraction; retry?: { maxAttempts: number; intervalMs: number; backoffFactor?:number; maxIntervalMs?:number; retryOn?:string[] }; timeoutMs?: number; cache?: { ttlMs: number }; errorHandler?: { functionRef: string; functionVersion?:number }; overwrite?:string[]; defer?:boolean; command?: { enabled: boolean; destinations: string[]; graph?:"current"|"parent"; update?:Record<string, import("./types").Binding> } };
+const nodeAuthoringSchema = z.object({ interrupt:z.object({title:z.string(),schema:z.record(z.string(),jsonValueSchema),resumeWrites:z.record(z.string(),z.string())}), retry:z.object({maxAttempts:z.number().int().min(1).max(10),intervalMs:z.number().nonnegative(),backoffFactor:z.number().min(1).optional(),maxIntervalMs:z.number().nonnegative().optional(),retryOn:z.array(z.string()).optional()}).optional(), timeoutMs:z.number().positive().optional(),cache:z.object({ttlMs:z.number().positive()}).optional(),overwrite:z.array(z.string()).optional(),errorHandler:z.object({functionRef:z.string(),functionVersion:z.number().int().positive().optional()}).optional(),defer:z.boolean().optional(),command:z.object({enabled:z.boolean(),destinations:z.array(z.string()),graph:z.enum(["current","parent"]).optional(),update:z.record(z.string(),bindingSchema).optional()}).optional() }).partial().passthrough();
 export function nodeAuthoring(node: WorkflowNodeV2): NodeAuthoring { const result=nodeAuthoringSchema.safeParse(node.config.authoring??{});return result.success?result.data as NodeAuthoring:{}; }
 export function graphInNode(node: WorkflowNodeV2): WorkflowDefinitionV2 | undefined {
   if (node.type !== "core.subgraph") return undefined;
@@ -71,6 +71,37 @@ export function nodeOutlets(node: WorkflowNodeV2): string[] {
   const cases = node.config.cases as { id: string }[] | undefined;
   return [...(Array.isArray(cases) ? cases.filter(item => item && typeof item.id === "string").map(item => item.id) : []), String(node.config.defaultOutlet ?? "default")];
 }
+/**
+ * User-visible outlet name. Router cases carry an optional author label and a
+ * literal comparison value as a fallback, so canvas edges never expose internal
+ * keys such as `learning` or `branch_2`.
+ */
+export function outletDisplayName(node: WorkflowNodeV2 | undefined, outlet: string): string {
+  if (outlet === "next") return "";
+  if (outlet === "has_calls") return "有工具调用";
+  if (outlet === "item") return "逐项派发";
+  if (node?.type === "core.router") {
+    const cases = Array.isArray(node.config.cases) ? node.config.cases as { id?: unknown; label?: unknown; predicate?: Record<string, JsonValue> }[] : [];
+    const index = cases.findIndex(item => item && item.id === outlet);
+    if (index >= 0) {
+      const item = cases[index];
+      if (typeof item.label === "string" && item.label.trim()) return item.label.trim();
+      const predicate = item.predicate ?? {};
+      const right = predicate.right as Record<string, JsonValue> | undefined;
+      if (predicate.op === "eq" && right?.source === "literal" && typeof right.value === "string" && right.value.trim()) return right.value.trim();
+      return `分支 ${index + 1}`;
+    }
+    if (outlet === String(node.config.defaultOutlet ?? "default")) {
+      const label = node.config.defaultLabel;
+      return typeof label === "string" && label.trim() ? label.trim() : "其他";
+    }
+    return `分支 ${cases.length + 1}`;
+  }
+  if (outlet === "default") return "否则";
+  if (/^branch_\d+$/.test(outlet)) return `分支 ${outlet.slice(7)}`;
+  return outlet;
+}
+
 export function frontendCapabilities(graph: WorkflowDefinitionV2, supported: string[] = []): string[] {
   const features = new Set<string>();
   if(graph.policy.authoring&&!supported.includes("checkpoint"))features.add("图中断等待与持久化策略");
@@ -85,7 +116,6 @@ export function frontendCapabilities(graph: WorkflowDefinitionV2, supported: str
     if(settings.cache&&!supported.includes("node-cache"))features.add("节点缓存");
     if(settings.errorHandler&&!supported.includes("node-error-handler"))features.add("节点错误处理");
     if (settings.command?.enabled&&!supported.includes("command")) features.add("Command 状态与路由");
-    if (settings.previewOutput || settings.previewBranch) features.add("节点预览数据");
     const child = graphInNode(node); if (child) frontendCapabilities(child,supported).forEach(feature => features.add(feature));
   }
   return [...features];

@@ -1,5 +1,5 @@
 import { PARAM_NAME_PATTERN, RESERVED_PARAM_NAME } from "./schema";
-import type { Binding, JsonValue, LlmConfigV2, PromptSegment } from "./types";
+import type { Binding, JsonValue, LlmConfigV2, PromptSegment, WorkflowNodeV2 } from "./types";
 
 /** The persisted prompt section of a typeVersion 2 model node. */
 export type PromptConfigV2 = LlmConfigV2["prompt"];
@@ -86,4 +86,23 @@ export function renameParam(
     },
     inputs: nextInputs,
   };
+}
+
+/**
+ * Applies one input-table edit to a node. For a typeVersion 2 model node, a
+ * single removed/added parameter is a rename, so its prompt segments follow.
+ * A rejected rename keeps the prompt untouched; the table reported the reason.
+ */
+export function withRenamedNodeParams(node: WorkflowNodeV2, inputs: Record<string, Binding>): WorkflowNodeV2 {
+  if (node.type !== "core.llm" || node.typeVersion < 2) return { ...node, inputs };
+  const history = node.inputs.history;
+  const previousNames = Object.keys(node.inputs).filter(name => name !== "history");
+  const nextNames = Object.keys(inputs);
+  const removed = previousNames.filter(name => !nextNames.includes(name));
+  const added = nextNames.filter(name => !previousNames.includes(name));
+  let config = node.config;
+  if (removed.length === 1 && added.length === 1) {
+    try { config = renameParam(node.config as unknown as LlmConfigV2, node.inputs, removed[0], added[0]).config as unknown as Record<string, JsonValue>; } catch { /* keep the prompt unchanged; the table already reported the rename error */ }
+  }
+  return { ...node, config, inputs: { ...inputs, ...(history ? { history } : {}) } };
 }

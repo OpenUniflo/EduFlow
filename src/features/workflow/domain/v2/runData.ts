@@ -1,9 +1,10 @@
 import type { JsonValue, WorkflowDefinitionV2, WorkflowNodeV2 } from "./types";
 
-/** The subset of a Run Step (or frontend preview step) that node run data needs. */
+/** The subset of a Run Step that node run data needs. */
 export type RunStepInput = {
   stepId: string; runId: string; nodeId: string; status: string;
   input?: JsonValue; output?: JsonValue; startedAt?: string; finishedAt?: string; graphPath?: string[];
+  error?: { code: string; message: string; category?: string; retryable?: boolean; externalStatus?: number; httpStatus?: number; reason?: string; provider?: string; model?: string; host?: string; tool?: string; effect?: string; elapsedMs?: number; timeoutMs?: number };
 };
 
 export type NodeRunWrite = { field: string; pointer: string; value: JsonValue | undefined; reducer: string };
@@ -11,6 +12,7 @@ export type NodeRunWrite = { field: string; pointer: string; value: JsonValue | 
 export type NodeRunData = {
   runId: string; stepId: string; status: string;
   input?: JsonValue; output?: JsonValue;
+  error?: RunStepInput["error"];
   writes: NodeRunWrite[];
   elapsedMs?: number;
   /** Zero-based position of the selected (last) invocation in the supplied step list. */
@@ -109,6 +111,7 @@ export function nodeRunData(definition: WorkflowDefinitionV2, steps: readonly Ru
     status: selected.status,
     ...(selected.input === undefined ? {} : { input: selected.input }),
     ...(selected.output === undefined ? {} : { output: selected.output }),
+    ...(selected.error === undefined ? {} : { error: selected.error }),
     writes,
     ...(elapsed === undefined ? {} : { elapsedMs: elapsed }),
     stepIndex,

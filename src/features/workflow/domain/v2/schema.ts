@@ -28,7 +28,13 @@ const promptParamSegmentSchema = z.object({ type: z.literal("param"), name: prom
 export const promptSegmentSchema = z.union([promptTextSegmentSchema, promptParamSegmentSchema]);
 export const promptMessageSchema = z.object({ role: z.enum(["user", "assistant"]), content: z.array(promptSegmentSchema) }).strict();
 export const promptConfigV2Schema = z.object({ system: z.array(promptSegmentSchema), messages: z.array(promptMessageSchema).min(1, "至少需要一条提示词消息。") }).strict();
-export const llmConfigV2Schema = z.object({ providerRef: z.string(), modelRef: z.string(), modelParameters: jsonObject, allowedToolRefs: z.array(z.string()), prompt: promptConfigV2Schema }).strict();
+export const structuredOutputFieldSchema = z.object({
+  name: z.string().regex(PARAM_NAME_PATTERN, "字段名只能包含字母、数字和下划线，且不能以数字开头。"),
+  type: z.enum(["string", "number", "boolean", "array", "object"]),
+  description: z.string().max(300, "字段说明最长 300 个字符。").optional(),
+}).strict();
+export const structuredOutputSchema = z.object({ fields: z.array(structuredOutputFieldSchema).max(20, "最多定义 20 个输出字段。") }).strict();
+export const llmConfigV2Schema = z.object({ providerRef: z.string(), modelRef: z.string(), modelParameters: jsonObject, allowedToolRefs: z.array(z.string()), prompt: promptConfigV2Schema, structuredOutput: structuredOutputSchema.optional() }).strict();
 export const stateSchemaV2 = z.object({ schema: jsonObject, initial: jsonObject, inputBindings: z.record(z.string(), bindingSchema), reducers: z.record(z.string(), z.object({ name: z.string().min(1), version: z.literal(1) }).strict()) }).strict();
 export const executionPolicySchema = z.object({ timeoutMs: z.number().int().positive(), nodeTimeoutMs: z.number().int().positive(), maxNodeExecutions: z.number().int().positive(), maxToolCalls: z.number().int().nonnegative(), maxInputBytes: z.number().int().positive(), maxStateBytes: z.number().int().positive(), maxEventBytes: z.number().int().positive(), maxOutputTokens: z.number().int().positive(), maxAttempts: z.number().int().min(1).max(10), authoring: z.object({recursionLimit:z.number().int().min(1).max(500),waitTimeoutMs:z.number().int().positive().max(604800000),checkpoint:z.literal("superstep"),interruptBefore:z.array(z.string()).optional(),interruptAfter:z.array(z.string()).optional(),entryRouter:z.string().optional()}).strict().optional(), maxCost: z.object({ amount: z.string(), currency: z.string() }).optional() }).strict();
 export const definitionSchemaV2 = z.object({ schemaVersion: z.literal("2.0"), workflowId: z.string(), revision: z.number().int().nonnegative(), name: z.string().min(1), description: z.string(), inputSchema: jsonObject, outputSchema: jsonObject, state: stateSchemaV2,

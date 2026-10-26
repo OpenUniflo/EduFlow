@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Binding, LlmConfigV2 } from "./types";
-import { promptParamUsage, renameParam, renderPromptPreview, renderPromptSegment } from "./promptAuthoring";
+import { promptParamUsage, renameParam, renderPromptPreview, renderPromptSegment, withRenamedNodeParams } from "./promptAuthoring";
+import { createNodeV2 } from "./factory";
 
 const binding = (pointer: string): Binding => ({ source: "state", pointer, onMissing: { mode: "error" } });
 
@@ -141,5 +142,23 @@ describe("renameParam", () => {
   it("rejects a malformed prompt config instead of half-renaming", () => {
     expect(() => renameParam(null as unknown as LlmConfigV2, inputs(), "query", "question")).toThrow("提示词配置无效");
     expect(() => renameParam({ ...config(prompt()), prompt: { system: [], messages: null } } as unknown as LlmConfigV2, inputs(), "query", "question")).toThrow("提示词配置无效");
+  });
+});
+
+describe("withRenamedNodeParams", () => {
+  it("renames a model input and its prompt reference in one node edit", () => {
+    const node = createNodeV2("core.llm", "model");
+    node.config = config(prompt()) as unknown as Record<string, import("./types").JsonValue>;
+    node.inputs = { role: binding("/role"), query: binding("/query"), context: binding("/context") };
+    const next = withRenamedNodeParams(node, { role: binding("/role"), question: binding("/query"), context: binding("/context") });
+    expect(Object.keys(next.inputs)).toEqual(["role", "question", "context"]);
+    expect((next.config.prompt as LlmConfigV2["prompt"]).messages[0].content[1]).toEqual({ type: "param", name: "question" });
+  });
+
+  it("updates declared inputs without touching prompts for non-model nodes", () => {
+    const node = createNodeV2("core.function", "fn");
+    const next = withRenamedNodeParams(node, { input: binding("/value") });
+    expect(next.inputs).toEqual({ input: binding("/value") });
+    expect(next.config).toBe(node.config);
   });
 });

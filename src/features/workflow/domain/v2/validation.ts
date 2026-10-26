@@ -93,6 +93,13 @@ export function llmConfigDiagnostics(node: WorkflowDefinitionV2["nodes"][number]
     return diagnostics;
   }
   const config = parsed.data as unknown as LlmConfigV2;
+  const reservedOutputs = new Set(["text", "messages", "toolCalls"]);
+  const structuredNames = new Set<string>();
+  (config.structuredOutput?.fields ?? []).forEach((field, fieldIndex) => {
+    if (reservedOutputs.has(field.name)) diagnostics.push({ code: "INVALID_STRUCTURED_OUTPUT", severity: "error", nodeId: node.id, pointer: `/nodes/${index}/config/structuredOutput/fields/${fieldIndex}/name`, message: `结构化字段「${field.name}」与模型内置输出重名，请换一个字段名。` });
+    if (structuredNames.has(field.name)) diagnostics.push({ code: "INVALID_STRUCTURED_OUTPUT", severity: "error", nodeId: node.id, pointer: `/nodes/${index}/config/structuredOutput/fields/${fieldIndex}/name`, message: `结构化字段「${field.name}」重复。` });
+    structuredNames.add(field.name);
+  });
   const declared = new Set(Object.keys(node.inputs));
   const checkSegments = (segments: LlmConfigV2["prompt"]["system"], pointer: string) => {
     segments.forEach((segment, segmentIndex) => {

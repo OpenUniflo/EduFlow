@@ -27,7 +27,7 @@ export type WorkflowTemplateDetail = WorkflowTemplateSummary & { definition: Wor
 export type WorkflowDeleteImpact = { revision: number; revisions: number; runs: number; activeRuns: number };
 export type WorkflowEnvironment = { environmentRef: string; environmentRevision: string; name: string; access?: "owners" | "authenticated"; capabilities: string[]; providers: { ref: string; name: string; modelRefs: string[]; origin?: "environment" | "user"; connectionRef?: string; version?: number }[]; connectors: { ref: string; name: string; transport: string; origin?: "environment" | "user"; connectionRef?: string; version?: number }[]; limits?: JsonValue; variables?: Record<string,string|number|boolean>; configurationRevision?: number };
 export type WorkflowTool = { ref: string; name: string; description?: string; contractDigest: string; inputSchema: JsonSchema; outputSchema?: JsonSchema; available?: boolean; adapter?: string; sideEffect?: string; diagnostics?: WorkflowDiagnostic[]; connectorRef?: string; origin?: "environment" | "user"; connectionRef?: string; version?: number; group?: string };
-export type WorkflowExecutionError = { code: string; category?: string; message: string; retryable?: boolean; externalStatus?: number; effect?: string; graphPath?:string[]; nodeId?: string; invocation?: number; stage?: "input_resolution"; pointer?: string };
+export type WorkflowExecutionError = { code: string; category?: string; message: string; retryable?: boolean; externalStatus?: number; httpStatus?: number; reason?: string; provider?: string; model?: string; host?: string; tool?: string; effect?: string; elapsedMs?: number; timeoutMs?: number; graphPath?:string[]; nodeId?: string; invocation?: number; stage?: "input_resolution"; pointer?: string; field?: string; expectedType?: string; actualType?: string; expectedLabel?: string; actualLabel?: string; valueSource?: string };
 export type WorkflowRunV2 = {
   operation?: "initial" | "next" | "branch" | null;
   variableEnvironment?: string | null;
@@ -40,7 +40,7 @@ export type WorkflowRunV2 = {
   error?: WorkflowExecutionError;
 };
 export type WorkflowEventV2 = { protocolVersion: "1"; eventId: string; runId: string; seq: number; type: string; occurredAt: string; stepId?: string; nodeId?: string; attempt?: number; stateVersion?: number; payload: JsonValue };
-export type WorkflowStepV2 = { execution?: { taskId: string; namespace: string; checkpointId: string; attempt: number }; taskId?: string; graphPath?: string[]; namespace?: string[]; parentStepId?: string; stepId: string; runId: string; nodeId: string; invocation: number; attempt: number; status: string; input?: JsonValue; output?: JsonValue; inputRef?: string; outputRef?: string; stateVersionBefore?: number; stateVersionAfter?: number; startedAt?: string; finishedAt?: string; error?: { code: string; message: string }; toolCallIds?: string[] };
+export type WorkflowStepV2 = { execution?: { taskId: string; namespace: string; checkpointId: string; attempt: number }; taskId?: string; graphPath?: string[]; namespace?: string[]; parentStepId?: string; stepId: string; runId: string; nodeId: string; invocation: number; attempt: number; status: string; input?: JsonValue; output?: JsonValue; inputRef?: string; outputRef?: string; stateVersionBefore?: number; stateVersionAfter?: number; startedAt?: string; finishedAt?: string; error?: { code: string; message: string; category?: string; retryable?: boolean; externalStatus?: number; httpStatus?: number; reason?: string; provider?: string; model?: string; host?: string; tool?: string; effect?: string; elapsedMs?: number; timeoutMs?: number }; toolCallIds?: string[] };
 export type WorkflowLaunchContext = { courseId: string; assignmentId: string; workflowTemplateId: string; workflowInput?: JsonValue };
 
 
@@ -57,6 +57,9 @@ export type WorkflowThreadV2={threadId:string;workflowId:string;revision:number;
 export type ToolConfigV2 = { toolRef: string; contractDigest: string };
 export type PromptSegment = { type: "text"; text: string } | { type: "param"; name: string; format?: "text" | "json" };
 export type PromptMessageV2 = { role: "user" | "assistant"; content: PromptSegment[] };
-export type LlmConfigV2 = { providerRef: string; modelRef: string; modelParameters: Record<string, JsonValue>; allowedToolRefs: string[]; prompt: { system: PromptSegment[]; messages: PromptMessageV2[] } };
-export type ConnectionTestResult = { ok: boolean; elapsedMs?: number; status?: number; preview?: string; models?: string[]; tools?: { name: string; description?: string }[]; error?: { code: string; message: string } };
+export type StructuredOutputFieldType = "string" | "number" | "boolean" | "array" | "object";
+/** One model structured-output field; the runtime returns it as a top-level output item. */
+export type StructuredOutputField = { name: string; type: StructuredOutputFieldType; description?: string };
+export type LlmConfigV2 = { providerRef: string; modelRef: string; modelParameters: Record<string, JsonValue>; allowedToolRefs: string[]; prompt: { system: PromptSegment[]; messages: PromptMessageV2[] }; structuredOutput?: { fields: StructuredOutputField[] } };
+export type ConnectionTestResult = { ok: boolean; elapsedMs?: number; status?: number; preview?: string; models?: string[]; reply?: string; output?: JsonValue; tools?: { name: string; description?: string }[]; error?: { code: string; message: string } };
 export type ResourceReferenceRow = { workflowId: string; workflowName: string; revision: number; graphPath: string[]; nodeId: string; nodeLabel: string; version?: number; modelRef?: string; variableKey?: string };
