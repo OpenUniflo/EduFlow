@@ -1,4 +1,4 @@
-import type { JsonValue, WorkflowEventV2, WorkflowRunV2 } from "../../domain/v2/types";
+import type { JsonValue, WorkflowDefinitionV2, WorkflowEventV2, WorkflowRunV2, WorkflowTool } from "../../domain/v2/types";
 
 export type ToolActivity = { key: string; stepId?: string; nodeId?: string; toolCallId: string; toolRef?: string; status: "running" | "success" | "failed" | "skipped"; effect?: "none" | "confirmed" | "unknown"; result?: JsonValue };
 const object = (value: JsonValue | undefined) => value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
@@ -32,4 +32,17 @@ export function externalEffectNotice(run: Pick<WorkflowRunV2, "runId" | "status"
     uncertain ? "部分外部操作的结果尚不确定，请先核对。" : "",
     !complete ? "执行记录尚未加载完整，不能据此认定没有外部操作。" : "",
     confirmed || uncertain || !complete ? "再次运行会重新执行，可能造成重复写入。" : ""].filter(Boolean).join(" ");
+}
+
+/** True when the flow can call a tool that is declared to write an external system. */
+export function definitionHasExternalWriteTools(definition: WorkflowDefinitionV2, tools: readonly WorkflowTool[]): boolean {
+  const writes = new Set(tools.filter(tool => tool.sideEffect === "write").map(tool => tool.ref));
+  const walk = (scope: WorkflowDefinitionV2): boolean => scope.nodes.some(node => {
+    const config = node.config;
+    const refs = [...(typeof config.toolRef === "string" && config.toolRef ? [config.toolRef] : []), ...(Array.isArray(config.allowedToolRefs) ? config.allowedToolRefs.filter((ref): ref is string => typeof ref === "string") : [])];
+    if (refs.some(ref => writes.has(ref))) return true;
+    const graph = config.graph;
+    return Boolean(graph && typeof graph === "object" && Array.isArray((graph as unknown as WorkflowDefinitionV2).nodes) && walk(graph as unknown as WorkflowDefinitionV2));
+  });
+  return walk(definition);
 }

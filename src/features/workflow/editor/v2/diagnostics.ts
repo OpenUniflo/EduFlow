@@ -97,9 +97,9 @@ export function diagnosticTarget(item: WorkflowDiagnostic, definition: WorkflowD
     return { panel: "node" as const, nodeId: node.id, transitionId: edge?.id, fields: [...fields, "节点配置"] };
   }
   if (tokens[0] === "state" && ["initial", "reducers"].includes(tokens[1]) && Object.prototype.hasOwnProperty.call(definition.state.schema.properties ?? {}, tokens[2])) {
-    return { panel: "state-field" as const, stateField: tokens[2], control: tokens[1] === "reducers" ? "reducer" as const : "initial" as const, fields: [`state/${tokens[2]}`, "Graph State", "工作流配置"] };
+    return { panel: "state-field" as const, stateField: tokens[2], control: tokens[1] === "reducers" ? "reducer" as const : "initial" as const, fields: [`state/${tokens[2]}`, "流程数据", "工作流配置"] };
   }
-  const globalFields: Record<string, string> = { inputSchema: "输入 Schema", outputSchema: "输出 Schema", state: "Graph State", outputBindings: "最终输出绑定", policy: "运行限制" };
+  const globalFields: Record<string, string> = { inputSchema: "输入 Schema", outputSchema: "输出 Schema", state: "流程数据", outputBindings: "最终输出绑定", policy: "运行限制" };
   if (globalFields[tokens[0]]) return { panel: "state" as const, fields: [globalFields[tokens[0]], "工作流配置"] };
   if (item.scope === "environment") return { panel: "environment" as const, fields: [] as string[] };
   return { panel: "problems" as const, fields: ["问题摘要"] };

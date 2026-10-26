@@ -24,9 +24,9 @@ it("keeps historical failed invocation identity and never guesses a node for leg
 it.each([
   ["/inputSchema/properties/question", "输入 Schema"],
   ["/outputSchema/type", "输出 Schema"],
-  ["/state/schema", "Graph State"],
-  ["/state/reducers/answer", "Graph State"],
-  ["/state/inputBindings/answer", "Graph State"],
+  ["/state/schema", "流程数据"],
+  ["/state/reducers/answer", "流程数据"],
+  ["/state/inputBindings/answer", "流程数据"],
   ["/outputBindings/answer", "最终输出绑定"],
   ["/policy/maxSteps", "运行限制"],
 ])("routes a real compiler Definition pointer %s to an editable global field", (pointer, field) => {
@@ -62,9 +62,9 @@ it("prioritizes actionable model and policy pointers over a broad environment sc
 
 it("locates existing State initial and reducer controls while missing fields use the full State editor", () => {
   const stateDefinition = { ...definition, state: { ...definition.state, schema: { type: "object", properties: { "a/b~c": { type: "number" } } } } };
-  expect(diagnosticTarget(diagnostic({ pointer: "/state/initial/a~1b~0c" }), stateDefinition)).toMatchObject({ panel: "state-field", stateField: "a/b~c", control: "initial", fields: ["state/a/b~c", "Graph State", "工作流配置"] });
+  expect(diagnosticTarget(diagnostic({ pointer: "/state/initial/a~1b~0c" }), stateDefinition)).toMatchObject({ panel: "state-field", stateField: "a/b~c", control: "initial", fields: ["state/a/b~c", "流程数据", "工作流配置"] });
   expect(diagnosticTarget(diagnostic({ pointer: "/state/reducers/a~1b~0c" }), stateDefinition)).toMatchObject({ panel: "state-field", control: "reducer" });
-  expect(diagnosticTarget(diagnostic({ pointer: "/state/reducers/absent" }), stateDefinition)).toMatchObject({ panel: "state", fields: ["Graph State", "工作流配置"] });
+  expect(diagnosticTarget(diagnostic({ pointer: "/state/reducers/absent" }), stateDefinition)).toMatchObject({ panel: "state", fields: ["流程数据", "工作流配置"] });
 });
 
 it("explains State and output diagnostics from structured pointers rather than English message text", () => {

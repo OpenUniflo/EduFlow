@@ -63,12 +63,33 @@ function reviewText(value: JsonValue[]): string | undefined {
   }).filter((item): item is string => Boolean(item));
   return parts.length ? parts.join("；") : undefined;
 }
+/** Finds a public search result array (hits) inside a tool/step output without exposing raw JSON. */
+export function searchResultCount(value: JsonValue | undefined, depth = 0): number | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value) || depth > 3) return undefined;
+  const object = value as Record<string, JsonValue>;
+  if (Array.isArray(object.hits)) return object.hits.length;
+  for (const key of ["result", "output", "response", "data"]) {
+    const nested = object[key];
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      const found = searchResultCount(nested, depth + 1);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
+}
+
+export function searchResultSummary(value: JsonValue | undefined): string | undefined {
+  const count = searchResultCount(value);
+  if (count === undefined) return undefined;
+  return count === 0 ? "搜索没有结果 · 0 条" : `搜索到 ${count} 条结果`;
+}
+
 export function processingDescription(node: WorkflowNodeV2): string {
   const type = node.type;
   if (type === "core.start") return "接收输入并初始化 State";
   if (type === "core.end") return "汇总流程输出";
   if (type === "core.llm") return `调用 ${String(node.config.modelRef || "模型")} 生成回复`;
-  if (type === "core.tool") return `调用工具 ${String(node.config.toolRef || "待配置")}`;
+  if (type === "core.tool") return `使用 ${node.label || "工具"}`;
   if (type === "core.tool_dispatch") return "执行模型请求的工具并收集结果";
   if (type === "core.router") return "检查条件，选择后续分支";
   if (type === "core.function") return `执行函数 ${String(node.config.functionRef || "用户代码")}`;
@@ -96,6 +117,8 @@ export function briefValue(value: JsonValue | undefined): string {
   }
   const object = objectValue(value);
   if (!object) return "";
+  const search = searchResultSummary(object);
+  if (search) return search;
   const message = messageText(object);
   if (message !== undefined) return compact(message);
   if (Array.isArray(object.messages)) return compact(`消息：${briefValue(object.messages)}`);
@@ -114,6 +137,8 @@ export function summaryFields(value: JsonValue | undefined): string {
   if (value === null) return "null";
   if (typeof value !== "object" || Array.isArray(value)) return briefValue(value);
   const object = objectValue(value)!;
+  const search = searchResultSummary(object);
+  if (search) return search;
   const message = messageText(object);
   if (message !== undefined) return compact(message);
   if (Array.isArray(object.messages)) return `messages · ${briefValue(object.messages)}`;

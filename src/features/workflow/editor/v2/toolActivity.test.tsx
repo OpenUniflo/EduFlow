@@ -1,7 +1,8 @@
 import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { JsonValue, WorkflowEventV2, WorkflowRunV2, WorkflowStepV2 } from "../../domain/v2/types";
-import { toolActivities, externalEffectNotice } from "./toolActivity";
+import { toolActivities, externalEffectNotice, definitionHasExternalWriteTools } from "./toolActivity";
+import { createNodeV2 } from "../../domain/v2/factory";
 import { RunEffectNotice, RunToolActivity } from "./RunOutput";
 
 const event = (seq: number, type: string, payload: JsonValue, stepId = "batch-1", runId = "run"): WorkflowEventV2 => ({ protocolVersion: "1", eventId: `${runId}-${seq}`, runId, seq, type, occurredAt: "2026-10-15T00:00:00Z", stepId, nodeId: "tools", payload });
@@ -49,4 +50,17 @@ it('does not turn a human-wait expiry into an unknown write, while retaining act
   expect(externalEffectNotice(expired,[],false)).toContain('尚未加载完整');
   expect(externalEffectNotice(expired,[event(1,'tool.completed',{toolCallId:'write',effect:'confirmed'})],true)).toContain('外部写入成功');
   expect(externalEffectNotice(expired,[event(1,'tool.started',{toolCallId:'write'})],true)).toContain('结果尚不确定');
+});
+
+it("warns about external writes only when the flow can call a write tool", () => {
+  const start = createNodeV2("core.start", "start");
+  const read = createNodeV2("core.tool", "read"); read.config = { toolRef: "hn_search", contractDigest: "d" };
+  const write = createNodeV2("core.tool", "write"); write.config = { toolRef: "deploy_tool", contractDigest: "d" };
+  const definition = { nodes: [start, read], transitions: [] } as unknown as import("../../domain/v2/types").WorkflowDefinitionV2;
+  const tools = [
+    { ref: "hn_search", name: "HN", contractDigest: "d", inputSchema: {}, sideEffect: "read" },
+    { ref: "deploy_tool", name: "Deploy", contractDigest: "d", inputSchema: {}, sideEffect: "write" },
+  ];
+  expect(definitionHasExternalWriteTools(definition, tools)).toBe(false);
+  expect(definitionHasExternalWriteTools({ ...definition, nodes: [start, read, write] }, tools)).toBe(true);
 });

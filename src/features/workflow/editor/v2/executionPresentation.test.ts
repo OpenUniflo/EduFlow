@@ -1,5 +1,5 @@
 import {expect,it} from "vitest";
-import {briefValue,latestNodeSteps,presentRunSteps,processingDescription,stepWrites,summaryFields} from "./executionPresentation";
+import {briefValue,latestNodeSteps,presentRunSteps,processingDescription,searchResultCount,searchResultSummary,stepWrites,summaryFields} from "./executionPresentation";
 import type {WorkflowEventV2,WorkflowNodeV2,WorkflowStepV2} from "../../domain/v2/types";
 const step=(invocation:number,attempt=1)=>({runId:"run-a",stepId:`step-${invocation}-${attempt}`,nodeId:"model",invocation,attempt,status:"completed"} as WorkflowStepV2);
 it("selects latest invocation and retry without collapsing unrelated records",()=>{const records=[step(3),step(1),step(2),step(3,2)];expect(latestNodeSteps(records).get("model")?.stepId).toBe("step-3-2");expect(records).toHaveLength(4);});
@@ -43,4 +43,13 @@ it("joins superstep State by checkpoint and exposes only the selected frozen nod
  expect(stepWrites(record,events,node)).toEqual({items:[1,2],confirmed:false});
  expect(stepWrites({...record,stepId:'someone-else'},events,node)).toBeUndefined();
  expect(stepWrites({...record,runId:'another-run'},events,node)).toBeUndefined();
+});
+
+it("states a zero-hit search explicitly instead of rendering an empty array",()=>{
+  expect(searchResultCount({result:{hits:[]}})).toBe(0);
+  expect(searchResultSummary({result:{hits:[]}})).toBe("搜索没有结果 · 0 条");
+  expect(summaryFields({result:{hits:[]}})).toBe("搜索没有结果 · 0 条");
+  expect(briefValue({result:{hits:[]}})).toBe("搜索没有结果 · 0 条");
+  expect(searchResultSummary({result:{hits:[{title:"a"},{title:"b"}]}})).toBe("搜索到 2 条结果");
+  expect(searchResultCount({result:{nbHits:0}})).toBeUndefined();
 });
