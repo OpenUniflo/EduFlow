@@ -1,4 +1,4 @@
-import { authoringExample, liveQuestionExample } from "@/features/workflow/domain/v2/authoringExamples";
+import { liveQuestionExample } from "@/features/workflow/domain/v2/authoringExamples";
 import { createWorkflowV2 } from "@/features/workflow/domain/v2/factory";
 import type { Binding, JsonSchema, WorkflowDefinitionV2, WorkflowDocumentV2 } from "@/features/workflow/domain/v2/types";
 const obj=(properties:Record<string,JsonSchema>,required=Object.keys(properties)):JsonSchema=>({type:'object',properties,required,additionalProperties:false});
@@ -12,6 +12,5 @@ export function expenseExample():WorkflowDocumentV2 {
 export function workspaceWorkflowExamples(providerRef='',modelRef='') {
   const expense=expenseExample();expense.definition.workflowId='workspace-expense';
   const question=liveQuestionExample({...createWorkflowV2('节点提问与模型问答'),workflowId:'workspace-question'},providerRef,modelRef);
-  const order=authoringExample('parallel',{...createWorkflowV2('订单并行与子图（前端演示）'),workflowId:'workspace-order-preview'});
-  return [expense,question,order];
+  return [expense,question];
 }
