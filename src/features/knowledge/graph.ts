@@ -1,5 +1,5 @@
 import type { KnowledgeGraph } from "./types";
-import { validateKnowledgeRelations } from "./relationAudit";
+import { validateKnowledgeRelations } from "./relationAudit.js";
 
 function assertUnique(label: string, ids: string[]) {
   const seen = new Set<string>();

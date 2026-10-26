@@ -1,5 +1,5 @@
 import type { GeneratedAssignmentCandidate, GeneratedAssignmentDependency, ImplementationStep } from "./types";
-import { deterministicMappingId, normalizeMappingSemanticKey } from "./deterministicId";
+import { deterministicMappingId, normalizeMappingSemanticKey } from "./deterministicId.js";
 
 type JsonObject = Record<string, unknown>;
 const object = (value: unknown, label: string) => {

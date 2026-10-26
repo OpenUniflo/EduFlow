@@ -1,6 +1,6 @@
 import type { KnowledgeGraph } from "../types";
-import { validateKnowledgeGraph } from "../graph";
-import { assertDirectedAcyclic } from "../graphAlgorithms";
+import { validateKnowledgeGraph } from "../graph.js";
+import { assertDirectedAcyclic } from "../graphAlgorithms.js";
 import type { CandidateKnowledgeRelation, GeneratedCurriculum, KnowledgeCandidate } from "./types";
 
 export function validateCandidateGraph(candidates: KnowledgeCandidate[], relations: CandidateKnowledgeRelation[]) {

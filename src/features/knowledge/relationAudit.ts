@@ -1,5 +1,5 @@
 import type { DomainAssignment } from "./domain/domainTypes";
-import { assertDirectedAcyclic, buildStructuralAdjacency, findConnectedComponents } from "./graphAlgorithms";
+import { assertDirectedAcyclic, buildStructuralAdjacency, findConnectedComponents } from "./graphAlgorithms.js";
 import type { KnowledgeEdge, KnowledgeGraph } from "./types";
 
 export type DomainRelationAudit = {

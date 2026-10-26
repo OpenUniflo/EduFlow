@@ -1,17 +1,17 @@
 import { auditProjectStructure } from '../../../shared/learning/projectStructureAudit.js';
 import type { SourceLocation, StructuredMaterialChunk } from "@/features/material/parsing/types";
-import { deduplicateWithinIngestion } from "./normalization";
-import { candidateAdmissionPrompt, coverageAuditPrompt, curriculumPrompt, equivalencePrompt, extractionPrompt, KNOWLEDGE_GENERATION_PROMPT_VERSION, pairClassificationPrompt } from "./prompts";
-import { parseAdmissionOutput, parseCoverageOutput, parseCurriculumOutput, parseEquivalenceOutput, parseExtractionOutput, parsePairClassificationOutput } from "./schema";
+import { deduplicateWithinIngestion } from "./normalization.js";
+import { candidateAdmissionPrompt, coverageAuditPrompt, curriculumPrompt, equivalencePrompt, extractionPrompt, KNOWLEDGE_GENERATION_PROMPT_VERSION, pairClassificationPrompt } from "./prompts.js";
+import { parseAdmissionOutput, parseCoverageOutput, parseCurriculumOutput, parseEquivalenceOutput, parseExtractionOutput, parsePairClassificationOutput } from "./schema.js";
 import {
   buildCoverageUnits, evidenceChunksForCandidate, evidenceChunksForPair, nearestCandidatesForAdmission, nearestCandidatesForCoverage, retrieveRelationCandidatePairs,
   retrieveSemanticDuplicatePairs, RunLocalEmbeddingCache
-} from "./retrieval";
+} from "./retrieval.js";
 import type {
   CandidateAdmissionReview, CandidateKnowledgeRelation, CandidatePair, EmbeddingService, GeneratedCurriculum, KnowledgeCandidate,
   KnowledgeGenerationInput, KnowledgeGenerationResult, ModelExecutionMetadata, StructuredGenerationClient
 } from "./types";
-import { validateCandidateGraph, validateGeneratedCurriculum } from "./validation";
+import { validateCandidateGraph, validateGeneratedCurriculum } from "./validation.js";
 
 const EXTRACTION_SCHEMA_VERSION = "knowledge-candidates-v1";
 const EQUIVALENCE_SCHEMA_VERSION = "knowledge-equivalence-v1";

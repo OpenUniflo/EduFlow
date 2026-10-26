@@ -1,4 +1,4 @@
-import { assertDirectedAcyclic } from "@/features/knowledge/graphAlgorithms";
+import { assertDirectedAcyclic } from "../../knowledge/graphAlgorithms.js";
 import type { GeneratedAssignmentCandidate, GeneratedAssignmentDependency } from "./types";
 import type { KnowledgeEdge } from "@/features/knowledge/types";
 

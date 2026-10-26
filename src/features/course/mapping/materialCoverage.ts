@@ -1,7 +1,7 @@
 import type { CourseRuntimeData } from "../runtime/courseRuntime";
 import type { KnowledgeNode } from "@/features/knowledge/types";
 import type { MaterialKnowledgeCoverage } from "@/features/course/types";
-import { deterministicMappingId } from "./deterministicId";
+import { deterministicMappingId } from "./deterministicId.js";
 import type { ResolvedMaterialCoverage } from "./types";
 
 function normalizedSection(value: string) {

@@ -1,10 +1,10 @@
 import type { StructuredGenerationClient } from "@/features/knowledge/generation/types";
-import { reduceAssignmentDependencies, retrieveDependencyCandidates } from "./assignmentDag";
-import { resolveMaterialCoverage } from "./materialCoverage";
-import { assignmentDependencyPrompt, assignmentGenerationPrompt, COURSE_MAPPING_PROMPT_VERSION, implementationStepPrompt } from "./prompts";
-import { parseGeneratedAssignmentGroups, parseGeneratedDependencies, parseImplementationSteps, type AssignmentGenerationGroup } from "./schema";
+import { reduceAssignmentDependencies, retrieveDependencyCandidates } from "./assignmentDag.js";
+import { resolveMaterialCoverage } from "./materialCoverage.js";
+import { assignmentDependencyPrompt, assignmentGenerationPrompt, COURSE_MAPPING_PROMPT_VERSION, implementationStepPrompt } from "./prompts.js";
+import { parseGeneratedAssignmentGroups, parseGeneratedDependencies, parseImplementationSteps, type AssignmentGenerationGroup } from "./schema.js";
 import type { CourseMappingGeneration, CourseMappingInput } from "./types";
-import { normalizeMappingSemanticKey } from "./deterministicId";
+import { normalizeMappingSemanticKey } from "./deterministicId.js";
 
 async function boundedGenerate<T>(client: StructuredGenerationClient, request: Parameters<StructuredGenerationClient["generateJson"]>[0], parse: (value: unknown) => T) {
   let correction = "";

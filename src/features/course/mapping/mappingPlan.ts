@@ -1,7 +1,7 @@
 import type { AssignmentCoverage, AssignmentDependency, AssignmentOutcomeComposition, ChapterOutcome, CourseAssignment, FinalProject, FinalProjectOutcomeComposition } from "@/features/course/types";
-import { selectPrimaryCurriculumCoverage } from "../curriculum/curriculumOrdering";
+import { selectPrimaryCurriculumCoverage } from "../curriculum/curriculumOrdering.js";
 import type { CourseRuntimeData } from "../runtime/courseRuntime";
-import { deterministicMappingId } from "./deterministicId";
+import { deterministicMappingId } from "./deterministicId.js";
 import type { CourseMappingGeneration } from "./types";
 
 export type CourseMappingPlan = {
