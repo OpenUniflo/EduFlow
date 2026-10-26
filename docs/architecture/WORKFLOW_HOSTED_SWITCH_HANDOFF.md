@@ -80,7 +80,7 @@
 - commit：`bb89bbf02847937a7fcb578f1d13b28d64702aa5`（`feat/workflow`）。
 - GitHub Deployment：`7332374098`，state `success`（`vercel[bot]`）。
 - 部署 URL：`https://edu-flow-p852e92aw-july-nanas-projects.vercel.app`；分支别名：`https://edu-flow-git-feat-workflow-july-nanas-projects.vercel.app`（两者 ETag 一致）。
-- Vercel CLI 当前登录 token 已过期，未能读取 `dpl_...` 控制面 ID；上列 GitHub Deployment ID 与部署 URL hash `p852e92aw` 是本轮可读回的部署身份。
+- Vercel CLI 登录 token 已过期；`dpl_...` 从部署 HTML 的 Vercel Live `data-deployment-id` 读回：代码 Preview 为 `dpl_7VDxB7sXUbdyRrWp2pCzuQwmN6FF`。最终 docs commit 的分支别名在推送后读回。
 - Function 数量：仓库 `api/` 为 **11** 个物理入口（9 TS + `workflow-compiler.py` + `workflow-run-consumer.py`）；`tests/courseCreatorArchitecture.test.ts` 断言 11。Preview 实测 9 个 TS 入口均由 Function 处理（401/405/500 JSON，不是 SPA HTML），`/api/workflow-compiler/health` 返回 401 JSON；consumer 无公网入口（POST 405 / SPA fallback）。
 - `daemons`：`vercel.json` 不再声明；该 Preview 成功构建自上述 commit。Vercel 控制面构建日志原文因 CLI token 过期未读取，未把本地 `vercel build` 的 2.2GB 依赖错误当作部署失败。
 - 前端产物包含本轮文案：`运行已排队超过 30 秒`、`运行超过时长上限`、`排队超时`，证明部署执行的是本轮代码。
