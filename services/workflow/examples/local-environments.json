@@ -32,7 +32,8 @@
             "echo",
             "get-sum"
           ],
-          "sideEffect": "read"
+          "sideEffect": "read",
+          "fixture": true
         }
       ],
       "tools": [
@@ -63,7 +64,8 @@
               "value"
             ],
             "additionalProperties": false
-          }
+          },
+          "fixture": true
         },
         {
           "ref": "order_lookup",
@@ -89,7 +91,8 @@
           },
           "outputSchema": {
             "type": "object"
-          }
+          },
+          "fixture": true
         },
         {
           "ref": "fault_500",
@@ -108,7 +111,8 @@
           },
           "outputSchema": {
             "type": "object"
-          }
+          },
+          "fixture": true
         },
         {
           "ref": "fault_429",
@@ -127,7 +131,8 @@
           },
           "outputSchema": {
             "type": "object"
-          }
+          },
+          "fixture": true
         },
         {
           "ref": "fault_slow",
@@ -146,7 +151,8 @@
           },
           "outputSchema": {
             "type": "object"
-          }
+          },
+          "fixture": true
         },
         {
           "ref": "fault_401",
@@ -165,7 +171,8 @@
           },
           "outputSchema": {
             "type": "object"
-          }
+          },
+          "fixture": true
         },
         {
           "ref": "fault_403",
@@ -187,7 +194,8 @@
           },
           "headerSecretRefs": {
             "X-Tool-Key": "WORKFLOW_FIXTURE_TOOL_KEY"
-          }
+          },
+          "fixture": true
         },
         {
           "ref": "fault_404",
@@ -206,7 +214,8 @@
           },
           "outputSchema": {
             "type": "object"
-          }
+          },
+          "fixture": true
         }
       ]
     }

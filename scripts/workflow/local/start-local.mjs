@@ -39,6 +39,10 @@ mkdirSync(cacheDirectory, { recursive: true, mode: 0o700 });
 mkdirSync(pnpmHome, { recursive: true, mode: 0o700 });
 const environment = {
   ...process.env,
+  // A malformed NO_PROXY bracket (e.g. [::1]) breaks httpx model-client creation.
+  no_proxy: "localhost,127.0.0.1,::1",
+  NO_PROXY: "localhost,127.0.0.1,::1",
+  WORKFLOW_FIXTURE_TOOL_REFS: "identity,order_lookup,fault_500,fault_429,fault_slow,fault_401,fault_403,fault_404,fixture_status,hn_ai_agents,hn_community_question,npm_zod,pypistats_langgraph,se_workflow,echo,get-sum,everything:echo,everything:get-sum",
   XDG_CACHE_HOME: process.env.XDG_CACHE_HOME ?? cacheDirectory,
   PNPM_HOME: process.env.PNPM_HOME ?? pnpmHome,
   WORKFLOW_DATABASE_URL: `postgresql://workflow_worker:${password}@127.0.0.1:54322/postgres`,

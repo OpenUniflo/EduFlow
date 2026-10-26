@@ -10,7 +10,8 @@ const pids = JSON.parse(readFileSync(pidsPath, "utf8"));
 const action = process.argv[2] ?? "restart";
 const targets = process.argv.slice(3).length ? process.argv.slice(3) : ["compiler", "worker", "watchdog"];
 if (!targets.every(name => ["compiler", "worker", "watchdog"].includes(name)) || !["start", "stop", "restart"].includes(action)) throw new Error("Invalid local control action");
-const processRows = execFileSync("ps", ["-axo", "pid,ppid,command"], { encoding: "utf8" }).split("\n");
+let processRows = [];
+try { processRows = execFileSync("ps", ["-axo", "pid,ppid,command"], { encoding: "utf8" }).split("\n"); } catch { /* ps may be unavailable in a sandbox */ }
 for (const name of targets) {
   if (["restart", "stop"].includes(action)) {
     const pid = pids[name];
@@ -23,7 +24,7 @@ for (const name of targets) {
   }
 }
 await new Promise(resolve => setTimeout(resolve, 500));
-const environment = { ...process.env, WORKFLOW_DATABASE_URL: privateConfig.databaseUrl, WORKFLOW_INTERNAL_TOKEN: privateConfig.internalToken, WORKFLOW_ENVIRONMENTS_FILE: privateConfig.configurationPath, WORKFLOW_CATALOG_FILE: privateConfig.catalogPath, WORKFLOW_ALLOW_LOCAL_FIXTURES: "1", LLM_PROVIDER_KEY: process.env.LLM_API_KEY, WORKFLOW_FIXTURE_TOOL_KEY: "tool-test-key" };
+const environment = { ...process.env, XDG_CACHE_HOME: process.env.XDG_CACHE_HOME ?? resolve(directory, "cache"), PNPM_HOME: process.env.PNPM_HOME ?? resolve(directory, "pnpm-home"), no_proxy: "localhost,127.0.0.1,::1", NO_PROXY: "localhost,127.0.0.1,::1", WORKFLOW_FIXTURE_TOOL_REFS: "identity,order_lookup,fault_500,fault_429,fault_slow,fault_401,fault_403,fault_404,fixture_status,hn_ai_agents,hn_community_question,npm_zod,pypistats_langgraph,se_workflow,echo,get-sum,everything:echo,everything:get-sum", WORKFLOW_DATABASE_URL: privateConfig.databaseUrl, WORKFLOW_INTERNAL_TOKEN: privateConfig.internalToken, WORKFLOW_ENVIRONMENTS_FILE: privateConfig.configurationPath, WORKFLOW_CATALOG_FILE: privateConfig.catalogPath, WORKFLOW_ALLOW_LOCAL_FIXTURES: "1", LLM_PROVIDER_KEY: process.env.LLM_API_KEY, WORKFLOW_FIXTURE_TOOL_KEY: "tool-test-key" };
 for (const name of targets) {
   if (["restart", "start"].includes(action)) {
     const logfile = openSync(resolve(directory, `${name}.log`), "a", 0o600);
