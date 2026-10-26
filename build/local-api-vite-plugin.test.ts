@@ -15,6 +15,8 @@ describe("local consolidated API adapter", () => {
       "/api/edge-actions": "edge-actions",
       "/api/courses": "courses",
       "/api/course-authoring": "authoring",
+      "/api/course-intent": "intent",
+      "/api/course-mapping": "mapping",
       "/api/learning": "learning",
       "/api/micro": "micro",
       "/api/progress": "progress",

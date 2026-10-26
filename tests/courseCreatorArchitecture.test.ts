@@ -48,13 +48,19 @@ describe("Course Creator persistence and authority boundaries", () => {
     expect(assistant).not.toMatch(/course-creator-proposal[\s\S]*\.from\("courses"\)\.update/);
   });
 
-  it("adds zero physical Vercel Function entrypoints", () => {
-    // M14 moved api/health.ts into api/_handlers (not a deployable entrypoint) and added the
-    // Python compiler Function: 11 TypeScript entries + 1 Python entry = the Hobby budget of 12.
+  it("keeps physical Vercel Function entrypoints within the Hobby budget", () => {
+    // The queue consumer is a physical Python entrypoint. course-intent.ts and
+    // course-mapping.ts were merged into api/course.ts to free two slots:
+    // 9 TypeScript entries + 2 Python entries = 11 of the 12-Function budget.
     const entries = readdirSync(resolve(process.cwd(), "api"), { withFileTypes: true }).filter((entry) => entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".py")));
-    expect(entries).toHaveLength(12);
-    expect(entries.filter((entry) => entry.name.endsWith(".py")).map((entry) => entry.name)).toEqual(["workflow-compiler.py"]);
+    expect(entries).toHaveLength(11);
+    expect(entries.filter((entry) => entry.name.endsWith(".ts"))).toHaveLength(9);
+    expect(entries.filter((entry) => entry.name.endsWith(".py")).map((entry) => entry.name)).toEqual(["workflow-compiler.py", "workflow-run-consumer.py"]);
     expect(entries.map((entry) => entry.name)).not.toContain("course-creator.ts");
+    expect(entries.map((entry) => entry.name)).not.toContain("course-intent.ts");
+    expect(entries.map((entry) => entry.name)).not.toContain("course-mapping.ts");
+    const config = JSON.parse(read("vercel.json"));
+    expect(config.functions["api/workflow-run-consumer.py"].experimentalTriggers[0]).toMatchObject({ type: "queue/v2beta", topic: "workflow-runs" });
   });
 
   it("keeps database Functions and the existing Assistant in Singapore", () => {

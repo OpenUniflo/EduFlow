@@ -8,6 +8,7 @@ import { applyTemplateBindings, TemplateBindingError, validateTemplateBindings }
 import { readAssignmentEligibility } from "./assignmentEligibility.js";
 import { connectionReferenceRows, variableReferenceRows, type ReferenceWorkflow } from "./workflowV2References.js";
 import { cleanVariableOverrides, configurationSaveIssue, configurationSaveSchema, frozenVariableEnvironment, normalizeConfiguration, resolveDefaultEnvironmentId, withFrozenVariableEnvironment } from "./workflowVariableEnvironments.js";
+import { dispatchQueuedWorkflow, resolveWorkflowRunnerMode } from "./workflowQueue.js";
 
 type Result<T> = { data: T | null; error: { message: string; code?: string } | null };
 function result<T>(query: Result<T>): T {
@@ -162,20 +163,26 @@ async function resumeThread(client:SupabaseClient,owner:string,id:string,body:Wo
   const hash=await workflowDigest({threadId:id,checkpointId:checkpoint,responses,...(expectedRun?{currentRunId:expectedRun}:{})}); const key='resume:'+hash;
   const prior=result(await client.from('workflow_idempotency').select('*').eq('owner_user_id',owner).eq('key',key).gt('expires_at',new Date().toISOString()).maybeSingle()) as WorkflowRow|null;
   // A lost response can be recovered even after the Thread moved on or was pruned.
-  if(prior){ const run=result(await client.from('workflow_live_runs').select('status,last_seq').eq('owner_user_id',owner).eq('run_id',prior.run_id).maybeSingle()) as WorkflowRow|null;return {runId:prior.run_id,revision:prior.revision,status:run?.status??'expired',historyExpired:!run,eventsCursor:run?.last_seq??0}; }
+  if(prior){ const run=result(await client.from('workflow_live_runs').select('status,last_seq').eq('owner_user_id',owner).eq('run_id',prior.run_id).maybeSingle()) as WorkflowRow|null;const replay={runId:prior.run_id,revision:prior.revision,status:run?.status??'expired',historyExpired:!run,eventsCursor:run?.last_seq??0};await dispatchQueuedWorkflow(replay);return replay; }
   const thread=await executionThread(client,owner,id);
   if(expectedRun&&thread.current_run_id!==expectedRun)throw new ApiError(409,'THREAD_STATE_CONFLICT','Waiting tasks have changed; refresh before responding');
   if(thread.checkpoint_id!==checkpoint||!['waiting','closed'].includes(String(thread.status)))throw new ApiError(409,'THREAD_STATE_CONFLICT','Thread has already moved on');
   const doc=await readWorkflowDocument(client,owner,String(thread.workflow_id),Number(thread.revision));
   await workflowCompiler('/v1/resume-validate',{ownerId:owner,thread,definition:doc.definition,responses});
-  return rpc(client,'workflow_v2_resume',{p_owner:owner,p_thread:id,p_checkpoint:checkpoint,p_responses:responses,p_hash:hash,p_key:key,...(expectedRun?{p_expected_run:expectedRun}:{})});
+  const resumed=await rpc(client,'workflow_v2_resume',{p_owner:owner,p_thread:id,p_checkpoint:checkpoint,p_responses:responses,p_hash:hash,p_key:key,...(expectedRun?{p_expected_run:expectedRun}:{})});
+  await dispatchQueuedWorkflow(resumed);
+  return resumed;
 }
 /**
- * New Runs are only admitted while a Worker has recently signalled health. The
- * compiler ignores executor-digest differences so a Preview can still use the
- * Production Worker that consumes the shared queue.
+ * Run admission. Daemon mode requires a recently signalled Worker; Queue push mode has no
+ * standing Worker and admits Runs because the deployment's own consumer executes them.
+ * The compiler ignores executor-digest differences so a Preview can still use the
+ * Production Worker in daemon mode.
  */
 async function ensureWorkflowRunnerOnline() {
+  // Queue push mode has no standing Worker to heartbeat; the deployment itself is the
+  // executor. Daemon mode keeps the historical fail-closed admission check.
+  if (resolveWorkflowRunnerMode() === "queue") return;
   const status = await workflowCompiler<{ online?: boolean }>("/v1/runner-status");
   if (status?.online !== true) throw new ApiError(503, "WORKFLOW_RUNNER_OFFLINE", "Workflow runner is offline");
 }
@@ -213,6 +220,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
     const body=workflowStrictBody(request.body,["action","workflowId","environmentRef","threadId","checkpointId","namespace","graphPath","before","input","updates","idempotencyKey","confirmExternalEffects","scope","collection","key","value","expectedVersion","ttlMinutes","offset"],["action"]);
     if(JSON.stringify(body)!==JSON.stringify(workflowSecretProjection(body)))throw new ApiError(400,'SECRET_IN_RUN_INPUT','Credentials cannot enter memory or state updates');
     const data=await workflowCompiler('/v1/p5',{...body,ownerId:owner});
+    await dispatchQueuedWorkflow(data);
     json(response,200,workflowProjection(data));return true;
   }
   if(resource === "extensions") {
@@ -447,7 +455,9 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       if (prior) {
         if (prior.request_hash !== requestHash) throw new ApiError(409, "IDEMPOTENCY_CONFLICT", "Idempotency key was used for another request");
         const priorRun = result(await client.from("workflow_live_runs").select("status,last_seq").eq("owner_user_id", owner).eq("run_id", prior.run_id).maybeSingle()) as WorkflowRow | null;
-        json(response, 202, { runId: prior.run_id, revision: prior.revision, status: priorRun?.status ?? "expired", eventsCursor: priorRun?.last_seq ?? 0, historyExpired: !priorRun }); return true;
+        const replay = { runId: prior.run_id, revision: prior.revision, status: priorRun?.status ?? "expired", eventsCursor: priorRun?.last_seq ?? 0, historyExpired: !priorRun };
+        await dispatchQueuedWorkflow(replay);
+        json(response, 202, replay); return true;
       }
       if (JSON.stringify(body.input) !== JSON.stringify(workflowSecretProjection(body.input))) throw new ApiError(400, "SECRET_IN_RUN_INPUT", "Secret values cannot enter Workflow Input or State");
       const workflowId = workflowString(body.workflowId); const doc = await readWorkflowDocument(client, owner, workflowId, workflowInteger(body.revision));
@@ -461,7 +471,9 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       await ensureWorkflowRunnerOnline();
       const validation = await workflowCompiler("/v1/validate", { ownerId: owner, environmentRef: workflowString(body.environmentRef), definition: doc.definition, input: body.input, ...(variableEnvironment ? { variableEnvironmentId: variableEnvironment.id } : {}) });
       if (!validation.valid) { const correlation = workflowDiagnosticCorrelation(); throw new ApiError(422, "GRAPH_INVALID", "Workflow execution validation failed", { ...correlation, diagnostics: workflowScopedDiagnostics(validation.diagnostics, correlation) }); }
-      json(response, 202, await rpc(client, "workflow_v2_enqueue", { p_owner: owner, p_workflow: workflowId, p_revision: body.revision, p_input: body.input, p_environment: body.environmentRef, p_environment_revision: validation.environmentRevision, p_registry: withFrozenVariableEnvironment(validation.registrySnapshot, variableEnvironment), p_semantic: validation.semanticHash, p_fingerprint: validation.compileFingerprint, p_request_hash: requestHash, p_key: key, p_launch: launch?.context ?? null, p_variable_environment: variableEnvironment?.id ?? null })); return true;
+      const accepted = await rpc(client, "workflow_v2_enqueue", { p_owner: owner, p_workflow: workflowId, p_revision: body.revision, p_input: body.input, p_environment: body.environmentRef, p_environment_revision: validation.environmentRevision, p_registry: withFrozenVariableEnvironment(validation.registrySnapshot, variableEnvironment), p_semantic: validation.semanticHash, p_fingerprint: validation.compileFingerprint, p_request_hash: requestHash, p_key: key, p_launch: launch?.context ?? null, p_variable_environment: variableEnvironment?.id ?? null });
+      await dispatchQueuedWorkflow(accepted);
+      json(response, 202, accepted); return true;
     }
     if (request.method === "GET" && id) {
       const run = await liveRun(client, owner, id);

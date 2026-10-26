@@ -56,6 +56,9 @@ importers:
       '@tiptap/static-renderer':
         specifier: 3.31.3
         version: 3.31.3(@tiptap/core@3.31.3(@tiptap/pm@3.31.3))(@tiptap/pm@3.31.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@vercel/queue':
+        specifier: ^0.10.0
+        version: 0.10.0
       '@vitejs/plugin-react':
         specifier: ^5.1.0
         version: 5.2.0(vite@7.3.6(@types/node@26.2.0)(tsx@4.23.12))
@@ -1770,6 +1773,15 @@ packages:
   '@vercel/python@6.56.1':
     resolution: {integrity: sha512-gkTLBbMZbmBTVCrRMn47grZptEbCeUSMVJb4hrditW7MvpuSkTuYYMx6/mCEpwPkxXFqbjgrE3KZM4z1PT5CrA==}
 
+  '@vercel/queue@0.10.0':
+    resolution: {integrity: sha512-GKrt5p+D/drm5bkDr8j2EqEkYs29AMLAtun18iXA4PLorVzaHk39YorQ8TdCCeN9H5CDQV4ElMnfxDrbxou8Aw==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@opentelemetry/api': ^1.0.0
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
+
   '@vercel/redwood@2.5.1':
     resolution: {integrity: sha512-oldy4mZmhFzHKkXluyPNHiIyZHxVW1Zpznn0qBag2hzmn2HpqkL9fZfZvlWGIvuAdQz/Sa4AErbreMEPOzCv0w==}
 
@@ -2695,6 +2707,10 @@ packages:
   minizlib@3.1.0:
     resolution: {integrity: sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==}
     engines: {node: '>= 18'}
+
+  mixpart@0.0.6:
+    resolution: {integrity: sha512-CRdXtgfQH2jARmtNmPR0Q7jL20fiESbaYk1b0KvLD0jCdUuemepREtsbd8nbiY6BHV9OGGddAZITNXklupUPUQ==}
+    engines: {node: '>=20.0.0'}
 
   mkdirp@1.0.4:
     resolution: {integrity: sha512-vVqVZQyf3WLx2Shd0qJ9xuvqgAyKPLAiqITEtqW0oIUjzo3PePDd6fW9iFz30ef7Ysp/oiWqbhszeGWW2T6Gzw==}
@@ -5065,6 +5081,13 @@ snapshots:
     dependencies:
       '@vercel/python-analysis': 0.13.2
 
+  '@vercel/queue@0.10.0':
+    dependencies:
+      '@vercel/oidc': 3.2.0
+      minimatch: 10.2.6
+      mixpart: 0.0.6
+      picocolors: 1.1.1
+
   '@vercel/redwood@2.5.1(rollup@4.62.3)':
     dependencies:
       '@vercel/nft': 1.10.0(rollup@4.62.3)
@@ -6037,6 +6060,8 @@ snapshots:
   minizlib@3.1.0:
     dependencies:
       minipass: 7.1.3
+
+  mixpart@0.0.6: {}
 
   mkdirp@1.0.4: {}
 

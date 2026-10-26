@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createJsonGenerationClient } from "./_lib/llm.js";
-import { readLlmEnvironment } from "./_lib/env.js";
-import { createUserSupabase } from "./_lib/supabase.js";
-import { analyzeCourseIntent } from "../src/features/course/creation/courseIntent.js";
-import { ApiError, handleApi, json, methodNotAllowed } from "./_lib/http.js";
+import { createJsonGenerationClient } from "../_lib/llm.js";
+import { readLlmEnvironment } from "../_lib/env.js";
+import { createUserSupabase } from "../_lib/supabase.js";
+import { analyzeCourseIntent } from "../../src/features/course/creation/courseIntent.js";
+import { ApiError, handleApi, json, methodNotAllowed } from "../_lib/http.js";
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   if (request.method !== "POST") return methodNotAllowed(response, ["POST"]);
