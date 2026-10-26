@@ -1,11 +1,13 @@
-import { useState } from "react";
-import type { Binding, JsonSchema, JsonValue } from "../../domain/v2/types";
+import { useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
+import type { Binding, JsonSchema, JsonValue, WorkflowTool } from "../../domain/v2/types";
 import { PARAM_NAME_PATTERN, RESERVED_PARAM_NAME } from "../../domain/v2/schema";
 import { defaultParamName } from "../../domain/v2/dataFlow";
 import { toolParamRows } from "../../domain/v2/toolParams";
 import { resolveFormSchema, SchemaForm } from "./SchemaForm";
 import { typeLabel, types } from "./bindingTypes";
-import { VariablePicker } from "./VariablePicker";
+import { BindingSelect } from "./BindingSelect";
+import type { StateFieldType } from "../../domain/v2/stateAuthoring";
 
 /**
  * Input table of the unified node panel (M8).
@@ -21,16 +23,28 @@ export type NodeParamsTableProps = {
   mode: NodeParamsMode;
   inputs: Record<string, Binding>;
   onChangeInputs: (inputs: Record<string, Binding>) => void;
-  inputSchema: JsonSchema;
+  /** Parameter definition structure: which rows exist, their types and required flags (tool/function Schema). */
+  paramSchema: JsonSchema;
+  /** Workflow startup input structure (`definition.inputSchema`), used only by the 启动输入 menu. */
+  startInputSchema: JsonSchema;
   stateSchema: JsonSchema;
   environmentSchema?: JsonSchema;
   environmentVariables?: Record<string, string | number | boolean>;
   producers?: Map<string, string[]>;
+  laterProducerFields?: ReadonlySet<string>;
   nodeLabels?: Record<string, string>;
   samples?: Record<string, JsonValue>;
+  inputInitializedFields?: ReadonlySet<string>;
   readOnly?: boolean;
-  /** Accepts bindings dragged from the debug dialog (M9); null targets create a new parameter. */
+  /** Tool whose API resource the footer's 编辑工具 action opens. */
+  tool?: WorkflowTool;
+  onEditTool?: () => void;
+  /** Accepts bindings dragged from the workbench; null targets create a new parameter. */
   onDropBinding?: (target: string | null, binding: Binding) => void;
+  /** Creates the State field and binds this parameter in one caller-owned edit. */
+  onCreateStateField?: (field: string, type: StateFieldType, paramName: string) => void;
+  /** The section header owns the add action; the table omits its own footer button. */
+  showAdd?: boolean;
 };
 
 export const PARAM_NAME_RULES = "参数名只能使用字母、数字和下划线，不能以数字开头，节点内不可重名。";
@@ -81,6 +95,14 @@ function uniqueParamName(name: string, taken: Set<string>): string {
   return name;
 }
 
+/** Drops every binding the tool's Schema does not declare (extra inputs from older node versions). */
+export function removeUnknownToolInputs(inputs: Record<string, Binding>, inputSchema: JsonSchema): Record<string, Binding> {
+  const known = new Set(toolParamRows(inputSchema).map(row => row.name));
+  const next = { ...inputs };
+  for (const name of Object.keys(next)) if (!known.has(name)) delete next[name];
+  return next;
+}
+
 /** Appends a declared parameter named by `defaultParamName` (never mutates `inputs`). */
 export function addDeclaredParam(inputs: Record<string, Binding>, binding: Binding = { source: "literal", value: "" }): { inputs: Record<string, Binding>; name: string } {
   // `defaultParamName` always answers "value" for a literal, so the table keeps that name unique.
@@ -123,12 +145,6 @@ function schemaForLiteral(binding: Binding | undefined, declared: JsonSchema | u
   return { type: value === null ? "null" : Array.isArray(value) ? "array" : typeof value === "number" ? (Number.isInteger(value) ? "integer" : "number") : typeof value === "boolean" ? "boolean" : typeof value === "object" ? "object" : "string" };
 }
 
-function bindingText(binding: Binding): string {
-  if (binding.source === "literal") return "固定值";
-  const source = binding.source === "input" ? "启动输入" : binding.source === "state" ? "State" : "环境变量";
-  return binding.pointer ? `${source} · ${binding.pointer}` : `全部${source}`;
-}
-
 function LiteralControl({ schema, value, label, readOnly, onChange }: { schema: JsonSchema; value: JsonValue; label: string; readOnly: boolean; onChange: (value: JsonValue) => void }) {
   const resolved = resolveFormSchema(schema, schema);
   const type = Array.isArray(resolved.type) ? resolved.type.find(item => item !== "null") : resolved.type;
@@ -158,14 +174,85 @@ function LiteralControl({ schema, value, label, readOnly, onChange }: { schema: 
 type ParamRow = { name: string; title: string; description?: string; schema: JsonSchema; required: boolean; binding?: Binding };
 
 export function NodeParamsTable(props: NodeParamsTableProps) {
-  const { mode, inputs, onChangeInputs, inputSchema, stateSchema, environmentSchema, environmentVariables, producers, nodeLabels, samples, readOnly = false, onDropBinding } = props;
-  const [pickerName, setPickerName] = useState<string | null>(null);
+  const { mode, inputs, onChangeInputs, paramSchema, startInputSchema, stateSchema, environmentSchema, environmentVariables, producers, laterProducerFields, nodeLabels, samples, inputInitializedFields, readOnly = false, onDropBinding, onCreateStateField, showAdd = true, tool, onEditTool } = props;
   const [nameDrafts, setNameDrafts] = useState<Record<string, string>>({});
   const [nameErrors, setNameErrors] = useState<Record<string, string>>({});
+  const rowIds = useRef(new Map<string, string>());
+  const nextRowId = useRef(0);
+  const composing = useRef(false);
+  const skipBlur = useRef<string | null>(null);
 
-  const inputProperties = inputSchema.properties && typeof inputSchema.properties === "object" && !Array.isArray(inputSchema.properties) ? inputSchema.properties : {};
+  /** Stable row identity: a rename moves the id with the parameter instead of remounting the row. */
+  function rowId(name: string): string {
+    const existing = rowIds.current.get(name);
+    if (existing) return existing;
+    const id = `param-row-${nextRowId.current += 1}`;
+    rowIds.current.set(name, id);
+    return id;
+  }
+
+  function moveRowId(from: string, to: string) {
+    const id = rowIds.current.get(from);
+    if (!id) return;
+    rowIds.current.delete(from);
+    rowIds.current.set(to, id);
+  }
+
+  function forgetRow(name: string) {
+    const id = rowIds.current.get(name);
+    rowIds.current.delete(name);
+    if (!id) return;
+    setNameDrafts(drafts => { const next = { ...drafts }; delete next[id]; return next; });
+    setNameErrors(errors => { const next = { ...errors }; delete next[id]; return next; });
+  }
+
+  function clearNameError(id: string) {
+    setNameErrors(errors => {
+      if (!Object.prototype.hasOwnProperty.call(errors, id)) return errors;
+      const next = { ...errors }; delete next[id]; return next;
+    });
+  }
+
+  function draftName(id: string, from: string, value: string) {
+    setNameDrafts(drafts => ({ ...drafts, [id]: value }));
+    const issue = value === from ? undefined : paramNameIssue(inputs, from, value);
+    setNameErrors(errors => {
+      const next = { ...errors };
+      if (issue) next[id] = issue; else delete next[id];
+      return next;
+    });
+  }
+
+  /** Commits the draft once; an invalid name is reported and the original is restored. */
+  function commitName(id: string, from: string) {
+    const draft = nameDrafts[id];
+    if (draft === undefined) return;
+    const name = draft.trim();
+    if (name === from) {
+      setNameDrafts(drafts => { const next = { ...drafts }; delete next[id]; return next; });
+      clearNameError(id);
+      return;
+    }
+    const result = renameDeclaredParam(inputs, from, draft);
+    setNameDrafts(drafts => { const next = { ...drafts }; delete next[id]; return next; });
+    if (!result.renamed) {
+      if (result.reason) setNameErrors(errors => ({ ...errors, [id]: result.reason! }));
+      else clearNameError(id);
+      return;
+    }
+    moveRowId(from, name);
+    clearNameError(id);
+    onChangeInputs(result.inputs);
+  }
+
+  function cancelName(id: string) {
+    setNameDrafts(drafts => { const next = { ...drafts }; delete next[id]; return next; });
+    clearNameError(id);
+  }
+
+  const inputProperties = paramSchema.properties && typeof paramSchema.properties === "object" && !Array.isArray(paramSchema.properties) ? paramSchema.properties : {};
   const rows: ParamRow[] = mode === "schema"
-    ? toolParamRows(inputSchema, inputs).map(row => ({ ...row }))
+    ? toolParamRows(paramSchema, inputs).map(row => ({ ...row }))
     : Object.entries(inputs).map(([name, binding]) => ({ name, title: String(asSchema(inputProperties[name]).title ?? name), schema: asSchema(inputProperties[name]), required: false, binding }));
 
   const knownNames = new Set(rows.map(row => row.name));
@@ -173,22 +260,17 @@ export function NodeParamsTable(props: NodeParamsTableProps) {
 
   function changeBinding(name: string, binding: Binding, rename = mode === "declared") {
     if (rename) {
+      const id = rowIds.current.get(name);
       const result = applyDeclaredBinding(inputs, name, binding);
-      if (result.name !== name) {
-        setNameDrafts(drafts => { const next = { ...drafts }; delete next[name]; return next; });
-        setNameErrors(errors => { const next = { ...errors }; delete next[name]; return next; });
+      if (result.name !== name && id) {
+        moveRowId(name, result.name);
+        setNameDrafts(drafts => { const next = { ...drafts }; delete next[id]; return next; });
+        setNameErrors(errors => { const next = { ...errors }; delete next[id]; return next; });
       }
       onChangeInputs(result.inputs);
       return;
     }
     onChangeInputs({ ...inputs, [name]: binding });
-  }
-
-  function toggleVariable(row: ParamRow) {
-    if (readOnly) return;
-    // Keep the existing value until the picker returns a binding, so closing the picker
-    // never leaves an invalid placeholder binding behind.
-    setPickerName(row.name);
   }
 
   function useLiteral(row: ParamRow) {
@@ -197,87 +279,103 @@ export function NodeParamsTable(props: NodeParamsTableProps) {
     changeBinding(row.name, { source: "literal", value: initialLiteralValue(schema) }, false);
   }
 
-  function rename(row: ParamRow, next: string) {
-    setNameDrafts(drafts => ({ ...drafts, [row.name]: next }));
-    const result = renameDeclaredParam(inputs, row.name, next);
-    if (!result.renamed) {
-      if (result.reason) setNameErrors(errors => ({ ...errors, [row.name]: result.reason! }));
-      else setNameErrors(errors => { const copy = { ...errors }; delete copy[row.name]; return copy; });
-      return;
-    }
-    setNameErrors(errors => { const copy = { ...errors }; delete copy[row.name]; return copy; });
-    setNameDrafts(drafts => { const copy = { ...drafts }; delete copy[row.name]; return copy; });
-    onChangeInputs(result.inputs);
-  }
-
   function add() {
     const result = addDeclaredParam(inputs);
     onChangeInputs(result.inputs);
   }
 
   function remove(row: ParamRow) {
+    forgetRow(row.name);
     const next = { ...inputs };
     delete next[row.name];
     onChangeInputs(next);
   }
 
+  const showAction = mode === "declared" && !readOnly && rows.length > 0;
+
   return (
-    <div className="wf-params-table" data-mode={mode} data-readonly={readOnly ? "true" : undefined}>
-      <div className="wf-params-head"><span>参数名</span><span>取值</span><span aria-hidden="true" /></div>
+    <div className="wf-params-table" data-mode={mode} data-readonly={readOnly ? "true" : undefined} data-actions={showAction ? "true" : undefined}>
+      <div className="wf-params-head"><span>参数名</span><span>取值来源</span>{showAction ? <span aria-hidden="true" /> : null}</div>
       {rows.map(row => {
         const literal = row.binding?.source === "literal" ? row.binding : undefined;
-        const variableBinding = row.binding && row.binding.source !== "literal" ? row.binding : undefined;
         const schema = schemaForLiteral(row.binding, row.schema);
-        const targetSchema = mode === "schema" ? row.schema : schemaForLiteral(row.binding, row.schema);
         const requiredMissing = row.required && !row.binding;
-        const rowError = nameErrors[row.name];
+        const key = rowId(row.name);
+        const rowError = nameErrors[key];
         return (
-          <div key={row.name} className={`wf-params-row${requiredMissing ? " required-missing" : ""}`} data-param-name={row.name} data-config-field={`inputs/${row.name}`} data-required-missing={requiredMissing ? "true" : undefined} onDragOver={onDropBinding && !readOnly ? event => { if (event.dataTransfer.types.includes(DROP_BINDING_TYPE)) event.preventDefault(); } : undefined} onDrop={onDropBinding && !readOnly ? event => { const binding = readDroppedBinding(event); if (!binding) return; event.preventDefault(); onDropBinding(row.name, binding); } : undefined}>
-            <div className="wf-params-name">
+          <div key={key} className={`wf-params-row${requiredMissing ? " required-missing" : ""}`} data-param-name={row.name} data-config-field={`inputs/${row.name}`} data-required-missing={requiredMissing ? "true" : undefined} onDragOver={onDropBinding && !readOnly ? event => { if (event.dataTransfer.types.includes(DROP_BINDING_TYPE)) event.preventDefault(); } : undefined} onDrop={onDropBinding && !readOnly ? event => { const binding = readDroppedBinding(event); if (!binding) return; event.preventDefault(); onDropBinding(row.name, binding); } : undefined}>
+            <div className="wf-params-name" title={mode === "schema" ? [row.title !== row.name ? row.title : "", row.description ?? ""].filter(Boolean).join(" · ") || undefined : undefined}>
               {mode === "declared"
-                ? <input aria-label={`参数名 ${row.name}`} aria-invalid={Boolean(rowError)} readOnly={readOnly} value={nameDrafts[row.name] ?? row.name} onChange={event => rename(row, event.target.value)} />
-                : <span className="wf-params-name-readonly">{row.name}</span>}
-              {mode === "schema" ? <small className="wf-params-title">{row.title}{row.title !== row.name ? "" : "（参数名）"}</small> : null}
-              {row.description ? <small className="wf-params-description">{row.description}</small> : null}
-              <small className="wf-params-type">{mode === "schema" ? `类型：${typeLabel(types(row.schema, inputSchema))}${row.required ? " · 必填" : ""}` : ""}</small>
+                ? <input
+                  aria-label={`参数名 ${row.name}`}
+                  aria-invalid={Boolean(rowError)}
+                  readOnly={readOnly}
+                  value={nameDrafts[key] ?? row.name}
+                  onChange={event => draftName(key, row.name, event.target.value)}
+                  onFocus={() => clearNameError(key)}
+                  onBlur={() => {
+                    if (skipBlur.current === key) { skipBlur.current = null; return; }
+                    commitName(key, row.name);
+                  }}
+                  onCompositionStart={() => { composing.current = true; }}
+                  onCompositionEnd={() => { composing.current = false; }}
+                  onKeyDown={event => {
+                    if (event.key === "Enter") {
+                      if (event.nativeEvent.isComposing || composing.current) return;
+                      event.preventDefault();
+                      commitName(key, row.name);
+                      skipBlur.current = key;
+                      event.currentTarget.blur();
+                    } else if (event.key === "Escape") {
+                      event.preventDefault();
+                      cancelName(key);
+                    }
+                  }}
+                />
+                : <div className="wf-params-name-line"><code className="wf-params-name-readonly">{row.name}</code><span className="wf-params-type-badge">{typeLabel(types(row.schema, paramSchema))}</span>{row.required ? <span className="wf-params-required-badge">必填</span> : <span className="wf-params-optional-badge">可选</span>}</div>}
               {rowError ? <span role="alert" className="wf-params-name-error">{rowError}</span> : null}
               {requiredMissing ? <span role="alert" className="wf-params-required-missing">必填参数尚未填写</span> : null}
             </div>
             <div className="wf-params-value">
-              <div className="wf-params-modes">
-                <button type="button" aria-pressed={Boolean(row.binding && row.binding.source !== "literal")} disabled={readOnly} onClick={() => toggleVariable(row)}>变量</button>
-                <button type="button" aria-pressed={Boolean(literal)} disabled={readOnly} onClick={() => useLiteral(row)}>固定值</button>
-              </div>
-              {literal ? <LiteralControl schema={schema} value={literal.value} label={row.name} readOnly={readOnly} onChange={value => changeBinding(row.name, { source: "literal", value })} />
-                : variableBinding ? <button type="button" className="wf-params-bound" disabled={readOnly} title={variableBinding.pointer || "（全部）"} onClick={() => setPickerName(row.name)}>{bindingText(variableBinding)}</button>
-                  : <span className="wf-params-unset">未设置</span>}
-              {pickerName === row.name && !readOnly ? (
-                <VariablePicker
-                  inputSchema={inputSchema}
-                  stateSchema={stateSchema}
-                  environmentSchema={environmentSchema}
-                  environmentVariables={environmentVariables}
-                  producers={producers}
-                  nodeLabels={nodeLabels}
-                  samples={samples}
-                  targetSchema={targetSchema}
-                  value={row.binding}
-                  onPick={binding => { setPickerName(null); changeBinding(row.name, binding); }}
-                  onPickLiteral={() => { setPickerName(null); useLiteral(row); }}
-                  onClose={() => setPickerName(null)}
-                />
-              ) : null}
+              <BindingSelect
+                value={row.binding}
+                startInputSchema={startInputSchema}
+                valueSchema={row.schema}
+                stateSchema={stateSchema}
+                environmentSchema={environmentSchema}
+                environmentVariables={environmentVariables}
+                producers={producers}
+                laterProducerFields={laterProducerFields}
+                nodeLabels={nodeLabels}
+                samples={samples}
+                inputInitializedFields={inputInitializedFields}
+                readOnly={readOnly}
+                ariaLabel={`参数 ${row.name} 取值`}
+                {...(mode === "schema" && !row.required ? { unsetLabel: "不填", clearable: true, onClear: () => remove(row) } : {})}
+                onSelect={binding => changeBinding(row.name, binding)}
+                onLiteral={() => useLiteral(row)}
+                {...(onCreateStateField ? { onCreateStateField: (field, type) => onCreateStateField(field, type, row.name) } : {})}
+              />
+              {literal ? <LiteralControl schema={schema} value={literal.value} label={row.name} readOnly={readOnly} onChange={value => changeBinding(row.name, { source: "literal", value })} /> : null}
             </div>
-            <div className="wf-params-actions">
-              {mode === "declared" && !readOnly ? <button type="button" className="wf-params-remove" aria-label={`删除参数 ${row.name}`} onClick={() => remove(row)}>删除</button> : null}
-            </div>
+            {showAction ? <div className="wf-params-actions">
+              <button type="button" className="wf-params-remove" aria-label={`删除参数 ${row.name}`} title="删除参数" onClick={() => remove(row)}><Trash2 size={13}/></button>
+            </div> : null}
           </div>
         );
       })}
-      {!rows.length ? <p className="wf-params-empty">{mode === "schema" ? "此工具的输入 Schema 没有参数。" : "此节点还没有参数。"}</p> : null}
-      {mode === "declared" && !readOnly ? <div className="wf-params-add" onDragOver={onDropBinding && !readOnly ? event => { if (event.dataTransfer.types.includes(DROP_BINDING_TYPE)) event.preventDefault(); } : undefined} onDrop={onDropBinding && !readOnly ? event => { const binding = readDroppedBinding(event); if (!binding) return; event.preventDefault(); onDropBinding(null, binding); } : undefined}><button type="button" onClick={add}>新增参数</button><small>{PARAM_NAME_RULES}{onDropBinding ? "；也可以把左侧字段拖到参数行或这里。" : ""}</small></div> : null}
-      {mode === "schema" ? <p className="wf-params-hint">参数来自工具的输入 Schema，参数名只读，必填参数未填时不能运行；可在每行选择变量或固定值。</p> : null}
-      {extraInputs.length ? <p className="wf-params-hint" role="note">当前输入不在工具的输入 Schema 中：{extraInputs.join("、")}。这是旧版节点数据，M11 切换为新版后再编辑。</p> : null}
+      {!rows.length ? <p className="wf-params-empty">{mode === "schema" ? "这个工具没有输入参数。" : "此节点还没有参数。"}</p> : null}
+      {mode === "declared" && !readOnly && showAdd ? <div className="wf-params-add" onDragOver={onDropBinding ? event => { if (event.dataTransfer.types.includes(DROP_BINDING_TYPE)) event.preventDefault(); } : undefined} onDrop={onDropBinding ? event => { const binding = readDroppedBinding(event); if (!binding) return; event.preventDefault(); onDropBinding(null, binding); } : undefined}><button type="button" onClick={add}>＋ 添加输入</button>{onDropBinding ? <small>也可以把左侧字段拖到参数行或这里。</small> : null}</div> : null}
+      {mode === "schema" ? <div className="wf-params-tool-footer" title={tool ? `${tool.name} 的参数` : undefined}>
+        <span>参数由工具定义</span><span aria-hidden="true">·</span>
+        <button type="button" title="打开 API 资源编辑器" disabled={!onEditTool || readOnly} onClick={() => onEditTool?.()}>编辑工具</button>
+        <span className="wf-params-tool-footer-spacer" />
+        <span>{rows.length} 个参数</span>
+      </div> : null}
+      {extraInputs.length ? <div className="wf-params-extra" role="note">
+        <p>这些输入不是当前工具的参数，运行时不会使用：{extraInputs.join("、")}。</p>
+        <button type="button" className="wf-params-extra-remove" onClick={() => onChangeInputs(removeUnknownToolInputs(inputs, paramSchema))}>移除</button>
+      </div> : null}
     </div>
   );
 }

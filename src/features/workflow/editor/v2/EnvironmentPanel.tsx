@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { WorkflowDefinitionV2, WorkflowEnvironment, WorkflowTool } from "../../domain/v2/types";
+import type { JsonValue, WorkflowDefinitionV2, WorkflowEnvironment, WorkflowTool } from "../../domain/v2/types";
 import { connectionUpdates, type CapabilityBinding } from "../../domain/v2/connectionReferences";
 import { definitionScopes, variableReferences } from "../../domain/v2/dataFlow";
 import { CapabilityBindingPanel } from "./CapabilityBindingPanel";
@@ -8,7 +8,25 @@ import { nodeLabelIndex } from "./StateFields";
 
 type ResourceStatus = "available" | "update" | "disabled" | "missing";
 
-const statusLabels: Record<ResourceStatus | "platform", string> = { available: "可用", update: "有新版本", disabled: "已停用", missing: "已不可用", platform: "平台提供" };
+const statusLabels: Record<ResourceStatus, string> = { available: "可用", update: "有新版本", disabled: "已停用", missing: "已不可用" };
+
+type ConnectionLabelSource = { connectionKey: string; ref: string; version: number; content: Record<string, JsonValue> };
+
+/** User-facing connection identity: catalog name + version, never the owner-scoped internal ref. */
+export function connectionDisplayName(ref: string, connections: readonly ConnectionLabelSource[]): string {
+  const current = connections.find(item => item.connectionKey === ref);
+  if (current) {
+    const configured = typeof current.content.name === "string" ? current.content.name.trim() : "";
+    return `${configured || current.ref} · v${current.version}`;
+  }
+  if (ref.startsWith("p4:")) {
+    const parts = ref.split(":");
+    const version = parts.pop() ?? "";
+    const name = parts.slice(2).join(":") || "连接";
+    return `${name} · v${version}`;
+  }
+  return ref;
+}
 
 /**
  * “本流程资源” panel: only what this workflow references, derived from the definition.
@@ -25,7 +43,7 @@ export function EnvironmentPanel({ definition, environment, tools, locked, onApp
 }) {
   const { data, error } = useExtensions(environment?.environmentRef);
   const labels = useMemo(() => nodeLabelIndex(definition), [definition]);
-  // Every declared provider/tool reference, including platform-managed ones (status is read-only for those).
+  // Every declared provider/tool reference; only user connections are shown as available.
   const references = useMemo(() => {
     const found: { ref: string; kind: "provider" | "tool"; nodeId: string; modelRef?: string }[] = [];
     for (const scope of definitionScopes(definition)) for (const node of scope.definition.nodes) {
@@ -65,8 +83,8 @@ export function EnvironmentPanel({ definition, environment, tools, locked, onApp
     }
     return [...byRef.values()];
   }, [references]);
-  function statusOf(ref: string): ResourceStatus | "platform" {
-    if (!ref.startsWith("p4:")) return "platform";
+  function statusOf(ref: string): ResourceStatus {
+    if (!ref.startsWith("p4:")) return "missing";
     const connection = latest.get(ref);
     if (!connection) return "missing";
     if (connection.disabled) return "disabled";
@@ -81,7 +99,7 @@ export function EnvironmentPanel({ definition, environment, tools, locked, onApp
     <section className="wf-flow-resource-group" aria-label="引用的连接">
       <h4>模型与工具 · {grouped.length}</h4>
       {grouped.length ? grouped.map(item => <article className="wf-connection-card" key={`${item.kind}:${item.ref}`}>
-        <strong>{item.ref}</strong>
+        <strong>{connectionDisplayName(item.ref, data?.connections ?? [])}</strong>
         <small>{item.kind === "provider" ? "模型连接" : "工具连接"}{item.modelRefs.size ? ` · ${[...item.modelRefs].join(" · ")}` : ""}</small>
         <span className={`wf-resource-status ${statusOf(item.ref)}`}>{statusLabels[statusOf(item.ref)]}</span>
         <small>被引用节点：{item.nodes.map(id => labels.get(id) ?? id).join("、")}</small>

@@ -17,8 +17,8 @@ it("shows the startup contract, State initializers and direct/indirect consumers
   const html = renderToStaticMarkup(createElement(StartInputFields, { definition, onChange: () => undefined }));
   expect(html).toContain("启动输入契约");
   expect(html).toContain("订单号");
-  expect(html).toContain("State · query");
+  expect(html).toContain("流程数据 · query");
   expect(html).toContain("准备对话 · question ← /question");
-  expect(html).toContain("State.query ← /question");
-  expect(html).toContain("通过 State 间接读取的节点：准备对话");
+  expect(html).toContain("流程数据.query ← /question");
+  expect(html).toContain("通过流程数据间接读取的节点：准备对话");
 });

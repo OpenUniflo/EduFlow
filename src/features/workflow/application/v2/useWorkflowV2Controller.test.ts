@@ -108,11 +108,11 @@ describe("initial data and submission feedback", () => {
     let observed: WorkflowRunV2 = { ...oldRun, runId: "new", status: "running" };
     api.run.mockImplementation(async () => observed);
     await boot(); await render().startRun(); render(); await flush();
-    expect(render().notice).toContain("真实运行已提交");
+    expect(render().notice).toContain("运行已提交");
     observed = { ...observed, status: "failed" };
     await vi.advanceTimersByTimeAsync(1000); render(); await flush();
     expect(render().run?.status).toBe("failed");
-    expect(render().notice).not.toContain("真实运行已提交");
+    expect(render().notice).not.toContain("运行已提交");
     expect(api.createRun).toHaveBeenCalledTimes(1);
   });
 });

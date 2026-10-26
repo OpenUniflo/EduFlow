@@ -9,7 +9,7 @@ it("shows nested direct-tool results as fields while preserving typed falsy valu
   const before = JSON.stringify(value);
   const html = renderToStaticMarkup(createElement(ReadableRunOutput, { value, text: before }));
   expect(html).toContain('<dl class="wf-data-fields">');
-  expect(html).toContain("<dt>total</dt>"); expect(html).toContain(">0</span>");
+  expect(html).toContain('<dt title="total">total</dt>'); expect(html).toContain(">0</span>");
   expect(html).toContain("否"); expect(html).toContain("空值");
   expect(html).toContain("&lt;script&gt;"); expect(html).not.toContain("<script>");
   expect(html).not.toContain('"total":'); expect(JSON.stringify(value)).toBe(before);

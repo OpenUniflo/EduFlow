@@ -28,13 +28,13 @@ it("shows the actual review object, related state, output and write target witho
   expect(html).toContain("审核依据");
   expect(html).toContain("请确认费用");
   expect(html).toContain("汇总差旅费用");
-  expect(html).toContain("Run run-1234");
-  expect(html).toContain("检查点 checkpo");
+  expect(html).not.toContain("Run run-1234");
+  expect(html).toContain("保存版本");
   expect(html).toContain("任务 task-abc");
   expect(html).toContain("主图");
   expect(html).toContain("approved");
   expect(html).toContain("R-1");
-  expect(html).toContain("approved → State.approved");
+  expect(html).toContain("approved → 流程数据.approved");
   expect(html).not.toContain("hidden");
 });
 

@@ -2,7 +2,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { createNodeV2 } from "../../domain/v2/factory";
-import { currentNodeTypeVersion } from "../../domain/v2/nodeVersions";
 import { NodePanel } from "./NodePanel";
 
 const node = createNodeV2("core.llm", "node-llm");
@@ -25,16 +24,17 @@ function render(overrides: Partial<Parameters<typeof NodePanel>[0]> = {}) {
   }));
 }
 
-it("hides the tab strip until run data exists and renders numbered collapsible sections", () => {
+it("hides the tab strip until run data exists and keeps only the advanced section collapsible", () => {
   const html = render();
   expect(html).not.toContain("运行数据");
   expect(html).toContain("生成回答");
   expect(html).toContain("输入段内容");
-  expect(html).toContain(">2<");
+  expect(html).toContain("2 项");
   expect(html).not.toContain("高级段内容");
   expect(html).toContain('aria-expanded="false"');
   expect(html).toContain("模型");
-  expect(html).toContain(`core.llm · v${currentNodeTypeVersion("core.llm")}`);
+  expect(html).toContain("节点信息");
+  expect(html).not.toContain('aria-controls="wf-nodepanel-section-inputs"');
 });
 
 it("switches to the run-data tab only when it is available", () => {
@@ -59,11 +59,12 @@ it("lets the caller keep a section open and makes the title read-only when confi
   expect(html).toContain('readOnly=""');
 });
 
-it("renders expand-debug, more, close and footer actions from props", () => {
-  const html = render({ onExpandDebug: vi.fn(), footer: createElement("span", null, "运行到此节点") });
-  expect(html).toContain("展开调试");
+it("renders expand, duplicate, delete and close actions from props", () => {
+  const html = render({ onExpandDebug: vi.fn(), onDuplicate: vi.fn(), onDelete: vi.fn() });
+  expect(html).toContain("展开为大窗口");
   expect(html).toContain("更多操作");
+  expect(html).toContain("复制节点");
+  expect(html).toContain("删除节点");
   expect(html).toContain("关闭节点面板");
-  expect(html).toContain("运行到此节点");
-  expect(render()).not.toContain("展开调试");
+  expect(render()).not.toContain("展开为大窗口");
 });

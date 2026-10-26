@@ -8,9 +8,11 @@ function record(value: JsonValue | undefined) { return value && typeof value ===
 export function StructuredValue({ value, depth = 0 }: { value: JsonValue; depth?: number }) {
   if (value === null) return <span>空值</span>;
   if (typeof value !== "object") return <span className="wf-data-text">{typeof value === "boolean" ? value ? "是" : "否" : String(value)}</span>;
-  if (depth >= 4) return <details><summary>展开详细数据</summary><pre>{JSON.stringify(value, null, 2)}</pre></details>;
+  // Deep payloads collapse to one readable JSON block instead of narrowing the
+  // key column again at every nesting level.
+  if (depth >= 2) return <details><summary>展开详细数据</summary><pre>{JSON.stringify(value, null, 2)}</pre></details>;
   if (Array.isArray(value)) return value.length ? <ol className="wf-data-list">{value.map((item, index) => <li key={index}><StructuredValue value={item} depth={depth + 1}/></li>)}</ol> : <span>空列表（[]）</span>;
-  return Object.keys(value).length ? <dl className="wf-data-fields">{Object.entries(value).map(([key, item]) => <div key={key}><dt>{key}</dt><dd><StructuredValue value={item} depth={depth + 1}/></dd></div>)}</dl> : <span>无字段</span>;
+  return Object.keys(value).length ? <dl className="wf-data-fields">{Object.entries(value).map(([key, item]) => <div key={key}><dt title={key}>{key}</dt><dd><StructuredValue value={item} depth={depth + 1}/></dd></div>)}</dl> : <span>无字段</span>;
 }
 
 export function readableAnswer(value: JsonValue | undefined, depth=0): string | undefined {
@@ -24,7 +26,7 @@ export function readableAnswer(value: JsonValue | undefined, depth=0): string | 
 }
 export function ReadableRunOutput({ value, text }: { value: JsonValue | undefined; text: string }) {
   const answer=readableAnswer(value);
-  if(value && typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length)return <p>本次图输出未返回字段。节点仍可能更新了 State，可在执行详情中查看；需要返回数据时，请在图设置中配置图输出映射。</p>;
+  if(value && typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length)return <p>本次图输出未返回字段。节点仍可能更新了流程数据，可在执行详情中查看；需要返回数据时，请在图设置中配置图输出映射。</p>;
   return answer!==undefined?<div className="wf-answer-text">{answer}</div>:value!==null&&typeof value==="object"?<StructuredValue value={value}/>:<>{text}</>;
 }
 

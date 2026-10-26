@@ -14,21 +14,21 @@ const base: WorkflowRunV2 = {
 it("shows the safe input snapshot, omissions and a revision mismatch warning", () => {
   const html = renderToStaticMarkup(createElement(RunInputSnapshot, { run: base, currentRevision: 3 }));
   expect(html).toContain("启动输入快照");
-  expect(html).toContain("修订 2");
+  expect(html).toContain("保存版本 2");
   expect(html).toContain("部分脱敏");
   expect(html).toContain("orderId");
   expect(html).toContain("A1001");
   expect(html).toContain("未包含的输入字段");
   expect(html).toContain("token");
   expect(html).toContain("敏感字段");
-  expect(html).toContain("当前编辑为修订 3");
+  expect(html).toContain("当前编辑为保存版本 3");
 });
 
 it("marks a complete snapshot and does not warn on the same revision", () => {
   const complete: WorkflowRunV2 = { ...base, inputReuse: { available: true, complete: true, fields: [{ pointer: "/orderId", value: "A1001" }] } };
   const html = renderToStaticMarkup(createElement(RunInputSnapshot, { run: complete, currentRevision: 2 }));
   expect(html).toContain("完整");
-  expect(html).not.toContain("当前编辑为修订");
+  expect(html).not.toContain("当前编辑为保存版本");
 });
 
 it("explains when no reusable snapshot exists", () => {

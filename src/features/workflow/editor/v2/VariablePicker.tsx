@@ -229,7 +229,7 @@ export function buildPickerGroups(model: VariablePickerModel): PickerGroup[] {
     nodeGroups.set(owner, entries);
   }
   for (const [nodeId, entries] of nodeGroups) groups.push({ id: `node:${nodeId}`, label: `${labelOf(nodeId)} 的输出`, tone: "node", entries });
-  if (shared.length) groups.push({ id: "state", label: "共享 State", tone: "state", entries: shared });
+  if (shared.length) groups.push({ id: "state", label: "共享流程数据", tone: "state", entries: shared });
 
   if (mode === "value") {
     const environmentRoot = environmentSchema ?? {};
@@ -406,7 +406,7 @@ export function VariablePicker(props: VariablePickerProps) {
   return (
     <div className="wf-variable-picker" role="dialog" aria-label="选择变量" onKeyDown={handleKeyDown} data-mode={props.mode ?? "value"}>
       <header className="wf-variable-picker-head">
-        <strong>{props.mode === "state" ? "选择 State 字段" : "选择变量"}</strong>
+        <strong>{props.mode === "state" ? "选择流程数据字段" : "选择变量"}</strong>
         <button type="button" className="wf-variable-picker-close" aria-label="关闭变量选择" onClick={onClose}>关闭</button>
       </header>
       <label className="wf-variable-picker-search">搜索变量<input aria-label="搜索变量" value={query} onChange={event => { setQuery(event.target.value); setActiveIndex(-1); }} placeholder="按名称、类型或路径过滤" autoFocus /></label>

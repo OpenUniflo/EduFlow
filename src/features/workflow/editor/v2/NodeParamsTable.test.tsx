@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import type { Binding, JsonSchema } from "../../domain/v2/types";
-import { addDeclaredParam, applyDeclaredBinding, initialLiteralValue, NodeParamsTable, paramNameIssue, PARAM_NAME_RULES, renameDeclaredParam } from "./NodeParamsTable";
+import { addDeclaredParam, applyDeclaredBinding, initialLiteralValue, NodeParamsTable, paramNameIssue, PARAM_NAME_RULES, removeUnknownToolInputs, renameDeclaredParam } from "./NodeParamsTable";
 
 const stateBinding: Binding = { source: "state", pointer: "/answer", onMissing: { mode: "error" } };
 const literal = (value: string | number | boolean): Binding => ({ source: "literal", value });
@@ -48,13 +48,15 @@ it("renders fixed values as read-only controls when the table is read-only", () 
     mode: "declared",
     inputs: { q: literal("已固定") },
     onChangeInputs: vi.fn(),
-    inputSchema: { type: "object", properties: { q: { type: "string" } } },
+    paramSchema: { type: "object", properties: { q: { type: "string" } } },
+    startInputSchema: { type: "object", properties: { question: { type: "string" } } },
     stateSchema: { type: "object" },
     readOnly: true,
   }));
   expect(html).toContain('aria-label="q 固定值"');
   expect(html).toContain('readOnly=""');
-  expect(html).toContain('aria-pressed="true"');
+  expect(html).toContain("wf-binding-chip literal");
+  expect(html).toContain("固定值 · 已固定");
   expect(html).not.toContain("新增参数");
   expect(html).not.toContain("删除参数");
 });
@@ -65,17 +67,66 @@ it("renders Schema-mode rows read-only with title, description, type and a requi
     mode: "schema",
     inputs: { arguments: literal("{}") },
     onChangeInputs: vi.fn(),
-    inputSchema,
+    paramSchema: inputSchema,
+    startInputSchema: { type: "object", properties: { question: { type: "string" } } },
     stateSchema: { type: "object" },
   }));
   expect(html).toContain("查询");
   expect(html).toContain("要检索的词");
-  expect(html).toContain("类型：文本 · 必填");
+  expect(html).toContain('wf-params-type-badge">文本');
+  expect(html).toContain('wf-params-required-badge">必填');
+  expect(html).not.toContain("类型：文本");
   expect(html).toContain('data-required-missing="true"');
   expect(html).toContain("必填参数尚未填写");
-  expect(html).toContain("当前输入不在工具的输入 Schema 中：arguments");
+  expect(html).toContain("这些输入不是当前工具的参数，运行时不会使用：arguments。");
+  expect(html).toContain("移除");
+  expect(html).not.toContain("M11");
+  expect(html).not.toContain("Schema");
   expect(html).not.toContain("参数名 query");
   expect(html).not.toContain("新增参数");
+  expect(html).not.toContain("删除");
+  expect(html).toContain("参数由工具定义");
+  expect(html).toContain("编辑工具");
+});
+
+it("marks optional tool parameters with 可选 and leaves unset values as 不填", () => {
+  const inputSchema: JsonSchema = { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } }, required: ["query"] };
+  const html = renderToStaticMarkup(createElement(NodeParamsTable, {
+    mode: "schema",
+    inputs: { query: stateBinding },
+    onChangeInputs: vi.fn(),
+    paramSchema: inputSchema,
+    startInputSchema: { type: "object", properties: { question: { type: "string" } } },
+    stateSchema: { type: "object" },
+    tool: { ref: "t", name: "工具", contractDigest: "d", inputSchema },
+    onEditTool: vi.fn(),
+  }));
+  expect(html).toContain('wf-params-optional-badge">可选');
+  expect(html).toContain("不填");
+  expect(html).toContain("2 个参数");
+});
+
+it("removes tool inputs the current Schema does not declare", () => {
+  const inputSchema: JsonSchema = { type: "object", properties: { query: { type: "string" } } };
+  const inputs = { query: stateBinding, hits: literal("x"), text: literal("y") };
+  expect(removeUnknownToolInputs(inputs, inputSchema)).toEqual({ query: stateBinding });
+  expect(Object.keys(inputs)).toEqual(["query", "hits", "text"]);
+});
+
+it("builds tool rows from the parameter Schema and startup options from the workflow Schema", () => {
+  const paramSchema: JsonSchema = { type: "object", properties: { query: { type: "string", title: "查询" } }, required: ["query"] };
+  const startInputSchema: JsonSchema = { type: "object", properties: { question: { type: "string", title: "问题" } }, required: ["question"] };
+  const html = renderToStaticMarkup(createElement(NodeParamsTable, {
+    mode: "schema",
+    inputs: { query: { source: "input", pointer: "/question", onMissing: { mode: "error" } } },
+    onChangeInputs: vi.fn(),
+    paramSchema,
+    startInputSchema,
+    stateSchema: { type: "object" },
+  }));
+  expect(html).toContain('data-param-name="query"');
+  expect(html).not.toContain('data-param-name="question"');
+  expect(html).toContain("查询");
 });
 
 it("renders literal controls by parameter type, including a collapsed SchemaForm for objects", () => {
@@ -93,7 +144,8 @@ it("renders literal controls by parameter type, including a collapsed SchemaForm
     mode: "declared",
     inputs: { text: literal("hello"), count: literal(2), flag: literal(true), mode: literal("a"), obj: { source: "literal", value: { nested: "x" } } },
     onChangeInputs: vi.fn(),
-    inputSchema,
+    paramSchema: inputSchema,
+    startInputSchema: { type: "object", properties: { question: { type: "string" } } },
     stateSchema: { type: "object" },
   }));
   expect(html).toContain('type="text"');
@@ -111,4 +163,20 @@ it("seeds initial literal values from the parameter sub-Schema", () => {
   expect(initialLiteralValue({ type: "object", properties: {} })).toEqual({});
   expect(initialLiteralValue({ type: "array", items: { type: "string" } })).toEqual([]);
   expect(initialLiteralValue({ type: "string", enum: ["x", "y"] })).toBe("x");
+});
+
+it("shows a persistent delete action per declared row without a header action label", () => {
+  const html = renderToStaticMarkup(createElement(NodeParamsTable, {
+    mode: "declared",
+    inputs: { q: literal("x"), topic: literal("y") },
+    onChangeInputs: vi.fn(),
+    paramSchema: { type: "object", properties: {} },
+    startInputSchema: { type: "object", properties: { question: { type: "string" } } },
+    stateSchema: { type: "object" },
+  }));
+  expect(html).toContain('data-actions="true"');
+  expect(html).toContain("删除参数 q");
+  expect(html).toContain("删除参数 topic");
+  expect(html).not.toContain(">删除<");
+  expect(html).not.toContain(">操作<");
 });

@@ -24,7 +24,7 @@ function groups(targetSchema?: JsonSchema) {
 
 it("groups inputs, node outputs, shared State, environment variables and the literal action", () => {
   const list = groups();
-  expect(list.map(group => group.label)).toEqual(["启动输入", "整理社区问题 的输出", "共享 State", "环境变量", "固定值"]);
+  expect(list.map(group => group.label)).toEqual(["启动输入", "整理社区问题 的输出", "共享流程数据", "环境变量", "固定值"]);
   const nodeGroup = list.find(group => group.id === "node:n1")!;
   expect(nodeGroup.entries.map(entry => entry.pointer)).toEqual(["/summary", "/messages"]);
   expect(nodeGroup.entries[0].children?.map(entry => entry.pointer)).toEqual(["/summary/topics", "/summary/conclusion"]);
@@ -90,7 +90,7 @@ it("renders groups, the inferred sample badge and State-only mode", () => {
   const html = renderToStaticMarkup(createElement(VariablePicker, { inputSchema, stateSchema, environmentSchema, environmentVariables, producers, nodeLabels, samples, onPick, onPickLiteral: vi.fn(), onClose: vi.fn() }));
   expect(html).toContain("启动输入");
   expect(html).toContain("整理社区问题 的输出");
-  expect(html).toContain("共享 State");
+  expect(html).toContain("共享流程数据");
   expect(html).toContain("环境变量");
   expect(html).toContain("固定值…");
   expect(html).toContain("样例推断，未声明类型");
@@ -98,7 +98,7 @@ it("renders groups, the inferred sample badge and State-only mode", () => {
   expect(html).toContain("↑↓ 选择 · 回车确认 · Esc 关闭");
 
   const stateOnly = renderToStaticMarkup(createElement(VariablePicker, { mode: "state", inputSchema, stateSchema, producers, nodeLabels, onPick, onClose: vi.fn() }));
-  expect(stateOnly).toContain("选择 State 字段");
+  expect(stateOnly).toContain("选择流程数据字段");
   expect(stateOnly).not.toContain("启动输入");
   expect(stateOnly).not.toContain("环境变量");
   expect(stateOnly).not.toContain("固定值…");

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { Copy } from "lucide-react";
 import { workflowApiV2 } from "../../application/v2/useWorkflowV2Controller";
 import { workflowErrorMessage } from "../../repository/v2/WorkflowApiV2";
 import { nodeRunData, type RunStepInput } from "../../domain/v2/runData";
-import type { JsonValue, WorkflowDefinitionV2, WorkflowStepV2 } from "../../domain/v2/types";
-import { ReadableRunOutput } from "./RunOutput";
-
-export type PreviewRunStep = { stepId?: string; nodeId: string; status: string; input?: JsonValue; output?: JsonValue; path?: string[]; pathKey?: string };
+import { formatRunDuration, runStatusTone } from "../../domain/v2/runSummary";
+import type { JsonValue, WorkflowDefinitionV2, WorkflowExecutionError, WorkflowStepV2 } from "../../domain/v2/types";
+import { presentExecutionError, type ErrorActionHint } from "./errorPresentation";
+import { ExecutionErrorCard } from "./ExecutionErrorCard";
+import { RunValueList } from "./RunValueList";
 
 export type NodeRunDataTabProps = {
   definition: WorkflowDefinitionV2;
@@ -15,72 +17,95 @@ export type NodeRunDataTabProps = {
   runId?: string | null;
   runStatus?: string;
   runCreatedAt?: string;
-  /** Steps supplied by the controller (observed run) or frontend preview; omit to fetch by runId. */
+  /** Run-level error used when the failed step did not persist its own error. */
+  runError?: WorkflowExecutionError;
+  /** Frozen variable environment name for the run summary tag. */
+  runEnvironment?: string | null;
+  /** Steps supplied by the controller (observed run); omit to fetch by runId. */
   steps?: readonly RunStepInput[];
-  previewSteps?: readonly PreviewRunStep[];
-  onViewHistory?: () => void;
-  onUseInput?: (input: JsonValue) => void;
+  onErrorAction?: (hint: ErrorActionHint) => void;
 };
 
 function toRunStep(step: WorkflowStepV2): RunStepInput {
-  return { stepId: step.stepId, runId: step.runId, nodeId: step.nodeId, status: step.status, ...(step.input === undefined ? {} : { input: step.input }), ...(step.output === undefined ? {} : { output: step.output }), ...(step.startedAt ? { startedAt: step.startedAt } : {}), ...(step.finishedAt ? { finishedAt: step.finishedAt } : {}), ...(step.graphPath ? { graphPath: step.graphPath } : {}) };
+  return { stepId: step.stepId, runId: step.runId, nodeId: step.nodeId, status: step.status, ...(step.input === undefined ? {} : { input: step.input }), ...(step.output === undefined ? {} : { output: step.output }), ...(step.startedAt ? { startedAt: step.startedAt } : {}), ...(step.finishedAt ? { finishedAt: step.finishedAt } : {}), ...(step.graphPath ? { graphPath: step.graphPath } : {}), ...(step.error ? { error: step.error } : {}) };
 }
 
-function previewToRunStep(step: PreviewRunStep, index: number): RunStepInput {
-  return { stepId: step.stepId ?? `preview-${index}`, runId: "preview", nodeId: step.nodeId, status: step.status, ...(step.input === undefined ? {} : { input: step.input }), ...(step.output === undefined ? {} : { output: step.output }), graphPath: step.path ?? [] };
-}
-
-const statusNames: Record<string, string> = { completed: "完成", failed: "失败", running: "运行中", waiting: "等待回应", cancelled: "已停止", success: "完成" };
+const statusNames: Record<string, string> = { completed: "已完成", success: "已完成", failed: "失败", running: "运行中", waiting: "等待回应", cancelled: "已停止", interrupted: "执行中断", queued: "排队中", prepared: "结果已暂存", continued: "已继续" };
 
 /**
- * “运行数据” tab (M9): the node's step in the run selected in the history drawer,
- * defaulting to the latest run. Reads only; State writes show the written value
- * (a full before/after comparison needs checkpoints and stays P1).
+ * “运行数据” tab (batch 3): the node's input and written State values for the
+ * selected run, defaulting to the latest. Read-only; no update mode and no raw
+ * JSON in the list. The JSON stays available through the copy action.
  */
-export function useRunSteps({ runId, steps, previewSteps }: { runId?: string | null; steps?: readonly RunStepInput[]; previewSteps?: readonly PreviewRunStep[] }): { steps?: readonly RunStepInput[]; loading: boolean; error: string } {
+export function useRunSteps({ runId, steps }: { runId?: string | null; steps?: readonly RunStepInput[] }): { steps?: readonly RunStepInput[]; loading: boolean; error: string } {
   const [fetched, setFetched] = useState<RunStepInput[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const supplied = previewSteps ? previewSteps.map(previewToRunStep) : steps;
-  const effectiveRunId = supplied !== undefined ? null : runId;
+  const supplied = steps;
   useEffect(() => {
     let active = true;
-    if (previewSteps || steps !== undefined || !runId) { setFetched(null); setLoading(false); setError(""); return () => { active = false; }; }
+    if (steps !== undefined || !runId) { setFetched(null); setLoading(false); setError(""); return () => { active = false; }; }
     setLoading(true);
     void workflowApiV2.steps(runId).then(result => { if (active) { setFetched(result.items.map(toRunStep)); setError(""); } }).catch(reason => { if (active) setError(workflowErrorMessage(reason)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [runId, steps === undefined, previewSteps === undefined]);
-  if (previewSteps) return { steps: supplied, loading: false, error: "" };
+  }, [runId, steps === undefined]);
   if (steps !== undefined) return { steps, loading: false, error: "" };
   return { steps: fetched ?? undefined, loading, error };
 }
 
-export function NodeRunDataTab({ definition, nodeId, graphPath, runId, runStatus, runCreatedAt, steps, previewSteps, onViewHistory, onUseInput }: NodeRunDataTabProps) {
+function runTime(value: string | undefined): string {
+  if (!value) return "时间未知";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "时间未知";
+  return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+export function NodeRunDataTab({ definition, nodeId, graphPath, runId, runStatus, runCreatedAt, runError, runEnvironment, steps, onErrorAction }: NodeRunDataTabProps) {
   const [copied, setCopied] = useState("");
-  const resolved = useRunSteps({ runId, steps, previewSteps });
+  const resolved = useRunSteps({ runId, steps });
   const supplied = resolved.steps;
   const loading = resolved.loading;
   const error = resolved.error;
   const data = useMemo(() => supplied ? nodeRunData(definition, supplied, nodeId, graphPath) : null, [definition, nodeId, graphPath, supplied]);
-  const effectiveRunId = runId ?? null;
+  const presentedError = data?.error ? presentExecutionError(data.error, { savedAt: runCreatedAt }) : runStatus === "failed" && runError ? presentExecutionError(runError, { savedAt: runCreatedAt }) : undefined;
 
   function copyJson() {
     if (!data) return;
     const text = JSON.stringify({ input: data.input, output: data.output, writes: data.writes, elapsedMs: data.elapsedMs, stepIndex: data.stepIndex, invocationCount: data.invocationCount }, null, 2);
     void navigator.clipboard?.writeText(text).then(() => setCopied("已复制这组运行数据")).catch(() => setCopied("复制失败，请手动选择"));
-    setCopied("已复制这组运行数据");
   }
 
   if (error) return <p role="alert" className="wf-run-data-note">{error}</p>;
   if (loading) return <p className="wf-run-data-note">正在读取所选运行的数据…</p>;
-  if (!data) return <p className="wf-run-data-note">本次运行未经过此节点{effectiveRunId ? "" : "；工作流还没有可用的运行记录"}。</p>;
+  if (!data) {
+    const failed = runStatus === "failed" && runError ? presentExecutionError(runError, { savedAt: runCreatedAt }) : undefined;
+    return failed ? <section className="wf-run-data" aria-label="节点运行数据"><ExecutionErrorCard error={failed} onAction={onErrorAction}/><p className="wf-run-data-note">此节点在读取或校验输入时停止，尚未产生执行步骤。</p></section> : <p className="wf-run-data-note">本次运行未经过此节点{runId ? "" : "；工作流还没有可用的运行记录"}。</p>;
+  }
 
-  const time = runCreatedAt ?? null;
+  const tone = runStatusTone(data.status);
+  const writes: Record<string, JsonValue> = Object.fromEntries(data.writes.map(write => [write.field, write.value ?? null]));
   return <section className="wf-run-data" aria-label="节点运行数据">
-    <header className="wf-run-data-source"><div><strong>{statusNames[data.status] ?? data.status}</strong><small>{time ? `来自运行 ${new Date(time).toLocaleString()} · ` : "来自运行 · "}第 {data.stepIndex + 1} 步{data.invocationCount > 1 ? ` · 共执行 ${data.invocationCount} 次（显示最后一次）` : ""}{data.elapsedMs === undefined ? "" : ` · ${data.elapsedMs}ms`}</small></div>{onViewHistory ? <button type="button" className="wf-text-button" onClick={onViewHistory}>在历史中查看</button> : null}</header>
-    <section className="wf-run-data-block"><h4>输入</h4><ReadableRunOutput value={data.input} text={data.input === undefined ? "此步骤没有输入记录" : ""}/></section>
-    <section className="wf-run-data-block"><h4>输出</h4><ReadableRunOutput value={data.output} text={data.output === undefined ? "此步骤没有输出记录" : ""}/></section>
-    <section className="wf-run-data-block"><h4>写入 State</h4>{data.writes.length ? <table className="wf-flow-variable-table"><thead><tr><th>字段</th><th>写入值</th><th>更新方式</th></tr></thead><tbody>{data.writes.map(write => <tr key={write.field}><td><code>{write.field}</code></td><td>{write.value === undefined ? <span className="wf-state-muted">未产生值</span> : <code>{JSON.stringify(write.value).slice(0, 240)}</code>}</td><td>{write.reducer}</td></tr>)}</tbody></table> : <p className="wf-field-note">此节点没有写入 State 的映射。</p>}<small className="wf-run-data-note">只显示写入值；运行步骤不携带 State 快照，因此不显示写入前的值。</small></section>
-    <footer className="wf-run-data-actions">{onUseInput && data.input !== undefined ? <button type="button" className="wf-text-button" onClick={() => onUseInput(data.input as JsonValue)}>用这组输入单步测试</button> : null}<button type="button" className="wf-text-button" onClick={copyJson}>复制 JSON</button>{copied ? <small role="status">{copied}</small> : null}</footer>
+    <div className="wf-run-data-meta">
+      <span>{runTime(runCreatedAt)}</span><span aria-hidden="true">·</span>
+      <span className="wf-run-data-duration">{data.elapsedMs === undefined ? "耗时未记录" : formatRunDuration(data.elapsedMs)}</span><span aria-hidden="true">·</span>
+      <span className="wf-run-env-tag">{runEnvironment?.trim() || "默认"}</span>
+      <span className="wf-run-data-meta-spacer" />
+      <span className={`wf-run-status ${tone}`}><i aria-hidden="true" />{statusNames[data.status] ?? data.status}</span>
+    </div>
+    {presentedError ? <ExecutionErrorCard error={presentedError} onAction={onErrorAction}/> : null}
+    <section className="wf-run-data-block">
+      <header className="wf-run-data-block-head"><span aria-hidden="true" className="wf-run-data-accent" /><div><h3>本次输入</h3><p>这次运行读到的值 · {data.input === undefined ? 0 : (data.input && typeof data.input === "object" && !Array.isArray(data.input) ? Object.keys(data.input).length : 1)} 项</p></div></header>
+      <RunValueList value={data.input} scalarName="输入" layout="stacked" emptyText="此步骤没有输入记录。"/>
+    </section>
+    <section className="wf-run-data-block">
+      <header className="wf-run-data-block-head"><span aria-hidden="true" className="wf-run-data-accent" /><div><h3>写入的数据</h3><p>{data.writes.length ? `这次运行写入流程数据的字段 · ${data.writes.length} 项` : "此节点没有写入流程数据"}</p></div></header>
+      {data.writes.length ? <RunValueList value={writes} layout="inline" emptyText="此节点没有写入流程数据。"/> : <p className="wf-run-data-note">此节点没有写入流程数据的映射。</p>}
+    </section>
+    <footer className="wf-run-data-footer">
+      <small>运行数据为只读</small>
+      <span className="wf-run-data-meta-spacer" />
+      <button type="button" className="wf-run-data-copy" onClick={copyJson}><Copy size={11} aria-hidden="true"/>复制 JSON</button>
+      {copied ? <small role="status">{copied}</small> : null}
+    </footer>
   </section>;
 }
