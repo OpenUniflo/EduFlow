@@ -19,10 +19,14 @@ TOPIC = "workflow-runs"
 # Function path. `sanitizeConsumerName("api/workflow-run-consumer.py")` is stable for this
 # entrypoint; the SDK subscriber must use the same group or push delivery is unhandled.
 CONSUMER_GROUP = "api_Sworkflow-run-consumer_Dpy"
-DEFAULT_BUDGET_SECONDS = 270
-MAX_BUDGET_SECONDS = 290
+# The function budget leaves headroom inside the 300s Vercel limit for claim, finish,
+# bounded maintenance and cold-start/import time.
+DEFAULT_BUDGET_SECONDS = 250
+MAX_BUDGET_SECONDS = 270
 MAX_DELAY_SECONDS = 604800  # Vercel Queues maximum delay/retention.
 WAIT_DELIVERY_MARGIN_SECONDS = 60
+MAINTENANCE_TIMEOUT_SECONDS = 6
+REAP_TIMEOUT_SECONDS = 4
 
 
 def _run_id(value):
@@ -79,24 +83,63 @@ async def _schedule_existing_wait(storage, run_id, claim):
     return "wait_scheduled"
 
 
-async def consume_run(run_id):
-    """Claim and execute one Run; return a bounded outcome label."""
+def _log_maintenance_failure(stage):
+    print(json.dumps({"event": "workflow.queue.maintenance", "stage": stage, "outcome": "failed"}), flush=True)
+
+
+async def _maintenance(storage, *, require_watchdog=False):
+    """Run one bounded sweep: queue/lease/timeout watchdog, retention, sandbox reap.
+
+    Every step has its own timeout. A normal Run keeps its outcome even if cleanup fails;
+    a delayed queue-timeout check must surface a watchdog failure so the message retries.
+    """
+    from .sandbox import reap
+
+    try:
+        await asyncio.wait_for(storage.call("watchdog"), MAINTENANCE_TIMEOUT_SECONDS)
+    except Exception:
+        _log_maintenance_failure("watchdog")
+        if require_watchdog:
+            raise
+    try:
+        await asyncio.wait_for(storage.call("p5_sweep"), MAINTENANCE_TIMEOUT_SECONDS)
+    except Exception:
+        _log_maintenance_failure("p5_sweep")
+    try:
+        await asyncio.wait_for(reap(), REAP_TIMEOUT_SECONDS)
+    except Exception:
+        _log_maintenance_failure("reap")
+
+
+async def consume_run(run_id, kind=None):
+    """Claim and execute one Run; return a bounded outcome label.
+
+    ``kind="timeout"`` is the delayed queue-timeout check. It does not claim anything: the
+    bounded watchdog seals Runs still queued past the database threshold, including Runs
+    whose original queue message was lost or whose deployment predates this switch.
+    """
     from .server import refresh, registry
     from .storage import Storage
     from .cli import execute_claim
 
     storage = Storage(os.environ["WORKFLOW_DATABASE_URL"])
     refresh()
+    if kind == "timeout":
+        await _maintenance(storage, require_watchdog=True)
+        return "timeout_swept"
     worker_id = "queue:" + uuid.uuid4().hex
     claim = await storage.call("claim_run", run_id, worker_id)
     if not claim:
         return "missing"
-    kind = claim.get("kind")
-    if kind == "busy":
+    claim_kind = claim.get("kind")
+    if claim_kind == "busy":
         raise RetryAfter(5)
-    if kind in {"terminal", "running", "sealed", "expired", "unsupported"}:
-        return kind
-    if kind == "waiting":
+    if claim_kind in {"terminal", "running", "unsupported"}:
+        return claim_kind
+    if claim_kind in {"sealed", "expired"}:
+        await _maintenance(storage)
+        return claim_kind
+    if claim_kind == "waiting":
         return await _schedule_existing_wait(storage, run_id, claim)
     result = await execute_claim(
         claim,
@@ -108,7 +151,7 @@ async def consume_run(run_id):
     )
     if result.get("status") == "paused":
         await _send_wait(run_id, max(1, int(result.get("waitMs", 1000) / 1000)))
-        return "paused"
+    await _maintenance(storage)
     return result.get("status", "failed")
 
 
@@ -116,17 +159,20 @@ async def consume_run(run_id):
 async def consume(message: Message[dict[str, object]]) -> None:
     payload = message.payload if isinstance(message.payload, dict) else {}
     run_id = _run_id(payload.get("runId"))
+    kind = payload.get("kind")
+    if not isinstance(kind, str) or kind not in {"timeout", "wait"}:
+        kind = None
     if not run_id:
         # A malformed message is not worth redelivering; return so the SDK acknowledges it.
         print(json.dumps({"event": "workflow.queue.consumer", "outcome": "invalid"}), flush=True)
         return
     started = time.monotonic()
     try:
-        outcome = await consume_run(run_id)
+        outcome = await consume_run(run_id, kind=kind)
     except Exception:
-        print(json.dumps({"event": "workflow.queue.consumer", "runId": run_id, "outcome": "retry", "durationMs": int((time.monotonic() - started) * 1000)}), flush=True)
+        print(json.dumps({"event": "workflow.queue.consumer", "runId": run_id, "kind": kind, "outcome": "retry", "durationMs": int((time.monotonic() - started) * 1000)}), flush=True)
         raise
-    print(json.dumps({"event": "workflow.queue.consumer", "runId": run_id, "outcome": outcome, "durationMs": int((time.monotonic() - started) * 1000)}), flush=True)
+    print(json.dumps({"event": "workflow.queue.consumer", "runId": run_id, "kind": kind, "outcome": outcome, "durationMs": int((time.monotonic() - started) * 1000)}), flush=True)
 
 
 async def _respond(send, status, body):

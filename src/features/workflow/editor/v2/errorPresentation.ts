@@ -24,6 +24,7 @@ const CODE_TITLES: Record<string, string> = {
   TOOL_REQUEST_FAILED: "工具请求失败", HTTP_TOOL_FAILED: "工具请求失败", TOOL_FAILED: "工具请求失败", TOOL_TIMEOUT: "工具请求超时",
   BINDING_MISSING: "数据字段缺失", INVALID_STATE_UPDATE: "写入数据不符合要求", INVALID_NODE_OUTPUT: "写入数据不符合要求", INVALID_NODE_INPUT: "节点输入不符合要求",
   WAIT_EXPIRED: "等待回应已到期", WORKER_LOST: "执行服务中断", RUN_CANCELLED: "运行已取消",
+  RUN_TIMEOUT: "运行超过时长上限", QUEUE_TIMEOUT: "排队超时",
 };
 
 /** Title for contexts that only persisted the error code. */
@@ -59,6 +60,7 @@ export function executionErrorReason(error: Pick<WorkflowExecutionError, "code" 
   if (code === "timeout") {
     // A model generation budget is not a connection failure. Keep the model and
     // elapsed time visible so the user can shorten the answer or retry.
+    if (error.code === "RUN_TIMEOUT") return `本次运行超过执行时长上限${waited ? `（已运行 ${waited} 秒）` : ""}，已停止。请缩短流程或拆分步骤后重试。`;
     if (error.code === "NODE_TIMEOUT") return `节点执行超时${waited ? `（已等待 ${waited} 秒）` : ""}。请缩短处理时间，或在节点“高级”中调高节点超时。`;
     if (error.code === "MODEL_TIMEOUT" || error.model) {
       return `模型${error.model ? `「${error.model}」` : ""}回复超时${waited ? `（已等待 ${waited} 秒）` : ""}。可以缩短回答要求或稍后重试。`;
@@ -78,6 +80,8 @@ export function executionErrorReason(error: Pick<WorkflowExecutionError, "code" 
 }
 
 function baseTitle(error: WorkflowExecutionError): { title: string; actions: ErrorAction[] } {
+  if (error.code === "RUN_TIMEOUT") return { title: CODE_TITLES.RUN_TIMEOUT, actions: [{ label: "重新运行", hint: "run" }] };
+  if (error.code === "QUEUE_TIMEOUT") return { title: CODE_TITLES.QUEUE_TIMEOUT, actions: [{ label: "重新运行", hint: "run" }] };
   if (["MODEL_TIMEOUT", "MODEL_STREAM_INTERRUPTED", "MODEL_OUTPUT_TRUNCATED"].includes(error.code)) return { title: CODE_TITLES[error.code], actions: [{ label: "检查模型设置", hint: "model-settings" }, { label: "重新运行", hint: "run" }] };
   if (error.code === "NODE_TIMEOUT") return { title: "节点执行超时", actions: [{ label: "定位出错节点", hint: "node" }, { label: "重新运行", hint: "run" }] };
   if (error.code === "BINDING_MISSING") return { title: "数据字段缺失", actions: [{ label: "定位出错节点", hint: "node" }] };
@@ -101,6 +105,8 @@ function readableMessage(message: string | undefined): string | undefined {
 }
 
 function reasonForBinding(error: WorkflowExecutionError): string {
+  if (error.code === "QUEUE_TIMEOUT") return "这次运行在排队阶段等待过久，没有开始执行。请稍后重新运行。";
+  if (error.code === "RUN_TIMEOUT") return "本次运行超过执行时长上限，已停止。请缩短流程或拆分步骤后重试。";
   if (error.code === "BINDING_MISSING") return "节点需要的数据字段不存在，请检查参数来源，或确认上游节点已经写入。";
   if (error.code === "INVALID_STATE_UPDATE" || error.code === "INVALID_NODE_OUTPUT") return "节点写入的值与字段类型不符，请检查输出字段与类型。";
   if (error.code === "INVALID_NODE_INPUT") return "节点输入不符合要求，请检查参数来源、字段类型和必填项。";

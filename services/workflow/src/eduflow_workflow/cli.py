@@ -50,7 +50,14 @@ async def execute_claim(claim, registry, storage, *, stop=None, signal_role="wor
         return {"status": "paused", "waitMs": paused.wait_ms}
     except Exception as error:
         if isinstance(error, (asyncio.TimeoutError, TimeoutError)):
-            error = ExecutionError("RUN_TIMEOUT", "Run exceeded the function execution budget", "timeout", effect="unknown")
+            error = ExecutionError(
+                "RUN_TIMEOUT",
+                "Run exceeded the function execution budget",
+                "timeout",
+                effect="unknown",
+                reason="timeout",
+                timeout_ms=int(budget_seconds * 1000) if budget_seconds is not None else None,
+            )
         elif not isinstance(error, ExecutionError):
             error = ExecutionError(failure_code, "Workflow execution failed", "infrastructure", effect="unknown")
         try:

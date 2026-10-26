@@ -70,7 +70,7 @@ const validated = { valid: true, environmentRevision: 1, registrySnapshot: {}, s
 beforeEach(() => {
   delete process.env.WORKFLOW_RUNNER_MODE;
   queue.send.mockReset().mockResolvedValue({ messageId: 'message-id' });
-  deps.compiler.mockReset().mockImplementation(async (path: string) => path === '/v1/runner-status' ? { online: true } : validated);
+  deps.compiler.mockReset().mockResolvedValue(validated);
   deps.rpc.mockReset().mockResolvedValue({ data: { runId: '11111111-1111-4111-8111-111111111111', revision: 1, status: 'queued' }, error: null });
 });
 
@@ -149,25 +149,6 @@ it('projects safe structured provider error context without changing the error c
   expect((dto as Record<string, unknown>).error).toMatchObject({ code: 'MODEL_REQUEST_FAILED', reason: 'auth_failed', provider: 'DeepSeek', model: 'deepseek-chat', host: 'api.deepseek.com', httpStatus: 401 });
 });
 
-it('rejects a new Run without leaving it queued when no Worker is online', async () => {
-  const state = setup(null);
-  deps.compiler.mockImplementation(async (path: string) => path === '/v1/runner-status' ? { online: false } : validated);
-  await expect(handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner'))
-    .rejects.toMatchObject({ status: 503, code: 'WORKFLOW_RUNNER_OFFLINE' });
-  expect(deps.rpc).not.toHaveBeenCalled();
-  expect(deps.compiler).toHaveBeenCalledWith('/v1/runner-status');
-  expect(deps.compiler).not.toHaveBeenCalledWith('/v1/validate', expect.anything());
-});
-
-it('admits a Run when any Worker is online even if its executor digest differs', async () => {
-  const state = setup(null);
-  deps.compiler.mockImplementation(async (path: string) => path === '/v1/runner-status'
-    ? { online: true, executorDigest: 'different-from-preview' }
-    : validated);
-  await handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner');
-  expect(deps.rpc).toHaveBeenCalledWith('workflow_v2_enqueue', expect.objectContaining({ p_input: { query: 'manual' } }));
-});
-
 it('admits a Run in queue mode without a Worker heartbeat and publishes its runId', async () => {
   process.env.WORKFLOW_RUNNER_MODE = 'queue';
   try {
@@ -175,8 +156,8 @@ it('admits a Run in queue mode without a Worker heartbeat and publishes its runI
     deps.rpc.mockResolvedValue({ data: { runId, revision: 1, status: 'queued' }, error: null });
     const state = setup(null);
     await handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner');
-    expect(deps.compiler).not.toHaveBeenCalledWith('/v1/runner-status');
-    expect(queue.send).toHaveBeenCalledWith('workflow-runs', { runId }, { idempotencyKey: `run:${runId}` });
+    expect(queue.send).toHaveBeenNthCalledWith(1, 'workflow-runs', { runId }, { idempotencyKey: `run:${runId}` });
+    expect(queue.send).toHaveBeenNthCalledWith(2, 'workflow-runs', { runId, kind: 'timeout' }, { idempotencyKey: `run:${runId}:timeout`, delaySeconds: 75, retentionSeconds: 3600 });
   } finally {
     delete process.env.WORKFLOW_RUNNER_MODE;
   }
@@ -192,6 +173,7 @@ it('keeps the queued Run and returns a retryable error when the queue publish fa
     await expect(handleWorkflowV2(request({ query: 'manual' }), state.response, 'owner'))
       .rejects.toMatchObject({ status: 503, code: 'WORKFLOW_QUEUE_DISPATCH_FAILED', details: { runId, retryable: true } });
     expect(deps.rpc).toHaveBeenCalledWith('workflow_v2_enqueue', expect.anything());
+    expect(queue.send).toHaveBeenCalledTimes(1);
   } finally {
     delete process.env.WORKFLOW_RUNNER_MODE;
   }
@@ -208,8 +190,17 @@ it('re-publishes a still-queued Run on an idempotent replay', async () => {
     });
     await handleWorkflowV2(value, state.response, 'owner');
     expect(deps.rpc).not.toHaveBeenCalled();
-    expect(queue.send).toHaveBeenCalledWith('workflow-runs', { runId }, { idempotencyKey: `run:${runId}` });
+    expect(queue.send).toHaveBeenNthCalledWith(1, 'workflow-runs', { runId }, { idempotencyKey: `run:${runId}` });
+    expect(queue.send).toHaveBeenNthCalledWith(2, 'workflow-runs', { runId, kind: 'timeout' }, { idempotencyKey: `run:${runId}:timeout`, delaySeconds: 75, retentionSeconds: 3600 });
   } finally {
     delete process.env.WORKFLOW_RUNNER_MODE;
   }
+});
+
+it('forces queue mode on Vercel and leaves daemon mode to local development', async () => {
+  const { resolveWorkflowRunnerMode } = await import('./workflowQueue');
+  expect(resolveWorkflowRunnerMode({ VERCEL_ENV: 'preview', WORKFLOW_RUNNER_MODE: 'daemon' } as NodeJS.ProcessEnv)).toBe('queue');
+  expect(resolveWorkflowRunnerMode({ VERCEL_ENV: 'production' } as NodeJS.ProcessEnv)).toBe('queue');
+  expect(resolveWorkflowRunnerMode({} as NodeJS.ProcessEnv)).toBe('daemon');
+  expect(resolveWorkflowRunnerMode({ WORKFLOW_RUNNER_MODE: 'queue' } as NodeJS.ProcessEnv)).toBe('queue');
 });

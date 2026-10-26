@@ -411,6 +411,35 @@ def test_queue_claim_run_seals_stale_lease_and_expires_wait_without_reexecution(
     rollback;
     """)
 
+def test_queue_timeout_watchdog_seals_old_queued_run_idempotently():
+    owner,run=[str(uuid.uuid4()) for _ in range(2)]
+    workflow='queue-timeout-'+str(uuid.uuid4());definition=sample();definition['workflowId']=workflow
+    editor={'schemaVersion':1,'workflowId':workflow,'definitionRevision':1,'editorRevision':1,'nodes':{},'edges':{}}
+    q=lambda value:"'"+json.dumps(value).replace("'","''")+"'::jsonb"
+    run_sql(f"""
+    begin;
+    insert into auth.users(id,aud,role,email) values('{owner}','authenticated','authenticated','{owner}@integration.invalid');
+    select public.workflow_v2_save('{owner}','{workflow}',null,null,{q(definition)},{q(editor)},'hash',null);
+    insert into public.workflow_execution_threads(thread_id,owner_user_id,workflow_id,revision,snapshot,status,current_run_id)
+      values('{run}','{owner}','{workflow}',1,'{{}}','active','{run}');
+    insert into public.workflow_live_runs(run_id,owner_user_id,workflow_id,revision,status,definition_hash,semantic_hash,compile_fingerprint,environment_ref,environment_revision,input,registry_snapshot,thread_id,created_at)
+      values('{run}','{owner}','{workflow}',1,'queued','d','s','c','env','1','{{}}','{{}}','{run}',now()-interval '2 minutes');
+    insert into public.workflow_run_jobs(run_id,queue_msg_id) values('{run}',pgmq.send('workflow_v2','{{}}'));
+    select workflow_private.watchdog();
+    do $$ begin
+      if (select status from public.workflow_live_runs where run_id='{run}')<>'failed' then raise exception 'FAILED queue timeout status';end if;
+      if (select error->>'code' from public.workflow_live_runs where run_id='{run}')<>'QUEUE_TIMEOUT' then raise exception 'FAILED queue timeout code';end if;
+      if (select status from public.workflow_execution_threads where thread_id='{run}')<>'closed' then raise exception 'FAILED queue timeout thread';end if;
+      if exists(select from public.workflow_run_steps where run_id='{run}' and status='running') then raise exception 'FAILED queue timeout step';end if;
+    end $$;
+    select workflow_private.watchdog();
+    do $$ begin
+      if (select status from public.workflow_live_runs where run_id='{run}')<>'failed' then raise exception 'FAILED repeated queue timeout';end if;
+      if (select count(*) from public.workflow_run_events where run_id='{run}' and type='run.failed')<>1 then raise exception 'FAILED duplicate timeout event';end if;
+    end $$;
+    rollback;
+    """)
+
 def test_queue_claim_functions_are_worker_only_and_seal_is_private():
     run_sql("""
     begin;
@@ -422,6 +451,7 @@ def test_queue_claim_functions_are_worker_only_and_seal_is_private():
       if not has_function_privilege('workflow_worker','workflow_private.claim_run(uuid,text)','execute')
         or not has_function_privilege('workflow_worker','workflow_private.expire_wait(uuid)','execute') then raise exception 'FAILED worker queue authority';end if;
       if has_function_privilege('workflow_worker','workflow_private.seal_run(uuid,text,text,text,text,boolean)','execute') then raise exception 'FAILED seal authority';end if;
+      if not has_function_privilege('workflow_worker','workflow_private.watchdog()','execute') or not has_function_privilege('workflow_worker','workflow_private.p5_sweep()','execute') then raise exception 'FAILED worker watchdog authority';end if;
     end $$;
     rollback;
     """)

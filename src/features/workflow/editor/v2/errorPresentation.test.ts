@@ -51,6 +51,17 @@ describe("execution error presentation", () => {
     expect(card?.technical).toContain("Node execution or persistence failed");
   });
 
+it("explains a bounded run timeout and a queue timeout in plain Chinese", () => {
+  const run = presentExecutionError({ code: "RUN_TIMEOUT", message: "Run exceeded the function execution budget", category: "timeout", reason: "timeout", timeoutMs: 250000 });
+  expect(run?.title).toBe("运行超过时长上限");
+  expect(run?.message).toContain("已运行 250 秒");
+  expect(run?.message).toContain("拆分步骤");
+  const queued = presentExecutionError({ code: "QUEUE_TIMEOUT", message: "QUEUE_TIMEOUT", category: "infrastructure" });
+  expect(queued?.title).toBe("排队超时");
+  expect(queued?.message).toContain("排队阶段等待过久");
+  expect(queued?.technical).toContain("QUEUE_TIMEOUT");
+});
+
 it("renders a concrete write type mismatch with the fix-field action", () => {
   const card = presentExecutionError({ code: "INVALID_STATE_UPDATE", message: "result 字段是文本，但工具返回的是对象", field: "result", expectedType: "string", actualType: "object", expectedLabel: "文本", actualLabel: "对象", valueSource: "工具" });
   expect(card?.title).toBe("写入的数据类型不符");
