@@ -74,8 +74,8 @@ describe("Workflow request failures", () => {
     const details = { requestId: "request-id", diagnostics };
     const rejection = new ApiRequestError("SERVER_CODE", "Internal English detail", status, details);
     expect(workflowErrorMessage(rejection)).toContain(message);
-    expect(workflowErrorMessage(rejection)).toContain(`HTTP ${status}`);
-    expect(workflowErrorMessage(rejection)).toContain("request-id");
+    expect(workflowErrorMessage(rejection)).not.toContain(`HTTP ${status}`);
+    expect(workflowErrorMessage(rejection)).not.toContain("request-id");
     expect(workflowErrorMessage(rejection)).not.toContain("Internal English detail");
     expect(rejection.status).toBe(status); expect(rejection.code).toBe("SERVER_CODE");
     expect(rejection.details).toBe(details); expect(rejection.message).toBe("Internal English detail");

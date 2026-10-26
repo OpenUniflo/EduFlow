@@ -63,8 +63,9 @@ export function workflowErrorMessage(reason: unknown): string {
     : reason.status >= 500 ? "执行服务暂不可用，请稍后重试。"
     : reason.status === 408 ? "请求超时，请检查连接后重试。"
     : "请求未完成，请检查配置与问题列表后重试。");
-  const requestId = reason.details && typeof reason.details === "object" && "requestId" in reason.details ? reason.details.requestId : undefined;
-  return `${message}（HTTP ${reason.status}）${typeof requestId === "string" ? ` 请求编号：${requestId}` : ""}`;
+  // User-facing text stays a Chinese reason plus next step; status and request identity
+  // remain in ApiRequestError/details for diagnostics, never as a raw HTTP code.
+  return message;
 }
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   try { return await sharedApiRequest<T>(path, init); }
@@ -108,7 +109,7 @@ export class WorkflowApiV2 {
   /** Read-only "who reads this variable" scan across the current user's current definitions. */
   variableReferences() { return apiRequest<{items:ResourceReferenceRow[]}>(endpoint("configuration",{view:"references"})); }
   /** Connection test; the Worker returns the shared ConnectionTestResult contract. */
-  testExtension(environmentRef:string,body:{ref:string;version:number;arguments?:Record<string,JsonValue>;confirmExternalEffect?:boolean}) { return jsonRequest<ConnectionTestResult>("extensions","POST",{action:"test",kind:"connection",...body,environmentRef}); }
+  testExtension(environmentRef:string,body:{ref:string;version:number;kind?:"connection"|"function";arguments?:Record<string,JsonValue>;confirmExternalEffect?:boolean;testModel?:string;testMessage?:string;content?:JsonValue}) { return jsonRequest<ConnectionTestResult>("extensions","POST",{action:"test",kind:"connection",...body,environmentRef}); }
   async configuration() { return normalizeConfiguration(await apiRequest<WorkflowConfiguration>(endpoint("configuration"))); }
   async saveConfiguration(config: WorkflowConfiguration) {
     const normalized = normalizeConfiguration(config);
