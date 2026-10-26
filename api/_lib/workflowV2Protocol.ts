@@ -16,8 +16,21 @@ export function workflowCompilerUrl(base: string, path: string): URL {
   const relative = path.startsWith("/") ? path : `/${path}`;
   return new URL(`${prefix}${relative}`, url);
 }
+/**
+ * Resolves the compiler base URL for the current deployment. A Vercel Preview always calls
+ * its own `/api/workflow-compiler`, so a branch preview is never redirected to the global
+ * `WORKFLOW_COMPILER_URL` host. Production and local development keep the configured URL.
+ */
+export function resolveWorkflowCompilerBase(env: Record<string, string | undefined>): string | undefined {
+  const vercelUrl = env.VERCEL_URL?.trim();
+  if (env.VERCEL_ENV === "preview" && vercelUrl) {
+    const host = vercelUrl.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    if (host) return `https://${host}/api/workflow-compiler`;
+  }
+  return env.WORKFLOW_COMPILER_URL?.trim() || undefined;
+}
 export async function workflowCompiler<T = WorkflowRow>(path: string, body?: unknown): Promise<T> {
-  const url = process.env.WORKFLOW_COMPILER_URL;
+  const url = resolveWorkflowCompilerBase(process.env);
   const token = process.env.WORKFLOW_INTERNAL_TOKEN;
   if (!url || !token) throw new ApiError(503, "WORKFLOW_SERVICE_UNAVAILABLE", "Workflow execution service is not configured");
   let response: Response;

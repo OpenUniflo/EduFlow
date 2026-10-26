@@ -24,7 +24,7 @@
 | `WORKFLOW_SANDBOX_BACKEND` | 是 | `vercel` |
 | `WORKFLOW_SANDBOX_IMAGE` | 是 | 形如 `registry/image@sha256:<64 hex>`，沿用旧项目已验证的沙箱镜像摘要（旧项目 Daemon 镜像摘要可从 Vercel Daemons API 读取，但沙箱镜像不同，需从旧项目环境变量面板复制） |
 | `WORKFLOW_INTERNAL_TOKEN` | 已存在 | 保持现值（API 与 Worker 同项目共享，无需从旧项目复制） |
-| `WORKFLOW_COMPILER_URL` | 已存在 | 改为 `https://edu-flow-six-phi.vercel.app/api/workflow-compiler`（Production 与 Preview 均指向生产，Worker 只在生产运行） |
+| `WORKFLOW_COMPILER_URL` | 已存在 | 仅 Production 需改为 `https://edu-flow-six-phi.vercel.app/api/workflow-compiler`；Preview 自动使用本次部署的 `/api/workflow-compiler`，无需配置（Preview 与 Production 共用 Hosted 数据库） |
 | `LLM_PROVIDER_KEY` | 可选 | 旧项目用于平台提供方；公共环境不含 providers，如 Worker 启动不读取可省略 |
 
 `WORKFLOW_ALLOW_LOCAL_FIXTURES` 不得设置为 `1`；`assert_hosted_configuration()` 会 fail closed。

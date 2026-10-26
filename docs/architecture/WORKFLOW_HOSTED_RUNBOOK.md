@@ -13,7 +13,7 @@
 
 ## 环境和秘密
 
-`edu-flow` 必须配置 `WORKFLOW_DEPLOYMENT_MODE=hosted`、`WORKFLOW_DATABASE_URL`、`WORKFLOW_INTERNAL_TOKEN`、`WORKFLOW_ENVIRONMENTS_JSON`、`WORKFLOW_SANDBOX_BACKEND=vercel`、固定 `WORKFLOW_SANDBOX_IMAGE`，以及可信目录引用的提供方/工具秘密；同一项目的服务端配置同一内部令牌及 `WORKFLOW_COMPILER_URL=https://<edu-flow 生产域名>/api/workflow-compiler`（Production 与 Preview 均指向生产，因为 Worker 只在生产运行）。内部令牌至少32字符，禁止放入 VITE 变量。
+`edu-flow` 必须配置 `WORKFLOW_DEPLOYMENT_MODE=hosted`、`WORKFLOW_DATABASE_URL`、`WORKFLOW_INTERNAL_TOKEN`、`WORKFLOW_ENVIRONMENTS_JSON`、`WORKFLOW_SANDBOX_BACKEND=vercel`、固定 `WORKFLOW_SANDBOX_IMAGE`，以及可信目录引用的提供方/工具秘密；同一项目的服务端配置同一内部令牌。Production 仍需配置 `WORKFLOW_COMPILER_URL=https://<edu-flow 生产域名>/api/workflow-compiler`；Preview 自动使用本次部署的 `https://$VERCEL_URL/api/workflow-compiler`，不需要配置 `WORKFLOW_COMPILER_URL`。Preview 与 Production 共用 Hosted 数据库。内部令牌至少32字符，禁止放入 VITE 变量。
 
 平台运行环境（R12/R13）：每个部署只配置一个 `access: "authenticated"` 的公共环境，不写 `ownerIds`，且不得包含 `providers`/`connectors`/`tools`/`variables`/`functions`；所有登录用户通过资源中心建立自己的连接。公共环境只改内容、不改 `ref`（用户连接与函数按“用户 + 运行环境标识”存放，改标识会失联），平台 DeepSeek / DeepWiki 不再提供；界面上不出现运行环境选择。
 

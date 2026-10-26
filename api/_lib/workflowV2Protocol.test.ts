@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { workflowCompiler, workflowCompilerUrl, workflowRedact, workflowStrictBody, validateWorkflowEditor } from "./workflowV2Protocol.js";
+import { resolveWorkflowCompilerBase, workflowCompiler, workflowCompilerUrl, workflowRedact, workflowStrictBody, validateWorkflowEditor } from "./workflowV2Protocol.js";
 
 describe("Workflow V2 authenticated boundary", () => {
   it("rejects authority supplied in public Run requests", () => {
@@ -105,7 +105,54 @@ describe("Compiler URL composition across deployment topologies", () => {
   });
 });
 
+describe("Deployment-scoped compiler resolution", () => {
+  it("uses the preview's own deployment even when a global compiler URL exists", () => {
+    expect(resolveWorkflowCompilerBase({
+      VERCEL_ENV: "preview",
+      VERCEL_URL: "edu-flow-pr-42.vercel.app",
+      WORKFLOW_COMPILER_URL: "https://edu-flow.example.com/api/workflow-compiler",
+    })).toBe("https://edu-flow-pr-42.vercel.app/api/workflow-compiler");
+  });
+
+  it("uses the configured compiler URL in production", () => {
+    expect(resolveWorkflowCompilerBase({
+      VERCEL_ENV: "production",
+      VERCEL_URL: "edu-flow.example.com",
+      WORKFLOW_COMPILER_URL: "https://edu-flow.example.com/api/workflow-compiler",
+    })).toBe("https://edu-flow.example.com/api/workflow-compiler");
+  });
+
+  it("uses the configured compiler URL locally", () => {
+    expect(resolveWorkflowCompilerBase({
+      WORKFLOW_COMPILER_URL: "http://127.0.0.1:18110",
+    })).toBe("http://127.0.0.1:18110");
+  });
+
+  it("falls back to the configured compiler URL when a preview has no deployment host", () => {
+    expect(resolveWorkflowCompilerBase({
+      VERCEL_ENV: "preview",
+      VERCEL_URL: "",
+      WORKFLOW_COMPILER_URL: "https://edu-flow.example.com/api/workflow-compiler",
+    })).toBe("https://edu-flow.example.com/api/workflow-compiler");
+  });
+
+  it("returns no base URL when neither source is configured", () => {
+    expect(resolveWorkflowCompilerBase({})).toBeUndefined();
+  });
+});
+
 describe("Service-authenticated compiler requests", () => {
+  it("routes a preview request to its own deployment despite a global compiler URL", async () => {
+    const fetchMock = vi.fn(async (_url: URL, _init: RequestInit) => ({ ok: true, status: 200, json: async () => ({ valid: true }) }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_URL", "edu-flow-pr-42.vercel.app");
+    vi.stubEnv("WORKFLOW_COMPILER_URL", "https://edu-flow.example.com/api/workflow-compiler");
+    vi.stubEnv("WORKFLOW_INTERNAL_TOKEN", "internal-token");
+    await workflowCompiler("/v1/document", { definition: {} });
+    expect(fetchMock.mock.calls[0][0].toString()).toBe("https://edu-flow-pr-42.vercel.app/api/workflow-compiler/v1/document");
+  });
+
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
   it("addresses the prefixed Hosted compiler with the service token", async () => {
