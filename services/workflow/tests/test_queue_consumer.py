@@ -37,7 +37,10 @@ async def test_asgi_app_rejects_non_post_callbacks_without_touching_the_queue():
     assert sent[1]["type"] == "http.response.body"
 
 
-def test_subscriber_is_registered_for_the_workflow_runs_topic():
+def test_subscriber_is_registered_for_the_workflow_runs_topic_and_consumer_group():
     from vercel.queue import get_subscriptions
 
-    assert any(subscription.topic == queue_consumer.TOPIC for subscription in get_subscriptions())
+    assert any(
+        subscription.topic == queue_consumer.TOPIC and subscription.consumer_group == queue_consumer.CONSUMER_GROUP
+        for subscription in get_subscriptions()
+    )

@@ -25,8 +25,9 @@
       "includeFiles": "services/workflow/src/**",
       "experimentalTriggers": [
         {
-          "type": "queue/v2beta",
+          "type": "queue/v1beta",
           "topic": "workflow-runs",
+          "consumer": "workflow-runs",
           "retryAfterSeconds": 60,
           "maxDeliveries": 5
         }
