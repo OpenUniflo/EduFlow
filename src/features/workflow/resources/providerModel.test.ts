@@ -6,7 +6,7 @@ import {
   latestVisibleProviders, mergeModelSelection, modelRowsFor, modelSelectionDirty, modelSourceLabel, modelUsageCount,
   nextProviderVersion, probeConnectionContent, probeConnectionRef, providerDraftIssue, providerPublishRequest,
   providerTestIssue, providerTestStatusLabel, providerUsageCount, providerVersions, stagedModelChanges,
-  stagedProviderSummary, toggleDraftModel,
+  stagedProviderSummary, toggleDraftModel, firstUserModelProvider, userModelProviders,
 } from "./providerModel";
 
 const connection = (ref: string, version: number, content: Record<string, JsonValue>, extra: Partial<CatalogConnection> = {}): CatalogConnection => ({
@@ -158,7 +158,7 @@ describe("dialog validation", () => {
     expect(providerDraftIssue({ ...base, name: "" })).toContain("名称");
     expect(providerDraftIssue({ ...base, ref: "1bad" })).toContain("字母开头");
     expect(providerDraftIssue({ ...base, ref: "taken", existingRefs: ["taken"] })).toContain("已存在");
-    expect(providerDraftIssue({ ...base, baseUrl: "" })).toContain("Base URL");
+    expect(providerDraftIssue({ ...base, baseUrl: "" })).toContain("API 地址");
     expect(providerDraftIssue({ ...base, baseUrl: "ftp://models.example/v1" })).toContain("https");
     expect(providerDraftIssue({ ...base, models: ["bad model"] })).toContain("只能包含");
   });
@@ -186,5 +186,15 @@ describe("dialog helpers", () => {
     const ref = probeConnectionRef();
     expect(isProbeConnection(ref)).toBe(true);
     expect(/^[A-Za-z][A-Za-z0-9_.-]{0,79}$/.test(ref)).toBe(true);
+  });
+});
+
+describe("user model provider selection", () => {
+  const provider = (ref: string, origin: "environment" | "user", modelRefs = ["deepseek-flash"]) => ({ ref, name: ref, origin, modelRefs });
+  it("never auto-binds environment models and skips fake endpoints", () => {
+    const providers = [provider("deepseek", "environment"), provider("fake_openai", "user"), provider("local-env-deepseek", "user")];
+    expect(userModelProviders(providers).map(item => item.ref)).toEqual(["local-env-deepseek"]);
+    expect(firstUserModelProvider(providers)?.ref).toBe("local-env-deepseek");
+    expect(firstUserModelProvider([provider("deepseek", "environment")])).toBeUndefined();
   });
 });

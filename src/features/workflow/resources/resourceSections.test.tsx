@@ -94,7 +94,7 @@ describe("ProviderResource", () => {
   it("opens the add-model dialog for a create intent", () => {
     const html = renderToStaticMarkup(createElement(ProviderResource, { environmentRef: "local", create: true }));
     expect(html).toContain("添加模型");
-    expect(html).toContain("选择预设");
-    expect(html).toContain("将创建供应商「未命名供应商」v1，启用 0 个模型");
+    expect(html).toContain("选择供应商");
+    expect(html).toContain("保存后会出现在节点的模型下拉里");
   });
 });

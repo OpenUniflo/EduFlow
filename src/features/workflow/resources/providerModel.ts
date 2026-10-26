@@ -34,8 +34,27 @@ export function isLocalProvider(entry: { content: Record<string, JsonValue> }): 
   return isLocalBaseUrl(providerAddress(entry));
 }
 
+/** Local acceptance fixtures used a loopback fake provider; keep it out of every user-facing list. */
+export function isFakeEndpointConnection(entry: { ref: string; content: Record<string, JsonValue> }): boolean {
+  return /fake[_-]?openai|(?:127\.0\.0\.1|localhost):56121/i.test(`${entry.ref} ${providerDisplayName(entry)} ${providerAddress(entry)}`);
+}
+
+export function isFakeEndpointRef(ref: string): boolean {
+  return /fake[_-]?openai|(?:127\.0\.0\.1|localhost):56121/i.test(ref);
+}
+
+
+/** Product direction: templates bind only enabled user model connections; environment models are not offered. */
+export function userModelProviders(providers: readonly PlatformProvider[]): PlatformProvider[] {
+  return providers.filter(provider => provider.origin === "user" && provider.modelRefs.length > 0 && !isFakeEndpointRef(provider.ref));
+}
+
+export function firstUserModelProvider(providers: readonly PlatformProvider[]): PlatformProvider | undefined {
+  return userModelProviders(providers)[0];
+}
+
 export function visibleProviderConnections(connections: readonly CatalogConnection[]): CatalogConnection[] {
-  return connections.filter(entry => isProviderConnection(entry) && !isProbeConnection(entry.ref));
+  return connections.filter(entry => isProviderConnection(entry) && !isProbeConnection(entry.ref) && !isFakeEndpointConnection(entry));
 }
 
 /** One card per provider (its newest version), sorted by reference. */
@@ -64,8 +83,13 @@ export function nextProviderVersion(entry: { version: number }): number {
   return entry.version + 1;
 }
 
-export function providerPublishContent(entry: ProviderConnection, models: readonly string[]): Record<string, JsonValue> {
-  return { ...entry.content, modelRefs: [...models] };
+/** A new version keeps unrelated fields but must apply the edited address/name/type, not the old content. */
+export function providerPublishContent(
+  entry: ProviderConnection,
+  models: readonly string[],
+  patch: { name?: string; baseUrl?: string; type?: string } = {},
+): Record<string, JsonValue> {
+  return { ...entry.content, ...patch, modelRefs: [...models] };
 }
 
 export function providerPublishRequest(entry: ProviderConnection, models: readonly string[], credential: string) {
@@ -170,19 +194,19 @@ export function addModelSummary(input: { mode: "create" | "existing"; name: stri
 export function providerBaseUrlIssue(type: string, baseUrl: string, localEnvironment: boolean): string {
   if (type === "deepseek") return "";
   const value = baseUrl.trim();
-  if (!value) return "请填写 Base URL。";
+  if (!value) return "请填写 API 地址。";
   let parsed: URL;
   try {
     parsed = new URL(value);
   } catch {
-    return "Base URL 格式有误，请填写完整地址。";
+    return "API 地址格式有误，请填写完整地址。";
   }
   if (parsed.username || parsed.password || parsed.search || parsed.hash) return "Base URL 不能包含账号、密码、查询参数或片段。";
   if (parsed.protocol === "https:") return "";
   if (parsed.protocol === "http:" && isLocalBaseUrl(value)) {
     return localEnvironment ? "" : "明文 HTTP 地址仅本地开发可用。";
   }
-  return "Base URL 必须使用 https；仅本地开发允许 http://localhost 或 http://127.0.0.1。";
+  return "API 地址必须使用 https；仅本地开发允许 http://localhost 或 http://127.0.0.1。";
 }
 
 export type ProviderDraftInput = {

@@ -5,21 +5,21 @@ import {
 } from "./providerPresets";
 
 describe("provider presets", () => {
-  it("documents the supported OpenAI-compatible endpoints", () => {
+  it("documents the supported supplier endpoints", () => {
     const byId = Object.fromEntries(PROVIDER_PRESETS.map(preset => [preset.id, preset]));
     expect(byId.deepseek).toMatchObject({ type: "deepseek", baseUrl: "https://api.deepseek.com" });
     expect(byId.openai.baseUrl).toBe("https://api.openai.com/v1");
     expect(byId.dashscope.baseUrl).toBe("https://dashscope.aliyuncs.com/compatible-mode/v1");
     expect(byId.kimi.baseUrl).toBe("https://api.moonshot.cn/v1");
-    expect(byId.ollama.baseUrl).toBe("http://localhost:11434/v1");
+    expect(byId.zhipu.baseUrl).toBe("https://open.bigmodel.cn/api/paas/v4");
     expect(byId["custom-openai"].baseUrl).toBe("");
     for (const preset of PROVIDER_PRESETS) expect(preset).toHaveProperty("hint");
   });
 
-  it("shows the local Ollama preset only in local development", () => {
-    expect(visibleProviderPresets(true).map(preset => preset.id)).toContain("ollama");
+  it("shows every preset in every environment", () => {
+    expect(visibleProviderPresets(true).map(preset => preset.id)).toEqual(PROVIDER_PRESETS.map(preset => preset.id));
+    expect(visibleProviderPresets(false).map(preset => preset.id)).toEqual(PROVIDER_PRESETS.map(preset => preset.id));
     expect(visibleProviderPresets(false).map(preset => preset.id)).not.toContain("ollama");
-    expect(visibleProviderPresets(false)).toHaveLength(PROVIDER_PRESETS.length - 1);
   });
 
   it("finds a preset by id", () => {

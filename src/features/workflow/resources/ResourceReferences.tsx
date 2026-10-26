@@ -22,11 +22,11 @@ export function ResourceReferences({
       const detail = row.modelRef ? `模型 ${row.modelRef}` : row.variableKey ? `变量 ${row.variableKey}` : typeof row.version === "number" ? `版本 v${row.version}` : "";
       return <li key={`${row.workflowId}:${row.nodeId}:${row.graphPath.join("/")}:${row.modelRef ?? ""}:${row.variableKey ?? ""}:${index}`}>
         <div className="wf-resource-reference-main">
-          <strong>{row.workflowName || row.workflowId}</strong>
+          <strong>{row.workflowName || "未命名工作流"}</strong>
           <small>修订 v{row.revision}{detail ? ` · ${detail}` : ""}</small>
         </div>
         <div className="wf-resource-reference-node">
-          <span>{row.nodeLabel || row.nodeId}</span>
+          <span>{row.nodeLabel || "未命名节点"}</span>
           {row.graphPath.length ? <small>子图：{row.graphPath.join(" / ")}</small> : null}
         </div>
         {onOpen ? <button type="button" onClick={() => onOpen(row)}>定位节点</button> : null}

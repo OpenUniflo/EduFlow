@@ -34,8 +34,6 @@ vi.mock("../application/v2/useWorkflowV2Controller", () => ({ workflowApiV2: api
 vi.mock("../editor/v2/FunctionExecutionFields", () => ({ useExtensions: () => catalog }));
 
 import { ResourceCenterDialog } from "./ResourceCenterDialog";
-import { ApiResource } from "./ApiResource";
-import { McpResource } from "./McpResource";
 import { VariableTable } from "./VariableTable";
 
 type Element = { type: unknown; props: Record<string, any> };
@@ -77,17 +75,16 @@ beforeEach(() => {
 
 describe("ResourceCenterDialog interactions", () => {
   it("switches category content through the left navigation", () => {
-    expect(hasType(render(base), ApiResource)).toBe(false);
     const providers = render(base);
+    expect(find(providers, element => element.props.className === "wf-resource-center-list")).toBeTruthy();
     const apis = find(providers, element => element.props["data-resource-section"] === "apis")!;
     (apis.props.onClick as () => void)();
     const afterApis = render(base);
-    expect(hasType(afterApis, ApiResource)).toBe(true);
+    expect(find(afterApis, element => element.props["data-resource-section"] === "apis")!.props["aria-pressed"]).toBe(true);
     const variables = find(afterApis, element => element.props["data-resource-section"] === "variables")!;
     (variables.props.onClick as () => void)();
     const afterVariables = render(base);
     expect(hasType(afterVariables, VariableTable)).toBe(true);
-    expect(hasType(afterVariables, ApiResource)).toBe(false);
   });
 
   it("closes through the close button and the Escape key", () => {
@@ -104,8 +101,8 @@ describe("ResourceCenterDialog interactions", () => {
   it("opens the intent section and keeps the create form visible", () => {
     const onCreated = vi.fn();
     const tree = render({ ...base, initialSection: undefined, intent: { kind: "create", section: "mcp", onCreated } });
-    expect(hasType(tree, McpResource)).toBe(true);
     expect(find(tree, element => element.props.className === "wf-resource-intent")).toBeTruthy();
+    expect(find(tree, element => element.props.className === "wf-resource-center-list")).toBeTruthy();
   });
 
   it("shows the variable count after the workspace configuration loads", async () => {

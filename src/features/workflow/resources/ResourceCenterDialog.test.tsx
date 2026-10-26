@@ -41,6 +41,8 @@ describe("ResourceCenterDialog", () => {
     expect(html).toContain('data-resource-section="apis" data-resource-count="1"');
     expect(html).toContain('data-resource-section="mcp" data-resource-count="1"');
     expect(html).toContain('data-resource-section="functions" data-resource-count="2"');
+    expect(html).toContain("我的 DeepSeek");
+    expect(html).not.toContain("还没有模型供应商");
   });
 
   it("never mentions the platform runtime environment", () => {
@@ -60,8 +62,7 @@ describe("ResourceCenterDialog", () => {
       intent: { kind: "create", section: "providers", onCreated: (_ref: string, _version: number, _content?: Record<string, JsonValue>) => undefined },
     }));
     expect(intent).toContain("正在为节点新建资源");
-    expect(intent).toContain("添加模型");
-    expect(intent).toContain("选择预设");
+    expect(intent).toContain("新建模型供应商");
 
     const variableIntent = renderToStaticMarkup(createElement(ResourceCenterDialog, {
       ...props,

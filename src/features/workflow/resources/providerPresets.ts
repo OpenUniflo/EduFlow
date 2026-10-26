@@ -7,24 +7,23 @@ export type ProviderPreset = {
   type: ProviderPresetType;
   baseUrl: string;
   hint: string;
+  docsUrl: string;
 };
 
 export const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 
 export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
-  { id: "deepseek", label: "DeepSeek", type: "deepseek", baseUrl: DEEPSEEK_BASE_URL, hint: "官方地址，固定使用 DeepSeek 服务；需要 API Key。" },
-  { id: "openai", label: "OpenAI", type: "openai-compatible", baseUrl: "https://api.openai.com/v1", hint: "OpenAI 官方兼容端点，保留 /v1 路径。" },
-  { id: "dashscope", label: "通义千问", type: "openai-compatible", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", hint: "阿里云百炼的 OpenAI 兼容模式地址。" },
-  { id: "kimi", label: "Kimi", type: "openai-compatible", baseUrl: "https://api.moonshot.cn/v1", hint: "Moonshot Kimi 的 OpenAI 兼容端点。" },
-  { id: "ollama", label: "本地 Ollama", type: "openai-compatible", baseUrl: "http://localhost:11434/v1", hint: "仅本地开发可用，无需 API Key；本地没有 Ollama 时只验证预设显示。" },
-  { id: "custom-openai", label: "自定义 OpenAI 兼容", type: "openai-compatible", baseUrl: "", hint: "填写任意兼容 OpenAI /v1 的服务地址。" },
+  { id: "deepseek", label: "DeepSeek", type: "deepseek", baseUrl: DEEPSEEK_BASE_URL, hint: "官方地址，需要 DeepSeek API Key。", docsUrl: "https://platform.deepseek.com/api_keys" },
+  { id: "openai", label: "OpenAI", type: "openai-compatible", baseUrl: "https://api.openai.com/v1", hint: "OpenAI 官方兼容端点，保留 /v1 路径。", docsUrl: "https://platform.openai.com/api-keys" },
+  { id: "dashscope", label: "通义千问", type: "openai-compatible", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", hint: "阿里云百炼的 OpenAI 兼容模式地址。", docsUrl: "https://help.aliyun.com/zh/model-studio/get-api-key" },
+  { id: "kimi", label: "Kimi", type: "openai-compatible", baseUrl: "https://api.moonshot.cn/v1", hint: "Moonshot Kimi 的 OpenAI 兼容端点。", docsUrl: "https://platform.moonshot.cn/console/api-keys" },
+  { id: "zhipu", label: "智谱", type: "openai-compatible", baseUrl: "https://open.bigmodel.cn/api/paas/v4", hint: "智谱开放平台的 OpenAI 兼容地址。", docsUrl: "https://bigmodel.cn/usercenter/apikeys" },
+  { id: "custom-openai", label: "OpenAI 兼容自定义", type: "openai-compatible", baseUrl: "", hint: "填写任意兼容 OpenAI /v1 的服务地址。", docsUrl: "" },
 ];
 
-/** Presets that are only meaningful in local development. */
-export const LOCAL_ONLY_PRESET_IDS: readonly string[] = ["ollama"];
-
-export function visibleProviderPresets(localEnvironment: boolean): ProviderPreset[] {
-  return PROVIDER_PRESETS.filter(preset => localEnvironment || !LOCAL_ONLY_PRESET_IDS.includes(preset.id));
+/** Every preset is usable in every environment; the parameter is kept for API compatibility. */
+export function visibleProviderPresets(_localEnvironment = true): ProviderPreset[] {
+  return [...PROVIDER_PRESETS];
 }
 
 export function findProviderPreset(id: string): ProviderPreset | undefined {

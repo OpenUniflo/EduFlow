@@ -4,10 +4,10 @@ import { workflowErrorMessage } from "../repository/v2/WorkflowApiV2";
 import type { ResourceReferenceRow } from "../domain/v2/types";
 import {
   canSaveModelDraft, credentialRequiredForConnection, draftModelsFor, filterProviderCards, isLocalProvider,
-  latestVisibleProviders, modelRowsFor, modelSelectionDirty, modelSourceLabel, modelUsageCount, nextProviderVersion,
-  platformProviderName, providerAddress, providerDisplayName, providerModelRefs, providerPublishRequest,
-  providerTestStatusLabel, providerTypeLabel, providerUsageCount, stagedProviderSummary, testModelsOf,
-  type PlatformProvider, type ProviderTestState,
+  latestVisibleProviders, modelRowsFor, modelSelectionDirty, modelSourceLabel, modelUsageCount,
+  providerAddress, providerDisplayName, providerModelRefs, providerPublishRequest,
+  providerTestStatusLabel, providerTypeLabel, providerUsageCount, testModelsOf,
+  type ProviderTestState,
 } from "./providerModel";
 import { credentialLabel, type CatalogConnection } from "./resourceModel";
 import { ResourceReferences } from "./ResourceReferences";
@@ -16,10 +16,8 @@ import { ResourceTestPanel } from "./ResourceTestPanel";
 export type ProviderOverviewProps = {
   environmentRef: string;
   connections: readonly CatalogConnection[];
-  platformProviders: readonly PlatformProvider[];
   loading?: boolean;
   error?: string;
-  platformError?: string;
   onReload?: () => void;
   onRequestAdd: () => void;
   onRequestEdit: (ref: string) => void;
@@ -37,7 +35,7 @@ function providerInitial(name: string): string {
 
 /** Model supplier overview: cards, enabled-model staging, test results and references. */
 export function ProviderOverview({
-  environmentRef, connections, platformProviders, loading = false, error = "", platformError = "",
+  environmentRef, connections, loading = false, error = "",
   onReload, onRequestAdd, onRequestEdit, onResourcesChanged, onOpenReference,
 }: ProviderOverviewProps) {
   const providers = latestVisibleProviders(connections);
@@ -64,7 +62,7 @@ export function ProviderOverview({
     return () => { active = false; };
   }, [environmentRef, providerRefsKey]);
 
-  const filtered = filterProviderCards(providers, platformProviders, search);
+  const filtered = filterProviderCards(providers, [], search);
 
   function toggleModel(entry: CatalogConnection, model: string, enabled: boolean) {
     const current = providerModelRefs(entry);
@@ -91,7 +89,7 @@ export function ProviderOverview({
     setBusyRef(entry.ref); setFeedback(null);
     try {
       await workflowApiV2.extension(environmentRef, providerPublishRequest(entry, draft, credentials[entry.ref] ?? ""));
-      setFeedback({ ok: true, text: `已发布「${providerDisplayName(entry)}」v${nextProviderVersion(entry)}，启用 ${draft.length} 个模型；正在使用 v${entry.version} 的节点保持不变。` });
+      setFeedback({ ok: true, text: `已保存「${providerDisplayName(entry)}」的 ${draft.length} 个模型。` });
       discardDraft(entry);
       onResourcesChanged?.();
     } catch (reason) {
@@ -113,7 +111,7 @@ export function ProviderOverview({
     setBusyRef(entry.ref); setFeedback(null);
     try {
       await workflowApiV2.extension(environmentRef, { action: "disable", kind: "connection", ref: entry.ref, version: entry.version });
-      setFeedback({ ok: true, text: `已停用「${providerDisplayName(entry)}」v${entry.version}；引用该版本的节点会提示不可用。` });
+      setFeedback({ ok: true, text: `已停用「${providerDisplayName(entry)}」；引用它的节点会提示不可用。` });
       onResourcesChanged?.();
     } catch (reason) {
       setFeedback({ ok: false, text: workflowErrorMessage(reason) });
@@ -126,7 +124,7 @@ export function ProviderOverview({
 
   return <section className="wf-resource-section" aria-label="模型供应商总览">
     <div className="wf-resource-overview-toolbar">
-      <p className="wf-field-note">一个供应商一份凭据，可启用多个模型；模型变更会发布新版本，不会自动替换正在使用旧版本的节点。</p>
+      <p className="wf-field-note">一个供应商保存一份地址和凭据，可以启用多个模型。</p>
       <div className="wf-resource-overview-actions">
         <label>搜索供应商或模型<input aria-label="搜索模型供应商" value={search} onChange={event => setSearch(event.target.value)} placeholder="名称、类型或模型名" /></label>
         <button type="button" className="primary" data-provider-action="add" onClick={onRequestAdd}>+ 添加模型</button>
@@ -145,7 +143,6 @@ export function ProviderOverview({
       const dirty = modelSelectionDirty(current, draft);
       const credentialRequired = credentialRequiredForConnection(entry) || entry.hasCredential;
       const credential = credentials[entry.ref] ?? "";
-      const nextVersion = nextProviderVersion(entry);
       const canSave = canSaveModelDraft(draft) && !busyRef && (!credentialRequired || Boolean(credential.trim()));
       const usage = referenceState?.loading ? "正在读取引用…" : referenceState?.error ? "引用暂时无法读取" : `被 ${providerUsageCount(referenceState?.rows ?? [])} 个工作流使用`;
       return <article className="wf-resource-provider-card" data-provider-ref={entry.ref} key={`${entry.ref}@${entry.version}`}>
@@ -153,7 +150,7 @@ export function ProviderOverview({
           <span className="wf-resource-provider-icon" aria-hidden="true">{providerInitial(providerDisplayName(entry))}</span>
           <div className="wf-resource-provider-identity">
             <strong>{providerDisplayName(entry)}</strong>
-            <small>{providerTypeLabel(entry)} · v{entry.version} · {providerAddress(entry)}</small>
+            <small>{providerTypeLabel(entry)} · {providerAddress(entry)}</small>
           </div>
           <div className="wf-resource-provider-badges">
             {isLocalProvider(entry) ? <span className="wf-resource-badge is-local">仅本地开发可用</span> : null}
@@ -166,8 +163,7 @@ export function ProviderOverview({
               <summary aria-label={`更多操作 ${providerDisplayName(entry)}`}>⋯</summary>
               <div className="wf-resource-menu-panel">
                 <button type="button" data-provider-action="disable" disabled={Boolean(busyRef) || entry.disabled} onClick={() => void disableConnection(entry)}>停用</button>
-                <button type="button" data-provider-action="versions" aria-expanded={expanded[entry.ref] === "versions"} onClick={() => toggleExpanded(entry.ref, "versions")}>版本历史</button>
-                <button type="button" data-provider-action="references" aria-expanded={expanded[entry.ref] === "references"} onClick={() => toggleExpanded(entry.ref, "references")}>引用</button>
+                    <button type="button" data-provider-action="references" aria-expanded={expanded[entry.ref] === "references"} onClick={() => toggleExpanded(entry.ref, "references")}>引用</button>
               </div>
             </details>
           </div>
@@ -185,43 +181,19 @@ export function ProviderOverview({
         {!rows.length ? <p className="wf-resource-empty">还没有启用的模型。点击「编辑」添加模型。</p> : null}
         {test ? <ResourceTestPanel result={test.result} /> : null}
         {expanded[entry.ref] === "references" ? <div className="wf-resource-inline-references"><h4>引用位置</h4><ResourceReferences rows={referenceState?.rows ?? []} loading={referenceState?.loading} error={referenceState?.error} onOpen={onOpenReference} emptyText="暂无工作流引用此供应商。" /></div> : null}
-        {expanded[entry.ref] === "versions" ? <div className="wf-resource-inline-versions"><h4>版本历史</h4><ul>
-          {[...providerVersionList(connections, entry.ref)].reverse().map(version => <li key={version.version}>
-            <strong>v{version.version}</strong>
-            <small>{providerModelRefs(version).join(" · ") || "无模型"}{version.disabled ? " · 已停用" : version.version === entry.version ? " · 当前" : ""}</small>
-          </li>)}
-        </ul></div> : null}
         {dirty ? <div className="wf-resource-stage-bar" data-provider-confirm={entry.ref}>
-          <p>{stagedProviderSummary(entry)}</p>
-          {credentialRequired ? <label>API Key<input aria-label={`发布新版本 API Key ${entry.ref}`} type="password" autoComplete="new-password" value={credential} onChange={event => setCredentials(current => ({ ...current, [entry.ref]: event.target.value }))} /></label> : null}
+          <p>保存后，模型会出现在节点里；已经保存的工作流保持原样。</p>
+          {credentialRequired ? <label>API Key<input aria-label={`保存模型 API Key ${entry.ref}`} type="password" autoComplete="new-password" value={credential} onChange={event => setCredentials(current => ({ ...current, [entry.ref]: event.target.value }))} /></label> : null}
           {!canSaveModelDraft(draft) ? <p role="alert">至少保留一个模型才能保存。</p> : null}
           {credentialRequired && !credential.trim() ? <small>重新输入 API Key 才能发布新版本（只写不读）。</small> : null}
           <div className="wf-resource-actions">
             <button type="button" data-provider-action="discard" onClick={() => discardDraft(entry)}>放弃</button>
-            <button type="button" className="primary" data-provider-action="save" disabled={!canSave} title={!canSave ? "至少保留一个模型并填写 API Key。" : undefined} onClick={() => void publishDraft(entry)}>{`保存为 v${nextVersion}`}</button>
+            <button type="button" className="primary" data-provider-action="save" disabled={!canSave} title={!canSave ? "至少保留一个模型并填写 API Key。" : undefined} onClick={() => void publishDraft(entry)}>保存模型</button>
           </div>
         </div> : null}
       </article>;
     })}
 
-    {filtered.platformProviders.length ? <section className="wf-resource-platform-section" aria-label="平台提供的供应商">
-      <h3>平台提供的供应商</h3>
-      {filtered.platformProviders.map(provider => <article className="wf-resource-provider-card is-platform" data-platform-provider={provider.ref} key={provider.ref}>
-        <header className="wf-resource-provider-head">
-          <span className="wf-resource-provider-icon" aria-hidden="true">{providerInitial(platformProviderName(provider))}</span>
-          <div className="wf-resource-provider-identity"><strong>{platformProviderName(provider)}</strong><small>平台提供的模型</small></div>
-          <div className="wf-resource-provider-badges"><span className="wf-resource-badge is-platform">由平台管理凭据</span></div>
-        </header>
-        <p className="wf-resource-models">{provider.modelRefs.length ? provider.modelRefs.join(" · ") : "平台未启用模型"}</p>
-        <small>模型与凭据由平台管理；不可编辑、测试、停用或引用。</small>
-      </article>)}
-    </section> : null}
-    {platformError ? <p className="wf-field-note">平台供应商信息暂时无法读取：{platformError}</p> : null}
-
-    {!filtered.providers.length && !filtered.platformProviders.length && !loading ? <p className="wf-resource-empty">{search.trim() ? "没有匹配的供应商或模型。" : "还没有模型供应商。点击「+ 添加模型」创建，或检查是否已停用。"}</p> : null}
+    {!filtered.providers.length && !loading ? <p className="wf-resource-empty">{search.trim() ? "没有匹配的供应商或模型。" : "还没有模型供应商。点击「+ 添加模型」创建，或检查是否已停用。"}</p> : null}
   </section>;
-}
-
-function providerVersionList(connections: readonly CatalogConnection[], ref: string): CatalogConnection[] {
-  return connections.filter(entry => entry.ref === ref).sort((left, right) => left.version - right.version);
 }

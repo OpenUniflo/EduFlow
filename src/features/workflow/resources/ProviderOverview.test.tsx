@@ -17,12 +17,9 @@ const connections = [
   connection("probe__hidden", 1, { type: "openai-compatible", name: "连接测试", baseUrl: "http://127.0.0.1:18080/v1", modelRefs: ["probe"] }),
 ];
 
-const platformProviders = [{ ref: "platform_deepseek", name: "DeepSeek", modelRefs: ["deepseek-flash"] }];
-
 const props = (overrides: Partial<ProviderOverviewProps> = {}): ProviderOverviewProps => ({
   environmentRef: "local",
   connections,
-  platformProviders,
   onRequestAdd: vi.fn(),
   onRequestEdit: vi.fn(),
   onOpenReference: vi.fn(),
@@ -31,24 +28,22 @@ const props = (overrides: Partial<ProviderOverviewProps> = {}): ProviderOverview
 });
 
 describe("ProviderOverview", () => {
-  it("renders one card per provider with models, local badge and read-only platform cards", () => {
+  it("renders one card per provider with models and the local badge", () => {
     const html = renderToStaticMarkup(createElement(ProviderOverview, props()));
     expect(html).toContain("模型供应商总览");
     expect(html).toContain("+ 添加模型");
     expect(html).toContain('aria-label="搜索模型供应商"');
     expect(html).toContain("本地网关");
     expect(html).toContain("团队网关");
-    expect(html).toContain("OpenAI 兼容 · v2");
+    expect(html).toContain("OpenAI 兼容 · https://models.example/v1");
     expect(html).toContain("fake-openai-reasoner");
     expect(html).toContain("仅本地开发可用");
     expect(html).toContain("已配置加密凭据");
     expect(html).toContain("测试连接");
     expect(html).toContain("编辑");
-    expect(html).toContain("版本历史");
-    expect(html).toContain("平台提供的供应商");
-    expect(html).toContain("由平台管理凭据");
-    expect(html).toContain("deepseek-flash");
-    expect(html).toContain("不可编辑、测试、停用或引用");
+    expect(html).not.toContain("版本历史");
+    expect(html).not.toContain("平台提供的供应商");
+    expect(html).not.toContain("由平台管理凭据");
   });
 
   it("hides probe connections and marks the disabled provider", () => {
@@ -61,12 +56,14 @@ describe("ProviderOverview", () => {
   });
 
   it("keeps the platform runtime environment out of the UI", () => {
-    expect(renderToStaticMarkup(createElement(ProviderOverview, props()))).not.toContain("运行环境");
+    const html = renderToStaticMarkup(createElement(ProviderOverview, props()));
+    expect(html).not.toContain("运行环境");
+    expect(html).not.toContain("平台提供");
   });
 
   it("renders loading, error and empty states", () => {
-    expect(renderToStaticMarkup(createElement(ProviderOverview, props({ connections: [], platformProviders: [], loading: true })))).toContain("正在读取模型供应商");
-    expect(renderToStaticMarkup(createElement(ProviderOverview, props({ connections: [], platformProviders: [], error: "网络错误" })))).toContain("模型供应商暂时无法读取：网络错误");
-    expect(renderToStaticMarkup(createElement(ProviderOverview, props({ connections: [], platformProviders: [] })))).toContain("还没有模型供应商");
+    expect(renderToStaticMarkup(createElement(ProviderOverview, props({ connections: [], loading: true })))).toContain("正在读取模型供应商");
+    expect(renderToStaticMarkup(createElement(ProviderOverview, props({ connections: [], error: "网络错误" })))).toContain("模型供应商暂时无法读取：网络错误");
+    expect(renderToStaticMarkup(createElement(ProviderOverview, props({ connections: [] })))).toContain("还没有模型供应商");
   });
 });

@@ -73,7 +73,7 @@ const remoteProvider = connection("remote_gateway", 2, { type: "openai-compatibl
 
 function baseProps(connections: readonly CatalogConnection[]): ProviderOverviewProps {
   return {
-    environmentRef: "local", connections, platformProviders: [],
+    environmentRef: "local", connections,
     onRequestAdd: vi.fn(), onRequestEdit: vi.fn(), onResourcesChanged: vi.fn(), onOpenReference: vi.fn(),
   };
 }
@@ -106,9 +106,9 @@ describe("ProviderOverview staging and save", () => {
     (modelSwitch(tree, "fake-openai-reasoner")!.props.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: false } });
     tree = render(props);
     const confirm = find(tree, element => "data-provider-confirm" in element.props)!;
-    expect(textOf(confirm)).toContain("将发布 v2");
-    expect(textOf(confirm)).toContain("正在使用 v1 的节点不受影响");
-    expect(textOf(confirm)).toContain("保存为 v2");
+    expect(textOf(confirm)).toContain("保存后，模型会出现在节点里");
+    expect(textOf(confirm)).toContain("已经保存的工作流保持原样");
+    expect(textOf(confirm)).toContain("保存模型");
     const save = find(tree, element => element.props["data-provider-action"] === "save")!;
     expect(save.props.disabled).toBe(false);
     (save.props.onClick as () => void)();
@@ -140,7 +140,7 @@ describe("ProviderOverview staging and save", () => {
     let tree = render(props);
     (modelSwitch(tree, "gateway-b")!.props.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: false } });
     tree = render(props);
-    const credentialInput = find(tree, element => typeof element.props["aria-label"] === "string" && element.props["aria-label"].startsWith("发布新版本 API Key"))!;
+    const credentialInput = find(tree, element => typeof element.props["aria-label"] === "string" && element.props["aria-label"].startsWith("保存模型 API Key"))!;
     expect(find(tree, element => element.props["data-provider-action"] === "save")!.props.disabled).toBe(true);
     expect(textOf(find(tree, element => "data-provider-confirm" in element.props))).toContain("重新输入 API Key");
     (credentialInput.props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "test-key-local" } });
@@ -159,7 +159,7 @@ describe("ProviderOverview staging and save", () => {
     let tree = render(props);
     (modelSwitch(tree, "b-model")!.props.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: false } });
     tree = render(props);
-    expect(find(tree, element => typeof element.props["aria-label"] === "string" && element.props["aria-label"].startsWith("发布新版本 API Key"))).toBeTruthy();
+    expect(find(tree, element => typeof element.props["aria-label"] === "string" && element.props["aria-label"].startsWith("保存模型 API Key"))).toBeTruthy();
     expect(find(tree, element => element.props["data-provider-action"] === "save")!.props.disabled).toBe(true);
   });
 

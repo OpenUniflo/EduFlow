@@ -98,14 +98,14 @@ describe("AddModelDialog new-provider flow", () => {
       (checkbox.props.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
       tree = render(value);
     }
-    expect(textOf(tree)).toContain("将创建供应商「自定义 OpenAI 兼容」v1，启用 2 个模型");
+    expect(textOf(tree)).toContain("保存后会出现在节点的模型下拉里");
     const save = find(tree, element => element.props["data-action"] === "save")!;
     expect(save.props.disabled).toBe(false);
     (save.props.onClick as () => void)();
     await flush();
     expect(api.extension.mock.calls[2][1]).toMatchObject({
       action: "publish", kind: "connection", ref: "custom_openai", version: 1, credential: "",
-      content: { type: "openai-compatible", name: "自定义 OpenAI 兼容", baseUrl: "http://127.0.0.1:18080/v1", modelRefs: ["fake-openai-chat", "fake-openai-reasoner"] },
+      content: { type: "openai-compatible", name: "OpenAI 兼容自定义", baseUrl: "http://127.0.0.1:18080/v1", modelRefs: ["fake-openai-chat", "fake-openai-reasoner"] },
     });
     expect(value.onCreated).toHaveBeenCalledWith("custom_openai", 1, expect.objectContaining({ type: "openai-compatible", modelRefs: ["fake-openai-chat", "fake-openai-reasoner"] }));
     expect(value.onClose).toHaveBeenCalled();

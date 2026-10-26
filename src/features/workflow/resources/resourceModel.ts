@@ -61,12 +61,23 @@ export function isProviderConnection(entry: { content: Record<string, JsonValue>
   return type === "deepseek" || type === "openai-compatible";
 }
 
+/** Test probes and the old loopback fake provider stay out of user-facing counts and lists. */
+export function isFixtureConnectionRef(ref: string): boolean {
+  return ref.startsWith("probe__") || /fake[_-]?openai|(?:127\.0\.0\.1|localhost):56121/i.test(ref);
+}
+
+/** Fixture/test connections stay out of lists, counts and tool pickers. */
+export function isFixtureConnection(entry: { ref: string; content: Record<string, JsonValue> }): boolean {
+  const content = entry.content;
+  return isFixtureConnectionRef(entry.ref) || /fake[_-]?openai|(?:127\.0\.0\.1|localhost):56121/i.test(`${String(content.name ?? "")} ${String(content.baseUrl ?? "")} ${String(content.url ?? "")}`);
+}
+
 /** Newest version of every connection in one resource-center category. */
 export function latestConnectionsOfType(
   connections: readonly CatalogConnection[],
   category: "http" | "mcp-http" | "provider",
 ): CatalogConnection[] {
-  return latestEntries(connections).filter(entry => category === "provider" ? isProviderConnection(entry) : connectionTypeOf(entry) === category);
+  return latestEntries(connections).filter(entry => !isFixtureConnection(entry) && (category === "provider" ? isProviderConnection(entry) : connectionTypeOf(entry) === category));
 }
 
 /**
