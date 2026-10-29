@@ -1,4 +1,6 @@
-# EduFlow 新版设计规格（重建画布用，所有画板共同遵守）
+# EduFlow 新版设计规格（历史记录）
+
+> **状态：历史记录，不再更新。** 本文是早期重建画布时的规格，其中「AI 自动审核 / 审核方式 / 学习地图 / 翻牌 / 倒影 / WebGL」等说法已被后续决定取代。实施时以 `AGENTS.md`、`docs/rules/*.md`、`system/tokens.css` 和设计稿最新版（见 [`DESKTOP_MIGRATION_PLAN.md`](DESKTOP_MIGRATION_PLAN.md) §0）为准；与本文冲突时以它们为准。
 
 ## 产品与原则
 EduFlow：以共享知识图谱为核心的 AI 学习平台（知识节点、课程、能力、个人路线、微学习、实践、工作流）。

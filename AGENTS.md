@@ -34,7 +34,7 @@ This file holds only cross-cutting rules. Domain rules live in `docs/rules/`. **
 ## Validation
 
 - Changes MUST pass `pnpm typecheck`, `pnpm lint`, relevant tests and the production build; touched pages MUST be checked for runtime errors.
-- New UI follows `docs/design/new-ui/` (tokens, components, design spec) and `docs/rules/frontend-ui.md`.
+- New UI follows `docs/design/new-ui/system/tokens.css`, the latest design artifact linked in `docs/design/new-ui/DESKTOP_MIGRATION_PLAN.md` and `docs/rules/frontend-ui.md`. `docs/design/new-ui/DESIGN_SPEC.md` is a historical record and yields to these.
 
 ## Domain Rule Index
 
