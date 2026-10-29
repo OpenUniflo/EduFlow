@@ -1,38 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { createDemoApplicationServices } from "@/demo/services/createDemoApplicationServices";
 import { resolveWorkflowAssignmentContext } from "./workflowAssignmentIntegration";
 import type { CourseRepository } from "@/features/course/repository/CourseRepository";
 
-const applicationServices = createDemoApplicationServices();
+const repository = {
+  getCourse: () => ({
+    course: { id: "fixture-course" },
+    assignments: [
+      { id: "fixture-task-a", mode: "workflow", workflowTemplateId: "fixture-template" },
+      { id: "fixture-task-b", mode: "workflow", workflowTemplateId: "fixture-template" },
+      { id: "fixture-task-c", mode: "workflow", workflowTemplateId: "other-template" }
+    ]
+  })
+} as unknown as CourseRepository;
 
 describe("Workflow Assignment application integration", () => {
   it("accepts only explicit Course/Assignment/Template relationships", () => {
-    const repository = applicationServices.courseRepository;
-    const runtime = repository.getCourse("python-engineering")!;
-    const shared = runtime.assignments.filter((item) => item.workflowTemplateId === "agent-loop");
-    expect(shared.length).toBeGreaterThan(1);
-    const validA = resolveWorkflowAssignmentContext(repository, "agent-loop", `?courseId=${runtime.course.id}&assignmentId=${shared[0].id}`);
-    const validB = resolveWorkflowAssignmentContext(repository, "agent-loop", `?courseId=${runtime.course.id}&assignmentId=${shared[1].id}`);
-    expect(validA).toEqual({ courseId: runtime.course.id, assignmentId: shared[0].id, workflowTemplateId: "agent-loop" });
-    expect(validB).toEqual({ courseId: runtime.course.id, assignmentId: shared[1].id, workflowTemplateId: "agent-loop" });
-    expect(validA?.assignmentId).not.toBe(validB?.assignmentId);
-    expect(resolveWorkflowAssignmentContext(repository, "minimal", `?courseId=${runtime.course.id}&assignmentId=${shared[0].id}`)).toBeNull();
-    expect(resolveWorkflowAssignmentContext(repository, "agent-loop", `?courseId=${runtime.course.id}&assignmentId=missing`)).toBeNull();
-    expect(resolveWorkflowAssignmentContext(repository, "agent-loop", "")).toBeNull();
+    expect(resolveWorkflowAssignmentContext(repository, "fixture-template", "?courseId=fixture-course&assignmentId=fixture-task-a")).toEqual({ courseId: "fixture-course", assignmentId: "fixture-task-a", workflowTemplateId: "fixture-template" });
+    expect(resolveWorkflowAssignmentContext(repository, "fixture-template", "?courseId=fixture-course&assignmentId=fixture-task-b")).toEqual({ courseId: "fixture-course", assignmentId: "fixture-task-b", workflowTemplateId: "fixture-template" });
+    expect(resolveWorkflowAssignmentContext(repository, "other-template", "?courseId=fixture-course&assignmentId=fixture-task-a")).toBeNull();
+    expect(resolveWorkflowAssignmentContext(repository, "fixture-template", "?courseId=fixture-course&assignmentId=missing")).toBeNull();
+    expect(resolveWorkflowAssignmentContext(repository, "fixture-template", "")).toBeNull();
   });
 
   it("carries caller-provided workflow input through the Assignment context", () => {
-    const repository = {
+    const withInput = {
       getCourse: () => ({
-        assignments: [{ id: "caller-task", mode: "workflow", workflowTemplateId: "agent-loop", workflowInput: { query: "A1001" } }],
-      }),
+        assignments: [{ id: "caller-task", mode: "workflow", workflowTemplateId: "fixture-template", workflowInput: { query: "fixture-value" } }]
+      })
     } as unknown as CourseRepository;
-    expect(resolveWorkflowAssignmentContext(repository, "agent-loop", "?courseId=course&assignmentId=caller-task")).toEqual({
+    expect(resolveWorkflowAssignmentContext(withInput, "fixture-template", "?courseId=course&assignmentId=caller-task")).toEqual({
       courseId: "course",
       assignmentId: "caller-task",
-      workflowTemplateId: "agent-loop",
-      workflowInput: { query: "A1001" },
+      workflowTemplateId: "fixture-template",
+      workflowInput: { query: "fixture-value" }
     });
   });
-
 });

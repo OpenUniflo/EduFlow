@@ -4,16 +4,12 @@
  * Deletes workflow definitions, editor documents, revisions, runs and their steps/events/jobs,
  * threads, checkpoints and workflow-scoped memory. Keeps user connections (`workflow_private.p4_catalog`),
  * Vault secrets, workspace configuration (variables) and all course/learning data, then rewrites
- * `workflow_templates` from the current fixtures with unchanged ids.
+ * `workflow_templates` untouched; product content is owned by the database.
  *
  * Defaults to a read-only preflight; pass --apply to delete. Refuses any non-local Supabase target.
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { createClient } from "@supabase/supabase-js";
-import { courseWorkflowTemplates } from "../../../src/demo/workflow/courseWorkflowTemplates";
-import { productWorkflowTemplates } from "../../../src/demo/workflow/productWorkflowTemplates";
-import { workspaceWorkflowExamples } from "../../../src/demo/workflow/workspaceWorkflowTemplates";
 
 process.loadEnvFile(".env.local");
 const url = new URL(process.env.SUPABASE_URL!);
@@ -72,11 +68,7 @@ assert.equal(after.workflow_revisions ?? 0, 0);
 assert.equal(after.workflow_live_runs ?? 0, 0);
 assert.equal(after.workflow_execution_threads ?? 0, 0);
 
-// Rewrite templates from current fixtures; ids are unchanged so course references keep working.
-const templates = [...courseWorkflowTemplates, ...workspaceWorkflowExamples().map(item => item.definition), ...productWorkflowTemplates().map(item => item.definition)];
-const admin = createClient(url.href, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false } });
-const saved = await admin.from("workflow_templates").upsert(templates.map(definition => ({ id: definition.workflowId, name: definition.name, description: definition.description, definition })));
-assert.ifError(saved.error);
+// Product starting templates live in the database; legacy cleanup must not rewrite them from fixtures.
 const templateCount = Number(sql("select count(*) from public.workflow_templates;"));
 const providers = exists("workflow_private", "p4_catalog") ? Number(sql("select count(*) from workflow_private.p4_catalog;")) : 0;
 const variables = count("workflow_workspace_configuration");

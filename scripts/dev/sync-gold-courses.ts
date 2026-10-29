@@ -273,13 +273,7 @@ async function ensureH5PFixtures(client: SupabaseClient) {
     console.log("SKIP Golden H5P packages already published");
     return;
   }
-  const output = await mkdtemp(join(tmpdir(), "eduflow-golden-h5p-"));
-  try {
-    runNodeScript(["scripts/build-golden-h5p.ts", output], "Build Golden H5P packages");
-    for (const id of ids) runNodeScript(["scripts/import-h5p.ts", "--content-id", id, "--package", join(output, `${id}.h5p`)], `Import ${id}`);
-  } finally {
-    await rm(output, { recursive: true, force: true });
-  }
+  throw new Error(`Golden H5P packages are not published: ${ids.join(", ")}. Import a content snapshot instead of rebuilding them from Demo fixtures.`);
 }
 async function syncAssets(client: SupabaseClient, assets: Array<{ asset: Asset; bytes: Uint8Array }>) {
   for (const { asset, bytes } of assets) {

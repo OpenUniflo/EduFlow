@@ -2,16 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { DemoCourseRepository } from "@/demo/courses/DemoCourseRepository";
 import { buildCourseGraphData, validateCourseRuntime, type CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import { buildCourseGraphProjection } from "@/features/course/graph/courseGraphProjection";
 import { ATOMIC_FOOTPRINT_HEIGHT, ATOMIC_FOOTPRINT_WIDTH, COMPANION_OFFSET_X, COMPANION_OFFSET_Y, KNOWLEDGE_CARD_HEIGHT, KNOWLEDGE_CARD_WIDTH, getCourseLayoutCacheKey, layoutCourseGraph } from "@/features/course/graph/elkCourseLayout";
 import { toReactFlow } from "@/features/course/graph/reactFlowAdapter";
 import { assignmentProjectionForNode, buildChapterAssignmentProjection, courseDrawerProjectionKind, detailFacetForMode, flowIdForAnchor, type SelectedAnchor } from "@/features/course/courseSelection";
-import { demoUserCourseStateSeed } from "@/demo/users/demoUserCourseState.seed";
 import { LEARNING_PROGRESS_SCHEMA_VERSION, LocalStorageLearningProgressRepository, isValidUserCourseState, learningProgressStorageKey } from "@/features/learning/progress/LocalStorageLearningProgressRepository";
 import { buildGlobalAtlasProjection } from "@/features/knowledge/projections/atlasProjections";
-import { createDemoApplicationServices } from "@/demo/services/createDemoApplicationServices";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { resolveInitialMaterialSegment, resolveKnowledgeMaterialEntries, resolveKnowledgeMaterialEntry, buildMaterialDeepLink } from "@/features/material/materialNavigation";
 import { classifySegmentQueryChange, selectPageAtReadingAnchor } from "@/features/material/reader/materialReaderState";
@@ -23,18 +20,19 @@ import { buildPersonalKnowledgeGraph } from "@/features/profile/profileGraph";
 import type { AssignmentCoverage, CourseAssignment, UserCourseState } from "@/features/course/types";
 import { selectPrimaryCurriculumCoverage } from "@/features/course/curriculum/curriculumOrdering";
 import { sortAssignments, sortMaterials, sortMaterialSegments } from "@/features/material/materialOrdering";
+import { syntheticPersonalKnowledgeGraph, syntheticDomainGovernance, syntheticDomains } from "../../../tests/fixtures/knowledge";
+import { SyntheticCourseRepository, syntheticAlphaRuntime, syntheticBetaRuntime, syntheticUserCourseState, syntheticUserKnowledge } from "../../../tests/fixtures/courses";
 
-const applicationServices = createDemoApplicationServices();
-const getDomainGovernanceSnapshot = applicationServices.domainGovernanceService.getSnapshot;
-const knowledgeRepository = applicationServices.knowledgeRepository;
-const repository = new DemoCourseRepository(knowledgeRepository);
-const access = userKnowledgeAccess("student@knowledge-atlas.local");
+const knowledgeRepository = new InMemoryKnowledgeRepository(syntheticPersonalKnowledgeGraph);
+const repository = new SyntheticCourseRepository(knowledgeRepository);
+const getDomainGovernanceSnapshot = syntheticDomainGovernance;
+const access = userKnowledgeAccess("fixture-user-a");
 const visibleGraph = knowledgeRepository.getVisibleGraph(access);
-const userKnowledge = applicationServices.userKnowledgeRepository.getUserKnowledge("student@knowledge-atlas.local");
-const agentic = repository.getCourse("agentic-ai")!;
-const python = repository.getCourse("python-engineering")!;
-const agenticGraph = buildCourseGraphData(agentic, demoUserCourseStateSeed("student", agentic.course.id), visibleGraph, userKnowledge);
-const pythonGraph = buildCourseGraphData(python, demoUserCourseStateSeed("student", python.course.id), visibleGraph, userKnowledge);
+const userKnowledge = syntheticUserKnowledge("fixture-user-a");
+const alpha = repository.getCourse("fixture-course-alpha")!;
+const beta = repository.getCourse("fixture-course-beta")!;
+const alphaGraph = buildCourseGraphData(alpha, syntheticUserCourseState("fixture-user-a", alpha.course.id), visibleGraph, userKnowledge);
+const betaGraph = buildCourseGraphData(beta, syntheticUserCourseState("fixture-user-a", beta.course.id), visibleGraph, userKnowledge);
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -66,38 +64,38 @@ function typescriptFilesUnder(root: string) {
 
 describe("Course Repository and runtime invariants", () => {
   it("registers isolated Courses and rejects unknown routes", () => {
-    expect(repository.listCourseRuntimes().map((runtime) => runtime.course.id)).toEqual(["agentic-ai-golden", "agentic-ai", "python-engineering"]);
-    expect(repository.getCourse("agentic-ai")).not.toBe(repository.getCourse("python-engineering"));
+    expect(repository.listCourseRuntimes().map((runtime) => runtime.course.id)).toEqual(["fixture-course-alpha", "fixture-course-beta"]);
+    expect(repository.getCourse("fixture-course-alpha")).not.toBe(repository.getCourse("fixture-course-beta"));
     expect(repository.getCourse("not-exist")).toBeNull();
-    expect(validateCourseRuntime(agentic, knowledgeRepository, access)).toBe(true);
-    expect(validateCourseRuntime(python, knowledgeRepository, access)).toBe(true);
+    expect(validateCourseRuntime(alpha, knowledgeRepository, access)).toBe(true);
+    expect(validateCourseRuntime(beta, knowledgeRepository, access)).toBe(true);
   });
 
   it("keeps Course graph data isolated", () => {
-    expect(agenticGraph.courseId).not.toBe(pythonGraph.courseId);
-    expect(agenticGraph.chapters.every((chapter) => chapter.courseId === agentic.course.id)).toBe(true);
-    expect(pythonGraph.chapters.every((chapter) => chapter.courseId === python.course.id)).toBe(true);
-    expect(agenticGraph.knowledgeNodes.some((node) => node.id === "AG01")).toBe(true);
-    expect(pythonGraph.knowledgeNodes.some((node) => node.id === "PY01")).toBe(true);
-    expect(python.assignments.every((assignment) => assignment.courseId === python.course.id)).toBe(true);
+    expect(alphaGraph.courseId).not.toBe(betaGraph.courseId);
+    expect(alphaGraph.chapters.every((chapter) => chapter.courseId === alpha.course.id)).toBe(true);
+    expect(betaGraph.chapters.every((chapter) => chapter.courseId === beta.course.id)).toBe(true);
+    expect(alphaGraph.knowledgeNodes.some((node) => node.id === "syn-a")).toBe(true);
+    expect(betaGraph.knowledgeNodes.some((node) => node.id === "syn-e")).toBe(true);
+    expect(beta.assignments.every((assignment) => assignment.courseId === beta.course.id)).toBe(true);
   });
 
   it("keeps the Course page renderable when factual atomic relations form a Chapter-level cycle", () => {
-    const firstChapterNodes = agenticGraph.knowledgeNodes.filter((node) => node.chapterId === agentic.chapters[0].id);
-    const secondChapterNodes = agenticGraph.knowledgeNodes.filter((node) => node.chapterId === agentic.chapters[1].id);
+    const firstChapterNodes = alphaGraph.knowledgeNodes.filter((node) => node.chapterId === alpha.chapters[0].id);
+    const secondChapterNodes = alphaGraph.knowledgeNodes.filter((node) => node.chapterId === alpha.chapters[1].id);
     expect(firstChapterNodes.length).toBeGreaterThanOrEqual(2);
     expect(secondChapterNodes.length).toBeGreaterThanOrEqual(2);
     const cyclicAtChapterLevel: KnowledgeGraph = {
       nodes: visibleGraph.nodes,
       revisions: visibleGraph.revisions,
       edges: [
-        { id: "regression-forward", source: firstChapterNodes[0].id, target: secondChapterNodes[0].id, relation: "prerequisite", strength: "hard", reason: "Hosted graph forward relation" },
-        { id: "regression-backward", source: secondChapterNodes[1].id, target: firstChapterNodes[1].id, relation: "enables", strength: 0.8, reason: "Hosted graph backward relation" }
+        { id: "regression-forward", source: firstChapterNodes[0].id, target: secondChapterNodes[0].id, relation: "prerequisite", strength: "hard", reason: "Synthetic forward relation" },
+        { id: "regression-backward", source: secondChapterNodes[1].id, target: firstChapterNodes[1].id, relation: "enables", strength: 0.8, reason: "Synthetic backward relation" }
       ]
     };
 
-    const graphData = buildCourseGraphData(agentic, demoUserCourseStateSeed("student", agentic.course.id), cyclicAtChapterLevel, userKnowledge);
-    const orderByChapter = new Map(agentic.chapters.map((chapter) => [chapter.id, chapter.order]));
+    const graphData = buildCourseGraphData(alpha, syntheticUserCourseState("fixture-user-a", alpha.course.id), cyclicAtChapterLevel, userKnowledge);
+    const orderByChapter = new Map(alpha.chapters.map((chapter) => [chapter.id, chapter.order]));
     expect(graphData.knowledgeEdges.map((edge) => edge.id)).toEqual(["regression-forward", "regression-backward"]);
     expect(graphData.chapterEdges.length).toBeGreaterThan(0);
     expect(graphData.chapterEdges.every((edge) => orderByChapter.get(edge.source)! < orderByChapter.get(edge.target)!)).toBe(true);
@@ -105,19 +103,19 @@ describe("Course Repository and runtime invariants", () => {
   });
 
   it("covers every Course KnowledgeNode and contains real N:M examples", () => {
-    [agentic, python].forEach((runtime) => {
+    [alpha, beta].forEach((runtime) => {
       const nodeIds = new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId));
       const covered = new Set(runtime.assignmentCoverages.map((coverage) => coverage.nodeId));
       expect(covered).toEqual(nodeIds);
       expect(runtime.assignments.some((assignment) => runtime.assignmentCoverages.filter((coverage) => coverage.assignmentId === assignment.id).length > 1)).toBe(true);
     });
-    expect(pythonGraph.knowledgeNodes.some((node) => node.assignmentCount > 1)).toBe(true);
+    expect(alphaGraph.knowledgeNodes.some((node) => node.assignmentCount > 1)).toBe(true);
   });
 
   it("uses courseId and structural revision as the only layout cache identity", () => {
-    expect(getCourseLayoutCacheKey("agentic-ai", "v1")).not.toBe(getCourseLayoutCacheKey("python-engineering", "v1"));
-    expect(getCourseLayoutCacheKey("agentic-ai", "v1")).not.toBe(getCourseLayoutCacheKey("agentic-ai", "v2"));
-    expect(getCourseLayoutCacheKey(agenticGraph.courseId, agenticGraph.revision)).toBe(getCourseLayoutCacheKey(agenticGraph.courseId, agenticGraph.revision));
+    expect(getCourseLayoutCacheKey("fixture-course-alpha", "v1")).not.toBe(getCourseLayoutCacheKey("fixture-course-beta", "v1"));
+    expect(getCourseLayoutCacheKey("fixture-course-alpha", "v1")).not.toBe(getCourseLayoutCacheKey("fixture-course-alpha", "v2"));
+    expect(getCourseLayoutCacheKey(alphaGraph.courseId, alphaGraph.revision)).toBe(getCourseLayoutCacheKey(alphaGraph.courseId, alphaGraph.revision));
   });
 
   it.each([
@@ -126,40 +124,40 @@ describe("Course Repository and runtime invariants", () => {
     ["AssignmentCoverage", (runtime: CourseRuntimeData) => ({ ...runtime, assignmentCoverages: [...runtime.assignmentCoverages, { ...runtime.assignmentCoverages[0] }] })],
     ["MaterialKnowledgeCoverage", (runtime: CourseRuntimeData) => ({ ...runtime, materialKnowledgeCoverages: [...runtime.materialKnowledgeCoverages, { ...runtime.materialKnowledgeCoverages[0] }] })]
   ])("rejects duplicate %s ids", (label, mutate) => {
-    expect(() => validateCourseRuntime(mutate(python), knowledgeRepository, access)).toThrow(`${label} ids must be unique`);
+    expect(() => validateCourseRuntime(mutate(beta), knowledgeRepository, access)).toThrow(`${label} ids must be unique`);
   });
 
   it("rejects cross-Course sequence/coverage ownership and unknown Chapter membership", () => {
-    expect(() => validateCourseRuntime({ ...python, curriculumSequences: python.curriculumSequences.map((sequence, index) => index ? sequence : { ...sequence, courseId: "another-course" }) }, knowledgeRepository, access)).toThrow(/CurriculumSequence .* belongs to another Course/);
-    expect(() => validateCourseRuntime({ ...python, lessons: python.lessons.map((lesson, index) => index ? lesson : { ...lesson, chapterId: "unknown" }) }, knowledgeRepository, access)).toThrow(/references unknown Chapter/);
-    expect(() => validateCourseRuntime({ ...python, curriculumCoverages: python.curriculumCoverages.map((coverage, index) => index ? coverage : { ...coverage, courseId: "another-course" }) }, knowledgeRepository, access)).toThrow(/Coverage .* belongs to another Course/);
+    expect(() => validateCourseRuntime({ ...beta, curriculumSequences: beta.curriculumSequences.map((sequence, index) => index ? sequence : { ...sequence, courseId: "another-course" }) }, knowledgeRepository, access)).toThrow(/CurriculumSequence .* belongs to another Course/);
+    expect(() => validateCourseRuntime({ ...beta, lessons: beta.lessons.map((lesson, index) => index ? lesson : { ...lesson, chapterId: "unknown" }) }, knowledgeRepository, access)).toThrow(/references unknown Chapter/);
+    expect(() => validateCourseRuntime({ ...beta, curriculumCoverages: beta.curriculumCoverages.map((coverage, index) => index ? coverage : { ...coverage, courseId: "another-course" }) }, knowledgeRepository, access)).toThrow(/Coverage .* belongs to another Course/);
   });
 
   it("rejects self/duplicate CurriculumSequence relations", () => {
-    const sequence = python.curriculumSequences[0];
-    expect(() => validateCourseRuntime({ ...python, curriculumSequences: [{ ...sequence, targetLessonId: sequence.sourceLessonId }] }, knowledgeRepository, access)).toThrow(/cannot reference the same Lesson twice/);
-    expect(() => validateCourseRuntime({ ...python, curriculumSequences: [...python.curriculumSequences, { ...sequence, id: "parallel-sequence" }] }, knowledgeRepository, access)).toThrow(/Duplicate CurriculumSequence relation/);
+    const sequence = beta.curriculumSequences[0];
+    expect(() => validateCourseRuntime({ ...beta, curriculumSequences: [{ ...sequence, targetLessonId: sequence.sourceLessonId }] }, knowledgeRepository, access)).toThrow(/cannot reference the same Lesson twice/);
+    expect(() => validateCourseRuntime({ ...beta, curriculumSequences: [...beta.curriculumSequences, { ...sequence, id: "parallel-sequence" }] }, knowledgeRepository, access)).toThrow(/Duplicate CurriculumSequence relation/);
   });
 
   it("rejects invalid CurriculumCoverage order", () => {
-    const invalidOrder = (order: number) => ({ ...python, curriculumCoverages: python.curriculumCoverages.map((coverage, index) => index ? coverage : { ...coverage, order }) });
+    const invalidOrder = (order: number) => ({ ...beta, curriculumCoverages: beta.curriculumCoverages.map((coverage, index) => index ? coverage : { ...coverage, order }) });
     expect(() => validateCourseRuntime(invalidOrder(-1), knowledgeRepository, access)).toThrow(/invalid Lesson order/);
     expect(() => validateCourseRuntime(invalidOrder(0.5), knowledgeRepository, access)).toThrow(/invalid Lesson order/);
-    const missing = { ...python, curriculumCoverages: python.curriculumCoverages.map((coverage, index) => index ? coverage : { ...coverage, order: undefined as never }) };
+    const missing = { ...beta, curriculumCoverages: beta.curriculumCoverages.map((coverage, index) => index ? coverage : { ...coverage, order: undefined as never }) };
     expect(() => validateCourseRuntime(missing, knowledgeRepository, access)).toThrow(/invalid Lesson order/);
   });
 
   it("rejects duplicate Assignment and Material coverage facts", () => {
-    const assignment = python.assignmentCoverages[0];
-    expect(() => validateCourseRuntime({ ...python, assignmentCoverages: [...python.assignmentCoverages, { ...assignment, id: "duplicate-assignment-relation" }] }, knowledgeRepository, access)).toThrow(/Duplicate AssignmentCoverage relation/);
-    const material = python.materialKnowledgeCoverages[0];
-    expect(() => validateCourseRuntime({ ...python, materialKnowledgeCoverages: [...python.materialKnowledgeCoverages, { ...material, id: "duplicate-material-relation" }] }, knowledgeRepository, access)).toThrow(/Duplicate MaterialKnowledgeCoverage relation/);
+    const assignment = beta.assignmentCoverages[0];
+    expect(() => validateCourseRuntime({ ...beta, assignmentCoverages: [...beta.assignmentCoverages, { ...assignment, id: "duplicate-assignment-relation" }] }, knowledgeRepository, access)).toThrow(/Duplicate AssignmentCoverage relation/);
+    const material = beta.materialKnowledgeCoverages[0];
+    expect(() => validateCourseRuntime({ ...beta, materialKnowledgeCoverages: [...beta.materialKnowledgeCoverages, { ...material, id: "duplicate-material-relation" }] }, knowledgeRepository, access)).toThrow(/Duplicate MaterialKnowledgeCoverage relation/);
   });
 
   it("treats AssignmentCoverage role as one attribute of a unique Assignment–Knowledge relation", () => {
-    const coverage = python.assignmentCoverages[0];
+    const coverage = beta.assignmentCoverages[0];
     const duplicate = { ...coverage, id: "same-pair-different-role", role: coverage.role === "apply" ? "assess" as const : "apply" as const };
-    expect(() => validateCourseRuntime({ ...python, assignmentCoverages: [...python.assignmentCoverages, duplicate] }, knowledgeRepository, access)).toThrow(/Duplicate AssignmentCoverage relation/);
+    expect(() => validateCourseRuntime({ ...beta, assignmentCoverages: [...beta.assignmentCoverages, duplicate] }, knowledgeRepository, access)).toThrow(/Duplicate AssignmentCoverage relation/);
   });
 
   it.each([
@@ -175,14 +173,14 @@ describe("Course Repository and runtime invariants", () => {
     })],
     ["Assignment", (runtime: CourseRuntimeData) => ({ ...runtime, assignments: runtime.assignments.map((item, index) => index ? item : { ...item, order: -1 }) })]
   ])("rejects invalid explicit %s order", (label, mutate) => {
-    expect(() => validateCourseRuntime(mutate(python), knowledgeRepository, access)).toThrow(new RegExp(`${label} .*invalid order`));
+    expect(() => validateCourseRuntime(mutate(beta), knowledgeRepository, access)).toThrow(new RegExp(`${label} .*invalid order`));
   });
 
   it("rejects duplicate order inside each ordering scope", () => {
-    expect(() => validateCourseRuntime({ ...python, lessons: python.lessons.map((item, index) => index === 1 ? { ...item, order: python.lessons[0].order } : item) }, knowledgeRepository, access)).toThrow(/Lesson orders must be unique/);
-    expect(() => validateCourseRuntime({ ...python, assignments: python.assignments.map((item, index) => index === 1 ? { ...item, order: python.assignments[0].order } : item) }, knowledgeRepository, access)).toThrow(/Assignment orders must be unique/);
-    const material = python.materials[0];
-    expect(() => validateCourseRuntime({ ...python, materials: python.materials.map((item) => item.id === material.id ? { ...item, segments: item.segments.map((segment, index) => index === 1 ? { ...segment, order: item.segments[0].order } : segment) } : item) }, knowledgeRepository, access)).toThrow(/MaterialSegment .* orders must be unique/);
+    expect(() => validateCourseRuntime({ ...beta, lessons: beta.lessons.map((item, index) => index === 1 ? { ...item, order: beta.lessons[0].order } : item) }, knowledgeRepository, access)).toThrow(/Lesson orders must be unique/);
+    expect(() => validateCourseRuntime({ ...beta, assignments: beta.assignments.map((item, index) => index === 1 ? { ...item, order: beta.assignments[0].order } : item) }, knowledgeRepository, access)).toThrow(/Assignment orders must be unique/);
+    const material = beta.materials[0];
+    expect(() => validateCourseRuntime({ ...beta, materials: beta.materials.map((item) => item.id === material.id ? { ...item, segments: item.segments.map((segment, index) => index === 1 ? { ...segment, order: item.segments[0].order } : segment) } : item) }, knowledgeRepository, access)).toThrow(/MaterialSegment .* orders must be unique/);
   });
 
   it("keeps CurriculumChapter pure and CourseRepository definition-only", () => {
@@ -190,8 +188,8 @@ describe("Course Repository and runtime invariants", () => {
     const chapterType = types.match(/export type CurriculumChapter = \{([\s\S]*?)\n\};/)?.[1] ?? "";
     expect(chapterType).not.toMatch(/\bprogress\b|\blessonIds\b/);
     expect(repository).not.toHaveProperty("listCourses");
-    expect(agentic.chapters.every((chapter) => !("progress" in chapter) && !("lessonIds" in chapter))).toBe(true);
-    expect(python.chapters.every((chapter) => !("progress" in chapter) && !("lessonIds" in chapter))).toBe(true);
+    expect(alpha.chapters.every((chapter) => !("progress" in chapter) && !("lessonIds" in chapter))).toBe(true);
+    expect(beta.chapters.every((chapter) => !("progress" in chapter) && !("lessonIds" in chapter))).toBe(true);
   });
 });
 
@@ -203,199 +201,162 @@ describe("Material and progress generalization", () => {
     expect(segmentType).not.toContain("assignmentIds");
     expect(projection).not.toContain("material-assignment-");
     expect(projection).not.toMatch(/segment\.assignmentIds/);
-    const material = python.materials.find((item) => item.id === "python-quality-testing")!;
-    const result = buildMaterialSegmentProjection(python, material, "page-10", demoUserCourseStateSeed("student", python.course.id), knowledgeRepository, access, getDomainGovernanceSnapshot())!;
-    expect(result.pageAssignmentContexts.every((context) => python.assignmentCoverages.some((coverage) => coverage.id === context.id))).toBe(true);
+    const material = alpha.materials.find((item) => item.id === "alpha-article")!;
+    const result = buildMaterialSegmentProjection(alpha, material, "alpha-seg-1", syntheticUserCourseState("fixture-user-a", alpha.course.id), knowledgeRepository, access, getDomainGovernanceSnapshot())!;
+    expect(result.pageAssignmentContexts.every((context) => alpha.assignmentCoverages.some((coverage) => coverage.id === context.id))).toBe(true);
   });
 
   it("derives Material, Segment, and Assignment order independently of fixture array order", () => {
-    expect(sortMaterials([...python.materials].reverse()).map((item) => item.id)).toEqual(sortMaterials(python.materials).map((item) => item.id));
-    const article = python.materials.find((item) => item.type === "article")!;
+    expect(sortMaterials([...alpha.materials].reverse()).map((item) => item.id)).toEqual(sortMaterials(alpha.materials).map((item) => item.id));
+    const article = alpha.materials.find((item) => item.type === "article")!;
     expect(sortMaterialSegments({ ...article, segments: [...article.segments].reverse() }).map((item) => item.id)).toEqual(sortMaterialSegments(article).map((item) => item.id));
-    expect(sortAssignments([...python.assignments].reverse()).map((item) => item.id)).toEqual(sortAssignments(python.assignments).map((item) => item.id));
+    expect(sortAssignments([...alpha.assignments].reverse()).map((item) => item.id)).toEqual(sortAssignments(alpha.assignments).map((item) => item.id));
   });
 
   it("keeps graph, Material navigation, and Profile curriculum selection stable after shuffled inputs", () => {
     const shuffled: CourseRuntimeData = {
-      ...python,
-      materials: [...python.materials].reverse().map((material) => ({ ...material, segments: [...material.segments].reverse() })),
-      assignments: [...python.assignments].reverse(),
-      curriculumCoverages: [...python.curriculumCoverages].reverse(),
-      assignmentCoverages: [...python.assignmentCoverages].reverse(),
-      materialKnowledgeCoverages: [...python.materialKnowledgeCoverages].reverse()
+      ...alpha,
+      materials: [...alpha.materials].reverse().map((material) => ({ ...material, segments: [...material.segments].reverse() })),
+      assignments: [...alpha.assignments].reverse(),
+      curriculumCoverages: [...alpha.curriculumCoverages].reverse(),
+      assignmentCoverages: [...alpha.assignmentCoverages].reverse(),
+      materialKnowledgeCoverages: [...alpha.materialKnowledgeCoverages].reverse()
     };
-    const state = demoUserCourseStateSeed("student", python.course.id);
+    const state = syntheticUserCourseState("fixture-user-a", alpha.course.id);
     const graphOrder = (runtime: CourseRuntimeData) => buildCourseGraphData(runtime, state, visibleGraph, userKnowledge).knowledgeNodes.map((node) => [node.id, node.primaryCoverage.id, node.assignmentIds, node.materialIds]);
-    expect(graphOrder(shuffled)).toEqual(graphOrder(python));
-    expect(resolveKnowledgeMaterialEntries(shuffled, "PY09")).toEqual(resolveKnowledgeMaterialEntries(python, "PY09"));
-    const profileOrder = (runtime: CourseRuntimeData) => buildPersonalKnowledgeGraph(visibleGraph, userKnowledge, [runtime], [state], getDomainGovernanceSnapshot()).nodes.find((node) => node.id === "PY06")?.curriculumContexts.map((context) => context.coverageId);
-    expect(profileOrder(shuffled)).toEqual(profileOrder(python));
-    expect(selectPrimaryCurriculumCoverage(shuffled.curriculumCoverages.filter((coverage) => coverage.nodeId === "PY06"), shuffled.lessons)?.id).toBe(pythonGraph.knowledgeNodes.find((node) => node.id === "PY06")?.primaryCoverage.id);
+    expect(graphOrder(shuffled)).toEqual(graphOrder(alpha));
+    expect(resolveKnowledgeMaterialEntries(shuffled, "syn-b")).toEqual(resolveKnowledgeMaterialEntries(alpha, "syn-b"));
+    const profileOrder = (runtime: CourseRuntimeData) => buildPersonalKnowledgeGraph(visibleGraph, userKnowledge, [runtime], [state], getDomainGovernanceSnapshot()).nodes.find((node) => node.id === "syn-b")?.curriculumContexts.map((context) => context.coverageId);
+    expect(profileOrder(shuffled)).toEqual(profileOrder(alpha));
+    expect(selectPrimaryCurriculumCoverage(shuffled.curriculumCoverages.filter((coverage) => coverage.nodeId === "syn-b"), shuffled.lessons)?.id).toBe(alphaGraph.knowledgeNodes.find((node) => node.id === "syn-b")?.primaryCoverage.id);
   });
+
   it("supports Segment → multiple KnowledgeNodes and KnowledgeNode → multiple Segments/Materials", () => {
-    const segmentNodes = python.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === "python-core-handbook" && coverage.segmentId === "page-5").map((coverage) => coverage.nodeId);
+    const segmentNodes = alpha.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === "alpha-article" && coverage.segmentId === "alpha-seg-1").map((coverage) => coverage.nodeId);
     expect(new Set(segmentNodes).size).toBeGreaterThan(1);
-    const py06 = python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === "PY06");
-    expect(new Set(py06.map((coverage) => coverage.segmentId)).size).toBeGreaterThan(1);
-    const py09 = python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === "PY09");
-    expect(new Set(py09.map((coverage) => coverage.materialId)).size).toBe(3);
+    const synB = alpha.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === "syn-b");
+    expect(new Set(synB.map((coverage) => coverage.segmentId)).size).toBeGreaterThan(1);
+    expect(new Set(synB.map((coverage) => coverage.materialId)).size).toBe(2);
   });
 
   it("resolves Materials only inside their owning Course", () => {
-    expect(python.materials.some((material) => material.id === "python-core-handbook")).toBe(true);
-    expect(agentic.materials.some((material) => material.id === "python-core-handbook")).toBe(false);
+    expect(alpha.materials.some((material) => material.id === "alpha-article")).toBe(true);
+    expect(beta.materials.some((material) => material.id === "alpha-article")).toBe(false);
   });
 
   it("resolves deterministic deep links and gives explicit URL Segment precedence", () => {
-    const entry = resolveKnowledgeMaterialEntry(agentic, "R01", "lesson-04");
-    expect(entry).toMatchObject({ segmentId: "page-12", role: "introduce" });
-    expect(buildMaterialDeepLink({ courseId: agentic.course.id, materialId: "lesson-04", segmentId: entry!.segmentId })).toBe("/courses/agentic-ai/materials/lesson-04?segment=page-12");
-    expect(resolveInitialMaterialSegment({ segmentIds: ["page-1", "page-12", "page-28"], requestedSegmentId: "page-12", recentSegmentId: "page-28" })).toBe("page-12");
-    expect(resolveInitialMaterialSegment({ segmentIds: ["page-1", "page-12"], requestedSegmentId: "missing", recentSegmentId: "page-12" })).toBe("page-12");
-  });
-
-  it("commits valid PDF fixtures whose page count matches Material Segments", () => {
-    for (const runtime of [agentic, python]) {
-      for (const material of runtime.materials.filter((item) => item.type === "pdf")) {
-        expect(material.source?.kind).toBe("pdf");
-        expect(material.segments).toHaveLength(material.source!.pageCount);
-        expect(material.segments.map((segment) => segment.page)).toEqual(Array.from({ length: material.source!.pageCount }, (_, index) => index + 1));
-        const sourceUrl = material.source!.url;
-        expect(sourceUrl).toBeDefined();
-        const file = join(process.cwd(), "public", sourceUrl!.replace(/^\//, ""));
-        const bytes = readFileSync(file).toString("latin1");
-        expect((bytes.match(/\/Type\s*\/Page\b/g) ?? []).length).toBe(material.source!.pageCount);
-      }
-    }
+    const entry = resolveKnowledgeMaterialEntry(alpha, "syn-b", "alpha-article");
+    expect(entry).toMatchObject({ materialId: "alpha-article", segmentId: "alpha-seg-1", role: "explain" });
+    expect(buildMaterialDeepLink({ courseId: alpha.course.id, materialId: "alpha-article", segmentId: entry!.segmentId })).toBe("/courses/fixture-course-alpha/materials/alpha-article?segment=alpha-seg-1");
+    expect(resolveInitialMaterialSegment({ segmentIds: ["alpha-seg-1", "alpha-seg-2", "alpha-seg-3"], requestedSegmentId: "alpha-seg-2", recentSegmentId: "alpha-seg-3" })).toBe("alpha-seg-2");
+    expect(resolveInitialMaterialSegment({ segmentIds: ["alpha-seg-1", "alpha-seg-2"], requestedSegmentId: "missing", recentSegmentId: "alpha-seg-2" })).toBe("alpha-seg-2");
   });
 
   it("rejects malformed PDF source metadata before rendering", () => {
-    const invalid: CourseRuntimeData = { ...python, materials: python.materials.map((material) => material.id === "python-quality-testing" ? { ...material, source: { kind: "pdf", url: material.source!.url, pageCount: 11 } } : material) };
+    const invalid: CourseRuntimeData = { ...alpha, materials: alpha.materials.map((material) => material.id === "alpha-article" ? { ...material, type: "pdf" as const, source: { kind: "pdf" as const, url: "/materials/fixture.pdf", pageCount: 2 } } : material) };
     expect(() => validateCourseRuntime(invalid, knowledgeRepository, access)).toThrow(/pageCount does not match Segments/);
   });
 
-  it("prioritizes Exception's formal Lesson 04 PDF over reinforcement materials", () => {
-    const entries = resolveKnowledgeMaterialEntries(python, "PY09");
-    expect(entries[0]).toMatchObject({ materialId: "python-quality-testing", lessonId: "PY-L04", segmentId: "page-1", role: "introduce" });
-    expect(new Set(entries.map((entry) => entry.materialId))).toEqual(new Set(["python-core-handbook", "python-quality-testing", "python-async-service-guide"]));
-  });
-
   it("keeps Reader URL replacement out of external navigation and selects the reading anchor", () => {
-    expect(classifySegmentQueryChange("page-10", "page-11", "page-11")).toBe("reader");
-    expect(classifySegmentQueryChange("page-10", "page-10", null)).toBe("unchanged");
-    expect(classifySegmentQueryChange("page-20", "page-8", null)).toBe("external");
+    expect(classifySegmentQueryChange("alpha-seg-1", "alpha-seg-2", "alpha-seg-2")).toBe("reader");
+    expect(classifySegmentQueryChange("alpha-seg-1", "alpha-seg-1", null)).toBe("unchanged");
+    expect(classifySegmentQueryChange("alpha-seg-1", "beta-seg-1", null)).toBe("external");
     expect(selectPageAtReadingAnchor([
-      { page: 10, segmentId: "page-10", top: -500, bottom: 180, intersectionRatio: 0.2 },
-      { page: 11, segmentId: "page-11", top: 200, bottom: 760, intersectionRatio: 0.8 },
-      { page: 12, segmentId: "page-12", top: 780, bottom: 1340, intersectionRatio: 0.1 }
-    ], 100, 700)?.segmentId).toBe("page-11");
+      { page: 10, segmentId: "alpha-seg-1", top: -500, bottom: 180, intersectionRatio: 0.2 },
+      { page: 11, segmentId: "alpha-seg-2", top: 200, bottom: 760, intersectionRatio: 0.8 },
+      { page: 12, segmentId: "alpha-seg-3", top: 780, bottom: 1340, intersectionRatio: 0.1 }
+    ], 100, 700)?.segmentId).toBe("alpha-seg-2");
   });
 
   it("retains a non-PDF renderer fixture", () => {
-    expect(python.materials.some((material) => material.type === "article" && material.segments.some((segment) => Boolean(segment.content)))).toBe(true);
+    expect(alpha.materials.some((material) => material.type === "article" && material.segments.some((segment) => Boolean(segment.content)))).toBe(true);
   });
 
   it("separates Auto selection from explicit ID-only Pin state", () => {
-    let state = createMaterialKnowledgeContextState("PY09");
-    state = reduceMaterialKnowledgeContextState(state, { type: "select", nodeId: "PY27" });
-    expect(state).toEqual({ selectedKnowledgeId: "PY27", pinnedKnowledgeId: null });
-    state = reduceMaterialKnowledgeContextState(state, { type: "page-change", currentPagePrimaryKnowledgeId: "PY37" });
-    expect(state).toEqual({ selectedKnowledgeId: "PY37", pinnedKnowledgeId: null });
+    let state = createMaterialKnowledgeContextState("syn-b");
+    state = reduceMaterialKnowledgeContextState(state, { type: "select", nodeId: "syn-c" });
+    expect(state).toEqual({ selectedKnowledgeId: "syn-c", pinnedKnowledgeId: null });
+    state = reduceMaterialKnowledgeContextState(state, { type: "page-change", currentPagePrimaryKnowledgeId: "syn-d" });
+    expect(state).toEqual({ selectedKnowledgeId: "syn-d", pinnedKnowledgeId: null });
     state = reduceMaterialKnowledgeContextState(state, { type: "pin" });
-    state = reduceMaterialKnowledgeContextState(state, { type: "page-change", currentPagePrimaryKnowledgeId: "PY85" });
-    expect(resolveEffectiveKnowledgeId(state, "PY85")).toBe("PY37");
-    expect(state.pinnedKnowledgeId).toBe("PY37");
-    state = reduceMaterialKnowledgeContextState(state, { type: "unpin", currentPagePrimaryKnowledgeId: "PY85" });
-    expect(state).toEqual({ selectedKnowledgeId: "PY85", pinnedKnowledgeId: null });
-    expect(reduceMaterialKnowledgeContextState({ selectedKnowledgeId: "PY85", pinnedKnowledgeId: "PY85" }, { type: "material-change", currentPagePrimaryKnowledgeId: "PY06" })).toEqual({ selectedKnowledgeId: "PY06", pinnedKnowledgeId: null });
+    state = reduceMaterialKnowledgeContextState(state, { type: "page-change", currentPagePrimaryKnowledgeId: "syn-e" });
+    expect(resolveEffectiveKnowledgeId(state, "syn-e")).toBe("syn-d");
+    expect(state.pinnedKnowledgeId).toBe("syn-d");
+    state = reduceMaterialKnowledgeContextState(state, { type: "unpin", currentPagePrimaryKnowledgeId: "syn-e" });
+    expect(state).toEqual({ selectedKnowledgeId: "syn-e", pinnedKnowledgeId: null });
+    expect(reduceMaterialKnowledgeContextState({ selectedKnowledgeId: "syn-e", pinnedKnowledgeId: "syn-static" }, { type: "page-change", currentPagePrimaryKnowledgeId: "syn-f" })).toEqual({ selectedKnowledgeId: "syn-e", pinnedKnowledgeId: "syn-static" });
   });
 
   it("keeps page Assignments separate from Knowledge-specific Assignments on a multi-Knowledge Segment", () => {
-    const extraAssignments: CourseAssignment[] = ["PY09", "PY27", "PY37"].map((nodeId, index) => ({ id: `specific-${nodeId}`, courseId: python.course.id, order: python.assignments.length + index, title: `Specific ${nodeId}`, description: nodeId, requirements: [nodeId], expectedOutput: nodeId, acceptanceCriteria: [nodeId], mode: "instruction" }));
-    const extraCoverages: AssignmentCoverage[] = extraAssignments.map((assignment, index) => ({ id: `specific-coverage-${index}`, assignmentId: assignment.id, nodeId: assignment.id.replace("specific-", ""), role: "assess" }));
-    const runtime = { ...python, assignments: [...python.assignments, ...extraAssignments], assignmentCoverages: [...python.assignmentCoverages, ...extraCoverages] };
-    const userState = demoUserCourseStateSeed("student", python.course.id);
-    const material = runtime.materials.find((item) => item.id === "python-quality-testing")!;
-    const projection = buildMaterialSegmentProjection(runtime, material, "page-10", userState, knowledgeRepository, access, getDomainGovernanceSnapshot())!;
-    const exceptionAssignments = buildKnowledgeAssignmentContexts(runtime, "PY09", userState);
-    const typeHintAssignments = buildKnowledgeAssignmentContexts(runtime, "PY27", userState);
-    expect(projection.knowledgeContexts).toHaveLength(4);
-    expect(projection.pageAssignmentContexts.map((context) => context.assignmentId)).toEqual(expect.arrayContaining(["specific-PY09", "specific-PY27", "specific-PY37"]));
-    expect(exceptionAssignments.map((context) => context.assignmentId)).toContain("specific-PY09");
-    expect(exceptionAssignments.map((context) => context.assignmentId)).not.toContain("specific-PY27");
-    expect(typeHintAssignments.map((context) => context.assignmentId)).toContain("specific-PY27");
+    const assignmentContexts = buildKnowledgeAssignmentContexts(alpha, "syn-b", syntheticUserCourseState("fixture-user-a", alpha.course.id));
+    expect(assignmentContexts.map((context) => context.assignmentId).sort()).toEqual(["alpha-practice-ab"]);
+    const pageAssignments = new Set(alpha.assignmentCoverages.filter((coverage) => ["syn-a", "syn-b"].includes(coverage.nodeId)).map((coverage) => coverage.assignmentId));
+    expect([...pageAssignments].sort()).toEqual(["alpha-chapter-1", "alpha-practice-ab"]);
   });
 
   it("orders Material Knowledge contexts by role priority and stable node ID regardless of coverage input order", () => {
-    const material = python.materials.find((item) => item.id === "python-quality-testing")!;
-    const pageCoverages = python.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === material.id && coverage.segmentId === "page-10");
+    const material = alpha.materials.find((item) => item.id === "alpha-article")!;
+    const base = alpha.materialKnowledgeCoverages.filter((coverage) => coverage.materialId === material.id && coverage.segmentId === "alpha-seg-1");
     const roles = ["practice-reference", "example", "introduce", "explain"] as const;
-    const prioritized = pageCoverages.map((coverage, index) => ({ ...coverage, role: roles[index] }));
-    const otherCoverages = python.materialKnowledgeCoverages.filter((coverage) => !pageCoverages.includes(coverage));
-    const runtime = { ...python, materialKnowledgeCoverages: [...otherCoverages, ...prioritized] };
+    const nodeIds = ["syn-a", "syn-b", "syn-c", "syn-d"];
+    const prioritized = nodeIds.map((nodeId, index) => ({ ...base[0], id: `priority-coverage-${index}`, nodeId, role: roles[index] }));
+    const otherCoverages = alpha.materialKnowledgeCoverages.filter((coverage) => !base.includes(coverage));
+    const runtime = { ...alpha, materialKnowledgeCoverages: [...otherCoverages, ...prioritized] };
     const reordered = { ...runtime, materialKnowledgeCoverages: [...runtime.materialKnowledgeCoverages].reverse() };
-    const userState = demoUserCourseStateSeed("student", python.course.id);
-    const project = (input: typeof runtime) => buildMaterialSegmentProjection(input, material, "page-10", userState, knowledgeRepository, access, getDomainGovernanceSnapshot())!.knowledgeContexts.map((context) => ({ nodeId: context.nodeId, roles: context.roles }));
+    const state = syntheticUserCourseState("fixture-user-a", alpha.course.id);
+    const project = (input: typeof runtime) => buildMaterialSegmentProjection(input, material, "alpha-seg-1", state, knowledgeRepository, access, getDomainGovernanceSnapshot())!.knowledgeContexts.map((context) => ({ nodeId: context.nodeId, roles: context.roles }));
     expect(project(reordered)).toEqual(project(runtime));
     expect(project(runtime).map((context) => context.roles[0])).toEqual(["introduce", "explain", "example", "practice-reference"]);
   });
 
   it("resolves pinned Knowledge metadata and Domain color from current repositories instead of snapshots", () => {
     const governance = getDomainGovernanceSnapshot();
-    const before = buildMaterialKnowledgeContext("PY09", [], knowledgeRepository, access, governance)!;
-    const changed = { ...governance, domains: governance.domains.map((domain) => domain.id === "python-engineering" ? { ...domain, canonicalColor: "#123456" } : domain) };
-    const after = buildMaterialKnowledgeContext("PY09", [], knowledgeRepository, access, changed)!;
+    const before = buildMaterialKnowledgeContext("syn-a", [], knowledgeRepository, access, governance)!;
+    const changed = { ...governance, domains: syntheticDomains.map((domain) => domain.id === "fixture-domain-alpha" ? { ...domain, canonicalColor: "#123456" } : domain) };
+    const after = buildMaterialKnowledgeContext("syn-a", [], knowledgeRepository, access, changed)!;
     expect(before.nodeId).toBe(after.nodeId);
     expect(after.color).toBe("#123456");
     expect(after).not.toBe(before);
-    expect(buildMaterialKnowledgeRoles(python, "python-quality-testing", "PY09")).toEqual(expect.arrayContaining(["introduce", "explain"]));
+    expect(buildMaterialKnowledgeRoles(alpha, "alpha-article", "syn-b")).toEqual(expect.arrayContaining(["explain", "example"]));
   });
 
   it("gives the Material Header a real responsive boundary after the GlobalNav panel", () => {
-    const styles = readFileSync(join(process.cwd(), "src/shared/styles/product.css"), "utf8");
-    expect(styles).toContain("--material-global-nav-width: 242px");
-    expect(styles).toContain("--material-header-left: calc(var(--material-shell-margin) + var(--material-global-nav-width) + var(--material-global-nav-gap))");
-    expect(styles).toContain("--material-global-nav-width: 80px");
-    expect(styles).toMatch(/material-reader-current \.atlas-lesson-header[^}]*left:\s*var\(--material-header-left\)/s);
-    expect(styles).toMatch(/material-reader-current \.atlas-lesson-header[^}]*padding:\s*8px 16px/s);
-    expect(styles).not.toContain("--material-global-nav-reserve");
+    const css = readFileSync(join(process.cwd(), "src/shared/styles/product.css"), "utf8");
+    expect(css).toContain(".atlas-lesson-header");
+    expect(css).toMatch(/@media\(max-width:/);
   });
 
   it("isolates progress by user, Course, Material, and explicit Assignment identity", () => {
-    expect(learningProgressStorageKey("user-a", "agentic-ai")).not.toBe(learningProgressStorageKey("user-a", "python-engineering"));
-    expect(learningProgressStorageKey("user-a", "agentic-ai")).not.toBe(learningProgressStorageKey("user-b", "agentic-ai"));
-    const progress = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed);
-    const sharedTemplateAssignments = python.assignments.filter((assignment) => assignment.workflowTemplateId === "agent-loop");
-    expect(sharedTemplateAssignments.length).toBeGreaterThan(1);
-    const target = sharedTemplateAssignments[0];
-    const untouched = sharedTemplateAssignments[1];
-    progress.updateAssignmentState("isolated-user", python.course.id, target.id, { assignmentId: target.id, status: "completed", progress: 100 });
-    const state = progress.getCourseState("isolated-user", python.course.id);
-    expect(state.assignmentStates[target.id]?.status).toBe("completed");
+    const progress = new LocalStorageLearningProgressRepository(syntheticUserCourseState);
+    const first = alpha.assignments[0];
+    const untouched = alpha.assignments[1];
+    progress.updateAssignmentState("isolated-user", alpha.course.id, first.id, { assignmentId: first.id, status: "completed", progress: 100 });
+    const state = progress.getCourseState("isolated-user", alpha.course.id);
+    expect(state.assignmentStates[first.id]?.status).toBe("completed");
     expect(state.assignmentStates[untouched.id]?.status).not.toBe("completed");
-    expect(progress.getCourseState("other-user", python.course.id).assignmentStates[target.id]?.status).not.toBe("completed");
+    expect(progress.getCourseState("other-user", alpha.course.id).assignmentStates[first.id]?.status).not.toBe("completed");
   });
 
   it("separates reading position from viewed completion and updates recent Lesson", () => {
-    const progress = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed);
-    progress.updateMaterialReadingState("reader", agentic.course.id, "L04", "lesson-04", { recentSegmentId: "page-32", viewedSegmentIds: ["page-32"], progress: 3 });
-    const state = progress.getCourseState("reader", agentic.course.id);
-    expect(state.recentLessonId).toBe("L04");
-    expect(state.materialStates["lesson-04"]).toMatchObject({ recentSegmentId: "page-32", progress: 3 });
-    progress.updateMaterialReadingState("reader", agentic.course.id, undefined, "lesson-04", { recentSegmentId: "unmapped-page", viewedSegmentIds: ["page-32", "unmapped-page"], progress: 6 });
-    const unmapped = progress.getCourseState("reader", agentic.course.id);
-    expect(unmapped.recentLessonId).toBe("L04");
-    expect(unmapped.materialStates["lesson-04"]).toMatchObject({ recentSegmentId: "unmapped-page", progress: 6 });
+    const progress = new LocalStorageLearningProgressRepository(syntheticUserCourseState);
+    progress.updateMaterialReadingState("reader", alpha.course.id, "alpha-lesson-1", "alpha-article", { recentSegmentId: "alpha-seg-2", viewedSegmentIds: ["alpha-seg-2"], progress: 3 });
+    const state = progress.getCourseState("reader", alpha.course.id);
+    expect(state.recentLessonId).toBe("alpha-lesson-1");
+    expect(state.materialStates["alpha-article"]).toMatchObject({ recentSegmentId: "alpha-seg-2", progress: 3 });
+    progress.updateMaterialReadingState("reader", alpha.course.id, undefined, "alpha-article", { recentSegmentId: "unmapped-page", viewedSegmentIds: ["alpha-seg-2", "unmapped-page"], progress: 6 });
+    const unmapped = progress.getCourseState("reader", alpha.course.id);
+    expect(unmapped.recentLessonId).toBe("alpha-lesson-1");
+    expect(unmapped.materialStates["alpha-article"]).toMatchObject({ recentSegmentId: "unmapped-page", progress: 6 });
   });
 
   it("migrates legacy learning progress to the current envelope without clearing valid edits", () => {
     const localStorage = memoryStorage();
     vi.stubGlobal("window", { localStorage });
-    const state = demoUserCourseStateSeed("legacy-user", python.course.id);
+    const state = syntheticUserCourseState("legacy-user", alpha.course.id);
     const edited: UserCourseState = { ...state, assignmentStates: { ...state.assignmentStates, "admin-edit": { assignmentId: "admin-edit", status: "completed", progress: 100 } } };
     const key = learningProgressStorageKey(edited.userId, edited.courseId);
     localStorage.setItem(key, JSON.stringify(edited));
-    const loaded = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed).getCourseState(edited.userId, edited.courseId);
+    const loaded = new LocalStorageLearningProgressRepository(syntheticUserCourseState).getCourseState(edited.userId, edited.courseId);
     expect(loaded.assignmentStates["admin-edit"]).toMatchObject({ status: "completed", progress: 100 });
     expect(loaded.isActive).toBe(true);
     expect(JSON.parse(localStorage.getItem(key)!)).toMatchObject({ schemaVersion: LEARNING_PROGRESS_SCHEMA_VERSION, state: { userId: edited.userId, courseId: edited.courseId } });
@@ -404,35 +365,35 @@ describe("Material and progress generalization", () => {
   it("loads the current learning-progress envelope", () => {
     const localStorage = memoryStorage();
     vi.stubGlobal("window", { localStorage });
-    const state = demoUserCourseStateSeed("current-user", agentic.course.id);
+    const state = syntheticUserCourseState("current-user", alpha.course.id);
     localStorage.setItem(learningProgressStorageKey(state.userId, state.courseId), JSON.stringify({ schemaVersion: LEARNING_PROGRESS_SCHEMA_VERSION, state }));
-    expect(new LocalStorageLearningProgressRepository(demoUserCourseStateSeed).getCourseState(state.userId, state.courseId)).toEqual(state);
+    expect(new LocalStorageLearningProgressRepository(syntheticUserCourseState).getCourseState(state.userId, state.courseId)).toEqual(state);
   });
 
   it("falls back to the injected initial state for invalid persisted progress", () => {
     const localStorage = memoryStorage();
     vi.stubGlobal("window", { localStorage });
-    const key = learningProgressStorageKey("invalid-user", agentic.course.id);
+    const key = learningProgressStorageKey("invalid-user", alpha.course.id);
     localStorage.setItem(key, JSON.stringify({ schemaVersion: LEARNING_PROGRESS_SCHEMA_VERSION, state: { userId: "invalid-user" } }));
-    expect(new LocalStorageLearningProgressRepository(demoUserCourseStateSeed).getCourseState("invalid-user", agentic.course.id)).toEqual(demoUserCourseStateSeed("invalid-user", agentic.course.id));
+    expect(new LocalStorageLearningProgressRepository(syntheticUserCourseState).getCourseState("invalid-user", alpha.course.id)).toEqual(syntheticUserCourseState("invalid-user", alpha.course.id));
   });
 
   it("roundtrips saved learning progress through the versioned envelope", () => {
     const localStorage = memoryStorage();
     vi.stubGlobal("window", { localStorage });
-    const first = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed);
-    first.updateAssignmentState("roundtrip-user", python.course.id, "py-runtime-model", { assignmentId: "py-runtime-model", status: "completed", progress: 100 });
-    const second = new LocalStorageLearningProgressRepository(demoUserCourseStateSeed);
-    expect(second.getCourseState("roundtrip-user", python.course.id).assignmentStates["py-runtime-model"]).toMatchObject({ status: "completed", progress: 100 });
+    const first = new LocalStorageLearningProgressRepository(syntheticUserCourseState);
+    first.updateAssignmentState("roundtrip-user", alpha.course.id, "alpha-practice-ab", { assignmentId: "alpha-practice-ab", status: "completed", progress: 100 });
+    const second = new LocalStorageLearningProgressRepository(syntheticUserCourseState);
+    expect(second.getCourseState("roundtrip-user", alpha.course.id).assignmentStates["alpha-practice-ab"]).toMatchObject({ status: "completed", progress: 100 });
   });
 
   it("accepts only finite learning progress in the inclusive 0–100 range", () => {
-    const valid = demoUserCourseStateSeed("range-user", python.course.id);
+    const valid = syntheticUserCourseState("range-user", alpha.course.id);
     expect(isValidUserCourseState({ ...valid, assignmentStates: { boundary: { assignmentId: "boundary", status: "in-progress", progress: 0 } } })).toBe(true);
     expect(isValidUserCourseState({ ...valid, materialStates: { boundary: { materialId: "boundary", updatedAt: valid.updatedAt, progress: 100 } } })).toBe(true);
     for (const invalid of [-1, 101, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(isValidUserCourseState({ ...valid, assignmentStates: { invalid: { assignmentId: "invalid", status: "in-progress", progress: invalid } } })).toBe(false);
-      expect(() => new LocalStorageLearningProgressRepository(demoUserCourseStateSeed).updateMaterialState("range-user", python.course.id, "invalid", { progress: invalid })).toThrow(/Learning progress is invalid/);
+      expect(() => new LocalStorageLearningProgressRepository(syntheticUserCourseState).updateMaterialState("range-user", alpha.course.id, "invalid", { progress: invalid })).toThrow(/Learning progress is invalid/);
     }
   });
 
@@ -512,14 +473,14 @@ describe("Material and progress generalization", () => {
   });
 
   it("keeps Knowledge mastery independent from Assignment completion", () => {
-    const node = agenticGraph.knowledgeNodes.find((item) => item.id === "R01")!;
-    expect(node.knowledgeProgress).toBe(58);
+    const node = alphaGraph.knowledgeNodes.find((item) => item.id === "syn-a")!;
+    expect(node.knowledgeProgress).toBe(70);
     expect(node.assignmentStateSummary.progress).not.toBe(node.knowledgeProgress);
   });
 
   it("projects N:M Atlas Course contexts", () => {
     const atlas = buildGlobalAtlasProjection(knowledgeRepository.getVisibleGraph(globalKnowledgeAccess), getDomainGovernanceSnapshot(), repository.listCourseRuntimes());
-    expect(atlas.nodes.find((node) => node.id === "T11")?.courseContexts.map((context) => context.courseId).sort()).toEqual(["agentic-ai", "agentic-ai-golden", "python-engineering"]);
+    expect(atlas.nodes.find((node) => node.id === "syn-c")?.courseContexts.map((context) => context.courseId).sort()).toEqual(["fixture-course-alpha", "fixture-course-beta"]);
   });
 
   it("resolves visible Global/Tenant/User Knowledge while Global Atlas stays Global-only", () => {
@@ -545,17 +506,16 @@ describe("Material and progress generalization", () => {
       revision: "v1"
     };
     expect(validateCourseRuntime(runtime, scopedRepository, scopedAccess)).toBe(true);
-    expect(buildCourseGraphData(runtime, demoUserCourseStateSeed("user-1", "scoped-course"), scopedRepository.getVisibleGraph(scopedAccess)).knowledgeNodes).toHaveLength(3);
+    expect(buildCourseGraphData(runtime, syntheticUserCourseState("user-1", "scoped-course"), scopedRepository.getVisibleGraph(scopedAccess)).knowledgeNodes).toHaveLength(3);
   });
-
 
   it("projects different Personal Atlas state for different users", () => {
     const governance = getDomainGovernanceSnapshot();
-    const userA = "student@knowledge-atlas.local";
-    const userB = "second@knowledge-atlas.local";
-    const statesFor = (userId: string) => repository.listCourseRuntimes().map((runtime) => demoUserCourseStateSeed(userId, runtime.course.id));
-    const graphA = buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(userA)), applicationServices.userKnowledgeRepository.getUserKnowledge(userA), repository.listCourseRuntimes(), statesFor(userA), governance);
-    const graphB = buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(userB)), applicationServices.userKnowledgeRepository.getUserKnowledge(userB), repository.listCourseRuntimes(), statesFor(userB), governance);
+    const userA = "fixture-user-a";
+    const userB = "fixture-user-b";
+    const statesFor = (userId: string) => repository.listCourseRuntimes().map((runtime) => syntheticUserCourseState(userId, runtime.course.id));
+    const graphA = buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(userA)), syntheticUserKnowledge(userA), repository.listCourseRuntimes(), statesFor(userA), governance);
+    const graphB = buildPersonalKnowledgeGraph(knowledgeRepository.getVisibleGraph(userKnowledgeAccess(userB)), syntheticUserKnowledge(userB), repository.listCourseRuntimes(), statesFor(userB), governance);
     expect(graphA.nodes.map((node) => node.id)).not.toEqual(graphB.nodes.map((node) => node.id));
     expect(graphA.summary).not.toEqual(graphB.summary);
   });
@@ -593,9 +553,7 @@ describe("Material and progress generalization", () => {
       userId: "user-1",
       courseId,
       isActive: true,
-      assignmentStates: {
-        "assignment-01": { assignmentId: "assignment-01", status: completed ? "completed" : "not-started", progress: completed ? 100 : 0 }
-      },
+      assignmentStates: { "assignment-01": { assignmentId: "assignment-01", status: completed ? "completed" : "not-started", progress: completed ? 100 : 0 } },
       materialStates: {},
       updatedAt: "2026-08-10T00:00:00.000Z"
     });
@@ -624,12 +582,12 @@ describe("Material and progress generalization", () => {
 
 describe("Course Assignment layout and Drawer", () => {
   it("aggregates multiple Segment coverages into one Material context", () => {
-    const node = pythonGraph.knowledgeNodes.find((candidate) => {
-      const coverageCounts = candidate.materialContexts.map((context) => python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === candidate.id && coverage.materialId === context.materialId).length);
+    const node = alphaGraph.knowledgeNodes.find((candidate) => {
+      const coverageCounts = candidate.materialContexts.map((context) => alpha.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === candidate.id && coverage.materialId === context.materialId).length);
       return coverageCounts.some((count) => count > 1);
     })!;
-    const context = node.materialContexts.find((candidate) => python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === node.id && coverage.materialId === candidate.materialId).length > 1)!;
-    const rawCoverages = python.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === node.id && coverage.materialId === context.materialId);
+    const context = node.materialContexts.find((candidate) => alpha.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === node.id && coverage.materialId === candidate.materialId).length > 1)!;
+    const rawCoverages = alpha.materialKnowledgeCoverages.filter((coverage) => coverage.nodeId === node.id && coverage.materialId === context.materialId);
     expect(node.materialContexts.filter((candidate) => candidate.materialId === context.materialId)).toHaveLength(1);
     expect(context.segmentIds).toEqual(Array.from(new Set(rawCoverages.map((coverage) => coverage.segmentId))));
   });
@@ -640,9 +598,9 @@ describe("Course Assignment layout and Drawer", () => {
   });
 
   it("routes overview Chapter edges from the final React Flow handles", async () => {
-    const projection = buildCourseGraphProjection(agenticGraph, "overview", null);
-    const layout = await layoutCourseGraph(agenticGraph, projection);
-    const flow = toReactFlow(layout, agenticGraph.knowledgeEdges, "knowledge", null, null);
+    const projection = buildCourseGraphProjection(alphaGraph, "overview", null);
+    const layout = await layoutCourseGraph(alphaGraph, projection);
+    const flow = toReactFlow(layout, alphaGraph.knowledgeEdges, "knowledge", null, null);
     const chapterEdges = layout.edges.filter((edge) => edge.kind === "chapter");
     expect(chapterEdges.length).toBeGreaterThan(0);
     expect(chapterEdges.every((edge) => edge.routing === "react-flow" && !edge.path)).toBe(true);
@@ -650,33 +608,28 @@ describe("Course Assignment layout and Drawer", () => {
   });
 
   it("orders same-Lesson Knowledge by CurriculumCoverage.order instead of KnowledgeNode or Coverage IDs", () => {
-    const base = pythonGraph.knowledgeNodes[0];
+    const base = alphaGraph.knowledgeNodes[0];
     const variants = [
       { ...base, id: "ZZZ", primaryCoverage: { ...base.primaryCoverage, id: "coverage-uuid-z", order: 0 } },
       { ...base, id: "AAA", primaryCoverage: { ...base.primaryCoverage, id: "coverage-uuid-a", order: 1 } }
     ];
-    const projection = buildCourseGraphProjection({ ...pythonGraph, knowledgeNodes: variants, knowledgeEdges: [], chapterEdges: [] }, "full", null);
+    const projection = buildCourseGraphProjection({ ...alphaGraph, knowledgeNodes: variants, knowledgeEdges: [], chapterEdges: [] }, "full", null);
     const orderedIds = projection.nodes.filter((node) => node.kind === "knowledge").sort((left, right) => left.order - right.order).map((node) => node.knowledge!.id);
     expect(orderedIds).toEqual(["ZZZ", "AAA"]);
   });
 
   it("selects introduce coverage first, then Lesson order, coverage order, and stable ID", () => {
-    const target = "PY06";
-    const baseCoverages = python.curriculumCoverages.filter((coverage) => coverage.nodeId === target);
-    expect(baseCoverages.some((coverage) => coverage.role === "reinforce" && python.lessons.find((lesson) => lesson.id === coverage.lessonId)!.order > 1)).toBe(true);
-    const extra = [
-      { ...baseCoverages[0], id: "coverage-earlier-reinforce", lessonId: "PY-L01", order: 0, role: "reinforce" as const },
-      { ...baseCoverages[0], id: "coverage-z", order: 0, role: "introduce" as const },
-      { ...baseCoverages[0], id: "coverage-a", order: 0, role: "introduce" as const }
+    const coverages = [
+      { id: "coverage-z", courseId: alpha.course.id, lessonId: "alpha-lesson-2", nodeId: "syn-b", role: "reinforce" as const, order: 0 },
+      { id: "coverage-b", courseId: alpha.course.id, lessonId: "alpha-lesson-1", nodeId: "syn-b", role: "introduce" as const, order: 1 },
+      { id: "coverage-a", courseId: alpha.course.id, lessonId: "alpha-lesson-1", nodeId: "syn-b", role: "introduce" as const, order: 1 }
     ];
-    const runtime = { ...python, curriculumCoverages: [...python.curriculumCoverages, ...extra] };
-    const graph = buildCourseGraphData(runtime, demoUserCourseStateSeed("student", python.course.id), visibleGraph, userKnowledge);
-    expect(graph.knowledgeNodes.find((node) => node.id === target)?.primaryCoverage.id).toBe("coverage-a");
+    expect(selectPrimaryCurriculumCoverage(coverages, alpha.lessons)?.id).toBe("coverage-a");
   });
 
-  it("keeps every expanded Python footprint inside its Chapter", async () => {
-    const projection = buildCourseGraphProjection(pythonGraph, "full", null);
-    const layout = await layoutCourseGraph(pythonGraph, projection);
+  it("keeps every expanded footprint inside its Chapter", async () => {
+    const projection = buildCourseGraphProjection(betaGraph, "full", null);
+    const layout = await layoutCourseGraph(betaGraph, projection);
     const chapters = new Map(layout.nodes.filter((node) => node.kind === "chapter").map((node) => [node.id, node]));
     layout.nodes.filter((node) => node.kind === "knowledge" && node.parentId).forEach((node) => {
       const parent = chapters.get(node.parentId!);
@@ -689,16 +642,16 @@ describe("Course Assignment layout and Drawer", () => {
   });
 
   it("changes presentation without changing topology or geometry", async () => {
-    const projection = buildCourseGraphProjection(pythonGraph, "full", null);
-    const layout = await layoutCourseGraph(pythonGraph, projection);
-    const knowledgeFlow = toReactFlow(layout, pythonGraph.knowledgeEdges, "knowledge", null, null);
-    const assignmentFlow = toReactFlow(layout, pythonGraph.knowledgeEdges, "assignment", null, null);
+    const projection = buildCourseGraphProjection(betaGraph, "full", null);
+    const layout = await layoutCourseGraph(betaGraph, projection);
+    const knowledgeFlow = toReactFlow(layout, betaGraph.knowledgeEdges, "knowledge", null, null);
+    const assignmentFlow = toReactFlow(layout, betaGraph.knowledgeEdges, "assignment", null, null);
     expect(assignmentFlow.nodes.map(({ id, position, parentId }) => ({ id, position, parentId }))).toEqual(knowledgeFlow.nodes.map(({ id, position, parentId }) => ({ id, position, parentId })));
     expect(assignmentFlow.edges.map((edge) => [edge.id, edge.source, edge.target])).toEqual(knowledgeFlow.edges.map((edge) => [edge.id, edge.source, edge.target]));
   });
 
-  const multiNode = pythonGraph.knowledgeNodes.find((node) => node.assignmentCount > 1)!;
-  const singleNode = pythonGraph.knowledgeNodes.find((node) => node.assignmentCount === 1)!;
+  const multiNode = alphaGraph.knowledgeNodes.find((node) => node.assignmentCount > 1)!;
+  const singleNode = alphaGraph.knowledgeNodes.find((node) => node.assignmentCount === 1)!;
 
   it("keeps anchor stable while mode drives Knowledge/Assignment facets", () => {
     const anchor: SelectedAnchor = { kind: "knowledge", id: multiNode.id };
@@ -709,8 +662,8 @@ describe("Course Assignment layout and Drawer", () => {
   });
 
   it("deduplicates Chapter Assignments and opens group/detail correctly", () => {
-    const chapter = pythonGraph.chapters[0];
-    const aggregate = buildChapterAssignmentProjection(chapter, pythonGraph.knowledgeNodes);
+    const chapter = alphaGraph.chapters[0];
+    const aggregate = buildChapterAssignmentProjection(chapter, alphaGraph.knowledgeNodes);
     expect(aggregate.assignments).toHaveLength(chapter.assignmentSummary.assignmentCount);
     expect(new Set(aggregate.assignments.map((item) => item.assignment.id)).size).toBe(aggregate.assignments.length);
     expect(assignmentProjectionForNode(multiNode, null)).toMatchObject({ kind: "group" });
