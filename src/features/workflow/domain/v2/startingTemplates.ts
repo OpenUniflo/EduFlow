@@ -2,7 +2,7 @@ import { createEditorV2, createNodeV2, stateBinding, workflowPolicy } from "./fa
 import type { Binding, JsonSchema, JsonValue, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowNodeV2, WorkflowTool } from "./types";
 
 /**
- * Product-owned starting flows. They are not Demo fixtures and never import src/demo:
+ * Product-owned starting flows. They are not sample fixtures:
  * the canvas writes them locally, and the user's first save persists them as a normal Workflow.
  */
 export type StartingTemplateKind = "assistant" | "search" | "triage";

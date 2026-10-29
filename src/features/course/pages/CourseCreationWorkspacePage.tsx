@@ -32,7 +32,7 @@ function operationLabel(operation: CourseCreatorOperation, titleById: Map<string
 const graphCallbacks = { onChapterClick: () => {}, onChapterDoubleClick: () => {}, onKnowledgeClick: () => {}, onAssignmentClick: () => {} };
 function creatorPublishValidation(runtime:CourseRuntimeData) { const knowledgeCount=new Set(runtime.curriculumCoverages.map((item)=>item.nodeId)).size; const materialCovered=new Set(runtime.materialKnowledgeCoverages.map((item)=>item.nodeId)).size; const assignmentCovered=new Set(runtime.assignmentCoverages.map((item)=>item.nodeId)).size; return {valid:Boolean(runtime.chapters.length&&runtime.lessons.length&&knowledgeCount),knowledgeCount,materialCovered,assignmentCovered,warnings:{missingMaterial:knowledgeCount-materialCovered,missingAssignment:knowledgeCount-assignmentCovered,microCoverageAvailable:false}}; }
 
-export function CourseCreationWorkspacePage({ session, onLogout, resolver, entryMode="learner" }: { session: MockSession; onLogout(): void; resolver: CourseCreationScenarioResolver; entryMode?:"learner"|"teacher" }) {
+export function CourseCreationWorkspacePage({ session, onLogout, resolver, entryMode="learner" }: { session: MockSession; onLogout(): void; resolver?: CourseCreationScenarioResolver; entryMode?:"learner"|"teacher" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const routeParams = new URLSearchParams(location.search); const briefMessageId = routeParams.get("briefId"); const teacherCourseId=routeParams.get("courseId"); const isTeacher=entryMode==="teacher";
@@ -108,6 +108,7 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver, entry
   }, [briefMessageId,isTeacher,teacherCourseId]);
   useEffect(() => {
     let alive = true;
+    if (!resolver) { setGoldenReference(null); return () => { alive = false; }; }
     void resolver.resolve(files).then((scenario) => { if (alive) setGoldenReference(scenario); });
     return () => { alive = false; };
   }, [files, resolver]);

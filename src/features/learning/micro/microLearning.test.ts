@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { demoMicroLearningProvider } from "@/demo/learning/demoMicroLearningProvider";
+import { syntheticMicroProvider } from "../../../../tests/fixtures/micro";
 import {
   canCompleteMicroLesson,
   createMicroLearningNavigation,
@@ -33,8 +33,8 @@ describe("Micro Learning navigation", () => {
     expect(isMicroReviewSubmissionCorrect({type:"h5p",contentRef:"h5p/other"},completedH5p)).toBe(false);
   });
   it("carries Learning Home as the explicit return target", () => {
-    expect(createMicroLearningNavigation("AG01", { courseId: "agentic-ai", returnTo: "/" })).toEqual({
-      to: "/learn/micro/AG01?courseId=agentic-ai",
+    expect(createMicroLearningNavigation("syn-a", { courseId: "fixture-course-alpha", returnTo: "/" })).toEqual({
+      to: "/learn/micro/syn-a?courseId=fixture-course-alpha",
       state: { returnTo: "/" }
     });
     const learningPage = readFileSync(join(process.cwd(), "src/features/learning/pages/LearningPage.tsx"), "utf8");
@@ -42,27 +42,27 @@ describe("Micro Learning navigation", () => {
   });
 
   it("carries the current Course route as the explicit return target", () => {
-    expect(createMicroLearningNavigation("AG01", { courseId: "agentic-ai", returnTo: "/courses/agentic-ai" })).toEqual({
-      to: "/learn/micro/AG01?courseId=agentic-ai",
-      state: { returnTo: "/courses/agentic-ai" }
+    expect(createMicroLearningNavigation("syn-a", { courseId: "fixture-course-alpha", returnTo: "/courses/fixture-course-alpha" })).toEqual({
+      to: "/learn/micro/syn-a?courseId=fixture-course-alpha",
+      state: { returnTo: "/courses/fixture-course-alpha" }
     });
-    expect(resolveMicroLearningReturnTarget({ returnTo: "/courses/agentic-ai/chapters/chapter-1?mode=knowledge" }, "agentic-ai"))
-      .toBe("/courses/agentic-ai/chapters/chapter-1?mode=knowledge");
+    expect(resolveMicroLearningReturnTarget({ returnTo: "/courses/fixture-course-alpha/chapters/fixture-chapter?mode=knowledge" }, "fixture-course-alpha"))
+      .toBe("/courses/fixture-course-alpha/chapters/fixture-chapter?mode=knowledge");
     const coursePage = readFileSync(join(process.cwd(), "src/features/course/pages/CourseGraphPage.tsx"), "utf8");
     expect(coursePage).toContain("returnTo:`${location.pathname}${location.search}`");
   });
 
   it("uses deterministic safe fallbacks for refreshes and rejects external targets", () => {
-    expect(resolveMicroLearningReturnTarget(undefined, "agentic-ai")).toBe("/courses/agentic-ai");
+    expect(resolveMicroLearningReturnTarget(undefined, "fixture-course-alpha")).toBe("/courses/fixture-course-alpha");
     expect(resolveMicroLearningReturnTarget(undefined)).toBe("/");
-    expect(resolveMicroLearningReturnTarget({ returnTo: "https://evil.example.com" }, "agentic-ai")).toBe("/courses/agentic-ai");
+    expect(resolveMicroLearningReturnTarget({ returnTo: "https://evil.example.com" }, "fixture-course-alpha")).toBe("/courses/fixture-course-alpha");
     expect(resolveMicroLearningReturnTarget({ returnTo: "//evil.example.com" })).toBe("/");
     expect(resolveMicroLearningReturnTarget({ returnTo: "/\\evil.example.com" })).toBe("/");
   });
 
   it("exposes executable Micro navigation only for Provider-supported knowledge", () => {
-    expect(demoMicroLearningProvider.getLesson("AG01", { courseId: "agentic-ai-golden" })).not.toBeNull();
-    expect(demoMicroLearningProvider.getLesson("CDS525-K056", { courseId: "cds525-deep-learning" })).toBeNull();
+    expect(syntheticMicroProvider.getLesson("syn-a", { courseId: "fixture-course-alpha" })).not.toBeNull();
+    expect(syntheticMicroProvider.getLesson("missing-node", { courseId: "fixture-course-alpha" })).toBeNull();
 
     const coursePage = readFileSync(join(process.cwd(), "src/features/course/pages/CourseGraphPage.tsx"), "utf8");
     expect(coursePage).toContain("selectedMicroLesson ? <button");
@@ -119,11 +119,6 @@ describe("Micro Learning assessment integrity", () => {
     expect(reviewBranch).not.toContain("refreshLearnerState");
     expect(source).toContain("repository.completeStep(path.id,unitId,stepId");
     expect(source).toContain("主动复习不会清空进度、重复完成证据或降低学习状态");
-  });
-
-  it("does not expose the deferred fake Matching interaction in Golden lessons", () => {
-    const demoProvider = readFileSync(join(process.cwd(), "src/demo/learning/demoMicroLearningProvider.ts"), "utf8");
-    expect(demoProvider).not.toMatch(/type:\s*["']matching["']/);
   });
 
   it("keeps the production Micro composition root database-backed without a Demo fallback", () => {

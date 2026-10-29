@@ -2,10 +2,9 @@ mkdirSync("artifacts/workflow/acceptance/evidence",{recursive:true});
 mkdirSync("artifacts/workflow/acceptance/reports",{recursive:true});
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {randomUUID,createHash} from 'node:crypto';
+import {createHash} from 'node:crypto';
 import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {createClient} from '@supabase/supabase-js';
-import {workspaceWorkflowExamples} from '../../../src/demo/workflow/workspaceWorkflowTemplates';
 
 process.loadEnvFile('.env.local');
 const url=new URL(process.env.SUPABASE_URL!);
@@ -37,12 +36,12 @@ const heads={data:await ownedRows<{workflow_id:string;current_revision:number}>(
 const threads={data:await ownedRows<{thread_id:string}>('workflow_execution_threads','thread_id','thread_id')};
 const runs={data:await ownedRows<{run_id:string}>('workflow_live_runs','run_id','run_id')};
 if(!apply){console.log(JSON.stringify({mode:'dry-run',batch,owner,workflows:heads.data.length,threads:threads.data.length,runs:runs.data.length}));process.exit(0);}
-type Manifest={batch:string;owner:string;url:string;targets:{workflow_id:string;current_revision:number}[];threadIds:string[];runIds:string[];examples:{creationId:string;templateId:string;name:string}[];deleted:string[];protectedBefore?:string;protectedAfter?:string;complete?:boolean;completedAt?:string};
-const manifest:Manifest=existsSync(path)?JSON.parse(readFileSync(path,'utf8')):{batch,owner,url:url.origin,targets:heads.data!,threadIds:threads.data!.map(t=>t.thread_id),runIds:runs.data!.map(r=>r.run_id),examples:workspaceWorkflowExamples().map(doc=>({creationId:randomUUID(),templateId:doc.definition.workflowId,name:doc.definition.name})),deleted:[]};
+type Manifest={batch:string;owner:string;url:string;targets:{workflow_id:string;current_revision:number}[];threadIds:string[];runIds:string[];deleted:string[];protectedBefore?:string;protectedAfter?:string;complete?:boolean;completedAt?:string};
+const manifest:Manifest=existsSync(path)?JSON.parse(readFileSync(path,'utf8')):{batch,owner,url:url.origin,targets:heads.data!,threadIds:threads.data!.map(t=>t.thread_id),runIds:runs.data!.map(r=>r.run_id),deleted:[]};
 assert.equal(manifest.owner,owner);assert.equal(manifest.url,url.origin);assert.equal(manifest.batch,batch);
 const save=()=>writeFileSync(path,JSON.stringify(manifest,null,2)+'\n');
 // A recorded batch is a fixed manifest, never "delete everything again" on a rerun.
-if(manifest.complete){for(const item of manifest.examples)await api('definitions',{id:item.creationId});console.log(JSON.stringify({batch,alreadyComplete:true,examples:manifest.examples}));process.exit(0);}
+if(manifest.complete){console.log(JSON.stringify({batch,alreadyComplete:true}));process.exit(0);}
 save();
 const quotedIds=(ids:string[])=>ids.length?ids.map(literal).join(','):"''";
 function protectedDigest(){
@@ -55,10 +54,6 @@ function protectedDigest(){
   const values=pairs.map(({schema,name,filter})=>sql(`select md5(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text)::text,'[]')) from "${schema}"."${name.split('"').join('""')}" t where ${filter};`));
   return createHash('sha256').update(JSON.stringify(values)).digest('hex');
 }
-const environments=await api('environments');const environment=environments.items.find((item:{providers:unknown[];capabilities:string[]})=>item.providers.length&&item.capabilities.includes('interrupt'));
-assert.ok(environment,'An authorized environment with model and interrupt support is required');
-const provider=environment.providers.find((item:{modelRefs:string[]})=>item.modelRefs.length);assert.ok(provider);
-const examples=workspaceWorkflowExamples(provider.ref,provider.modelRefs[0]);
 manifest.protectedBefore??=protectedDigest();save();
 for(const target of manifest.targets){
   if(manifest.deleted.includes(target.workflow_id))continue;
@@ -73,8 +68,6 @@ for(const target of manifest.targets){
 // SQL reads verify private/checkpoint data without exposing it or adding a reset API.
 for(const name of ['checkpoints','checkpoint_blobs','checkpoint_writes'])assert.equal(sql(`select count(*) from workflow_checkpoints.${name} where thread_id in (${quotedIds(manifest.threadIds)});`),'0');
 assert.equal(sql(`select count(*) from public.workflow_execution_threads where owner_user_id=${literal(owner)}::uuid;`),'0');
-const synced=await admin.from('workflow_templates').upsert(examples.map(doc=>({id:doc.definition.workflowId,name:doc.definition.name,description:doc.definition.description,definition:doc.definition})));assert.ifError(synced.error);
-for(const [index,doc] of examples.entries())await api('definitions',{},'POST',{...doc,creationId:manifest.examples[index].creationId});
 manifest.protectedAfter=protectedDigest();assert.equal(manifest.protectedAfter,manifest.protectedBefore,'Unrelated records must be unchanged');
 manifest.complete=true;manifest.completedAt=new Date().toISOString();save();
-console.log(JSON.stringify({batch,deleted:manifest.deleted.length,protectedUnchanged:true,examples:manifest.examples.map(item=>({...item,url:'http://127.0.0.1:5173/workflows/'+item.creationId}))}));
+console.log(JSON.stringify({batch,deleted:manifest.deleted.length,protectedUnchanged:true}));

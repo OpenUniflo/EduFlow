@@ -1,49 +1,53 @@
 import { describe, expect, it } from "vitest";
 import { validateGlobalKnowledgeGraph, validateKnowledgeGraph } from "@/features/knowledge/graph";
-import { buildKnowledgeEdges, createKnowledgeEdgeId, type EdgeSeed } from "@/demo/knowledge/demoKnowledgeEdgeFactory.fixture";
 import {
-  demoGlobalKnowledgeGraph as globalKnowledgeGraph,
-  demoKnowledgeEdges as knowledgeEdges,
-  demoKnowledgeNodes as knowledgeNodes
-} from "@/demo/knowledge/demoGlobalKnowledgeGraph.fixture";
+  buildKnowledgeEdges,
+  createKnowledgeEdgeId,
+  syntheticDomainAssignments,
+  syntheticDomainGovernance,
+  syntheticDomains,
+  syntheticGlobalKnowledgeGraph,
+  syntheticKnowledgeEdges,
+  syntheticKnowledgeNodes,
+  syntheticPersonalKnowledgeGraph,
+  type EdgeSeed
+} from "../../../tests/fixtures/knowledge";
+import { syntheticCourseRuntimes } from "../../../tests/fixtures/courses";
 import { buildGlobalAtlasProjection } from "@/features/knowledge/projections/atlasProjections";
 import { applyAutomaticAssignment, decideDomainAssignment, DEFAULT_DOMAIN_DISCOVERY_CONFIG, scoreNodeAgainstDomains } from "@/features/knowledge/domain/domainScoring";
-import { demoDomainDiscoveryService } from "@/demo/domains/DemoDomainDiscoveryService";
-import { demoKnowledgeDomains } from "@/demo/domains/demoDomains.fixture";
-import { demoDomainAssignments } from "@/demo/domains/demoDomainAssignments.fixture";
-import { demoDomainGovernanceSeed } from "@/demo/domains/demoDomainGovernance.seed";
 import { assignNodeDomain, assertGlobalDomainAdmin } from "@/features/knowledge/domain/domainStore";
 import { assertDomainAcceptsAssignment, assertDomainCanArchive, getDomainMembers, validateDomainGovernance } from "@/features/knowledge/domain/domainValidation";
 import { moveNodesToDomain } from "@/features/knowledge/domain/domainAssignment";
 import { atlasStructureKey, freezeAtlasNodePositions, resetAtlasCamera } from "@/features/knowledge/atlasCamera";
 import type { DomainAssignmentCandidate } from "@/features/knowledge/domain/domainTypes";
 import { canManageKnowledgeDomains } from "@/features/auth/capabilities";
-import { createDemoApplicationServices } from "@/demo/services/createDemoApplicationServices";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
+import { InMemoryKnowledgeRepository } from "@/features/knowledge/repository/InMemoryKnowledgeRepository";
 import { auditDomainRelations, validateKnowledgeRelations } from "@/features/knowledge/relationAudit";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "@/features/knowledge/types";
-import { demoPersonalKnowledgeGraph } from "@/demo/users/demoPersonalKnowledgeGraph.fixture";
 import { DOMAIN_GOVERNANCE_SCHEMA_VERSION, migrateDomainGovernanceStateToGlobalV1, reconcileDomainGovernanceState } from "@/features/knowledge/domain/LocalStorageDomainGovernanceRepository";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { DomainGovernanceService } from "@/features/knowledge/domain/DomainGovernanceService";
-import { InMemoryKnowledgeRepository } from "@/features/knowledge/repository/InMemoryKnowledgeRepository";
 import type { DomainGovernanceRepository, DomainGovernanceState } from "@/features/knowledge/domain/DomainGovernanceRepository";
 
-const applicationServices = createDemoApplicationServices();
-const getDomainGovernanceSnapshot = applicationServices.domainGovernanceService.getSnapshot;
-const atlasGraph = applicationServices.knowledgeRepository.getVisibleGraph(globalKnowledgeAccess);
-const runtimes = applicationServices.courseRepository.listCourseRuntimes();
+const knowledgeRepository = new InMemoryKnowledgeRepository(syntheticPersonalKnowledgeGraph);
+const getDomainGovernanceSnapshot = syntheticDomainGovernance;
+const atlasGraph = knowledgeRepository.getVisibleGraph(globalKnowledgeAccess);
+const runtimes = syntheticCourseRuntimes;
+const globalKnowledgeGraph = syntheticGlobalKnowledgeGraph;
+const knowledgeNodes = syntheticKnowledgeNodes;
+const knowledgeEdges = syntheticKnowledgeEdges;
 
 function candidate(score: number): DomainAssignmentCandidate {
-  return { nodeId: "new-node", domainId: "agentic-ai", score, semanticScore: score, structuralScore: score, algorithmVersion: "test", generatedAt: "2026-08-08T00:00:00.000Z" };
+  return { nodeId: "syn-f", domainId: "fixture-domain-alpha", score, semanticScore: score, structuralScore: score, algorithmVersion: "fixture", generatedAt: "2026-01-01T00:00:00.000Z" };
 }
 
 describe("Knowledge Domain invariants", () => {
   it("keeps KnowledgeNode and KnowledgeGraph free of Domain authority", () => {
     expect(knowledgeNodes.every((node) => !("domainId" in node))).toBe(true);
     expect("domains" in globalKnowledgeGraph).toBe(false);
-    expect("domains" in applicationServices.knowledgeRepository.getVisibleGraph(globalKnowledgeAccess)).toBe(false);
+    expect("domains" in knowledgeRepository.getVisibleGraph(globalKnowledgeAccess)).toBe(false);
   });
 
   it("validates canonical relation endpoints, active status, uniqueness, strength, and reasons", () => {
@@ -66,16 +70,7 @@ describe("Knowledge Domain invariants", () => {
     const nodes = [node("GLOBAL", "global"), node("USER", "user", "user-1")];
     const graph: KnowledgeGraph = {
       nodes,
-      revisions: nodes.map((item) => ({
-        id: item.currentRevisionId,
-        nodeId: item.id,
-        version: 1,
-        title: item.title,
-        description: item.description,
-        type: item.type,
-        masteryCriteria: item.masteryCriteria,
-        createdAt: "2026-08-11T00:00:00.000Z"
-      })),
+      revisions: nodes.map((item) => ({ id: item.currentRevisionId, nodeId: item.id, version: 1, title: item.title, description: item.description, type: item.type, masteryCriteria: item.masteryCriteria, createdAt: "2026-08-11T00:00:00.000Z" })),
       edges: [{ id: "shared", source: "GLOBAL", target: "USER", relation: "related", strength: 1, reason: "The nodes share a concept." }]
     };
 
@@ -154,19 +149,19 @@ describe("Knowledge Domain invariants", () => {
 
   it("keeps exactly zero or one valid primary Domain and pins admin assignments", () => {
     const snapshot = getDomainGovernanceSnapshot();
-    expect(validateDomainGovernance(demoPersonalKnowledgeGraph, snapshot)).toEqual([]);
-    expect(snapshot.assignments.find((item) => item.nodeId === "R03")).toMatchObject({ domainId: "agentic-ai", source: "admin", pinned: true });
-    expect(snapshot.assignments.find((item) => item.nodeId === "U-DEMO-01")).toMatchObject({ domainId: "agentic-ai" });
-    expect(demoDomainAssignments.every((assignment) => demoPersonalKnowledgeGraph.nodes.some((node) => node.id === assignment.nodeId))).toBe(true);
+    expect(validateDomainGovernance(syntheticPersonalKnowledgeGraph, snapshot)).toEqual([]);
+    expect(snapshot.assignments.find((item) => item.nodeId === "syn-a")).toMatchObject({ domainId: "fixture-domain-alpha", source: "admin", pinned: true });
+    expect(snapshot.assignments.find((item) => item.nodeId === "syn-user")).toMatchObject({ domainId: "fixture-domain-alpha" });
+    expect(syntheticDomainAssignments.every((assignment) => syntheticPersonalKnowledgeGraph.nodes.some((node) => node.id === assignment.nodeId))).toBe(true);
   });
 
-  it("keeps fixture location semantically inert and BR01 explicitly Unclassified", () => {
-    expect(knowledgeNodes.some((node) => node.id === "BR01")).toBe(true);
-    expect(demoDomainAssignments.some((assignment) => assignment.nodeId === "BR01")).toBe(false);
-    expect(getDomainMembers(knowledgeNodes, demoDomainAssignments, "").map((node) => node.id)).toContain("BR01");
+  it("keeps fixture location semantically inert and leaves an unclassified node", () => {
+    expect(knowledgeNodes.some((node) => node.id === "syn-f")).toBe(true);
+    expect(syntheticDomainAssignments.some((assignment) => assignment.nodeId === "syn-f")).toBe(false);
+    expect(getDomainMembers(knowledgeNodes, syntheticDomainAssignments, "").map((node) => node.id)).toContain("syn-f");
   });
 
-  it("builds stable KnowledgeEdges from Demo EdgeSeed fixtures", () => {
+  it("builds stable KnowledgeEdges from EdgeSeed fixtures", () => {
     const seeds: EdgeSeed[] = [
       ["B", "A", "related", 0.7, "B relates to A."],
       ["A", "C", "enables", 0.8, "A enables C."]
@@ -194,13 +189,13 @@ describe("Knowledge Domain invariants", () => {
   });
 
   it("never overwrites an admin-pinned assignment automatically", () => {
-    const pinned = { nodeId: "new-node", domainId: "python-engineering", source: "admin" as const, pinned: true, assignedAt: "now" };
+    const pinned = { nodeId: "syn-f", domainId: "fixture-domain-beta", source: "admin" as const, pinned: true, assignedAt: "now" };
     expect(applyAutomaticAssignment(pinned, { kind: "auto-assign", candidate: candidate(0.96) })).toBe(pinned);
   });
 
   it("scores existing Domains with semantic and factual structural evidence", () => {
     const snapshot = getDomainGovernanceSnapshot();
-    const node = knowledgeNodes.find((item) => item.id === "BR01")!;
+    const node = knowledgeNodes.find((item) => item.id === "syn-f")!;
     const scored = scoreNodeAgainstDomains(node, snapshot.domains, knowledgeNodes, knowledgeEdges, snapshot.assignments);
     expect(scored.length).toBeGreaterThan(1);
     expect(scored.every((item) => item.score === DEFAULT_DOMAIN_DISCOVERY_CONFIG.semanticWeight * item.semanticScore + DEFAULT_DOMAIN_DISCOVERY_CONFIG.structuralWeight * item.structuralScore)).toBe(true);
@@ -212,20 +207,13 @@ describe("Knowledge Domain invariants", () => {
     const before = buildGlobalAtlasProjection(atlasGraph, snapshot, runtimes);
     const changed = {
       ...snapshot,
-      assignments: [...snapshot.assignments.filter((item) => item.nodeId !== "PY46"), { nodeId: "PY46", domainId: "agentic-ai", source: "admin" as const, pinned: true, assignedAt: "now" }],
+      assignments: [...snapshot.assignments.filter((item) => item.nodeId !== "syn-c"), { nodeId: "syn-c", domainId: "fixture-domain-beta", source: "admin" as const, pinned: true, assignedAt: "now" }],
       revision: snapshot.revision + 1
     };
     const after = buildGlobalAtlasProjection(atlasGraph, changed, runtimes);
     const signature = (projection: typeof before) => ({ ids: projection.nodes.map((node) => node.id).sort(), edges: projection.edges.map((edge) => `${edge.source}:${edge.relation}:${edge.target}`).sort() });
     expect(signature(after)).toEqual(signature(before));
-    expect(after.nodes.find((node) => node.id === "PY46")?.color).toBe(demoKnowledgeDomains.find((domain) => domain.id === "agentic-ai")?.canonicalColor);
-  });
-
-  it("discovery emits reviewable proposals rather than formal Domains", () => {
-    const proposals = demoDomainDiscoveryService.discover(knowledgeNodes, demoKnowledgeDomains);
-    expect(proposals[0]).toMatchObject({ status: "pending" });
-    expect("scope" in proposals[0]).toBe(false);
-    expect(demoKnowledgeDomains.some((domain) => domain.id === proposals[0].id)).toBe(false);
+    expect(after.nodes.find((node) => node.id === "syn-c")?.color).toBe(syntheticDomains.find((domain) => domain.id === "fixture-domain-beta")?.canonicalColor);
   });
 
   it("keeps Core Domain modules free of Demo and static graph dependencies", () => {
@@ -303,31 +291,31 @@ describe("Knowledge Domain invariants", () => {
   });
 
   it("audits membership only from DomainAssignment and discovers auditable Domains dynamically", () => {
-    expect(auditDomainRelations(globalKnowledgeGraph, [], "agentic-ai").activeNodeCount).toBe(0);
+    expect(auditDomainRelations(globalKnowledgeGraph, [], "fixture-domain-alpha").activeNodeCount).toBe(0);
     const script = readFileSync(join(process.cwd(), "scripts/audit-knowledge-relations.mjs"), "utf8");
     expect(script).toContain("auditableDomains");
     expect(script).not.toContain('[["agentic-ai", "Agentic AI"]');
   });
 
   it("reconciles seed upgrades while preserving valid governance edits and explicit unassignment", () => {
-    const seed = demoDomainGovernanceSeed();
+    const seed = syntheticDomainGovernance();
     const saved = {
       ...seed,
-      domains: seed.domains.map((domain) => domain.id === "agentic-ai" ? { ...domain, name: "Renamed", canonicalColor: "#123456" } : domain),
+      domains: seed.domains.map((domain) => domain.id === "fixture-domain-alpha" ? { ...domain, name: "Renamed", canonicalColor: "#123456" } : domain),
       assignments: seed.assignments
-        .filter((assignment) => assignment.nodeId !== "U-DEMO-01" && assignment.nodeId !== "PY46")
-        .concat({ nodeId: "PY46", domainId: "agentic-ai", source: "admin", pinned: true, assignedBy: "admin", assignedAt: "now" }),
+        .filter((assignment) => assignment.nodeId !== "syn-user" && assignment.nodeId !== "syn-f")
+        .concat({ nodeId: "syn-f", domainId: "fixture-domain-alpha", source: "admin", pinned: true, assignedBy: "admin", assignedAt: "now" }),
       revision: 9
     } as typeof seed;
-    const reconciled = reconcileDomainGovernanceState(saved, seed, seed.domains.map((domain) => domain.id), seed.assignments.map((assignment) => assignment.nodeId), demoPersonalKnowledgeGraph);
-    expect(reconciled.domains.find((domain) => domain.id === "agentic-ai")).toMatchObject({ name: "Renamed", canonicalColor: "#123456" });
-    expect(reconciled.assignments.find((assignment) => assignment.nodeId === "PY46")).toMatchObject({ domainId: "agentic-ai", source: "admin", pinned: true });
-    expect(reconciled.assignments.some((assignment) => assignment.nodeId === "U-DEMO-01")).toBe(false);
+    const reconciled = reconcileDomainGovernanceState(saved, seed, seed.domains.map((domain) => domain.id), seed.assignments.map((assignment) => assignment.nodeId), syntheticPersonalKnowledgeGraph);
+    expect(reconciled.domains.find((domain) => domain.id === "fixture-domain-alpha")).toMatchObject({ name: "Renamed", canonicalColor: "#123456" });
+    expect(reconciled.assignments.find((assignment) => assignment.nodeId === "syn-f")).toMatchObject({ domainId: "fixture-domain-alpha", source: "admin", pinned: true });
+    expect(reconciled.assignments.some((assignment) => assignment.nodeId === "syn-user")).toBe(false);
     expect(reconciled.revision).toBe(9);
   });
 
   it("migrates legacy Global records, discards Tenant records, and preserves pinned Global assignments", () => {
-    const seed = demoDomainGovernanceSeed();
+    const seed = syntheticDomainGovernance();
     const legacy = {
       ...seed,
       domains: [
@@ -335,17 +323,17 @@ describe("Knowledge Domain invariants", () => {
         { ...seed.domains[1], id: "tenant-domain", scope: "tenant" }
       ],
       assignments: [
-        { nodeId: "R03", domainId: seed.domains[0].id, source: "admin", pinned: true, assignedBy: "admin", assignedAt: "now" },
-        { nodeId: "PY01", domainId: "tenant-domain", source: "admin", pinned: true, assignedBy: "tenant", assignedAt: "now" }
+        { nodeId: "syn-a", domainId: seed.domains[0].id, source: "admin", pinned: true, assignedBy: "admin", assignedAt: "now" },
+        { nodeId: "syn-b", domainId: "tenant-domain", source: "admin", pinned: true, assignedBy: "tenant", assignedAt: "now" }
       ],
-      candidates: [{ ...candidate(0.8), nodeId: "PY02", domainId: "tenant-domain" }],
+      candidates: [{ ...candidate(0.8), nodeId: "syn-b", domainId: "tenant-domain" }],
       proposals: [{ ...seed.proposals[0], id: "tenant-proposal", scope: "tenant" }]
     } as unknown as DomainGovernanceState;
     const migrated = migrateDomainGovernanceStateToGlobalV1(legacy);
     expect(DOMAIN_GOVERNANCE_SCHEMA_VERSION).toBe(2);
     expect(migrated.domains.map((domain) => domain.id)).toEqual([seed.domains[0].id]);
     expect(migrated.domains.every((domain) => !("scope" in domain))).toBe(true);
-    expect(migrated.assignments).toEqual([expect.objectContaining({ nodeId: "R03", source: "admin", pinned: true })]);
+    expect(migrated.assignments).toEqual([expect.objectContaining({ nodeId: "syn-a", source: "admin", pinned: true })]);
     expect(migrated.candidates).toEqual([]);
     expect(migrated.proposals).toEqual([]);
   });
@@ -353,21 +341,21 @@ describe("Knowledge Domain invariants", () => {
   it("treats nodes without DomainAssignment as manageable Unclassified members", () => {
     const snapshot = getDomainGovernanceSnapshot();
     const members = getDomainMembers(knowledgeNodes, snapshot.assignments, "");
-    expect(members.map((node) => node.id)).toContain("BR01");
+    expect(members.map((node) => node.id)).toContain("syn-f");
     expect(members.length).toBe(knowledgeNodes.filter((node) => node.status === "active" && !snapshot.assignments.some((assignment) => assignment.nodeId === node.id)).length);
   });
 
   it("moves Unclassified nodes with admin pinned precedence", () => {
     const snapshot = getDomainGovernanceSnapshot();
-    const moved = moveNodesToDomain(snapshot.assignments, ["BR01"], "python-engineering", { id: "admin", capabilities: ["global-domain-admin"] }, "now");
-    const assignment = moved.find((item) => item.nodeId === "BR01");
-    expect(assignment).toMatchObject({ domainId: "python-engineering", source: "admin", pinned: true });
+    const moved = moveNodesToDomain(snapshot.assignments, ["syn-f"], "fixture-domain-beta", { id: "admin", capabilities: ["global-domain-admin"] }, "now");
+    const assignment = moved.find((item) => item.nodeId === "syn-f");
+    expect(assignment).toMatchObject({ domainId: "fixture-domain-beta", source: "admin", pinned: true });
     expect(applyAutomaticAssignment(assignment, { kind: "auto-assign", candidate: candidate(0.99) })).toBe(assignment);
   });
 
   it("rejects archive while members exist and rejects assignments to archived Domains", () => {
     const snapshot = getDomainGovernanceSnapshot();
-    expect(() => assertDomainCanArchive("agentic-ai", snapshot.assignments)).toThrow(/仍包含/);
+    expect(() => assertDomainCanArchive("fixture-domain-alpha", snapshot.assignments)).toThrow(/仍包含/);
     expect(() => assertDomainCanArchive("empty-domain", snapshot.assignments)).not.toThrow();
     expect(() => assertDomainAcceptsAssignment({ ...snapshot.domains[0], status: "archived" })).toThrow(/cannot accept assignments/);
   });
@@ -396,7 +384,7 @@ describe("Knowledge Domain invariants", () => {
   });
 
   it("requires one Global Domain authority for every manual mutation", () => {
-    expect(() => assignNodeDomain({ actor: { id: "user", capabilities: [] }, access: globalKnowledgeAccess, nodeId: "R03", domainId: null })).toThrow(/global-domain-admin/);
+    expect(() => assignNodeDomain({ actor: { id: "user", capabilities: [] }, access: globalKnowledgeAccess, nodeId: "syn-a", domainId: null })).toThrow(/global-domain-admin/);
     expect(() => assertGlobalDomainAdmin({ id: "user", capabilities: [] })).toThrow(/global-domain-admin/);
     expect(() => assertGlobalDomainAdmin({ id: "global", capabilities: ["global-domain-admin"] })).not.toThrow();
   });
