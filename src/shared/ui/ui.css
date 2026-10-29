@@ -1,0 +1,1175 @@
+/* =====================================================================
+   EduFlow new-UI shared components.
+   Only tokens from src/shared/styles/tokens.css are used here:
+   font sizes, semantic colours, radii, shadows, durations and easings.
+   ===================================================================== */
+
+.ef-ui-glass-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* ---------- Glass ---------- */
+.ef-ui-glass {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  color: var(--ink);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.ef-ui-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  padding: 1.5px;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    var(--glass-edge),
+    color-mix(in srgb, var(--surface) 26%, transparent) 40%,
+    color-mix(in srgb, var(--surface) 10%, transparent) 60%,
+    color-mix(in srgb, var(--surface) 62%, transparent)
+  );
+  -webkit-mask: linear-gradient(var(--ink) 0 0) content-box, linear-gradient(var(--ink) 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(var(--ink) 0 0) content-box, linear-gradient(var(--ink) 0 0);
+  mask-composite: exclude;
+}
+
+.ef-ui-glass--regular {
+  --lg-lens: url(#lg-lens-panel);
+  background: var(--glass-regular);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
+  backdrop-filter: blur(36px) saturate(180%) var(--lg-lens);
+  box-shadow: var(--sh-2);
+}
+
+.ef-ui-glass--clear {
+  --lg-lens: url(#lg-lens-round);
+  background: var(--glass-clear);
+  -webkit-backdrop-filter: blur(8px) saturate(180%);
+  backdrop-filter: blur(8px) saturate(180%) var(--lg-lens);
+  box-shadow: var(--sh-1);
+}
+
+.ef-ui-glass--regular:hover {
+  background: var(--glass-regular-hover);
+}
+
+.ef-ui-glass--clear:hover {
+  background: var(--glass-clear-hover);
+}
+
+.ef-ui-glass--r-12,
+.ef-ui-glass--r-12::after {
+  border-radius: var(--r-12);
+}
+
+.ef-ui-glass--r-16,
+.ef-ui-glass--r-16::after {
+  border-radius: var(--r-16);
+}
+
+.ef-ui-glass--r-24,
+.ef-ui-glass--r-24::after {
+  border-radius: var(--r-24);
+}
+
+.ef-ui-glass--r-full,
+.ef-ui-glass--r-full::after {
+  border-radius: var(--r-full);
+}
+
+/* ---------- Focus ---------- */
+.ef-ui-btn:focus-visible,
+.ef-ui-chip:focus-visible,
+.ef-ui-ctx-remove:focus-visible,
+.ef-ui-send:focus-visible,
+.ef-ui-account button:focus-visible,
+.ef-ui-input:focus-visible,
+.ef-ui-textarea:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ---------- Button ---------- */
+.ef-ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  min-height: var(--ctl-40);
+  padding: 0 var(--sp-16);
+  border: 1px solid transparent;
+  border-radius: var(--r-12);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  font-weight: var(--fw-600);
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.ef-ui-btn--32 {
+  min-height: var(--ctl-32);
+  padding: 0 var(--sp-12);
+  border-radius: var(--r-8);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-ui-btn--primary {
+  background: var(--brand);
+  color: var(--surface);
+  box-shadow: var(--sh-2);
+}
+
+.ef-ui-btn--secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line-strong);
+  box-shadow: var(--sh-1);
+}
+
+.ef-ui-btn--ghost {
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.ef-ui-btn--icon {
+  width: var(--ctl-40);
+  min-width: var(--ctl-40);
+  padding: 0;
+  border-color: var(--line-strong);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.ef-ui-btn--icon.ef-ui-btn--32 {
+  width: var(--ctl-32);
+  min-width: var(--ctl-32);
+  border-radius: var(--r-8);
+}
+
+.ef-ui-btn--primary:hover:not(:disabled) {
+  background: var(--brand-ink);
+}
+
+.ef-ui-btn--secondary:hover:not(:disabled),
+.ef-ui-btn--icon:hover:not(:disabled) {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-ui-btn--ghost:hover:not(:disabled) {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-ui-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: var(--sh-1);
+}
+
+.ef-ui-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.ef-ui-btn.is-loading {
+  cursor: progress;
+}
+
+.ef-ui-spinner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-top-color: currentColor;
+  border-radius: var(--r-full);
+  animation: ef-ui-spin var(--dur-slow) var(--ease-out) infinite;
+}
+
+.ef-ui-btn--32 .ef-ui-spinner {
+  width: 12px;
+  height: 12px;
+  flex-basis: 12px;
+}
+
+/* ---------- Fields ---------- */
+.ef-ui-field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+
+.ef-ui-field-label {
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+  color: var(--ink-2);
+}
+
+.ef-ui-field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--ctl-40);
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.ef-ui-field:focus-within {
+  border-color: var(--brand);
+  box-shadow: none;
+}
+
+.ef-ui-field.is-error {
+  border-color: var(--danger);
+}
+
+.ef-ui-field-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 18px;
+  color: var(--muted);
+}
+
+.ef-ui-input,
+.ef-ui-textarea {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-ui-input::placeholder,
+.ef-ui-textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.ef-ui-textarea {
+  min-height: 80px;
+  padding: var(--sp-8) 0;
+  resize: vertical;
+}
+
+.ef-ui-help {
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  color: var(--muted);
+}
+
+.ef-ui-help.is-error {
+  color: var(--danger);
+}
+
+/* ---------- Pills / chips / context ---------- */
+.ef-ui-pill {
+  --ef-pill-color: var(--brand);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: 26px;
+  padding: var(--sp-4) var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--brand-soft);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  white-space: nowrap;
+}
+
+.ef-ui-pill-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: var(--r-full);
+  background: var(--ef-pill-color);
+}
+
+.ef-ui-pill--brand {
+  border-color: color-mix(in srgb, var(--brand) 22%, transparent);
+  color: var(--brand-ink);
+}
+
+.ef-ui-pill--acquired {
+  --ef-pill-color: var(--acquired);
+  border-color: color-mix(in srgb, var(--acquired) 24%, transparent);
+  background: var(--acquired-soft);
+}
+
+.ef-ui-pill--target {
+  --ef-pill-color: var(--target);
+  border-color: color-mix(in srgb, var(--target) 24%, transparent);
+  background: var(--target-soft);
+}
+
+.ef-ui-pill--pending {
+  --ef-pill-color: var(--pending);
+  border-color: var(--line-strong);
+  background: var(--pending-soft);
+}
+
+.ef-ui-pill--warn {
+  --ef-pill-color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 22%, transparent);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.ef-ui-pill--danger {
+  --ef-pill-color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 22%, transparent);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.ef-ui-pill--ok {
+  --ef-pill-color: var(--target);
+  border-color: color-mix(in srgb, var(--target) 24%, transparent);
+  background: var(--target-soft);
+}
+
+.ef-ui-pill--quiet {
+  --ef-pill-color: var(--muted);
+  border-color: var(--line);
+  background: var(--page);
+  color: var(--muted);
+}
+
+.ef-ui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--ctl-32);
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+  white-space: nowrap;
+  box-shadow: var(--sh-1);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.ef-ui-chip:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-ui-chip[aria-pressed="true"] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-ui-ctx {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  max-width: 100%;
+  min-height: var(--ctl-32);
+  padding: 0 var(--sp-4) 0 var(--sp-12);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-ui-ctx-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-ui-ctx-remove {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--page);
+  color: var(--muted);
+}
+
+.ef-ui-ctx-remove:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* ---------- Avatar / person ring ---------- */
+.ef-ui-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: var(--ctl-32);
+  height: var(--ctl-32);
+  flex: 0 0 var(--ctl-32);
+  overflow: hidden;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-full);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-700);
+}
+
+.ef-ui-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ef-ui-avatar--24 {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-ui-avatar--28 {
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-ui-avatar--40 {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-ui-avatar.is-ring {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(var(--p-me) 0 50%, var(--line) 50% 100%) border-box;
+}
+
+.ef-ui-avatar.is-ring--orange {
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(var(--p-orange) 0 72%, var(--line) 72% 100%) border-box;
+}
+
+.ef-ui-avatar.is-ring--cyan {
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(var(--p-cyan) 0 38%, var(--line) 38% 100%) border-box;
+}
+
+.ef-ui-avatar.is-ring--rose {
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(var(--p-rose) 0 60%, var(--line) 60% 100%) border-box;
+}
+
+.ef-ui-avatar.is-ring--multi {
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(
+      var(--p-me) 0 25%,
+      var(--p-orange) 25% 50%,
+      var(--p-cyan) 50% 75%,
+      var(--p-rose) 75% 100%
+    ) border-box;
+}
+
+.ef-ui-avatar-stack {
+  display: inline-flex;
+  align-items: center;
+}
+
+.ef-ui-avatar-stack .ef-ui-avatar {
+  margin-left: -8px;
+  box-shadow: var(--sh-1);
+}
+
+.ef-ui-avatar-stack .ef-ui-avatar:first-child {
+  margin-left: 0;
+}
+
+.ef-ui-avatar-more {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: -8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--page);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+/* ---------- Object shell ---------- */
+.ef-ui-obj {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--r-24);
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-ui-obj--s {
+  width: 100%;
+  max-width: 340px;
+}
+
+.ef-ui-obj--l {
+  width: 100%;
+  max-width: 660px;
+}
+
+.ef-ui-obj--panel {
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+}
+
+.ef-ui-obj--immersive {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+}
+
+.ef-ui-obj-head {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-12);
+  flex: 0 0 auto;
+  padding: var(--sp-16) var(--sp-16) var(--sp-12);
+}
+
+.ef-ui-obj--s .ef-ui-obj-head {
+  padding: var(--sp-12);
+}
+
+.ef-ui-obj-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-12);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-ui-obj-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.ef-ui-obj-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-ui-obj-title {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+  font-weight: var(--fw-700);
+}
+
+.ef-ui-obj--s .ef-ui-obj-title {
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-ui-obj-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+}
+
+.ef-ui-obj-badge {
+  flex: 0 0 auto;
+}
+
+.ef-ui-obj-tools {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.ef-ui-obj-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  flex: 1;
+  min-height: 0;
+  padding: 0 var(--sp-16);
+  overflow: auto;
+}
+
+.ef-ui-obj--s .ef-ui-obj-body {
+  gap: var(--sp-8);
+  padding: 0 var(--sp-12);
+}
+
+.ef-ui-obj-body--immersive {
+  flex-direction: row;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ef-ui-obj-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+  background: var(--glass-well);
+}
+
+.ef-ui-obj-inspector {
+  display: flex;
+  flex: 0 0 360px;
+  flex-direction: column;
+  width: 360px;
+  overflow: hidden;
+  background: var(--glass-well);
+}
+
+.ef-ui-obj-inspector-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-16);
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-ui-obj-inspector-head b {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-ui-obj-inspector-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-12);
+  min-height: 0;
+  padding: var(--sp-12) var(--sp-16);
+  overflow: auto;
+}
+
+.ef-ui-obj-section {
+  border-top: 1px solid var(--line);
+  padding-top: var(--sp-12);
+}
+
+.ef-ui-obj-section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.ef-ui-obj-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding-bottom: var(--sp-8);
+}
+
+.ef-ui-obj-section-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: var(--r-8);
+  background: var(--page);
+  color: var(--brand-ink);
+}
+
+.ef-ui-obj-section-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-ui-obj-section-title em {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-style: normal;
+  font-weight: var(--fw-500);
+}
+
+.ef-ui-obj-section-body {
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-ui-obj-foot {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding: var(--sp-12) var(--sp-16) var(--sp-16);
+  border-top: 1px solid var(--line);
+  background: var(--glass-well);
+}
+
+.ef-ui-obj--s .ef-ui-obj-foot {
+  padding: var(--sp-8) var(--sp-12) var(--sp-12);
+}
+
+.ef-ui-obj--immersive .ef-ui-obj-head {
+  padding: var(--sp-16);
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-ui-obj--immersive .ef-ui-obj-foot {
+  padding: var(--sp-12) var(--sp-16);
+}
+
+/* ---------- Conversation ---------- */
+.ef-ui-bubble {
+  max-width: 92%;
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16) var(--r-16) var(--r-16) var(--r-8);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  box-shadow: var(--sh-1);
+}
+
+.ef-ui-bubble--user {
+  margin-left: auto;
+  border-color: color-mix(in srgb, var(--brand) 22%, transparent);
+  border-radius: var(--r-16) var(--r-16) var(--r-8) var(--r-16);
+  background: var(--brand-soft);
+}
+
+.ef-ui-bubble-meta {
+  display: block;
+  margin-top: var(--sp-8);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-ui-event-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-12);
+  width: 100%;
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--sh-1);
+}
+
+.ef-ui-event-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: var(--r-8);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-ui-event-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.ef-ui-event-title {
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  font-weight: var(--fw-600);
+}
+
+.ef-ui-event-detail {
+  margin-top: var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-ui-event-action {
+  flex: 0 0 auto;
+}
+
+.ef-ui-conversation-card {
+  width: 100%;
+}
+
+.ef-ui-conversation-card--s {
+  max-width: 480px;
+  margin-inline: auto;
+}
+
+.ef-ui-conversation-card--l {
+  width: 100%;
+}
+
+.ef-ui-conversation-card--s .ef-ui-obj,
+.ef-ui-conversation-card--l .ef-ui-obj {
+  max-width: none;
+}
+
+/* ---------- Home composer ---------- */
+.ef-ui-composer-wrap {
+  width: 100%;
+}
+
+.ef-ui-composer {
+  padding: var(--sp-12);
+  border-radius: var(--r-24);
+}
+
+.ef-ui-composer-contexts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-8);
+}
+
+.ef-ui-composer-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-ui-composer-bar .ef-ui-field-wrap {
+  flex: 1;
+}
+
+.ef-ui-composer-bar .ef-ui-field {
+  min-height: var(--ctl-32);
+  padding-left: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ef-ui-composer-bar .ef-ui-field:focus-within {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ef-ui-send {
+  display: grid;
+  place-items: center;
+  width: var(--ctl-32);
+  height: var(--ctl-32);
+  flex: 0 0 var(--ctl-32);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--brand);
+  color: var(--surface);
+  box-shadow: var(--sh-1);
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+.ef-ui-send:hover:not(:disabled) {
+  background: var(--brand-ink);
+}
+
+.ef-ui-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ef-ui-composer-hint {
+  margin-top: var(--sp-8);
+  padding: 0 var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+/* ---------- Account menu ---------- */
+.ef-ui-account {
+  width: 320px;
+  max-width: 100%;
+  padding: var(--sp-8);
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-ui-account-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--sp-8);
+}
+
+.ef-ui-account-id {
+  flex: 1;
+  min-width: 0;
+}
+
+.ef-ui-account-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-ui-account-email {
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-ui-account-open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: var(--ctl-32);
+  padding: 0 var(--sp-12);
+  border: 1px solid color-mix(in srgb, var(--brand) 24%, transparent);
+  border-radius: var(--r-8);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  white-space: nowrap;
+}
+
+.ef-ui-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-ui-account-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  width: 100%;
+  min-height: 40px;
+  padding: var(--sp-8) var(--sp-12);
+  border: 0;
+  border-radius: var(--r-12);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  font-weight: var(--fw-500);
+  text-align: left;
+}
+
+.ef-ui-account-item:hover {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-ui-account-item.is-danger {
+  color: var(--danger);
+}
+
+.ef-ui-account-item.is-danger:hover {
+  background: var(--danger-soft);
+}
+
+.ef-ui-account-item-icon {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.ef-ui-account-kbd {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-ui-account-divider {
+  height: 1px;
+  margin: var(--sp-8) var(--sp-4);
+  background: var(--line);
+}
+
+/* ---------- Preview marker ---------- */
+.ef-ui-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: 26px;
+  padding: var(--sp-4) var(--sp-8);
+  border: 1px solid color-mix(in srgb, var(--warn) 22%, transparent);
+  border-radius: var(--r-full);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  white-space: nowrap;
+}
+
+.ef-ui-preview-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: var(--r-full);
+  background: var(--warn);
+}
+
+/* ---------- Motion / transparency fallbacks ---------- */
+@keyframes ef-ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-ui-glass,
+  .ef-ui-btn,
+  .ef-ui-chip,
+  .ef-ui-field,
+  .ef-ui-send {
+    transition: none;
+  }
+
+  .ef-ui-btn:active:not(:disabled) {
+    transform: none;
+  }
+
+  .ef-ui-spinner {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ef-ui-glass {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .ef-ui-glass::after {
+    background: var(--line);
+  }
+}
+
+@media (max-width: 900px) {
+  .ef-ui-obj--immersive .ef-ui-obj-body--immersive {
+    flex-direction: column;
+    overflow: auto;
+  }
+
+  .ef-ui-obj-stage {
+    flex: 0 0 auto;
+    min-height: 320px;
+  }
+
+  .ef-ui-obj-inspector {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: 360px;
+    border-top: 1px solid var(--line);
+  }
+
+  .ef-ui-account {
+    width: min(320px, calc(100vw - 32px));
+  }
+}

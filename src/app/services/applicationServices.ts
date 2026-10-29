@@ -21,6 +21,7 @@ import type { KnowledgeGraph } from "@/features/knowledge/types";
 import type { UserCourseState } from "@/features/course/types";
 import type { UserCapability, UserRole } from "@/features/auth/types";
 import type { UserKnowledgeRecord } from "@/features/profile/types";
+import { previewApplicationServices, type ApplicationPreviewServices } from "./previewServices";
 
 export type ApplicationServices = {
   courseRepository: CourseRepository;
@@ -33,6 +34,8 @@ export type ApplicationServices = {
   domainGovernanceService: DomainGovernanceService;
   courseCreationService: CourseCreationService;
   courseAuthoringDraftRepository: CourseAuthoringDraftRepository;
+  /** Feature Preview sources are injected here; real page wiring arrives in P1+. */
+  preview?: ApplicationPreviewServices;
 };
 
 const knowledgeRepository = new ApiKnowledgeRepository();
@@ -55,7 +58,8 @@ export const applicationServices: ApplicationServices = {
   domainGovernanceRepository,
   domainGovernanceService,
   courseAuthoringDraftRepository,
-  courseCreationService: new BackendCourseCreationService()
+  courseCreationService: new BackendCourseCreationService(),
+  preview: previewApplicationServices
 };
 
 type KnowledgeHydration = { graph: KnowledgeGraph; governance: DomainGovernanceState; profile: { displayName: string; role: UserRole; capabilities: UserCapability[] } | null };

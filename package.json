@@ -15,7 +15,7 @@
     "preinstall": "node scripts/enforce-pnpm.mjs",
     "dev": "vite --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src api scripts tests",
+    "lint": "eslint src api scripts tests && pnpm lint:css",
     "test": "vitest run",
     "test:workflow:services": "docker compose -f tests/workflow-integration/compose.yaml up -d wiremock",
     "test:workflow:smoke": "bash tests/workflow-integration/scripts/smoke_test.sh",
@@ -47,7 +47,10 @@
     "workflow:check-layout": "node scripts/workflow/checks/check-layout.mjs",
     "test:workflow": "node scripts/workflow/checks/test.mjs",
     "workflow:report-fake-endpoints": "tsx scripts/workflow/local/report-fake-endpoints.ts",
-    "content:import": "node --env-file=.env.local --import tsx scripts/content-import.ts"
+    "content:import": "node --env-file=.env.local --import tsx scripts/content-import.ts",
+    "lint:css": "node scripts/lint-css.mjs",
+    "tokens:sync": "node scripts/sync-design-tokens.mjs",
+    "tokens:check": "node scripts/sync-design-tokens.mjs --check"
   },
   "dependencies": {
     "3d-force-graph": "1.79.1",
