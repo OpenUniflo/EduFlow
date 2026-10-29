@@ -5,9 +5,10 @@
 ## Micro Learning Runtime
 
 - Micro authors and AI authoring MUST follow `docs/TEACHING_PATTERN_LIBRARY.md` for Knowledge-to-Pattern selection, cognitive strategies, existing-runtime recommendations, feedback, and independent review. Teaching Patterns are instructional semantics, never new runtime enum values or Course-specific branches.
+- Micro Learning follows concise Brilliant/Duolingo-style steps with immediate deterministic feedback; it never contains long-running tasks or long-form work.
 - Ordinary Micro MUST default to bounded clicks, classification, ordering, connections, parameter changes or short causal judgments, without long-text input. Long-form Practice/Assignment/Evidence work remains separate. New patterns and runtime dependencies must pass their distinct documented addition gates.
 
-- Runtime Micro content authority is the database; Demo fixtures and providers MUST NOT become a Production fallback. Golden demo content MUST use the same persistence and API path as ordinary product content.
+- Runtime Micro content authority is the database; sample/test data MUST NOT become a fallback. Golden course content is ordinary database content using the same persistence and API path.
 - H5P is a `MicroStep` interaction adapter, never a parallel learning domain. H5P completion MUST flow through EduFlow Step, Unit, Path, Evidence, and mastery rules.
 - Native and H5P completion MUST NOT bypass mastery or Course-context membership semantics. Micro completion may reach `learned`; it MUST NOT directly manufacture mastery.
 - Published Micro edits SHOULD preserve stable Path, Unit, and Step identities so existing learner progress remains valid.

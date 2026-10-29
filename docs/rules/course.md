@@ -119,9 +119,9 @@
 ## Data-driven Frontend Invariants
 
 - Generic pages and services MUST resolve course data by route `courseId`; an unknown course or cross-course material reference MUST render Not Found and MUST NOT fall back to a demo course.
-- Course Center cards, search results, metrics, recent learning, Atlas course links, material navigation, and workflow launch context MUST be derived from repositories and runtime data.
-- Agentic AI and Python Engineering identifiers, titles, counts, lesson rules, or workflow mappings may exist only in explicit demo seeds/adapters, never in generic UI algorithms.
-- Adding a valid course seed to the demo repository MUST be sufficient for it to appear in Course Center and work through the shared routes and projections.
+- Archive course-panel cards, search results, metrics, recent learning, Atlas course links, material navigation, and workflow launch context MUST be derived from repositories and runtime data.
+- Concrete course identifiers, titles, counts, lesson rules, or workflow mappings MUST NOT appear in generic UI algorithms; they exist only as database content.
+- Adding a valid Course to the database MUST be sufficient for it to appear in the Archive course panel and work through the shared routes and projections.
 
 ## Repository and Projection Invariants
 
@@ -185,11 +185,16 @@
 
 ## UI Demo Boundary
 
-- Generic product pages MUST NOT contain concrete Demo course identities such as Agentic AI or Python Engineering unless that content is explicitly injected by a Demo configuration or adapter.
+- Generic product pages MUST NOT contain concrete course identities; all course content comes from the database.
 
-## Assignment Experience and Demo Provider Boundaries
+## Assignment Experience Boundaries
 
 - `AssignmentExperience` is optional execution/presentation metadata on CourseAssignment; it MUST NOT create a parallel Practice ontology or change Assignment ownership and coverage semantics.
-- Generic Assignment UI may select an answer, code/file, trace, or workflow renderer only from explicit Assignment metadata and MUST NOT branch on Demo Course or Assignment identities.
-- Generic Lesson and Workflow UI consume provider/result contracts. Concrete Demo lesson scripts and fixed assessment content MUST live under `src/demo` and be injected by the application composition root.
+- A practice (CourseAssignment) is one concrete task: a clear task description plus a submission. There are no per-type practice editors (2026-10-30).
+- A practice may be linked to works the learner creates for it. From the practice, the learner can create a new platform work (today: a Workflow, optionally from the Course starter template) that is linked to the practice, or link an existing work. Future platform execution forms link the same way.
+- Submission references a frozen version of a linked work, plus optional uploaded files/links and a note for anything the platform cannot execute. Later edits to the work never change a submitted version.
+- Practice is evaluated only by evaluators (teacher or AI); deterministic rule grading belongs to Micro Learning feedback, not practice.
+- Question/answer checks are not practice. Existing `answer` practices are removed; existing `code` and `trace` experiences become file-upload practice.
+- Generic Assignment UI MUST NOT branch on concrete Course or Assignment identities.
+- Generic Lesson and Workflow UI consume provider/result contracts. Lesson scripts and assessment content are database content; no concrete lesson script or assessment content lives in the repository.
 - Workflow assessment resolution MUST use the complete explicit `(courseId, assignmentId, workflowTemplateId)` launch context; template identity alone MUST NOT select Course-specific feedback.

@@ -21,5 +21,5 @@
 ## Feature Preview
 
 - A feature whose backend is not available MAY ship as a Feature Preview: the real UI and interactions fed by a fixed sample dataset, so users see the intended product.
-- Sample datasets live under `src/demo` and are injected by `src/app` through the same contracts as real repositories.
+- Sample datasets live under `src/demo/preview/` and are injected by `src/app` through the same contracts as real repositories.
 - Preview regions MUST carry a visible "预览 · 示例数据" marker, use obviously sample identities, never mix with real user data and never write durable state. Replacing a preview with the real backend only swaps the injected source.

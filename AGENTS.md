@@ -15,11 +15,12 @@ This file holds only cross-cutting rules. Domain rules live in `docs/rules/`. **
 ## Project Structure and Dependency Direction
 
 - `src/app` owns application assembly, providers and the `ApplicationServices` composition root.
-- `src/features` owns product feature code. Feature code MUST NOT import `src/demo`; pure Feature Core MUST NOT import `src/app`, `applicationServices`, React/application singleton stores, Supabase SDK or environment variables.
-- `src/demo` owns concrete Demo fixtures, seeds, sample datasets, adapters and Demo-specific fixture parsing/building utilities; it may depend inward on Feature contracts. `src/app` performs the final wiring; `applicationServices` is a composition root, never a Core dependency, and UI/application adapters bind Core contracts to it.
+- `src/features` owns product feature code. Feature code MUST NOT import `src/demo` or `tests/fixtures`; pure Feature Core MUST NOT import `src/app`, `applicationServices`, React/application singleton stores, Supabase SDK or environment variables.
+- Product content (courses, knowledge, Domains, materials, Micro, workflow starter templates, demo accounts) lives only in the database. The repository holds no product content or seeds; content moves between environments through admin import/export and local snapshots in the git-ignored `content-snapshots/` directory, which MUST NOT be committed.
+- The repository keeps only: minimal synthetic test data in `tests/fixtures/` (never product content), and small Feature Preview sample datasets in `src/demo/preview/` with obviously sample identities. `src/app` performs the final wiring; `applicationServices` is a composition root, never a Core dependency, and UI/application adapters bind Core contracts to it.
 - `src/shared` owns only cross-Feature utilities, components, types and styles and MUST NOT depend on `src/features`, `src/demo` or `src/app`.
-- Core packages define reusable contracts, repositories, validation, algorithms, projections and governance, operating from explicit inputs. Demo depends on Core; Core never depends on Demo. Static Demo data is never production runtime authority.
-- Core/Demo separation is enforced by dependency direction, not by blacklists of concrete names, IDs or fixture filenames. Generic barrels MUST NOT re-export Demo fixtures; temporary Demo compatibility exports live under `src/demo` and are named as such.
+- Core packages define reusable contracts, repositories, validation, algorithms, projections and governance, operating from explicit inputs. Demo depends on Core; Core never depends on Demo. Sample and test data are never runtime authority.
+- Separation from sample/test data is enforced by dependency direction, not by blacklists of concrete names, IDs or fixture filenames. Generic barrels MUST NOT re-export sample or test data.
 - Cross-top-level imports SHOULD use the single `@/* -> src/*` alias; short relative imports within one Feature may remain relative.
 
 ## Product-wide Invariants

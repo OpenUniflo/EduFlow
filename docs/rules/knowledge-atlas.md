@@ -105,7 +105,7 @@
 ## Core / Demo Domain Boundary
 
 - Core Domain services MUST NOT import demo KnowledgeNode or KnowledgeEdge fixtures, concrete demo Domain definitions, concrete demo DomainAssignments, or demo Domain proposals.
-- Concrete demo identities MUST live under explicit demo fixtures/adapters.
+- Concrete Domain and Knowledge identities are database content, never repository fixtures.
 - Domain membership MUST be represented explicitly by `DomainAssignment` and MUST NOT be inferred from fixture file location, module name, course provenance, tags, node naming, or node ID prefix.
 - Generic Domain application logic MUST consume Knowledge data through `KnowledgeRepository` or explicit `KnowledgeGraph` input. Generic Domain code MUST NOT read static demo graph singletons.
 
@@ -129,12 +129,12 @@
 
 ## Domain Lifecycle and Authority
 
-- Domain definitions and assignments are loaded and persisted through a governance repository; demo seeds are initialization data only.
+- Domain definitions and assignments are loaded and persisted through a governance repository; initial definitions are imported into the database, never read from the repository.
 - Archiving a Domain requires explicit governance authority, MUST be rejected while active members remain, and archived Domains MUST reject new assignments.
 - Domain mutations require an explicit actor/capability. Generic stores MUST NOT manufacture default administrator authority.
 - Pinned admin assignments have precedence over automatic scoring, candidate recomputation, and proposals.
-- Concrete Domain definitions and seed assignments MUST live in demo adapters/fixtures, never in the core Domain package.
-- Persisted Domain governance state MUST use a versioned schema/seed envelope and reconcile seed upgrades while preserving valid administrator changes and explicit unassignment.
+- Concrete Domain definitions and assignments are database content, never part of the repository.
+- Persisted Domain governance state MUST use a versioned schema envelope and reconcile imported content upgrades while preserving valid administrator changes and explicit unassignment.
 
 ## Domain Mutation Integrity
 
