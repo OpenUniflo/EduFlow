@@ -10,9 +10,11 @@ In project capability/route views, blue means acquired/current capability, green
 
 The same object retains its identity and behavior across presentations. Node detail unfolds from the node with an optional course context. Default emphasis is current state, next step and recommended Action. Relations, history and alternatives use progressive disclosure. One region has one visually dominant primary action. Disabled, loading, hover, focus, selection, error and success states must be readable and operable.
 
-Typography, spacing, borders, radii, surfaces and shadows use shared tokens. Avoid decorative gradients, broad glow, excessive glass and competing CTAs. Keep context secondary to useful actions. Responsive readability and accessibility are part of the design, not a later patch. Every hover affordance has a click/touch/keyboard path.
+Typography, spacing, borders, radii, surfaces and shadows use shared tokens. Avoid decorative gradients, broad glow and competing CTAs. Glass is limited to the two token materials (`lg-regular`, `lg-clear`) defined in `docs/design/new-ui/system/tokens.css`, with Safari and reduced-transparency fallbacks. Keep context secondary to useful actions. Responsive readability and accessibility are part of the design, not a later patch. Every hover affordance has a click/touch/keyboard path.
 
 ## Motion tokens
+
+> New UI (2026-10-30): use the token durations 160 / 240 / 400 / 600 ms and three easings from `docs/design/new-ui/system/tokens.css`; 600 ms is reserved for scene transitions. The ranges below remain as guidance for existing pages until they migrate.
 
 - Micro interaction: 100–160 ms.
 - Component expansion: 160–240 ms.
