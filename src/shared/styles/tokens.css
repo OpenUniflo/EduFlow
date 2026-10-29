@@ -1,0 +1,74 @@
+/*
+ * Generated from docs/design/new-ui/system/tokens.css by `pnpm tokens:sync`.
+ * Do not edit by hand: change the design source and run the sync command.
+ *
+ * The design source is board-scoped and also contains board presentation
+ * (fixed board heights, decorative background, etc.). This output keeps only
+ * custom properties, scoped to :root, so consuming the design tokens cannot
+ * alter an existing page's layout or appearance.
+ */
+:root {
+  /* ---------- 字体：6 档，仅此 6 档 ---------- */
+  --fs-12:12px; --lh-12:16px;   /* 时间戳、角标、最小字号 */
+  --fs-13:13px; --lh-13:18px;   /* 辅助文字 */
+  --fs-14:14px; --lh-14:20px;   /* 正文（默认） */
+  --fs-16:16px; --lh-16:24px;   /* 小标题 */
+  --fs-20:20px; --lh-20:28px;   /* 区块标题 */
+  --fs-28:28px; --lh-28:36px;   /* 页面标题 */
+  --fw-400:400; --fw-500:500; --fw-600:600; --fw-700:700;
+  /* ---------- 颜色：18 个基础语义色；状态 soft 与品牌柔色由 color-mix 派生 ---------- */
+  --ink:#0F172A;                 /* 正文 */
+  --ink-2:#334155;               /* 次级正文 */
+  --muted:#6B7280;               /* 辅助文字，对 page 4.55:1 */
+  --line:#E5E7EB;                /* 细边框 */
+  --line-strong:#CBD5E1;         /* 强边框 / 知识连线 */
+  --page:#F7F8FA;                /* 页面底色 */
+  --surface:#FFFFFF;             /* 卡片面 */
+  --brand:#6D5DF6;               /* 品牌靛紫 */
+  --brand-ink:#4338CA;           /* 品牌文字，对白 7.9:1 */
+  --brand-soft:color-mix(in srgb, var(--brand) 12%, var(--surface));
+  --acquired:#3B82F6;            /* 已获得（填充 / 图示，不作正文） */
+  --acquired-soft:color-mix(in srgb, var(--acquired) 14%, var(--surface));
+  --target:#22C55E;              /* 目标 */
+  --target-soft:color-mix(in srgb, var(--target) 14%, var(--surface));
+  --pending:#9CA3AF;             /* 待学 */
+  --pending-soft:color-mix(in srgb, var(--pending) 18%, var(--surface));
+  --warn:#B45309;                /* 警示文字，对白 5.02:1 */
+  --warn-soft:color-mix(in srgb, var(--warn) 12%, var(--surface));
+  --danger:#DC2626;              /* 危险文字，对白 4.83:1 */
+  --danger-soft:color-mix(in srgb, var(--danger) 12%, var(--surface));
+  --p-me:var(--brand);           /* 人物色：我 = 品牌色 */
+  --p-orange:#F59E0B;
+  --p-cyan:#06B6D4;
+  --p-rose:#EC4899;
+  /* 领域色：档案星图节点填充，仅用于知识领域，不参与状态语义 */
+  --domain-1:#E07A7A;
+  --domain-2:#E0A060;
+  --domain-3:#C9B24A;
+  --domain-4:#6FBF73;
+  --domain-5:#4FB8B0;
+  --domain-6:#8C7BE0;
+  /* 玻璃材料（白色透明度，属于材质而非色板） */
+  --glass-regular:color-mix(in srgb, var(--surface) 34%, transparent);
+  --glass-regular-hover:color-mix(in srgb, var(--surface) 42%, transparent);
+  --glass-clear:color-mix(in srgb, var(--surface) 14%, transparent);
+  --glass-clear-hover:color-mix(in srgb, var(--surface) 22%, transparent);
+  --glass-line:color-mix(in srgb, var(--surface) 62%, transparent);
+  --glass-edge:color-mix(in srgb, var(--surface) 92%, transparent);
+  --glass-well:color-mix(in srgb, var(--surface) 26%, transparent);
+  --glass-scrim:color-mix(in srgb, var(--page) 58%, transparent);
+  /* ---------- 圆角：5 档 ---------- */
+  --r-8:8px; --r-12:12px; --r-16:16px; --r-24:24px; --r-full:999px;
+  /* 动效：时长 4 档 + 缓动 3 种（见 C03 动效规范） */
+  --dur-fast:160ms; --dur-base:240ms; --dur-slow:400ms; --dur-scene:600ms;
+  --ease-out:cubic-bezier(.2,.8,.2,1); --ease-inout:cubic-bezier(.4,0,.2,1); --ease-spring:cubic-bezier(.2,.9,.25,1.18);
+  /* ---------- 间距：4 的倍数，9 档 ---------- */
+  --sp-4:4px; --sp-8:8px; --sp-12:12px; --sp-16:16px; --sp-20:20px;
+  --sp-24:24px; --sp-32:32px; --sp-40:40px; --sp-48:48px;
+  /* ---------- 阴影：3 档 ---------- */
+  --sh-1:0 1px 2px rgb(15 23 42 / .05), 0 4px 12px -8px rgb(15 23 42 / .14);
+  --sh-2:0 8px 24px -16px rgb(15 23 42 / .24), 0 2px 8px rgb(15 23 42 / .05);
+  --sh-3:0 24px 60px -30px rgb(15 23 42 / .42), 0 2px 10px rgb(15 23 42 / .06);
+  /* ---------- 尺寸 ---------- */
+  --nav-w:64px; --ctl-32:32px; --ctl-40:40px;
+}
