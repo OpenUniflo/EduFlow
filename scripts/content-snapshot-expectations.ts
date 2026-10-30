@@ -16,7 +16,7 @@ export type SnapshotAssignment = {
 export type ContentExpectations = {
   snapshotPath: string;
   courseIds: string[];
-  goldenCourseId: string;
+  verificationCourseId: string;
   goldenChapterCount: number;
   goldenAssignments: SnapshotAssignment[];
   goldenAssignmentIds: string[];
@@ -193,7 +193,7 @@ export function deriveContentExpectations(snapshotPath: string): ContentExpectat
   return {
     snapshotPath,
     courseIds,
-    goldenCourseId: GOLDEN_COURSE_ID,
+    verificationCourseId: GOLDEN_COURSE_ID,
     goldenChapterCount,
     goldenAssignments,
     goldenAssignmentIds: goldenAssignments.map((assignment) => assignment.id).sort(),

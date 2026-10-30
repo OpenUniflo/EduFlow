@@ -2,7 +2,7 @@
 
 日期：2026-10-29（2026-10-30 修订）· 状态：已定稿，从 P0 开始实施 · 范围：桌面端（≥ 1280 宽）；1024 与手机端放到下一批
 
-当前进度（2026-10-30 核查）：P0 全部未完成；§8 只完成了「`content-snapshots/` 加入 `.gitignore`」。基线 `typecheck` / `lint` / `test` / `build` 全部通过。
+当前进度（2026-10-30）：P0 已完成并合入 `feat/new-ui-frontend`（产品内容出仓库、app 作用域 tokens 与一致性检查、玻璃组件、基础组件与对象外壳、功能预览机制、`pnpm lint:css`）。`typecheck` / `lint` / `test` / `build` 通过；现有页面运行无错误、外观与 P0 前逐像素一致。`pnpm content:import` 与 `verify:backend:local` 尚未在本地库实测。下一步：P1。
 
 依据：设计稿最新版（见 §0）、[`AGENTS_RULE_CHANGES.md`](AGENTS_RULE_CHANGES.md)、2026-10-29 的产品决定：
 - 只迁移后端已有的能力；后端缺的界面做成「功能预览」（真实界面 + 示例数据 + 「预览 · 示例数据」标识，不写入）。
@@ -72,7 +72,7 @@
 1. `src/shared/styles/tokens.css` 与玻璃滤镜组件；减少透明度与 Safari 回退。设计侧的 `system/tokens.css` 作用于画板（`.ef` 作用域，含 `min-height:960px` 等画板专用规则），不能直接复制：新增一个同步脚本，把令牌转换成 `:root` 作用域、去掉画板专用规则后写入 `src/shared/styles/tokens.css`，并提供 `--check` 模式，在令牌与设计源不一致时失败。
 2. 基础组件：按钮、输入框、胶囊/上下文胶囊、头像与人物色环、对象外壳四种尺寸、对话气泡与卡片（事件行 / S 480 / L 满宽）、首页输入框、账户菜单。
 3. 功能预览机制：预览数据源契约（与真实仓储同接口）、`src/demo/preview/` 示例数据、`src/app` 注入、统一的「预览 · 示例数据」标识组件。
-4. 规格检查：`lint.py` 只检查设计稿的 `.dc.html`，现有 `pnpm lint` 只跑 ESLint（`ts`/`tsx`）。新增 `pnpm lint:css`（stylelint 或等价脚本），并入 `pnpm lint`：新样式文件（`legacy.css` / `product.css` 之外）不得出现规格外的字号、颜色、圆角、阴影，同时运行第 1 步的令牌一致性检查。
+4. 规格检查：`lint.py` 只检查设计稿的 `.dc.html`，现有 `pnpm lint` 只跑 ESLint（`ts`/`tsx`）。新增 `pnpm lint:css`（stylelint 或等价脚本），并入 `pnpm lint`：新样式文件（`legacy.css` / `product.css` 之外）不得出现规格外的字号、颜色、圆角、阴影，同时运行第 1 步的令牌一致性检查。尚未迁移页面的旧样式文件列入豁免基线，每迁移一页就把该页样式移出豁免。
 
 **P1 · 外壳与导航**：左侧导航栏、账户菜单、路由表与旧路由重定向、`/messages` 下线。
 
@@ -84,7 +84,7 @@
 
 **P5 · 教学**：课程管理、实践审核、课程创建 6 阶段（左工作区 + 右常驻助手）。画板与代码阶段对应：N16a 需求 = `requirements`，N16b 范围 = `scope`，N16c 结构 = `structure`，N21a 资源 + N21b 实践 = `assets` 的两面，N21c 学员视角预览 = `draft`，N21d 发布 = `publish`（`src/features/course/creation/courseCreator.ts`）。不新增阶段；若 N21b 需要 `assets` 阶段目前没有的实践设计能力，在 P5 开始前单独确认。
 
-**P6 · 作品**：作品总览、工作流编辑器换外观（去掉提交，保留试运行/保存），版本以预览展示。
+**P6 · 作品**：作品总览、工作流编辑器换外观（去掉提交，保留试运行/保存），版本以预览展示。工作流起始模板属于产品内容：从 `src/features/workflow/domain/v2/startingTemplates.ts` 移到数据库，仓库只留测试用的合成模板。
 
 **P7 · 记录、设置、管理（用户与角色）、⌘K。**
 
@@ -109,31 +109,31 @@
 
 ## 6. 实践简化（2026-10-30 决定）
 
-- 实践只有一种形态：任务描述 + 提交。提交方式两种：从「作品」选择工作流（系统支持的格式，提交时冻结），或上传文件 / 链接。
+- 实践只有一种类型（2026-10-30 再次确认）：问题描述、实现方式、一次提交。提交方式两种：从「作品」选择工作流（系统支持的格式，提交时冻结），或上传文件 / 链接。
 - 问答类检查属于微学习，不再作为实践。
 - 实践可以「新建工作流并关联」或关联已有作品；提交时冻结所关联作品的某个版本，另可附文件 / 链接与备注。实践只由评估者（教师或 AI）评估，不再有规则判分。
-- 现有数据：`answer` 类实践直接删除；`code`、`trace` 改为文件上传实践。代码侧 `AssignmentAuthoringEditor`、`AssignmentExperiencePage` 随 P2 调整；内容侧不改仓库里的种子（P0 后已不存在）：本地在导出快照时删除 2 个问答实践（§8-1），托管环境在 P2 部署时按 §8-6 处理。托管环境上已有 `code` / `trace` 实践如何转换见 §9。
+- 现有数据：`answer` 类实践直接删除；`code`、`trace` 改为文件上传实践。代码侧 `AssignmentAuthoringEditor`、`AssignmentExperiencePage` 随 P2 调整；内容侧不改仓库里的种子（P0 后已不存在）：本地在导出快照时已删除全部 22 个 `answer` 类实践（§8-1；黄金课程 37 个实践中默认类型即 `answer`），托管环境在 P2 部署时按 §8-6 处理。托管环境上已有 `code` / `trace` 实践如何转换见 §9。
 
 ## 7. 其他已定事项（2026-10-30）
 
 - 首页对所有角色都是学习工作台；教师从导航进入「教学」，教学提醒出现在「我的」面板。
-- 黄金课程：§8 完成前，内容源仍在 `src/demo/scenarios/agenticAiBook/`，由 `scripts/generate-supabase-seed.ts` 生成 `supabase/seed.sql`；§8 完成后只存在于数据库和本地快照，以后通过管理端导入 / 导出维护。2 个问答实践按 §6 删除。
+- 黄金课程：§8 完成前，内容源仍在 `src/demo/scenarios/agenticAiBook/`，由 `scripts/generate-supabase-seed.ts` 生成 `supabase/seed.sql`；§8 完成后只存在于数据库和本地快照，以后通过管理端导入 / 导出维护。全部 22 个 `answer` 类实践按 §6 删除。
 
 ## 8. 产品内容移出仓库（2026-10-30 决定，属于 P0 第 0 步）
 
-现状（2026-10-30）：只完成了 `.gitignore`。仍有 10 个文件引用 `agenticAiBook|goldenCourse`；`src/demo` 仍是旧结构，没有 `preview/`；`tests/fixtures/` 不存在，至少 4 个测试文件直接引用 `@/demo`；`supabase/seed.sql` 仍有 1,434 条产品内容 INSERT；`package.json` 仍有 `db:seed:*`、`h5p:build-golden`，没有 `content:import`。
+现状（2026-10-30）：已完成。`src/demo` 只剩 `preview/`；测试使用 `tests/fixtures/` 合成数据；`seed.sql` 无产品内容；快照在本机 `content-snapshots/`（全部 22 个 `answer` 类实践已删除，剩 15 个实践）。未完成：快照导入与 `verify:backend:local` 的本地实测。
 
 产品内容（课程、知识、领域、资料、微学习、工作流起始模板、演示账号）只存在数据库里；仓库只留 `tests/fixtures/` 的最小合成测试数据，和 `src/demo/preview/` 的功能预览示例数据。
 
-1. **导出**：用现有 `generate-supabase-seed.ts` 生成一份完整内容快照（删除 2 个问答实践后），放到仓库内被 Git 忽略的 `content-snapshots/` 目录（已加入 `.gitignore`，不会被提交）；再从本地数据库导出一份核对。
+1. **导出**：用现有 `generate-supabase-seed.ts` 生成一份完整内容快照（删除全部 22 个 `answer` 类实践后），放到仓库内被 Git 忽略的 `content-snapshots/` 目录（已加入 `.gitignore`，不会被提交）；再从本地数据库导出一份核对。
 2. **本地导入**：新增 `pnpm content:import`（默认读取 `content-snapshots/` 下的最新快照），只允许指向本地 Supabase（沿用现有「拒绝非本地 URL」的保护）；`supabase/seed.sql` 只保留无产品内容的必要初始化。
 3. **测试**：把测试依赖的数据改为 `tests/fixtures/` 下的最小合成数据（只为测试规则而造，不复用黄金课程内容）。
 4. **删除**：移除 `src/demo` 下除 `preview/` 以外的全部内容、`scripts/generate-supabase-seed.ts` 与相关 `db:seed:*`、`h5p:build-golden` 脚本，以及 `src/app` 里对它们的装配。
 5. **备份与共享**：`content-snapshots/` 只在本机，需要另外备份；其他开发者需要时单独传给对方。CI 不依赖快照，只用 `tests/fixtures/`。
-6. **托管环境**：Hosted 上已有的黄金课程数据保持不动，以后通过管理端导入 / 导出维护；唯一例外是 2 个问答实践：P2 去掉 `answer` 类型后它们无法打开，因此在 P2 部署时用一条可审查的数据变更同步删除，执行前单独确认。
+6. **托管环境**：Hosted 上已有的黄金课程数据保持不动，以后通过管理端导入 / 导出维护；唯一例外是全部 22 个 `answer` 类实践：P2 去掉 `answer` 类型后它们无法打开，因此在 P2 部署时用一条可审查的数据变更同步删除，执行前单独确认。
 7. **验收**：`rg -l "agenticAiBook|goldenCourse" src scripts supabase` 无结果；typecheck / lint / test / build 通过；本地用快照导入后课程能完整走通。
 
 ## 9. 待确认事项
 
-- **托管环境的 `code` / `trace` 实践**：§6 把它们改为文件上传实践，但 §8-6 规定托管数据只删除 2 个问答实践。P2 去掉这两种类型前需要决定：随同一条可审查的数据变更转换它们，还是在 P2 保留旧类型的只读兼容。P2 开始前确认。
+- **托管环境的 `code` / `trace` 实践**：§6 把它们改为文件上传实践，但 §8-6 规定托管数据只删除 `answer` 类实践。P2 去掉这两种类型前需要决定：随同一条可审查的数据变更转换它们，还是在 P2 保留旧类型的只读兼容。P2 开始前确认。
 - **课程创建实践面（N21b）**：见 P5，若需要 `assets` 阶段之外的新能力，P5 开始前确认。
