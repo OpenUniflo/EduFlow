@@ -2,6 +2,8 @@
 
 日期：2026-10-29 · 状态：**已于 2026-10-30 合入** `AGENTS.md` 与 `docs/rules/*.md`（本文件保留为决策记录）
 
+> 2026-10-31 更新：第 1 条（档案）与第 2 条中「技能树 / 实训树 / 能力模型」的呈现方式已被 [`DESKTOP_MIGRATION_PLAN.md`](DESKTOP_MIGRATION_PLAN.md) §10 取代（以人为中心与课程平面两种布局、地图式分层、课程页「课程树 / 路线」两个视图）。现行规则以 `AGENTS.md` 与 `docs/rules/` 为准。
+
 依据：当时的第 58 版设计稿「EduFlow 新版设计」（最新版地址见 [`DESKTOP_MIGRATION_PLAN.md`](DESKTOP_MIGRATION_PLAN.md) §0）与 2026-10-29 的产品决定。下面每一条给出**原规则**、**修改后规则（拟合入 AGENTS.md 的英文条文）**和**理由**。未列出的规则保持不变。
 
 ---

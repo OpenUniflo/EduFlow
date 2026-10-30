@@ -18,6 +18,12 @@
 - Conversation cards: event rows span the conversation column; S cards are 480 wide and centered on the column; L cards span the column.
 - Retired surfaces: Course Center, Explore page and Assistant Messages page; their routes redirect to Archive / Home.
 
+## Archive Chrome (2026-10-31)
+
+- Top-left people bar: `[people icon] | [me] [followed people…] [+]`. The people icon toggles the 人与分享 panel (followed people, profile visibility, revocable share link). Clicking a person's avatar opens that person's panel and applies person focus; clicking it again, blank space or Esc clears both; Shift-click adds a person for comparison.
+- Panels change only by explicit user action: they never open, close, shrink or swap content because of zoom, camera, focus or course selection. Every panel has a collapse control that leaves a small strip to reopen it. While a panel is open, scene framing (e.g. the Archive course plane) fits the remaining free area.
+- Bottom-right holds only zoom out, a monotonic zoom percentage, zoom in and reset view; bottom-left shows the current map level (领域 / 主题 / 知识). There is no locate-me button and no own-subset highlight toggle.
+
 ## Feature Preview
 
 - A feature whose backend is not available MAY ship as a Feature Preview: the real UI and interactions fed by a fixed sample dataset, so users see the intended product.

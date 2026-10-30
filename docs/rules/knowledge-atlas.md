@@ -36,18 +36,22 @@
 
 ## Atlas Views
 
-- The learner Archive (档案) is one Knowledge Atlas over active visible Knowledge and factual edges. Zoom distance is presentation only: close range emphasizes the learner's own subset, far range reveals the whole visible graph. There is no Personal/Global mode switch. (Supersedes the former separate Global/Personal Atlas views, 2026-10-30.)
-- The learner's own subset (nodes with UserKnowledgeState) is a presentation overlay (outline, opacity, labels), never a separate graph, layout or fact set. Other learners' subsets are person-colored overlays over the same layout, using only data the server authorizes for the viewer.
+- The learner Archive (档案) is one 3D Knowledge Atlas (three.js; free orbit rotation, zoom, pan) over active visible Knowledge and factual edges. There is no Personal/Global mode switch. (2026-10-31; interaction spec: `docs/design/new-ui/DESKTOP_MIGRATION_PLAN.md` §10.)
+- Zoom distance selects map-like levels of detail and is presentation only: far shows Domains (KnowledgeDomain-colored regions, name and member count, aggregated inter-Domain links; nodes as small points without labels); mid shows topic groups; near shows individual Knowledge with collision-culled labels that never overlap. Levels cross-fade and MUST NOT relayout.
+- Topic groups are communities computed deterministically from factual edges inside each Domain and labeled by their most central member. They are presentation only: not persisted, not KnowledgeNodes, never layout anchors. (Supersedes the former ban on visible community titles, 2026-10-31.)
+- Default layout: one deterministic relation-driven force layout. It MUST NOT use domain, cluster, chapter, community, or island anchors.
+- Person focus: selecting a person capsule (the learner, or others only from data the server authorizes for the viewer) switches to a person-centred layout. That person's Knowledge forms a compact core marked by person-colored rings; every other node is placed outward by factual hop distance from the core while keeping its default-layout direction, and stays visible at reduced opacity. Several people form a union core with segmented person-colored rings. The layout is a deterministic, cached function of the structural graph and the selected person set; zoom and rotation inside it MUST NOT relayout. Clearing the selection restores the default layout.
+- Course focus: selecting a Course moves that Course's own Knowledge nodes (not a copy or overlay) onto a front plane using the Course's ELK coordinates; all other nodes stay behind at reduced opacity, and edges from Course Knowledge to outside Knowledge stay faintly visible and brighten with their endpoints on hover. Clearing restores the previous layout.
+- Selecting a node highlights the node, its incident edges and one-hop neighbours, dims the rest and opens its detail side panel; it MUST NOT relayout.
+- The learner's own subset is shown through person focus, never as a persistent hull or frame; the Archive has no separate locate-me control or own-subset highlight toggle.
 - Anonymous viewers and the Admin governance view render active Global-scope nodes and factual edges only.
-- The Archive uses one deterministic relation-driven force layout for all zoom levels; zoom, locate-me, people comparison and search MUST NOT relayout. It MUST NOT use domain, cluster, chapter, community, or island anchors.
-- Community detection is an optional analysis technique, not a required product entity or visible region. The Archive MUST NOT render by default community/island hulls, titles, quotas, or potential bridges.
 - Archive edges use a neutral undirected visual by default while preserving their factual relation and direction in data and details.
 - The Archive MAY contain disconnected knowledge islands. Edges MUST NOT be revealed or invented solely to preserve visual connectivity.
 
 ## Atlas Stability
 
 - Knowledge Atlas is a stable spatial world.
-- Hover, selection, search, learning state, Domain changes, filters, and drawer state MUST NOT trigger graph relayout.
+- Hover, selection, search, learning state, Domain changes, filters, and drawer state MUST NOT trigger graph relayout. Only structural changes and the explicit layout modes in Atlas Views (person focus, course focus) change node positions; every such change animates existing nodes and is reversible.
 - Auto rotation MUST pause while a node is hovered or selected. Manual camera interaction MUST receive a grace period before rotation may resume.
 - Visual node size and interaction hit target MUST be decoupled.
 - Force positions MUST freeze after stabilization and remain frozen until the structural node/edge set changes.
@@ -71,7 +75,7 @@
 
 - Atlas layouts MUST be deterministic for identical graph data and driven by real relation structure.
 - The Archive uses force layout without metadata centers. Course views use deterministic layered DAG layout (see `course.md`).
-- The Archive and the Admin governance map MUST use the same `KnowledgeAtlasScene` renderer. At larger scales prefer instanced rendering, off-main-thread or cached deterministic layout, and point-level detail at far zoom rather than per-node meshes.
+- The Archive and the Admin governance map MUST use the same three.js `KnowledgeAtlasScene` renderer. Use batched point rendering, cached deterministic layouts (person-centred layouts keyed by structural revision plus person set, computed off the main thread when large) and point-level detail at far zoom rather than per-node meshes.
 - Custom layout/routing code MUST NOT duplicate functionality owned by ELK or the Force Graph engine.
 - Archive selection MUST operate as camera/highlight presentation over a stable knowledge layout.
 

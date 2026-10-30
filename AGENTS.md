@@ -28,7 +28,7 @@ This file holds only cross-cutting rules. Domain rules live in `docs/rules/`. **
 - One shared Knowledge Graph (`KnowledgeNode`, `KnowledgeEdge`, user-owned `UserKnowledgeState`); every map, course tree and capability view is a projection over it and MUST NOT keep separate knowledge facts or fabricate nodes/edges.
 - Knowledge mastery, Course progress, Material reading, Micro completion and Assignment evaluation are distinct states. Only the centralized learner-state policy changes `UserKnowledgeState`.
 - The LLM is never navigation, mutation or publication authority: Assistant changes go through Proposal → Preview → deterministic validation → explicit confirmation → Apply, and every authority check is revalidated server-side.
-- Presentation state (hover, selection, search, zoom, camera, layer/mode switches, panels) MUST NOT trigger relayout; only structural graph changes may.
+- Presentation state (hover, selection, search, zoom, camera, layer/mode switches, panels) MUST NOT trigger relayout; only structural graph changes may. The explicit Archive layout modes (person focus, course focus; see `docs/rules/knowledge-atlas.md`) are the only exception: they move existing nodes to positions that are deterministic, cached functions of graph structure and the selected people or Course, and never change facts.
 - Browser-supplied identities, roles or context payloads are never authority. `SUPABASE_SECRET_KEY` and other secrets stay server-only.
 
 ## Validation

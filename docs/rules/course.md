@@ -37,7 +37,10 @@
 
 - Course nodes MUST NOT overlap, share coordinates, or use modulo-based placement. Edges MUST route outside node interiors with readable source/target ports.
 - ELK (layered DAG) is the single layout authority for course structure; every renderer consumes the same ELK coordinates for the same structural revision.
-- The learner course immersive view (skill tree, practice shadow layer, capability model 3D, flattened route editor) is one three.js scene. The front pose uses a near-orthographic camera so the tree reads as 2D; rotation, flattening and skill/practice layer swaps are camera/node animations inside that scene. Node capsules, labels and Object Shell cards are DOM overlays anchored to scene coordinates. The learner view MUST NOT switch renderers at runtime.
+- The learner course immersive view is one three.js scene, continued from the Archive course focus without reloading. It has exactly two views (2026-10-31; spec: `docs/design/new-ui/DESKTOP_MIGRATION_PLAN.md` §10.6–10.8):
+  - 课程树: the skill tree on the front plane, the practice tree as its stacked reflection, and the Project Capability Model on deeper planes behind, revealed by free orbit rotation (double-click on blank space returns to the front pose). Skill tree, practice tree and capability model MUST NOT be separate tabs. The learner's current route is shown by default as a pulse beam with step numbers and a "you are here" marker, and can be toggled off. Route editing flattens the same nodes into the layered 2D editor.
+  - 路线: the adopted Personal Route as a vertical winding step path (completed, current with a start card, not started; chapter banners), scrolled to the current step. It MUST NOT be duplicated in a side panel.
+- Rotation, flattening and skill/practice swaps are camera/node animations inside that scene. Knowledge, practice and capability cards, chapter labels and badges are DOM overlays anchored to scene coordinates and MUST NOT overlap one another; after rotation, farther overlapping cards collapse to points. The learner view MUST NOT switch renderers at runtime.
 - React Flow remains the renderer for editing canvases (Course Creator structure editing, Workflow editor).
 - Chapter and Atomic views MUST share one hierarchical course topology and MUST NOT use unrelated independent layout systems.
 - Renderer-specific graph objects are projections only and MUST NOT become domain data.
@@ -107,7 +110,7 @@
 
 ## Course Selection & Drawer Invariants
 
-- In the new UI, "Drawer" means the node Object Shell (card S anchored at the node, expandable to a side panel); it never slides in from the screen edge.
+- In the new UI, "Drawer" means the node Object Shell. Selecting a node in the course scene or a step in the 路线 view opens it directly as a floating side panel inset from the right edge (never a full-height drawer sliding from the edge); the scene shifts so the selection stays visible. Selection dims unrelated cards and keeps the node's dependencies, covering practices, supporting capabilities and adjacent route steps highlighted. Blank click or Esc closes it.
 
 - Course selection MUST be anchor-based. A selected anchor is a stable location in the course graph: a Chapter or an atomic KnowledgeNode.
 - 技能树 / 实训树 mode determines the active Knowledge / Assignment detail facet. Switching mode MUST preserve the selected anchor and synchronize an open Drawer instead of closing it or leaving stale content.
