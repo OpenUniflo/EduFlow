@@ -1,0 +1,2331 @@
+/* P2 Home conversation workbench, My panel and boundary states. Tokens only. */
+.ef-home {
+  display: flex;
+  height: 100dvh;
+  flex-direction: column;
+  gap: var(--sp-16);
+  padding: var(--sp-20) var(--sp-40) 0 var(--sp-24);
+  overflow: hidden;
+  color: var(--ink);
+}
+
+.ef-home-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-24);
+  padding-left: var(--sp-4);
+}
+
+.ef-home-head-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.ef-home-date {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-head h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+  font-weight: var(--fw-700);
+  letter-spacing: -.02em;
+}
+
+.ef-home-head p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-home-panel-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--ctl-40);
+  padding: 0 var(--sp-16);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+  box-shadow: var(--sh-1);
+  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+.ef-home-panel-toggle:hover,
+.ef-home-panel-toggle.is-open {
+  border-color: color-mix(in srgb, var(--brand) 34%, transparent);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-home-panel-toggle:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ---------- Today cards ---------- */
+.ef-home-today {
+  display: grid;
+  width: min(1100px, 100%);
+  flex: 0 0 auto;
+  grid-template-columns: 1.28fr .94fr .94fr;
+  gap: var(--sp-16);
+  margin-inline: auto;
+}
+
+.ef-home-today-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-20);
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-home-today-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-today-card h2 {
+  margin: var(--sp-4) 0 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+  font-weight: var(--fw-700);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-home-today-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-chapter-track {
+  display: flex;
+  gap: var(--sp-12);
+  margin: var(--sp-4) 0;
+  padding-bottom: var(--sp-8);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.ef-home-chapter-track span {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  white-space: nowrap;
+}
+
+.ef-home-chapter-track i {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--line-strong);
+}
+
+.ef-home-chapter-track span.is-done i {
+  background: var(--brand);
+}
+
+.ef-home-chapter-track span.is-current {
+  color: var(--brand-ink);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-chapter-track span.is-current i {
+  outline: 2px solid var(--brand-soft);
+  outline-offset: 1px;
+  background: var(--brand);
+}
+
+.ef-home-next {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-progress-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-home-progress-track {
+  display: block;
+  height: 6px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: var(--line);
+}
+
+.ef-home-progress-track i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--brand);
+}
+
+.ef-home-progress-row strong {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-today-card .ef-ui-btn {
+  align-self: flex-start;
+}
+
+.ef-home-today-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  color: var(--muted);
+}
+
+.ef-home-today-empty h2 {
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+}
+
+.ef-home-today-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-mini-id {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  margin-top: var(--sp-4);
+}
+
+.ef-home-mini-id > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-home-mini-id strong {
+  color: var(--ink);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-mini-id small {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-mini-stats {
+  display: flex;
+  gap: var(--sp-20);
+  padding: var(--sp-8) 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-home-mini-stats span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-home-mini-stats strong {
+  color: var(--brand-ink);
+  font-size: var(--fs-16);
+}
+
+.ef-home-mini-stats small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-4);
+  height: 34px;
+  padding: var(--sp-4) 0;
+}
+
+.ef-home-spark i {
+  width: 8px;
+  border-radius: var(--r-full);
+  background: var(--line);
+}
+
+.ef-home-spark i.is-on {
+  background: var(--brand);
+}
+
+.ef-home-mini-recent {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  margin: 0;
+  font-size: var(--fs-12);
+}
+
+.ef-home-mini-recent span {
+  color: var(--muted);
+}
+
+.ef-home-mini-recent strong {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-home-text-link,
+.ef-my-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-text-link:hover,
+.ef-my-link:hover {
+  text-decoration: underline;
+}
+
+.ef-home-week-count {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-8);
+  margin-top: var(--sp-4);
+}
+
+.ef-home-week-count strong {
+  color: var(--brand-ink);
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+}
+
+.ef-home-week-count span {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-week {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin: var(--sp-4) 0;
+}
+
+.ef-home-week span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-week i {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: var(--surface);
+}
+
+.ef-home-week span.is-active i {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  outline: 2px solid var(--surface);
+  outline-offset: -3px;
+}
+
+.ef-home-week-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border-radius: var(--r-8);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-week-actions {
+  margin-top: auto;
+}
+
+/* ---------- Work area ---------- */
+.ef-home-work {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-16);
+  padding-bottom: var(--sp-12);
+}
+
+.ef-home {
+  --side-w: 0px;
+  --panel-top: var(--sp-16);
+  --panel-right: var(--sp-20);
+  --panel-bottom: var(--sp-16);
+}
+
+.ef-home.has-panel {
+  --side-w: 380px;
+  padding-right: var(--sp-20);
+}
+
+.ef-home.has-workspace {
+  --side-w: 680px;
+  padding-right: var(--sp-20);
+}
+
+.ef-home[data-workspace="practice"].has-workspace {
+  --side-w: 400px;
+}
+
+.ef-home.has-panel .ef-home-head,
+.ef-home.has-workspace .ef-home-head {
+  padding-right: calc(var(--side-w) + var(--sp-20));
+}
+
+/* The side panel floats with board insets and pushes the conversation into
+   the remaining space instead of covering it. */
+.ef-home.has-panel .ef-home-work,
+.ef-home.has-workspace .ef-home-work {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding-right: calc(var(--side-w) + var(--sp-20));
+}
+
+.ef-home.has-panel .ef-my-panel,
+.ef-home.has-workspace .ef-home-workspace {
+  position: fixed;
+  top: var(--panel-top);
+  right: var(--panel-right);
+  bottom: var(--panel-bottom);
+  z-index: 20;
+  width: var(--side-w);
+  height: auto;
+  margin: 0;
+}
+
+.ef-home.has-panel .ef-home-today,
+.ef-home.has-workspace .ef-home-today,
+.ef-home.has-panel .ef-home-new-user,
+.ef-home.has-workspace .ef-home-new-user {
+  display: none;
+}
+
+.ef-home-column {
+  display: flex;
+  width: min(760px, 100%);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  margin: 0 auto;
+}
+
+/* The timeline scrolls above the composer; the composer stays on the column
+   bottom whether the panel is open or the conversation is short. */
+.ef-home-conversation {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.ef-home-timeline {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-4) var(--sp-4) var(--sp-16);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ef-home-day {
+  display: flex;
+  justify-content: center;
+  margin: var(--sp-4) 0;
+}
+
+.ef-home-day span {
+  padding: 2px var(--sp-8);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--surface) 52%, transparent);
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  max-width: 100%;
+}
+
+.ef-home-message-row[data-role="user"] {
+  justify-content: flex-end;
+}
+
+.ef-home-assistant-mark {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  margin-top: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--brand-ink);
+  box-shadow: var(--sh-1);
+}
+
+.ef-home-assistant-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.ef-home-copy {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.ef-home-copy + .ef-home-copy {
+  margin-top: var(--sp-8);
+}
+
+.ef-home-muted {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-rich {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-home-rich p,
+.ef-home-rich ul {
+  margin: 0;
+}
+
+.ef-home-rich ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding-left: var(--sp-16);
+}
+
+.ef-home-rich li {
+  color: var(--ink-2);
+}
+
+.ef-home-md-heading {
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  font-weight: var(--fw-700);
+}
+
+.ef-home-md-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+}
+
+.ef-home-md-table > div {
+  display: flex;
+  gap: var(--sp-8);
+  padding: var(--sp-4) var(--sp-8);
+  background: var(--page);
+}
+
+.ef-home-md-table > div:first-child {
+  background: var(--brand-soft);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-md-table span {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-expand {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-thinking {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.ef-home-error,
+.ef-home-error-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
+  border-radius: var(--r-12);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--fs-13);
+}
+
+.ef-home-error button,
+.ef-home-error-banner button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-error-banner {
+  margin-bottom: var(--sp-8);
+}
+
+.ef-home-error-banner span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-home-error-banner small {
+  font-size: var(--fs-12);
+}
+
+.ef-home-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  padding: var(--sp-4) 0 var(--sp-8);
+}
+
+.ef-home-composer {
+  width: 100%;
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding-top: var(--sp-8);
+}
+
+.ef-home-composer .ef-ui-composer {
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  box-shadow: var(--sh-2);
+}
+
+.ef-home .ef-ui-composer-contexts {
+  margin-bottom: var(--sp-4);
+}
+
+/* ---------- Structured assistant cards ---------- */
+.ef-home-message-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-home-structured-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--surface);
+}
+
+.ef-home-structured-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  color: var(--ink);
+  font-size: var(--fs-13);
+}
+
+.ef-home-structured-head strong {
+  flex: 1;
+  min-width: 0;
+}
+
+.ef-home-structured-card > p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-home-structured-card ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ef-home-structured-card li button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border: 1px solid transparent;
+  border-radius: var(--r-8);
+  background: var(--page);
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.ef-home-structured-card li button:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ef-home-structured-card li span {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.ef-home-structured-card li strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-home-structured-card li small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+/* ---------- Preview person card in conversation ---------- */
+.ef-home-person-card {
+  width: 100%;
+}
+
+.ef-home-person-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-home-person-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-home-person-head > span:nth-child(2) {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-home-person-head strong {
+  color: var(--ink);
+  font-size: var(--fs-14);
+}
+
+.ef-home-person-head small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-person-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: var(--r-full);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-700);
+}
+
+.ef-home-person-avatar.accent-cyan {
+  background: color-mix(in srgb, var(--p-cyan) 16%, var(--surface));
+  color: color-mix(in srgb, var(--p-cyan) 72%, var(--ink));
+}
+
+.ef-home-person-avatar.accent-rose {
+  background: color-mix(in srgb, var(--p-rose) 16%, var(--surface));
+  color: color-mix(in srgb, var(--p-rose) 72%, var(--ink));
+}
+
+.ef-home-person-avatar.accent-orange {
+  background: color-mix(in srgb, var(--p-orange) 16%, var(--surface));
+  color: color-mix(in srgb, var(--p-orange) 72%, var(--ink));
+}
+
+.ef-home-person-private,
+.ef-home-person-progress {
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--page);
+}
+
+.ef-home-person-private strong {
+  color: var(--ink);
+  font-size: var(--fs-13);
+}
+
+.ef-home-person-private p,
+.ef-home-person-progress p {
+  margin: var(--sp-4) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-person-progress > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-person-progress > div:first-child strong {
+  color: var(--ink);
+  font-size: var(--fs-13);
+}
+
+.ef-home-person-bar {
+  height: 5px;
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: var(--line);
+}
+
+.ef-home-person-bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--p-cyan);
+}
+
+.ef-home-person-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-8);
+}
+
+/* ---------- Simple / complex micro card in conversation ---------- */
+.ef-home-today-micro,
+.ef-home-micro-card {
+  display: flex;
+  width: min(480px, 100%);
+  flex-direction: column;
+  gap: var(--sp-8);
+  align-self: center;
+  padding: var(--sp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-home-today-micro > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-micro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+
+.ef-home-micro.is-panel {
+  padding: var(--sp-16);
+}
+
+.ef-home-micro-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.ef-home-micro-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-micro-head h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+}
+
+.ef-home-micro-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-micro-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-micro-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+}
+
+.ef-home-micro-note,
+.ef-home-micro-foot,
+.ef-home-micro-error {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-micro-error {
+  padding: var(--sp-8);
+  border-radius: var(--r-8);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.ef-home-micro-error button {
+  margin-left: var(--sp-8);
+  border: 0;
+  background: transparent;
+  color: var(--warn);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-micro-done-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+
+.ef-home-micro-done-row span {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-micro-complete {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border: 1px solid color-mix(in srgb, var(--target) 24%, transparent);
+  border-radius: var(--r-12);
+  background: var(--target-soft);
+}
+
+.ef-home-micro-complete strong {
+  color: var(--ink);
+  font-size: var(--fs-13);
+}
+
+.ef-home-micro-complete p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+}
+
+.ef-home-micro-rail {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+}
+
+.ef-home-micro-tools {
+  display: flex;
+  gap: var(--sp-4);
+}
+
+.ef-home-icon {
+  display: grid;
+  width: var(--ctl-32);
+  height: var(--ctl-32);
+  flex: 0 0 var(--ctl-32);
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.ef-home-icon:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-home-icon:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.ef-home-micro-foot {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+
+.ef-home-micro-shell {
+  height: 100%;
+}
+
+.ef-home-micro.is-panel {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: var(--sp-16);
+  align-items: start;
+}
+
+.ef-home-micro.is-panel .ef-home-micro-rail {
+  max-height: none;
+}
+
+.ef-home-micro-shell .ef-ui-obj-body {
+  padding-top: var(--sp-8);
+}
+
+.ef-home-micro-shell .ef-ui-obj-stage {
+  display: none;
+}
+
+@media (min-width: 901px) {
+  .ef-micro-shell .ef-ui-obj-body--immersive {
+    flex-direction: row-reverse;
+  }
+
+  .ef-micro-shell .ef-ui-obj-stage {
+    border-right: 0;
+    border-left: 1px solid var(--line);
+  }
+}
+
+.ef-home-micro-shell .ef-ui-obj-inspector {
+  display: none;
+}
+
+/* The micro step panel already carries its own card frame. */
+.ef-home-micro .micro-card {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ef-home-micro .micro-card h1 {
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+}
+
+.ef-home-micro .micro-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-8);
+}
+
+/* ---------- Workspace ---------- */
+.ef-home-workspace {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.ef-home-workspace > .ef-practice-shell,
+.ef-home-workspace > .ef-home-micro-shell {
+  height: 100%;
+}
+
+/* ---------- My panel ---------- */
+.ef-my-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-24);
+  background: var(--glass-regular);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
+  backdrop-filter: blur(36px) saturate(180%);
+  box-shadow: var(--sh-2);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ef-my-panel {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+.ef-my-panel-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-my-panel-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: var(--r-12);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-my-panel-head > div:nth-child(2) {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.ef-my-panel-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+}
+
+.ef-my-panel-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-my-panel-tools {
+  display: flex;
+  gap: var(--sp-4);
+}
+
+.ef-my-panel-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-12) var(--sp-12);
+  overflow-y: auto;
+}
+
+.ef-my-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding-bottom: var(--sp-8);
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-my-section:last-child {
+  border-bottom: 0;
+}
+
+.ef-my-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: 24px;
+}
+
+.ef-my-section-head h3 {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-700);
+}
+
+.ef-my-section-head small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-my-course-list,
+.ef-my-recent-list,
+.ef-my-practice-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.ef-my-course {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-4) var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  text-align: left;
+}
+
+.ef-my-course:hover,
+.ef-my-course.is-selected {
+  border-color: color-mix(in srgb, var(--brand) 30%, transparent);
+  background: var(--brand-soft);
+}
+
+.ef-my-course-title {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-my-course-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-my-course-meta small {
+  flex: 1;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-my-course-meta strong {
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+}
+
+.ef-my-course-check {
+  position: absolute;
+  top: var(--sp-8);
+  right: var(--sp-12);
+  color: var(--brand);
+  font-size: var(--fs-12);
+}
+
+.ef-my-course-plus {
+  position: absolute;
+  right: var(--sp-8);
+  color: var(--muted);
+}
+
+.ef-my-recent {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.ef-my-recent span {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-my-recent strong {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-500);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-my-recent small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-my-recent svg {
+  color: var(--muted);
+}
+
+.ef-my-people-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--sp-4);
+}
+
+.ef-my-person {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-8) var(--sp-4);
+  border: 1px solid transparent;
+  border-radius: var(--r-12);
+  background: transparent;
+}
+
+.ef-my-person:hover,
+.ef-my-person.is-selected {
+  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+  background: var(--brand-soft);
+}
+
+.ef-my-person strong {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--ink);
+  font-size: var(--fs-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-my-person small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-my-people-skeleton {
+  display: flex;
+  gap: var(--sp-8);
+}
+
+.ef-my-people-skeleton span {
+  width: 56px;
+  height: 76px;
+  border-radius: var(--r-12);
+  background: var(--line);
+}
+
+.ef-my-preview-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-my-person-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--surface);
+}
+
+.ef-my-person-detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-my-person-detail-head > span {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.ef-my-person-detail-head strong {
+  color: var(--ink);
+  font-size: var(--fs-13);
+}
+
+.ef-my-person-detail-head small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-my-private {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border-radius: var(--r-8);
+  background: var(--page);
+  color: var(--ink-2);
+}
+
+.ef-my-private p {
+  margin: 0;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-my-peer-stats {
+  display: flex;
+  gap: var(--sp-20);
+}
+
+.ef-my-peer-stats span {
+  display: flex;
+  flex-direction: column;
+}
+
+.ef-my-peer-stats strong {
+  color: var(--brand-ink);
+  font-size: var(--fs-16);
+}
+
+.ef-my-peer-stats small,
+.ef-my-peer-progress p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-my-peer-bar {
+  height: 5px;
+  margin-top: var(--sp-8);
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: var(--line);
+}
+
+.ef-my-peer-bar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--p-cyan);
+}
+
+.ef-my-practice {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+}
+
+.ef-my-practice-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.ef-my-practice-main strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-my-practice-main small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-my-status {
+  flex: 0 0 auto;
+  padding: 2px var(--sp-8);
+  border-radius: var(--r-full);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-my-status.is-pending {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.ef-my-status.is-warn {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.ef-my-status.is-brand {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-my-status.is-quiet {
+  background: var(--page);
+  color: var(--muted);
+}
+
+.ef-my-teacher-reminder {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border: 1px solid color-mix(in srgb, var(--warn) 22%, transparent);
+  border-radius: var(--r-12);
+  background: var(--warn-soft);
+  color: var(--warn);
+  text-align: left;
+}
+
+.ef-my-teacher-reminder span {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-my-teacher-reminder strong {
+  font-size: var(--fs-13);
+}
+
+.ef-my-teacher-reminder small {
+  font-size: var(--fs-12);
+}
+
+.ef-my-archive {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-my-archive-visual {
+  position: relative;
+  width: 78px;
+  height: 44px;
+  flex: 0 0 78px;
+  overflow: hidden;
+  border-radius: var(--r-8);
+  background: var(--page);
+}
+
+.ef-my-archive-visual i {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--surface);
+  border-radius: var(--r-full);
+  background: var(--brand);
+}
+
+.ef-my-archive-visual i.dot-1 {
+  background: var(--acquired);
+}
+
+.ef-my-archive-visual i.dot-2 {
+  background: var(--target);
+}
+
+.ef-my-archive-visual i.dot-3 {
+  background: var(--p-cyan);
+}
+
+.ef-my-archive-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-my-archive-copy strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-my-archive-copy small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-my-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  padding: var(--sp-12);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-12);
+  color: var(--muted);
+}
+
+.ef-my-empty strong {
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+
+.ef-my-empty p,
+.ef-my-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-my-error {
+  margin: 0;
+  padding: var(--sp-8);
+  border-radius: var(--r-8);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--fs-12);
+}
+
+.ef-my-error button {
+  margin-left: var(--sp-8);
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font-weight: var(--fw-600);
+}
+
+.ef-my-panel-foot {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-12);
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 64%, transparent);
+}
+
+.ef-my-panel-foot > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-my-panel-foot > div {
+  display: flex;
+  gap: var(--sp-8);
+}
+
+/* ---------- New user ---------- */
+.ef-home-new-user {
+  display: grid;
+  width: min(1100px, 100%);
+  flex: 0 0 auto;
+  grid-template-columns: 1.2fr .8fr;
+  gap: var(--sp-16);
+  margin-inline: auto;
+}
+
+.ef-home-new-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-20);
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-home-new-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-new-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+}
+
+.ef-home-new-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-scenarios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+}
+
+.ef-home-scenarios button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--page);
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.ef-home-scenarios button:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ef-home-scenarios span:first-child {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-home-scenarios strong {
+  color: var(--ink);
+  font-size: var(--fs-13);
+}
+
+.ef-home-scenarios small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-recommendations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.ef-home-recommendations button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  text-align: left;
+}
+
+.ef-home-recommendations button:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ef-home-recommendations span:first-child {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.ef-home-recommendations strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-home-recommendations small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-arrow {
+  color: var(--muted);
+  font-size: var(--fs-14);
+}
+
+/* ---------- Boundaries / skeleton ---------- */
+.ef-home-conversation-skeleton {
+  gap: var(--sp-12);
+  padding: var(--sp-4);
+}
+
+.ef-home-skeleton-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+}
+
+.ef-home-skeleton-row.is-user {
+  justify-content: flex-end;
+}
+
+.ef-home-skeleton-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: var(--r-full);
+  background: var(--line);
+}
+
+.ef-home-skeleton-bubble {
+  width: min(420px, 80%);
+  height: 76px;
+  border-radius: var(--r-16);
+  background: linear-gradient(90deg, var(--line), var(--page), var(--line));
+}
+
+.ef-home-skeleton-bubble.short {
+  width: 240px;
+  height: 56px;
+  background: var(--brand-soft);
+}
+
+.ef-home-skeleton-bubble.tall {
+  height: 150px;
+}
+
+.ef-home-skeleton-line {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-skeleton-composer {
+  height: 64px;
+  margin-top: auto;
+  border-radius: var(--r-24);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-home[data-boundary="error"] .ef-home-today {
+  opacity: .55;
+}
+
+/* ---------- Focus and motion ---------- */
+.ef-home button:focus-visible,
+.ef-home a:focus-visible,
+.ef-my-panel button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.ef-my-more {
+  align-self: flex-start;
+  padding: var(--sp-4) 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-home-panel-toggle,
+  .ef-home-icon,
+  .ef-home-timeline {
+    transition: none;
+    scroll-behavior: auto;
+  }
+}
+
+@media (max-width: 1320px) {
+  .ef-home.has-workspace {
+    --side-w: min(680px, 50vw);
+  }
+}
+
+@media (max-width: 1180px) {
+  .ef-home {
+    padding-left: var(--sp-20);
+    padding-right: var(--sp-20);
+  }
+
+  .ef-home.has-panel {
+    --side-w: 340px;
+  }
+
+  .ef-home[data-workspace="practice"].has-workspace {
+    --side-w: 360px;
+  }
+
+  .ef-home-today {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ef-home-today-card.is-week {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .ef-home {
+    height: auto;
+    min-height: 100dvh;
+    padding: var(--sp-16) var(--sp-12) 88px;
+  }
+
+  .ef-home-today,
+  .ef-home-new-user {
+    grid-template-columns: 1fr;
+  }
+
+  .ef-home.has-panel .ef-home-work,
+  .ef-home.has-workspace .ef-home-work {
+    display: grid;
+    grid-template-columns: 1fr;
+    padding-right: 0;
+  }
+
+  .ef-home.has-panel .ef-home-head,
+  .ef-home.has-workspace .ef-home-head {
+    padding-right: 0;
+  }
+
+  .ef-home.has-panel .ef-my-panel,
+  .ef-home.has-workspace .ef-home-workspace {
+    position: static;
+    width: 100%;
+    height: auto;
+    min-height: 480px;
+  }
+
+  .ef-home-column {
+    width: 100%;
+    height: auto;
+  }
+}
+
+/* ---------- Conversation course / micro cards ---------- */
+.ef-home-course-foot,
+.ef-home-micro-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  width: 100%;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-tree-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.ef-home-tree {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--page);
+}
+
+.ef-home-tree-chapter {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-home-tree-chapter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-tree-chapter-head span {
+  color: var(--brand-ink);
+  font-weight: var(--fw-700);
+}
+
+.ef-home-tree-chapter-title {
+  overflow: hidden;
+  padding-bottom: var(--sp-8);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-home-tree-nodes {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.ef-home-tree-nodes::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 9px;
+  bottom: 9px;
+  width: 1px;
+  background: var(--line-strong);
+}
+
+.ef-home-tree-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 32px;
+  padding-left: 14px;
+}
+
+.ef-home-tree-node::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  width: 10px;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+.ef-home-tree-node i {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translateY(-50%);
+  border: 1px solid var(--ink);
+  border-radius: var(--r-full);
+  background: var(--pending);
+}
+
+.ef-home-tree-node span {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  padding: var(--sp-4) var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-home-tree-node.is-done i {
+  background: var(--acquired);
+}
+
+.ef-home-tree-node.is-now i {
+  background: var(--brand);
+}
+
+.ef-home-tree-node.is-now span {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-tree-node.is-quiet span {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.ef-home-tree-practice {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--page);
+}
+
+.ef-home-tree-practice-chapter {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-home-tree-practice ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ef-home-tree-practice li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-tree-practice li > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-home-tree-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-tree-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-tree-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-home-tree-legend i {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--ink);
+  border-radius: var(--r-full);
+  background: var(--pending);
+}
+
+.ef-home-tree-legend i.is-done {
+  background: var(--acquired);
+}
+
+.ef-home-tree-legend i.is-now {
+  background: var(--brand);
+}
+
+.ef-home-micro-s {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-home-micro-s-progress {
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: var(--line);
+}
+
+.ef-home-micro-s-progress i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--brand);
+}
+
+.ef-home-micro-s p {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-micro-s strong {
+  color: var(--ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+}
+
+@media (max-width: 900px) {
+  .ef-home-tree,
+  .ef-home-tree-practice {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- My panel loading skeleton ---------- */
+.ef-my-skeleton-rows,
+.ef-my-skeleton-circles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-my-skeleton-rows span {
+  display: block;
+  height: 40px;
+  border-radius: var(--r-12);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-my-skeleton-circles {
+  flex-direction: row;
+}
+
+.ef-my-skeleton-circles span {
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}

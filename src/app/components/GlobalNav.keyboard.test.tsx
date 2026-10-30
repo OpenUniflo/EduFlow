@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GlobalNav } from "./GlobalNav";
 import type { MockSession } from "@/features/auth/types";
@@ -36,6 +36,11 @@ function key(target: EventTarget, value: string) {
   act(() => { target.dispatchEvent(new KeyboardEvent("keydown", { key: value, bubbles: true })); });
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{location.pathname}{location.search}</output>;
+}
+
 describe("GlobalNav shell", () => {
   it("marks the current page and renders learner items in one rail", () => {
     const container = mount(<MemoryRouter initialEntries={["/archive"]}><GlobalNav session={student} onLogout={vi.fn()} /></MemoryRouter>);
@@ -63,6 +68,14 @@ describe("GlobalNav shell", () => {
     key(document, "Escape");
     expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it("opens the My panel from the account menu instead of navigating to the bare Home route", () => {
+    const container = mount(<MemoryRouter initialEntries={["/"]}><GlobalNav session={student} onLogout={vi.fn()} /><LocationProbe /></MemoryRouter>);
+    click(container.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!);
+    const first = document.querySelector<HTMLButtonElement>('[role="menu"] [role="menuitem"]')!;
+    click(first);
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toBe("/?panel=1");
   });
 
   it("shows the compact display name in the rail without an ellipsis", () => {

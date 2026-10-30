@@ -31,6 +31,10 @@ export function evaluateAssignmentResponse(assignment: Row, response: Assignment
   const experience = object(assignment.experience);
   const type = typeof experience?.type === "string" ? experience.type : assignment.mode === "workflow" ? "workflow" : "answer";
   if (type === "trace") {
+    // P2 removed the trace answer editor. A trace record edited through the
+    // unified file/link practice is recorded as an open response for the
+    // evaluator instead of being failed by a client-shaped rule.
+    if (response.kind === "code") return { outcome: "pending", feedback: { code: "manual_review_required", message: "The file/link response is recorded and requires teacher review." }, evaluatorKind: "manual" };
     if (response.kind !== "trace" || typeof experience?.faultyStepId !== "string") return { outcome: "failed", score: 0, feedback: { code: "trace_response_invalid", message: "Trace response does not match the published validator." }, evaluatorKind: "rule" };
     const passed = response.selectedStepId === experience.faultyStepId;
     return { outcome: passed ? "passed" : "failed", score: passed ? 1 : 0, feedback: { code: passed ? "trace_root_cause_found" : "trace_root_cause_missed", message: passed ? "The earliest failing step was identified." : "Review the trace and locate the earliest failing step." }, evaluatorKind: "rule" };

@@ -104,8 +104,8 @@ describe("Micro Learning assessment integrity", () => {
   it("keeps Assistant actions separate from grading and persisted progress writes", () => {
     const source = readFileSync(join(process.cwd(), "src/features/learning/micro/MicroLearningExperience.tsx"), "utf8");
     const assistant = source.slice(source.indexOf("<EduFlowAssistant"),source.indexOf("function MicroStepPanel"));
-    expect(assistant).toContain("microPathId:path.id");
-    expect(assistant).toContain("microStepId:step.id");
+    expect(assistant).toMatch(/microPathId:\s*path\.id/);
+    expect(assistant).toMatch(/microStepId:\s*step\.id/);
     expect(assistant).not.toMatch(/setGradingFeedback|completeCurrent\(/);
     expect(source).toContain("repository.completeStep(path.id,unitId,stepId");
     expect(source).toContain("refreshLearnerState(session.userId)");
@@ -118,7 +118,7 @@ describe("Micro Learning assessment integrity", () => {
     expect(reviewBranch).not.toContain("repository.completeStep");
     expect(reviewBranch).not.toContain("refreshLearnerState");
     expect(source).toContain("repository.completeStep(path.id,unitId,stepId");
-    expect(source).toContain("主动复习不会清空进度、重复完成证据或降低学习状态");
+    expect(source).toContain("主动复习不会清空进度，也不会改变已获得的学习状态");
   });
 
   it("keeps the production Micro composition root database-backed without a Demo fallback", () => {

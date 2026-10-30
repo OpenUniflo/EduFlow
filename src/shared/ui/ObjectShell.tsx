@@ -16,6 +16,8 @@ export type ObjectShellProps = {
   stage?: ReactNode;
   inspector?: ReactNode;
   inspectorTitle?: string;
+  /** Floating card stacked inside the shell (practice confirm / work picker). */
+  overlay?: ReactNode;
   children?: ReactNode;
   className?: string;
   "aria-label"?: string;
@@ -27,7 +29,7 @@ export type ObjectShellProps = {
  * split used by course and practice editors.
  */
 export function ObjectShell({
-  size, title, titleId, kicker, icon, context, badge, tools, footer, stage, inspector, inspectorTitle = "检查器", children, className = "", "aria-label": ariaLabel
+  size, title, titleId, kicker, icon, context, badge, tools, footer, stage, inspector, inspectorTitle = "检查器", overlay, children, className = "", "aria-label": ariaLabel
 }: ObjectShellProps) {
   const immersive = size === "immersive";
   return (
@@ -61,6 +63,7 @@ export function ObjectShell({
         <div className="ef-ui-obj-body">{children}</div>
       )}
       {footer ? <footer className="ef-ui-obj-foot">{footer}</footer> : null}
+      {overlay ? <div className="ef-ui-obj-overlay">{overlay}</div> : null}
     </section>
   );
 }

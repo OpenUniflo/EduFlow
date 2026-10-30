@@ -1,0 +1,1298 @@
+/* P2 unified practice object. Tokens only; no page-specific colours or sizes. */
+.ef-practice-page {
+  height: 100dvh;
+  padding: var(--sp-16);
+  overflow: hidden;
+}
+
+.ef-practice-shell {
+  height: 100%;
+}
+
+.ef-practice-shell .ef-ui-obj-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-practice-shell .ef-ui-obj-context {
+  display: block;
+  overflow: hidden;
+  max-height: var(--lh-14);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-practice-shell .ef-ui-obj-stage {
+  background:
+    radial-gradient(80% 70% at 50% 0%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 70%),
+    var(--page);
+}
+
+.ef-practice-shell .ef-ui-obj-inspector {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+}
+
+.ef-practice-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-practice-draft,
+.ef-practice-confirm,
+.ef-practice-result,
+.ef-practice-disabled,
+.ef-practice-workflow {
+  display: flex;
+  width: min(720px, 100%);
+  flex-direction: column;
+  gap: var(--sp-12);
+  margin: 0 auto;
+  padding: 0;
+}
+
+.ef-practice-shell[data-size="immersive"] .ef-practice-draft,
+.ef-practice-shell[data-size="immersive"] .ef-practice-result {
+  width: min(720px, 100%);
+  padding: var(--sp-20);
+}
+
+.ef-practice-requirements {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: 0;
+}
+
+.ef-practice-requirements p,
+.ef-practice-requirements li,
+.ef-practice-details p {
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-practice-requirements ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: var(--sp-8) 0;
+  padding-left: var(--sp-16);
+}
+
+.ef-practice-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  margin: var(--sp-8) 0 0;
+}
+
+.ef-practice-facts div {
+  display: flex;
+  gap: var(--sp-8);
+  padding-top: var(--sp-8);
+  border-top: 1px solid var(--line);
+}
+
+.ef-practice-facts dt {
+  flex: 0 0 72px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-facts dd {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-practice-details {
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  padding: var(--sp-12);
+}
+
+.ef-practice-details summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+  cursor: pointer;
+}
+
+.ef-practice-details[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.ef-practice-submission-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ef-practice-submission-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.ef-practice-submission-list li > span:nth-child(2) {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-practice-submission-list strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-practice-submission-list small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-work {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+
+.ef-practice-work-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+}
+
+.ef-practice-linked-work {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border: 1px solid color-mix(in srgb, var(--brand) 24%, transparent);
+  border-radius: var(--r-16);
+  background: var(--brand-soft);
+}
+
+.ef-practice-linked-work > div:nth-child(2) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-practice-linked-work strong {
+  overflow: hidden;
+  color: var(--brand-ink);
+  font-size: var(--fs-14);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-practice-linked-work small {
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+}
+
+.ef-practice-version {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+  padding-top: var(--sp-8);
+  border-top: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
+}
+
+.ef-practice-version label {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-practice-version select {
+  min-height: var(--ctl-32);
+  padding: 0 var(--sp-8);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+}
+
+.ef-practice-work-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-16);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-practice-work-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+
+.ef-practice-work-picker-head strong {
+  color: var(--ink);
+  font-size: var(--fs-13);
+}
+
+.ef-practice-work-picker ul {
+  display: flex;
+  max-height: 280px;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.ef-practice-work-picker li > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border: 1px solid transparent;
+  border-radius: var(--r-12);
+  background: transparent;
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.ef-practice-work-picker li > button:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ef-practice-work-picker li span:nth-child(2) {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.ef-practice-work-picker li strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-practice-work-picker li small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-practice-version-preview {
+  flex: 0 0 auto;
+  padding: 2px var(--sp-8);
+  border-radius: var(--r-full);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-practice-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-practice-attachment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+}
+
+.ef-practice-file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  max-width: 100%;
+  padding: var(--sp-4) var(--sp-8);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+}
+
+.ef-practice-file button {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: var(--page);
+  color: var(--muted);
+}
+
+.ef-practice-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: var(--ctl-32);
+  padding: 0 var(--sp-12);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-full);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  cursor: pointer;
+}
+
+.ef-practice-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.ef-practice-upload:focus-within {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.ef-practice-attachments small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-note {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-error {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid color-mix(in srgb, var(--danger) 26%, transparent);
+  border-radius: var(--r-8);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--fs-13);
+}
+
+.ef-practice-confirm-head span {
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-700);
+}
+
+.ef-practice-confirm-head h3 {
+  margin: var(--sp-4) 0;
+  color: var(--ink);
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+}
+
+.ef-practice-confirm-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-practice-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  margin: 0;
+  padding: var(--sp-12);
+  border: 1px solid color-mix(in srgb, var(--warn) 24%, transparent);
+  border-radius: var(--r-12);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-practice-evaluator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ef-practice-evaluator legend {
+  margin-bottom: var(--sp-8);
+  color: var(--ink);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-practice-evaluator-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+}
+
+.ef-practice-evaluator-option.is-selected {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ef-practice-evaluator-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.ef-practice-radio {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin-top: 2px;
+  border: 2px solid var(--line-strong);
+  border-radius: var(--r-full);
+}
+
+.ef-practice-evaluator-option.is-selected .ef-practice-radio {
+  border-color: var(--brand);
+  background: radial-gradient(circle, var(--brand) 0 45%, transparent 46%);
+}
+
+.ef-practice-evaluator-option:focus-within {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.ef-practice-evaluator-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-practice-evaluator-copy strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+  color: var(--ink);
+  font-size: var(--fs-13);
+}
+
+.ef-practice-evaluator-copy small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-result-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--surface);
+}
+
+.ef-practice-result-card.tone-accepted {
+  border-color: color-mix(in srgb, var(--target) 28%, transparent);
+  background: var(--target-soft);
+}
+
+.ef-practice-result-card.tone-revision {
+  border-color: color-mix(in srgb, var(--warn) 28%, transparent);
+  background: var(--warn-soft);
+}
+
+.ef-practice-result-card.tone-preview {
+  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+  background: var(--brand-soft);
+}
+
+.ef-practice-score {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  place-items: center;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--brand-ink);
+  font-size: var(--fs-20);
+  font-weight: var(--fw-700);
+  box-shadow: var(--sh-1);
+}
+
+.ef-practice-result-head {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-practice-result-head strong {
+  color: var(--ink);
+  font-size: var(--fs-16);
+}
+
+.ef-practice-result-head small {
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-preview-detail {
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+}
+
+.ef-practice-preview-detail h4 {
+  margin: 0 0 var(--sp-8);
+  color: var(--ink);
+  font-size: var(--fs-13);
+}
+
+.ef-practice-preview-detail ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ef-practice-preview-detail li {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+
+.ef-practice-preview-detail p {
+  margin: var(--sp-8) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-practice-submitted-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--brand-ink);
+  font-size: var(--fs-13);
+}
+
+.ef-practice-submitted {
+  padding: var(--sp-12);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-12);
+  background: var(--page);
+}
+
+.ef-practice-submitted p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+}
+
+.ef-practice-disabled {
+  align-items: flex-start;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-16);
+  background: var(--surface);
+}
+
+.ef-practice-disabled strong {
+  color: var(--ink);
+  font-size: var(--fs-16);
+}
+
+.ef-practice-disabled p {
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+
+.ef-practice-workflow {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.ef-practice-workflow h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-20);
+}
+
+.ef-practice-workflow p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-practice-footer {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+
+.ef-practice-footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-practice-footer > div {
+  display: flex;
+  gap: var(--sp-8);
+}
+
+.ef-practice-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-24);
+}
+
+.ef-practice-skeleton span {
+  height: 18px;
+  border-radius: var(--r-8);
+  background: linear-gradient(90deg, var(--line), var(--page), var(--line));
+}
+
+.ef-practice-skeleton span:nth-child(1) {
+  width: 52%;
+  height: 24px;
+}
+
+.ef-practice-skeleton span:nth-child(2) {
+  width: 88%;
+}
+
+.ef-practice-skeleton span:nth-child(3) {
+  width: 74%;
+}
+
+.ef-practice-skeleton span:nth-child(4) {
+  width: 64%;
+  height: 120px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-practice-details summary svg,
+  .ef-practice-skeleton span {
+    transition: none;
+    animation: none;
+  }
+}
+
+
+/* ---------- P2 practice completion: checklist, overlays, result ---------- */
+.ef-practice-goal {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-practice-deliverables {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin-top: var(--sp-8);
+}
+
+.ef-practice-deliverable {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--page);
+}
+
+.ef-practice-deliverable.is-done {
+  border-color: color-mix(in srgb, var(--target) 24%, transparent);
+  background: color-mix(in srgb, var(--target) 7%, var(--surface));
+}
+
+.ef-practice-deliverable-check {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  place-items: center;
+  margin-top: 1px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--surface);
+}
+
+.ef-practice-deliverable.is-done .ef-practice-deliverable-check {
+  border-color: color-mix(in srgb, var(--target) 70%, var(--ink));
+  background: var(--target);
+}
+
+.ef-practice-deliverable-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-practice-deliverable-copy b {
+  color: var(--ink);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-practice-deliverable-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  text-overflow: ellipsis;
+}
+
+.ef-practice-deliverable-state {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  white-space: nowrap;
+}
+
+.ef-practice-deliverable.is-done .ef-practice-deliverable-state {
+  color: var(--ink-2);
+}
+
+.ef-practice-req-more {
+  margin-top: var(--sp-8);
+}
+
+.ef-practice-req-more summary {
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  cursor: pointer;
+}
+
+.ef-practice-req-more ul {
+  margin: var(--sp-4) 0 0;
+  padding-left: var(--sp-16);
+}
+
+.ef-practice-req-more li {
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-score-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: var(--sp-8);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-linked-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-practice-linked-copy span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-save {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: var(--sp-8);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-file > span {
+  overflow: hidden;
+  max-width: 176px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-practice-file button {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--muted);
+}
+
+.ef-practice-file button:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.ef-ui-obj-overlay .ef-practice-overlay-card {
+  width: 100%;
+  max-width: 376px;
+  max-height: 100%;
+  overflow: hidden;
+  padding: var(--sp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--surface);
+  box-shadow: var(--sh-3);
+}
+
+.ef-practice-overlay-kicker {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-practice-overlay-card h3 {
+  margin: var(--sp-4) 0 0;
+  color: var(--ink);
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+  font-weight: var(--fw-700);
+}
+
+.ef-practice-overlay-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  margin-top: var(--sp-12);
+}
+
+.ef-practice-overlay-actions > * {
+  flex: 1;
+}
+
+.ef-practice-work-picker.ef-practice-overlay-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+
+.ef-practice-work-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+
+.ef-practice-work-picker-head h3 {
+  margin-top: 2px;
+}
+
+.ef-practice-work-results {
+  display: flex;
+  min-height: 0;
+  max-height: 48vh;
+  flex-direction: column;
+  gap: var(--sp-8);
+  overflow: auto;
+}
+
+.ef-practice-pick-work {
+  display: flex;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+}
+
+.ef-practice-pick-work.is-selected {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ef-practice-pick-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--brand-ink);
+}
+
+.ef-practice-pick-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-practice-pick-main > b {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-practice-pick-main > span {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  margin-top: var(--sp-8);
+}
+
+.ef-practice-version-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: 28px;
+  padding: 0 var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  cursor: pointer;
+}
+
+.ef-practice-version-option input {
+  margin: 0;
+  accent-color: var(--brand);
+}
+
+.ef-practice-version-option b {
+  color: var(--ink);
+  font-weight: var(--fw-600);
+}
+
+.ef-practice-version-option.is-selected {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ef-practice-pick-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-pick-foot > span {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.ef-practice-result {
+  gap: var(--sp-12);
+}
+
+.ef-practice-result-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-16);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--page);
+}
+
+.ef-practice-result-hero.tone-accepted {
+  border-color: color-mix(in srgb, var(--target) 24%, transparent);
+  background: var(--target-soft);
+}
+
+.ef-practice-result-hero.tone-revision {
+  border-color: color-mix(in srgb, var(--warn) 24%, transparent);
+  background: var(--warn-soft);
+}
+
+.ef-practice-result-hero.tone-preview {
+  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+  background: var(--brand-soft);
+}
+
+.ef-practice-result-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  place-items: center;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--brand-ink);
+  box-shadow: var(--sh-1);
+}
+
+.ef-practice-result-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.ef-practice-result-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-practice-result-source {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-result-copy p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-practice-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-score-ring {
+  display: grid;
+  width: 88px;
+  height: 88px;
+  flex: 0 0 88px;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(var(--brand) 0 76%, color-mix(in srgb, var(--brand) 14%, var(--surface)) 76% 100%);
+}
+
+.ef-practice-score-ring > div {
+  display: flex;
+  width: 72px;
+  height: 72px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--brand) 18%, transparent);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.ef-practice-score-ring b {
+  color: var(--ink);
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+  font-weight: var(--fw-700);
+  letter-spacing: -.02em;
+}
+
+.ef-practice-score-ring span {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-feedback {
+  margin: 0;
+  padding: var(--sp-8) var(--sp-12);
+  border-left: 2px solid color-mix(in srgb, var(--brand) 45%, transparent);
+  border-radius: 0 var(--r-8) var(--r-8) 0;
+  background: var(--page);
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-practice-dim-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-practice-dim span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-dim span b {
+  color: var(--ink);
+  font-weight: var(--fw-600);
+}
+
+.ef-practice-dim span em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.ef-practice-dim > i {
+  display: block;
+  height: 5px;
+  margin-top: var(--sp-4);
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: var(--line);
+}
+
+.ef-practice-dim > i > b {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--brand);
+}
+
+.ef-practice-snapshot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+}
+
+.ef-practice-snapshot > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-8);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-snapshot dt {
+  flex: 0 0 60px;
+  color: var(--muted);
+  font-weight: var(--fw-600);
+}
+
+.ef-practice-snapshot dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-practice-confirm.ef-practice-overlay-card {
+  overflow: auto;
+}

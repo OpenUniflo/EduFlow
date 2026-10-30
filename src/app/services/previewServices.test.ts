@@ -19,6 +19,6 @@ describe("Feature Preview injection", () => {
     await expect(repository.unfollow("real-user-id", "preview-person-aqing")).rejects.toMatchObject({ code: "preview_read_only" });
     await expect(repository.setVisibility("real-user-id", "preview-person-aqing", "private")).rejects.toMatchObject({ code: "preview_read_only" });
     const after = await repository.listFollowed("real-user-id");
-    expect(after.map((person) => person.visibility)).toEqual(["public", "private"]);
+    expect(after.map((person) => person.visibility)).toEqual(["public", "public", "public", "public", "private"]);
   });
 });

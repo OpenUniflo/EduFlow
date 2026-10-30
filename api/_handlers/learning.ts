@@ -35,7 +35,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       if (!attempt) { json(response,200,{result:null}); return; }
       const performanceResult = await client.from("performance_results").select("id,outcome,feedback,evaluated_at,version").eq("attempt_id",text(attempt,"id")).order("version",{ascending:false}).limit(1).single();
       const performance = dataOrThrow(performanceResult.data as Row|null,performanceResult.error,"Latest PerformanceResult lookup");
-      json(response,200,{result:{attemptId:text(attempt,"id"),resultId:text(performance,"id"),outcome:text(performance,"outcome"),accepted:text(performance,"outcome")==="passed",feedback:performance.feedback,evaluatedAt:text(performance,"evaluated_at"),response:attempt.response}}); return;
+      json(response,200,{result:{attemptId:text(attempt,"id"),attemptNumber:Number(attempt.attempt_number),resultId:text(performance,"id"),outcome:text(performance,"outcome"),accepted:text(performance,"outcome")==="passed",feedback:performance.feedback,evaluatedAt:text(performance,"evaluated_at"),response:attempt.response}}); return;
     }
     const server = await requireTeacher(user.id);
     const courseId = learnerCourseId;

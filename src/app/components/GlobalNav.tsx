@@ -67,7 +67,7 @@ export function GlobalNav({ session, onLogout }: { session?: MockSession | null;
         email={session.email}
         returnFocusRef={triggerRef}
         onClose={() => setAccountOpen(false)}
-        onOpenPanel={() => navigate("/")}
+        onOpenPanel={() => navigate("/?panel=1")}
         items={[
           { id: "settings", label: "设置", icon: <Settings2 size={18} aria-hidden />, onSelect: () => navigate("/settings") },
           { id: "records", label: "学习记录", icon: <BookOpen size={18} aria-hidden />, onSelect: () => navigate("/records") }

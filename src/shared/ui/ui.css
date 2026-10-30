@@ -596,6 +596,16 @@
   min-height: 520px;
 }
 
+/* Side panel and immersive are the same floating glass object, not a drawer. */
+.ef-ui-obj--panel,
+.ef-ui-obj--immersive {
+  border: 1px solid var(--glass-line);
+  background: var(--glass-regular);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
+  backdrop-filter: blur(36px) saturate(180%);
+  box-shadow: var(--sh-2);
+}
+
 .ef-ui-obj-head {
   position: relative;
   z-index: 2;
@@ -804,6 +814,26 @@
   padding: var(--sp-12) var(--sp-16) var(--sp-16);
   border-top: 1px solid var(--line);
   background: var(--glass-well);
+}
+
+/* Floating overlay cards (confirm, work picker, preview). */
+.ef-ui-obj-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: auto;
+  padding: var(--sp-48) var(--sp-16) var(--sp-16);
+  border-radius: var(--r-24);
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.ef-ui-obj-overlay > * {
+  width: 100%;
 }
 
 .ef-ui-obj--s .ef-ui-obj-foot {
@@ -1154,8 +1184,16 @@
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .ef-ui-glass {
+  .ef-ui-glass,
+  .ef-ui-obj--panel,
+  .ef-ui-obj--immersive {
     background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .ef-ui-obj-overlay {
+    background: var(--glass-scrim);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
