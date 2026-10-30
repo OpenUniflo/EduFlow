@@ -14,7 +14,7 @@ function ProgressRing({ value }: { value: number }) {
   );
 }
 
-function CourseRow({ course, focused, onFocus, onOpen, onOpenChapters }: { course: ArchiveCourse; focused: boolean; onFocus: () => void; onOpen: () => void; onOpenChapters: () => void }) {
+function CourseRow({ course, focused, onFocus, onOpen, onOpenChapters }: { course: ArchiveCourse; focused: boolean; onFocus: () => void; onOpen: (origin?: DOMRect) => void; onOpenChapters: () => void }) {
   return (
     <div className={`ef-archive-course-row ${focused ? "is-focused" : ""}`} data-course-state={course.state}>
       <button type="button" className="ef-archive-course-main" onClick={onFocus} title={course.title}>
@@ -24,13 +24,13 @@ function CourseRow({ course, focused, onFocus, onOpen, onOpenChapters }: { cours
           <small>{course.state === "draft" ? `草稿 · ${course.knowledgeCount} 个知识` : course.nextLabel}</small>
         </span>
       </button>
-      <button type="button" className="ef-archive-course-open" onClick={onOpen} aria-label={`进入 ${course.title}`}><ArrowRight size={14} aria-hidden /></button>
+      <button type="button" className="ef-archive-course-open" onClick={(event) => onOpen(event.currentTarget.getBoundingClientRect())} aria-label={`进入 ${course.title}`}><ArrowRight size={14} aria-hidden /></button>
       {focused ? (
         <div className="ef-archive-course-detail">
           <div className="ef-archive-course-detail-progress"><span>实践进度 <b>{course.progress}%</b></span><i aria-hidden><b style={{ width: `${Math.max(0, Math.min(100, course.progress))}%` }} /></i></div>
           <small>{course.nextLabel}</small>
           <div className="ef-archive-course-detail-actions">
-            <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={onOpen}>进入课程</button>
+            <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => onOpen(event.currentTarget.getBoundingClientRect())}>进入课程</button>
             <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={onOpenChapters}>查看章节</button>
           </div>
         </div>
@@ -46,7 +46,7 @@ export function ArchiveCoursePanel({ model, focusedCourseId, guest, listMode, er
   listMode: boolean;
   error: boolean;
   onFocusCourse: (courseId: string) => void;
-  onOpenCourse: (courseId: string) => void;
+  onOpenCourse: (courseId: string, origin?: DOMRect) => void;
   onOpenChapters: (courseId: string) => void;
   onOpenSearch: () => void;
   onOpenAssistant: () => void;
@@ -102,7 +102,7 @@ export function ArchiveCoursePanel({ model, focusedCourseId, guest, listMode, er
           <div className="ef-archive-section-head"><b>全部公开课程</b><span>按热度</span></div>
           <div className="ef-archive-rec-list">
             {publicCourses.map((course) => (
-              <button type="button" key={course.id} className="ef-archive-rec-row" onClick={() => onOpenCourse(course.id)} title={course.title}>
+              <button type="button" key={course.id} className="ef-archive-rec-row" onClick={(event) => onOpenCourse(course.id, event.currentTarget.getBoundingClientRect())} title={course.title}>
                 <span className="ef-archive-rec-icon"><BookOpen size={14} aria-hidden /></span>
                 <span><b>{course.title}</b><small>{course.chapterCount} 章 · {course.knowledgeCount} 个知识 · {course.lessonCount} 课</small></span>
                 <span className="ef-archive-rec-kind">公开</span>
@@ -122,7 +122,7 @@ export function ArchiveCoursePanel({ model, focusedCourseId, guest, listMode, er
           <div className="ef-archive-rec-head"><b>推荐课程</b><span>{recommended.length} 门</span></div>
           <div className="ef-archive-rec-list">
             {recommended.map((course) => (
-              <button type="button" key={course.id} className="ef-archive-rec-row" onClick={() => onOpenCourse(course.id)} title={course.title}>
+              <button type="button" key={course.id} className="ef-archive-rec-row" onClick={(event) => onOpenCourse(course.id, event.currentTarget.getBoundingClientRect())} title={course.title}>
                 <span className="ef-archive-rec-icon"><BookOpen size={14} aria-hidden /></span>
                 <span><b>{course.title}</b><small>{course.chapterCount} 章 · {course.knowledgeCount} 个知识 · {course.lessonCount} 课</small></span>
                 <ArrowRight size={14} aria-hidden />
@@ -134,7 +134,7 @@ export function ArchiveCoursePanel({ model, focusedCourseId, guest, listMode, er
         <>
           <div className="ef-archive-section-head"><b>正在学习</b><span>{active.filter((course) => course.state === "active").length} 在学 · {active.filter((course) => course.state === "draft").length} 草稿</span></div>
           <div className="ef-archive-course-list">
-            {active.map((course) => <CourseRow key={course.id} course={course} focused={focusedCourseId === course.id} onFocus={() => onFocusCourse(course.id)} onOpen={() => onOpenCourse(course.id)} onOpenChapters={() => onOpenChapters(course.id)} />)}
+            {active.map((course) => <CourseRow key={course.id} course={course} focused={focusedCourseId === course.id} onFocus={() => onFocusCourse(course.id)} onOpen={(origin) => onOpenCourse(course.id, origin)} onOpenChapters={() => onOpenChapters(course.id)} />)}
             {!active.length ? <p className="ef-archive-muted">还没有在学课程，从下面的推荐开始。</p> : null}
           </div>
           <div className="ef-archive-section-head"><b>推荐</b><span>{recommended.length} 门</span></div>

@@ -2,7 +2,7 @@
 
 日期：2026-10-29（2026-10-30 修订）· 状态：已定稿，从 P0 开始实施 · 范围：桌面端（≥ 1280 宽）；1024 与手机端放到下一批
 
-当前进度（2026-10-30）：P0–P3 已完成并提交到 `feat/new-ui-frontend`。`/courses` 已重定向到档案课程浮层；`/records`、`/settings` 为占位页，P7 替换。P2 遗留：作品与实践尚无持久关联（提交时把作品名 / 版本记入提交内容）；文件上传沿用 Evidence 限制（.txt/.md/.csv）；AI 评估与作品版本为预览。`pnpm content:import` 与 `verify:backend:local` 尚未在本地库实测。P3 遗留：档案星图改为 Canvas 批量绘制（306 节点静止 61fps，课程树叠加过渡约 15fps，需在 P4 前后优化）；本地仅 2 个领域有知识归属，领域配色效果待内容补齐。下一步：P4。
+当前进度（2026-10-31）：P0–P4 已完成并提交到 `feat/new-ui-frontend`。`/courses` 已重定向到档案课程浮层；`/records`、`/settings` 为占位页，P7 替换。P2 遗留：作品与实践尚无持久关联（提交时把作品名 / 版本记入提交内容）；文件上传沿用 Evidence 限制（.txt/.md/.csv）；AI 评估与作品版本为预览。`pnpm content:import` 与 `verify:backend:local` 尚未在本地库实测。P3 遗留：档案星图改为 Canvas 批量绘制（306 节点静止 61fps，课程树叠加过渡约 15fps，需在 P4 前后优化）；本地仅 2 个领域有知识归属，领域配色效果待内容补齐。P4 遗留：学习者课程页改为 three.js 沉浸场景（异步 chunk 约 583KB / gzip 151KB），React Flow 只保留在 `?experience=design` 工作室；课程知识状态统一由 `learnerStateProjection` 读取 UserKnowledgeState；本地测试课程为 6 章 / 31 知识，路线行动资源为空，故能力模型预览为 +0/−0；软件 GL 下约 15fps，硬件 60fps。下一步：P5。
 
 依据：设计稿最新版（见 §0）、[`AGENTS_RULE_CHANGES.md`](AGENTS_RULE_CHANGES.md)、2026-10-29 的产品决定：
 - 只迁移后端已有的能力；后端缺的界面做成「功能预览」（真实界面 + 示例数据 + 「预览 · 示例数据」标识，不写入）。

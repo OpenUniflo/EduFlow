@@ -5,8 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { PreviewReadOnlyError } from "@/features/profile/people/PeopleRepository";
 import { PreviewPeopleRepository } from "@/demo/preview/people/PreviewPeopleRepository";
-import { ArchivePeopleBar } from "./ArchivePeopleBar";
-import { GuestAssistantCard } from "./ArchiveAssistantPanel";
+import { ArchivePeopleBar } from "@/features/archive/components/ArchivePeopleBar";
+import { GuestAssistantCard } from "@/features/archive/components/ArchiveAssistantPanel";
 
 const source = (file: string) => readFileSync(join(process.cwd(), file), "utf8");
 

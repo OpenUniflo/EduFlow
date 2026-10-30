@@ -23,6 +23,7 @@ import { ArchivePeopleBar } from "../components/ArchivePeopleBar";
 import { ArchiveSearchPanel } from "../components/ArchiveSearchPanel";
 import { ArchiveCompareCard, ArchiveCompareNodeCard, ArchiveNodeHoverCard, ArchiveNotificationsDialog, ArchivePeerCard, ArchivePeopleDialog, ArchivePeoplePicker, type PeopleDialogTab } from "../components/ArchiveSocialDialogs";
 import { getArchiveLayout } from "../model/atlasLayout";
+import { rememberCourseOrigin } from "@/features/course/immersive/courseTransition";
 import { archiveCourseKnowledgeIds, archivePeopleKnowledgeIds, buildArchiveModel, searchArchive, type ArchiveEdge, type ArchiveModel } from "../model/atlasModel";
 import { deriveAssistantPresentation, type ArchiveAssistantPresentation } from "../model/assistantPresentation";
 import { archiveHref, parseArchiveSearch, type ArchivePanel } from "../model/atlasParams";
@@ -273,8 +274,9 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     setPanelParam(null);
   }, [focusedCourseId, selectedPeopleIds.length, setPanelParam]);
 
-  const openCourse = useCallback((courseId: string) => {
+  const openCourse = useCallback((courseId: string, origin?: DOMRect) => {
     if (!courseId) return;
+    rememberCourseOrigin(courseId, origin);
     navigate(`/courses/${encodeURIComponent(courseId)}`);
   }, [navigate]);
   const openCourseChapters = useCallback((courseId: string) => {
@@ -564,7 +566,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
           learned={courseTreeCounts?.learned ?? 0}
           total={focusedCourse.knowledgeCount}
           onMode={setCourseTreeMode}
-          onOpen={() => openCourse(focusedCourse.id)}
+          onOpen={(origin) => openCourse(focusedCourse.id, origin)}
           onClose={clearCourseFocus}
         />
       ) : null}

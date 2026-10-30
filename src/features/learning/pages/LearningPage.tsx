@@ -14,6 +14,7 @@ import { defaultKnowledgeContextId, resolveKnowledgeLearningContext } from "@/fe
 import { PracticeObject } from "@/features/course/practice/PracticeObject";
 import { InlineMicro } from "@/features/home/InlineMicro";
 import { CoursePreviewCard } from "@/features/home/CoursePreviewCard";
+import { rememberCourseOrigin } from "@/features/course/immersive/courseTransition";
 import { ConversationMicroCard } from "@/features/home/ConversationMicroCard";
 import { HomeConversation } from "@/features/home/HomeConversation";
 import { MyPanel } from "@/features/home/MyPanel";
@@ -225,7 +226,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       <button ref={panelToggleRef} type="button" className={`ef-home-panel-toggle ${panelOpen ? "is-open" : ""}`} aria-pressed={panelOpen} aria-controls="ef-my-panel" onClick={() => setPanel(!panelOpen)}><PanelRight size={16} aria-hidden="true" />我的</button>
     </header>
 
-    {boundary === "new-user" ? <NewUserStart runtimes={runtimes} onSend={(prompt) => void send(prompt)} onOpenCourse={(courseId) => navigate(`/courses/${encodeURIComponent(courseId)}`)} onOpenArchive={openArchive} /> : boundary === "ready" && !assistant.messages.length ? <TodayOverview session={session} course={todayCourse as TodayCourse | null} counts={{ learned: archive.learned, learning: archive.learning, practicing: archive.practicing, mastered: archive.mastered }} week={week} recentTitle={archive.recentTitle} onOpenCourse={() => todayCourse ? navigate(`/courses/${encodeURIComponent(todayCourse.runtime.course.id)}`) : openArchive()} onOpenArchive={openArchive} /> : null}
+    {boundary === "new-user" ? <NewUserStart runtimes={runtimes} onSend={(prompt) => void send(prompt)} onOpenCourse={(courseId, origin) => { rememberCourseOrigin(courseId, origin); navigate(`/courses/${encodeURIComponent(courseId)}`); }} onOpenArchive={openArchive} /> : boundary === "ready" && !assistant.messages.length ? <TodayOverview session={session} course={todayCourse as TodayCourse | null} counts={{ learned: archive.learned, learning: archive.learning, practicing: archive.practicing, mastered: archive.mastered }} week={week} recentTitle={archive.recentTitle} onOpenCourse={(origin) => { if (!todayCourse) { openArchive(); return; } rememberCourseOrigin(todayCourse.runtime.course.id, origin); navigate(`/courses/${encodeURIComponent(todayCourse.runtime.course.id)}`); }} onOpenArchive={openArchive} /> : null}
 
     <div className="ef-home-work">
       <div className="ef-home-column">
@@ -271,7 +272,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
 
 type TodayCourse = { runtime: CourseRuntimeData; state: UserCourseState; progress: number; currentChapter?: string; nextLabel: string };
 
-function NewUserStart({ runtimes, onSend, onOpenCourse, onOpenArchive }: { runtimes: CourseRuntimeData[]; onSend: (prompt: string) => void; onOpenCourse: (courseId: string) => void; onOpenArchive: () => void }) {
+function NewUserStart({ runtimes, onSend, onOpenCourse, onOpenArchive }: { runtimes: CourseRuntimeData[]; onSend: (prompt: string) => void; onOpenCourse: (courseId: string, origin?: DOMRect) => void; onOpenArchive: () => void }) {
   const scenarios = [
     { title: "让 AI 会查我们自己的文档", hint: "RAG", prompt: "我想让 AI 会查我们自己的文档，现在它总是编。" },
     { title: "把重复的周报整理自动化", hint: "工作流", prompt: "我想把重复的周报整理自动化。" },
@@ -287,7 +288,7 @@ function NewUserStart({ runtimes, onSend, onOpenCourse, onOpenArchive }: { runti
     </article>
     <article className="ef-home-new-card">
       <header><span>推荐先学</span><Pill tone="quiet">{recommendations.length} 门</Pill></header>
-      <div className="ef-home-recommendations">{recommendations.map((runtime) => <button key={runtime.course.id} type="button" onClick={() => onOpenCourse(runtime.course.id)}><span><strong>{runtime.course.title}</strong><small>{runtime.chapters.length} 章 · {runtime.assignments.length} 项实践</small></span><ArrowRightIcon /></button>)}</div>
+      <div className="ef-home-recommendations">{recommendations.map((runtime) => <button key={runtime.course.id} type="button" onClick={(event) => onOpenCourse(runtime.course.id, event.currentTarget.getBoundingClientRect())}><span><strong>{runtime.course.title}</strong><small>{runtime.chapters.length} 章 · {runtime.assignments.length} 项实践</small></span><ArrowRightIcon /></button>)}</div>
       <button type="button" className="ef-home-text-link" onClick={onOpenArchive}>浏览全部档案 →</button>
     </article>
   </section>;

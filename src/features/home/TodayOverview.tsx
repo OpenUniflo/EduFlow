@@ -13,7 +13,7 @@ export type TodayOverviewProps = {
   counts: { learned: number; learning: number; practicing: number; mastered: number };
   week: { labels: string[]; active: boolean[]; count: number };
   recentTitle?: string;
-  onOpenCourse: () => void;
+  onOpenCourse: (origin?: DOMRect) => void;
   onOpenArchive: () => void;
 };
 
@@ -29,7 +29,7 @@ export function TodayOverview({ session, course, counts, week, recentTitle, onOp
         </div>
         <p className="ef-home-next"><ArrowRight size={13} aria-hidden="true" />{course.nextLabel}</p>
         <div className="ef-home-progress-row"><span className="ef-home-progress-track"><i style={{ width: `${course.progress}%` }} /></span><strong>{course.progress}% 已完成</strong></div>
-        <button type="button" className="ef-ui-btn ef-ui-btn--primary" onClick={onOpenCourse}>继续学习<ArrowRight size={15} /></button>
+        <button type="button" className="ef-ui-btn ef-ui-btn--primary" onClick={(event) => onOpenCourse(event.currentTarget.getBoundingClientRect())}>继续学习<ArrowRight size={15} /></button>
       </> : <div className="ef-home-today-empty"><BookOpen size={22} /><h2>从一门课程开始</h2><p>还没有在学课程。可以在档案里选择一门课程，或和助手说说你的目标。</p><button type="button" className="ef-ui-btn ef-ui-btn--secondary" onClick={onOpenArchive}>浏览档案<ArrowRight size={15} /></button></div>}
     </article>
 

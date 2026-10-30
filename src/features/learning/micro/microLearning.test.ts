@@ -48,8 +48,8 @@ describe("Micro Learning navigation", () => {
     });
     expect(resolveMicroLearningReturnTarget({ returnTo: "/courses/fixture-course-alpha/chapters/fixture-chapter?mode=knowledge" }, "fixture-course-alpha"))
       .toBe("/courses/fixture-course-alpha/chapters/fixture-chapter?mode=knowledge");
-    const coursePage = readFileSync(join(process.cwd(), "src/features/course/pages/CourseGraphPage.tsx"), "utf8");
-    expect(coursePage).toContain("returnTo:`${location.pathname}${location.search}`");
+    const coursePage = readFileSync(join(process.cwd(), "src/features/course/immersive/CourseImmersivePage.tsx"), "utf8");
+    expect(coursePage).toContain("returnTo: `${location.pathname}${location.search}`");
   });
 
   it("uses deterministic safe fallbacks for refreshes and rejects external targets", () => {
@@ -64,9 +64,9 @@ describe("Micro Learning navigation", () => {
     expect(syntheticMicroProvider.getLesson("syn-a", { courseId: "fixture-course-alpha" })).not.toBeNull();
     expect(syntheticMicroProvider.getLesson("missing-node", { courseId: "fixture-course-alpha" })).toBeNull();
 
-    const coursePage = readFileSync(join(process.cwd(), "src/features/course/pages/CourseGraphPage.tsx"), "utf8");
-    expect(coursePage).toContain("selectedMicroLesson ? <button");
-    expect(coursePage).toContain("microLearningProvider?.getLesson(nodeId,{courseId:runtime.course.id})");
+    const coursePage = readFileSync(join(process.cwd(), "src/features/course/immersive/CourseImmersivePage.tsx"), "utf8");
+    expect(coursePage).toContain("selectedStageKnowledge && selectedMicro ? <button");
+    expect(coursePage).toContain("microLearningProvider?.getLesson(selectedStageKnowledge.id, { courseId })");
   });
 
   it("renders an honest unsupported deep-link fallback inside the Micro page", () => {

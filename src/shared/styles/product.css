@@ -1403,92 +1403,6 @@
   touch-action: none;
   background-image: radial-gradient(circle, rgba(112, 132, 164, 0.18) 1px, transparent 1px);
   background-size: 24px 24px;
-}.atlas-graph-world{
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 1600px;
-  height: 850px;
-  transform-origin: 0 0;
-  will-change: transform;
-}.atlas-graph-lines{
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}.atlas-graph-lines path{
-  fill: none;
-  stroke: #aebbd0;
-  stroke-width: 2;
-}.atlas-graph-lines path.highlighted{
-  stroke: var(--atlas-brand);
-  stroke-width: 4;
-}.atlas-skill-node{
-  position: absolute;
-  width: 186px;
-  min-height: 96px;
-  padding: 14px;
-  border: 1px solid rgba(112, 132, 164, 0.22);
-  border-radius: 18px;
-  color: var(--atlas-ink);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 10px 25px rgba(66, 88, 126, 0.1);
-  text-align: left;
-  user-select: none;
-  transition: opacity 0.18s, box-shadow 0.18s, transform 0.18s;
-}.atlas-skill-node::before{
-  position: absolute;
-  z-index: -1;
-  top: 10px;
-  right: -9px;
-  bottom: -9px;
-  left: 10px;
-  border: 1px solid color-mix(in srgb, var(--node-color) 35%, transparent);
-  border-radius: 17px;
-  background: color-mix(in srgb, var(--node-color) 12%, white);
-  content: "";
-}.atlas-skill-node.practice{
-  background: color-mix(in srgb, var(--node-color) 15%, white);
-}.atlas-skill-node.practice::before{
-  top: -9px;
-  right: 10px;
-  bottom: 10px;
-  left: -9px;
-  background: rgba(255, 255, 255, 0.94);
-}.atlas-skill-node:hover{
-  box-shadow: 0 14px 34px rgba(66, 88, 126, 0.16);
-  transform: translateY(-2px);
-}.atlas-skill-node.selected{
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--node-color) 22%, transparent), 0 16px 35px rgba(66, 88, 126, 0.17);
-}.atlas-skill-node.dimmed{
-  opacity: 0.22;
-}.atlas-node-kicker{
-  color: #7d899a;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}.atlas-skill-node h3{
-  margin: 7px 0;
-  font-size: 14px;
-  line-height: 1.35;
-}.atlas-node-info{
-  display: flex;
-  justify-content: space-between;
-  color: #768499;
-  font-size: 9px;
-}.atlas-node-progress{
-  height: 5px;
-  margin-top: 9px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e9eef5;
-}.atlas-node-progress i{
-  display: block;
-  height: 100%;
-  background: var(--node-color);
 }.atlas-graph-meta{
   position: fixed;
   top: 82px;
@@ -2718,24 +2632,6 @@
   width: 42px;
   height: 42px;
   border-radius: 12px;
-}.atlas-skill-node{
-  width: 184px;
-  min-height: 84px;
-  padding: 13px 16px;
-  border: 1.7px solid #90a3c4;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 16px 40px rgba(83, 104, 145, 0.12);
-}.atlas-skill-node::before{
-  top: 12px;
-  right: -12px;
-  bottom: -12px;
-  left: 12px;
-  border: 1.5px dashed color-mix(in srgb, var(--node-color) 70%, #63b79c);
-  background: color-mix(in srgb, var(--node-color) 12%, #d9f7ed);
-}.atlas-skill-node.selected{
-  border-width: 3px;
-  border-color: var(--atlas-brand);
 }.atlas-detail-drawer{
   width: min(50vw, 760px);
   padding: 92px 26px 110px;
@@ -3501,43 +3397,6 @@
   border: 1px solid #fff;
   background: #8292ad;
   opacity: 0.8;
-}.atlas-graph-world{
-  width: 6000px;
-  height: 5200px;
-}.atlas-graph-lines path{
-  marker-end: url(#atlas-arrow);
-  transition: opacity 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
-}.atlas-graph-lines marker path{
-  fill: #aebbd0;
-  stroke: none;
-}.atlas-graph-lines marker#atlas-arrow-active path{
-  fill: var(--atlas-brand);
-}.atlas-graph-lines path.highlighted{
-  stroke-width: 3.2px;
-}.atlas-graph-lines path.dimmed{
-  opacity: 0.13;
-}.atlas-graph-lines path.prerequisite.hard{
-  stroke: #7f8fad;
-  stroke-width: 2.4px;
-  opacity: 0.88;
-}.atlas-graph-lines path.prerequisite.soft{
-  stroke: #9aa8be;
-  stroke-width: 1.7px;
-  opacity: 0.62;
-}.atlas-graph-lines path.enables{
-  stroke: #7fa3ab;
-  stroke-width: 1.45px;
-  opacity: 0.54;
-}.atlas-graph-lines path.related{
-  stroke: #a6a1bd;
-  stroke-width: 1.2px;
-  stroke-dasharray: 4 6;
-  opacity: 0.45;
-}.atlas-graph-lines path.sequence{
-  stroke: #a4adbd;
-  stroke-width: 1.2px;
-  stroke-dasharray: 5 6;
-  opacity: 0.52;
 }.atlas-chapter-hull{
   fill: rgba(91, 124, 250, 0.055);
   stroke: rgba(91, 124, 250, 0.23);
@@ -3548,19 +3407,6 @@
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.03em;
-}.atlas-skill-node{
-  width: 196px;
-  height: 104px;
-  min-height: 104px;
-  padding: 0;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  transition: opacity 0.2s ease, filter 0.2s ease;
-}.atlas-skill-node::before{
-  display: none;
 }.atlas-node-shadow,.atlas-node-selection,.atlas-node-main{
   position: absolute;
   inset: 0;
@@ -3582,33 +3428,6 @@
   border: 1.7px solid #90a3c4;
   background: rgba(255, 255, 255, 0.94);
   text-align: left;
-}.atlas-skill-node.practice .atlas-node-main{
-  border-color: #5fb79c;
-  background: rgba(235, 250, 245, 0.97);
-}.atlas-skill-node.practice .atlas-node-shadow{
-  border-color: #91a4da;
-  background: rgba(239, 243, 255, 0.88);
-}.atlas-skill-node:hover{
-  box-shadow: none;
-  transform: none;
-}.atlas-skill-node:hover .atlas-node-main{
-  border-color: var(--atlas-brand);
-  border-width: 2.4px;
-}.atlas-skill-node:hover .atlas-node-shadow{
-  transform: translate(4px, 4px);
-}.atlas-skill-node.selected{
-  box-shadow: none;
-}.atlas-skill-node.selected .atlas-node-main{
-  border-color: var(--atlas-brand);
-  border-width: 3px;
-}.atlas-skill-node.selected .atlas-node-selection{
-  opacity: 1;
-}.atlas-skill-node.focused{
-  filter: drop-shadow(0 10px 18px rgba(91, 124, 250, 0.18));
-}.atlas-skill-node.related{
-  opacity: 0.8;
-}.atlas-skill-node.dimmed{
-  opacity: 0.28;
 }.atlas-node-status{
   position: absolute;
   top: 13px;
@@ -3663,8 +3482,6 @@
   font-weight: 800;
   opacity: 0;
   transition: opacity 0.16s ease;
-}.atlas-skill-node:hover .atlas-node-expand-mark{
-  opacity: 1;
 }.atlas-graph-search{
   width: 52px;
   padding: 7px;

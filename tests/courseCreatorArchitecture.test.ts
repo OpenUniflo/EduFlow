@@ -74,7 +74,7 @@ describe("Course Creator persistence and authority boundaries", () => {
   });
 
   it("restores Personal Creator and teaching authoring to their source contexts", () => {
-    const page = read("src/features/course/pages/CourseGraphPage.tsx");
+    const page = read("src/features/course/pages/CourseStudioPage.tsx");
     expect(page).toContain("window.location.assign(`/courses/create?briefId=");
     expect(page).toContain("teacherCreatorPreview");
     expect(page).toContain("/teaching/create?courseId=");

@@ -8,7 +8,7 @@ export function ArchiveCourseMini({ model, onExpand, onFocusCourse, onOpenCourse
   model: ArchiveModel;
   onExpand: () => void;
   onFocusCourse: (courseId: string) => void;
-  onOpenCourse: (courseId: string) => void;
+  onOpenCourse: (courseId: string, origin?: DOMRect) => void;
 }) {
   const courses = model.courses.filter((course) => course.state === "active" || course.state === "draft").slice(0, 2);
   return (
@@ -21,7 +21,7 @@ export function ArchiveCourseMini({ model, onExpand, onFocusCourse, onOpenCourse
             <small>{course.state === "draft" ? `草稿 · ${course.knowledgeCount} 个知识` : course.nextLabel}</small>
           </button>
           <em>{course.progress}%</em>
-          <button type="button" className="ef-archive-course-mini-go" onClick={() => onOpenCourse(course.id)} aria-label={`进入 ${course.title}`}><ArrowRight size={12} aria-hidden /></button>
+          <button type="button" className="ef-archive-course-mini-go" onClick={(event) => onOpenCourse(course.id, event.currentTarget.getBoundingClientRect())} aria-label={`进入 ${course.title}`}><ArrowRight size={12} aria-hidden /></button>
         </div>
       ))}
       {!courses.length ? <p className="ef-archive-muted">还没有在学课程。</p> : null}
@@ -35,7 +35,7 @@ export function ArchiveCourseFocusBar({ course, mode, learned, total, onMode, on
   learned: number;
   total: number;
   onMode: (mode: "skill" | "practice") => void;
-  onOpen: () => void;
+  onOpen: (origin?: DOMRect) => void;
   onClose: () => void;
 }) {
   return (
@@ -54,7 +54,7 @@ export function ArchiveCourseFocusBar({ course, mode, learned, total, onMode, on
         <span className="ef-archive-course-progress-track" aria-hidden><i style={{ width: `${Math.max(0, Math.min(100, course.progress))}%` }} /></span>
         <span>{learned}/{total} 已学</span>
       </div>
-      <button type="button" className="ef-archive-course-focus-open" onClick={onOpen}>进入课程<ArrowRight size={13} aria-hidden /></button>
+      <button type="button" className="ef-archive-course-focus-open" onClick={(event) => onOpen(event.currentTarget.getBoundingClientRect())}>进入课程<ArrowRight size={13} aria-hidden /></button>
       <button type="button" className="ef-archive-icon-btn" onClick={onClose} aria-label="退出课程聚焦"><X size={14} aria-hidden /></button>
     </div>
   );
@@ -83,7 +83,7 @@ export function ArchiveNodePanel({ node, model, edges, onClose, onSelectNode, on
   edges: readonly ArchiveEdge[];
   onClose: () => void;
   onSelectNode: (id: string) => void;
-  onOpenCourse: (courseId: string) => void;
+  onOpenCourse: (courseId: string, origin?: DOMRect) => void;
 }) {
   const prerequisites = useMemo(() => edges.filter((edge) => edge.target === node.id && edge.relation === "prerequisite").flatMap((edge) => { const item = model.nodeById.get(edge.source); return item ? [item] : []; }).slice(0, 5), [edges, model.nodeById, node.id]);
   const neighbors = useMemo(() => edges.filter((edge) => edge.source === node.id || edge.target === node.id).length, [edges, node.id]);
@@ -103,9 +103,9 @@ export function ArchiveNodePanel({ node, model, edges, onClose, onSelectNode, on
         <div><dt>覆盖课程</dt><dd>{node.courseContexts.length} 门</dd></div>
       </dl>
       {prerequisites.length ? <section><h3>事实前置</h3><div>{prerequisites.map((item) => <button type="button" key={item.id} onClick={() => onSelectNode(item.id)}><span style={{ background: item.color }} aria-hidden />{item.title}<ChevronRight size={12} aria-hidden /></button>)}</div></section> : null}
-      {node.courseContexts.length ? <section><h3>出现在课程</h3><div>{node.courseContexts.slice(0, 4).map((context) => <button type="button" key={context.courseId} onClick={() => onOpenCourse(context.courseId)}><BookOpen size={12} aria-hidden />{context.courseTitle}<ArrowRight size={12} aria-hidden /></button>)}</div></section> : null}
+      {node.courseContexts.length ? <section><h3>出现在课程</h3><div>{node.courseContexts.slice(0, 4).map((context) => <button type="button" key={context.courseId} onClick={(event) => onOpenCourse(context.courseId, event.currentTarget.getBoundingClientRect())}><BookOpen size={12} aria-hidden />{context.courseTitle}<ArrowRight size={12} aria-hidden /></button>)}</div></section> : null}
       <div className="ef-archive-node-actions">
-        {node.courseContexts[0] ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => onOpenCourse(node.courseContexts[0].courseId)}>进入相关课程<ArrowRight size={13} aria-hidden /></button> : null}
+        {node.courseContexts[0] ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => onOpenCourse(node.courseContexts[0].courseId, event.currentTarget.getBoundingClientRect())}>进入相关课程<ArrowRight size={13} aria-hidden /></button> : null}
         <span className="ef-archive-node-note"><Lock size={11} aria-hidden />查看不会改变学习状态</span>
       </div>
     </aside>
