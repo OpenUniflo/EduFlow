@@ -42,7 +42,7 @@ export function updateMaterialReadingState(userId: string, courseId: string, les
 
 export function workflowLaunchUrl(context: WorkflowLaunchContext) {
   const query = new URLSearchParams({ courseId: context.courseId, assignmentId: context.assignmentId });
-  return `/workflows/${context.workflowTemplateId}?${query.toString()}`;
+  return `/works/${context.workflowTemplateId}?${query.toString()}`;
 }
 
 export function workflowLaunchContextFromLocation(workflowTemplateId: string, search: string): WorkflowLaunchContext | null {

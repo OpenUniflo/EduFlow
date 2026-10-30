@@ -1,7 +1,6 @@
 import { ArrowLeft, Bot, Check, ChevronRight, FileText, GitCompare, Network, Rocket, Sparkles, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
 import { getAssistantTimelineMessage, proposeCourseCreatorAdjustment } from "@/features/assistant/assistantClient";
@@ -204,8 +203,8 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver, entry
     finally { setPublishing(false); }
   }
 
-  if (briefError) return <main className="atlas-page-shell creator-page"><GlobalNav active={isTeacher?"teaching":"courses"} session={session} onLogout={onLogout} /><section className="creator-error glass-v2"><h1>无法开始 Course Creator</h1><p>{briefError}</p><button className="atlas-primary" onClick={() => navigate(isTeacher?"/teaching":"/messages")}>{isTeacher?"返回教学管理":"返回 Assistant"}</button></section></main>;
-  if (!design || !brief) return <main className="atlas-page-shell creator-page"><GlobalNav active={isTeacher?"teaching":"courses"} session={session} onLogout={onLogout} /><section className="creator-error glass-v2"><Sparkles/><h1>正在读取课程创建上下文…</h1></section></main>;
+  if (briefError) return <main className="atlas-page-shell creator-page"><section className="creator-error glass-v2"><h1>无法开始 Course Creator</h1><p>{briefError}</p><button className="atlas-primary" onClick={() => navigate(isTeacher?"/teaching":"/")}>{isTeacher?"返回教学管理":"返回首页"}</button></section></main>;
+  if (!design || !brief) return <main className="atlas-page-shell creator-page"><section className="creator-error glass-v2"><Sparkles/><h1>正在读取课程创建上下文…</h1></section></main>;
 
   const stage = courseCreatorStages[stageIndex];
   const displayRuntime = persistedRuntime ?? previewRuntime!;
@@ -213,7 +212,7 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver, entry
   const previewHref=draftCourseId?(isTeacher?`/courses/${draftCourseId}?experience=design&creator=teacher`:`/courses/${draftCourseId}`):"";
   const completedHref=draftCourseId?(isTeacher?`/courses/${draftCourseId}?experience=design`:`/courses/${draftCourseId}`):"";
 
-  return <main className="atlas-page-shell creator-page"><GlobalNav active={isTeacher?"teaching":"courses"} session={session} onLogout={onLogout} /><div className="creator-shell">
+  return <main className="atlas-page-shell creator-page"><div className="creator-shell">
     <header className="creator-heading"><div><span className="atlas-kicker">六步课程创建 · {isTeacher?"标准课程":"个人课程"}</span><h1>{design.requirements.goal||"创建一门标准课程"}</h1><p>参考课程和资料只帮助你做决定，不会改变六步流程；没有资料也可以完成创建。</p></div>{draftCourseId ? <span className={`creator-lifecycle ${published ? "published" : "draft"}`}>{published ? "已发布" : "课程草稿"}</span> : null}</header>
     <nav className="creator-stepper" aria-label="Course Creator stages">{stageLabels.map((label, index) => <button key={label} className={`${index === stageIndex ? "active" : ""} ${index <= confirmedThrough ? "done" : ""}`} disabled={index > Math.max(stageIndex, confirmedThrough + 1)} onClick={() => { setStageIndex(index); setPendingProposal(null); }}><i>{index <= confirmedThrough ? <Check size={13}/> : index + 1}</i><span>{label}<small>{stageOutputLabels[index]}</small></span>{index < 5 ? <ChevronRight size={14}/> : null}</button>)}</nav>
     <div className="creator-workspace"><section className="creator-result glass-v2">

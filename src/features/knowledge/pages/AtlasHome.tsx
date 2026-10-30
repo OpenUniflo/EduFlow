@@ -2,7 +2,6 @@ import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ArrowRight, FileText, Minus, Pause, Play, Plus, RefreshCcw, Send, Settings2, Upload, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
-import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices } from "@/app/services/applicationServices";
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneHandle } from "@/features/knowledge/components/KnowledgeAtlasScene";
 import { buildGlobalAtlasProjection } from "@/features/knowledge/projections/atlasProjections";
@@ -74,7 +73,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
 
   return (
     <main className="atlas-home-page">
-      <GlobalNav active="explore" session={session} onLogout={onLogout} />
+
       <KnowledgeAtlasScene
         ref={sceneRef}
         className="atlas-star-canvas"

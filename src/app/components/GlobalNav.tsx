@@ -1,28 +1,122 @@
-import { BookOpen, Compass, GraduationCap, LogIn, LogOut, Network, ShieldCheck, UserPlus, Workflow } from "lucide-react";
-import { useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { BookOpen, GraduationCap, History, Home, LayoutGrid, LogIn, Network, Settings2, ShieldCheck } from "lucide-react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
 import { canManageCourses, canManageKnowledgeDomains } from "@/features/auth/capabilities";
+import { authGateState } from "@/features/auth/authRedirect";
+import { AccountMenu } from "@/shared/ui/AccountMenu";
+import { Avatar } from "@/shared/ui/Avatar";
+import { BrandMark } from "@/shared/ui/BrandMark";
+import { shortDisplayName } from "@/shared/ui/displayName";
 
-export type GlobalNavActive="learning"|"explore"|"courses"|"canvas"|"teaching"|"system";
-export type GlobalNavItem={id:GlobalNavActive;to:string;label:string};
+export type GlobalNavActive = "home" | "archive" | "works" | "records" | "teaching" | "admin";
 
-export function getPrimaryNavigationItems(session?:MockSession|null):GlobalNavItem[]{
-  const items:GlobalNavItem[]=[{id:"learning",to:"/",label:"学习"},{id:"explore",to:"/explore",label:"探索"},{id:"courses",to:"/courses",label:"课程"},{id:"canvas",to:"/workflows",label:"画布"}];
-  if(canManageCourses(session))items.push({id:"teaching",to:"/teaching",label:"教学管理"});
-  if(canManageKnowledgeDomains(session))items.push({id:"system",to:"/system",label:"系统管理"});
+export type GlobalNavItem = {
+  id: GlobalNavActive;
+  to: string;
+  label: string;
+  icon: ComponentType<{ size?: number | string; "aria-hidden"?: boolean }>;
+};
+
+/** Learner workspaces first; role workspaces append without changing learner IA. */
+export function getPrimaryNavigationItems(session?: MockSession | null): GlobalNavItem[] {
+  const items: GlobalNavItem[] = [
+    { id: "home", to: "/", label: "首页", icon: Home },
+    { id: "archive", to: "/archive", label: "档案", icon: Network },
+    { id: "works", to: "/works", label: "作品", icon: LayoutGrid },
+    { id: "records", to: "/records", label: "记录", icon: History }
+  ];
+  if (!session) return items.slice(0, 2);
+  if (canManageCourses(session)) items.push({ id: "teaching", to: "/teaching", label: "教学", icon: GraduationCap });
+  if (canManageKnowledgeDomains(session)) items.push({ id: "admin", to: "/admin", label: "管理", icon: ShieldCheck });
   return items;
 }
 
-const icons={learning:GraduationCap,explore:Compass,courses:BookOpen,canvas:Workflow,teaching:BookOpen,system:ShieldCheck};
-function initials(name:string){return name.trim().slice(0,2).toUpperCase()||"ED";}
+function NavItem({ item }: { item: GlobalNavItem }) {
+  const Icon = item.icon;
+  return (
+    <NavLink className="ef-nav-item" data-nav-id={item.id} end={item.to === "/"} to={item.to}>
+      <Icon size={20} aria-hidden />
+      <span>{item.label}</span>
+    </NavLink>
+  );
+}
 
-export function GlobalNav({active,session,onLogout}:{active:GlobalNavActive;session?:MockSession|null;onLogout?:()=>void}){
-  const navigate=useNavigate(); const [accountOpen,setAccountOpen]=useState(false);
-  useEffect(()=>{function close(event:KeyboardEvent){if(event.key==="Escape")setAccountOpen(false);}window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[]);
-  return <nav className="atlas-global-nav global-tab-nav" aria-label="全局导航">
-    <button className="global-nav-brand glass-v2" onClick={()=>navigate("/")} aria-label="返回学习空间"><span><Network size={18}/></span><strong>EduFlow</strong></button>
-    <div className="global-nav-tabs glass-v2">{getPrimaryNavigationItems(session).map((item)=>{const Icon=icons[item.id];return <NavLink key={item.id} to={item.to} className={active===item.id?"active":""}><Icon size={15}/><span>{item.label}</span></NavLink>;})}</div>
-    {session?<div className={`global-account ${accountOpen?"open":""}`}><button className="global-account-trigger glass-v2" onClick={()=>setAccountOpen((value)=>!value)} aria-expanded={accountOpen} aria-label="账户菜单"><span>{initials(session.name)}</span></button>{accountOpen?<div className="global-account-popover glass-v2"><strong>{session.name}</strong><small>{session.email}</small><button onClick={()=>{setAccountOpen(false);navigate("/?view=knowledge");}}><GraduationCap size={14}/>我的知识</button>{onLogout?<button onClick={onLogout}><LogOut size={14}/>退出登录</button>:null}</div>:null}</div>:<div className="guest-auth-actions glass-v2"><button aria-label="登录" onClick={()=>navigate("/login")}><LogIn size={14}/>登录</button><button aria-label="注册" onClick={()=>navigate("/register")}><UserPlus size={14}/>注册</button></div>}
-  </nav>;
+export function GlobalNav({ session, onLogout }: { session?: MockSession | null; onLogout?: () => void }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [lastPath, setLastPath] = useState(location.pathname);
+
+  useEffect(() => {
+    if (lastPath !== location.pathname) {
+      setAccountOpen(false);
+      setLastPath(location.pathname);
+    }
+  }, [lastPath, location.pathname]);
+
+  const accountLabel = session ? shortDisplayName(session.name) : "";
+  const accountMenu: ReactNode = accountOpen && session && typeof document !== "undefined"
+    ? createPortal(
+      <AccountMenu
+        open
+        className="ef-nav-account"
+        name={session.name}
+        email={session.email}
+        returnFocusRef={triggerRef}
+        onClose={() => setAccountOpen(false)}
+        onOpenPanel={() => navigate("/")}
+        items={[
+          { id: "settings", label: "设置", icon: <Settings2 size={18} aria-hidden />, onSelect: () => navigate("/settings") },
+          { id: "records", label: "学习记录", icon: <BookOpen size={18} aria-hidden />, onSelect: () => navigate("/records") }
+        ]}
+        onLogout={onLogout ? () => onLogout() : undefined}
+      />,
+      document.body
+    )
+    : null;
+
+  return (
+    <>
+      <nav className="ef-nav ef-ui-glass ef-ui-glass--clear ef-ui-glass--r-24" aria-label="主导航" data-nav-role={session?.role ?? "guest"}>
+        <NavLink className="ef-nav-logo" to="/" aria-label="EduFlow 首页">
+          <BrandMark variant="rail" size={22} />
+        </NavLink>
+        <div className="ef-nav-grp">
+          {getPrimaryNavigationItems(session).map((item) => <NavItem key={item.id} item={item} />)}
+        </div>
+        <div className="ef-nav-spacer" />
+        {session ? (
+          <div className="ef-nav-me-wrap">
+            <button
+              ref={triggerRef}
+              type="button"
+              className={`ef-nav-me${accountOpen ? " is-open" : ""}`}
+              aria-label={`账户：${session.name}，${accountOpen ? "收起" : "打开"}账户菜单`}
+              aria-haspopup="menu"
+              aria-expanded={accountOpen}
+              aria-controls="ef-account-menu"
+              onClick={() => setAccountOpen((value) => !value)}
+            >
+              <Avatar name={session.name} size={32} personColor="me" decorative />
+              <span className="ef-nav-me-name">{accountLabel}</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="ef-nav-guest"
+            aria-label="登录"
+            onClick={() => navigate("/login", { state: authGateState(location) })}
+          >
+            <span className="ef-nav-guest-icon"><LogIn size={16} aria-hidden /></span>
+            <span className="ef-nav-me-name">登录</span>
+          </button>
+        )}
+      </nav>
+      {accountMenu}
+    </>
+  );
 }

@@ -11,6 +11,11 @@
   overflow: hidden;
 }
 
+.ef-brand-mark {
+  display: block;
+  flex: 0 0 auto;
+}
+
 /* ---------- Glass ---------- */
 .ef-ui-glass {
   position: relative;
@@ -251,6 +256,13 @@
   display: grid;
   place-items: center;
   flex: 0 0 18px;
+  color: var(--muted);
+}
+
+.ef-ui-field-trailing {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
   color: var(--muted);
 }
 
@@ -974,12 +986,14 @@
 
 /* ---------- Account menu ---------- */
 .ef-ui-account {
+  --lg-lens: url(#lg-lens-menu);
   width: 320px;
   max-width: 100%;
   padding: var(--sp-8);
   color: var(--ink);
   font-size: var(--fs-14);
   line-height: var(--lh-14);
+  box-shadow: var(--sh-3);
 }
 
 .ef-ui-account-head {

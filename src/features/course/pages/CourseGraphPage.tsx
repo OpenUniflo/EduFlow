@@ -12,7 +12,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
 import { authGateState } from "@/features/auth/authRedirect";
-import { GlobalNav } from "@/app/components/GlobalNav";
 import { assignmentProjectionForNode, buildChapterAssignmentProjection, detailFacetForMode, flowIdForAnchor, type SelectedAnchor } from "@/features/course/courseSelection";
 import { CourseGraph, type CourseGraphHandle } from "@/features/course/graph/CourseGraph";
 import { CourseNavigator } from "@/features/course/path/CourseNavigator";
@@ -575,12 +574,12 @@ function CourseGraphWorkspace({ session, onLogout, courseDesignAssistantProvider
   const overviewReturnTarget = teacherCreatorPreview?`/teaching/create?courseId=${encodeURIComponent(courseId)}`:authoringRoute ? "/teaching" : "/courses";
 
   if (!runtime || !graphData || invalidChapter) {
-    return <main className="atlas-graph-page"><PlanningNavigationGuard control={routeControl}/><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>{invalidChapter ? "篇章不存在" : "课程不存在"}</h1><p>{invalidChapter ? `课程 “${courseId}” 中没有篇章 “${routeChapterId}”。` : `没有找到课程 “${courseId}”。`}</p><button className="atlas-primary" onClick={() => navigate(invalidChapter ? `/courses/${courseId}` : "/courses")}>返回课程</button></section></main>;
+    return <main className="atlas-graph-page"><PlanningNavigationGuard control={routeControl}/><section className="atlas-empty-state"><h1>{invalidChapter ? "篇章不存在" : "课程不存在"}</h1><p>{invalidChapter ? `课程 “${courseId}” 中没有篇章 “${routeChapterId}”。` : `没有找到课程 “${courseId}”。`}</p><button className="atlas-primary" onClick={() => navigate(invalidChapter ? `/courses/${courseId}` : "/courses")}>返回课程</button></section></main>;
   }
 
   return (
     <main className="atlas-graph-page" data-experience={experience} data-presentation={presentation}>
-      <PlanningNavigationGuard control={routeControl}/><GlobalNav active={experience === "design" ? "teaching" : "courses"} session={session} onLogout={onLogout} />
+      <PlanningNavigationGuard control={routeControl}/>
       <header className="atlas-skill-course-island">
         <div className="atlas-skill-header-left"><button onClick={() => view === "overview" ? navigate(overviewReturnTarget) : changeView("overview")} aria-label={teacherCreatorPreview?"返回课程创建":authoringRoute ? "返回教学管理" : "返回课程中心"}><ArrowLeft size={18} /></button><span className="atlas-skill-divider" /><div className="atlas-skill-title"><span>{runtime.course.title}</span><strong>{presentation === "path" ? "课程路线" : presentation === "capability" ? "项目能力模型" : view === "overview" ? "课程篇章总览" : view === "focused" ? "聚焦篇章" : `完整课程${mode === "knowledge" ? "技能树" : "实训树"}`}</strong>{view === "focused" && presentation === "graph" ? <small>/ {courseChapters.find((item) => item.id === focusedChapterId)?.title}</small> : null}</div>{personalDraftPreview && runtime.course.creationBriefMessageId ? <button className="atlas-skill-focus" onClick={() => window.location.assign(`/courses/create?briefId=${encodeURIComponent(runtime.course.creationBriefMessageId!)}`)}>返回课程创建</button> : teacherCreatorPreview?<button className="atlas-skill-focus" onClick={()=>window.location.assign(overviewReturnTarget)}>返回课程创建</button>:null}</div>
         <div className="atlas-skill-header-center">{canDesignCourse(session) && presentation === "graph" ? <ExperienceModeToggle value={experience} onChange={setExperience} /> : null}</div>

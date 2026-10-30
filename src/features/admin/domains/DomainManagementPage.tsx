@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Archive, Check, ChevronRight, CirclePlus, Palette, Search, Sparkles, X } from "lucide-react";
 import type { MockSession } from "@/features/auth/types";
-import { GlobalNav } from "@/app/components/GlobalNav";
 import { DOMAIN_COLOR_PALETTE, UNCLASSIFIED_DOMAIN_COLOR } from "@/features/knowledge/domain/domainColors";
 import { acceptCandidate, assignNodeDomain, assignNodesToDomain, createDomain, ignoreCandidate, reviewProposal, updateDomain, useDomainGovernance, validateDomainAssignmentTargets } from "@/features/knowledge/domain/domainStore";
 import { getDomainMembers } from "@/features/knowledge/domain/domainValidation";
@@ -58,7 +57,7 @@ export function DomainManagementPage({ session, onLogout }: { session: MockSessi
 
   return (
     <main className="domain-admin-page">
-      <GlobalNav active="system" session={session} onLogout={onLogout} />
+
       <header className="domain-admin-header"><div><span>KNOWLEDGE GOVERNANCE</span><h1>知识领域管理</h1><p>领域负责语义分类与颜色治理，不参与知识图布局。</p></div><div className="domain-admin-tabs"><button className={tab === "management" ? "active" : ""} onClick={() => setTab("management")}>领域管理</button><button className={tab === "suggestions" ? "active" : ""} onClick={() => setTab("suggestions")}>自动建议 <i>{candidateGroups.length + governance.proposals.filter((item) => item.status === "pending").length}</i></button></div></header>
 
       {tab === "management" ? <section className="domain-admin-grid">

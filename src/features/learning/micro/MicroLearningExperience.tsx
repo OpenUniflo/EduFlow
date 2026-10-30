@@ -7,7 +7,6 @@ import { NativeInteraction, initialAnswer } from "./NativeInteraction";
 import { ArrowLeft,ArrowRight,Check,RotateCcw } from "lucide-react";
 import { lazy,Suspense,useCallback,useEffect,useMemo,useRef,useState } from "react";
 import { useLocation,useNavigate,useParams,useSearchParams } from "react-router-dom";
-import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices,refreshLearnerState } from "@/app/services/applicationServices";
 import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
 import type { MockSession } from "@/features/auth/types";
@@ -63,9 +62,9 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
     try { const result=await repository.completeStep(path.id,unitId,stepId,submission,courseId,{decisionId:recommendationDecisionId,clientDurationMs,actionRunId});if(actionRunId)setActionProgress({stepIds:result.actionStepIds??[],complete:result.completed});if(result.correct&&session)await refreshLearnerState(session.userId);return result.correct; }
     finally { setBusy(false); }
   },[courseId,path,repository,session,recommendationDecisionId,actionRunId]);
-  if(actionRunId&&!actionProgress)return <main className="micro-learning-page"><GlobalNav active="learning" session={session} onLogout={onLogout}/><Unsupported title={actionError?'无法继续本次行动':'正在读取本次行动…'} body={actionError||'正在核对执行资源和起点能力。'} onBack={()=>navigate(returnTarget)}/></main>;
-  if(!path)return <main className="micro-learning-page"><GlobalNav active="learning" session={session} onLogout={onLogout}/><Unsupported title="该知识暂不支持快速学习" body="当前还没有已发布的 MicroLearningPath。你仍然可以返回来源，或继续查看关联课件。" onBack={()=>navigate(returnTarget)}/></main>;
-  if(!unit||!step||!formalUnit||!formalStep)return <main className="micro-learning-page"><GlobalNav active="learning" session={session} onLogout={onLogout}/><Unsupported title="该快速学习内容尚未完整发布" body="发布内容缺少必要 Unit 或 Step。" onBack={()=>navigate(returnTarget)}/></main>;
+  if(actionRunId&&!actionProgress)return <main className="micro-learning-page"><Unsupported title={actionError?'无法继续本次行动':'正在读取本次行动…'} body={actionError||'正在核对执行资源和起点能力。'} onBack={()=>navigate(returnTarget)}/></main>;
+  if(!path)return <main className="micro-learning-page"><Unsupported title="该知识暂不支持快速学习" body="当前还没有已发布的 MicroLearningPath。你仍然可以返回来源，或继续查看关联课件。" onBack={()=>navigate(returnTarget)}/></main>;
+  if(!unit||!step||!formalUnit||!formalStep)return <main className="micro-learning-page"><Unsupported title="该快速学习内容尚未完整发布" body="发布内容缺少必要 Unit 或 Step。" onBack={()=>navigate(returnTarget)}/></main>;
   const total=path.units.reduce((sum,item)=>sum+item.steps.length,0);
   const currentIndex=path.units.filter((item)=>item.position<unit.position).reduce((sum,item)=>sum+item.steps.length,0)+unit.steps.findIndex((item)=>item.id===step.id)+1;
   const formalCompleted=actionRunId?Boolean(actionProgress?.complete):progress?.status==="completed";
@@ -76,7 +75,7 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
 
   const previous=previousMicroReviewStep(path,{unitId:unit.id,stepId:step.id});
   const nextReview=()=>{if(!reviewCursor)return;const next=nextMicroReviewStep(path,reviewCursor);setReviewCursor(next&&!((!formalCompleted||pinned)&&next.unitId===formalUnit.id&&next.stepId===formalStep.id)&&!(next.unitId===progress?.currentUnitId&&next.stepId===progress?.currentStepId&&!formalCompleted)?next:null);};
-  return <main className="micro-learning-page"><GlobalNav active="learning" session={session} onLogout={onLogout}/><header className="micro-learning-header"><button onClick={()=>navigate(returnTarget)}><ArrowLeft size={16}/>返回</button><span><small>MICRO LEARNING · {path.estimatedMinutes} 分钟</small><strong>{path.title}</strong></span><i>{showCompleted?total:currentIndex} / {total}</i></header>
+  return <main className="micro-learning-page"><header className="micro-learning-header"><button onClick={()=>navigate(returnTarget)}><ArrowLeft size={16}/>返回</button><span><small>MICRO LEARNING · {path.estimatedMinutes} 分钟</small><strong>{path.title}</strong></span><i>{showCompleted?total:currentIndex} / {total}</i></header>
     <section className="micro-learning-stage">{startError?<div className="micro-feedback retry" role="alert">学习尚未成功启动；当前 Step 不会被记录。<button type="button" onClick={()=>{setStartError(false);void repository.start(path.id,courseId).catch(()=>setStartError(true));}}>重试启动</button></div>:null}<div className="micro-progress" aria-label={`${actionRunId ? "本次行动进度" : "正式学习进度"} ${completedCount}/${total}`}><i style={{width:`${completedCount/Math.max(total,1)*100}%`}}/></div>
       {showCompleted?<article className="micro-card micro-complete"><Check size={36}/><span className="atlas-kicker">PATH COMPLETED</span><h1>这条微学习路径已完成</h1><p>{actionRunId?"本次行动的执行观察已保存；行动完成不会额外授予能力，正式状态仍由既有证据规则决定。":session?"完成已持久化为学习证据；主动复习不会清空进度、重复完成证据或降低学习状态。":"你已完成一次匿名本地体验；答案与进度不会写入账户或 learner state。"}</p>{actionRunId&&courseId?<button className="atlas-primary micro-completion-next" onClick={()=>navigate(`/courses/${encodeURIComponent(courseId)}`)}>继续正式路线<ArrowRight size={17}/></button>:null}{completionActions.length||navigationError?<section className="micro-completion-context" aria-label="继续学习与相关内容"><h2>继续学习 / 相关内容</h2>
         {nextAction?<button className="atlas-primary micro-completion-next" onClick={()=>navigate(nextAction.href,{state:{returnTo:returnTarget,recommendationDecisionId:navigationDecision?.decisionId,microPathId:navigationDecision?.nextAction.resourceKind==="micro"?navigationDecision.nextAction.resourceId:undefined}})}><span>继续下一项<strong>{nextAction.title}</strong></span><ArrowRight size={17}/></button>:null}

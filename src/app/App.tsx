@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Navigate, Route as RouterRoute, Routes, useLocation, useMatch, useNavigate } from "react-router-dom";
+import { Network } from "lucide-react";
 import { AuthProvider } from "@/features/auth/AuthContext";
 import type { MockSession } from "@/features/auth/types";
 import { canManageCourses, canManageKnowledgeDomains } from "@/features/auth/capabilities";
 import { AuthPage } from "@/features/auth/pages/AuthPage";
-import { NavigationProvider } from "@/app/providers/NavigationContext";
-import { GlobalNav } from "@/app/components/GlobalNav";
-import { NotFoundPage } from "@/app/pages/PlaceholderPages";
+import { AppChrome } from "@/app/components/AppChrome";
+import { NotFoundPage, RecordsPage, SettingsPage } from "@/app/pages/PlaceholderPages";
 import { PublicHomePage } from "@/app/pages/PublicHomePage";
 import { applicationServices, hydrateApplicationServices, hydratePublicApplicationServices, resetAuthenticatedApplicationServices } from "@/app/services/applicationServices";
 import { resolveWorkflowAssignmentContext } from "@/app/integrations/workflowAssignmentIntegration";
@@ -28,8 +28,8 @@ import { resolveLegacyRoute } from "@/app/legacyRoutes";
 import { ApiRequestError } from "@/shared/api/apiClient";
 import { CapabilityEvidenceBoundary } from "@/app/integrations/CapabilityEvidenceBoundary";
 import { AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeContext";
-import { AssistantMessagesPage } from "@/features/assistant/pages/AssistantMessagesPage";
 import { authGateState, resolveAuthRedirect } from "@/features/auth/authRedirect";
+import { Button } from "@/shared/ui/Button";
 
 function AssistantRuntimeBoundary({ session, children }: { session: MockSession | null; children: ReactNode }) {
   return session ? <AssistantRuntimeProvider session={session}><CapabilityEvidenceBoundary session={session}>{children}</CapabilityEvidenceBoundary></AssistantRuntimeProvider> : children;
@@ -37,13 +37,27 @@ function AssistantRuntimeBoundary({ session, children }: { session: MockSession 
 
 function LegacyRedirect() {
   const location = useLocation();
-  return <Navigate to={resolveLegacyRoute(location.pathname,location.search)} replace />;
+  const target = resolveLegacyRoute(location.pathname, location.search);
+  return <Navigate to={`${target}${location.hash}`} replace />;
+}
+
+function ConnectionScreen({ error, onRetry }: { error?: string; onRetry?: () => void }) {
+  return (
+    <main className="ef-connection ef-shell-bg">
+      <section className="ef-connection-card ef-ui-glass ef-ui-glass--regular ef-ui-glass--r-24">
+        <Network size={28} aria-hidden />
+        <h1>{error ? "数据连接失败" : "正在连接 EduFlow…"}</h1>
+        <p>{error ?? "正在读取公开学习内容与你的学习状态。"}</p>
+        {error && onRetry ? <Button variant="primary" onClick={onRetry}>重新加载</Button> : null}
+      </section>
+    </main>
+  );
 }
 
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const routeWorkflowId = useMatch("/workflows/:workflowId")?.params.workflowId;
+  const routeWorkflowId = useMatch("/works/:id")?.params.id;
   const [session, setSession] = useState<MockSession | null>(null);
   const [ready, setReady] = useState(false);
   const [startupError, setStartupError] = useState("");
@@ -104,7 +118,7 @@ export default function App() {
     if (error || !data.session) {
       console.error("Authentication failed", error);
       const invalidCredentials = error?.code === "invalid_credentials" || error?.message === "Invalid login credentials";
-      throw new Error(invalidCredentials ? "邮箱或密码错误" : "登录失败，请稍后重试。");
+      throw new Error(invalidCredentials ? "邮箱或密码错误，请检查后重试。" : "登录失败，请稍后重试。");
     }
     let profile: Awaited<ReturnType<typeof hydrateApplicationServices>>;
     try {
@@ -156,55 +170,51 @@ export default function App() {
     return session ? element : <Navigate to="/login" replace state={authGateState(location)} />;
   }
 
-  const navigationContextValue = {
-    onGoCourses: () => navigate("/courses"),
-    onGoTasks: () => navigate("/"),
-    onGoWorkflows: () => navigate("/workflows"),
-    onGoProfile: () => navigate("/profile"),
-    onGoSettings: () => navigate("/settings"),
-    onGoNotifications: () => navigate("/notifications"),
-    onGoMessages: () => navigate("/messages"),
-    onLogout: logout
-  };
-  const editor = routeWorkflowId && session ? <WorkflowV2Route key={`${session.userId}:${routeWorkflowId}`} ownerId={session.userId} workflowId={routeWorkflowId} navigation={<div className="atlas-canvas-nav"><GlobalNav active="canvas" session={session} onLogout={logout} /></div>} onBack={() => navigate(typeof location.state?.workflowLibraryReturn === "string" && /^\/workflows(?:\?|$)/.test(location.state.workflowLibraryReturn) ? location.state.workflowLibraryReturn : "/workflows")} onOpen={(id) => navigate(`/workflows/${id}`, {state:location.state})} launchContext={assignmentContext ?? undefined} /> : <NotFoundPage onHome={() => navigate("/")} />;
+  const editor = routeWorkflowId && session
+    ? <WorkflowV2Route key={`${session.userId}:${routeWorkflowId}`} ownerId={session.userId} workflowId={routeWorkflowId} navigation={null} onBack={() => navigate(typeof location.state?.workflowLibraryReturn === "string" && /^\/works(?:\?|$)/.test(location.state.workflowLibraryReturn) ? location.state.workflowLibraryReturn : "/works")} onOpen={(id) => navigate(`/works/${id}`, { state: location.state })} launchContext={assignmentContext ?? undefined} />
+    : <NotFoundPage onHome={() => navigate("/")} onArchive={() => navigate("/archive")} />;
 
-  if (!ready) return <main className="atlas-auth-page"><section className="atlas-auth-panel glass-v2"><h2>正在连接 EduFlow…</h2></section></main>;
-  if (startupError) return <main className="atlas-auth-page"><section className="atlas-auth-panel glass-v2"><h2>数据连接失败</h2><p>{startupError}</p><button className="atlas-primary" onClick={() => void retryStartup()}>重新加载</button></section></main>;
+  if (!ready) return <ConnectionScreen />;
+  if (startupError) return <ConnectionScreen error={startupError} onRetry={() => void retryStartup()} />;
 
   return (
     <AuthProvider value={{ session, signIn, signUp, logout }}>
-      <NavigationProvider value={navigationContextValue}>
+      <AppChrome session={session} onLogout={logout}>
         <AssistantRuntimeBoundary session={session}>
-        <Routes>
-          <RouterRoute path="/login" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
-          <RouterRoute path="/register" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
-          <RouterRoute path="/" element={session ? <LearningPage session={session} onLogout={logout} /> : <PublicHomePage />} />
-          <RouterRoute path="/explore" element={<ExplorePage session={session} onLogout={logout} />} />
-          <RouterRoute path="/learn/micro/:knowledgeId" element={<MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} />} />
-          <RouterRoute path="/workflows" element={protectedElement(session ? <WorkflowLibraryPage navigation={<GlobalNav active="canvas" session={session} onLogout={logout} />} userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} onOpenWorkflow={(id, returnTo) => navigate(`/workflows/${id}`, {state:{workflowLibraryReturn:returnTo}})} /> : null)} />
-          <RouterRoute path="/workflows/:workflowId" element={protectedElement(editor)} />
-          <RouterRoute path="/courses" element={<CourseCenterPage session={session} onLogout={logout} />} />
-          <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} entryMode="learner" /> : null)} />
-          <RouterRoute path="/teaching" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseManagementPage session={session} onLogout={logout} /> : <Navigate to="/courses" replace />} />
-          <RouterRoute path="/teaching/create" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseCreationWorkspacePage session={session} onLogout={logout} entryMode="teacher" /> : <Navigate to="/courses" replace />} />
-          <RouterRoute path="/course-management" element={<LegacyRedirect />} />
-          <RouterRoute path="/courses/:courseId" element={<CourseGraphPage session={session} onLogout={logout} microLearningProvider={applicationServices.microLearningRepository} />} />
-          <RouterRoute path="/courses/:courseId/assignments/:assignmentId" element={<AssignmentExperiencePage session={session} onLogout={logout} />} />
-          <RouterRoute path="/courses/:courseId/materials/:materialId" element={<LessonPage session={session} onLogout={logout} />} />
-          <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={<CourseGraphPage session={session} onLogout={logout} microLearningProvider={applicationServices.microLearningRepository} />} />
-          <RouterRoute path="/tasks/*" element={protectedElement(<Navigate to="/" replace />)} />
-          <RouterRoute path="/system" element={!session ? protectedElement(null) : canManageKnowledgeDomains(session) ? <DomainManagementPage session={session} onLogout={logout} /> : <Navigate to="/" replace />} />
-          <RouterRoute path="/system/domains" element={<Navigate to="/system" replace />} />
-          <RouterRoute path="/admin/domains" element={<LegacyRedirect />} />
-          <RouterRoute path="/profile" element={protectedElement(<LegacyRedirect />)} />
-          <RouterRoute path="/profile/*" element={protectedElement(<LegacyRedirect />)} />
-          <RouterRoute path="/settings/*" element={protectedElement(<Navigate to="/" replace />)} />
-          <RouterRoute path="/notifications/*" element={protectedElement(<Navigate to="/" replace />)} />
-          <RouterRoute path="/messages/*" element={protectedElement(session ? <AssistantMessagesPage session={session} onLogout={logout} /> : null)} />
-          <RouterRoute path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          <Routes>
+            <RouterRoute path="/login" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
+            <RouterRoute path="/register" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
+            <RouterRoute path="/" element={session ? <LearningPage session={session} onLogout={logout} /> : <PublicHomePage />} />
+            <RouterRoute path="/archive" element={<ExplorePage session={session} onLogout={logout} />} />
+            <RouterRoute path="/learn/micro/:knowledgeId" element={<MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} />} />
+            <RouterRoute path="/works" element={protectedElement(session ? <WorkflowLibraryPage userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} onOpenWorkflow={(id, returnTo) => navigate(`/works/${id}`, { state: { workflowLibraryReturn: returnTo } })} /> : null)} />
+            <RouterRoute path="/works/:workflowId" element={protectedElement(editor)} />
+            <RouterRoute path="/courses" element={<CourseCenterPage session={session} onLogout={logout} />} />
+            <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} entryMode="learner" /> : null)} />
+            <RouterRoute path="/teaching" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseManagementPage session={session} onLogout={logout} /> : <Navigate to="/" replace />} />
+            <RouterRoute path="/teaching/create" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseCreationWorkspacePage session={session} onLogout={logout} entryMode="teacher" /> : <Navigate to="/" replace />} />
+            <RouterRoute path="/course-management" element={<LegacyRedirect />} />
+            <RouterRoute path="/courses/:courseId" element={<CourseGraphPage session={session} onLogout={logout} microLearningProvider={applicationServices.microLearningRepository} />} />
+            <RouterRoute path="/courses/:courseId/assignments/:assignmentId" element={<AssignmentExperiencePage session={session} onLogout={logout} />} />
+            <RouterRoute path="/courses/:courseId/materials/:materialId" element={<LessonPage session={session} onLogout={logout} />} />
+            <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={<CourseGraphPage session={session} onLogout={logout} microLearningProvider={applicationServices.microLearningRepository} />} />
+            <RouterRoute path="/records" element={protectedElement(<RecordsPage />)} />
+            <RouterRoute path="/settings" element={protectedElement(<SettingsPage />)} />
+            <RouterRoute path="/settings/*" element={protectedElement(<Navigate to="/settings" replace />)} />
+            <RouterRoute path="/admin" element={!session ? protectedElement(null) : canManageKnowledgeDomains(session) ? <DomainManagementPage session={session} onLogout={logout} /> : <Navigate to="/" replace />} />
+            <RouterRoute path="/admin/domains" element={<LegacyRedirect />} />
+            <RouterRoute path="/system/*" element={<LegacyRedirect />} />
+            <RouterRoute path="/tasks/*" element={protectedElement(<Navigate to="/" replace />)} />
+            <RouterRoute path="/profile" element={protectedElement(<LegacyRedirect />)} />
+            <RouterRoute path="/profile/*" element={protectedElement(<LegacyRedirect />)} />
+            <RouterRoute path="/notifications/*" element={protectedElement(<Navigate to="/" replace />)} />
+            <RouterRoute path="/messages/*" element={<Navigate to="/" replace />} />
+            <RouterRoute path="/explore" element={<LegacyRedirect />} />
+            <RouterRoute path="/workflows/*" element={<LegacyRedirect />} />
+            <RouterRoute path="*" element={<NotFoundPage onHome={() => navigate("/")} onArchive={() => navigate("/archive")} />} />
+          </Routes>
         </AssistantRuntimeBoundary>
-      </NavigationProvider>
+      </AppChrome>
     </AuthProvider>
   );
 }

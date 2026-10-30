@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import App from "@/app/App";
 import { GlassDefs } from "@/shared/ui/GlassDefs";
 import "@/shared/styles/tokens.css";
+import "@/shared/styles/shell.css";
 import "@/shared/styles/legacy.css";
 import "@/shared/styles/product.css";
 

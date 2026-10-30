@@ -3,7 +3,6 @@ import { ArrowLeft, ArrowRight, Check, Send, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
-import { GlobalNav } from "@/app/components/GlobalNav";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import { useDomainGovernance } from "@/features/knowledge/domain/domainStore";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
@@ -128,7 +127,7 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
   const assistantContext = session ? {workspace:"material" as const,experienceMode:experience,userRole:session.role,capabilities:session.capabilities,courseId:runtime.course.id,lessonId:lesson?.id,materialId:material.id,segmentId:reader.activeSegmentId,knowledgeId:effectiveKnowledgeId??undefined,assignmentId:activeAssignmentId??undefined} : undefined;
 
   return <main className={`atlas-lesson-page material-reader-current ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`} data-experience={experience}>
-    <GlobalNav active={designEnabled ? "teaching" : "courses"} session={session} onLogout={onLogout} />
+
     <header className="atlas-lesson-header">
       <div className="atlas-lesson-header-left"><button className="atlas-lesson-back" onClick={() => navigate(resolveMicroLearningReturnTarget(location.state, runtime.course.id), { state: location.state?.returnState })} aria-label={location.state?.returnTo ? "返回学习来源" : "返回课程技能树"}><ArrowLeft size={16} /></button><div className="atlas-lesson-breadcrumb"><button onClick={() => navigate(`/courses/${runtime.course.id}`)}>{runtime.course.title}</button><span>/</span><span>{lesson?.title ?? material.title}</span></div></div>
       <div className="atlas-lesson-title"><strong>{material.title}</strong><small>{material.type === "pdf" ? "Original PDF" : material.type} · {draftSegments.length} 个内容段 · {material.duration ?? "自定进度"}</small></div>
@@ -157,7 +156,7 @@ export function LessonPage({ session, onLogout, lessonAssistantProvider }: { ses
   const userState = useOptionalUserCourseState(session?.userId, courseId);
 
   if (!runtime || !material) {
-    return <main className="atlas-lesson-page material-reader-current"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>课件不存在</h1><p>该课件不存在，或不属于课程 “{courseId}”。</p><button className="atlas-primary" onClick={() => navigate(runtime ? `/courses/${runtime.course.id}` : "/courses")}>返回课程</button></section></main>;
+    return <main className="atlas-lesson-page material-reader-current"><section className="atlas-empty-state"><h1>课件不存在</h1><p>该课件不存在，或不属于课程 “{courseId}”。</p><button className="atlas-primary" onClick={() => navigate(runtime ? `/courses/${runtime.course.id}` : "/courses")}>返回课程</button></section></main>;
   }
 
   return <MaterialReaderShell key={`${session?.userId??"public"}:${runtime.course.id}:${material.id}`} runtime={runtime} material={material} userState={userState} savedState={userState?.materialStates[material.id]} session={session} lessonAssistantProvider={lessonAssistantProvider} onLogout={onLogout} draftState={draftState} />;

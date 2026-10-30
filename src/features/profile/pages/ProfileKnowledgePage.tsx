@@ -2,7 +2,6 @@ import { ArrowRight, BookOpen, CircleDot, Crosshair, Maximize2, Minus, Network, 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
-import { GlobalNav } from "@/app/components/GlobalNav";
 import { KnowledgeAtlasScene, type KnowledgeAtlasSceneHandle } from "@/features/knowledge/components/KnowledgeAtlasScene";
 import { buildPersonalAtlasProjection } from "@/features/knowledge/projections/atlasProjections";
 import { resolveNodeDomain, useDomainGovernance } from "@/features/knowledge/domain/domainStore";
@@ -124,7 +123,7 @@ export function PersonalKnowledgeView({ session, onLogout, embedded = false }: {
 
   return (
     <main className={`personal-atlas-page ${embedded ? "learning-personal-view" : ""} ${drawerOpen ? "has-drawer" : ""}`}>
-      {!embedded ? <GlobalNav active="learning" session={session} onLogout={onLogout} /> : null}
+
       {!embedded ? <header className="personal-page-title"><h1>我的知识</h1><p>Personal Knowledge Atlas</p></header> : null}
       <aside className="personal-summary glass-v2">
         {!embedded ? <><div className="personal-identity"><span className="personal-avatar">{initials(session.name)}</span><span><strong>{session.name}</strong><small>{session.email}</small></span><button aria-label="打开个人设置" onClick={() => showToast("个人资料设置将在后续版本开放")}>•••</button></div><div className="personal-summary-divider" /></> : null}
@@ -140,7 +139,7 @@ export function PersonalKnowledgeView({ session, onLogout, embedded = false }: {
 
       <div className="personal-canvas">
         <KnowledgeAtlasScene ref={sceneRef} variant="personal" nodes={atlas.nodes} edges={atlas.edges} selectedId={selectedId} searchMatchId={searchMatchId} currentLearningId={graph.summary.currentLearningId} autoRotate={false} onNodeClick={(node) => setSelectedId(node.id)} onBackgroundClick={() => { setSelectedId(null); setSearchMatchId(null); }} />
-        {!graph.nodes.some((node)=>node.isCore)?<section className="personal-atlas-empty glass-v2"><CircleDot size={28}/><h2>你还没有开始学习任何 Knowledge</h2><p>从探索或课程中开始一个 Knowledge，它会自动出现在这里。</p><div><button className="atlas-primary" onClick={()=>navigate("/explore")}>去探索<ArrowRight size={14}/></button><button className="atlas-secondary" onClick={()=>navigate("/courses")}>查看课程<BookOpen size={14}/></button></div></section>:null}
+        {!graph.nodes.some((node)=>node.isCore)?<section className="personal-atlas-empty glass-v2"><CircleDot size={28}/><h2>你还没有开始学习任何 Knowledge</h2><p>从探索或课程中开始一个 Knowledge，它会自动出现在这里。</p><div><button className="atlas-primary" onClick={()=>navigate("/archive")}>去探索<ArrowRight size={14}/></button><button className="atlas-secondary" onClick={()=>navigate("/courses")}>查看课程<BookOpen size={14}/></button></div></section>:null}
       </div>
 
       <aside className={`personal-drawer glass-v2 ${drawerOpen ? "open" : ""}`}>

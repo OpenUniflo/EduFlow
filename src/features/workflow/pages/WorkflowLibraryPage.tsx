@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, GitBranch, MoreHorizontal, Plus, Search } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { workflowApiV2 } from "../application/v2/useWorkflowV2Controller";
@@ -12,13 +12,13 @@ import "../editor/v2/workflowV2.css";
 
 type Action = { kind: "rename" | "copy" | "delete"; item: WorkflowSummaryV2 };
 const scrollPositions = new Map<string, number>();
-export function WorkflowLibraryPage({ navigation, userId, onOpenWorkflow }: { navigation: ReactNode; userId: string; courseRepository: CourseRepository; learningProgressRepository: LearningProgressRepository; onOpenWorkflow: (id: string, returnTo?: string) => void }) {
+export function WorkflowLibraryPage({ userId, onOpenWorkflow }: { userId: string; courseRepository: CourseRepository; learningProgressRepository: LearningProgressRepository; onOpenWorkflow: (id: string, returnTo?: string) => void }) {
   const [params, setParams] = useSearchParams();
   const search = (params.get("q") ?? "").slice(0, 200), scope = params.get("scope") === "course" ? "course" : params.get("scope") === "personal" ? "personal" : "all";
   const sort = params.get("sort") === "name" ? "name" : "updated", page = Math.max(1, Math.min(1000000, Number(params.get("page")) || 1)), pageSize = params.get("size") === "24" ? 24 : 12;
   const [data, setData] = useState<LibraryPage | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [retry, setRetry] = useState(0), [creating, setCreating] = useState(false), [action, setAction] = useState<Action | null>(null), [menu, setMenu] = useState<string | null>(null), [notice, setNotice] = useState("");
-  const root = useRef<HTMLElement>(null), returnTo = `/workflows${params.size ? `?${params}` : ""}`, scrollKey = `${userId}:${returnTo}`;
+  const root = useRef<HTMLElement>(null), returnTo = `/works${params.size ? `?${params}` : ""}`, scrollKey = `${userId}:${returnTo}`;
   useEffect(() => {
     if (!menu) return;
     function outside(event: PointerEvent) { if (!(event.target instanceof Element) || !event.target.closest(".wf-card-menu")) setMenu(null); }
@@ -39,7 +39,7 @@ export function WorkflowLibraryPage({ navigation, userId, onOpenWorkflow }: { na
   function refresh(message: string) { setNotice(message); setLoading(true); setAction(null); setRetry(v => v + 1); }
   function open(item: WorkflowSummaryV2) { scrollPositions.set(scrollKey, root.current?.scrollTop ?? 0); onOpenWorkflow(item.workflowId, returnTo); }
   const pages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
-  return <main ref={root} className="atlas-page-shell wf-library-page" onScroll={e => scrollPositions.set(scrollKey, e.currentTarget.scrollTop)}>{navigation}<div className="wf-library-content">
+  return <main ref={root} className="atlas-page-shell wf-library-page" onScroll={e => scrollPositions.set(scrollKey, e.currentTarget.scrollTop)}><div className="wf-library-content">
     <header className="wf-library-hero"><div><small>工作流空间</small><h1>工作流</h1><p>管理你的工作流，从空白或模板开始搭建。</p></div><button className="primary" onClick={() => setCreating(true)}><Plus size={18}/>新建工作流</button></header>
     <section className="wf-library-browser" aria-label="工作流库">
       <div className="wf-library-search"><label><Search size={17}/><input aria-label="搜索工作流" placeholder="搜索名称或描述" maxLength={200} value={search} onChange={e => { setLoading(true); change("q", e.target.value); }}/></label><select aria-label="工作流范围" value={scope} onChange={e => { setLoading(true); change("scope", e.target.value); }}><option value="all">全部工作流</option><option value="personal">独立工作流</option><option value="course">课程模板来源</option></select><select aria-label="工作流排序" value={sort} onChange={e => { setLoading(true); change("sort", e.target.value); }}><option value="updated">最近更新</option><option value="name">名称</option></select></div>

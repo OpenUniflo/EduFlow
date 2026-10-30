@@ -13,12 +13,12 @@
 .eduflow-assistant .assistant-primary-operation small { color: var(--atlas-muted); font-size: 11px; }
 .eduflow-assistant .assistant-conversation-messages { max-height: 220px; }
 .eduflow-assistant .assistant-chat-message p, .eduflow-assistant .assistant-empty, .eduflow-assistant .assistant-error { font-size: 12px; line-height: 1.6; }
-.eduflow-assistant .assistant-input-mode button, .eduflow-assistant .assistant-open-full { font-size: 11px; }
+.eduflow-assistant .assistant-input-mode button { font-size: 11px; }
 .eduflow-assistant .course-design-assistant-input { margin-top: 0; }
 .eduflow-assistant .course-design-assistant-input input { padding: 11px 12px; font-size: 13px; }
 .eduflow-assistant button:focus-visible, .eduflow-assistant input:focus-visible { outline: 2px solid var(--atlas-brand); outline-offset: 3px; }
 .eduflow-assistant button:disabled { opacity: .5; cursor: not-allowed; }
-.eduflow-assistant .assistant-open-full { justify-content: flex-end; color: var(--atlas-muted); font-weight: 500; }
+
 @media(max-width:620px) { .eduflow-assistant.course-design-assistant { right: 12px; bottom: 24px; } .eduflow-assistant .eduflow-assistant-panel { width: calc(100vw - 24px); max-height: calc(100dvh - 170px); } }
 @media(prefers-reduced-motion:reduce) { .eduflow-assistant.course-design-assistant, .eduflow-assistant .course-design-assistant-trigger { transition: none; } .eduflow-assistant .course-design-assistant-trigger:hover { transform: none; } .eduflow-assistant .spin { animation: none; } }
 

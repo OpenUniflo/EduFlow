@@ -1,0 +1,520 @@
+/*
+ * P1 application shell: one left navigation rail and the document-flow
+ * placeholder surfaces. Only design tokens are used here.
+ */
+
+/* The design boards paint this gradient on the whole viewport (.ef). Keep the
+ * exact token-derived recipe so the shell, auth and public surfaces match. */
+.ef-shell-bg {
+  color: var(--ink);
+  background:
+    radial-gradient(120% 96% at 12% 8%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 72%),
+    radial-gradient(132% 102% at 88% 4%, color-mix(in srgb, var(--acquired) 18%, transparent), transparent 70%),
+    radial-gradient(124% 98% at 84% 86%, color-mix(in srgb, var(--p-cyan) 16%, transparent), transparent 72%),
+    radial-gradient(138% 110% at 16% 92%, color-mix(in srgb, var(--acquired) 14%, transparent), transparent 70%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand) 9%, var(--page)) 0%,
+      color-mix(in srgb, var(--acquired) 7%, var(--page)) 48%,
+      color-mix(in srgb, var(--p-cyan) 7%, var(--page)) 100%
+    );
+  background-repeat: no-repeat;
+}
+
+.ef-app {
+  display: flex;
+  min-height: 100dvh;
+  overflow-x: clip;
+  color: var(--ink);
+}
+
+.ef-app-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 100dvh;
+  margin-left: calc(var(--nav-w) + var(--sp-12));
+  overflow-x: clip;
+}
+
+/* ---------- Navigation rail (N01 / N38) ---------- */
+.ef-nav {
+  position: fixed;
+  z-index: 90;
+  top: var(--sp-12);
+  bottom: var(--sp-12);
+  left: var(--sp-12);
+  display: flex;
+  width: var(--nav-w);
+  flex: 0 0 var(--nav-w);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-12) var(--sp-4) var(--sp-8);
+  border-radius: var(--r-24);
+  color: var(--ink);
+}
+
+.ef-nav-logo {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  margin: 0 0 var(--sp-8);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-12);
+  color: var(--brand-ink);
+  background: var(--glass-regular);
+  box-shadow: var(--sh-1);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.ef-nav-logo:hover {
+  color: var(--brand);
+  background: var(--glass-regular-hover);
+}
+
+.ef-nav-grp {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.ef-nav-item {
+  display: flex;
+  width: 52px;
+  min-height: 56px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 2px;
+  border: 1px solid transparent;
+  border-radius: var(--r-16);
+  color: var(--ink-2);
+  background: transparent;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  text-align: center;
+  text-decoration: none;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.ef-nav-item:hover {
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+}
+
+.ef-nav-item[aria-current="page"] {
+  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+}
+
+.ef-nav-item[aria-current="page"] svg {
+  stroke-width: 2.1;
+}
+
+.ef-nav-spacer {
+  flex: 1;
+  min-height: var(--sp-8);
+}
+
+.ef-nav-me-wrap {
+  position: relative;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+
+.ef-nav-me {
+  display: flex;
+  width: 52px;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 2px;
+  border: 0;
+  border-radius: var(--r-12);
+  color: var(--ink-2);
+  background: transparent;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.ef-nav-me:hover,
+.ef-nav-me.is-open {
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+}
+
+.ef-nav-me .ef-ui-avatar {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color var(--dur-fast) var(--ease-out);
+}
+
+.ef-nav-me.is-open .ef-ui-avatar {
+  outline-color: color-mix(in srgb, var(--brand) 30%, transparent);
+}
+
+/* The short display name is chosen to fit; never clip it with an ellipsis. */
+.ef-nav-me-name {
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+/* Portaled to <body> so the menu is not painted into the rail's backdrop root:
+ * nested backdrop-filter would sample the 64px rail instead of the page. */
+.ef-nav-account {
+  position: fixed;
+  z-index: 120;
+  bottom: calc(var(--sp-12) + var(--sp-48) + var(--sp-40) + var(--sp-32));
+  left: calc(var(--sp-12) + var(--nav-w));
+  width: 320px;
+  max-width: calc(100vw - var(--nav-w) - var(--sp-48));
+  transform-origin: bottom left;
+  animation: ef-nav-account-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes ef-nav-account-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--sp-8)) scale(.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ef-nav-guest {
+  display: flex;
+  width: 52px;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 2px;
+  border: 0;
+  border-radius: var(--r-12);
+  color: var(--ink-2);
+  background: transparent;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-nav-guest:hover {
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+}
+
+.ef-nav-guest-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-full);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-nav a:focus-visible,
+.ef-nav button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ---------- Compatibility for pages whose layouts predate the rail ---------- */
+.ef-app-main .learning-space-page,
+.ef-app-main .explore-page,
+.ef-app-main .micro-learning-page,
+.ef-app-main .atlas-graph-page,
+.ef-app-main .atlas-lesson-page,
+.ef-app-main .assignment-page,
+.ef-app-main .creator-page,
+.ef-app-main .domain-admin-page,
+.ef-app-main .wf-unified,
+.ef-app-main .wf-v2-loading {
+  width: 100%;
+  max-width: 100%;
+}
+
+.ef-app-main .atlas-page-shell {
+  padding-top: var(--sp-40);
+}
+
+.ef-app-main .wf-library-content,
+.ef-app-main .wf-v2-loading {
+  padding-top: var(--sp-40);
+}
+
+.ef-app-main .wf-unified {
+  padding-top: 0;
+}
+
+.ef-app-main .domain-admin-page {
+  padding-top: var(--sp-40);
+}
+
+/* Old pages keep their card surfaces, but their page-level opaque backgrounds
+ * step aside so the shared shell gradient remains visible behind them. */
+.ef-app-main .learning-space-page,
+.ef-app-main .micro-learning-page,
+.ef-app-main .explore-page,
+.ef-app-main .wf-library-page,
+.ef-app-main .course-management-page,
+.ef-app-main .domain-admin-page,
+.ef-app-main .atlas-course-center {
+  background: transparent;
+}
+
+.ef-app-main .explore-heading {
+  top: var(--sp-40);
+  left: calc(var(--nav-w) + var(--sp-40));
+}
+
+.ef-app-main .atlas-workspace-head,
+.ef-app-main .atlas-skill-course-island,
+.ef-app-main .course-authoring-toolbar {
+  top: var(--sp-24);
+  left: calc(var(--nav-w) + var(--sp-24));
+}
+
+.ef-app-main .atlas-graph-meta {
+  top: calc(var(--sp-24) + 54px);
+  left: calc(var(--nav-w) + var(--sp-24));
+}
+
+.ef-app-main .micro-learning-header {
+  top: var(--sp-24);
+  right: var(--sp-24);
+  left: calc(var(--nav-w) + var(--sp-24));
+}
+
+.ef-app-main .atlas-lesson-page.material-reader-current {
+  --material-header-top: var(--sp-16);
+  --material-header-left: calc(var(--nav-w) + var(--sp-16));
+}
+
+/* ---------- Document-flow placeholder pages ---------- */
+.ef-doc-page {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  gap: var(--sp-32);
+  padding: var(--sp-48) var(--sp-32);
+}
+
+.ef-doc-head {
+  display: flex;
+  max-width: 860px;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-doc-kicker {
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-700);
+  letter-spacing: .12em;
+}
+
+.ef-doc-head h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+  font-weight: var(--fw-700);
+  letter-spacing: -.02em;
+}
+
+.ef-doc-head p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-empty {
+  display: flex;
+  width: min(560px, 100%);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: var(--sp-24);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-16);
+  color: var(--ink-2);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-empty svg {
+  color: var(--muted);
+}
+
+.ef-empty h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+  font-weight: var(--fw-600);
+}
+
+.ef-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+/* ---------- 404 (N50) ---------- */
+.ef-notfound {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-16);
+  padding: var(--sp-32);
+  text-align: center;
+}
+
+.ef-notfound-code {
+  color: var(--brand-ink);
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+  font-weight: var(--fw-700);
+  letter-spacing: .2em;
+}
+
+.ef-notfound h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+  font-weight: var(--fw-700);
+}
+
+.ef-notfound p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-notfound-actions {
+  display: flex;
+  gap: var(--sp-8);
+}
+
+/* ---------- Connection screen ---------- */
+.ef-connection {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: var(--sp-24);
+}
+
+.ef-connection-card {
+  display: flex;
+  width: min(420px, 100%);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-12);
+  padding: var(--sp-32);
+}
+
+.ef-connection-card h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+  font-weight: var(--fw-700);
+}
+
+.ef-connection-card p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-nav,
+  .ef-nav-logo,
+  .ef-nav-item,
+  .ef-nav-me,
+  .ef-nav-me .ef-ui-avatar {
+    transition: none;
+  }
+
+  .ef-nav-account {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ef-nav {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .ef-app {
+    display: block;
+  }
+
+  .ef-app-main {
+    margin-left: 0;
+    padding-bottom: 88px;
+  }
+
+  .ef-nav {
+    top: auto;
+    right: var(--sp-12);
+    bottom: var(--sp-12);
+    left: var(--sp-12);
+    width: auto;
+    height: 64px;
+    flex-direction: row;
+    padding: var(--sp-8);
+    border-radius: var(--r-16);
+  }
+
+  .ef-nav-logo,
+  .ef-nav-spacer,
+  .ef-nav-me-name {
+    display: none;
+  }
+
+  .ef-nav-grp {
+    width: auto;
+    flex-direction: row;
+  }
+
+  .ef-nav-item,
+  .ef-nav-me,
+  .ef-nav-guest {
+    width: 50px;
+    min-height: 48px;
+  }
+
+  .ef-nav-account {
+    position: fixed;
+    right: var(--sp-12);
+    bottom: calc(var(--sp-12) + 76px);
+    left: auto;
+  }
+}

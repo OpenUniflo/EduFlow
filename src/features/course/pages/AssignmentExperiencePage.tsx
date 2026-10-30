@@ -2,7 +2,6 @@ import { isArtifactPracticeExecutor } from '@/shared/learning/practiceBoundary';
 import { ArrowLeft, Check } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
 import { courseAssignmentEligibility } from "@/features/course/assignmentExperience";
@@ -71,8 +70,8 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
   }, [courseId, stableAssignmentId, actionRunId, repeatAttemptId]);
   const savedDiagnosis = chat.references.some(ref=>['diagnosis','confirmation'].includes(ref.event))||chat.messages.some(message=>message.structuredContent?.type==='workspace_event'&&['diagnosis','confirmation'].includes(message.structuredContent.event));
   useEffect(()=>{if(savedDiagnosis)setCapabilitySources(JSON.parse(savedAttachments) as string[]);else setCapabilitySources(undefined);},[savedDiagnosis,savedAttachments]);
-  if (!runtime || !assignment) return <main className="assignment-page"><GlobalNav active="courses" session={session} onLogout={onLogout} /><section className="atlas-empty-state"><h1>实训不存在</h1><button className="atlas-primary" onClick={() => navigate(`/courses/${courseId}`)}>返回课程</button></section></main>;
-  if (!isArtifactPracticeExecutor(assignment) && experience.type !== "workflow") return <main className="assignment-page"><GlobalNav active="courses" session={session} onLogout={onLogout}/><section className="atlas-empty-state"><h1>此内容属于学习检查</h1><p>理解检查已退出正式成果实践；原有记录保持不变。请返回课程选择微学习或成果实践。</p><button className="atlas-primary" onClick={() => navigate(`/courses/${encodeURIComponent(courseId)}`)}>返回课程路线</button></section></main>;
+  if (!runtime || !assignment) return <main className="assignment-page"><section className="atlas-empty-state"><h1>实训不存在</h1><button className="atlas-primary" onClick={() => navigate(`/courses/${courseId}`)}>返回课程</button></section></main>;
+  if (!isArtifactPracticeExecutor(assignment) && experience.type !== "workflow") return <main className="assignment-page"><section className="atlas-empty-state"><h1>此内容属于学习检查</h1><p>理解检查已退出正式成果实践；原有记录保持不变。请返回课程选择微学习或成果实践。</p><button className="atlas-primary" onClick={() => navigate(`/courses/${encodeURIComponent(courseId)}`)}>返回课程路线</button></section></main>;
   async function submit(response: AssignmentResponse) {
     if (busy || (session && (!startConfirmed || !resultLoaded || (!actionRunId && !repeatAttemptId && !eligibility?.canSubmit)))) return; setBusy(true);setRequestError(null);setRetry(()=>()=>void submit(response));
     try {
@@ -118,7 +117,7 @@ export function AssignmentExperiencePage({ session, onLogout }: { session: MockS
   if(!submitted&&experience.type!=='workflow')messages.push({id:'formal-submission',role:'assistant',content:<section className="assignment-experience-body"><h3>准备本次正式成果</h3><><details open={Boolean(answer)}><summary>{answer?"已准备正式成果 · 复核或编辑":"直接编辑正式成果（也可从本人消息选择）"}</summary><label>本次正式提交内容<textarea aria-label="正式实践成果" value={answer} onChange={event=>setAnswer(event.target.value)} placeholder="写下本人完成的过程、计算依据、结论与边界…"/></label></details>{attachmentIds.length?<ul>{attachmentIds.map(id=><li key={id}>{attachmentTitles[id]??id} · 已保存原始文件 <button className="atlas-secondary" onClick={()=>void evidenceRequest<{url:string}>({action:'download',sourceId:id}).then(result=>window.open(result.url,'_blank','noopener')).catch(()=>setRequestError('原始文件暂时无法打开，请重试。'))}>查看原文件</button></li>)}</ul>:null}<p>这里的成果和选定附件将进入正式提交；普通聊天与 Assistant 回复不会自动加入。</p></></section>});
   if(!submitted&&experience.type==='workflow')messages.push({id:'workflow-launch',role:'assistant',content:<><p>在现有工作流画布完成任务，执行结果仍由 Workflow Runtime 保存。</p><button className="atlas-primary" onClick={()=>session?navigate(workflowLaunchUrl({courseId,assignmentId:assignment.id,workflowTemplateId:assignment.workflowTemplateId!})):navigate('/login',{state:authGateState(location)})}>{session?'进入画布':'登录后进入画布'}</button></>});
   return <main className="assignment-page">
-    <GlobalNav active="courses" session={session} onLogout={onLogout} />
+
     <ConversationWorkbenchShell mode={capabilitySources?'能力更新':'课程实训'} title={assignment.title} description={capabilitySources?'从本次实践资料检查能力依据，再明确确认。':'讨论、准备成果，再明确提交本次实践。'} contextLabel={`${runtime.course.title} · ${assignment.estimatedMinutes??25} 分钟`} action={<button className="atlas-secondary" onClick={()=>navigate(`/courses/${courseId}`)}><ArrowLeft size={16}/>返回课程</button>} context={<>        <section><h3>关联能力</h3>{coverages.map((coverage) => <span key={coverage.id}>◆ {knowledgeById.get(coverage.nodeId)?.title ?? coverage.nodeId}</span>)}</section>
         <section><h3>前置实训</h3>{dependencies.length ? dependencies.map((item) => <span key={item.id}>→ {item.title}</span>) : <span>当前实训无直接前置任务</span>}</section>
         {assignment.inheritedOutputs?.length ? <section><h3>已继承成果</h3>{assignment.inheritedOutputs.map((item) => <span key={item}><Check size={13} />{item}</span>)}{assignment.dependencyRationale ? <p>{assignment.dependencyRationale}</p> : null}</section> : null}

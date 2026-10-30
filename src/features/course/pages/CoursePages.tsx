@@ -2,7 +2,6 @@ import { ArrowRight, Layers3, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
-import { GlobalNav } from "@/app/components/GlobalNav";
 import { buildCourseGraphData, buildCourseSummary } from "@/features/course/runtime/courseRuntime";
 import { applicationServices } from "@/app/services/applicationServices";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
@@ -57,8 +56,7 @@ export function CourseCenterPage({ session, onLogout }: { session: MockSession |
 
   return (
     <main className="atlas-page-shell atlas-course-center">
-      <GlobalNav active="courses" session={session} onLogout={onLogout} />
-      <div className="atlas-course-floating-title glass-v2">课程中心</div>
+
       <div className="atlas-content-wrap">
         <section className="atlas-course-title atlas-course-title-row"><div><h1>课程中心</h1><p>{session ? "标准课程与仅你可见的个人课程共用同一课程体系；我的课程只包含你主动选择或开始的课程。" : "无需登录即可浏览已发布的标准课程；个人课程、进度与我的课程会在登录后显示。"}</p></div><span className="atlas-pill">{courses.length} 门可见课程{session ? ` · ${learningCount} 门我的课程` : ""}</span></section>
         {session?<nav className="learning-view-tabs" aria-label="课程范围"><button className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>我的课程</button><button className={tab === "all" ? "active" : ""} onClick={() => setTab("all")}>全部课程</button></nav>:null}

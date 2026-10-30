@@ -1,4 +1,4 @@
-import { ArrowUpRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
 import { Avatar } from "./Avatar";
 import "./ui.css";
@@ -22,13 +22,14 @@ export type AccountMenuProps = {
   onClose: () => void;
   returnFocusRef?: RefObject<HTMLElement | null>;
   className?: string;
+  id?: string;
 };
 
 /**
  * Account popover opened from the avatar. The first row is always
  * 「打开我的面板」; arrows move between rows and Escape closes/returns focus.
  */
-export function AccountMenu({ open, name, email, onOpenPanel, items = [], onLogout, onClose, returnFocusRef, className = "" }: AccountMenuProps) {
+export function AccountMenu({ open, name, email, onOpenPanel, items = [], onLogout, onClose, returnFocusRef, className = "", id = "ef-account-menu" }: AccountMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const firstRef = useRef<HTMLButtonElement>(null);
   const controlRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -42,7 +43,11 @@ export function AccountMenu({ open, name, email, onOpenPanel, items = [], onLogo
     if (!open) return;
     firstRef.current?.focus();
     function onPointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) onClose();
+      const target = event.target as Node;
+      // The trigger owns the toggle; do not close on its pointerdown and then
+      // immediately reopen on the following click.
+      if (rootRef.current?.contains(target) || returnFocusRef?.current?.contains(target)) return;
+      onClose();
     }
     function onKeyDown(event: globalThis.KeyboardEvent) {
       if (event.key === "Escape") {
@@ -72,6 +77,7 @@ export function AccountMenu({ open, name, email, onOpenPanel, items = [], onLogo
   return (
     <div
       ref={rootRef}
+      id={id}
       className={`ef-ui-glass ef-ui-glass--regular ef-ui-glass--r-24 ef-ui-account ${className}`.trim()}
       role="menu"
       aria-label="账户菜单"
@@ -79,7 +85,7 @@ export function AccountMenu({ open, name, email, onOpenPanel, items = [], onLogo
       data-open="true"
     >
       <div className="ef-ui-account-head">
-        <Avatar name={name} size={32} personColor="me" />
+        <Avatar name={name} size={40} personColor="me" />
         <div className="ef-ui-account-id">
           <div className="ef-ui-account-name">{name}</div>
           <div className="ef-ui-account-email">{email}</div>
@@ -93,7 +99,7 @@ export function AccountMenu({ open, name, email, onOpenPanel, items = [], onLogo
           onKeyDown={(event) => onArrow(event, event.key === "ArrowUp" ? -1 : 1)}
         >
           打开我的面板
-          <ArrowUpRight size={14} aria-hidden="true" />
+          <ArrowRight size={14} aria-hidden="true" />
         </button>
       </div>
       <div className="ef-ui-account-list">

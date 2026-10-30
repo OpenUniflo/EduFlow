@@ -20,7 +20,7 @@ function FieldChrome({ label, hint, error, icon, children, inputId, hintId, clas
         {icon ? <span className="ef-ui-field-icon" aria-hidden="true">{icon}</span> : null}
         {children}
       </div>
-      {error || hint ? <p id={hintId} className={`ef-ui-help${error ? " is-error" : ""}`.trim()}>{error ?? hint}</p> : null}
+      {error || hint ? <p id={hintId} className={`ef-ui-help${error ? " is-error" : ""}`.trim()} role={error ? "alert" : undefined}>{error ?? hint}</p> : null}
     </div>
   );
 }
@@ -30,10 +30,11 @@ export type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "classN
   hint?: string;
   error?: string;
   icon?: ReactNode;
+  trailing?: ReactNode;
   className?: string;
 };
 
-export function TextField({ label, hint, error, icon, className, id, ...rest }: TextFieldProps) {
+export function TextField({ label, hint, error, icon, trailing, className, id, ...rest }: TextFieldProps) {
   const generated = useId();
   const inputId = id ?? generated;
   const hintId = error || hint ? `${inputId}-help` : undefined;
@@ -46,6 +47,7 @@ export function TextField({ label, hint, error, icon, className, id, ...rest }: 
         aria-invalid={error ? true : undefined}
         aria-describedby={hintId}
       />
+      {trailing ? <span className="ef-ui-field-trailing">{trailing}</span> : null}
     </FieldChrome>
   );
 }

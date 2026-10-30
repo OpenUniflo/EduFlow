@@ -1,7 +1,6 @@
 import { Archive, BookOpen, Check, Plus, Rocket } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GlobalNav } from "@/app/components/GlobalNav";
 import { applicationServices } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
 import type { CourseLifecycle } from "@/features/course/types";
@@ -53,7 +52,7 @@ export function CourseManagementPage({ session, onLogout }: { session: MockSessi
   const visible = courses.filter((item) => filter === "all" || item.lifecycle === filter);
   const runtimeById = new Map(courses.map(({ runtime }) => [runtime.course.id, runtime]));
   return <main className="atlas-page-shell course-management-page">
-    <GlobalNav active="teaching" session={session} onLogout={onLogout} />
+
     <div className="atlas-content-wrap">
       <section className="atlas-course-title atlas-course-title-row"><div><span className="atlas-kicker">TEACHING WORKSPACE</span><h1>教学管理</h1><p>创建、检查和维护可学习的课程资产；同一课程从这里进入 Design Mode。</p></div><button className="atlas-primary" onClick={() => navigate("/teaching/create")}><Plus size={17} /> 创建课程</button></section>
       <div className="course-management-filters">{(["all", "draft", "published", "archived"] as const).map((value) => <button className={filter === value ? "active" : ""} key={value} onClick={() => setFilter(value)}>{value === "all" ? "全部" : labels[value]}</button>)}</div>
