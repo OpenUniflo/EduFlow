@@ -10,10 +10,8 @@ import { NotFoundPage, RecordsPage, SettingsPage } from "@/app/pages/Placeholder
 import { PublicHomePage } from "@/app/pages/PublicHomePage";
 import { applicationServices, hydrateApplicationServices, hydratePublicApplicationServices, resetAuthenticatedApplicationServices } from "@/app/services/applicationServices";
 import { resolveWorkflowAssignmentContext } from "@/app/integrations/workflowAssignmentIntegration";
-import { ExplorePage } from "@/features/explore/pages/ExplorePage";
 import { LearningPage } from "@/features/learning/pages/LearningPage";
 import { MicroLearningExperience } from "@/features/learning/micro/MicroLearningExperience";
-import { CourseCenterPage } from "@/features/course/pages/CoursePages";
 import { CourseManagementPage } from "@/features/course/pages/CourseManagementPage";
 import { CourseCreationWorkspacePage } from "@/features/course/pages/CourseCreationWorkspacePage";
 import { CourseGraphPage } from "@/features/course/pages/CourseGraphPage";
@@ -30,6 +28,7 @@ import { CapabilityEvidenceBoundary } from "@/app/integrations/CapabilityEvidenc
 import { AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeContext";
 import { authGateState, resolveAuthRedirect } from "@/features/auth/authRedirect";
 import { Button } from "@/shared/ui/Button";
+import { ArchivePage } from "@/features/archive/pages/ArchivePage";
 
 function AssistantRuntimeBoundary({ session, children }: { session: MockSession | null; children: ReactNode }) {
   return session ? <AssistantRuntimeProvider session={session}><CapabilityEvidenceBoundary session={session}>{children}</CapabilityEvidenceBoundary></AssistantRuntimeProvider> : children;
@@ -141,6 +140,11 @@ export default function App() {
     return { confirmationRequired: false };
   }
 
+  async function reloadArchiveData() {
+    await hydratePublicApplicationServices();
+    if (session) await hydrateApplicationServices(session.userId);
+  }
+
   async function retryStartup() {
     setReady(false);
     setStartupError("");
@@ -185,11 +189,12 @@ export default function App() {
             <RouterRoute path="/login" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
             <RouterRoute path="/register" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
             <RouterRoute path="/" element={session ? <LearningPage session={session} onLogout={logout} /> : <PublicHomePage />} />
-            <RouterRoute path="/archive" element={<ExplorePage session={session} onLogout={logout} />} />
+            <RouterRoute path="/archive" element={<ArchivePage session={session} onRetry={reloadArchiveData} />} />
             <RouterRoute path="/learn/micro/:knowledgeId" element={<MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} />} />
             <RouterRoute path="/works" element={protectedElement(session ? <WorkflowLibraryPage userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} onOpenWorkflow={(id, returnTo) => navigate(`/works/${id}`, { state: { workflowLibraryReturn: returnTo } })} /> : null)} />
             <RouterRoute path="/works/:workflowId" element={protectedElement(editor)} />
-            <RouterRoute path="/courses" element={<CourseCenterPage session={session} onLogout={logout} />} />
+            <RouterRoute path="/courses" element={<LegacyRedirect />} />
+            <RouterRoute path="/courses/" element={<LegacyRedirect />} />
             <RouterRoute path="/courses/create" element={protectedElement(session ? <CourseCreationWorkspacePage session={session} onLogout={logout} entryMode="learner" /> : null)} />
             <RouterRoute path="/teaching" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseManagementPage session={session} onLogout={logout} /> : <Navigate to="/" replace />} />
             <RouterRoute path="/teaching/create" element={!session ? protectedElement(null) : canManageCourses(session) ? <CourseCreationWorkspacePage session={session} onLogout={logout} entryMode="teacher" /> : <Navigate to="/" replace />} />

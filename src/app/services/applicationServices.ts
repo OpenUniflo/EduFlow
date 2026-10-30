@@ -67,6 +67,7 @@ type KnowledgeHydration = { graph: KnowledgeGraph; governance: DomainGovernanceS
 async function hydrateCatalog(userId?: string) {
   const knowledge = await apiRequest<KnowledgeHydration>("/api/knowledge");
   knowledgeRepository.hydrate(knowledge.graph);
+  previewApplicationServices.bindKnowledgeCatalog(knowledge.graph.nodes.filter((node) => node.status === "active").map((node) => node.id));
   domainGovernanceRepository.hydrate(knowledge.governance);
   domainGovernanceService.reloadFromRepository();
   await Promise.all([courseRepository.hydrate(userId), microLearningRepository.hydrate(userId)]);

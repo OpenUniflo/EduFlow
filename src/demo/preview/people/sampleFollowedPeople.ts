@@ -13,6 +13,10 @@ export const sampleFollowedPeople: readonly FollowedPerson[] = [
     visibility: "public",
     sharedKnowledgeCount: 12,
     activityLabel: "示例进度：3 门课程 · 本周 5 次学习",
+    bio: "示例档案：把检索、工具调用和评测串成一条能跑通的链路。",
+    sharedCourseIds: ["preview-course-rag"],
+    followsMe: true,
+    updatedAt: "2026-10-30T09:20:00.000Z",
     sample: true
   },
   {
@@ -23,6 +27,10 @@ export const sampleFollowedPeople: readonly FollowedPerson[] = [
     visibility: "public",
     sharedKnowledgeCount: 9,
     activityLabel: "示例进度：2 门课程 · 本周 3 次学习",
+    bio: "示例档案：正在练习 Agent 工作流与工具编排。",
+    sharedCourseIds: ["preview-course-agent"],
+    followsMe: true,
+    updatedAt: "2026-10-29T15:10:00.000Z",
     sample: true
   },
   {
@@ -33,6 +41,10 @@ export const sampleFollowedPeople: readonly FollowedPerson[] = [
     visibility: "public",
     sharedKnowledgeCount: 7,
     activityLabel: "示例进度：1 门课程 · 本周 2 次学习",
+    bio: "示例档案：从多智能体协作入门开始。",
+    sharedCourseIds: ["preview-course-multi"],
+    followsMe: false,
+    updatedAt: "2026-10-28T11:00:00.000Z",
     sample: true
   },
   {
@@ -43,6 +55,10 @@ export const sampleFollowedPeople: readonly FollowedPerson[] = [
     visibility: "public",
     sharedKnowledgeCount: 14,
     activityLabel: "示例进度：3 门课程 · 本周 6 次学习",
+    bio: "示例档案：在学评测与回归，关注可靠性。",
+    sharedCourseIds: ["preview-course-eval"],
+    followsMe: true,
+    updatedAt: "2026-10-27T08:40:00.000Z",
     sample: true
   },
   {
@@ -53,6 +69,10 @@ export const sampleFollowedPeople: readonly FollowedPerson[] = [
     visibility: "private",
     sharedKnowledgeCount: 4,
     activityLabel: "示例进度：对方未公开学习进度",
+    bio: "示例档案：仅公开作品，不公开学习进度。",
+    sharedCourseIds: [],
+    followsMe: false,
+    updatedAt: "2026-10-26T18:00:00.000Z",
     sample: true
   }
 ];

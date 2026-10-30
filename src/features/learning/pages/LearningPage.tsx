@@ -5,6 +5,7 @@ import { applicationServices } from "@/app/services/applicationServices";
 import { useAssistantRuntime } from "@/features/assistant/AssistantRuntimeContext";
 import type { MockSession } from "@/features/auth/types";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
+import { archiveHref } from "@/features/archive/model/atlasParams";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { buildActiveLearningKnowledge } from "@/features/learning/recommendation/todayQueue";
 import { createMicroLearningNavigation, type MicroLearningPath } from "@/features/learning/micro/microLearning";
@@ -206,7 +207,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     return assistant.send(message, context);
   }
 
-  function openArchive() { navigate("/archive"); }
+  function openArchive() { navigate(archiveHref({ focus: "me" })); }
 
   const todayCard = current && microPath && boundary === "ready" ? (microComplex ? <div className="ef-home-today-micro">
     <div className="ef-home-structured-head"><Pill tone="brand">复杂微学习</Pill><strong>{microPath.title}</strong></div>
@@ -240,7 +241,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
           suggestions={selectedPerson || boundary === "error" ? [] : boundary === "new-user" ? ["让 AI 会查我们自己的文档", "把重复的周报整理自动化", "搞懂 Agent 为什么总调错工具"] : current ? [`先来一道「${current.title}」的热身题`, "今天还有哪些安排？", "我上周的实践还差什么？"] : ["推荐一门适合我的课程", "我想先补提示工程", "查看本周学习安排"]}
           todayCard={selectedPerson || assistant.messages.length ? undefined : todayCard}
           eventRow={workspace?.kind === "practice" ? <EventRow icon={<Play size={15} />} title={<>已开始实践 <strong>{workspace.title}</strong></>} detail="在右侧工作区继续；提交后内容会被保存。" action={<Pill tone="brand" dot>进行中</Pill>} /> : undefined}
-          coursePreview={boundary === "ready" && assistant.messages.length && selectedCourse && !removedContexts.includes("course") ? <CoursePreviewCard course={selectedCourse} records={records} courseState={selectedCourseState} currentKnowledgeId={current?.knowledgeId} nodeTitles={nodeTitles} onOpenArchive={() => navigate(`/archive?courseId=${encodeURIComponent(selectedCourse.course.id)}`)} /> : undefined}
+          coursePreview={boundary === "ready" && assistant.messages.length && selectedCourse && !removedContexts.includes("course") ? <CoursePreviewCard course={selectedCourse} records={records} courseState={selectedCourseState} currentKnowledgeId={current?.knowledgeId} nodeTitles={nodeTitles} onOpenArchive={() => navigate(archiveHref({ focus: `course:${selectedCourse.course.id}` }))} /> : undefined}
           microCard={boundary === "ready" && assistant.messages.length > 0 && current && microPath && microProgress?.status === "in_progress" ? <ConversationMicroCard path={microPath} progress={microProgress} currentUnitId={microCurrentUnit} completeSteps={microCompleteSteps} totalSteps={microTotalSteps} onOpen={() => microComplex ? openMicroPanel() : launchMicro()} /> : undefined}
           previewPerson={selectedPerson}
           onRetry={() => window.location.reload()}

@@ -8,6 +8,7 @@ import type { FollowedPerson } from "@/features/profile/people/PeopleRepository"
 import { Avatar } from "@/shared/ui/Avatar";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
 import { buildArchiveSummary, buildPanelPeople, buildRecentLearning, buildTeacherReminders, type PanelCourseItem, type PanelPracticeItem, type PanelRecentItem, type PanelTeacherReminder } from "./panelModel";
+import { archiveHref } from "@/features/archive/model/atlasParams";
 import "./home.css";
 
 type PanelProps = {
@@ -135,7 +136,7 @@ export function MyPanel({ session, open, loading = false, onClose, selectedPerso
       <span className="ef-my-panel-avatar" aria-hidden="true"><UserRound size={18} /></span>
       <div><h2>我的</h2><p>{shortName(session.name)}</p></div>
       <div className="ef-my-panel-tools">
-        <button type="button" className="ef-home-icon" onClick={() => navigate("/archive")} aria-label="打开档案" title="打开档案"><Network size={15} /></button>
+        <button type="button" className="ef-home-icon" onClick={() => navigate(archiveHref({ focus: "me" }))} aria-label="打开档案" title="打开档案"><Network size={15} /></button>
         <button ref={closeRef} type="button" className="ef-home-icon" onClick={onClose} aria-label="关闭我的面板"><X size={15} /></button>
       </div>
     </header>
@@ -149,14 +150,14 @@ export function MyPanel({ session, open, loading = false, onClose, selectedPerso
             <span className="ef-my-course-meta"><small>{course.nextLabel}</small><strong>{course.draft ? "草稿" : `${course.progress}%`}</strong></span>
             {course.id === selectedCourse?.id ? <span className="ef-my-course-check" aria-hidden="true">✓</span> : <Plus size={14} aria-hidden="true" className="ef-my-course-plus" />}
           </button>) : <div className="ef-my-empty"><BookOpen size={18} /><strong>还没有课程</strong><p>从档案选一门课程开始，进度会出现在这里。</p></div>}
-          {courses.length > 3 ? <button type="button" className="ef-my-more" onClick={() => navigate("/courses")}>还有 {courses.length - 3} 门课程 · 查看全部</button> : null}
+          {courses.length > 3 ? <button type="button" className="ef-my-more" onClick={() => navigate(archiveHref({ panel: "courses" }))}>还有 {courses.length - 3} 门课程 · 查看全部</button> : null}
         </div>
       </section>
 
       <section className="ef-my-section" aria-labelledby="my-recent">
         <div className="ef-my-section-head"><h3 id="my-recent"><Clock size={14} aria-hidden="true" />最近学习</h3><small>{recent.length} 条</small></div>
         <div className="ef-my-recent-list">
-          {recent.length ? recent.map((item) => <button type="button" key={item.id} className="ef-my-recent" onClick={() => navigate("/archive")}>
+          {recent.length ? recent.map((item) => <button type="button" key={item.id} className="ef-my-recent" onClick={() => navigate(archiveHref({ focus: `knowledge:${item.id}` }))}>
             <span><strong>{item.title}</strong><small>{item.detail}{item.updatedAt ? ` · ${formatRelative(item.updatedAt)}` : ""}</small></span><Plus size={14} aria-hidden="true" />
           </button>) : <p className="ef-my-muted">还没有学习记录。</p>}
         </div>
@@ -164,7 +165,7 @@ export function MyPanel({ session, open, loading = false, onClose, selectedPerso
 
       <section className="ef-my-section" aria-labelledby="my-people">
         <div className="ef-my-section-head"><h3 id="my-people"><UserRound size={14} aria-hidden="true" />关注的人</h3>{peopleLoading ? <small>加载中…</small> : peopleView.marker ? <PreviewBadge /> : <small>真实空态</small>}</div>
-        {peopleLoading ? <div className="ef-my-people-skeleton" aria-hidden="true"><span /><span /><span /><span /></div> : peopleError ? <p className="ef-my-error" role="alert">{peopleError}</p> : peopleView.state === "empty" ? <div className="ef-my-empty"><UserRound size={18} /><strong>还没有关注的人</strong><p>关注同学后，这里会显示他们的公开进度。</p><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate("/archive")}>去找人</button></div> : <>
+        {peopleLoading ? <div className="ef-my-people-skeleton" aria-hidden="true"><span /><span /><span /><span /></div> : peopleError ? <p className="ef-my-error" role="alert">{peopleError}</p> : peopleView.state === "empty" ? <div className="ef-my-empty"><UserRound size={18} /><strong>还没有关注的人</strong><p>关注同学后，这里会显示他们的公开进度。</p><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate(archiveHref({ panel: "people" }))}>去找人</button></div> : <>
           <div className="ef-my-people-row" role="list">
             {peopleView.people.map((person) => <button key={person.id} type="button" role="listitem" className={`ef-my-person ${selectedPersonId === person.id ? "is-selected" : ""}`} onClick={() => onSelectPerson(person)} aria-pressed={selectedPersonId === person.id}>
               <Avatar name={person.displayName.replace("示例 · ", "")} size={40} personColor={person.accent} />
@@ -194,7 +195,7 @@ export function MyPanel({ session, open, loading = false, onClose, selectedPerso
       </section> : null}
 
       <section className="ef-my-section" aria-labelledby="my-archive">
-        <div className="ef-my-section-head"><h3 id="my-archive"><Sparkles size={14} aria-hidden="true" />档案快照</h3><button type="button" className="ef-my-link" onClick={() => navigate("/archive")}>打开<ChevronRight size={12} /></button></div>
+        <div className="ef-my-section-head"><h3 id="my-archive"><Sparkles size={14} aria-hidden="true" />档案快照</h3><button type="button" className="ef-my-link" onClick={() => navigate(archiveHref({ focus: archive.recentNodeId ? `knowledge:${archive.recentNodeId}` : "me" }))}>打开<ChevronRight size={12} /></button></div>
         <div className="ef-my-archive">
           <div className="ef-my-archive-visual" aria-hidden="true">{(records.length ? records.slice(0, 20) : [{ nodeId: "empty" }]).map((record, index) => <i key={`${record.nodeId}:${index}`} className={`dot-${index % 4}`} style={{ left: `${8 + (index * 17) % 84}%`, top: `${20 + (index * 31) % 60}%` }} />)}</div>
           <div className="ef-my-archive-copy"><strong>{archive.recentTitle ?? "还没有学习记录"}</strong><small>{archive.learned} 已学习 · {archive.learning} 在学 · {archive.practicing} 实训中 · {archive.mastered} 已掌握</small></div>
@@ -204,7 +205,7 @@ export function MyPanel({ session, open, loading = false, onClose, selectedPerso
 
     <footer className="ef-my-panel-foot">
       <span><Lock size={12} aria-hidden="true" />仅自己可见</span>
-      <div><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate("/archive")}>分享</button><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => navigate("/archive")}>打开档案<ArrowRight size={14} /></button></div>
+      <div><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate(archiveHref({ panel: "share" }))}>分享</button><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => navigate(archiveHref({ focus: "me" }))}>打开档案<ArrowRight size={14} /></button></div>
     </footer>
   </aside>;
 }

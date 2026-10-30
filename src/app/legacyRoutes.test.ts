@@ -6,6 +6,12 @@ describe("P1 route redirect table", () => {
     expect(resolveLegacyRoute("/explore", "")).toBe("/archive");
     expect(resolveLegacyRoute("/explore", "?focus=k1")).toBe("/archive?focus=k1");
   });
+  it("moves the Course Center list to the Archive course overlay and keeps course subroutes untouched", () => {
+    expect(resolveLegacyRoute("/courses", "")).toBe("/archive?panel=courses");
+    expect(resolveLegacyRoute("/courses/", "?query=rag")).toBe("/archive?query=rag&panel=courses");
+    expect(resolveLegacyRoute("/courses/c1", "")).toBe("/");
+    expect(resolveLegacyRoute("/courses/c1/assignments/a1", "")).toBe("/");
+  });
   it("moves every workflow path to its works counterpart", () => {
     expect(resolveLegacyRoute("/workflows", "")).toBe("/works");
     expect(resolveLegacyRoute("/workflows/", "")).toBe("/works");

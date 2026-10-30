@@ -7,6 +7,7 @@ import { HomeComposer, type ComposerContext } from "@/shared/ui/HomeComposer";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
 import { Pill } from "@/shared/ui/Pill";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
+import { archiveHref } from "@/features/archive/model/atlasParams";
 
 export type HomeConversationProps = {
   messages: AssistantMessage[];
@@ -166,7 +167,7 @@ function PreviewPersonCard({ person }: { person: FollowedPerson }) {
           <div className="ef-home-person-bar" aria-hidden="true"><i style={{ width: `${Math.min(100, person.sharedKnowledgeCount * 6)}%` }} /></div>
           <p>{person.activityLabel}</p>
         </div>}
-        <div className="ef-home-person-actions"><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate("/archive")}>查看档案</button><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => navigate("/archive")}>在档案中对比<ArrowRight size={13} /></button></div>
+        <div className="ef-home-person-actions"><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate(archiveHref({ panel: "people" }))}>查看档案</button><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => navigate(archiveHref({ panel: "people", compare: [person.id] }))}>在档案中对比<ArrowRight size={13} /></button></div>
       </div>
     </ConversationCard>
   </div>;

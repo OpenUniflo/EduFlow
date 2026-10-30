@@ -229,19 +229,8 @@
 .ef-nav button:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
-}
-
-/* ---------- Compatibility for pages whose layouts predate the rail ---------- */
-.ef-app-main .learning-space-page,
-.ef-app-main .explore-page,
-.ef-app-main .micro-learning-page,
-.ef-app-main .atlas-graph-page,
-.ef-app-main .atlas-lesson-page,
-.ef-app-main .assignment-page,
-.ef-app-main .creator-page,
-.ef-app-main .domain-admin-page,
-.ef-app-main .wf-unified,
-.ef-app-main .wf-v2-loading {
+}/* ---------- Compatibility for pages whose layouts predate the rail ---------- */
+.ef-app-main .learning-space-page,.ef-app-main .micro-learning-page,.ef-app-main .atlas-graph-page,.ef-app-main .atlas-lesson-page,.ef-app-main .assignment-page,.ef-app-main .creator-page,.ef-app-main .domain-admin-page,.ef-app-main .wf-unified,.ef-app-main .wf-v2-loading{
   width: 100%;
   max-width: 100%;
 }
@@ -261,23 +250,10 @@
 
 .ef-app-main .domain-admin-page {
   padding-top: var(--sp-40);
-}
-
-/* Old pages keep their card surfaces, but their page-level opaque backgrounds
+}/* Old pages keep their card surfaces,but their page-level opaque backgrounds
  * step aside so the shared shell gradient remains visible behind them. */
-.ef-app-main .learning-space-page,
-.ef-app-main .micro-learning-page,
-.ef-app-main .explore-page,
-.ef-app-main .wf-library-page,
-.ef-app-main .course-management-page,
-.ef-app-main .domain-admin-page,
-.ef-app-main .atlas-course-center {
+.ef-app-main .learning-space-page,.ef-app-main .micro-learning-page,.ef-app-main .wf-library-page,.ef-app-main .course-management-page,.ef-app-main .domain-admin-page{
   background: transparent;
-}
-
-.ef-app-main .explore-heading {
-  top: var(--sp-40);
-  left: calc(var(--nav-w) + var(--sp-40));
 }
 
 .ef-app-main .atlas-workspace-head,

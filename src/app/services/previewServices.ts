@@ -8,10 +8,16 @@ import { PreviewPeopleRepository } from "@/demo/preview/people/PreviewPeopleRepo
  */
 export type ApplicationPreviewServices = {
   peopleRepository: PeopleRepository;
+  /** Binds preview-only public subsets to the hydrated active Knowledge catalog. */
+  bindKnowledgeCatalog(nodeIds: readonly string[]): void;
 };
 
 export function createPreviewApplicationServices(): ApplicationPreviewServices {
-  return { peopleRepository: new PreviewPeopleRepository() };
+  const people = new PreviewPeopleRepository();
+  return {
+    peopleRepository: people,
+    bindKnowledgeCatalog: (nodeIds) => people.bindKnowledgeNodeIds(nodeIds)
+  };
 }
 
 export const previewApplicationServices = createPreviewApplicationServices();

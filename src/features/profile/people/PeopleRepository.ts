@@ -20,6 +20,14 @@ export type FollowedPerson = {
   activityLabel: string;
   /** Preview identities are visibly sample data and never real users. */
   sample: boolean;
+  /** Preview-only public subset bound to real Knowledge IDs by the app seam. */
+  sharedKnowledgeIds?: string[];
+  /** Preview-only per-node status for the comparison node card. */
+  sharedKnowledgeStatuses?: Record<string, "learned" | "learning">;
+  sharedCourseIds?: string[];
+  followsMe?: boolean;
+  bio?: string;
+  updatedAt?: string;
 };
 
 export interface PeopleRepository {

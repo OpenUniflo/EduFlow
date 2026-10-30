@@ -112,7 +112,8 @@ export function buildArchiveSummary(records: readonly UserKnowledgeRecord[], nod
     learning: count("learning"),
     practicing: count("practicing"),
     mastered: count("mastered"),
-    recentTitle: recent ? nodeTitles.get(recent.nodeId) ?? recent.nodeId : undefined
+    recentTitle: recent ? nodeTitles.get(recent.nodeId) ?? recent.nodeId : undefined,
+    recentNodeId: recent?.nodeId
   };
 }
 
