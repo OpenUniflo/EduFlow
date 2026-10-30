@@ -1,33 +1,37 @@
-import { ArrowRight, BookOpen, Lock, Network, RefreshCcw, Search, Sparkles, Users } from "lucide-react";
+import { Lock, Network, RefreshCcw } from "lucide-react";
 import { useReducedMotion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { applicationServices } from "@/app/services/applicationServices";
 import { useAssistantRuntime } from "@/features/assistant/AssistantRuntimeContext";
-import { Avatar } from "@/shared/ui/Avatar";
-import { PreviewBadge } from "@/shared/ui/PreviewBadge";
 import type { AssistantContextSnapshot } from "@/features/assistant/assistantContract";
 import { authGateState } from "@/features/auth/authRedirect";
 import type { MockSession } from "@/features/auth/types";
+import { buildCourseGraphData, type CourseGraphData } from "@/features/course/runtime/courseRuntime";
 import { isCourseVisibleToViewer } from "@/features/course/runtime/courseVisibility";
-import { buildCourseGraphData } from "@/features/course/runtime/courseRuntime";
+import { rememberCourseOrigin } from "@/features/course/immersive/courseTransition";
 import { useDomainGovernance } from "@/features/knowledge/domain/domainStore";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
-import { ArchiveAtlas, type ArchiveAtlasHandle, type ArchiveCameraTarget, type AtlasComparePerson } from "../components/ArchiveAtlas";
-import { ArchiveAssistantPanel, GuestAssistantCard } from "../components/ArchiveAssistantPanel";
-import { ArchiveCourseFocusBar, ArchiveCourseMini, ArchiveDraftPills, ArchiveKnowledgeList, ArchiveLegend, ArchiveNodePanel, ArchiveZoomControls } from "../components/ArchiveChrome";
-import { ArchiveCourseTreeLegend, ArchiveCourseTreeOverlay, ArchiveDraftTreeLegend, ArchiveDraftTreeOverlay } from "../components/ArchiveTreeOverlay";
-import { ArchiveCoursePanel } from "../components/ArchiveCoursePanel";
 import { ArchivePeopleBar } from "../components/ArchivePeopleBar";
+import { ArchivePersonPanel, ArchivePeopleSharePanel, type PanelPerson } from "../components/ArchivePeoplePanels";
+import { ArchiveAssistantPanel, GuestAssistantCard } from "../components/ArchiveAssistantPanel";
+import { ArchiveCourseFocusBar, ArchiveDraftFocusBar, ArchiveLevelChip, ArchiveNodePanel, ArchiveZoomControls } from "../components/ArchiveChrome";
 import { ArchiveSearchPanel } from "../components/ArchiveSearchPanel";
-import { ArchiveCompareCard, ArchiveCompareNodeCard, ArchiveNodeHoverCard, ArchiveNotificationsDialog, ArchivePeerCard, ArchivePeopleDialog, ArchivePeoplePicker, type PeopleDialogTab } from "../components/ArchiveSocialDialogs";
-import { getArchiveLayout } from "../model/atlasLayout";
-import { rememberCourseOrigin } from "@/features/course/immersive/courseTransition";
-import { archiveCourseKnowledgeIds, archivePeopleKnowledgeIds, buildArchiveModel, searchArchive, type ArchiveEdge, type ArchiveModel } from "../model/atlasModel";
+import type { ArchiveAtlasSceneHandle } from "../components/ArchiveAtlasScene";
+import { archiveCourseKnowledgeIds, buildArchiveModel, searchArchive, type ArchiveModel } from "../model/atlasModel";
+import { communityByNodeId, detectAtlasCommunities } from "../model/atlasCommunities";
+import { readAtlas3DLayoutCache, type Atlas3DLayout } from "../model/atlas3dLayout";
+import { requestAtlas3DLayout } from "../model/atlas3dLayoutClient";
+import { requestPersonLayout } from "../model/personLayoutClient";
+import type { PersonLayout } from "../model/personLayout";
+import { buildCoursePlane, buildDraftPlane, type CoursePlaneLayout } from "../model/coursePlaneLayout";
 import { deriveAssistantPresentation, type ArchiveAssistantPresentation } from "../model/assistantPresentation";
-import { archiveHref, parseArchiveSearch, type ArchivePanel } from "../model/atlasParams";
+import { parseArchiveSearch, type ArchivePanel } from "../model/atlasParams";
 import "./archive.css";
+import "./archive3d.css";
+
+const ArchiveAtlasScene = lazy(() => import("../components/ArchiveAtlasScene"));
 
 const EMPTY_PRESENTATION: ArchiveAssistantPresentation = {
   state: "idle",
@@ -39,7 +43,7 @@ const EMPTY_PRESENTATION: ArchiveAssistantPresentation = {
   matchCount: 0
 };
 
-type ActiveMode = "default" | "search" | "course" | "peer" | "assistant" | "draft" | "knowledge";
+type SceneMode = "default" | "person" | "course" | "draft";
 
 function plannedWeeks(text: string | undefined, knowledgeCount: number) {
   const match = text?.match(/([0-9]+|[一二三四五六七八九十]+)\s*周/);
@@ -50,6 +54,10 @@ function plannedWeeks(text: string | undefined, knowledgeCount: number) {
     if (chinese[match[1]]) return chinese[match[1]];
   }
   return Math.max(1, Math.ceil(knowledgeCount / 4));
+}
+
+function shortName(person: FollowedPerson) {
+  return person.displayName.replace(/^示例\s*·\s*/, "");
 }
 
 function useArchiveData(session: MockSession | null, refreshToken: number) {
@@ -86,30 +94,60 @@ function useArchiveData(session: MockSession | null, refreshToken: number) {
       return { model: null, error };
     }
   }, [courseStates, governance, graph, records, runtimes]);
-  const layoutResult = useMemo(() => {
-    if (!built.model) return { layout: null };
-    try {
-      return { layout: getArchiveLayout(built.model.nodes, built.model.edges) };
-    } catch (error) {
-      return { layout: null, error };
+  const cachedLayout = useMemo(
+    () => built.model ? readAtlas3DLayoutCache(built.model.nodes, built.model.edges) : null,
+    [built.model]
+  );
+  const [layoutResult, setLayoutResult] = useState<{ model: ArchiveModel; layout: Atlas3DLayout; elapsed: number; cached: boolean; usedWorker: boolean } | null>(null);
+  useEffect(() => {
+    if (!built.model) return;
+    if (cachedLayout) {
+      const perf = (window as unknown as { __archivePerf?: Record<string, number> }).__archivePerf ?? {};
+      perf.defaultLayoutMs = 0;
+      perf.defaultLayoutCached = 1;
+      perf.defaultLayoutWorker = 0;
+      (window as unknown as { __archivePerf?: Record<string, number> }).__archivePerf = perf;
+      console.info("[archive] default 3D layout 0.0ms (cache)");
+      return;
     }
-  }, [built.model]);
-  return { model: built.model, layout: layoutResult.layout, error: built.error ?? layoutResult.error, revision, runtimes, graph, records, courseStates };
+    let live = true;
+    const start = performance.now();
+    const request = requestAtlas3DLayout(built.model.nodes, built.model.edges);
+    void request.promise.then((layout) => {
+      if (!live) return;
+      const elapsed = performance.now() - start;
+      setLayoutResult({ model: built.model!, layout, elapsed, cached: request.cached, usedWorker: request.usedWorker });
+      const perf = (window as unknown as { __archivePerf?: Record<string, number> }).__archivePerf ?? {};
+      perf.defaultLayoutMs = Math.round(elapsed * 10) / 10;
+      perf.defaultLayoutCached = request.cached ? 1 : 0;
+      perf.defaultLayoutWorker = request.usedWorker ? 1 : 0;
+      (window as unknown as { __archivePerf?: Record<string, number> }).__archivePerf = perf;
+      console.info(`[archive] default 3D layout ${elapsed.toFixed(1)}ms (${request.usedWorker ? "worker" : "main"})`);
+    }).catch((layoutError) => {
+      if (live) console.error("Atlas layout failed", layoutError);
+    });
+    return () => { live = false; };
+  }, [built.model, cachedLayout]);
+  const layout = layoutResult?.model === built.model ? layoutResult.layout : cachedLayout;
+  const layoutElapsed = layoutResult?.model === built.model ? layoutResult.elapsed : 0;
+  const layoutCached = layoutResult?.model === built.model ? layoutResult.cached : Boolean(cachedLayout);
+  return { model: built.model, layout, layoutElapsed, layoutCached, error: built.error, revision, runtimes, graph, records, courseStates };
 }
 
-function ArchiveAssistantBridge({ session, model, context, seedGoal, onPresentation, onOpenBrief, onActiveChange }: {
+function ArchiveAssistantBridge({ session, model, context, seedGoal, open, onOpenChange, onPresentation, onOpenBrief }: {
   session: MockSession;
   model: ArchiveModel;
   context: AssistantContextSnapshot;
   seedGoal: { key: string; goal: string } | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onPresentation: (presentation: ArchiveAssistantPresentation) => void;
   onOpenBrief: (briefMessageId: string) => void;
-  onActiveChange: (active: boolean) => void;
 }) {
   const runtime = useAssistantRuntime();
   const presentation = useMemo(() => deriveAssistantPresentation({ messages: runtime.messages, model, sending: runtime.sending, error: runtime.error }), [model, runtime.error, runtime.messages, runtime.sending]);
   useEffect(() => { onPresentation(presentation); }, [onPresentation, presentation]);
-  return <ArchiveAssistantPanel session={session} model={model} context={context} presentation={presentation} seedGoal={seedGoal} onOpenBrief={onOpenBrief} onActiveChange={onActiveChange} />;
+  return <ArchiveAssistantPanel session={session} model={model} context={context} presentation={presentation} seedGoal={seedGoal} open={open} onOpenChange={onOpenChange} onOpenBrief={onOpenBrief} />;
 }
 
 export function ArchivePage({ session, onRetry }: { session: MockSession | null; onRetry?: () => Promise<void> }) {
@@ -119,45 +157,42 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   const [searchParams, setSearchParams] = useSearchParams();
   const urlState = useMemo(() => parseArchiveSearch(location.search), [location.search]);
   const [refreshToken, setRefreshToken] = useState(0);
-  const { model, layout, error: dataError, revision, runtimes, graph, records, courseStates } = useArchiveData(session, refreshToken);
-  const atlasRef = useRef<ArchiveAtlasHandle>(null);
-  const [cameraTarget, setCameraTarget] = useState<ArchiveCameraTarget | null>(null);
+  const { model, layout, layoutCached, error: dataError, revision, runtimes, graph, records, courseStates } = useArchiveData(session, refreshToken);
+  const sceneRef = useRef<ArchiveAtlasSceneHandle>(null);
   const [percent, setPercent] = useState(100);
+  const [level, setLevel] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<{ id: string; point: { x: number; y: number } } | null>(null);
-  const [activeMode, setActiveMode] = useState<ActiveMode>("default");
   const [searchOpen, setSearchOpen] = useState(urlState.panel === "search");
   const [query, setQuery] = useState(urlState.search);
-  const [focusedCourseId, setFocusedCourseId] = useState(urlState.focus.type === "course" ? urlState.focus.id : null);
+  const [focusedCourseId, setFocusedCourseId] = useState<string | null>(urlState.focus.type === "course" ? urlState.focus.id : null);
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>(urlState.comparePersonIds);
   const [people, setPeople] = useState<readonly FollowedPerson[]>([]);
   const [peopleError, setPeopleError] = useState("");
-  const [peopleDialog, setPeopleDialog] = useState<PeopleDialogTab | null>(urlState.panel === "people" ? "following" : urlState.panel === "share" ? "share" : null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [replaceOpen, setReplaceOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(urlState.panel === "notifications");
-  const [listOpen, setListOpen] = useState(false);
-  const [coursePanelExpanded, setCoursePanelExpanded] = useState(false);
-  const [courseTreeMode, setCourseTreeMode] = useState<"skill" | "practice">("skill");
-  const [listMode, setListMode] = useState(false);
+  const [socialOpen, setSocialOpen] = useState(urlState.panel === "people" || urlState.panel === "share");
+  const [personPanelCollapsed, setPersonPanelCollapsed] = useState(false);
   const [assistant, setAssistant] = useState<ArchiveAssistantPresentation>(EMPTY_PRESENTATION);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [seedGoal, setSeedGoal] = useState<{ key: string; goal: string } | null>(null);
+  const [personLayout, setPersonLayout] = useState<PersonLayout | null>(null);
+  const [sceneReady, setSceneReady] = useState(false);
+  const [coursePlane, setCoursePlane] = useState<CoursePlaneLayout | null>(null);
+  const [draftPlane, setDraftPlane] = useState<CoursePlaneLayout | null>(null);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
-  const handleCameraState = useCallback((value: number) => setPercent(value), []);
   const [retrying, setRetrying] = useState(false);
   const [retryMessage, setRetryMessage] = useState("");
   const [lastGoodAt, setLastGoodAt] = useState<number | null>(null);
-  const assistantDraftActive = Boolean(session) && assistant.state === "brief" && activeMode !== "course" && activeMode !== "peer" && activeMode !== "search";
-  const assistantSearchActive = Boolean(session) && (assistant.state === "searching" || assistant.state === "results") && activeMode !== "course" && activeMode !== "peer" && activeMode !== "search";
-  const initializedRef = useRef(false);
-  const lastUrlRef = useRef("");
+  const previousPeopleKey = useRef("");
+  const personFocusIdsRef = useRef<string[]>([]);
+  const initialisedRef = useRef(false);
+  const coursePlaneKeyRef = useRef("");
 
   const error = !online || Boolean(dataError);
   const hasHistory = Boolean(model?.hasLearningHistory);
+  const communities = useMemo(() => model ? detectAtlasCommunities(model.nodes, model.edges) : [], [model]);
+  const communityByNode = useMemo(() => communityByNodeId(communities), [communities]);
   const focusedCourse = useMemo(() => model?.courses.find((course) => course.id === focusedCourseId) ?? null, [focusedCourseId, model]);
   const focusedRuntime = useMemo(() => runtimes.find((runtime) => runtime.course.id === focusedCourseId) ?? null, [focusedCourseId, runtimes]);
-  const focusedGraphData = useMemo(() => {
+  const focusedGraphData = useMemo<CourseGraphData | null>(() => {
     if (!focusedRuntime) return null;
     try {
       return buildCourseGraphData(focusedRuntime, session ? courseStates.get(focusedRuntime.course.id) : undefined, graph, records);
@@ -165,43 +200,42 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       return null;
     }
   }, [courseStates, focusedRuntime, graph, records, session]);
-  const courseTreeCounts = useMemo(() => {
-    if (!focusedGraphData) return null;
-    const counts = { learned: 0, learning: 0, current: 0, target: 0, pending: 0 };
-    focusedGraphData.knowledgeNodes.forEach((node) => {
-      if (node.status === "completed") counts.learned += 1;
-      else if (node.status === "learning") counts.learning += 1;
-      else if (node.status === "available") counts.target += 1;
-      else counts.pending += 1;
-    });
-    counts.current = Math.min(1, counts.learning);
-    return counts;
-  }, [focusedGraphData]);
-  const draftDepthCounts = useMemo(() => {
-    const counts = { one: 0, two: 0, three: 0 };
-    assistant.draftIds.forEach((id) => {
-      const depth = Math.max(1, Math.min(3, (assistant.draftDepth.get(id) ?? 0) + 1));
-      if (depth === 1) counts.one += 1;
-      else if (depth === 2) counts.two += 1;
-      else counts.three += 1;
-    });
-    return counts;
-  }, [assistant.draftDepth, assistant.draftIds]);
-  const courseNodes = useMemo(() => model && focusedCourse ? archiveCourseKnowledgeIds(model, focusedCourse.id) : new Set<string>(), [focusedCourse, model]);
-  const comparePeople = useMemo<AtlasComparePerson[]>(() => {
+  const draftActive = Boolean(session) && assistant.state === "brief" && assistant.draftIds.length > 0 && !focusedCourse;
+  const selectedNode = model && selectedId ? model.nodeById.get(selectedId) ?? null : null;
+  const searchResults = useMemo(() => model ? searchArchive(model, query, people) : null, [model, people, query]);
+  const courseNodeIds = useMemo(() => model && focusedCourse ? archiveCourseKnowledgeIds(model, focusedCourse.id) : new Set<string>(), [focusedCourse, model]);
+  const draftNodeIds = useMemo(() => new Set(draftActive ? assistant.draftIds : []), [assistant.draftIds, draftActive]);
+  const selectedPeople = useMemo<PanelPerson[]>(() => {
     if (!model) return [];
-    const map = archivePeopleKnowledgeIds(people.filter((person) => selectedPeopleIds.includes(person.id)));
     return selectedPeopleIds.flatMap((id) => {
+      if (id === "me") return [{ id: "me", name: "我", accent: "me", nodeIds: new Set(model.mineNodeIds) }];
       const person = people.find((candidate) => candidate.id === id);
       if (!person) return [];
-      return [{ id: person.id, name: person.displayName.replace(/^示例\s*·\s*/, ""), accent: person.accent, color: "", nodeIds: map.get(person.id) ?? new Set() }];
+      return [{ id: person.id, name: shortName(person), accent: person.accent, nodeIds: new Set(person.sharedKnowledgeIds ?? []), person }];
     });
   }, [model, people, selectedPeopleIds]);
-  const assistantCandidateSet = useMemo(() => new Set(assistant.candidateIds), [assistant.candidateIds]);
-  const assistantDraftSet = useMemo(() => new Set(assistant.draftIds), [assistant.draftIds]);
-  const searchResults = useMemo(() => model ? searchArchive(model, query, people) : null, [model, people, query]);
-  const selectedNode = model && selectedId ? model.nodeById.get(selectedId) ?? null : null;
-  const selectedPeople = useMemo(() => people.filter((person) => selectedPeopleIds.includes(person.id)), [people, selectedPeopleIds]);
+  const personMembers = useMemo(() => new Set(selectedPeople.flatMap((person) => Array.from(person.nodeIds))), [selectedPeople]);
+  const sceneMode: SceneMode = focusedCourse && coursePlane ? "course" : draftActive && draftPlane ? "draft" : selectedPeopleIds.length ? "person" : "default";
+  const scenePositions = sceneMode === "person" ? personLayout?.positions ?? null : null;
+  const scenePlanePositions = focusedCourse ? coursePlane?.positions ?? null : draftActive ? draftPlane?.positions ?? null : null;
+  const scenePlaneIds = focusedCourse ? courseNodeIds : draftActive ? draftNodeIds : new Set<string>();
+  const scenePlaneChapters = focusedCourse ? coursePlane?.chapters ?? [] : draftActive ? draftPlane?.chapters ?? [] : [];
+  const scenePlaneDependencies = focusedCourse ? coursePlane?.dependencies ?? [] : draftActive ? draftPlane?.dependencies ?? [] : [];
+  const scenePlaneCardSize = focusedCourse
+    ? coursePlane ? { width: coursePlane.cardWidth, height: coursePlane.cardHeight } : null
+    : draftActive && draftPlane ? { width: draftPlane.cardWidth, height: draftPlane.cardHeight } : null;
+  const scenePlaneTargetIds = useMemo(
+    () => new Set((focusedRuntime?.targetKnowledge ?? []).map((target) => target.nodeId)),
+    [focusedRuntime]
+  );
+  const personPanelOpen = Boolean(session) && selectedPeopleIds.length > 0 && !socialOpen;
+  // The top-left slot holds one panel at a time: search and the assistant both
+  // make the person / people-share panel yield to a small strip, and the
+  // previous expanded state returns as soon as both overlays are closed.
+  const searchYieldsPanel = searchOpen && (personPanelOpen || (Boolean(session) && socialOpen));
+  const personPanelCollapsedForOverlay = personPanelOpen && (personPanelCollapsed || searchOpen || assistantOpen);
+  // When search takes the slot, frame the scene to the wider search panel.
+  const leftInset = personPanelOpen ? (searchOpen ? 386 : personPanelCollapsed || assistantOpen ? 156 : 360) : 0;
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -209,6 +243,14 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     window.addEventListener("offline", update);
     return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); };
   }, []);
+
+  // A new assistant result reopens the assistant and takes the slot from search.
+  useEffect(() => {
+    if (assistant.state === "idle") return;
+    setAssistantOpen(true);
+    setSearchOpen(false);
+    setQuery("");
+  }, [assistant.state]);
 
   useEffect(() => {
     if (model && !error) setLastGoodAt(Date.now());
@@ -224,33 +266,149 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   }, [session]);
 
   useEffect(() => {
-    if (error) { setListMode(true); return; }
-    setListMode(false);
-  }, [error]);
+    if (!model || initialisedRef.current) return;
+    initialisedRef.current = true;
+    if (urlState.focus.type === "course") {
+      setFocusedCourseId(urlState.focus.id);
+      setPersonPanelCollapsed(false);
+    } else if (urlState.focus.type === "knowledge" && model.nodeById.has(urlState.focus.id)) {
+      setSelectedId(urlState.focus.id);
+      sceneRef.current?.shiftForDetail(true);
+    } else if (urlState.focus.type === "me") {
+      setSelectedPeopleIds(["me"]);
+    }
+    if (urlState.panel === "search") setSearchOpen(true);
+    if (urlState.panel === "people" || urlState.panel === "share") setSocialOpen(true);
+    if (urlState.comparePersonIds.length) setSelectedPeopleIds(urlState.comparePersonIds);
+  }, [model, urlState]);
 
-  useEffect(() => { setQuery(urlState.search); }, [urlState.search]);
+  // Person-centred layout: deterministic and cached; large graphs move to a worker.
   useEffect(() => {
-    if (urlState.panel === "search") { setSearchOpen(true); setActiveMode("search"); }
-    else if (urlState.panel === "people") { setPeopleDialog("following"); }
-    else if (urlState.panel === "share") { setPeopleDialog("share"); }
-    else if (urlState.panel === "notifications") { setNotificationsOpen(true); }
-    if (urlState.focus.type === "course") { setFocusedCourseId(urlState.focus.id); setActiveMode("course"); }
-    if (urlState.focus.type === "me") { setActiveMode("default"); }
-    if (urlState.focus.type === "knowledge") { setSelectedId(urlState.focus.id); setActiveMode("knowledge"); }
-    if (urlState.comparePersonIds.length) { setSelectedPeopleIds(urlState.comparePersonIds); setActiveMode("peer"); }
-  }, [urlState]);
+    if (!layout || !model || !selectedPeopleIds.length) { setPersonLayout(null); return; }
+    let live = true;
+    const start = performance.now();
+    const request = requestPersonLayout({
+      structureKey: layout.structureKey,
+      defaultPositions: layout.positions,
+      nodes: model.nodes,
+      edges: model.edges,
+      memberIds: personMembers
+    });
+    void request.promise.then((next) => {
+      if (!live) return;
+      const elapsed = performance.now() - start;
+      setPersonLayout(next);
+      const perf = (window as unknown as { __archivePerf?: Record<string, number> }).__archivePerf ?? {};
+      perf.personLayoutMs = Math.round(elapsed * 10) / 10;
+      if (!perf.personLayoutFirstMs) perf.personLayoutFirstMs = Math.round(elapsed * 10) / 10;
+      (window as unknown as { __archivePerf?: Record<string, number> }).__archivePerf = perf;
+      console.info(`[archive] person layout ${elapsed.toFixed(1)}ms (${request.usedWorker ? "worker" : "main"})`);
+      personFocusIdsRef.current = [...next.memberIds, ...Object.entries(next.hopByNodeId).filter(([, hop]) => hop <= 1).map(([id]) => id)];
+    }).catch((layoutError) => {
+      if (live) console.error("Person layout failed", layoutError);
+    });
+    return () => { live = false; };
+  }, [layout, model, selectedPeopleIds.join(","), personMembers]);
+
+  // Course plane uses the existing ELK course projection.
+  useEffect(() => {
+    if (!focusedGraphData) { setCoursePlane(null); coursePlaneKeyRef.current = ""; return; }
+    const key = `${focusedGraphData.courseId}:${focusedGraphData.revision}`;
+    if (coursePlaneKeyRef.current === key && coursePlane) return;
+    coursePlaneKeyRef.current = key;
+    let live = true;
+    setCoursePlane(null);
+    void buildCoursePlane(focusedGraphData).then((plane) => {
+      if (!live) return;
+      setCoursePlane(plane);
+    }).catch((planeError) => {
+      if (live) console.error("Course plane layout failed", planeError);
+    });
+    return () => { live = false; };
+  }, [focusedGraphData]);
+
+  // N08 brief: the draft Knowledge set is laid out by the same ELK projection.
+  useEffect(() => {
+    if (!draftActive || !model) { setDraftPlane(null); return; }
+    let live = true;
+    void buildDraftPlane({ ids: assistant.draftIds, edges: model.edges, titles: new Map(model.nodes.map((node) => [node.id, node.title])) }).then((plane) => {
+      if (live) setDraftPlane(plane);
+    }).catch((planeError) => {
+      if (live) console.error("Draft plane layout failed", planeError);
+    });
+    return () => { live = false; };
+  }, [assistant.draftIds, draftActive, model]);
+
+  const fitCourseInView = useCallback(() => {
+    if (!focusedCourse && !draftActive) return;
+    if (!sceneReady) return;
+    sceneRef.current?.fitCourse({
+      left: leftInset + 12,
+      right: selectedNode ? 392 : 12,
+      top: 188,
+      bottom: 96
+    });
+  }, [draftActive, focusedCourse, leftInset, sceneReady, selectedNode]);
+
+  const fitPersonFocus = useCallback(() => {
+    if (!sceneReady || !personFocusIdsRef.current.length) return;
+    sceneRef.current?.fitIds(personFocusIdsRef.current, {
+      padding: 1.32,
+      insets: { left: leftInset + 12, right: 12, top: 78, bottom: 96 }
+    });
+  }, [leftInset, sceneReady]);
+
+  // Container/window resize: re-frame whichever of the three layouts is
+  // active. The scene debounces its ResizeObserver before calling this.
+  const refitCurrentView = useCallback(() => {
+    if (!sceneReady) return;
+    if (focusedCourse || draftActive) { fitCourseInView(); return; }
+    if (selectedPeopleIds.length && personFocusIdsRef.current.length) { fitPersonFocus(); return; }
+    sceneRef.current?.fitAll({ padding: 1.08, insets: selectedNode ? { right: 392 } : undefined });
+  }, [draftActive, fitCourseInView, fitPersonFocus, focusedCourse, sceneReady, selectedNode, selectedPeopleIds.length]);
+
+  // Person focus frames the core inside the free area and re-frames whenever
+  // the person panel opens, collapses or switches to its strip.
+  useEffect(() => {
+    if (!sceneReady || focusedCourse || draftActive || !selectedPeopleIds.length || !personLayout || !personFocusIdsRef.current.length) return;
+    const timer = window.setTimeout(() => fitPersonFocus(), 50);
+    return () => window.clearTimeout(timer);
+  }, [draftActive, fitPersonFocus, focusedCourse, personLayout, sceneReady, selectedPeopleIds.length]);
+
+  useEffect(() => {
+    if (!scenePlanePositions) return;
+    const timer = window.setTimeout(() => fitCourseInView(), 40);
+    return () => window.clearTimeout(timer);
+  }, [fitCourseInView, scenePlanePositions, sceneReady]);
+
+  useEffect(() => {
+    if (!sceneReady) return;
+    sceneRef.current?.shiftForDetail(Boolean(selectedId));
+  }, [sceneReady, selectedId]);
+
+  useEffect(() => {
+    if (selectedPeopleIds.length) return;
+    if (previousPeopleKey.current) {
+      previousPeopleKey.current = "";
+      setPersonPanelCollapsed(false);
+      sceneRef.current?.fitAll();
+    }
+    previousPeopleKey.current = selectedPeopleIds.join(",");
+  }, [selectedPeopleIds]);
+
+  useEffect(() => {
+    previousPeopleKey.current = selectedPeopleIds.join(",");
+  }, [selectedPeopleIds]);
 
   const context = useMemo<AssistantContextSnapshot>(() => ({
     workspace: "explore",
     experienceMode: "learn",
     ...(focusedCourse ? { courseId: focusedCourse.id } : {}),
-    ...(selectedId ? { knowledgeId: selectedId } : {}),
-  } as AssistantContextSnapshot), [focusedCourse, selectedId, selectedPeopleIds]);
+    ...(selectedId ? { knowledgeId: selectedId } : {})
+  } as AssistantContextSnapshot), [focusedCourse, selectedId]);
 
   const handlePresentation = useCallback((next: ArchiveAssistantPresentation) => {
     setAssistant(next);
-    if (next.state === "brief") setActiveMode((current) => current === "course" || current === "peer" ? current : "draft");
-    else if (next.state === "searching" || next.state === "results") setActiveMode((current) => current === "course" || current === "peer" ? current : "assistant");
   }, []);
 
   const setPanelParam = useCallback((panel: ArchivePanel) => {
@@ -262,164 +420,165 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   }, [searchParams, setSearchParams]);
 
   const openSearch = useCallback(() => {
+    setAssistantOpen(false);
     setSearchOpen(true);
-    setActiveMode("search");
     setPanelParam("search");
   }, [setPanelParam]);
 
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
     setQuery("");
-    setActiveMode(selectedPeopleIds.length ? "peer" : focusedCourseId ? "course" : "default");
     setPanelParam(null);
-  }, [focusedCourseId, selectedPeopleIds.length, setPanelParam]);
+  }, [setPanelParam]);
+
+  const handleAssistantOpenChange = useCallback((next: boolean) => {
+    setAssistantOpen(next);
+    if (!next) return;
+    setSearchOpen(false);
+    setQuery("");
+    setPanelParam(null);
+  }, [setPanelParam]);
 
   const openCourse = useCallback((courseId: string, origin?: DOMRect) => {
     if (!courseId) return;
     rememberCourseOrigin(courseId, origin);
     navigate(`/courses/${encodeURIComponent(courseId)}`);
   }, [navigate]);
-  const openCourseChapters = useCallback((courseId: string) => {
-    if (!courseId) return;
-    navigate(`/courses/${encodeURIComponent(courseId)}#curriculum`);
-  }, [navigate]);
 
   const focusCourse = useCallback((courseId: string) => {
+    if (!courseId) return;
+    setSelectedId(null);
+    sceneRef.current?.shiftForDetail(false);
     setFocusedCourseId(courseId);
-    setActiveMode("course");
     setSearchOpen(false);
-    setSelectedPeopleIds([]);
+    setSocialOpen(false);
     const next = new URLSearchParams(searchParams);
     next.set("focus", `course:${courseId}`);
     next.delete("panel");
     next.delete("search");
-    next.delete("compare");
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   const clearCourseFocus = useCallback(() => {
     setFocusedCourseId(null);
-    setActiveMode("default");
+    setCoursePlane(null);
     const next = new URLSearchParams(searchParams);
     next.delete("focus");
     setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+    window.setTimeout(() => {
+      if (selectedPeopleIds.length && personFocusIdsRef.current.length) {
+        sceneRef.current?.fitIds(personFocusIdsRef.current, {
+          padding: 1.32,
+          insets: { left: leftInset + 12, right: 12, top: 78, bottom: 96 }
+        });
+      } else sceneRef.current?.fitAll({ padding: 1.08 });
+    }, 80);
+  }, [leftInset, searchParams, selectedPeopleIds.length, setSearchParams]);
 
   const selectNode = useCallback((id: string | null) => {
     setSelectedId(id);
+    sceneRef.current?.shiftForDetail(Boolean(id));
     if (id) {
-      setActiveMode((current) => current === "search" ? current : "knowledge");
       const next = new URLSearchParams(searchParams);
       next.set("focus", `knowledge:${id}`);
       setSearchParams(next, { replace: true });
     } else {
-      setActiveMode((current) => current === "search" ? "search" : current === "course" ? "course" : current === "peer" ? "peer" : "default");
       const next = new URLSearchParams(searchParams);
-      next.delete("focus");
+      if (next.get("focus")?.startsWith("knowledge:")) next.delete("focus");
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 
-  const handlePersonSelect = useCallback((person: FollowedPerson) => {
-    setSelectedPeopleIds([person.id]);
-    setActiveMode("peer");
-    setPeopleDialog(null);
+  const focusNodeCamera = useCallback((id: string) => {
+    if (!model) return;
+    const ids = new Set<string>([id]);
+    model.edges.forEach((edge) => {
+      if (edge.source === id) ids.add(edge.target);
+      if (edge.target === id) ids.add(edge.source);
+    });
+    communityByNode.get(id)?.nodeIds.forEach((nodeId) => ids.add(nodeId));
+    window.setTimeout(() => sceneRef.current?.fitIds(ids, { padding: 1.7 }), 50);
+  }, [communityByNode, model]);
+
+  const clearPeople = useCallback(() => {
+    setSelectedPeopleIds([]);
+    setPersonPanelCollapsed(false);
+    setSocialOpen(false);
     const next = new URLSearchParams(searchParams);
+    next.delete("compare");
     next.delete("panel");
-    next.set("compare", person.id);
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const toggleComparePerson = useCallback((person: FollowedPerson) => {
+  const toggleMe = useCallback((shift: boolean) => {
+    setSelectedId(null);
+    sceneRef.current?.shiftForDetail(false);
+    setPersonPanelCollapsed(false);
+    setSocialOpen(false);
     setSelectedPeopleIds((current) => {
-      if (current.includes(person.id)) return current.filter((id) => id !== person.id);
-      return current.length >= 3 ? current : [...current, person.id];
+      if (shift) return current.includes("me") ? current.filter((id) => id !== "me") : current.length >= 3 ? current : [...current, "me"];
+      return current.length === 1 && current[0] === "me" ? [] : ["me"];
     });
-    setActiveMode("peer");
-    setPeopleDialog(null);
   }, []);
 
-  useEffect(() => {
-    if (!model || !layout || initializedRef.current) return;
-    initializedRef.current = true;
-    if (urlState.focus.type === "course") {
-      const focusId = urlState.focus.id;
-      const ids = archiveCourseKnowledgeIds(model, focusId);
-      setCameraTarget({ key: `course:${focusId}`, type: "ids", ids: Array.from(ids), padding: 82, maxScaleRatio: 1.3 });
-      setActiveMode("course");
-      return;
-    }
-    if (urlState.focus.type === "knowledge" && model.nodeById.has(urlState.focus.id)) {
-      const focusId = urlState.focus.id;
-      const neighbors = new Set([focusId]);
-      model.edges.forEach((edge) => {
-        if (edge.source === focusId) neighbors.add(edge.target);
-        if (edge.target === focusId) neighbors.add(edge.source);
-      });
-      setCameraTarget({ key: `knowledge:${focusId}`, type: "ids", ids: Array.from(neighbors), padding: 150, maxScaleRatio: 2.3 });
-      setActiveMode("knowledge");
-      return;
-    }
-    if (urlState.panel === "search" && urlState.search) {
-      setCameraTarget({ key: "initial-search", type: "all", padding: 90 });
-      setActiveMode("search");
-      return;
-    }
-    if (urlState.comparePersonIds.length) { setActiveMode("peer"); return; }
-    setCameraTarget({ key: "initial", type: model.hasLearningHistory ? "mine" : "all", padding: model.hasLearningHistory ? 72 : 54 });
-    setActiveMode("default");
-  }, [layout, model, urlState]);
+  const togglePerson = useCallback((person: FollowedPerson, shift: boolean) => {
+    setSelectedId(null);
+    sceneRef.current?.shiftForDetail(false);
+    setPersonPanelCollapsed(false);
+    setSocialOpen(false);
+    setSelectedPeopleIds((current) => {
+      if (shift) return current.includes(person.id) ? current.filter((id) => id !== person.id) : current.length >= 3 ? current : [...current, person.id];
+      return current.length === 1 && current[0] === person.id ? [] : [person.id];
+    });
+  }, []);
 
-  useEffect(() => {
-    if (!model || !layout) return;
-    const key = `${activeMode}:${focusedCourseId ?? ""}:${selectedPeopleIds.join(",")}:${assistant.candidateIds.join(",")}:${assistant.draftIds.join(",")}:${selectedId ?? ""}:${query}:${revision}:${model.stats.totalNodes}`;
-    if (lastUrlRef.current === key) return;
-    lastUrlRef.current = key;
-    if (assistantDraftActive) {
-      const ids = assistant.draftIds;
-      setCameraTarget({ key: `draft:${ids.join(",")}`, type: ids.length ? "ids" : "all", ids, padding: 130, maxScaleRatio: 1.35 });
-    } else if (assistantSearchActive) {
-      const ids = assistant.candidateIds;
-      setCameraTarget({ key: `assistant:${ids.join(",")}`, type: ids.length ? "ids" : "all", ids, padding: 130, maxScaleRatio: 1.85 });
-    } else if (activeMode === "course" && focusedCourse) {
-      setCameraTarget({ key: `course:${focusedCourse.id}`, type: "ids", ids: Array.from(courseNodes), padding: 82, maxScaleRatio: 1.3 });
-    } else if (activeMode === "search") {
-      const ids = searchResults?.mapHitIds ?? [];
-      setCameraTarget({ key: `search:${ids.join(",")}:${query}`, type: ids.length ? "ids" : "all", ids, padding: 120, maxScaleRatio: 1.85 });
-    } else if (activeMode === "peer" && selectedPeopleIds.length) {
-      const union = new Set(model.mineNodeIds);
-      comparePeople.forEach((person) => person.nodeIds.forEach((id) => union.add(id)));
-      setCameraTarget({ key: `peer:${selectedPeopleIds.join(",")}`, type: "ids", ids: Array.from(union), padding: 90, maxScaleRatio: 1.18 });
-    } else if (activeMode === "draft") {
-      const ids = assistant.draftIds;
-      setCameraTarget({ key: `draft:${ids.join(",")}`, type: ids.length ? "ids" : "all", ids, padding: 130, maxScaleRatio: 1.35 });
-    } else if (activeMode === "assistant") {
-      const ids = assistant.candidateIds;
-      setCameraTarget({ key: `assistant:${ids.join(",")}`, type: ids.length ? "ids" : "all", ids, padding: 130, maxScaleRatio: 1.85 });
-    } else if (activeMode === "knowledge" && selectedId) {
-      const neighbors = new Set([selectedId]);
-      model.edges.forEach((edge) => {
-        if (edge.source === selectedId) neighbors.add(edge.target);
-        if (edge.target === selectedId) neighbors.add(edge.source);
-      });
-      setCameraTarget({ key: `knowledge:${selectedId}`, type: "ids", ids: Array.from(neighbors), padding: 170, maxScaleRatio: 2.3 });
-    } else {
-      setCameraTarget({ key: `default:${model.hasLearningHistory ? "mine" : "all"}:${revision}`, type: model.hasLearningHistory ? "mine" : "all", padding: model.hasLearningHistory ? 72 : 54 });
-    }
-  }, [activeMode, assistant.candidateIds, assistant.draftIds, assistantDraftActive, assistantSearchActive, comparePeople, courseNodes, focusedCourse, focusedCourseId, layout, model, query, revision, searchResults, selectedId, selectedPeopleIds, selectedPeopleIds.length]);
+  const compareWithMe = useCallback((personId: string) => {
+    setSocialOpen(false);
+    setSelectedId(null);
+    sceneRef.current?.shiftForDetail(false);
+    setPersonPanelCollapsed(false);
+    setSelectedPeopleIds(Array.from(new Set(["me", personId])).slice(0, 3));
+  }, []);
+
+  const handlePersonSelect = useCallback((person: FollowedPerson) => {
+    setSocialOpen(false);
+    setSelectedId(null);
+    sceneRef.current?.shiftForDetail(false);
+    setPersonPanelCollapsed(false);
+    setSelectedPeopleIds([person.id]);
+  }, []);
+
+  const closeDetailOrFocus = useCallback(() => {
+    if (selectedId) { selectNode(null); return; }
+    if (focusedCourse) { clearCourseFocus(); return; }
+    if (searchOpen) { closeSearch(); return; }
+    if (draftActive) return;
+    if (selectedPeopleIds.length) { clearPeople(); return; }
+  }, [clearCourseFocus, clearPeople, closeSearch, draftActive, focusedCourse, searchOpen, selectedId, selectNode, selectedPeopleIds.length]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openSearch(); return; }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (socialOpen) { setSocialOpen(false); return; }
+        closeDetailOrFocus();
+        return;
+      }
       if (typing) return;
-      if (event.key.toLowerCase() === "l") { event.preventDefault(); setListOpen((value) => !value); return; }
       if (event.key === "/") { event.preventDefault(); openSearch(); }
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [openSearch]);
+  }, [closeDetailOrFocus, openSearch, socialOpen]);
+
+  useEffect(() => {
+    if (assistant.state === "idle") return;
+    if (assistant.state === "brief") return;
+    if (assistant.candidateIds.length) window.setTimeout(() => sceneRef.current?.fitIds(assistant.candidateIds, { padding: 1.9 }), 60);
+  }, [assistant.candidateIds, assistant.state]);
 
   const retry = useCallback(async () => {
     if (retrying) return;
@@ -437,15 +596,15 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     }
   }, [onRetry, retrying]);
 
-  const focusMode = assistantDraftActive ? "draft" : activeMode === "search" || assistantSearchActive ? "search" : activeMode === "course" ? "course" : activeMode === "peer" ? "peer" : activeMode === "draft" ? "draft" : "all";
-  const mapFocusMode = focusMode === "search" && activeMode === "search" && (!query.trim() || searchResults?.empty) ? "all" : focusMode;
-  const searchHitIds = mapFocusMode === "search" ? (activeMode === "search" ? searchResults?.mapHitIds ?? [] : assistant.candidateIds) : [];
-  const hoveredNode = hovered && model ? model.nodeById.get(hovered.id) : null;
-  const hoverPeople = hoveredNode && comparePeople.length ? comparePeople.map((person) => ({ name: person.name, has: person.nodeIds.has(hoveredNode.id), color: person.accent === "orange" ? "var(--p-orange)" : person.accent === "cyan" ? "var(--p-cyan)" : person.accent === "rose" ? "var(--p-rose)" : "var(--p-me)" })) : [];
-  const dialogPeople = people;
-  const peerPerson = selectedPeopleIds.length === 1 ? people.find((person) => person.id === selectedPeopleIds[0]) ?? null : null;
+  const learners = useMemo(() => {
+    if (!selectedNode) return [];
+    return [
+      { name: "我", color: "var(--p-me)", has: selectedNode.isMine },
+      ...people.map((person) => ({ name: shortName(person), color: `var(--p-${person.accent})`, has: Boolean(person.sharedKnowledgeIds?.includes(selectedNode.id)) }))
+    ];
+  }, [people, selectedNode]);
 
-  if (!model || !layout) {
+  if (!model) {
     return (
       <main className="ef-archive" data-boundary="error">
         <section className="ef-archive-error-card">
@@ -459,194 +618,185 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     );
   }
 
+  if (!layout) {
+    return (
+      <main className="ef-archive" data-boundary="loading" data-layout-ms="pending">
+        <section className="ef-archive-loading-card" role="status" aria-live="polite">
+          <span className="ef-archive-loading-spinner" aria-hidden />
+          <h1>正在生成星图</h1>
+          <p>正在按知识关系计算三维布局，完成后会自动进入档案。</p>
+          <small>{layoutCached ? "已读取缓存，正在准备画面…" : "首次进入需要计算一次，之后会直接命中缓存。"}</small>
+        </section>
+      </main>
+    );
+  }
+
+  const personView: "me" | "person" | "compare" = selectedPeople.length > 1 ? "compare" : selectedPeople[0]?.id === "me" ? "me" : "person";
+  const assistantDraft = draftActive && draftPlane;
+
   return (
-    <main className="ef-archive" data-boundary={error ? "error" : !session ? "guest" : hasHistory ? "ready" : "empty"} data-focus={mapFocusMode}>
-      <ArchiveAtlas
-        ref={atlasRef}
-        nodes={model.nodes}
-        edges={model.edges}
-        layout={layout}
-        cameraTarget={cameraTarget}
-        focusMode={mapFocusMode}
-        mineNodeIds={model.mineNodeIds}
-        selectedId={selectedId}
-        hoveredId={hovered?.id ?? null}
-        searchHitIds={searchHitIds}
-        courseNodeIds={courseNodes}
-        draftNodeIds={assistantDraftSet}
-        draftDepth={assistant.draftDepth}
-        comparePeople={comparePeople}
-        dimmed={error}
-        reducedMotion={reducedMotion}
-        onCameraStateChange={handleCameraState}
-        onSelectNode={selectNode}
-        onHoverNode={(id, point) => setHovered(id && point ? { id, point } : null)}
-      />
+    <main className="ef-archive" data-boundary={error ? "error" : !session ? "guest" : hasHistory ? "ready" : "empty"} data-focus={focusedCourse ? "course" : assistantDraft ? "draft" : selectedPeopleIds.length ? "person" : "default"} data-layout-ms={personLayout ? "ready" : undefined}>
+      <Suspense fallback={<div className="ef-atlas-loading">正在生成星图…</div>}>
+        <ArchiveAtlasScene
+          ref={sceneRef}
+          nodes={model.nodes}
+          edges={model.edges}
+          basePositions={layout.positions}
+          mode={sceneMode}
+          modePositions={scenePositions}
+          planePositions={scenePlanePositions}
+          planeChapters={scenePlaneChapters}
+          planeDependencies={scenePlaneDependencies}
+          planeNodeIds={scenePlaneIds}
+          planeTargetIds={scenePlaneTargetIds}
+          planeCardSize={scenePlaneCardSize}
+          people={selectedPeople}
+          communities={communities}
+          selectedId={selectedId}
+          searchIds={searchOpen ? searchResults?.mapHitIds ?? [] : []}
+          assistantIds={assistant.state === "searching" || assistant.state === "results" ? assistant.candidateIds : []}
+          draftIds={assistant.draftIds}
+          reducedMotion={reducedMotion}
+          onSelectNode={(id) => { if (id) selectNode(id); else closeDetailOrFocus(); }}
+          onLevelChange={setLevel}
+          onZoomChange={setPercent}
+          onActivatePlaneNode={() => { if (focusedCourse) openCourse(focusedCourse.id); }}
+          onBlank={closeDetailOrFocus}
+          onReady={() => setSceneReady(true)}
+          onResize={refitCurrentView}
+        />
+      </Suspense>
 
-      {focusedCourse && focusedGraphData && !error ? (
-        <ArchiveCourseTreeOverlay graphData={focusedGraphData} mode={courseTreeMode} onSelectKnowledge={(id) => setSelectedId(id)} />
-      ) : null}
-
-      {assistantDraftActive && assistant.draftIds.length ? (
-        <ArchiveDraftTreeOverlay ids={assistant.draftIds} depth={assistant.draftDepth} model={model} onSelectKnowledge={(id) => setSelectedId(id)} />
-      ) : null}
-
-      {!session ? <button type="button" className="ef-archive-login" onClick={() => navigate("/login", { state: authGateState(location) })}>登录</button> : null}
-
-      {session ? (
+      {!session ? (
+        <div className="ef-atlas-guest">
+          <button type="button" className="ef-atlas-guest-login" onClick={() => navigate("/login", { state: authGateState(location) })}>登录</button>
+          <span><Lock size={11} aria-hidden />未登录 · 仅公开知识</span>
+        </div>
+      ) : (
         <ArchivePeopleBar
           sessionName={session.name}
           people={people}
           selectedIds={selectedPeopleIds}
-          onFitMe={() => { setSelectedPeopleIds([]); setActiveMode("default"); atlasRef.current?.fitMine(); }}
-          onRemove={(id) => { setSelectedPeopleIds((current) => current.filter((value) => value !== id)); if (selectedPeopleIds.length <= 1) setActiveMode("default"); }}
-          onOpenPicker={() => setPickerOpen(true)}
-          onOpenReplace={() => setReplaceOpen((value) => !value)}
-          onOpenPeople={() => setPeopleDialog("following")}
+          onToggleMe={toggleMe}
+          onTogglePerson={togglePerson}
+          onOpenPeople={() => setSocialOpen((value) => !value)}
+          onOpenSearch={() => { if (searchOpen) closeSearch(); else openSearch(); }}
+        />
+      )}
+
+      {socialOpen && session ? (
+        <ArchivePeopleSharePanel
+          people={people}
+          sessionName={session.name}
+          collapsed={searchOpen || assistantOpen}
+          onExpandStrip={() => { if (searchOpen) closeSearch(); if (assistantOpen) handleAssistantOpenChange(false); }}
+          onClose={() => setSocialOpen(false)}
+          onView={handlePersonSelect}
+          onCompare={(person) => compareWithMe(person.id)}
         />
       ) : null}
 
+      {personPanelOpen && !socialOpen ? (
+        <ArchivePersonPanel
+          model={model}
+          people={selectedPeople}
+          view={personView}
+          sessionName={session?.name ?? "我"}
+          collapsed={personPanelCollapsedForOverlay}
+          onCollapse={() => setPersonPanelCollapsed(true)}
+          onExpandStrip={() => { if (searchOpen) closeSearch(); if (assistantOpen) handleAssistantOpenChange(false); setPersonPanelCollapsed(false); }}
+          onFocusCourse={focusCourse}
+          onCompare={compareWithMe}
+          onOpenPeople={() => setSocialOpen(true)}
+          onOpenCourse={(id) => openCourse(id)}
+        />
+      ) : null}
+
+      {searchOpen ? (
+        <ArchiveSearchPanel
+          belowStrip={searchYieldsPanel}
+          query={query}
+          results={searchResults}
+          searching={false}
+          onQueryChange={(value) => {
+            setQuery(value);
+            const next = new URLSearchParams(searchParams);
+            next.set("panel", "search");
+            if (value) next.set("search", value); else next.delete("search");
+            setSearchParams(next, { replace: true });
+          }}
+          onClose={closeSearch}
+          onSelectNode={(id) => { selectNode(id); focusNodeCamera(id); }}
+          onFocusCourse={focusCourse}
+          onOpenCourse={openCourse}
+          onSelectPerson={handlePersonSelect}
+          onAskAssistant={(goal) => { closeSearch(); handleAssistantOpenChange(true); setSeedGoal({ key: `${Date.now()}`, goal }); }}
+        />
+      ) : null}
+
+      {focusedCourse && coursePlane ? <ArchiveCourseFocusBar course={focusedCourse} learned={focusedGraphData?.knowledgeNodes.filter((node) => node.status === "completed").length ?? 0} leftInset={leftInset} onOpen={(origin) => openCourse(focusedCourse.id, origin)} /> : null}
+      {assistantDraft && assistant.brief ? <ArchiveDraftFocusBar title={assistant.brief.goal} knowledgeCount={assistant.draftIds.length} weeks={plannedWeeks(assistant.brief.requestedAdjustments, assistant.draftIds.length)} leftInset={leftInset} /> : null}
+
+      {selectedNode && !focusedCourse && !assistantDraft ? (
+        <ArchiveNodePanel
+          node={selectedNode}
+          model={model}
+          edges={model.edges}
+          topicName={communityByNode.get(selectedNode.id)?.name ?? "未分类"}
+          learners={learners}
+          onClose={() => selectNode(null)}
+          onSelectNode={(id) => { selectNode(id); focusNodeCamera(id); }}
+          onOpenCourse={openCourse}
+        />
+      ) : null}
+
+      {focusedCourse ? null : <ArchiveLevelChip level={level} />}
+      <ArchiveZoomControls
+        percent={percent}
+        disabled={error}
+        onZoomIn={() => sceneRef.current?.zoomBy(0.82)}
+        onZoomOut={() => sceneRef.current?.zoomBy(1.22)}
+        onReset={() => {
+          if (focusedCourse || assistantDraft) sceneRef.current?.fitCourse({ left: leftInset + 12, right: 12, top: 188, bottom: 96 });
+          else sceneRef.current?.resetView();
+        }}
+      />
+
+      <div className="ef-atlas-legend" aria-live="polite">
+        {!session ? <span><i className="is-public" aria-hidden />公开知识 {model.stats.totalNodes}</span> : null}
+        {session && !selectedPeopleIds.length ? <span><i className="is-me" aria-hidden />我的知识 {model.stats.mine}</span> : null}
+        {selectedPeople.length ? selectedPeople.map((person) => <span key={person.id}><i style={{ background: `var(--p-${person.accent})` }} aria-hidden />{person.name} {person.nodeIds.size}</span>) : null}
+        {assistant.state === "results" || assistant.state === "searching" ? <span><i className="is-hit" aria-hidden />助手命中 {assistant.candidateIds.length}</span> : null}
+        {searchOpen && searchResults ? <span><i className="is-hit" aria-hidden />搜索命中 {searchResults.mapHitIds.length}</span> : null}
+      </div>
+
+      {session ? (
+        <ArchiveAssistantBridge
+          session={session}
+          model={model}
+          context={context}
+          seedGoal={seedGoal}
+          open={assistantOpen}
+          onOpenChange={handleAssistantOpenChange}
+          onPresentation={handlePresentation}
+          onOpenBrief={() => navigate("/")}
+        />
+      ) : (
+        <GuestAssistantCard onLogin={() => navigate("/login", { state: authGateState(location) })} onRegister={() => navigate("/register", { state: authGateState(location) })} />
+      )}
+
       {error ? (
-        <div className="ef-archive-error-banner" role="alert">
+        <div className="ef-atlas-error-banner" role="alert">
           <RefreshCcw size={15} aria-hidden />
-          <span><b>星图加载失败 · 请检查网络</b><small>{lastGoodAt ? `上次缓存 ${new Date(lastGoodAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}，可用列表查看` : "当前没有可用缓存"}</small></span>
+          <span><b>星图加载失败 · 请检查网络</b><small>{lastGoodAt ? `上次缓存 ${new Date(lastGoodAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}` : "当前没有可用缓存"}</small></span>
           <button type="button" onClick={() => void retry()} disabled={retrying}>{retrying ? "重试中…" : "重试"}</button>
           {retryMessage ? <em>{retryMessage}</em> : null}
         </div>
       ) : null}
 
-      {searchOpen ? (
-        <ArchiveSearchPanel
-          query={query}
-          results={searchResults}
-          searching={false}
-          onQueryChange={(value) => { setQuery(value); setActiveMode("search"); if (value.trim()) { const next = new URLSearchParams(searchParams); next.set("panel", "search"); next.set("search", value); setSearchParams(next, { replace: true }); } }}
-          onClose={closeSearch}
-          onSelectNode={(id) => { setSelectedId(id); setActiveMode("search"); }}
-          onFocusCourse={focusCourse}
-          onOpenCourse={openCourse}
-          onSelectPerson={handlePersonSelect}
-          onAskAssistant={(goal) => { closeSearch(); setSeedGoal({ key: `${Date.now()}`, goal }); setActiveMode("assistant"); }}
-        />
-      ) : peerPerson ? (
-        <ArchivePeerCard person={peerPerson} model={model} onClose={() => { setSelectedPeopleIds([]); setActiveMode("default"); }} onCompare={() => { setActiveMode("peer"); setPeopleDialog(null); }} onOpenCourse={openCourse} />
-      ) : selectedPeopleIds.length > 1 ? (
-        <ArchiveCompareCard model={model} sessionName={session?.name ?? "我"} peopleCount={selectedPeopleIds.length} onShare={() => setPeopleDialog("share")} onVisibility={() => setPeopleDialog("share")} onFitMine={() => atlasRef.current?.fitMine()} />
-      ) : assistantOpen && assistant.state !== "idle" ? null : !error && session && hasHistory && percent <= 108 && activeMode === "default" && !coursePanelExpanded ? (
-        <ArchiveCourseMini
-          model={model}
-          onExpand={() => setCoursePanelExpanded(true)}
-          onFocusCourse={focusCourse}
-          onOpenCourse={openCourse}
-        />
-      ) : (
-        <ArchiveCoursePanel
-          model={model}
-          focusedCourseId={focusedCourseId}
-          guest={!session}
-          listMode={listMode}
-          error={error}
-          onFocusCourse={focusCourse}
-          onOpenCourse={openCourse}
-          onOpenChapters={openCourseChapters}
-          onOpenSearch={openSearch}
-          onOpenAssistant={() => setSeedGoal({ key: `${Date.now()}`, goal: "" })}
-          onToggleList={() => setListMode((value) => !value)}
-          onLocateMe={() => atlasRef.current?.fitMine()}
-          onSelectCached={(id) => { selectNode(id); atlasRef.current?.fitNode(id); }}
-          hasHistory={hasHistory}
-          onRetry={() => void retry()}
-        />
-      )}
-
-      {focusedCourse && !error ? (
-        <ArchiveCourseFocusBar
-          course={focusedCourse}
-          mode={courseTreeMode}
-          learned={courseTreeCounts?.learned ?? 0}
-          total={focusedCourse.knowledgeCount}
-          onMode={setCourseTreeMode}
-          onOpen={(origin) => openCourse(focusedCourse.id, origin)}
-          onClose={clearCourseFocus}
-        />
-      ) : null}
-
-      {assistantDraftActive && assistant.brief ? (
-        <ArchiveDraftPills title={assistant.brief.goal} knowledgeCount={assistant.draftIds.length} weeks={plannedWeeks(assistant.brief.requestedAdjustments, assistant.draftIds.length)} />
-      ) : null}
-
-      {selectedNode && !searchOpen && selectedPeopleIds.length > 1 ? (
-        <ArchiveCompareNodeCard
-          node={selectedNode}
-          people={selectedPeople}
-          sessionName={session?.name ?? "我"}
-          onClose={() => selectNode(null)}
-          onAskAssistant={(goal) => { setSelectedId(null); setSeedGoal({ key: `${Date.now()}`, goal }); setAssistantOpen(true); }}
-        />
-      ) : selectedNode && !searchOpen ? (
-        <ArchiveNodePanel node={selectedNode} model={model} edges={model.edges} onClose={() => selectNode(null)} onSelectNode={(id) => selectNode(id)} onOpenCourse={openCourse} />
-      ) : null}
-
-      {hoveredNode && hovered && !selectedNode ? (
-        <div className="ef-archive-hover-anchor" style={{ left: Math.min(hovered.point.x + 14, 1040), top: Math.min(hovered.point.y + 14, 680) }}>
-          <ArchiveNodeHoverCard title={hoveredNode.title} domain={hoveredNode.domainTitle} domainColor={hoveredNode.color} people={hoverPeople} canLearn={Boolean(comparePeople.length)} onLearn={() => selectNode(hoveredNode.id)} />
-        </div>
-      ) : null}
-
-      {focusedCourse && courseTreeCounts ? (
-        <ArchiveCourseTreeLegend treeMode={courseTreeMode} counts={courseTreeCounts} />
-      ) : assistantDraftActive ? (
-        <ArchiveDraftTreeLegend counts={draftDepthCounts} />
-      ) : (
-        <ArchiveLegend model={model} focusMode={mapFocusMode} hasPeople={selectedPeopleIds.length > 0} hitCount={searchHitIds.length} publicOnly={!session || !hasHistory} people={comparePeople.map((person) => ({ name: person.name, accent: person.accent }))} />
-      )}
-
-      <ArchiveZoomControls
-        percent={percent}
-        canLocate={hasHistory && Boolean(session)}
-        listOpen={listOpen}
-        onZoomIn={() => atlasRef.current?.zoomBy(1.2)}
-        onZoomOut={() => atlasRef.current?.zoomBy(0.84)}
-        onLocate={() => atlasRef.current?.fitMine()}
-        onFitAll={() => atlasRef.current?.fitAll()}
-        onToggleList={() => setListOpen((value) => !value)}
-        disabled={error}
-      />
-
-      {session ? (
-        <ArchiveAssistantBridge session={session} model={model} context={context} seedGoal={seedGoal} onPresentation={handlePresentation} onOpenBrief={() => navigate("/")} onActiveChange={(active) => {
-          setAssistantOpen(active);
-          if (!active) setActiveMode((current) => current === "draft" || current === "assistant" ? "default" : current);
-          else setActiveMode(assistant.state === "brief" ? "draft" : assistant.state === "idle" ? "default" : "assistant");
-        }} />
-      ) : (
-        <GuestAssistantCard onLogin={() => navigate("/login", { state: authGateState(location) })} onRegister={() => navigate("/register", { state: authGateState(location) })} />
-      )}
-
-      <ArchiveKnowledgeList open={listOpen} model={model} selectedId={selectedId} onSelect={(id) => { selectNode(id); atlasRef.current?.fitNode(id); }} onClose={() => setListOpen(false)} />
-
-      {replaceOpen && selectedPeople.length ? (
-        <div className="ef-archive-replace-menu" role="dialog" aria-label="替换谁">
-          <header><b>替换谁</b><span>先移出一位</span><PreviewBadge /></header>
-          {selectedPeople.map((person) => (
-            <button type="button" key={person.id} onClick={() => { setSelectedPeopleIds((current) => current.filter((id) => id !== person.id)); setReplaceOpen(false); setPickerOpen(true); }}>
-              <Avatar name={person.displayName.replace(/^示例\s*·\s*/, "").slice(0, 1)} size={24} personColor={person.accent} decorative />
-              <span>{person.displayName.replace(/^示例\s*·\s*/, "")}</span>
-              <em>替换</em>
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      <ArchivePeoplePicker open={pickerOpen} people={people} selectedIds={selectedPeopleIds} onClose={() => setPickerOpen(false)} onToggle={toggleComparePerson} onFinish={() => setPickerOpen(false)} />
-
-      <ArchivePeopleDialog open={Boolean(peopleDialog)} tab={peopleDialog ?? "following"} people={dialogPeople} selectedIds={selectedPeopleIds} model={model} sessionName={session?.name ?? "我"} onClose={() => { setPeopleDialog(null); setPanelParam(null); }} onTab={(tab) => setPeopleDialog(tab)} onToggleCompare={toggleComparePerson} onViewPerson={handlePersonSelect} />
-
-      <ArchiveNotificationsDialog open={notificationsOpen} onClose={() => { setNotificationsOpen(false); setPanelParam(null); }} />
-
       {peopleError ? <p className="ef-archive-people-error" role="status">{peopleError}</p> : null}
 
-
+      <span className="ef-atlas-sr-only">{model.stats.totalNodes} 个知识 · {model.stats.totalEdges} 条关系 · 布局不随选择改变</span>
     </main>
   );
 }

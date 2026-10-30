@@ -1,4 +1,4 @@
-import { Plus, Users, X } from "lucide-react";
+import { Plus, Search, Users } from "lucide-react";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
 import { Avatar } from "@/shared/ui/Avatar";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
@@ -7,45 +7,38 @@ function shortName(person: FollowedPerson) {
   return person.displayName.replace(/^示例\s*·\s*/, "");
 }
 
-export function ArchivePeopleBar({ sessionName, people, selectedIds, onFitMe, onRemove, onOpenPicker, onOpenReplace, onOpenPeople }: {
+export function ArchivePeopleBar({ sessionName, people, selectedIds, onToggleMe, onTogglePerson, onOpenPeople, onOpenSearch }: {
   sessionName: string;
   people: readonly FollowedPerson[];
   selectedIds: readonly string[];
-  onFitMe: () => void;
-  onRemove: (id: string) => void;
-  onOpenPicker: () => void;
-  onOpenReplace: () => void;
+  onToggleMe: (shift: boolean) => void;
+  onTogglePerson: (person: FollowedPerson, shift: boolean) => void;
   onOpenPeople: () => void;
+  onOpenSearch: () => void;
 }) {
-  const selected = selectedIds.flatMap((id) => {
-    const person = people.find((candidate) => candidate.id === id);
-    return person ? [person] : [];
-  });
+  const meActive = selectedIds.includes("me");
   return (
-    <div className="ef-archive-people" role="toolbar" aria-label="档案人物">
-      <button type="button" className="ef-archive-people-social" onClick={onOpenPeople} aria-label="打开人与分享">
+    <nav className="ef-atlas-people ef-ui-glass ef-ui-glass--regular" role="toolbar" aria-label="档案人物">
+      <button type="button" className="ef-atlas-people-social" onClick={onOpenPeople} aria-label="人与分享" title="人与分享">
         <Users size={18} aria-hidden />
       </button>
-      <span className="ef-archive-people-kicker">人</span>
-      <button type="button" className={`ef-archive-person ${selected.length ? "" : "is-active"}`} onClick={onFitMe} aria-pressed={selected.length === 0}>
+      <span className="ef-atlas-people-sep" aria-hidden />
+      <button type="button" className={`ef-atlas-person-pill ${meActive ? "is-on" : ""}`} aria-pressed={meActive} onClick={(event) => onToggleMe(event.shiftKey)} title="我的档案（按住 Shift 可多选对比）">
         <Avatar name={sessionName} size={24} personColor="me" decorative />
         <span>我</span>
       </button>
-      {selected.map((person) => (
-        <span className={`ef-archive-person is-active ef-archive-person--${person.accent}`} key={person.id} data-preview="sample">
-          <button type="button" className="ef-archive-person-main" onClick={onOpenPeople} title={person.displayName}>
-            <Avatar name={shortName(person)} size={24} personColor={person.accent} decorative />
+      {people.filter((person) => person.sample).slice(0, 4).map((person) => {
+        const active = selectedIds.includes(person.id);
+        return (
+          <button type="button" key={person.id} className={`ef-atlas-person-pill ${active ? "is-on" : ""}`} aria-pressed={active} onClick={(event) => onTogglePerson(person, event.shiftKey)} title={`${shortName(person)} 的档案（按住 Shift 可多选对比）`} data-preview="sample">
+            <Avatar name={shortName(person)} size={24} personColor={person.accent as "me" | "orange" | "cyan" | "rose"} decorative />
             <span>{shortName(person)}</span>
           </button>
-          <button type="button" className="ef-archive-person-x" onClick={() => onRemove(person.id)} aria-label={`移除 ${shortName(person)}`}><X size={12} aria-hidden /></button>
-        </span>
-      ))}
-      <button type="button" className="ef-archive-person-add" onClick={selected.length >= 3 ? onOpenReplace : onOpenPicker} aria-label={selected.length >= 3 ? "替换谁" : "加入对比"} title={selected.length >= 3 ? "替换谁" : "加入对比"}>
-        <Plus size={14} aria-hidden />
-        <span>{selected.length >= 3 ? "替换谁" : "添加"}</span>
-      </button>
-      <span className="ef-archive-people-count">{selected.length + 1}/4</span>
-      <PreviewBadge className="ef-archive-people-preview" />
-    </div>
+        );
+      })}
+      <button type="button" className="ef-atlas-people-add" onClick={onOpenPeople} aria-label="添加关注的人" title="添加关注的人"><Plus size={15} aria-hidden /></button>
+      <button type="button" className="ef-atlas-people-search" onClick={onOpenSearch} aria-label="搜索 ⌘K" title="搜索 ⌘K"><Search size={16} aria-hidden /></button>
+      <PreviewBadge className="ef-atlas-people-preview" />
+    </nav>
   );
 }

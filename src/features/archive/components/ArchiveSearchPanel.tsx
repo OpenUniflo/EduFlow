@@ -9,7 +9,8 @@ function shortName(person: FollowedPerson) {
   return person.displayName.replace(/^示例\s*·\s*/, "");
 }
 
-export function ArchiveSearchPanel({ query, results, searching, onQueryChange, onClose, onSelectNode, onFocusCourse, onOpenCourse, onSelectPerson, onAskAssistant }: {
+export function ArchiveSearchPanel({ belowStrip, query, results, searching, onQueryChange, onClose, onSelectNode, onFocusCourse, onOpenCourse, onSelectPerson, onAskAssistant }: {
+  belowStrip?: boolean;
   query: string;
   results: ArchiveSearchResults | null;
   searching: boolean;
@@ -25,7 +26,7 @@ export function ArchiveSearchPanel({ query, results, searching, onQueryChange, o
   useEffect(() => { inputRef.current?.focus(); }, []);
   const noResult = Boolean(query.trim() && results?.empty && !searching);
   return (
-    <section className="ef-archive-search-panel" aria-label="档案搜索">
+    <section className={`ef-archive-search-panel ${belowStrip ? "is-below-strip" : ""}`} aria-label="档案搜索">
       <header className="ef-archive-search-head">
         <span className="ef-archive-panel-kicker"><Search size={14} aria-hidden />搜索</span>
         <span className="ef-archive-panel-meta">{results ? `${results.knowledge.total} 个知识 · ${results.courses.total} 门课程 · ${results.people.total} 位同学` : "课程与知识"}</span>

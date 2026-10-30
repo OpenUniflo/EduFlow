@@ -19,19 +19,19 @@ export function GuestAssistantCard({ onLogin, onRegister }: { onLogin: () => voi
   );
 }
 
-export function ArchiveAssistantPanel({ session, model, context, presentation, onOpenBrief, onActiveChange, seedGoal }: {
+export function ArchiveAssistantPanel({ session, model, context, presentation, onOpenBrief, open, onOpenChange, seedGoal }: {
   session: MockSession;
   model: ArchiveModel;
   context: AssistantContextSnapshot;
   presentation: ArchiveAssistantPresentation;
   onOpenBrief: (briefMessageId: string) => void;
-  onActiveChange?: (active: boolean) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   seedGoal?: { key: string; goal: string } | null;
 }) {
   const runtime = useAssistantRuntime();
   const navigate = useNavigate();
   const [goal, setGoal] = useState("");
-  const [collapsed, setCollapsed] = useState(presentation.state === "idle");
   const [localError, setLocalError] = useState("");
   const [adjustments, setAdjustments] = useState("");
   const [showAdjustments, setShowAdjustments] = useState(false);
@@ -45,16 +45,8 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
   const contextLabel = useMemo(() => goal.trim() || presentation.goalText || "档案 · 全局星图", [goal, presentation.goalText]);
 
   useEffect(() => {
-    if (presentation.state !== "idle") {
-      setCollapsed(false);
-      onActiveChange?.(true);
-    }
-  }, [onActiveChange, presentation.state]);
-
-  useEffect(() => {
     if (!seedGoal) return;
     setGoal(seedGoal.goal);
-    setCollapsed(false);
   }, [seedGoal]);
 
   async function findRoute(valueOverride?: string) {
@@ -81,8 +73,8 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
     navigate(`${base}?briefId=${encodeURIComponent(presentation.briefMessageId)}`);
   }
 
-  if (collapsed) {
-    return <button type="button" className="ef-archive-assistant-fab" onClick={() => { setCollapsed(false); onActiveChange?.(true); }} aria-label="展开 EduFlow 小助手"><Sparkles size={22} aria-hidden /><span className="ef-archive-assistant-dot" aria-hidden /></button>;
+  if (!open) {
+    return <button type="button" className="ef-archive-assistant-fab" onClick={() => onOpenChange(true)} aria-label="展开 EduFlow 小助手"><Sparkles size={22} aria-hidden /><span className="ef-archive-assistant-dot" aria-hidden /></button>;
   }
 
   return (
@@ -90,7 +82,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
       <header>
         <span className="ef-archive-assistant-icon"><Sparkles size={15} aria-hidden /></span>
         <div><b>EduFlow 小助手 · 档案</b><span>{status === "searching" ? "正在寻找" : status === "brief" ? "课程创建简报" : "只提议，不直接修改课程"}</span></div>
-        <button type="button" className="ef-archive-assistant-collapse" onClick={() => { setCollapsed(true); onActiveChange?.(false); }} aria-label="收起助手"><X size={14} aria-hidden /></button>
+        <button type="button" className="ef-archive-assistant-collapse" onClick={() => onOpenChange(false)} aria-label="收起助手"><X size={14} aria-hidden /></button>
       </header>
 
       {status === "idle" ? (
@@ -98,7 +90,19 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
           <strong>想学什么？我帮你找一条路线</strong>
           <p>说出目标，我只会提议知识范围和课程；锁定后进入现有的课程创建流程，仍需预览、校验与确认。</p>
           <form className="ef-archive-assistant-form" onSubmit={(event) => { event.preventDefault(); void findRoute(); }}>
-            <textarea value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="例如：我想系统学 RAG，从检索一直做到能查资料的 Agent。" aria-label="学习目标" rows={3} />
+            <textarea
+              value={goal}
+              onChange={(event) => setGoal(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  void findRoute();
+                }
+              }}
+              placeholder="例如：我想系统学 RAG，从检索一直做到能查资料的 Agent。"
+              aria-label="学习目标"
+              rows={3}
+            />
             <div><span>{contextLabel}</span><button type="submit" disabled={runtime.sending}><Search size={13} aria-hidden />{runtime.sending ? "寻找中…" : "让助手寻找"}</button></div>
           </form>
           {localError ? <p className="ef-archive-assistant-error" role="alert">{localError}</p> : null}
@@ -173,7 +177,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
       {status !== "brief" && presentation.state === "brief" && !brief ? <p className="ef-archive-assistant-error">简报暂不可用，请重试。</p> : null}
       {runtime.error || localError ? <p className="ef-archive-assistant-error" role="alert">{runtime.error || localError}</p> : null}
       {status === "brief" ? <button type="button" className="ef-archive-assistant-open" onClick={() => onOpenBrief(presentation.briefMessageId ?? "")}>在对话中查看完整简报</button> : null}
-      <button type="button" className="ef-archive-assistant-collapse-text" onClick={() => { setCollapsed(true); onActiveChange?.(false); }}>收起助手</button>
+      <button type="button" className="ef-archive-assistant-collapse-text" onClick={() => onOpenChange(false)}>收起助手</button>
     </aside>
   );
 }

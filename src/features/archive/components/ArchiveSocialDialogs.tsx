@@ -2,7 +2,6 @@ import { ArrowRight, Bell, Check, Copy, Globe2, Lock, Search, ShieldCheck, UserR
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
 import type { ArchiveModel } from "../model/atlasModel";
-import type { AtlasLayout } from "../model/atlasLayout";
 import { Avatar } from "@/shared/ui/Avatar";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
 

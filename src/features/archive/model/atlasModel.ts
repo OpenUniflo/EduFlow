@@ -23,6 +23,7 @@ export type ArchiveNode = {
   isMine: boolean;
   /** The single in-progress knowledge highlighted with the brand ring. */
   isCurrent: boolean;
+  updatedAt?: string;
   courseContexts: AtlasCourseContext[];
 };
 
@@ -226,6 +227,7 @@ export function buildArchiveModel(input: ArchiveModelInput): ArchiveModel {
         status: record?.status ?? "explore",
         isMine: Boolean(record),
         isCurrent: Boolean(currentId && currentId === node.id && record),
+        updatedAt: record?.updatedAt,
         courseContexts: contexts.get(node.id) ?? []
       };
     });
