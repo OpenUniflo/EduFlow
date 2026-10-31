@@ -479,8 +479,13 @@ export function placeCapabilityAnchors(
     groups.set(key, [...(groups.get(key) ?? []), { id, anchor }]);
   });
   const positions = new Map<string, ImmersivePoint>();
-  [...groups.entries()].sort(([left], [right]) => left.localeCompare(right)).forEach(([, members]) => {
-    const anchorX = members.reduce((sum, member) => sum + member.anchor.x, 0) / members.length;
+  [...groups.entries()].sort(([left], [right]) => left.localeCompare(right)).forEach(([key, members]) => {
+    const level = Number(key.split(":")[0]) || 0;
+    // Deeper capability planes stack almost on the same screen column when
+    // the course plane is turned. Give each deeper layer a deterministic
+    // lateral lane so the same support anchor never reads as one dot with
+    // three names (P4R6). The offset is structural, never camera-dependent.
+    const anchorX = members.reduce((sum, member) => sum + member.anchor.x, 0) / members.length + level * spacingX * 0.55;
     const anchorY = members.reduce((sum, member) => sum + member.anchor.y, 0) / members.length;
     const anchorZ = Math.min(...members.map((member) => member.anchor.z));
     const sorted = [...members].sort((left, right) => left.id.localeCompare(right.id));

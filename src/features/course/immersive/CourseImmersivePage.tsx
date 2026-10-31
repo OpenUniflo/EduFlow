@@ -1,6 +1,6 @@
 import {
   ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Clock3, Edit3, FileText, Layers3,
-  ListChecks, LocateFixed, Lock, LogIn, Maximize2, Minus, Network, Plus, RotateCcw, Route, Sparkles, Target, X
+  ListChecks, LocateFixed, Lock, LogIn, Network, Route, Sparkles, Target, X
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -16,6 +16,7 @@ import { createMicroLearningNavigation, type MicroLearningProvider, type MicroLe
 import { buildMaterialDeepLink } from "@/features/material/materialNavigation";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { routeDiff } from "@/shared/learning/routeDiff";
+import { SceneZoomToolbar } from "@/shared/scene/SceneZoomToolbar";
 import { ObjectShell } from "@/shared/ui/ObjectShell";
 import { Pill } from "@/shared/ui/Pill";
 import { buildCourseGraphData } from "../runtime/courseRuntime";
@@ -916,6 +917,24 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         });
       });
     }
+    // A route neighbour without a factual edge is still one hop away. Draw
+    // that adjacent route segment as a lit line so the highlighted neighbour
+    // never floats without a connection (P4R6).
+    if (!swapped) {
+      selectionRelations.routeHopPairs.forEach((pair) => {
+        const points = buildRouteTrack([pair.source, pair.target], routeTrack.cards)
+          .map((point) => ({ x: point.x, y: -point.y, z: point.z }));
+        if (points.length < 2) return;
+        edges.push({
+          id: `route-hop:${pair.source}:${pair.target}`,
+          source: pair.source,
+          target: pair.target,
+          points,
+          kind: "route-hop",
+          highlighted: true
+        });
+      });
+    }
     // Practice connectors are visible only while the practice tree is in
     // front. They are short knowledge→reflection links, never a second layer
     // of full-height orthogonal lines.
@@ -939,7 +958,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       });
     }
     return edges;
-  }, [capabilityLayout, courseLayout, effectiveSelection, flat, flattenedLayout, practiceByKnowledge, selectionRelations, swapped]);
+  }, [capabilityLayout, courseLayout, effectiveSelection, flat, flattenedLayout, practiceByKnowledge, routeTrack, selectionRelations, swapped]);
 
   if (import.meta.env.DEV) {
     const modelNodes = capabilityModel?.orderedNodeIds ?? [];
@@ -1333,7 +1352,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
             pose={currentPose === "rotated" ? "rotated" : "front"}
             selectedId={selectedStageId}
             externalHoverId={capsHoverId}
-            rightInset={capRailVisible ? (effectiveSelection ? 420 : 16) + (capListOpen ? 300 : 48) + 12 : 0}
+            rightInset={effectiveSelection ? (capListOpen ? 688 : 388) : capRailVisible ? 480 : 0}
             reducedMotion={reducedMotion}
             onCapabilityReveal={(visible) => setCapRailVisible(visible)}
             detailOpen={Boolean(effectiveSelection)}
@@ -1398,13 +1417,14 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           {capabilityCount > 0 && pose === "front" && !flat && tab === "course" ? <span className="ef-imm-cap-hint">拖动旋转可查看 {capabilityCount} 个前置能力</span> : null}
         </div> : <div className="ef-imm-status-legend is-public" role="status"><Lock size={12} /><span>公开课程 · 只读 · 登录后查看学习状态和路线</span></div>}
 
-        {!flat ? <div className="ef-imm-controls" role="group" aria-label="场景控制">
-          <button type="button" onClick={() => stageRef.current?.zoomIn()} aria-label="放大场景"><Plus size={16} /></button>
-          <button type="button" onClick={() => stageRef.current?.zoomOut()} aria-label="缩小场景"><Minus size={16} /></button>
-          <button type="button" onClick={() => stageRef.current?.fit()} aria-label="适配全图"><Maximize2 size={16} /></button>
-          <span>{zoomPercent}%</span>
-          <button type="button" className="ef-imm-control-wide" onClick={() => { setPose("front"); setCapListOpen(false); stageRef.current?.front(); }} aria-label="回正面"><RotateCcw size={16} />回正面</button>
-        </div> : null}
+        {!flat ? <SceneZoomToolbar
+          className="ef-imm-controls"
+          percent={zoomPercent}
+          onZoomIn={() => stageRef.current?.zoomIn()}
+          onZoomOut={() => stageRef.current?.zoomOut()}
+          onFit={() => stageRef.current?.fit()}
+          onFront={() => { setPose("front"); setCapListOpen(false); stageRef.current?.front(); }}
+        /> : null}
 
         {tab === "course" && !flat ? <div className="ef-imm-toolbar" role="toolbar" aria-label="课程树工具">
           <button type="button" aria-pressed={swapped} onClick={() => switchLayer(!swapped)}><Layers3 size={14} />切换到{swapped ? "技能树" : "实训树"}</button>

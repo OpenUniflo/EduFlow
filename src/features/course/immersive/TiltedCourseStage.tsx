@@ -8,6 +8,8 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import {
   chooseTiltedLabels,
   clampToPanBounds,
+  labelRectForAnchor,
+  overlapRatio,
   findExcentricCluster,
   layoutExcentricOutside,
   panBoundsFor,
@@ -21,6 +23,8 @@ import {
   type TiltedLabelChoice,
   type TiltedPoint
 } from "@/shared/scene/tiltedPlane";
+import { SCENE_CAMERA, doubleClickAction, frontPose, isCameraDrag, isPanGesture, shouldSnapToFront, zoomDistance } from "@/shared/scene/cameraInteraction";
+import { cardNameOpacity, cardShowsOwnName, hoverStyleFor, isPickable } from "@/shared/scene/presentationRules";
 import { LAYER_SWAP_MS, REFLECTION_OFFSET, layerMixAt, layerOffsetsAt } from "./courseTreeLayout";
 import { projectColorVar, projectToneFor } from "./projectColors";
 import { advancePulse, pulseCenters, routeMetrics, windowLengthForPixels } from "@/shared/scene/routePulse";
@@ -68,6 +72,10 @@ type CardRuntime = {
   node: StageNode;
   element: HTMLDivElement;
   object: CSS3DObject;
+  /** Depth-only copy of the card quad. CSS3D sits above the WebGL canvas, so
+   *  without this plane a capability / far star behind the card would be
+   *  drawn on top of it instead of being hidden by it. */
+  occluder: THREE.Mesh;
   signature: string;
   width: number;
   height: number;
@@ -276,6 +284,7 @@ export function TiltedCourseStage({
     edgeGroup: THREE.Group;
     beamGroup: THREE.Group;
     chapterGroup: THREE.Group;
+    occluderGroup: THREE.Group;
     flows: Array<{
       material: LineMaterial;
       metrics: ReturnType<typeof routeMetrics>;
@@ -380,13 +389,13 @@ export function TiltedCourseStage({
     camera.position.set(0, 0, 1200);
     const controls = new OrbitControls(camera, host);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.09;
-    controls.rotateSpeed = 0.55;
-    controls.zoomSpeed = 0.9;
-    controls.panSpeed = 0.9;
+    controls.dampingFactor = SCENE_CAMERA.dampingFactor;
+    controls.rotateSpeed = SCENE_CAMERA.rotateSpeed;
+    controls.zoomSpeed = SCENE_CAMERA.zoomSpeed;
+    controls.panSpeed = SCENE_CAMERA.panSpeed;
     controls.screenSpacePanning = true;
-    controls.minDistance = 160;
-    controls.maxDistance = 6000;
+    controls.minDistance = SCENE_CAMERA.minDistance;
+    controls.maxDistance = SCENE_CAMERA.maxDistance;
     controls.minPolarAngle = 0.08;
     controls.maxPolarAngle = Math.PI - 0.08;
     controls.enablePan = true;
@@ -400,7 +409,16 @@ export function TiltedCourseStage({
     const edgeGroup = new THREE.Group();
     const beamGroup = new THREE.Group();
     const chapterGroup = new THREE.Group();
-    scene.add(edgeGroup, beamGroup, chapterGroup);
+    // Depth-only card quads. They are opaque to the depth buffer but write no
+    // colour, so the WebGL points and lines behind a CSS3D card are clipped
+    // exactly where the card is. Card bodies stay DOM elements on top.
+    const occluderGroup = new THREE.Group();
+    const occluderGeometry = new THREE.PlaneGeometry(1, 1);
+    const occluderMaterial = new THREE.MeshBasicMaterial({ side: THREE.FrontSide });
+    occluderMaterial.colorWrite = false;
+    occluderMaterial.depthWrite = true;
+    occluderMaterial.depthTest = true;
+    scene.add(edgeGroup, beamGroup, chapterGroup, occluderGroup);
 
     const pointPositions = new Float32Array(512 * 3);
     const pointAlpha = new Float32Array(512);
@@ -473,7 +491,7 @@ export function TiltedCourseStage({
       renderer, cssRenderer, scene, cssScene, camera, controls, points, rings,
       pointPositions, pointAlpha, pointSize, pointColor,
       ringPositions, ringAlpha, ringSize, ringColor, ringColor2, ringSplit,
-      edgeGroup, beamGroup, chapterGroup, flows: [],
+      edgeGroup, beamGroup, chapterGroup, occluderGroup, flows: [],
       cards: new Map<string, CardRuntime>(), chapters: new Map<string, ChapterRuntime>(),
       xrayHost, xraySvg, xrayName, hoverRing,
       labels: new Map<string, HTMLDivElement>(), exRows: new Map<string, HTMLButtonElement>(),
@@ -710,10 +728,28 @@ export function TiltedCourseStage({
       if (node.step) return 2;
       return 3;
     }
+    function cardOccludesPoint(screen: { x: number; y: number }, distance: number, padding = 2) {
+      for (const card of engine.cards.values()) {
+        if (!card.object.visible || card.opacity < 0.1 || card.angle.dot >= 0.72) continue;
+        // Only a card physically in front of the node can hide it.
+        if (card.distance >= distance - 3) continue;
+        const rect = rectForCard(card.node, card);
+        if (screen.x >= rect.x - padding && screen.x <= rect.x + rect.width + padding
+          && screen.y >= rect.y - padding && screen.y <= rect.y + rect.height + padding) return true;
+      }
+      return false;
+    }
+    function cardLabelObstacles() {
+      return [...engine.cards.values()].flatMap((card) => {
+        if (!card.object.visible || card.opacity < 0.1 || card.angle.dot >= 0.72) return [];
+        const rect = rectForCard(card.node, card);
+        if (rect.width < 8 || rect.height < 8) return [];
+        return [{ x: rect.x - 3, y: rect.y - 3, width: rect.width + 6, height: rect.height + 8 }];
+      });
+    }
     function chooseLabels() {
       const candidates: TiltedLabelCandidate[] = [];
       const obstacles: Array<{ id: string; x: number; y: number; width: number; height: number }> = [];
-      const capVisible = capabilityVisible();
       const angle = tiltAngleDegrees(camera.position.clone().sub(controls.target));
       const hovered = engine.hover ?? engine.externalHover;
       if (engine.exVisible) {
@@ -739,14 +775,26 @@ export function TiltedCourseStage({
         const dist = camera.position.distanceTo(new THREE.Vector3(node.x, -node.y, node.z));
         const screen = cardScreen(node, dist);
         if (screen.z > 1) continue;
+        // A name may only be anchored to a point the viewer can actually see.
+        // When a nearer card covers the point, the oblique label is omitted
+        // entirely (the selected node still gets its x-ray marker/name).
+        if (cardOccludesPoint(screen, dist)) continue;
+        const isCapability = node.kind === "capability";
+        const card = engine.cards.get(node.id);
+        // One node, one name: full cards and capsules already carry their own
+        // title, so the screen-facing layer must not hang a second one above.
+        if (cardShowsOwnName({
+          cardVisible: Boolean(card && card.object.visible && card.opacity > 0.05),
+          pointMix: card?.pointMix ?? 1,
+          cardNameOpacity: card?.angle.cardName ?? 0,
+          isCapability
+        })) continue;
         const width = Math.max(14, Math.min(52, screen.diameter + 8));
         obstacles.push({ id: node.id, x: screen.x - width / 2, y: screen.y - width / 2, width, height: width });
-        // Capability names appear as soon as the plane is readable; Knowledge
-        // names only hand over from the capsule to the outside label after 55°.
-        const isCapability = node.kind === "capability";
+        // Capability names follow the same oblique naming rule as Knowledge;
+        // they are never revealed by a special angle switch.
         const visible = !node.dim && !node.mirror && renderedOpacity(index) >= 0.1;
         if (!visible) continue;
-        if (!engine.selected && isCapability && capVisible <= 0.5) continue;
         // 35–58°: the turned plane is read through screen-facing names. The
         // card body is hidden (turnLabels), so the name layer is the only
         // owner. Capability names stay quiet until hovered / selected / current
@@ -766,18 +814,71 @@ export function TiltedCourseStage({
       }
       const rightLimit = engine.width - Math.max(propsRef.current.detailOpen ? 388 : 0, propsRef.current.rightInset ?? 0) - 8;
       const turned = angle >= 34 && angle < 58;
-      const chosen = chooseTiltedLabels(candidates, {
-        width: Math.max(200, rightLimit), height: engine.height,
-        maxLabels: turned ? 90 : SIDE_MAX,
-        showDiameter: turned ? 4 : SIDE_SHOW_PX,
-        hideDiameter: turned ? 3 : SIDE_HIDE_PX,
-        lineHeight: SIDE_H, margin: 8,
-        measure: sideTextWidth, previous: engine.labelPrevious, obstacles,
-        exclusions: [
+      const selection = Boolean(engine.selected);
+      let chosen: TiltedLabelChoice[];
+      if (selection) {
+        // Selection layout: every related point gets a name. Labels are packed
+        // from the right edge inward so a capability behind the selected card
+        // keeps a free anchor instead of being silently dropped by a marker
+        // obstacle. Names stay anchored to their own node; a node with no free
+        // anchor is still omitted rather than moved across the screen.
+        chosen = [];
+        const placed: Array<{ x: number; y: number; width: number; height: number }> = [];
+        const usedTexts = new Set<string>();
+        const hud = [
           { x: 0, y: 0, width: Math.max(200, rightLimit), height: 76 },
           { x: 0, y: engine.height - 128, width: Math.max(200, rightLimit), height: 128 }
-        ]
-      });
+        ];
+        const cardBoxes = cardLabelObstacles();
+        // A name for one capability must not cover a different capability's
+        // point (the points share a screen neighbourhood when the plane turns).
+        const pointBoxes = engine.currentNodes.flatMap((node) => {
+          if (node.kind !== "capability") return [];
+          const info = nodeScreenFor(node.id);
+          if (!info || info.screen.z > 1) return [];
+          return [{ id: node.id, x: info.screen.x - 10, y: info.screen.y - 10, width: 20, height: 20 }];
+        });
+        const ordered = [...candidates].sort((left, right) => right.x - left.x || left.distance - right.distance || left.id.localeCompare(right.id));
+        for (const candidate of ordered) {
+          const key = candidate.text.trim().toLocaleLowerCase();
+          if (key && usedTexts.has(key)) continue;
+          const width = Math.max(24, sideTextWidth(candidate.text) + 18);
+          for (const anchor of ["above", "right", "below", "left"] as const) {
+            const rect = labelRectForAnchor(candidate, anchor, width, SIDE_H);
+            if (rect.x < 8 || rect.y < 8 || rect.x + rect.width > Math.max(200, rightLimit) - 4 || rect.y + rect.height > engine.height - 4) continue;
+            if (placed.some((other) => overlapRatio(rect, other) > 0.02)) continue;
+            if (hud.some((other) => overlapRatio(rect, other) > 0.02)) continue;
+            if (cardBoxes.some((other) => overlapRatio(rect, other) > 0.02)) continue;
+            if (pointBoxes.some((other) => other.id !== candidate.id && overlapRatio(rect, other) > 0.02)) continue;
+            chosen.push({ id: candidate.id, anchor, rect, alpha: 1, distance: candidate.distance, priority: 0 });
+            placed.push(rect);
+            if (key) usedTexts.add(key);
+            break;
+          }
+        }
+      } else {
+        chosen = chooseTiltedLabels(candidates, {
+          width: Math.max(200, rightLimit), height: engine.height,
+          maxLabels: turned ? 90 : SIDE_MAX,
+          showDiameter: turned ? 4 : SIDE_SHOW_PX,
+          hideDiameter: turned ? 3 : SIDE_HIDE_PX,
+          lineHeight: SIDE_H, margin: 8,
+          measure: sideTextWidth, previous: engine.labelPrevious, obstacles,
+          exclusions: [
+            { x: 0, y: 0, width: Math.max(200, rightLimit), height: 76 },
+            { x: 0, y: engine.height - 128, width: Math.max(200, rightLimit), height: 128 }
+          ]
+        });
+      }
+      if (import.meta.env.DEV) {
+        (engine as unknown as { lastCandidates?: unknown }).lastCandidates = candidates.map((candidate) => ({
+          id: candidate.id, x: Number(candidate.x.toFixed(1)), y: Number(candidate.y.toFixed(1)),
+          distance: Number(candidate.distance.toFixed(1)), visibility: Number(candidate.visibility.toFixed(2)),
+          priority: candidate.priority, text: candidate.text
+        }));
+        (engine as unknown as { lastChosen?: unknown }).lastChosen = chosen.map((choice) => ({ id: choice.id, anchor: choice.anchor }));
+        (engine as unknown as { lastObstacles?: unknown }).lastObstacles = obstacles;
+      }
       // One text label on screen at a time, even if two nodes share a title.
       const texts = new Set<string>();
       engine.labelChoices = chosen.filter((choice) => {
@@ -792,19 +893,11 @@ export function TiltedCourseStage({
       engine.lastLabelAt = performance.now();
       engine.labelsDirty = false;
     }
-    function capabilityVisible() {
-      // The capability plane is always present. It is hidden behind the front
-      // knowledge plane and becomes readable as the camera rotates away from
-      // the front (~3° -> ~34°), exactly the threshold used by the list rail.
-      // No presentation switch participates in visibility: what is drawn is
-      // what can be named and picked.
-      const direction = camera.position.clone().sub(controls.target).normalize();
-      const angle = Math.acos(Math.max(-1, Math.min(1, direction.z)));
-      return smooth(0.06, 0.6, angle);
-    }
     function updateLabels() {
       const angle = tiltAngleDegrees(camera.position.clone().sub(controls.target));
-      const on = angle > 34;
+      // A selection names its one-hop set at every angle, including the front
+      // pose; otherwise the oblique label layer only exists past 34°.
+      const on = angle > 34 || Boolean(engine.selected);
       if (!on || engine.exVisible) {
         engine.labelChoices = [];
         engine.labelPrevious.clear();
@@ -895,6 +988,14 @@ export function TiltedCourseStage({
         return;
       }
       const node = info.node;
+      const card = id ? engine.cards.get(id) : undefined;
+      // P4R6 hover rule: card / capsule stages only brighten the outline.
+      // The circle exists only for a point and is drawn outside the marker.
+      const stage = !card || card.pointMix > 0.62 ? "dot" : card.angle.pill > 0.02 ? "pill" : "full";
+      if (hoverStyleFor(stage) !== "ring") {
+        engine.hoverRing.style.opacity = "0";
+        return;
+      }
       const diameter = Math.max(34, Math.min(58, 13 * (engine.height / (2 * info.distance * FOV_T)) * 0.8 + 14));
       engine.hoverRing.style.width = `${diameter.toFixed(1)}px`;
       engine.hoverRing.style.height = `${diameter.toFixed(1)}px`;
@@ -903,8 +1004,7 @@ export function TiltedCourseStage({
       // The route step is hidden in the dot stage until hover, then it rides
       // the hover ring instead of becoming a second persistent marker.
       engine.hoverRing.dataset.step = node.step ? String(node.step) : "";
-      const card = id ? engine.cards.get(id) : undefined;
-      engine.hoverRing.dataset.dot = card && card.pointMix > 0.62 ? "1" : "";
+      engine.hoverRing.dataset.dot = stage === "dot" ? "1" : "";
       engine.hoverRing.style.opacity = "1";
     }
 
@@ -986,7 +1086,9 @@ export function TiltedCourseStage({
       const selectedCard = engine.cards.get(xray.node.id);
       const selectedRect = selectedCard ? rectForCard(xray.node, selectedCard) : null;
       const blocked = selectedRect ? xrayBlocked(selectedRect, xray.distance, xray) : false;
-      const marker = angle > 35 || blocked;
+      // A capability never has a card, so its selected point always owns the
+      // small ring + name, even in the front pose.
+      const marker = angle > 35 || blocked || xray.node.kind === "capability";
       const dotPx = Math.max(8, Math.min(18, 13 * (engine.height / (2 * xray.distance * FOV_T)) * 1.15));
       const radius = Math.max(6, Math.min(14, dotPx / 2 + 2));
       const lines = xray.segments.map((segment) => `<line x1="${segment.x1.toFixed(1)}" y1="${segment.y1.toFixed(1)}" x2="${segment.x2.toFixed(1)}" y2="${segment.y2.toFixed(1)}"/>`).join("");
@@ -1137,9 +1239,9 @@ export function TiltedCourseStage({
         const distance = camera.position.distanceTo(new THREE.Vector3(node.x, -node.y, node.z));
         const screen = cardScreen(node, distance);
         if (screen.z > 1) continue;
-        // Exactly the same opacity test as the name layer: no candidate for a
-        // reflection after 42°, a closed capability layer, or a hidden card.
-        if (renderedOpacity(index) < 0.1) continue;
+        // Dimmed nodes stay clickable; only a node that is not drawn leaves
+        // the screen-space pick set.
+        if (!isPickable(renderedOpacity(index))) continue;
         const card = engine.cards.get(node.id);
         // Only the front card stage uses card-body hit testing. Once turned,
         // the visible marker (pill or dot) is the target, not the old card box.
@@ -1177,7 +1279,6 @@ export function TiltedCourseStage({
       });
       engine.lastSizeStage = state.sizeStage;
       const xray = xrayFor();
-      const capVis = capabilityVisible();
       const offsets = layerOffsetsAt(engine.layerMix);
       const mix = engine.layerMix;
       // Between ~35° and ~58° the plane is read through screen-facing names,
@@ -1205,7 +1306,6 @@ export function TiltedCourseStage({
         card.layerOpacity = knowledge ? offsets.knowledgeOpacity : assignment ? offsets.practiceOpacity : 1;
         let opacity = card.layerOpacity;
         if (node.dim) opacity *= 0.24;
-        if (node.kind === "capability") opacity *= capVis;
         opacity *= 1 - state.back;
         if (node.id === selected && angle > 35) opacity *= 1 - smooth(35, 38, angle);
         // A reflection is text-only clutter once the plane turns; its copy is
@@ -1301,14 +1401,18 @@ export function TiltedCourseStage({
           element.style.removeProperty("--ghost-content-op");
           element.style.opacity = Math.max(0, Math.min(1, opacity)).toFixed(3);
         }
-        element.style.setProperty("--name-op", state.cardName.toFixed(3));
-        element.style.setProperty("--extra-op", state.extra.toFixed(3));
+        // Unrelated cards keep their body at 20% but show no name. A
+        // reflection is the other face of the same node: it may share the
+        // brightness but never owns a second name or secondary rows.
+        element.style.setProperty("--name-op", (ghost ? 0 : cardNameOpacity(state.cardName, !node.dim)).toFixed(3));
+        element.style.setProperty("--extra-op", (ghost || node.dim ? 0 : state.extra).toFixed(3));
         element.style.setProperty("--dotc", `var(--dotc, ${nodeColor(node)})`);
         element.classList.toggle("is-pill", state.pill > 0.02);
         element.classList.toggle("is-dot", state.dot > 0.6);
         element.classList.toggle("is-ghost", ghost);
         element.classList.toggle("is-dim", Boolean(node.dim));
         element.classList.toggle("is-sel", node.id === selected);
+        element.classList.toggle("is-hover", node.id === (engine.hover ?? engine.externalHover));
         card.object.visible = opacity > 0.004 && screen.z < 1;
         element.style.pointerEvents = "none";
         // Billboard only the shrinking capsule / dot so the final marker is a
@@ -1322,6 +1426,16 @@ export function TiltedCourseStage({
           card.object.quaternion.copy(targetQuaternion);
         } else {
           card.object.quaternion.slerpQuaternions(new THREE.Quaternion(), targetQuaternion, state.billboard);
+        }
+        // A card must hide a capability / far point that sits behind it. The
+        // full card and the capsule are opaque surfaces; in the dot stage the
+        // marker itself is the only visible geometry, so its quad is disabled
+        // to avoid clipping its own point.
+        card.occluder.visible = card.object.visible && opacity > 0.1 && state.dot < 0.72 && cardRect.width > 6 && cardRect.height > 6;
+        if (card.occluder.visible) {
+          card.occluder.position.copy(card.object.position);
+          card.occluder.quaternion.copy(card.object.quaternion);
+          card.occluder.scale.set(width, height, 1);
         }
       });
     }
@@ -1384,16 +1498,20 @@ export function TiltedCourseStage({
 
     function updatePoints() {
       const count = engine.currentNodes.length;
-      const capVis = capabilityVisible();
-      const capSet = selectedCapabilitySet();
       const offsets = layerOffsetsAt(engine.layerMix);
+      const angle = tiltAngleDegrees(camera.position.clone().sub(controls.target));
+      // In the front / near-front poses the capability model is seen *through*
+      // the gaps between cards. Keep those points as a faint depth cue instead
+      // of a bright second layer; they become fully readable once the plane is
+      // turned past ~35°. The depth-only card quads handle the covered ones.
+      const capabilityFade = 0.16 + 0.84 * smooth(30, 46, angle);
       for (let index = 0; index < count; index += 1) {
         const node = engine.currentNodes[index];
         const card = engine.cards.get(node.id);
         const color = new THREE.Color(colorFor(node));
-        const selectedCap = capSet && !capSet.has(node.id);
         const knowledge = node.kind === "knowledge";
         const assignment = node.kind === "assignment";
+        const isCapability = node.kind === "capability";
         const offset = knowledge ? offsets.knowledge : assignment ? offsets.practice : { x: 0, y: 0, z: 0 };
         const worldX = node.x + offset.x;
         const worldY = -node.y - offset.y;
@@ -1401,9 +1519,9 @@ export function TiltedCourseStage({
         // One marker per node: the WebGL point only owns the node in the dot
         // stage. Earlier stages are the DOM card, so the point stays invisible.
         const ghost = card?.ghost ?? false;
-        const pointMix = ghost ? 0 : (card?.pointMix ?? 0);
-        const capabilityAlpha = node.kind === "capability" ? capVis : 1;
-        const alpha = pointMix * (node.dim ? 0.2 : 1) * capabilityAlpha * (selectedCap ? 0.4 : 1);
+        // A capability has no card: its point owns the node at every angle.
+        const pointMix = isCapability ? 1 : ghost ? 0 : (card?.pointMix ?? 0);
+        const alpha = pointMix * (node.dim ? 0.2 : 1) * (isCapability ? capabilityFade : 1);
         const hovered = engine.hover === node.id || engine.externalHover === node.id;
         pointPositions[index * 3] = worldX;
         pointPositions[index * 3 + 1] = worldY;
@@ -1426,13 +1544,13 @@ export function TiltedCourseStage({
         ringAlpha[index] = 0;
         // Status rings belong to the dot stage; during the full / pill stages
         // they would read as a second marker beside the card.
-        ringAlpha[index] = pointMix * (node.dim ? 0.12 : 0.58) * (node.kind === "capability" ? capVis : 1);
+        ringAlpha[index] = pointMix * (node.dim ? 0.12 : 0.58) * (isCapability ? capabilityFade : 1);
         if (node.current) {
           const pulse = engine.reduced ? 0.5 : 0.5 + 0.5 * Math.sin(performance.now() / 1000 * 3.1);
           const brand = new THREE.Color(colors.brand);
           brand.toArray(ringColor, index * 3);
           brand.toArray(ringColor2, index * 3);
-          ringAlpha[index] = Math.max(ringAlpha[index], pointMix * (0.62 + 0.3 * pulse));
+          ringAlpha[index] = Math.max(ringAlpha[index], pointMix * (0.62 + 0.3 * pulse) * (isCapability ? capabilityFade : 1));
           ringSize[index] *= 1 + 0.045 * pointMix * pulse;
         }
         if (hovered) {
@@ -1457,28 +1575,18 @@ export function TiltedCourseStage({
       void count;
     }
 
-    function selectedCapabilitySet() {
-      if (!engine.selected) return null;
-      const selectedNode = nodeById(engine.selected);
-      if (!selectedNode || selectedNode.kind !== "capability") return null;
-      const set = new Set<string>([selectedNode.id]);
-      for (const edge of engine.currentEdges) {
-        if (edge.kind === "capability" && edge.source && edge.target && (edge.source === selectedNode.id || edge.target === selectedNode.id)) {
-          set.add(edge.source);
-          set.add(edge.target);
-        }
-      }
-      return set;
-    }
     function hoveredStatusColor(node: StageNode) {
       return new THREE.Color(colorFor(node));
     }
 
     function rebuildCards() {
-      const desired = new Map(engine.currentNodes.filter((node) => node.kind !== "route" && node.kind !== "route-chapter").map((node) => [node.id, node]));
+      // P4R6: capabilities are points at every angle; they never get a CSS3D
+      // card (and therefore never leak "前置能力" card copy between trees).
+      const desired = new Map(engine.currentNodes.filter((node) => node.kind !== "route" && node.kind !== "route-chapter" && node.kind !== "capability").map((node) => [node.id, node]));
       engine.cards.forEach((card, id) => {
         if (desired.has(id)) return;
         cssScene.remove(card.object);
+        occluderGroup.remove(card.occluder);
         card.element.remove();
         engine.cards.delete(id);
       });
@@ -1499,8 +1607,13 @@ export function TiltedCourseStage({
           const object = new CSS3DObject(element);
           object.element.style.pointerEvents = "none";
           cssScene.add(object);
+          const occluder = new THREE.Mesh(occluderGeometry, occluderMaterial);
+          occluder.frustumCulled = false;
+          occluder.renderOrder = 1;
+          occluder.visible = false;
+          occluderGroup.add(occluder);
           card = {
-            node, element, object, signature: "", width: node.width, height: node.height, opacity: 0,
+            node, element, object, occluder, signature: "", width: node.width, height: node.height, opacity: 0,
             screen: { x: 0, y: 0, z: 0 }, distance: 1000, angle: simplificationForAngle(0),
             pointMix: 0, layerOpacity: 1, ghost: false
           };
@@ -1597,18 +1710,23 @@ export function TiltedCourseStage({
         line.renderOrder = 0;
         engine.edgeGroup.add(line);
       };
-      const hasSelection = Boolean(engine.selected);
+      const hasSelection = Boolean(propsRef.current.selectedId);
       for (const edge of engine.currentEdges) {
-        if (edge.kind === "capability") add(edge.points, colors.brand, edge.highlighted ? 0.9 : hasSelection ? 0.05 : 0.4, true, edge.kind, edge.pointWeights);
-        else if (edge.kind === "practice") {
-          add(edge.points, colors.practice, edge.highlighted ? 0.74 : 0.25, true, edge.kind);
+        if (edge.kind === "capability") {
+          // Rest: a quiet 40% gray support web. Selected one-hop support links
+          // become a clear solid line, never a faint dashed one.
+          add(edge.points, edge.highlighted ? colors.brandInk : colors.pending, edge.highlighted ? 1 : hasSelection ? 0.05 : 0.4, !edge.highlighted, edge.kind, edge.pointWeights);
+        } else if (edge.kind === "practice") {
+          add(edge.points, colors.practice, edge.highlighted ? 0.8 : 0.25, true, edge.kind);
           const line = engine.edgeGroup.children[engine.edgeGroup.children.length - 1];
           if (line instanceof THREE.Line) {
             line.userData.sourceId = edge.source;
             line.userData.targetId = edge.target;
           }
+        } else if (edge.kind === "route-hop") {
+          add(edge.points, colors.brandInk, 0.95, false, edge.kind);
         } else if (edge.kind === "chapter") add(edge.points, colors.line, 0.2, false, edge.kind);
-        else add(edge.points, colors.brand, edge.highlighted ? 0.92 : hasSelection ? 0.06 : 0.27, false, edge.kind, edge.pointWeights ?? edge.points.map(() => 1));
+        else add(edge.points, edge.highlighted ? colors.brandInk : colors.brand, edge.highlighted ? 1 : hasSelection ? 0.06 : 0.27, false, edge.kind, edge.pointWeights ?? edge.points.map(() => 1));
         const line = engine.edgeGroup.children[engine.edgeGroup.children.length - 1];
         if (line instanceof THREE.Line) {
           line.userData.highlighted = Boolean(edge.highlighted);
@@ -1938,12 +2056,10 @@ export function TiltedCourseStage({
         const base = typeof child.userData.baseOpacity === "number" ? child.userData.baseOpacity : 0.2;
         const highlighted = Boolean(child.userData.highlighted);
         const hasSelection = Boolean(selected);
-        const capabilityAlpha = capabilityVisible();
         if (kind === "capability") {
           // Support lines are a visible 40% gray web at rest. A selection keeps
-          // only the path to the selected node lit.
-          material.opacity = (highlighted ? 0.9 : hasSelection ? 0.05 : 0.4) * capabilityAlpha;
-          if (capabilityAlpha <= 0.02) return;
+          // only the one-hop edges to the selected node lit, as solid lines.
+          material.opacity = highlighted ? 1 : hasSelection ? 0.05 : 0.4;
         } else if (kind === "knowledge") {
           material.opacity = highlighted ? 0.92 : hasSelection ? 0.06 : base;
         }
@@ -1956,7 +2072,7 @@ export function TiltedCourseStage({
           return Boolean(node && (node.id === hover || node.id === selected));
         };
         if (!hasSelection && (endpointHit(source) || endpointHit(target))) {
-          material.opacity = kind === "capability" ? 0.9 * capabilityAlpha : 0.92;
+          material.opacity = kind === "capability" ? 1 : 0.95;
         }
       });
     }
@@ -2021,8 +2137,6 @@ export function TiltedCourseStage({
       engine.moved = false;
       engine.suppressClick = false;
       freezeLabels();
-      if (event.shiftKey || event.button === 2) controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
-      else controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
     }
     function pointerMove(event: PointerEvent) {
       const rect = hostEl.getBoundingClientRect();
@@ -2049,12 +2163,11 @@ export function TiltedCourseStage({
       if (!down) return;
       engine.down = null;
       engine.dragging = false;
-      controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
       const moved = Math.hypot(event.clientX - down.x, event.clientY - down.y);
       const rect = hostEl.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-      if (moved < 5 && event.button === 0 && !down.onLabel) {
+      if (!isCameraDrag(moved) && event.detail < 2 && event.button === 0 && !down.onLabel) {
         const hit = pickAt(x, y);
         if (hit) {
           const node = nodeById(hit);
@@ -2063,18 +2176,16 @@ export function TiltedCourseStage({
           propsRef.current.onBackground?.();
         }
       }
-      if (down.button === 0 && moved > 5) {
+      if (!isPanGesture(down.button, down.shift) && isCameraDrag(moved)) {
         window.setTimeout(() => {
           if (engine.dragging) return;
-          const angleNow = angle();
-          if (angleNow < 15) {
-            const distance = camera.position.distanceTo(controls.target);
-            const target = controls.target.clone();
-            animateCamera(target.clone().add(new THREE.Vector3(0, 0, distance)), target, 450);
-          }
-        }, 180);
+          if (!shouldSnapToFront(angle())) return;
+          const target = controls.target.clone();
+          const pose = frontPose({ x: target.x, y: target.y, z: target.z }, camera.position.distanceTo(target));
+          animateCamera(new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z), target, 450);
+        }, SCENE_CAMERA.snapDelayMs);
       }
-      if (moved > 5) {
+      if (isCameraDrag(moved)) {
         // A drag can end without another pointermove: name the node under the
         // resting cursor immediately instead of keeping a stale hover.
         const hit = pickAt(x, y);
@@ -2101,18 +2212,16 @@ export function TiltedCourseStage({
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
       const hit = pickAt(x, y);
-      if (hit) {
-        const node = nodeById(hit);
-        if (node) {
-          stopCameraTween();
-          const world = new THREE.Vector3(node.x, -node.y, node.z);
-          const delta = world.clone().sub(controls.target);
-          controls.target.copy(world);
-          camera.position.add(delta);
-          controls.update();
-          markLabelsDirty();
-          return;
-        }
+      const node = hit ? nodeById(hit) : null;
+      if (doubleClickAction(node?.id ?? null) === "focus" && node) {
+        stopCameraTween();
+        const world = new THREE.Vector3(node.x, -node.y, node.z);
+        const delta = world.clone().sub(controls.target);
+        controls.target.copy(world);
+        camera.position.add(delta);
+        controls.update();
+        markLabelsDirty();
+        return;
       }
       frontView();
     }
@@ -2135,7 +2244,7 @@ export function TiltedCourseStage({
         setOrbit: (thetaDeg: number, pitchDeg = 0) => setOrbit(thetaDeg, pitchDeg),
         setZoomPercent: (percent: number) => {
           const direction = camera.position.clone().sub(controls.target);
-          const distance = THREE.MathUtils.clamp(engine.fitDistance / Math.max(0.2, percent / 100), 180, 5200);
+          const distance = THREE.MathUtils.clamp(engine.fitDistance / Math.max(0.2, percent / 100), SCENE_CAMERA.minDistance, engine.controls.maxDistance);
           animateCamera(controls.target.clone().add(direction.setLength(distance)), controls.target.clone(), 320);
         },
         zoomPercent: () => engine.lastZoomPercent,
@@ -2150,6 +2259,9 @@ export function TiltedCourseStage({
         nodeCount: () => engine.currentNodes.length,
         fitDistance: () => engine.fitDistance,
         labels: () => engine.labelChoices.map((choice) => ({ id: choice.id, anchor: choice.anchor, alpha: Number(choice.alpha.toFixed(2)), text: nodeById(choice.id)?.title })),
+        labelCandidates: () => (engine as unknown as { lastCandidates?: unknown }).lastCandidates ?? [],
+        labelObstacles: () => (engine as unknown as { lastObstacles?: unknown }).lastObstacles ?? [],
+        labelChosen: () => (engine as unknown as { lastChosen?: unknown }).lastChosen ?? [],
         edges: () => engine.edgeGroup.children.filter((child): child is THREE.Line => child instanceof THREE.Line).map((line) => ({
           id: line.userData.edgeId as string | undefined,
           kind: line.userData.kind as string,
@@ -2232,13 +2344,42 @@ export function TiltedCourseStage({
           const index = engine.currentNodes.findIndex((node) => node.id === id);
           return index < 0 ? 0 : Number(renderedOpacity(index).toFixed(3));
         },
-        capabilityVisible: () => Number(capabilityVisible().toFixed(3)),
         beamWidths: () => beamMaterialsRef.current.map((material) => material.linewidth),
         pointAlphaOf: (id: string) => {
           const index = engine.currentNodes.findIndex((node) => node.id === id);
           return index < 0 ? 0 : Number((engine.pointAlpha[index] ?? 0).toFixed(3));
         },
-        cardState: () => [...engine.cards.values()].map((card) => ({ id: card.node.id, kind: card.node.kind, op: Number(card.opacity.toFixed(2)), width: Number(card.width.toFixed(1)), height: Number(card.height.toFixed(1)), visible: card.object.visible }))
+        cardState: () => [...engine.cards.values()].map((card) => ({ id: card.node.id, kind: card.node.kind, op: Number(card.opacity.toFixed(2)), width: Number(card.width.toFixed(1)), height: Number(card.height.toFixed(1)), visible: card.object.visible })),
+        cardsScreen: () => [...engine.cards.values()].filter((card) => card.object.visible && card.opacity > 0.1 && card.angle.dot < 0.72).map((card) => {
+          const rect = rectForCard(card.node, card);
+          return { id: card.node.id, kind: card.node.kind, ...rect, distance: Number(card.distance.toFixed(1)), opacity: Number(card.opacity.toFixed(2)), occluder: card.occluder.visible };
+        }),
+        capabilityOcclusion: () => {
+          const cards = [...engine.cards.values()].filter((card) => card.object.visible && card.opacity > 0.1 && card.angle.dot < 0.72).map((card) => ({ card, rect: rectForCard(card.node, card) }));
+          const covered: Array<{ id: string; x: number; y: number; distance: number }> = [];
+          const uncovered: Array<{ id: string; x: number; y: number; distance: number; alpha: number }> = [];
+          let inFrontIntersections = 0;
+          engine.currentNodes.forEach((node, index) => {
+            if (node.kind !== "capability") return;
+            const info = nodeScreenFor(node.id);
+            if (!info || info.screen.z > 1) return;
+            const intersects = cards.filter(({ rect }) => info.screen.x >= rect.x && info.screen.x <= rect.x + rect.width && info.screen.y >= rect.y && info.screen.y <= rect.y + rect.height);
+            const behind = intersects.filter(({ card }) => card.distance < info.distance - 3);
+            if (behind.length) covered.push({ id: node.id, x: Number(info.screen.x.toFixed(1)), y: Number(info.screen.y.toFixed(1)), distance: Number(info.distance.toFixed(1)) });
+            else {
+              if (intersects.length) inFrontIntersections += 1;
+              uncovered.push({ id: node.id, x: Number(info.screen.x.toFixed(1)), y: Number(info.screen.y.toFixed(1)), distance: Number(info.distance.toFixed(1)), alpha: Number((engine.pointAlpha[index] ?? 0).toFixed(3)) });
+            }
+          });
+          return {
+            coveredCount: covered.length,
+            covered: covered.slice(0, 8),
+            gapCount: uncovered.length,
+            gapAlpha: uncovered.length ? [Math.min(...uncovered.map((item) => item.alpha)), Math.max(...uncovered.map((item) => item.alpha))] : [],
+            inFrontIntersections,
+            cards: cards.length
+          };
+        }
       };
     }
     engine.frame = requestAnimationFrame(tick);
@@ -2261,6 +2402,9 @@ export function TiltedCourseStage({
       hoverRing.remove();
       engine.cards.forEach((card) => { cssScene.remove(card.object); card.element.remove(); });
       engine.cards.clear();
+      engine.occluderGroup.clear();
+      occluderGeometry.dispose();
+      occluderMaterial.dispose();
       engine.chapters.forEach((runtime) => { cssScene.remove(runtime.panelObject, runtime.titleObject); runtime.panel.remove(); runtime.title.remove(); });
       engine.chapters.clear();
       engine.labels.forEach((element) => element.remove());
@@ -2329,14 +2473,14 @@ export function TiltedCourseStage({
       const api = apiRef.current;
       if (!engine || !api) return;
       const direction = engine.camera.position.clone().sub(engine.controls.target);
-      api.animateCamera(engine.controls.target.clone().add(direction.setLength(Math.max(180, direction.length() * 0.78))), engine.controls.target.clone(), 260);
+      api.animateCamera(engine.controls.target.clone().add(direction.setLength(zoomDistance(direction.length(), SCENE_CAMERA.zoomInFactor))), engine.controls.target.clone(), 260);
     },
     zoomOut: () => {
       const engine = runtimeRef.current;
       const api = apiRef.current;
       if (!engine || !api) return;
       const direction = engine.camera.position.clone().sub(engine.controls.target);
-      api.animateCamera(engine.controls.target.clone().add(direction.setLength(Math.min(5200, direction.length() * 1.28))), engine.controls.target.clone(), 260);
+      api.animateCamera(engine.controls.target.clone().add(direction.setLength(zoomDistance(direction.length(), SCENE_CAMERA.zoomOutFactor))), engine.controls.target.clone(), 260);
     },
     fit: () => {
       const engine = runtimeRef.current;
@@ -2379,7 +2523,7 @@ export function TiltedCourseStage({
       const api = apiRef.current;
       if (!engine || !api) return;
       const direction = engine.camera.position.clone().sub(engine.controls.target);
-      const distance = THREE.MathUtils.clamp(engine.fitDistance / Math.max(0.2, percent / 100), 180, 5200);
+      const distance = THREE.MathUtils.clamp(engine.fitDistance / Math.max(0.2, percent / 100), SCENE_CAMERA.minDistance, engine.controls.maxDistance);
       api.animateCamera(engine.controls.target.clone().add(direction.setLength(distance)), engine.controls.target.clone(), 320);
     },
     getViewState: () => {
@@ -2437,7 +2581,6 @@ export function TiltedCourseStage({
       data-layer={layer}
       data-mode="course"
       aria-label={`${ariaLabel ?? "课程场景"}。左键拖拽旋转，滚轮缩放，右键或 Shift 拖拽平移，双击卡片聚焦，双击空白回正面。`}
-      title="左键拖拽旋转 · 滚轮/双指缩放 · 右键或 Shift 拖拽平移 · 双击卡片聚焦 · 双击空白回正"
     >
       <canvas ref={canvasRef} className="ef-imm-canvas" aria-hidden="true" />
       <div ref={labelsRef} className="ef-imm-tilt-labels" aria-hidden="true" />

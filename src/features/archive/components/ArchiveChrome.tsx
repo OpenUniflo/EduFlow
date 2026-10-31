@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, ChevronRight, Crosshair, Lock, Minus, Plus, X } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronRight, Lock, X } from "lucide-react";
 import type { ArchiveCourse, ArchiveEdge, ArchiveModel, ArchiveNode } from "../model/atlasModel";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
 
@@ -6,24 +6,6 @@ export function ArchiveLevelChip({ level }: { level: number }) {
   return (
     <div className="ef-atlas-level ef-ui-glass ef-ui-glass--regular" aria-label="当前星图层级">
       {["领域", "主题", "知识"].map((label, index) => <span key={label} className={index === level ? "is-on" : ""}>{label}</span>)}
-    </div>
-  );
-}
-
-export function ArchiveZoomControls({ percent, disabled, onZoomIn, onZoomOut, onReset }: {
-  percent: number;
-  disabled?: boolean;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onReset: () => void;
-}) {
-  return (
-    <div className="ef-atlas-zoom ef-ui-glass ef-ui-glass--regular" role="group" aria-label="星图镜头">
-      <button type="button" onClick={onZoomOut} disabled={disabled} aria-label="缩小"><Minus size={16} aria-hidden /></button>
-      <span className="ef-atlas-zoom-percent" aria-label={`当前缩放 ${percent}%`}>{percent}%</span>
-      <button type="button" onClick={onZoomIn} disabled={disabled} aria-label="放大"><Plus size={16} aria-hidden /></button>
-      <span className="ef-atlas-zoom-div" aria-hidden />
-      <button type="button" className="ef-atlas-zoom-reset" onClick={onReset} disabled={disabled} aria-label="复位视角" title="复位视角"><Crosshair size={15} aria-hidden /><span>复位</span></button>
     </div>
   );
 }

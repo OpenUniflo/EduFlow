@@ -324,5 +324,9 @@ describe("compressed capability layers", () => {
     expect(c3.z).toBe(-388);
     expect(c2.z - c1.z).toBeLessThanOrEqual(54);
     expect(c3.y - c2.y).toBeLessThanOrEqual(26);
+    // Deeper capability planes get a lateral lane, so a shared support anchor
+    // does not project as one dot with three names when the plane is turned.
+    expect(c2.x - c1.x).toBeGreaterThanOrEqual(40);
+    expect(c3.x - c2.x).toBeGreaterThanOrEqual(40);
   });
 });

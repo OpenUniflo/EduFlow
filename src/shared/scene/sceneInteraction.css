@@ -1,0 +1,33 @@
+/* Shared scene zoom toolbar. Page-level classes keep the Archive / course
+   placement and glass material; these rules only own the common internals. */
+
+.ef-scene-zoom-percent {
+  min-width: 47px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.ef-scene-zoom-div {
+  width: 1px;
+  min-width: 1px;
+  height: 22px;
+  padding: 0;
+  background: var(--line);
+}
+
+.ef-scene-zoom-wide {
+  width: auto !important;
+  min-width: 34px;
+  padding: 0 9px !important;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+  line-height: var(--lh-12);
+}
+
+@media (max-width: 1120px) {
+  .ef-scene-zoom-label { display: none; }
+}

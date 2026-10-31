@@ -1884,17 +1884,26 @@
   color: var(--ink);
   background: var(--surface);
   filter: none;
-  opacity: 1 !important;
 }
 
 .ef-imm-node.is-hl:not(.is-ghost) {
-  box-shadow: var(--sh-2);
+  box-shadow: none;
 }
 
 .ef-imm-node.is-sel:not(.is-ghost) {
-  outline: 3px solid var(--brand);
+  outline: 2px solid var(--brand);
   outline-offset: 0;
-  box-shadow: var(--sh-3);
+  box-shadow: none;
+}
+
+/* P4R6: hovering a card or capsule only brightens its outline; the ring is
+   reserved for the point stage (and capability dots). */
+.ef-imm-node.is-hover:not(.is-ghost):not(.is-hl):not(.is-sel) {
+  border-color: color-mix(in srgb, var(--brand) 58%, var(--line));
+}
+
+.ef-imm-node.is-hover.is-ghost {
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--line));
 }
 
 .ef-imm-node.is-hl:not(.is-ghost) .ef-imm-node-copy strong,

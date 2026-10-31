@@ -301,7 +301,7 @@ describe("complete capability path selection", () => {
     expect([...path.nodeIds]).toEqual(["K"]);
   });
 
-  it("lights every capability path node and no isolated capability in the selection relation", () => {
+  it("lights only the one-hop capability supporters of the selected Knowledge", () => {
     const relations = courseSelectionRelations({
       selection: { kind: "knowledge", id: "K" },
       knowledgeIds: ["K", "K2"],
@@ -314,8 +314,9 @@ describe("complete capability path selection", () => {
       acquiredNodeIds: ["ACQ"],
       modelNodeIds: ["ACQ", "B", "C", "D", "K"]
     });
-    // B and C are on the acquired path; D is not.
-    expect([...relations.capabilityIds].sort()).toEqual(["ACQ", "B", "C"]);
-    expect([...relations.edgeIds].sort()).toEqual(["a", "b", "c"]);
+    // P4R6: only the capabilities directly supporting K are one hop away;
+    // ACQ and B need a second hop through C and are therefore not included.
+    expect([...relations.capabilityIds].sort()).toEqual(["C", "D"]);
+    expect([...relations.edgeIds].sort()).toEqual(["c", "d"]);
   });
 });

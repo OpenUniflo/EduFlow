@@ -17,7 +17,8 @@ import type { FollowedPerson } from "@/features/profile/people/PeopleRepository"
 import { ArchivePeopleBar } from "../components/ArchivePeopleBar";
 import { ArchivePersonPanel, ArchivePeopleSharePanel, type PanelPerson } from "../components/ArchivePeoplePanels";
 import { ArchiveAssistantPanel, GuestAssistantCard } from "../components/ArchiveAssistantPanel";
-import { ArchiveCourseFocusBar, ArchiveDraftFocusBar, ArchiveLevelChip, ArchiveNodePanel, ArchiveZoomControls } from "../components/ArchiveChrome";
+import { ArchiveCourseFocusBar, ArchiveDraftFocusBar, ArchiveLevelChip, ArchiveNodePanel } from "../components/ArchiveChrome";
+import { SceneZoomToolbar } from "@/shared/scene/SceneZoomToolbar";
 import { ArchiveSearchPanel } from "../components/ArchiveSearchPanel";
 import type { ArchiveAtlasSceneHandle } from "../components/ArchiveAtlasScene";
 import { archiveCourseKnowledgeIds, buildArchiveModel, searchArchive, type ArchiveModel } from "../model/atlasModel";
@@ -796,15 +797,17 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       ) : null}
 
       {focusedCourse ? null : <ArchiveLevelChip level={level} />}
-      <ArchiveZoomControls
+      <SceneZoomToolbar
+        className="ef-atlas-zoom ef-ui-glass ef-ui-glass--regular"
         percent={percent}
         disabled={error}
         onZoomIn={() => sceneRef.current?.zoomBy(0.82)}
         onZoomOut={() => sceneRef.current?.zoomBy(1.22)}
-        onReset={() => {
+        onFit={() => {
           if (focusedCourse || assistantDraft) sceneRef.current?.fitCourse({ left: leftInset + 12, right: 12, top: 188, bottom: 96 });
           else sceneRef.current?.resetView();
         }}
+        onFront={() => sceneRef.current?.frontView()}
       />
 
       <div className="ef-atlas-legend" aria-live="polite">

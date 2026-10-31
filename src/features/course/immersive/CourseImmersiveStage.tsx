@@ -76,7 +76,7 @@ export type StageEdge = {
   source?: string;
   target?: string;
   points: StagePoint[];
-  kind?: "plain" | "knowledge" | "chapter" | "capability" | "practice";
+  kind?: "plain" | "knowledge" | "chapter" | "capability" | "practice" | "route-hop";
   highlighted?: boolean;
   /** Per-point weight of the animated knowledge reflection offset (0..1). */
   pointWeights?: number[];

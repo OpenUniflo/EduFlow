@@ -1,46 +1,33 @@
 /**
- * Course-page-only learning-state colour encoding (2026-11-01):
- * green = acquired, blue = pending Course target, gray = pending intermediate
- * capability, plus practice identity. The Archive keeps Domain and its own
- * learner colours; do not apply this mapping outside the learner course page.
+ * Feature-facing names for the shared course colour encoding. The mapping
+ * itself lives in `src/shared/scene/coursePalette.ts` so the Archive course
+ * plane and the learner course page cannot drift apart (2026-11-01).
  */
 
-export type ProjectTone = "acquired" | "target" | "intermediate" | "practice";
+import {
+  courseColorVar,
+  courseToneFor,
+  courseToneLegend,
+  type CourseTone,
+  type CourseToneInput
+} from "@/shared/scene/coursePalette";
 
-export type ProjectToneInput = {
-  kind: "knowledge" | "assignment" | "capability" | "chapter" | "chapter-empty" | "route" | "route-chapter";
-  /** Learner category when known; `completed` / `learning` are also accepted. */
-  category?: "acquired" | "learning" | "pending" | null;
-  status?: string | null;
-};
+export type ProjectTone = CourseTone;
+export type ProjectToneInput = CourseToneInput;
 
 export function projectToneFor(input: ProjectToneInput): ProjectTone {
-  if (input.kind === "assignment") return "practice";
-  const acquired = input.category === "acquired"
-    || input.status === "completed";
-  if (input.kind === "capability") return acquired ? "acquired" : "intermediate";
-  return acquired ? "acquired" : "target";
+  return courseToneFor(input);
 }
 
 /** CSS custom property for the tone; all colours come from tokens. */
 export function projectColorVar(tone: ProjectTone) {
-  if (tone === "acquired") return "var(--course-acquired)";
-  if (tone === "target") return "var(--course-target)";
-  if (tone === "intermediate") return "var(--course-intermediate)";
-  return "var(--practice)";
+  return courseColorVar(tone);
 }
 
 export function projectColorValue(tone: ProjectTone) {
-  if (tone === "acquired") return "var(--course-acquired)";
-  if (tone === "target") return "var(--course-target)";
-  if (tone === "intermediate") return "var(--course-intermediate)";
-  return "var(--practice)";
+  return courseColorVar(tone);
 }
 
 export function projectToneLegend(): Array<{ tone: ProjectTone; label: string }> {
-  return [
-    { tone: "acquired", label: "已具备" },
-    { tone: "target", label: "待学目标" },
-    { tone: "intermediate", label: "待学中间能力" }
-  ];
+  return courseToneLegend();
 }

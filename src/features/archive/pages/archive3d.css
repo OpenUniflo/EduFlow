@@ -165,6 +165,19 @@
   box-shadow: var(--sh-2);
 }
 
+/* P4R6: selection highlight is stroke + opacity only. The card is never
+   lifted, scaled or restacked. */
+.ef-atlas-plane-card.is-hl {
+  border-color: color-mix(in srgb, var(--brand) 58%, var(--line));
+  color: var(--ink);
+}
+
+.ef-atlas-plane-card.is-sel {
+  border-color: var(--brand);
+  outline: 2px solid var(--brand);
+  outline-offset: 0;
+}
+
 .ef-atlas-card-dot {
   position: absolute;
   top: 4px;
@@ -178,6 +191,17 @@
 
 .ef-atlas-card[data-status="learned"] .ef-atlas-card-dot,
 .ef-atlas-card[data-status="mastered"] .ef-atlas-card-dot { background: var(--acquired); }
+
+/* The Archive course plane uses the same course encoding as the course page:
+   green acquired, blue pending target (not the Archive's Domain colours). */
+.ef-atlas-plane-card .ef-atlas-card-dot { background: var(--course-target); }
+.ef-atlas-plane-card[data-status="learning"] .ef-atlas-card-dot,
+.ef-atlas-plane-card[data-status="practicing"] .ef-atlas-card-dot,
+.ef-atlas-plane-card[data-status="explore"] .ef-atlas-card-dot,
+.ef-atlas-plane-card[data-status="available"] .ef-atlas-card-dot,
+.ef-atlas-plane-card[data-status="locked"] .ef-atlas-card-dot { background: var(--course-target); }
+.ef-atlas-plane-card[data-status="learned"] .ef-atlas-card-dot,
+.ef-atlas-plane-card[data-status="mastered"] .ef-atlas-card-dot { background: var(--course-acquired); }
 .ef-atlas-card[data-status="learning"] .ef-atlas-card-dot,
 .ef-atlas-card[data-status="practicing"] .ef-atlas-card-dot { background: var(--brand); }
 

@@ -10,14 +10,19 @@ import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRe
 import type { ArchiveEdge, ArchiveNode } from "../model/atlasModel";
 import type { AtlasCommunity } from "../model/atlasCommunities";
 import type { Vec3 } from "../model/atlas3dLayout";
-import { placeAtlasKnowledgeLabels, placeAtlasLabels, type AtlasKnowledgeLabelCandidate, type AtlasLabelCandidate, type AtlasLabelRect } from "../model/atlasLabels";
+import { knowledgeLabelRect, placeAtlasKnowledgeLabels, placeAtlasLabels, type AtlasKnowledgeLabelCandidate, type AtlasLabelCandidate, type AtlasLabelRect } from "../model/atlasLabels";
 import { KNOWLEDGE_LABEL_FONT, KNOWLEDGE_LABEL_STRONG_FONT, measureKnowledgeLabelBox, measurePlaneLabelWidth } from "@/shared/scene/labelBox";
 import {
   chooseTiltedLabels,
   findExcentricCluster,
   layoutExcentricOutside,
+  pickScreenSpace,
   simplificationForAngle
 } from "@/shared/scene/tiltedPlane";
+import { SCENE_CAMERA, doubleClickAction, focusPose, frontPose, isCameraDrag, isPanGesture, shouldSnapToFront, zoomDistance } from "@/shared/scene/cameraInteraction";
+import { isPickable, cardNameOpacity, cardShowsOwnName } from "@/shared/scene/presentationRules";
+import { oneHopSelection } from "@/shared/scene/selection";
+import { courseColorVar, courseToneForStatus } from "@/shared/scene/coursePalette";
 import type { PlaneChapter } from "../model/coursePlaneLayout";
 import type { PlaneDependencyRoute } from "../model/coursePlaneDependencies";
 import type { CourseEnterSnapshot, ArchiveCourseView } from "@/features/course/immersive/courseTransition";
@@ -32,6 +37,7 @@ export type ArchiveAtlasSceneHandle = {
   fitIds(ids: Iterable<string>, options?: { padding?: number; maxRatio?: number; insets?: SceneInsets }): void;
   fitCourse(insets?: SceneInsets): void;
   resetView(): void;
+  frontView(): void;
   shiftForDetail(open: boolean): void;
   getZoomPercent(): number;
   getLevel(): number;
@@ -351,7 +357,7 @@ export default function ArchiveAtlasScene({
   const detailShiftRef = useRef(0);
   const lastCourseInsetsRef = useRef<{ left?: number; right?: number; top?: number; bottom?: number }>({});
   const referenceDistanceRef = useRef(1);
-  const downRef = useRef<{ x: number; y: number; time: number; button: number } | null>(null);
+  const downRef = useRef<{ x: number; y: number; time: number; button: number; shift: boolean } | null>(null);
   const paletteRef = useRef({ edge: "#8b93b5", bright: "#b9b1ff", brandInk: "#4338ca", star: "#9aa6da", global: "#ffb454" });
   const labelPoolRef = useRef(new Map<string, HTMLDivElement>());
   const lastLabelFrameRef = useRef(0);
@@ -394,6 +400,21 @@ export default function ArchiveAtlasScene({
     return target;
   }
 
+  function selectionIndices() {
+    const selectedId = propsRef.current.selectedId;
+    const engine = engineRef.current;
+    if (!selectedId || !engine) return null;
+    const hop = oneHopSelection({
+      selectedIds: [selectedId],
+      nodeIds: propsRef.current.nodes.map((node) => node.id),
+      edges: propsRef.current.edges
+    });
+    return new Set([...hop.nodeIds].flatMap((id) => {
+      const index = engine.nodeIndex.get(id);
+      return index === undefined ? [] : [index];
+    }));
+  }
+
   function presentationTargets() {
     const engine = engineRef.current;
     if (!engine) return;
@@ -403,7 +424,7 @@ export default function ArchiveAtlasScene({
     const size = new Float32Array(count).fill(1);
     const edgeAlpha = new Float32Array(currentProps.edges.length).fill(0.16);
     const selected = currentProps.selectedId ? engine.nodeIndex.get(currentProps.selectedId) : undefined;
-    const selectedNeighborhood = selected === undefined ? null : new Set([selected, ...engine.neighbors[selected]]);
+    const selectedNeighborhood = selected === undefined ? null : selectionIndices();
     const personSets = currentProps.people.map((person) => ({ ...person, indices: new Set(Array.from(person.nodeIds).flatMap((id) => { const index = engine.nodeIndex.get(id); return index === undefined ? [] : [index]; })) }));
     const focusedPersonIndices = new Set<number>();
     personSets.forEach((person) => person.indices.forEach((index) => focusedPersonIndices.add(index)));
@@ -416,9 +437,10 @@ export default function ArchiveAtlasScene({
 
     currentProps.nodes.forEach((node, index) => {
       if (selectedNeighborhood) {
-        if (index === selected) { alpha[index] = 1; size[index] = 1.65; }
-        else if (selectedNeighborhood.has(index)) { alpha[index] = 1; size[index] = 1.2; }
-        else { alpha[index] = SELECTION_DIM; size[index] = 0.9; }
+        // P4R6: highlight only changes opacity / stroke. A selected or related
+        // card is never lifted, enlarged or restacked.
+        alpha[index] = selectedNeighborhood.has(index) ? 1 : SELECTION_DIM;
+        size[index] = 1;
       } else if (currentProps.mode === "course" || currentProps.mode === "draft") {
         const inPlane = inStationedPlane(node.id) || drafting.has(index);
         if (inPlane) { alpha[index] = 1; size[index] = 1.35; }
@@ -433,7 +455,7 @@ export default function ArchiveAtlasScene({
         if (assisting.has(index)) { alpha[index] = 1; size[index] = 1.4; }
         else { alpha[index] = 0.5; size[index] = 0.94; }
       }
-      if (hoveredRef.current === index) { alpha[index] = 1; size[index] = Math.max(1.3, size[index]); }
+      if (hoveredRef.current === index) { alpha[index] = 1; }
     });
 
     const courseMode = currentProps.mode === "course" || currentProps.mode === "draft";
@@ -441,7 +463,7 @@ export default function ArchiveAtlasScene({
     const hoveredPlaneNode = courseMode && hoveredIndex !== null && inStationedPlane(currentProps.nodes[hoveredIndex]?.id ?? "");
     const hoveredNeighbors = hoveredPlaneNode && hoveredIndex !== null ? new Set([hoveredIndex, ...engine.neighbors[hoveredIndex]]) : null;
     if (hoveredNeighbors) {
-      hoveredNeighbors.forEach((index) => { alpha[index] = 1; size[index] = Math.max(index === hoveredIndex ? 1.7 : 1.85, size[index]); });
+      hoveredNeighbors.forEach((index) => { alpha[index] = 1; });
     }
     currentProps.edges.forEach((edge, index) => {
       const source = engine.nodeIndex.get(edge.source);
@@ -513,6 +535,11 @@ export default function ArchiveAtlasScene({
 
   function pxPerWorld(distance: number, height: number) {
     return height / (2 * distance * FOV_T);
+  }
+
+  function cameraDistance() {
+    const engine = engineRef.current;
+    return engine ? Math.max(SCENE_CAMERA.minDistance, engine.camera.position.distanceTo(engine.controls.target)) : SCENE_CAMERA.minDistance;
   }
 
   function fitBoundsOf(indices: Iterable<number>, options: { inset?: SceneInsets; padding?: number; maxRatio?: number; direction?: THREE.Vector3; useTarget?: boolean } = {}) {
@@ -686,7 +713,7 @@ export default function ArchiveAtlasScene({
       planeLabelsApiRef.current?.freeze();
       planeLabelsApiRef.current?.thaw(300);
       const direction = engine.camera.position.clone().sub(engine.controls.target);
-      const distance = Math.max(engine.controls.minDistance, Math.min(engine.controls.maxDistance, direction.length() * factor));
+      const distance = zoomDistance(direction.length(), factor, engine.controls.minDistance, engine.controls.maxDistance);
       const target = engine.controls.target.clone();
       animateCamera(target.clone().add(direction.setLength(distance)), target, 260);
     },
@@ -705,6 +732,13 @@ export default function ArchiveAtlasScene({
       const currentMode = propsRef.current.mode;
       if (currentMode === "course" || currentMode === "draft") { fitCoursePlane(lastCourseInsetsRef.current); return; }
       fitBoundsOf(Array.from({ length: propsRef.current.nodes.length }, (_, index) => index), { padding: 1.08 });
+    },
+    frontView() {
+      const engine = engineRef.current;
+      if (!engine) return;
+      const target = engine.controls.target;
+      const pose = frontPose({ x: target.x, y: target.y, z: target.z }, cameraDistance());
+      animateCamera(new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z), new THREE.Vector3(pose.target.x, pose.target.y, pose.target.z), 450);
     },
     shiftForDetail(open) {
       const engine = engineRef.current;
@@ -752,13 +786,14 @@ export default function ArchiveAtlasScene({
     const camera = new THREE.PerspectiveCamera(FOV, width / height, 1, 20000);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.085;
-    controls.rotateSpeed = 0.62;
-    controls.zoomSpeed = 0.8;
-    controls.panSpeed = 0.8;
+    controls.dampingFactor = SCENE_CAMERA.dampingFactor;
+    controls.rotateSpeed = SCENE_CAMERA.rotateSpeed;
+    controls.zoomSpeed = SCENE_CAMERA.zoomSpeed;
+    controls.panSpeed = SCENE_CAMERA.panSpeed;
     controls.screenSpacePanning = true;
-    controls.minDistance = 180;
-    controls.maxDistance = 6000;
+    controls.minDistance = SCENE_CAMERA.minDistance;
+    controls.maxDistance = SCENE_CAMERA.maxDistance;
+    controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 
     const count = nodes.length;
     const current = new Float32Array(count * 3);
@@ -1096,6 +1131,22 @@ export default function ArchiveAtlasScene({
     resizeObserver.observe(container);
     resize();
 
+    let paintedCourseMode = false;
+    let paintedPlaneIds: ReadonlySet<string> | null = null;
+    function refreshPointColors() {
+      const courseMode = propsRef.current.mode === "course" || propsRef.current.mode === "draft";
+      const planeIds = propsRef.current.planeNodeIds;
+      nodes.forEach((node, index) => {
+        const colorValue = courseMode && planeIds?.has(node.id)
+          ? courseColorVar(courseToneForStatus(node.status))
+          : node.color;
+        new THREE.Color(resolveColor(colorValue)).toArray(pointColor.array, index * 3);
+      });
+      pointColor.needsUpdate = true;
+      paintedCourseMode = courseMode;
+      paintedPlaneIds = planeIds ?? null;
+    }
+
     const refreshPalette = () => {
       paletteRef.current = {
         edge: cssVarValue("--atlas-edge", "#8b93b5"),
@@ -1112,11 +1163,7 @@ export default function ArchiveAtlasScene({
       dependencyHotLines.material.color.set(paletteRef.current.brandInk);
       domainGroups.forEach((group, index) => domainSprites[index]?.material.color.set(resolveColor(group.color)));
       communityGroups.forEach((group, index) => topicSprites[index]?.material.color.set(resolveColor(group.color)));
-      nodes.forEach((node, index) => {
-        const color = new THREE.Color(resolveColor(node.color));
-        color.toArray(pointColor.array, index * 3);
-      });
-      pointColor.needsUpdate = true;
+      refreshPointColors();
       domainLinks.forEach((link) => link.material.color.set(paletteRef.current.edge));
     };
     refreshPalette();
@@ -1127,7 +1174,8 @@ export default function ArchiveAtlasScene({
 
     const onPointerDown = (event: PointerEvent) => {
       cameraTweenRef.current.active = false;
-      downRef.current = { x: event.clientX, y: event.clientY, time: performance.now(), button: event.button };
+      window.clearTimeout(blankTimer);
+      downRef.current = { x: event.clientX, y: event.clientY, time: performance.now(), button: event.button, shift: event.shiftKey };
       archiveLabelsRef.current.frozen = true;
       archiveLabelsRef.current.lastMoveAt = performance.now();
       freezePlaneLabels();
@@ -1141,22 +1189,57 @@ export default function ArchiveAtlasScene({
       schedulePlaneThaw(260);
       hidePlaneEx();
     };
+    const snapFrontAfterDrag = () => {
+      const currentMode = propsRef.current.mode;
+      if (currentMode !== "course" && currentMode !== "draft") return;
+      window.setTimeout(() => {
+        if (downRef.current) return;
+        if (!shouldSnapToFront(planeAngle())) return;
+        const target = controls.target.clone();
+        const pose = frontPose({ x: target.x, y: target.y, z: target.z }, camera.position.distanceTo(target));
+        animateCamera(new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z), target, 450);
+      }, SCENE_CAMERA.snapDelayMs);
+    };
     const onPointerUp = (event: PointerEvent) => {
       const down = downRef.current;
       downRef.current = null;
       if (!down) return;
-      if (down.button !== 0) return;
       const moved = Math.hypot(event.clientX - down.x, event.clientY - down.y);
-      if (moved > 5) return;
+      if (!isPanGesture(down.button, down.shift) && isCameraDrag(moved)) snapFrontAfterDrag();
+      if (down.button !== 0) return;
       const rect = renderer.domElement.getBoundingClientRect();
-      onCanvasClick(event.clientX - rect.left, event.clientY - rect.top);
-      schedulePlaneThaw(260);
-      if (down.button === 0 && moved > 5 && propsRef.current.mode === "course" && planeAngle() < 15) {
-        const distance = camera.position.distanceTo(controls.target);
-        const target = controls.target.clone();
-        animateCamera(target.clone().add(new THREE.Vector3(0, 0, distance)), target, 450);
+      if (!isCameraDrag(moved) && event.detail < 2) {
+        // The second click of a double click must not run the single-click
+        // blank action (leaving course focus); the dblclick handler owns it.
+        onCanvasClick(event.clientX - rect.left, event.clientY - rect.top);
       }
+      schedulePlaneThaw(260);
     };
+    const onDoubleClick = (event: MouseEvent) => {
+      window.clearTimeout(blankTimer);
+      const currentMode = propsRef.current.mode;
+      if (currentMode !== "course" && currentMode !== "draft") return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      const hit = pick(event.clientX - rect.left, event.clientY - rect.top);
+      const node = hit === null ? null : propsRef.current.nodes[hit];
+      if (doubleClickAction(node?.id ?? null) === "focus" && node && hit !== null) {
+        const world = getPosition(hit);
+        const pose = focusPose(
+          { x: controls.target.x, y: controls.target.y, z: controls.target.z },
+          { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+          world
+        );
+        controls.target.set(pose.target.x, pose.target.y, pose.target.z);
+        camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+        controls.update();
+        planeLabelsDirty = true;
+        return;
+      }
+      const target = controls.target.clone();
+      const pose = frontPose({ x: target.x, y: target.y, z: target.z }, camera.position.distanceTo(target));
+      animateCamera(new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z), target, 450);
+    };
+    const onContextMenu = (event: MouseEvent) => event.preventDefault();
     const onPointerMove = (event: PointerEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
       if (propsRef.current.mode === "course" || propsRef.current.mode === "draft") {
@@ -1197,6 +1280,8 @@ export default function ArchiveAtlasScene({
     renderer.domElement.addEventListener("pointerup", onPointerUp);
     renderer.domElement.addEventListener("pointermove", onPointerMove);
     renderer.domElement.addEventListener("pointerleave", onPointerLeave);
+    renderer.domElement.addEventListener("dblclick", onDoubleClick);
+    renderer.domElement.addEventListener("contextmenu", onContextMenu);
 
     function project(point: { x: number; y: number; z: number }) {
       const projected = new THREE.Vector3(point.x, point.y, point.z).project(camera);
@@ -1207,35 +1292,36 @@ export default function ArchiveAtlasScene({
     function pick(x: number, y: number) {
       const currentMode = propsRef.current.mode;
       const courseMode = currentMode === "course" || currentMode === "draft";
-      let best: number | null = null;
-      let bestDistance = Infinity;
-      // Full card body, capsule and point all share one 22px screen picker. The
-      // nearest camera candidate wins when bodies overlap.
-      if (courseMode) {
-        cardRects.forEach((rect, index) => {
-          if (x < rect.x || x > rect.x + rect.width || y < rect.y || y > rect.y + rect.height) return;
-          const point = getPosition(index);
-          const distance = camera.position.distanceTo(new THREE.Vector3(point.x, point.y, point.z));
-          if (distance < bestDistance) { best = index; bestDistance = distance; }
-        });
-      }
+      const candidates: Array<{
+        id: string; x: number; y: number; distance: number; rect?: { x: number; y: number; width: number; height: number }; radius?: number; priority?: number;
+      }> = [];
       for (let index = 0; index < count; index += 1) {
-        const nodeId = propsRef.current.nodes[index]?.id;
-        if (courseMode && nodeId && propsRef.current.planeNodeIds?.has(nodeId)) {
-          // Plane nodes stay clickable at every angle, including the back side.
-        } else if (engine.alpha[index] < 0.25) continue;
+        const node = propsRef.current.nodes[index];
+        if (!node) continue;
+        const planeNode = courseMode && Boolean(propsRef.current.planeNodeIds?.has(node.id));
+        // A dimmed node stays clickable (P4R6); only a node that is not drawn
+        // at all leaves the pick set.
+        if (!planeNode && !isPickable(engine.alpha[index])) continue;
         const point = project(getPosition(index));
         if (point.z > 1) continue;
-        const screenDistance = Math.hypot(point.x - x, point.y - y);
-        const hitRadius = Math.max(22, (pointScreenCss[index] ?? 12) / 2 + 5);
-        if (screenDistance > hitRadius) continue;
         const position = getPosition(index);
         const distance = camera.position.distanceTo(new THREE.Vector3(position.x, position.y, position.z));
-        if (distance < bestDistance) { best = index; bestDistance = distance; }
+        candidates.push({
+          id: node.id,
+          x: point.x,
+          y: point.y,
+          distance,
+          rect: cardRects.get(index),
+          radius: Math.max(22, (pointScreenCss[index] ?? 12) / 2 + 5)
+        });
       }
-      return best;
+      const id = pickScreenSpace(candidates, { x, y }, { minRadius: 22 });
+      if (!id) return null;
+      const index = engine.nodeIndex.get(id);
+      return index === undefined ? null : index;
     }
 
+    let blankTimer = 0;
     function onCanvasClick(x: number, y: number) {
       const id = pick(x, y);
       const node = id === null ? null : propsRef.current.nodes[id];
@@ -1250,7 +1336,11 @@ export default function ArchiveAtlasScene({
         hoverPointRef.current = null;
         presentationTargets();
         startPresentationAnimation(160);
-        propsRef.current.onBlank?.();
+        // A blank click normally leaves course focus / clears the detail. Hold
+        // it briefly so the first click of a blank double click (return to the
+        // front pose) cannot exit course focus before dblclick runs.
+        window.clearTimeout(blankTimer);
+        blankTimer = window.setTimeout(() => propsRef.current.onBlank?.(), 260);
         return;
       }
       if (node) propsRef.current.onSelectNode?.(node.id);
@@ -1328,6 +1418,9 @@ export default function ArchiveAtlasScene({
       glowMaterial.uniforms.uScale.value = sharedScale;
       glowMaterial.uniforms.uPixelRatio.value = pixelRatio;
       const courseMode = currentMode === "course" || currentMode === "draft";
+      if (courseMode !== paintedCourseMode || (propsRef.current.planeNodeIds ?? null) !== paintedPlaneIds) {
+        refreshPointColors();
+      }
       // The name set freezes while the camera moves; labels only follow their
       // nodes. 250ms after the last camera change the set is recomputed and
       // changes cross-fade (200ms).
@@ -1396,14 +1489,62 @@ export default function ArchiveAtlasScene({
           .map(([id, element]) => ({ id, text: element.textContent }));
         const visibleGlobalLabels = [...labelPoolRef.current].filter(([, element]) => Number(element.style.opacity) > 0.05)
           .map(([key, element]) => ({ key, text: element.querySelector(".ef-atlas-label-text")?.textContent ?? element.textContent }));
+        const highlightedEdges: Array<{ source: string; target: string; kind: string; opacity: number }> = [];
+        if (selectedId && selectedIndex !== undefined) {
+          if (currentMode === "course" || currentMode === "draft") {
+            propsRef.current.planeDependencies.forEach((route) => {
+              if (route.source !== selectedId && route.target !== selectedId) return;
+              highlightedEdges.push({ source: route.source, target: route.target, kind: "dependency", opacity: 1 });
+            });
+            engine.neighbors[selectedIndex].forEach((neighbor) => {
+              const neighborId = propsRef.current.nodes[neighbor]?.id;
+              if (!neighborId || propsRef.current.planeNodeIds?.has(neighborId)) return;
+              highlightedEdges.push({ source: selectedId, target: neighborId, kind: "global", opacity: 0.95 });
+            });
+          } else {
+            engine.neighbors[selectedIndex].forEach((neighbor) => {
+              const neighborId = propsRef.current.nodes[neighbor]?.id;
+              if (neighborId) highlightedEdges.push({ source: selectedId, target: neighborId, kind: "knowledge", opacity: 0.95 });
+            });
+          }
+        }
+        const courseColors = propsRef.current.nodes.flatMap((node, index) => {
+          if (!propsRef.current.planeNodeIds?.has(node.id)) return [];
+          const color = new THREE.Color(pointColor.array[index * 3], pointColor.array[index * 3 + 1], pointColor.array[index * 3 + 2]);
+          return [{ id: node.id, status: node.status, color: `#${color.getHexString()}` }];
+        });
         (window as unknown as { __efArchivePlane?: unknown }).__efArchivePlane = {
-          mode: currentMode, angle: Number(planeAngle().toFixed(1)), selectedId, neighborIds, relatedNames, relatedScreens,
+          mode: currentMode, angle: Number(planeAngle().toFixed(1)), selectedId, neighborIds, relatedNames, relatedScreens, highlightedEdges, courseColors,
           planeNodeIds: [...(propsRef.current.planeNodeIds ?? [])],
           planeCards: planeCardsDebug,
           labelState: { frozen: planeLabelsFrozen, dirty: planeLabelsDirty, layerOn: planeLabelLayerOn, choices: planeLabelChoices.length, cacheFrozen: cache.frozen, cacheLabels: cache.labels.map((label) => ({ key: label.key, alpha: label.alpha, x: Math.round(label.x ?? -1), y: Math.round(label.y ?? -1) })) },
           xrayNameOpacity: xrayName.style.opacity,
           visiblePlaneLabels,
-          visibleGlobalLabels
+          visibleGlobalLabels,
+          occlusion: () => {
+            const planeIds = propsRef.current.planeNodeIds ?? new Set<string>();
+            const cards = [...planeCards.values()]
+              .filter((runtime) => runtime.object.visible && runtime.opacity > 0.1 && runtime.state.dot < 0.72)
+              .map((runtime) => ({ runtime, rect: { x: runtime.screen.x - runtime.width * (planeViewport.height / (2 * Math.max(1, runtime.distance) * FOV_T)) / 2, y: runtime.screen.y - runtime.height * (planeViewport.height / (2 * Math.max(1, runtime.distance) * FOV_T)) / 2, width: runtime.width * (planeViewport.height / (2 * Math.max(1, runtime.distance) * FOV_T)), height: runtime.height * (planeViewport.height / (2 * Math.max(1, runtime.distance) * FOV_T)) } }));
+            let globalCount = 0;
+            let intersections = 0;
+            let behind = 0;
+            let visibleIntersections = 0;
+            propsRef.current.nodes.forEach((node, index) => {
+              if (planeIds.has(node.id)) return;
+              globalCount += 1;
+              const point = planeProject(planePoint(index));
+              if (point.z > 1) return;
+              const distance = camera.position.distanceTo(new THREE.Vector3(engine.current[index * 3], engine.current[index * 3 + 1], engine.current[index * 3 + 2]));
+              const hits = cards.filter(({ rect }) => point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height);
+              if (!hits.length) return;
+              intersections += 1;
+              const hidden = hits.some(({ runtime }) => runtime.distance < distance - 3);
+              if (hidden) behind += 1;
+              else visibleIntersections += 1;
+            });
+            return { globalCount, cards: cards.length, intersections, behind, visibleIntersections };
+          }
         };
       }
       pointPosition.needsUpdate = true;
@@ -1481,11 +1622,14 @@ export default function ArchiveAtlasScene({
         });
       }
       const globalHighlight: number[] = [];
-      if (courseMode && hovered !== null && propsRef.current.planeNodeIds?.has(propsRef.current.nodes[hovered]?.id ?? "")) {
-        engine.neighbors[hovered].forEach((neighbor) => {
+      const globalFocus = selected !== undefined && propsRef.current.planeNodeIds?.has(propsRef.current.nodes[selected]?.id ?? "")
+        ? selected
+        : hovered !== null && propsRef.current.planeNodeIds?.has(propsRef.current.nodes[hovered]?.id ?? "") ? hovered : null;
+      if (courseMode && globalFocus !== null) {
+        engine.neighbors[globalFocus].forEach((neighbor) => {
           const neighborId = propsRef.current.nodes[neighbor]?.id;
           if (neighborId && propsRef.current.planeNodeIds?.has(neighborId)) return;
-          globalHighlight.push(engine.current[hovered * 3], engine.current[hovered * 3 + 1], engine.current[hovered * 3 + 2]);
+          globalHighlight.push(engine.current[globalFocus * 3], engine.current[globalFocus * 3 + 1], engine.current[globalFocus * 3 + 2]);
           globalHighlight.push(engine.current[neighbor * 3], engine.current[neighbor * 3 + 1], engine.current[neighbor * 3 + 2]);
         });
       }
@@ -1621,6 +1765,9 @@ export default function ArchiveAtlasScene({
       id: string;
       element: HTMLDivElement;
       object: CSS3DObject;
+      /** Depth-only copy of the plane card, so global stars / dependency
+       *  points behind it cannot leak through the CSS3D sheet. */
+      occluder: THREE.Mesh;
       width: number;
       height: number;
       opacity: number;
@@ -1631,6 +1778,13 @@ export default function ArchiveAtlasScene({
     type PlaneChapterRuntime = { id: string; panel: HTMLDivElement; panelObject: CSS3DObject; title: HTMLDivElement; titleObject: CSS3DObject; quad: Array<{ x: number; y: number }> };
     const planeCards = new Map<string, PlaneCardRuntime>();
     const planeChapterObjects = new Map<string, PlaneChapterRuntime>();
+    const planeOccluderGroup = new THREE.Group();
+    const planeOccluderGeometry = new THREE.PlaneGeometry(1, 1);
+    const planeOccluderMaterial = new THREE.MeshBasicMaterial({ side: THREE.FrontSide });
+    planeOccluderMaterial.colorWrite = false;
+    planeOccluderMaterial.depthWrite = true;
+    planeOccluderMaterial.depthTest = true;
+    scene.add(planeOccluderGroup);
     const planeSidePool = new Map<string, HTMLDivElement>();
     const planeSideVisibleTexts = new Set<string>();
     const planeLabelPrevious = new Set<string>();
@@ -1674,6 +1828,7 @@ export default function ArchiveAtlasScene({
       if (!courseMode) {
         planeCards.forEach((runtime) => { engine.cssScene.remove(runtime.object); runtime.element.remove(); });
         planeCards.clear();
+        planeOccluderGroup.clear();
         planeChapterObjects.forEach((runtime) => { engine.cssScene.remove(runtime.panelObject, runtime.titleObject); runtime.panel.remove(); runtime.title.remove(); });
         planeChapterObjects.clear();
         return;
@@ -1694,7 +1849,12 @@ export default function ArchiveAtlasScene({
           const object = new CSS3DObject(element);
           object.element.style.pointerEvents = "none";
           engine.cssScene.add(object);
-          runtime = { index, id: node.id, element, object, width: planeSize().width, height: planeSize().height, opacity: 1, screen: { x: 0, y: 0, z: 0 }, distance: 1000, state: simplificationForAngle(0) };
+          const occluder = new THREE.Mesh(planeOccluderGeometry, planeOccluderMaterial);
+          occluder.frustumCulled = false;
+          occluder.renderOrder = 1;
+          occluder.visible = false;
+          planeOccluderGroup.add(occluder);
+          runtime = { index, id: node.id, element, object, occluder, width: planeSize().width, height: planeSize().height, opacity: 1, screen: { x: 0, y: 0, z: 0 }, distance: 1000, state: simplificationForAngle(0) };
           planeCards.set(node.id, runtime);
         }
         runtime.index = index;
@@ -1711,6 +1871,7 @@ export default function ArchiveAtlasScene({
       planeCards.forEach((runtime, id) => {
         if (current.has(id)) return;
         engine.cssScene.remove(runtime.object);
+        planeOccluderGroup.remove(runtime.occluder);
         runtime.element.remove();
         planeCards.delete(id);
       });
@@ -1831,7 +1992,6 @@ export default function ArchiveAtlasScene({
         ? `<circle class="ef-atlas-plane-xray-halo" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${(radius + 3).toFixed(1)}"/><circle class="ef-atlas-plane-xray-ring" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${radius.toFixed(1)}"/>`
         : ""}`;
       xrayName.textContent = xray.title;
-      xrayName.title = xray.title;
       const width = Math.max(54, estimateLabelWidth(xray.title, "", "knowledge", true));
       const x = Math.max(8, Math.min(box.width - width - 8, xray.screen.x - width / 2));
       let y = xray.screen.y - radius - 30;
@@ -1901,23 +2061,33 @@ export default function ArchiveAtlasScene({
         runtime.width = width;
         runtime.height = height;
         runtime.opacity = opacity;
+        const related = !relatedIndices || relatedIndices.has(runtime.index);
         const element = runtime.element;
         element.style.width = `${width.toFixed(2)}px`;
         element.style.height = `${height.toFixed(2)}px`;
         element.style.padding = `${THREE.MathUtils.lerp(THREE.MathUtils.lerp(9, 3, state.pill), 0, state.dot).toFixed(2)}px ${THREE.MathUtils.lerp(THREE.MathUtils.lerp(10, 9, state.pill), 0, state.dot).toFixed(2)}px`;
         element.style.borderRadius = state.pill > 0.02 ? "var(--r-full)" : "var(--r-8)";
         element.style.opacity = Math.max(0, Math.min(1, opacity)).toFixed(3);
-        element.style.setProperty("--name-op", state.cardName.toFixed(3));
-        element.style.setProperty("--extra-op", state.extra.toFixed(3));
+        // One node, one name: an unrelated card keeps its body but hides its
+        // copy, so a dimmed node never shows a second faded title.
+        element.style.setProperty("--name-op", cardNameOpacity(state.cardName, related).toFixed(3));
+        element.style.setProperty("--extra-op", (related ? state.extra : 0).toFixed(3));
         element.classList.toggle("is-pill", state.pill > 0.02);
         element.classList.toggle("is-dot", state.dot > 0.6);
         element.classList.toggle("is-hover", node.id === hoveredId);
         element.classList.toggle("is-sel", node.id === selectedId);
+        element.classList.toggle("is-hl", Boolean(relatedIndices && related && node.id !== selectedId));
         element.classList.toggle("is-current", Boolean(node.isCurrent));
         runtime.object.visible = opacity > 0.004 && screen.z < 1;
         if (state.billboard <= 0.001) runtime.object.quaternion.set(0, 0, 0, 1);
         else if (state.billboard >= 0.999) runtime.object.quaternion.copy(camera.quaternion);
         else runtime.object.quaternion.slerpQuaternions(new THREE.Quaternion(), camera.quaternion, state.billboard);
+        runtime.occluder.visible = runtime.object.visible && opacity > 0.1 && state.dot < 0.72;
+        if (runtime.occluder.visible) {
+          runtime.occluder.position.copy(runtime.object.position);
+          runtime.occluder.quaternion.copy(runtime.object.quaternion);
+          runtime.occluder.scale.set(width, height, 1);
+        }
         if (runtime.object.visible) {
           visibleCardIndices.add(runtime.index);
           cardRects.set(runtime.index, {
@@ -1960,11 +2130,7 @@ export default function ArchiveAtlasScene({
       planeSidePool.forEach((element) => { element.style.opacity = "0"; });
     }
     function planeSelectionIndices() {
-      const selectedId = propsRef.current.selectedId;
-      if (!selectedId) return null;
-      const selectedIndex = engine.nodeIndex.get(selectedId);
-      if (selectedIndex === undefined) return null;
-      return new Set([selectedIndex, ...engine.neighbors[selectedIndex]]);
+      return selectionIndices();
     }
     function planeLabelCandidates(selectionOnly = false) {
       const result: Array<{ id: string; index: number; x: number; y: number; distance: number; diameter: number; visibility: number; priority: number; text: string }> = [];
@@ -2050,6 +2216,8 @@ export default function ArchiveAtlasScene({
           if (skipSelected && selectedId && choice.id === selectedId) continue;
           const runtime = planeCards.get(choice.id);
           if (!runtime) continue;
+          // The card already owns its name at the full / capsule stage.
+          if (cardShowsOwnName({ cardVisible: runtime.object.visible && runtime.opacity > 0.05, pointMix: runtime.state.dot, cardNameOpacity: runtime.state.cardName })) continue;
           const screen = runtime.screen;
           const labelNode = propsRef.current.nodes[runtime.index];
           const textKey = (labelNode?.title ?? "").trim().toLocaleLowerCase();
@@ -2069,7 +2237,6 @@ export default function ArchiveAtlasScene({
           if (element.textContent !== (labelNode?.title ?? "")) {
             element.textContent = labelNode?.title ?? "";
           }
-          element.title = labelNode?.title ?? "";
           element.style.transform = `translate(${anchorX.toFixed(1)}px, ${anchorY.toFixed(1)}px)`;
           element.style.opacity = (choice.alpha * fade).toFixed(3);
           used.add(choice.id);
@@ -2104,7 +2271,8 @@ export default function ArchiveAtlasScene({
         const used = new Set<string>();
         if (hoveredId && angle > 35) {
           const runtime = planeCards.get(hoveredId);
-          const candidate = runtime ? planeLabelCandidates().find((entry) => entry.id === hoveredId) : null;
+          const cardOwnsName = Boolean(runtime && cardShowsOwnName({ cardVisible: runtime.object.visible && runtime.opacity > 0.05, pointMix: runtime.state.dot, cardNameOpacity: runtime.state.cardName }));
+          const candidate = runtime && !cardOwnsName ? planeLabelCandidates().find((entry) => entry.id === hoveredId) : null;
           if (candidate) {
             const placed = placeOnePlaneLabel(candidate);
             const element = planeSidePool.get(hoveredId) ?? (() => {
@@ -2402,7 +2570,7 @@ export default function ArchiveAtlasScene({
             if (point.z > 1) continue;
             const text = node.title;
             const textKey = text.trim().toLocaleLowerCase();
-            if (textKey && planeSideVisibleTexts.has(textKey)) return;
+            if (textKey && planeSideVisibleTexts.has(textKey)) continue;
             const width = estimateLabelWidth(text, "", "knowledge", forced);
             const height = labelHeight("knowledge");
             const diameter = Math.max(12, (pointScreenCss[index] ?? 9) * 2.2);
@@ -2450,7 +2618,7 @@ export default function ArchiveAtlasScene({
             // Selection names the selected node and its one-hop neighbours.
             // Plane nodes are named by the side label layer; this adds the
             // Course-outside global Knowledge and its edges.
-            const related = new Set([context.selected, ...engine.neighbors[context.selected]]);
+            const related = selectionIndices() ?? new Set([context.selected]);
             related.forEach((index) => {
               const relatedNode = currentProps.nodes[index];
               if (!relatedNode || planeSet.has(relatedNode.id)) return;
@@ -2480,9 +2648,7 @@ export default function ArchiveAtlasScene({
             }
           }
         }
-        const selectionRelated = context.selected !== null
-          ? new Set([context.selected, ...engine.neighbors[context.selected]])
-          : null;
+        const selectionRelated = context.selected !== null ? selectionIndices() : null;
         // During a selection, unrelated cards are dimmed to 20%; a related
         // name may sit over one of those faded cards rather than disappear.
         // Bright related cards still keep their names off their copy.
@@ -2515,13 +2681,68 @@ export default function ArchiveAtlasScene({
           ...placedOther.map((label) => (label.text ?? "").trim().toLocaleLowerCase()).filter(Boolean),
           ...(context.courseMode ? planeSideVisibleTexts : [])
         ]);
-        const placedKnowledge = placeAtlasKnowledgeLabels(knowledgeCandidates, { width: context.rect.width, height: context.rect.height }, {
-          maxLabels: 120,
-          // A name never moves away from its node; it may sit next to another
-          // point in a compact core, but it never overlaps a card or HUD.
-          exclusions: blocked,
-          reservedTexts
-        });
+        let placedKnowledge: ReturnType<typeof placeAtlasKnowledgeLabels>;
+        if (context.selected !== null) {
+          // Selection names every related node. Pack from the right edge so a
+          // dense cross-course cluster keeps four names instead of losing the
+          // last one to the greedy card/HUD obstacle pass. Names still stay
+          // anchored to their own marker.
+          placedKnowledge = [];
+          const placedRects: AtlasLabelRect[] = [];
+          const usedTexts = new Set<string>(reservedTexts);
+          const ordered = [...knowledgeCandidates].sort((left, right) => right.x - left.x || left.key.localeCompare(right.key));
+          for (const candidate of ordered) {
+            const key = candidate.text.trim().toLocaleLowerCase();
+            if (key && usedTexts.has(key)) continue;
+            for (const anchor of ["above", "right", "below", "left"] as const) {
+              const rect = knowledgeLabelRect(candidate, anchor);
+              if (rect.x < 8 || rect.y < 8 || rect.x + rect.width > context.rect.width - 4 || rect.y + rect.height > context.rect.height - 4) continue;
+              if (placedRects.some((other) => overlapRatio(rect, other) > 0.02)) continue;
+              if (hudRects.some((other) => overlapRatio(rect, other) > 0.02)) continue;
+              placedKnowledge.push({ ...candidate, anchor });
+              placedRects.push(rect);
+              if (key) usedTexts.add(key);
+              break;
+            }
+          }
+        } else {
+          placedKnowledge = placeAtlasKnowledgeLabels(knowledgeCandidates, { width: context.rect.width, height: context.rect.height }, {
+            maxLabels: 120,
+            // A name never moves away from its node; it may sit next to another
+            // point in a compact core, but it never overlaps a card or HUD.
+            exclusions: blocked,
+            reservedTexts
+          });
+        }
+        // P4R6: during a selection every related node keeps a name. Dense
+        // cross-course clusters can leave a label out of placeAtlasKnowledgeLabels'
+        // anchor pass; retry only against other names and HUD, never against a
+        // card body (the name stays anchored to its own marker).
+        if (context.selected !== null) {
+          const placedKnowledgeTexts = new Set(placedKnowledge.map((label) => (label.text ?? "").trim().toLocaleLowerCase()));
+          const placedRects: AtlasLabelRect[] = [
+            ...placedKnowledge.map((label) => ({ x: label.x - 2, y: label.y - 2, width: label.width + 4, height: label.height + 4 })),
+            ...placedOther.map((label) => ({ x: label.x - 2, y: label.y - 2, width: label.width + 4, height: label.height + 4 }))
+          ];
+          const hudOnly = hudRects;
+          const unplaced = knowledgeCandidates
+            .filter((candidate) => !placedKnowledgeTexts.has((candidate.text ?? "").trim().toLocaleLowerCase()))
+            .sort((left, right) => right.x - left.x || left.key.localeCompare(right.key));
+          for (const candidate of unplaced) {
+            const key = candidate.text.trim().toLocaleLowerCase();
+            if (placedKnowledgeTexts.has(key)) continue;
+            for (const anchor of ["above", "right", "below", "left"] as const) {
+              const rect = knowledgeLabelRect(candidate, anchor);
+              if (rect.x < 8 || rect.y < 8 || rect.x + rect.width > context.rect.width - 4 || rect.y + rect.height > context.rect.height - 4) continue;
+              if (placedRects.some((other) => overlapRatio(rect, other) > 0.02)) continue;
+              if (hudOnly.some((other) => overlapRatio(rect, other) > 0.02)) continue;
+              placedKnowledge.push({ ...candidate, anchor });
+              placedRects.push(rect);
+              if (key) placedKnowledgeTexts.add(key);
+              break;
+            }
+          }
+        }
         const next: AtlasRenderedLabel[] = [];
         placedOther.forEach((label) => {
           const world = worldByKey.get(label.key);
@@ -2607,7 +2828,6 @@ export default function ArchiveAtlasScene({
         if (element.dataset.html !== html) { element.innerHTML = html; element.dataset.html = html; }
         element.dataset.key = label.key;
         element.className = `ef-atlas-label is-${label.kind}${content?.strong ? " is-strong" : ""}`;
-        element.title = label.kind === "knowledge" || label.kind === "chapter" ? (content?.text ?? label.text) : "";
         if (label.kind === "chapter") {
           element.style.whiteSpace = "nowrap";
           element.style.textAlign = "center";
@@ -2666,6 +2886,7 @@ export default function ArchiveAtlasScene({
       disposed = true;
       cancelAnimationFrame(frameHandle);
       window.clearTimeout(resizeTimer);
+      window.clearTimeout(blankTimer);
       resizeObserver.disconnect();
       themeObserver.disconnect();
       media.removeEventListener("change", refreshPalette);
@@ -2674,6 +2895,8 @@ export default function ArchiveAtlasScene({
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
       renderer.domElement.removeEventListener("pointermove", onPointerMove);
       renderer.domElement.removeEventListener("pointerleave", onPointerLeave);
+      renderer.domElement.removeEventListener("dblclick", onDoubleClick);
+      renderer.domElement.removeEventListener("contextmenu", onContextMenu);
       labelPoolRef.current.forEach((element) => element.remove());
       cardPool.forEach((element) => element.remove());
       cardPool.clear();
