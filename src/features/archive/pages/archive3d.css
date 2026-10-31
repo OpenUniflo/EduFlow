@@ -46,6 +46,7 @@
   left: 0;
   top: 0;
   display: inline-flex;
+  box-sizing: border-box;
   max-width: 280px;
   align-items: center;
   gap: 4px;

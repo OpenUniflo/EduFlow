@@ -7,6 +7,7 @@ import {
   computeCourseFit,
   computeCoursePan
 } from "./immersiveViewport";
+import { advancePulse, pulseCenters, routeMetrics, windowLengthForPixels } from "@/shared/scene/routePulse";
 
 /**
  * One three.js scene for every learner course presentation. Structural layout
@@ -54,6 +55,8 @@ export type StageNode = {
   /** Route step number and the "you are here" marker. */
   step?: number;
   here?: boolean;
+  /** Far face of the selected node: normal brightness, no highlight or name. */
+  mirror?: boolean;
 };
 
 export type StageChapter = {
@@ -158,7 +161,11 @@ type Engine = {
   edgeGroup: THREE.Group;
   chapterGroup: THREE.Group;
   beamGroup: THREE.Group;
-  packets: Array<{ mesh: THREE.Mesh; points: StagePoint[]; progress: number; speed: number; offset: number }>;
+  flows: Array<{
+    material: THREE.ShaderMaterial;
+    metrics: ReturnType<typeof routeMetrics>;
+    distance: number;
+  }>;
   overviewPoints: THREE.Points | null;
   colors: Record<string, string>;
   width: number;
@@ -308,8 +315,10 @@ export function CourseImmersiveStage({
       line: cssColor("--line-strong", "#CBD5E1"),
       branch: cssColor("--muted", "#64748B"),
       ink: cssColor("--ink", "#0F172A"),
-      target: cssColor("--target", "#22C55E"),
-      acquired: cssColor("--acquired", "#3B82F6"),
+      target: cssColor("--course-target", "#3B82F6"),
+      acquired: cssColor("--course-acquired", "#22C55E"),
+      pending: cssColor("--course-intermediate", "#9CA3AF"),
+      preview: cssColor("--course-route-preview", "#F59E0B"),
       surface: cssColor("--surface", "#FFFFFF")
     };
     const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: "high-performance" });
@@ -327,7 +336,7 @@ export function CourseImmersiveStage({
     const beamGroup = new THREE.Group();
     group.add(edgeGroup, chapterGroup, beamGroup);
     const engine: Engine = {
-      renderer, scene, camera, group, edgeGroup, chapterGroup, beamGroup, packets: [], overviewPoints: null, colors,
+      renderer, scene, camera, group, edgeGroup, chapterGroup, beamGroup, flows: [], overviewPoints: null, colors,
       width: host.clientWidth, height: host.clientHeight, fitDistance: 2400,
       bounds: { x: 700, y: 480 }, pxPerWorld: 1, panX: 0, panY: 0,
       minPanX: -600, maxPanX: 600, minPanY: -600, maxPanY: 600, horizontalOverflow: false, detailShiftX: 0,
@@ -764,24 +773,15 @@ export function CourseImmersiveStage({
         }
         card.style.opacity = selected.visible ? "1" : "0";
       }
-      engine.packets.forEach((packet) => {
-        if (reduced) {
-          const point = packet.points[0];
-          packet.mesh.position.set(point.x, -point.y, point.z + 12);
-          return;
-        }
-        packet.progress = (packet.progress + packet.speed * delta) % 1;
-        const raw = (packet.progress + packet.offset) % 1;
-        const scaled = raw * (packet.points.length - 1);
-        const index = Math.min(packet.points.length - 2, Math.max(0, Math.floor(scaled)));
-        const local = scaled - index;
-        const from = packet.points[index];
-        const to = packet.points[Math.min(packet.points.length - 1, index + 1)];
-        packet.mesh.position.set(
-          from.x + (to.x - from.x) * local,
-          -(from.y + (to.y - from.y) * local),
-          from.z + (to.z - from.z) * local + 12
-        );
+      engine.flows.forEach((flow) => {
+        const uniforms = flow.material.uniforms;
+        if (reduced) { uniforms.uFlowOn.value = 0; return; }
+        uniforms.uFlowOn.value = 1;
+        flow.distance = advancePulse(flow.distance, flow.metrics, delta);
+        const centers = pulseCenters(flow.distance, flow.metrics);
+        uniforms.uPulseA.value = centers[0] ?? 0;
+        uniforms.uPulseB.value = centers[1] ?? -10;
+        uniforms.uPulseWidth.value = windowLengthForPixels(64, 1 / Math.max(0.0001, engine.pxPerWorld), flow.metrics);
       });
       renderer.render(scene, camera);
       frameCount += 1;
@@ -1099,9 +1099,8 @@ export function CourseImmersiveStage({
       positions[index * 3 + 2] = node.z + 4;
       const color = new THREE.Color(
         node.status === "completed" ? engine.colors.acquired
-          : node.status === "learning" ? engine.colors.brand
-            : node.status === "available" ? engine.colors.target
-              : "#94A3B8"
+          : node.kind === "capability" ? engine.colors.pending
+            : engine.colors.target
       );
       colors[index * 3] = color.r;
       colors[index * 3 + 1] = color.g;
@@ -1154,7 +1153,7 @@ export function CourseImmersiveStage({
     // the highlighted incident routes stay thin and orthogonal behind cards.
     const hasHighlight = edges.some((edge) => edge.highlighted);
     edges.forEach((edge) => {
-      if (edge.kind === "capability") addLine(edge.points, engine.colors.brand, edge.highlighted ? 0.88 : hasHighlight ? 0.08 : 0.62, "capability", true);
+      if (edge.kind === "capability") addLine(edge.points, engine.colors.brand, edge.highlighted ? 0.88 : hasHighlight ? 0.08 : 0.4, "capability", true);
       else if (edge.kind === "practice") addLine(edge.points, engine.colors.branch, edge.highlighted ? 0.78 : hasHighlight ? 0.08 : 0.34, "practice", true);
       else if (edge.kind === "chapter") addLine(edge.points, engine.colors.line, 0.2, "chapter");
       else addLine(edge.points, engine.colors.brand, edge.highlighted ? 0.92 : hasHighlight ? 0.06 : 0.24, "knowledge");
@@ -1164,7 +1163,7 @@ export function CourseImmersiveStage({
     const engine = engineRef.current;
     if (!engine) return;
     disposeGroup(engine.beamGroup);
-    engine.packets = [];
+    engine.flows = [];
     const points3d = (points: StagePoint[]) => points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
     const linePath = (points: StagePoint[]) => {
       const path = new THREE.CurvePath<THREE.Vector3>();
@@ -1181,7 +1180,7 @@ export function CourseImmersiveStage({
     beams.forEach((beam) => {
       const points = beam.points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
       if (points.length < 2) return;
-      const color = beam.kind === "current" ? engine.colors.brandInk : engine.colors.target;
+      const color = beam.kind === "current" ? engine.colors.brandInk : engine.colors.preview;
       const dim = Boolean(beam.dimmed);
       const curve = linePath(beam.points);
       const geometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), beam.kind === "preview" ? 2.8 : 3.2, 8, false);
@@ -1191,16 +1190,39 @@ export function CourseImmersiveStage({
       const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: dim ? 0.3 : 0.58, depthWrite: false }));
       mesh.renderOrder = 2;
       engine.beamGroup.add(glow, mesh);
-      // Both the adopted/current route and the edit preview use flowing light
-      // pulses; colour is the only distinction (brand vs target green).
-      const packetGeometry = new THREE.SphereGeometry(beam.kind === "preview" ? 3.2 : 3.6, 12, 10);
-      const count = Math.min(7, Math.max(2, Math.floor(curve.getLength() / 130)));
-      for (let index = 0; index < count; index += 1) {
-        const packet = new THREE.Mesh(packetGeometry.clone(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: dim ? 0.3 : 0.95, depthWrite: false }));
-        packet.renderOrder = 3;
-        engine.beamGroup.add(packet);
-        engine.packets.push({ mesh: packet, points: beam.points, progress: 0, speed: 0.00034, offset: index / count });
-      }
+      // Same flowing light band as the 3D course tree: 1–2 windows with a
+      // fading tail travel at one step per second. Preview uses amber.
+      const anchorMetrics = routeMetrics(beam.points);
+      const metrics = { ...anchorMetrics, total: curve.getLength() };
+      const pulseMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          uColor: { value: new THREE.Color(color) },
+          uPulseA: { value: 0 },
+          uPulseB: { value: -10 },
+          uPulseWidth: { value: 0.02 },
+          uFlowOn: { value: dim ? 0.55 : 1 }
+        },
+        vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: `uniform vec3 uColor; uniform float uPulseA; uniform float uPulseB; uniform float uPulseWidth; uniform float uFlowOn; varying vec2 vUv;
+          float efPulse(float d, float c, float w) {
+            if (w <= 0.00001) return 0.0;
+            float head = c + w * 0.5; float start = c - w * 1.2;
+            if (d < start || d > head) return 0.0;
+            if (d > c) { float t = (head - d) / max(0.00001, head - c); return clamp(t / 0.35, 0.0, 1.0); }
+            float t = (d - start) / max(0.00001, c - start);
+            return pow(clamp(t, 0.0, 1.0), 1.8);
+          }
+          void main() {
+            float pulse = max(efPulse(vUv.x, uPulseA, uPulseWidth), efPulse(vUv.x, uPulseB, uPulseWidth));
+            gl_FragColor = vec4(uColor, pulse * 0.9);
+          }`,
+        transparent: true,
+        depthWrite: false
+      });
+      const pulse = new THREE.Mesh(geometry.clone(), pulseMaterial);
+      pulse.renderOrder = 3;
+      engine.beamGroup.add(pulse);
+      engine.flows.push({ material: pulseMaterial, metrics, distance: 0 });
     });
   }, [beams]);
   useEffect(() => {

@@ -294,3 +294,35 @@ describe("immersive course layout", () => {
     expect(layout.get("K2")!.y).toBeLessThan(layout.get("K3")!.y);
   });
 });
+
+
+describe("compressed capability layers", () => {
+  const positions = new Map([
+    ["K1", { x: 0, y: 0, z: 0 }],
+    ["K2", { x: 400, y: 0, z: 0 }]
+  ]);
+
+  it("uses at most three close layers instead of stretching a long diagonal", () => {
+    const chain = placeCapabilityAnchors(
+      new Map([["C1", ["K1"]], ["C2", ["K1"]], ["C3", ["K1"]]]),
+      positions,
+      new Map(),
+      {
+        baseZ: -280,
+        edges: [
+          { source: "C1", target: "K1" },
+          { source: "C2", target: "C1" },
+          { source: "C3", target: "C2" }
+        ]
+      }
+    );
+    const c1 = chain.get("C1")!;
+    const c2 = chain.get("C2")!;
+    const c3 = chain.get("C3")!;
+    expect(c1.z).toBe(-280);
+    expect(c2.z).toBe(-334);
+    expect(c3.z).toBe(-388);
+    expect(c2.z - c1.z).toBeLessThanOrEqual(54);
+    expect(c3.y - c2.y).toBeLessThanOrEqual(26);
+  });
+});

@@ -436,29 +436,28 @@ export function placeCapabilityAnchors(
   const courseIds = new Set(coursePositions.keys());
   const ids = [...supports.keys()].sort();
   const memberIds = new Set(ids);
-  const children = new Map<string, string[]>();
-  const directCourse = new Map<string, string[]>();
+  const incoming = new Map<string, string[]>();
   (options.edges ?? []).forEach((edge) => {
-    if (!memberIds.has(edge.source) || !memberIds.has(edge.target)) return;
-    children.set(edge.source, [...(children.get(edge.source) ?? []), edge.target]);
-    if (courseIds.has(edge.target)) {
-      directCourse.set(edge.source, [...(directCourse.get(edge.source) ?? []), edge.target]);
-    }
+    if (!memberIds.has(edge.source)) return;
+    if (!memberIds.has(edge.target) && !courseIds.has(edge.target)) return;
+    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source]);
   });
-  const levels = new Map<string, number>();
-  const levelOf = (id: string, stack: Set<string>): number => {
-    const cached = levels.get(id);
-    if (cached !== undefined) return cached;
-    if (stack.has(id)) return 0;
-    stack.add(id);
-    const direct = (directCourse.get(id)?.length ?? 0) > 0;
-    const kids = direct ? [] : (children.get(id) ?? []).filter((child) => memberIds.has(child));
-    const value = kids.length ? 1 + Math.max(...kids.map((child) => levelOf(child, stack))) : 0;
-    stack.delete(id);
-    levels.set(id, value);
-    return value;
-  };
-  ids.forEach((id) => levelOf(id, new Set()));
+  // Shortest support distance from Course Knowledge, not the deepest branch.
+  // Only three compressed layers exist behind the front plane, so a chain of
+  // capabilities cannot stretch into one long diagonal when the camera turns.
+  const distances = new Map<string, number>();
+  const queue: string[] = [];
+  courseIds.forEach((id) => { distances.set(id, 0); queue.push(id); });
+  for (let index = 0; index < queue.length; index += 1) {
+    const id = queue[index];
+    const distance = distances.get(id) ?? 0;
+    for (const source of incoming.get(id) ?? []) {
+      if (distances.has(source)) continue;
+      distances.set(source, distance + 1);
+      queue.push(source);
+    }
+  }
+  const layerOf = (id: string) => Math.min(2, Math.max(0, (distances.get(id) ?? 1) - 1));
 
   const groups = new Map<string, Array<{ id: string; anchor: { x: number; y: number; z: number } }>>();
   const empty: string[] = [];
@@ -468,15 +467,15 @@ export function placeCapabilityAnchors(
       return position ? [position] : [];
     });
     if (!supported.length) { empty.push(id); return; }
-    const level = levels.get(id) ?? 0;
+    const level = layerOf(id);
     const anchor = {
-      x: supported.reduce((sum, point) => sum + point.x, 0) / supported.length + (level % 2) * 32,
-      // y is layout-down: indirect capabilities sit visibly below/behind their
-      // supports instead of piling on the same screen point.
-      y: supported.reduce((sum, point) => sum + point.y, 0) / supported.length + level * 54,
-      z: baseZ - level * 72
+      x: supported.reduce((sum, point) => sum + point.x, 0) / supported.length,
+      // y is layout-down: the two/three compressed layers sit visibly behind
+      // their supports without becoming a long diagonal.
+      y: supported.reduce((sum, point) => sum + point.y, 0) / supported.length + level * 26,
+      z: baseZ - level * 54
     };
-    const key = `${Math.round(anchor.x / groupSize)}:${Math.round(anchor.y / groupSize)}`;
+    const key = `${level}:${Math.round(anchor.x / groupSize)}:${Math.round(anchor.y / groupSize)}`;
     groups.set(key, [...(groups.get(key) ?? []), { id, anchor }]);
   });
   const positions = new Map<string, ImmersivePoint>();
@@ -493,7 +492,7 @@ export function placeCapabilityAnchors(
       positions.set(member.id, {
         x: anchorX + (column - (columns - 1) / 2) * spacingX,
         y: anchorY + (row - (rows - 1) / 2) * spacingY,
-        z: anchorZ - (index % 3) * 6
+        z: anchorZ
       });
     });
   });

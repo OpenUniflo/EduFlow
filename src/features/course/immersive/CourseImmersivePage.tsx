@@ -161,6 +161,15 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   }, [baseKnowledgeGraph, learnerKnowledge, runtime]);
   const capabilityLayout = useMemo(() => courseLayout && capabilityModel ? buildCapabilitySceneLayout(courseLayout, capabilityModel) : null, [capabilityModel, courseLayout]);
   const acquiredNodeIds = useMemo(() => learnerKnowledge.filter((record) => learnerCategory(record.status) === "acquired").map((record) => record.nodeId), [learnerKnowledge]);
+  // Capabilities live outside the Course Knowledge set, so `learnerById` (a
+  // Course-only projection) cannot answer their state. The Capability Model's
+  // formal entry set is the authority; union the durable UKS as a fallback for
+  // an acquired record that is not a model entry.
+  const capabilityAcquiredIds = useMemo(() => {
+    const ids = new Set(capabilityModel?.currentKnowledgeIds ?? []);
+    acquiredNodeIds.forEach((id) => ids.add(id));
+    return ids;
+  }, [acquiredNodeIds, capabilityModel]);
   const targetNodeIds = useMemo(() => runtime?.targetKnowledge?.map((target) => target.nodeId) ?? [], [runtime]);
   const targetNodeSet = useMemo(() => new Set(targetNodeIds), [targetNodeIds]);
   const flattenedLayout = useMemo(() => capabilityLayout && capabilityModel
@@ -273,12 +282,15 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   const selectionRelations = useMemo(() => courseSelectionRelations({
     selection: effectiveSelection,
     knowledgeIds: courseNodes.map((node) => node.id),
-    dependencyEdges: courseLayout?.edges.map((edge) => ({ source: edge.source, target: edge.target })) ?? [],
+    dependencyEdges: courseLayout?.edges.map((edge) => ({ id: edge.id, source: edge.source, target: edge.target })) ?? [],
     assignmentsByKnowledge: knowledgeAssignments,
     assignmentKnowledge,
     capabilitySupports,
-    routeOrder
-  }), [assignmentKnowledge, capabilitySupports, courseLayout?.edges, courseNodes, effectiveSelection, knowledgeAssignments, routeOrder]);
+    routeOrder: routeOrder.filter((id) => courseNodes.some((node) => node.id === id)),
+    supportEdges: capabilityModel?.supportEdges,
+    acquiredNodeIds,
+    modelNodeIds: capabilityModel?.orderedNodeIds
+  }), [acquiredNodeIds, assignmentKnowledge, capabilityModel, capabilitySupports, courseLayout?.edges, courseNodes, effectiveSelection, knowledgeAssignments, routeOrder]);
 
   const openLogin = useCallback(() => navigate("/login", { state: authGateState(location) }), [location, navigate]);
   const launchMicro = useCallback(async (node: CourseSkillTreeNode) => {
@@ -621,7 +633,11 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   }, [capabilityLayout, courseLayout]);
 
   const courseBeam = useMemo<StageBeam[]>(() => {
-    if (!authenticated || !routeReady || !routeOn || tab !== "course" || flat || swapped) return [];
+    // Skill tree and practice tree show the same route. Practice cards share
+    // their Knowledge's base coordinate, so the same anchors are correct on
+    // both faces; the stage moves the band with the layer offset during the
+    // 420ms swap. A missing practice is the "暂无对应实训" placeholder card.
+    if (!authenticated || !routeReady || !routeOn || tab !== "course" || flat) return [];
     const worldPoints = buildRouteTrack(routeOrder, routeTrack.cards);
     if (worldPoints.length < 2) return [];
     const points = worldPoints.map((point) => ({ x: point.x, y: -point.y, z: point.z }));
@@ -633,7 +649,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       // status-bar copy differs.
       dimmed: Boolean(effectiveSelection) && !selectionRelations.onRoute
     }];
-  }, [authenticated, effectiveSelection, flat, routeOn, routeOrder, routeReady, routeTrack, selectionRelations.onRoute, swapped, tab]);
+  }, [authenticated, effectiveSelection, flat, routeOn, routeOrder, routeReady, routeTrack, selectionRelations.onRoute, tab]);
 
   const currentKnowledge = effectiveSelection?.kind === "knowledge" ? displayNodes.find((node) => node.id === effectiveSelection.id) ?? null : null;
   const currentPractice = effectiveSelection?.kind === "practice" ? assignmentById.get(effectiveSelection.id) ?? null : null;
@@ -687,7 +703,6 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       const columnByNode = new Map((flattened.columns ?? []).flatMap((column) => column.nodeIds.map((id) => [id, column.kind] as const)));
       const nodes: StageNode[] = flattened.nodes.map((node) => {
         const column = columnByNode.get(node.id);
-        const learner = learnerById.get(node.id);
         const key = `c:${node.id}`;
         const selected = effectiveSelection?.kind === "capability" && effectiveSelection.id === node.id;
         return {
@@ -699,8 +714,8 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           z: node.z,
           width: 150,
           height: 46,
-          status: authenticated ? learnerStageStatus(learner?.category ?? "pending") : "available",
-          current: authenticated && Boolean(learner?.current),
+          status: authenticated ? (capabilityAcquiredIds.has(node.id) ? "completed" : "locked") : "available",
+          current: false,
           bridge: node.bridge,
           meta: column === "acquired" ? "已获得" : column === "target" ? "目标" : "中间能力",
           dim: Boolean(effectiveSelection) && !selected && !selectionRelations.capabilityIds.has(node.id),
@@ -751,8 +766,9 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         target: targetNodeSet.has(node.id),
         detail: actionRow(node.node),
         actions: actionLabels(node.node),
-        dim: Boolean(effectiveSelection) && !selected && !selectionRelations.knowledgeIds.has(node.id),
-        highlight: selectionRelations.knowledgeIds.has(node.id) && !selected,
+        dim: Boolean(effectiveSelection) && !selected && !selectionRelations.mirrorKnowledgeIds.has(node.id) && !selectionRelations.knowledgeIds.has(node.id),
+        mirror: Boolean(effectiveSelection) && selectionRelations.mirrorKnowledgeIds.has(node.id),
+        highlight: selectionRelations.knowledgeIds.has(node.id) && !selected && !selectionRelations.mirrorKnowledgeIds.has(node.id),
         selected,
         step: step ?? undefined
       });
@@ -797,7 +813,13 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         statusLine: card.kind === "empty" ? "暂无对应实训" : `${card.kind === "shadow" ? "见主位置 · " : ""}${statusText}${coverage ? ` · 覆盖 ${coverage} 个知识` : ""}`,
         empty: card.kind === "empty" || card.kind === "shadow",
         dim: Boolean(effectiveSelection) && !selected && !selectionRelations.practiceKnowledgeIds.has(card.knowledgeId),
-        highlight: selectionRelations.practiceKnowledgeIds.has(card.knowledgeId) && !selected,
+        // A Knowledge card and its practice reflection are two faces of one
+        // node: the far face stays at normal brightness but is never
+        // highlighted or separately named. When the practice tree is in
+        // front, related front practice cards are the named face.
+        highlight: swapped && Boolean(effectiveSelection) && !selected
+          && selectionRelations.practiceKnowledgeIds.has(card.knowledgeId)
+          && !selectionRelations.mirrorKnowledgeIds.has(card.knowledgeId),
         selected,
         chapterId: card.knowledgeId,
         tone: cardSelectionPractice ? ((Number(card.code) % 3 + 1) as 1 | 2 | 3) : 1
@@ -806,7 +828,6 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     if (capabilityLayout) {
       capabilityLayout.bridgeNodes.forEach((node) => {
         const selected = effectiveSelection?.kind === "capability" && effectiveSelection.id === node.id;
-        const learner = learnerById.get(node.id);
         nodes.push({
           id: node.id,
           kind: "capability",
@@ -816,8 +837,8 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           z: node.z,
           width: 150,
           height: 46,
-          status: authenticated ? learnerStageStatus(learner?.category ?? "pending") : "available",
-          current: Boolean(node.current),
+          status: authenticated ? (capabilityAcquiredIds.has(node.id) ? "completed" : "locked") : "available",
+          current: false,
           bridge: true,
           meta: "前置能力",
           statusLine: "前置能力",
@@ -829,7 +850,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       });
     }
     return nodes;
-  }, [actionLabels, actionRow, assignmentById, assignmentKnowledge, authenticated, capabilityLayout, courseLayout, displayNodes, effectiveSelection, flat, flattenedLayout, knowledgeTitleById, learnerById, microFor, practiceByKnowledge, routeCurrentId, routeOn, routeOrder, routeReady, selectionRelations, targetNodeSet]);
+  }, [actionLabels, actionRow, assignmentById, assignmentKnowledge, authenticated, capabilityAcquiredIds, capabilityLayout, courseLayout, displayNodes, effectiveSelection, flat, flattenedLayout, knowledgeTitleById, learnerById, microFor, practiceByKnowledge, routeCurrentId, routeOn, routeOrder, routeReady, selectionRelations, targetNodeSet]);
 
   if (import.meta.env.DEV) (window as unknown as { __efPage?: unknown }).__efPage = {
     flat,
@@ -840,9 +861,13 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     capabilities: capabilityLayout?.bridgeNodes.map((node) => ({
       id: node.id, title: node.title, x: node.x, y: node.y, z: node.z,
       direct: node.directSupports ?? [], indirect: node.indirectSupports ?? []
-    })) ?? []
+    })) ?? [],
+    capabilityCurrentIds: capabilityModel?.currentKnowledgeIds ?? [],
+    capabilityAcquiredIds: [...capabilityAcquiredIds],
+    capabilityBridgeIds: capabilityLayout?.bridgeNodes.map((node) => node.id) ?? []
   };
   const stageEdges = useMemo<StageEdge[]>(() => {
+    const highlightEdge = (id: string) => Boolean(effectiveSelection) && selectionRelations.edgeIds.has(id);
     const highlight = (source?: string, target?: string) => {
       if (!effectiveSelection) return false;
       if (source && (selectionRelations.knowledgeIds.has(source) || selectionRelations.capabilityIds.has(source))) return true;
@@ -857,7 +882,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         target: edge.target,
         points: edge.points,
         kind: "plain",
-        highlighted: highlight(edge.source, edge.target)
+        highlighted: highlightEdge(edge.id)
       }));
     }
     const edges: StageEdge[] = (courseLayout?.edges ?? []).map((edge) => ({
@@ -866,7 +891,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       target: edge.target,
       points: edge.points,
       kind: "plain",
-      highlighted: highlight(edge.source, edge.target),
+      highlighted: highlightEdge(edge.id),
       pointWeights: edge.points.map(() => 1)
     }));
     // Always supply capability support lines; the Stage fades them by the
@@ -883,7 +908,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           target: edge.target,
           points: edge.points,
           kind: "capability",
-          highlighted: highlight(edge.source, edge.target),
+          highlighted: highlightEdge(edge.id),
           pointWeights: edge.points.map((_point, index) => {
             const id = index === 0 ? edge.source : index === edge.points.length - 1 ? edge.target : edge.source;
             return courseIds.has(id) ? 1 : 0;
@@ -909,12 +934,32 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
             { x: card.x + card.width / 2 + 2, y: card.y, z: 2 }
           ],
           kind: "practice",
-          highlighted: highlight(anchor.id)
+          highlighted: false
         });
       });
     }
     return edges;
   }, [capabilityLayout, courseLayout, effectiveSelection, flat, flattenedLayout, practiceByKnowledge, selectionRelations, swapped]);
+
+  if (import.meta.env.DEV) {
+    const modelNodes = capabilityModel?.orderedNodeIds ?? [];
+    const modelEdges = capabilityModel?.supportEdges.map((edge) => edge.id) ?? [];
+    const projectedNodes = capabilityLayout?.nodes.map((node) => node.id) ?? [];
+    const projectedEdges = capabilityLayout?.edges.map((edge) => edge.id) ?? [];
+    const renderedNodes = stageNodes.filter((node) => node.kind === "capability" || (node.kind === "knowledge" && modelNodes.includes(node.id))).map((node) => node.id);
+    const renderedEdgeIds = [...new Set(stageEdges.map((edge) => edge.id.replace(/^cap:/, "")))];
+    const renderedEdges = modelEdges.filter((id) => renderedEdgeIds.includes(id));
+    const missingNodes = modelNodes.filter((id) => !renderedNodes.includes(id));
+    const extraNodes = renderedNodes.filter((id) => !modelNodes.includes(id));
+    const missingEdges = modelEdges.filter((id) => !projectedEdges.includes(id) || !renderedEdges.includes(id));
+    const extraEdges = renderedEdges.filter((id) => !modelEdges.includes(id));
+    (window as unknown as { __efCapabilityModelCheck?: unknown }).__efCapabilityModelCheck = {
+      modelNodes, modelEdges, projectedNodes, projectedEdges, renderedNodes, renderedEdges,
+      missingNodes, extraNodes, missingEdges, extraEdges,
+      nodeDiff: missingNodes.length + extraNodes.length,
+      edgeDiff: missingEdges.length + extraEdges.length
+    };
+  }
 
   const flatBeams = useMemo<StageBeam[]>(() => {
     if (!flat || !capabilityLayout || !capabilityModel) return [];
@@ -990,31 +1035,41 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   const detailTitle = currentGroup ? currentGroup.title : currentPractice?.title ?? capabilityTitle ?? currentKnowledge?.title ?? "课程节点";
   const detailKicker = currentCapability ? "前置能力 · 课程外" : currentPractice || currentGroup ? "课程实训" : "知识节点";
   const detailContext = knowledgeForDetail ? `第 ${knowledgeForDetail.lesson} 课 · ${courseChapters.find((chapter) => chapter.id === knowledgeForDetail.chapterId)?.title ?? ""}` : currentCapability?.bridge ? "位于课程知识后方" : "";
-  const detailLabel = currentCapability ? "前置能力" : authenticated ? selectedLearner?.label ?? "待学" : "公开";
-  const detailTone = currentCapability ? "quiet" : authenticated ? learnerTone(selectedLearner) : "target";
+  const currentCapabilityAcquired = Boolean(currentCapability && capabilityAcquiredIds.has(currentCapability.id));
+  const detailLabel = currentCapability ? (authenticated ? (currentCapabilityAcquired ? "已具备" : "未具备") : "前置能力") : authenticated ? selectedLearner?.label ?? "待学" : "公开";
+  const detailTone = currentCapability ? (currentCapabilityAcquired ? "acquired" : "quiet") : authenticated ? learnerTone(selectedLearner) : "target";
 
   const capabilityCount = capabilityLayout?.bridgeNodes.length ?? 0;
   const capabilityItems = useMemo(() => {
     if (!capabilityLayout) return [];
     return capabilityLayout.bridgeNodes.map((node) => {
-      const learner = learnerById.get(node.id);
       const direct = node.directSupports?.length ?? 0;
       const indirect = node.indirectSupports?.length ?? 0;
       return {
         id: node.id,
         title: knowledgeTitleById.get(node.id) ?? node.title,
-        mastered: Boolean(authenticated && learner?.category === "acquired"),
+        mastered: Boolean(authenticated && capabilityAcquiredIds.has(node.id)),
         direct,
         indirect,
         supports: direct + indirect
       };
     }).sort((left, right) => left.title.localeCompare(right.title, "zh-Hans-CN") || left.id.localeCompare(right.id));
-  }, [authenticated, capabilityLayout, knowledgeTitleById, learnerById]);
+  }, [authenticated, capabilityAcquiredIds, capabilityLayout, knowledgeTitleById]);
   if (import.meta.env.DEV) (window as unknown as { __efCourse?: unknown }).__efCourse = {
     capabilityItems,
     capabilityLayout,
     courseLayout,
-    capabilitySupports
+    capabilitySupports,
+    titles: Object.fromEntries(knowledgeTitleById),
+    knowledgeIds: courseNodes.map((node) => node.id),
+    selectionRelations: {
+      knowledgeIds: [...selectionRelations.knowledgeIds],
+      capabilityIds: [...selectionRelations.capabilityIds],
+      practiceKnowledgeIds: [...selectionRelations.practiceKnowledgeIds],
+      mirrorKnowledgeIds: [...selectionRelations.mirrorKnowledgeIds],
+      edgeIds: [...selectionRelations.edgeIds],
+      onRoute: selectionRelations.onRoute
+    }
   };
   const supportCopy = useCallback((item: { direct: number; indirect: number }) => {
     if (item.direct && item.indirect) return `直接 ${item.direct} · 间接 ${item.indirect}`;
@@ -1107,7 +1162,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         {currentPractice ? <span className="ef-imm-detail-chip">{assignmentStatusLabel(userCourseState?.assignmentStates[currentPractice.id]?.status ?? "not_started")}</span> : null}
         {currentGroup ? <span className="ef-imm-detail-chip">{groupAssignments.filter((assignment) => ["accepted", "completed"].includes(userCourseState?.assignmentStates[assignment.id]?.status ?? "")).length} / {groupAssignments.length} 已完成</span> : null}
         {currentPractice?.estimatedMinutes ? <span className="ef-imm-detail-chip">约 {currentPractice.estimatedMinutes} 分钟</span> : null}
-        {currentCapability ? <span className="ef-imm-detail-chip">{selectedLearner?.category === "acquired" ? "已掌握" : "未掌握"}</span> : null}
+        {currentCapability ? <span className="ef-imm-detail-chip">{currentCapabilityAcquired ? "已具备" : "未具备"}</span> : null}
         {currentCapability && capabilitySupportCounts.get(currentCapability.id) ? <span className="ef-imm-detail-chip">{supportCopy(capabilitySupportCounts.get(currentCapability.id)!)}</span> : null}
         {selectedRecord?.mastery !== undefined ? <span className="ef-imm-detail-chip">掌握度 {Math.round(selectedRecord.mastery)}%</span> : null}
       </div>
@@ -1337,6 +1392,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           <span className="ef-imm-status-legend-markers" aria-label="不计入状态合计的呈现标记">
             <span><i className="is-current" />当前 {learnerState.counts.current}</span>
             <span><i className="is-target" />目标 {learnerState.counts.target}</span>
+            {capabilityCount > 0 ? <span><i className="is-capability" />前置能力 {capabilityCount}</span> : null}
             <small>标记不计入</small>
           </span>
           {capabilityCount > 0 && pose === "front" && !flat && tab === "course" ? <span className="ef-imm-cap-hint">拖动旋转可查看 {capabilityCount} 个前置能力</span> : null}

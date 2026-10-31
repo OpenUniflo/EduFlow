@@ -11,6 +11,7 @@ import type { ArchiveEdge, ArchiveNode } from "../model/atlasModel";
 import type { AtlasCommunity } from "../model/atlasCommunities";
 import type { Vec3 } from "../model/atlas3dLayout";
 import { placeAtlasKnowledgeLabels, placeAtlasLabels, type AtlasKnowledgeLabelCandidate, type AtlasLabelCandidate, type AtlasLabelRect } from "../model/atlasLabels";
+import { KNOWLEDGE_LABEL_FONT, KNOWLEDGE_LABEL_STRONG_FONT, measureKnowledgeLabelBox, measurePlaneLabelWidth } from "@/shared/scene/labelBox";
 import {
   chooseTiltedLabels,
   findExcentricCluster,
@@ -162,20 +163,39 @@ function regionTexture() {
   return texture;
 }
 
-function estimateLabelWidth(text: string, small: string, kind: AtlasLabelCandidate["kind"]) {
+let labelMeasureContext: CanvasRenderingContext2D | null = null;
+function measureLabelText(text: string, font: string) {
+  if (typeof document === "undefined") return text.length * 7;
+  labelMeasureContext ??= document.createElement("canvas").getContext("2d");
+  if (!labelMeasureContext) return text.length * 7;
+  labelMeasureContext.font = font;
+  return labelMeasureContext.measureText(text).width;
+}
+
+const knowledgeLabelWidthCache = new Map<string, number>();
+function estimateLabelWidth(text: string, small: string, kind: AtlasLabelCandidate["kind"], strong = false) {
   if (kind === "knowledge") {
-    let width = 0;
-    for (const character of text) width += character.charCodeAt(0) > 255 ? 12 : 6.5;
-    // Match the actual DOM box (8px horizontal padding each side + border),
-    // otherwise a wide estimated box pushes a left-anchored name away from
-    // its node and hides labels that would have fit.
-    return width + 18;
+    const cacheKey = `${strong ? "strong" : "normal"}\u0001${text}`;
+    const cached = knowledgeLabelWidthCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+    // Match the DOM box exactly: dot + gap + 9px padding each side + border.
+    const width = measureKnowledgeLabelBox(text, {
+      measure: measureLabelText,
+      font: strong ? KNOWLEDGE_LABEL_STRONG_FONT : KNOWLEDGE_LABEL_FONT,
+      strong,
+      maxWidth: 260
+    }).width;
+    knowledgeLabelWidthCache.set(cacheKey, width);
+    return width;
   }
-  let width = 0;
-  for (const character of text) width += character.charCodeAt(0) > 255 ? 13 : 7;
-  for (const character of small) width += character.charCodeAt(0) > 255 ? 11 : 6;
+  const textWidth = measureLabelText(text, kind === "domain"
+    ? '700 16px -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif'
+    : '700 14px -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif');
+  const smallWidth = small
+    ? measureLabelText(small, '600 12px -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif') + 10
+    : 0;
   const padding = kind === "domain" ? 34 : kind === "topic" ? 28 : kind === "chapter" || kind === "column" ? 26 : 22;
-  return width + padding + (small ? 10 : 0) + 10;
+  return textWidth + smallWidth + padding + 10;
 }
 
 function labelHeight(kind: AtlasLabelCandidate["kind"]) {
@@ -428,7 +448,7 @@ export default function ArchiveAtlasScene({
       const target = engine.nodeIndex.get(edge.target);
       if (source === undefined || target === undefined) return;
       if (selectedNeighborhood) {
-        edgeAlpha[index] = edge.source === currentProps.selectedId || edge.target === currentProps.selectedId ? 0.95 : 0.025;
+        edgeAlpha[index] = edge.source === currentProps.selectedId || edge.target === currentProps.selectedId ? 0.95 : 0.18;
       } else if (courseMode) {
         // Course focus draws its own card-safe orthogonal dependency layer.
         // The generic star-map edge web is suppressed here (only a hovered
@@ -1351,6 +1371,41 @@ export default function ArchiveAtlasScene({
       // after the point-size pass, never from the previous frame's sizes.
       updatePlaneLabels(rect, courseMode);
       updateArchiveChapterLabel(courseMode);
+      if (import.meta.env.DEV) {
+        const selectedId = propsRef.current.selectedId;
+        const selectedIndex = selectedId ? engine.nodeIndex.get(selectedId) : undefined;
+        const neighborIds = selectedIndex === undefined ? [] : engine.neighbors[selectedIndex]
+          .map((index) => propsRef.current.nodes[index]?.id)
+          .filter((id): id is string => Boolean(id));
+        const relatedNames = selectedIndex === undefined ? [] : [selectedId as string, ...neighborIds]
+          .map((id) => propsRef.current.nodes.find((node) => node.id === id)?.title ?? id);
+        const relatedScreens = selectedIndex === undefined ? [] : [selectedId as string, ...neighborIds].map((id) => {
+          const index = engine.nodeIndex.get(id);
+          if (index === undefined) return { id, missing: true };
+          const point = planeProject({ x: engine.current[index * 3], y: engine.current[index * 3 + 1], z: engine.current[index * 3 + 2] });
+          return { id, x: Number(point.x.toFixed(1)), y: Number(point.y.toFixed(1)), z: Number(point.z.toFixed(2)), alpha: Number(engine.alpha[index].toFixed(2)), plane: (propsRef.current.planeNodeIds ?? new Set()).has(id) };
+        });
+        const planeCardsDebug = [...planeCards].map(([id, runtime]) => ({
+          id,
+          opacity: Number(runtime.opacity.toFixed(3)),
+          x: Number(runtime.screen.x.toFixed(1)),
+          y: Number(runtime.screen.y.toFixed(1)),
+          selected: id === selectedId
+        }));
+        const visiblePlaneLabels = [...planeSidePool].filter(([, element]) => Number(element.style.opacity) > 0.05)
+          .map(([id, element]) => ({ id, text: element.textContent }));
+        const visibleGlobalLabels = [...labelPoolRef.current].filter(([, element]) => Number(element.style.opacity) > 0.05)
+          .map(([key, element]) => ({ key, text: element.querySelector(".ef-atlas-label-text")?.textContent ?? element.textContent }));
+        (window as unknown as { __efArchivePlane?: unknown }).__efArchivePlane = {
+          mode: currentMode, angle: Number(planeAngle().toFixed(1)), selectedId, neighborIds, relatedNames, relatedScreens,
+          planeNodeIds: [...(propsRef.current.planeNodeIds ?? [])],
+          planeCards: planeCardsDebug,
+          labelState: { frozen: planeLabelsFrozen, dirty: planeLabelsDirty, layerOn: planeLabelLayerOn, choices: planeLabelChoices.length, cacheFrozen: cache.frozen, cacheLabels: cache.labels.map((label) => ({ key: label.key, alpha: label.alpha, x: Math.round(label.x ?? -1), y: Math.round(label.y ?? -1) })) },
+          xrayNameOpacity: xrayName.style.opacity,
+          visiblePlaneLabels,
+          visibleGlobalLabels
+        };
+      }
       pointPosition.needsUpdate = true;
       pointAlpha.needsUpdate = true;
       pointSize.needsUpdate = true;
@@ -1460,7 +1515,7 @@ export default function ArchiveAtlasScene({
             output.push(start.x, start.y, start.z, end.x, end.y, end.z);
           }
         });
-        dependencySegments.material.opacity = focusedNodeId ? 0.38 : 0.7;
+        dependencySegments.material.opacity = focusedNodeId ? 0.18 : 0.7;
       }
       updateLineGeometry(dependencyGeometry, dependencyBase);
       dependencyLines.visible = dependencyBase.length > 0;
@@ -1597,11 +1652,10 @@ export default function ArchiveAtlasScene({
       measureContext.font = '600 16px -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif';
       return measureContext.measureText(text).width;
     };
-    const sideTextWidth = (text: string) => {
-      let width = 0;
-      for (const character of text) width += character.charCodeAt(0) > 255 ? 12 : 7;
-      return width + 18;
-    };
+    const sideTextWidth = (text: string) => measurePlaneLabelWidth(text, (value, font) => {
+      measureContext.font = font;
+      return measureContext.measureText(value).width;
+    });
     const planePoint = (index: number) => ({ x: engine.current[index * 3], y: engine.current[index * 3 + 1], z: engine.current[index * 3 + 2] });
     const planeViewport = { width: 1, height: 1 };
     const planeProject = (point: { x: number; y: number; z: number }) => {
@@ -1725,6 +1779,16 @@ export default function ArchiveAtlasScene({
       });
       return { index, screen, distance, segments, title: propsRef.current.nodes[index]?.title ?? "" };
     }
+    function planeXrayBlocked(xray: NonNullable<ReturnType<typeof planeXray>>) {
+      for (const [index, rect] of cardRects) {
+        if (index === xray.index) continue;
+        const runtime = planeCards.get(propsRef.current.nodes[index]?.id ?? "");
+        if (!runtime || runtime.distance >= xray.distance - 3) continue;
+        if (xray.screen.x >= rect.x - 4 && xray.screen.x <= rect.x + rect.width + 4
+          && xray.screen.y >= rect.y - 4 && xray.screen.y <= rect.y + rect.height + 4) return true;
+      }
+      return false;
+    }
     function segmentHitsRect(segment: { x1: number; y1: number; x2: number; y2: number }, rect: { x: number; y: number; width: number; height: number }) {
       const contains = (x: number, y: number) => x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
       if (contains(segment.x1, segment.y1) || contains(segment.x2, segment.y2)) return true;
@@ -1756,18 +1820,25 @@ export default function ArchiveAtlasScene({
       xraySvg.setAttribute("width", String(box.width));
       xraySvg.setAttribute("height", String(box.height));
       const lines = xray.segments.map((segment) => `<line x1="${segment.x1.toFixed(1)}" y1="${segment.y1.toFixed(1)}" x2="${segment.x2.toFixed(1)}" y2="${segment.y2.toFixed(1)}"/>`).join("");
-      const radius = Math.max(16, Math.min(30, 13 * engine.size[xray.index] * (renderer.domElement.clientHeight / (2 * FOV_T)) / Math.max(1, xray.distance) * 0.55 + 10));
-      xraySvg.innerHTML = `<g class="ef-atlas-plane-xray-glow">${lines}</g><g class="ef-atlas-plane-xray-core">${lines}</g>
-        <circle class="ef-atlas-plane-xray-halo" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${(radius + 7).toFixed(1)}"/>
-        <circle class="ef-atlas-plane-xray-ring" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${radius.toFixed(1)}"/>`;
+      const angle = planeAngle();
+      // The selected marker is the node/card outline itself. Only a node that
+      // is a point or hidden behind a nearer plane gets a small outer ring and
+      // a name; never a 16–34px circle over the card text.
+      const marker = angle > 35 || planeXrayBlocked(xray);
+      const dotPx = Math.max(8, Math.min(18, (pointScreenCss[xray.index] ?? 8) * 1.15));
+      const radius = Math.max(6, Math.min(14, dotPx / 2 + 2));
+      xraySvg.innerHTML = `<g class="ef-atlas-plane-xray-glow">${lines}</g><g class="ef-atlas-plane-xray-core">${lines}</g>${marker
+        ? `<circle class="ef-atlas-plane-xray-halo" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${(radius + 3).toFixed(1)}"/><circle class="ef-atlas-plane-xray-ring" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${radius.toFixed(1)}"/>`
+        : ""}`;
       xrayName.textContent = xray.title;
-      const width = Math.min(260, Math.max(54, estimateLabelWidth(xray.title, "", "knowledge") + 18));
+      xrayName.title = xray.title;
+      const width = Math.max(54, estimateLabelWidth(xray.title, "", "knowledge", true));
       const x = Math.max(8, Math.min(box.width - width - 8, xray.screen.x - width / 2));
-      let y = xray.screen.y - radius - 34;
-      if (y < 8) y = xray.screen.y + radius + 12;
+      let y = xray.screen.y - radius - 30;
+      if (y < 8) y = xray.screen.y + radius + 10;
       xrayName.style.width = `${width}px`;
       xrayName.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
-      xrayName.style.opacity = planeAngle() > 35 ? "1" : "0";
+      xrayName.style.opacity = marker ? "1" : "0";
     }
     function freezePlaneLabels() {
       planeLabelsFrozen = true;
@@ -1794,6 +1865,7 @@ export default function ArchiveAtlasScene({
       const angle = planeAngle();
       const state = simplificationForAngle(angle);
       const selectedId = propsRef.current.selectedId;
+      const relatedIndices = planeSelectionIndices();
       const xray = planeXray();
       const hoveredIndex = hoveredRef.current;
       const hoveredId = hoveredIndex === null ? null : propsRef.current.nodes[hoveredIndex]?.id ?? null;
@@ -1817,6 +1889,9 @@ export default function ArchiveAtlasScene({
         const height = THREE.MathUtils.lerp(THREE.MathUtils.lerp(base.height, 26, state.pill), dotWorld, state.dot);
         let opacity = (state.stage === "dot" ? 0 : 1) * (1 - state.back);
         if (state.handoff > 0.02) opacity *= 1 - smoothStep(0.72, 0.995, state.dot);
+        // Selection: unrelated cards drop to ~20%; the selected node and its
+        // one-hop neighbours keep normal brightness.
+        if (relatedIndices) opacity *= relatedIndices.has(runtime.index) ? 1 : 0.2;
         if (node.id === selectedId) opacity *= 1 - smoothStep(35, 38, angle);
         if (xray && node.id !== selectedId && distance < xray.distance - 3) {
           const box = { x: screen.x - width * pxPerWorld / 2, y: screen.y - height * pxPerWorld / 2, width: width * pxPerWorld, height: height * pxPerWorld };
@@ -1884,35 +1959,48 @@ export default function ArchiveAtlasScene({
     function hidePlaneSideLabels() {
       planeSidePool.forEach((element) => { element.style.opacity = "0"; });
     }
-    function planeLabelCandidates() {
+    function planeSelectionIndices() {
+      const selectedId = propsRef.current.selectedId;
+      if (!selectedId) return null;
+      const selectedIndex = engine.nodeIndex.get(selectedId);
+      if (selectedIndex === undefined) return null;
+      return new Set([selectedIndex, ...engine.neighbors[selectedIndex]]);
+    }
+    function planeLabelCandidates(selectionOnly = false) {
       const result: Array<{ id: string; index: number; x: number; y: number; distance: number; diameter: number; visibility: number; priority: number; text: string }> = [];
       const ids = planeIdSet();
       const selectedId = propsRef.current.selectedId;
+      const related = selectionOnly ? planeSelectionIndices() : null;
       const hoveredIndex = hoveredRef.current;
       const hoveredId = hoveredIndex === null ? null : propsRef.current.nodes[hoveredIndex]?.id ?? null;
       for (let index = 0; index < count; index += 1) {
         const node = propsRef.current.nodes[index];
-        if (!node || !ids.has(node.id) || node.id === selectedId) continue;
+        if (!node || !ids.has(node.id)) continue;
+        if (related) {
+          if (!related.has(index)) continue;
+        } else if (node.id === selectedId) continue;
         const distance = camera.position.distanceTo(new THREE.Vector3(engine.current[index * 3], engine.current[index * 3 + 1], engine.current[index * 3 + 2]));
         const point = planeProject(planePoint(index));
         if (point.z > 1) continue;
         const diameter = (pointScreenCss[index] ?? 12) * 2.2;
-        const priority = node.id === hoveredId ? 0 : node.isCurrent ? 1 : 3;
-        result.push({ id: node.id, index, x: point.x, y: point.y, distance, diameter, visibility: engine.alpha[index], priority, text: node.title });
+        const priority = related ? 0 : node.id === hoveredId ? 0 : node.isCurrent ? 1 : 3;
+        result.push({ id: node.id, index, x: point.x, y: point.y, distance, diameter, visibility: related ? 1 : engine.alpha[index], priority, text: node.title });
       }
       return result;
     }
     function rectHeightCss() { return renderer.domElement.clientHeight || 1; }
     function choosePlaneLabels() {
-      const candidates = planeLabelCandidates();
+      const selectionOnly = Boolean(propsRef.current.selectedId);
+      const candidates = planeLabelCandidates(selectionOnly);
       planeLabelChoices = chooseTiltedLabels(candidates.map(({ id, x, y, distance, diameter, visibility, priority, text }) => ({ id, x, y, distance, diameter, visibility, priority, text })), {
         width: renderer.domElement.clientWidth || 1,
         height: rectHeightCss(),
         // A hovered name is an addition, not a replacement: keep the whole
-        // distance/fit set and make room for the forced hover name.
-        maxLabels: planeHoveredId() !== null ? 9 : propsRef.current.selectedId ? 7 : 8,
-        showDiameter: 14,
-        hideDiameter: 10,
+        // distance/fit set and make room for the forced hover name. During a
+        // selection only the related set is named, so distance naming stops.
+        maxLabels: selectionOnly ? Math.max(1, candidates.length) : planeHoveredId() !== null ? 9 : 8,
+        showDiameter: selectionOnly ? 0 : 14,
+        hideDiameter: selectionOnly ? 0 : 10,
         lineHeight: 22,
         margin: 8,
         measure: sideTextWidth,
@@ -1952,8 +2040,59 @@ export default function ArchiveAtlasScene({
       planeSideVisibleTexts.clear();
       if (!courseMode || planeExVisible) { planeLabelChoices = []; planeLabelPrevious.clear(); hidePlaneSideLabels(); return; }
       const hoveredId = planeHoveredId();
+      const selectedId = propsRef.current.selectedId;
       const layer = sideLabelsRef.current;
       if (!layer) return;
+      const renderChoices = (fade: number, skipSelected: boolean) => {
+        const texts = new Set<string>();
+        const used = new Set<string>();
+        for (const choice of planeLabelChoices) {
+          if (skipSelected && selectedId && choice.id === selectedId) continue;
+          const runtime = planeCards.get(choice.id);
+          if (!runtime) continue;
+          const screen = runtime.screen;
+          const labelNode = propsRef.current.nodes[runtime.index];
+          const textKey = (labelNode?.title ?? "").trim().toLocaleLowerCase();
+          if (textKey && texts.has(textKey)) continue;
+          if (textKey) texts.add(textKey);
+          const width = Math.max(24, sideTextWidth(labelNode?.title ?? ""));
+          // Use the stored anchor but let the label follow the card between recomputes.
+          const anchorX = choice.anchor === "left" ? screen.x - width - 12 : choice.anchor === "right" ? screen.x + 12 : screen.x - width / 2;
+          const anchorY = choice.anchor === "below" ? screen.y + 12 : choice.anchor === "above" ? screen.y - 22 - 12 : screen.y - 11;
+          let element = planeSidePool.get(choice.id);
+          if (!element) {
+            element = document.createElement("div");
+            element.className = "ef-atlas-plane-label";
+            layer.appendChild(element);
+            planeSidePool.set(choice.id, element);
+          }
+          if (element.textContent !== (labelNode?.title ?? "")) {
+            element.textContent = labelNode?.title ?? "";
+          }
+          element.title = labelNode?.title ?? "";
+          element.style.transform = `translate(${anchorX.toFixed(1)}px, ${anchorY.toFixed(1)}px)`;
+          element.style.opacity = (choice.alpha * fade).toFixed(3);
+          used.add(choice.id);
+          if (textKey) planeSideVisibleTexts.add(textKey);
+        }
+        planeSidePool.forEach((element, id) => { if (!used.has(id)) element.style.opacity = "0"; });
+      };
+      // Selection: stop distance naming and excentric labels; name only the
+      // selected node and its one-hop neighbours (including Course-outside
+      // global Knowledge, which the global label layer adds below).
+      if (selectedId) {
+        if (!planeLabelLayerOn) {
+          planeLabelLayerOn = true;
+          planeLabelsDirty = true;
+        }
+        if (!planeLabelsFrozen && planeLabelsDirty && performance.now() - planeLabelLast > 30) choosePlaneLabels();
+        // A node owns exactly one visible name. While its card still shows
+        // its own title (front / pill), the side name would duplicate it; once
+        // the card becomes a dot the x-ray name takes over. So the selected
+        // node is never added to the side-label layer.
+        renderChoices(1, true);
+        return;
+      }
       // 35–55°: only the hovered name exists (the plane is read as dots), and
       // the global layer adds at most three cross-course related names.
       // 55°+: the distance / fit name layer stays intact; ordinary hover only
@@ -1990,37 +2129,7 @@ export default function ArchiveAtlasScene({
         planeLabelsDirty = true;
       }
       if (!planeLabelsFrozen && planeLabelsDirty && performance.now() - planeLabelLast > 30) choosePlaneLabels();
-      const fade = smoothStep(55, 60, angle);
-      const texts = new Set<string>();
-      const used = new Set<string>();
-      for (const choice of planeLabelChoices) {
-        const runtime = planeCards.get(choice.id);
-        if (!runtime) continue;
-        const screen = runtime.screen;
-        const labelNode = propsRef.current.nodes[runtime.index];
-        const textKey = (labelNode?.title ?? "").trim().toLocaleLowerCase();
-        if (textKey && texts.has(textKey)) continue;
-        if (textKey) texts.add(textKey);
-        const width = Math.max(24, sideTextWidth(labelNode?.title ?? ""));
-        // Use the stored anchor but let the label follow the card between recomputes.
-        const anchorX = choice.anchor === "left" ? screen.x - width - 12 : choice.anchor === "right" ? screen.x + 12 : screen.x - width / 2;
-        const anchorY = choice.anchor === "below" ? screen.y + 12 : choice.anchor === "above" ? screen.y - 22 - 12 : screen.y - 11;
-        let element = planeSidePool.get(choice.id);
-        if (!element) {
-          element = document.createElement("div");
-          element.className = "ef-atlas-plane-label";
-          layer.appendChild(element);
-          planeSidePool.set(choice.id, element);
-        }
-        if (element.textContent !== (labelNode?.title ?? "")) {
-          element.textContent = labelNode?.title ?? "";
-        }
-        element.style.transform = `translate(${anchorX.toFixed(1)}px, ${anchorY.toFixed(1)}px)`;
-        element.style.opacity = (choice.alpha * fade).toFixed(3);
-        used.add(choice.id);
-        if (textKey) planeSideVisibleTexts.add(textKey);
-      }
-      planeSidePool.forEach((element, id) => { if (!used.has(id)) element.style.opacity = "0"; });
+      renderChoices(smoothStep(55, 60, angle), false);
     }
 
     function updateArchiveChapterLabel(courseMode: boolean) {
@@ -2081,6 +2190,7 @@ export default function ArchiveAtlasScene({
       return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
     }
     function drawPlaneEx(x: number, y: number) {
+      if (propsRef.current.selectedId) { hidePlaneEx(); return; }
       const candidates = planeLabelCandidates();
       const cluster = findExcentricCluster(
         candidates.map((candidate) => ({ id: candidate.id, x: candidate.x, y: candidate.y, distance: candidate.distance, visibility: candidate.visibility, text: candidate.text })),
@@ -2126,7 +2236,7 @@ export default function ArchiveAtlasScene({
     function schedulePlaneEx(x: number, y: number) {
       window.clearTimeout(planeExTimer);
       planeExTimer = window.setTimeout(() => {
-        if (downRef.current || planeAngle() <= 35) return;
+        if (downRef.current || propsRef.current.selectedId || planeAngle() <= 35) return;
         drawPlaneEx(x, y);
       }, 400);
     }
@@ -2293,7 +2403,7 @@ export default function ArchiveAtlasScene({
             const text = node.title;
             const textKey = text.trim().toLocaleLowerCase();
             if (textKey && planeSideVisibleTexts.has(textKey)) return;
-            const width = estimateLabelWidth(text, "", "knowledge");
+            const width = estimateLabelWidth(text, "", "knowledge", forced);
             const height = labelHeight("knowledge");
             const diameter = Math.max(12, (pointScreenCss[index] ?? 9) * 2.2);
             const key = `node:${node.id}`;
@@ -2327,7 +2437,7 @@ export default function ArchiveAtlasScene({
             const text = node.title;
             const textKey = text.trim().toLocaleLowerCase();
             if (textKey && planeSideVisibleTexts.has(textKey)) return;
-            const width = estimateLabelWidth(text, "", "knowledge");
+            const width = estimateLabelWidth(text, "", "knowledge", true);
             const height = labelHeight("knowledge");
             const diameter = Math.max(12, (pointScreenCss[index] ?? 9) * 2.2);
             const key = `node:${node.id}`;
@@ -2336,7 +2446,17 @@ export default function ArchiveAtlasScene({
             indexByKnowledgeKey.set(key, index);
             info.set(key, { text, dot: resolveColor(node.color), strong: true });
           };
-          if (!planeExVisible && hover !== null) {
+          if (context.selected !== null) {
+            // Selection names the selected node and its one-hop neighbours.
+            // Plane nodes are named by the side label layer; this adds the
+            // Course-outside global Knowledge and its edges.
+            const related = new Set([context.selected, ...engine.neighbors[context.selected]]);
+            related.forEach((index) => {
+              const relatedNode = currentProps.nodes[index];
+              if (!relatedNode || planeSet.has(relatedNode.id)) return;
+              addKnowledgeLabel(index, 2600, 1);
+            });
+          } else if (!planeExVisible && hover !== null) {
             const hoveredNode = currentProps.nodes[hover];
             if (hoveredNode && planeSet.has(hoveredNode.id)) {
               const hoverPoint = project(getPosition(hover));
@@ -2360,12 +2480,20 @@ export default function ArchiveAtlasScene({
             }
           }
         }
-        const cardObstacles: AtlasLabelRect[] = Array.from(cardRects.values()).map((rect) => ({
-          x: rect.x - 3,
-          y: rect.y - 3,
-          width: rect.width + 6,
-          height: rect.height + 11
-        }));
+        const selectionRelated = context.selected !== null
+          ? new Set([context.selected, ...engine.neighbors[context.selected]])
+          : null;
+        // During a selection, unrelated cards are dimmed to 20%; a related
+        // name may sit over one of those faded cards rather than disappear.
+        // Bright related cards still keep their names off their copy.
+        const cardObstacles: AtlasLabelRect[] = Array.from(cardRects.entries())
+          .filter(([index]) => !selectionRelated || selectionRelated.has(index))
+          .map(([, rect]) => ({
+            x: rect.x - 3,
+            y: rect.y - 3,
+            width: rect.width + 6,
+            height: rect.height + 11
+          }));
         const coreObstacles: AtlasLabelRect[] = [];
         if (!context.courseMode && currentProps.mode === "person") {
           currentProps.people.forEach((person) => {
@@ -2426,6 +2554,17 @@ export default function ArchiveAtlasScene({
             diameter: label.diameter
           });
         });
+        if (import.meta.env.DEV) (window as unknown as { __efArchiveLabelsDebug?: unknown }).__efArchiveLabelsDebug = {
+          courseMode: context.courseMode,
+          selected: context.selected,
+          level: context.level,
+          candidateKeys: knowledgeCandidates.map((candidate) => candidate.key),
+          candidateText: knowledgeCandidates.map((candidate) => candidate.text),
+          placedKeys: placedKnowledge.map((label) => label.key),
+          placedOther: placedOther.length,
+          blockedCount: blocked.length,
+          reservedCount: reservedTexts.size
+        };
         cache.labels = next;
         cache.info = info;
       }
@@ -2468,7 +2607,7 @@ export default function ArchiveAtlasScene({
         if (element.dataset.html !== html) { element.innerHTML = html; element.dataset.html = html; }
         element.dataset.key = label.key;
         element.className = `ef-atlas-label is-${label.kind}${content?.strong ? " is-strong" : ""}`;
-        element.title = label.kind === "chapter" ? (content?.text ?? "") : "";
+        element.title = label.kind === "knowledge" || label.kind === "chapter" ? (content?.text ?? label.text) : "";
         if (label.kind === "chapter") {
           element.style.whiteSpace = "nowrap";
           element.style.textAlign = "center";

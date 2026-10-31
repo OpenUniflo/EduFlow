@@ -337,10 +337,79 @@ export function primaryKnowledgeByAssignment(graphData: CourseGraphData): Map<st
   return result;
 }
 
+export type CapabilitySupportEdge = { id: string; source: string; target: string };
+
+export type CapabilityPath = {
+  nodeIds: ReadonlySet<string>;
+  edgeIds: ReadonlySet<string>;
+};
+
+/**
+ * Every node and edge on a support path from an acquired capability to one of
+ * the targets (usually the selected Course Knowledge). The walk starts at the
+ * target and goes upstream; ancestors that are not reachable from an acquired
+ * capability are excluded because they are not on a real path. This is the
+ * selection complement of the Project Capability Model: it can only use the
+ * model's own support edges and never invents a node.
+ */
+export function capabilityPathToTargets(input: {
+  targetNodeIds: readonly string[];
+  supportEdges: readonly CapabilitySupportEdge[];
+  acquiredNodeIds: readonly string[];
+  memberNodeIds?: readonly string[];
+}): CapabilityPath {
+  const members = input.memberNodeIds
+    ? new Set(input.memberNodeIds)
+    : new Set(input.supportEdges.flatMap((edge) => [edge.source, edge.target]));
+  const edges = input.supportEdges.filter((edge) => members.has(edge.source) && members.has(edge.target));
+  const outgoing = new Map<string, CapabilitySupportEdge[]>();
+  const incoming = new Map<string, CapabilitySupportEdge[]>();
+  edges.forEach((edge) => {
+    outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge]);
+    incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge]);
+  });
+  const acquired = new Set(input.acquiredNodeIds.filter((id) => members.has(id)));
+  const forward = new Set(acquired);
+  const queue = [...acquired];
+  for (let index = 0; index < queue.length; index += 1) {
+    for (const edge of outgoing.get(queue[index]) ?? []) {
+      if (forward.has(edge.target)) continue;
+      forward.add(edge.target);
+      queue.push(edge.target);
+    }
+  }
+  const nodeIds = new Set<string>();
+  const edgeIds = new Set<string>();
+  for (const target of input.targetNodeIds) {
+    if (!members.has(target)) continue;
+    if (acquired.has(target)) { nodeIds.add(target); continue; }
+    if (!forward.has(target)) continue;
+    const backward = new Set<string>([target]);
+    const walk = [target];
+    for (let index = 0; index < walk.length; index += 1) {
+      for (const edge of incoming.get(walk[index]) ?? []) {
+        if (!forward.has(edge.source) || backward.has(edge.source)) continue;
+        backward.add(edge.source);
+        walk.push(edge.source);
+      }
+    }
+    backward.forEach((id) => nodeIds.add(id));
+    edges.forEach((edge) => {
+      if (backward.has(edge.source) && backward.has(edge.target)) edgeIds.add(edge.id);
+    });
+  }
+  return { nodeIds, edgeIds };
+}
+
 export type CourseSelectionRelations = {
   knowledgeIds: ReadonlySet<string>;
+  /** Knowledge whose practice reflection must stay at normal brightness. */
   practiceKnowledgeIds: ReadonlySet<string>;
   capabilityIds: ReadonlySet<string>;
+  /** Factual dependency / capability edge ids on the selection path. */
+  edgeIds: ReadonlySet<string>;
+  /** Knowledge on the far face of the selected facet: normal, never highlighted. */
+  mirrorKnowledgeIds: ReadonlySet<string>;
   relatedKeys: ReadonlySet<string>;
   /** Selection is not part of the adopted route, so the pulse beam fades. */
   onRoute: boolean;
@@ -355,84 +424,119 @@ export function selectionKey(selection: CourseSelection): string {
 export function courseSelectionRelations(input: {
   selection: CourseSelection | null;
   knowledgeIds: readonly string[];
-  dependencyEdges: readonly { source: string; target: string }[];
+  dependencyEdges: readonly { id?: string; source: string; target: string }[];
   assignmentsByKnowledge: ReadonlyMap<string, readonly string[]>;
   assignmentKnowledge: ReadonlyMap<string, readonly string[]>;
   capabilitySupports: ReadonlyMap<string, readonly string[]>;
   routeOrder: readonly string[];
+  /** Project Capability Model support edges (only these may be lit). */
+  supportEdges?: readonly CapabilitySupportEdge[];
+  /** Capabilities whose learning state is already acquired. */
+  acquiredNodeIds?: readonly string[];
+  /** Capability model membership, so accidental graph edges never join. */
+  modelNodeIds?: readonly string[];
 }): CourseSelectionRelations {
   const knowledge = new Set<string>();
   const practices = new Set<string>();
   const capabilities = new Set<string>();
+  const edges = new Set<string>();
+  const mirrors = new Set<string>();
   const related = new Set<string>();
   const selection = input.selection;
-  if (!selection) return { knowledgeIds: knowledge, practiceKnowledgeIds: practices, capabilityIds: capabilities, relatedKeys: related, onRoute: false };
+  if (!selection) return {
+    knowledgeIds: knowledge, practiceKnowledgeIds: practices, capabilityIds: capabilities,
+    edgeIds: edges, mirrorKnowledgeIds: mirrors, relatedKeys: related, onRoute: false
+  };
   const add = (key: string) => related.add(key);
   const addKnowledge = (id: string) => {
     if (!input.knowledgeIds.includes(id)) return;
     knowledge.add(id);
     add(`k:${id}`);
-    const card = input.assignmentsByKnowledge.has(id) ? `p:${id}` : `p:${id}`;
-    add(card);
+    add(`p:${id}`);
   };
   const addDependencies = (id: string) => {
-    input.dependencyEdges.forEach((edge) => {
-      if (edge.source === id) addKnowledge(edge.target);
-      if (edge.target === id) addKnowledge(edge.source);
+    input.dependencyEdges.forEach((edge, index) => {
+      const touches = edge.source === id || edge.target === id;
+      if (!touches) return;
+      addKnowledge(edge.source);
+      addKnowledge(edge.target);
+      if (knowledge.has(edge.source) && knowledge.has(edge.target)) edges.add(edge.id ?? `dep:${index}`);
     });
   };
-  const addCapabilities = (id: string) => {
-    input.capabilitySupports.forEach((supports, capabilityId) => {
-      if (supports.includes(id)) {
+  const addCapabilityPath = (targets: readonly string[]) => {
+    if (!input.supportEdges?.length) {
+      // Compatibility fallback for callers that only know direct support.
+      targets.forEach((id) => input.capabilitySupports.forEach((supports, capabilityId) => {
+        if (!supports.includes(id)) return;
         capabilities.add(capabilityId);
         add(`c:${capabilityId}`);
-      }
+      }));
+      return;
+    }
+    const path = capabilityPathToTargets({
+      targetNodeIds: targets,
+      supportEdges: input.supportEdges,
+      acquiredNodeIds: input.acquiredNodeIds ?? [],
+      memberNodeIds: input.modelNodeIds
     });
+    path.nodeIds.forEach((id) => {
+      if (input.knowledgeIds.includes(id)) {
+        // A Course Knowledge on the capability path is a real node too.
+        addKnowledge(id);
+        return;
+      }
+      capabilities.add(id);
+      add(`c:${id}`);
+    });
+    path.edgeIds.forEach((id) => edges.add(id));
   };
   let onRoute = false;
+  const addRouteNeighbours = (id: string) => {
+    const index = input.routeOrder.indexOf(id);
+    if (index < 0) return;
+    onRoute = true;
+    if (index > 0) addKnowledge(input.routeOrder[index - 1]);
+    if (index < input.routeOrder.length - 1) addKnowledge(input.routeOrder[index + 1]);
+  };
   if (selection.kind === "knowledge") {
     addKnowledge(selection.id);
+    mirrors.add(selection.id);
     addDependencies(selection.id);
-    addCapabilities(selection.id);
-    practices.add(selection.id);
-    const index = input.routeOrder.indexOf(selection.id);
-    if (index >= 0) {
-      onRoute = true;
-      if (index > 0) addKnowledge(input.routeOrder[index - 1]);
-      if (index < input.routeOrder.length - 1) addKnowledge(input.routeOrder[index + 1]);
-    }
+    addCapabilityPath([selection.id]);
+    addRouteNeighbours(selection.id);
   } else if (selection.kind === "practice") {
     const covered = input.assignmentKnowledge.get(selection.id) ?? [];
     covered.forEach((id) => {
       addKnowledge(id);
-      practices.add(id);
+      mirrors.add(id);
       addDependencies(id);
-      addCapabilities(id);
-      const index = input.routeOrder.indexOf(id);
-      if (index >= 0) {
-        onRoute = true;
-        if (index > 0) addKnowledge(input.routeOrder[index - 1]);
-        if (index < input.routeOrder.length - 1) addKnowledge(input.routeOrder[index + 1]);
-      }
+      addCapabilityPath([id]);
+      addRouteNeighbours(id);
     });
   } else if (selection.kind === "group") {
     addKnowledge(selection.id);
-    practices.add(selection.id);
+    mirrors.add(selection.id);
     addDependencies(selection.id);
-    addCapabilities(selection.id);
-    const index = input.routeOrder.indexOf(selection.id);
-    onRoute = index >= 0;
-    if (index >= 0) {
-      if (index > 0) addKnowledge(input.routeOrder[index - 1]);
-      if (index < input.routeOrder.length - 1) addKnowledge(input.routeOrder[index + 1]);
-    }
+    addCapabilityPath([selection.id]);
+    addRouteNeighbours(selection.id);
   } else {
     capabilities.add(selection.id);
     add(`c:${selection.id}`);
-    (input.capabilitySupports.get(selection.id) ?? []).forEach((id) => addKnowledge(id));
+    const supported = input.capabilitySupports.get(selection.id) ?? [];
+    supported.forEach((id) => addKnowledge(id));
+    addCapabilityPath([selection.id]);
+    if (input.supportEdges?.length) {
+      // The selected capability's own outgoing supports are part of the
+      // "what does this capability lead to" answer and stay lit.
+      input.supportEdges.forEach((edge) => {
+        if (edge.source !== selection.id) return;
+        edges.add(edge.id);
+        if (input.knowledgeIds.includes(edge.target)) addKnowledge(edge.target);
+      });
+    }
   }
-  [...knowledge].forEach((id) => add(`p:${id}`));
-  return { knowledgeIds: knowledge, practiceKnowledgeIds: practices, capabilityIds: capabilities, relatedKeys: related, onRoute };
+  [...knowledge].forEach((id) => { add(`p:${id}`); practices.add(id); });
+  return { knowledgeIds: knowledge, practiceKnowledgeIds: practices, capabilityIds: capabilities, edgeIds: edges, mirrorKnowledgeIds: mirrors, relatedKeys: related, onRoute };
 }
 
 /** Resolve the open detail facet when the skill/practice mirror swaps. */
@@ -590,10 +694,12 @@ export function buildRouteTrack(
     return card ? [card] : [];
   });
   if (route.length < 2) return [];
-  // A step number is a 24px disc pinned 8px inside the card's left edge.
+  // The step disc is centred on the card's left edge (`.ef-imm-step` spans
+  // -11..+11px), so the band must run through that edge rather than 18px inside
+  // the card where it would cross the title.
   const anchorX = (card: RouteTrackCard) => card.chapterId === "supplemental"
     ? card.x
-    : card.x - card.width / 2 + 18;
+    : card.x - card.width / 2;
   return route.map((card) => ({ x: anchorX(card), y: card.y, z: -24 }));
 }
 

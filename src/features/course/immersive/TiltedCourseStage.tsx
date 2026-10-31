@@ -22,6 +22,8 @@ import {
   type TiltedPoint
 } from "@/shared/scene/tiltedPlane";
 import { LAYER_SWAP_MS, REFLECTION_OFFSET, layerMixAt, layerOffsetsAt } from "./courseTreeLayout";
+import { projectColorVar, projectToneFor } from "./projectColors";
+import { advancePulse, pulseCenters, routeMetrics, windowLengthForPixels } from "@/shared/scene/routePulse";
 import type {
   CourseImmersiveStageHandle,
   SemanticZoom,
@@ -133,12 +135,13 @@ function escapeHtml(value: string) {
 }
 
 function nodeColor(node: StageNode) {
-  if (node.kind === "assignment") return "var(--practice)";
-  if (node.kind === "capability") return "var(--capability, var(--brand))";
-  if (node.status === "completed") return "var(--acquired)";
-  if (node.status === "learning") return "var(--brand)";
-  if (node.status === "available") return "var(--target)";
-  return "var(--pending)";
+  // Whole course page: green acquired, blue pending Course target, gray
+  // pending intermediate capability. "learning" only adds a ring and never
+  // changes the main colour. Archive colours are untouched.
+  return projectColorVar(projectToneFor({
+    kind: node.kind === "assignment" ? "assignment" : node.kind === "capability" ? "capability" : "knowledge",
+    status: node.status
+  }));
 }
 
 function cardSignature(node: StageNode) {
@@ -160,6 +163,7 @@ function cardClass(node: StageNode) {
     node.ghost ? "is-ghost" : "",
     node.empty ? "is-empty" : "",
     node.dim ? "is-dim" : "",
+    node.mirror ? "is-mirror" : "",
     node.highlight ? "is-hl" : "",
     node.selected ? "is-sel" : ""
   ].filter(Boolean).join(" ");
@@ -272,7 +276,14 @@ export function TiltedCourseStage({
     edgeGroup: THREE.Group;
     beamGroup: THREE.Group;
     chapterGroup: THREE.Group;
-    packets: Array<{ mesh: THREE.Mesh; points: TiltedPoint[]; progress: number; speed: number; offset: number }>;
+    flows: Array<{
+      material: LineMaterial;
+      metrics: ReturnType<typeof routeMetrics>;
+      distance: number;
+      midpoint: THREE.Vector3;
+      samples: THREE.Vector3[];
+      pulseCount: number;
+    }>;
     cards: Map<string, CardRuntime>;
     chapters: Map<string, ChapterRuntime>;
     xrayHost: HTMLDivElement;
@@ -328,6 +339,7 @@ export function TiltedCourseStage({
     layerTarget: number;
     layerSwapFrom: number;
     layerSwapStarted: number;
+    occluders: Array<{ x: number; y: number; width: number; height: number }>;
     capabilityReveal: boolean;
     lastSizeStage: "full" | "pill" | "dot";
     frameCount: number;
@@ -350,10 +362,11 @@ export function TiltedCourseStage({
     const colors = {
       brand: cssColor("--brand", "#6D5DF6"),
       brandInk: cssColor("--brand-ink", "#4338CA"),
-      acquired: cssColor("--acquired", "#3B82F6"),
-      target: cssColor("--target", "#22C55E"),
-      pending: cssColor("--pending", "#94A3B8"),
-      practice: cssColor("--practice", "#F59E0B"),
+      acquired: cssColor("--course-acquired", "#22C55E"),
+      target: cssColor("--course-target", "#3B82F6"),
+      pending: cssColor("--course-intermediate", "#94A3B8"),
+      practice: cssColor("--practice", "#14A6A0"),
+      preview: cssColor("--course-route-preview", "#F59E0B"),
       line: cssColor("--line-strong", "#CBD5E1"),
       ink: cssColor("--ink", "#0F172A")
     };
@@ -460,7 +473,7 @@ export function TiltedCourseStage({
       renderer, cssRenderer, scene, cssScene, camera, controls, points, rings,
       pointPositions, pointAlpha, pointSize, pointColor,
       ringPositions, ringAlpha, ringSize, ringColor, ringColor2, ringSplit,
-      edgeGroup, beamGroup, chapterGroup, packets: [],
+      edgeGroup, beamGroup, chapterGroup, flows: [],
       cards: new Map<string, CardRuntime>(), chapters: new Map<string, ChapterRuntime>(),
       xrayHost, xraySvg, xrayName, hoverRing,
       labels: new Map<string, HTMLDivElement>(), exRows: new Map<string, HTMLButtonElement>(),
@@ -479,6 +492,7 @@ export function TiltedCourseStage({
       currentNodes: [] as StageNode[], currentChapters: [] as StageChapter[], currentEdges: [] as StageEdge[], currentBeams: [] as StageBeam[],
       layer: "skill" as "skill" | "practice",
       layerMix: 0, layerTarget: 0, layerSwapFrom: 0, layerSwapStarted: 0,
+      occluders: [] as Array<{ x: number; y: number; width: number; height: number }>,
       capabilityReveal: false, lastSizeStage: "full" as "full" | "pill" | "dot",
       frameCount: 0, fpsStarted: performance.now(),
       emitZoom(force = false) {
@@ -497,20 +511,16 @@ export function TiltedCourseStage({
     } as unknown as NonNullable<typeof runtimeRef.current>;
     runtimeRef.current = engine;
 
-    const colorFor = (node: StageNode) => node.kind === "assignment"
-      ? colors.practice
-      : node.kind === "capability"
-        ? colors.brand
-        : node.status === "completed"
-          ? colors.acquired
-          : node.status === "learning"
-            ? colors.brand
-            : node.status === "available"
-              ? colors.target
-              : colors.pending;
+    const colorFor = (node: StageNode) => {
+      if (node.kind === "assignment") return colors.practice;
+      if (node.kind === "capability") return node.status === "completed" ? colors.acquired : colors.pending;
+      // Learning only adds a ring; the Knowledge stays target-blue (or green
+      // once acquired).
+      return node.status === "completed" ? colors.acquired : colors.target;
+    };
     const measureCanvas = document.createElement("canvas").getContext("2d")!;
-    const measureText = (text: string, size = 13) => {
-      measureCanvas.font = `600 ${size}px -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif`;
+    const measureText = (text: string, size = 12) => {
+      measureCanvas.font = `700 ${size}px Inter, -apple-system, "system-ui", "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif`;
       return measureCanvas.measureText(text).width;
     };
     const sideTextWidth = (text: string) => {
@@ -686,9 +696,13 @@ export function TiltedCourseStage({
     }
     /** Same-position precedence on the turned plane. */
     function pickPriority(node: StageNode) {
-      if (node.kind === "assignment") return 2;
+      // The front face owns a same-position click. When the practice tree is
+      // in front its card beats the Knowledge reflection underneath; in the
+      // skill tree the reverse is true.
+      const practiceFront = engine.layer === "practice";
+      if (node.kind === "assignment") return practiceFront ? 0 : 2;
       if (node.kind === "capability") return 1;
-      return 0;
+      return practiceFront ? 2 : 0;
     }
     function rankOf(node: StageNode) {
       if (engine.hover === node.id || engine.externalHover === node.id) return 0;
@@ -711,9 +725,17 @@ export function TiltedCourseStage({
         const node = engine.currentNodes[index];
         if (node.kind === "route" || node.kind === "route-chapter") continue;
         // Reflection practice cards are the same step as their Knowledge; naming
-        // both would duplicate text on the turned plane.
-        if (node.kind === "assignment") continue;
+        // both would duplicate text on the turned plane. The far face of a
+        // selected node stays at normal brightness but is never named.
+        // Only the front face is named: Knowledge in the skill tree, practice
+        // cards in the practice tree. The far face keeps its glow but no name.
+        if (node.ghost || node.mirror) continue;
+        if (node.kind === "assignment" && engine.layer !== "practice") continue;
         if (node.id === engine.selected) continue;
+        // §10.7: while a node is selected only its related set is named.
+        // Distance naming and the excentric list are disabled, and dimmed
+        // unrelated markers no longer block the related names.
+        if (engine.selected && !node.highlight) continue;
         const dist = camera.position.distanceTo(new THREE.Vector3(node.x, -node.y, node.z));
         const screen = cardScreen(node, dist);
         if (screen.z > 1) continue;
@@ -722,15 +744,15 @@ export function TiltedCourseStage({
         // Capability names appear as soon as the plane is readable; Knowledge
         // names only hand over from the capsule to the outside label after 55°.
         const isCapability = node.kind === "capability";
-        const visible = !node.dim && renderedOpacity(index) >= 0.1;
+        const visible = !node.dim && !node.mirror && renderedOpacity(index) >= 0.1;
         if (!visible) continue;
-        if (isCapability && capVisible <= 0.5) continue;
+        if (!engine.selected && isCapability && capVisible <= 0.5) continue;
         // 35–58°: the turned plane is read through screen-facing names. The
         // card body is hidden (turnLabels), so the name layer is the only
         // owner. Capability names stay quiet until hovered / selected / current
         // so 42 capability labels cannot cover the course names.
-        if (angle < 58) {
-          if (isCapability && !(node.id === hovered || node.id === engine.selected || node.current)) continue;
+        if (angle < 58 && !engine.selected) {
+          if (isCapability && !(node.id === hovered || node.id === engine.selected || (node.current && node.kind !== "capability"))) continue;
         }
         // Ordinary hover only forces the hovered node's name. Every other
         // distance / fit decision stays as-is; the excentric list replaces
@@ -738,7 +760,7 @@ export function TiltedCourseStage({
         candidates.push({
           id: node.id, x: screen.x, y: screen.y, distance: dist,
           diameter: isCapability ? Math.max(16, screen.diameter) : screen.diameter,
-          visibility: renderedOpacity(index), priority: rankOf(node),
+          visibility: renderedOpacity(index), priority: engine.selected ? 0 : rankOf(node),
           text: node.title
         });
       }
@@ -818,6 +840,8 @@ export function TiltedCourseStage({
         }
         if (element.textContent !== node.title) element.textContent = node.title;
         element.classList.toggle("is-capability-label", node.kind === "capability");
+        element.dataset.status = node.status ?? "";
+        element.dataset.kind = node.kind;
         element.style.fontSize = node.kind === "capability" ? "11px" : "";
         element.style.lineHeight = node.kind === "capability" ? "16px" : "";
         const fade = 1;
@@ -955,20 +979,42 @@ export function TiltedCourseStage({
       engine.xraySvg.setAttribute("viewBox", `0 0 ${engine.width} ${engine.height}`);
       engine.xraySvg.setAttribute("width", String(engine.width));
       engine.xraySvg.setAttribute("height", String(engine.height));
-      const radius = Math.max(16, Math.min(34, 13 * (engine.height / (2 * xray.distance * FOV_T)) * 0.55 + 10));
-      const lines = xray.segments.map((segment) => `<line x1="${segment.x1.toFixed(1)}" y1="${segment.y1.toFixed(1)}" x2="${segment.x2.toFixed(1)}" y2="${segment.y2.toFixed(1)}"/>`).join("");
-      engine.xraySvg.innerHTML = `<g class="ef-imm-tilt-xray-glow">${lines}</g><g class="ef-imm-tilt-xray-core">${lines}</g>
-        <circle class="ef-imm-tilt-xray-halo" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${(radius + 7).toFixed(1)}"/>
-        <circle class="ef-imm-tilt-xray-ring" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${radius.toFixed(1)}"/>`;
       const angle = tiltAngleDegrees(camera.position.clone().sub(controls.target));
+      // The selected card / point owns its own highlight. A small outer ring
+      // and a name are only drawn when the node is a point on the turned
+      // plane or is hidden behind a nearer card; never a big circle over text.
+      const selectedCard = engine.cards.get(xray.node.id);
+      const selectedRect = selectedCard ? rectForCard(xray.node, selectedCard) : null;
+      const blocked = selectedRect ? xrayBlocked(selectedRect, xray.distance, xray) : false;
+      const marker = angle > 35 || blocked;
+      const dotPx = Math.max(8, Math.min(18, 13 * (engine.height / (2 * xray.distance * FOV_T)) * 1.15));
+      const radius = Math.max(6, Math.min(14, dotPx / 2 + 2));
+      const lines = xray.segments.map((segment) => `<line x1="${segment.x1.toFixed(1)}" y1="${segment.y1.toFixed(1)}" x2="${segment.x2.toFixed(1)}" y2="${segment.y2.toFixed(1)}"/>`).join("");
+      // X-ray lines stay above the cards but never run across card copy: mask
+      // them out wherever a card body is actually visible. The small ring and
+      // name stay outside the mask.
+      const maskRects = [...engine.cards.values()].flatMap((card) => {
+        if (card.opacity < 0.12 || card.pointMix > 0.6) return [];
+        const rect = rectForCard(card.node, card);
+        return [`<rect x="${rect.x.toFixed(1)}" y="${rect.y.toFixed(1)}" width="${rect.width.toFixed(1)}" height="${rect.height.toFixed(1)}" fill="black"/>`];
+      });
+      const xrayMask = maskRects.length
+        ? `<defs><mask id="ef-imm-xray-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="${engine.width}" height="${engine.height}"><rect x="0" y="0" width="${engine.width}" height="${engine.height}" fill="white"/>${maskRects.join("")}</mask></defs>`
+        : "";
+      const maskAttr = xrayMask ? ' mask="url(#ef-imm-xray-mask)"' : "";
+      engine.xraySvg.innerHTML = `${xrayMask}<g class="ef-imm-tilt-xray-glow"${maskAttr}>${lines}</g><g class="ef-imm-tilt-xray-core"${maskAttr}>${lines}</g>${marker
+        ? `<circle class="ef-imm-tilt-xray-halo" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${(radius + 3).toFixed(1)}"/><circle class="ef-imm-tilt-xray-ring" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${radius.toFixed(1)}"/>`
+        : ""}`;
       engine.xrayName.textContent = xray.node.title;
+      engine.xrayName.dataset.status = xray.node.status ?? "";
+      engine.xrayName.dataset.kind = xray.node.kind;
       const width = Math.min(260, Math.max(54, measureText(xray.node.title) + 26));
       let x = Math.max(8, Math.min(engine.width - width - 8, xray.screen.x - width / 2));
-      let y = xray.screen.y - radius - 34;
-      if (y < 8) y = xray.screen.y + radius + 12;
+      let y = xray.screen.y - radius - 30;
+      if (y < 8) y = xray.screen.y + radius + 10;
       engine.xrayName.style.width = `${width}px`;
       engine.xrayName.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
-      engine.xrayName.style.opacity = angle > 35 ? "1" : "0";
+      engine.xrayName.style.opacity = marker ? "1" : "0";
     }
 
     function denseNodesAt(x: number, y: number): ExcentricNode[] {
@@ -1018,6 +1064,7 @@ export function TiltedCourseStage({
       return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
     }
     function drawExcentric(x: number, y: number) {
+      if (engine.selected) { hideExcentric(); return; }
       const cluster = findExcentricCluster(denseNodesAt(x, y), { x, y }, { radius: 22, minNodes: 3, maxNodes: 6, snap: 7 });
       if (!cluster) { hideExcentric(); return; }
       const list = cluster.nodes.slice();
@@ -1116,6 +1163,7 @@ export function TiltedCourseStage({
 
     function updateCards() {
       const selected = engine.selected;
+      engine.occluders = [];
       const direction = camera.position.clone().sub(controls.target).normalize();
       const angle = tiltAngleDegrees(direction);
       const sample = engine.currentNodes.find((node) => node.kind === "knowledge");
@@ -1199,6 +1247,21 @@ export function TiltedCourseStage({
         };
         const blocked = xrayBlocked(cardRect, distance, xray);
         if (blocked) opacity *= 0.16;
+        // Keep the step-disc lane (30px) free; every other card pixel clips the
+        // route band, so it cannot sit over a title or description.
+        if (opacity > 0.12 && screen.z < 1 && state.dot < 0.72 && cardRect.width > 34) {
+          // Reflections hide their copy and step disc, so their whole sheet is
+          // opaque; solid cards keep the 30px step-disc lane.
+          const lane = ghost || state.pill > 0.6 ? 0 : 30;
+          engine.occluders.push({
+            x: cardRect.x + lane,
+            y: cardRect.y,
+            width: Math.max(1, cardRect.width - lane),
+            // The reflection's identity strip can overflow the 64px sheet by a
+            // few pixels; include that strip so the band never crosses it.
+            height: cardRect.height + (ghost ? 14 : 0)
+          });
+        }
         card.width = width;
         card.height = height;
         card.opacity = opacity;
@@ -1225,7 +1288,19 @@ export function TiltedCourseStage({
           }
         }
         element.style.borderRadius = state.pill > 0.02 ? "999px" : "12px";
-        element.style.opacity = Math.max(0, Math.min(1, opacity)).toFixed(3);
+        // In the practice tree the Knowledge reflection sits behind every
+        // practice card. Its translucent sheet let the route band shine
+        // through the ghost title; make that sheet opaque and fade only its
+        // content, so the band is truly occluded by the card stack.
+        const occludeBeam = ghost && engine.layer === "practice" && angle < 35 && state.dot < 0.5;
+        element.classList.toggle("is-beam-occluder", occludeBeam);
+        if (occludeBeam) {
+          element.style.setProperty("--ghost-content-op", Math.max(0, Math.min(1, opacity)).toFixed(3));
+          element.style.opacity = "1";
+        } else {
+          element.style.removeProperty("--ghost-content-op");
+          element.style.opacity = Math.max(0, Math.min(1, opacity)).toFixed(3);
+        }
         element.style.setProperty("--name-op", state.cardName.toFixed(3));
         element.style.setProperty("--extra-op", state.extra.toFixed(3));
         element.style.setProperty("--dotc", `var(--dotc, ${nodeColor(node)})`);
@@ -1328,7 +1403,7 @@ export function TiltedCourseStage({
         const ghost = card?.ghost ?? false;
         const pointMix = ghost ? 0 : (card?.pointMix ?? 0);
         const capabilityAlpha = node.kind === "capability" ? capVis : 1;
-        const alpha = pointMix * (node.dim ? 0.35 : 1) * capabilityAlpha * (selectedCap ? 0.4 : 1);
+        const alpha = pointMix * (node.dim ? 0.2 : 1) * capabilityAlpha * (selectedCap ? 0.4 : 1);
         const hovered = engine.hover === node.id || engine.externalHover === node.id;
         pointPositions[index * 3] = worldX;
         pointPositions[index * 3 + 1] = worldY;
@@ -1341,7 +1416,7 @@ export function TiltedCourseStage({
         ringPositions[index * 3 + 1] = worldY;
         ringPositions[index * 3 + 2] = worldZ;
         ringSize[index] = 13 * (node.kind === "capability" ? 1.15 : 1) * 2.1;
-        const ringStatus = node.status === "completed" ? colors.acquired : node.status === "learning" ? colors.brand : node.status === "available" ? colors.target : colors.pending;
+        const ringStatus = node.status === "completed" ? colors.acquired : node.status === "learning" ? colors.brand : colorFor(node);
         const ring = new THREE.Color(ringStatus);
         ring.toArray(ringColor, index * 3);
         ringColor2[index * 3] = ringColor[index * 3];
@@ -1524,7 +1599,7 @@ export function TiltedCourseStage({
       };
       const hasSelection = Boolean(engine.selected);
       for (const edge of engine.currentEdges) {
-        if (edge.kind === "capability") add(edge.points, colors.brand, edge.highlighted ? 0.9 : hasSelection ? 0.06 : 0.15, true, edge.kind, edge.pointWeights);
+        if (edge.kind === "capability") add(edge.points, colors.brand, edge.highlighted ? 0.9 : hasSelection ? 0.05 : 0.4, true, edge.kind, edge.pointWeights);
         else if (edge.kind === "practice") {
           add(edge.points, colors.practice, edge.highlighted ? 0.74 : 0.25, true, edge.kind);
           const line = engine.edgeGroup.children[engine.edgeGroup.children.length - 1];
@@ -1533,7 +1608,14 @@ export function TiltedCourseStage({
             line.userData.targetId = edge.target;
           }
         } else if (edge.kind === "chapter") add(edge.points, colors.line, 0.2, false, edge.kind);
-        else add(edge.points, colors.brand, edge.highlighted ? 0.92 : hasSelection ? 0.07 : 0.27, false, edge.kind, edge.pointWeights ?? edge.points.map(() => 1));
+        else add(edge.points, colors.brand, edge.highlighted ? 0.92 : hasSelection ? 0.06 : 0.27, false, edge.kind, edge.pointWeights ?? edge.points.map(() => 1));
+        const line = engine.edgeGroup.children[engine.edgeGroup.children.length - 1];
+        if (line instanceof THREE.Line) {
+          line.userData.highlighted = Boolean(edge.highlighted);
+          line.userData.edgeId = edge.id;
+          line.userData.sourceId = edge.source;
+          line.userData.targetId = edge.target;
+        }
       }
       (engine as unknown as { lastEdgeMix?: number }).lastEdgeMix = undefined;
       updateEdgeGeometry();
@@ -1619,6 +1701,62 @@ export function TiltedCourseStage({
       return out;
     }
 
+    // The route band is a WebGL line under the CSS3D cards, but a translucent
+    // reflection (or a 3D stacking corner case) can still let it read through a
+    // card. Clip the band in screen space against the card bodies, leaving the
+    // left 30px lane free so it still passes through each step disc.
+    function attachBeamOccluders(material: LineMaterial) {
+      const uniforms = {
+        uOccluders: { value: Array.from({ length: 96 }, () => new THREE.Vector4()) },
+        uOccluderCount: { value: 0 }
+      };
+      material.userData.occluderUniforms = uniforms;
+      const previous = material.onBeforeCompile;
+      material.onBeforeCompile = (shader, renderer) => {
+        previous?.call(material, shader, renderer);
+        shader.uniforms.uOccluders = uniforms.uOccluders;
+        shader.uniforms.uOccluderCount = uniforms.uOccluderCount;
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform vec4 uOccluders[96];\nuniform int uOccluderCount;\nbool efBeamOccluded(vec2 p) {\n  for (int i = 0; i < 96; i++) {\n    if (i >= uOccluderCount) break;\n    vec4 r = uOccluders[i];\n    if (p.x >= r.x && p.x <= r.x + r.z && p.y >= r.y && p.y <= r.y + r.w) return true;\n  }\n  return false;\n}')
+          .replace('void main() {', 'void main() {\n  if (efBeamOccluded(gl_FragCoord.xy)) discard;');
+        material.userData.occluderInjected = shader.fragmentShader.includes('efBeamOccluded');
+      };
+      const cacheKey = material.customProgramCacheKey.bind(material);
+      material.customProgramCacheKey = () => `${cacheKey()}:beam-occluder`;
+    }
+
+    function makePulseMaterial(color: string) {
+      const material = new LineMaterial({
+        color,
+        linewidth: 12,
+        transparent: true,
+        opacity: 1,
+        depthWrite: false
+      });
+      const uniforms = {
+        uPulseA: { value: 0 },
+        uPulseB: { value: -10 },
+        uPulseWidth: { value: 0.02 },
+        uFlowOn: { value: 1 }
+      };
+      material.userData.flowUniforms = uniforms;
+      material.onBeforeCompile = (shader) => {
+        shader.uniforms.uPulseA = uniforms.uPulseA;
+        shader.uniforms.uPulseB = uniforms.uPulseB;
+        shader.uniforms.uPulseWidth = uniforms.uPulseWidth;
+        shader.uniforms.uFlowOn = uniforms.uFlowOn;
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nattribute float aRouteStart;\nattribute float aRouteEnd;\nvarying float vRouteDist;')
+          .replace('void main() {', 'void main() {\n  vRouteDist = ( position.y < 0.5 ) ? aRouteStart : aRouteEnd;');
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform float uPulseA;\nuniform float uPulseB;\nuniform float uPulseWidth;\nuniform float uFlowOn;\nvarying float vRouteDist;\nfloat efPulse(float d, float c, float w) {\n  if (w <= 0.00001) return 0.0;\n  float head = c + w * 0.5;\n  float start = c - w * 1.2;\n  if (d < start || d > head) return 0.0;\n  if (d > c) { float t = (head - d) / max(0.00001, head - c); return clamp(t / 0.35, 0.0, 1.0); }\n  float t = (d - start) / max(0.00001, c - start);\n  return pow(clamp(t, 0.0, 1.0), 1.8);\n}')
+          .replace('float alpha = opacity;', 'float alpha = opacity;\nif (uFlowOn < 0.5) { alpha = 0.0; } else {\n  float pulse = max(efPulse(vRouteDist, uPulseA, uPulseWidth), efPulse(vRouteDist, uPulseB, uPulseWidth));\n  alpha *= pulse;\n}');
+      };
+      material.customProgramCacheKey = () => "ef-route-pulse";
+      attachBeamOccluders(material);
+      return material;
+    }
+
     function rebuildBeams() {
       engine.beamGroup.children.slice().forEach((child) => {
         engine.beamGroup.remove(child);
@@ -1630,13 +1768,13 @@ export function TiltedCourseStage({
         if (Array.isArray(disposable.material)) disposable.material.forEach((material) => material.dispose?.());
         else disposable.material?.dispose?.();
       });
-      engine.packets = [];
+      engine.flows = [];
       beamMaterialsRef.current = [];
       for (const beam of engine.currentBeams) {
-        const points = beam.points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
-        if (points.length < 2) continue;
-        const color = beam.kind === "current" ? colors.brandInk : colors.target;
-        const samples = roundedRoutePoints(points);
+        const anchors = beam.points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
+        if (anchors.length < 2) continue;
+        const color = beam.kind === "current" ? colors.brandInk : colors.preview;
+        const samples = roundedRoutePoints(anchors);
         const positions: number[] = [];
         samples.forEach((point) => positions.push(point.x, point.y, point.z));
         const dim = Boolean(beam.dimmed);
@@ -1645,27 +1783,50 @@ export function TiltedCourseStage({
         const glowGeometry = new LineGeometry();
         glowGeometry.setPositions(positions);
         const glowMaterial = new LineMaterial({ color, linewidth: 10, transparent: true, opacity: dim ? 0.04 : 0.12, depthWrite: false });
+        attachBeamOccluders(glowMaterial);
         glowMaterial.resolution.set(engine.width, engine.height);
         const glow = new Line2(glowGeometry, glowMaterial);
         glow.renderOrder = 0;
         const coreGeometry = new LineGeometry();
         coreGeometry.setPositions(positions);
         const coreMaterial = new LineMaterial({ color, linewidth: 3, transparent: true, opacity: dim ? 0.3 : 0.68, depthWrite: false });
+        attachBeamOccluders(coreMaterial);
         coreMaterial.resolution.set(engine.width, engine.height);
         const core = new Line2(coreGeometry, coreMaterial);
         core.renderOrder = 2;
         engine.beamGroup.add(glow, core);
         beamMaterialsRef.current.push(glowMaterial, coreMaterial);
-        const packetGeometry = new THREE.SphereGeometry(3.6, 12, 10);
-        let routeLength = 0;
-        for (let index = 1; index < samples.length; index += 1) routeLength += samples[index].distanceTo(samples[index - 1]);
-        const count = Math.min(7, Math.max(2, Math.floor(routeLength / 130)));
-        for (let index = 0; index < count; index += 1) {
-          const packet = new THREE.Mesh(packetGeometry.clone(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: dim ? 0.3 : 0.95, depthWrite: false }));
-          packet.renderOrder = 3;
-          engine.beamGroup.add(packet);
-          engine.packets.push({ mesh: packet, points: samples.map((point) => ({ x: point.x, y: -point.y, z: point.z })), progress: 0, speed: 0.00034, offset: index / count });
+        // Constant-speed flowing windows instead of a moving ball. The pulse
+        // overlay shares the core polyline and only lights a distance window.
+        const sampleMetrics = routeMetrics(samples.map((point) => ({ x: point.x, y: point.y, z: point.z })));
+        const anchorMetrics = routeMetrics(beam.points);
+        const metrics = { ...sampleMetrics, stepDistance: anchorMetrics.stepDistance };
+        const cumulative = sampleMetrics.cumulative;
+        const routeStart = new Float32Array(Math.max(1, samples.length - 1));
+        const routeEnd = new Float32Array(Math.max(1, samples.length - 1));
+        for (let index = 0; index < samples.length - 1; index += 1) {
+          routeStart[index] = sampleMetrics.total > 0 ? cumulative[index] / sampleMetrics.total : 0;
+          routeEnd[index] = sampleMetrics.total > 0 ? cumulative[index + 1] / sampleMetrics.total : 1;
         }
+        const pulseGeometry = new LineGeometry();
+        pulseGeometry.setPositions(positions);
+        pulseGeometry.setAttribute("aRouteStart", new THREE.InstancedBufferAttribute(routeStart, 1));
+        pulseGeometry.setAttribute("aRouteEnd", new THREE.InstancedBufferAttribute(routeEnd, 1));
+        const pulseMaterial = makePulseMaterial(color);
+        pulseMaterial.resolution.set(engine.width, engine.height);
+        const pulse = new Line2(pulseGeometry, pulseMaterial);
+        pulse.renderOrder = 3;
+        engine.beamGroup.add(pulse);
+        beamMaterialsRef.current.push(pulseMaterial);
+        const midpoint = samples[Math.floor(samples.length / 2)] ?? anchors[0];
+        engine.flows.push({
+          material: pulseMaterial,
+          metrics,
+          distance: 0,
+          midpoint: midpoint.clone(),
+          samples: samples.map((point) => point.clone()),
+          pulseCount: metrics.total > 420 ? 2 : 1
+        });
       }
     }
 
@@ -1732,6 +1893,10 @@ export function TiltedCourseStage({
         engine.layerTarget = layerTarget;
       }
       engine.layerMix = layerMixAt(engine.layerSwapFrom, engine.layerTarget, now - engine.layerSwapStarted, LAYER_SWAP_MS, engine.reduced);
+      // The route band follows the midpoint of the two offsets during the
+      // 420ms swap, so it visibly moves with the knowledge/practice layers.
+      const beamMix = 2 * engine.layerMix * (1 - engine.layerMix);
+      engine.beamGroup.position.set(REFLECTION_OFFSET.x * beamMix, -REFLECTION_OFFSET.y * beamMix, REFLECTION_OFFSET.z * beamMix);
       // The list rail is a ~35° affordance, not the first faint pixels of
       // the deeper plane.
       const capReveal = angle >= 33;
@@ -1771,12 +1936,17 @@ export function TiltedCourseStage({
         const kind = child.userData.kind as StageEdge["kind"];
         const material = child.material as THREE.LineBasicMaterial | THREE.LineDashedMaterial;
         const base = typeof child.userData.baseOpacity === "number" ? child.userData.baseOpacity : 0.2;
+        const highlighted = Boolean(child.userData.highlighted);
+        const hasSelection = Boolean(selected);
         const capabilityAlpha = capabilityVisible();
         if (kind === "capability") {
-          // Support lines fade with the same angle rule as the markers.
-          material.opacity = 0.15 * capabilityAlpha;
+          // Support lines are a visible 40% gray web at rest. A selection keeps
+          // only the path to the selected node lit.
+          material.opacity = (highlighted ? 0.9 : hasSelection ? 0.05 : 0.4) * capabilityAlpha;
           if (capabilityAlpha <= 0.02) return;
-        } else if (kind === "knowledge") material.opacity = base;
+        } else if (kind === "knowledge") {
+          material.opacity = highlighted ? 0.92 : hasSelection ? 0.06 : base;
+        }
         if (kind !== "capability" && kind !== "knowledge") return;
         const source = child.userData.source as TiltedPoint | undefined;
         const target = child.userData.target as TiltedPoint | undefined;
@@ -1785,7 +1955,7 @@ export function TiltedCourseStage({
           const node = nodeByIdForPoint(point);
           return Boolean(node && (node.id === hover || node.id === selected));
         };
-        if (endpointHit(source) || endpointHit(target)) {
+        if (!hasSelection && (endpointHit(source) || endpointHit(target))) {
           material.opacity = kind === "capability" ? 0.9 * capabilityAlpha : 0.92;
         }
       });
@@ -1795,27 +1965,46 @@ export function TiltedCourseStage({
     }
 
     function updateBeams(delta: number) {
-      for (const packet of engine.packets) {
-        if (propsRef.current.reducedMotion) {
-          const point = packet.points[0];
-          packet.mesh.position.set(point.x, -point.y, point.z + 12);
+      const reduced = propsRef.current.reducedMotion;
+      const pixelRatio = renderer.getPixelRatio();
+      const occluders = engine.occluders.slice(0, 96);
+      beamMaterialsRef.current.forEach((material) => {
+        const uniforms = material.userData.occluderUniforms as { uOccluders: { value: THREE.Vector4[] }; uOccluderCount: { value: number } } | undefined;
+        if (!uniforms) return;
+        uniforms.uOccluderCount.value = occluders.length;
+        occluders.forEach((rect, index) => {
+          const target = uniforms.uOccluders.value[index];
+          if (!target) return;
+          target.set(
+            rect.x * pixelRatio,
+            (engine.height - rect.y - rect.height) * pixelRatio,
+            rect.width * pixelRatio,
+            rect.height * pixelRatio
+          );
+        });
+      });
+      for (const flow of engine.flows) {
+        const uniforms = flow.material.userData.flowUniforms as {
+          uPulseA: { value: number };
+          uPulseB: { value: number };
+          uPulseWidth: { value: number };
+          uFlowOn: { value: number };
+        } | undefined;
+        if (!uniforms) continue;
+        if (reduced) {
+          uniforms.uFlowOn.value = 0;
           continue;
         }
-        packet.progress = (packet.progress + packet.speed * delta) % 1;
-        const scaled = ((packet.progress + packet.offset) % 1) * (packet.points.length - 1);
-        const index = Math.min(packet.points.length - 2, Math.max(0, Math.floor(scaled)));
-        const local = scaled - index;
-        const from = packet.points[index];
-        const to = packet.points[Math.min(packet.points.length - 1, index + 1)];
-        packet.mesh.position.set(
-          from.x + (to.x - from.x) * local,
-          -(from.y + (to.y - from.y) * local),
-          from.z + (to.z - from.z) * local + 12
-        );
-        // Pulses keep a constant screen size, like the 3px core line.
-        const distance = camera.position.distanceTo(packet.mesh.position);
-        const pxPerWorld = engine.height / (2 * Math.max(1, distance) * FOV_T);
-        packet.mesh.scale.setScalar(5 / Math.max(0.0001, pxPerWorld) / 3.6);
+        uniforms.uFlowOn.value = 1;
+        flow.distance = advancePulse(flow.distance, flow.metrics, delta);
+        const centers = pulseCenters(flow.distance, flow.metrics);
+        uniforms.uPulseA.value = centers[0] ?? 0;
+        uniforms.uPulseB.value = centers[1] ?? -10;
+        // 40–80px screen window; convert through the camera distance at the
+        // route midpoint so the pulse reads as a light band, not a dot.
+        const distance = camera.position.distanceTo(flow.midpoint);
+        const worldPerPixel = (2 * Math.max(1, distance) * FOV_T) / Math.max(1, engine.height);
+        uniforms.uPulseWidth.value = windowLengthForPixels(64, worldPerPixel, flow.metrics);
       }
     }
 
@@ -1961,6 +2150,14 @@ export function TiltedCourseStage({
         nodeCount: () => engine.currentNodes.length,
         fitDistance: () => engine.fitDistance,
         labels: () => engine.labelChoices.map((choice) => ({ id: choice.id, anchor: choice.anchor, alpha: Number(choice.alpha.toFixed(2)), text: nodeById(choice.id)?.title })),
+        edges: () => engine.edgeGroup.children.filter((child): child is THREE.Line => child instanceof THREE.Line).map((line) => ({
+          id: line.userData.edgeId as string | undefined,
+          kind: line.userData.kind as string,
+          source: line.userData.sourceId as string | undefined,
+          target: line.userData.targetId as string | undefined,
+          highlighted: Boolean(line.userData.highlighted),
+          opacity: Number((line.material as THREE.LineBasicMaterial).opacity.toFixed(3))
+        })),
         labelDom: () => [...engine.labels.entries()].filter(([, element]) => Number(element.style.opacity) > 0.02).map(([id, element]) => ({ id, text: element.textContent, transform: element.style.transform, opacity: Number(element.style.opacity) })),
         frozen: () => engine.labelsFrozen,
         labelSet: () => engine.labelChoices.map((choice) => choice.id),
@@ -1975,14 +2172,62 @@ export function TiltedCourseStage({
         layer: () => engine.layer,
         layerState: () => ({ mix: Number(engine.layerMix.toFixed(3)), target: engine.layerTarget, from: engine.layerSwapFrom, started: engine.layerSwapStarted, reduced: engine.reduced }),
         beams: () => engine.currentBeams.map((beam) => ({ id: beam.id, kind: beam.kind, points: beam.points.length, dimmed: Boolean(beam.dimmed) })),
-        packets: () => engine.packets.map((packet) => packet.mesh.position.toArray().map((value) => Number(value.toFixed(2)))),
+        pulses: () => engine.flows.map((flow) => {
+          const centers = pulseCenters(flow.distance, flow.metrics);
+          const sampleAt = (normalized: number) => {
+            const target = normalized * flow.metrics.total;
+            let index = 0;
+            while (index < flow.metrics.cumulative.length - 2 && flow.metrics.cumulative[index + 1] < target) index += 1;
+            const span = Math.max(0.0001, flow.metrics.cumulative[index + 1] - flow.metrics.cumulative[index]);
+            const t = Math.max(0, Math.min(1, (target - flow.metrics.cumulative[index]) / span));
+            const from = flow.samples[index];
+            const to = flow.samples[Math.min(flow.samples.length - 1, index + 1)];
+            return from.clone().lerp(to, t);
+          };
+          return {
+            distance: Number(flow.distance.toFixed(2)),
+            total: Number(flow.metrics.total.toFixed(2)),
+            stepDistance: Number(flow.metrics.stepDistance.toFixed(2)),
+            centers,
+            screens: centers.map((center) => {
+              const screen = project(sampleAt(center));
+              return { x: Number(screen.x.toFixed(1)), y: Number(screen.y.toFixed(1)) };
+            })
+          };
+        }),
+        beamOffset: () => engine.beamGroup.position.toArray().map((value) => Number(value.toFixed(2))),
+        setBeamVisible: (value: boolean) => { engine.beamGroup.visible = value; },
+        occluderInfo: () => ({
+          count: engine.occluders.length,
+          rects: engine.occluders,
+          uniforms: beamMaterialsRef.current.map((material) => {
+            const uniforms = material.userData.occluderUniforms as { uOccluderCount: { value: number }; uOccluders: { value: THREE.Vector4[] } } | undefined;
+            return uniforms ? { count: uniforms.uOccluderCount.value, first: uniforms.uOccluders.value[0]?.toArray(), injected: material.userData.occluderInjected } : null;
+          })
+        }),
         hover: () => engine.hover,
+        colorOf: (id: string) => {
+          const node = nodeById(id);
+          return node ? { id: node.id, kind: node.kind, status: node.status ?? "", color: nodeColor(node) } : null;
+        },
+        nodeStates: () => engine.currentNodes.map((node) => ({
+          id: node.id, kind: node.kind, status: node.status ?? "", dim: Boolean(node.dim), highlight: Boolean(node.highlight), selected: Boolean(node.selected)
+        })),
         xray: () => {
           const info = engine.selected ? nodeScreenFor(engine.selected) : null;
           return info ? { id: info.node.id, x: Math.round(info.screen.x), y: Math.round(info.screen.y) } : null;
         },
         pick: (x: number, y: number) => pickAt(x, y),
-        nodeScreen: (id: string) => nodeScreenFor(id),
+        nodeScreen: (id: string) => {
+          const info = nodeScreenFor(id);
+          return info ? {
+            id: info.node.id,
+            x: Number(info.screen.x.toFixed(1)),
+            y: Number(info.screen.y.toFixed(1)),
+            z: Number(info.screen.z.toFixed(3)),
+            distance: Number(info.distance.toFixed(1))
+          } : null;
+        },
         nodeAlpha: (id: string) => {
           const index = engine.currentNodes.findIndex((node) => node.id === id);
           return index < 0 ? 0 : Number(renderedOpacity(index).toFixed(3));

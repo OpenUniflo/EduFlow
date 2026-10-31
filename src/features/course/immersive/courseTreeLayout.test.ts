@@ -14,6 +14,7 @@ import {
   buildPracticeCards,
   buildRouteTrack,
   buildWindingRoute,
+  capabilityPathToTargets,
   courseSelectionRelations,
   positionPracticeCards,
   primaryKnowledgeByAssignment,
@@ -155,7 +156,7 @@ describe("course tree geometry", () => {
     track.forEach((point, index) => {
       const card = cards.get(ids[index])!;
       // One point per step, on the disc, not a detour around the card edge.
-      expect(point.x).toBeCloseTo(card.x - card.width / 2 + 18, 5);
+      expect(point.x).toBeCloseTo(card.x - card.width / 2, 5);
       expect(point.y).toBeCloseTo(card.y, 5);
       expect(point.z).toBe(-24);
     });
@@ -270,5 +271,51 @@ describe("course tree geometry", () => {
       { id: "K3", title: "知识三", chapterId: "ch2", chapterTitle: "第二章", chapterNumber: 2, status: "locked", stateLabel: "待学" }
     ], 560);
     expect(second).toEqual(layout);
+  });
+});
+
+
+describe("complete capability path selection", () => {
+  const supportEdges = [
+    { id: "a", source: "ACQ", target: "B" },
+    { id: "b", source: "B", target: "C" },
+    { id: "c", source: "C", target: "K" },
+    { id: "d", source: "D", target: "K" },
+    { id: "e", source: "X", target: "Y" }
+  ];
+
+  it("walks upstream from the selected Knowledge to every acquired entry", () => {
+    const path = capabilityPathToTargets({ targetNodeIds: ["K"], supportEdges, acquiredNodeIds: ["ACQ"] });
+    expect([...path.nodeIds].sort()).toEqual(["ACQ", "B", "C", "K"]);
+    expect([...path.edgeIds].sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("excludes ancestors that are not reachable from an acquired capability", () => {
+    const path = capabilityPathToTargets({ targetNodeIds: ["K"], supportEdges, acquiredNodeIds: ["NOPE"] });
+    expect([...path.nodeIds]).toEqual([]);
+    expect([...path.edgeIds]).toEqual([]);
+  });
+
+  it("keeps the knowledge node itself when it is already acquired", () => {
+    const path = capabilityPathToTargets({ targetNodeIds: ["K"], supportEdges, acquiredNodeIds: ["K"] });
+    expect([...path.nodeIds]).toEqual(["K"]);
+  });
+
+  it("lights every capability path node and no isolated capability in the selection relation", () => {
+    const relations = courseSelectionRelations({
+      selection: { kind: "knowledge", id: "K" },
+      knowledgeIds: ["K", "K2"],
+      dependencyEdges: [],
+      assignmentsByKnowledge: new Map(),
+      assignmentKnowledge: new Map(),
+      capabilitySupports: new Map([["B", ["K"]], ["C", ["K"]]]),
+      routeOrder: ["K"],
+      supportEdges,
+      acquiredNodeIds: ["ACQ"],
+      modelNodeIds: ["ACQ", "B", "C", "D", "K"]
+    });
+    // B and C are on the acquired path; D is not.
+    expect([...relations.capabilityIds].sort()).toEqual(["ACQ", "B", "C"]);
+    expect([...relations.edgeIds].sort()).toEqual(["a", "b", "c"]);
   });
 });

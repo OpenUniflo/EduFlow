@@ -32,6 +32,12 @@
   --target:#22C55E;              /* 目标 */
   --target-soft:color-mix(in srgb, var(--target) 14%, var(--surface));
   --pending:#9CA3AF;             /* 待学 */
+  /* 课程页专用学习状态色（2026-11-01）：档案的领域 / 学习色不随之改变。 */
+  --course-acquired:var(--target);      /* 课程页：绿 = 已具备 */
+  --course-target:var(--acquired);      /* 课程页：蓝 = 待学目标（课程知识） */
+  --course-intermediate:var(--pending); /* 课程页：灰 = 待学中间能力 */
+  --course-learning-ring:var(--brand);   /* 在学只加外圈，不改主色 */
+  --course-route-preview:var(--p-orange);/* 编辑路线预览光带：琥珀色 */
   --practice:#14A6A0;            /* 实训树实践卡竖条 / 编号 */
   --pending-soft:color-mix(in srgb, var(--pending) 18%, var(--surface));
   --warn:#B45309;                /* 警示文字，对白 5.02:1 */
