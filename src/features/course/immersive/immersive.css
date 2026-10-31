@@ -385,7 +385,7 @@
   max-width: none;
   height: auto;
   align-items: center;
-  gap: var(--sp-6);
+  gap: 6px;
   /* The route step circle hugs the left edge outside the card, so the card
      itself must not clip it. The title row clips its own text. */
   overflow: visible;
@@ -529,7 +529,7 @@
   align-items: center;
   padding: 8px 10px;
   border-radius: var(--r-12);
-  gap: var(--sp-6);
+  gap: 6px;
 }
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge .ef-imm-node-copy {
@@ -850,7 +850,7 @@
 .ef-imm-node--route-chapter.is-flat-column .ef-imm-node-copy {
   flex-direction: row;
   align-items: baseline;
-  gap: var(--sp-6);
+  gap: 6px;
 }
 
 .ef-imm-node--route-chapter.is-flat-column .ef-imm-node-copy small {
@@ -2011,7 +2011,7 @@
 .ef-imm-detail-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp-6);
+  gap: 6px;
 }
 
 .ef-imm-detail-chip {
@@ -2031,7 +2031,7 @@
 
 .ef-imm-detail-section {
   display: grid;
-  gap: var(--sp-6);
+  gap: 6px;
   padding-top: var(--sp-12);
   border-top: 1px solid var(--line);
 }
@@ -2109,7 +2109,7 @@
   display: inline-flex;
   height: 34px;
   align-items: center;
-  gap: var(--sp-6);
+  gap: 6px;
   padding: 0 12px;
   border: 0;
   border-radius: var(--r-8);
@@ -2186,7 +2186,7 @@
 .ef-imm-flatbar span {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-6);
+  gap: 6px;
   color: var(--ink-2);
   font-size: var(--fs-13);
 }
@@ -2570,7 +2570,7 @@
 
 .ef-imm-route-continue {
   display: grid;
-  gap: var(--sp-6);
+  gap: 6px;
   margin: 0 auto var(--sp-16);
   padding: var(--sp-16);
   border: 1px solid var(--glass-line);
@@ -2631,5 +2631,503 @@ body:has(.ef-imm-page) {
   .ef-imm-help {
     bottom: 78px;
     max-width: 220px;
+  }
+}
+
+/* ---------------------------------------------------------------- P4R3: tilted plane
+   Cards live in the CSS3D scene and tilt with their plane. Names at the side
+   are screen-facing labels; picking is handled once in the stage. */
+.ef-imm-css3d {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ef-imm-tilt-stage {
+  cursor: grab;
+}
+
+.ef-imm-tilt-stage:active {
+  cursor: grabbing;
+}
+
+.ef-imm-tilt-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 176px;
+  padding: 9px 12px;
+  pointer-events: none !important;
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: opacity, width, height;
+  transition: opacity var(--dur-base) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.ef-imm-tilt-card .ef-imm-node-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.ef-imm-tilt-card .ef-imm-node-dot {
+  opacity: var(--extra-op, 1);
+}
+
+.ef-imm-tilt-card .ef-imm-step,
+.ef-imm-tilt-card .ef-imm-badge,
+.ef-imm-tilt-card .ef-imm-node-meta,
+.ef-imm-tilt-card .ef-imm-node-detail,
+.ef-imm-tilt-card .ef-imm-node-index,
+.ef-imm-tilt-card .ef-imm-node-count {
+  opacity: var(--extra-op, 1);
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.ef-imm-tilt-card .ef-imm-node-copy strong {
+  opacity: var(--name-op, 1);
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+/* Full tilted cards reserve 36px on the left (Stage sets the inline padding):
+   the step badge sits 8px inside the edge, 6px before the status dot. */
+.ef-imm-tilt-card .ef-imm-step {
+  left: 8px;
+}
+
+.ef-imm-tilt-card.is-pill {
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  gap: 0;
+}
+
+.ef-imm-tilt-card.is-pill .ef-imm-node-dot,
+.ef-imm-tilt-card.is-pill .ef-imm-step,
+.ef-imm-tilt-card.is-pill .ef-imm-badge,
+.ef-imm-tilt-card.is-pill .ef-imm-node-meta,
+.ef-imm-tilt-card.is-pill .ef-imm-node-detail,
+.ef-imm-tilt-card.is-pill .ef-imm-node-index,
+.ef-imm-tilt-card.is-pill .ef-imm-node-count,
+.ef-imm-tilt-card.is-pill .ef-imm-actions {
+  display: none;
+}
+
+.ef-imm-tilt-card.is-pill .ef-imm-node-copy {
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+.ef-imm-tilt-card.is-pill .ef-imm-node-copy strong {
+  text-align: center;
+}
+
+.ef-imm-tilt-card.is-dot {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.ef-imm-tilt-card.is-dot .ef-imm-node-copy,
+.ef-imm-tilt-card.is-dot .ef-imm-node-dot,
+.ef-imm-tilt-card.is-dot .ef-imm-step,
+.ef-imm-tilt-card.is-dot .ef-imm-badge {
+  opacity: 0;
+}
+
+.ef-imm-tilt-chapter {
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 60%, transparent);
+  border-radius: var(--r-24);
+  background: color-mix(in srgb, var(--surface) 12%, transparent);
+  box-shadow: none;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  transition: opacity var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
+}
+
+.ef-imm-tilt-chapter.is-hover {
+  border-color: color-mix(in srgb, var(--brand) 52%, transparent);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  box-shadow: var(--sh-1);
+}
+
+.ef-imm-tilt-chapter-title {
+  z-index: 3;
+  transform-origin: 50% 50%;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.ef-imm-tilt-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ef-imm-tilt-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  height: 22px;
+  padding: 2px 8px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 78%, transparent);
+  border-radius: var(--r-8);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  backdrop-filter: blur(10px) saturate(1.15);
+  box-shadow: var(--sh-1);
+  font-size: var(--fs-12);
+  line-height: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.ef-imm-tilt-label.is-chapter {
+  height: 24px;
+  padding: 2px 10px;
+  border-color: color-mix(in srgb, var(--brand) 38%, transparent);
+  color: var(--brand-ink);
+  line-height: 18px;
+}
+
+.ef-imm-tilt-hover-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 7;
+  border: 2px solid var(--brand);
+  border-radius: 50%;
+  box-shadow: var(--sh-1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.ef-imm-tilt-ex {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ef-imm-tilt-ex-lines {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.ef-imm-tilt-ex-lines line {
+  stroke: color-mix(in srgb, var(--brand) 72%, transparent);
+  stroke-width: 1.1;
+}
+
+.ef-imm-tilt-ex-column {
+  position: absolute;
+  height: 0;
+  pointer-events: none;
+}
+
+.ef-imm-tilt-ex-item {
+  position: absolute;
+  left: 0;
+  display: block;
+  height: 22px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 76%, transparent);
+  border-radius: var(--r-8);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  font-size: var(--fs-12);
+  line-height: 20px;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.ef-imm-tilt-ex-item:hover,
+.ef-imm-tilt-ex-item:focus-visible {
+  border-color: var(--brand);
+  color: var(--surface);
+  background: var(--brand);
+  outline: none;
+}
+
+.ef-imm-tilt-xray {
+  position: fixed;
+  z-index: 3000;
+  overflow: visible;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.ef-imm-tilt-xray svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.ef-imm-tilt-xray-glow line {
+  stroke: var(--brand);
+  stroke-width: 7;
+  opacity: 0.16;
+}
+
+.ef-imm-tilt-xray-core line {
+  stroke: var(--brand);
+  stroke-width: 1.5;
+  opacity: 0.92;
+}
+
+.ef-imm-tilt-xray-halo {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 5.5;
+  opacity: 0.94;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--brand) 55%, transparent));
+}
+
+.ef-imm-tilt-xray-ring {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--brand) 55%, transparent));
+}
+
+.ef-imm-tilt-xray-name {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  height: 24px;
+  padding: 2px 8px;
+  overflow: hidden;
+  border: 1.5px solid var(--brand);
+  border-radius: var(--r-8);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
+  box-shadow: var(--sh-2);
+  font-size: var(--fs-12);
+  line-height: 18px;
+  font-weight: 700;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-imm-tilt-label,
+  .ef-imm-tilt-card,
+  .ef-imm-tilt-xray,
+  .ef-imm-tilt-xray-name {
+    transition-duration: var(--dur-fast);
+  }
+}
+
+/* P4R3 capability list: a right rail that yields to the detail panel. */
+.ef-imm-controls button.ef-imm-control-wide {
+  width: auto;
+  min-width: 34px;
+  padding: 0 10px;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-imm-cap-panel {
+  position: absolute;
+  z-index: 35;
+  top: 84px;
+  right: 20px;
+  display: flex;
+  width: 300px;
+  max-height: calc(100vh - 196px);
+  flex-direction: column;
+  padding: var(--sp-16);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-16);
+  background: var(--glass-regular);
+  -webkit-backdrop-filter: blur(32px) saturate(170%);
+  backdrop-filter: blur(32px) saturate(170%);
+  box-shadow: var(--sh-2);
+  transition: right var(--dur-base) var(--ease-out);
+}
+
+.ef-imm-cap-panel.is-with-detail {
+  right: 420px;
+}
+
+.ef-imm-cap-panel > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+
+.ef-imm-cap-panel > header span {
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-imm-cap-panel > header h2 {
+  margin: 2px 0 0;
+  font-size: var(--fs-16);
+  line-height: 22px;
+  font-weight: var(--fw-700);
+}
+
+.ef-imm-cap-panel > header p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-imm-cap-panel > header button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-8);
+  color: var(--muted);
+  background: transparent;
+}
+
+.ef-imm-cap-panel > header button:hover {
+  color: var(--ink);
+  background: var(--brand-soft);
+}
+
+.ef-imm-cap-panel > input {
+  width: 100%;
+  height: 32px;
+  margin-top: var(--sp-12);
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-8);
+  color: var(--ink);
+  background: var(--surface);
+  font-size: var(--fs-12);
+}
+
+.ef-imm-cap-scroll {
+  min-height: 0;
+  margin-top: var(--sp-8);
+  overflow: auto;
+}
+
+.ef-imm-cap-scroll section h3 {
+  margin: var(--sp-12) 0 4px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-imm-cap-scroll section button {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--r-8);
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+}
+
+.ef-imm-cap-scroll section button:hover,
+.ef-imm-cap-scroll section button:focus-visible,
+.ef-imm-cap-scroll section button.is-sel {
+  background: var(--brand-soft);
+  outline: none;
+}
+
+.ef-imm-cap-scroll section button i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: var(--r-full);
+  background: var(--pending);
+}
+
+.ef-imm-cap-scroll section button i.is-mastered {
+  background: var(--acquired);
+}
+
+.ef-imm-cap-scroll section button span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-imm-cap-scroll section button small {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-imm-cap-empty {
+  margin: 6px 8px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-imm-locate {
+  margin-left: auto;
+}
+
+@media (max-width: 1100px) {
+  .ef-imm-crumb span,
+  .ef-imm-progress-pill > span {
+    display: none;
+  }
+
+  .ef-imm-top {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, auto);
+  }
+
+  .ef-imm-progress-pill {
+    max-width: 132px;
+  }
+
+  .ef-imm-status-legend {
+    max-width: calc(100% - 390px);
+  }
+
+  .ef-imm-controls button.ef-imm-control-wide {
+    padding: 0 8px;
   }
 }

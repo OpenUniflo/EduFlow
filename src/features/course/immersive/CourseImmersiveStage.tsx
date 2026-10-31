@@ -33,6 +33,8 @@ export type StageNode = {
   detail?: ReactNode;
   /** Number of practices merged into one practice-group card. */
   count?: number;
+  /** Plain-text action row shown on the near-view full card. */
+  actions?: string[];
   bridge?: boolean;
   tone?: 1 | 2 | 3;
   index?: number;
@@ -92,6 +94,12 @@ export type CourseImmersiveStageHandle = {
   setZoomPercent(percent: number): void;
   getViewState(): StageViewState;
   setViewState(state: StageViewState): void;
+  /** Smoothly move to the capability-layer preset (used by 看能力层). */
+  focusCapabilities(): void;
+  /** Pan + zoom only, preserving the current rotation (used by 定位). */
+  locate(id: string): void;
+  /** Smoothly return to the front pose (used by 回正面). */
+  front(): void;
 };
 
 export type StageViewState = {
@@ -1257,6 +1265,31 @@ export function CourseImmersiveStage({
       engine.detailShiftX = 0;
       engine.velocity = { yaw: 0, pitch: 0, panX: 0, panY: 0 };
       engine.setCameraDistance(state.distance, 0);
+    },
+    focusCapabilities: () => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      targetPoseRef.current = { yaw: 0.95, pitch: -0.14 };
+      poseRef.current = "rotated";
+      onPoseChangeRef.current?.("rotated");
+    },
+    locate: (id: string) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      const node = nodesRef.current.find((item) => item.id === id);
+      if (!node) return;
+      const targetX = node.x;
+      const targetY = node.y;
+      const px = engine.pxPerWorld;
+      engine.panX = -targetX * px + (engine.width - 388) / 2 - engine.width / 2;
+      engine.panY = targetY * px - engine.height / 2;
+      engine.setCameraDistance(Math.max(engine.fitDistance * 0.55, 240), 320);
+    },
+    front: () => {
+      poseRef.current = "front";
+      targetPoseRef.current = { yaw: 0, pitch: 0 };
+      if (engineRef.current) engineRef.current.velocity = { yaw: 0, pitch: 0, panX: 0, panY: 0 };
+      onPoseChangeRef.current?.("front");
     }
   }), []);
 
@@ -1295,9 +1328,9 @@ export function CourseImmersiveStage({
           >
             {node.kind === "assignment" ? <><b className="ef-imm-node-index">{node.empty ? "—" : node.meta}</b><span className="ef-imm-node-copy"><span className="ef-imm-node-title-row"><strong>{node.title}</strong>{node.count && node.count > 1 ? <em className="ef-imm-node-count">+{node.count - 1}</em> : null}</span>{node.detail ? <small className="ef-imm-node-meta">{node.detail}</small> : null}</span></> : null}
             {node.kind === "chapter-empty" ? <><i className="ef-imm-node-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small className="ef-imm-node-meta">{node.meta}</small></span></> : null}
-            {node.kind === "route" ? <><i className="ef-imm-route-dot">{node.index ? String(node.index).padStart(2, "0") : null}</i><span className="ef-imm-node-copy"><strong>{node.title}</strong><small>{node.meta}</small><span className="ef-imm-node-detail">{node.detail}</span></span>{node.current ? <em className="ef-imm-here">你在这里</em> : null}</> : null}
+            {node.kind === "route" ? <><i className="ef-imm-route-dot">{node.index ? String(node.index).padStart(2, "0") : null}</i><span className="ef-imm-node-copy"><strong>{node.title}</strong><small>{node.meta}</small><span className="ef-imm-node-detail">{node.detail}</span></span></> : null}
             {node.kind === "route-chapter" ? <><i className="ef-imm-route-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small>{node.meta ?? node.detail}</small></span></> : null}
-            {node.kind === "knowledge" || node.kind === "capability" ? <>{node.step ? <i className="ef-imm-step">{node.step}</i> : null}<i className="ef-imm-node-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small className="ef-imm-node-meta">{node.meta}</small><span className="ef-imm-node-detail">{node.detail}</span></span>{node.kind === "knowledge" && (node.current || node.target) ? <em className={`ef-imm-badge ${node.current ? "is-current" : "is-target"}`}>{node.current ? "当前" : "目标"}</em> : null}{node.here ? <em className="ef-imm-here">你在这里</em> : null}</> : null}
+            {node.kind === "knowledge" || node.kind === "capability" ? <>{node.step ? <i className="ef-imm-step">{node.step}</i> : null}<i className="ef-imm-node-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small className="ef-imm-node-meta">{node.meta}</small><span className="ef-imm-node-detail">{node.detail}</span></span>{node.kind === "knowledge" && (node.current || node.target) ? <em className={`ef-imm-badge ${node.current ? "is-current" : "is-target"}`}>{node.current ? "当前" : "目标"}</em> : null}</> : null}
             {node.ghost ? <span className="ef-imm-ghost-peek" aria-hidden="true"><strong>{node.kind === "assignment" ? <>{node.title}{node.count && node.count > 1 ? <em className="ef-imm-node-count">+{node.count - 1}</em> : null}</> : node.title}</strong>{node.kind === "assignment" && node.detail ? <small>{node.detail}</small> : null}</span> : null}
           </div>
         ))}

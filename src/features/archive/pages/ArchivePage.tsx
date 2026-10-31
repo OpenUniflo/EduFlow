@@ -186,6 +186,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   const [seedGoal, setSeedGoal] = useState<{ key: string; goal: string } | null>(null);
   const [personLayout, setPersonLayout] = useState<PersonLayout | null>(null);
   const [sceneReady, setSceneReady] = useState(false);
+  const courseFramedRef = useRef(false);
   const [coursePlane, setCoursePlane] = useState<CoursePlaneLayout | null>(null);
   const [draftPlane, setDraftPlane] = useState<CoursePlaneLayout | null>(null);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" ? true : navigator.onLine);
@@ -355,16 +356,18 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     return () => { live = false; };
   }, [assistant.draftIds, draftActive, model]);
 
+  const selectedNodeRef = useRef(false);
+  selectedNodeRef.current = Boolean(selectedNode);
   const fitCourseInView = useCallback(() => {
     if (!focusedCourse && !draftActive) return;
     if (!sceneReady) return;
     sceneRef.current?.fitCourse({
       left: leftInset + 12,
-      right: selectedNode ? 392 : 12,
+      right: selectedNodeRef.current ? 392 : 12,
       top: 188,
       bottom: 96
     });
-  }, [draftActive, focusedCourse, leftInset, sceneReady, selectedNode]);
+  }, [draftActive, focusedCourse, leftInset, sceneReady]);
 
   const fitPersonFocus = useCallback(() => {
     if (!sceneReady || !personFocusIdsRef.current.length) return;
@@ -380,8 +383,8 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     if (!sceneReady) return;
     if (focusedCourse || draftActive) { fitCourseInView(); return; }
     if (selectedPeopleIds.length && personFocusIdsRef.current.length) { fitPersonFocus(); return; }
-    sceneRef.current?.fitAll({ padding: 1.08, insets: selectedNode ? { right: 392 } : undefined });
-  }, [draftActive, fitCourseInView, fitPersonFocus, focusedCourse, sceneReady, selectedNode, selectedPeopleIds.length]);
+    sceneRef.current?.fitAll({ padding: 1.08, insets: selectedNodeRef.current ? { right: 392 } : undefined });
+  }, [draftActive, fitCourseInView, fitPersonFocus, focusedCourse, sceneReady, selectedPeopleIds.length]);
 
   // Person focus frames the core inside the free area and re-frames whenever
   // the person panel opens, collapses or switches to its strip.
@@ -392,9 +395,11 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   }, [draftActive, fitPersonFocus, focusedCourse, personLayout, sceneReady, selectedPeopleIds.length]);
 
   useEffect(() => {
-    if (!sceneReady || !focusedCourse || !scenePlanePositions) return;
+    if (!sceneReady || !focusedCourse || !scenePlanePositions || courseFramedRef.current) return;
+    courseFramedRef.current = true;
     // Returning from the course restores the exact pre-entry course-plane
-    // camera; a cold deep link gets a fresh fit instead.
+    // camera; a cold deep link gets a fresh fit instead. Selection later must
+    // only pan for the detail panel, never reframe or shrink the plane.
     const saved = readArchiveCourseView(focusedCourse.id);
     const timer = window.setTimeout(() => {
       if (saved) sceneRef.current?.applyCourseView(saved, !reducedMotion);
@@ -481,6 +486,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
 
   const focusCourse = useCallback((courseId: string) => {
     if (!courseId) return;
+    courseFramedRef.current = false;
     void preloadCourseImmersive().catch(() => undefined);
     setSelectedId(null);
     sceneRef.current?.shiftForDetail(false);
@@ -495,6 +501,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   }, [searchParams, setSearchParams]);
 
   const clearCourseFocus = useCallback(() => {
+    courseFramedRef.current = false;
     setFocusedCourseId(null);
     setCoursePlane(null);
     const next = new URLSearchParams(searchParams);
@@ -519,10 +526,11 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       setSearchParams(next, { replace: true });
     } else {
       const next = new URLSearchParams(searchParams);
-      if (next.get("focus")?.startsWith("knowledge:")) next.delete("focus");
+      if (focusedCourse) next.set("focus", `course:${focusedCourse.id}`);
+      else if (next.get("focus")?.startsWith("knowledge:")) next.delete("focus");
       setSearchParams(next, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [focusedCourse, searchParams, setSearchParams]);
 
   const focusNodeCamera = useCallback((id: string) => {
     if (!model) return;
@@ -695,7 +703,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
           onSelectNode={(id) => { if (id) selectNode(id); else closeDetailOrFocus(); }}
           onLevelChange={setLevel}
           onZoomChange={setPercent}
-          onActivatePlaneNode={(id) => { if (focusedCourse) openCourse(focusedCourse.id, undefined, id); }}
+          onActivatePlaneNode={(id) => { if (focusedCourse) selectNode(id); }}
           onBlank={closeDetailOrFocus}
           onReady={() => setSceneReady(true)}
           onResize={refitCurrentView}
@@ -772,7 +780,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       {focusedCourse && coursePlane ? <ArchiveCourseFocusBar course={focusedCourse} learned={focusedLearned} leftInset={leftInset} onOpen={(origin) => openCourse(focusedCourse.id, origin)} /> : null}
       {assistantDraft && assistant.brief ? <ArchiveDraftFocusBar title={assistant.brief.goal} knowledgeCount={assistant.draftIds.length} weeks={plannedWeeks(assistant.brief.requestedAdjustments, assistant.draftIds.length)} leftInset={leftInset} /> : null}
 
-      {selectedNode && !focusedCourse && !assistantDraft ? (
+      {selectedNode && !assistantDraft ? (
         <ArchiveNodePanel
           node={selectedNode}
           model={model}
@@ -780,8 +788,10 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
           topicName={communityByNode.get(selectedNode.id)?.name ?? "未分类"}
           learners={learners}
           onClose={() => selectNode(null)}
-          onSelectNode={(id) => { selectNode(id); focusNodeCamera(id); }}
+          onSelectNode={(id) => { selectNode(id); if (!focusedCourse) focusNodeCamera(id); }}
           onOpenCourse={openCourse}
+          focusedCourseId={focusedCourse && courseNodeIds.has(selectedNode.id) ? focusedCourse.id : null}
+          onOpenFocusCourse={focusedCourse ? (knowledgeId) => openCourse(focusedCourse.id, undefined, knowledgeId) : undefined}
         />
       ) : null}
 

@@ -1,6 +1,6 @@
 import {
   ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Clock3, Edit3, FileText, Layers3,
-  ListChecks, Lock, LogIn, Maximize2, Minus, Network, Plus, RotateCcw, Route, Sparkles, Target, X
+  ListChecks, LocateFixed, Lock, LogIn, Maximize2, Minus, Network, Plus, RotateCcw, Route, Sparkles, Target, X
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -44,6 +44,7 @@ import {
   type StageNode,
   type StageViewState
 } from "./CourseImmersiveStage";
+import { TiltedCourseStage } from "./TiltedCourseStage";
 import {
   assignmentKnowledgeMap,
   buildPlaneCourseLayout,
@@ -172,12 +173,19 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
 
   const [tab, setTab] = useState<Tab>("course");
   const [swapped, setSwapped] = useState(false);
+  // A turned-plane click selects exactly the facet under the pointer. Only the
+  // front stage keeps the P4R2 behaviour of resolving practice <-> knowledge
+  // when the layer changes.
+  const [selectionPinned, setSelectionPinned] = useState(false);
   const [routeOn, setRouteOn] = useState(true);
   const [pose, setPose] = useState<Pose>("front");
   const [zoom, setZoom] = useState<SemanticZoom>("mid");
   const [zoomPercent, setZoomPercent] = useState(100);
   const [selection, setSelection] = useState<CourseSelection | null>(null);
   const [flat, setFlat] = useState(false);
+  const [capsOpen, setCapsOpen] = useState(false);
+  const [capsHoverId, setCapsHoverId] = useState<string | null>(null);
+  const [capsQuery, setCapsQuery] = useState("");
   const [perf, setPerf] = useState<{ fps: number; nodes: number; dom: number } | null>(null);
   const stageRef = useRef<CourseImmersiveStageHandle>(null);
   const pageRef = useRef<HTMLElement>(null);
@@ -267,13 +275,13 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     return capabilitySupports.get(selectionValue.id) ?? [];
   }, [assignmentKnowledge, capabilitySupports]);
 
-  const effectiveSelection = useMemo(() => selection ? resolveFacetSelection({
+  const effectiveSelection = useMemo(() => selection ? (selectionPinned ? selection : resolveFacetSelection({
     selection,
     knowledgeInFront: !swapped,
     practiceByKnowledge,
     assignmentKnowledge,
     primaryKnowledge
-  }) : null, [assignmentKnowledge, practiceByKnowledge, primaryKnowledge, selection, swapped]);
+  })) : null, [assignmentKnowledge, practiceByKnowledge, primaryKnowledge, selection, selectionPinned, swapped]);
   const selectionRelations = useMemo(() => courseSelectionRelations({
     selection: effectiveSelection,
     knowledgeIds: courseNodes.map((node) => node.id),
@@ -329,8 +337,8 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     if (requested) {
       const node = graphData.knowledgeNodes.find((item) => item.id === requested);
       const chapter = graphData.chapters.find((item) => item.id === requested);
-      if (node) { setSelection({ kind: "knowledge", id: node.id }); return; }
-      if (chapter) { setSelection(null); return; }
+      if (node) { setSelection({ kind: "knowledge", id: node.id }); setSelectionPinned(false); return; }
+      if (chapter) { setSelection(null); setSelectionPinned(false); return; }
     }
   }, [graphData, location.search]);
 
@@ -492,6 +500,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     setFlat(true);
     setTab("course");
     setSelection(null);
+    setSelectionPinned(false);
     setPose("flat");
     if (!routeControl.editing) routeControl.begin();
   }, [authenticated, capabilityLayout, routeControl]);
@@ -507,6 +516,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
 
   const switchLayer = useCallback((next: boolean) => {
     setSwapped(next);
+    setSelectionPinned(false);
     // The open facet follows the mirror instead of closing. Keeping the
     // knowledge anchor means the new practice detail is the same step, and the
     // stage keeps its camera/pan (no fit is triggered by a layer switch).
@@ -524,6 +534,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     if (next === "route") {
       routeReturnView.current = stageRef.current?.getViewState() ?? null;
       setSelection(null);
+      setSelectionPinned(false);
       setFlat(false);
       setTab("route");
       return;
@@ -541,7 +552,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       if (target?.matches("input, textarea, select, [contenteditable=true]")) return;
       const key = event.key.toLowerCase();
       if (key === "escape") {
-        if (selection) { setSelection(null); return; }
+        if (selection) { setSelection(null); setSelectionPinned(false); return; }
         if (flat) { leaveFlatten(); return; }
         if (tab === "route") { setTab("course"); return; }
         void exitScene();
@@ -562,21 +573,24 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   const openKnowledge = useCallback((id: string) => {
     setTab("course");
     setSwapped(false);
+    setSelectionPinned(false);
     setSelection({ kind: "knowledge", id });
   }, []);
   const openPractice = useCallback((id: string) => {
     setTab("course");
     setSwapped(true);
+    setSelectionPinned(false);
     setSelection({ kind: "practice", id });
   }, []);
   const openCapability = useCallback((id: string) => {
     setTab("course");
+    setSelectionPinned(false);
     setSelection({ kind: "capability", id });
-    setPose("rotated");
   }, []);
   const openGroup = useCallback((knowledgeId: string) => {
     setTab("course");
     setSwapped(true);
+    setSelectionPinned(false);
     setSelection({ kind: "group", id: knowledgeId });
   }, []);
   const routeStepInputs = useMemo<WindingStepInput[]>(() => {
@@ -665,6 +679,19 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     return actions.length ? <span className="ef-imm-actions">{actions}</span> : null;
   }, [courseId, microLearningProvider, runtime]);
 
+  const actionLabels = useCallback((node: CourseSkillTreeNode): string[] => {
+    const actions: string[] = [];
+    const micro = microLearningProvider?.getLesson(node.id, { courseId }) ?? microLearningProvider?.getLesson(node.id);
+    if (micro) actions.push(`微学习 · ${micro.estimatedMinutes ?? 8} 分钟`);
+    const assignment = runtime?.assignments.find((item) => node.assignmentIds.includes(item.id));
+    if (assignment) actions.push(`实践 ${String(assignment.order + 1).padStart(2, "0")}${assignment.estimatedMinutes ? ` · ${assignment.estimatedMinutes} 分钟` : ""}`);
+    const materialContext = node.materialContexts[0];
+    const material = materialContext && runtime ? runtime.materials.find((item) => item.id === materialContext.materialId) : null;
+    const segment = material && materialContext ? material.segments.find((item) => item.id === materialContext.primarySegmentId) : null;
+    if (segment?.page) actions.push(`资料 p.${String(segment.page).padStart(2, "0")}`);
+    return actions;
+  }, [courseId, microLearningProvider, runtime]);
+
   const stageNodes = useMemo<StageNode[]>(() => {
     if (flat && capabilityLayout) {
       const flattened = flattenedLayout ?? capabilityLayout;
@@ -743,6 +770,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         current: authenticated && (routeReady ? node.id === routeCurrentId : Boolean(display?.learner.current)),
         target: targetNodeSet.has(node.id),
         detail: actionRow(node.node),
+        actions: actionLabels(node.node),
         ghost: swapped,
         dim: Boolean(effectiveSelection) && !selected && !selectionRelations.knowledgeIds.has(node.id),
         highlight: selectionRelations.knowledgeIds.has(node.id) && !selected,
@@ -830,7 +858,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       });
     }
     return nodes;
-  }, [actionRow, assignmentById, assignmentKnowledge, authenticated, capabilityAnchors, capabilityLayout, capabilityModel?.currentKnowledgeIds, courseId, courseLayout, displayNodes, effectiveSelection, flat, flattenedLayout, knowledgeTitleById, learnerById, practiceByKnowledge, routeCurrentId, routeOn, routeOrder, routeReady, selectionRelations, swapped, targetNodeSet, zoom]);
+  }, [actionLabels, actionRow, assignmentById, assignmentKnowledge, authenticated, capabilityAnchors, capabilityLayout, capabilityModel?.currentKnowledgeIds, courseId, courseLayout, displayNodes, effectiveSelection, flat, flattenedLayout, knowledgeTitleById, learnerById, practiceByKnowledge, routeCurrentId, routeOn, routeOrder, routeReady, selectionRelations, swapped, targetNodeSet, zoom]);
 
   const stageEdges = useMemo<StageEdge[]>(() => {
     const highlight = (source?: string, target?: string) => {
@@ -941,7 +969,13 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
 
   const currentPose: Pose = flat ? "flat" : pose;
   const sceneMode: "course" | "flat" = flat ? "flat" : "course";
-  const selectedStageId = currentKnowledge?.id ?? currentPractice?.id ?? currentGroup?.knowledgeId ?? currentCapability?.id ?? null;
+  // Stage cards carry their own composite id (`assignment:…:knowledge`,
+  // `group:knowledge`). A detail selection uses the bare practice id, so map
+  // it back before handing it to the stage; otherwise x-ray and 定位 miss.
+  const selectedPracticeCard = currentPractice
+    ? [...practiceByKnowledge.values()].find((card) => card.assignmentIds.includes(currentPractice.id)) ?? null
+    : currentGroup;
+  const selectedStageId = currentKnowledge?.id ?? selectedPracticeCard?.id ?? currentCapability?.id ?? null;
   const completedCount = learnerState.counts.acquired;
   const progress = learnerState.counts.total ? Math.round((completedCount / learnerState.counts.total) * 100) : 0;
   const currentTitle = routeCurrentId ? (displayNodes.find((node) => node.id === routeCurrentId)?.title ?? knowledgeTitleById.get(routeCurrentId) ?? routeCurrentId) : null;
@@ -967,11 +1001,64 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   const routeIndex = selectedKnowledgeId ? routeStepNumber(routeOrder, selectedKnowledgeId) : null;
   const selectedMaterials = knowledgeForDetail && runtime ? knowledgeForDetail.materialContexts.flatMap((context) => runtime.materials.find((material) => material.id === context.materialId) ?? []) : [];
   const primaryAssignment = detailAssignments[0];
-  const detailTitle = currentGroup ? currentGroup.title : currentPractice?.title ?? currentCapability?.title ?? currentKnowledge?.title ?? "课程节点";
+  const capabilityTitle = currentCapability ? (knowledgeTitleById.get(currentCapability.id) ?? currentCapability.title) : null;
+  const detailTitle = currentGroup ? currentGroup.title : currentPractice?.title ?? capabilityTitle ?? currentKnowledge?.title ?? "课程节点";
   const detailKicker = currentCapability ? "前置能力 · 课程外" : currentPractice || currentGroup ? "课程实训" : "知识节点";
   const detailContext = knowledgeForDetail ? `第 ${knowledgeForDetail.lesson} 课 · ${courseChapters.find((chapter) => chapter.id === knowledgeForDetail.chapterId)?.title ?? ""}` : currentCapability?.bridge ? "位于课程知识后方" : "";
   const detailLabel = currentCapability ? "前置能力" : authenticated ? selectedLearner?.label ?? "待学" : "公开";
   const detailTone = currentCapability ? "quiet" : authenticated ? learnerTone(selectedLearner) : "target";
+
+  const capabilityItems = useMemo(() => {
+    if (!capabilityLayout) return [];
+    return capabilityLayout.bridgeNodes.map((node) => {
+      const learner = learnerById.get(node.id);
+      return {
+        id: node.id,
+        title: knowledgeTitleById.get(node.id) ?? node.title,
+        mastered: Boolean(authenticated && learner?.category === "acquired"),
+        supports: capabilitySupports.get(node.id)?.length ?? 0
+      };
+    }).sort((left, right) => left.title.localeCompare(right.title, "zh-Hans-CN") || left.id.localeCompare(right.id));
+  }, [authenticated, capabilityLayout, capabilitySupports, knowledgeTitleById, learnerById]);
+  const visibleCapabilities = capabilityItems.filter((item) => !capsQuery.trim() || item.title.toLocaleLowerCase().includes(capsQuery.trim().toLocaleLowerCase()));
+  const capGroups = [
+    { key: "mastered", label: "已掌握", items: visibleCapabilities.filter((item) => item.mastered) },
+    { key: "learning", label: "未掌握", items: visibleCapabilities.filter((item) => !item.mastered) }
+  ];
+
+  const capabilityPanel = capsOpen && !flat && tab === "course" ? (
+    <aside className={`ef-imm-cap-panel ${effectiveSelection ? "is-with-detail" : ""}`} aria-label="能力层清单">
+      <header>
+        <div><span>能力层</span><h2>前置能力</h2><p>按掌握情况分组 · 支撑课程知识</p></div>
+        <button type="button" onClick={() => setCapsOpen(false)} aria-label="收起能力层清单"><X size={15} /></button>
+      </header>
+      <input value={capsQuery} onChange={(event) => setCapsQuery(event.target.value)} type="search" placeholder="搜索能力名称…" aria-label="搜索能力名称" />
+      <div className="ef-imm-cap-scroll">
+        {capGroups.map((group) => (
+          <section key={group.key}>
+            <h3>{group.label} · {group.items.length}</h3>
+            {group.items.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                className={effectiveSelection?.kind === "capability" && effectiveSelection.id === item.id ? "is-sel" : ""}
+                onPointerEnter={() => setCapsHoverId(item.id)}
+                onPointerLeave={() => setCapsHoverId((current) => current === item.id ? null : current)}
+                onFocus={() => setCapsHoverId(item.id)}
+                onBlur={() => setCapsHoverId((current) => current === item.id ? null : current)}
+                onClick={() => { setSelectionPinned(false); setSelection({ kind: "capability", id: item.id }); }}
+              >
+                <i className={item.mastered ? "is-mastered" : ""} />
+                <span>{item.title}</span>
+                <small>{item.supports} 个知识</small>
+              </button>
+            ))}
+            {!group.items.length ? <p className="ef-imm-cap-empty">没有匹配的能力</p> : null}
+          </section>
+        ))}
+      </div>
+    </aside>
+  ) : null;
 
   const detailPanel = effectiveSelection ? (
     <ObjectShell
@@ -982,7 +1069,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       title={detailTitle}
       badge={<Pill tone={detailTone}>{detailLabel}{selectedLearner?.current && authenticated ? " · 当前" : ""}</Pill>}
       context={<span>{detailContext}</span>}
-      tools={<button type="button" className="ef-imm-icon-btn" onClick={() => setSelection(null)} aria-label="关闭详情"><X size={15} /></button>}
+      tools={<button type="button" className="ef-imm-icon-btn" onClick={() => { setSelection(null); setSelectionPinned(false); }} aria-label="关闭详情"><X size={15} /></button>}
       footer={
         <>
           {!session ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={openLogin}><LogIn size={13} />登录后开始学习</button> : null}
@@ -995,6 +1082,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           {session && !currentPractice && !currentGroup && selectedMicro && primaryAssignment && knowledgeForDetail ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void launchAssignment(primaryAssignment)}><FileText size={13} />{detailAssignments.length > 1 ? "实践组" : "实践"}</button> : null}
           {session && selectedMaterials[0] && knowledgeForDetail ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void launchMaterial(selectedMaterials[0].id, knowledgeForDetail)}><BookOpen size={13} />资料</button> : null}
           {session && routeIndex ? <span className="ef-imm-detail-chip">路线第 {routeIndex} 步</span> : null}
+          <button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32 ef-imm-locate" onClick={() => { if (selectedStageId) stageRef.current?.locate(selectedStageId); }}><LocateFixed size={13} />定位</button>
         </>
       }
     >
@@ -1130,45 +1218,95 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       {!courseLayout && !enterSnapshot ? <div className="ef-imm-layout-wait" role="status"><Clock3 size={16} />正在展开课程结构…</div> : null}
 
       <div className={`ef-imm-stage-wrap ${flat ? "has-detail" : ""}`}>
-        <CourseImmersiveStage
-          ref={stageRef}
-          className="ef-imm-stage-main"
-          nodes={stageNodes}
-          chapters={baseStageChapters}
-          edges={stageEdges}
-          beams={flat ? flatBeams : courseBeam}
-          mode={sceneMode}
-          layer={swapped ? "practice" : "skill"}
-          pose={currentPose}
-          selectedId={selectedStageId}
-          reducedMotion={reducedMotion}
-          detailOpen={Boolean(effectiveSelection)}
-          onSelect={(id, kind) => {
-            if (kind === "assignment") {
-              setTab("course");
-              setSwapped(true);
-              const card = practiceByKnowledge.get(id.replace(/^(?:assignment:[^:]+:|shadow:[^:]+:|group:|empty:)/, ""));
-              setSelection(card && card.kind === "group" ? { kind: "group", id: card.knowledgeId } : { kind: "practice", id: (card?.assignmentIds[0] ?? id) });
-              return;
-            }
-            if (kind === "capability") { if (flat) setSelection({ kind: "capability", id }); else openCapability(id); return; }
-            if (kind === "chapter" || kind === "chapter-empty") { setSelection(null); return; }
-            setTab("course");
-            setSwapped(false);
-            setSelection({ kind: "knowledge", id });
-          }}
-          onBackground={() => setSelection(null)}
-          onPoseChange={(next) => setPose(next === "flat" ? "flat" : next)}
-          onSemanticZoom={(next, percent) => { setZoom((current) => current === next ? current : next); setZoomPercent((current) => current === percent ? current : percent); }}
-          onFps={(fps, nodeCount, domCount) => {
-            const value = { fps, nodes: nodeCount, dom: domCount };
-            setPerf(value);
-            (window as unknown as { __eduflowP4Perf?: typeof value }).__eduflowP4Perf = value;
-          }}
-          fitKey={`${courseId}:${courseLayout?.revision ?? ""}:${flat ? "flat" : "tree"}`}
-          instantFit={Boolean(enterSnapshot?.cards.length) && enterPhase !== "done"}
-          aria-label={`${runtime.course.title} 三维课程场景`}
-        />
+        {flat ? (
+          <CourseImmersiveStage
+            ref={stageRef}
+            className="ef-imm-stage-main"
+            nodes={stageNodes}
+            chapters={baseStageChapters}
+            edges={stageEdges}
+            beams={flatBeams}
+            mode="flat"
+            layer={swapped ? "practice" : "skill"}
+            pose="flat"
+            selectedId={selectedStageId}
+            reducedMotion={reducedMotion}
+            detailOpen={Boolean(effectiveSelection)}
+            onSelect={(id, kind) => {
+              setSelectionPinned(false);
+              if (kind === "capability") { setSelection({ kind: "capability", id }); return; }
+              setSelection({ kind: "knowledge", id });
+            }}
+            onBackground={() => { setSelection(null); setSelectionPinned(false); }}
+            onPoseChange={() => undefined}
+            onSemanticZoom={(next, percent) => { setZoom((current) => current === next ? current : next); setZoomPercent((current) => current === percent ? current : percent); }}
+            onFps={(fps, nodeCount, domCount) => {
+              const value = { fps, nodes: nodeCount, dom: domCount };
+              setPerf(value);
+              (window as unknown as { __eduflowP4Perf?: typeof value }).__eduflowP4Perf = value;
+            }}
+            fitKey={`${courseId}:${courseLayout?.revision ?? ""}:flat`}
+            instantFit={Boolean(enterSnapshot?.cards.length) && enterPhase !== "done"}
+            aria-label={`${runtime.course.title} 三维课程场景`}
+          />
+        ) : (
+          <TiltedCourseStage
+            ref={stageRef}
+            className="ef-imm-stage-main"
+            nodes={stageNodes}
+            chapters={baseStageChapters}
+            edges={stageEdges}
+            beams={courseBeam}
+            layer={swapped ? "practice" : "skill"}
+            pose={currentPose === "rotated" ? "rotated" : "front"}
+            selectedId={selectedStageId}
+            externalHoverId={capsHoverId}
+            rightInset={capsOpen && !effectiveSelection ? 320 : 0}
+            capabilitiesOn={capsOpen}
+            reducedMotion={reducedMotion}
+            detailOpen={Boolean(effectiveSelection)}
+            onSelect={(id, kind, context) => {
+              // §10.10: only a front-facing (≤35°) card click may swap layers.
+              // On the turned plane every click is select + open detail, so the
+              // scene never restructures under the pointer and the clicked facet
+              // (including a visible reflection) keeps its own x-ray.
+              const front = context.angle <= 35;
+              if (kind === "assignment") {
+                const card = practiceByKnowledge.get(id.replace(/^(?:assignment:[^:]+:|shadow:[^:]+:|group:|empty:)/, ""));
+                if (front) {
+                  setTab("course");
+                  setSwapped(true);
+                  setSelectionPinned(false);
+                } else {
+                  setSelectionPinned(true);
+                }
+                setSelection(card && card.kind === "group" ? { kind: "group", id: card.knowledgeId } : { kind: "practice", id: (card?.assignmentIds[0] ?? id) });
+                return;
+              }
+              if (kind === "capability") { setSelectionPinned(!front); setSelection({ kind: "capability", id }); return; }
+              if (kind === "chapter" || kind === "chapter-empty") { setSelection(null); setSelectionPinned(false); return; }
+              if (front) {
+                setTab("course");
+                setSwapped(false);
+                setSelectionPinned(false);
+              } else {
+                setSelectionPinned(true);
+              }
+              setSelection({ kind: "knowledge", id });
+            }}
+            onBackground={() => { setSelection(null); setSelectionPinned(false); }}
+            onPoseChange={(next) => setPose(next)}
+            onSemanticZoom={(next, percent) => { setZoom((current) => current === next ? current : next); setZoomPercent((current) => current === percent ? current : percent); }}
+            onFps={(fps, nodeCount, domCount) => {
+              const value = { fps, nodes: nodeCount, dom: domCount };
+              setPerf(value);
+              (window as unknown as { __eduflowP4Perf?: typeof value }).__eduflowP4Perf = value;
+            }}
+            fitKey={`${courseId}:${courseLayout?.revision ?? ""}:tree`}
+            instantFit={Boolean(enterSnapshot?.cards.length) && enterPhase !== "done"}
+            aria-label={`${runtime.course.title} 三维课程场景`}
+          />
+        )}
         {authenticated ? <div className="ef-imm-status-legend" role="group" aria-label={`课程学习状态图例：已学 ${learnerState.counts.acquired}，在学 ${learnerState.counts.learning}，待学 ${learnerState.counts.pending}，合计 ${learnerState.counts.total}`}>
           <span className="ef-imm-status-legend-states">
             <span><i className="is-learned" />已学 {learnerState.counts.acquired}</span>
@@ -1188,7 +1326,8 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           <button type="button" onClick={() => stageRef.current?.zoomOut()} aria-label="缩小场景"><Minus size={16} /></button>
           <button type="button" onClick={() => stageRef.current?.fit()} aria-label="适配全图"><Maximize2 size={16} /></button>
           <span>{zoomPercent}%</span>
-          <button type="button" className={currentPose === "rotated" ? "is-on" : ""} onClick={() => { const next = currentPose === "rotated" ? "front" : "rotated"; setPose(next); stageRef.current?.setPose(next); }} aria-label="旋转场景" aria-pressed={currentPose === "rotated"}><RotateCcw size={16} /></button>
+          <button type="button" className="ef-imm-control-wide" onClick={() => { setCapsOpen(true); stageRef.current?.focusCapabilities(); }} aria-label="看能力层"><Layers3 size={16} />看能力层</button>
+          <button type="button" className="ef-imm-control-wide" onClick={() => { setPose("front"); stageRef.current?.front(); }} aria-label="回正面"><RotateCcw size={16} />回正面</button>
         </div> : null}
 
         {tab === "course" && !flat ? <div className="ef-imm-toolbar" role="toolbar" aria-label="课程树工具">
@@ -1199,6 +1338,8 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         </div> : null}
         {flat ? <div className="ef-imm-flatbar"><span><i />当前路线</span><span><i className="is-preview" />预览路线</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={leaveFlatten}>完成</button></div> : null}
       </div>
+
+      {!flat ? capabilityPanel : null}
 
       {!flat ? detailPanel : null}
 
@@ -1217,6 +1358,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         })() : undefined}
         onSelect={(step) => {
           const kind: CourseSelection = displayNodes.some((node) => node.id === step.id) ? { kind: "knowledge", id: step.id } : { kind: "capability", id: step.id };
+          setSelectionPinned(false);
           setSelection(kind);
         }}
         onStart={(step) => {

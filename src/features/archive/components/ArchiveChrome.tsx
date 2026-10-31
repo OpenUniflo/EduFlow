@@ -77,7 +77,7 @@ export function ArchiveDraftFocusBar({ title, knowledgeCount, weeks, leftInset =
 
 const RELATION_LABEL: Record<string, string> = { prerequisite: "前置", enables: "使能", related: "相关" };
 
-export function ArchiveNodePanel({ node, model, edges, topicName, learners, onClose, onSelectNode, onOpenCourse }: {
+export function ArchiveNodePanel({ node, model, edges, topicName, learners, onClose, onSelectNode, onOpenCourse, focusedCourseId, onOpenFocusCourse }: {
   node: ArchiveNode;
   model: ArchiveModel;
   edges: readonly ArchiveEdge[];
@@ -86,6 +86,8 @@ export function ArchiveNodePanel({ node, model, edges, topicName, learners, onCl
   onClose: () => void;
   onSelectNode: (id: string) => void;
   onOpenCourse: (courseId: string, origin?: DOMRect) => void;
+  focusedCourseId?: string | null;
+  onOpenFocusCourse?: (knowledgeId: string) => void;
 }) {
   const neighbours = edges
     .filter((edge) => edge.source === node.id || edge.target === node.id)
@@ -147,7 +149,9 @@ export function ArchiveNodePanel({ node, model, edges, topicName, learners, onCl
         </section>
       ) : null}
       <footer>
-        <span><Lock size={11} aria-hidden />查看不会改变学习状态</span>
+        {focusedCourseId && onOpenFocusCourse
+          ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => onOpenFocusCourse(node.id)}>在课程中打开<ArrowRight size={13} aria-hidden /></button>
+          : <span><Lock size={11} aria-hidden />查看不会改变学习状态</span>}
       </footer>
     </aside>
   );

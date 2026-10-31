@@ -6,10 +6,17 @@ import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import type { ArchiveEdge, ArchiveNode } from "../model/atlasModel";
 import type { AtlasCommunity } from "../model/atlasCommunities";
 import type { Vec3 } from "../model/atlas3dLayout";
 import { placeAtlasLabels, type AtlasLabelCandidate, type AtlasLabelRect } from "../model/atlasLabels";
+import {
+  chooseExcentricNodes,
+  chooseTiltedLabels,
+  layoutExcentric,
+  simplificationForAngle
+} from "@/shared/scene/tiltedPlane";
 import type { PlaneChapter } from "../model/coursePlaneLayout";
 import type { PlaneDependencyRoute } from "../model/coursePlaneDependencies";
 import type { CourseEnterSnapshot, ArchiveCourseView } from "@/features/course/immersive/courseTransition";
@@ -188,12 +195,17 @@ export default function ArchiveAtlasScene({
   const containerRef = useRef<HTMLDivElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
+  const sideLabelsRef = useRef<HTMLDivElement>(null);
+  const exLabelsRef = useRef<HTMLDivElement>(null);
+  const planeLabelsApiRef = useRef<{ freeze(): void; thaw(delay?: number): void; dirty(): void } | null>(null);
   const propsRef = useRef({ nodes, edges, mode, selectedId, searchIds, assistantIds, draftIds, people, communities, onSelectNode, onHoverNode, onLevelChange, onZoomChange, onActivatePlaneNode, onBlank, onReady, onResize, planeChapters, planeDependencies, planeNodeIds, planeTargetIds, planeCardSize, reducedMotion });
   propsRef.current = { nodes, edges, mode, selectedId, searchIds, assistantIds, draftIds, people, communities, onSelectNode, onHoverNode, onLevelChange, onZoomChange, onActivatePlaneNode, onBlank, onReady, onResize, planeChapters, planeDependencies, planeNodeIds, planeTargetIds, planeCardSize, reducedMotion };
 
   const engineRef = useRef<{
     renderer: THREE.WebGLRenderer;
     scene: THREE.Scene;
+    cssScene: THREE.Scene;
+    cssRenderer: CSS3DRenderer;
     camera: THREE.PerspectiveCamera;
     controls: OrbitControls;
     points: THREE.Points;
@@ -560,6 +572,39 @@ export default function ArchiveAtlasScene({
             current: Boolean(element.querySelector(".ef-atlas-card-badge.is-current"))
           }];
         });
+      // When the plane is turned past 55°, CSS3D cards are already dots/hidden,
+      // so the visible-DOM capture would be empty and the entry overlay would
+      // disappear (a blank frame). Project every plane node as a fallback card
+      // at the same screen position so the transition always has content.
+      const engine = engineRef.current;
+      const seen = new Set(cards.map((card) => card.id));
+      if (engine && propsRef.current.planeNodeIds) {
+        const cardSize = propsRef.current.planeCardSize ?? { width: 176, height: 40 };
+        const hostRect = engine.renderer.domElement.getBoundingClientRect();
+        propsRef.current.nodes.forEach((node, index) => {
+          if (!propsRef.current.planeNodeIds?.has(node.id) || seen.has(node.id)) return;
+          const world = new THREE.Vector3(engine.current[index * 3], engine.current[index * 3 + 1], engine.current[index * 3 + 2]);
+          const projected = world.clone().project(engine.camera);
+          if (projected.z > 1) return;
+          const distance = Math.max(1, engine.camera.position.distanceTo(world));
+          const pxPerWorld = hostRect.height / (2 * distance * FOV_T);
+          const width = Math.max(42, Math.min(190, cardSize.width * pxPerWorld));
+          const height = Math.max(18, Math.min(70, cardSize.height * pxPerWorld));
+          const left = (projected.x + 1) / 2 * hostRect.width - width / 2 + hostRect.left;
+          const top = (1 - projected.y) / 2 * hostRect.height - height / 2 + hostRect.top;
+          cards.push({
+            id: node.id,
+            title: node.title,
+            status: node.status,
+            left,
+            top,
+            width,
+            height,
+            current: Boolean(node.isCurrent)
+          });
+          seen.add(node.id);
+        });
+      }
       return { cards, width: window.innerWidth, height: window.innerHeight };
     },
     getCourseView() {
@@ -582,6 +627,8 @@ export default function ArchiveAtlasScene({
     zoomBy(factor) {
       const engine = engineRef.current;
       if (!engine) return;
+      planeLabelsApiRef.current?.freeze();
+      planeLabelsApiRef.current?.thaw(300);
       const direction = engine.camera.position.clone().sub(engine.controls.target);
       const distance = Math.max(engine.controls.minDistance, Math.min(engine.controls.maxDistance, direction.length() * factor));
       const target = engine.controls.target.clone();
@@ -597,7 +644,7 @@ export default function ArchiveAtlasScene({
       if (!indices.length) { fitBoundsOf(Array.from({ length: propsRef.current.nodes.length }, (_, index) => index), { padding: 1.08, inset: options.insets }); return; }
       fitBoundsOf(indices, { padding: options.padding ?? 1.55, inset: options.insets, useTarget: true });
     },
-    fitCourse(insets) { fitCoursePlane(insets); },
+    fitCourse(insets) { planeLabelsApiRef.current?.freeze(); planeLabelsApiRef.current?.thaw(320); fitCoursePlane(insets); },
     resetView() {
       const currentMode = propsRef.current.mode;
       if (currentMode === "course" || currentMode === "draft") { fitCoursePlane(lastCourseInsetsRef.current); return; }
@@ -634,6 +681,18 @@ export default function ArchiveAtlasScene({
     container.prepend(renderer.domElement);
 
     const scene = new THREE.Scene();
+    const cssScene = new THREE.Scene();
+    const cssRenderer = new CSS3DRenderer();
+    cssRenderer.domElement.className = "ef-atlas-css3d";
+    cssRenderer.domElement.style.zIndex = "4";
+    cssRenderer.domElement.style.pointerEvents = "none";
+    container.appendChild(cssRenderer.domElement);
+    const xrayHost = document.createElement("div");
+    xrayHost.className = "ef-atlas-plane-xray";
+    xrayHost.innerHTML = '<svg aria-hidden="true"></svg><div class="ef-atlas-plane-xray-name"></div>';
+    document.body.appendChild(xrayHost);
+    const xraySvg = xrayHost.querySelector("svg")!;
+    const xrayName = xrayHost.querySelector<HTMLDivElement>(".ef-atlas-plane-xray-name")!;
     const camera = new THREE.PerspectiveCamera(FOV, width / height, 1, 20000);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -721,11 +780,18 @@ export default function ArchiveAtlasScene({
     ringGeometry.setAttribute("size", ringSize);
     const ringMaterial = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false,
-      uniforms: { uScale: { value: 1 }, uSize: { value: 1 }, uPixelRatio: { value: renderer.getPixelRatio() } },
-      vertexShader: `attribute vec3 c1; attribute vec3 c2; attribute float split; attribute float alpha; attribute float size; varying vec3 v1; varying vec3 v2; varying float vSplit; varying float vAlpha; uniform float uScale; uniform float uSize; uniform float uPixelRatio;
-        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = clamp(size * uSize * uScale / max(1.0, -mv.z), 7.0 * uPixelRatio, 120.0 * uPixelRatio); gl_Position = projectionMatrix * mv; v1 = c1; v2 = c2; vSplit = split; vAlpha = alpha; }`,
-      fragmentShader: `varying vec3 v1; varying vec3 v2; varying float vSplit; varying float vAlpha;
-        void main(){ vec2 uv = gl_PointCoord - 0.5; float distanceFromCenter = length(uv) * 2.0; if (distanceFromCenter > 1.0) discard; float ring = smoothstep(0.70, 0.78, distanceFromCenter) * (1.0 - smoothstep(0.90, 0.98, distanceFromCenter)); vec3 color = (vSplit > 0.5 && uv.x > 0.0) ? v2 : v1; gl_FragColor = vec4(color, ring * vAlpha);
+      uniforms: { uScale: { value: 1 }, uSize: { value: 1 }, uPixelRatio: { value: renderer.getPixelRatio() }, uNodeMax: { value: 64 }, uGap: { value: 10 }, uRingMax: { value: 60 }, uWidth: { value: 2.2 } },
+      vertexShader: `attribute vec3 c1; attribute vec3 c2; attribute float split; attribute float alpha; attribute float size; varying vec3 v1; varying vec3 v2; varying float vSplit; varying float vAlpha; varying float vPx; uniform float uScale; uniform float uSize; uniform float uPixelRatio; uniform float uNodeMax; uniform float uGap; uniform float uRingMax;
+        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          float nodePx = min(size * uSize * uScale / max(1.0, -mv.z), uNodeMax * uPixelRatio);
+          float px = min(nodePx + uGap * uPixelRatio, uRingMax * uPixelRatio);
+          gl_PointSize = max(px, 10.0 * uPixelRatio);
+          vPx = px;
+          gl_Position = projectionMatrix * mv; v1 = c1; v2 = c2; vSplit = split; vAlpha = alpha; }`,
+      fragmentShader: `varying vec3 v1; varying vec3 v2; varying float vSplit; varying float vAlpha; varying float vPx; uniform float uPixelRatio; uniform float uWidth;
+        void main(){ vec2 uv = gl_PointCoord - 0.5; float d = length(uv) * vPx; float outer = vPx * 0.5 - 0.5; float inner = max(0.0, outer - uWidth * uPixelRatio);
+          float ring = smoothstep(inner - 1.0, inner, d) * (1.0 - smoothstep(outer - 1.0, outer, d));
+          if (ring <= 0.001) discard; vec3 color = (vSplit > 0.5 && uv.x > 0.0) ? v2 : v1; gl_FragColor = vec4(color, ring * vAlpha);
           #include <colorspace_fragment>
         }`
     });
@@ -850,7 +916,7 @@ export default function ArchiveAtlasScene({
     scene.add(starField);
 
     const engine = {
-      renderer, scene, camera, controls, points, glowPoints, glowMaterial, pointGeometry, pointPosition, pointAlpha, pointSize, pointColor, pointMaterial,
+      renderer, scene, cssScene, cssRenderer, camera, controls, points, glowPoints, glowMaterial, pointGeometry, pointPosition, pointAlpha, pointSize, pointColor, pointMaterial,
       rings, ringGeometry, ringPosition, ringColor1, ringColor2, ringSplit, ringAlpha, ringSize, ringMaterial,
       edgeLines, edgeGeometry, edgePosition, edgeAlpha: edgeAlphaAttribute, edgeMaterial,
       highlightLines, highlightGeometry, globalLines, globalGeometry,
@@ -873,10 +939,54 @@ export default function ArchiveAtlasScene({
           }
         });
         glow.dispose();
+        cssRenderer.domElement.remove();
+        xrayHost.remove();
       }
     };
     engineRef.current = engine;
     detailShiftRef.current = 0;
+    if (import.meta.env.DEV) {
+      (window as unknown as { __archiveScene?: unknown }).__archiveScene = {
+        angle: () => {
+          const direction = camera.position.clone().sub(controls.target).normalize();
+          return Math.acos(Math.max(-1, Math.min(1, direction.z))) * 180 / Math.PI;
+        },
+        setAngle: (deg: number, pitchDeg = 0) => {
+          const distance = camera.position.distanceTo(controls.target);
+          const yaw = deg * Math.PI / 180;
+          const pitch = pitchDeg * Math.PI / 180;
+          const direction = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+          const target = controls.target.clone();
+          camera.position.copy(target.clone().add(direction.multiplyScalar(distance)));
+          controls.update();
+          camera.updateMatrixWorld();
+          planeLabelsDirty = true;
+        },
+        controls,
+        camera,
+        cards: () => [...planeCards.values()].map((runtime) => ({ id: runtime.id, opacity: runtime.opacity, width: runtime.width, height: runtime.height, visible: runtime.object.visible })),
+        nodeScreen: (id: string) => {
+          const index = engine.nodeIndex.get(id);
+          if (index === undefined) return null;
+          const point = getPosition(index);
+          const projected = new THREE.Vector3(point.x, point.y, point.z).project(camera);
+          const box = renderer.domElement.getBoundingClientRect();
+          return { x: (projected.x + 1) / 2 * box.width, y: (1 - projected.y) / 2 * box.height, z: projected.z, diameter: pointScreenCss[index] ?? 0 };
+        },
+        chapters: () => [...planeChapterObjects.keys()],
+        selected: () => propsRef.current.selectedId,
+        personSets: () => propsRef.current.people.flatMap((person) => [...person.nodeIds]),
+        mode: () => propsRef.current.mode,
+        peopleSizes: () => propsRef.current.people.map((person) => person.nodeIds.size),
+        chapterHover: () => chapterHover,
+        labels: () => [...planeSidePool.entries()].filter(([, element]) => Number(element.style.opacity) > 0.02).map(([id, element]) => ({ id, text: element.textContent, transform: element.style.transform })),
+        labelSet: () => planeLabelChoices.map((choice) => choice.id),
+        frozen: () => planeLabelsFrozen,
+        dirty: () => planeLabelsDirty,
+        labelCandidates: () => planeLabelCandidates().map((candidate) => ({ id: candidate.id, x: Math.round(candidate.x), y: Math.round(candidate.y), distance: candidate.distance, diameter: Number(candidate.diameter.toFixed(1)), visibility: Number(candidate.visibility.toFixed(2)), priority: candidate.priority, text: candidate.text })),
+        ex: () => ({ visible: planeExVisible, ids: planeExRows })
+      };
+    }
     window.requestAnimationFrame(() => onReady?.());
     const cardPool = new Map<string, HTMLDivElement>();
     const cardRects = new Map<number, { x: number; y: number; width: number; height: number }>();
@@ -901,6 +1011,7 @@ export default function ArchiveAtlasScene({
       const nextWidth = Math.max(1, container.clientWidth);
       const nextHeight = Math.max(1, container.clientHeight);
       renderer.setSize(nextWidth, nextHeight);
+      cssRenderer.setSize(nextWidth, nextHeight);
       camera.aspect = nextWidth / nextHeight;
       camera.updateProjectionMatrix();
       domainLinks.forEach((link) => link.material.resolution.set(nextWidth * renderer.getPixelRatio(), nextHeight * renderer.getPixelRatio()));
@@ -951,8 +1062,15 @@ export default function ArchiveAtlasScene({
     const onPointerDown = (event: PointerEvent) => {
       cameraTweenRef.current.active = false;
       downRef.current = { x: event.clientX, y: event.clientY, time: performance.now(), button: event.button };
+      freezePlaneLabels();
+      hidePlaneEx();
     };
-    const onWheel = () => { cameraTweenRef.current.active = false; };
+    const onWheel = () => {
+      cameraTweenRef.current.active = false;
+      freezePlaneLabels();
+      schedulePlaneThaw(260);
+      hidePlaneEx();
+    };
     const onPointerUp = (event: PointerEvent) => {
       const down = downRef.current;
       downRef.current = null;
@@ -962,10 +1080,22 @@ export default function ArchiveAtlasScene({
       if (moved > 5) return;
       const rect = renderer.domElement.getBoundingClientRect();
       onCanvasClick(event.clientX - rect.left, event.clientY - rect.top);
+      schedulePlaneThaw(260);
+      if (down.button === 0 && moved > 5 && propsRef.current.mode === "course" && planeAngle() < 15) {
+        const distance = camera.position.distanceTo(controls.target);
+        const target = controls.target.clone();
+        animateCamera(target.clone().add(new THREE.Vector3(0, 0, distance)), target, 450);
+      }
     };
     const onPointerMove = (event: PointerEvent) => {
-      if (downRef.current) return;
       const rect = renderer.domElement.getBoundingClientRect();
+      if (propsRef.current.mode === "course" || propsRef.current.mode === "draft") {
+        planePointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        planePointerInside = true;
+        if (planeExVisible && planeExAnchor && !(event.target as HTMLElement).closest?.(".ef-atlas-plane-ex-item") && Math.hypot(planePointer.x - planeExAnchor.x, planePointer.y - planeExAnchor.y) > 7) hidePlaneEx();
+        schedulePlaneEx(planePointer.x, planePointer.y);
+      }
+      if (downRef.current) return;
       const id = pick(event.clientX - rect.left, event.clientY - rect.top);
       if (id !== hoveredRef.current) {
         hoveredRef.current = id;
@@ -978,6 +1108,10 @@ export default function ArchiveAtlasScene({
       }
     };
     const onPointerLeave = () => {
+      planePointerInside = false;
+      planePointer = null;
+      hidePlaneEx();
+      chapterHover = null;
       if (hoveredRef.current === null) return;
       hoveredRef.current = null;
       hoverPointRef.current = null;
@@ -1000,23 +1134,32 @@ export default function ArchiveAtlasScene({
 
     function pick(x: number, y: number) {
       const currentMode = propsRef.current.mode;
-      if (currentMode === "course" || currentMode === "draft") {
-        let cardHit = -1;
-        cardRects.forEach((rect, index) => {
-          if (x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height) cardHit = index;
-        });
-        if (cardHit >= 0) return cardHit;
-      }
+      const courseMode = currentMode === "course" || currentMode === "draft";
       let best: number | null = null;
       let bestDistance = Infinity;
+      // Full card body, capsule and point all share one 22px screen picker. The
+      // nearest camera candidate wins when bodies overlap.
+      if (courseMode) {
+        cardRects.forEach((rect, index) => {
+          if (x < rect.x || x > rect.x + rect.width || y < rect.y || y > rect.y + rect.height) return;
+          const point = getPosition(index);
+          const distance = camera.position.distanceTo(new THREE.Vector3(point.x, point.y, point.z));
+          if (distance < bestDistance) { best = index; bestDistance = distance; }
+        });
+      }
       for (let index = 0; index < count; index += 1) {
-        if (engine.alpha[index] < 0.25) continue;
+        const nodeId = propsRef.current.nodes[index]?.id;
+        if (courseMode && nodeId && propsRef.current.planeNodeIds?.has(nodeId)) {
+          // Plane nodes stay clickable at every angle, including the back side.
+        } else if (engine.alpha[index] < 0.25) continue;
         const point = project(getPosition(index));
         if (point.z > 1) continue;
         const screenDistance = Math.hypot(point.x - x, point.y - y);
-        const hitRadius = Math.max(8, (pointScreenCss[index] ?? 12) / 2 + 5);
+        const hitRadius = Math.max(22, (pointScreenCss[index] ?? 12) / 2 + 5);
         if (screenDistance > hitRadius) continue;
-        if (screenDistance < bestDistance) { best = index; bestDistance = screenDistance; }
+        const position = getPosition(index);
+        const distance = camera.position.distanceTo(new THREE.Vector3(position.x, position.y, position.z));
+        if (distance < bestDistance) { best = index; bestDistance = distance; }
       }
       return best;
     }
@@ -1026,7 +1169,11 @@ export default function ArchiveAtlasScene({
       const node = id === null ? null : propsRef.current.nodes[id];
       const currentMode = propsRef.current.mode;
       if (currentMode === "course" || currentMode === "draft") {
-        if (node && propsRef.current.planeNodeIds?.has(node.id)) { propsRef.current.onActivatePlaneNode?.(node.id); return; }
+        if (node) {
+          if (propsRef.current.planeNodeIds?.has(node.id)) propsRef.current.onActivatePlaneNode?.(node.id);
+          else propsRef.current.onSelectNode?.(node.id);
+          return;
+        }
         hoveredRef.current = null;
         hoverPointRef.current = null;
         presentationTargets();
@@ -1109,10 +1256,12 @@ export default function ArchiveAtlasScene({
       glowMaterial.uniforms.uScale.value = sharedScale;
       glowMaterial.uniforms.uPixelRatio.value = pixelRatio;
       const courseMode = currentMode === "course" || currentMode === "draft";
+      updateChapterHover();
       drawCards(rect, courseMode);
-      pointMaterial.uniforms.uSize.value = courseMode ? 1.12 : 1 - 0.08 * far;
+      drawPlaneXray(courseMode);
+      pointMaterial.uniforms.uSize.value = courseMode ? 1.5 : 1 - 0.08 * far;
       pointMaterial.uniforms.uAlpha.value = 1;
-      glowMaterial.uniforms.uSize.value = courseMode ? 1.12 : 1 - 0.12 * far;
+      glowMaterial.uniforms.uSize.value = courseMode ? 1.5 : 1 - 0.12 * far;
       glowMaterial.uniforms.uAlpha.value = courseMode ? 0.45 : 1;
       edgeMaterial.uniforms.uMul.value = 1 - 0.68 * far;
 
@@ -1130,6 +1279,10 @@ export default function ArchiveAtlasScene({
           .applyMatrix4(camera.matrixWorldInverse).z);
         pointScreenCss[index] = Math.max(2, Math.min(64, baseSize * pointUnit / depth));
       }
+      // Labels depend on the current projected diameter, so they are chosen
+      // after the point-size pass, never from the previous frame's sizes.
+      updatePlaneLabels(rect, courseMode);
+      updateArchiveChapterLabel(courseMode);
       pointPosition.needsUpdate = true;
       pointAlpha.needsUpdate = true;
       pointSize.needsUpdate = true;
@@ -1292,6 +1445,7 @@ export default function ArchiveAtlasScene({
         domainCentroids, communityCentroids, hovered
       });
       renderer.render(scene, camera);
+      cssRenderer.render(cssScene, camera);
     };
     frameHandle = requestAnimationFrame(frame);
 
@@ -1339,72 +1493,497 @@ export default function ArchiveAtlasScene({
       return (x * y) / Math.max(1, Math.min(left.width * left.height, right.width * right.height));
     }
 
-    function drawCards(rect: DOMRect, courseMode: boolean) {
-      const currentProps = propsRef.current;
-      cardRects.clear();
-      visibleCardIndices = new Set();
-      const wanted = courseMode && currentProps.planeNodeIds?.size;
-      if (!wanted) {
-        cardPool.forEach((element) => { element.style.display = "none"; });
+    type PlaneCardRuntime = {
+      index: number;
+      id: string;
+      element: HTMLDivElement;
+      object: CSS3DObject;
+      width: number;
+      height: number;
+      opacity: number;
+      screen: { x: number; y: number; z: number };
+      distance: number;
+      state: ReturnType<typeof simplificationForAngle>;
+    };
+    type PlaneChapterRuntime = { id: string; panel: HTMLDivElement; panelObject: CSS3DObject; title: HTMLDivElement; titleObject: CSS3DObject; quad: Array<{ x: number; y: number }> };
+    const planeCards = new Map<string, PlaneCardRuntime>();
+    const planeChapterObjects = new Map<string, PlaneChapterRuntime>();
+    const planeSidePool = new Map<string, HTMLDivElement>();
+    const planeLabelPrevious = new Set<string>();
+    let planeLabelChoices: ReturnType<typeof chooseTiltedLabels> = [];
+    let planeLabelsFrozen = false;
+    let planeLabelsDirty = true;
+    let planeLabelTimer = 0;
+    let planeLabelLast = 0;
+    let planeExVisible = false;
+    let planeExRows: string[] = [];
+    let planeExAnchor: { x: number; y: number } | null = null;
+    let planeExTimer = 0;
+    let chapterHover: string | null = null;
+    let planePointerInside = false;
+    let planePointer: { x: number; y: number } | null = null;
+    const measureContext = document.createElement("canvas").getContext("2d")!;
+    const measurePlaneText = (text: string) => {
+      measureContext.font = '600 16px -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif';
+      return measureContext.measureText(text).width;
+    };
+    const sideTextWidth = (text: string) => {
+      let width = 0;
+      for (const character of text) width += character.charCodeAt(0) > 255 ? 12 : 7;
+      return width + 18;
+    };
+    const planePoint = (index: number) => ({ x: engine.current[index * 3], y: engine.current[index * 3 + 1], z: engine.current[index * 3 + 2] });
+    const planeViewport = { width: 1, height: 1 };
+    const planeProject = (point: { x: number; y: number; z: number }) => {
+      const projected = new THREE.Vector3(point.x, point.y, point.z).project(camera);
+      return { x: (projected.x + 1) / 2 * planeViewport.width, y: (1 - projected.y) / 2 * planeViewport.height, z: projected.z };
+    };
+    const planeAngle = () => {
+      const direction = camera.position.clone().sub(controls.target).normalize();
+      return Math.acos(Math.max(-1, Math.min(1, direction.z))) * 180 / Math.PI;
+    };
+    const planeIdSet = () => propsRef.current.planeNodeIds ?? new Set<string>();
+    const planeSize = () => propsRef.current.planeCardSize ?? { width: CARD_NATURAL_WIDTH, height: CARD_NATURAL_HEIGHT };
+
+    function syncPlaneObjects(courseMode: boolean) {
+      const ids = planeIdSet();
+      if (!courseMode) {
+        planeCards.forEach((runtime) => { engine.cssScene.remove(runtime.object); runtime.element.remove(); });
+        planeCards.clear();
+        planeChapterObjects.forEach((runtime) => { engine.cssScene.remove(runtime.panelObject, runtime.titleObject); runtime.panel.remove(); runtime.title.remove(); });
+        planeChapterObjects.clear();
         return;
       }
-      const planeSize = currentProps.planeCardSize ?? { width: CARD_NATURAL_WIDTH, height: CARD_NATURAL_HEIGHT };
-      const candidates: Array<{ index: number; id: string; x: number; y: number; width: number; height: number; scale: number; distance: number; node: ArchiveNode; rect: { x: number; y: number; width: number; height: number } }> = [];
+      const current = new Set<string>();
       for (let index = 0; index < count; index += 1) {
-        const node = currentProps.nodes[index];
-        if (!node || !currentProps.planeNodeIds?.has(node.id)) continue;
-        if (engine.alpha[index] < 0.2) continue;
-        const point = project(getPosition(index));
-        if (point.z > 1) continue;
-        const distance = camera.position.distanceTo(new THREE.Vector3(engine.current[index * 3], engine.current[index * 3 + 1], engine.current[index * 3 + 2]));
-        // The demo's `150 * pxPerWorld / 176` in world terms: a card is 176x40
-        // world units and scales with camera distance; it only becomes a point
-        // when the text would be unreadable.
-        const pxPerWorld = rect.height / (2 * Math.max(1, distance) * FOV_T);
-        const scale = Math.max(0.3, Math.min(1.3, (planeSize.width * pxPerWorld) / CARD_NATURAL_WIDTH));
-        if (scale < 0.42) continue;
-        const width = CARD_NATURAL_WIDTH * scale;
-        const height = CARD_NATURAL_HEIGHT * scale;
-        const box = { x: point.x - width / 2, y: point.y - height / 2, width, height };
-        candidates.push({ index, id: node.id, x: point.x, y: point.y, width, height, scale, distance, node, rect: box });
-      }
-      candidates.sort((left, right) => left.distance - right.distance || left.index - right.index);
-      const accepted: typeof candidates = [];
-      candidates.forEach((candidate) => {
-        if (accepted.some((other) => overlapRatio(candidate.rect, other.rect) > 0.12)) return;
-        accepted.push(candidate);
-      });
-      accepted.forEach((candidate) => {
-        visibleCardIndices.add(candidate.index);
-        cardRects.set(candidate.index, candidate.rect);
-        let element = cardPool.get(candidate.id);
-        if (!element) {
-          element = document.createElement("div");
-          element.className = "ef-atlas-card";
-          cardsRef.current?.appendChild(element);
-          cardPool.set(candidate.id, element);
+        const node = propsRef.current.nodes[index];
+        if (!node || !ids.has(node.id)) continue;
+        current.add(node.id);
+        let runtime = planeCards.get(node.id);
+        if (!runtime) {
+          const element = document.createElement("div");
+          element.className = "ef-atlas-card ef-atlas-plane-card";
+          element.style.position = "absolute";
+          element.style.top = "0";
+          element.style.left = "0";
+          element.style.pointerEvents = "none";
+          const object = new CSS3DObject(element);
+          object.element.style.pointerEvents = "none";
+          engine.cssScene.add(object);
+          runtime = { index, id: node.id, element, object, width: planeSize().width, height: planeSize().height, opacity: 1, screen: { x: 0, y: 0, z: 0 }, distance: 1000, state: simplificationForAngle(0) };
+          planeCards.set(node.id, runtime);
         }
-        const isCurrent = Boolean(candidate.node.isCurrent);
-        const isTarget = Boolean(currentProps.planeTargetIds?.has(candidate.id));
+        runtime.index = index;
+        const isCurrent = Boolean(node.isCurrent);
+        const isTarget = Boolean(propsRef.current.planeTargetIds?.has(node.id));
         const badge = isCurrent
           ? '<em class="ef-atlas-card-badge is-current">当前</em>'
           : isTarget ? '<em class="ef-atlas-card-badge is-target">目标</em>' : "";
-        const html = `<span class="ef-atlas-card-dot" aria-hidden></span><span class="ef-atlas-card-title">${escapeHtml(candidate.node.title)}</span>${badge}`;
-        if (element.dataset.html !== html) { element.innerHTML = html; element.dataset.html = html; }
-        element.dataset.status = candidate.node.status;
-        element.dataset.nodeId = candidate.id;
-        element.classList.toggle("is-hover", hoveredRef.current === candidate.index);
-        element.style.width = `${CARD_NATURAL_WIDTH}px`;
-        element.style.height = `${CARD_NATURAL_HEIGHT}px`;
-        element.style.transform = `translate(${candidate.x.toFixed(1)}px, ${candidate.y.toFixed(1)}px) scale(${candidate.scale.toFixed(3)}) translate(-50%, -50%)`;
-        element.style.display = "";
+        const html = `<span class="ef-atlas-card-dot" aria-hidden></span><span class="ef-atlas-card-title">${escapeHtml(node.title)}</span>${badge}`;
+        if (runtime.element.dataset.html !== html) { runtime.element.innerHTML = html; runtime.element.dataset.html = html; }
+        runtime.element.dataset.status = node.status;
+        runtime.element.dataset.nodeId = node.id;
+      }
+      planeCards.forEach((runtime, id) => {
+        if (current.has(id)) return;
+        engine.cssScene.remove(runtime.object);
+        runtime.element.remove();
+        planeCards.delete(id);
       });
-      cardPool.forEach((element, id) => {
-        const index = engine.nodeIndex.get(id);
-        if (index === undefined || !visibleCardIndices.has(index)) element.style.display = "none";
+      const chapterIds = new Set<string>();
+      propsRef.current.planeChapters.forEach((chapter, chapterIndex) => {
+        const id = chapter.id;
+        chapterIds.add(id);
+        let runtime = planeChapterObjects.get(id);
+        if (!runtime) {
+          const panel = document.createElement("div");
+          panel.className = "ef-atlas-plane-chapter";
+          panel.style.position = "absolute";
+          panel.style.top = "0";
+          panel.style.left = "0";
+          panel.style.pointerEvents = "none";
+          const panelObject = new CSS3DObject(panel);
+          panelObject.element.style.pointerEvents = "none";
+          const title = document.createElement("div");
+          title.className = "ef-atlas-plane-chapter-title";
+          title.style.position = "absolute";
+          title.style.top = "0";
+          title.style.left = "0";
+          title.style.pointerEvents = "none";
+          const titleObject = new CSS3DObject(title);
+          titleObject.element.style.pointerEvents = "none";
+          engine.cssScene.add(panelObject, titleObject);
+          runtime = { id, panel, panelObject, title, titleObject, quad: [] };
+          planeChapterObjects.set(id, runtime);
+        }
+        runtime.panel.style.width = `${chapter.width}px`;
+        runtime.panel.style.height = `${chapter.height}px`;
+        runtime.panel.dataset.chapterId = id;
+        runtime.title.innerHTML = `<b>${String(chapterIndex + 1).padStart(2, "0")}</b><span>${escapeHtml(chapter.title)}</span>`;
+        runtime.title.style.maxWidth = `${Math.min(220, Math.max(110, chapter.width * 0.94))}px`;
+      });
+      planeChapterObjects.forEach((runtime, id) => {
+        if (chapterIds.has(id)) return;
+        engine.cssScene.remove(runtime.panelObject, runtime.titleObject);
+        runtime.panel.remove();
+        runtime.title.remove();
+        planeChapterObjects.delete(id);
       });
     }
 
+    function planeXray() {
+      if (!propsRef.current.selectedId) return null;
+      const index = engine.nodeIndex.get(propsRef.current.selectedId);
+      if (index === undefined) return null;
+      const point = getPosition(index);
+      const screen = planeProject(point);
+      const distance = camera.position.distanceTo(new THREE.Vector3(point.x, point.y, point.z));
+      const segments: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+      engine.neighbors[index].forEach((neighbor) => {
+        const other = getPosition(neighbor);
+        const projected = planeProject(other);
+        if (projected.z <= 1) segments.push({ x1: screen.x, y1: screen.y, x2: projected.x, y2: projected.y });
+      });
+      // Course-internal dependency routes also belong to the selected node.
+      propsRef.current.planeDependencies.forEach((route) => {
+        if (route.source !== propsRef.current.selectedId && route.target !== propsRef.current.selectedId) return;
+        for (let i = 0; i < route.points.length - 1; i += 1) {
+          const a = planeProject(route.points[i]);
+          const b = planeProject(route.points[i + 1]);
+          if (a.z <= 1 && b.z <= 1) segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+        }
+      });
+      return { index, screen, distance, segments, title: propsRef.current.nodes[index]?.title ?? "" };
+    }
+    function segmentHitsRect(segment: { x1: number; y1: number; x2: number; y2: number }, rect: { x: number; y: number; width: number; height: number }) {
+      const contains = (x: number, y: number) => x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+      if (contains(segment.x1, segment.y1) || contains(segment.x2, segment.y2)) return true;
+      const hit = (ax: number, ay: number, bx: number, by: number) => {
+        const denominator = (bx - ax) * (segment.y2 - segment.y1) - (by - ay) * (segment.x2 - segment.x1);
+        if (Math.abs(denominator) < 1e-6) return false;
+        const t = ((segment.x1 - ax) * (segment.y2 - segment.y1) - (segment.y1 - ay) * (segment.x2 - segment.x1)) / denominator;
+        const u = ((segment.x1 - ax) * (by - ay) - (segment.y1 - ay) * (bx - ax)) / denominator;
+        return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+      };
+      return hit(rect.x, rect.y, rect.x + rect.width, rect.y)
+        || hit(rect.x + rect.width, rect.y, rect.x + rect.width, rect.y + rect.height)
+        || hit(rect.x + rect.width, rect.y + rect.height, rect.x, rect.y + rect.height)
+        || hit(rect.x, rect.y + rect.height, rect.x, rect.y);
+    }
+    function drawPlaneXray(courseMode: boolean) {
+      const xray = courseMode ? planeXray() : null;
+      if (!xray) {
+        xrayHost.style.opacity = "0";
+        return;
+      }
+      const box = renderer.domElement.getBoundingClientRect();
+      xrayHost.style.opacity = "1";
+      xrayHost.style.left = `${box.left}px`;
+      xrayHost.style.top = `${box.top}px`;
+      xrayHost.style.width = `${box.width}px`;
+      xrayHost.style.height = `${box.height}px`;
+      xraySvg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+      xraySvg.setAttribute("width", String(box.width));
+      xraySvg.setAttribute("height", String(box.height));
+      const lines = xray.segments.map((segment) => `<line x1="${segment.x1.toFixed(1)}" y1="${segment.y1.toFixed(1)}" x2="${segment.x2.toFixed(1)}" y2="${segment.y2.toFixed(1)}"/>`).join("");
+      const radius = Math.max(16, Math.min(30, 13 * engine.size[xray.index] * (renderer.domElement.clientHeight / (2 * FOV_T)) / Math.max(1, xray.distance) * 0.55 + 10));
+      xraySvg.innerHTML = `<g class="ef-atlas-plane-xray-glow">${lines}</g><g class="ef-atlas-plane-xray-core">${lines}</g>
+        <circle class="ef-atlas-plane-xray-halo" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${(radius + 7).toFixed(1)}"/>
+        <circle class="ef-atlas-plane-xray-ring" cx="${xray.screen.x.toFixed(1)}" cy="${xray.screen.y.toFixed(1)}" r="${radius.toFixed(1)}"/>`;
+      xrayName.textContent = xray.title;
+      const width = Math.min(260, Math.max(54, estimateLabelWidth(xray.title, "", "knowledge") + 18));
+      const x = Math.max(8, Math.min(box.width - width - 8, xray.screen.x - width / 2));
+      let y = xray.screen.y - radius - 34;
+      if (y < 8) y = xray.screen.y + radius + 12;
+      xrayName.style.width = `${width}px`;
+      xrayName.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      xrayName.style.opacity = planeAngle() > 35 ? "1" : "0";
+    }
+    function freezePlaneLabels() {
+      planeLabelsFrozen = true;
+      window.clearTimeout(planeLabelTimer);
+      hidePlaneEx();
+    }
+    function schedulePlaneThaw(delay = 250) {
+      window.clearTimeout(planeLabelTimer);
+      planeLabelTimer = window.setTimeout(() => {
+        planeLabelsFrozen = false;
+        planeLabelsDirty = true;
+      }, delay);
+    }
+    function drawCards(rect: DOMRect, courseMode: boolean) {
+      planeViewport.width = rect.width;
+      planeViewport.height = rect.height;
+      syncPlaneObjects(courseMode);
+      cardRects.clear();
+      visibleCardIndices = new Set();
+      if (!courseMode) {
+        planeSidePool.forEach((element) => { element.style.opacity = "0"; });
+        return;
+      }
+      const angle = planeAngle();
+      const state = simplificationForAngle(angle);
+      const selectedId = propsRef.current.selectedId;
+      const xray = planeXray();
+      const hoveredIndex = hoveredRef.current;
+      const hoveredId = hoveredIndex === null ? null : propsRef.current.nodes[hoveredIndex]?.id ?? null;
+      planeCards.forEach((runtime) => {
+        const node = propsRef.current.nodes[runtime.index];
+        if (!node) return;
+        const world = planePoint(runtime.index);
+        runtime.object.position.set(world.x, world.y, world.z);
+        const distance = camera.position.distanceTo(new THREE.Vector3(world.x, world.y, world.z));
+        const pxPerWorld = rect.height / (2 * Math.max(1, distance) * FOV_T);
+        const screen = planeProject(world);
+        runtime.screen = screen;
+        runtime.distance = distance;
+        runtime.state = state;
+        const base = planeSize();
+        const maxPill = THREE.MathUtils.lerp(170, 90, smoothStep(35, 55, angle));
+        const nameWidth = Math.max(48, Math.min(maxPill, measurePlaneText(node.title) + 24));
+        const dotPx = Math.min(13 * engine.size[runtime.index] * pxPerWorld, 48);
+        const dotWorld = dotPx / Math.max(0.0001, pxPerWorld);
+        const width = THREE.MathUtils.lerp(THREE.MathUtils.lerp(base.width, nameWidth, state.pill), dotWorld, state.dot);
+        const height = THREE.MathUtils.lerp(THREE.MathUtils.lerp(base.height, 26, state.pill), dotWorld, state.dot);
+        let opacity = (state.stage === "dot" ? 0 : 1) * (1 - state.back);
+        if (state.handoff > 0.02) opacity *= 1 - smoothStep(0.72, 0.995, state.dot);
+        if (node.id === selectedId) opacity *= 1 - smoothStep(35, 38, angle);
+        if (xray && node.id !== selectedId && distance < xray.distance - 3) {
+          const box = { x: screen.x - width * pxPerWorld / 2, y: screen.y - height * pxPerWorld / 2, width: width * pxPerWorld, height: height * pxPerWorld };
+          const coversPoint = xray.screen.x >= box.x - 4 && xray.screen.x <= box.x + box.width + 4 && xray.screen.y >= box.y - 4 && xray.screen.y <= box.y + box.height + 4;
+          if (coversPoint || xray.segments.some((segment) => segmentHitsRect(segment, { x: box.x - 4, y: box.y - 4, width: box.width + 8, height: box.height + 8 }))) opacity *= 0.16;
+        }
+        runtime.width = width;
+        runtime.height = height;
+        runtime.opacity = opacity;
+        const element = runtime.element;
+        element.style.width = `${width.toFixed(2)}px`;
+        element.style.height = `${height.toFixed(2)}px`;
+        element.style.padding = `${THREE.MathUtils.lerp(THREE.MathUtils.lerp(9, 3, state.pill), 0, state.dot).toFixed(2)}px ${THREE.MathUtils.lerp(THREE.MathUtils.lerp(10, 9, state.pill), 0, state.dot).toFixed(2)}px`;
+        element.style.borderRadius = state.pill > 0.02 ? "var(--r-full)" : "var(--r-8)";
+        element.style.opacity = Math.max(0, Math.min(1, opacity)).toFixed(3);
+        element.style.setProperty("--name-op", state.cardName.toFixed(3));
+        element.style.setProperty("--extra-op", state.extra.toFixed(3));
+        element.classList.toggle("is-pill", state.pill > 0.02);
+        element.classList.toggle("is-dot", state.dot > 0.6);
+        element.classList.toggle("is-hover", node.id === hoveredId);
+        element.classList.toggle("is-sel", node.id === selectedId);
+        element.classList.toggle("is-current", Boolean(node.isCurrent));
+        runtime.object.visible = opacity > 0.004 && screen.z < 1;
+        if (state.billboard <= 0.001) runtime.object.quaternion.set(0, 0, 0, 1);
+        else if (state.billboard >= 0.999) runtime.object.quaternion.copy(camera.quaternion);
+        else runtime.object.quaternion.slerpQuaternions(new THREE.Quaternion(), camera.quaternion, state.billboard);
+        if (runtime.object.visible) {
+          visibleCardIndices.add(runtime.index);
+          cardRects.set(runtime.index, {
+            x: screen.x - width * pxPerWorld / 2,
+            y: screen.y - height * pxPerWorld / 2,
+            width: width * pxPerWorld,
+            height: height * pxPerWorld
+          });
+        }
+      });
+      const chapterAngle = state.chapterTitle;
+      planeChapterObjects.forEach((runtime, id) => {
+        const chapterIndex = propsRef.current.planeChapters.findIndex((chapter) => chapter.id === id);
+        const chapter = propsRef.current.planeChapters[chapterIndex];
+        if (!chapter) return;
+        const cx = chapter.x + chapter.width / 2;
+        const cy = chapter.y - chapter.height / 2;
+        runtime.panelObject.position.set(cx, cy, -3);
+        runtime.titleObject.position.set(cx, chapter.y, 2);
+        const hovered = chapterHover === id;
+        let panelOpacity = 0.9 * (1 - state.back);
+        if (hovered) panelOpacity = Math.min(1, panelOpacity * 1.25 + 0.04);
+        runtime.panel.style.opacity = panelOpacity.toFixed(3);
+        runtime.panel.classList.toggle("is-hover", hovered);
+        runtime.panelObject.visible = panelOpacity > 0.01;
+        const titleOpacity = chapterAngle * (1 - state.back) * (propsRef.current.mode === "course" ? 1 : 0);
+        runtime.title.style.opacity = titleOpacity.toFixed(3);
+        runtime.titleObject.visible = titleOpacity > 0.01;
+        const corners = [
+          { x: chapter.x, y: chapter.y },
+          { x: chapter.x + chapter.width, y: chapter.y },
+          { x: chapter.x + chapter.width, y: chapter.y - chapter.height },
+          { x: chapter.x, y: chapter.y - chapter.height }
+        ].map((point) => planeProject({ x: point.x, y: point.y, z: -3 }));
+        runtime.quad = corners.map((point) => ({ x: point.x, y: point.y }));
+      });
+    }
+
+    function hidePlaneSideLabels() {
+      planeSidePool.forEach((element) => { element.style.opacity = "0"; });
+    }
+    function planeLabelCandidates() {
+      const result: Array<{ id: string; index: number; x: number; y: number; distance: number; diameter: number; visibility: number; priority: number; text: string }> = [];
+      const ids = planeIdSet();
+      const selectedId = propsRef.current.selectedId;
+      const hoveredIndex = hoveredRef.current;
+      const hoveredId = hoveredIndex === null ? null : propsRef.current.nodes[hoveredIndex]?.id ?? null;
+      for (let index = 0; index < count; index += 1) {
+        const node = propsRef.current.nodes[index];
+        if (!node || !ids.has(node.id) || node.id === selectedId) continue;
+        const distance = camera.position.distanceTo(new THREE.Vector3(engine.current[index * 3], engine.current[index * 3 + 1], engine.current[index * 3 + 2]));
+        const point = planeProject(planePoint(index));
+        if (point.z > 1) continue;
+        const diameter = (pointScreenCss[index] ?? 12) * 2.2;
+        const priority = node.id === hoveredId ? 0 : node.isCurrent ? 1 : 3;
+        result.push({ id: node.id, index, x: point.x, y: point.y, distance, diameter, visibility: engine.alpha[index], priority, text: node.title });
+      }
+      return result;
+    }
+    function rectHeightCss() { return renderer.domElement.clientHeight || 1; }
+    function choosePlaneLabels() {
+      const candidates = planeLabelCandidates();
+      const obstacles = candidates.map((candidate) => ({
+        id: candidate.id,
+        x: candidate.x - Math.max(12, candidate.diameter / 2 + 4),
+        y: candidate.y - Math.max(12, candidate.diameter / 2 + 4),
+        width: Math.max(24, candidate.diameter + 8),
+        height: Math.max(24, candidate.diameter + 8)
+      }));
+      planeLabelChoices = chooseTiltedLabels(candidates.map(({ id, x, y, distance, diameter, visibility, priority, text }) => ({ id, x, y, distance, diameter, visibility, priority, text })), {
+        width: renderer.domElement.clientWidth || 1,
+        height: rectHeightCss(),
+        maxLabels: propsRef.current.selectedId ? 7 : 8,
+        showDiameter: 14,
+        hideDiameter: 10,
+        lineHeight: 22,
+        margin: 8,
+        measure: sideTextWidth,
+        previous: planeLabelPrevious,
+        obstacles
+      });
+      planeLabelPrevious.clear();
+      planeLabelChoices.forEach((choice) => planeLabelPrevious.add(choice.id));
+      planeLabelLast = performance.now();
+      planeLabelsDirty = false;
+    }
+    function updatePlaneLabels(rect: DOMRect, courseMode: boolean) {
+      const angle = planeAngle();
+      if (!courseMode || angle <= 54) { planeLabelChoices = []; planeLabelPrevious.clear(); hidePlaneSideLabels(); return; }
+      if (!planeLabelsFrozen && planeLabelsDirty && performance.now() - planeLabelLast > 30) choosePlaneLabels();
+      const fade = smoothStep(55, 60, angle);
+      const layer = sideLabelsRef.current;
+      if (!layer) return;
+      const used = new Set<string>();
+      root: for (const choice of planeLabelChoices) {
+        const runtime = planeCards.get(choice.id);
+        if (!runtime) continue;
+        const screen = runtime.screen;
+        const labelNode = propsRef.current.nodes[runtime.index];
+        const width = Math.max(24, sideTextWidth(labelNode?.title ?? ""));
+        // Use the stored anchor but let the label follow the card between recomputes.
+        const anchorX = choice.anchor === "left" ? screen.x - width - 12 : choice.anchor === "right" ? screen.x + 12 : screen.x - width / 2;
+        const anchorY = choice.anchor === "below" ? screen.y + 12 : choice.anchor === "above" ? screen.y - 22 - 12 : screen.y - 11;
+        let element = planeSidePool.get(choice.id);
+        if (!element) {
+          element = document.createElement("div");
+          element.className = "ef-atlas-plane-label";
+          layer.appendChild(element);
+          planeSidePool.set(choice.id, element);
+        }
+        if (element.textContent !== choice.id) {
+          const node = propsRef.current.nodes[runtime.index];
+          element.textContent = node?.title ?? "";
+        }
+        element.style.transform = `translate(${anchorX.toFixed(1)}px, ${anchorY.toFixed(1)}px)`;
+        element.style.opacity = (choice.alpha * fade).toFixed(3);
+        used.add(choice.id);
+      }
+      planeSidePool.forEach((element, id) => { if (!used.has(id)) element.style.opacity = "0"; });
+    }
+    function updateArchiveChapterLabel(courseMode: boolean) {
+      const angle = planeAngle();
+      const layer = sideLabelsRef.current;
+      if (!layer) return;
+      const runtime = courseMode && angle > 35 && chapterHover ? planeChapterObjects.get(chapterHover) : null;
+      let element = planeSidePool.get("__chapter__");
+      if (!runtime) {
+        if (element) element.style.opacity = "0";
+        return;
+      }
+      if (!element) {
+        element = document.createElement("div");
+        element.className = "ef-atlas-plane-label is-chapter";
+        layer.appendChild(element);
+        planeSidePool.set("__chapter__", element);
+      }
+      const index = propsRef.current.planeChapters.findIndex((chapter) => chapter.id === runtime.id);
+      const chapter = propsRef.current.planeChapters[index];
+      const top = planeProject({ x: chapter.x + chapter.width / 2, y: chapter.y, z: 4 });
+      const text = `第 ${index + 1} 章 · ${chapter.title}`;
+      if (element.textContent !== text) element.textContent = text;
+      const labelX = Math.max(8, Math.min((renderer.domElement.clientWidth || 1) - 150, top.x - 70));
+      const labelY = Math.max(8, Math.min((renderer.domElement.clientHeight || 1) - 32, top.y - 32));
+      element.style.transform = `translate(${labelX.toFixed(1)}px, ${labelY.toFixed(1)}px)`;
+      element.style.opacity = "1";
+    }
+    function hidePlaneEx() {
+      if (!planeExVisible && !planeExRows.length) return;
+      planeExVisible = false;
+      planeExRows = [];
+      planeExAnchor = null;
+      if (exLabelsRef.current) exLabelsRef.current.innerHTML = "";
+      planeLabelsDirty = true;
+    }
+    function drawPlaneEx(x: number, y: number) {
+      const rect = { width: planeViewport.width, height: planeViewport.height };
+      const candidates = planeLabelCandidates().map((candidate) => ({ id: candidate.id, x: candidate.x, y: candidate.y, distance: candidate.distance, visibility: candidate.visibility, text: candidate.text }));
+      const nodesNear = chooseExcentricNodes(candidates, { x, y }, { radius: 50, minNodes: 3, maxNodes: 6 });
+      if (nodesNear.length < 3) { hidePlaneEx(); return; }
+      const layout = layoutExcentric(nodesNear, { x, y }, { width: renderer.domElement.clientWidth || 1, height: rectHeightCss() }, {
+        measure: sideTextWidth, rowHeight: 22, margin: 12, topInset: 76, bottomInset: 76
+      });
+      if (!layout) { hidePlaneEx(); return; }
+      planeExVisible = true;
+      planeExRows = nodesNear.map((node) => node.id);
+      planeExAnchor = { x, y };
+      const layer = exLabelsRef.current;
+      if (!layer) return;
+      layer.innerHTML = `<svg class="ef-atlas-plane-ex-lines" width="${rect.width}" height="${rect.height}" aria-hidden="true">${layout.lines.map((line) => `<line x1="${line.x1.toFixed(1)}" y1="${line.y1.toFixed(1)}" x2="${line.x2.toFixed(1)}" y2="${line.y2.toFixed(1)}"/>`).join("")}</svg><div class="ef-atlas-plane-ex-column" style="left:0;top:0;width:${layout.width}px">${layout.rows.map((row) => `<button type="button" class="ef-atlas-plane-ex-item" data-id="${escapeHtml(row.id)}" style="left:${row.x.toFixed(1)}px;top:${row.y.toFixed(1)}px;width:${row.width.toFixed(1)}px;height:${row.height}px">${escapeHtml(row.text)}</button>`).join("")}</div>`;
+      layer.querySelectorAll<HTMLButtonElement>(".ef-atlas-plane-ex-item").forEach((button) => {
+        const id = button.dataset.id!;
+        button.addEventListener("pointerenter", () => {
+          const index = engine.nodeIndex.get(id);
+          if (index !== undefined) { hoveredRef.current = index; const box = button.getBoundingClientRect(); hoverPointRef.current = { x: box.left, y: box.top }; propsRef.current.onHoverNode?.(id, hoverPointRef.current); }
+        });
+        button.addEventListener("pointerleave", () => {
+          hoveredRef.current = null;
+          propsRef.current.onHoverNode?.(null, null);
+        });
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const index = engine.nodeIndex.get(id);
+          if (index !== undefined) propsRef.current.onSelectNode?.(id);
+        });
+      });
+    }
+    function schedulePlaneEx(x: number, y: number) {
+      window.clearTimeout(planeExTimer);
+      planeExTimer = window.setTimeout(() => {
+        if (downRef.current || planeAngle() <= 35) return;
+        drawPlaneEx(x, y);
+      }, 300);
+    }
+    function updateChapterHover() {
+      if (!planePointerInside || downRef.current || planeAngle() <= 35 || !planePointer) { chapterHover = null; return; }
+      let found: string | null = null;
+      planeChapterObjects.forEach((runtime) => {
+        if (found || !pointInQuad(planePointer!.x, planePointer!.y, runtime.quad)) return;
+        found = runtime.id;
+      });
+      chapterHover = found;
+    }
+    function pointInQuad(x: number, y: number, quad: Array<{ x: number; y: number }>) {
+      let inside = false;
+      for (let index = 0, previous = quad.length - 1; index < quad.length; previous = index++) {
+        const xi = quad[index].x, yi = quad[index].y;
+        const xj = quad[previous].x, yj = quad[previous].y;
+        if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+      }
+      return inside;
+    }
     function collectHudRects(rect: DOMRect): AtlasLabelRect[] {
       const selectors = [
         ".ef-atlas-people", ".ef-atlas-guest", ".ef-atlas-panel", ".ef-atlas-detail",
@@ -1507,14 +2086,20 @@ export default function ArchiveAtlasScene({
         // matching the level chip instead of switching a layer early.
         const knowledgeAlpha = context.level === 2 ? Math.min(1, context.near * 2.2) : 0;
         const coreNodeIds = new Set(currentProps.people.flatMap((person) => Array.from(person.nodeIds)));
+        const personMode = currentProps.mode === "person" && currentProps.people.length > 0;
         const hover = context.hovered;
         for (let index = 0; index < count; index += 1) {
+          const node = currentProps.nodes[index];
+          if (!node) continue;
           const forced = index === context.selected || index === hover || context.neighborSet?.has(index) || context.searchSet.has(index) || context.assistantSet.has(index);
+          const core = personMode && coreNodeIds.has(node.id);
+          // Person-centred near view names only the focused people's core
+          // knowledge; every other node stays a point unless hovered, selected
+          // or a one-hop neighbour of the selection.
+          if (!forced && personMode && !core) continue;
           if (!forced && (knowledgeAlpha < 0.08 || engine.alpha[index] < 0.3)) continue;
           const point = project(getPosition(index));
           if (point.z > 1) continue;
-          const node = currentProps.nodes[index];
-          if (!node) continue;
           const text = node.title;
           const width = estimateLabelWidth(text, "", "knowledge");
           const key = `node:${node.id}`;
@@ -1529,39 +2114,11 @@ export default function ArchiveAtlasScene({
             priority: forced ? 2200 + (index === context.selected ? 300 : 0) : 600 + engine.neighbors[index].length * 4,
             alpha: forced ? 1 : knowledgeAlpha,
             // Core labels stay visible by nudging outside the ring obstacle.
-            force: currentProps.mode === "person" && coreNodeIds.has(node.id)
+            force: personMode && core
           });
           info.set(key, { text, dot: resolveColor(node.color), strong: forced });
         }
       } else {
-        currentProps.planeChapters.forEach((chapter, index) => {
-          const chapterText = `第 ${index + 1} 章 ${chapter.title}`;
-          const point = project({ x: chapter.x + chapter.width / 2, y: chapter.y, z: 0 });
-          const leftPoint = project({ x: chapter.x, y: chapter.y, z: 0 });
-          const rightPoint = project({ x: chapter.x + chapter.width, y: chapter.y, z: 0 });
-          const regionWidth = Math.max(80, Math.abs(rightPoint.x - leftPoint.x));
-          const naturalWidth = estimateLabelWidth(chapterText, "", "chapter");
-          // One-line capsule anchored just above the chapter's top edge. Keep it
-          // within the region's screen width so neighbouring titles cannot
-          // collide and force each other away from their regions.
-          const width = Math.max(48, Math.min(naturalWidth, regionWidth - 16));
-          const height = labelHeight("chapter");
-          const labelY = point.y - height - 4;
-          // The left panel can sit right next to the first chapter. Keep the
-          // title pill above its own region but slide it just clear of HUD
-          // exclusions instead of dropping it (chapter titles never nudge
-          // vertically in this layout).
-          const blockingHud = hudRects.filter((hud) => labelY < hud.y + hud.height && labelY + height > hud.y);
-          const safeLeft = Math.max(8, ...blockingHud.filter((hud) => hud.x + hud.width <= point.x).map((hud) => hud.x + hud.width + 6));
-          const safeRight = Math.min(context.rect.width - 8, ...blockingHud.filter((hud) => hud.x >= point.x).map((hud) => hud.x - 6));
-          let labelX = point.x - width / 2;
-          if (labelX < safeLeft) labelX = safeLeft;
-          if (labelX + width > safeRight) labelX = safeRight - width;
-          if (labelX < 8) labelX = 8;
-          const key = `chapter:${chapter.id}`;
-          candidates.push({ key, kind: "chapter", text: chapterText, x: labelX, y: labelY, width, height, priority: 1300 - index, force: true, alpha: 1 });
-          info.set(key, { text: chapterText, strong: true });
-        });
         const hover = context.hovered;
         const planeSet = currentProps.planeNodeIds ?? new Set<string>();
         for (let index = 0; index < count; index += 1) {
@@ -1661,6 +2218,7 @@ export default function ArchiveAtlasScene({
       labelPoolRef.current.clear();
       engine.dispose();
       renderer.domElement.remove();
+      planeLabelsApiRef.current = null;
       engineRef.current = null;
     };
     // The scene is intentionally bound to the structural dataset; presentation
@@ -1696,6 +2254,8 @@ export default function ArchiveAtlasScene({
   return (
     <div className="ef-atlas-scene" ref={containerRef} data-mode={mode}>
       <div className="ef-atlas-cards" ref={cardsRef} aria-hidden="true" />
+      <div className="ef-atlas-plane-labels" ref={sideLabelsRef} aria-hidden="true" />
+      <div className="ef-atlas-plane-ex" ref={exLabelsRef} aria-hidden="true" />
       <div className="ef-atlas-labels" ref={labelsRef} aria-hidden="true" />
     </div>
   );
