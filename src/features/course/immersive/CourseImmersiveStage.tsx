@@ -27,8 +27,12 @@ export type StageNode = {
   height: number;
   status?: string;
   current?: boolean;
+  /** Explicit course target Knowledge; rendered as a small top-right badge. */
+  target?: boolean;
   meta?: string;
   detail?: ReactNode;
+  /** Number of practices merged into one practice-group card. */
+  count?: number;
   bridge?: boolean;
   tone?: 1 | 2 | 3;
   index?: number;
@@ -170,6 +174,8 @@ type Engine = {
   resize(): void;
   fit(animated?: boolean): void;
   targetFov: number;
+  /** Release inertia for rotation and panning (radians or world units per ms). */
+  velocity: { yaw: number; pitch: number; panX: number; panY: number };
   cameraVersion: number;
   frame: number;
   disposed: boolean;
@@ -177,6 +183,16 @@ type Engine = {
 };
 
 const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+
+function cardOverlapRatio(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number }
+) {
+  const width = Math.max(0, Math.min(a.x + a.w / 2, b.x + b.w / 2) - Math.max(a.x - a.w / 2, b.x - b.w / 2));
+  const height = Math.max(0, Math.min(a.y + a.h / 2, b.y + b.h / 2) - Math.max(a.y - a.h / 2, b.y - b.h / 2));
+  if (!width || !height) return 0;
+  return (width * height) / Math.max(1, Math.min(a.w * a.h, b.w * b.h));
+}
 
 function cssColor(name: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
@@ -305,7 +321,7 @@ export function CourseImmersiveStage({
       minPanX: -600, maxPanX: 600, minPanY: -600, maxPanY: 600, horizontalOverflow: false, detailShiftX: 0,
       safeLeft: 40, safeRight: 28, safeTop: 120, safeBottom: 78,
       chapterLabels: [], semantic: "mid", lastZoomPercent: 100,
-      targetFov: 16, cameraVersion: 0, frame: 0, disposed: false, resizeObserver: null
+      targetFov: 16, velocity: { yaw: 0, pitch: 0, panX: 0, panY: 0 }, cameraVersion: 0, frame: 0, disposed: false, resizeObserver: null
     } as unknown as Engine;
     engineRef.current = engine;
 
@@ -377,8 +393,10 @@ export function CourseImmersiveStage({
         safeRight,
         safeTop,
         safeBottom,
-        minScale: flatMode ? 0.35 : undefined,
-        maxScale: flatMode ? 1.05 : undefined
+        // Same readable floor as the course tree: 13px card labels never
+        // shrink below ~12px. Tall bands are browsed by vertical panning.
+        minScale: flatMode ? 1 : undefined,
+        maxScale: flatMode ? 1.03 : undefined
       });
       engine.pxPerWorld = fit.pxPerWorld;
       engine.panX = fit.panX;
@@ -427,6 +445,23 @@ export function CourseImmersiveStage({
         entry.object.position.set(entry.current.x, -entry.current.y, entry.current.z);
         entry.object.scale.setScalar(0.82 + entry.fade * 0.18);
       });
+      // Release inertia: camera/pose continues briefly, then settles. User
+      // input always clears these velocities on pointerdown.
+      if (!dragging && !reduced) {
+        const velocity = engine.velocity;
+        if (Math.abs(velocity.yaw) + Math.abs(velocity.pitch) > 0.00004) {
+          const nextYaw = targetPoseRef.current.yaw + velocity.yaw * rawDelta;
+          const nextPitch = Math.max(-0.55, Math.min(0.55, targetPoseRef.current.pitch + velocity.pitch * rawDelta));
+          targetPoseRef.current = { yaw: nextYaw, pitch: nextPitch };
+          const normalized = Math.atan2(Math.sin(nextYaw), Math.cos(nextYaw));
+          const nextPose = Math.abs(normalized) > 0.12 || Math.abs(nextPitch) > 0.08 ? "rotated" : "front";
+          if (nextPose !== poseRef.current) { poseRef.current = nextPose; onPoseChangeRef.current?.(nextPose); }
+          const decay = Math.exp(-rawDelta / 240);
+          velocity.yaw *= decay;
+          velocity.pitch *= decay;
+          if (Math.abs(velocity.yaw) + Math.abs(velocity.pitch) < 0.00004) { velocity.yaw = 0; velocity.pitch = 0; }
+        }
+      }
       const target = targetPoseRef.current;
       const rotationSmoothing = reduced ? 1 : 1 - Math.exp(-rawDelta / 150);
       group.rotation.y += (target.yaw - group.rotation.y) * rotationSmoothing;
@@ -461,6 +496,17 @@ export function CourseImmersiveStage({
       engine.minPanY = envelope.minPanY;
       engine.maxPanY = envelope.maxPanY;
       engine.horizontalOverflow = envelope.horizontalOverflow;
+      if (!dragging && !reduced) {
+        const velocity = engine.velocity;
+        if (Math.abs(velocity.panX) + Math.abs(velocity.panY) > 0.002) {
+          engine.panX += velocity.panX * rawDelta;
+          engine.panY += velocity.panY * rawDelta;
+          const decay = Math.exp(-rawDelta / 260);
+          velocity.panX *= decay;
+          velocity.panY *= decay;
+          if (Math.abs(velocity.panX) + Math.abs(velocity.panY) < 0.002) { velocity.panX = 0; velocity.panY = 0; }
+        }
+      }
       engine.panX = Math.max(engine.minPanX, Math.min(engine.maxPanX, engine.panX));
       engine.panY = Math.max(engine.minPanY, Math.min(engine.maxPanY, engine.panY));
       // Capability support lives on a deeper plane. Front view keeps it under
@@ -519,8 +565,11 @@ export function CourseImmersiveStage({
         // spacing and card size shrink together instead of overlapping.
         const fovTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
         const pxPerWorldNow = engine.height / Math.max(1, 2 * camera.position.z * fovTan);
-        const worldWidth = spec?.width || 176;
-        const scale = Math.max(0.38, Math.min(1.3, (worldWidth * pxPerWorldNow) / 176));
+        // Every card's CSS width already equals its world width, so the DOM
+        // scale is just screen pixels per world unit. Scaling by width/176 a
+        // second time made wide flat column headings huge while their cards
+        // stayed tiny.
+        const scale = Math.max(0.38, Math.min(1.3, pxPerWorldNow));
         const distance = camera.position.distanceTo(world);
         positions.set(id, { ...point, scale, distance });
         const bridgeFactor = spec?.bridge ? capVis : 1;
@@ -531,7 +580,7 @@ export function CourseImmersiveStage({
         const ghost = Boolean(spec?.ghost);
         const empty = Boolean(spec?.empty);
         const dimmed = Boolean(spec?.dim);
-        const opacity = entry.fade * (hidden ? 0 : 1) * bridgeFactor * (ghost ? 0.52 : 1) * (dimmed ? 0.34 : 1) * (empty ? 0.72 : 1);
+        const opacity = entry.fade * (hidden ? 0 : 1) * bridgeFactor * (ghost ? 0.62 : 1) * (dimmed ? 0.34 : 1) * (empty && !ghost ? 0.72 : 1);
         const pointer = hidden || ghost || empty ? "none" : "";
         if (element.dataset.lastHidden !== String(hidden)) {
           element.dataset.lastHidden = String(hidden);
@@ -567,9 +616,9 @@ export function CourseImmersiveStage({
         if (!point.visible) element.style.visibility = "hidden";
         else if (!hidden) element.style.visibility = "visible";
       });
-      // Rotated overlap: the farther card of two cards on the same plane
-      // collapses to its status dot. Reading offsetWidth here would fight the
-      // collapsed style, so the nominal card box is used.
+      // Rotated overlap (demo `updateCards`): within one layer, any two cards
+      // overlapping more than ~12% collapse the farther one to its status dot.
+      // Capability cards participate; chapter banners and route labels do not.
       if (syncDom) {
         const cull = Math.abs(normalizedYaw) > 0.24 && poseRef.current !== "flat";
         const collapsed = new Set<string>();
@@ -581,11 +630,7 @@ export function CourseImmersiveStage({
             const spec = specById.get(id);
             if (!element || !point || !point.visible || element.dataset.lastHidden === "true" || !spec) return;
             if (spec.kind === "chapter" || spec.kind === "route-chapter" || spec.kind === "chapter-empty") return;
-            if (spec.ghost) return;
-            // Capability names must stay legible after rotation; only cards on
-            // the same plane collapse into each other.
-            if (spec.bridge) return;
-            const layer = "front";
+            const layer = spec.ghost ? "ghost" : "front";
             const priority = spec.selected ? 500 : spec.here ? 450 : spec.highlight ? 400 : spec.status === "completed" ? 300 : spec.status === "learning" ? 200 : 100;
             boxes.push({
               id,
@@ -601,9 +646,7 @@ export function CourseImmersiveStage({
           boxes.sort((left, right) => left.distance - right.distance || right.priority - left.priority || left.id.localeCompare(right.id));
           const accepted: typeof boxes = [];
           boxes.forEach((box) => {
-            const overlaps = accepted.some((other) => other.layer === box.layer
-              && Math.min(box.x + box.w / 2, other.x + other.w / 2) - Math.max(box.x - box.w / 2, other.x - other.w / 2) > 4
-              && Math.min(box.y + box.h / 2, other.y + other.h / 2) - Math.max(box.y - box.h / 2, other.y - other.h / 2) > 2);
+            const overlaps = accepted.some((other) => other.layer === box.layer && cardOverlapRatio(box, other) > 0.12);
             if (overlaps) collapsed.add(box.id);
             else accepted.push(box);
           });
@@ -638,7 +681,7 @@ export function CourseImmersiveStage({
         const meta = element.querySelector<HTMLElement>("em");
         if (meta) meta.style.display = maxWidth < 150 ? "none" : "";
         const compress = Math.max(0.24, Math.abs(Math.cos(group.rotation.y)));
-        const transform = `translate3d(${screen.x.toFixed(1)}px, ${screen.y.toFixed(1)}px, 0) scaleX(${compress.toFixed(3)})`;
+        const transform = `translate3d(${screen.x.toFixed(1)}px, ${screen.y.toFixed(1)}px, 0) translate(-50%, -50%) scaleX(${compress.toFixed(3)})`;
         if (element.dataset.lastTransform !== transform) {
           element.dataset.lastTransform = transform;
           element.style.transform = transform;
@@ -750,16 +793,24 @@ export function CourseImmersiveStage({
     let suppressClick = false;
     let startPointer = { x: 0, y: 0 };
     let lastPointer = { x: 0, y: 0 };
+    let lastMoveAt = 0;
+    function clearInertia() {
+      engine.velocity = { yaw: 0, pitch: 0, panX: 0, panY: 0 };
+    }
     function pointerDown(event: PointerEvent) {
       // Cards and labels are draggable scene objects, not text. Only the
       // floating detail card and browser chrome opt out.
-      if ((event.target as HTMLElement).closest(".ef-imm-selected-card, .ef-imm-detail, .ef-imm-stage button[data-immersive-control]")) return;
+      if (event.button !== 0 && event.button !== 2) return;
+      if (event.button === 0 && (event.target as HTMLElement).closest(".ef-imm-selected-card, .ef-imm-detail, .ef-imm-stage button[data-immersive-control]")) return;
       dragging = true;
       moved = false;
       startedOnNode = Boolean((event.target as HTMLElement).closest("[data-stage-node], .ef-imm-chapter-label"));
-      panning = event.shiftKey;
+      // Archive-identical mapping: left drag rotates; right or Shift drag pans.
+      panning = event.button === 2 || event.shiftKey;
+      clearInertia();
       startPointer = { x: event.clientX, y: event.clientY };
       lastPointer = { x: event.clientX, y: event.clientY };
+      lastMoveAt = performance.now();
     }
     function pointerMove(event: PointerEvent) {
       if (!dragging) return;
@@ -767,31 +818,45 @@ export function CourseImmersiveStage({
       const dy = event.clientY - lastPointer.y;
       if (Math.hypot(event.clientX - startPointer.x, event.clientY - startPointer.y) > 4) moved = true;
       lastPointer = { x: event.clientX, y: event.clientY };
+      const now = performance.now();
+      const delta = Math.max(8, now - lastMoveAt);
+      lastMoveAt = now;
       if (panning) {
         const scale = Math.max(0.0001, engine.pxPerWorld);
-        engine.panX = Math.max(engine.minPanX, Math.min(engine.maxPanX, engine.panX + dx / scale));
-        engine.panY = Math.max(engine.minPanY, Math.min(engine.maxPanY, engine.panY - dy / scale));
+        const worldX = dx / scale;
+        const worldY = -dy / scale;
+        engine.panX = Math.max(engine.minPanX, Math.min(engine.maxPanX, engine.panX + worldX));
+        engine.panY = Math.max(engine.minPanY, Math.min(engine.maxPanY, engine.panY + worldY));
+        engine.velocity.panX = worldX / delta * 0.18;
+        engine.velocity.panY = worldY / delta * 0.18;
         return;
       }
       if (!moved) return;
       // Free 360° orbit: yaw is unbounded, pitch stays comfortable.
-      const nextYaw = targetPoseRef.current.yaw + dx * 0.006;
-      const nextPitch = Math.max(-0.55, Math.min(0.55, targetPoseRef.current.pitch + dy * 0.004));
+      const yawDelta = dx * 0.006;
+      const pitchDelta = dy * 0.004;
+      const nextYaw = targetPoseRef.current.yaw + yawDelta;
+      const nextPitch = Math.max(-0.55, Math.min(0.55, targetPoseRef.current.pitch + pitchDelta));
       targetPoseRef.current = { yaw: nextYaw, pitch: nextPitch };
+      // Only a fraction of the pointer velocity becomes release inertia;
+      // otherwise a short flick spins several extra turns.
+      engine.velocity.yaw = Math.max(-0.012, Math.min(0.012, yawDelta / delta * 0.06));
+      engine.velocity.pitch = Math.max(-0.008, Math.min(0.008, pitchDelta / delta * 0.06));
       const normalized = Math.atan2(Math.sin(nextYaw), Math.cos(nextYaw));
       poseRef.current = Math.abs(normalized) > 0.12 || Math.abs(nextPitch) > 0.08 ? "rotated" : "front";
       onPoseChangeRef.current?.(poseRef.current);
     }
-    function pointerUp() {
+    function pointerUp(event: PointerEvent) {
       if (!dragging) return;
       dragging = false;
       if (moved) {
-        // A drag that started on a card must rotate, never select text or fire
-        // the card's click. Swallow exactly the click that follows this release.
+        // A drag that started on a card must rotate/pan, never select text or
+        // fire the card's click. Swallow exactly the click that follows.
         suppressClick = true;
         window.setTimeout(() => { suppressClick = false; }, 0);
-      } else if (!startedOnNode) {
-        onBackgroundRef.current?.();
+      } else {
+        clearInertia();
+        if (event.button === 0 && !startedOnNode) onBackgroundRef.current?.();
       }
     }
     function swallowClick(event: MouseEvent) {
@@ -801,25 +866,26 @@ export function CourseImmersiveStage({
       event.stopPropagation();
     }
     function wheel(event: WheelEvent) {
+      if ((event.target as HTMLElement).closest(".ef-imm-detail, .ef-imm-selected-card")) return;
       event.preventDefault();
-      // Pinch on a trackpad arrives as Ctrl+wheel; buttons keep their zoom.
-      if (event.ctrlKey || event.metaKey) {
-        const next = Math.max(engine.fitDistance * 0.35, Math.min(engine.fitDistance * 2.6, camera.position.z + event.deltaY * 1.7));
-        camera.position.z = next;
-        emitZoom(true);
-        return;
-      }
-      const scale = Math.max(0.0001, engine.pxPerWorld);
-      const dx = event.deltaX + (event.shiftKey && !event.deltaX ? event.deltaY : 0);
-      const dy = event.shiftKey ? 0 : event.deltaY;
-      if (dx) engine.panX = Math.max(engine.minPanX, Math.min(engine.maxPanX, engine.panX - dx / scale));
-      if (dy) engine.panY = Math.max(engine.minPanY, Math.min(engine.maxPanY, engine.panY + dy / scale));
+      // Wheel and trackpad pinch (Ctrl+wheel) both zoom, exactly like the
+      // Archive. Shift is reserved for panning with the pointer.
+      const factor = Math.exp(event.deltaY * 0.0015);
+      const next = Math.max(engine.fitDistance * 0.22, Math.min(engine.fitDistance * 3.2, camera.position.z * factor));
+      camera.position.z = next;
+      clearInertia();
+      emitZoom(true);
     }
     function doubleClick(event: MouseEvent) {
       if ((event.target as HTMLElement).closest("[data-stage-node], .ef-imm-chapter-label, .ef-imm-selected-card")) return;
+      clearInertia();
       targetPoseRef.current = { yaw: 0, pitch: 0 };
       poseRef.current = "front";
       onPoseChangeRef.current?.("front");
+    }
+    function contextMenu(event: MouseEvent) {
+      if ((event.target as HTMLElement).closest(".ef-imm-detail, .ef-imm-selected-card")) return;
+      event.preventDefault();
     }
     host.addEventListener("pointerdown", pointerDown);
     window.addEventListener("pointermove", pointerMove);
@@ -827,6 +893,7 @@ export function CourseImmersiveStage({
     host.addEventListener("click", swallowClick, true);
     host.addEventListener("wheel", wheel, { passive: false });
     host.addEventListener("dblclick", doubleClick);
+    host.addEventListener("contextmenu", contextMenu);
     const observer = new ResizeObserver(() => resize());
     observer.observe(host);
     engine.resizeObserver = observer;
@@ -842,6 +909,7 @@ export function CourseImmersiveStage({
       host.removeEventListener("click", swallowClick, true);
       host.removeEventListener("wheel", wheel);
       host.removeEventListener("dblclick", doubleClick);
+      host.removeEventListener("contextmenu", contextMenu);
       disposeGroup(edgeGroup);
       disposeGroup(chapterGroup);
       disposeGroup(beamGroup);
@@ -946,31 +1014,33 @@ export function CourseImmersiveStage({
     chapters.forEach((chapter) => {
       const color = new THREE.Color(chapter.tone === 1 ? engine.colors.brand : chapter.tone === 2 ? engine.colors.acquired : engine.colors.target);
       const shape = new THREE.Shape();
-      roundedRect(shape, chapter.width, chapter.height, 18);
+      roundedRect(shape, chapter.width, chapter.height, 28);
       const plate = new THREE.Mesh(
         new THREE.ShapeGeometry(shape),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: engine.semantic === "far" ? 0.1 : 0.06, depthWrite: false, side: THREE.DoubleSide })
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: engine.semantic === "far" ? 0.14 : 0.11, depthWrite: false, side: THREE.DoubleSide })
       );
       plate.position.set(chapter.x, -chapter.y, -18);
       engine.chapterGroup.add(plate);
-      const borderPoints: THREE.Vector3[] = [];
-      const steps = 14;
-      for (let index = 0; index <= steps; index += 1) {
-        borderPoints.push(new THREE.Vector3(chapter.x - chapter.width / 2 + (chapter.width / steps) * index, -chapter.y - chapter.height / 2, -17));
-      }
-      for (let index = 0; index <= steps; index += 1) {
-        borderPoints.push(new THREE.Vector3(chapter.x + chapter.width / 2, -chapter.y - chapter.height / 2 + (chapter.height / steps) * index, -17));
-      }
-      for (let index = 0; index <= steps; index += 1) {
-        borderPoints.push(new THREE.Vector3(chapter.x + chapter.width / 2 - (chapter.width / steps) * index, -chapter.y + chapter.height / 2, -17));
-      }
-      for (let index = 0; index <= steps; index += 1) {
-        borderPoints.push(new THREE.Vector3(chapter.x - chapter.width / 2, -chapter.y + chapter.height / 2 - (chapter.height / steps) * index, -17));
-      }
-      engine.chapterGroup.add(new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(borderPoints),
-        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.22, depthWrite: false })
+      // Follow the same rounded outline as the glass fill. A square line loop
+      // was what made the chapter area read as a rectangular table header.
+      const borderPoints = shape.getPoints(10).map((point) => new THREE.Vector3(
+        chapter.x + point.x,
+        -chapter.y + point.y,
+        -17
       ));
+      const border = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(borderPoints),
+        new THREE.LineDashedMaterial({
+          color,
+          transparent: true,
+          opacity: 0.52,
+          dashSize: 9,
+          gapSize: 6,
+          depthWrite: false
+        })
+      );
+      border.computeLineDistances();
+      engine.chapterGroup.add(border);
       const element = document.createElement("button");
       element.type = "button";
       element.className = "ef-imm-chapter-label";
@@ -978,15 +1048,15 @@ export function CourseImmersiveStage({
       element.innerHTML = `<b>${String(chapter.displayNumber).padStart(2, "0")}</b><span></span><em></em>`;
       element.querySelector("span")!.textContent = chapter.title;
       element.querySelector("em")!.textContent = chapter.meta ?? "";
-      element.style.maxWidth = `${Math.min(232, Math.max(110, chapter.width * 0.9))}px`;
+      element.style.maxWidth = `${Math.min(196, Math.max(92, chapter.width * 0.94))}px`;
       element.setAttribute("aria-label", `第 ${chapter.displayNumber} 章 ${chapter.title}${chapter.meta ? `，${chapter.meta}` : ""}`);
       element.title = `第 ${chapter.displayNumber} 章 · ${chapter.title}${chapter.meta ? ` · ${chapter.meta}` : ""}`;
       element.addEventListener("click", (event) => { event.stopPropagation(); onSelectRef.current?.(chapter.id, "chapter"); });
       hostRef.current?.appendChild(element);
-      // Anchor inside the region's top-left, not above its top edge.
+      // Demo chapter style: one glass capsule centred on the panel's top edge.
       const point = new THREE.Vector3(
-        chapter.x - chapter.width / 2 + 12,
-        -(chapter.y - chapter.height / 2 + 12),
+        chapter.x,
+        -(chapter.y - chapter.height / 2),
         2
       );
       engine.chapterLabels.push({ element, point, width: chapter.width });
@@ -1147,16 +1217,22 @@ export function CourseImmersiveStage({
     });
   }, [beams]);
   useEffect(() => {
+    // A drag reports its new pose through onPoseChange; do not snap the target
+    // back to the canned rotated pose mid-gesture. Only an external pose
+    // change (toolbar/keyboard) should set the target here.
+    const changed = poseRef.current !== pose;
     poseRef.current = pose;
+    if (!changed) return;
     targetPoseRef.current = pose === "rotated" ? { yaw: 1.05, pitch: -0.22 } : { yaw: 0, pitch: 0 };
+    if (engineRef.current) engineRef.current.velocity = { yaw: 0, pitch: 0, panX: 0, panY: 0 };
   }, [pose]);
 
   useImperativeHandle(ref, () => ({
     zoomIn: () => { const engine = engineRef.current; if (engine) engine.setCameraDistance(Math.max(engine.fitDistance * 0.35, engine.camera.position.z * 0.78), 260); },
     zoomOut: () => { const engine = engineRef.current; if (engine) engine.setCameraDistance(Math.min(engine.fitDistance * 2.6, engine.camera.position.z * 1.28), 260); },
     fit: () => engineRef.current?.fit(!reducedRef.current),
-    resetPose: () => { poseRef.current = "front"; targetPoseRef.current = { yaw: 0, pitch: 0 }; onPoseChangeRef.current?.("front"); },
-    setPose: (value) => { poseRef.current = value; targetPoseRef.current = value === "rotated" ? { yaw: 1.05, pitch: -0.22 } : { yaw: 0, pitch: 0 }; onPoseChangeRef.current?.(value); },
+    resetPose: () => { poseRef.current = "front"; targetPoseRef.current = { yaw: 0, pitch: 0 }; if (engineRef.current) engineRef.current.velocity = { yaw: 0, pitch: 0, panX: 0, panY: 0 }; onPoseChangeRef.current?.("front"); },
+    setPose: (value) => { poseRef.current = value; targetPoseRef.current = value === "rotated" ? { yaw: 1.05, pitch: -0.22 } : { yaw: 0, pitch: 0 }; if (engineRef.current) engineRef.current.velocity = { yaw: 0, pitch: 0, panX: 0, panY: 0 }; onPoseChangeRef.current?.(value); },
     rotateBy: (radians) => { targetPoseRef.current = { ...targetPoseRef.current, yaw: targetPoseRef.current.yaw + radians }; },
     zoomPercent: () => engineRef.current?.lastZoomPercent ?? 100,
     setZoomPercent: (percent) => { const engine = engineRef.current; if (!engine) return; engine.setCameraDistance(engine.fitDistance / Math.max(0.2, percent / 100), 320); },
@@ -1179,6 +1255,7 @@ export function CourseImmersiveStage({
       engine.panX = state.panX;
       engine.panY = state.panY;
       engine.detailShiftX = 0;
+      engine.velocity = { yaw: 0, pitch: 0, panX: 0, panY: 0 };
       engine.setCameraDistance(state.distance, 0);
     }
   }), []);
@@ -1190,9 +1267,9 @@ export function CourseImmersiveStage({
       data-mode={mode}
       data-layer={layer}
       data-pose={pose}
-      aria-label={`${ariaLabel ?? "课程场景"}。拖拽旋转，滚轮上下平移，Ctrl/⌘+滚轮缩放，双击空白回正，方向键与 1/2/3 切换视角。`}
+      aria-label={`${ariaLabel ?? "课程场景"}。左键拖拽旋转，滚轮或双指缩放，右键或 Shift 拖拽平移，双击空白回正，方向键与 1/2/3 切换视角。`}
       aria-keyshortcuts="1 2 3 R F 0 + -"
-      title="拖拽旋转 · 滚轮上下平移 · Ctrl/⌘+滚轮缩放 · 双击空白回正"
+      title="左键拖拽旋转 · 滚轮/双指缩放 · 右键或 Shift 拖拽平移 · 双击空白回正"
     >
       <canvas ref={canvasRef} className="ef-imm-canvas" aria-hidden="true" />
       <div className="ef-imm-overlay">
@@ -1207,7 +1284,7 @@ export function CourseImmersiveStage({
             data-layer={mode === "course" ? (node.kind === "assignment" ? "practice" : "skill") : "course"}
             className={`ef-imm-node ef-imm-node--${node.kind} ${node.current ? "is-current" : ""} ${node.kind === "assignment" ? "is-practice" : "is-skill"} ${node.tone ? `tone-${node.tone}` : ""} ${node.id.startsWith("flatten-column:") ? "is-flat-column" : ""} ${node.ghost ? "is-ghost" : ""} ${node.empty ? "is-empty" : ""} ${node.dim ? "is-dim" : ""} ${node.highlight ? "is-hl" : ""} ${node.selected ? "is-sel" : ""} ${node.step ? "has-step" : ""}`}
             style={node.kind === "assignment"
-              ? { width: `${Math.min(node.width, 176)}px`, height: `${node.empty ? 28 : node.height}px` }
+              ? { width: `${Math.min(node.width, 176)}px`, height: `${node.height}px` }
               : { width: `${node.width}px`, height: `${node.height}px` }}
             role="button"
             tabIndex={0}
@@ -1216,16 +1293,17 @@ export function CourseImmersiveStage({
             onClick={(event) => { event.stopPropagation(); onSelect?.(node.kind === "route-chapter" ? node.chapterId ?? node.id : node.id, node.kind); }}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect?.(node.kind === "route-chapter" ? node.chapterId ?? node.id : node.id, node.kind); } }}
           >
-            {node.kind === "assignment" ? <><b className="ef-imm-node-index">{node.empty ? "—" : node.meta}</b><span className="ef-imm-node-copy"><strong>{node.title}</strong></span></> : null}
+            {node.kind === "assignment" ? <><b className="ef-imm-node-index">{node.empty ? "—" : node.meta}</b><span className="ef-imm-node-copy"><span className="ef-imm-node-title-row"><strong>{node.title}</strong>{node.count && node.count > 1 ? <em className="ef-imm-node-count">+{node.count - 1}</em> : null}</span>{node.detail ? <small className="ef-imm-node-meta">{node.detail}</small> : null}</span></> : null}
             {node.kind === "chapter-empty" ? <><i className="ef-imm-node-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small className="ef-imm-node-meta">{node.meta}</small></span></> : null}
             {node.kind === "route" ? <><i className="ef-imm-route-dot">{node.index ? String(node.index).padStart(2, "0") : null}</i><span className="ef-imm-node-copy"><strong>{node.title}</strong><small>{node.meta}</small><span className="ef-imm-node-detail">{node.detail}</span></span>{node.current ? <em className="ef-imm-here">你在这里</em> : null}</> : null}
             {node.kind === "route-chapter" ? <><i className="ef-imm-route-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small>{node.meta ?? node.detail}</small></span></> : null}
-            {node.kind === "knowledge" || node.kind === "capability" ? <>{node.step ? <i className="ef-imm-step">{node.step}</i> : null}<i className="ef-imm-node-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small className="ef-imm-node-meta">{node.meta}</small><span className="ef-imm-node-detail">{node.detail}</span></span>{node.here ? <em className="ef-imm-here">你在这里</em> : null}</> : null}
+            {node.kind === "knowledge" || node.kind === "capability" ? <>{node.step ? <i className="ef-imm-step">{node.step}</i> : null}<i className="ef-imm-node-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small className="ef-imm-node-meta">{node.meta}</small><span className="ef-imm-node-detail">{node.detail}</span></span>{node.kind === "knowledge" && (node.current || node.target) ? <em className={`ef-imm-badge ${node.current ? "is-current" : "is-target"}`}>{node.current ? "当前" : "目标"}</em> : null}{node.here ? <em className="ef-imm-here">你在这里</em> : null}</> : null}
+            {node.ghost ? <span className="ef-imm-ghost-peek" aria-hidden="true"><strong>{node.kind === "assignment" ? <>{node.title}{node.count && node.count > 1 ? <em className="ef-imm-node-count">+{node.count - 1}</em> : null}</> : node.title}</strong>{node.kind === "assignment" && node.detail ? <small>{node.detail}</small> : null}</span> : null}
           </div>
         ))}
         {selectedCard ? <div ref={selectedRef} className="ef-imm-selected-card">{selectedCard}</div> : null}
       </div>
-      <div className="ef-imm-help" aria-hidden="true">拖拽旋转 · 滚轮上下平移 · Ctrl/⌘+滚轮缩放</div>
+      <div className="ef-imm-help" aria-hidden="true">左键拖拽旋转 · 滚轮/双指缩放 · 右键或 Shift 拖拽平移</div>
     </div>
   );
 }

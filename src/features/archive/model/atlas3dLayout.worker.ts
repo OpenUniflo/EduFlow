@@ -2,7 +2,7 @@ import { computeAtlas3DLayout, type Atlas3DLayout } from "./atlas3dLayout";
 import type { ArchiveEdge } from "./atlasModel";
 
 export type Atlas3DLayoutWorkerRequest = {
-  nodes: Array<{ id: string }>;
+  nodes: Array<{ id: string; domainId?: string }>;
   edges: Array<Pick<ArchiveEdge, "id" | "source" | "target" | "relation" | "strength">>;
 };
 

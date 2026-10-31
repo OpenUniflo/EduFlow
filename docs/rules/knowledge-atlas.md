@@ -20,7 +20,7 @@
 - Knowledge-to-knowledge facts use only `prerequisite`, `enables`, or `related` KnowledgeEdges.
 - CurriculumCoverage, AssignmentCoverage, KnowledgeMapping, and Promotion MUST remain separate from KnowledgeEdge.
 - `KnowledgeNode` MUST NOT contain `domainId`; `KnowledgeGraph` MUST NOT contain Domain definitions or assignments.
-- `DomainAssignment` is the only authoritative Domain-membership source. Domain membership MUST NOT be inferred from tags, provenance, fixture location, or course context and MUST NOT determine coordinates or grouping.
+- `DomainAssignment` is the only authoritative Domain-membership source. Domain membership MUST NOT be inferred from tags, provenance, fixture location, or course context. It may influence node position only through the default-layout same-Domain attraction defined in Atlas Views; it never creates, removes or implies KnowledgeEdges.
 - `clusterId` and persistent Knowledge Cluster structures MUST NOT be added to the v1 core model.
 - Fake nodes or edges MUST NOT be created for layout, composition, islands, bridges, chapters, or demos.
 
@@ -39,7 +39,7 @@
 - The learner Archive (档案) is one 3D Knowledge Atlas (three.js; free orbit rotation, zoom, pan) over active visible Knowledge and factual edges. There is no Personal/Global mode switch. (2026-10-31; interaction spec: `docs/design/new-ui/DESKTOP_MIGRATION_PLAN.md` §10.)
 - Zoom distance selects map-like levels of detail and is presentation only: far shows Domains (KnowledgeDomain-colored regions, name and member count, aggregated inter-Domain links; nodes as small points without labels); mid shows topic groups; near shows individual Knowledge with collision-culled labels that never overlap. Levels cross-fade and MUST NOT relayout.
 - Topic groups are communities computed deterministically from factual edges inside each Domain and labeled by their most central member. They are presentation only: not persisted, not KnowledgeNodes, never layout anchors. (Supersedes the former ban on visible community titles, 2026-10-31.)
-- Default layout: one deterministic relation-driven force layout. It MUST NOT use domain, cluster, chapter, community, or island anchors.
+- Default layout: one deterministic force layout driven by factual KnowledgeEdges plus a weak same-Domain attraction (Unclassified counts as one group), so each Domain forms its own visibly separated cluster while cross-Domain edges stay drawn. Domain attraction moves positions only; every drawn line is a real KnowledgeEdge. It MUST NOT use chapter, community, topic or island anchors. (2026-10-31: relations decide which nodes connect; Domain clustering decides where groups sit.)
 - Person focus: selecting a person capsule (the learner, or others only from data the server authorizes for the viewer) switches to a person-centred layout. That person's Knowledge forms a compact core marked by person-colored rings; every other node is placed outward by factual hop distance from the core while keeping its default-layout direction, and stays visible at reduced opacity. Several people form a union core with segmented person-colored rings. The layout is a deterministic, cached function of the structural graph and the selected person set; zoom and rotation inside it MUST NOT relayout. Clearing the selection restores the default layout.
 - Course focus: selecting a Course moves that Course's own Knowledge nodes (not a copy or overlay) onto a front plane using the Course's ELK coordinates; all other nodes stay behind at reduced opacity, and edges from Course Knowledge to outside Knowledge stay faintly visible and brighten with their endpoints on hover. Clearing restores the previous layout.
 - Selecting a node highlights the node, its incident edges and one-hop neighbours, dims the rest and opens its detail side panel; it MUST NOT relayout.
@@ -51,14 +51,14 @@
 ## Atlas Stability
 
 - Knowledge Atlas is a stable spatial world.
-- Hover, selection, search, learning state, Domain changes, filters, and drawer state MUST NOT trigger graph relayout. Only structural changes and the explicit layout modes in Atlas Views (person focus, course focus) change node positions; every such change animates existing nodes and is reversible.
+- Hover, selection, search, learning state, filters, and drawer state MUST NOT trigger graph relayout. Only structural changes and the explicit layout modes in Atlas Views (person focus, course focus) change node positions; every such change animates existing nodes and is reversible.
 - Auto rotation MUST pause while a node is hovered or selected. Manual camera interaction MUST receive a grace period before rotation may resume.
 - Visual node size and interaction hit target MUST be decoupled.
 - Force positions MUST freeze after stabilization and remain frozen until the structural node/edge set changes.
 
 ## Atlas Visual Encoding
 
-- Domain hue represents semantic Domain; node size represents graph importance; a marker or ring represents user learning state; opacity represents focus/explore visibility; halo and scale represent interaction; position is driven by KnowledgeEdges.
+- Domain hue represents semantic Domain; node size represents graph importance; a marker or ring represents user learning state; opacity represents focus/explore visibility; halo and scale represent interaction; position is driven by KnowledgeEdges plus same-Domain clustering. Domains visible together MUST have distinct hues; the palette is assigned over Domains that have assigned Knowledge and extends beyond six colors when needed.
 - Domain color MUST NOT be replaced by mastery or learning colors.
 - Atlas nodes use a dot-first visual, KnowledgeEdges use neutral thread colors by default, and ordinary labels use sparse map-label styling.
 
@@ -98,7 +98,7 @@
 - V1 supports Global KnowledgeDomain governance only. Tenant Domain governance is deferred.
 - Core V1 models, stores, services, permissions, persistence, and UI MUST NOT expose partial Tenant Domain behavior.
 - A future Tenant Domain implementation MUST add tenant ownership, tenant-scoped authority, repository isolation, assignment isolation, and persistence isolation as one coherent feature.
-- `KnowledgeDomain` MUST NOT directly constrain graph geometry. Changing Domain membership MUST NOT trigger graph relayout.
+- `KnowledgeDomain` influences geometry only through the default-layout same-Domain attraction. Domain membership is part of the layout's structural key: a membership change recomputes the cached layout on next load, never as a live relayout while the Atlas is open.
 - Every `KnowledgeNode` has at most one primary Domain in v1. Unclassified is a valid state.
 - Domain assignment uses semantic and structural evidence. Automatic discovery creates proposals, not authoritative Domains.
 - An admin `DomainAssignment` is pinned and MUST NOT be overwritten automatically.

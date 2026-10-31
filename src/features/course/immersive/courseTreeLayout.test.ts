@@ -170,8 +170,11 @@ describe("course tree geometry", () => {
 
   it("groups multiple practices for one Knowledge instead of silently picking the first", () => {
     const cards = buildPracticeCards(graphData);
-    expect(cards.get("K1")).toMatchObject({ kind: "group", assignmentIds: ["A1", "A2"], title: "实践组 · 2 项" });
-    expect(cards.get("K2")).toMatchObject({ kind: "assignment", assignmentIds: ["A2"], code: "02" });
+    expect(cards.get("K1")).toMatchObject({ kind: "group", assignmentIds: ["A1", "A2"], count: 2, code: "01", title: "实践一" });
+    // The group card is the single foreground card for K1; A2 is not drawn a
+    // second time as a solid card. K2 keeps a dashed identity placeholder.
+    expect([...cards.values()].filter((card) => card.kind === "assignment" && card.assignmentIds.includes("A2"))).toHaveLength(0);
+    expect(cards.get("K2")).toMatchObject({ kind: "shadow", assignmentIds: ["A2"], code: "02" });
     expect(cards.get("K3")).toMatchObject({ kind: "empty", title: "暂无对应实训" });
     expect(assignmentKnowledgeMap(graphData).get("A2")).toEqual(["K1", "K2"]);
     expect(primaryKnowledgeByAssignment(graphData).get("A2")).toBe("K1");

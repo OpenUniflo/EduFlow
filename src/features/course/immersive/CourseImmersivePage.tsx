@@ -53,7 +53,10 @@ import {
   courseSelectionRelations,
   positionPracticeCards,
   primaryKnowledgeByAssignment,
+  REFLECTION_CARD_HEIGHT,
+  REFLECTION_OFFSET,
   reflectionOffset,
+  reflectionStackY,
   resolveFacetSelection,
   routeStepNumber,
   type CoursePracticeCard,
@@ -162,6 +165,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   const capabilityLayout = useMemo(() => courseLayout && capabilityModel ? buildCapabilitySceneLayout(courseLayout, capabilityModel) : null, [capabilityModel, courseLayout]);
   const acquiredNodeIds = useMemo(() => learnerKnowledge.filter((record) => learnerCategory(record.status) === "acquired").map((record) => record.nodeId), [learnerKnowledge]);
   const targetNodeIds = useMemo(() => runtime?.targetKnowledge?.map((target) => target.nodeId) ?? [], [runtime]);
+  const targetNodeSet = useMemo(() => new Set(targetNodeIds), [targetNodeIds]);
   const flattenedLayout = useMemo(() => capabilityLayout && capabilityModel
     ? flattenCapabilityLayout(capabilityLayout, capabilityModel, { acquiredNodeIds, targetNodeIds })
     : null, [acquiredNodeIds, capabilityLayout, capabilityModel, targetNodeIds]);
@@ -358,12 +362,16 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       setEntering(false);
       clearCourseEnterSnapshot(courseId);
     };
+    let lastSignature = "";
+    let stableSamples = 0;
     const measure = () => {
       if (cancelled) return;
       attempts += 1;
       const targets: Record<string, { left: number; top: number; width: number; height: number }> = {};
       enterSnapshot.cards.forEach((card) => {
-        const element = document.querySelector<HTMLElement>(`[data-stage-id="${CSS.escape(card.id)}"]`);
+        // Exclude the entry overlay, which mirrors the same ids while it is on
+        // screen; the real stage card is the measurement target.
+        const element = document.querySelector<HTMLElement>(`[data-stage-node="true"][data-stage-id="${CSS.escape(card.id)}"]`);
         if (!element) return;
         const rect = element.getBoundingClientRect();
         if (rect.width > 2 && rect.height > 2) targets[card.id] = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
@@ -371,8 +379,29 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       // Do not start the hand-off until the real course cards exist. Until then
       // the Archive snapshot stays fully visible, so the page can never blank
       // while the graph/ELK layout is still resolving.
-      if (Object.keys(targets).length < Math.min(10, enterSnapshot.cards.length) && attempts < 30) {
+      const ready = Object.keys(targets).length >= Math.min(10, enterSnapshot.cards.length)
+        && document.querySelectorAll(".ef-imm-chapter-label").length > 0;
+      if (!ready && attempts < 30) {
         retryTimer = window.setTimeout(measure, 90);
+        return;
+      }
+      // The first stage frame can measure before the shell/stage resize has
+      // settled (356px narrower, different fit). Only commit rectangles that
+      // are stable across consecutive frames; otherwise the overlay lands on
+      // stale coordinates and the real cards jump at settle.
+      const signature = enterSnapshot.cards.map((card) => {
+        const rect = targets[card.id];
+        return rect ? `${card.id}:${Math.round(rect.left)}:${Math.round(rect.top)}:${Math.round(rect.width)}:${Math.round(rect.height)}` : "";
+      }).join("|");
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        stableSamples = 0;
+        retryTimer = window.setTimeout(measure, 80);
+        return;
+      }
+      stableSamples += 1;
+      if (stableSamples < 2) {
+        retryTimer = window.setTimeout(measure, 80);
         return;
       }
       setEnterTargets(targets);
@@ -425,14 +454,19 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         const rect = target ?? card;
         const left = (enterFrame ? rect.left - enterFrame.left : rect.left);
         const top = (enterFrame ? rect.top - enterFrame.top : rect.top);
-        const scaleX = Math.max(0.05, rect.width / 176);
-        const scaleY = Math.max(0.05, rect.height / 64);
+        const scale = Math.max(0.05, rect.width / 176);
+        // Uniform scale keeps the snapshot text at the same size as the real
+        // course card. Height is compensated on the element so the box still
+        // reaches the target rectangle without squashing the glyphs.
         return (
           <div
             key={card.id}
             className={`ef-imm-enter-card ${enterPhase === "run" || enterPhase === "settle" ? "is-run" : ""}`}
             data-status={card.status}
-            style={{ transform: `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px) scale(${scaleX.toFixed(3)}, ${scaleY.toFixed(3)})` }}
+            style={{
+              transform: `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px) scale(${scale.toFixed(3)})`,
+              height: `${Math.max(20, rect.height / scale).toFixed(1)}px`
+            }}
           >
             <span className="ef-imm-node-dot" aria-hidden="true" />
             <span className="ef-imm-node-copy"><strong>{card.title}</strong></span>
@@ -612,8 +646,8 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       return {
         ...chapter,
         meta: chapter.empty
-          ? `综合实践 · ${Math.max(1, chapter.lessonCount || chapter.assignmentCount || 1)} 项`
-          : swapped ? `${chapter.assignmentCount} 个实训` : authenticated ? `${chapterNodes.filter((node) => node.learner.category === "acquired").length}/${chapterNodes.length} 已学` : `${chapterNodes.length} 个知识`
+          ? `综合 · ${Math.max(1, chapter.lessonCount || chapter.assignmentCount || 1)} 项`
+          : swapped ? `${chapter.assignmentCount} 实训` : authenticated ? `${chapterNodes.filter((node) => node.learner.category === "acquired").length}/${chapterNodes.length}` : `${chapterNodes.length} 知识`
       };
     });
   }, [authenticated, courseLayout, displayNodes, flat, swapped]);
@@ -647,8 +681,8 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           x: node.x,
           y: node.y,
           z: node.z,
-          width: Math.min(168, node.width),
-          height: 34,
+          width: 150,
+          height: 46,
           status: authenticated ? learnerStageStatus(learner?.category ?? "pending") : "available",
           current: authenticated && Boolean(learner?.current),
           bridge: node.bridge,
@@ -667,8 +701,8 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           x: column.x,
           y: minY - 66,
           z: 0,
-          width: Math.max(150, Math.min(420, column.width)),
-          height: 26,
+          width: 160,
+          height: 28,
           meta: `· ${column.count} 项能力`
         }));
       }
@@ -682,18 +716,32 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       const offset = reflectionOffset(!swapped, true);
       const selected = effectiveSelection?.kind === "knowledge" && effectiveSelection.id === node.id;
       const step = authenticated && routeReady && routeOn ? routeStepNumber(routeOrder, node.id) : null;
+      // In the practice view the knowledge card is the reflection. Its front
+      // counterpart is the practice card for this Knowledge, so the visible
+      // top-left (not the taller ghost's centre) keeps the demo 14/13 offset.
+      const mirroredPractice = practiceByKnowledge.get(node.id);
+      const mirroredFrontHeight = mirroredPractice?.kind === "empty" ? 28 : mirroredPractice?.height ?? 48;
+      // Keep the peek strip (title + status, 26px) below whatever solid card
+      // is in front: mid/near knowledge cards and 48px practice cards need
+      // different ghost heights, while the top-left offset stays 14/13.
+      const mirroredGhostHeight = Math.max(REFLECTION_CARD_HEIGHT, mirroredFrontHeight + 16);
       nodes.push({
         id: node.id,
         kind: "knowledge",
         title: node.title,
         x: node.x + offset.x,
-        y: node.y + offset.y,
+        y: node.y + (swapped ? reflectionStackY(mirroredFrontHeight, mirroredGhostHeight) : 0),
         z: node.z + offset.z,
         width: node.width,
-        height: node.height,
+        // The layout row pitch reserves the near-view action height, but the
+        // card itself only grows when the action row is actually visible.
+        // A reflection stays tall enough to expose its bottom identity line
+        // below the front card instead of disappearing behind it.
+        height: swapped ? mirroredGhostHeight : zoom === "near" ? 64 : 40,
         status,
-        current: authenticated && Boolean(display?.learner.current),
-        meta: display?.displayLabel ?? learnerLabel("pending"),
+        meta: display?.displayLabel,
+        current: authenticated && (routeReady ? node.id === routeCurrentId : Boolean(display?.learner.current)),
+        target: targetNodeSet.has(node.id),
         detail: actionRow(node.node),
         ghost: swapped,
         dim: Boolean(effectiveSelection) && !selected && !selectionRelations.knowledgeIds.has(node.id),
@@ -720,24 +768,35 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       });
     });
     positionPracticeCards(practiceByKnowledge, courseLayout, !swapped).forEach((card) => {
-      const show = swapped || card.kind !== "empty";
-      if (!show) return;
       const selected = effectiveSelection?.kind === "practice" ? card.assignmentIds.includes(effectiveSelection.id)
         : effectiveSelection?.kind === "group" ? card.knowledgeId === effectiveSelection.id : false;
       const cardSelectionPractice = card.assignmentIds.length === 1 ? card.assignmentIds[0] : null;
+      const coverage = new Set(card.assignmentIds.flatMap((id) => assignmentKnowledge.get(id) ?? [])).size;
+      const statusText = assignmentStatusLabel(card.status);
+      const ghost = !swapped || card.kind === "shadow";
+      // Only the practice layer under a solid knowledge card needs the
+      // top-left correction; the taller ghost's centre would otherwise put its
+      // top edge level with the front card and bury the peeking strip.
+      const frontKnowledgeHeight = zoom === "near" ? 64 : 40;
+      const reflectionHeight = Math.max(REFLECTION_CARD_HEIGHT, frontKnowledgeHeight + 16);
+      const reflectionShift = !swapped ? reflectionStackY(frontKnowledgeHeight, reflectionHeight) - REFLECTION_OFFSET.y : 0;
       nodes.push({
         id: card.id,
         kind: "assignment",
         title: card.title,
         x: card.x,
-        y: card.y,
+        y: card.y + reflectionShift,
         z: card.z,
         width: card.width,
-        height: card.height,
+        // The reflection peeks out below the front card and carries a
+        // readable title/status strip; empty slots still say 暂无对应实训.
+        height: ghost ? reflectionHeight : card.kind === "empty" ? 28 : card.height,
+        count: card.count,
         status: card.status === "accepted" ? "completed" : card.status === "started" || card.status === "submitted" || card.status === "needs_revision" ? "learning" : "available",
         meta: card.kind === "empty" ? "—" : card.code,
-        ghost: !swapped,
-        empty: card.kind === "empty",
+        detail: card.kind === "empty" ? "" : `${card.kind === "shadow" ? "见主位置 · " : ""}${statusText}${coverage ? ` · 覆盖 ${coverage} 个知识` : ""}`,
+        ghost,
+        empty: card.kind === "empty" || card.kind === "shadow",
         dim: Boolean(effectiveSelection) && !selected && !selectionRelations.practiceKnowledgeIds.has(card.knowledgeId),
         highlight: selectionRelations.practiceKnowledgeIds.has(card.knowledgeId) && !selected,
         selected,
@@ -757,8 +816,8 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           x: anchor.x,
           y: anchor.y,
           z: anchor.z,
-          width: 300,
-          height: 56,
+          width: 150,
+          height: 46,
           status: authenticated ? learnerStageStatus(learner?.category ?? "pending") : "available",
           current: false,
           bridge: true,
@@ -771,7 +830,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       });
     }
     return nodes;
-  }, [actionRow, assignmentById, authenticated, capabilityAnchors, capabilityLayout, capabilityModel?.currentKnowledgeIds, courseId, courseLayout, displayNodes, effectiveSelection, flat, flattenedLayout, knowledgeTitleById, learnerById, practiceByKnowledge, routeCurrentId, routeOn, routeOrder, routeReady, selectionRelations, swapped]);
+  }, [actionRow, assignmentById, assignmentKnowledge, authenticated, capabilityAnchors, capabilityLayout, capabilityModel?.currentKnowledgeIds, courseId, courseLayout, displayNodes, effectiveSelection, flat, flattenedLayout, knowledgeTitleById, learnerById, practiceByKnowledge, routeCurrentId, routeOn, routeOrder, routeReady, selectionRelations, swapped, targetNodeSet, zoom]);
 
   const stageEdges = useMemo<StageEdge[]>(() => {
     const highlight = (source?: string, target?: string) => {
@@ -829,7 +888,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     if (swapped && courseLayout) {
       const knowledgeById = new Map(courseLayout.nodes.filter((node) => node.kind === "knowledge").map((node) => [node.id, node]));
       positionPracticeCards(practiceByKnowledge, courseLayout, false).forEach((card) => {
-        if (card.kind === "empty") return;
+        if (card.kind === "empty" || card.kind === "shadow") return;
         const anchor = knowledgeById.get(card.knowledgeId);
         if (!anchor) return;
         edges.push({
@@ -1047,7 +1106,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   ) : null;
 
   return (
-    <main ref={pageRef} className={`ef-imm-page ${entering ? "is-entering" : ""} ${leaving ? "is-leaving" : ""}`} data-tab={tab} data-pose={currentPose} data-view={flat ? "flat" : "tree"}>
+    <main ref={pageRef} className={`ef-imm-page ${entering ? "is-entering" : ""} ${entering && enterPhase !== "start" ? "is-enter-run" : ""} ${leaving ? "is-leaving" : ""}`} data-tab={tab} data-pose={currentPose} data-view={flat ? "flat" : "tree"}>
       {enterOverlay}
       <div className="ef-imm-transition" style={leaving ? leavingStyle ?? undefined : { opacity: 0 }} aria-hidden="true" />
 
@@ -1088,7 +1147,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
             if (kind === "assignment") {
               setTab("course");
               setSwapped(true);
-              const card = practiceByKnowledge.get(id.replace(/^(?:assignment:[^:]+:|group:|empty:)/, ""));
+              const card = practiceByKnowledge.get(id.replace(/^(?:assignment:[^:]+:|shadow:[^:]+:|group:|empty:)/, ""));
               setSelection(card && card.kind === "group" ? { kind: "group", id: card.knowledgeId } : { kind: "practice", id: (card?.assignmentIds[0] ?? id) });
               return;
             }

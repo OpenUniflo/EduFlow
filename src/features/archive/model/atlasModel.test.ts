@@ -57,6 +57,43 @@ describe("Archive projection", () => {
     expect(model.hasLearningHistory).toBe(true);
   });
 
+  it("assigns distinct token hues only to Domains that own active Knowledge", () => {
+    const domainNodes = Array.from({ length: 8 }, (_, index) => node(`P${index}`, `领域知识 ${index}`, "global"));
+    const paletteGraph: KnowledgeGraph = { nodes: domainNodes, revisions: [], edges: [] };
+    const domains = Array.from({ length: 8 }, (_, index) => ({
+      id: `d${index}`,
+      name: `领域 ${index}`,
+      canonicalColor: "#6F8FEA",
+      status: "active" as const,
+      createdBy: "t",
+      createdAt: `2026-01-0${index + 1}`,
+      updatedBy: "t",
+      updatedAt: "t"
+    }));
+    const paletteGovernance: DomainGovernanceState = {
+      // d0 is active but empty: it must not consume a visible colour slot.
+      domains,
+      assignments: domains.slice(1).map((domain, index) => ({
+        nodeId: `P${index}`,
+        domainId: domain.id,
+        source: "admin" as const,
+        pinned: true,
+        assignedBy: "t",
+        assignedAt: "t"
+      })),
+      candidates: [], proposals: [], revision: 0
+    };
+    const model = buildArchiveModel({ graph: paletteGraph, governance: paletteGovernance, runtimes: [], records: [] });
+    expect(model.nodes.filter((item) => item.domainColorIndex !== null)).toHaveLength(7);
+    expect(new Set(model.nodes.filter((item) => item.domainColorIndex !== null).map((item) => item.color)).size).toBe(7);
+    expect(model.nodeById.get("P0")?.domainColorIndex).toBe(0);
+    expect(model.nodeById.get("P6")?.domainColorIndex).toBe(6);
+    expect(model.nodeById.get("P6")?.color).toBe("var(--domain-7)");
+    expect(model.nodeById.get("P7")?.domainTitle).toBe("未分类");
+    expect(model.nodeById.get("P7")?.domainColorIndex).toBeNull();
+    expect(model.nodeById.get("P7")?.color).toBe("#A7B0BF");
+  });
+
   it("uses real course coverage for the course overlay and never invents a course knowledge fact", () => {
     const model = buildArchiveModel({ graph, governance, runtimes: [runtime], records: [] });
     expect(model.courses).toHaveLength(1);

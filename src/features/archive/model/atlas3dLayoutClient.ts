@@ -32,7 +32,7 @@ export function requestAtlas3DLayout(
     return { promise: Promise.resolve(layout), usedWorker: false, cached: false };
   }
   const request: Atlas3DLayoutWorkerRequest = {
-    nodes: nodes.map((node) => ({ id: node.id })),
+    nodes: nodes.map((node) => ({ id: node.id, domainId: node.domainId })),
     edges: edges.map((edge) => ({ ...edge }))
   };
   const worker = new Worker(new URL("./atlas3dLayout.worker.ts", import.meta.url), { type: "module" });

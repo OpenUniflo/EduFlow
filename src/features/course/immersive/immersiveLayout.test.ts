@@ -158,7 +158,7 @@ describe("immersive course layout", () => {
   });
 
   it("wraps a large target band into sub-columns instead of one endless column", () => {
-    const targets = Array.from({ length: 27 }, (_, index) => `T${String(index).padStart(2, "0")}`);
+    const targets = Array.from({ length: 40 }, (_, index) => `T${String(index).padStart(2, "0")}`);
     const large: CapabilityModel = {
       ...model,
       orderedNodeIds: [...targets, "K1"],
@@ -172,7 +172,7 @@ describe("immersive course layout", () => {
     };
     const layout = layoutCapabilityFlattenLayout(large);
     const targetColumn = layout.columns.find((column) => column.kind === "target")!;
-    expect(targetColumn.count).toBe(27);
+    expect(targetColumn.count).toBe(40);
     const xs = new Set(targets.map((id) => layout.positions.get(id)!.x));
     expect(xs.size).toBe(2);
     expect(layout.columns.map((column) => column.label)).toEqual(["已获得", "目标"]);

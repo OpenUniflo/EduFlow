@@ -655,6 +655,7 @@ export default function ArchiveAtlasScene({
     target.set(current);
 
     const pointGeometry = new THREE.BufferGeometry();
+    const pointScreenCss = new Float32Array(count);
     const pointPosition = new THREE.BufferAttribute(new Float32Array(count * 3), 3);
     const pointAlpha = new THREE.BufferAttribute(new Float32Array(count), 1);
     const pointSize = new THREE.BufferAttribute(new Float32Array(count), 1);
@@ -665,11 +666,25 @@ export default function ArchiveAtlasScene({
     pointGeometry.setAttribute("color", pointColor);
     const pointMaterial = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, vertexColors: false,
-      uniforms: { uScale: { value: 1 }, uSize: { value: 1 }, uAlpha: { value: 1 } },
-      vertexShader: `attribute float alpha; attribute float size; attribute vec3 color; varying vec3 vColor; varying float vAlpha; uniform float uScale; uniform float uSize;
-        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = clamp(size * uSize * uScale / max(1.0, -mv.z), 2.0, 28.0); gl_Position = projectionMatrix * mv; vColor = color; vAlpha = alpha; }`,
+      uniforms: { uScale: { value: 1 }, uSize: { value: 1 }, uAlpha: { value: 1 }, uPixelRatio: { value: renderer.getPixelRatio() } },
+      vertexShader: `attribute float alpha; attribute float size; attribute vec3 color; varying vec3 vColor; varying float vAlpha; uniform float uScale; uniform float uSize; uniform float uPixelRatio;
+        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = clamp(size * uSize * uScale / max(1.0, -mv.z), 2.0 * uPixelRatio, 64.0 * uPixelRatio); gl_Position = projectionMatrix * mv; vColor = color; vAlpha = alpha; }`,
       fragmentShader: `varying vec3 vColor; varying float vAlpha; uniform float uAlpha;
-        void main(){ float distanceFromCenter = length(gl_PointCoord - 0.5) * 2.0; if (distanceFromCenter > 1.0) discard; float core = smoothstep(1.0, 0.62, distanceFromCenter); vec3 color = vColor * (1.06 - 0.22 * distanceFromCenter) + vec3(0.16) * (1.0 - smoothstep(0.0, 0.5, distanceFromCenter)); gl_FragColor = vec4(color, core * vAlpha * uAlpha); }`
+        void main(){ vec2 uv = gl_PointCoord - 0.5; float distanceFromCenter = length(uv) * 2.0; if (distanceFromCenter > 1.0) discard;
+          float z = sqrt(max(0.0, 1.0 - distanceFromCenter * distanceFromCenter));
+          vec3 normal = normalize(vec3(uv.x * 2.0, uv.y * 2.0, z));
+          vec3 light = normalize(vec3(-0.55, 0.62, 0.82));
+          float highlight = pow(max(0.0, dot(normal, light)), 10.0);
+          float rim = pow(1.0 - z, 2.2);
+          // Demo-style luminous sphere: bright volume, soft coloured rim and a
+          // small specular core. Far away the same shader reads as a small dot.
+          vec3 color = vColor * (1.08 - 0.18 * distanceFromCenter + rim * 0.34)
+            + vColor * highlight * 0.55
+            + vec3(0.22) * (1.0 - smoothstep(0.0, 0.55, distanceFromCenter));
+          float alpha = smoothstep(1.0, 0.82, distanceFromCenter) * (0.88 + 0.12 * z);
+          gl_FragColor = vec4(color, alpha * vAlpha * uAlpha);
+          #include <colorspace_fragment>
+        }`
     });
     const points = new THREE.Points(pointGeometry, pointMaterial);
     points.renderOrder = 4;
@@ -678,11 +693,13 @@ export default function ArchiveAtlasScene({
 
     const glowMaterial = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      uniforms: { uScale: { value: 1 }, uSize: { value: 1 }, uAlpha: { value: 1 } },
-      vertexShader: `attribute float alpha; attribute float size; attribute vec3 color; varying vec3 vColor; varying float vAlpha; uniform float uScale; uniform float uSize;
-        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = clamp(size * 3.2 * uSize * uScale / max(1.0, -mv.z), 3.0, 72.0); gl_Position = projectionMatrix * mv; vColor = color; vAlpha = alpha; }`,
+      uniforms: { uScale: { value: 1 }, uSize: { value: 1 }, uAlpha: { value: 1 }, uPixelRatio: { value: renderer.getPixelRatio() } },
+      vertexShader: `attribute float alpha; attribute float size; attribute vec3 color; varying vec3 vColor; varying float vAlpha; uniform float uScale; uniform float uSize; uniform float uPixelRatio;
+        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = clamp(size * 3.2 * uSize * uScale / max(1.0, -mv.z), 3.0 * uPixelRatio, 128.0 * uPixelRatio); gl_Position = projectionMatrix * mv; vColor = color; vAlpha = alpha; }`,
       fragmentShader: `varying vec3 vColor; varying float vAlpha; uniform float uAlpha;
-        void main(){ float distanceFromCenter = length(gl_PointCoord - 0.5) * 2.0; if (distanceFromCenter > 1.0) discard; float halo = smoothstep(1.0, 0.15, distanceFromCenter) * 0.14; gl_FragColor = vec4(vColor, halo * vAlpha * uAlpha); }`
+        void main(){ float distanceFromCenter = length(gl_PointCoord - 0.5) * 2.0; if (distanceFromCenter > 1.0) discard; float halo = smoothstep(1.0, 0.15, distanceFromCenter) * 0.18; gl_FragColor = vec4(vColor, halo * vAlpha * uAlpha);
+          #include <colorspace_fragment>
+        }`
     });
     const glowPoints = new THREE.Points(pointGeometry, glowMaterial);
     glowPoints.renderOrder = 3;
@@ -704,11 +721,13 @@ export default function ArchiveAtlasScene({
     ringGeometry.setAttribute("size", ringSize);
     const ringMaterial = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false,
-      uniforms: { uScale: { value: 1 }, uSize: { value: 1 } },
-      vertexShader: `attribute vec3 c1; attribute vec3 c2; attribute float split; attribute float alpha; attribute float size; varying vec3 v1; varying vec3 v2; varying float vSplit; varying float vAlpha; uniform float uScale; uniform float uSize;
-        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = clamp(size * uSize * uScale / max(1.0, -mv.z), 6.0, 84.0); gl_Position = projectionMatrix * mv; v1 = c1; v2 = c2; vSplit = split; vAlpha = alpha; }`,
+      uniforms: { uScale: { value: 1 }, uSize: { value: 1 }, uPixelRatio: { value: renderer.getPixelRatio() } },
+      vertexShader: `attribute vec3 c1; attribute vec3 c2; attribute float split; attribute float alpha; attribute float size; varying vec3 v1; varying vec3 v2; varying float vSplit; varying float vAlpha; uniform float uScale; uniform float uSize; uniform float uPixelRatio;
+        void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_PointSize = clamp(size * uSize * uScale / max(1.0, -mv.z), 7.0 * uPixelRatio, 120.0 * uPixelRatio); gl_Position = projectionMatrix * mv; v1 = c1; v2 = c2; vSplit = split; vAlpha = alpha; }`,
       fragmentShader: `varying vec3 v1; varying vec3 v2; varying float vSplit; varying float vAlpha;
-        void main(){ vec2 uv = gl_PointCoord - 0.5; float distanceFromCenter = length(uv) * 2.0; if (distanceFromCenter > 1.0) discard; float ring = smoothstep(0.56, 0.68, distanceFromCenter) * (1.0 - smoothstep(0.88, 1.0, distanceFromCenter)); vec3 color = (vSplit > 0.5 && uv.x > 0.0) ? v2 : v1; gl_FragColor = vec4(color, ring * vAlpha); }`
+        void main(){ vec2 uv = gl_PointCoord - 0.5; float distanceFromCenter = length(uv) * 2.0; if (distanceFromCenter > 1.0) discard; float ring = smoothstep(0.70, 0.78, distanceFromCenter) * (1.0 - smoothstep(0.90, 0.98, distanceFromCenter)); vec3 color = (vSplit > 0.5 && uv.x > 0.0) ? v2 : v1; gl_FragColor = vec4(color, ring * vAlpha);
+          #include <colorspace_fragment>
+        }`
     });
     const rings = new THREE.Points(ringGeometry, ringMaterial);
     rings.renderOrder = 5;
@@ -995,7 +1014,8 @@ export default function ArchiveAtlasScene({
         const point = project(getPosition(index));
         if (point.z > 1) continue;
         const screenDistance = Math.hypot(point.x - x, point.y - y);
-        if (screenDistance > 12) continue;
+        const hitRadius = Math.max(8, (pointScreenCss[index] ?? 12) / 2 + 5);
+        if (screenDistance > hitRadius) continue;
         if (screenDistance < bestDistance) { best = index; bestDistance = screenDistance; }
       }
       return best;
@@ -1020,6 +1040,7 @@ export default function ArchiveAtlasScene({
 
     let frameHandle = 0;
     let disposed = false;
+    const pointDepth = new THREE.Vector3();
     const frame = (now: number) => {
       if (disposed) return;
       frameHandle = requestAnimationFrame(frame);
@@ -1080,24 +1101,34 @@ export default function ArchiveAtlasScene({
       const rect = renderer.domElement.getBoundingClientRect();
       const pixelRatio = renderer.getPixelRatio();
       const sharedScale = rect.height / (2 * FOV_T) * pixelRatio;
+      const cssScale = rect.height / (2 * FOV_T);
       pointMaterial.uniforms.uScale.value = sharedScale;
+      pointMaterial.uniforms.uPixelRatio.value = pixelRatio;
       ringMaterial.uniforms.uScale.value = sharedScale;
+      ringMaterial.uniforms.uPixelRatio.value = pixelRatio;
+      glowMaterial.uniforms.uScale.value = sharedScale;
+      glowMaterial.uniforms.uPixelRatio.value = pixelRatio;
       const courseMode = currentMode === "course" || currentMode === "draft";
       drawCards(rect, courseMode);
       pointMaterial.uniforms.uSize.value = courseMode ? 1.12 : 1 - 0.08 * far;
       pointMaterial.uniforms.uAlpha.value = 1;
-      glowMaterial.uniforms.uScale.value = sharedScale;
       glowMaterial.uniforms.uSize.value = courseMode ? 1.12 : 1 - 0.12 * far;
       glowMaterial.uniforms.uAlpha.value = courseMode ? 0.45 : 1;
       edgeMaterial.uniforms.uMul.value = 1 - 0.68 * far;
 
+      const pointUnit = pointMaterial.uniforms.uSize.value * cssScale;
       for (let index = 0; index < count; index += 1) {
         const cardVisible = visibleCardIndices.has(index);
         pointPosition.array[index * 3] = engine.current[index * 3];
         pointPosition.array[index * 3 + 1] = engine.current[index * 3 + 1];
         pointPosition.array[index * 3 + 2] = engine.current[index * 3 + 2];
         pointAlpha.array[index] = cardVisible ? Math.min(0.24, engine.alpha[index]) : engine.alpha[index];
-        pointSize.array[index] = cardVisible ? 5 : (courseMode ? 9.4 : 11.5) * engine.size[index];
+        const baseSize = cardVisible ? 5 : (courseMode ? 9.4 : 11.5) * engine.size[index];
+        pointSize.array[index] = baseSize;
+        const depth = Math.max(1, -pointDepth
+          .set(engine.current[index * 3], engine.current[index * 3 + 1], engine.current[index * 3 + 2])
+          .applyMatrix4(camera.matrixWorldInverse).z);
+        pointScreenCss[index] = Math.max(2, Math.min(64, baseSize * pointUnit / depth));
       }
       pointPosition.needsUpdate = true;
       pointAlpha.needsUpdate = true;
@@ -1136,7 +1167,7 @@ export default function ArchiveAtlasScene({
         color2.toArray(ringColor2.array, index * 3);
         ringSplit.array[index] = split;
         ringAlpha.array[index] = ringAlphaValue;
-        ringSize.array[index] = (courseMode ? 19 : 20) * engine.size[index];
+        ringSize.array[index] = (courseMode ? 20 : 22) * engine.size[index];
       }
       ringPosition.needsUpdate = true;
       ringColor1.needsUpdate = true;

@@ -3,28 +3,31 @@ import type { ArchiveEdge } from "./atlasModel";
 /**
  * One deterministic, relation-driven 3D force layout for the Archive.
  *
- * Domain, community, chapter and learner state are deliberately absent from
- * this module: only the active node/edge facts shape coordinates. The result is
- * cached by structural identity, so camera, selection, search, panels and
- * learning-state updates never move a node.
+ * Factual KnowledgeEdges decide which nodes connect. A weak same-Domain
+ * attraction (Unclassified counts as one group) then compacts each Domain into
+ * its own cluster, and a final group separation keeps the clusters visibly
+ * apart without adding or removing any drawn edge. Domain membership is part
+ * of the structural key; presentation state never moves a node.
  */
 
 export type Vec3 = { x: number; y: number; z: number };
 export type Atlas3DBounds = { center: Vec3; radius: number; min: Vec3; max: Vec3 };
 export type Atlas3DLayout = {
-  version: 3;
+  version: 4;
   structureKey: string;
   positions: Record<string, Vec3>;
   bounds: Atlas3DBounds;
 };
 
-export type Atlas3DLayoutNode = { id: string };
+export type Atlas3DLayoutNode = { id: string; domainId?: string };
 type LayoutEdge = Pick<ArchiveEdge, "id" | "source" | "target" | "relation" | "strength">;
 
-const LAYOUT_VERSION = 3;
-const STORAGE_KEY = "eduflow:archive:3d-layout:v3";
+const LAYOUT_VERSION = 4;
+const STORAGE_KEY = "eduflow:archive:3d-layout:v4";
 const WORLD_RADIUS = 900;
 const GOLDEN_ANGLE = 2.399963229728653;
+const UNCLASSIFIED_GROUP = "__unclassified";
+const GROUP_GAP = 90;
 
 const layoutCache = new Map<string, Atlas3DLayout>();
 let lastLayout: Atlas3DLayout | null = null;
@@ -50,11 +53,20 @@ function rng(seed: number) {
   };
 }
 
+function groupId(node: Atlas3DLayoutNode) {
+  return node.domainId?.trim() || UNCLASSIFIED_GROUP;
+}
+
 export function archive3DStructureKey(
   nodes: readonly Atlas3DLayoutNode[],
   edges: readonly Pick<ArchiveEdge, "id" | "source" | "target" | "relation" | "strength">[]
 ) {
-  const nodePart = nodes.map((node) => node.id).sort().join(",");
+  // Domain membership is structural for the default layout: an assignment
+  // change must produce a new cached layout, never a live relayout.
+  const nodePart = nodes
+    .map((node) => `${node.id}@${groupId(node)}`)
+    .sort()
+    .join(",");
   const edgePart = edges
     .map((edge) => `${edge.id}:${edge.source}>${edge.target}:${edge.relation}:${edge.strength ?? ""}`)
     .sort()
@@ -96,22 +108,112 @@ function store(layout: Atlas3DLayout) {
   try { storage()?.setItem(STORAGE_KEY, JSON.stringify(layout)); } catch { /* cache only */ }
 }
 
-function seedPositions(ids: readonly string[], random: () => number) {
+function fibonacciDirection(index: number, count: number) {
+  if (count <= 1) return { x: 0, y: 0, z: 0 };
+  const y = 1 - (index / (count - 1)) * 2;
+  const radius = Math.sqrt(Math.max(0, 1 - y * y));
+  const theta = GOLDEN_ANGLE * index;
+  return { x: Math.cos(theta) * radius, y, z: Math.sin(theta) * radius };
+}
+
+/**
+ * Seed one compact cloud per Domain around a deterministic group direction.
+ * These are only initial coordinates; the force pass below is still driven by
+ * factual edges plus same-Domain attraction, never by fixed group anchors.
+ */
+function seedPositions(ids: readonly string[], groupOf: ReadonlyMap<string, string>, random: () => number) {
   const positions = new Map<string, Vec3>();
-  ids.forEach((id, index) => {
-    // Fibonacci sphere gives an even, deterministic starting cloud; the small
-    // seeded jitter only avoids perfectly symmetric local minima.
-    const y = 1 - (index / Math.max(1, ids.length - 1)) * 2;
-    const radius = Math.sqrt(Math.max(0, 1 - y * y));
-    const theta = GOLDEN_ANGLE * index;
-    const jitter = 0.22;
-    positions.set(id, {
-      x: Math.cos(theta) * radius * WORLD_RADIUS * 0.42 + (random() - 0.5) * WORLD_RADIUS * jitter,
-      y: y * WORLD_RADIUS * 0.42 + (random() - 0.5) * WORLD_RADIUS * jitter,
-      z: Math.sin(theta) * radius * WORLD_RADIUS * 0.42 + (random() - 0.5) * WORLD_RADIUS * jitter
+  const members = new Map<string, string[]>();
+  ids.forEach((id) => {
+    const group = groupOf.get(id) ?? UNCLASSIFIED_GROUP;
+    members.set(group, [...(members.get(group) ?? []), id]);
+  });
+  const groups = [...members.entries()].sort(([left], [right]) => left.localeCompare(right));
+  groups.forEach(([, groupIds], groupIndex) => {
+    const direction = fibonacciDirection(groupIndex, groups.length);
+    const centerRadius = groups.length > 1 ? WORLD_RADIUS * 0.56 : 0;
+    const center = { x: direction.x * centerRadius, y: direction.y * centerRadius, z: direction.z * centerRadius };
+    const localRadius = Math.min(210, 34 + Math.sqrt(groupIds.length) * 34);
+    groupIds.forEach((id, index) => {
+      const local = fibonacciDirection(index, groupIds.length);
+      const jitter = localRadius * 0.18;
+      positions.set(id, {
+        x: center.x + local.x * localRadius + (random() - 0.5) * jitter,
+        y: center.y + local.y * localRadius + (random() - 0.5) * jitter,
+        z: center.z + local.z * localRadius + (random() - 0.5) * jitter
+      });
     });
   });
   return positions;
+}
+
+type GroupBounds = { id: string; ids: string[]; center: Vec3; radius: number };
+
+function groupBounds(positions: ReadonlyMap<string, Vec3>, members: ReadonlyMap<string, string[]>): GroupBounds[] {
+  return [...members.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([id, ids]) => {
+    const center = ids.reduce((sum, nodeId) => {
+      const position = positions.get(nodeId)!;
+      sum.x += position.x; sum.y += position.y; sum.z += position.z;
+      return sum;
+    }, { x: 0, y: 0, z: 0 });
+    center.x /= Math.max(1, ids.length);
+    center.y /= Math.max(1, ids.length);
+    center.z /= Math.max(1, ids.length);
+    const radius = Math.max(24, ...ids.map((nodeId) => {
+      const position = positions.get(nodeId)!;
+      return Math.hypot(position.x - center.x, position.y - center.y, position.z - center.z);
+    }));
+    return { id, ids, center, radius };
+  });
+}
+
+/**
+ * Same-Domain attraction gathers each group; this final translation pass keeps
+ * group centres at least their own radii plus a gap apart. It moves whole
+ * groups, so every within-Domain relation keeps its shape and the set of
+ * drawn edges is unchanged.
+ */
+function separateGroups(positions: Map<string, Vec3>, members: ReadonlyMap<string, string[]>) {
+  for (let iteration = 0; iteration < 96; iteration += 1) {
+    const groups = groupBounds(positions, members);
+    let moved = false;
+    for (let left = 0; left < groups.length; left += 1) {
+      for (let right = left + 1; right < groups.length; right += 1) {
+        const a = groups[left];
+        const b = groups[right];
+        let dx = b.center.x - a.center.x;
+        let dy = b.center.y - a.center.y;
+        let dz = b.center.z - a.center.z;
+        let distance = Math.hypot(dx, dy, dz);
+        if (distance < 0.01) {
+          dx = 0.31; dy = 0.47; dz = 0.83;
+          distance = 1;
+        }
+        const required = (a.radius + b.radius) * 1.12 + GROUP_GAP;
+        if (distance >= required) continue;
+        const push = (required - distance) / distance * 0.52;
+        a.ids.forEach((id) => {
+          const position = positions.get(id)!;
+          position.x -= dx * push; position.y -= dy * push; position.z -= dz * push;
+        });
+        b.ids.forEach((id) => {
+          const position = positions.get(id)!;
+          position.x += dx * push; position.y += dy * push; position.z += dz * push;
+        });
+        // Refresh centres before the next pair so every group is evaluated
+        // against the positions that actually exist in this pass.
+        a.center.x -= dx * push; a.center.y -= dy * push; a.center.z -= dz * push;
+        b.center.x += dx * push; b.center.y += dy * push; b.center.z += dz * push;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  // Re-centre the settled cluster cloud without changing inter-group spacing.
+  const all = [...positions.values()];
+  const center = all.reduce((sum, position) => ({ x: sum.x + position.x, y: sum.y + position.y, z: sum.z + position.z }), { x: 0, y: 0, z: 0 });
+  center.x /= Math.max(1, all.length); center.y /= Math.max(1, all.length); center.z /= Math.max(1, all.length);
+  all.forEach((position) => { position.x -= center.x; position.y -= center.y; position.z -= center.z; });
 }
 
 function springLength(edge: LayoutEdge) {
@@ -136,16 +238,29 @@ export function computeAtlas3DLayout(
   edges: readonly Pick<ArchiveEdge, "id" | "source" | "target" | "relation" | "strength">[]
 ): Atlas3DLayout {
   const key = archive3DStructureKey(nodes, edges);
+  const domainByNode = new Map<string, string>();
+  nodes.forEach((node) => domainByNode.set(node.id, groupId(node)));
   const ids = Array.from(new Set(nodes.map((node) => node.id))).sort();
   const idSet = new Set(ids);
+  const groupOf = new Map(ids.map((id) => [id, domainByNode.get(id) ?? UNCLASSIFIED_GROUP]));
+  const members = new Map<string, string[]>();
+  ids.forEach((id) => {
+    const group = groupOf.get(id)!;
+    members.set(group, [...(members.get(group) ?? []), id]);
+  });
   const random = rng(hashString(key));
-  const positions = seedPositions(ids, random);
+  const positions = seedPositions(ids, groupOf, random);
   const velocity = new Map<string, Vec3>(ids.map((id) => [id, { x: 0, y: 0, z: 0 }]));
   const springs = edges
     .filter((edge) => idSet.has(edge.source) && idSet.has(edge.target) && edge.source !== edge.target)
     .slice()
     .sort((left, right) => left.id.localeCompare(right.id))
-    .map((edge) => ({ source: edge.source, target: edge.target, length: springLength(edge), strength: springStrength(edge) }));
+    .map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      length: springLength(edge),
+      strength: springStrength(edge) * (groupOf.get(edge.source) === groupOf.get(edge.target) ? 1 : 0.45)
+    }));
 
   const count = ids.length;
   const iterations = count > 900 ? 90 : count > 500 ? 130 : count > 260 ? 175 : 240;
@@ -154,6 +269,8 @@ export function computeAtlas3DLayout(
   const cutoffSquared = cutoff * cutoff;
   const centerPull = 0.0018;
   const damping = 0.86;
+  const domainPull = 0.0042;
+  const domainRest = 34;
 
   for (let iteration = 0; iteration < iterations; iteration += 1) {
     const forces = new Map<string, Vec3>();
@@ -170,7 +287,11 @@ export function computeAtlas3DLayout(
         let dy = leftPosition.y - rightPosition.y;
         let dz = leftPosition.z - rightPosition.z;
         const distanceSquared = dx * dx + dy * dy + dz * dz;
-        if (distanceSquared > cutoffSquared || distanceSquared < 0.01) continue;
+        const sameDomain = groupOf.get(leftId) === groupOf.get(rightId);
+        // Same-Domain pairs keep attracting at any distance; unrelated pairs
+        // skip early beyond the repulsion cutoff.
+        if (!sameDomain && distanceSquared > cutoffSquared) continue;
+        if (distanceSquared < 0.01) continue;
         const distance = Math.sqrt(distanceSquared);
         const strength = repulsion / (distanceSquared + 40);
         dx /= distance; dy /= distance; dz /= distance;
@@ -178,6 +299,11 @@ export function computeAtlas3DLayout(
         const rightForce = forces.get(rightId)!;
         leftForce.x += dx * strength; leftForce.y += dy * strength; leftForce.z += dz * strength;
         rightForce.x -= dx * strength; rightForce.y -= dy * strength; rightForce.z -= dz * strength;
+        if (sameDomain) {
+          const pull = (distance - domainRest) * domainPull / distance;
+          leftForce.x -= dx * pull; leftForce.y -= dy * pull; leftForce.z -= dz * pull;
+          rightForce.x += dx * pull; rightForce.y += dy * pull; rightForce.z += dz * pull;
+        }
       }
     }
 
@@ -215,25 +341,20 @@ export function computeAtlas3DLayout(
     });
   }
 
-  // Normalize to a stable world sphere without changing relative structure.
+  separateGroups(positions, members);
+
+  // Normalize uniformly into a stable world sphere. A non-uniform widening
+  // would stretch a Domain's internal radius and erase the separation the
+  // cluster pass just established.
   const rawBounds = boundsOf(Object.fromEntries(positions));
-  const rawSpanX = Math.max(1, rawBounds.max.x - rawBounds.min.x);
-  const rawSpanY = Math.max(1, rawBounds.max.y - rawBounds.min.y);
-  const rawSpanZ = Math.max(1, rawBounds.max.z - rawBounds.min.z);
-  const widest = Math.max(rawSpanX, rawSpanY, rawSpanZ);
-  // Gently widen the two axes that a front-ish camera compresses. This is an
-  // isotropic-free normalisation only: topology and distances remain driven by
-  // the factual springs, never by Domain or other metadata.
-  const axisX = 1 + (widest / rawSpanX - 1) * 0.45;
-  const axisZ = 1 + (widest / rawSpanZ - 1) * 0.3;
   const scale = WORLD_RADIUS / Math.max(1, rawBounds.radius);
   const normalized: Record<string, Vec3> = {};
   ids.forEach((id) => {
     const position = positions.get(id)!;
     normalized[id] = {
-      x: (position.x - rawBounds.center.x) * scale * axisX,
+      x: (position.x - rawBounds.center.x) * scale,
       y: (position.y - rawBounds.center.y) * scale,
-      z: (position.z - rawBounds.center.z) * scale * axisZ
+      z: (position.z - rawBounds.center.z) * scale
     };
   });
   const normalizedBounds = boundsOf(normalized);

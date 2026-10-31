@@ -8,13 +8,16 @@ import type { AtlasCourseContext } from "@/features/knowledge/projections/atlasP
 import type { UserKnowledgeRecord, UserKnowledgeStatus } from "@/features/profile/types";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
 
+/** The token palette has twelve distinct domain hues (`--domain-1..12`). */
+export const DOMAIN_COLOR_SLOT_COUNT = 12;
+
 export type ArchiveNode = {
   id: string;
   title: string;
   description: string;
   scope: KnowledgeNode["scope"];
   color: string;
-  /** Index into the six token domain colours; null means neutral/unclassified. */
+  /** Index into the twelve token domain colours; null means neutral/unclassified. */
   domainColorIndex: number | null;
   domainTitle: string;
   domainId?: string;
@@ -196,14 +199,16 @@ export function buildArchiveModel(input: ArchiveModelInput): ArchiveModel {
   const importance = archiveImportanceByNodeId(activeIds, edges);
   const contexts = courseContextsByNode(input.runtimes);
   const recordsById = new Map(input.records.filter((record) => activeIds.has(record.nodeId)).map((record) => [record.nodeId, record]));
-  // The Archive palette is the six design-token domain colours. Domains keep a
-  // deterministic slot (creation order then id) so the same domain is always
-  // the same colour, independent of the current learner or camera.
+  // The Archive palette is the design-token domain palette. Only Domains that
+  // actually own active Knowledge receive a slot, in deterministic governance
+  // order, so an empty Domain never makes two visible Domains collide.
+  const nodeDomains = new Map(activeNodes.map((node) => [node.id, resolveNodeDomain(node.id, input.governance).domain]));
+  const usedDomainIds = new Set(Array.from(nodeDomains.values()).flatMap((domain) => domain ? [domain.id] : []));
   const orderedDomains = input.governance.domains
-    .filter((domain) => domain.status === "active")
+    .filter((domain) => domain.status === "active" && usedDomainIds.has(domain.id))
     .slice()
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
-  const domainSlot = new Map(orderedDomains.map((domain, index) => [domain.id, index % 6]));
+  const domainSlot = new Map(orderedDomains.map((domain, index) => [domain.id, index % DOMAIN_COLOR_SLOT_COUNT]));
   const currentId = [...recordsById.values()]
     .filter((record) => record.status === "learning" || record.status === "practicing")
     .sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "") || left.nodeId.localeCompare(right.nodeId))[0]?.nodeId;
@@ -211,7 +216,7 @@ export function buildArchiveModel(input: ArchiveModelInput): ArchiveModel {
     .slice()
     .sort((left, right) => left.id.localeCompare(right.id))
     .map((node) => {
-      const { domain } = resolveNodeDomain(node.id, input.governance);
+      const domain = nodeDomains.get(node.id) ?? null;
       const record = recordsById.get(node.id);
       const slot = domain ? domainSlot.get(domain.id) ?? null : null;
       return {

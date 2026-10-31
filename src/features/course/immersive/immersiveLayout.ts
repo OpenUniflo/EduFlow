@@ -539,10 +539,12 @@ export function layoutCapabilityFlattenLayout(model: CapabilityModel, options?: 
 
   // Fewer sub-columns keep the three semantic bands readable in the narrowed
   // editor stage; tall columns are browsed by vertical panning.
-  const maxRows = 24;
+  const maxRows = 32;
   const subColumnWidth = 186;
   const subColumnGap = 20;
-  const groupGap = 74;
+  // Keep the three groups narrow enough that the readable 12px floor fits the
+  // editor stage width without a horizontal scroll at 1440.
+  const groupGap = 60;
   const rowGap = 50;
   // Exactly three semantic columns (acquired → intermediate → target). Large
   // bands wrap into deterministic sub-columns ordered by dependency depth.

@@ -17,6 +17,13 @@ import type {
  */
 
 export const REFLECTION_OFFSET = { x: 14, y: 13, z: -6 } as const;
+/**
+ * Reflection cards expose the same bottom identity strip as the demo. The card
+ * is taller than its solid counterpart, so anchoring it by centre would put
+ * its top edge level with the front card; the stack helper keeps the visible
+ * top-left at the documented (14, 13) offset and lets the rest peek below.
+ */
+export const REFLECTION_CARD_HEIGHT = 56;
 
 /**
  * The course tree reserves the action row inside every card, so zooming in can
@@ -40,8 +47,9 @@ export type CourseSelection =
 export type CoursePracticeCard = {
   id: string;
   knowledgeId: string;
-  kind: "assignment" | "group" | "empty";
+  kind: "assignment" | "group" | "empty" | "shadow";
   assignmentIds: string[];
+  count: number;
   title: string;
   code: string;
   status: UserAssignmentStatus | "mixed";
@@ -157,6 +165,10 @@ function assignmentState(contexts: readonly AssignmentContext[]): CoursePractice
 
 export function buildPracticeCards(graphData: CourseGraphData): Map<string, CoursePracticeCard> {
   const cards = new Map<string, CoursePracticeCard>();
+  // One Assignment has exactly one foreground location: the Knowledge where it
+  // is introduced. Other covered Knowledge positions get a dashed identity
+  // placeholder instead of drawing the same solid card repeatedly.
+  const primaryKnowledge = primaryKnowledgeByAssignment(graphData);
   graphData.knowledgeNodes.forEach((node) => {
     const contexts = node.assignmentIds
       .map((assignmentId) => node.assignmentContexts.find((context) => context.assignmentId === assignmentId))
@@ -168,6 +180,7 @@ export function buildPracticeCards(graphData: CourseGraphData): Map<string, Cour
         knowledgeId: node.id,
         kind: "empty",
         assignmentIds: [],
+        count: 0,
         title: "暂无对应实训",
         code: "",
         status: "not_started",
@@ -181,11 +194,13 @@ export function buildPracticeCards(graphData: CourseGraphData): Map<string, Cour
     }
     if (contexts.length === 1) {
       const context = contexts[0];
+      const primary = primaryKnowledge.get(context.assignmentId) === node.id;
       cards.set(node.id, {
-        id: `assignment:${context.assignmentId}:${node.id}`,
+        id: `${primary ? "assignment" : "shadow"}:${context.assignmentId}:${node.id}`,
         knowledgeId: node.id,
-        kind: "assignment",
+        kind: primary ? "assignment" : "shadow",
         assignmentIds: [context.assignmentId],
+        count: 1,
         title: context.assignment.title,
         code: String(context.assignment.order + 1).padStart(2, "0"),
         status: assignmentState(contexts),
@@ -193,17 +208,21 @@ export function buildPracticeCards(graphData: CourseGraphData): Map<string, Cour
         y: 0,
         z: 0,
         width: 176,
-        height: 48
+        height: primary ? 48 : 28
       });
       return;
     }
+    // A Knowledge can cover several practices. Keep one card and lead with the
+    // primary practice, then mark the remaining count (demo: 实践 03 名称 +1).
+    const primaryContext = contexts[0];
     cards.set(node.id, {
       id: `group:${node.id}`,
       knowledgeId: node.id,
       kind: "group",
       assignmentIds: contexts.map((context) => context.assignmentId),
-      title: `实践组 · ${contexts.length} 项`,
-      code: "组",
+      count: contexts.length,
+      title: primaryContext.assignment.title,
+      code: String(primaryContext.assignment.order + 1).padStart(2, "0"),
       status: assignmentState(contexts),
       x: 0,
       y: 0,
@@ -219,6 +238,11 @@ export function buildPracticeCards(graphData: CourseGraphData): Map<string, Cour
 export function reflectionOffset(knowledgeInFront: boolean, isKnowledge: boolean): ImmersivePoint {
   const inFront = isKnowledge ? knowledgeInFront : !knowledgeInFront;
   return inFront ? { x: 0, y: 0, z: 0 } : { ...REFLECTION_OFFSET };
+}
+
+/** Centre-to-centre Y delta that keeps the reflection's top edge 13px below. */
+export function reflectionStackY(frontHeight: number, ghostHeight = REFLECTION_CARD_HEIGHT): number {
+  return REFLECTION_OFFSET.y + (ghostHeight - frontHeight) / 2;
 }
 
 export function positionPracticeCards(
@@ -367,7 +391,8 @@ export function resolveFacetSelection(input: {
   if (selection.kind === "knowledge" && !input.knowledgeInFront) {
     const card = input.practiceByKnowledge.get(selection.id);
     if (!card || card.kind === "empty") return selection;
-    return card.kind === "group" ? { kind: "group", id: selection.id } : { kind: "practice", id: card.assignmentIds[0] };
+    if (card.kind === "group") return { kind: "group", id: selection.id };
+    return { kind: "practice", id: card.assignmentIds[0] };
   }
   if (selection.kind === "practice" && input.knowledgeInFront) {
     const primary = input.primaryKnowledge.get(selection.id);

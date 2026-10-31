@@ -378,18 +378,23 @@
   position: absolute;
   top: 0;
   left: 0;
+  box-sizing: border-box;
   display: flex;
+  width: auto;
   min-width: 0;
   max-width: none;
+  height: auto;
   align-items: center;
-  gap: 7px;
-  overflow: hidden;
-  padding: 6px 9px;
+  gap: var(--sp-6);
+  /* The route step circle hugs the left edge outside the card, so the card
+     itself must not clip it. The title row clips its own text. */
+  overflow: visible;
+  padding: 7px 10px;
   border: 1px solid color-mix(in srgb, var(--line-strong) 74%, transparent);
-  border-radius: var(--r-full);
+  border-radius: var(--r-12);
   color: var(--ink);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  box-shadow: none;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: var(--sh-1);
   font-size: var(--fs-12);
   line-height: var(--lh-12);
   font-weight: var(--fw-500);
@@ -437,13 +442,24 @@
 }
 
 .ef-imm-node[data-status="locked"] {
-  color: var(--muted);
-  border-style: dashed;
-  background: color-mix(in srgb, var(--surface) 66%, transparent);
+  color: var(--ink);
+  border-style: solid;
+  background: var(--surface);
 }
 
 .ef-imm-node[data-status="locked"] .ef-imm-node-dot {
   background: var(--pending);
+}
+
+/* Pending Knowledge still reads as a card, exactly like the demo; only its
+   status dot says 待学. Reflection cards keep their own dashed treatment. */
+.ef-imm-node--knowledge[data-status="locked"] {
+  background: var(--surface);
+}
+
+.ef-imm-node--knowledge.is-ghost[data-status="locked"] {
+  background: color-mix(in srgb, var(--surface) 36%, transparent);
+  border-style: dashed;
 }
 
 .ef-imm-node.is-current {
@@ -460,7 +476,7 @@
   height: 8px;
   flex: 0 0 8px;
   border-radius: var(--r-full);
-  background: var(--muted);
+  background: var(--pending);
 }
 
 .ef-imm-node-copy {
@@ -471,20 +487,26 @@
 }
 
 .ef-imm-node-copy strong {
+  display: block;
   overflow: hidden;
+  min-width: 0;
   color: inherit;
-  font-size: var(--fs-14);
-  line-height: var(--lh-14);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
   font-weight: var(--fw-600);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .ef-imm-node--knowledge .ef-imm-node-copy strong,
-.ef-imm-node--assignment .ef-imm-node-copy strong,
+.ef-imm-node--assignment .ef-imm-node-copy strong {
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
 .ef-imm-node--capability .ef-imm-node-copy strong {
-  font-size: var(--fs-16);
-  line-height: var(--lh-16);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
 }
 
 .ef-imm-node-meta,
@@ -502,78 +524,42 @@
   color: var(--brand-ink);
 }
 
-.ef-imm-stage[data-zoom="near"] .ef-imm-node-meta,
-.ef-imm-stage[data-zoom="near"] .ef-imm-node-detail {
-  display: block;
-}
-
 .ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge {
   display: flex;
-  align-items: flex-start;
-  padding: 6px 8px;
+  align-items: center;
+  padding: 8px 10px;
   border-radius: var(--r-12);
-  gap: 6px;
-}
-
-.ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge.has-step {
-  padding-left: 34px;
-}
-
-.ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge .ef-imm-node-dot {
-  margin-top: 3px;
+  gap: var(--sp-6);
 }
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge .ef-imm-node-copy {
-  display: grid;
-  height: auto;
+  display: flex;
+  min-width: 0;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: auto auto;
-  align-content: start;
-  align-items: center;
-  column-gap: 6px;
-  row-gap: 2px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
 }
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge .ef-imm-node-copy strong {
-  grid-column: 1;
-  grid-row: 1;
   min-width: 0;
-}
-
-.ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge .ef-imm-node-meta {
-  display: block;
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-  color: var(--brand-ink);
-  font-size: var(--fs-12);
-  line-height: var(--lh-12);
-  white-space: nowrap;
 }
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge .ef-imm-node-detail {
   display: block;
-  grid-column: 1 / -1;
-  grid-row: 2;
   color: var(--muted);
-  line-height: 14px;
-  white-space: normal;
+  line-height: var(--lh-12);
+  white-space: nowrap;
 }
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge .ef-imm-actions span {
   height: 14px;
-  padding: 0 3px;
+  padding: 0 4px;
 }
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node-copy strong {
-  font-size: var(--fs-12);
-  line-height: var(--lh-12);
-}
-
-.ef-imm-stage[data-zoom="near"] .ef-imm-node-meta,
-.ef-imm-stage[data-zoom="near"] .ef-imm-node-detail {
-  display: block;
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
 }
 
 .ef-imm-actions {
@@ -636,16 +622,57 @@
   max-width: none;
   height: auto;
   align-items: center;
-  gap: 5px;
-  padding: 5px 8px 5px 5px;
-  border-radius: var(--r-12);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  gap: var(--sp-4);
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--practice) 38%, var(--line));
+  border-left: 3px solid var(--practice);
+  border-radius: var(--r-8);
+  background: var(--surface);
 }
 
-.ef-imm-node--knowledge,
-.ef-imm-node--assignment {
-  border-radius: var(--r-12);
+.ef-imm-node--assignment .ef-imm-node-copy {
+  flex: 1 1 auto;
+  gap: 1px;
 }
+
+.ef-imm-node--assignment .ef-imm-node-copy strong {
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-imm-node--assignment .ef-imm-node-meta {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: 14px;
+  font-weight: var(--fw-500);
+}
+
+.ef-imm-node-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.ef-imm-node-title-row strong {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.ef-imm-node-count {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  color: var(--practice);
+  background: color-mix(in srgb, var(--practice) 14%, transparent);
+  font-size: var(--fs-12);
+  line-height: 15px;
+  font-style: normal;
+  font-weight: var(--fw-700);
+  font-variant-numeric: tabular-nums;
+}
+
 
 .ef-imm-node--chapter-empty {
   justify-content: center;
@@ -678,11 +705,6 @@
   line-height: var(--lh-12);
 }
 
-.ef-imm-node--assignment .ef-imm-node-copy strong {
-  font-size: var(--fs-16);
-  line-height: var(--lh-16);
-}
-
 .ef-imm-node--assignment[data-status="started"],
 .ef-imm-node--assignment[data-status="in-progress"] {
   border-color: color-mix(in srgb, var(--brand) 44%, transparent);
@@ -690,31 +712,25 @@
 }
 
 .ef-imm-node-index {
-  display: grid;
-  width: 22px;
-  height: 18px;
-  flex: 0 0 22px;
-  place-items: center;
-  border-radius: var(--r-8);
-  color: var(--brand-ink);
-  background: var(--brand-soft);
+  display: block;
+  width: auto;
+  height: auto;
+  flex: 0 0 auto;
+  border-radius: 0;
+  color: var(--practice);
+  background: transparent;
   font-size: var(--fs-12);
   line-height: var(--lh-12);
   font-weight: var(--fw-700);
-}
-
-.ef-imm-node--assignment.tone-2 .ef-imm-node-index {
-  color: var(--warn);
-  background: var(--warn-soft);
-}
-
-.ef-imm-node--assignment.tone-3 .ef-imm-node-index {
-  color: var(--target);
-  background: var(--target-soft);
+  font-variant-numeric: tabular-nums;
 }
 
 .ef-imm-node--capability {
-  border-style: solid;
+  padding: 6px 9px;
+  border: 1px dashed color-mix(in srgb, var(--line-strong) 88%, transparent);
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--surface) 68%, transparent);
+  box-shadow: none;
 }
 
 .ef-imm-node--capability .ef-imm-node-meta {
@@ -736,51 +752,6 @@
 
 /* Rotated depth culling: far labels collapse to a state dot. Hover restores
    the full card, and the native title keeps the complete name available. */
-.ef-imm-stage[data-mode="capability"] .ef-imm-node--capability[data-label-hidden="true"] {
-  width: 14px;
-  min-width: 14px;
-  max-width: 14px;
-  height: 14px;
-  min-height: 14px;
-  justify-content: center;
-  gap: 0;
-  padding: 0;
-  border-radius: var(--r-full);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-}
-
-.ef-imm-stage[data-mode="capability"] .ef-imm-node--capability[data-label-hidden="true"] .ef-imm-node-copy {
-  display: none;
-}
-
-.ef-imm-stage[data-mode="capability"] .ef-imm-node--capability[data-label-hidden="true"] .ef-imm-node-dot {
-  width: 7px;
-  height: 7px;
-  flex-basis: 7px;
-  outline: none;
-}
-
-.ef-imm-stage[data-mode="capability"] .ef-imm-node--capability[data-label-hidden="true"]:hover,
-.ef-imm-stage[data-mode="capability"] .ef-imm-node--capability[data-label-hidden="true"]:focus-visible {
-  width: auto;
-  min-width: 132px;
-  max-width: 220px;
-  height: auto;
-  min-height: 28px;
-  justify-content: flex-start;
-  gap: 6px;
-  padding: 5px 8px;
-  border-radius: var(--r-12);
-  background: var(--surface);
-  box-shadow: var(--sh-2);
-  z-index: 8;
-}
-
-.ef-imm-stage[data-mode="capability"] .ef-imm-node--capability[data-label-hidden="true"]:hover .ef-imm-node-copy,
-.ef-imm-stage[data-mode="capability"] .ef-imm-node--capability[data-label-hidden="true"]:focus-visible .ef-imm-node-copy {
-  display: flex;
-}
-
 .ef-imm-node--route {
   display: flex;
   /* Anchor the step at its disc centre; the text column grows to the right. */
@@ -824,22 +795,6 @@
   display: block;
   font-size: var(--fs-12);
   line-height: 14px;
-}
-
-.ef-imm-here {
-  position: absolute;
-  top: 50%;
-  right: calc(100% + 8px);
-  padding: 2px 7px;
-  border-radius: var(--r-full);
-  color: var(--surface);
-  background: var(--brand);
-  font-size: var(--fs-12);
-  line-height: var(--lh-12);
-  font-style: normal;
-  font-weight: var(--fw-700);
-  white-space: nowrap;
-  transform: translateY(-50%);
 }
 
 .ef-imm-node--route[data-status] {
@@ -910,32 +865,32 @@
 }
 
 .ef-imm-node--route-chapter .ef-imm-node-copy strong {
-  font-size: var(--fs-13);
-  line-height: var(--lh-13);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
   font-weight: var(--fw-700);
 }
 
 .ef-imm-chapter-label {
   position: absolute;
   z-index: 1;
-  transform-origin: 0 50%;
+  transform-origin: 50% 50%;
   top: 0;
   left: 0;
   display: inline-flex;
-  max-width: 232px;
-  margin-top: -12px;
+  max-width: 210px;
   align-items: center;
-  gap: 8px;
-  padding: 4px 9px;
-  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  border-radius: var(--r-8);
+  gap: 6px;
+  padding: 4px 11px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 76%, transparent);
+  border-radius: var(--r-full);
   color: var(--ink-2);
-  background: color-mix(in srgb, var(--surface) 74%, transparent);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: var(--sh-1);
   font-size: var(--fs-12);
-  line-height: var(--lh-12);
-  text-align: left;
+  line-height: 13px;
+  text-align: center;
   white-space: nowrap;
   will-change: transform, opacity;
   pointer-events: auto;
@@ -944,9 +899,10 @@
 .ef-imm-chapter-label b {
   flex: 0 0 auto;
   color: var(--brand-ink);
-  font-size: var(--fs-13);
-  line-height: var(--lh-13);
+  font-size: var(--fs-12);
+  line-height: 13px;
   font-weight: var(--fw-700);
+  font-variant-numeric: tabular-nums;
 }
 
 .ef-imm-chapter-label span {
@@ -954,7 +910,7 @@
   min-width: 0;
   flex: 1 1 auto;
   font-size: var(--fs-12);
-  line-height: var(--lh-12);
+  line-height: 13px;
   font-weight: var(--fw-600);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -962,19 +918,21 @@
 
 .ef-imm-chapter-label em {
   flex: 0 0 auto;
-  margin-left: 2px;
+  margin-left: 1px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
   color: var(--muted);
   font-size: var(--fs-12);
-  line-height: var(--lh-12);
+  line-height: 13px;
   font-style: normal;
   white-space: nowrap;
 }
 
 .ef-imm-stage[data-zoom="far"] .ef-imm-chapter-label {
   display: inline-flex;
-  padding: 3px 8px;
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
-  border-radius: var(--r-8);
+  padding: 4px 12px;
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  border-radius: var(--r-full);
   white-space: nowrap;
 }
 
@@ -1791,35 +1749,6 @@
 }
 
 /* ------------------------------------------------------------------ P4R course tree */
-.ef-imm-node {
-  box-sizing: border-box;
-  min-width: 0;
-  max-width: none;
-  width: auto;
-  height: auto;
-  gap: var(--sp-6);
-  padding: 7px 10px;
-  border-radius: var(--r-12);
-  background: color-mix(in srgb, var(--surface) 96%, transparent);
-  box-shadow: var(--sh-1);
-}
-
-.ef-imm-node--knowledge,
-.ef-imm-node--capability {
-  align-items: center;
-}
-
-.ef-imm-node--assignment {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: 5px 8px;
-  border: 1px solid color-mix(in srgb, var(--practice, var(--acquired)) 48%, var(--line));
-  border-left: 3px solid var(--practice, var(--acquired));
-  border-radius: var(--r-8);
-  background: var(--surface);
-}
-
 .ef-imm-node.is-ghost .ef-imm-node-copy,
 .ef-imm-node.is-ghost .ef-imm-node-index,
 .ef-imm-node.is-ghost .ef-imm-step,
@@ -1829,9 +1758,53 @@
 
 .ef-imm-node.is-ghost {
   border-style: dashed;
-  border-color: color-mix(in srgb, var(--line-strong) 78%, transparent);
-  background: color-mix(in srgb, var(--surface) 36%, transparent);
+  border-color: color-mix(in srgb, var(--brand) 22%, var(--line-strong));
+  background: color-mix(in srgb, var(--surface) 30%, transparent);
   box-shadow: none;
+}
+
+.ef-imm-node.is-ghost.is-empty {
+  border: 1px dashed color-mix(in srgb, var(--line-strong) 82%, transparent);
+  background: color-mix(in srgb, var(--surface) 34%, transparent);
+}
+
+/* The reflection is only exposed as a bottom strip. Identity + status sit in
+   that strip so the peeking practice card stays informative, not decorative. */
+.ef-imm-ghost-peek {
+  position: absolute;
+  right: 10px;
+  bottom: 0;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  color: var(--ink);
+  text-align: left;
+}
+
+.ef-imm-ghost-peek strong {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  font-size: var(--fs-12);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.ef-imm-ghost-peek small {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: 13px;
+  font-weight: var(--fw-500);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ef-imm-node.is-empty {
@@ -1849,10 +1822,11 @@
   filter: saturate(0.45);
 }
 
-/* A selected card and its related cards stay fully lit: status/locked colours
-   may not dim the very nodes the user is inspecting. */
-.ef-imm-node.is-hl,
-.ef-imm-node.is-sel {
+/* A selected solid card and its related solid cards stay fully lit. The
+   reflection layer NEVER becomes a white solid card: it keeps its dashed,
+   translucent edge and only brightens the outline while related. */
+.ef-imm-node.is-hl:not(.is-ghost),
+.ef-imm-node.is-sel:not(.is-ghost) {
   border-style: solid;
   border-color: var(--brand);
   color: var(--ink);
@@ -1861,21 +1835,35 @@
   opacity: 1 !important;
 }
 
-.ef-imm-node.is-hl {
+.ef-imm-node.is-hl:not(.is-ghost) {
   box-shadow: var(--sh-2);
 }
 
-.ef-imm-node.is-sel {
+.ef-imm-node.is-sel:not(.is-ghost) {
   outline: 3px solid var(--brand);
   outline-offset: 0;
   box-shadow: var(--sh-3);
 }
 
-.ef-imm-node.is-hl .ef-imm-node-copy strong,
-.ef-imm-node.is-sel .ef-imm-node-copy strong,
-.ef-imm-node.is-hl .ef-imm-node-copy small,
-.ef-imm-node.is-sel .ef-imm-node-copy small {
+.ef-imm-node.is-hl:not(.is-ghost) .ef-imm-node-copy strong,
+.ef-imm-node.is-sel:not(.is-ghost) .ef-imm-node-copy strong,
+.ef-imm-node.is-hl:not(.is-ghost) .ef-imm-node-copy small,
+.ef-imm-node.is-sel:not(.is-ghost) .ef-imm-node-copy small {
   color: var(--ink);
+}
+
+.ef-imm-node.is-ghost.is-hl,
+.ef-imm-node.is-ghost.is-sel {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--brand) 62%, transparent);
+  background: color-mix(in srgb, var(--surface) 34%, transparent);
+  filter: none;
+  box-shadow: none;
+}
+
+.ef-imm-node.is-ghost.is-sel {
+  outline: 2px solid color-mix(in srgb, var(--brand) 72%, transparent);
+  outline-offset: 0;
 }
 
 .ef-imm-node[data-collapsed="true"] {
@@ -1893,7 +1881,8 @@
 .ef-imm-node[data-collapsed="true"] .ef-imm-node-copy,
 .ef-imm-node[data-collapsed="true"] .ef-imm-node-index,
 .ef-imm-node[data-collapsed="true"] .ef-imm-step,
-.ef-imm-node[data-collapsed="true"] .ef-imm-here {
+.ef-imm-node[data-collapsed="true"] .ef-imm-here,
+.ef-imm-node[data-collapsed="true"] .ef-imm-badge {
   display: none;
 }
 
@@ -1901,25 +1890,53 @@
   margin: 0 auto;
 }
 
-.ef-imm-node.has-step {
-  padding-left: 34px;
+.ef-imm-node--assignment[data-collapsed="true"]::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-full);
+  background: var(--practice);
 }
 
-.ef-imm-node.has-step .ef-imm-node-dot {
-  display: none;
+.ef-imm-node.is-ghost[data-collapsed="true"] {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--surface) 34%, transparent);
+}
+
+.ef-imm-badge {
+  position: absolute;
+  z-index: 2;
+  top: -9px;
+  right: 10px;
+  padding: 0 6px;
+  border-radius: var(--r-full);
+  color: var(--surface);
+  font-size: var(--fs-12);
+  font-style: normal;
+  font-weight: var(--fw-600);
+  line-height: var(--lh-13);
+  white-space: nowrap;
+}
+
+.ef-imm-badge.is-current {
+  background: var(--brand);
+}
+
+.ef-imm-badge.is-target {
+  background: var(--target);
 }
 
 .ef-imm-step {
   position: absolute;
-  z-index: 2;
-  top: 7px;
-  left: 8px;
+  z-index: 3;
+  top: 50%;
+  left: -11px;
   display: grid;
-  width: 19px;
-  height: 19px;
-  margin: 0;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
   place-items: center;
-  border: 1.5px solid var(--surface);
+  border: 0;
   border-radius: var(--r-full);
   color: var(--surface);
   background: var(--brand);
@@ -2434,25 +2451,28 @@
   top: 0;
   left: 0;
   width: 176px;
-  height: 64px;
+  height: 40px;
   box-sizing: border-box;
-  padding: 6px 9px;
+  padding: 7px 10px;
   border: 1px solid var(--line);
   border-radius: var(--r-12);
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   box-shadow: var(--sh-1);
   transform-origin: 0 0;
-  transition: transform var(--dur-scene) var(--ease-inout), opacity var(--dur-scene) var(--ease-inout);
   will-change: transform, opacity;
 }
 
+/* Transition only during the flight. If it were always on, the switch from
+   viewport coordinates to page-relative coordinates (when enterFrame lands)
+   would animate as a sideways drift before the flight even starts. */
 .ef-imm-enter-card.is-run {
   opacity: 0.9;
+  transition: transform var(--dur-scene) var(--ease-inout), opacity var(--dur-scene) var(--ease-inout), height var(--dur-scene) var(--ease-inout);
 }
 
 .ef-imm-enter-card .ef-imm-node-copy strong {
-  font-size: var(--fs-16);
-  line-height: var(--lh-16);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
 }
 
 .ef-imm-page.is-entering .ef-imm-stage-wrap,
@@ -2461,6 +2481,23 @@
 .ef-imm-page.is-entering .ef-imm-status-legend {
   opacity: 0;
   transition: opacity var(--dur-base) var(--ease-out);
+}
+
+/* While the snapshots fly, reveal the chapter panels underneath and keep the
+   real cards hidden. That way the room (panels) and the cards arrive together
+   instead of the panels popping in after the hand-off. */
+.ef-imm-page.is-entering.is-enter-run .ef-imm-stage-wrap {
+  opacity: 1;
+  animation: ef-imm-stage-enter var(--dur-scene) var(--ease-out) both;
+}
+
+.ef-imm-page.is-entering.is-enter-run .ef-imm-stage-wrap .ef-imm-node {
+  opacity: 0 !important;
+}
+
+@keyframes ef-imm-stage-enter {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: none; }
 }
 
 .ef-imm-route-canvas {
@@ -2585,5 +2622,14 @@ body:has(.ef-imm-page) {
 
   .ef-imm-route-wrap {
     padding-top: 136px;
+  }
+}
+
+/* Narrow course viewports: the status legend occupies the bottom band, so the
+   interaction hint sits just above it instead of being covered. */
+@media (max-width: 1180px) {
+  .ef-imm-help {
+    bottom: 78px;
+    max-width: 220px;
   }
 }
