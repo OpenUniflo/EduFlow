@@ -80,6 +80,9 @@ export type ImmersiveCapabilityNode = {
   course: boolean;
   bridge: boolean;
   courseNode?: CourseSkillTreeNode;
+  /** Factual Course Knowledge directly / indirectly supported by this capability. */
+  directSupports?: string[];
+  indirectSupports?: string[];
 };
 
 export type ImmersiveCourseEdge = {
@@ -346,6 +349,161 @@ export function capabilityModelKey(model: CapabilityModel) {
   ].join("|");
 }
 
+/**
+ * Direct and indirect Course Knowledge support for every capability, derived
+ * only from the Project Capability Model's factual support edges. A capability
+ * directly supports a Course Knowledge when one edge reaches it; when the path
+ * runs through another capability first the target is indirect. A target that
+ * is directly reachable is never also reported as indirect.
+ */
+export type CapabilitySupportInfo = {
+  direct: string[];
+  indirect: string[];
+  /** Union, deterministic: direct first then indirect. */
+  all: string[];
+};
+
+export function capabilitySupportByNode(model: CapabilityModel): Map<string, CapabilitySupportInfo> {
+  const memberIds = new Set(model.orderedNodeIds);
+  const courseIds = new Set(model.courseKnowledgeIds.filter((id) => memberIds.has(id)));
+  const courseOrder = new Map(model.courseKnowledgeIds.map((id, index) => [id, index]));
+  const outgoing = new Map<string, Array<{ target: string }>>();
+  model.supportEdges.forEach((edge) => {
+    if (!memberIds.has(edge.source) || !memberIds.has(edge.target)) return;
+    outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), { target: edge.target }]);
+  });
+  outgoing.forEach((list) => list.sort((left, right) => left.target.localeCompare(right.target)));
+  const result = new Map<string, CapabilitySupportInfo>();
+  for (const id of model.orderedNodeIds) {
+    if (courseIds.has(id)) continue;
+    const direct = new Set<string>();
+    const indirect = new Set<string>();
+    let frontier: Array<{ id: string; depth: number }> = [{ id, depth: 0 }];
+    const visited = new Set<string>([id]);
+    while (frontier.length) {
+      const next: Array<{ id: string; depth: number }> = [];
+      for (const entry of frontier) {
+        for (const edge of outgoing.get(entry.id) ?? []) {
+          if (visited.has(edge.target)) continue;
+          visited.add(edge.target);
+          if (courseIds.has(edge.target)) {
+            if (entry.depth + 1 === 1) direct.add(edge.target);
+            else indirect.add(edge.target);
+            continue;
+          }
+          next.push({ id: edge.target, depth: entry.depth + 1 });
+        }
+      }
+      frontier = next;
+    }
+    direct.forEach((target) => indirect.delete(target));
+    const sortCourse = (ids: Iterable<string>) => [...ids].sort((left, right) =>
+      (courseOrder.get(left) ?? Number.MAX_SAFE_INTEGER) - (courseOrder.get(right) ?? Number.MAX_SAFE_INTEGER)
+      || left.localeCompare(right));
+    result.set(id, { direct: sortCourse(direct), indirect: sortCourse(indirect), all: [...sortCourse(direct), ...sortCourse(indirect)] });
+  }
+  return result;
+}
+
+export type CapabilityAnchorOptions = {
+  /** Deeper plane than the Course Knowledge. */
+  baseZ?: number;
+  /** Grouping grid for capabilities supporting the same Knowledge region. */
+  groupSize?: number;
+  /** Horizontal / vertical spacing of the deterministic shared-anchor grid. */
+  spread?: number;
+  /** Factual support edges, used to put indirect capabilities behind theirs. */
+  edges?: readonly { source: string; target: string }[];
+};
+
+/**
+ * Every capability sits behind the centre of the Course Knowledge it supports.
+ * A capability that only supports other capabilities is placed further behind
+ * the capabilities it supports, never at a common default point. Several
+ * capabilities sharing one anchor occupy a deterministic grid (not a corner
+ * spiral) so their screen markers never collapse onto each other.
+ */
+export function placeCapabilityAnchors(
+  supports: ReadonlyMap<string, readonly string[]>,
+  coursePositions: ReadonlyMap<string, ImmersivePoint>,
+  fallback: ReadonlyMap<string, ImmersivePoint> = new Map(),
+  options: CapabilityAnchorOptions = {}
+): Map<string, ImmersivePoint> {
+  const baseZ = options.baseZ ?? -280;
+  const groupSize = Math.max(8, options.groupSize ?? 96);
+  const spacingX = Math.max(64, options.spread ?? 92);
+  const spacingY = Math.max(40, Math.round(spacingX * 0.65));
+  const courseIds = new Set(coursePositions.keys());
+  const ids = [...supports.keys()].sort();
+  const memberIds = new Set(ids);
+  const children = new Map<string, string[]>();
+  const directCourse = new Map<string, string[]>();
+  (options.edges ?? []).forEach((edge) => {
+    if (!memberIds.has(edge.source) || !memberIds.has(edge.target)) return;
+    children.set(edge.source, [...(children.get(edge.source) ?? []), edge.target]);
+    if (courseIds.has(edge.target)) {
+      directCourse.set(edge.source, [...(directCourse.get(edge.source) ?? []), edge.target]);
+    }
+  });
+  const levels = new Map<string, number>();
+  const levelOf = (id: string, stack: Set<string>): number => {
+    const cached = levels.get(id);
+    if (cached !== undefined) return cached;
+    if (stack.has(id)) return 0;
+    stack.add(id);
+    const direct = (directCourse.get(id)?.length ?? 0) > 0;
+    const kids = direct ? [] : (children.get(id) ?? []).filter((child) => memberIds.has(child));
+    const value = kids.length ? 1 + Math.max(...kids.map((child) => levelOf(child, stack))) : 0;
+    stack.delete(id);
+    levels.set(id, value);
+    return value;
+  };
+  ids.forEach((id) => levelOf(id, new Set()));
+
+  const groups = new Map<string, Array<{ id: string; anchor: { x: number; y: number; z: number } }>>();
+  const empty: string[] = [];
+  ids.forEach((id) => {
+    const supported = (supports.get(id) ?? []).flatMap((courseId) => {
+      const position = coursePositions.get(courseId);
+      return position ? [position] : [];
+    });
+    if (!supported.length) { empty.push(id); return; }
+    const level = levels.get(id) ?? 0;
+    const anchor = {
+      x: supported.reduce((sum, point) => sum + point.x, 0) / supported.length + (level % 2) * 32,
+      // y is layout-down: indirect capabilities sit visibly below/behind their
+      // supports instead of piling on the same screen point.
+      y: supported.reduce((sum, point) => sum + point.y, 0) / supported.length + level * 54,
+      z: baseZ - level * 72
+    };
+    const key = `${Math.round(anchor.x / groupSize)}:${Math.round(anchor.y / groupSize)}`;
+    groups.set(key, [...(groups.get(key) ?? []), { id, anchor }]);
+  });
+  const positions = new Map<string, ImmersivePoint>();
+  [...groups.entries()].sort(([left], [right]) => left.localeCompare(right)).forEach(([, members]) => {
+    const anchorX = members.reduce((sum, member) => sum + member.anchor.x, 0) / members.length;
+    const anchorY = members.reduce((sum, member) => sum + member.anchor.y, 0) / members.length;
+    const anchorZ = Math.min(...members.map((member) => member.anchor.z));
+    const sorted = [...members].sort((left, right) => left.id.localeCompare(right.id));
+    const columns = sorted.length <= 2 ? sorted.length : sorted.length <= 4 ? 2 : 3;
+    const rows = Math.ceil(sorted.length / columns);
+    sorted.forEach((member, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      positions.set(member.id, {
+        x: anchorX + (column - (columns - 1) / 2) * spacingX,
+        y: anchorY + (row - (rows - 1) / 2) * spacingY,
+        z: anchorZ - (index % 3) * 6
+      });
+    });
+  });
+  empty.forEach((id) => {
+    const position = fallback.get(id) ?? { x: 0, y: 0, z: baseZ };
+    positions.set(id, { x: position.x, y: position.y, z: Math.min(baseZ, position.z) });
+  });
+  return positions;
+}
+
 function capabilityPositions(courseLayout: ImmersiveCourseLayout, model: CapabilityModel) {
   const courseNodes = new Map(courseLayout.nodes.filter((node): node is ImmersiveKnowledgeNode => node.kind === "knowledge").map((node) => [node.id, node]));
   const memberIds = new Set(model.orderedNodeIds);
@@ -357,61 +515,30 @@ function capabilityPositions(courseLayout: ImmersiveCourseLayout, model: Capabil
     outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge.target]);
   });
   const courseIds = new Set(model.courseKnowledgeIds);
-  const descendants = new Map<string, string[]>();
-  const descendantCache = new Map<string, string[]>();
-  const courseDescendants = (id: string): string[] => {
-    const cached = descendantCache.get(id);
-    if (cached) return cached;
-    const found = new Set<string>();
-    const stack = [...(outgoing.get(id) ?? [])].sort();
-    const seen = new Set<string>();
-    while (stack.length) {
-      const next = stack.shift()!;
-      if (seen.has(next)) continue;
-      seen.add(next);
-      if (courseIds.has(next) && next !== id) found.add(next);
-      stack.push(...[...(outgoing.get(next) ?? [])].sort());
-    }
-    const result = [...found].sort();
-    descendantCache.set(id, result);
-    return result;
-  };
   const positions = new Map<string, ImmersivePoint>();
   const courseEntries = model.orderedNodeIds.filter((id) => courseIds.has(id));
-  const fallbackIndex = new Map<string, number>();
   courseEntries.forEach((id, index) => {
     const node = courseNodes.get(id);
     if (node) positions.set(id, { x: node.x, y: node.y, z: 0 });
     else {
       const column = index % 5;
-      fallbackIndex.set(id, index);
       positions.set(id, { x: (column - 2) * 210, y: Math.floor(index / 5) * 90 - 120, z: 0 });
     }
   });
-  const bridgeGroups = new Map<string, string[]>();
+  const supportInfo = capabilitySupportByNode(model);
+  const supports = new Map<string, string[]>();
+  supportInfo.forEach((info, id) => supports.set(id, info.all));
   const bridgeIds = model.orderedNodeIds.filter((id) => !courseIds.has(id) && memberIds.has(id));
-  bridgeIds.forEach((id) => {
-    const support = courseDescendants(id)[0] ?? "root";
-    bridgeGroups.set(support, [...(bridgeGroups.get(support) ?? []), id]);
+  // The old fan-out is only a fallback for a member that has no factual path
+  // to Course Knowledge (it must not happen in a valid model, but a fallback
+  // keeps the renderer deterministic instead of stacking at the origin).
+  const courseCentre = [...positions.values()][0] ?? { x: 0, y: 0, z: 0 };
+  const fallback = new Map<string, ImmersivePoint>();
+  bridgeIds.forEach((id, index) => {
+    fallback.set(id, { x: courseCentre.x + (index % 3) * 18, y: courseCentre.y - 40 - index * 6, z: -280 });
   });
-  // Non-course ancestors sit on deeper planes directly behind the course
-  // Knowledge they support. They fan out deterministically so a group is
-  // readable once rotation reveals the back plane, and never shares a point.
-  [...bridgeGroups.entries()].forEach(([support, ids], groupIndex) => {
-    const anchor = positions.get(support) ?? { x: 0, y: 0, z: 0 };
-    const sorted = [...ids].sort();
-    const columns = sorted.length > 1 ? 2 : 1;
-    const rows = Math.ceil(sorted.length / columns);
-    sorted.forEach((id, index) => {
-      const column = index % columns;
-      const row = Math.floor(index / columns);
-      positions.set(id, {
-        x: anchor.x + (column - (columns - 1) / 2) * 168,
-        y: anchor.y - 54 - (rows - 1 - row) * 56 - (groupIndex % 2) * 26,
-        z: -280 - groupIndex * 34 - row * 46
-      });
-    });
-  });
+  const anchors = placeCapabilityAnchors(supports, positions, fallback, { edges: model.supportEdges });
+  anchors.forEach((position, id) => positions.set(id, position));
   model.orderedNodeIds.forEach((id, index) => {
     if (positions.has(id)) return;
     positions.set(id, { x: (index % 5 - 2) * 210, y: Math.floor(index / 5) * 90 - 120, z: 0 });
@@ -425,13 +552,15 @@ function capabilityPositions(courseLayout: ImmersiveCourseLayout, model: Capabil
  * course Knowledge they support on deeper planes. No layer frame is drawn.
  */
 export function buildCapabilitySceneLayout(courseLayout: ImmersiveCourseLayout, model: CapabilityModel): ImmersiveCapabilityLayout {
-  const { positions, courseIds, incoming, outgoing } = capabilityPositions(courseLayout, model);
+  const { positions, courseIds } = capabilityPositions(courseLayout, model);
+  const supportInfo = capabilitySupportByNode(model);
   const memberIds = new Set(model.orderedNodeIds);
   const supportEdges = model.supportEdges.filter((edge) => memberIds.has(edge.source) && memberIds.has(edge.target));
   const nodes: ImmersiveCapabilityNode[] = model.orderedNodeIds.map((id) => {
     const course = courseIds.has(id);
     const position = positions.get(id) ?? { x: 0, y: 0, z: 0 };
     const knowledge = courseLayout.nodes.find((node): node is ImmersiveKnowledgeNode => node.kind === "knowledge" && node.id === id);
+    const info = supportInfo.get(id);
     return {
       id,
       kind: "capability",
@@ -440,12 +569,14 @@ export function buildCapabilitySceneLayout(courseLayout: ImmersiveCourseLayout, 
       y: position.y,
       z: position.z,
       width: course ? 168 : 148,
-      height: 30,
+      height: course ? 30 : 46,
       status: knowledge?.status ?? "available",
       current: model.currentKnowledgeIds.includes(id),
       course,
       bridge: !course,
-      courseNode: knowledge?.node
+      courseNode: knowledge?.node,
+      directSupports: info?.direct,
+      indirectSupports: info?.indirect
     };
   });
   const nodeById = new Map(nodes.map((node) => [node.id, node]));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placeAtlasLabels } from "./atlasLabels";
+import { placeAtlasKnowledgeLabels, placeAtlasLabels, type AtlasKnowledgeLabelCandidate } from "./atlasLabels";
 
 const viewport = { width: 1200, height: 800 };
 
@@ -81,5 +81,54 @@ describe("HUD exclusions and duplicate label suppression", () => {
       { key: "topic:mlp", kind: "topic", text: "Multi-Layer Perceptron", x: 100, y: 100, width: 160, height: 28, priority: 350, alpha: 1 }
     ], viewport);
     expect(placed.map((label) => label.key)).toEqual(["node:mlp"]);
+  });
+});
+
+describe("knowledge labels stay anchored to their own node", () => {
+  const knowledge = (overrides: Partial<AtlasKnowledgeLabelCandidate> & Pick<AtlasKnowledgeLabelCandidate, "nodeId" | "x" | "y">): AtlasKnowledgeLabelCandidate => ({
+    key: `node:${overrides.nodeId}`,
+    text: overrides.nodeId,
+    diameter: 16,
+    width: 100,
+    height: 22,
+    priority: 100,
+    alpha: 1,
+    ...overrides
+  });
+
+  it("uses one of the four anchors next to the node and never relocates it", () => {
+    const placed = placeAtlasKnowledgeLabels([knowledge({ nodeId: "a", x: 400, y: 300 })], viewport);
+    expect(placed).toHaveLength(1);
+    expect(["above", "right", "below", "left"]).toContain(placed[0].anchor);
+    expect(Math.abs(placed[0].x - 400)).toBeLessThan(120);
+    expect(Math.abs(placed[0].y - 300)).toBeLessThan(120);
+  });
+
+  it("hides the name when every anchor collides", () => {
+    const node = knowledge({ nodeId: "dense", x: 400, y: 300 });
+    const obstacles = [
+      { x: 300, y: 200, width: 200, height: 220 },
+      { x: 420, y: 240, width: 220, height: 160 }
+    ];
+    expect(placeAtlasKnowledgeLabels([node], viewport, { obstacles })).toEqual([]);
+  });
+
+  it("registers at most one name per node and suppresses duplicate text", () => {
+    const placed = placeAtlasKnowledgeLabels([
+      knowledge({ nodeId: "a", x: 300, y: 300 }),
+      knowledge({ nodeId: "a", x: 300, y: 300, priority: 50 }),
+      knowledge({ nodeId: "b", text: "a", x: 800, y: 300 })
+    ], viewport);
+    expect(placed).toHaveLength(1);
+    expect(placed[0].nodeId).toBe("a");
+  });
+
+  it("prefers the core / selected label over other names", () => {
+    const placed = placeAtlasKnowledgeLabels([
+      knowledge({ nodeId: "core", x: 400, y: 300, priority: 2000 }),
+      knowledge({ nodeId: "other", x: 402, y: 300, priority: 10 })
+    ], viewport);
+    expect(placed[0].nodeId).toBe("core");
+    expect(placed.length).toBeGreaterThanOrEqual(1);
   });
 });

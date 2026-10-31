@@ -5,6 +5,7 @@ import type { CourseChapterTree } from "../graph/courseChapterTree";
 import {
   buildCapabilitySceneLayout,
   buildImmersiveCourseLayout,
+  capabilitySupportByNode,
   clearImmersiveLayoutCache,
   flattenCapabilityLayout,
   immersiveLayoutLoadCount,
@@ -12,7 +13,8 @@ import {
   layoutCapabilityFlattenLayout,
   layoutVerticalRoute,
   layoutVerticalRouteFlow,
-  loadImmersiveCourseLayout
+  loadImmersiveCourseLayout,
+  placeCapabilityAnchors
 } from "./immersiveLayout";
 
 const tree: CourseChapterTree = {
@@ -95,6 +97,51 @@ const model: CapabilityModel = {
 
 beforeEach(() => clearImmersiveLayoutCache());
 
+describe("capability support and placement", () => {
+  it("counts direct and indirect factual support without unexplained zeros", () => {
+    const direct = capabilitySupportByNode(model);
+    expect(direct.get("B1")).toMatchObject({ direct: ["K1"], indirect: [] });
+    expect(direct.get("B2")).toMatchObject({ direct: ["K3"], indirect: [] });
+    const chained: CapabilityModel = {
+      ...model,
+      orderedNodeIds: ["A1", "B1", "K1", "K2"],
+      supportEdges: [
+        { id: "a1", source: "A1", target: "B1", strength: "hard", relation: "prerequisite" },
+        { id: "a2", source: "B1", target: "K1", strength: "hard", relation: "prerequisite" },
+        { id: "a3", source: "B1", target: "K2", strength: "hard", relation: "prerequisite" }
+      ],
+      courseKnowledgeIds: ["K1", "K2"],
+      currentKnowledgeIds: [],
+      bridgeKnowledgeIds: ["A1", "B1"]
+    };
+    const chainedSupport = capabilitySupportByNode(chained);
+    expect(chainedSupport.get("A1")).toMatchObject({ direct: [], indirect: ["K1", "K2"] });
+    expect(chainedSupport.get("B1")).toMatchObject({ direct: ["K1", "K2"], indirect: [] });
+  });
+
+  it("places a capability behind the centre of the Knowledge it supports", () => {
+    const positions = new Map([
+      ["K1", { x: -100, y: 40, z: 0 }],
+      ["K2", { x: 100, y: -20, z: 0 }]
+    ]);
+    const placement = placeCapabilityAnchors(new Map([["C1", ["K1", "K2"]]]), positions);
+    expect(placement.get("C1")).toMatchObject({ x: 0, y: 10 });
+    expect(placement.get("C1")!.z).toBeLessThan(-200);
+  });
+
+  it("fans several capabilities sharing an anchor around that anchor without a corner pile", () => {
+    const positions = new Map([["K1", { x: 40, y: 30, z: 0 }]]);
+    const supports = new Map([["C1", ["K1"]], ["C2", ["K1"]], ["C3", ["K1"]], ["C4", ["K1"]]]);
+    const placement = placeCapabilityAnchors(supports, positions);
+    const points = [...placement.values()];
+    expect(new Set(points.map((point) => `${point.x}:${point.y}`)).size).toBe(points.length);
+    points.forEach((point) => {
+      expect(Math.hypot(point.x - 40, point.y - 30)).toBeLessThanOrEqual(100);
+      expect(point.z).toBeLessThan(-200);
+    });
+  });
+});
+
 describe("immersive course layout", () => {
   it("uses one ELK-derived layout for a structural revision and reuses it across presentation changes", async () => {
     const loader = vi.fn(async () => tree);
@@ -139,8 +186,8 @@ describe("immersive course layout", () => {
     const bridge = spatial.nodes.find((node) => node.id === "B1")!;
     const course = spatial.nodes.find((node) => node.id === "K1")!;
     expect(bridge.bridge).toBe(true);
-    expect(Math.abs(bridge.x - course.x)).toBeLessThanOrEqual(84);
-    expect(bridge.y).toBeLessThan(course.y);
+    expect(Math.abs(bridge.x - course.x)).toBeLessThanOrEqual(8);
+    expect(Math.abs(bridge.y - course.y)).toBeLessThanOrEqual(8);
     expect(bridge.z).toBeLessThan(course.z);
   });
 

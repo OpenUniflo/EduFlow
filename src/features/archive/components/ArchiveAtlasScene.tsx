@@ -10,11 +10,11 @@ import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRe
 import type { ArchiveEdge, ArchiveNode } from "../model/atlasModel";
 import type { AtlasCommunity } from "../model/atlasCommunities";
 import type { Vec3 } from "../model/atlas3dLayout";
-import { placeAtlasLabels, type AtlasLabelCandidate, type AtlasLabelRect } from "../model/atlasLabels";
+import { placeAtlasKnowledgeLabels, placeAtlasLabels, type AtlasKnowledgeLabelCandidate, type AtlasLabelCandidate, type AtlasLabelRect } from "../model/atlasLabels";
 import {
-  chooseExcentricNodes,
   chooseTiltedLabels,
-  layoutExcentric,
+  findExcentricCluster,
+  layoutExcentricOutside,
   simplificationForAngle
 } from "@/shared/scene/tiltedPlane";
 import type { PlaneChapter } from "../model/coursePlaneLayout";
@@ -72,6 +72,27 @@ export type ArchiveAtlasSceneProps = {
 type DomainGroup = { id: string; name: string; color: string; indices: number[] };
 
 type PersonRing = { index: number; color1: THREE.Color; color2: THREE.Color; split: number; alpha: number };
+
+type AtlasRenderedLabel = {
+  key: string;
+  kind: AtlasLabelCandidate["kind"];
+  text: string;
+  width: number;
+  height: number;
+  alpha: number;
+  strong?: boolean;
+  /** Knowledge labels are re-anchored to their node every frame. */
+  nodeIndex?: number;
+  anchor?: "above" | "right" | "below" | "left";
+  diameter?: number;
+  /** Domain / topic labels follow their centroid with a fixed small offset. */
+  world?: { x: number; y: number; z: number };
+  offsetX?: number;
+  offsetY?: number;
+  /** Static fallback for chapter / column labels. */
+  x?: number;
+  y?: number;
+};
 
 const FOV = 40;
 const FOV_T = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
@@ -142,12 +163,18 @@ function regionTexture() {
 }
 
 function estimateLabelWidth(text: string, small: string, kind: AtlasLabelCandidate["kind"]) {
+  if (kind === "knowledge") {
+    let width = 0;
+    for (const character of text) width += character.charCodeAt(0) > 255 ? 12 : 6.5;
+    // Match the actual DOM box (8px horizontal padding each side + border),
+    // otherwise a wide estimated box pushes a left-anchored name away from
+    // its node and hides labels that would have fit.
+    return width + 18;
+  }
   let width = 0;
   for (const character of text) width += character.charCodeAt(0) > 255 ? 13 : 7;
   for (const character of small) width += character.charCodeAt(0) > 255 ? 11 : 6;
   const padding = kind === "domain" ? 34 : kind === "topic" ? 28 : kind === "chapter" || kind === "column" ? 26 : 22;
-  // The DOM label is slightly wider than the glyph estimate (padding, dot,
-  // blur border); keep a safety margin so collision and clamping match reality.
   return width + padding + (small ? 10 : 0) + 10;
 }
 
@@ -194,6 +221,7 @@ export default function ArchiveAtlasScene({
 }: ArchiveAtlasSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
+  const labelLinesRef = useRef<SVGSVGElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
   const sideLabelsRef = useRef<HTMLDivElement>(null);
   const exLabelsRef = useRef<HTMLDivElement>(null);
@@ -307,6 +335,14 @@ export default function ArchiveAtlasScene({
   const paletteRef = useRef({ edge: "#8b93b5", bright: "#b9b1ff", brandInk: "#4338ca", star: "#9aa6da", global: "#ffb454" });
   const labelPoolRef = useRef(new Map<string, HTMLDivElement>());
   const lastLabelFrameRef = useRef(0);
+  const archiveLabelsRef = useRef({
+    labels: [] as AtlasRenderedLabel[],
+    info: new Map<string, { text: string; small?: string; dot?: string; strong?: boolean }>(),
+    frozen: false,
+    lastMoveAt: 0,
+    camera: new THREE.Vector3(0, 0, 0),
+    target: new THREE.Vector3(0, 0, 0)
+  });
 
   function getPosition(index: number) {
     const current = engineRef.current?.current;
@@ -975,6 +1011,8 @@ export default function ArchiveAtlasScene({
         },
         chapters: () => [...planeChapterObjects.keys()],
         selected: () => propsRef.current.selectedId,
+        hoveredId: () => (hoveredRef.current === null ? null : propsRef.current.nodes[hoveredRef.current]?.id ?? null),
+        pointer: () => planePointer,
         personSets: () => propsRef.current.people.flatMap((person) => [...person.nodeIds]),
         mode: () => propsRef.current.mode,
         peopleSizes: () => propsRef.current.people.map((person) => person.nodeIds.size),
@@ -984,7 +1022,15 @@ export default function ArchiveAtlasScene({
         frozen: () => planeLabelsFrozen,
         dirty: () => planeLabelsDirty,
         labelCandidates: () => planeLabelCandidates().map((candidate) => ({ id: candidate.id, x: Math.round(candidate.x), y: Math.round(candidate.y), distance: candidate.distance, diameter: Number(candidate.diameter.toFixed(1)), visibility: Number(candidate.visibility.toFixed(2)), priority: candidate.priority, text: candidate.text })),
-        ex: () => ({ visible: planeExVisible, ids: planeExRows })
+        ex: () => ({ visible: planeExVisible, ids: planeExRows }),
+        archiveFrozen: () => archiveLabelsRef.current.frozen,
+        archiveDown: () => Boolean(downRef.current),
+        archiveLabels: () => archiveLabelsRef.current.labels.map((label) => ({
+          key: label.key, kind: label.kind, text: label.text,
+          x: Number((label.x ?? 0).toFixed(1)), y: Number((label.y ?? 0).toFixed(1)),
+          w: Number(label.width.toFixed(1)), h: label.height,
+          nodeIndex: label.nodeIndex, anchor: label.anchor ?? null, alpha: label.alpha ?? 1, diameter: label.diameter ?? null
+        }))
       };
     }
     window.requestAnimationFrame(() => onReady?.());
@@ -1062,11 +1108,15 @@ export default function ArchiveAtlasScene({
     const onPointerDown = (event: PointerEvent) => {
       cameraTweenRef.current.active = false;
       downRef.current = { x: event.clientX, y: event.clientY, time: performance.now(), button: event.button };
+      archiveLabelsRef.current.frozen = true;
+      archiveLabelsRef.current.lastMoveAt = performance.now();
       freezePlaneLabels();
       hidePlaneEx();
     };
     const onWheel = () => {
       cameraTweenRef.current.active = false;
+      archiveLabelsRef.current.frozen = true;
+      archiveLabelsRef.current.lastMoveAt = performance.now();
       freezePlaneLabels();
       schedulePlaneThaw(260);
       hidePlaneEx();
@@ -1103,6 +1153,7 @@ export default function ArchiveAtlasScene({
         hoverPointRef.current = id === null ? null : { x: event.clientX - rect.left, y: event.clientY - rect.top };
         const nodeId = id === null ? null : propsRef.current.nodes[id]?.id ?? null;
         propsRef.current.onHoverNode?.(nodeId, hoverPointRef.current);
+        planeLabelsDirty = true;
         presentationTargets();
         startPresentationAnimation(160);
       }
@@ -1117,6 +1168,7 @@ export default function ArchiveAtlasScene({
       hoverPointRef.current = null;
       renderer.domElement.style.cursor = "";
       propsRef.current.onHoverNode?.(null, null);
+      planeLabelsDirty = true;
       presentationTargets();
       startPresentationAnimation(160);
     };
@@ -1256,6 +1308,22 @@ export default function ArchiveAtlasScene({
       glowMaterial.uniforms.uScale.value = sharedScale;
       glowMaterial.uniforms.uPixelRatio.value = pixelRatio;
       const courseMode = currentMode === "course" || currentMode === "draft";
+      // The name set freezes while the camera moves; labels only follow their
+      // nodes. 250ms after the last camera change the set is recomputed and
+      // changes cross-fade (200ms).
+      const cache = archiveLabelsRef.current;
+      const cameraMoved = camera.position.distanceToSquared(cache.camera) > 0.02
+        || controls.target.distanceToSquared(cache.target) > 0.02;
+      if (cameraMoved) {
+        cache.frozen = true;
+        cache.lastMoveAt = now;
+        cache.camera.copy(camera.position);
+        cache.target.copy(controls.target);
+        if (!planeLabelsFrozen) { planeLabelsFrozen = true; hidePlaneEx(); }
+      } else if (cache.frozen && now - cache.lastMoveAt > 250) {
+        cache.frozen = false;
+        if (planeLabelsFrozen) { planeLabelsFrozen = false; planeLabelsDirty = true; }
+      }
       updateChapterHover();
       drawCards(rect, courseMode);
       drawPlaneXray(courseMode);
@@ -1509,10 +1577,12 @@ export default function ArchiveAtlasScene({
     const planeCards = new Map<string, PlaneCardRuntime>();
     const planeChapterObjects = new Map<string, PlaneChapterRuntime>();
     const planeSidePool = new Map<string, HTMLDivElement>();
+    const planeSideVisibleTexts = new Set<string>();
     const planeLabelPrevious = new Set<string>();
     let planeLabelChoices: ReturnType<typeof chooseTiltedLabels> = [];
     let planeLabelsFrozen = false;
     let planeLabelsDirty = true;
+    let planeLabelLayerOn = false;
     let planeLabelTimer = 0;
     let planeLabelLast = 0;
     let planeExVisible = false;
@@ -1835,43 +1905,102 @@ export default function ArchiveAtlasScene({
     function rectHeightCss() { return renderer.domElement.clientHeight || 1; }
     function choosePlaneLabels() {
       const candidates = planeLabelCandidates();
-      const obstacles = candidates.map((candidate) => ({
-        id: candidate.id,
-        x: candidate.x - Math.max(12, candidate.diameter / 2 + 4),
-        y: candidate.y - Math.max(12, candidate.diameter / 2 + 4),
-        width: Math.max(24, candidate.diameter + 8),
-        height: Math.max(24, candidate.diameter + 8)
-      }));
       planeLabelChoices = chooseTiltedLabels(candidates.map(({ id, x, y, distance, diameter, visibility, priority, text }) => ({ id, x, y, distance, diameter, visibility, priority, text })), {
         width: renderer.domElement.clientWidth || 1,
         height: rectHeightCss(),
-        maxLabels: propsRef.current.selectedId ? 7 : 8,
+        // A hovered name is an addition, not a replacement: keep the whole
+        // distance/fit set and make room for the forced hover name.
+        maxLabels: planeHoveredId() !== null ? 9 : propsRef.current.selectedId ? 7 : 8,
         showDiameter: 14,
         hideDiameter: 10,
         lineHeight: 22,
         margin: 8,
         measure: sideTextWidth,
-        previous: planeLabelPrevious,
-        obstacles
+        previous: planeLabelPrevious
       });
       planeLabelPrevious.clear();
       planeLabelChoices.forEach((choice) => planeLabelPrevious.add(choice.id));
       planeLabelLast = performance.now();
       planeLabelsDirty = false;
     }
+    function planeHoveredId() {
+      const hoveredIndex = hoveredRef.current;
+      return hoveredIndex === null ? null : propsRef.current.nodes[hoveredIndex]?.id ?? null;
+    }
+    function placeOnePlaneLabel(candidate: ReturnType<typeof planeLabelCandidates>[number]) {
+      const placed = placeAtlasKnowledgeLabels([{
+        key: `node:${candidate.id}`,
+        nodeId: candidate.id,
+        text: candidate.text,
+        x: candidate.x,
+        y: candidate.y,
+        diameter: Math.max(12, candidate.diameter),
+        width: Math.max(24, sideTextWidth(candidate.text)),
+        height: 22,
+        priority: 0,
+        alpha: 1
+      }], { width: renderer.domElement.clientWidth || 1, height: rectHeightCss() }, {
+        margin: 8,
+        exclusions: [],
+        obstacles: [],
+        maxLabels: 1
+      });
+      return placed[0] ?? null;
+    }
     function updatePlaneLabels(rect: DOMRect, courseMode: boolean) {
       const angle = planeAngle();
-      if (!courseMode || angle <= 54) { planeLabelChoices = []; planeLabelPrevious.clear(); hidePlaneSideLabels(); return; }
-      if (!planeLabelsFrozen && planeLabelsDirty && performance.now() - planeLabelLast > 30) choosePlaneLabels();
-      const fade = smoothStep(55, 60, angle);
+      planeSideVisibleTexts.clear();
+      if (!courseMode || planeExVisible) { planeLabelChoices = []; planeLabelPrevious.clear(); hidePlaneSideLabels(); return; }
+      const hoveredId = planeHoveredId();
       const layer = sideLabelsRef.current;
       if (!layer) return;
+      // 35–55°: only the hovered name exists (the plane is read as dots), and
+      // the global layer adds at most three cross-course related names.
+      // 55°+: the distance / fit name layer stays intact; ordinary hover only
+      // forces the hovered node's name instead of replacing the whole set.
+      if (angle <= 54) {
+        planeLabelChoices = [];
+        planeLabelPrevious.clear();
+        planeLabelLayerOn = false;
+        const used = new Set<string>();
+        if (hoveredId && angle > 35) {
+          const runtime = planeCards.get(hoveredId);
+          const candidate = runtime ? planeLabelCandidates().find((entry) => entry.id === hoveredId) : null;
+          if (candidate) {
+            const placed = placeOnePlaneLabel(candidate);
+            const element = planeSidePool.get(hoveredId) ?? (() => {
+              const next = document.createElement("div");
+              next.className = "ef-atlas-plane-label";
+              layer.appendChild(next);
+              planeSidePool.set(hoveredId, next);
+              return next;
+            })();
+            if (element.textContent !== candidate.text) element.textContent = candidate.text;
+            element.style.transform = `translate(${(placed?.x ?? candidate.x - sideTextWidth(candidate.text) / 2).toFixed(1)}px, ${(placed?.y ?? candidate.y - 11).toFixed(1)}px)`;
+            element.style.opacity = "1";
+            used.add(hoveredId);
+            planeSideVisibleTexts.add(candidate.text.trim().toLocaleLowerCase());
+          }
+        }
+        planeSidePool.forEach((element, id) => { if (!used.has(id)) element.style.opacity = "0"; });
+        return;
+      }
+      if (!planeLabelLayerOn) {
+        planeLabelLayerOn = true;
+        planeLabelsDirty = true;
+      }
+      if (!planeLabelsFrozen && planeLabelsDirty && performance.now() - planeLabelLast > 30) choosePlaneLabels();
+      const fade = smoothStep(55, 60, angle);
+      const texts = new Set<string>();
       const used = new Set<string>();
-      root: for (const choice of planeLabelChoices) {
+      for (const choice of planeLabelChoices) {
         const runtime = planeCards.get(choice.id);
         if (!runtime) continue;
         const screen = runtime.screen;
         const labelNode = propsRef.current.nodes[runtime.index];
+        const textKey = (labelNode?.title ?? "").trim().toLocaleLowerCase();
+        if (textKey && texts.has(textKey)) continue;
+        if (textKey) texts.add(textKey);
         const width = Math.max(24, sideTextWidth(labelNode?.title ?? ""));
         // Use the stored anchor but let the label follow the card between recomputes.
         const anchorX = choice.anchor === "left" ? screen.x - width - 12 : choice.anchor === "right" ? screen.x + 12 : screen.x - width / 2;
@@ -1883,21 +2012,24 @@ export default function ArchiveAtlasScene({
           layer.appendChild(element);
           planeSidePool.set(choice.id, element);
         }
-        if (element.textContent !== choice.id) {
-          const node = propsRef.current.nodes[runtime.index];
-          element.textContent = node?.title ?? "";
+        if (element.textContent !== (labelNode?.title ?? "")) {
+          element.textContent = labelNode?.title ?? "";
         }
         element.style.transform = `translate(${anchorX.toFixed(1)}px, ${anchorY.toFixed(1)}px)`;
         element.style.opacity = (choice.alpha * fade).toFixed(3);
         used.add(choice.id);
+        if (textKey) planeSideVisibleTexts.add(textKey);
       }
       planeSidePool.forEach((element, id) => { if (!used.has(id)) element.style.opacity = "0"; });
     }
+
     function updateArchiveChapterLabel(courseMode: boolean) {
       const angle = planeAngle();
       const layer = sideLabelsRef.current;
       if (!layer) return;
-      const runtime = courseMode && angle > 35 && chapterHover ? planeChapterObjects.get(chapterHover) : null;
+      const runtime = courseMode && angle > 35 && !planeExVisible && hoveredRef.current === null && chapterHover
+        ? planeChapterObjects.get(chapterHover)
+        : null;
       let element = planeSidePool.get("__chapter__");
       if (!runtime) {
         if (element) element.style.opacity = "0";
@@ -1927,21 +2059,53 @@ export default function ArchiveAtlasScene({
       if (exLabelsRef.current) exLabelsRef.current.innerHTML = "";
       planeLabelsDirty = true;
     }
+    function planeScreenBounds() {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      cardRects.forEach((rect) => {
+        minX = Math.min(minX, rect.x);
+        minY = Math.min(minY, rect.y);
+        maxX = Math.max(maxX, rect.x + rect.width);
+        maxY = Math.max(maxY, rect.y + rect.height);
+      });
+      planeChapterObjects.forEach((runtime) => {
+        runtime.quad.forEach((point) => {
+          minX = Math.min(minX, point.x);
+          minY = Math.min(minY, point.y);
+          maxX = Math.max(maxX, point.x);
+          maxY = Math.max(maxY, point.y);
+        });
+      });
+      if (!Number.isFinite(minX)) {
+        return { x: (renderer.domElement.clientWidth || 1) / 2 - 220, y: (renderer.domElement.clientHeight || 1) / 2 - 160, width: 440, height: 320 };
+      }
+      return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+    }
     function drawPlaneEx(x: number, y: number) {
-      const rect = { width: planeViewport.width, height: planeViewport.height };
-      const candidates = planeLabelCandidates().map((candidate) => ({ id: candidate.id, x: candidate.x, y: candidate.y, distance: candidate.distance, visibility: candidate.visibility, text: candidate.text }));
-      const nodesNear = chooseExcentricNodes(candidates, { x, y }, { radius: 50, minNodes: 3, maxNodes: 6 });
-      if (nodesNear.length < 3) { hidePlaneEx(); return; }
-      const layout = layoutExcentric(nodesNear, { x, y }, { width: renderer.domElement.clientWidth || 1, height: rectHeightCss() }, {
-        measure: sideTextWidth, rowHeight: 22, margin: 12, topInset: 76, bottomInset: 76
+      const candidates = planeLabelCandidates();
+      const cluster = findExcentricCluster(
+        candidates.map((candidate) => ({ id: candidate.id, x: candidate.x, y: candidate.y, distance: candidate.distance, visibility: candidate.visibility, text: candidate.text })),
+        { x, y },
+        { radius: 22, minNodes: 3, maxNodes: 6, snap: 7 }
+      );
+      if (!cluster) { hidePlaneEx(); return; }
+      const list = cluster.nodes.slice();
+      const hoveredIndex = hoveredRef.current;
+      const hoveredNode = hoveredIndex === null ? null : propsRef.current.nodes[hoveredIndex];
+      if (hoveredNode && hoveredIndex !== null && !list.some((node) => node.id === hoveredNode.id)) {
+        const hoveredCandidate = candidates.find((candidate) => candidate.id === hoveredNode.id);
+        if (hoveredCandidate) list.push({ id: hoveredCandidate.id, x: hoveredCandidate.x, y: hoveredCandidate.y, distance: hoveredCandidate.distance, visibility: hoveredCandidate.visibility, text: hoveredCandidate.text });
+      }
+      const nodesForList = list.slice(0, 6).sort((left, right) => left.y - right.y || left.id.localeCompare(right.id));
+      const layout = layoutExcentricOutside(nodesForList, cluster.anchor, { width: renderer.domElement.clientWidth || 1, height: rectHeightCss() }, planeScreenBounds(), {
+        measure: sideTextWidth, rowHeight: 22, margin: 12, gap: 18, topInset: 76, bottomInset: 76, maxNodes: 6
       });
       if (!layout) { hidePlaneEx(); return; }
       planeExVisible = true;
-      planeExRows = nodesNear.map((node) => node.id);
       planeExAnchor = { x, y };
+      planeExRows = nodesForList.map((node) => node.id);
       const layer = exLabelsRef.current;
       if (!layer) return;
-      layer.innerHTML = `<svg class="ef-atlas-plane-ex-lines" width="${rect.width}" height="${rect.height}" aria-hidden="true">${layout.lines.map((line) => `<line x1="${line.x1.toFixed(1)}" y1="${line.y1.toFixed(1)}" x2="${line.x2.toFixed(1)}" y2="${line.y2.toFixed(1)}"/>`).join("")}</svg><div class="ef-atlas-plane-ex-column" style="left:0;top:0;width:${layout.width}px">${layout.rows.map((row) => `<button type="button" class="ef-atlas-plane-ex-item" data-id="${escapeHtml(row.id)}" style="left:${row.x.toFixed(1)}px;top:${row.y.toFixed(1)}px;width:${row.width.toFixed(1)}px;height:${row.height}px">${escapeHtml(row.text)}</button>`).join("")}</div>`;
+      layer.innerHTML = `<svg class="ef-atlas-plane-ex-lines" width="${renderer.domElement.clientWidth || 1}" height="${rectHeightCss()}" aria-hidden="true">${layout.lines.map((line) => `<line x1="${line.x1.toFixed(1)}" y1="${line.y1.toFixed(1)}" x2="${line.x2.toFixed(1)}" y2="${line.y2.toFixed(1)}"/>`).join("")}</svg><div class="ef-atlas-plane-ex-column" style="left:0;top:0;width:${layout.width}px">${layout.rows.map((row) => `<button type="button" class="ef-atlas-plane-ex-item" data-id="${escapeHtml(row.id)}" style="left:${row.x.toFixed(1)}px;top:${row.y.toFixed(1)}px;width:${row.width.toFixed(1)}px;height:${row.height}px">${escapeHtml(row.text)}</button>`).join("")}</div>`;
       layer.querySelectorAll<HTMLButtonElement>(".ef-atlas-plane-ex-item").forEach((button) => {
         const id = button.dataset.id!;
         button.addEventListener("pointerenter", () => {
@@ -1964,7 +2128,7 @@ export default function ArchiveAtlasScene({
       planeExTimer = window.setTimeout(() => {
         if (downRef.current || planeAngle() <= 35) return;
         drawPlaneEx(x, y);
-      }, 300);
+      }, 400);
     }
     function updateChapterHover() {
       if (!planePointerInside || downRef.current || planeAngle() <= 35 || !planePointer) { chapterHover = null; return; }
@@ -2009,6 +2173,27 @@ export default function ArchiveAtlasScene({
       return result;
     }
 
+    function knowledgeAnchorRect(point: { x: number; y: number }, width: number, height: number, diameter: number, anchor: "above" | "right" | "below" | "left") {
+      // The name sits on the node's own edge: a 4–5px visual gap, not a
+      // distant free slot. Wide names still extend away from the marker, but
+      // their near edge stays attached to it.
+      const radius = Math.max(6, Math.min(24, diameter / 2 + 1));
+      const gap = 4;
+      if (anchor === "right") return { x: point.x + radius + gap, y: point.y - height / 2, width, height };
+      if (anchor === "left") return { x: point.x - radius - gap - width, y: point.y - height / 2, width, height };
+      if (anchor === "below") return { x: point.x - width / 2, y: point.y + radius + gap, width, height };
+      return { x: point.x - width / 2, y: point.y - radius - gap - height, width, height };
+    }
+
+    /** Drawn knowledge label rect: on the node's visible edge (<=8px gap). */
+    function knowledgeDrawRect(point: { x: number; y: number }, width: number, height: number, diameter: number, anchor: "above" | "right" | "below" | "left") {
+      const radius = Math.max(6, Math.min(24, diameter / 4.4));
+      if (anchor === "right") return { x: point.x + radius, y: point.y - height / 2, width, height };
+      if (anchor === "left") return { x: point.x - radius - width, y: point.y - height / 2, width, height };
+      if (anchor === "below") return { x: point.x - width / 2, y: point.y + radius, width, height };
+      return { x: point.x - width / 2, y: point.y - radius - height, width, height };
+    }
+
     function drawLabels(now: number, context: {
       rect: DOMRect;
       far: number;
@@ -2024,154 +2209,262 @@ export default function ArchiveAtlasScene({
       communityCentroids: Array<{ x: number; y: number; z: number; spread: number; alpha: number }>;
       hovered: number | null;
     }) {
-      if (now - lastLabelFrameRef.current < 24) return;
+      if (now - lastLabelFrameRef.current < 8) return;
       lastLabelFrameRef.current = now;
       if (!hudRects.length || now - lastHudAt > 220) {
         lastHudAt = now;
         hudRects = collectHudRects(context.rect);
       }
-      const candidates: AtlasLabelCandidate[] = [];
-      const info = new Map<string, { text: string; small?: string; dot?: string; strong?: boolean }>();
+      const cache = archiveLabelsRef.current;
       const currentProps = propsRef.current;
       const personCoverage = currentProps.people.map((person) => ({ name: person.name, ids: person.nodeIds }));
       const selectionDim = context.selected !== null ? 0.3 : 1;
-      if (!context.courseMode) {
-        const domainFade = context.level >= 2 ? 0 : 1 - smoothStep(0.12, 0.5, context.near);
-        const domainAlpha = (context.far + 0.72 * context.mid) * domainFade * selectionDim * (currentProps.mode === "person" ? 0.8 : 1);
-        if (domainAlpha > 0.06) {
-          engine.domainGroups.forEach((group, index) => {
-            const centroid = context.domainCentroids[index];
-            const point = project({ x: centroid.x, y: centroid.y + centroid.spread * 0.18, z: centroid.z });
-            if (point.z > 1) return;
-            const text = group.name;
-            const small = personCoverage.length
-              ? `${personCoverage.map((person) => `${person.name} ${group.indices.filter((nodeIndex) => person.ids.has(currentProps.nodes[nodeIndex].id)).length}`).join(" · ")} / ${group.indices.length}`
-              : `${group.indices.length} 个知识`;
-            const width = estimateLabelWidth(text, small, "domain");
-            const key = `domain:${group.id}`;
-            candidates.push({ key, kind: "domain", text, x: point.x - width / 2, y: point.y - labelHeight("domain") * 0.5, width, height: labelHeight("domain"), priority: 1000 - index, force: true, alpha: domainAlpha });
-            info.set(key, { text, small });
+      // A drag owns the label set even if a previous thaw timer fires mid-drag.
+      if ((!cache.frozen && downRef.current === null) || !cache.labels.length) {
+        const otherCandidates: AtlasLabelCandidate[] = [];
+        const knowledgeCandidates: AtlasKnowledgeLabelCandidate[] = [];
+        const knowledgeObstacles: AtlasLabelRect[] = [];
+        const info = new Map<string, { text: string; small?: string; dot?: string; strong?: boolean }>();
+        const worldByKey = new Map<string, { x: number; y: number; z: number }>();
+        const indexByKnowledgeKey = new Map<string, number>();
+        if (!context.courseMode) {
+          const domainFade = context.level >= 2 ? 0 : 1 - smoothStep(0.12, 0.5, context.near);
+          const domainAlpha = (context.far + 0.72 * context.mid) * domainFade * selectionDim * (currentProps.mode === "person" ? 0.8 : 1);
+          if (domainAlpha > 0.06) {
+            engine.domainGroups.forEach((group, index) => {
+              const centroid = context.domainCentroids[index];
+              const world = { x: centroid.x, y: centroid.y + centroid.spread * 0.18, z: centroid.z };
+              const point = project(world);
+              if (point.z > 1) return;
+              const text = group.name;
+              const small = personCoverage.length
+                ? `${personCoverage.map((person) => `${person.name} ${group.indices.filter((nodeIndex) => person.ids.has(currentProps.nodes[nodeIndex].id)).length}`).join(" · ")} / ${group.indices.length}`
+                : `${group.indices.length} 个知识`;
+              const width = estimateLabelWidth(text, small, "domain");
+              const key = `domain:${group.id}`;
+              otherCandidates.push({ key, kind: "domain", text, x: point.x - width / 2, y: point.y - labelHeight("domain") * 0.5, width, height: labelHeight("domain"), priority: 1000 - index, force: true, alpha: domainAlpha });
+              worldByKey.set(key, world);
+              info.set(key, { text, small });
+            });
+          }
+          const topicFade = context.level >= 2 ? 0 : 1 - smoothStep(0.42, 0.78, context.near);
+          const topicAlpha = (context.level >= 1 ? 1 : 0) * context.mid * (currentProps.mode === "person" ? 0.65 : 1) * (1 - context.far) * topicFade * selectionDim;
+          const knowledgeTitles = new Set<string>();
+          const knowledgeLabelIndices = context.level === 2
+            ? Array.from({ length: count }, (_, index) => index).filter((index) => engine.alpha[index] >= 0.3)
+            : [context.selected, context.hovered].filter((index): index is number => index !== null);
+          knowledgeLabelIndices.forEach((index) => {
+            const node = currentProps.nodes[index];
+            if (node) knowledgeTitles.add(node.title.trim().toLocaleLowerCase());
           });
-        }
-        const topicFade = context.level >= 2 ? 0 : 1 - smoothStep(0.42, 0.78, context.near);
-        const topicAlpha = (context.level >= 1 ? 1 : 0) * context.mid * (currentProps.mode === "person" ? 0.65 : 1) * (1 - context.far) * topicFade * selectionDim;
-        // Suppress a topic only when a knowledge label with the same name is
-        // actually on screen. At the topic layer knowledge labels are hidden,
-        // so their titles must not swallow the topic labels.
-        const knowledgeTitles = new Set<string>();
-        const knowledgeLabelIndices = context.level === 2
-          ? Array.from({ length: count }, (_, index) => index).filter((index) => engine.alpha[index] >= 0.3)
-          : [context.selected, context.hovered].filter((index): index is number => index !== null);
-        knowledgeLabelIndices.forEach((index) => {
-          const node = currentProps.nodes[index];
-          if (node) knowledgeTitles.add(node.title.trim().toLocaleLowerCase());
-        });
-        if (topicAlpha > 0.06) {
-          engine.communityGroups.forEach((group, index) => {
-            if (group.indices.length < 2) return;
-            if (knowledgeTitles.has(group.name.trim().toLocaleLowerCase())) return;
-            const centroid = context.communityCentroids[index];
-            const point = project(centroid);
-            if (point.z > 1) return;
-            const text = group.name;
-            const small = `· ${group.indices.length} 个`;
-            const dot = resolveColor(currentProps.nodes[group.indices[0]]?.color ?? "#8b93b5");
-            const width = estimateLabelWidth(text, small, "topic");
-            const key = `topic:${group.name}:${group.indices[0]}`;
-            candidates.push({ key, kind: "topic", text, x: point.x - width / 2, y: point.y - labelHeight("topic"), width, height: labelHeight("topic"), priority: 320 + group.indices.length, alpha: topicAlpha });
-            info.set(key, { text, small, dot });
-          });
-        }
-        // Knowledge labels only appear once the near layer is the dominant one,
-        // matching the level chip instead of switching a layer early.
-        const knowledgeAlpha = context.level === 2 ? Math.min(1, context.near * 2.2) : 0;
-        const coreNodeIds = new Set(currentProps.people.flatMap((person) => Array.from(person.nodeIds)));
-        const personMode = currentProps.mode === "person" && currentProps.people.length > 0;
-        const hover = context.hovered;
-        for (let index = 0; index < count; index += 1) {
-          const node = currentProps.nodes[index];
-          if (!node) continue;
-          const forced = index === context.selected || index === hover || context.neighborSet?.has(index) || context.searchSet.has(index) || context.assistantSet.has(index);
-          const core = personMode && coreNodeIds.has(node.id);
-          // Person-centred near view names only the focused people's core
-          // knowledge; every other node stays a point unless hovered, selected
-          // or a one-hop neighbour of the selection.
-          if (!forced && personMode && !core) continue;
-          if (!forced && (knowledgeAlpha < 0.08 || engine.alpha[index] < 0.3)) continue;
-          const point = project(getPosition(index));
-          if (point.z > 1) continue;
-          const text = node.title;
-          const width = estimateLabelWidth(text, "", "knowledge");
-          const key = `node:${node.id}`;
-          candidates.push({
-            key,
-            kind: "knowledge",
-            text,
-            x: point.x - width / 2,
-            y: point.y - labelHeight("knowledge") - 8,
-            width,
-            height: labelHeight("knowledge"),
-            priority: forced ? 2200 + (index === context.selected ? 300 : 0) : 600 + engine.neighbors[index].length * 4,
-            alpha: forced ? 1 : knowledgeAlpha,
-            // Core labels stay visible by nudging outside the ring obstacle.
-            force: personMode && core
-          });
-          info.set(key, { text, dot: resolveColor(node.color), strong: forced });
-        }
-      } else {
-        const hover = context.hovered;
-        const planeSet = currentProps.planeNodeIds ?? new Set<string>();
-        for (let index = 0; index < count; index += 1) {
-          const node = currentProps.nodes[index];
-          if (!node || planeSet.has(node.id) || currentProps.draftIds.includes(node.id)) continue;
-          const isGlobalNeighbor = hover !== null && engine.neighbors[hover].includes(index);
-          if (!isGlobalNeighbor) continue;
-          const point = project(getPosition(index));
-          if (point.z > 1) continue;
-          const text = node.title;
-          const width = estimateLabelWidth(text, "", "knowledge");
-          const key = `node:${node.id}`;
-          candidates.push({ key, kind: "knowledge", text, x: point.x - width / 2, y: point.y - labelHeight("knowledge") - 12, width, height: labelHeight("knowledge"), priority: 2400, alpha: 1, force: true });
-          info.set(key, { text, dot: resolveColor(node.color), strong: true });
-        }
-      }
-      const cardObstacles: AtlasLabelRect[] = Array.from(cardRects.values()).map((rect) => ({
-        x: rect.x - 3,
-        y: rect.y - 3,
-        width: rect.width + 6,
-        // Include the optional current/target badge hanging below the card.
-        height: rect.height + 11
-      }));
-      const coreObstacles: AtlasLabelRect[] = [];
-      if (!context.courseMode && currentProps.mode === "person") {
-        currentProps.people.forEach((person) => {
-          person.nodeIds.forEach((id) => {
-            const index = engine.nodeIndex.get(id);
-            if (index === undefined) return;
+          if (topicAlpha > 0.06) {
+            engine.communityGroups.forEach((group, index) => {
+              if (group.indices.length < 2) return;
+              if (knowledgeTitles.has(group.name.trim().toLocaleLowerCase())) return;
+              const centroid = context.communityCentroids[index];
+              const point = project(centroid);
+              if (point.z > 1) return;
+              const text = group.name;
+              const small = `· ${group.indices.length} 个`;
+              const dot = resolveColor(currentProps.nodes[group.indices[0]]?.color ?? "#8b93b5");
+              const width = estimateLabelWidth(text, small, "topic");
+              const key = `topic:${group.name}:${group.indices[0]}`;
+              otherCandidates.push({ key, kind: "topic", text, x: point.x - width / 2, y: point.y - labelHeight("topic"), width, height: labelHeight("topic"), priority: 320 + group.indices.length, alpha: topicAlpha });
+              worldByKey.set(key, centroid);
+              info.set(key, { text, small, dot });
+            });
+          }
+          const knowledgeAlpha = context.level === 2 ? Math.min(1, context.near * 2.2) : 0;
+          const coreNodeIds = new Set(currentProps.people.flatMap((person) => Array.from(person.nodeIds)));
+          const personMode = currentProps.mode === "person" && currentProps.people.length > 0;
+          const hover = context.hovered;
+          for (let index = 0; index < count; index += 1) {
+            const node = currentProps.nodes[index];
+            if (!node) continue;
+            const forced = index === context.selected || index === hover || context.neighborSet?.has(index) || context.searchSet.has(index) || context.assistantSet.has(index);
+            const core = personMode && coreNodeIds.has(node.id);
+            // Person-centred near view names only the focused people's core
+            // knowledge; every other node stays a point unless hovered, selected
+            // or a one-hop neighbour of the selection.
+            if (!forced && personMode && !core) continue;
+            if (!forced && (knowledgeAlpha < 0.08 || engine.alpha[index] < 0.3)) continue;
+            const point = project(getPosition(index));
+            if (point.z > 1) continue;
+            const text = node.title;
+            const textKey = text.trim().toLocaleLowerCase();
+            if (textKey && planeSideVisibleTexts.has(textKey)) return;
+            const width = estimateLabelWidth(text, "", "knowledge");
+            const height = labelHeight("knowledge");
+            const diameter = Math.max(12, (pointScreenCss[index] ?? 9) * 2.2);
+            const key = `node:${node.id}`;
+            knowledgeObstacles.push({ x: point.x - diameter / 2 - 4, y: point.y - diameter / 2 - 4, width: diameter + 8, height: diameter + 8 });
+            knowledgeCandidates.push({
+              key,
+              nodeId: node.id,
+              text,
+              x: point.x,
+              y: point.y,
+              diameter,
+              width,
+              height,
+              // Core names are prioritised but never forced to a far slot.
+              priority: forced ? 2200 + (index === context.selected ? 300 : 0) : core ? 900 + engine.neighbors[index].length * 4 : 600 + engine.neighbors[index].length * 4,
+              alpha: forced ? 1 : knowledgeAlpha
+            });
+            indexByKnowledgeKey.set(key, index);
+            info.set(key, { text, dot: resolveColor(node.color), strong: forced });
+          }
+        } else {
+          // Course plane: ordinary hover keeps the distance-name set and adds
+          // at most three nearest cross-course related knowledge names.
+          const hover = context.hovered;
+          const planeSet = currentProps.planeNodeIds ?? new Set<string>();
+          const addKnowledgeLabel = (index: number, priority: number, alpha: number) => {
+            const node = currentProps.nodes[index];
+            if (!node) return;
             const point = project(getPosition(index));
             if (point.z > 1) return;
-            // Each core node and its person-colour ring is a no-label island.
-            coreObstacles.push({ x: point.x - 28, y: point.y - 28, width: 56, height: 56 });
+            const text = node.title;
+            const textKey = text.trim().toLocaleLowerCase();
+            if (textKey && planeSideVisibleTexts.has(textKey)) return;
+            const width = estimateLabelWidth(text, "", "knowledge");
+            const height = labelHeight("knowledge");
+            const diameter = Math.max(12, (pointScreenCss[index] ?? 9) * 2.2);
+            const key = `node:${node.id}`;
+            knowledgeObstacles.push({ x: point.x - diameter / 2 - 4, y: point.y - diameter / 2 - 4, width: diameter + 8, height: diameter + 8 });
+            knowledgeCandidates.push({ key, nodeId: node.id, text, x: point.x, y: point.y, diameter, width, height, priority, alpha });
+            indexByKnowledgeKey.set(key, index);
+            info.set(key, { text, dot: resolveColor(node.color), strong: true });
+          };
+          if (!planeExVisible && hover !== null) {
+            const hoveredNode = currentProps.nodes[hover];
+            if (hoveredNode && planeSet.has(hoveredNode.id)) {
+              const hoverPoint = project(getPosition(hover));
+              const hoveredTitle = hoveredNode.title.trim().toLocaleLowerCase();
+              const related = engine.neighbors[hover]
+                .filter((index) => {
+                  const node = currentProps.nodes[index];
+                  return node && !planeSet.has(node.id) && !currentProps.draftIds.includes(node.id)
+                    && engine.alpha[index] >= 0.12
+                    && node.title.trim().toLocaleLowerCase() !== hoveredTitle;
+                })
+                .map((index) => {
+                  const point = project(getPosition(index));
+                  return { index, distance: Math.hypot(point.x - hoverPoint.x, point.y - hoverPoint.y) };
+                })
+                .sort((left, right) => left.distance - right.distance || left.index - right.index)
+                .slice(0, 3);
+              related.forEach(({ index }, rank) => addKnowledgeLabel(index, 2600 - rank, 1));
+            } else if (hoveredNode) {
+              addKnowledgeLabel(hover, 2600, 1);
+            }
+          }
+        }
+        const cardObstacles: AtlasLabelRect[] = Array.from(cardRects.values()).map((rect) => ({
+          x: rect.x - 3,
+          y: rect.y - 3,
+          width: rect.width + 6,
+          height: rect.height + 11
+        }));
+        const coreObstacles: AtlasLabelRect[] = [];
+        if (!context.courseMode && currentProps.mode === "person") {
+          currentProps.people.forEach((person) => {
+            person.nodeIds.forEach((id) => {
+              const index = engine.nodeIndex.get(id);
+              if (index === undefined) return;
+              const point = project(getPosition(index));
+              if (point.z > 1) return;
+              coreObstacles.push({ x: point.x - 22, y: point.y - 22, width: 44, height: 44 });
+            });
+          });
+        }
+        const blocked = [...hudRects, ...cardObstacles, ...coreObstacles];
+        const placedOther = placeAtlasLabels(otherCandidates, { width: context.rect.width, height: context.rect.height }, {
+          maxLabels: 120,
+          exclusions: blocked
+        });
+        const reservedTexts = new Set([
+          ...placedOther.map((label) => (label.text ?? "").trim().toLocaleLowerCase()).filter(Boolean),
+          ...(context.courseMode ? planeSideVisibleTexts : [])
+        ]);
+        const placedKnowledge = placeAtlasKnowledgeLabels(knowledgeCandidates, { width: context.rect.width, height: context.rect.height }, {
+          maxLabels: 120,
+          // A name never moves away from its node; it may sit next to another
+          // point in a compact core, but it never overlaps a card or HUD.
+          exclusions: blocked,
+          reservedTexts
+        });
+        const next: AtlasRenderedLabel[] = [];
+        placedOther.forEach((label) => {
+          const world = worldByKey.get(label.key);
+          const base = world ? project(world) : null;
+          next.push({
+            key: label.key,
+            kind: label.kind,
+            text: label.text ?? "",
+            width: label.width,
+            height: label.height,
+            alpha: label.alpha ?? 1,
+            world,
+            offsetX: base ? label.x - base.x : 0,
+            offsetY: base ? label.y - base.y : 0,
+            x: label.x,
+            y: label.y
           });
         });
+        placedKnowledge.forEach((label) => {
+          next.push({
+            key: label.key,
+            kind: "knowledge",
+            text: label.text,
+            width: label.width,
+            height: label.height,
+            alpha: label.alpha ?? 1,
+            strong: info.get(label.key)?.strong,
+            nodeIndex: indexByKnowledgeKey.get(label.key),
+            anchor: label.anchor,
+            diameter: label.diameter
+          });
+        });
+        cache.labels = next;
+        cache.info = info;
       }
-      const placed = placeAtlasLabels(candidates, { width: context.rect.width, height: context.rect.height }, {
-        maxLabels: 120,
-        exclusions: [...hudRects, ...cardObstacles, ...coreObstacles]
-      });
       const used = new Set<string>();
-      placed.forEach((label) => {
+      const layer = labelsRef.current;
+      if (!layer) return;
+      const leaderLines: string[] = [];
+      for (const label of cache.labels) {
+        let x = label.x ?? 0;
+        let y = label.y ?? 0;
+        if (label.nodeIndex !== undefined) {
+          const point = project(getPosition(label.nodeIndex));
+          if (point.z > 1) continue;
+          // Freeze the draw radius with the label set; otherwise the tiny
+          // camera-distance change during a drag moves the name relative to
+          // its node by a few pixels.
+          const drawDiameter = label.diameter ?? Math.max(12, (pointScreenCss[label.nodeIndex] ?? 9) * 2.2);
+          const rect = knowledgeDrawRect(point, label.width, label.height, drawDiameter, label.anchor ?? "above");
+          x = rect.x;
+          y = rect.y;
+        } else if (label.world) {
+          const point = project(label.world);
+          if (point.z > 1) continue;
+          x = point.x - label.width / 2 + (label.offsetX ?? 0);
+          y = point.y - label.height / 2 + (label.offsetY ?? 0);
+        }
         used.add(label.key);
         let element = labelPoolRef.current.get(label.key);
+        let isNew = false;
         if (!element) {
           element = document.createElement("div");
           element.className = "ef-atlas-label";
-          labelsRef.current?.appendChild(element);
+          layer.appendChild(element);
           labelPoolRef.current.set(label.key, element);
+          isNew = true;
         }
-        const content = info.get(label.key);
+        const content = cache.info.get(label.key);
         const dot = content?.dot;
-        const html = `${dot ? `<i style="background:${dot}"></i>` : ""}<span class="ef-atlas-label-text">${escapeHtml(content?.text ?? "")}</span>${content?.small ? `<small>${escapeHtml(content.small)}</small>` : ""}`;
+        const html = `${dot ? `<i style="background:${dot}"></i>` : ""}<span class="ef-atlas-label-text">${escapeHtml(content?.text ?? label.text)}</span>${content?.small ? `<small>${escapeHtml(content.small)}</small>` : ""}`;
         if (element.dataset.html !== html) { element.innerHTML = html; element.dataset.html = html; }
         element.dataset.key = label.key;
         element.className = `ef-atlas-label is-${label.kind}${content?.strong ? " is-strong" : ""}`;
@@ -2181,18 +2474,48 @@ export default function ArchiveAtlasScene({
           element.style.textAlign = "center";
           element.style.width = `${label.width}px`;
           element.style.maxWidth = `${label.width}px`;
+        } else if (label.nodeIndex !== undefined) {
+          // The placement rectangle and the DOM box must have the same width;
+          // otherwise a left-anchored name leaves a gap between its near edge
+          // and the node it belongs to.
+          element.style.whiteSpace = "nowrap";
+          element.style.textAlign = "";
+          element.style.width = `${label.width}px`;
+          element.style.maxWidth = `${label.width}px`;
         } else {
           element.style.whiteSpace = "";
           element.style.textAlign = "";
           element.style.width = "";
           element.style.maxWidth = "";
         }
-        element.style.transform = `translate(${label.x.toFixed(1)}px, ${label.y.toFixed(1)}px)`;
-        element.style.opacity = String((label.alpha ?? 1).toFixed(2));
         element.style.display = "";
-      });
+        element.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+        if (label.nodeIndex !== undefined) {
+          const point = project(getPosition(label.nodeIndex));
+          const radius = Math.max(6, Math.min(24, (label.diameter ?? 16) / 2 + 1));
+          const anchor = label.anchor ?? "above";
+          const nearX = anchor === "left" ? x + label.width : anchor === "right" ? x : x + label.width / 2;
+          const nearY = anchor === "above" ? y + label.height : anchor === "below" ? y : y + label.height / 2;
+          const startX = anchor === "left" ? point.x - radius : anchor === "right" ? point.x + radius : point.x;
+          const startY = anchor === "above" ? point.y - radius : anchor === "below" ? point.y + radius : point.y;
+          if (Math.hypot(nearX - startX, nearY - startY) > 2) {
+            leaderLines.push(`<line x1="${startX.toFixed(1)}" y1="${startY.toFixed(1)}" x2="${nearX.toFixed(1)}" y2="${nearY.toFixed(1)}" />`);
+          }
+        }
+        const target = Math.max(0, Math.min(1, label.alpha));
+        if (isNew) {
+          element.style.opacity = "0";
+          element.animate([{ opacity: 0 }, { opacity: target }], { duration: 200, easing: "ease-out" });
+        }
+        element.style.opacity = String(target.toFixed(2));
+      }
+      if (labelLinesRef.current) labelLinesRef.current.innerHTML = leaderLines.join("");
       labelPoolRef.current.forEach((element, key) => {
-        if (!used.has(key) && element.style.display !== "none") element.style.display = "none";
+        if (!used.has(key)) {
+          // Fade out over 200ms, then leave it in the pool at zero opacity so
+          // an unchanged set never rebuilds DOM between frames.
+          element.style.opacity = "0";
+        }
       });
     }
 
@@ -2256,7 +2579,9 @@ export default function ArchiveAtlasScene({
       <div className="ef-atlas-cards" ref={cardsRef} aria-hidden="true" />
       <div className="ef-atlas-plane-labels" ref={sideLabelsRef} aria-hidden="true" />
       <div className="ef-atlas-plane-ex" ref={exLabelsRef} aria-hidden="true" />
-      <div className="ef-atlas-labels" ref={labelsRef} aria-hidden="true" />
+      <div className="ef-atlas-labels" ref={labelsRef} aria-hidden="true">
+        <svg className="ef-atlas-label-lines" ref={labelLinesRef} aria-hidden="true" />
+      </div>
     </div>
   );
 }

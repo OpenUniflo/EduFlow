@@ -2,21 +2,26 @@ import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRenderer.js";
+import { Line2 } from "three/examples/jsm/lines/Line2.js";
+import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import {
-  chooseExcentricNodes,
   chooseTiltedLabels,
   clampToPanBounds,
-  layoutExcentric,
+  findExcentricCluster,
+  layoutExcentricOutside,
   panBoundsFor,
   panOffsetToBounds,
   pickScreenSpace,
   simplificationForAngle,
+  simplificationForView,
   tiltAngleDegrees,
   type ExcentricNode,
   type TiltedLabelCandidate,
   type TiltedLabelChoice,
   type TiltedPoint
 } from "@/shared/scene/tiltedPlane";
+import { LAYER_SWAP_MS, REFLECTION_OFFSET, layerMixAt, layerOffsetsAt } from "./courseTreeLayout";
 import type {
   CourseImmersiveStageHandle,
   SemanticZoom,
@@ -43,11 +48,11 @@ type Props = {
   externalHoverId?: string | null;
   /** HUD width on the right that labels must avoid (e.g. the capability rail). */
   rightInset?: number;
-  /** The capability layer only exists while 看能力层 is active. */
-  capabilitiesOn?: boolean;
   onSelect?(id: string, kind: StageNode["kind"], context: { angle: number }): void;
   onBackground?(): void;
   onPoseChange?(pose: "front" | "rotated"): void;
+  /** True once the capability plane is readable (~35°). */
+  onCapabilityReveal?(visible: boolean): void;
   onSemanticZoom?(zoom: SemanticZoom, percent: number): void;
   onFps?(fps: number, nodeCount: number, domCount: number): void;
   onHoverNode?(id: string | null, point: { x: number; y: number } | null): void;
@@ -68,6 +73,11 @@ type CardRuntime = {
   screen: { x: number; y: number; z: number };
   distance: number;
   angle: ReturnType<typeof simplificationForAngle>;
+  /** Crossfade to the single WebGL point; 0 = card only, 1 = point only. */
+  pointMix: number;
+  /** 1 when this card's layer is in front, 0.52 when reflected. */
+  layerOpacity: number;
+  ghost: boolean;
 };
 
 type ChapterRuntime = {
@@ -83,7 +93,7 @@ type EngineApi = {
   animateCamera(position: THREE.Vector3, target: THREE.Vector3, duration?: number): void;
   fit(animated?: boolean): void;
   frontView(): void;
-  capsView(): void;
+  capPresetView(): void;
   markLabelsDirty(): void;
   rebuildCards(): void;
   rebuildChapters(): void;
@@ -133,7 +143,7 @@ function nodeColor(node: StageNode) {
 
 function cardSignature(node: StageNode) {
   return [
-    node.id, node.title, node.kind, node.status ?? "", node.meta ?? "", node.count ?? "",
+    node.id, node.title, node.kind, node.status ?? "", node.meta ?? "", node.statusLine ?? "", node.code ?? "", node.count ?? "",
     node.current ? "1" : "", node.target ? "1" : "", node.ghost ? "1" : "", node.empty ? "1" : "",
     node.selected ? "1" : "", node.highlight ? "1" : "", node.dim ? "1" : "", node.step ?? "",
     node.actions?.join("|") ?? "", node.height
@@ -155,17 +165,36 @@ function cardClass(node: StageNode) {
   ].filter(Boolean).join(" ");
 }
 
+function ghostPeekHtml(node: StageNode) {
+  if (node.kind === "knowledge") {
+    return `<span class="ef-imm-ghost-peek"><strong>${escapeHtml(node.title)}</strong><small>${escapeHtml(node.statusLine ?? node.meta ?? "知识")}</small></span>`;
+  }
+  if (node.kind === "assignment") {
+    const code = node.code ? `实践 ${escapeHtml(node.code)}` : "实训";
+    return `<span class="ef-imm-ghost-peek"><strong><em>${code}</em>${escapeHtml(node.title)}</strong><small>${escapeHtml(node.statusLine ?? "")}</small></span>`;
+  }
+  return "";
+}
+
+function actionChips(node: StageNode) {
+  if (!node.actions?.length) return "";
+  return `<span class="ef-imm-node-actions">${node.actions.map((action) => `<span>${escapeHtml(action)}</span>`).join("")}</span>`;
+}
+
 function cardHtml(node: StageNode) {
   const step = node.step ? `<i class="ef-imm-step">${node.step}</i>` : "";
   const badge = node.kind === "knowledge" && (node.current || node.target)
     ? `<em class="ef-imm-badge ${node.current ? "is-current" : "is-target"}">${node.current ? "当前" : "目标"}</em>`
     : "";
   if (node.kind === "assignment") {
-    return `${node.empty ? "" : `<i class="ef-imm-node-index">${escapeHtml(node.meta ?? "")}</i>`}
+    const code = node.empty ? "" : `<i class="ef-imm-node-index">${escapeHtml(node.code ?? node.meta ?? "")}</i>`;
+    return `${code}
       <span class="ef-imm-node-copy">
         <span class="ef-imm-node-title-row"><strong>${escapeHtml(node.title)}</strong>${node.count && node.count > 1 ? `<em class="ef-imm-node-count">+${node.count - 1}</em>` : ""}</span>
-        <small class="ef-imm-node-meta">${escapeHtml(node.meta ?? "")}</small>
-      </span>`;
+        <small class="ef-imm-node-meta">${escapeHtml(node.statusLine ?? node.meta ?? "")}</small>
+        ${actionChips(node)}
+      </span>
+      ${ghostPeekHtml(node)}`;
   }
   if (node.kind === "capability") {
     return `${step}<i class="ef-imm-node-dot" style="--dotc:${nodeColor(node)}"></i>
@@ -175,14 +204,15 @@ function cardHtml(node: StageNode) {
   if (node.kind === "chapter-empty") {
     return `<i class="ef-imm-node-dot"></i><span class="ef-imm-node-copy"><strong>${escapeHtml(node.title)}</strong><small class="ef-imm-node-meta">${escapeHtml(node.meta ?? "")}</small></span>`;
   }
-  const actions = node.actions?.length
-    ? `<span class="ef-imm-node-detail"><span class="ef-imm-actions">${node.actions.map((action) => `<span>${escapeHtml(action)}</span>`).join("")}</span></span>`
-    : "";
-  return `${step}<i class="ef-imm-node-dot" style="--dotc:${nodeColor(node)}"></i>
-    <span class="ef-imm-node-copy"><strong>${escapeHtml(node.title)}</strong><small class="ef-imm-node-meta">${escapeHtml(node.meta ?? "")}</small>${actions}</span>
-    ${badge}`;
+  return `${step}
+    <span class="ef-imm-node-copy">
+      <span class="ef-imm-node-title-row"><i class="ef-imm-node-dot" style="--dotc:${nodeColor(node)}"></i><strong>${escapeHtml(node.title)}</strong></span>
+      <small class="ef-imm-node-meta">${escapeHtml(node.statusLine ?? node.meta ?? "")}</small>
+      ${actionChips(node)}
+    </span>
+    ${badge}
+    ${ghostPeekHtml(node)}`;
 }
-
 
 function chapterTitleHtml(chapter: StageChapter) {
   return `<b>${String(chapter.displayNumber).padStart(2, "0")}</b><span>${escapeHtml(chapter.title)}</span><em>${escapeHtml(chapter.meta ?? "")}</em>`;
@@ -205,8 +235,7 @@ function makeIconTexture() {
 export function TiltedCourseStage({
   nodes, chapters = [], edges, beams = [], layer, pose, selectedId = null, hoverId = null,
   reducedMotion = false, detailOpen = false, fitKey = "", instantFit = false, externalHoverId = null, rightInset = 0,
-  capabilitiesOn = false,
-  onSelect, onBackground, onPoseChange, onSemanticZoom, onFps, onHoverNode, onReady,
+  onSelect, onBackground, onPoseChange, onCapabilityReveal, onSemanticZoom, onFps, onHoverNode, onReady,
   className = "", ref, "aria-label": ariaLabel
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -220,6 +249,7 @@ export function TiltedCourseStage({
   externalHoverRef.current = externalHoverId;
   const hoverIdRef = useRef(hoverId);
   hoverIdRef.current = hoverId;
+  const beamMaterialsRef = useRef<LineMaterial[]>([]);
   const runtimeRef = useRef<{
     renderer: THREE.WebGLRenderer;
     cssRenderer: CSS3DRenderer;
@@ -255,6 +285,7 @@ export function TiltedCourseStage({
     labelPrevious: Set<string>;
     labelsFrozen: boolean;
     labelsDirty: boolean;
+    labelLayerOn: boolean;
     labelTimer: number;
     lastLabelAt: number;
     exTimer: number;
@@ -293,13 +324,19 @@ export function TiltedCourseStage({
     currentEdges: StageEdge[];
     currentBeams: StageBeam[];
     layer: "skill" | "practice";
+    layerMix: number;
+    layerTarget: number;
+    layerSwapFrom: number;
+    layerSwapStarted: number;
+    capabilityReveal: boolean;
+    lastSizeStage: "full" | "pill" | "dot";
     frameCount: number;
     fpsStarted: number;
     emitZoom(force?: boolean): void;
   }>(null);
 
-  const propsRef = useRef({ nodes, chapters, edges, beams, layer, selectedId, hoverId, reducedMotion, detailOpen, externalHoverId, rightInset, capabilitiesOn, onSelect, onBackground, onPoseChange, onSemanticZoom, onFps, onHoverNode, onReady });
-  propsRef.current = { nodes, chapters, edges, beams, layer, selectedId, hoverId, reducedMotion, detailOpen, externalHoverId, rightInset, capabilitiesOn, onSelect, onBackground, onPoseChange, onSemanticZoom, onFps, onHoverNode, onReady };
+  const propsRef = useRef({ nodes, chapters, edges, beams, layer, selectedId, hoverId, reducedMotion, detailOpen, externalHoverId, rightInset, onSelect, onBackground, onPoseChange, onCapabilityReveal, onSemanticZoom, onFps, onHoverNode, onReady });
+  propsRef.current = { nodes, chapters, edges, beams, layer, selectedId, hoverId, reducedMotion, detailOpen, externalHoverId, rightInset, onSelect, onBackground, onPoseChange, onCapabilityReveal, onSemanticZoom, onFps, onHoverNode, onReady };
 
   useEffect(() => {
     const host = hostRef.current;
@@ -428,7 +465,7 @@ export function TiltedCourseStage({
       xrayHost, xraySvg, xrayName, hoverRing,
       labels: new Map<string, HTMLDivElement>(), exRows: new Map<string, HTMLButtonElement>(),
       labelChoices: [] as TiltedLabelChoice[], labelPrevious: new Set<string>(),
-      labelsFrozen: false, labelsDirty: true, labelTimer: 0, lastLabelAt: 0,
+      labelsFrozen: false, labelsDirty: true, labelLayerOn: false, labelTimer: 0, lastLabelAt: 0,
       exTimer: 0, exVisible: false, exAnchor: null as { x: number; y: number } | null, exHovering: false,
       hover: null as string | null, internalHover: null as string | null, chapterHover: null as string | null,
       pointer: null as { x: number; y: number } | null, pointerInside: false,
@@ -441,6 +478,8 @@ export function TiltedCourseStage({
       externalHover: null as string | null, selected: null as string | null, detailOpen: false, reduced: false,
       currentNodes: [] as StageNode[], currentChapters: [] as StageChapter[], currentEdges: [] as StageEdge[], currentBeams: [] as StageBeam[],
       layer: "skill" as "skill" | "practice",
+      layerMix: 0, layerTarget: 0, layerSwapFrom: 0, layerSwapStarted: 0,
+      capabilityReveal: false, lastSizeStage: "full" as "full" | "pill" | "dot",
       frameCount: 0, fpsStarted: performance.now(),
       emitZoom(force = false) {
         const percent = Math.round((engine.fitDistance / Math.max(1, camera.position.distanceTo(controls.target))) * 100);
@@ -546,12 +585,14 @@ export function TiltedCourseStage({
       const usableWidth = Math.max(280, engine.width - 80);
       // Two-row header at <=1180: the chapter titles must start below the tabs.
       const safeTop = engine.width <= 1180 ? 152 : 112;
-      const safeBottom = 82;
+      // Reserve the bottom toolbar and status strip, including their 20px
+      // inset, so a visible chapter frame is never cut by the HUD.
+      const safeBottom = engine.width <= 1180 ? 164 : 140;
       const usableHeight = Math.max(240, engine.height - safeTop - safeBottom);
       // Knowledge labels must stay readable. If the seven chapter columns do
       // not fit at the floor, the view starts at the left edge and the user
       // pans; zooming out to ~6px text was the P4R2 problem this guard fixes.
-      const scale = Math.max(0.86, Math.min(1.12, Math.min(usableWidth / contentWidth, usableHeight / contentHeight)));
+      const scale = Math.max(0.28, Math.min(1.12, Math.min(usableWidth / contentWidth, usableHeight / contentHeight)));
       engine.pxPerWorld = scale;
       const distance = engine.height / (2 * scale * FOV_T);
       engine.fitDistance = distance;
@@ -605,6 +646,9 @@ export function TiltedCourseStage({
       const target = controls.target.clone();
       (engine as unknown as { lastOrbit?: unknown }).lastOrbit = { target: target.toArray(), cam: camera.position.toArray(), distance, bounds: engine.panBounds };
       animateCamera(target.clone().add(direction.multiplyScalar(distance)), target, duration);
+      // A programmatic orbit is a camera move like a drag: thaw the label set
+      // shortly after it settles so the count reflects the new projection.
+      scheduleThaw(duration + 80);
     }
 
     function markLabelsDirty() {
@@ -656,6 +700,13 @@ export function TiltedCourseStage({
       const candidates: TiltedLabelCandidate[] = [];
       const obstacles: Array<{ id: string; x: number; y: number; width: number; height: number }> = [];
       const capVisible = capabilityVisible();
+      const angle = tiltAngleDegrees(camera.position.clone().sub(controls.target));
+      const hovered = engine.hover ?? engine.externalHover;
+      if (engine.exVisible) {
+        engine.labelChoices = [];
+        engine.labelPrevious.clear();
+        return;
+      }
       for (let index = 0; index < engine.currentNodes.length; index += 1) {
         const node = engine.currentNodes[index];
         if (node.kind === "route" || node.kind === "route-chapter") continue;
@@ -668,53 +719,82 @@ export function TiltedCourseStage({
         if (screen.z > 1) continue;
         const width = Math.max(14, Math.min(52, screen.diameter + 8));
         obstacles.push({ id: node.id, x: screen.x - width / 2, y: screen.y - width / 2, width, height: width });
-        // Names and picking share this one "drawn and interactive" test: a
-        // capability outside 看能力层, or a reflection after 42°, has no name.
-        const alpha = renderedOpacity(index);
-        const visible = !node.dim && alpha >= 0.1;
+        // Capability names appear as soon as the plane is readable; Knowledge
+        // names only hand over from the capsule to the outside label after 55°.
+        const isCapability = node.kind === "capability";
+        const visible = !node.dim && renderedOpacity(index) >= 0.1;
         if (!visible) continue;
-        // A capability layer is revealed as a handful of markers behind the
-        // course; naming them is the point of 看能力层 even when their screen
-        // diameter is just under the normal distance threshold.
-        const capabilityOpen = node.kind === "capability" && capVisible > 0.5;
+        if (isCapability && capVisible <= 0.5) continue;
+        // 35–58°: the turned plane is read through screen-facing names. The
+        // card body is hidden (turnLabels), so the name layer is the only
+        // owner. Capability names stay quiet until hovered / selected / current
+        // so 42 capability labels cannot cover the course names.
+        if (angle < 58) {
+          if (isCapability && !(node.id === hovered || node.id === engine.selected || node.current)) continue;
+        }
+        // Ordinary hover only forces the hovered node's name. Every other
+        // distance / fit decision stays as-is; the excentric list replaces
+        // them only when the pick radius is ambiguous.
         candidates.push({
-          id: node.id, x: screen.x, y: screen.y, distance: dist, diameter: screen.diameter,
-          visibility: alpha, priority: capabilityOpen ? 0 : rankOf(node),
+          id: node.id, x: screen.x, y: screen.y, distance: dist,
+          diameter: isCapability ? Math.max(16, screen.diameter) : screen.diameter,
+          visibility: renderedOpacity(index), priority: rankOf(node),
           text: node.title
         });
       }
-      const rightLimit = propsRef.current.detailOpen ? engine.width - 388 : engine.width - (propsRef.current.rightInset ?? 0);
-      engine.labelChoices = chooseTiltedLabels(candidates, {
-        width: Math.max(200, rightLimit), height: engine.height, maxLabels: engine.selected ? SIDE_MAX - 1 : SIDE_MAX,
-        showDiameter: SIDE_SHOW_PX, hideDiameter: SIDE_HIDE_PX, lineHeight: SIDE_H, margin: 8,
+      const rightLimit = engine.width - Math.max(propsRef.current.detailOpen ? 388 : 0, propsRef.current.rightInset ?? 0) - 8;
+      const turned = angle >= 34 && angle < 58;
+      const chosen = chooseTiltedLabels(candidates, {
+        width: Math.max(200, rightLimit), height: engine.height,
+        maxLabels: turned ? 90 : SIDE_MAX,
+        showDiameter: turned ? 4 : SIDE_SHOW_PX,
+        hideDiameter: turned ? 3 : SIDE_HIDE_PX,
+        lineHeight: SIDE_H, margin: 8,
         measure: sideTextWidth, previous: engine.labelPrevious, obstacles,
         exclusions: [
-          { x: 0, y: 0, width: rightLimit, height: 76 },
-          { x: 0, y: engine.height - 128, width: rightLimit, height: 128 }
+          { x: 0, y: 0, width: Math.max(200, rightLimit), height: 76 },
+          { x: 0, y: engine.height - 128, width: Math.max(200, rightLimit), height: 128 }
         ]
+      });
+      // One text label on screen at a time, even if two nodes share a title.
+      const texts = new Set<string>();
+      engine.labelChoices = chosen.filter((choice) => {
+        const node = nodeById(choice.id);
+        const key = (node?.title ?? "").trim().toLocaleLowerCase();
+        if (!key) return true;
+        if (texts.has(key)) return false;
+        texts.add(key);
+        return true;
       });
       engine.labelPrevious = new Set(engine.labelChoices.map((choice) => choice.id));
       engine.lastLabelAt = performance.now();
       engine.labelsDirty = false;
     }
     function capabilityVisible() {
-      // The layer is a mode, not a side effect of the camera angle: at a
-      // default 70° view its markers must not be named or pickable while the
-      // 看能力层 rail is closed. Opening the rail makes the same markers both
-      // visible and interactive.
-      if (!propsRef.current.capabilitiesOn) return 0;
+      // The capability plane is always present. It is hidden behind the front
+      // knowledge plane and becomes readable as the camera rotates away from
+      // the front (~3° -> ~34°), exactly the threshold used by the list rail.
+      // No presentation switch participates in visibility: what is drawn is
+      // what can be named and picked.
       const direction = camera.position.clone().sub(controls.target).normalize();
       const angle = Math.acos(Math.max(-1, Math.min(1, direction.z)));
       return smooth(0.06, 0.6, angle);
     }
     function updateLabels() {
       const angle = tiltAngleDegrees(camera.position.clone().sub(controls.target));
-      const on = angle > 54;
-      if (!on) {
+      const on = angle > 34;
+      if (!on || engine.exVisible) {
         engine.labelChoices = [];
         engine.labelPrevious.clear();
         engine.labels.forEach((element) => { element.style.opacity = "0"; });
+        engine.labelLayerOn = false;
         return;
+      }
+      // Crossing into the oblique zone must rebuild the set even when the
+      // previous angle had cleared it (programmatic orbit / Esc / thaw).
+      if (!engine.labelLayerOn) {
+        engine.labelLayerOn = true;
+        engine.labelsDirty = true;
       }
       // While dragging / zooming the set is frozen, but the labels still track
       // their nodes; only joining or leaving the set waits for the 250ms thaw.
@@ -737,7 +817,10 @@ export function TiltedCourseStage({
           engine.labels.set(choice.id, element);
         }
         if (element.textContent !== node.title) element.textContent = node.title;
-        const fade = smooth(55, 60, angle);
+        element.classList.toggle("is-capability-label", node.kind === "capability");
+        element.style.fontSize = node.kind === "capability" ? "11px" : "";
+        element.style.lineHeight = node.kind === "capability" ? "16px" : "";
+        const fade = 1;
         element.style.transform = `translate(${rect.x.toFixed(1)}px, ${rect.y.toFixed(1)}px)`;
         element.style.opacity = (choice.alpha * fade * (node.dim ? 0.25 : 1)).toFixed(3);
         used.add(choice.id);
@@ -749,7 +832,9 @@ export function TiltedCourseStage({
 
     function updateChapterLabelElement() {
       const angle = tiltAngleDegrees(camera.position.clone().sub(controls.target));
-      const chapterLabel = angle > 35 ? engine.chapters.get(engine.chapterHover ?? "") : null;
+      const chapterLabel = angle > 35 && !engine.exVisible && !engine.hover && !engine.externalHover
+        ? engine.chapters.get(engine.chapterHover ?? "")
+        : null;
       const element = engine.labels.get("__chapter__");
       if (!chapterLabel) {
         if (element) element.style.opacity = "0";
@@ -791,6 +876,11 @@ export function TiltedCourseStage({
       engine.hoverRing.style.height = `${diameter.toFixed(1)}px`;
       engine.hoverRing.style.borderColor = nodeColor(node);
       engine.hoverRing.style.transform = `translate(${(info.screen.x - diameter / 2).toFixed(1)}px, ${(info.screen.y - diameter / 2).toFixed(1)}px)`;
+      // The route step is hidden in the dot stage until hover, then it rides
+      // the hover ring instead of becoming a second persistent marker.
+      engine.hoverRing.dataset.step = node.step ? String(node.step) : "";
+      const card = id ? engine.cards.get(id) : undefined;
+      engine.hoverRing.dataset.dot = card && card.pointMix > 0.62 ? "1" : "";
       engine.hoverRing.style.opacity = "1";
     }
 
@@ -889,9 +979,9 @@ export function TiltedCourseStage({
         const distance = camera.position.distanceTo(new THREE.Vector3(node.x, -node.y, node.z));
         const screen = cardScreen(node, distance);
         const alpha = renderedOpacity(index);
-        if (screen.z > 1 || alpha < 0.12) continue;
+        if (screen.z > 1 || alpha < 0.02) continue;
         const close = Math.hypot(screen.x - x, screen.y - y);
-        if (close <= 50) result.push({ id: node.id, x: screen.x, y: screen.y, distance, visibility: alpha, text: node.title });
+        if (close <= 22) result.push({ id: node.id, x: screen.x, y: screen.y, distance, visibility: 1, text: node.title });
       }
       return result;
     }
@@ -904,11 +994,43 @@ export function TiltedCourseStage({
       exEl.innerHTML = "";
       markLabelsDirty();
     }
+    function planeScreenBounds() {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      engine.cards.forEach((card) => {
+        if (card.node.kind === "capability") return;
+        if (!card.object.visible) return;
+        const rect = rectForCard(card.node, card);
+        if (!Number.isFinite(rect.x) || rect.width <= 0) return;
+        minX = Math.min(minX, rect.x);
+        minY = Math.min(minY, rect.y);
+        maxX = Math.max(maxX, rect.x + rect.width);
+        maxY = Math.max(maxY, rect.y + rect.height);
+      });
+      engine.chapters.forEach((runtime) => {
+        runtime.quad.forEach((point) => {
+          minX = Math.min(minX, point.x);
+          minY = Math.min(minY, point.y);
+          maxX = Math.max(maxX, point.x);
+          maxY = Math.max(maxY, point.y);
+        });
+      });
+      if (!Number.isFinite(minX)) return { x: engine.width / 2 - 220, y: engine.height / 2 - 160, width: 440, height: 320 };
+      return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+    }
     function drawExcentric(x: number, y: number) {
-      const near = chooseExcentricNodes(denseNodesAt(x, y), { x, y }, { radius: 50, minNodes: 3, maxNodes: 6 });
-      if (near.length < 3) { hideExcentric(); return; }
-      const layout = layoutExcentric(near, { x, y }, { width: engine.width, height: engine.height }, {
-        measure: sideTextWidth, rowHeight: 22, margin: 12, topInset: 76, bottomInset: 76
+      const cluster = findExcentricCluster(denseNodesAt(x, y), { x, y }, { radius: 22, minNodes: 3, maxNodes: 6, snap: 7 });
+      if (!cluster) { hideExcentric(); return; }
+      const list = cluster.nodes.slice();
+      const hoveredId = engine.hover ?? engine.externalHover;
+      if (hoveredId && !list.some((node) => node.id === hoveredId)) {
+        const info = nodeScreenFor(hoveredId);
+        if (info && info.screen.z <= 1) {
+          list.push({ id: hoveredId, x: info.screen.x, y: info.screen.y, distance: info.distance, visibility: 1, text: info.node.title });
+        }
+      }
+      const nodesForList = list.slice(0, 6).sort((left, right) => left.y - right.y || left.id.localeCompare(right.id));
+      const layout = layoutExcentricOutside(nodesForList, cluster.anchor, { width: engine.width, height: engine.height }, planeScreenBounds(), {
+        measure: sideTextWidth, rowHeight: 22, margin: 12, gap: 18, topInset: 76, bottomInset: 76, maxNodes: 6
       });
       if (!layout) { hideExcentric(); return; }
       engine.exVisible = true;
@@ -947,7 +1069,7 @@ export function TiltedCourseStage({
         const angle = tiltAngleDegrees(camera.position.clone().sub(controls.target));
         if (angle <= 35) return;
         drawExcentric(x, y);
-      }, 300);
+      }, 400);
     }
 
     function applyHover(id: string | null) {
@@ -962,11 +1084,9 @@ export function TiltedCourseStage({
     function pickAt(x: number, y: number) {
       const candidates = [];
       const angle = tiltAngleDegrees(camera.position.clone().sub(controls.target));
-      const capVisible = capabilityVisible();
       for (let index = 0; index < engine.currentNodes.length; index += 1) {
         const node = engine.currentNodes[index];
         if (node.kind === "route" || node.kind === "route-chapter") continue;
-        if (node.kind === "capability" && capVisible < 0.02) continue;
         const distance = camera.position.distanceTo(new THREE.Vector3(node.x, -node.y, node.z));
         const screen = cardScreen(node, distance);
         if (screen.z > 1) continue;
@@ -998,40 +1118,79 @@ export function TiltedCourseStage({
       const selected = engine.selected;
       const direction = camera.position.clone().sub(controls.target).normalize();
       const angle = tiltAngleDegrees(direction);
-      const state = simplificationForAngle(angle);
+      const sample = engine.currentNodes.find((node) => node.kind === "knowledge");
+      const sampleWorld = sample ? new THREE.Vector3(sample.x, -sample.y, sample.z) : controls.target.clone();
+      const sampleDistance = Math.max(1, camera.position.distanceTo(sampleWorld));
+      const samplePx = engine.height / (2 * sampleDistance * FOV_T);
+      const state = simplificationForView({
+        theta: angle,
+        screenWidth: (sample?.width ?? 176) * samplePx,
+        previousSizeStage: engine.lastSizeStage
+      });
+      engine.lastSizeStage = state.sizeStage;
       const xray = xrayFor();
       const capVis = capabilityVisible();
-      const isFlat = engine.layer === "practice";
+      const offsets = layerOffsetsAt(engine.layerMix);
+      const mix = engine.layerMix;
+      // Between ~35° and ~58° the plane is read through screen-facing names,
+      // not through foreshortened card bodies. The WebGL marker owns the node
+      // and the card is hidden, so one node still has exactly one marker.
+      const turnLabels = smooth(33, 37, angle) * (1 - smooth(56, 60, angle));
+      const cardFade = (1 - smooth(0.5, 0.62, state.dot)) * (1 - turnLabels);
+      const pointMix = Math.max(smooth(0.62, 0.86, state.dot), turnLabels);
       engine.cards.forEach((card) => {
         const node = card.node;
-        const world = new THREE.Vector3(node.x, -node.y, node.z);
+        const knowledge = node.kind === "knowledge";
+        const assignment = node.kind === "assignment";
+        const offset = knowledge ? offsets.knowledge : assignment ? offsets.practice : { x: 0, y: 0, z: 0 };
+        const world = new THREE.Vector3(node.x + offset.x, -node.y - offset.y, node.z + offset.z);
         card.object.position.copy(world);
         const distance = camera.position.distanceTo(world);
         const pxPerWorld = engine.height / (2 * Math.max(1, distance) * FOV_T);
         const screen = project({ x: world.x, y: world.y, z: world.z });
+        const ghost = knowledge ? mix > 0.5 : assignment ? mix < 0.5 : false;
         card.screen = screen;
         card.distance = distance;
         card.angle = state;
-        const ghost = Boolean(node.ghost);
-        let opacity = 1;
-        if (ghost) opacity *= 1 - smooth(35, 42, angle);
+        card.ghost = ghost;
+        card.pointMix = pointMix;
+        card.layerOpacity = knowledge ? offsets.knowledgeOpacity : assignment ? offsets.practiceOpacity : 1;
+        let opacity = card.layerOpacity;
         if (node.dim) opacity *= 0.24;
         if (node.kind === "capability") opacity *= capVis;
         opacity *= 1 - state.back;
         if (node.id === selected && angle > 35) opacity *= 1 - smooth(35, 38, angle);
-        // The WebGL point takes over exactly when the card becomes a dot.
-        opacity *= 1 - smooth(0.72, 0.995, state.dot);
+        // A reflection is text-only clutter once the plane turns; its copy is
+        // gone by ~42°, and it never becomes a dot-stage marker (the front
+        // layer's single point owns the node there).
+        if (ghost) opacity *= (1 - smooth(35, 42, angle)) * (1 - smooth(0.16, 0.55, state.dot)) * (1 - turnLabels)
+          * (1 - smooth(0.35, 0.65, state.pill));
+        // The DOM card hands the node over to the WebGL point before the point
+        // fades in, so one Knowledge never shows two markers.
+        opacity *= cardFade;
         let width = node.width;
         let height = node.height;
         const name = node.title;
-        // The plane compresses columns as it turns; the capsule must shrink with
-        // it instead of painting over the neighbouring chapter column.
-        const maxPill = THREE.MathUtils.lerp(166, 86, smooth(35, 55, angle));
-        const pillWidth = Math.max(46, Math.min(maxPill, measureText(name, node.kind === "capability" ? 12 : 13) + 22));
-        const dotPx = Math.min(13 * (node.kind === "capability" ? 0.9 : 1) * pxPerWorld, NODE_MAX_PX);
+        // The capsule is defined in screen pixels and converted back into the
+        // card's world units. Otherwise perspective and zoom shrink both the
+        // capsule and its glyphs until a name collapses to "S…". The target is
+        // wide enough for a readable run (>= 8 Latin characters) or the full
+        // name, and never wider than the card itself.
+        // Keep the glyph size legible as the capsule shrinks: a 60px capsule
+        // at 50% zoom needs a smaller screen font, not a 13px font clipped to
+        // a few vertical strokes.
+        const safePxPerWorld = Math.max(0.0001, pxPerWorld);
+        const pillFont = Math.max(9, Math.min(node.kind === "capability" ? 12 : 13, (node.width * safePxPerWorld) * 0.16));
+        const targetPillPx = Math.max(
+          node.kind === "capability" ? 72 : 78,
+          Math.min(node.kind === "capability" ? 128 : 152, sideTextWidth(name) + (node.kind === "capability" ? 18 : 24))
+        );
+        const pillWorldWidth = Math.min(node.width, targetPillPx / safePxPerWorld);
+        const pillWorldHeight = 26 / safePxPerWorld;
+        const dotPx = Math.min(13 * (node.kind === "capability" ? 1.15 : 1) * pxPerWorld, NODE_MAX_PX);
         const dotSize = dotPx / Math.max(0.0001, pxPerWorld);
-        width = THREE.MathUtils.lerp(THREE.MathUtils.lerp(node.width, pillWidth, state.pill), dotSize, state.dot);
-        height = THREE.MathUtils.lerp(THREE.MathUtils.lerp(node.height, 26, state.pill), dotSize, state.dot);
+        width = THREE.MathUtils.lerp(THREE.MathUtils.lerp(node.width, pillWorldWidth, state.pill), dotSize, state.dot);
+        height = THREE.MathUtils.lerp(THREE.MathUtils.lerp(node.height, pillWorldHeight, state.pill), dotSize, state.dot);
         const cardRect = {
           x: screen.x - width * pxPerWorld / 2,
           y: screen.y - height * pxPerWorld / 2,
@@ -1040,19 +1199,31 @@ export function TiltedCourseStage({
         };
         const blocked = xrayBlocked(cardRect, distance, xray);
         if (blocked) opacity *= 0.16;
-        if (!node.selected && node.id === selected) opacity *= 1;
         card.width = width;
         card.height = height;
         card.opacity = opacity;
         const element = card.element;
         element.style.width = `${width.toFixed(2)}px`;
         element.style.height = `${height.toFixed(2)}px`;
-        const padY = THREE.MathUtils.lerp(THREE.MathUtils.lerp(node.kind === "assignment" ? 7 : 9, 3, state.pill), 0, state.dot);
-        const padRight = THREE.MathUtils.lerp(THREE.MathUtils.lerp(10, 9, state.pill), 0, state.dot);
-        // Front cards with a route step reserve room for the badge inside the
-        // left edge. Capsules / dots hide it and go back to the normal padding.
-        const padLeft = node.kind === "knowledge" && node.step && angle <= 35 ? 36 : padRight;
+        const padY = THREE.MathUtils.lerp(THREE.MathUtils.lerp(8, 0, state.pill), 0, state.dot);
+        const padRight = THREE.MathUtils.lerp(THREE.MathUtils.lerp(10, 4, state.pill), 0, state.dot);
+        // In the capsule the copy itself reserves the step disc's lane. The
+        // old code reserved 24px on the card AND 18px on the copy, leaving
+        // only a few pixels for the name.
+        const padLeft = node.kind === "knowledge" && node.step
+          ? THREE.MathUtils.lerp(36, 2, state.pill)
+          : padRight;
         element.style.padding = `${padY.toFixed(2)}px ${padRight.toFixed(2)}px ${padY.toFixed(2)}px ${padLeft.toFixed(2)}px`;
+        const strongElement = element.querySelector<HTMLElement>("strong");
+        if (strongElement) {
+          if (state.pill > 0.02) {
+            strongElement.style.fontSize = `${(pillFont / safePxPerWorld).toFixed(2)}px`;
+            strongElement.style.lineHeight = `${(pillFont * 1.18 / safePxPerWorld).toFixed(2)}px`;
+          } else {
+            strongElement.style.removeProperty("font-size");
+            strongElement.style.removeProperty("line-height");
+          }
+        }
         element.style.borderRadius = state.pill > 0.02 ? "999px" : "12px";
         element.style.opacity = Math.max(0, Math.min(1, opacity)).toFixed(3);
         element.style.setProperty("--name-op", state.cardName.toFixed(3));
@@ -1140,29 +1311,36 @@ export function TiltedCourseStage({
       const count = engine.currentNodes.length;
       const capVis = capabilityVisible();
       const capSet = selectedCapabilitySet();
+      const offsets = layerOffsetsAt(engine.layerMix);
       for (let index = 0; index < count; index += 1) {
         const node = engine.currentNodes[index];
+        const card = engine.cards.get(node.id);
         const color = new THREE.Color(colorFor(node));
         const selectedCap = capSet && !capSet.has(node.id);
-        const angleNow = tiltAngleDegrees(camera.position.clone().sub(controls.target));
-        const ghostSide = Boolean(node.ghost) && angleNow > 40;
-        const backKnowledge = engine.layer === "practice" && node.kind === "knowledge" && angleNow > 40;
-        const backPractice = engine.layer === "skill" && node.kind === "assignment" && angleNow > 40;
-        const layerHidden = ghostSide || backKnowledge || backPractice;
-        const capabilityAlpha = node.kind === "capability" ? (capVis <= 0.02 ? 0 : 0.14 + 0.86 * capVis) : 1;
-        const alpha = layerHidden ? 0 : (node.dim ? 0.24 : 1) * capabilityAlpha * (node.ghost ? 0.55 : 1) * (selectedCap ? 0.2 : 1);
+        const knowledge = node.kind === "knowledge";
+        const assignment = node.kind === "assignment";
+        const offset = knowledge ? offsets.knowledge : assignment ? offsets.practice : { x: 0, y: 0, z: 0 };
+        const worldX = node.x + offset.x;
+        const worldY = -node.y - offset.y;
+        const worldZ = node.z + offset.z;
+        // One marker per node: the WebGL point only owns the node in the dot
+        // stage. Earlier stages are the DOM card, so the point stays invisible.
+        const ghost = card?.ghost ?? false;
+        const pointMix = ghost ? 0 : (card?.pointMix ?? 0);
+        const capabilityAlpha = node.kind === "capability" ? capVis : 1;
+        const alpha = pointMix * (node.dim ? 0.35 : 1) * capabilityAlpha * (selectedCap ? 0.4 : 1);
         const hovered = engine.hover === node.id || engine.externalHover === node.id;
-        pointPositions[index * 3] = node.x;
-        pointPositions[index * 3 + 1] = -node.y;
-        pointPositions[index * 3 + 2] = node.z;
+        pointPositions[index * 3] = worldX;
+        pointPositions[index * 3 + 1] = worldY;
+        pointPositions[index * 3 + 2] = worldZ;
         pointAlpha[index] = Math.max(0, Math.min(1, alpha * (hovered ? 1.4 : 1)));
-        pointSize[index] = 13 * (node.kind === "capability" ? 0.9 : 1) * (hovered ? 1.55 : 1);
+        pointSize[index] = 13 * (node.kind === "capability" ? 1.15 : 1) * (hovered ? 1.55 : 1);
         color.toArray(pointColor, index * 3);
         // Status / current ring: screen-facing, fixed width, capped at 60px.
-        ringPositions[index * 3] = node.x;
-        ringPositions[index * 3 + 1] = -node.y;
-        ringPositions[index * 3 + 2] = node.z;
-        ringSize[index] = 13 * (node.kind === "capability" ? 0.9 : 1) * 2.1;
+        ringPositions[index * 3] = worldX;
+        ringPositions[index * 3 + 1] = worldY;
+        ringPositions[index * 3 + 2] = worldZ;
+        ringSize[index] = 13 * (node.kind === "capability" ? 1.15 : 1) * 2.1;
         const ringStatus = node.status === "completed" ? colors.acquired : node.status === "learning" ? colors.brand : node.status === "available" ? colors.target : colors.pending;
         const ring = new THREE.Color(ringStatus);
         ring.toArray(ringColor, index * 3);
@@ -1171,22 +1349,18 @@ export function TiltedCourseStage({
         ringColor2[index * 3 + 2] = ringColor[index * 3 + 2];
         ringSplit[index] = 0;
         ringAlpha[index] = 0;
-        if (!layerHidden && (engine.layer === "skill" || node.kind === "assignment" || node.kind === "capability")) {
-          // Status rings belong to the dot stage; during the 35–55° pill stage
-          // they would read as a second marker below the capsule.
-          const side = smooth(55, 64, angleNow);
-          ringAlpha[index] = side * (node.dim ? 0.12 : 0.58) * (node.kind === "capability" ? capVis : 1);
-        }
+        // Status rings belong to the dot stage; during the full / pill stages
+        // they would read as a second marker beside the card.
+        ringAlpha[index] = pointMix * (node.dim ? 0.12 : 0.58) * (node.kind === "capability" ? capVis : 1);
         if (node.current) {
-          const side = smooth(30, 42, tiltAngleDegrees(camera.position.clone().sub(controls.target)));
           const pulse = engine.reduced ? 0.5 : 0.5 + 0.5 * Math.sin(performance.now() / 1000 * 3.1);
           const brand = new THREE.Color(colors.brand);
           brand.toArray(ringColor, index * 3);
           brand.toArray(ringColor2, index * 3);
-          ringAlpha[index] = Math.max(ringAlpha[index], side * (0.62 + 0.3 * pulse));
-          ringSize[index] *= 1 + 0.045 * side * pulse;
+          ringAlpha[index] = Math.max(ringAlpha[index], pointMix * (0.62 + 0.3 * pulse));
+          ringSize[index] *= 1 + 0.045 * pointMix * pulse;
         }
-        if (node.id === engine.hover || node.id === engine.externalHover) {
+        if (hovered) {
           ringAlpha[index] = Math.max(ringAlpha[index], 0.95);
           hoveredStatusColor(node).toArray(ringColor, index * 3);
         }
@@ -1207,6 +1381,7 @@ export function TiltedCourseStage({
       (ringGeometry.getAttribute("split") as THREE.BufferAttribute).needsUpdate = true;
       void count;
     }
+
     function selectedCapabilitySet() {
       if (!engine.selected) return null;
       const selectedNode = nodeById(engine.selected);
@@ -1250,8 +1425,9 @@ export function TiltedCourseStage({
           object.element.style.pointerEvents = "none";
           cssScene.add(object);
           card = {
-            node, element, object, signature: "", width: node.width, height: node.height, opacity: 1,
-            screen: { x: 0, y: 0, z: 0 }, distance: 1000, angle: simplificationForAngle(0)
+            node, element, object, signature: "", width: node.width, height: node.height, opacity: 0,
+            screen: { x: 0, y: 0, z: 0 }, distance: 1000, angle: simplificationForAngle(0),
+            pointMix: 0, layerOpacity: 1, ghost: false
           };
           element.addEventListener("keydown", (event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -1326,7 +1502,7 @@ export function TiltedCourseStage({
           else child.material.dispose();
         }
       });
-      const add = (points: TiltedPoint[], color: string, opacity: number, dashed: boolean, kind: StageEdge["kind"]) => {
+      const add = (points: TiltedPoint[], color: string, opacity: number, dashed: boolean, kind: StageEdge["kind"], weights: number[] = []) => {
         if (points.length < 2) return;
         const positions = points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
         const geometry = new THREE.BufferGeometry().setFromPoints(positions);
@@ -1339,58 +1515,156 @@ export function TiltedCourseStage({
         line.userData.baseOpacity = opacity;
         line.userData.source = points[0];
         line.userData.target = points[points.length - 1];
+        line.userData.sourceId = undefined;
+        line.userData.targetId = undefined;
+        line.userData.points = points;
+        line.userData.weights = weights.length === points.length ? weights : points.map(() => 0);
         line.renderOrder = 0;
         engine.edgeGroup.add(line);
       };
       const hasSelection = Boolean(engine.selected);
       for (const edge of engine.currentEdges) {
-        if (edge.kind === "capability") add(edge.points, colors.brand, edge.highlighted ? 0.9 : hasSelection ? 0.06 : 0.15, true, edge.kind);
-        else if (edge.kind === "practice") add(edge.points, colors.practice, edge.highlighted ? 0.74 : 0.25, true, edge.kind);
-        else if (edge.kind === "chapter") add(edge.points, colors.line, 0.2, false, edge.kind);
-        else add(edge.points, colors.brand, edge.highlighted ? 0.92 : hasSelection ? 0.07 : 0.27, false, edge.kind);
+        if (edge.kind === "capability") add(edge.points, colors.brand, edge.highlighted ? 0.9 : hasSelection ? 0.06 : 0.15, true, edge.kind, edge.pointWeights);
+        else if (edge.kind === "practice") {
+          add(edge.points, colors.practice, edge.highlighted ? 0.74 : 0.25, true, edge.kind);
+          const line = engine.edgeGroup.children[engine.edgeGroup.children.length - 1];
+          if (line instanceof THREE.Line) {
+            line.userData.sourceId = edge.source;
+            line.userData.targetId = edge.target;
+          }
+        } else if (edge.kind === "chapter") add(edge.points, colors.line, 0.2, false, edge.kind);
+        else add(edge.points, colors.brand, edge.highlighted ? 0.92 : hasSelection ? 0.07 : 0.27, false, edge.kind, edge.pointWeights ?? edge.points.map(() => 1));
       }
+      (engine as unknown as { lastEdgeMix?: number }).lastEdgeMix = undefined;
+      updateEdgeGeometry();
+    }
+
+    function updateEdgeGeometry() {
+      const mix = engine.layerMix;
+      const last = (engine as unknown as { lastEdgeMix?: number }).lastEdgeMix;
+      if (last !== undefined && Math.abs(last - mix) < 0.0004) return;
+      (engine as unknown as { lastEdgeMix?: number }).lastEdgeMix = mix;
+      const offsets = layerOffsetsAt(mix);
+      for (const child of engine.edgeGroup.children) {
+        if (!(child instanceof THREE.Line)) continue;
+        const points = child.userData.points as TiltedPoint[] | undefined;
+        if (!points) continue;
+        const kind = child.userData.kind as StageEdge["kind"];
+        const attribute = child.geometry.getAttribute("position") as THREE.BufferAttribute;
+        if (kind === "practice") {
+          const source = nodeById(child.userData.sourceId as string);
+          const target = nodeById(child.userData.targetId as string);
+          if (!source || !target) continue;
+          const knowledgeOffset = offsets.knowledge;
+          const practiceOffset = offsets.practice;
+          const sourceX = source.x + source.width / 2 + knowledgeOffset.x;
+          const sourceY = -source.y - knowledgeOffset.y;
+          const sourceZ = source.z + knowledgeOffset.z + 2;
+          const targetX = target.x + target.width / 2 + practiceOffset.x;
+          const targetY = -target.y - practiceOffset.y;
+          const targetZ = target.z + practiceOffset.z + 2;
+          attribute.setXYZ(0, sourceX, sourceY, sourceZ);
+          attribute.setXYZ(1, targetX, targetY, targetZ);
+          attribute.needsUpdate = true;
+          if (child.material instanceof THREE.LineDashedMaterial) child.computeLineDistances();
+          continue;
+        }
+        const weights = child.userData.weights as number[] | undefined;
+        points.forEach((point, index) => {
+          const weight = weights?.[index] ?? 0;
+          attribute.setXYZ(
+            index,
+            point.x + offsets.knowledge.x * weight,
+            -point.y - offsets.knowledge.y * weight,
+            point.z + offsets.knowledge.z * weight
+          );
+        });
+        attribute.needsUpdate = true;
+        if (child.material instanceof THREE.LineDashedMaterial) child.computeLineDistances();
+      }
+    }
+
+    /**
+     * Route anchors are semantic steps, not a spline control polygon. Cutting
+     * each corner with a small quadratic keeps the band on the anchors while
+     * preventing Catmull-Rom overshoot loops when consecutive lessons jump
+     * between chapters.
+     */
+    function roundedRoutePoints(anchors: THREE.Vector3[], radius = 8) {
+      if (anchors.length < 3) return anchors;
+      const out: THREE.Vector3[] = [anchors[0]];
+      for (let index = 1; index < anchors.length - 1; index += 1) {
+        const previous = anchors[index - 1];
+        const current = anchors[index];
+        const next = anchors[index + 1];
+        const incoming = current.clone().sub(previous);
+        const outgoing = next.clone().sub(current);
+        const incomingLength = incoming.length();
+        const outgoingLength = outgoing.length();
+        if (incomingLength < 0.001 || outgoingLength < 0.001) { out.push(current); continue; }
+        const cut = Math.min(radius, incomingLength * 0.32, outgoingLength * 0.32);
+        const start = current.clone().add(incoming.normalize().multiplyScalar(-cut));
+        const end = current.clone().add(outgoing.normalize().multiplyScalar(cut));
+        for (let step = 0; step <= 6; step += 1) {
+          const t = step / 6;
+          const one = 1 - t;
+          out.push(new THREE.Vector3(
+            one * one * start.x + 2 * one * t * current.x + t * t * end.x,
+            one * one * start.y + 2 * one * t * current.y + t * t * end.y,
+            one * one * start.z + 2 * one * t * current.z + t * t * end.z
+          ));
+        }
+      }
+      out.push(anchors[anchors.length - 1]);
+      return out;
     }
 
     function rebuildBeams() {
       engine.beamGroup.children.slice().forEach((child) => {
         engine.beamGroup.remove(child);
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (Array.isArray(child.material)) child.material.forEach((material) => material.dispose());
-          else child.material.dispose();
-        } else if (child instanceof THREE.Line) {
-          child.geometry.dispose();
-          child.material.dispose();
-        }
+        const disposable = child as unknown as {
+          geometry?: { dispose?: () => void };
+          material?: { dispose?: () => void } | Array<{ dispose?: () => void }>;
+        };
+        disposable.geometry?.dispose?.();
+        if (Array.isArray(disposable.material)) disposable.material.forEach((material) => material.dispose?.());
+        else disposable.material?.dispose?.();
       });
       engine.packets = [];
+      beamMaterialsRef.current = [];
       for (const beam of engine.currentBeams) {
         const points = beam.points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
         if (points.length < 2) continue;
         const color = beam.kind === "current" ? colors.brandInk : colors.target;
-        if (beam.kind === "current" && beam.fallback) {
-          const geometry = new THREE.BufferGeometry().setFromPoints(points);
-          const material = new THREE.LineDashedMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.16 : 0.42, depthWrite: false, dashSize: 9, gapSize: 10 });
-          const line = new THREE.Line(geometry, material);
-          line.computeLineDistances();
-          engine.beamGroup.add(line);
-          continue;
-        }
-        const curve = new THREE.CatmullRomCurve3(points);
-        const tube = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), 1.4, 6, false);
-        const glow = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), 3.4, 8, false);
-        const glowMesh = new THREE.Mesh(glow, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.03 : 0.1, depthWrite: false }));
-        glowMesh.renderOrder = 0;
-        const mesh = new THREE.Mesh(tube, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.16 : 0.55, depthWrite: false }));
-        mesh.renderOrder = 2;
-        engine.beamGroup.add(glowMesh, mesh);
-        const packetGeometry = new THREE.SphereGeometry(2.2, 10, 8);
-        const count = Math.min(6, Math.max(2, Math.floor(curve.getLength() / 140)));
+        const samples = roundedRoutePoints(points);
+        const positions: number[] = [];
+        samples.forEach((point) => positions.push(point.x, point.y, point.z));
+        const dim = Boolean(beam.dimmed);
+        // Fat lines carry a pixel linewidth; zooming therefore never turns the
+        // route band into a world-space tube that swallows the cards.
+        const glowGeometry = new LineGeometry();
+        glowGeometry.setPositions(positions);
+        const glowMaterial = new LineMaterial({ color, linewidth: 10, transparent: true, opacity: dim ? 0.04 : 0.12, depthWrite: false });
+        glowMaterial.resolution.set(engine.width, engine.height);
+        const glow = new Line2(glowGeometry, glowMaterial);
+        glow.renderOrder = 0;
+        const coreGeometry = new LineGeometry();
+        coreGeometry.setPositions(positions);
+        const coreMaterial = new LineMaterial({ color, linewidth: 3, transparent: true, opacity: dim ? 0.3 : 0.68, depthWrite: false });
+        coreMaterial.resolution.set(engine.width, engine.height);
+        const core = new Line2(coreGeometry, coreMaterial);
+        core.renderOrder = 2;
+        engine.beamGroup.add(glow, core);
+        beamMaterialsRef.current.push(glowMaterial, coreMaterial);
+        const packetGeometry = new THREE.SphereGeometry(3.6, 12, 10);
+        let routeLength = 0;
+        for (let index = 1; index < samples.length; index += 1) routeLength += samples[index].distanceTo(samples[index - 1]);
+        const count = Math.min(7, Math.max(2, Math.floor(routeLength / 130)));
         for (let index = 0; index < count; index += 1) {
-          const packet = new THREE.Mesh(packetGeometry.clone(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.2 : 0.92, depthWrite: false }));
+          const packet = new THREE.Mesh(packetGeometry.clone(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: dim ? 0.3 : 0.95, depthWrite: false }));
           packet.renderOrder = 3;
           engine.beamGroup.add(packet);
-          engine.packets.push({ mesh: packet, points: beam.points, progress: 0, speed: 0.0002, offset: index / count });
+          engine.packets.push({ mesh: packet, points: samples.map((point) => ({ x: point.x, y: -point.y, z: point.z })), progress: 0, speed: 0.00034, offset: index / count });
         }
       }
     }
@@ -1411,6 +1685,7 @@ export function TiltedCourseStage({
       ringMaterial.uniforms.uGap.value = RING_GAP_PX * pixelRatio;
       ringMaterial.uniforms.uRingMax.value = RING_MAX_PX * pixelRatio;
       ringMaterial.uniforms.uWidth.value = RING_WIDTH_PX * pixelRatio;
+      beamMaterialsRef.current.forEach((material) => material.resolution.set(width, height));
       if (changed) fit(false);
     }
     (engine as unknown as { resize(): void }).resize = resize;
@@ -1448,11 +1723,28 @@ export function TiltedCourseStage({
       engine.layer = propsRef.current.layer;
       engine.reduced = propsRef.current.reducedMotion;
       engine.detailOpen = propsRef.current.detailOpen;
+      // Skill / practice swap: both layers interpolate their offset and
+      // opacity over 420ms. No layout, camera or React data is rebuilt.
+      const layerTarget = engine.layer === "practice" ? 1 : 0;
+      if (layerTarget !== engine.layerTarget) {
+        engine.layerSwapFrom = engine.layerMix;
+        engine.layerSwapStarted = now;
+        engine.layerTarget = layerTarget;
+      }
+      engine.layerMix = layerMixAt(engine.layerSwapFrom, engine.layerTarget, now - engine.layerSwapStarted, LAYER_SWAP_MS, engine.reduced);
+      // The list rail is a ~35° affordance, not the first faint pixels of
+      // the deeper plane.
+      const capReveal = angle >= 33;
+      if (capReveal !== engine.capabilityReveal) {
+        engine.capabilityReveal = capReveal;
+        propsRef.current.onCapabilityReveal?.(capReveal);
+      }
       updateHoverRing();
       updateCards();
       updateChapters();
       updateChapterHover();
       updatePoints();
+      updateEdgeGeometry();
       updateEdgeHighlights();
       updateLabels();
       updateChapterLabelElement();
@@ -1479,10 +1771,11 @@ export function TiltedCourseStage({
         const kind = child.userData.kind as StageEdge["kind"];
         const material = child.material as THREE.LineBasicMaterial | THREE.LineDashedMaterial;
         const base = typeof child.userData.baseOpacity === "number" ? child.userData.baseOpacity : 0.2;
+        const capabilityAlpha = capabilityVisible();
         if (kind === "capability") {
-          // Support lines belong to the same mode as the capability markers.
-          if (!propsRef.current.capabilitiesOn) { material.opacity = 0; return; }
-          material.opacity = 0.15;
+          // Support lines fade with the same angle rule as the markers.
+          material.opacity = 0.15 * capabilityAlpha;
+          if (capabilityAlpha <= 0.02) return;
         } else if (kind === "knowledge") material.opacity = base;
         if (kind !== "capability" && kind !== "knowledge") return;
         const source = child.userData.source as TiltedPoint | undefined;
@@ -1493,7 +1786,7 @@ export function TiltedCourseStage({
           return Boolean(node && (node.id === hover || node.id === selected));
         };
         if (endpointHit(source) || endpointHit(target)) {
-          material.opacity = kind === "capability" ? 0.9 : 0.92;
+          material.opacity = kind === "capability" ? 0.9 * capabilityAlpha : 0.92;
         }
       });
     }
@@ -1519,6 +1812,10 @@ export function TiltedCourseStage({
           -(from.y + (to.y - from.y) * local),
           from.z + (to.z - from.z) * local + 12
         );
+        // Pulses keep a constant screen size, like the 3px core line.
+        const distance = camera.position.distanceTo(packet.mesh.position);
+        const pxPerWorld = engine.height / (2 * Math.max(1, distance) * FOV_T);
+        packet.mesh.scale.setScalar(5 / Math.max(0.0001, pxPerWorld) / 3.6);
       }
     }
 
@@ -1588,7 +1885,14 @@ export function TiltedCourseStage({
           }
         }, 180);
       }
-      scheduleThaw(moved > 5 ? 260 : 0);
+      if (moved > 5) {
+        // A drag can end without another pointermove: name the node under the
+        // resting cursor immediately instead of keeping a stale hover.
+        const hit = pickAt(x, y);
+        engine.internalHover = hit;
+        applyHover(hit);
+      }
+      scheduleThaw(moved > 5 ? 240 : 0);
       propsRef.current.onPoseChange?.(angle() > 12 ? "rotated" : "front");
     }
     function wheel(event: WheelEvent) {
@@ -1635,11 +1939,17 @@ export function TiltedCourseStage({
     const resizeObserver = new ResizeObserver(() => resize());
     resizeObserver.observe(hostEl);
     resize();
-    apiRef.current = { animateCamera, fit, frontView, capsView, markLabelsDirty, rebuildCards, rebuildChapters, rebuildEdges, rebuildBeams };
+    apiRef.current = { animateCamera, fit, frontView, capPresetView: capsView, markLabelsDirty, rebuildCards, rebuildChapters, rebuildEdges, rebuildBeams };
     if (import.meta.env.DEV) {
       (window as unknown as { __efTilt?: unknown }).__efTilt = {
         angle: () => tiltAngleDegrees(camera.position.clone().sub(controls.target)),
         setOrbit: (thetaDeg: number, pitchDeg = 0) => setOrbit(thetaDeg, pitchDeg),
+        setZoomPercent: (percent: number) => {
+          const direction = camera.position.clone().sub(controls.target);
+          const distance = THREE.MathUtils.clamp(engine.fitDistance / Math.max(0.2, percent / 100), 180, 5200);
+          animateCamera(controls.target.clone().add(direction.setLength(distance)), controls.target.clone(), 320);
+        },
+        zoomPercent: () => engine.lastZoomPercent,
         camera,
         controls,
         cards: engine.cards,
@@ -1663,6 +1973,9 @@ export function TiltedCourseStage({
           return node ? { id: node.id, kind: node.kind, title: node.title } : null;
         },
         layer: () => engine.layer,
+        layerState: () => ({ mix: Number(engine.layerMix.toFixed(3)), target: engine.layerTarget, from: engine.layerSwapFrom, started: engine.layerSwapStarted, reduced: engine.reduced }),
+        beams: () => engine.currentBeams.map((beam) => ({ id: beam.id, kind: beam.kind, points: beam.points.length, dimmed: Boolean(beam.dimmed) })),
+        packets: () => engine.packets.map((packet) => packet.mesh.position.toArray().map((value) => Number(value.toFixed(2)))),
         hover: () => engine.hover,
         xray: () => {
           const info = engine.selected ? nodeScreenFor(engine.selected) : null;
@@ -1675,6 +1988,11 @@ export function TiltedCourseStage({
           return index < 0 ? 0 : Number(renderedOpacity(index).toFixed(3));
         },
         capabilityVisible: () => Number(capabilityVisible().toFixed(3)),
+        beamWidths: () => beamMaterialsRef.current.map((material) => material.linewidth),
+        pointAlphaOf: (id: string) => {
+          const index = engine.currentNodes.findIndex((node) => node.id === id);
+          return index < 0 ? 0 : Number((engine.pointAlpha[index] ?? 0).toFixed(3));
+        },
         cardState: () => [...engine.cards.values()].map((card) => ({ id: card.node.id, kind: card.node.kind, op: Number(card.opacity.toFixed(2)), width: Number(card.width.toFixed(1)), height: Number(card.height.toFixed(1)), visible: card.object.visible }))
       };
     }
@@ -1848,7 +2166,7 @@ export function TiltedCourseStage({
       );
       api.animateCamera(target.clone().add(direction.multiplyScalar(state.distance)), target, 0);
     },
-    focusCapabilities: () => apiRef.current?.capsView(),
+    focusCapabilities: () => apiRef.current?.capPresetView(),
     locate: (id: string) => {
       const engine = runtimeRef.current;
       const api = apiRef.current;

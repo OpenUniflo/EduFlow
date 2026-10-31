@@ -82,11 +82,24 @@
 .ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-stage-wrap,
 .ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-top,
 .ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-toolbar,
-.ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-status-legend,
 .ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-controls {
   opacity: 1;
   transform: none;
   transition: none;
+}
+
+/* The status strip is centred with a transform. Keep that transform in the
+   settled state too; the old blanket `transform: none` made it start at the
+   viewport centre and run underneath the zoom controls. */
+.ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-status-legend {
+  opacity: 1;
+  transition: none;
+}
+
+@media (min-width: 1101px) {
+  .ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-status-legend {
+    transform: translateX(-50%);
+  }
 }
 
 .ef-imm-top {
@@ -2603,7 +2616,7 @@ body:has(.ef-imm-page) {
   .ef-imm-status-legend {
     right: auto;
     left: var(--sp-16);
-    max-width: calc(100% - 220px);
+    max-width: calc(100% - 290px);
     flex-wrap: wrap;
     gap: var(--sp-8) var(--sp-12);
     transform: none;
@@ -2657,7 +2670,9 @@ body:has(.ef-imm-page) {
   position: absolute;
   top: 0;
   left: 0;
+  box-sizing: border-box;
   width: 176px;
+  height: 64px;
   padding: 9px 12px;
   pointer-events: none !important;
   transform-origin: 50% 50%;
@@ -2665,6 +2680,44 @@ body:has(.ef-imm-page) {
   -webkit-backface-visibility: hidden;
   will-change: opacity, width, height;
   transition: opacity var(--dur-base) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+/* Full cards carry name + state + practice / material chips at ordinary
+   zoom. The extra rows fade before the capsule stage, so the card never
+   reserves an empty action row in the distance. */
+.ef-imm-tilt-card:not(.is-pill):not(.is-dot) .ef-imm-node-meta {
+  display: block;
+}
+
+.ef-imm-node-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: 3px;
+  overflow: hidden;
+  opacity: var(--extra-op, 1);
+}
+
+.ef-imm-node-actions span {
+  display: inline-flex;
+  height: 14px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 4px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--line));
+  border-radius: var(--r-full);
+  color: var(--brand-ink);
+  background: var(--surface);
+  font-size: var(--fs-12);
+  line-height: 1;
+  font-weight: var(--fw-500);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ef-imm-tilt-card .ef-imm-node-copy {
+  gap: 2px;
 }
 
 .ef-imm-tilt-card .ef-imm-node-copy {
@@ -2705,7 +2758,6 @@ body:has(.ef-imm-page) {
 }
 
 .ef-imm-tilt-card.is-pill .ef-imm-node-dot,
-.ef-imm-tilt-card.is-pill .ef-imm-step,
 .ef-imm-tilt-card.is-pill .ef-imm-badge,
 .ef-imm-tilt-card.is-pill .ef-imm-node-meta,
 .ef-imm-tilt-card.is-pill .ef-imm-node-detail,
@@ -2718,10 +2770,29 @@ body:has(.ef-imm-page) {
 .ef-imm-tilt-card.is-pill .ef-imm-node-copy {
   width: 100%;
   flex: 0 0 auto;
+  padding-left: 18px;
 }
 
 .ef-imm-tilt-card.is-pill .ef-imm-node-copy strong {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: var(--fs-13);
+  line-height: 1.18;
   text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The route step moves inside the capsule instead of being a second marker. */
+.ef-imm-tilt-card.is-pill .ef-imm-step {
+  top: 50%;
+  left: 4px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  font-size: var(--fs-12);
+  line-height: 1;
 }
 
 .ef-imm-tilt-card.is-dot {
@@ -2736,6 +2807,62 @@ body:has(.ef-imm-page) {
 .ef-imm-tilt-card.is-dot .ef-imm-step,
 .ef-imm-tilt-card.is-dot .ef-imm-badge {
   opacity: 0;
+}
+
+/* The reflected card is exactly the same size as the solid card; only the
+   14/13 offset exposes a bottom identity strip. */
+.ef-imm-tilt-card .ef-imm-ghost-peek {
+  display: none;
+}
+
+.ef-imm-tilt-card.is-ghost .ef-imm-node-title-row,
+.ef-imm-tilt-card.is-ghost .ef-imm-node-meta,
+.ef-imm-tilt-card.is-ghost .ef-imm-node-actions,
+.ef-imm-tilt-card.is-ghost .ef-imm-node-dot,
+.ef-imm-tilt-card.is-ghost .ef-imm-step,
+.ef-imm-tilt-card.is-ghost .ef-imm-badge,
+.ef-imm-tilt-card.is-ghost .ef-imm-node-index,
+.ef-imm-tilt-card.is-ghost .ef-imm-node-count {
+  visibility: hidden;
+}
+
+.ef-imm-tilt-card.is-ghost .ef-imm-ghost-peek {
+  position: absolute;
+  right: 10px;
+  bottom: 1px;
+  left: 10px;
+  display: flex;
+  height: 13px;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--ink);
+  text-align: left;
+}
+
+.ef-imm-tilt-card.is-ghost .ef-imm-ghost-peek strong {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  font-size: var(--fs-12);
+  line-height: 13px;
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-imm-tilt-card.is-ghost .ef-imm-ghost-peek strong em {
+  flex: 0 0 auto;
+  color: var(--practice);
+  font-style: normal;
+  font-weight: var(--fw-700);
+}
+
+.ef-imm-tilt-card.is-ghost .ef-imm-ghost-peek small {
+  display: none;
 }
 
 .ef-imm-tilt-chapter {
@@ -2793,6 +2920,16 @@ body:has(.ef-imm-page) {
   transition: opacity var(--dur-base) var(--ease-out);
 }
 
+.ef-imm-tilt-label.is-capability-label {
+  height: 20px;
+  padding: 1px 7px;
+  border-style: dashed;
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  line-height: 16px;
+  font-weight: 600;
+}
+
 .ef-imm-tilt-label.is-chapter {
   height: 24px;
   padding: 2px 10px;
@@ -2812,6 +2949,121 @@ body:has(.ef-imm-page) {
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+/* Dot stage: the route step is a hover-only chip, never a second marker. */
+.ef-imm-tilt-hover-ring::after {
+  content: attr(data-step);
+  position: absolute;
+  top: 50%;
+  left: -9px;
+  display: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  place-items: center;
+  border-radius: var(--r-full);
+  color: var(--surface);
+  background: var(--brand);
+  font-size: var(--fs-12);
+  font-style: normal;
+  font-weight: var(--fw-700);
+  line-height: 1;
+}
+
+.ef-imm-tilt-hover-ring[data-dot="1"][data-step]:not([data-step=""])::after {
+  display: grid;
+}
+
+/* The tilted stage owns its inline card geometry. The legacy semantic-zoom
+   rules would turn every card into a 12px chip (and hide reflections), which
+   is exactly the multiple-marker problem the shared LOD replaces. */
+.ef-imm-tilt-stage[data-zoom="far"] .ef-imm-tilt-card {
+  display: flex;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: auto;
+  padding: 9px 12px;
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: var(--sh-1);
+}
+
+.ef-imm-tilt-stage[data-zoom="far"] .ef-imm-tilt-card.is-ghost {
+  background: color-mix(in srgb, var(--surface) 30%, transparent);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.ef-imm-tilt-stage[data-zoom="far"] .ef-imm-tilt-card .ef-imm-node-copy {
+  display: flex;
+}
+
+.ef-imm-tilt-stage[data-zoom="far"] .ef-imm-tilt-card.is-dot {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Capability rail: a narrow tab that appears by angle, not by a mode switch. */
+.ef-imm-cap-rail {
+  position: absolute;
+  z-index: 34;
+  top: 50%;
+  right: 16px;
+  display: flex;
+  width: 44px;
+  min-height: 148px;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 4px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-full);
+  color: var(--brand-ink);
+  background: var(--glass-regular);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: var(--sh-2);
+  transform: translateY(-50%);
+  transition: right var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out);
+}
+
+.ef-imm-cap-rail.is-with-detail {
+  right: 420px;
+}
+
+.ef-imm-cap-rail span {
+  writing-mode: vertical-rl;
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+  letter-spacing: 0.08em;
+}
+
+.ef-imm-cap-rail b {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: var(--r-full);
+  color: var(--surface);
+  background: var(--brand);
+  font-size: var(--fs-12);
+  line-height: 1;
+}
+
+.ef-imm-cap-rail svg {
+  color: var(--muted);
+}
+
+.ef-imm-cap-hint {
+  flex: 0 0 auto;
+  padding-left: var(--sp-12);
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .ef-imm-tilt-ex {

@@ -3,12 +3,15 @@ import {
   chooseExcentricNodes,
   chooseTiltedLabels,
   clampToPanBounds,
+  findExcentricCluster,
   layoutExcentric,
+  layoutExcentricOutside,
   overlapRatio,
   panBoundsFor,
   panOffsetToBounds,
   pickScreenSpace,
   simplificationForAngle,
+  simplificationForView,
   tiltAngleDegrees,
   type ExcentricNode,
   type TiltedLabelCandidate
@@ -71,6 +74,35 @@ describe("simplificationForAngle", () => {
   });
 });
 
+describe("simplificationForView", () => {
+  it("uses screen width when the plane faces the camera", () => {
+    expect(simplificationForView({ theta: 0, screenWidth: 150 }).stage).toBe("full");
+    expect(simplificationForView({ theta: 0, screenWidth: 80 }).stage).toBe("pill");
+    expect(simplificationForView({ theta: 0, screenWidth: 40 }).stage).toBe("dot");
+    expect(simplificationForView({ theta: 0, screenWidth: 40 }).dot).toBe(1);
+  });
+
+  it("uses the angle when the plane is turned, even at full zoom", () => {
+    expect(simplificationForView({ theta: 52, screenWidth: 150 }).stage).toBe("pill");
+    expect(simplificationForView({ theta: 75, screenWidth: 150 }).stage).toBe("dot");
+    expect(simplificationForView({ theta: 75, screenWidth: 150 }).dot).toBe(1);
+  });
+
+  it("carries a hysteresis gap when zooming across a boundary", () => {
+    // A remembered dot survives up to 66px; a remembered pill needs a wider
+    // card before it expands back to full.
+    expect(simplificationForView({ theta: 0, screenWidth: 70, previousSizeStage: "dot" }).stage).toBe("pill");
+    expect(simplificationForView({ theta: 0, screenWidth: 59, previousSizeStage: "dot" }).stage).toBe("dot");
+    expect(simplificationForView({ theta: 0, screenWidth: 100, previousSizeStage: "pill" }).stage).toBe("pill");
+    expect(simplificationForView({ theta: 0, screenWidth: 130, previousSizeStage: "full" }).stage).toBe("full");
+  });
+
+  it("is continuous across the size boundary", () => {
+    const near = [116, 116.001, 116.002].map((width) => simplificationForView({ theta: 0, screenWidth: width, previousSizeStage: "full" }).pill);
+    expect(Math.max(...near) - Math.min(...near)).toBeLessThan(0.02);
+  });
+});
+
 function candidate(overrides: Partial<TiltedLabelCandidate> & Pick<TiltedLabelCandidate, "id" | "x" | "y">): TiltedLabelCandidate {
   return {
     distance: 1000,
@@ -108,10 +140,26 @@ describe("chooseTiltedLabels", () => {
     expect(chosen[2].id).toBe("n2");
   });
 
-  it("keeps selection labels even when every anchor collides", () => {
+  it("adds a hovered name without dropping the distance / fit names", () => {
+    const grid = Array.from({ length: 8 }, (_, index) => candidate({
+      id: `n${index}`,
+      x: 200 + (index % 4) * 300,
+      y: 250 + Math.floor(index / 4) * 400,
+      distance: 800 + index
+    }));
+    const hovered = candidate({ id: "hovered", x: 700, y: 450, priority: 0, distance: 300 });
+    const previous = new Set([...grid.map((node) => node.id), hovered.id]);
+    const chosen = chooseTiltedLabels([...grid, hovered], { ...baseOptions, maxLabels: 9, previous });
+    const ids = chosen.map((choice) => choice.id);
+    expect(ids).toContain("hovered");
+    grid.forEach((node) => expect(ids).toContain(node.id));
+    expect(chosen).toHaveLength(9);
+  });
+
+  it("hides a name when every anchor collides instead of relocating it", () => {
     const nodes = [candidate({ id: "selected", x: 300, y: 300, priority: 0 }), candidate({ id: "other", x: 300, y: 300 })];
-    const chosen = chooseTiltedLabels(nodes, { ...baseOptions, previous: new Set(["selected", "other"]) });
-    expect(chosen.map((choice) => choice.id)).toContain("selected");
+    const chosen = chooseTiltedLabels(nodes, { ...baseOptions, previous: new Set(["selected", "other"]), exclusions: [{ x: 0, y: 0, width: 1440, height: 900 }] });
+    expect(chosen).toEqual([]);
   });
 
   it("is deterministic for equal priority and distance", () => {
@@ -154,15 +202,26 @@ describe("excentric labels", () => {
     text: `知识 ${index}`
   }));
 
-  it("requires at least three nodes within 50px and picks at most six", () => {
-    expect(chooseExcentricNodes(nodes.slice(0, 2), { x: 500, y: 400 })).toEqual([]);
-    const chosen = chooseExcentricNodes(nodes, { x: 500, y: 400 });
+  it("requires at least three nodes within the pick radius and picks at most six", () => {
+    expect(chooseExcentricNodes(nodes.slice(0, 2), { x: 500, y: 400 }, { radius: 50 })).toEqual([]);
+    const chosen = chooseExcentricNodes(nodes, { x: 500, y: 400 }, { radius: 50 });
     expect(chosen).toHaveLength(6);
     expect(chosen.every((node) => Math.hypot(node.x - 500, node.y - 400) <= 50)).toBe(true);
   });
 
+  it("uses the 22px pick radius by default", () => {
+    const inside = [
+      { ...nodes[0], x: 500, y: 400 },
+      { ...nodes[1], x: 518, y: 400 },
+      { ...nodes[2], x: 500, y: 418 }
+    ];
+    expect(chooseExcentricNodes(inside, { x: 500, y: 400 })).toHaveLength(3);
+    const outside = inside.map((node) => ({ ...node, x: node.x + 40 }));
+    expect(chooseExcentricNodes(outside, { x: 500, y: 400 })).toEqual([]);
+  });
+
   it("sorts rows by screen y and keeps the column inside the viewport", () => {
-    const layout = layoutExcentric(chooseExcentricNodes(nodes, { x: 500, y: 400 }), { x: 500, y: 400 }, { width: 1440, height: 900 }, { measure });
+    const layout = layoutExcentric(chooseExcentricNodes(nodes, { x: 500, y: 400 }, { radius: 50 }), { x: 500, y: 400 }, { width: 1440, height: 900 }, { measure });
     expect(layout).not.toBeNull();
     const ys = layout!.rows.map((row) => row.text);
     const reordered = [...layout!.rows].sort((left, right) => left.y - right.y).map((row) => row.text);
@@ -177,8 +236,40 @@ describe("excentric labels", () => {
 
   it("flips the column to the left near the right edge", () => {
     const nearRight = nodes.map((node) => ({ ...node, x: 1380 }));
-    const layout = layoutExcentric(chooseExcentricNodes(nearRight, { x: 1380, y: 400 }), { x: 1380, y: 400 }, { width: 1440, height: 900 }, { measure });
+    const layout = layoutExcentric(chooseExcentricNodes(nearRight, { x: 1380, y: 400 }, { radius: 50 }), { x: 1380, y: 400 }, { width: 1440, height: 900 }, { measure });
     expect(layout!.x + layout!.width).toBeLessThanOrEqual(1440);
+  });
+
+  it("finds a dense cluster with a small snap when the camera is settling", () => {
+    const cluster = findExcentricCluster([
+      { ...nodes[0], x: 500, y: 400 },
+      { ...nodes[1], x: 518, y: 400 },
+      { ...nodes[2], x: 500, y: 423 }
+    ], { x: 500, y: 400 }, { radius: 22, minNodes: 3, snap: 7 });
+    expect(cluster).not.toBeNull();
+    expect(cluster!.nodes.length).toBeGreaterThanOrEqual(3);
+    expect(Math.hypot(cluster!.anchor.x - 500, cluster!.anchor.y - 400)).toBeLessThanOrEqual(7);
+  });
+
+  it("does not invent a cluster when only two nodes are inside the radius", () => {
+    expect(findExcentricCluster([
+      { ...nodes[0], x: 500, y: 400 },
+      { ...nodes[1], x: 518, y: 400 },
+      { ...nodes[2], x: 600, y: 400 }
+    ], { x: 500, y: 400 }, { radius: 22, minNodes: 3, snap: 7 })).toBeNull();
+  });
+
+  it("places the excentric list outside the plane bounding box without crossing lines", () => {
+    const plane = { x: 300, y: 150, width: 640, height: 520 };
+    const chosen = chooseExcentricNodes(nodes, { x: 500, y: 400 }, { radius: 50 });
+    const layout = layoutExcentricOutside(chosen, { x: 500, y: 400 }, { width: 1440, height: 900 }, plane, { measure });
+    expect(layout).not.toBeNull();
+    expect(layout!.x).toBeGreaterThanOrEqual(plane.x + plane.width);
+    expect(layout!.lines).toHaveLength(chosen.length);
+    const rowYs = layout!.rows.map((row) => row.y);
+    expect(rowYs).toEqual([...rowYs].sort((left, right) => left - right));
+    const nodeYs = [...chosen].sort((left, right) => left.y - right.y).map((node) => node.y);
+    expect(nodeYs).toEqual([...nodeYs].sort((left, right) => left - right));
   });
 });
 

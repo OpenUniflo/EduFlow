@@ -47,17 +47,13 @@ import {
 import { TiltedCourseStage } from "./TiltedCourseStage";
 import {
   assignmentKnowledgeMap,
+  basePracticeCards,
   buildPlaneCourseLayout,
   buildPracticeCards,
   buildRouteTrack,
   buildWindingRoute,
   courseSelectionRelations,
-  positionPracticeCards,
   primaryKnowledgeByAssignment,
-  REFLECTION_CARD_HEIGHT,
-  REFLECTION_OFFSET,
-  reflectionOffset,
-  reflectionStackY,
   resolveFacetSelection,
   routeStepNumber,
   type CoursePracticeCard,
@@ -179,14 +175,22 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   const [selectionPinned, setSelectionPinned] = useState(false);
   const [routeOn, setRouteOn] = useState(true);
   const [pose, setPose] = useState<Pose>("front");
-  const [zoom, setZoom] = useState<SemanticZoom>("mid");
+  const [, setZoom] = useState<SemanticZoom>("mid");
   const [zoomPercent, setZoomPercent] = useState(100);
   const [selection, setSelection] = useState<CourseSelection | null>(null);
   const [flat, setFlat] = useState(false);
-  const [capsOpen, setCapsOpen] = useState(false);
+  const [capRailVisible, setCapRailVisible] = useState(false);
+  const [capListOpen, setCapListOpen] = useState(false);
   const [capsHoverId, setCapsHoverId] = useState<string | null>(null);
   const [capsQuery, setCapsQuery] = useState("");
   const [perf, setPerf] = useState<{ fps: number; nodes: number; dom: number } | null>(null);
+  useEffect(() => {
+    if (!capRailVisible || flat || tab !== "course") setCapListOpen(false);
+  }, [capRailVisible, flat, tab]);
+
+  useEffect(() => {
+    if (flat || tab !== "course") setCapRailVisible(false);
+  }, [flat, tab]);
   const stageRef = useRef<CourseImmersiveStageHandle>(null);
   const pageRef = useRef<HTMLElement>(null);
   const routeReturnView = useRef<StageViewState | null>(null);
@@ -226,35 +230,19 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   const capabilitySupports = useMemo(() => {
     const map = new Map<string, string[]>();
     capabilityLayout?.bridgeNodes.forEach((node) => {
-      const supports = capabilityModel?.supportEdges.filter((edge) => edge.source === node.id && !node.course && capabilityModel.courseKnowledgeIds.includes(edge.target)).map((edge) => edge.target) ?? [];
+      const supports = [...(node.directSupports ?? []), ...(node.indirectSupports ?? [])];
       if (supports.length) map.set(node.id, supports);
     });
     return map;
-  }, [capabilityLayout, capabilityModel]);
+  }, [capabilityLayout]);
+  const capabilitySupportCounts = useMemo(() => {
+    const map = new Map<string, { direct: number; indirect: number }>();
+    capabilityLayout?.bridgeNodes.forEach((node) => {
+      map.set(node.id, { direct: node.directSupports?.length ?? 0, indirect: node.indirectSupports?.length ?? 0 });
+    });
+    return map;
+  }, [capabilityLayout]);
   const assignmentById = useMemo(() => new Map((runtime?.assignments ?? []).map((assignment) => [assignment.id, assignment])), [runtime]);
-  // Course-external capabilities sit directly behind the course Knowledge
-  // they support, on a deeper plane. Re-anchoring here guarantees the support
-  // is on screen after rotation and that its dashed support line lands on the
-  // right card (the capability model was previously anchored with stale
-  // course coordinates and could sit a screen below its knowledge).
-  const capabilityAnchors = useMemo(() => {
-    const positionById = new Map<string, { x: number; y: number; z: number }>();
-    courseLayout?.nodes.forEach((node) => {
-      if (node.kind === "knowledge") positionById.set(node.id, { x: node.x, y: node.y, z: node.z });
-    });
-    const result = new Map<string, { x: number; y: number; z: number }>();
-    capabilityLayout?.bridgeNodes.forEach((node, index) => {
-      const supported = (capabilitySupports.get(node.id) ?? []).flatMap((id) => {
-        const position = positionById.get(id);
-        return position ? [position] : [];
-      });
-      const x = supported.length ? supported.reduce((sum, item) => sum + item.x, 0) / supported.length : node.x;
-      const y = supported.length ? supported.reduce((sum, item) => sum + item.y, 0) / supported.length : node.y;
-      result.set(node.id, { x: x + (index % 2) * 18, y: y - 8, z: -280 - index * 34 });
-    });
-    return result;
-  }, [capabilityLayout, capabilitySupports, courseLayout]);
-
   // Route source: only the adopted, server-validated version; otherwise the
   // canonical curriculum order with an explicit explanation.
   const activeRoute = routeControl.view?.activeVersion ?? null;
@@ -634,17 +622,18 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
 
   const courseBeam = useMemo<StageBeam[]>(() => {
     if (!authenticated || !routeReady || !routeOn || tab !== "course" || flat || swapped) return [];
-    const worldPoints = buildRouteTrack(routeOrder, routeTrack.cards, routeTrack.chapters);
+    const worldPoints = buildRouteTrack(routeOrder, routeTrack.cards);
     if (worldPoints.length < 2) return [];
     const points = worldPoints.map((point) => ({ x: point.x, y: -point.y, z: point.z }));
     return [{
       id: "course-route",
       kind: "current",
       points,
-      fallback: !usingActiveRoute,
+      // Course-order and adopted routes share one pulse-beam style; only the
+      // status-bar copy differs.
       dimmed: Boolean(effectiveSelection) && !selectionRelations.onRoute
     }];
-  }, [authenticated, effectiveSelection, flat, routeOn, routeOrder, routeReady, routeTrack, selectionRelations.onRoute, swapped, tab, usingActiveRoute]);
+  }, [authenticated, effectiveSelection, flat, routeOn, routeOrder, routeReady, routeTrack, selectionRelations.onRoute, swapped, tab]);
 
   const currentKnowledge = effectiveSelection?.kind === "knowledge" ? displayNodes.find((node) => node.id === effectiveSelection.id) ?? null : null;
   const currentPractice = effectiveSelection?.kind === "practice" ? assignmentById.get(effectiveSelection.id) ?? null : null;
@@ -740,43 +729,32 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     courseLayout.nodes.filter((node): node is ImmersiveKnowledgeNode => node.kind === "knowledge").forEach((node) => {
       const display = displayNodes.find((item) => item.id === node.id);
       const status = display?.displayStatus ?? (authenticated ? learnerStageStatus("pending") : "available");
-      const offset = reflectionOffset(!swapped, true);
       const selected = effectiveSelection?.kind === "knowledge" && effectiveSelection.id === node.id;
       const step = authenticated && routeReady && routeOn ? routeStepNumber(routeOrder, node.id) : null;
-      // In the practice view the knowledge card is the reflection. Its front
-      // counterpart is the practice card for this Knowledge, so the visible
-      // top-left (not the taller ghost's centre) keeps the demo 14/13 offset.
-      const mirroredPractice = practiceByKnowledge.get(node.id);
-      const mirroredFrontHeight = mirroredPractice?.kind === "empty" ? 28 : mirroredPractice?.height ?? 48;
-      // Keep the peek strip (title + status, 26px) below whatever solid card
-      // is in front: mid/near knowledge cards and 48px practice cards need
-      // different ghost heights, while the top-left offset stays 14/13.
-      const mirroredGhostHeight = Math.max(REFLECTION_CARD_HEIGHT, mirroredFrontHeight + 16);
+      const micro = microFor(node.id);
+      const statusLine = [display?.displayLabel, micro ? `微学习 ${micro.estimatedMinutes ?? 8} 分钟` : null].filter(Boolean).join(" · ");
       nodes.push({
         id: node.id,
         kind: "knowledge",
         title: node.title,
-        x: node.x + offset.x,
-        y: node.y + (swapped ? reflectionStackY(mirroredFrontHeight, mirroredGhostHeight) : 0),
-        z: node.z + offset.z,
+        x: node.x,
+        y: node.y,
+        z: node.z,
         width: node.width,
-        // The layout row pitch reserves the near-view action height, but the
-        // card itself only grows when the action row is actually visible.
-        // A reflection stays tall enough to expose its bottom identity line
-        // below the front card instead of disappearing behind it.
-        height: swapped ? mirroredGhostHeight : zoom === "near" ? 64 : 40,
+        // Every tree card shares one height. The reflection is then exactly the
+        // same size and only the 14/13 offset exposes its identity strip.
+        height: 64,
         status,
+        statusLine,
         meta: display?.displayLabel,
         current: authenticated && (routeReady ? node.id === routeCurrentId : Boolean(display?.learner.current)),
         target: targetNodeSet.has(node.id),
         detail: actionRow(node.node),
         actions: actionLabels(node.node),
-        ghost: swapped,
         dim: Boolean(effectiveSelection) && !selected && !selectionRelations.knowledgeIds.has(node.id),
         highlight: selectionRelations.knowledgeIds.has(node.id) && !selected,
         selected,
-        step: step ?? undefined,
-        here: Boolean(authenticated && routeReady && routeOn && node.id === routeCurrentId)
+        step: step ?? undefined
       });
     });
     // Empty chapters are not empty frames: the practical/lesson data explains
@@ -795,35 +773,28 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         meta: chapter.outcome ?? "成果验收"
       });
     });
-    positionPracticeCards(practiceByKnowledge, courseLayout, !swapped).forEach((card) => {
+    // Canonical shared coordinate: the stage adds the reflection offset while
+    // it animates the skill/practice swap, so React never rebuilds positions.
+    basePracticeCards(practiceByKnowledge, courseLayout).forEach((card) => {
       const selected = effectiveSelection?.kind === "practice" ? card.assignmentIds.includes(effectiveSelection.id)
         : effectiveSelection?.kind === "group" ? card.knowledgeId === effectiveSelection.id : false;
       const cardSelectionPractice = card.assignmentIds.length === 1 ? card.assignmentIds[0] : null;
       const coverage = new Set(card.assignmentIds.flatMap((id) => assignmentKnowledge.get(id) ?? [])).size;
       const statusText = assignmentStatusLabel(card.status);
-      const ghost = !swapped || card.kind === "shadow";
-      // Only the practice layer under a solid knowledge card needs the
-      // top-left correction; the taller ghost's centre would otherwise put its
-      // top edge level with the front card and bury the peeking strip.
-      const frontKnowledgeHeight = zoom === "near" ? 64 : 40;
-      const reflectionHeight = Math.max(REFLECTION_CARD_HEIGHT, frontKnowledgeHeight + 16);
-      const reflectionShift = !swapped ? reflectionStackY(frontKnowledgeHeight, reflectionHeight) - REFLECTION_OFFSET.y : 0;
       nodes.push({
         id: card.id,
         kind: "assignment",
         title: card.title,
         x: card.x,
-        y: card.y + reflectionShift,
+        y: card.y,
         z: card.z,
         width: card.width,
-        // The reflection peeks out below the front card and carries a
-        // readable title/status strip; empty slots still say 暂无对应实训.
-        height: ghost ? reflectionHeight : card.kind === "empty" ? 28 : card.height,
+        height: 64,
+        code: card.kind === "empty" ? "" : card.code,
         count: card.count,
         status: card.status === "accepted" ? "completed" : card.status === "started" || card.status === "submitted" || card.status === "needs_revision" ? "learning" : "available",
         meta: card.kind === "empty" ? "—" : card.code,
-        detail: card.kind === "empty" ? "" : `${card.kind === "shadow" ? "见主位置 · " : ""}${statusText}${coverage ? ` · 覆盖 ${coverage} 个知识` : ""}`,
-        ghost,
+        statusLine: card.kind === "empty" ? "暂无对应实训" : `${card.kind === "shadow" ? "见主位置 · " : ""}${statusText}${coverage ? ` · 覆盖 ${coverage} 个知识` : ""}`,
         empty: card.kind === "empty" || card.kind === "shadow",
         dim: Boolean(effectiveSelection) && !selected && !selectionRelations.practiceKnowledgeIds.has(card.knowledgeId),
         highlight: selectionRelations.practiceKnowledgeIds.has(card.knowledgeId) && !selected,
@@ -836,20 +807,20 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       capabilityLayout.bridgeNodes.forEach((node) => {
         const selected = effectiveSelection?.kind === "capability" && effectiveSelection.id === node.id;
         const learner = learnerById.get(node.id);
-        const anchor = capabilityAnchors.get(node.id) ?? node;
         nodes.push({
           id: node.id,
           kind: "capability",
           title: knowledgeTitleById.get(node.id) ?? node.title,
-          x: anchor.x,
-          y: anchor.y,
-          z: anchor.z,
+          x: node.x,
+          y: node.y,
+          z: node.z,
           width: 150,
           height: 46,
           status: authenticated ? learnerStageStatus(learner?.category ?? "pending") : "available",
-          current: false,
+          current: Boolean(node.current),
           bridge: true,
           meta: "前置能力",
+          statusLine: "前置能力",
           detail: <span className="ef-imm-actions"><span>课程外</span></span>,
           dim: Boolean(effectiveSelection) && !selected && !selectionRelations.capabilityIds.has(node.id),
           highlight: selectionRelations.capabilityIds.has(node.id) && !selected,
@@ -858,8 +829,19 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       });
     }
     return nodes;
-  }, [actionLabels, actionRow, assignmentById, assignmentKnowledge, authenticated, capabilityAnchors, capabilityLayout, capabilityModel?.currentKnowledgeIds, courseId, courseLayout, displayNodes, effectiveSelection, flat, flattenedLayout, knowledgeTitleById, learnerById, practiceByKnowledge, routeCurrentId, routeOn, routeOrder, routeReady, selectionRelations, swapped, targetNodeSet, zoom]);
+  }, [actionLabels, actionRow, assignmentById, assignmentKnowledge, authenticated, capabilityLayout, courseLayout, displayNodes, effectiveSelection, flat, flattenedLayout, knowledgeTitleById, learnerById, microFor, practiceByKnowledge, routeCurrentId, routeOn, routeOrder, routeReady, selectionRelations, targetNodeSet]);
 
+  if (import.meta.env.DEV) (window as unknown as { __efPage?: unknown }).__efPage = {
+    flat,
+    stageNodeCount: stageNodes.length,
+    capabilityLayoutNodes: capabilityLayout?.nodes.length ?? null,
+    flattenedNodes: flattenedLayout?.nodes.length ?? null,
+    stageNodeKinds: [...new Set(stageNodes.map((node) => node.kind))],
+    capabilities: capabilityLayout?.bridgeNodes.map((node) => ({
+      id: node.id, title: node.title, x: node.x, y: node.y, z: node.z,
+      direct: node.directSupports ?? [], indirect: node.indirectSupports ?? []
+    })) ?? []
+  };
   const stageEdges = useMemo<StageEdge[]>(() => {
     const highlight = (source?: string, target?: string) => {
       if (!effectiveSelection) return false;
@@ -884,29 +866,28 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       target: edge.target,
       points: edge.points,
       kind: "plain",
-      highlighted: highlight(edge.source, edge.target)
+      highlighted: highlight(edge.source, edge.target),
+      pointWeights: edge.points.map(() => 1)
     }));
     // Always supply capability support lines; the Stage fades them by the
-    // actual orbit (0 in front, full after ~25°). This removes the old jump
-    // where lines appeared at full strength before the card layer was visible.
+    // actual orbit (0 in front, full by ~35°). The endpoint weights let the
+    // lines follow the knowledge layer during the skill/practice swap.
     if (capabilityLayout) {
-      const positions = new Map<string, { x: number; y: number; z: number }>();
-      courseLayout?.nodes.forEach((node) => {
-        if (node.kind === "knowledge") positions.set(node.id, { x: node.x, y: node.y, z: 2 });
-      });
-      capabilityAnchors.forEach((position, id) => positions.set(id, { ...position, z: position.z + 4 }));
+      const courseIds = new Set(capabilityLayout.courseNodes.map((node) => node.id));
       capabilityLayout.edges.forEach((edge) => {
         const bridgeEdge = capabilityLayout.bridgeNodes.some((node) => node.id === edge.source || node.id === edge.target);
-        const source = positions.get(edge.source);
-        const target = positions.get(edge.target);
-        if (!bridgeEdge || !source || !target) return;
+        if (!bridgeEdge || edge.points.length < 2) return;
         edges.push({
           id: `cap:${edge.id}`,
           source: edge.source,
           target: edge.target,
-          points: [source, target],
+          points: edge.points,
           kind: "capability",
-          highlighted: highlight(edge.source, edge.target)
+          highlighted: highlight(edge.source, edge.target),
+          pointWeights: edge.points.map((_point, index) => {
+            const id = index === 0 ? edge.source : index === edge.points.length - 1 ? edge.target : edge.source;
+            return courseIds.has(id) ? 1 : 0;
+          })
         });
       });
     }
@@ -915,7 +896,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     // of full-height orthogonal lines.
     if (swapped && courseLayout) {
       const knowledgeById = new Map(courseLayout.nodes.filter((node) => node.kind === "knowledge").map((node) => [node.id, node]));
-      positionPracticeCards(practiceByKnowledge, courseLayout, false).forEach((card) => {
+      basePracticeCards(practiceByKnowledge, courseLayout).forEach((card) => {
         if (card.kind === "empty" || card.kind === "shadow") return;
         const anchor = knowledgeById.get(card.knowledgeId);
         if (!anchor) return;
@@ -933,21 +914,25 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       });
     }
     return edges;
-  }, [capabilityAnchors, capabilityLayout, courseLayout, effectiveSelection, flat, flattenedLayout, practiceByKnowledge, selectionRelations, swapped]);
+  }, [capabilityLayout, courseLayout, effectiveSelection, flat, flattenedLayout, practiceByKnowledge, selectionRelations, swapped]);
 
   const flatBeams = useMemo<StageBeam[]>(() => {
     if (!flat || !capabilityLayout || !capabilityModel) return [];
     const flattened = flattenedLayout ?? capabilityLayout;
     const beams: StageBeam[] = [];
-    const currentPoints = routeNodePoints(flattened, activeRoute?.snapshot.orderedNodeIds ?? []);
-    if (currentPoints.length > 1) beams.push({ id: "flat-current", kind: "current", points: currentPoints, dimmed: Boolean(effectiveSelection) && !selectionRelations.onRoute });
+    // While editing, the current route stays visible but dimmed; the preview
+    // route is a second flowing band in the target colour.
+    const currentPoints = routeNodePoints(flattened, routeOrder);
+    if (currentPoints.length > 1) beams.push({ id: "flat-current", kind: "current", points: currentPoints, dimmed: true });
     const preview = routeControl.preview?.valid ? routeControl.preview.route : null;
     if (preview) {
       const previewPoints = routeNodePoints(flattened, preview.orderedNodeIds);
       if (previewPoints.length > 1) beams.push({ id: "flat-preview", kind: "preview", points: previewPoints });
     }
     return beams;
-  }, [activeRoute?.snapshot.orderedNodeIds, capabilityLayout, capabilityModel, effectiveSelection, flat, flattenedLayout, routeControl.preview, selectionRelations.onRoute]);
+  }, [capabilityLayout, capabilityModel, flat, flattenedLayout, routeControl.preview, routeOrder]);
+
+  if (import.meta.env.DEV) (window as unknown as { __efFlatBeams?: unknown }).__efFlatBeams = flatBeams;
 
   if (!runtime || !graphData) {
     // While the course graph is still resolving, replay the captured Archive
@@ -1008,29 +993,60 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
   const detailLabel = currentCapability ? "前置能力" : authenticated ? selectedLearner?.label ?? "待学" : "公开";
   const detailTone = currentCapability ? "quiet" : authenticated ? learnerTone(selectedLearner) : "target";
 
+  const capabilityCount = capabilityLayout?.bridgeNodes.length ?? 0;
   const capabilityItems = useMemo(() => {
     if (!capabilityLayout) return [];
     return capabilityLayout.bridgeNodes.map((node) => {
       const learner = learnerById.get(node.id);
+      const direct = node.directSupports?.length ?? 0;
+      const indirect = node.indirectSupports?.length ?? 0;
       return {
         id: node.id,
         title: knowledgeTitleById.get(node.id) ?? node.title,
         mastered: Boolean(authenticated && learner?.category === "acquired"),
-        supports: capabilitySupports.get(node.id)?.length ?? 0
+        direct,
+        indirect,
+        supports: direct + indirect
       };
     }).sort((left, right) => left.title.localeCompare(right.title, "zh-Hans-CN") || left.id.localeCompare(right.id));
-  }, [authenticated, capabilityLayout, capabilitySupports, knowledgeTitleById, learnerById]);
+  }, [authenticated, capabilityLayout, knowledgeTitleById, learnerById]);
+  if (import.meta.env.DEV) (window as unknown as { __efCourse?: unknown }).__efCourse = {
+    capabilityItems,
+    capabilityLayout,
+    courseLayout,
+    capabilitySupports
+  };
+  const supportCopy = useCallback((item: { direct: number; indirect: number }) => {
+    if (item.direct && item.indirect) return `直接 ${item.direct} · 间接 ${item.indirect}`;
+    if (item.direct) return `${item.direct} 个知识`;
+    if (item.indirect) return `直接 0 · 间接 ${item.indirect}`;
+    return "经间接路径支撑";
+  }, []);
   const visibleCapabilities = capabilityItems.filter((item) => !capsQuery.trim() || item.title.toLocaleLowerCase().includes(capsQuery.trim().toLocaleLowerCase()));
   const capGroups = [
     { key: "mastered", label: "已掌握", items: visibleCapabilities.filter((item) => item.mastered) },
     { key: "learning", label: "未掌握", items: visibleCapabilities.filter((item) => !item.mastered) }
   ];
 
-  const capabilityPanel = capsOpen && !flat && tab === "course" ? (
+  const capabilityRail = capRailVisible && !capListOpen && !flat && tab === "course" ? (
+    <button
+      type="button"
+      className={`ef-imm-cap-rail ${effectiveSelection ? "is-with-detail" : ""}`}
+      onClick={() => setCapListOpen(true)}
+      aria-label={`展开前置能力清单，共 ${capabilityCount} 项`}
+      aria-expanded={false}
+    >
+      <span>前置能力</span>
+      <b>{capabilityCount}</b>
+      <ChevronRight size={14} aria-hidden="true" />
+    </button>
+  ) : null;
+
+  const capabilityPanel = capListOpen && capRailVisible && !flat && tab === "course" ? (
     <aside className={`ef-imm-cap-panel ${effectiveSelection ? "is-with-detail" : ""}`} aria-label="能力层清单">
       <header>
-        <div><span>能力层</span><h2>前置能力</h2><p>按掌握情况分组 · 支撑课程知识</p></div>
-        <button type="button" onClick={() => setCapsOpen(false)} aria-label="收起能力层清单"><X size={15} /></button>
+        <div><span>前置能力 · {capabilityCount}</span><h2>能力层</h2><p>按掌握情况分组 · 支撑课程知识</p></div>
+        <button type="button" onClick={() => setCapListOpen(false)} aria-label="收起能力层清单"><X size={15} /></button>
       </header>
       <input value={capsQuery} onChange={(event) => setCapsQuery(event.target.value)} type="search" placeholder="搜索能力名称…" aria-label="搜索能力名称" />
       <div className="ef-imm-cap-scroll">
@@ -1050,12 +1066,12 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
               >
                 <i className={item.mastered ? "is-mastered" : ""} />
                 <span>{item.title}</span>
-                <small>{item.supports} 个知识</small>
+                <small>{supportCopy(item)}</small>
               </button>
             ))}
-            {!group.items.length ? <p className="ef-imm-cap-empty">没有匹配的能力</p> : null}
           </section>
         ))}
+        {!visibleCapabilities.length ? <p className="ef-imm-cap-empty">没有匹配的能力</p> : null}
       </div>
     </aside>
   ) : null;
@@ -1092,6 +1108,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         {currentGroup ? <span className="ef-imm-detail-chip">{groupAssignments.filter((assignment) => ["accepted", "completed"].includes(userCourseState?.assignmentStates[assignment.id]?.status ?? "")).length} / {groupAssignments.length} 已完成</span> : null}
         {currentPractice?.estimatedMinutes ? <span className="ef-imm-detail-chip">约 {currentPractice.estimatedMinutes} 分钟</span> : null}
         {currentCapability ? <span className="ef-imm-detail-chip">{selectedLearner?.category === "acquired" ? "已掌握" : "未掌握"}</span> : null}
+        {currentCapability && capabilitySupportCounts.get(currentCapability.id) ? <span className="ef-imm-detail-chip">{supportCopy(capabilitySupportCounts.get(currentCapability.id)!)}</span> : null}
         {selectedRecord?.mastery !== undefined ? <span className="ef-imm-detail-chip">掌握度 {Math.round(selectedRecord.mastery)}%</span> : null}
       </div>
 
@@ -1118,7 +1135,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       {currentCapability ? (
         <>
           <section className="ef-imm-detail-section">
-            <h3>支撑这门课里的</h3>
+            <h3>支撑这门课里的 · 直接 {capabilitySupportCounts.get(currentCapability.id)?.direct ?? 0} · 间接 {capabilitySupportCounts.get(currentCapability.id)?.indirect ?? 0}</h3>
             {(capabilitySupports.get(currentCapability.id) ?? []).length
               ? (capabilitySupports.get(currentCapability.id) ?? []).map((id) => <button type="button" key={id} className="ef-imm-detail-link" onClick={() => openKnowledge(id)}><i />{knowledgeTitleById.get(id) ?? id}</button>)
               : <p>尚未连接课程知识。</p>}
@@ -1261,9 +1278,9 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
             pose={currentPose === "rotated" ? "rotated" : "front"}
             selectedId={selectedStageId}
             externalHoverId={capsHoverId}
-            rightInset={capsOpen && !effectiveSelection ? 320 : 0}
-            capabilitiesOn={capsOpen}
+            rightInset={capRailVisible ? (effectiveSelection ? 420 : 16) + (capListOpen ? 300 : 48) + 12 : 0}
             reducedMotion={reducedMotion}
+            onCapabilityReveal={(visible) => setCapRailVisible(visible)}
             detailOpen={Boolean(effectiveSelection)}
             onSelect={(id, kind, context) => {
               // §10.10: only a front-facing (≤35°) card click may swap layers.
@@ -1295,7 +1312,10 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
               setSelection({ kind: "knowledge", id });
             }}
             onBackground={() => { setSelection(null); setSelectionPinned(false); }}
-            onPoseChange={(next) => setPose(next)}
+            onPoseChange={(next) => {
+              setPose(next);
+              if (next === "front") setCapListOpen(false);
+            }}
             onSemanticZoom={(next, percent) => { setZoom((current) => current === next ? current : next); setZoomPercent((current) => current === percent ? current : percent); }}
             onFps={(fps, nodeCount, domCount) => {
               const value = { fps, nodes: nodeCount, dom: domCount };
@@ -1319,6 +1339,7 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
             <span><i className="is-target" />目标 {learnerState.counts.target}</span>
             <small>标记不计入</small>
           </span>
+          {capabilityCount > 0 && pose === "front" && !flat && tab === "course" ? <span className="ef-imm-cap-hint">拖动旋转可查看 {capabilityCount} 个前置能力</span> : null}
         </div> : <div className="ef-imm-status-legend is-public" role="status"><Lock size={12} /><span>公开课程 · 只读 · 登录后查看学习状态和路线</span></div>}
 
         {!flat ? <div className="ef-imm-controls" role="group" aria-label="场景控制">
@@ -1326,18 +1347,20 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
           <button type="button" onClick={() => stageRef.current?.zoomOut()} aria-label="缩小场景"><Minus size={16} /></button>
           <button type="button" onClick={() => stageRef.current?.fit()} aria-label="适配全图"><Maximize2 size={16} /></button>
           <span>{zoomPercent}%</span>
-          <button type="button" className="ef-imm-control-wide" onClick={() => { setCapsOpen(true); stageRef.current?.focusCapabilities(); }} aria-label="看能力层"><Layers3 size={16} />看能力层</button>
-          <button type="button" className="ef-imm-control-wide" onClick={() => { setPose("front"); stageRef.current?.front(); }} aria-label="回正面"><RotateCcw size={16} />回正面</button>
+          <button type="button" className="ef-imm-control-wide" onClick={() => { setPose("front"); setCapListOpen(false); stageRef.current?.front(); }} aria-label="回正面"><RotateCcw size={16} />回正面</button>
         </div> : null}
 
         {tab === "course" && !flat ? <div className="ef-imm-toolbar" role="toolbar" aria-label="课程树工具">
           <button type="button" aria-pressed={swapped} onClick={() => switchLayer(!swapped)}><Layers3 size={14} />切换到{swapped ? "技能树" : "实训树"}</button>
           {authenticated ? <button type="button" aria-pressed={routeOn} onClick={() => setRouteOn((value) => !value)}><span className="ef-imm-switch" />我的路线</button> : null}
           {authenticated ? <button type="button" onClick={enterFlatten} disabled={!capabilityLayout || !activeRoute}><Edit3 size={14} />调整路线</button> : null}
-          {authenticated && routeReady && !usingActiveRoute ? <span className="ef-imm-toolbar-note">个人路线未启用 · 按课程顺序（细虚线）</span> : null}
+          {authenticated && routeReady && !usingActiveRoute ? <span className="ef-imm-toolbar-note">个人路线未启用 · 按课程顺序</span> : null}
+          {authenticated && routeReady && usingActiveRoute ? <span className="ef-imm-toolbar-note">个人路线 · 已采用</span> : null}
         </div> : null}
         {flat ? <div className="ef-imm-flatbar"><span><i />当前路线</span><span><i className="is-preview" />预览路线</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={leaveFlatten}>完成</button></div> : null}
       </div>
+
+      {!flat ? capabilityRail : null}
 
       {!flat ? capabilityPanel : null}
 

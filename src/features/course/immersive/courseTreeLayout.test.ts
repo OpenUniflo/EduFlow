@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { CoursePlaneLayout } from "@/features/archive/model/coursePlaneLayout";
 import type { CourseGraphData } from "../runtime/courseRuntime";
 import {
+  COURSE_ROW_GAP,
+  COURSE_ROW_PITCH,
   REFLECTION_OFFSET,
+  basePracticeCards,
+  layerMixAt,
+  layerOffsetsAt,
   assignmentKnowledgeMap,
   buildDependencyRoutes,
   buildPlaneCourseLayout,
@@ -66,12 +71,16 @@ describe("course tree geometry", () => {
   it("keeps the Archive column/order but reserves the action-row card height", () => {
     const layout = buildPlaneCourseLayout(graphData, plane);
     const byId = new Map(layout.nodes.map((node) => [node.id, node]));
-    expect(byId.get("K1")).toMatchObject({ x: -112, y: -19, z: 0, width: 176, height: 64 });
-    expect(byId.get("K2")).toMatchObject({ x: -112, y: 63, z: 0 });
-    expect(byId.get("K3")).toMatchObject({ x: 128, y: -19, z: 0 });
+    const k1 = byId.get("K1")!;
+    const k2 = byId.get("K2")!;
+    const k3 = byId.get("K3")!;
+    expect(k1).toMatchObject({ x: -112, z: 0, width: 176, height: 64 });
+    expect(k2.x).toBe(k1.x);
+    expect(k2.y - k1.y).toBe(COURSE_ROW_PITCH);
+    expect(k3.y).toBe(k1.y);
     expect(layout.chapters.map((chapter) => chapter.id)).toEqual(["ch1", "ch2", "ch3"]);
     expect(layout.chapters.find((chapter) => chapter.id === "ch3")?.empty).toBe(true);
-    expect(layout.chapters.find((chapter) => chapter.id === "ch1")?.height).toBe(56 + 2 * 64 + 18 + 12);
+    expect(layout.chapters.find((chapter) => chapter.id === "ch1")?.height).toBe(56 + 2 * 64 + COURSE_ROW_GAP + 12);
     expect(layout.edges.map((edge) => edge.id)).toEqual(["e1", "e2"]);
   });
 
@@ -135,23 +144,20 @@ describe("course tree geometry", () => {
     });
   });
 
-  it("draws the route band outside card interiors and behind the plane", () => {
+  it("threads the route band through each step's left-edge number disc", () => {
     const layout = buildPlaneCourseLayout(graphData, plane);
     const cards = new Map(layout.nodes.filter((node) => node.kind === "knowledge").map((node) => [node.id, {
       id: node.id, x: node.x, y: -node.y, width: node.width, height: node.height, chapterId: node.chapterId
     }]));
-    const chapters = new Map(layout.chapters.map((chapter) => [chapter.id, {
-      id: chapter.id, x: chapter.x, y: -chapter.y, width: chapter.width, height: chapter.height
-    }]));
-    const track = buildRouteTrack(["K1", "K2", "K3"], cards, chapters);
-    expect(track.length).toBeGreaterThan(3);
-    expect(track.every((point) => point.z === -24)).toBe(true);
-    const cardBoxes = [...cards.values()].map((card) => ({
-      left: card.x - card.width / 2 + 1, right: card.x + card.width / 2 - 1,
-      top: card.y + card.height / 2 - 1, bottom: card.y - card.height / 2 + 1
-    }));
-    track.forEach((point) => {
-      expect(cardBoxes.some((card) => point.x > card.left && point.x < card.right && point.y < card.top && point.y > card.bottom)).toBe(false);
+    const ids = ["K1", "K2", "K3"];
+    const track = buildRouteTrack(ids, cards);
+    expect(track).toHaveLength(3);
+    track.forEach((point, index) => {
+      const card = cards.get(ids[index])!;
+      // One point per step, on the disc, not a detour around the card edge.
+      expect(point.x).toBeCloseTo(card.x - card.width / 2 + 18, 5);
+      expect(point.y).toBeCloseTo(card.y, 5);
+      expect(point.z).toBe(-24);
     });
   });
 
@@ -164,8 +170,33 @@ describe("course tree geometry", () => {
     const cards = buildPracticeCards(graphData);
     const solid = positionPracticeCards(cards, layout, true);
     const mirrored = positionPracticeCards(cards, layout, false);
-    expect(solid.find((card) => card.knowledgeId === "K1")).toMatchObject({ x: -112 + REFLECTION_OFFSET.x, y: -19 + REFLECTION_OFFSET.y, z: REFLECTION_OFFSET.z });
-    expect(mirrored.find((card) => card.knowledgeId === "K1")).toMatchObject({ x: -112, y: -19, z: 0 });
+    const k1 = layout.nodes.find((node) => node.id === "K1")!;
+    expect(solid.find((card) => card.knowledgeId === "K1")).toMatchObject({ x: k1.x + REFLECTION_OFFSET.x, y: k1.y + REFLECTION_OFFSET.y, z: REFLECTION_OFFSET.z });
+    expect(mirrored.find((card) => card.knowledgeId === "K1")).toMatchObject({ x: k1.x, y: k1.y, z: 0 });
+  });
+
+  it("interpolates the layer swap continuously and ends on the two states", () => {
+    const skill = layerOffsetsAt(0);
+    const practice = layerOffsetsAt(1);
+    expect(skill.knowledge).toEqual({ x: 0, y: 0, z: 0 });
+    expect(skill.practice).toEqual(REFLECTION_OFFSET);
+    expect(practice.knowledge).toEqual(REFLECTION_OFFSET);
+    expect(practice.practice).toEqual({ x: 0, y: 0, z: 0 });
+    const half = layerOffsetsAt(0.5);
+    expect(half.knowledge.x).toBeCloseTo(REFLECTION_OFFSET.x / 2);
+    expect(half.practice.x).toBeCloseTo(REFLECTION_OFFSET.x / 2);
+    expect(layerMixAt(0, 1, 0)).toBe(0);
+    expect(layerMixAt(0, 1, 210, 420)).toBeCloseTo(0.5, 2);
+    expect(layerMixAt(0, 1, 420, 420)).toBe(1);
+    expect(layerMixAt(0, 1, 100, 420, true)).toBe(1);
+  });
+
+  it("keeps practice and knowledge on one canonical coordinate for the stage animation", () => {
+    const layout = buildPlaneCourseLayout(graphData, plane);
+    const cards = buildPracticeCards(graphData);
+    const base = basePracticeCards(cards, layout);
+    const knowledge = layout.nodes.find((node) => node.id === "K1")!;
+    expect(base.find((card) => card.knowledgeId === "K1")).toMatchObject({ x: knowledge.x, y: knowledge.y, z: knowledge.z });
   });
 
   it("groups multiple practices for one Knowledge instead of silently picking the first", () => {

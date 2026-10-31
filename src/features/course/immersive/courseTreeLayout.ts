@@ -17,13 +17,52 @@ import type {
  */
 
 export const REFLECTION_OFFSET = { x: 14, y: 13, z: -6 } as const;
+export const LAYER_SWAP_MS = 420;
+
+/**
+ * Continuous layer-swap interpolation: 0 is the skill tree in front, 1 is the
+ * practice tree in front. Both layers stay at their shared coordinates; only
+ * the small reflection offset travels. The front card is fully solid, the back
+ * card stays dashed and translucent, and both values move continuously.
+ */
+export type LayerOffsets = {
+  knowledge: { x: number; y: number; z: number };
+  practice: { x: number; y: number; z: number };
+  /** 1 = the layer is fully in front, 0.52 = fully reflected. */
+  knowledgeOpacity: number;
+  practiceOpacity: number;
+};
+
+export function layerOffsetsAt(mix: number): LayerOffsets {
+  const value = Math.max(0, Math.min(1, mix));
+  // Layout coordinates are y-down; the scene converts them to y-up later.
+  const offset = (weight: number) => ({
+    x: Number((REFLECTION_OFFSET.x * weight).toFixed(6)),
+    y: Number((REFLECTION_OFFSET.y * weight).toFixed(6)),
+    z: Number((REFLECTION_OFFSET.z * weight).toFixed(6))
+  });
+  return {
+    knowledge: offset(value),
+    practice: offset(1 - value),
+    knowledgeOpacity: 0.52 + 0.48 * (1 - value),
+    practiceOpacity: 0.52 + 0.48 * value
+  };
+}
+
+/** Eased layer mix for a 420ms swap; reduced motion jumps to the target. */
+export function layerMixAt(start: number, target: number, elapsed: number, duration = LAYER_SWAP_MS, reducedMotion = false) {
+  if (reducedMotion || duration <= 0) return target;
+  const t = Math.max(0, Math.min(1, elapsed / duration));
+  const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  return start + (target - start) * eased;
+}
 /**
  * Reflection cards expose the same bottom identity strip as the demo. The card
  * is taller than its solid counterpart, so anchoring it by centre would put
  * its top edge level with the front card; the stack helper keeps the visible
  * top-left at the documented (14, 13) offset and lets the rest peek below.
  */
-export const REFLECTION_CARD_HEIGHT = 56;
+export const REFLECTION_CARD_HEIGHT = 64;
 
 /**
  * The course tree reserves the action row inside every card, so zooming in can
@@ -33,7 +72,7 @@ export const REFLECTION_CARD_HEIGHT = 56;
  */
 export const COURSE_CARD_WIDTH = 176;
 export const COURSE_CARD_HEIGHT = 64;
-export const COURSE_ROW_GAP = 18;
+export const COURSE_ROW_GAP = 27;
 export const COURSE_CHAPTER_HEADER = 56;
 export const COURSE_CHAPTER_PADDING_BOTTOM = 12;
 export const COURSE_ROW_PITCH = COURSE_CARD_HEIGHT + COURSE_ROW_GAP;
@@ -256,6 +295,23 @@ export function positionPracticeCards(
     if (!anchor) return [];
     const offset = reflectionOffset(knowledgeInFront, false);
     return [{ ...card, x: anchor.x + offset.x, y: anchor.y + offset.y, z: anchor.z + offset.z }];
+  });
+}
+
+/**
+ * Canonical position: both the knowledge and practice card sit on the same
+ * shared coordinate. The stage adds the reflection offset while it animates
+ * the layer swap, so React never has to re-layout or rebuild the scene.
+ */
+export function basePracticeCards(
+  cards: ReadonlyMap<string, CoursePracticeCard>,
+  layout: Pick<ImmersiveCourseLayout, "nodes">
+): CoursePracticeCard[] {
+  const byId = new Map(layout.nodes.filter((node): node is ImmersiveKnowledgeNode => node.kind === "knowledge").map((node) => [node.id, node]));
+  return [...cards.values()].flatMap((card) => {
+    const anchor = byId.get(card.knowledgeId);
+    if (!anchor) return [];
+    return [{ ...card, x: anchor.x, y: anchor.y, z: anchor.z }];
   });
 }
 
@@ -520,83 +576,25 @@ export type RouteTrackCard = { id: string; x: number; y: number; width: number; 
 export type RouteTrackChapter = { id: string; x: number; y: number; width: number; height: number };
 
 /**
- * Route light band in the scene's world space. It leaves/appends at card side
- * edges, runs in the chapter gutters and is placed behind the card plane. It
- * never cuts across a card interior, which is what made the old Catmull-Rom
- * band read as a thick arc thrown over the course.
+ * Route light band in the scene's world space. The band is a smooth line
+ * through each step's own left-edge number disc (the anchor the learner reads),
+ * not a path that detours around card edges. It sits just behind the card plane
+ * so the card still owns its content while the band shows in the gutters.
  */
 export function buildRouteTrack(
   orderedIds: readonly string[],
-  cards: ReadonlyMap<string, RouteTrackCard>,
-  chapterById: ReadonlyMap<string, RouteTrackChapter>
+  cards: ReadonlyMap<string, RouteTrackCard>
 ): { x: number; y: number; z: number }[] {
   const route = orderedIds.flatMap((id) => {
     const card = cards.get(id);
     return card ? [card] : [];
   });
   if (route.length < 2) return [];
-  const points: Array<{ x: number; y: number; z: number }> = [];
-  const push = (x: number, y: number) => {
-    const previous = points[points.length - 1];
-    if (previous && Math.abs(previous.x - x) < 0.01 && Math.abs(previous.y - y) < 0.01) return;
-    points.push({ x, y, z: -24 });
-  };
-  const box = (card: RouteTrackCard) => ({
-    left: card.x - card.width / 2,
-    right: card.x + card.width / 2,
-    top: card.y + card.height / 2,
-    bottom: card.y - card.height / 2
-  });
-  for (let index = 1; index < route.length; index += 1) {
-    const from = route[index - 1];
-    const to = route[index];
-    const fromChapter = chapterById.get(from.chapterId);
-    const toChapter = chapterById.get(to.chapterId);
-    const fromBox = box(from);
-    const toBox = box(to);
-    // Route order normally walks a chapter column top-to-bottom, then the next
-    // column. Right-hand gutters stay outside the 14px practice reflection.
-    const moveRight = !fromChapter || !toChapter ? to.x >= from.x : toChapter.x > fromChapter.x;
-    if (from.chapterId === to.chapterId && fromChapter) {
-      const lane = fromChapter.x + fromChapter.width / 2 + 7;
-      push(fromBox.right + 2, from.y);
-      push(lane, from.y);
-      push(lane, to.y);
-      push(toBox.right + 2, to.y);
-      continue;
-    }
-    if (moveRight && fromChapter && toChapter && toChapter.x - fromChapter.x > fromChapter.width) {
-      // Non-adjacent jump: travel above the chapter headers so no intermediate
-      // column is crossed.
-      const top = Math.max(fromChapter.y + fromChapter.height / 2, toChapter.y + toChapter.height / 2) + 18;
-      const fromLane = fromChapter.x + fromChapter.width / 2 + 7;
-      const toLane = toChapter.x - toChapter.width / 2 - 7;
-      push(fromBox.right + 2, from.y);
-      push(fromLane, from.y);
-      push(fromLane, top);
-      push(toLane, top);
-      push(toLane, to.y);
-      push(toBox.left - 2, to.y);
-      continue;
-    }
-    if (moveRight) {
-      const lane = fromChapter ? fromChapter.x + fromChapter.width / 2 + 7 : fromBox.right + 24;
-      push(fromBox.right + 2, from.y);
-      push(lane, from.y);
-      push(lane, to.y);
-      push(toBox.left - 2, to.y);
-    } else if (fromChapter) {
-      const lane = fromChapter.x - fromChapter.width / 2 - 7;
-      push(fromBox.left - 2, from.y);
-      push(lane, from.y);
-      push(lane, to.y);
-      push(toBox.right + 2, to.y);
-    } else {
-      push(from.x, from.y);
-      push(to.x, to.y);
-    }
-  }
-  return points;
+  // A step number is a 24px disc pinned 8px inside the card's left edge.
+  const anchorX = (card: RouteTrackCard) => card.chapterId === "supplemental"
+    ? card.x
+    : card.x - card.width / 2 + 18;
+  return route.map((card) => ({ x: anchorX(card), y: card.y, z: -24 }));
 }
 
 export type WindingStepInput = {

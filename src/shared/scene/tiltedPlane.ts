@@ -72,6 +72,85 @@ export function simplificationForAngle(theta: number): TiltedAngleState {
   return { theta: angle, stage, pill, extra, handoff, dot, back, billboard, chapterTitle, cardName, outsideName };
 }
 
+/**
+ * Shared level-of-detail state for the front (zoom) and oblique (angle) views.
+ * The two inputs feed one continuous set of parameters, so a Knowledge is
+ * never drawn twice: full card -> name capsule -> a single screen-facing point.
+ * The discrete stage is remembered and the thresholds have a gap, so zooming
+ * around a boundary cannot flicker.
+ */
+export type LodSizeStage = "full" | "pill" | "dot";
+
+export type LodViewInput = {
+  theta: number;
+  /** Current card width in CSS pixels (before simplification). */
+  screenWidth: number;
+  /** Previous size-driven stage, used for the hysteresis gap. */
+  previousSizeStage?: LodSizeStage;
+  /** Width at which the full card starts collapsing to a capsule. */
+  fullEnter?: number;
+  /** Width at which a capsule is fully collapsed. */
+  pillEnter?: number;
+  /** Width at which the capsule starts becoming a point. */
+  dotEnter?: number;
+  /** Width at which a point is fully collapsed / a previous point re-expands. */
+  dotExit?: number;
+};
+
+export function sizeStageForWidth(width: number, previous?: LodSizeStage, input: LodViewInput = { theta: 0, screenWidth: width }): LodSizeStage {
+  const fullEnter = input.fullEnter ?? 114;
+  const pillEnter = input.pillEnter ?? 108;
+  const dotEnter = input.dotEnter ?? 60;
+  const dotExit = input.dotExit ?? 74;
+  if (previous === "dot") {
+    if (width < dotExit) return width < dotEnter ? "dot" : "pill";
+    return width > fullEnter ? "full" : "pill";
+  }
+  if (previous === "pill") {
+    if (width < dotEnter) return "dot";
+    return width > fullEnter ? "full" : "pill";
+  }
+  if (width < pillEnter) return width < dotEnter ? "dot" : "pill";
+  return "full";
+}
+
+export function simplificationForView(input: LodViewInput): TiltedAngleState & { sizeStage: LodSizeStage } {
+  const angle = simplificationForAngle(input.theta);
+  const width = Math.max(0, input.screenWidth);
+  const fullEnter = input.fullEnter ?? 114;
+  const pillEnter = input.pillEnter ?? 108;
+  const dotEnter = input.dotEnter ?? 60;
+  const dotExit = input.dotExit ?? 74;
+  const sizeStage = sizeStageForWidth(width, input.previousSizeStage, { ...input, fullEnter, pillEnter, dotEnter, dotExit });
+  // Continuous ramps use the same thresholds; the remembered stage only keeps
+  // tiny threshold crossings from flipping the label/marker ownership.
+  const sizePill = 1 - smoothstep(pillEnter, fullEnter, width);
+  // The visual point ramp is deliberately narrower than the stage's
+  // hysteresis window: 50–60% still reads as capsules, below ~55% (about
+  // 45–60 screen px here) the marker becomes a point.
+  const sizeDot = 1 - smoothstep(56, 60, width);
+  const pill = Math.max(angle.pill, sizePill);
+  const dot = Math.max(angle.dot, sizeDot);
+  const stage: TiltedStage = angle.stage === "dot" || sizeStage === "dot"
+    ? "dot"
+    : angle.stage === "pill" || sizeStage === "pill"
+      ? "pill"
+      : "full";
+  return {
+    ...angle,
+    stage,
+    pill,
+    dot,
+    extra: angle.extra * (1 - sizePill),
+    billboard: Math.max(angle.billboard, smoothstep(0.02, 0.72, pill)),
+    cardName: 1 - dot,
+    // Screen-size simplification never invents an outside name: at the front a
+    // far point only carries a name on hover / selection.
+    outsideName: angle.outsideName,
+    sizeStage
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Screen-facing labels on the turned plane
 
@@ -200,29 +279,12 @@ export function chooseTiltedLabels(
     if (chosen.length >= maxLabels) break;
     if (selectedIds.has(node.id)) continue;
     const best = bestLabelRect(node, options, placed);
-    if (!best) {
-      // Selection / hover must remain readable even in a dense cluster.
-      if (node.priority > 0) continue;
-      const lineHeight = options.lineHeight ?? 22;
-      const width = Math.max(24, options.measure(node.text) + 18);
-      const margin = options.margin ?? 8;
-      const fallback = labelRectForAnchor(node, "above", width, lineHeight);
-      const rect = {
-        x: clamp(fallback.x, margin, Math.max(margin, options.width - width - margin)),
-        y: clamp(fallback.y, margin, Math.max(margin, options.height - lineHeight - margin)),
-        width,
-        height: lineHeight
-      };
-      chosen.push({ id: node.id, anchor: "above", rect, alpha: 1, distance: node.distance, priority: node.priority });
-      selectedIds.add(node.id);
-      placed.push(rect);
-      continue;
-    }
-    // Labels never overlap each other. A small overlap with the node marker is
-    // acceptable in a dense column; hiding every name would leave the plane
-    // unreadable at the very angles where names matter most.
-    if (node.priority > 0 && (best.labelOverlap > 0.02 || best.obstacleOverlap > 0.22)) continue;
-    if (node.priority <= 0 && best.overlap > 0.001 && best.labelOverlap > 0.05) continue;
+    // A name is anchored to its own marker or hidden; never moved to a
+    // distant free slot. This is the core of the stability rule.
+    if (!best) continue;
+    // A name never overlaps another name, a HUD rectangle or a node marker:
+    // if no anchor is free, the node stays unnamed.
+    if (best.labelOverlap > 0.02 || best.obstacleOverlap > 0.02) continue;
     selectedIds.add(node.id);
     chosen.push({ id: node.id, anchor: best.anchor, rect: best.rect, alpha: 1, distance: node.distance, priority: node.priority });
     placed.push(best.rect);
@@ -277,7 +339,7 @@ export function chooseExcentricNodes(
   anchor: { x: number; y: number },
   options: { radius?: number; minNodes?: number; maxNodes?: number } = {}
 ): ExcentricNode[] {
-  const radius = options.radius ?? 50;
+  const radius = options.radius ?? 22;
   const minNodes = options.minNodes ?? 3;
   const maxNodes = options.maxNodes ?? 6;
   const near = nodes
@@ -287,6 +349,50 @@ export function chooseExcentricNodes(
     .sort((left, right) => left.distance - right.distance || left.node.id.localeCompare(right.node.id));
   if (near.length < minNodes) return [];
   return near.slice(0, maxNodes).map((entry) => entry.node).sort((left, right) => left.y - right.y || left.id.localeCompare(right.id));
+}
+
+/**
+ * Ambiguous-cluster detector used by both the course plane and the Archive.
+ * The pointer must be inside the 22px pick radius of at least three nodes; a
+ * tiny snap (<= 6px) keeps a cluster from being missed when the camera is
+ * still settling between the pointer move and the 400ms dwell. It never
+ * invents nodes: only nodes that pass the pick radius are returned.
+ */
+export function findExcentricCluster(
+  nodes: readonly ExcentricNode[],
+  anchor: { x: number; y: number },
+  options: { radius?: number; minNodes?: number; maxNodes?: number; snap?: number } = {}
+): { anchor: { x: number; y: number }; nodes: ExcentricNode[] } | null {
+  const radius = options.radius ?? 22;
+  const minNodes = options.minNodes ?? 3;
+  const maxNodes = options.maxNodes ?? 6;
+  const snap = Math.max(0, options.snap ?? 6);
+  const usable = nodes.filter((node) => node.visibility > 0.02);
+  const candidates: Array<{ x: number; y: number }> = [{ x: anchor.x, y: anchor.y }];
+  if (snap > 0) {
+    for (let dx = -snap; dx <= snap; dx += 3) {
+      for (let dy = -snap; dy <= snap; dy += 3) {
+        if (dx === 0 && dy === 0) continue;
+        candidates.push({ x: anchor.x + dx, y: anchor.y + dy });
+      }
+    }
+  }
+  let best: { anchor: { x: number; y: number }; nodes: ExcentricNode[]; score: number; maxDistance: number; offset: number } | null = null;
+  for (const point of candidates) {
+    const near = usable
+      .map((node) => ({ node, distance: Math.hypot(node.x - point.x, node.y - point.y) }))
+      .filter((entry) => entry.distance <= radius)
+      .sort((left, right) => left.distance - right.distance || left.node.id.localeCompare(right.node.id));
+    if (near.length < minNodes) continue;
+    const maxDistance = near[Math.min(near.length, maxNodes) - 1].distance;
+    const offset = Math.hypot(point.x - anchor.x, point.y - anchor.y);
+    const score = near.length * 100 - maxDistance - offset * 0.5;
+    if (!best || score > best.score) {
+      best = { anchor: point, nodes: near.slice(0, maxNodes).map((entry) => entry.node), score, maxDistance, offset };
+    }
+  }
+  if (!best) return null;
+  return { anchor: best.anchor, nodes: [...best.nodes].sort((left, right) => left.y - right.y || left.id.localeCompare(right.id)) };
 }
 
 export function layoutExcentric(
@@ -319,6 +425,59 @@ export function layoutExcentric(
   });
   const lines = nodes.map((node, index) => ({
     x1: fitRight ? left : left + width,
+    y1: top + index * rowHeight + rowHeight / 2,
+    x2: node.x,
+    y2: node.y
+  }));
+  return { x: left, y: top, width, rows, lines };
+}
+
+/**
+ * Excentric list placed outside the plane's screen bounding box. Rows follow
+ * the nodes' vertical order, so leader lines never cross. Used by both the
+ * course plane and the Archive course focus.
+ */
+export function layoutExcentricOutside(
+  nodes: readonly ExcentricNode[],
+  anchor: { x: number; y: number },
+  viewport: { width: number; height: number },
+  planeBounds: TiltedLabelRect,
+  options: { measure: (text: string) => number; rowHeight?: number; margin?: number; gap?: number; topInset?: number; bottomInset?: number; maxNodes?: number } = { measure: (text) => text.length * 12 }
+): ExcentricLayout | null {
+  if (nodes.length < 3) return null;
+  const maxNodes = options.maxNodes ?? 6;
+  const rowHeight = options.rowHeight ?? 22;
+  const margin = options.margin ?? 12;
+  const gap = options.gap ?? 16;
+  const topInset = options.topInset ?? margin;
+  const bottomInset = options.bottomInset ?? margin;
+  const sorted = [...nodes].sort((left, right) => left.y - right.y || left.id.localeCompare(right.id)).slice(0, maxNodes);
+  const widths = sorted.map((node) => Math.max(40, options.measure(node.text) + 22));
+  const width = Math.max(...widths);
+  const totalHeight = sorted.length * rowHeight;
+  const top = clamp(anchor.y - totalHeight / 2, topInset, Math.max(topInset, viewport.height - bottomInset - totalHeight));
+  const rightX = planeBounds.x + planeBounds.width + gap;
+  const leftX = planeBounds.x - gap - width;
+  const fitsRight = rightX + width <= viewport.width - margin;
+  const fitsLeft = leftX >= margin;
+  const onRight = fitsRight || !fitsLeft;
+  const left = onRight
+    ? Math.min(Math.max(margin, rightX), Math.max(margin, viewport.width - margin - width))
+    : Math.max(margin, leftX);
+  const rows = sorted.map((node, index) => {
+    const rowWidth = widths[index];
+    return {
+      id: node.id,
+      text: node.text,
+      x: onRight ? left : left + width - rowWidth,
+      y: top + index * rowHeight,
+      width: rowWidth,
+      height: rowHeight
+    };
+  });
+  const lines = sorted.map((node, index) => ({
+    // The connector leaves the list edge that faces the plane.
+    x1: onRight ? left : left + width,
     y1: top + index * rowHeight + rowHeight / 2,
     x2: node.x,
     y2: node.y

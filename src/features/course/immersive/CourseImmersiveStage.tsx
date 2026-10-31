@@ -33,8 +33,12 @@ export type StageNode = {
   detail?: ReactNode;
   /** Number of practices merged into one practice-group card. */
   count?: number;
-  /** Plain-text action row shown on the near-view full card. */
+  /** Plain-text action row shown on the card (practice / material chips). */
   actions?: string[];
+  /** Second row under the name (state, practice count, coverage). */
+  statusLine?: string;
+  /** Practice identity shown on a front card and its reflection strip. */
+  code?: string;
   bridge?: boolean;
   tone?: 1 | 2 | 3;
   index?: number;
@@ -71,16 +75,16 @@ export type StageEdge = {
   points: StagePoint[];
   kind?: "plain" | "knowledge" | "chapter" | "capability" | "practice";
   highlighted?: boolean;
+  /** Per-point weight of the animated knowledge reflection offset (0..1). */
+  pointWeights?: number[];
 };
 
 export type StageBeam = {
   id: string;
   kind: "current" | "preview";
   points: StagePoint[];
-  /** Selection outside the adopted route fades the pulse beam. */
+  /** Selection outside the adopted route / route editing dims the beam. */
   dimmed?: boolean;
-  /** Course-order fallback: a thin dashed band, never the adopted route solid. */
-  fallback?: boolean;
 };
 
 export type CourseImmersiveStageHandle = {
@@ -923,7 +927,9 @@ export function CourseImmersiveStage({
       disposeGroup(beamGroup);
       engine.chapterLabels.forEach(({ element }) => element.remove());
       engine.chapterLabels = [];
-      runtimeRef.current.forEach((entry) => entry.element?.remove());
+      // React owns the DOM cards; removing them here broke the overlay when
+      // StrictMode re-ran the mount effect (setup -> cleanup -> setup) because
+      // the second setup could not recreate React's already-committed nodes.
       runtimeRef.current.clear();
       renderer.dispose();
       engineRef.current = null;
@@ -1172,55 +1178,28 @@ export function CourseImmersiveStage({
       }
       return path;
     };
-    const addDashTube = (points: THREE.Vector3[], color: string, radius: number, opacity: number) => {
-      const curve = new THREE.CatmullRomCurve3(points);
-      const samples = curve.getSpacedPoints(56);
-      for (let index = 0; index < samples.length - 1; index += 1) {
-        if (Math.floor(index / 4) % 2 === 0) continue;
-        const path = new THREE.CurvePath<THREE.Vector3>();
-        path.add(new THREE.LineCurve3(samples[index], samples[index + 1]));
-        const geometry = new THREE.TubeGeometry(path, 1, radius, 5, false);
-        const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.renderOrder = 2;
-        engine.beamGroup.add(mesh);
-      }
-    };
     beams.forEach((beam) => {
       const points = beam.points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
       if (points.length < 2) return;
       const color = beam.kind === "current" ? engine.colors.brandInk : engine.colors.target;
-      if (beam.kind === "current") {
-        if (beam.fallback) {
-          // Course-order fallback is intentionally weaker: a thin dashed line
-          // behind the cards, with no flowing pulse.
-          const geometry = new THREE.BufferGeometry().setFromPoints(points);
-          const material = new THREE.LineDashedMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.16 : 0.4, depthWrite: false, dashSize: 9, gapSize: 10 });
-          const line = new THREE.Line(geometry, material);
-          line.computeLineDistances();
-          line.renderOrder = 1;
-          engine.beamGroup.add(line);
-          return;
-        }
-        const curve = linePath(beam.points);
-        const geometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), 1.4, 6, false);
-        const glowGeometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), 3.4, 8, false);
-        const glow = new THREE.Mesh(glowGeometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.03 : 0.1, depthWrite: false }));
-        glow.renderOrder = 0;
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.16 : 0.55, depthWrite: false }));
-        mesh.renderOrder = 2;
-        engine.beamGroup.add(glow, mesh);
-        const packetGeometry = new THREE.SphereGeometry(2.2, 10, 8);
-        const count = Math.min(6, Math.max(2, Math.floor(curve.getLength() / 140)));
-        for (let index = 0; index < count; index += 1) {
-          const packet = new THREE.Mesh(packetGeometry.clone(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.2 : 0.92, depthWrite: false }));
-          packet.renderOrder = 3;
-          engine.beamGroup.add(packet);
-          engine.packets.push({ mesh: packet, points: beam.points, progress: 0, speed: 0.0002, offset: index / count });
-        }
-      } else {
-        // Preview: a distinct dashed light band, never the current-route solid.
-        addDashTube(points, color, 1.6, 0.7);
+      const dim = Boolean(beam.dimmed);
+      const curve = linePath(beam.points);
+      const geometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), beam.kind === "preview" ? 2.8 : 3.2, 8, false);
+      const glowGeometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), beam.kind === "preview" ? 6.5 : 7.5, 10, false);
+      const glow = new THREE.Mesh(glowGeometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: dim ? 0.05 : 0.11, depthWrite: false }));
+      glow.renderOrder = 0;
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: dim ? 0.3 : 0.58, depthWrite: false }));
+      mesh.renderOrder = 2;
+      engine.beamGroup.add(glow, mesh);
+      // Both the adopted/current route and the edit preview use flowing light
+      // pulses; colour is the only distinction (brand vs target green).
+      const packetGeometry = new THREE.SphereGeometry(beam.kind === "preview" ? 3.2 : 3.6, 12, 10);
+      const count = Math.min(7, Math.max(2, Math.floor(curve.getLength() / 130)));
+      for (let index = 0; index < count; index += 1) {
+        const packet = new THREE.Mesh(packetGeometry.clone(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: dim ? 0.3 : 0.95, depthWrite: false }));
+        packet.renderOrder = 3;
+        engine.beamGroup.add(packet);
+        engine.packets.push({ mesh: packet, points: beam.points, progress: 0, speed: 0.00034, offset: index / count });
       }
     });
   }, [beams]);
