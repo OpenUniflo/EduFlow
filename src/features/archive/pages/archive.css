@@ -1344,3 +1344,19 @@
 .ef-archive-replace-menu > button:hover { background: var(--page); }
 .ef-archive-replace-menu > button span { flex: 1; font-size: var(--fs-12); font-weight: var(--fw-600); }
 .ef-archive-replace-menu > button em { color: var(--brand-ink); font-size: var(--fs-12); font-style: normal; font-weight: var(--fw-600); }
+
+/* Entering a course fades every floating Archive panel first; the course page
+   then continues from the captured card rectangles without covering them. */
+.ef-archive.is-leaving-course .ef-atlas-panel,
+.ef-archive.is-leaving-course .ef-archive-assistant,
+.ef-archive.is-leaving-course .ef-atlas-coursebar,
+.ef-archive.is-leaving-course .ef-atlas-people,
+.ef-archive.is-leaving-course .ef-atlas-level,
+.ef-archive.is-leaving-course .ef-atlas-legend,
+.ef-archive.is-leaving-course .ef-atlas-zoom,
+.ef-archive.is-leaving-course .ef-atlas-detail,
+.ef-archive.is-leaving-course .ef-atlas-guest {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+  pointer-events: none;
+}

@@ -49,3 +49,61 @@ export function courseTransitionCss(origin: CourseOriginRect | null, viewport = 
     borderRadius: "24px"
   };
 }
+
+/** Screen-space cards captured from the Archive course plane at entry. */
+export type CourseEnterCard = {
+  id: string;
+  title: string;
+  status: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  current: boolean;
+};
+
+export type CourseEnterSnapshot = {
+  cards: CourseEnterCard[];
+  width: number;
+  height: number;
+};
+
+const enterMemory = new Map<string, CourseEnterSnapshot>();
+
+export function rememberCourseEnterSnapshot(courseId: string, snapshot: CourseEnterSnapshot | null | undefined) {
+  if (!courseId) return;
+  if (!snapshot || !snapshot.cards.length) {
+    enterMemory.delete(courseId);
+    return;
+  }
+  enterMemory.set(courseId, snapshot);
+}
+
+export function readCourseEnterSnapshot(courseId: string): CourseEnterSnapshot | null {
+  return enterMemory.get(courseId) ?? null;
+}
+
+export function clearCourseEnterSnapshot(courseId: string) {
+  enterMemory.delete(courseId);
+}
+
+/** Camera of the Archive course plane, restored when leaving the course. */
+export type ArchiveCourseView = {
+  position: [number, number, number];
+  target: [number, number, number];
+};
+
+const archiveViewMemory = new Map<string, ArchiveCourseView>();
+
+export function rememberArchiveCourseView(courseId: string, view: ArchiveCourseView | null | undefined) {
+  if (!courseId || !view) return;
+  archiveViewMemory.set(courseId, view);
+}
+
+export function readArchiveCourseView(courseId: string): ArchiveCourseView | null {
+  return archiveViewMemory.get(courseId) ?? null;
+}
+
+export function clearArchiveCourseView(courseId: string) {
+  archiveViewMemory.delete(courseId);
+}

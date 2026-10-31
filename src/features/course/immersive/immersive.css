@@ -42,14 +42,14 @@
   opacity: 0.5;
 }
 
-.ef-imm-page.is-entering .ef-imm-stage-wrap {
-  opacity: 0.35;
-  transform: scale(0.9);
-}
-
-.ef-imm-page.is-entering .ef-imm-top {
-  opacity: 0.6;
-  transform: scale(0.98);
+.ef-imm-page.is-entering .ef-imm-stage-wrap,
+.ef-imm-page.is-entering .ef-imm-top,
+.ef-imm-page.is-entering .ef-imm-toolbar,
+.ef-imm-page.is-entering .ef-imm-status-legend,
+.ef-imm-page.is-entering .ef-imm-controls {
+  opacity: 0;
+  transform: none;
+  pointer-events: none;
 }
 
 .ef-imm-stage-wrap,
@@ -75,6 +75,18 @@
 .ef-imm-page.is-leaving .ef-imm-top {
   opacity: 0;
   transform: scale(0.96);
+}
+
+/* Final state is explicit: never depend on a compositor transition finishing
+   after the entry overlay is gone. */
+.ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-stage-wrap,
+.ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-top,
+.ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-toolbar,
+.ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-status-legend,
+.ef-imm-page:not(.is-entering):not(.is-leaving) .ef-imm-controls {
+  opacity: 1;
+  transform: none;
+  transition: none;
 }
 
 .ef-imm-top {
@@ -313,6 +325,11 @@
   position: absolute;
   inset: 0;
   z-index: 10;
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+
+.ef-imm-stage-wrap.has-detail {
+  right: 404px;
 }
 
 .ef-imm-stage {
@@ -321,6 +338,8 @@
   overflow: hidden;
   cursor: grab;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .ef-imm-stage:active {
@@ -360,11 +379,12 @@
   top: 0;
   left: 0;
   display: flex;
-  min-width: 112px;
-  max-width: 128px;
+  min-width: 0;
+  max-width: none;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  gap: 7px;
+  overflow: hidden;
+  padding: 6px 9px;
   border: 1px solid color-mix(in srgb, var(--line-strong) 74%, transparent);
   border-radius: var(--r-full);
   color: var(--ink);
@@ -377,7 +397,9 @@
   transform-origin: center;
   contain: layout style;
   pointer-events: auto;
-  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  -webkit-user-select: none;
+  user-select: none;
+  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), opacity var(--dur-slow) var(--ease-out);
 }
 
 .ef-imm-node:hover {
@@ -451,11 +473,18 @@
 .ef-imm-node-copy strong {
   overflow: hidden;
   color: inherit;
-  font-size: var(--fs-12);
-  line-height: var(--lh-12);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
   font-weight: var(--fw-600);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ef-imm-node--knowledge .ef-imm-node-copy strong,
+.ef-imm-node--assignment .ef-imm-node-copy strong,
+.ef-imm-node--capability .ef-imm-node-copy strong {
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
 }
 
 .ef-imm-node-meta,
@@ -480,15 +509,14 @@
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge {
   display: flex;
-  width: 170px;
-  min-width: 170px;
-  max-width: 170px;
-  height: auto;
-  min-height: 60px;
   align-items: flex-start;
-  padding: 8px 9px;
+  padding: 6px 8px;
   border-radius: var(--r-12);
-  gap: 7px;
+  gap: 6px;
+}
+
+.ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge.has-step {
+  padding-left: 34px;
 }
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge .ef-imm-node-dot {
@@ -504,7 +532,7 @@
   align-content: start;
   align-items: center;
   column-gap: 6px;
-  row-gap: 3px;
+  row-gap: 2px;
 }
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge .ef-imm-node-copy strong {
@@ -534,7 +562,8 @@
 }
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node--knowledge .ef-imm-actions span {
-  height: 17px;
+  height: 14px;
+  padding: 0 3px;
 }
 
 .ef-imm-stage[data-zoom="near"] .ef-imm-node-copy strong {
@@ -549,16 +578,18 @@
 
 .ef-imm-actions {
   display: flex;
+  min-width: 0;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: 2px;
   max-width: 100%;
+  overflow: hidden;
 }
 
 .ef-imm-actions span {
   display: inline-flex;
-  height: 16px;
+  height: 14px;
   align-items: center;
-  padding: 0 4px;
+  padding: 0 3px;
   border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--line));
   border-radius: var(--r-full);
   color: var(--brand-ink);
@@ -597,33 +628,59 @@
   border: 0;
 }
 
-/* Practice shadow layer: front/back cards swap without changing coordinates. */
-.ef-imm-stage[data-layer="practice"] .ef-imm-node--knowledge {
-  margin-left: 24px;
-  filter: saturate(0.35);
-}
-
-.ef-imm-stage[data-layer="skill"] .ef-imm-node--assignment {
-  margin-left: 24px;
-  filter: saturate(0.4);
-}
 
 .ef-imm-node--assignment {
   display: flex;
   box-sizing: border-box;
   min-width: 0;
   max-width: none;
-  height: 22px;
+  height: auto;
   align-items: center;
-  gap: 3px;
-  padding: 1px 4px 1px 2px;
-  border-radius: var(--r-8);
+  gap: 5px;
+  padding: 5px 8px 5px 5px;
+  border-radius: var(--r-12);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
 }
 
-.ef-imm-node--assignment .ef-imm-node-copy strong {
+.ef-imm-node--knowledge,
+.ef-imm-node--assignment {
+  border-radius: var(--r-12);
+}
+
+.ef-imm-node--chapter-empty {
+  justify-content: center;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--brand) 34%, transparent);
+  border-radius: var(--r-12);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 58%, transparent);
+  text-align: center;
+}
+
+.ef-imm-node--chapter-empty .ef-imm-node-dot {
+  display: none;
+}
+
+.ef-imm-node--chapter-empty .ef-imm-node-copy {
+  align-items: center;
+}
+
+.ef-imm-node--chapter-empty .ef-imm-node-copy strong {
+  color: var(--ink-2);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-imm-node--chapter-empty .ef-imm-node-copy small {
+  display: block;
+  color: var(--muted);
   font-size: var(--fs-12);
   line-height: var(--lh-12);
+}
+
+.ef-imm-node--assignment .ef-imm-node-copy strong {
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
 }
 
 .ef-imm-node--assignment[data-status="started"],
@@ -658,6 +715,10 @@
 
 .ef-imm-node--capability {
   border-style: solid;
+}
+
+.ef-imm-node--capability .ef-imm-node-meta {
+  display: block;
 }
 
 .ef-imm-node--capability[data-bridge="true"] {
@@ -861,10 +922,11 @@
   top: 0;
   left: 0;
   display: inline-flex;
-  align-items: baseline;
-  gap: var(--sp-8);
-  max-width: 210px;
-  padding: 3px 8px;
+  max-width: 232px;
+  margin-top: -12px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 9px;
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: var(--r-8);
   color: var(--ink-2);
@@ -880,6 +942,7 @@
 }
 
 .ef-imm-chapter-label b {
+  flex: 0 0 auto;
   color: var(--brand-ink);
   font-size: var(--fs-13);
   line-height: var(--lh-13);
@@ -889,35 +952,39 @@
 .ef-imm-chapter-label span {
   overflow: hidden;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
   font-size: var(--fs-12);
   line-height: var(--lh-12);
   font-weight: var(--fw-600);
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ef-imm-chapter-label em {
+  flex: 0 0 auto;
+  margin-left: 2px;
   color: var(--muted);
   font-size: var(--fs-12);
   line-height: var(--lh-12);
   font-style: normal;
+  white-space: nowrap;
 }
 
 .ef-imm-stage[data-zoom="far"] .ef-imm-chapter-label {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  max-width: 220px;
-  padding: 5px 9px;
-  background: color-mix(in srgb, var(--surface) 62%, transparent);
-  border-radius: var(--r-12);
-  white-space: normal;
+  display: inline-flex;
+  padding: 3px 8px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-radius: var(--r-8);
+  white-space: nowrap;
 }
 
 .ef-imm-stage[data-zoom="far"] .ef-imm-chapter-label span {
   display: block;
+  overflow: hidden;
   font-size: var(--fs-12);
   line-height: var(--lh-12);
-  white-space: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ef-imm-stage[data-zoom="far"] .ef-imm-chapter-label em {
@@ -945,6 +1012,7 @@
 
 .ef-imm-status-legend {
   position: absolute;
+  z-index: 32;
   bottom: var(--sp-20);
   left: 50%;
   display: flex;
@@ -1653,10 +1721,6 @@
     justify-self: start;
   }
 
-  .ef-imm-status-legend {
-    display: none;
-  }
-
   .ef-imm-side-panel,
   .ef-imm-structure-list {
     width: 340px;
@@ -1723,5 +1787,803 @@
   .eduflow-assistant.course-design-assistant.ef-imm-assistant {
     bottom: 92px;
     left: 14px;
+  }
+}
+
+/* ------------------------------------------------------------------ P4R course tree */
+.ef-imm-node {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: none;
+  width: auto;
+  height: auto;
+  gap: var(--sp-6);
+  padding: 7px 10px;
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: var(--sh-1);
+}
+
+.ef-imm-node--knowledge,
+.ef-imm-node--capability {
+  align-items: center;
+}
+
+.ef-imm-node--assignment {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--practice, var(--acquired)) 48%, var(--line));
+  border-left: 3px solid var(--practice, var(--acquired));
+  border-radius: var(--r-8);
+  background: var(--surface);
+}
+
+.ef-imm-node.is-ghost .ef-imm-node-copy,
+.ef-imm-node.is-ghost .ef-imm-node-index,
+.ef-imm-node.is-ghost .ef-imm-step,
+.ef-imm-node.is-ghost .ef-imm-here {
+  visibility: hidden;
+}
+
+.ef-imm-node.is-ghost {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--line-strong) 78%, transparent);
+  background: color-mix(in srgb, var(--surface) 36%, transparent);
+  box-shadow: none;
+}
+
+.ef-imm-node.is-empty {
+  border: 1px dashed var(--line-strong);
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  box-shadow: none;
+}
+
+.ef-imm-node.is-empty .ef-imm-node-copy strong {
+  color: var(--muted);
+  font-weight: var(--fw-500);
+}
+
+.ef-imm-node.is-dim {
+  filter: saturate(0.45);
+}
+
+/* A selected card and its related cards stay fully lit: status/locked colours
+   may not dim the very nodes the user is inspecting. */
+.ef-imm-node.is-hl,
+.ef-imm-node.is-sel {
+  border-style: solid;
+  border-color: var(--brand);
+  color: var(--ink);
+  background: var(--surface);
+  filter: none;
+  opacity: 1 !important;
+}
+
+.ef-imm-node.is-hl {
+  box-shadow: var(--sh-2);
+}
+
+.ef-imm-node.is-sel {
+  outline: 3px solid var(--brand);
+  outline-offset: 0;
+  box-shadow: var(--sh-3);
+}
+
+.ef-imm-node.is-hl .ef-imm-node-copy strong,
+.ef-imm-node.is-sel .ef-imm-node-copy strong,
+.ef-imm-node.is-hl .ef-imm-node-copy small,
+.ef-imm-node.is-sel .ef-imm-node-copy small {
+  color: var(--ink);
+}
+
+.ef-imm-node[data-collapsed="true"] {
+  width: 14px !important;
+  min-width: 14px;
+  max-width: 14px;
+  height: 14px !important;
+  min-height: 14px;
+  padding: 0;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.ef-imm-node[data-collapsed="true"] .ef-imm-node-copy,
+.ef-imm-node[data-collapsed="true"] .ef-imm-node-index,
+.ef-imm-node[data-collapsed="true"] .ef-imm-step,
+.ef-imm-node[data-collapsed="true"] .ef-imm-here {
+  display: none;
+}
+
+.ef-imm-node[data-collapsed="true"] .ef-imm-node-dot {
+  margin: 0 auto;
+}
+
+.ef-imm-node.has-step {
+  padding-left: 34px;
+}
+
+.ef-imm-node.has-step .ef-imm-node-dot {
+  display: none;
+}
+
+.ef-imm-step {
+  position: absolute;
+  z-index: 2;
+  top: 7px;
+  left: 8px;
+  display: grid;
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  place-items: center;
+  border: 1.5px solid var(--surface);
+  border-radius: var(--r-full);
+  color: var(--surface);
+  background: var(--brand);
+  font-size: var(--fs-12);
+  font-style: normal;
+  font-weight: var(--fw-700);
+  line-height: 1;
+}
+
+.ef-imm-here {
+  position: absolute;
+  top: -12px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  color: var(--surface);
+  background: var(--brand);
+  font-size: var(--fs-12);
+  font-style: normal;
+  font-weight: var(--fw-700);
+  white-space: nowrap;
+  box-shadow: var(--sh-1);
+}
+
+.ef-imm-node.is-ghost .ef-imm-step,
+.ef-imm-node.is-ghost .ef-imm-here {
+  display: none;
+}
+
+/* Floating detail sidebar: inset from the edge, never edge-to-edge. */
+.ef-imm-detail {
+  position: absolute;
+  z-index: 46;
+  top: 84px;
+  right: var(--sp-16);
+  bottom: auto;
+  display: flex;
+  width: min(372px, calc(100% - 32px));
+  max-height: 70dvh;
+  height: auto;
+  min-height: 0;
+  animation: ef-imm-detail-in var(--dur-base) var(--ease-out);
+  pointer-events: auto;
+}
+
+.ef-imm-detail .ef-ui-obj--panel {
+  height: auto;
+  max-height: 70dvh;
+  min-height: 0;
+}
+
+.ef-imm-detail .ef-ui-obj-body {
+  overflow: auto;
+}
+
+@keyframes ef-imm-detail-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.ef-imm-detail .ef-ui-obj-body {
+  gap: var(--sp-12);
+  padding-bottom: var(--sp-8);
+}
+
+.ef-imm-detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+}
+
+.ef-imm-detail-chip {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-imm-detail-chip.is-accent {
+  border-color: transparent;
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+}
+
+.ef-imm-detail-section {
+  display: grid;
+  gap: var(--sp-6);
+  padding-top: var(--sp-12);
+  border-top: 1px solid var(--line);
+}
+
+.ef-imm-detail-section h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-imm-detail-section p,
+.ef-imm-detail-section ul {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-14);
+}
+
+.ef-imm-detail-section ul {
+  padding-left: 18px;
+}
+
+.ef-imm-detail-link {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  font-size: var(--fs-13);
+  text-align: left;
+}
+
+.ef-imm-detail-link:hover {
+  border-color: var(--brand);
+}
+
+.ef-imm-detail-link i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: var(--r-full);
+  background: var(--brand);
+}
+
+.ef-imm-detail .ef-ui-obj-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+}
+
+/* Course-page toolbar */
+.ef-imm-toolbar {
+  position: absolute;
+  z-index: 34;
+  bottom: 64px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 6px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-16);
+  background: var(--glass-regular);
+  box-shadow: var(--sh-2);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.ef-imm-toolbar button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-8);
+  color: var(--ink-2);
+  background: transparent;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-imm-toolbar button:hover {
+  background: var(--brand-soft);
+}
+
+.ef-imm-toolbar button[aria-pressed="true"] {
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+}
+
+.ef-imm-toolbar .ef-imm-switch {
+  width: 24px;
+  height: 14px;
+  border-radius: var(--r-full);
+  background: var(--line-strong);
+  position: relative;
+}
+
+.ef-imm-toolbar .ef-imm-switch::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  content: "";
+  transition: left var(--dur-fast) var(--ease-out);
+}
+
+.ef-imm-toolbar button[aria-pressed="true"] .ef-imm-switch {
+  background: var(--brand);
+}
+
+.ef-imm-toolbar button[aria-pressed="true"] .ef-imm-switch::after {
+  left: 12px;
+}
+
+.ef-imm-toolbar-note {
+  max-width: 280px;
+  padding: 0 var(--sp-8);
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  text-overflow: ellipsis;
+}
+
+.ef-imm-flatbar {
+  position: absolute;
+  z-index: 36;
+  bottom: 84px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-16);
+  background: var(--glass-regular);
+  box-shadow: var(--sh-2);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.ef-imm-flatbar span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+}
+
+.ef-imm-flatbar i {
+  display: inline-block;
+  width: 20px;
+  height: 3px;
+  border-radius: var(--r-full);
+  background: var(--brand);
+}
+
+.ef-imm-flatbar i.is-preview {
+  background: repeating-linear-gradient(90deg, var(--target) 0 5px, transparent 5px 8px);
+}
+
+/* Route view (Duolingo/Brilliant-style journey) */
+.ef-imm-route-view {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden auto;
+  background:
+    radial-gradient(80% 60% at 20% 10%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 70%),
+    color-mix(in srgb, var(--page) 96%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.ef-imm-route-wrap {
+  position: relative;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 96px 16px 140px;
+}
+
+.ef-imm-route-top {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--sp-12) 0;
+}
+
+.ef-imm-route-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-16);
+}
+
+.ef-imm-route-head h2 {
+  margin: 0;
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+}
+
+.ef-imm-route-head p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-imm-route-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ef-imm-route-chapter {
+  position: absolute;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.ef-imm-route-chapter div {
+  display: inline-block;
+  padding: 7px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--glass-regular);
+  box-shadow: var(--sh-1);
+}
+
+.ef-imm-route-chapter small {
+  display: block;
+  color: var(--brand);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-700);
+  letter-spacing: 0.08em;
+}
+
+.ef-imm-route-chapter b {
+  font-size: var(--fs-14);
+}
+
+.ef-imm-route-step {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  margin-left: -48px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.ef-imm-route-disc {
+  position: absolute;
+  top: 34px;
+  left: 8px;
+  width: 80px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(60% 60% at 50% 38%, var(--surface), color-mix(in srgb, var(--pending) 36%, var(--surface)));
+  border-bottom: 7px solid color-mix(in srgb, var(--pending) 62%, var(--line));
+  box-shadow: var(--sh-2);
+}
+
+.ef-imm-route-step.is-done .ef-imm-route-disc {
+  background: radial-gradient(60% 60% at 50% 38%, color-mix(in srgb, var(--acquired) 30%, var(--surface)), var(--acquired));
+  border-bottom: 7px solid color-mix(in srgb, var(--acquired) 70%, var(--ink));
+  box-shadow: var(--sh-2);
+}
+
+.ef-imm-route-step.is-current .ef-imm-route-disc {
+  background: radial-gradient(60% 60% at 50% 38%, color-mix(in srgb, var(--brand) 26%, var(--surface)), var(--brand));
+  border-bottom: 7px solid color-mix(in srgb, var(--brand) 68%, var(--ink));
+  outline: 8px solid color-mix(in srgb, var(--brand) 22%, transparent);
+  box-shadow: var(--sh-3);
+}
+
+.ef-imm-route-step.is-locked .ef-imm-route-disc {
+  opacity: 0.72;
+}
+
+.ef-imm-route-icon {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: var(--r-12);
+  color: var(--surface);
+  background: color-mix(in srgb, var(--pending) 70%, var(--ink));
+  transform: translateX(-50%);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-700);
+}
+
+.ef-imm-route-step.is-done .ef-imm-route-icon {
+  background: color-mix(in srgb, var(--acquired) 70%, var(--ink));
+}
+
+.ef-imm-route-step.is-current .ef-imm-route-icon {
+  top: 2px;
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 60%, var(--surface)), var(--brand));
+  box-shadow: var(--sh-2);
+  animation: ef-imm-bob var(--dur-scene) var(--ease-inout) infinite;
+}
+
+.ef-imm-route-step.is-locked .ef-imm-route-icon {
+  display: none;
+}
+
+@keyframes ef-imm-bob {
+  50% {
+    transform: translate(-50%, -5px);
+  }
+}
+
+.ef-imm-route-text {
+  position: absolute;
+  top: 36px;
+  width: 180px;
+}
+
+.ef-imm-route-text.is-right {
+  text-align: left;
+}
+
+.ef-imm-route-text.is-left {
+  text-align: right;
+}
+
+.ef-imm-route-text b {
+  display: block;
+  font-size: var(--fs-14);
+}
+
+.ef-imm-route-text small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-imm-route-step.is-locked + .ef-imm-route-text b {
+  color: var(--muted);
+}
+
+.ef-imm-route-start {
+  position: absolute;
+  left: 50%;
+  width: min(360px, 100%);
+  padding: var(--sp-16);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-16);
+  background: var(--glass-regular);
+  box-shadow: var(--sh-2);
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.ef-imm-route-start b {
+  display: block;
+  margin-bottom: var(--sp-4);
+  font-size: var(--fs-16);
+}
+
+.ef-imm-route-start small {
+  display: block;
+  margin-bottom: var(--sp-12);
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-imm-route-start .ef-ui-btn {
+  width: 100%;
+}
+
+.ef-imm-route-note {
+  margin: var(--sp-12) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  text-align: center;
+}
+
+/* Archive → course entry overlay: same cards, same screen positions. */
+.ef-imm-enter {
+  position: fixed;
+  z-index: 60;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ef-imm-enter.is-settle {
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.ef-imm-enter-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 176px;
+  height: 64px;
+  box-sizing: border-box;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: var(--sh-1);
+  transform-origin: 0 0;
+  transition: transform var(--dur-scene) var(--ease-inout), opacity var(--dur-scene) var(--ease-inout);
+  will-change: transform, opacity;
+}
+
+.ef-imm-enter-card.is-run {
+  opacity: 0.9;
+}
+
+.ef-imm-enter-card .ef-imm-node-copy strong {
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+}
+
+.ef-imm-page.is-entering .ef-imm-stage-wrap,
+.ef-imm-page.is-entering .ef-imm-top,
+.ef-imm-page.is-entering .ef-imm-toolbar,
+.ef-imm-page.is-entering .ef-imm-status-legend {
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.ef-imm-route-canvas {
+  position: relative;
+  width: 100%;
+}
+
+.ef-imm-route-head .ef-ui-btn {
+  flex: 0 0 auto;
+}
+
+.ef-imm-enter-card .ef-imm-node-dot {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  margin-top: -4px;
+}
+
+.ef-imm-enter-card .ef-imm-node-copy {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  left: 28px;
+  display: block;
+  transform: translateY(-50%);
+}
+
+.ef-imm-enter-card .ef-imm-node-copy strong {
+  display: block;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-imm-enter-card .ef-imm-node-copy {
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-imm-enter-badge {
+  position: absolute;
+  top: -9px;
+  right: 10px;
+  padding: 0 6px;
+  border-radius: var(--r-full);
+  color: var(--surface);
+  background: var(--brand);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-imm-layout-wait {
+  position: absolute;
+  z-index: 32;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-16);
+  color: var(--muted);
+  background: var(--glass-regular);
+  box-shadow: var(--sh-1);
+  font-size: var(--fs-13);
+  transform: translate(-50%, -50%);
+}
+
+.ef-imm-route-continue {
+  display: grid;
+  gap: var(--sp-6);
+  margin: 0 auto var(--sp-16);
+  padding: var(--sp-16);
+  border: 1px solid var(--glass-line);
+  border-radius: var(--r-16);
+  background: var(--glass-regular);
+  box-shadow: var(--sh-2);
+  text-align: center;
+}
+
+.ef-imm-route-continue b {
+  font-size: var(--fs-16);
+}
+
+.ef-imm-route-continue small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-imm-route-continue .ef-ui-btn {
+  width: 100%;
+}
+
+/* The legacy shell enforces a 1180px desktop canvas. The course scene is a
+ * canvas-first surface and must also be usable at the 960px acceptance size. */
+body:has(.ef-imm-page) {
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .ef-imm-status-legend {
+    right: auto;
+    left: var(--sp-16);
+    max-width: calc(100% - 220px);
+    flex-wrap: wrap;
+    gap: var(--sp-8) var(--sp-12);
+    transform: none;
+    white-space: normal;
+  }
+
+  .ef-imm-status-legend-markers small {
+    display: none;
+  }
+
+  .ef-imm-toolbar {
+    bottom: 82px;
+    max-width: calc(100% - 32px);
+    flex-wrap: wrap;
+  }
+
+  .ef-imm-route-wrap {
+    padding-top: 136px;
   }
 }

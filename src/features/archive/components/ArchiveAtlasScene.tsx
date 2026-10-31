@@ -12,6 +12,7 @@ import type { Vec3 } from "../model/atlas3dLayout";
 import { placeAtlasLabels, type AtlasLabelCandidate, type AtlasLabelRect } from "../model/atlasLabels";
 import type { PlaneChapter } from "../model/coursePlaneLayout";
 import type { PlaneDependencyRoute } from "../model/coursePlaneDependencies";
+import type { CourseEnterSnapshot, ArchiveCourseView } from "@/features/course/immersive/courseTransition";
 
 export type ScenePerson = { id: string; name: string; accent: string; nodeIds: ReadonlySet<string> };
 export type SceneMode = "default" | "person" | "course" | "draft";
@@ -26,6 +27,9 @@ export type ArchiveAtlasSceneHandle = {
   shiftForDetail(open: boolean): void;
   getZoomPercent(): number;
   getLevel(): number;
+  captureCoursePlaneSnapshot(): CourseEnterSnapshot | null;
+  getCourseView(): ArchiveCourseView | null;
+  applyCourseView(view: ArchiveCourseView, animated?: boolean): void;
 };
 
 export type ArchiveAtlasSceneProps = {
@@ -74,7 +78,6 @@ const CARD_NATURAL_WIDTH = 176;
 const CARD_NATURAL_HEIGHT = 40;
 /** Keep the world-space 14px card title at ~12px on screen. */
 const MIN_CARD_SCALE = 0.86;
-
 function cssVarValue(name: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
   let value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -379,10 +382,11 @@ export default function ArchiveAtlasScene({
       if (selectedNeighborhood) {
         edgeAlpha[index] = edge.source === currentProps.selectedId || edge.target === currentProps.selectedId ? 0.95 : 0.025;
       } else if (courseMode) {
-        const sourceIn = inStationedPlane(edge.source) || drafting.has(source);
-        const targetIn = inStationedPlane(edge.target) || drafting.has(target);
+        // Course focus draws its own card-safe orthogonal dependency layer.
+        // The generic star-map edge web is suppressed here (only a hovered
+        // node's incident edge is shown) so chapters never read as a tangle.
         const touchesHover = hoveredIndex !== null && (source === hoveredIndex || target === hoveredIndex);
-        edgeAlpha[index] = touchesHover ? 0.9 : sourceIn && targetIn ? 0.05 : sourceIn || targetIn ? 0.14 : 0.03;
+        edgeAlpha[index] = touchesHover ? 0.9 : 0;
       } else if (currentProps.mode === "person" && focusedPersonIndices.size) {
         const sourceIn = focusedPersonIndices.has(source);
         const targetIn = focusedPersonIndices.has(target);
@@ -507,26 +511,74 @@ export default function ArchiveAtlasScene({
     const maxY = Math.max(...values.map((value) => value.y + halfCardHeight), ...chapters.map((chapter) => chapter.y));
     const planeWidth = Math.max(80, maxX - minX);
     const planeHeight = Math.max(80, maxY - minY);
-    // Fit width and height together, but never below the readable card scale:
-    // a whole-course overview that makes names 6px tall is worse than a plane
-    // that is slightly wider than the free area and can be panned. This is the
-    // only case where the course plane may extend horizontally.
-    const fitScale = Math.min(availableWidth / planeWidth, availableHeight / planeHeight);
-    const worldPerPixel = Math.max(MIN_CARD_SCALE, fitScale);
+    // Course-plane focus keeps the cards readable (width fit with the same
+    // floor the Archive always used). Tall courses are aligned to the top of
+    // the free area instead of being centred under the people/course bars;
+    // the rest is browsed by zooming/panning, and the exact camera is restored
+    // when returning from the course page.
+    const widthScale = Math.min(1.35, availableWidth / planeWidth);
+    const worldPerPixel = Math.max(MIN_CARD_SCALE, widthScale);
     const distance = Math.max(240, Math.min(6000, height / (2 * FOV_T * Math.max(0.00001, worldPerPixel))));
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
     const shiftX = (left - right) / 2;
     const shiftY = (top - bottom) / 2;
-    // The course plane is front-facing: shift the camera target so the plane
-    // lands in the middle of the free rectangle, not the middle of the canvas.
-    const target = new THREE.Vector3(centerX - shiftX / worldPerPixel, centerY + shiftY / worldPerPixel, 0);
-    const position = new THREE.Vector3(target.x, target.y, distance);
+    const contentWidth = planeWidth * worldPerPixel;
+    const contentHeight = planeHeight * worldPerPixel;
+    const targetX = contentWidth > availableWidth + 1
+      ? minX + (width / 2 - left) / worldPerPixel
+      : centerX - shiftX / worldPerPixel;
+    const targetY = contentHeight > availableHeight + 1
+      ? maxY - (height / 2 - top) / worldPerPixel
+      : centerY + shiftY / worldPerPixel;
+    const target = new THREE.Vector3(targetX, targetY, 0);
+    const position = new THREE.Vector3(targetX, targetY, distance);
     referenceDistanceRef.current = distance;
     animateCamera(position, target, 600);
   }
 
   useImperativeHandle(ref, () => ({
+    captureCoursePlaneSnapshot() {
+      const host = containerRef.current;
+      if (!host || (propsRef.current.mode !== "course" && propsRef.current.mode !== "draft")) return null;
+      const cards = [...host.querySelectorAll<HTMLElement>(".ef-atlas-card")]
+        .filter((element) => element.style.display !== "none")
+        .flatMap((element) => {
+          const id = element.dataset.nodeId;
+          const title = element.querySelector<HTMLElement>(".ef-atlas-card-title")?.textContent?.trim();
+          if (!id || !title) return [];
+          const rect = element.getBoundingClientRect();
+          if (rect.width < 2 || rect.height < 2) return [];
+          return [{
+            id,
+            title,
+            status: element.dataset.status ?? "available",
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            current: Boolean(element.querySelector(".ef-atlas-card-badge.is-current"))
+          }];
+        });
+      return { cards, width: window.innerWidth, height: window.innerHeight };
+    },
+    getCourseView() {
+      const engine = engineRef.current;
+      if (!engine) return null;
+      return {
+        position: engine.camera.position.toArray() as [number, number, number],
+        target: engine.controls.target.toArray() as [number, number, number]
+      };
+    },
+    applyCourseView(view, animated = true) {
+      const engine = engineRef.current;
+      if (!engine) return;
+      animateCamera(
+        new THREE.Vector3(...view.position),
+        new THREE.Vector3(...view.target),
+        animated ? 420 : 1
+      );
+    },
     zoomBy(factor) {
       const engine = engineRef.current;
       if (!engine) return;

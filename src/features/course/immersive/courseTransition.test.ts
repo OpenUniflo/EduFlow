@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { clearCourseOrigin, courseTransitionCss, readCourseOrigin, rememberCourseOrigin } from "./courseTransition";
+import { clearArchiveCourseView, clearCourseOrigin, courseTransitionCss, readArchiveCourseView, readCourseOrigin, rememberArchiveCourseView, rememberCourseOrigin } from "./courseTransition";
 
 describe("course scene transition geometry", () => {
-  beforeEach(() => clearCourseOrigin("course-a"));
+  beforeEach(() => { clearCourseOrigin("course-a"); clearArchiveCourseView("course-a"); });
 
   it("replays the clicked origin rectangle and never invents one", () => {
     expect(readCourseOrigin("course-a")).toBeNull();
@@ -11,6 +11,14 @@ describe("course scene transition geometry", () => {
     const css = courseTransitionCss(readCourseOrigin("course-a"));
     expect(css?.transform).toContain("translate(120px, 80px)");
     expect(css?.transform).toContain("scale(0.2111111111111111, 0.175)");
+  });
+
+  it("restores the exact Archive course-plane camera after the course", () => {
+    expect(readArchiveCourseView("course-a")).toBeNull();
+    rememberArchiveCourseView("course-a", { position: [12, 34, 560], target: [1, 2, 0] });
+    expect(readArchiveCourseView("course-a")).toEqual({ position: [12, 34, 560], target: [1, 2, 0] });
+    clearArchiveCourseView("course-a");
+    expect(readArchiveCourseView("course-a")).toBeNull();
   });
 
   it("stores only presentation numbers and ignores malformed values", () => {

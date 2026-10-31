@@ -9,7 +9,8 @@ import { authGateState } from "@/features/auth/authRedirect";
 import type { MockSession } from "@/features/auth/types";
 import { buildCourseGraphData, type CourseGraphData } from "@/features/course/runtime/courseRuntime";
 import { isCourseVisibleToViewer } from "@/features/course/runtime/courseVisibility";
-import { rememberCourseOrigin } from "@/features/course/immersive/courseTransition";
+import { rememberCourseEnterSnapshot, rememberCourseOrigin, readArchiveCourseView, rememberArchiveCourseView } from "@/features/course/immersive/courseTransition";
+import { summarizeLearnerState } from "@/features/course/immersive/learnerStateProjection";
 import { useDomainGovernance } from "@/features/knowledge/domain/domainStore";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
@@ -32,6 +33,15 @@ import "./archive.css";
 import "./archive3d.css";
 
 const ArchiveAtlasScene = lazy(() => import("../components/ArchiveAtlasScene"));
+
+// The learner course page is route-lazy. Warm the exact same chunk while the
+// course plane is focused, then hold the Archive card snapshot on screen until
+// it has loaded so navigation never shows an empty route fallback.
+let courseImmersiveChunk: Promise<unknown> | null = null;
+function preloadCourseImmersive() {
+  courseImmersiveChunk ??= import("@/features/course/immersive/CourseImmersivePage");
+  return courseImmersiveChunk;
+}
 
 const EMPTY_PRESENTATION: ArchiveAssistantPresentation = {
   state: "idle",
@@ -172,6 +182,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   const [personPanelCollapsed, setPersonPanelCollapsed] = useState(false);
   const [assistant, setAssistant] = useState<ArchiveAssistantPresentation>(EMPTY_PRESENTATION);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [leavingForCourse, setLeavingForCourse] = useState(false);
   const [seedGoal, setSeedGoal] = useState<{ key: string; goal: string } | null>(null);
   const [personLayout, setPersonLayout] = useState<PersonLayout | null>(null);
   const [sceneReady, setSceneReady] = useState(false);
@@ -200,6 +211,11 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       return null;
     }
   }, [courseStates, focusedRuntime, graph, records, session]);
+  // Both the Archive course bar and the course page read the same projection:
+  // learned/practicing/mastered all count as 已学.
+  const focusedLearned = useMemo(() => focusedGraphData
+    ? summarizeLearnerState(records, focusedGraphData.knowledgeNodes.map((node) => node.id)).counts.acquired
+    : 0, [focusedGraphData, records]);
   const draftActive = Boolean(session) && assistant.state === "brief" && assistant.draftIds.length > 0 && !focusedCourse;
   const selectedNode = model && selectedId ? model.nodeById.get(selectedId) ?? null : null;
   const searchResults = useMemo(() => model ? searchArchive(model, query, people) : null, [model, people, query]);
@@ -376,10 +392,16 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   }, [draftActive, fitPersonFocus, focusedCourse, personLayout, sceneReady, selectedPeopleIds.length]);
 
   useEffect(() => {
-    if (!scenePlanePositions) return;
-    const timer = window.setTimeout(() => fitCourseInView(), 40);
+    if (!sceneReady || !focusedCourse || !scenePlanePositions) return;
+    // Returning from the course restores the exact pre-entry course-plane
+    // camera; a cold deep link gets a fresh fit instead.
+    const saved = readArchiveCourseView(focusedCourse.id);
+    const timer = window.setTimeout(() => {
+      if (saved) sceneRef.current?.applyCourseView(saved, !reducedMotion);
+      else fitCourseInView();
+    }, 120);
     return () => window.clearTimeout(timer);
-  }, [fitCourseInView, scenePlanePositions, sceneReady]);
+  }, [fitCourseInView, focusedCourse, reducedMotion, scenePlanePositions, sceneReady]);
 
   useEffect(() => {
     if (!sceneReady) return;
@@ -439,14 +461,27 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     setPanelParam(null);
   }, [setPanelParam]);
 
-  const openCourse = useCallback((courseId: string, origin?: DOMRect) => {
-    if (!courseId) return;
+  const openCourse = useCallback((courseId: string, origin?: DOMRect, focusKnowledgeId?: string) => {
+    if (!courseId || leavingForCourse) return;
+    // Capture the exact course-plane cards and camera before the Archive panels
+    // fade. The entry overlay replays those rectangles, and returning restores
+    // the same camera instead of refitting a clipped plane.
     rememberCourseOrigin(courseId, origin);
-    navigate(`/courses/${encodeURIComponent(courseId)}`);
-  }, [navigate]);
+    const enterSnapshot = sceneRef.current?.captureCoursePlaneSnapshot() ?? null;
+    rememberCourseEnterSnapshot(courseId, enterSnapshot);
+    rememberArchiveCourseView(courseId, sceneRef.current?.getCourseView());
+    const query = focusKnowledgeId ? `?focus=${encodeURIComponent(`knowledge:${focusKnowledgeId}`)}` : "";
+    setLeavingForCourse(true);
+    // Keep the Archive cards visible until the course chunk has loaded; only
+    // then navigate. This removes the empty lazy-route fallback frame.
+    void preloadCourseImmersive().catch(() => undefined).then(() => {
+      window.setTimeout(() => navigate(`/courses/${encodeURIComponent(courseId)}${query}`), 120);
+    });
+  }, [leavingForCourse, navigate]);
 
   const focusCourse = useCallback((courseId: string) => {
     if (!courseId) return;
+    void preloadCourseImmersive().catch(() => undefined);
     setSelectedId(null);
     sceneRef.current?.shiftForDetail(false);
     setFocusedCourseId(courseId);
@@ -635,7 +670,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   const assistantDraft = draftActive && draftPlane;
 
   return (
-    <main className="ef-archive" data-boundary={error ? "error" : !session ? "guest" : hasHistory ? "ready" : "empty"} data-focus={focusedCourse ? "course" : assistantDraft ? "draft" : selectedPeopleIds.length ? "person" : "default"} data-layout-ms={personLayout ? "ready" : undefined}>
+    <main className={`ef-archive ${leavingForCourse ? "is-leaving-course" : ""}`} data-boundary={error ? "error" : !session ? "guest" : hasHistory ? "ready" : "empty"} data-focus={focusedCourse ? "course" : assistantDraft ? "draft" : selectedPeopleIds.length ? "person" : "default"} data-layout-ms={personLayout ? "ready" : undefined}>
       <Suspense fallback={<div className="ef-atlas-loading">正在生成星图…</div>}>
         <ArchiveAtlasScene
           ref={sceneRef}
@@ -660,7 +695,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
           onSelectNode={(id) => { if (id) selectNode(id); else closeDetailOrFocus(); }}
           onLevelChange={setLevel}
           onZoomChange={setPercent}
-          onActivatePlaneNode={() => { if (focusedCourse) openCourse(focusedCourse.id); }}
+          onActivatePlaneNode={(id) => { if (focusedCourse) openCourse(focusedCourse.id, undefined, id); }}
           onBlank={closeDetailOrFocus}
           onReady={() => setSceneReady(true)}
           onResize={refitCurrentView}
@@ -734,7 +769,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
         />
       ) : null}
 
-      {focusedCourse && coursePlane ? <ArchiveCourseFocusBar course={focusedCourse} learned={focusedGraphData?.knowledgeNodes.filter((node) => node.status === "completed").length ?? 0} leftInset={leftInset} onOpen={(origin) => openCourse(focusedCourse.id, origin)} /> : null}
+      {focusedCourse && coursePlane ? <ArchiveCourseFocusBar course={focusedCourse} learned={focusedLearned} leftInset={leftInset} onOpen={(origin) => openCourse(focusedCourse.id, origin)} /> : null}
       {assistantDraft && assistant.brief ? <ArchiveDraftFocusBar title={assistant.brief.goal} knowledgeCount={assistant.draftIds.length} weeks={plannedWeeks(assistant.brief.requestedAdjustments, assistant.draftIds.length)} leftInset={leftInset} /> : null}
 
       {selectedNode && !focusedCourse && !assistantDraft ? (

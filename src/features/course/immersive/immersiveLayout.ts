@@ -29,6 +29,9 @@ export type ImmersiveChapter = {
   assignmentCount: number;
   progress: number;
   tone: 1 | 2 | 3;
+  lessonCount?: number;
+  outcome?: string;
+  empty?: boolean;
 };
 
 export type ImmersiveKnowledgeNode = {
@@ -486,18 +489,32 @@ export type FlattenLayout = {
 
 export type FlattenLayoutOptions = {
   /**
-   * Route-editing presents only formally mastered Knowledge in 已获得. Learned
-   * Knowledge remains acquired readiness for execution, but it is still a
-   * support step towards mastery and belongs in the depth columns.
+   * Route-editing groups the learner's real acquired Knowledge (learned,
+   * practicing and mastered) in 已获得; everything still ahead is split into
+   * intermediate support and target columns.
    */
   acquiredNodeIds?: readonly string[];
+  /**
+   * Optional explicit course destination Knowledge. When absent, terminal
+   * course Knowledge (no outgoing support edge) is the target column and the
+   * remaining unacquired Knowledge is ordered by dependency depth as
+   * intermediate capability.
+   */
+  targetNodeIds?: readonly string[];
 };
 
 export function layoutCapabilityFlattenLayout(model: CapabilityModel, options?: FlattenLayoutOptions): FlattenLayout {
   const memberIds = new Set(model.orderedNodeIds);
   const acquired = new Set((options?.acquiredNodeIds ?? model.currentKnowledgeIds).filter((id) => memberIds.has(id)));
-  const readiness = new Set(model.currentKnowledgeIds.filter((id) => memberIds.has(id)));
-  const targets = new Set(model.courseKnowledgeIds.filter((id) => memberIds.has(id) && !readiness.has(id)));
+  const course = new Set(model.courseKnowledgeIds.filter((id) => memberIds.has(id)));
+  const outgoing = new Set(model.supportEdges
+    .filter((edge) => course.has(edge.source) && course.has(edge.target))
+    .map((edge) => edge.source));
+  const requestedTargets = options?.targetNodeIds?.length
+    ? options.targetNodeIds.filter((id) => course.has(id))
+    : model.courseKnowledgeIds.filter((id) => course.has(id) && !outgoing.has(id));
+  const explicitTargets = requestedTargets.length ? requestedTargets : [...course];
+  const targets = new Set(explicitTargets.filter((id) => !acquired.has(id)));
   const intermediate = model.orderedNodeIds.filter((id) => !acquired.has(id) && !targets.has(id)).sort();
   const incoming = new Map<string, string[]>();
   model.supportEdges.forEach((edge) => {
@@ -517,24 +534,21 @@ export function layoutCapabilityFlattenLayout(model: CapabilityModel, options?: 
     return value;
   };
   intermediate.forEach((id) => visit(id, new Set()));
-  const depths = [...new Set(intermediate.map((id) => depth.get(id) ?? 1))].sort((left, right) => left - right);
-  const middleDepth = depths.length ? depths[Math.floor((depths.length - 1) / 2)] : 1;
-  const nearSupport: string[] = [];
-  const farSupport: string[] = [];
-  intermediate.forEach((id) => ((depth.get(id) ?? 1) <= middleDepth ? nearSupport : farSupport).push(id));
   const sortByDepth = (left: string, right: string) => (depth.get(left) ?? 1) - (depth.get(right) ?? 1) || left.localeCompare(right);
-  nearSupport.sort(sortByDepth);
-  farSupport.sort(sortByDepth);
+  const support = [...intermediate].sort(sortByDepth);
 
-  const maxRows = 16;
+  // Fewer sub-columns keep the three semantic bands readable in the narrowed
+  // editor stage; tall columns are browsed by vertical panning.
+  const maxRows = 24;
   const subColumnWidth = 186;
   const subColumnGap = 20;
   const groupGap = 74;
   const rowGap = 50;
+  // Exactly three semantic columns (acquired → intermediate → target). Large
+  // bands wrap into deterministic sub-columns ordered by dependency depth.
   const groups = [
     { kind: "acquired" as const, label: "已获得", ids: [...acquired].sort() },
-    { kind: "intermediate" as const, label: "中间能力", ids: nearSupport },
-    { kind: "far" as const, label: "更远支撑", ids: farSupport },
+    { kind: "intermediate" as const, label: "中间能力", ids: support },
     { kind: "target" as const, label: "目标", ids: [...targets].sort() }
   ].filter((group) => group.ids.length > 0);
 

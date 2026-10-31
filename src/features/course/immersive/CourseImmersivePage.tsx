@@ -1,5 +1,8 @@
-import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Clock3, Edit3, FileText, Layers3, List, Lock, LogIn, Maximize2, Minus, Network, Plus, RotateCcw, Route, Sparkles, Target, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import {
+  ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Clock3, Edit3, FileText, Layers3,
+  ListChecks, Lock, LogIn, Maximize2, Minus, Network, Plus, RotateCcw, Route, Sparkles, Target, X
+} from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useReducedMotion } from "motion/react";
 import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
@@ -9,32 +12,27 @@ import type { MockSession } from "@/features/auth/types";
 import { canDesignCourse } from "@/features/auth/capabilities";
 import { coursePresentationContext } from "@/features/assistant/presentationContext";
 import { useOptionalUserCourseState } from "@/features/learning/progress/progressService";
-import { createMicroLearningNavigation, type MicroLearningProvider } from "@/features/learning/micro/microLearning";
+import { createMicroLearningNavigation, type MicroLearningProvider, type MicroLesson } from "@/features/learning/micro/microLearning";
 import { buildMaterialDeepLink } from "@/features/material/materialNavigation";
-import { sortMaterials } from "@/features/material/materialOrdering";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
-import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
 import { routeDiff } from "@/shared/learning/routeDiff";
 import { ObjectShell } from "@/shared/ui/ObjectShell";
 import { Pill } from "@/shared/ui/Pill";
-import { PreviewBadge } from "@/shared/ui/PreviewBadge";
 import { buildCourseGraphData } from "../runtime/courseRuntime";
 import { isCourseVisibleToViewer } from "../runtime/courseVisibility";
 import { buildProjectCapabilityModel } from "../capability/projectCapability";
 import { useRoutePlanning } from "../capability/useRoutePlanning";
-import type { CoursePeerPresence } from "./courseSocial";
-import type { CourseAssignment, CourseSkillTreeNode } from "../types";
+import { evaluatorOptions } from "../practice/practiceModel";
+import type { CourseAssignment, CourseSkillTreeNode, UserAssignmentStatus } from "../types";
+import { buildCoursePlane, type CoursePlaneLayout } from "@/features/archive/model/coursePlaneLayout";
 import {
   buildCapabilitySceneLayout,
-  buildImmersiveCourseLayout,
   flattenCapabilityLayout,
-  layoutVerticalRouteFlow,
-  loadImmersiveCourseLayout,
+  layoutCapabilityFlattenLayout,
   routeNodePoints,
   type ImmersiveCapabilityLayout,
   type ImmersiveCourseLayout,
-  type ImmersiveKnowledgeNode,
-  type VerticalRouteStep
+  type ImmersiveKnowledgeNode
 } from "./immersiveLayout";
 import {
   CourseImmersiveStage,
@@ -43,14 +41,40 @@ import {
   type StageBeam,
   type StageChapter,
   type StageEdge,
-  type StageNode
+  type StageNode,
+  type StageViewState
 } from "./CourseImmersiveStage";
-import { clearCourseOrigin, courseTransitionCss, readCourseOrigin } from "./courseTransition";
-import { learnerLabel, learnerStageStatus, summarizeLearnerState, type LearnerNodeState } from "./learnerStateProjection";
+import {
+  assignmentKnowledgeMap,
+  buildPlaneCourseLayout,
+  buildPracticeCards,
+  buildRouteTrack,
+  buildWindingRoute,
+  courseSelectionRelations,
+  positionPracticeCards,
+  primaryKnowledgeByAssignment,
+  reflectionOffset,
+  resolveFacetSelection,
+  routeStepNumber,
+  type CoursePracticeCard,
+  type CourseSelection,
+  type WindingStep,
+  type WindingStepInput
+} from "./courseTreeLayout";
+import { CourseRouteView } from "./CourseRouteView";
+import {
+  clearCourseEnterSnapshot,
+  courseTransitionCss,
+  readCourseEnterSnapshot,
+  readCourseOrigin,
+  type CourseEnterSnapshot
+} from "./courseTransition";
+import { learnerCategory, learnerLabel, learnerStageStatus, summarizeLearnerState, type LearnerNodeState } from "./learnerStateProjection";
 import "./immersive.css";
 
-type Presentation = "skill" | "practice" | "route" | "capability";
+type Tab = "course" | "route";
 type Pose = "front" | "rotated" | "flat";
+type EnterPhase = "none" | "start" | "run" | "settle" | "done";
 
 function learnerTone(state: LearnerNodeState | undefined) {
   if (state?.category === "acquired") return "acquired";
@@ -69,8 +93,34 @@ function orderCourseNodes(nodes: readonly CourseSkillTreeNode[]) {
   return [...nodes].sort((left, right) => left.primaryCoverage.lessonOrder - right.primaryCoverage.lessonOrder || left.primaryCoverage.order - right.primaryCoverage.order || left.id.localeCompare(right.id));
 }
 
+function assignmentStatusLabel(status: UserAssignmentStatus | "mixed") {
+  if (status === "accepted" || status === "completed") return "已完成";
+  if (status === "submitted") return "待评价";
+  if (status === "needs_revision") return "需修改";
+  if (status === "started" || status === "in-progress") return "进行中";
+  if (status === "mixed") return "部分完成";
+  return "未开始";
+}
+
+function assignmentStatusTone(status: UserAssignmentStatus | "mixed"): "acquired" | "brand" | "warn" | "quiet" {
+  if (status === "accepted" || status === "completed") return "acquired";
+  if (status === "started" || status === "in-progress" || status === "submitted") return "brand";
+  if (status === "needs_revision") return "warn";
+  return "quiet";
+}
+
+function practiceMinutes(node: CourseSkillTreeNode, runtime: NonNullable<ReturnType<typeof applicationServices.courseRepository.getCourse>>) {
+  const first = runtime.assignments.find((assignment) => node.assignmentIds.includes(assignment.id));
+  return first?.estimatedMinutes;
+}
+
+function practiceCode(runtime: NonNullable<ReturnType<typeof applicationServices.courseRepository.getCourse>>, assignmentId: string) {
+  const assignment = runtime.assignments.find((item) => item.id === assignmentId);
+  return assignment ? String(assignment.order + 1).padStart(2, "0") : "";
+}
+
 export default function CourseImmersivePage({ session, microLearningProvider }: { session: MockSession | null; onLogout: () => void; microLearningProvider?: MicroLearningProvider }) {
-  const { courseId = "", chapterId: routeChapterId } = useParams();
+  const { courseId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const reducedMotion = Boolean(useReducedMotion());
@@ -86,17 +136,23 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     if (!runtime) return null;
     try { return buildCourseGraphData(runtime, userCourseState, baseKnowledgeGraph, learnerKnowledge); } catch { return null; }
   }, [baseKnowledgeGraph, learnerKnowledge, runtime, userCourseState]);
-  const [courseLayout, setCourseLayout] = useState<ImmersiveCourseLayout | null>(null);
+  const knowledgeTitleById = useMemo(() => new Map(baseKnowledgeGraph.nodes.map((node) => [node.id, node.title])), [baseKnowledgeGraph]);
+
+  // One layout authority: the Archive course plane. The async ELK promise is
+  // shared with the Archive, so entering right after course focus is warm.
+  const [plane, setPlane] = useState<CoursePlaneLayout | null>(null);
   const [layoutError, setLayoutError] = useState("");
   useEffect(() => {
-    if (!graphData) { setCourseLayout(null); return; }
+    if (!graphData) { setPlane(null); return; }
     let live = true;
     setLayoutError("");
-    void loadImmersiveCourseLayout(graphData)
-      .then((tree) => { if (live) setCourseLayout(buildImmersiveCourseLayout(graphData, tree)); })
+    void buildCoursePlane(graphData)
+      .then((next) => { if (live) setPlane(next); })
       .catch((error) => { if (live) setLayoutError(error instanceof Error ? error.message : "课程结构布局失败"); });
     return () => { live = false; };
   }, [graphData]);
+  const courseLayout: ImmersiveCourseLayout | null = useMemo(() => graphData && plane ? buildPlaneCourseLayout(graphData, plane) : null, [graphData, plane]);
+
   const knowledgeKey = `${session?.userId ?? "anonymous"}:` + JSON.stringify(learnerKnowledge.map((record) => [record.nodeId, record.status, record.updatedAt]).sort());
   const routeControl = useRoutePlanning(courseId, authenticated, knowledgeKey);
   const capabilityModel = useMemo(() => {
@@ -104,213 +160,141 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     try { return buildProjectCapabilityModel(baseKnowledgeGraph, runtime, learnerKnowledge); } catch { return null; }
   }, [baseKnowledgeGraph, learnerKnowledge, runtime]);
   const capabilityLayout = useMemo(() => courseLayout && capabilityModel ? buildCapabilitySceneLayout(courseLayout, capabilityModel) : null, [capabilityModel, courseLayout]);
-  const masteredNodeIds = useMemo(() => learnerKnowledge.filter((record) => record.status === "mastered").map((record) => record.nodeId), [learnerKnowledge]);
+  const acquiredNodeIds = useMemo(() => learnerKnowledge.filter((record) => learnerCategory(record.status) === "acquired").map((record) => record.nodeId), [learnerKnowledge]);
+  const targetNodeIds = useMemo(() => runtime?.targetKnowledge?.map((target) => target.nodeId) ?? [], [runtime]);
   const flattenedLayout = useMemo(() => capabilityLayout && capabilityModel
-    ? flattenCapabilityLayout(capabilityLayout, capabilityModel, { acquiredNodeIds: masteredNodeIds })
-    : null, [capabilityLayout, capabilityModel, masteredNodeIds]);
-  const courseFitBounds = useMemo(() => {
-    const knowledge = courseLayout?.nodes.filter((node): node is ImmersiveKnowledgeNode => node.kind === "knowledge") ?? [];
-    if (!knowledge.length) return undefined;
-    return {
-      x: Math.max(360, ...knowledge.flatMap((node) => [Math.abs(node.x - node.width / 2), Math.abs(node.x + node.width / 2)])),
-      y: Math.max(260, ...knowledge.flatMap((node) => [Math.abs(node.y - node.height / 2), Math.abs(node.y + node.height / 2)]))
-    };
-  }, [courseLayout]);
+    ? flattenCapabilityLayout(capabilityLayout, capabilityModel, { acquiredNodeIds, targetNodeIds })
+    : null, [acquiredNodeIds, capabilityLayout, capabilityModel, targetNodeIds]);
 
-  const [presentation, setPresentation] = useState<Presentation>("skill");
+  const [tab, setTab] = useState<Tab>("course");
+  const [swapped, setSwapped] = useState(false);
+  const [routeOn, setRouteOn] = useState(true);
   const [pose, setPose] = useState<Pose>("front");
   const [zoom, setZoom] = useState<SemanticZoom>("mid");
   const [zoomPercent, setZoomPercent] = useState(100);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedKind, setSelectedKind] = useState<StageNode["kind"] | null>(null);
-  const [listOpen, setListOpen] = useState(false);
-  const [coLearners, setCoLearners] = useState<readonly CoursePeerPresence[]>([]);
-  const [routePanelOpen, setRoutePanelOpen] = useState(false);
-  const [editPanelOpen, setEditPanelOpen] = useState(false);
+  const [selection, setSelection] = useState<CourseSelection | null>(null);
+  const [flat, setFlat] = useState(false);
   const [perf, setPerf] = useState<{ fps: number; nodes: number; dom: number } | null>(null);
   const stageRef = useRef<CourseImmersiveStageHandle>(null);
+  const pageRef = useRef<HTMLElement>(null);
+  const routeReturnView = useRef<StageViewState | null>(null);
   const autoSelectedRef = useRef(false);
   const origin = useMemo(() => readCourseOrigin(courseId), [courseId]);
-  const [entering, setEntering] = useState(Boolean(origin) && !reducedMotion);
+  const enterSnapshot = useRef<CourseEnterSnapshot | null>(readCourseEnterSnapshot(courseId)).current;
+  const [enterPhase, setEnterPhase] = useState<EnterPhase>(enterSnapshot?.cards.length && !reducedMotion ? "start" : "done");
+  const [enterTargets, setEnterTargets] = useState<Record<string, { left: number; top: number; width: number; height: number }>>({});
+  const [enterFrame, setEnterFrame] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const [entering, setEntering] = useState(Boolean(enterSnapshot?.cards.length) && !reducedMotion);
   const [leaving, setLeaving] = useState(false);
   const [leavingStyle, setLeavingStyle] = useState<ReturnType<typeof courseTransitionCss>>(null);
   const perfEnabled = useMemo(() => new URLSearchParams(location.search).get("perf") === "1", [location.search]);
-
-  const authenticatedView = Boolean(session);
   if (import.meta.env.DEV) (window as unknown as { __efRouteControl?: unknown }).__efRouteControl = routeControl;
+
   const courseChapters = graphData?.chapters ?? [];
   const courseNodes = graphData?.knowledgeNodes ?? [];
   const learnerState = useMemo(() => summarizeLearnerState(learnerKnowledge, courseNodes.map((node) => node.id)), [courseNodes, learnerKnowledge]);
   const learnerById = useMemo(() => new Map(learnerState.nodes.map((node) => [node.nodeId, node])), [learnerState.nodes]);
   const learnerFor = useCallback((id: string): LearnerNodeState => learnerById.get(id) ?? { nodeId: id, status: null, category: "pending", label: "待学", current: false }, [learnerById]);
+  const recordById = useMemo(() => new Map(learnerKnowledge.map((record) => [record.nodeId, record])), [learnerKnowledge]);
   const displayNodes = useMemo(() => courseNodes.map((node) => {
     const learner = learnerFor(node.id);
-    if (authenticatedView) {
-      return { ...node, learner, displayStatus: learnerStageStatus(learner.category), displayLabel: learner.label };
-    }
+    if (authenticated) return { ...node, learner, displayStatus: learnerStageStatus(learner.category), displayLabel: learner.label };
     const reachable = node.status !== "locked";
     return { ...node, learner, displayStatus: reachable ? "available" : "locked", displayLabel: reachable ? "可学" : "未解锁" };
-  }), [authenticatedView, courseNodes, learnerFor]);
-  const knowledgeTitleById = useMemo(() => new Map(baseKnowledgeGraph.nodes.map((node) => [node.id, node.title])), [baseKnowledgeGraph]);
-  const completedCount = learnerState.counts.acquired;
-  const progress = learnerState.counts.total ? Math.round((completedCount / learnerState.counts.total) * 100) : 0;
-  const assignmentCount = runtime?.assignments.length ?? 0;
-  const focusKnowledgeForZoom = useMemo(() => displayNodes.find((node) => node.id === selectedId)
-    ?? displayNodes.find((node) => node.learner.current)
-    ?? displayNodes.find((node) => node.learner.category === "learning")
-    ?? displayNodes.find((node) => node.learner.category === "pending")
-    ?? displayNodes[0], [displayNodes, selectedId]);
-  const nearChapterPair = useMemo(() => {
-    const chapters = courseLayout?.chapters ?? [];
-    if (!focusKnowledgeForZoom) return [];
-    const index = Math.max(0, chapters.findIndex((chapter) => chapter.id === focusKnowledgeForZoom.chapterId));
-    return chapters.slice(index, Math.min(chapters.length, index + 2));
-  }, [courseLayout, focusKnowledgeForZoom]);
-  const nearChapterIds = useMemo(() => new Set(nearChapterPair.map((chapter) => chapter.id)), [nearChapterPair]);
-  const nearCenterY = useMemo(() => nearChapterPair.length
-    ? nearChapterPair.reduce((sum, chapter) => sum + chapter.y, 0) / nearChapterPair.length
-    : 0, [nearChapterPair]);
-  const nearCenterX = useMemo(() => nearChapterPair.length
-    ? nearChapterPair.reduce((sum, chapter) => sum + chapter.x, 0) / nearChapterPair.length
-    : 0, [nearChapterPair]);
-  const nearSpread = 1.45;
-  const nearActive = zoom === "near" && presentation !== "route" && presentation !== "capability";
-  const projectNear = useCallback((point: { x: number; y: number; z?: number }) => (nearActive
-    ? { x: point.x - nearCenterX, y: nearCenterY + (point.y - nearCenterY) * nearSpread, z: point.z ?? 0 }
-    : { x: point.x, y: point.y, z: point.z ?? 0 }), [nearActive, nearCenterX, nearCenterY]);
-  if (import.meta.env.DEV) (window as unknown as { __efNear?: unknown }).__efNear = { nearActive, nearCenterX, nearCenterY, selectedId, pair: nearChapterPair.map((chapter) => [chapter.id, chapter.x, chapter.y]) };
+  }), [authenticated, courseNodes, learnerFor]);
 
-  useEffect(() => {
-    if (origin && !reducedMotion) {
-      setEntering(true);
-      const frame = requestAnimationFrame(() => requestAnimationFrame(() => setEntering(false)));
-      clearCourseOrigin(courseId);
-      return () => cancelAnimationFrame(frame);
-    }
-    if (origin) clearCourseOrigin(courseId);
-    setEntering(false);
-  }, [courseId, origin, reducedMotion]);
+  const practiceByKnowledge = useMemo(() => graphData ? buildPracticeCards(graphData) : new Map<string, CoursePracticeCard>(), [graphData]);
+  const assignmentKnowledge = useMemo(() => graphData ? assignmentKnowledgeMap(graphData) : new Map<string, string[]>(), [graphData]);
+  const primaryKnowledge = useMemo(() => graphData ? primaryKnowledgeByAssignment(graphData) : new Map<string, string>(), [graphData]);
+  const knowledgeAssignments = useMemo(() => {
+    const map = new Map<string, string[]>();
+    assignmentKnowledge.forEach((ids, assignmentId) => ids.forEach((id) => map.set(id, [...(map.get(id) ?? []), assignmentId])));
+    return map;
+  }, [assignmentKnowledge]);
+  const capabilitySupports = useMemo(() => {
+    const map = new Map<string, string[]>();
+    capabilityLayout?.bridgeNodes.forEach((node) => {
+      const supports = capabilityModel?.supportEdges.filter((edge) => edge.source === node.id && !node.course && capabilityModel.courseKnowledgeIds.includes(edge.target)).map((edge) => edge.target) ?? [];
+      if (supports.length) map.set(node.id, supports);
+    });
+    return map;
+  }, [capabilityLayout, capabilityModel]);
+  const assignmentById = useMemo(() => new Map((runtime?.assignments ?? []).map((assignment) => [assignment.id, assignment])), [runtime]);
+  // Course-external capabilities sit directly behind the course Knowledge
+  // they support, on a deeper plane. Re-anchoring here guarantees the support
+  // is on screen after rotation and that its dashed support line lands on the
+  // right card (the capability model was previously anchored with stale
+  // course coordinates and could sit a screen below its knowledge).
+  const capabilityAnchors = useMemo(() => {
+    const positionById = new Map<string, { x: number; y: number; z: number }>();
+    courseLayout?.nodes.forEach((node) => {
+      if (node.kind === "knowledge") positionById.set(node.id, { x: node.x, y: node.y, z: node.z });
+    });
+    const result = new Map<string, { x: number; y: number; z: number }>();
+    capabilityLayout?.bridgeNodes.forEach((node, index) => {
+      const supported = (capabilitySupports.get(node.id) ?? []).flatMap((id) => {
+        const position = positionById.get(id);
+        return position ? [position] : [];
+      });
+      const x = supported.length ? supported.reduce((sum, item) => sum + item.x, 0) / supported.length : node.x;
+      const y = supported.length ? supported.reduce((sum, item) => sum + item.y, 0) / supported.length : node.y;
+      result.set(node.id, { x: x + (index % 2) * 18, y: y - 8, z: -280 - index * 34 });
+    });
+    return result;
+  }, [capabilityLayout, capabilitySupports, courseLayout]);
 
-  useEffect(() => {
-    if (!graphData) return;
-    const requested = selectedPathFocus(location.search);
-    if (requested) {
-      const node = graphData.knowledgeNodes.find((item) => item.id === requested);
-      const chapter = graphData.chapters.find((item) => item.id === requested);
-      if (node) { setSelectedId(node.id); setSelectedKind("knowledge"); return; }
-      if (chapter) { setSelectedId(chapter.id); setSelectedKind("chapter"); return; }
-    }
-    if (routeChapterId) {
-      const chapter = graphData.chapters.find((item) => item.id === routeChapterId);
-      if (chapter) { setSelectedId(chapter.id); setSelectedKind("chapter"); return; }
-    }
-    if (!autoSelectedRef.current) {
-      autoSelectedRef.current = true;
-      const current = learnerState.counts.currentId
-        ? graphData.knowledgeNodes.find((node) => node.id === learnerState.counts.currentId)
-        : graphData.knowledgeNodes.find((node) => learnerFor(node.id).category === "learning") ?? graphData.knowledgeNodes.find((node) => learnerFor(node.id).category === "pending");
-      if (current) { setSelectedId(current.id); setSelectedKind("knowledge"); }
-    }
-  }, [graphData, learnerFor, learnerState.counts.currentId, location.search, routeChapterId]);
+  // Route source: only the adopted, server-validated version; otherwise the
+  // canonical curriculum order with an explicit explanation.
+  const activeRoute = routeControl.view?.activeVersion ?? null;
+  const routeReady = !authenticated || routeControl.view !== null;
+  const usingActiveRoute = Boolean(activeRoute?.snapshot.valid && activeRoute.snapshot.orderedNodeIds.length);
+  const courseOrder = useMemo(() => orderCourseNodes(courseNodes).map((node) => node.id), [courseNodes]);
+  const routeOrder = useMemo(() => usingActiveRoute ? activeRoute!.snapshot.orderedNodeIds : courseOrder, [activeRoute, courseOrder, usingActiveRoute]);
+  const routeIndexById = useMemo(() => new Map(routeOrder.map((id, index) => [id, index])), [routeOrder]);
+  const routeCurrentId = useMemo(() => {
+    if (!authenticated) return null;
+    return routeOrder.find((id) => learnerFor(id).category !== "acquired") ?? learnerState.counts.currentId ?? null;
+  }, [authenticated, learnerFor, learnerState.counts.currentId, routeOrder]);
+  const assignmentKnowledgeIds = useCallback((selectionValue: CourseSelection | null) => {
+    if (!selectionValue) return [] as string[];
+    if (selectionValue.kind === "knowledge") return [selectionValue.id];
+    if (selectionValue.kind === "group") return [selectionValue.id];
+    if (selectionValue.kind === "practice") return assignmentKnowledge.get(selectionValue.id) ?? [];
+    return capabilitySupports.get(selectionValue.id) ?? [];
+  }, [assignmentKnowledge, capabilitySupports]);
 
-  const impactRequested = useRef(false);
-  const impactModeRef = useRef("");
-  const routeControlRef = useRef(routeControl);
-  routeControlRef.current = routeControl;
-  useEffect(() => {
-    if (!session) return;
-    const params = new URLSearchParams(location.search);
-    const mode = params.get("view") === "project" || params.has("routeImpact") ? `${location.search}` : "";
-    if (!mode || impactModeRef.current === mode) return;
-    impactModeRef.current = mode;
-    setPresentation("capability");
-    setPose(params.has("routeImpact") ? "rotated" : "front");
-  }, [location.search, session]);
-  useEffect(() => {
-    if (!session || impactRequested.current) return;
-    const params = new URLSearchParams(location.search);
-    if (!params.has("routeImpact") || !routeControl.view?.activeVersion || routeControl.busy) return;
-    impactRequested.current = true;
-    void routeControlRef.current.previewImpact();
-  }, [location.search, routeControl.busy, routeControl.view?.activeVersion, session]);
+  const effectiveSelection = useMemo(() => selection ? resolveFacetSelection({
+    selection,
+    knowledgeInFront: !swapped,
+    practiceByKnowledge,
+    assignmentKnowledge,
+    primaryKnowledge
+  }) : null, [assignmentKnowledge, practiceByKnowledge, primaryKnowledge, selection, swapped]);
+  const selectionRelations = useMemo(() => courseSelectionRelations({
+    selection: effectiveSelection,
+    knowledgeIds: courseNodes.map((node) => node.id),
+    dependencyEdges: courseLayout?.edges.map((edge) => ({ source: edge.source, target: edge.target })) ?? [],
+    assignmentsByKnowledge: knowledgeAssignments,
+    assignmentKnowledge,
+    capabilitySupports,
+    routeOrder
+  }), [assignmentKnowledge, capabilitySupports, courseLayout?.edges, courseNodes, effectiveSelection, knowledgeAssignments, routeOrder]);
 
-  useEffect(() => {
-    if (selectedKind !== "knowledge" || !selectedId || !session) { setCoLearners([]); return; }
-    const chapter = courseChapters.find((item) => item.id === courseNodes.find((node) => node.id === selectedId)?.chapterId);
-    if (!chapter) { setCoLearners([]); return; }
-    let live = true;
-    const repository = applicationServices.preview?.courseSocialRepository;
-    if (!repository) { setCoLearners([]); return; }
-    void repository.listCoLearners({ courseId, sectionTitle: chapter.title }).then((people) => { if (live) setCoLearners(people); }).catch(() => { if (live) setCoLearners([]); });
-    return () => { live = false; };
-  }, [courseChapters, courseId, courseNodes, selectedId, selectedKind, session]);
-
-  useEffect(() => {
-    function keyboard(event: globalThis.KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      if (target?.matches("input, textarea, select, [contenteditable=true]")) return;
-      const key = event.key.toLowerCase();
-      if (key === "1") { setPresentation("skill"); setPose("front"); }
-      else if (key === "2") { setPresentation("practice"); setPose("front"); }
-      else if (key === "3") { setRoutePanelOpen(true); setPresentation("route"); setPose("front"); }
-      else if (key === "c") { if (capabilityLayout) { setPresentation("capability"); setPose("front"); setEditPanelOpen(false); } }
-      else if (key === "f") { if (capabilityLayout && authenticated && routeControl.view?.activeVersion) { enterFlatten(); } }
-      else if (key === "r") { setPose((value) => value === "rotated" ? "front" : "rotated"); }
-      else if (key === "0") { stageRef.current?.resetPose(); setPose("front"); }
-      else if (key === "+" || key === "=") { stageRef.current?.zoomIn(); }
-      else if (key === "-") { stageRef.current?.zoomOut(); }
-      else if (key === "escape") {
-        if (listOpen) setListOpen(false);
-        else if (selectedId) setSelectedId(null);
-        else void exitScene();
-      }
-    }
-    window.addEventListener("keydown", keyboard);
-    return () => window.removeEventListener("keydown", keyboard);
-  });
-
-  function enterFlatten() {
-    if (!authenticated || !capabilityLayout) return;
-    setPresentation("capability");
-    setPose("flat");
-    setEditPanelOpen(true);
-    setRoutePanelOpen(false);
-    setSelectedId(null);
-    if (!routeControl.editing) routeControl.begin();
-  }
-
-  function leaveFlatten() {
-    if (routeControl.editing) {
-      if (routeControl.dirty && !window.confirm("放弃尚未采用的路线调整？正式路线不会改变。")) return;
-      routeControl.discardDraft();
-    }
-    setEditPanelOpen(false);
-    setPose("front");
-  }
-
-  function selectNode(id: string, kind: StageNode["kind"]) {
-    setSelectedId(id);
-    setSelectedKind(kind === "assignment" ? "assignment" : kind === "capability" ? "capability" : kind === "chapter" || kind === "route-chapter" ? "chapter" : "knowledge");
-  }
-
-  function openLogin() {
-    navigate("/login", { state: authGateState(location) });
-  }
-
-  async function launchMicro(node: CourseSkillTreeNode) {
+  const openLogin = useCallback(() => navigate("/login", { state: authGateState(location) }), [location, navigate]);
+  const launchMicro = useCallback(async (node: CourseSkillTreeNode) => {
     if (!session) { openLogin(); return; }
-    if (!runtime || node.status === "locked" || !microLearningProvider?.getLesson(node.id, { courseId: runtime.course.id })) return;
+    if (!runtime || node.status === "locked") return;
+    const micro = microLearningProvider?.getLesson(node.id, { courseId: runtime.course.id }) ?? microLearningProvider?.getLesson(node.id);
+    if (!micro) return;
     const target = createMicroLearningNavigation(node.id, { courseId: runtime.course.id, returnTo: `${location.pathname}${location.search}` });
     navigate(target.to, { state: target.state });
-  }
-
-  async function launchAssignment(assignment: CourseAssignment) {
+  }, [courseId, location.pathname, location.search, microLearningProvider, navigate, openLogin, runtime, session]);
+  const launchAssignment = useCallback(async (assignment: CourseAssignment) => {
     if (!session) { openLogin(); return; }
     if (!runtime) return;
     navigate(`/courses/${runtime.course.id}/assignments/${assignment.id}`);
-  }
-
-  async function launchMaterial(materialId: string, node: CourseSkillTreeNode) {
+  }, [navigate, openLogin, runtime, session]);
+  const launchMaterial = useCallback(async (materialId: string, node: CourseSkillTreeNode) => {
     if (!session) { openLogin(); return; }
     if (!runtime) return;
     const segmentId = node.materialContexts.find((context) => context.materialId === materialId)?.primarySegmentId ?? userCourseState?.materialStates[materialId]?.recentSegmentId;
@@ -319,444 +303,814 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       await refreshLearnerState(session.userId);
     }
     navigate(buildMaterialDeepLink({ courseId: runtime.course.id, materialId, segmentId }));
-  }
+  }, [navigate, openLogin, runtime, session, userCourseState]);
 
-  async function exitScene(pointer?: { x: number; y: number }) {
+  const startKnowledge = useCallback((node: CourseSkillTreeNode) => {
+    if (!session) { openLogin(); return; }
+    const micro = microLearningProvider?.getLesson(node.id, { courseId }) ?? microLearningProvider?.getLesson(node.id);
+    if (micro) { void launchMicro(node); return; }
+    const assignment = runtime?.assignments.find((item) => node.assignmentIds.includes(item.id));
+    if (assignment) void launchAssignment(assignment);
+  }, [courseId, launchAssignment, launchMicro, microLearningProvider, openLogin, runtime, session]);
+
+  const microFor = useCallback((knowledgeId: string): MicroLesson | null => {
+    const node = displayNodes.find((item) => item.id === knowledgeId);
+    return microLearningProvider?.getLesson(knowledgeId, { courseId: node?.chapterId ? courseId : undefined }) ?? microLearningProvider?.getLesson(knowledgeId) ?? null;
+  }, [courseId, displayNodes, microLearningProvider]);
+
+  // Focus from Archive click / deep link / chapter route.
+  useEffect(() => {
+    if (!graphData) return;
+    const requested = selectedPathFocus(location.search);
+    if (requested) {
+      const node = graphData.knowledgeNodes.find((item) => item.id === requested);
+      const chapter = graphData.chapters.find((item) => item.id === requested);
+      if (node) { setSelection({ kind: "knowledge", id: node.id }); return; }
+      if (chapter) { setSelection(null); return; }
+    }
+  }, [graphData, location.search]);
+
+  useLayoutEffect(() => {
+    const page = pageRef.current;
+    if (!page) return;
+    const rect = page.getBoundingClientRect();
+    setEnterFrame({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+  }, []);
+
+  useEffect(() => {
+    if (!enterSnapshot?.cards.length) return;
+    if (reducedMotion) {
+      setEnterPhase("done");
+      setEntering(false);
+      clearCourseEnterSnapshot(courseId);
+      return;
+    }
+    if (!courseLayout) return;
+    let cancelled = false;
+    let runTimer = 0;
+    let finishTimer = 0;
+    let settleTimer = 0;
+    let retryTimer = 0;
+    let attempts = 0;
+    const finish = () => {
+      if (cancelled) return;
+      setEnterPhase("done");
+      setEntering(false);
+      clearCourseEnterSnapshot(courseId);
+    };
+    const measure = () => {
+      if (cancelled) return;
+      attempts += 1;
+      const targets: Record<string, { left: number; top: number; width: number; height: number }> = {};
+      enterSnapshot.cards.forEach((card) => {
+        const element = document.querySelector<HTMLElement>(`[data-stage-id="${CSS.escape(card.id)}"]`);
+        if (!element) return;
+        const rect = element.getBoundingClientRect();
+        if (rect.width > 2 && rect.height > 2) targets[card.id] = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+      });
+      // Do not start the hand-off until the real course cards exist. Until then
+      // the Archive snapshot stays fully visible, so the page can never blank
+      // while the graph/ELK layout is still resolving.
+      if (Object.keys(targets).length < Math.min(10, enterSnapshot.cards.length) && attempts < 30) {
+        retryTimer = window.setTimeout(measure, 90);
+        return;
+      }
+      setEnterTargets(targets);
+      runTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        setEnterPhase("run");
+        // The stage stays fully hidden until the overlay reaches the exact card
+        // rectangles; then both cross-fade for ~160ms. No huge mid-transition
+        // frame can appear over the Archive assistant.
+        finishTimer = window.setTimeout(() => {
+          if (cancelled) return;
+          setEnterPhase("settle");
+          // Reveal the real stage in the same commit that starts fading the
+          // overlay. Keeping `entering` until after the overlay hid made a
+          // fully empty frame for those 220ms.
+          setEntering(false);
+          settleTimer = window.setTimeout(finish, 300);
+        }, 700);
+      }, 50);
+    };
+    const outer = window.setTimeout(measure, 60);
+    const fallback = window.setTimeout(finish, 6000);
+    return () => {
+      cancelled = true;
+      clearTimeout(outer);
+      clearTimeout(retryTimer);
+      clearTimeout(runTimer);
+      clearTimeout(finishTimer);
+      clearTimeout(settleTimer);
+      clearTimeout(fallback);
+    };
+  }, [courseId, courseLayout, enterSnapshot, reducedMotion]);
+
+  if (import.meta.env.DEV) (window as unknown as { __efEnter?: unknown }).__efEnter = {
+    phase: enterPhase,
+    entering,
+    cards: enterSnapshot?.cards.length ?? 0,
+    frame: enterFrame,
+    overlayCards: typeof document === "undefined" ? 0 : document.querySelectorAll(".ef-imm-enter-card").length
+  };
+
+  const enterOverlay = enterSnapshot && enterPhase !== "done" ? (
+    <div
+      className={`ef-imm-enter ${enterPhase === "run" ? "is-run" : ""} ${enterPhase === "settle" ? "is-settle" : ""}`}
+      aria-hidden="true"
+      style={enterFrame ? { left: `${enterFrame.left}px`, top: `${enterFrame.top}px`, width: `${enterFrame.width}px`, height: `${enterFrame.height}px` } : undefined}
+    >
+      {enterSnapshot.cards.map((card) => {
+        const target = enterPhase === "run" || enterPhase === "settle" ? enterTargets[card.id] : undefined;
+        const rect = target ?? card;
+        const left = (enterFrame ? rect.left - enterFrame.left : rect.left);
+        const top = (enterFrame ? rect.top - enterFrame.top : rect.top);
+        const scaleX = Math.max(0.05, rect.width / 176);
+        const scaleY = Math.max(0.05, rect.height / 64);
+        return (
+          <div
+            key={card.id}
+            className={`ef-imm-enter-card ${enterPhase === "run" || enterPhase === "settle" ? "is-run" : ""}`}
+            data-status={card.status}
+            style={{ transform: `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px) scale(${scaleX.toFixed(3)}, ${scaleY.toFixed(3)})` }}
+          >
+            <span className="ef-imm-node-dot" aria-hidden="true" />
+            <span className="ef-imm-node-copy"><strong>{card.title}</strong></span>
+            {card.current ? <span className="ef-imm-enter-badge">当前</span> : null}
+          </div>
+        );
+      })}
+    </div>
+  ) : null;
+
+  const exitScene = useCallback(async () => {
     if (leaving) return;
     setLeaving(true);
-    const target = origin ?? (pointer ? { left: pointer.x - 80, top: pointer.y - 40, width: 160, height: 80 } : null);
     if (!reducedMotion) {
-      setLeavingStyle(courseTransitionCss(target));
-      await new Promise((resolve) => window.setTimeout(resolve, 600));
-    } else {
-      await new Promise((resolve) => window.setTimeout(resolve, 180));
+      setLeavingStyle(courseTransitionCss(origin));
+      await new Promise((resolve) => window.setTimeout(resolve, 380));
     }
-    if (window.history.length > 1) navigate(-1);
-    else navigate("/archive");
-  }
+    navigate(`/archive?focus=course:${encodeURIComponent(courseId)}`);
+  }, [courseId, leaving, navigate, origin, reducedMotion]);
 
-  // Presentation-only projections of the one ELK layout.
-  const currentKnowledge = selectedId ? displayNodes.find((node) => node.id === selectedId) ?? null : null;
-  const currentAssignment = selectedId && runtime ? runtime.assignments.find((assignment) => assignment.id === selectedId) ?? null : null;
-  const currentChapter = selectedId ? courseChapters.find((chapter) => chapter.id === selectedId) ?? null : null;
-  const selectedLayoutKnowledge = selectedId ? courseLayout?.nodes.find((node): node is ImmersiveKnowledgeNode => node.kind === "knowledge" && node.id === selectedId) ?? null : null;
-  const currentCapability = selectedId ? capabilityLayout?.nodes.find((node) => node.id === selectedId) ?? null : null;
+  const enterFlatten = useCallback(() => {
+    if (!authenticated || !capabilityLayout) return;
+    setFlat(true);
+    setTab("course");
+    setSelection(null);
+    setPose("flat");
+    if (!routeControl.editing) routeControl.begin();
+  }, [authenticated, capabilityLayout, routeControl]);
 
-  const baseStageChapters: StageChapter[] = useMemo(() => {
-    if (!courseLayout) return [];
-    if (presentation === "capability" && editPanelOpen) return [];
-    return courseLayout.chapters
-      .filter((chapter) => !nearActive || nearChapterIds.has(chapter.id))
-      .map((chapter) => {
-        const chapterNodes = displayNodes.filter((node) => node.chapterId === chapter.id);
-        const acquired = chapterNodes.filter((node) => node.learner.category === "acquired").length;
-        return {
-          ...chapter,
-          x: projectNear(chapter).x,
-          y: projectNear(chapter).y,
-          height: nearActive ? chapter.height * nearSpread : chapter.height,
-          meta: presentation === "practice" ? `${chapter.assignmentCount} 个实训` : authenticatedView ? `${acquired}/${chapterNodes.length} 已学` : `${chapterNodes.length} 个知识`
-        };
-      });
-  }, [authenticatedView, courseLayout, displayNodes, editPanelOpen, nearActive, nearChapterIds, nearSpread, presentation, projectNear]);
+  const leaveFlatten = useCallback(() => {
+    if (routeControl.editing) {
+      if (routeControl.dirty && !window.confirm("放弃尚未采用的路线调整？正式路线不会改变。")) return;
+      routeControl.discardDraft();
+    }
+    setFlat(false);
+    setPose("front");
+  }, [routeControl]);
 
-  const routeProjection = useMemo(() => {
-    if (!graphData) return { nodes: [] as StageNode[], beams: [] as StageBeam[], chapters: [] as StageChapter[], allIds: [] as string[], titles: {} as Record<string, string>, usingActiveRoute: false };
-    const active = routeControl.view?.activeVersion;
-    const usingActiveRoute = Boolean(active && active.snapshot.valid && active.snapshot.orderedNodeIds.length);
-    const ordered = active?.snapshot.orderedNodeIds?.length
-      ? active.snapshot.orderedNodeIds
-      : orderCourseNodes(graphData.knowledgeNodes).map((node) => node.id);
-    const titles = active?.snapshot.titles ?? {};
-    const currentIndex = learnerState.counts.currentId ? ordered.indexOf(learnerState.counts.currentId) : -1;
-    const start = Math.max(0, Math.min(ordered.length - 8, currentIndex >= 0 ? currentIndex - 2 : 0));
-    const visibleIds = ordered.slice(start, start + 8);
-    const chapterById = new Map(graphData.chapters.map((chapter) => [chapter.id, chapter]));
-    const steps: VerticalRouteStep[] = visibleIds.map((id) => {
-      const knowledge = graphData.knowledgeNodes.find((node) => node.id === id);
-      const chapter = chapterById.get(knowledge?.chapterId ?? "supplemental");
+  const switchLayer = useCallback((next: boolean) => {
+    setSwapped(next);
+    // The open facet follows the mirror instead of closing. Keeping the
+    // knowledge anchor means the new practice detail is the same step, and the
+    // stage keeps its camera/pan (no fit is triggered by a layer switch).
+    setSelection((current) => current ? resolveFacetSelection({
+      selection: current,
+      knowledgeInFront: !next,
+      practiceByKnowledge,
+      assignmentKnowledge,
+      primaryKnowledge
+    }) : current);
+  }, [assignmentKnowledge, practiceByKnowledge, primaryKnowledge]);
+
+  const switchTab = useCallback((next: Tab) => {
+    if (next === tab && !flat) return;
+    if (next === "route") {
+      routeReturnView.current = stageRef.current?.getViewState() ?? null;
+      setSelection(null);
+      setFlat(false);
+      setTab("route");
+      return;
+    }
+    setTab("course");
+    setFlat(false);
+    const saved = routeReturnView.current;
+    routeReturnView.current = null;
+    if (saved) window.requestAnimationFrame(() => stageRef.current?.setViewState(saved));
+  }, [flat, tab]);
+
+  useEffect(() => {
+    function keyboard(event: globalThis.KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select, [contenteditable=true]")) return;
+      const key = event.key.toLowerCase();
+      if (key === "escape") {
+        if (selection) { setSelection(null); return; }
+        if (flat) { leaveFlatten(); return; }
+        if (tab === "route") { setTab("course"); return; }
+        void exitScene();
+        return;
+      }
+      if (tab !== "course" || flat) return;
+      if (key === "1") { switchLayer(false); setPose("front"); }
+      else if (key === "2") { switchLayer(true); setPose("front"); }
+      else if (key === "r") { setPose((value) => value === "rotated" ? "front" : "rotated"); }
+      else if (key === "0") { stageRef.current?.resetPose(); setPose("front"); }
+      else if (key === "+" || key === "=") stageRef.current?.zoomIn();
+      else if (key === "-") stageRef.current?.zoomOut();
+    }
+    window.addEventListener("keydown", keyboard);
+    return () => window.removeEventListener("keydown", keyboard);
+  }, [exitScene, flat, leaveFlatten, selection, switchLayer, tab]);
+
+  const openKnowledge = useCallback((id: string) => {
+    setTab("course");
+    setSwapped(false);
+    setSelection({ kind: "knowledge", id });
+  }, []);
+  const openPractice = useCallback((id: string) => {
+    setTab("course");
+    setSwapped(true);
+    setSelection({ kind: "practice", id });
+  }, []);
+  const openCapability = useCallback((id: string) => {
+    setTab("course");
+    setSelection({ kind: "capability", id });
+    setPose("rotated");
+  }, []);
+  const openGroup = useCallback((knowledgeId: string) => {
+    setTab("course");
+    setSwapped(true);
+    setSelection({ kind: "group", id: knowledgeId });
+  }, []);
+  const routeStepInputs = useMemo<WindingStepInput[]>(() => {
+    return routeOrder.map((id) => {
+      const node = displayNodes.find((item) => item.id === id);
+      const chapter = courseChapters.find((item) => item.id === node?.chapterId);
+      const learner = learnerFor(id);
+      const done = authenticated && learner.category === "acquired";
+      const current = authenticated && id === routeCurrentId;
+      const micro = microFor(id);
+      const assignmentId = node?.assignmentIds[0];
+      const assignment = assignmentId ? assignmentById.get(assignmentId) : undefined;
       return {
         id,
+        title: node?.title ?? activeRoute?.snapshot.titles[id] ?? knowledgeTitleById.get(id) ?? id,
         chapterId: chapter?.id ?? "supplemental",
         chapterTitle: chapter?.title ?? "补充前置能力",
-        chapterNumber: chapter?.displayNumber ?? 0
+        chapterNumber: chapter?.displayNumber ?? 0,
+        status: done ? "done" : current ? "current" : "locked",
+        stateLabel: learner.label,
+        minutes: micro?.estimatedMinutes ?? assignment?.estimatedMinutes,
+        meta: assignment ? `实践 ${practiceCode(runtime!, assignment.id)}` : undefined
       };
     });
-    const flow = layoutVerticalRouteFlow(steps, 920);
-    const headerNodes: StageNode[] = flow.headers.map((header) => {
-      const chapter = chapterById.get(header.chapterId);
-      const nodesInChapter = graphData.knowledgeNodes.filter((node) => node.chapterId === header.chapterId);
-      const learned = nodesInChapter.filter((node) => learnerById.get(node.id)?.category === "acquired").length;
-      return {
-        id: header.id,
-        kind: "route-chapter",
-        title: header.title,
-        chapterId: header.chapterId,
-        x: header.x,
-        y: header.y,
-        z: 0,
-        width: header.width,
-        height: header.height,
-        meta: `${header.stepCount} 步`,
-        detail: chapter ? `${learned}/${nodesInChapter.length} 已学 · ${header.stepCount} 步` : "课程外"
-      } satisfies StageNode;
-    });
-    const nodes: StageNode[] = visibleIds.map((id, windowIndex) => {
-      const knowledge = graphData.knowledgeNodes.find((node) => node.id === id);
-      const position = flow.positions.get(id) ?? { x: 0, y: 0 };
-      const learner = learnerById.get(id);
-      const state = authenticatedView ? learnerStageStatus(learner?.category ?? "pending") : "available";
-      const label = authenticatedView ? learner?.label ?? learnerLabel("pending") : "可学";
-      const index = start + windowIndex;
-      const micro = microLearningProvider?.getLesson(id, { courseId });
-      const practice = knowledge?.assignmentCount ?? 0;
-      const material = knowledge?.materialContexts[0];
-      const detail = knowledge
-        ? [micro ? `微学习 · ${micro.estimatedMinutes ?? 8} 分钟` : null, material ? "资料" : null, practice ? `实践 ${practice}` : null].filter(Boolean).join(" · ")
-        : "补充前置能力";
-      return {
-        id,
-        kind: "route",
-        title: knowledge?.title ?? titles[id] ?? id,
-        x: position.x,
-        y: position.y,
-        z: 0,
-        width: 300,
-        height: 54,
-        index: index + 1,
-        status: state,
-        current: authenticatedView && id === learnerState.counts.currentId && usingActiveRoute,
-        meta: usingActiveRoute ? `${label} · 第 ${index + 1} 步` : `${label} · 课程顺序`,
-        detail
-      };
-    });
-    const points = nodes.map((node) => ({ x: node.x, y: node.y, z: 4 }));
-    return {
-      nodes: [...headerNodes, ...nodes],
-      chapters: [] as StageChapter[],
-      allIds: ordered,
-      titles,
-      usingActiveRoute,
-      beams: points.length > 1 ? [{ id: "route-current", kind: "current" as const, points }] : []
-    };
-  }, [authenticatedView, courseId, graphData, learnerById, learnerState.counts.currentId, microLearningProvider, routeControl.view?.activeVersion]);
+  }, [activeRoute?.snapshot.titles, assignmentById, authenticated, courseChapters, displayNodes, knowledgeTitleById, learnerFor, microFor, routeCurrentId, routeOrder, runtime]);
+  const winding = useMemo(() => buildWindingRoute(routeStepInputs, 560), [routeStepInputs]);
 
-  const capabilityScene = useMemo(() => {
-    if (!capabilityLayout) return null;
-    const flattened = editPanelOpen && flattenedLayout ? flattenedLayout : capabilityLayout;
-    const flat = editPanelOpen || pose === "flat";
-    const columnByNode = new Map((flattened.columns ?? []).flatMap((column) => column.nodeIds.map((id) => [id, column.kind] as const)));
-    const readiness = new Set(capabilityModel?.currentKnowledgeIds ?? []);
-    const nodes: StageNode[] = flattened.nodes.map((node) => {
-      const column = flat ? columnByNode.get(node.id) : undefined;
-      const learner = learnerById.get(node.id);
-      const meta = column === "acquired" ? "已获得 · 路径起点"
-        : column === "target" ? "课程目标"
-        : column === "intermediate" ? (readiness.has(node.id) ? "已具备 · 中间能力" : "中间能力")
-        : column === "far" ? (readiness.has(node.id) ? "已具备 · 更远支撑" : "更远支撑")
-        : node.bridge ? "课程外支撑能力" : node.current ? "已获得 · 路径起点" : node.course ? "课程目标" : "中间能力";
-      const detail = column === "far" ? "更远的事实依赖"
-        : column === "target" ? "尚未获得 · 路线目标"
-        : column === "acquired" ? "已掌握"
-        : column === "intermediate" ? (readiness.has(node.id) ? "已具备 · 待掌握" : "支撑路径")
-        : node.bridge ? "位于课程知识后方" : node.current ? "已具备" : node.course ? "课程知识" : "支撑路径";
+  const routeTrack = useMemo(() => {
+    const cards = new Map<string, { id: string; x: number; y: number; width: number; height: number; chapterId: string }>();
+    courseLayout?.nodes.forEach((node) => {
+      if (node.kind !== "knowledge") return;
+      cards.set(node.id, { id: node.id, x: node.x, y: -node.y, width: node.width, height: node.height, chapterId: node.chapterId });
+    });
+    capabilityLayout?.bridgeNodes.forEach((node) => {
+      cards.set(node.id, { id: node.id, x: node.x, y: -node.y, width: node.width, height: node.height, chapterId: "supplemental" });
+    });
+    const chapters = new Map<string, { id: string; x: number; y: number; width: number; height: number }>();
+    courseLayout?.chapters.forEach((chapter) => chapters.set(chapter.id, { id: chapter.id, x: chapter.x, y: -chapter.y, width: chapter.width, height: chapter.height }));
+    return { cards, chapters };
+  }, [capabilityLayout, courseLayout]);
+
+  const courseBeam = useMemo<StageBeam[]>(() => {
+    if (!authenticated || !routeReady || !routeOn || tab !== "course" || flat || swapped) return [];
+    const worldPoints = buildRouteTrack(routeOrder, routeTrack.cards, routeTrack.chapters);
+    if (worldPoints.length < 2) return [];
+    const points = worldPoints.map((point) => ({ x: point.x, y: -point.y, z: point.z }));
+    return [{
+      id: "course-route",
+      kind: "current",
+      points,
+      fallback: !usingActiveRoute,
+      dimmed: Boolean(effectiveSelection) && !selectionRelations.onRoute
+    }];
+  }, [authenticated, effectiveSelection, flat, routeOn, routeOrder, routeReady, routeTrack, selectionRelations.onRoute, swapped, tab, usingActiveRoute]);
+
+  const currentKnowledge = effectiveSelection?.kind === "knowledge" ? displayNodes.find((node) => node.id === effectiveSelection.id) ?? null : null;
+  const currentPractice = effectiveSelection?.kind === "practice" ? assignmentById.get(effectiveSelection.id) ?? null : null;
+  const currentGroup = effectiveSelection?.kind === "group" ? practiceByKnowledge.get(effectiveSelection.id) ?? null : null;
+  const currentCapability = effectiveSelection?.kind === "capability" ? capabilityLayout?.nodes.find((node) => node.id === effectiveSelection.id) ?? null : null;
+  const selectedKnowledgeId = currentKnowledge?.id ?? (currentPractice ? primaryKnowledge.get(currentPractice.id) : currentGroup?.knowledgeId) ?? null;
+  const selectedLearner = selectedKnowledgeId ? learnerById.get(selectedKnowledgeId) : undefined;
+
+  const baseStageChapters = useMemo<StageChapter[]>(() => {
+    if (!courseLayout || flat) return [];
+    return courseLayout.chapters.map((chapter) => {
+      const chapterNodes = displayNodes.filter((node) => node.chapterId === chapter.id);
       return {
-        id: node.id, kind: "capability", title: knowledgeTitleById.get(node.id) ?? node.title,
-        x: node.x, y: node.y, z: node.z, width: node.width, height: node.height,
-        status: authenticatedView ? learnerStageStatus(learner?.category ?? "pending") : "available",
-        current: authenticatedView ? Boolean(learner?.current) : false,
-        bridge: node.bridge, meta, detail
+        ...chapter,
+        meta: chapter.empty
+          ? `综合实践 · ${Math.max(1, chapter.lessonCount || chapter.assignmentCount || 1)} 项`
+          : swapped ? `${chapter.assignmentCount} 个实训` : authenticated ? `${chapterNodes.filter((node) => node.learner.category === "acquired").length}/${chapterNodes.length} 已学` : `${chapterNodes.length} 个知识`
       };
     });
-    const active = routeControl.view?.activeVersion;
-    const preview = routeControl.preview?.valid ? routeControl.preview.route : null;
-    const currentIds = active?.snapshot.orderedNodeIds ?? [];
-    const beams: StageBeam[] = [];
-    const courseIds = new Set(flattened.nodes.filter((node) => node.course).map((node) => node.id));
-    const visibleInFront = !editPanelOpen && pose === "front";
-    const currentSet = new Set(visibleInFront ? currentIds.filter((id) => courseIds.has(id)) : currentIds);
-    if (flat) {
-      // In the layered editor the route follows its factual edge segments in the
-      // gaps between columns. A single centre-to-centre polyline would cut
-      // through the nodes it passes.
-      flattened.edges.filter((edge) => currentSet.has(edge.source) && currentSet.has(edge.target)).forEach((edge) => {
-        beams.push({ id: `capability-current:${edge.id}`, kind: "current", points: edge.points });
+  }, [authenticated, courseLayout, displayNodes, flat, swapped]);
+
+  const actionRow = useCallback((node: CourseSkillTreeNode): ReactNode => {
+    const actions: ReactNode[] = [];
+    const micro = microLearningProvider?.getLesson(node.id, { courseId }) ?? microLearningProvider?.getLesson(node.id);
+    if (micro) actions.push(<span key="micro">微学习 · {micro.estimatedMinutes ?? 8} 分钟</span>);
+    const assignment = runtime?.assignments.find((item) => node.assignmentIds.includes(item.id));
+    if (assignment) actions.push(<span key="practice">实践 {String(assignment.order + 1).padStart(2, "0")}{assignment.estimatedMinutes ? ` · ${assignment.estimatedMinutes} 分钟` : ""}</span>);
+    const materialContext = node.materialContexts[0];
+    const material = materialContext && runtime ? runtime.materials.find((item) => item.id === materialContext.materialId) : null;
+    const segment = material && materialContext ? material.segments.find((item) => item.id === materialContext.primarySegmentId) : null;
+    if (segment?.page) actions.push(<span key="material">资料 p.{String(segment.page).padStart(2, "0")}</span>);
+    return actions.length ? <span className="ef-imm-actions">{actions}</span> : null;
+  }, [courseId, microLearningProvider, runtime]);
+
+  const stageNodes = useMemo<StageNode[]>(() => {
+    if (flat && capabilityLayout) {
+      const flattened = flattenedLayout ?? capabilityLayout;
+      const columnByNode = new Map((flattened.columns ?? []).flatMap((column) => column.nodeIds.map((id) => [id, column.kind] as const)));
+      const nodes: StageNode[] = flattened.nodes.map((node) => {
+        const column = columnByNode.get(node.id);
+        const learner = learnerById.get(node.id);
+        const key = `c:${node.id}`;
+        const selected = effectiveSelection?.kind === "capability" && effectiveSelection.id === node.id;
+        return {
+          id: node.id,
+          kind: "capability",
+          title: knowledgeTitleById.get(node.id) ?? node.title,
+          x: node.x,
+          y: node.y,
+          z: node.z,
+          width: Math.min(168, node.width),
+          height: 34,
+          status: authenticated ? learnerStageStatus(learner?.category ?? "pending") : "available",
+          current: authenticated && Boolean(learner?.current),
+          bridge: node.bridge,
+          meta: column === "acquired" ? "已获得" : column === "target" ? "目标" : "中间能力",
+          dim: Boolean(effectiveSelection) && !selected && !selectionRelations.capabilityIds.has(node.id),
+          highlight: selectionRelations.capabilityIds.has(node.id) && !selected,
+          selected
+        };
       });
-    } else {
-      const currentPoints = routeNodePoints(flattened, [...currentSet]);
-      if (currentPoints.length > 1) beams.push({ id: "capability-current", kind: "current", points: currentPoints });
-    }
-    if (preview) {
-      const previewSet = new Set(visibleInFront ? preview.orderedNodeIds.filter((id) => courseIds.has(id)) : preview.orderedNodeIds);
-      if (flat) {
-        const currentEdgeIds = new Set(flattened.edges.filter((edge) => currentSet.has(edge.source) && currentSet.has(edge.target)).map((edge) => edge.id));
-        const previewEdges = flattened.edges.filter((edge) => previewSet.has(edge.source) && previewSet.has(edge.target));
-        const changedEdges = previewEdges.filter((edge) => !currentEdgeIds.has(edge.id));
-        // New/changed relationships get the green band. A removal-only preview
-        // still shows the surviving route so the band always follows real edge
-        // segments instead of a single centre-to-centre polyline.
-        (changedEdges.length ? changedEdges : previewEdges).forEach((edge) => {
-          beams.push({ id: `capability-preview:${edge.id}`, kind: "preview", points: edge.points });
-        });
-      } else {
-        const previewPoints = routeNodePoints(flattened, [...previewSet]);
-        if (previewPoints.length > 1) beams.push({ id: "capability-preview", kind: "preview", points: previewPoints });
-      }
-    }
-    const edges: StageEdge[] = flattened.edges.map((edge) => ({ id: edge.id, source: edge.source, target: edge.target, points: edge.points }));
-    const routeSet = new Set([...currentIds, ...(preview?.orderedNodeIds ?? [])]);
-    if (editPanelOpen && flattened.columns?.length) {
-      const minY = Math.min(...nodes.map((node) => node.y));
-      flattened.columns.forEach((column) => {
-        nodes.push({
+      if (flattened.columns?.length) {
+        const minY = Math.min(...nodes.map((node) => node.y));
+        flattened.columns.forEach((column) => nodes.push({
           id: `flatten-column:${column.kind}`,
           kind: "route-chapter",
           title: column.label,
           x: column.x,
-          y: minY - 64,
+          y: minY - 66,
           z: 0,
-          width: 156,
+          width: Math.max(150, Math.min(420, column.width)),
           height: 26,
-          meta: `${column.count} 项能力`
+          meta: `· ${column.count} 项能力`
+        }));
+      }
+      return nodes;
+    }
+    if (!courseLayout) return [];
+    const nodes: StageNode[] = [];
+    courseLayout.nodes.filter((node): node is ImmersiveKnowledgeNode => node.kind === "knowledge").forEach((node) => {
+      const display = displayNodes.find((item) => item.id === node.id);
+      const status = display?.displayStatus ?? (authenticated ? learnerStageStatus("pending") : "available");
+      const offset = reflectionOffset(!swapped, true);
+      const selected = effectiveSelection?.kind === "knowledge" && effectiveSelection.id === node.id;
+      const step = authenticated && routeReady && routeOn ? routeStepNumber(routeOrder, node.id) : null;
+      nodes.push({
+        id: node.id,
+        kind: "knowledge",
+        title: node.title,
+        x: node.x + offset.x,
+        y: node.y + offset.y,
+        z: node.z + offset.z,
+        width: node.width,
+        height: node.height,
+        status,
+        current: authenticated && Boolean(display?.learner.current),
+        meta: display?.displayLabel ?? learnerLabel("pending"),
+        detail: actionRow(node.node),
+        ghost: swapped,
+        dim: Boolean(effectiveSelection) && !selected && !selectionRelations.knowledgeIds.has(node.id),
+        highlight: selectionRelations.knowledgeIds.has(node.id) && !selected,
+        selected,
+        step: step ?? undefined,
+        here: Boolean(authenticated && routeReady && routeOn && node.id === routeCurrentId)
+      });
+    });
+    // Empty chapters are not empty frames: the practical/lesson data explains
+    // what happens there (chapter 07 in the large course).
+    courseLayout.chapters.filter((chapter) => chapter.empty).forEach((chapter) => {
+      const count = Math.max(1, chapter.lessonCount || chapter.assignmentCount || 1);
+      nodes.push({
+        id: `chapter-empty:${chapter.id}`,
+        kind: "chapter-empty",
+        title: `本章为综合实践 · ${count} 项`,
+        x: chapter.x,
+        y: chapter.y,
+        z: 2,
+        width: 176,
+        height: 56,
+        meta: chapter.outcome ?? "成果验收"
+      });
+    });
+    positionPracticeCards(practiceByKnowledge, courseLayout, !swapped).forEach((card) => {
+      const show = swapped || card.kind !== "empty";
+      if (!show) return;
+      const selected = effectiveSelection?.kind === "practice" ? card.assignmentIds.includes(effectiveSelection.id)
+        : effectiveSelection?.kind === "group" ? card.knowledgeId === effectiveSelection.id : false;
+      const cardSelectionPractice = card.assignmentIds.length === 1 ? card.assignmentIds[0] : null;
+      nodes.push({
+        id: card.id,
+        kind: "assignment",
+        title: card.title,
+        x: card.x,
+        y: card.y,
+        z: card.z,
+        width: card.width,
+        height: card.height,
+        status: card.status === "accepted" ? "completed" : card.status === "started" || card.status === "submitted" || card.status === "needs_revision" ? "learning" : "available",
+        meta: card.kind === "empty" ? "—" : card.code,
+        ghost: !swapped,
+        empty: card.kind === "empty",
+        dim: Boolean(effectiveSelection) && !selected && !selectionRelations.practiceKnowledgeIds.has(card.knowledgeId),
+        highlight: selectionRelations.practiceKnowledgeIds.has(card.knowledgeId) && !selected,
+        selected,
+        chapterId: card.knowledgeId,
+        tone: cardSelectionPractice ? ((Number(card.code) % 3 + 1) as 1 | 2 | 3) : 1
+      });
+    });
+    if (capabilityLayout) {
+      capabilityLayout.bridgeNodes.forEach((node) => {
+        const selected = effectiveSelection?.kind === "capability" && effectiveSelection.id === node.id;
+        const learner = learnerById.get(node.id);
+        const anchor = capabilityAnchors.get(node.id) ?? node;
+        nodes.push({
+          id: node.id,
+          kind: "capability",
+          title: knowledgeTitleById.get(node.id) ?? node.title,
+          x: anchor.x,
+          y: anchor.y,
+          z: anchor.z,
+          width: 300,
+          height: 56,
+          status: authenticated ? learnerStageStatus(learner?.category ?? "pending") : "available",
+          current: false,
+          bridge: true,
+          meta: "前置能力",
+          detail: <span className="ef-imm-actions"><span>课程外</span></span>,
+          dim: Boolean(effectiveSelection) && !selected && !selectionRelations.capabilityIds.has(node.id),
+          highlight: selectionRelations.capabilityIds.has(node.id) && !selected,
+          selected
         });
       });
     }
-    return { layout: flattened, nodes, beams, edges, routeSet };
-  }, [authenticatedView, capabilityLayout, capabilityModel?.currentKnowledgeIds, editPanelOpen, flattenedLayout, knowledgeTitleById, learnerById, pose, routeControl.preview, routeControl.view?.activeVersion]);
+    return nodes;
+  }, [actionRow, assignmentById, authenticated, capabilityAnchors, capabilityLayout, capabilityModel?.currentKnowledgeIds, courseId, courseLayout, displayNodes, effectiveSelection, flat, flattenedLayout, knowledgeTitleById, learnerById, practiceByKnowledge, routeCurrentId, routeOn, routeOrder, routeReady, selectionRelations, swapped]);
 
-  const stageNodes = useMemo(() => {
-    if (presentation === "route") return routeProjection.nodes;
-    if ((presentation === "capability" || editPanelOpen) && capabilityScene) return capabilityScene.nodes;
-    if (!courseLayout) return [] as StageNode[];
-    // Practice mode renders the assignment layer; skill mode never mounts the
-    // hidden assignment cards. This keeps the DOM overlay proportional to the
-    // layer that is actually in front.
-    const sourceNodes = presentation === "practice"
-      ? courseLayout.nodes
-      : courseLayout.nodes.filter((node) => node.kind === "knowledge");
-    return sourceNodes
-      .filter((node) => !nearActive || nearChapterIds.has(node.chapterId))
-      .map((node) => {
-        const projected = projectNear(node);
-        if (node.kind === "knowledge") {
-          const display = displayNodes.find((item) => item.id === node.id);
-          const status = display?.displayStatus ?? (authenticatedView ? learnerStageStatus("pending") : "available");
-          const micro = microLearningProvider?.getLesson(node.id, { courseId });
-          const materialContext = node.node.materialContexts[0];
-          const material = materialContext && runtime ? runtime.materials.find((item) => item.id === materialContext.materialId) : null;
-          const segment = material && materialContext ? material.segments.find((item) => item.id === materialContext.primarySegmentId) : null;
-          const firstAssignment = runtime?.assignments.find((assignment) => node.node.assignmentIds.includes(assignment.id));
-          const practiceMinutes = firstAssignment?.estimatedMinutes;
-          const practice = node.node.assignmentCount;
-          const actions: ReactNode[] = [];
-          if (micro) actions.push(<span key="micro">{status === "completed" ? "复习" : "微学习"} · {micro.estimatedMinutes ?? 8} 分钟</span>);
-          if (material) actions.push(<span key="material">资料{segment?.page ? ` p.${String(segment.page).padStart(2, "0")}` : ""}</span>);
-          if (practice) actions.push(<span key="practice">实践{practiceMinutes ? ` · ${practiceMinutes} 分钟` : ` · ${practice} 项`}</span>);
-          return {
-            id: node.id,
-            kind: "knowledge",
-            title: node.title,
-            x: projected.x,
-            y: projected.y,
-            z: projected.z,
-            width: node.width,
-            height: node.height,
-            status,
-            current: authenticatedView && Boolean(display?.learner.current),
-            meta: display?.displayLabel ?? learnerLabel("pending"),
-            detail: actions.length ? <span className="ef-imm-actions">{actions}</span> : null
-          } satisfies StageNode;
-        }
-        return {
-          id: node.id,
-          kind: "assignment",
-          title: node.title,
-          x: projected.x,
-          y: projected.y,
-          z: projected.z,
-          width: node.width,
-          height: node.height,
-          status: node.status,
-          meta: String(node.assignment.order + 1).padStart(2, "0"),
-          tone: ((node.assignment.order % 3) + 1) as 1 | 2 | 3,
-          chapterId: node.chapterId
-        } satisfies StageNode;
-      });
-  }, [authenticatedView, capabilityScene, courseId, courseLayout, displayNodes, editPanelOpen, microLearningProvider, nearActive, nearChapterIds, presentation, projectNear, routeProjection.nodes, runtime]);
-  const upstreamIds = useMemo(() => {
-    const found = new Set<string>();
-    if (!courseLayout || !selectedId) return found;
-    const incoming = new Map<string, string[]>();
-    courseLayout.edges.forEach((edge) => {
-      if (edge.kind !== "knowledge") return;
-      incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge.source]);
-    });
-    const queue = [selectedId];
-    found.add(selectedId);
-    for (let index = 0; index < queue.length; index += 1) {
-      for (const source of incoming.get(queue[index]) ?? []) {
-        if (found.has(source)) continue;
-        found.add(source);
-        queue.push(source);
-      }
-    }
-    return found;
-  }, [courseLayout, selectedId]);
-
-  const stageEdges: StageEdge[] = useMemo(() => {
-    if (presentation === "route") return [];
-    if ((presentation === "capability" || editPanelOpen) && capabilityScene) {
-      if (presentation === "capability" && !editPanelOpen && pose === "front") {
-        const courseIds = new Set(capabilityScene.layout.nodes.filter((node) => node.course).map((node) => node.id));
-        return capabilityScene.edges.filter((edge) => Boolean(edge.source && edge.target && courseIds.has(edge.source) && courseIds.has(edge.target)));
-      }
-      return capabilityScene.edges;
-    }
-    if (!courseLayout) return [];
-    return courseLayout.edges
-      .filter((edge) => !nearActive || (nearChapterIds.has(edge.source) && nearChapterIds.has(edge.target)))
-      .map((edge) => ({
+  const stageEdges = useMemo<StageEdge[]>(() => {
+    const highlight = (source?: string, target?: string) => {
+      if (!effectiveSelection) return false;
+      if (source && (selectionRelations.knowledgeIds.has(source) || selectionRelations.capabilityIds.has(source))) return true;
+      if (target && (selectionRelations.knowledgeIds.has(target) || selectionRelations.capabilityIds.has(target))) return true;
+      return false;
+    };
+    if (flat && capabilityLayout) {
+      const flattened = flattenedLayout ?? capabilityLayout;
+      return flattened.edges.map((edge) => ({
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        kind: edge.kind === "chapter" ? "chapter" : "plain",
-        points: edge.points.map(projectNear),
-        highlighted: edge.kind === "knowledge" && (upstreamIds.has(edge.source) && upstreamIds.has(edge.target) || edge.source === selectedId || edge.target === selectedId)
+        points: edge.points,
+        kind: "plain",
+        highlighted: highlight(edge.source, edge.target)
       }));
-  }, [capabilityScene, courseLayout, editPanelOpen, nearActive, nearChapterIds, pose, presentation, projectNear, selectedId, upstreamIds]);
+    }
+    const edges: StageEdge[] = (courseLayout?.edges ?? []).map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      points: edge.points,
+      kind: "plain",
+      highlighted: highlight(edge.source, edge.target)
+    }));
+    // Always supply capability support lines; the Stage fades them by the
+    // actual orbit (0 in front, full after ~25°). This removes the old jump
+    // where lines appeared at full strength before the card layer was visible.
+    if (capabilityLayout) {
+      const positions = new Map<string, { x: number; y: number; z: number }>();
+      courseLayout?.nodes.forEach((node) => {
+        if (node.kind === "knowledge") positions.set(node.id, { x: node.x, y: node.y, z: 2 });
+      });
+      capabilityAnchors.forEach((position, id) => positions.set(id, { ...position, z: position.z + 4 }));
+      capabilityLayout.edges.forEach((edge) => {
+        const bridgeEdge = capabilityLayout.bridgeNodes.some((node) => node.id === edge.source || node.id === edge.target);
+        const source = positions.get(edge.source);
+        const target = positions.get(edge.target);
+        if (!bridgeEdge || !source || !target) return;
+        edges.push({
+          id: `cap:${edge.id}`,
+          source: edge.source,
+          target: edge.target,
+          points: [source, target],
+          kind: "capability",
+          highlighted: highlight(edge.source, edge.target)
+        });
+      });
+    }
+    // Practice connectors are visible only while the practice tree is in
+    // front. They are short knowledge→reflection links, never a second layer
+    // of full-height orthogonal lines.
+    if (swapped && courseLayout) {
+      const knowledgeById = new Map(courseLayout.nodes.filter((node) => node.kind === "knowledge").map((node) => [node.id, node]));
+      positionPracticeCards(practiceByKnowledge, courseLayout, false).forEach((card) => {
+        if (card.kind === "empty") return;
+        const anchor = knowledgeById.get(card.knowledgeId);
+        if (!anchor) return;
+        edges.push({
+          id: `practice:${card.id}`,
+          source: anchor.id,
+          target: card.id,
+          points: [
+            { x: anchor.x + anchor.width / 2 + 2, y: anchor.y, z: 2 },
+            { x: card.x + card.width / 2 + 2, y: card.y, z: 2 }
+          ],
+          kind: "practice",
+          highlighted: highlight(anchor.id)
+        });
+      });
+    }
+    return edges;
+  }, [capabilityAnchors, capabilityLayout, courseLayout, effectiveSelection, flat, flattenedLayout, practiceByKnowledge, selectionRelations, swapped]);
 
-  const selectedStageKnowledge = currentKnowledge;
-  const selectedCapabilityState = currentCapability ? learnerById.get(currentCapability.id) : undefined;
-  const selectedLearner = selectedStageKnowledge?.learner ?? selectedCapabilityState;
-  const selectedLabel = currentChapter ? `${currentChapter.lessonCount} 课` : currentAssignment ? "实训" : authenticatedView ? selectedLearner?.label ?? learnerLabel("pending") : "可学";
-  const selectedTone = currentChapter ? "brand" : currentAssignment ? "quiet" : authenticatedView ? learnerTone(selectedLearner) : "target";
-  const selectedNodeAssignments = selectedStageKnowledge && runtime ? selectedStageKnowledge.assignmentIds.flatMap((id) => runtime.assignments.find((assignment) => assignment.id === id) ?? []) : [];
-  const selectedMaterials = selectedStageKnowledge && runtime ? selectedStageKnowledge.materialIds.flatMap((id) => runtime.materials.find((material) => material.id === id) ?? []) : [];
-  const selectedMicro = selectedStageKnowledge ? microLearningProvider?.getLesson(selectedStageKnowledge.id, { courseId }) : null;
-
-  const selectedCard = selectedId ? (
-    <ObjectShell
-      size="s"
-      className="ef-imm-object"
-      icon={<Network size={15} />}
-      kicker={selectedKind === "chapter" ? "课程篇章" : selectedKind === "assignment" || currentAssignment ? "课程实训" : "知识节点"}
-      title={currentChapter?.title ?? currentAssignment?.title ?? currentCapability?.title ?? selectedStageKnowledge?.title ?? currentKnowledge?.title ?? "课程结构"}
-      badge={<Pill tone={selectedTone}>{selectedLabel}{selectedLearner?.current && authenticatedView ? " · 当前" : ""}</Pill>}
-      context={<span>{selectedStageKnowledge ? `第 ${selectedStageKnowledge.lesson} 课 · ${courseChapters.find((chapter) => chapter.id === selectedStageKnowledge.chapterId)?.title ?? ""}` : currentChapter ? `第 ${currentChapter.displayNumber} 章 · ${displayNodes.filter((node) => node.chapterId === currentChapter.id).length} 个知识` : currentAssignment ? `${currentAssignment.estimatedMinutes ?? 30} 分钟 · 课程实践` : currentCapability?.bridge ? "支撑课程知识的深层能力" : currentCapability ? "项目能力模型" : ""}</span>}
-      tools={<button type="button" className="ef-imm-card-close" onClick={() => setSelectedId(null)} aria-label="关闭节点卡片"><X size={15} /></button>}
-      footer={
-        <div className="ef-imm-card-foot">
-          {!session ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={openLogin}><LogIn size={13} />登录后开始学习</button> : null}
-          {session && selectedStageKnowledge && selectedMicro ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={selectedStageKnowledge.status === "locked"} onClick={() => void launchMicro(selectedStageKnowledge)}><Sparkles size={13} />开始微学习{selectedMicro.estimatedMinutes ? ` · ${selectedMicro.estimatedMinutes} 分钟` : ""}</button> : null}
-          {session && selectedNodeAssignments[0] ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void launchAssignment(selectedNodeAssignments[0])}><FileText size={13} />实践</button> : null}
-          {session && selectedMaterials[0] && selectedStageKnowledge ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void launchMaterial(selectedMaterials[0].id, selectedStageKnowledge)}><BookOpen size={13} />资料</button> : null}
-          {currentChapter ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => setSelectedId(null)}>关闭</button> : null}
-        </div>
-      }
-    >
-      {!session ? <div className="ef-imm-guest-note"><Lock size={13} /><span>公开课程结构只读。登录后记录你的学习进度与路线。</span></div> : null}
-      {selectedStageKnowledge ? <>
-        <div className="ef-imm-card-facts">
-          <span><b>{selectedStageKnowledge.assignmentCount}</b> 项实践</span>
-          <span><b>{selectedStageKnowledge.materialContexts.length}</b> 份资料</span>
-          <span><b>{selectedStageKnowledge.knowledgeProgress}%</b> 掌握</span>
-        </div>
-        {coLearners.length ? <div className="ef-imm-social"><div><span className="ef-imm-social-avatars">{coLearners.slice(0, 3).map((person) => <i key={person.id} title={person.displayName} />)}</span><span>{coLearners.length} 位关注的人也在这一节</span></div><PreviewBadge /></div> : null}
-      </> : null}
-      {currentChapter ? <>
-        <div className="ef-imm-card-progress"><span>学习进度</span><strong>{currentChapter.knowledgeProgress}%</strong><i><b style={{ width: `${currentChapter.knowledgeProgress}%` }} /></i></div>
-        <p className="ef-imm-card-copy">{currentChapter.description}</p>
-        <div className="ef-imm-card-facts"><span><b>{currentChapter.lessonCount}</b> 课</span><span><b>{displayNodes.filter((node) => node.chapterId === currentChapter.id).length}</b> 知识</span><span><b>{currentChapter.assignmentSummary.assignmentCount}</b> 实训</span></div>
-      </> : null}
-      {currentAssignment ? <>
-        <p className="ef-imm-card-copy">{currentAssignment.description}</p>
-        <div className="ef-imm-card-facts"><span><b>{currentAssignment.estimatedMinutes ?? 30}</b> 分钟</span><span><b>{currentAssignment.mode}</b> 执行</span><span><b>{currentAssignment.acceptanceCriteria.length}</b> 验收</span></div>
-      </> : null}
-      {currentCapability?.bridge ? <p className="ef-imm-card-copy">该能力不在课程本身中，它是课程知识的事实前置。正面视角隐藏，旋转后出现在更深的平面。</p> : null}
-    </ObjectShell>
-  ) : null;
-
-  // Presentation frame changes (capability, flat editor, route) always start
-  // from the fitted frame; skill/practice shadow swaps and semantic zoom keep it.
-  const fitFrame = presentation === "route" ? "route" : editPanelOpen ? "flat" : presentation === "capability" ? "capability" : "course";
-  useEffect(() => {
-    if (!courseLayout) return;
-    let inner = 0;
-    const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => stageRef.current?.fit()); });
-    return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
-  }, [courseLayout?.revision, fitFrame]);
+  const flatBeams = useMemo<StageBeam[]>(() => {
+    if (!flat || !capabilityLayout || !capabilityModel) return [];
+    const flattened = flattenedLayout ?? capabilityLayout;
+    const beams: StageBeam[] = [];
+    const currentPoints = routeNodePoints(flattened, activeRoute?.snapshot.orderedNodeIds ?? []);
+    if (currentPoints.length > 1) beams.push({ id: "flat-current", kind: "current", points: currentPoints, dimmed: Boolean(effectiveSelection) && !selectionRelations.onRoute });
+    const preview = routeControl.preview?.valid ? routeControl.preview.route : null;
+    if (preview) {
+      const previewPoints = routeNodePoints(flattened, preview.orderedNodeIds);
+      if (previewPoints.length > 1) beams.push({ id: "flat-preview", kind: "preview", points: previewPoints });
+    }
+    return beams;
+  }, [activeRoute?.snapshot.orderedNodeIds, capabilityLayout, capabilityModel, effectiveSelection, flat, flattenedLayout, routeControl.preview, selectionRelations.onRoute]);
 
   if (!runtime || !graphData) {
+    // While the course graph is still resolving, replay the captured Archive
+    // cards on the page itself. Returning a bare placeholder here was the
+    // blank frame between the Archive fade and the course scene mount.
+    if (enterSnapshot) {
+      return (
+        <main ref={pageRef} className={`ef-imm-page ${entering ? "is-entering" : ""}`}>
+          {enterOverlay}
+          <div className="ef-imm-transition" style={{ opacity: 0 }} aria-hidden="true" />
+        </main>
+      );
+    }
     return <main className="ef-imm-page ef-imm-empty"><PlanningMessage title="课程不存在" copy={`没有找到课程 “${courseId}”，或该课程没有公开的学习结构。`} onBack={() => navigate("/archive")} /></main>;
   }
   if (layoutError) {
     return <main className="ef-imm-page ef-imm-empty"><PlanningMessage title="课程结构加载失败" copy={layoutError} onBack={() => navigate("/archive")} /></main>;
   }
 
-  const currentPose: Pose = editPanelOpen ? "flat" : pose;
-  const sceneMode: "course" | "capability" | "flat" | "route" = presentation === "route" ? "route" : editPanelOpen ? "flat" : presentation === "capability" ? "capability" : "course";
-  const activeRoute = routeControl.view?.activeVersion ?? null;
-  const nearKnowledgeCount = nearChapterPair.reduce((count, chapter) => count + displayNodes.filter((node) => node.chapterId === chapter.id).length, 0);
-  const scopePill = presentation === "route"
-    ? { title: "个人路线", meta: `${activeRoute?.snapshot.valid ? `V${activeRoute.versionNumber} · ` : ""}${routeProjection.allIds.length} 步` }
-    : presentation === "practice"
-      ? { title: "实训树", meta: nearActive && nearChapterPair.length ? `${nearChapterPair.map((chapter) => `第 ${chapter.displayNumber} 章`).join(" · ")} · ${assignmentCount} 个实训` : `${assignmentCount} 个实训 · ${courseChapters.length} 章` }
-      : nearActive && nearChapterPair.length
-        ? { title: nearChapterPair.length > 1 ? `第 ${nearChapterPair[0].displayNumber}–${nearChapterPair[nearChapterPair.length - 1].displayNumber} 章` : `第 ${nearChapterPair[0].displayNumber} 章`, meta: `${nearKnowledgeCount} 个知识` }
-        : { title: "课程全景", meta: `${courseChapters.length} 章 · ${courseNodes.length} 个知识` };
-  const centerSelection = selectedStageKnowledge ? { knowledgeId: selectedStageKnowledge.id } : selectedId ? { knowledgeId: selectedId } : {};
+  const currentPose: Pose = flat ? "flat" : pose;
+  const sceneMode: "course" | "flat" = flat ? "flat" : "course";
+  const selectedStageId = currentKnowledge?.id ?? currentPractice?.id ?? currentGroup?.knowledgeId ?? currentCapability?.id ?? null;
+  const completedCount = learnerState.counts.acquired;
+  const progress = learnerState.counts.total ? Math.round((completedCount / learnerState.counts.total) * 100) : 0;
+  const currentTitle = routeCurrentId ? (displayNodes.find((node) => node.id === routeCurrentId)?.title ?? knowledgeTitleById.get(routeCurrentId) ?? routeCurrentId) : null;
   const preview = routeControl.preview?.valid ? routeControl.preview : null;
   const diff = activeRoute && preview?.valid ? routeDiff(activeRoute.snapshot, preview.route) : null;
+  const selectionKnowledgeIds = assignmentKnowledgeIds(effectiveSelection);
+  const selectedRecord = selectedKnowledgeId ? recordById.get(selectedKnowledgeId) : undefined;
+  const knowledgeForDetail = currentKnowledge ?? (currentPractice ? displayNodes.find((node) => node.id === primaryKnowledge.get(currentPractice.id)) : currentGroup ? displayNodes.find((node) => node.id === currentGroup.knowledgeId) : null);
+  const selectedStageKnowledge = knowledgeForDetail;
+  const selectedMicro = selectedStageKnowledge
+    ? (microLearningProvider?.getLesson(selectedStageKnowledge.id, { courseId }) ?? microLearningProvider?.getLesson(selectedStageKnowledge.id) ?? null)
+    : null;
+  const groupAssignments = currentGroup ? currentGroup.assignmentIds.flatMap((id) => assignmentById.get(id) ?? []) : [];
+  const detailAssignments = currentPractice
+    ? [currentPractice]
+    : currentGroup
+      ? groupAssignments
+      : knowledgeForDetail
+        ? knowledgeForDetail.assignmentIds.flatMap((id) => assignmentById.get(id) ?? [])
+        : [];
+  const prerequisiteIds = selectedKnowledgeId ? courseLayout?.edges.filter((edge) => edge.target === selectedKnowledgeId).map((edge) => edge.source) ?? [] : [];
+  const capabilityIdsForKnowledge = selectedKnowledgeId ? [...capabilitySupports.entries()].filter(([, supports]) => supports.includes(selectedKnowledgeId)).map(([id]) => id) : [];
+  const routeIndex = selectedKnowledgeId ? routeStepNumber(routeOrder, selectedKnowledgeId) : null;
+  const selectedMaterials = knowledgeForDetail && runtime ? knowledgeForDetail.materialContexts.flatMap((context) => runtime.materials.find((material) => material.id === context.materialId) ?? []) : [];
+  const primaryAssignment = detailAssignments[0];
+  const detailTitle = currentGroup ? currentGroup.title : currentPractice?.title ?? currentCapability?.title ?? currentKnowledge?.title ?? "课程节点";
+  const detailKicker = currentCapability ? "前置能力 · 课程外" : currentPractice || currentGroup ? "课程实训" : "知识节点";
+  const detailContext = knowledgeForDetail ? `第 ${knowledgeForDetail.lesson} 课 · ${courseChapters.find((chapter) => chapter.id === knowledgeForDetail.chapterId)?.title ?? ""}` : currentCapability?.bridge ? "位于课程知识后方" : "";
+  const detailLabel = currentCapability ? "前置能力" : authenticated ? selectedLearner?.label ?? "待学" : "公开";
+  const detailTone = currentCapability ? "quiet" : authenticated ? learnerTone(selectedLearner) : "target";
+
+  const detailPanel = effectiveSelection ? (
+    <ObjectShell
+      size="panel"
+      className="ef-imm-detail"
+      icon={currentCapability ? <Network size={16} /> : currentPractice || currentGroup ? <FileText size={16} /> : <BookOpen size={16} />}
+      kicker={detailKicker}
+      title={detailTitle}
+      badge={<Pill tone={detailTone}>{detailLabel}{selectedLearner?.current && authenticated ? " · 当前" : ""}</Pill>}
+      context={<span>{detailContext}</span>}
+      tools={<button type="button" className="ef-imm-icon-btn" onClick={() => setSelection(null)} aria-label="关闭详情"><X size={15} /></button>}
+      footer={
+        <>
+          {!session ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={openLogin}><LogIn size={13} />登录后开始学习</button> : null}
+          {session && (currentPractice || currentGroup) && primaryAssignment ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => void launchAssignment(primaryAssignment)}><FileText size={13} />{detailAssignments.length > 1 ? "开始实践组" : "开始实践"}</button> : null}
+          {session && !currentPractice && !currentGroup && selectedStageKnowledge ? (
+            selectedStageKnowledge && selectedMicro ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => startKnowledge(selectedStageKnowledge)}><Sparkles size={13} />开始微学习{selectedMicro.estimatedMinutes ? ` · ${selectedMicro.estimatedMinutes} 分钟` : ""}</button>
+              : primaryAssignment ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => startKnowledge(selectedStageKnowledge)}><FileText size={13} />{detailAssignments.length > 1 ? "开始实践组" : "开始实践"}</button>
+                : <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled>暂无学习资源</button>
+          ) : null}
+          {session && !currentPractice && !currentGroup && selectedMicro && primaryAssignment && knowledgeForDetail ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void launchAssignment(primaryAssignment)}><FileText size={13} />{detailAssignments.length > 1 ? "实践组" : "实践"}</button> : null}
+          {session && selectedMaterials[0] && knowledgeForDetail ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void launchMaterial(selectedMaterials[0].id, knowledgeForDetail)}><BookOpen size={13} />资料</button> : null}
+          {session && routeIndex ? <span className="ef-imm-detail-chip">路线第 {routeIndex} 步</span> : null}
+        </>
+      }
+    >
+      <div className="ef-imm-detail-chips">
+        {authenticated && selectedLearner ? <span className="ef-imm-detail-chip is-accent">{selectedLearner.label}</span> : null}
+        {currentPractice ? <span className="ef-imm-detail-chip">{assignmentStatusLabel(userCourseState?.assignmentStates[currentPractice.id]?.status ?? "not_started")}</span> : null}
+        {currentGroup ? <span className="ef-imm-detail-chip">{groupAssignments.filter((assignment) => ["accepted", "completed"].includes(userCourseState?.assignmentStates[assignment.id]?.status ?? "")).length} / {groupAssignments.length} 已完成</span> : null}
+        {currentPractice?.estimatedMinutes ? <span className="ef-imm-detail-chip">约 {currentPractice.estimatedMinutes} 分钟</span> : null}
+        {currentCapability ? <span className="ef-imm-detail-chip">{selectedLearner?.category === "acquired" ? "已掌握" : "未掌握"}</span> : null}
+        {selectedRecord?.mastery !== undefined ? <span className="ef-imm-detail-chip">掌握度 {Math.round(selectedRecord.mastery)}%</span> : null}
+      </div>
+
+      {currentPractice || currentGroup ? (
+        <section className="ef-imm-detail-section">
+          <h3>要做什么</h3>
+          <p>{currentPractice?.description || groupAssignments.map((assignment) => assignment.description).filter(Boolean).join("；") || "完成这组实践并提交结果。"}</p>
+          {currentPractice?.requirements.length ? <ul>{currentPractice.requirements.map((item) => <li key={item}>{item}</li>)}</ul> : null}
+        </section>
+      ) : knowledgeForDetail ? (
+        <section className="ef-imm-detail-section">
+          <h3>这一节学什么</h3>
+          <p>{knowledgeForDetail.description || `理解「${knowledgeForDetail.title}」的作用与常见做法，并在一个小任务里用起来。`}</p>
+        </section>
+      ) : null}
+
+      {(currentPractice || currentGroup) && selectionKnowledgeIds.length ? (
+        <section className="ef-imm-detail-section">
+          <h3>覆盖的知识 · {selectionKnowledgeIds.length}</h3>
+          {selectionKnowledgeIds.map((id) => <button type="button" key={id} className="ef-imm-detail-link" onClick={() => openKnowledge(id)}><i />{knowledgeTitleById.get(id) ?? id}</button>)}
+        </section>
+      ) : null}
+
+      {currentCapability ? (
+        <>
+          <section className="ef-imm-detail-section">
+            <h3>支撑这门课里的</h3>
+            {(capabilitySupports.get(currentCapability.id) ?? []).length
+              ? (capabilitySupports.get(currentCapability.id) ?? []).map((id) => <button type="button" key={id} className="ef-imm-detail-link" onClick={() => openKnowledge(id)}><i />{knowledgeTitleById.get(id) ?? id}</button>)
+              : <p>尚未连接课程知识。</p>}
+          </section>
+          <section className="ef-imm-detail-section">
+            <h3>说明</h3>
+            <p>这是项目能力模型里的课程外前置能力，正面视角几乎不可见，旋转后出现在更深的平面。</p>
+          </section>
+        </>
+      ) : null}
+
+      {!currentCapability && (knowledgeForDetail || detailAssignments.length) ? (
+        <section className="ef-imm-detail-section">
+          <h3>关联实践 · {detailAssignments.length}{detailAssignments.length > 1 ? " · 实践组" : ""}</h3>
+          {detailAssignments.length ? detailAssignments.map((assignment) => (
+            <button type="button" key={assignment.id} className="ef-imm-detail-link" onClick={() => openPractice(assignment.id)}>
+              <i />实践 {String(assignment.order + 1).padStart(2, "0")} · {assignment.title}
+            </button>
+          )) : <p>暂无对应实践。</p>}
+        </section>
+      ) : null}
+
+      {!currentCapability ? (
+        <section className="ef-imm-detail-section">
+          <h3>前置</h3>
+          {prerequisiteIds.length || capabilityIdsForKnowledge.length ? <>
+            {prerequisiteIds.map((id) => <button type="button" key={id} className="ef-imm-detail-link" onClick={() => openKnowledge(id)}><i style={{ background: "var(--acquired)" }} />{knowledgeTitleById.get(id) ?? id}</button>)}
+            {capabilityIdsForKnowledge.map((id) => <button type="button" key={id} className="ef-imm-detail-link" onClick={() => openCapability(id)}><i style={{ background: "var(--pending)" }} />{knowledgeTitleById.get(id) ?? id} · 课程外能力</button>)}
+          </> : <p>没有前置要求。</p>}
+        </section>
+      ) : null}
+
+      {currentPractice || currentGroup ? (
+        <section className="ef-imm-detail-section">
+          <h3>提交给</h3>
+          <p>{evaluatorOptions.map((option) => option.label).join(" 或 ")}</p>
+          {currentPractice?.requirements.length ? <ul>{currentPractice.requirements.map((item) => <li key={item}>{item}</li>)}</ul> : null}
+        </section>
+      ) : null}
+
+      {selectedKnowledgeId ? (
+        <section className="ef-imm-detail-section">
+          <h3>我的学习证据</h3>
+          {!authenticated ? <p>登录后可查看你的学习证据。</p> : selectedRecord?.evidence?.length ? (
+            <ul>{selectedRecord.evidence.map((evidence) => <li key={evidence.id}>{evidence.label}{evidence.createdAt ? ` · ${new Date(evidence.createdAt).toLocaleDateString("zh-CN")}` : ""}</li>)}</ul>
+          ) : <p>还没有学习记录。</p>}
+        </section>
+      ) : null}
+    </ObjectShell>
+  ) : null;
+
+  const flatPanel = flat && capabilityLayout ? (
+    <aside className="ef-imm-side-panel ef-imm-edit-panel" aria-label="路线编辑">
+      <header><div><span>能力模型 · 编辑路线</span><h2>调整路线</h2><p>{activeRoute ? `基于 V${activeRoute.versionNumber}` : "当前没有正式路线"}</p></div><button type="button" onClick={leaveFlatten} aria-label="关闭路线编辑"><X size={16} /></button></header>
+      <div className="ef-imm-edit-tools">
+        <button type="button" className={routeControl.tool === "include" ? "is-on" : ""} onClick={() => routeControl.setTool("include")} aria-pressed={routeControl.tool === "include"}>必须经过</button>
+        <button type="button" className={routeControl.tool === "exclude" ? "is-on" : ""} onClick={() => routeControl.setTool("exclude")} aria-pressed={routeControl.tool === "exclude"}>不经过</button>
+      </div>
+      <section className="ef-imm-draft-constraints"><h3>约束</h3>
+        {routeControl.draft.includeNodeIds.length ? <ul>{routeControl.draft.includeNodeIds.map((id) => <li key={id}>必须经过 · {knowledgeTitleById.get(id) ?? id}<button type="button" aria-label={`移除必须经过 ${id}`} onClick={() => routeControl.removeNodeConstraint(id)}>×</button></li>)}</ul> : <p>尚未添加「必须经过」。</p>}
+        {routeControl.draft.excludeNodeIds.length ? <ul>{routeControl.draft.excludeNodeIds.map((id) => <li key={id}>不经过 · {knowledgeTitleById.get(id) ?? id}<button type="button" aria-label={`移除不经过 ${id}`} onClick={() => routeControl.removeNodeConstraint(id)}>×</button></li>)}</ul> : <p>尚未添加「不经过」。</p>}
+      </section>
+      {currentCapability ? <section className="ef-imm-node-inspector"><h3>{currentCapability.title}</h3><p>{currentCapability.bridge ? "课程外支撑能力" : "课程知识"}</p><div><button type="button" disabled={routeControl.busy} onClick={() => routeControl.mark(currentCapability.id, "include")}>必须经过</button><button type="button" disabled={routeControl.busy} onClick={() => routeControl.mark(currentCapability.id, "exclude")}>不经过</button><button type="button" disabled={routeControl.busy} onClick={() => routeControl.undoNode(currentCapability.id)}>撤销</button></div></section> : <p className="ef-imm-panel-note">点击场景中的能力节点，选择「必须经过」或「不经过」。</p>}
+      {diff ? <section className="ef-imm-preview-card"><h3>预览变化</h3><div className="ef-imm-preview-stats"><span><b>+{diff.addedNodeIds.length}</b>新增</span><span><b>−{diff.removedNodeIds.length}</b>移除</span><span><b>+{diff.addedEdgeIds.length}</b>关系</span></div><ul>{diff.addedNodeIds.map((id) => <li key={id} className="is-added">+ {knowledgeTitleById.get(id) ?? id}</li>)}{diff.removedNodeIds.map((id) => <li key={id} className="is-removed">− {knowledgeTitleById.get(id) ?? id}</li>)}</ul></section> : null}
+      {routeControl.preview && !routeControl.preview.valid ? <section className="ef-imm-preview-card is-conflict"><h3>需要处理的结构冲突</h3><ul>{routeControl.preview.conflicts.slice(0, 5).map((conflict, index) => <li key={`${conflict.kind}:${index}`} className="is-removed">{conflict.kind === "target_without_acquired_path" ? "当前已具备能力没有通向目标的路径" : conflict.kind === "include_exclude" ? "不能同时加入与排除" : conflict.kind === "excluded_hard_prerequisite" ? "必须前置被排除" : "关系不属于当前目标路径"}</li>)}</ul></section> : null}
+      {routeControl.preview?.valid && routeControl.preview.execution?.issues.length ? <section className="ef-imm-preview-card is-conflict"><h3>需要选择真实支撑路径</h3><p>预览发现已选能力之间缺少真实关系。系统不会自动把推荐关系加进路线。</p><ul>{routeControl.preview.execution.issues.slice(0, 5).map((issue) => <li key={`${issue.kind}:${issue.nodeId ?? issue.edgeId}`} className="is-removed">{issue.reason}{issue.candidateEdgeIds?.length ? <button type="button" className="ef-imm-inline-btn" onClick={() => routeControl.chooseEdge(issue.candidateEdgeIds![0], true)}>选择支撑</button> : null}</li>)}</ul></section> : null}
+      {routeControl.error ? <p className="ef-imm-error" role="alert">{routeControl.error}</p> : null}
+      <footer className="ef-imm-panel-actions">
+        <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={routeControl.busy} onClick={() => routeControl.replan()}>预览调整结果</button>
+        <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={routeControl.busy || !preview?.valid || !preview.execution?.complete} onClick={() => void routeControl.adopt()}>采用新路线</button>
+      </footer>
+    </aside>
+  ) : null;
 
   return (
-    <main className={`ef-imm-page ${entering ? "is-entering" : ""} ${leaving ? "is-leaving" : ""}`} data-presentation={presentation} data-pose={currentPose}>
-      <div className="ef-imm-transition" style={leaving ? leavingStyle ?? undefined : entering ? courseTransitionCss(origin) ?? undefined : { opacity: 0, transform: "translate(0, 0) scale(1)" }} aria-hidden="true" />
+    <main ref={pageRef} className={`ef-imm-page ${entering ? "is-entering" : ""} ${leaving ? "is-leaving" : ""}`} data-tab={tab} data-pose={currentPose} data-view={flat ? "flat" : "tree"}>
+      {enterOverlay}
+      <div className="ef-imm-transition" style={leaving ? leavingStyle ?? undefined : { opacity: 0 }} aria-hidden="true" />
+
       <header className="ef-imm-top">
         <div className="ef-imm-top-left">
-          <button type="button" className="ef-imm-icon-btn" onClick={() => void exitScene()} aria-label="返回上一页"><ArrowLeft size={18} /></button>
-          <span className="ef-imm-crumb"><span>课程</span><b>{runtime.course.title}</b></span>
-          {!session ? <span className="ef-imm-public-pill"><Lock size={12} />公开课程 · {courseChapters.length} 章 · {courseNodes.length} 个知识</span> : <span className="ef-imm-progress-pill"><b>{progress}%</b><i><b style={{ width: `${progress}%` }} /></i><span>已学 {completedCount} / {courseNodes.length}</span></span>}
+          <button type="button" className="ef-imm-icon-btn" onClick={() => void exitScene()} aria-label="返回档案课程平面"><ArrowLeft size={18} /></button>
+          <span className="ef-imm-crumb"><span>← 档案</span><b>{runtime.course.title}</b></span>
+          {authenticated
+            ? <span className="ef-imm-progress-pill"><b>{progress}%</b><i><b style={{ width: `${progress}%` }} /></i><span>已学 {completedCount} / {courseNodes.length}{currentTitle ? ` · 当前：${currentTitle}` : ""}</span></span>
+            : <span className="ef-imm-public-pill"><Lock size={12} />公开课程 · {courseChapters.length} 章 · {courseNodes.length} 个知识</span>}
         </div>
-        <nav className="ef-imm-segmented" aria-label="课程视角" role="tablist">
-          {([["skill", "技能树"], ["practice", "实训树"], ["route", "路线"]] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={presentation === value && !editPanelOpen} className={presentation === value && !editPanelOpen ? "is-on" : ""} onClick={() => { setPresentation(value); setEditPanelOpen(false); setPose("front"); setSelectedId(value === "practice" && selectedStageKnowledge ? (selectedNodeAssignments[0]?.id ?? runtime?.assignmentCoverages.find((coverage) => coverage.nodeId === selectedStageKnowledge.id)?.assignmentId ?? null) : null); if (value === "route") setRoutePanelOpen(true); }}>{label}</button>)}
-          {session ? <button type="button" role="tab" aria-selected={presentation === "capability"} className={presentation === "capability" ? "is-on" : ""} onClick={() => { if (!capabilityLayout) return; setPresentation("capability"); setEditPanelOpen(false); setPose("front"); setSelectedId(null); }}><Network size={13} />能力模型</button> : null}
+        <nav className="ef-imm-segmented" aria-label="课程视图" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === "course" && !flat} className={tab === "course" && !flat ? "is-on" : ""} onClick={() => switchTab("course")}>课程树</button>
+          {authenticated ? <button type="button" role="tab" aria-selected={tab === "route" && !flat} className={tab === "route" && !flat ? "is-on" : ""} onClick={() => switchTab("route")}>路线</button> : null}
         </nav>
         <div className="ef-imm-top-right">
           {!session ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={openLogin}><LogIn size={14} />登录</button> : null}
-          <button type="button" className="ef-imm-exit" onClick={() => void exitScene()}><ArrowLeft size={14} />退出沉浸<span>Esc</span></button>
         </div>
       </header>
 
-      {(presentation === "skill" || presentation === "practice" || presentation === "route") && !editPanelOpen && <div className="ef-imm-scope-pill"><Layers3 size={13} /><b>{scopePill.title}</b><span>{scopePill.meta}</span></div>}
+      {!courseLayout && !enterSnapshot ? <div className="ef-imm-layout-wait" role="status"><Clock3 size={16} />正在展开课程结构…</div> : null}
 
-      <div className={`ef-imm-stage-wrap ${routePanelOpen || editPanelOpen ? "has-panel" : ""}`}>
+      <div className={`ef-imm-stage-wrap ${flat ? "has-detail" : ""}`}>
         <CourseImmersiveStage
           ref={stageRef}
           className="ef-imm-stage-main"
           nodes={stageNodes}
-          chapters={presentation === "route" ? [] : baseStageChapters}
+          chapters={baseStageChapters}
           edges={stageEdges}
-          beams={presentation === "route" ? routeProjection.beams : (presentation === "capability" || editPanelOpen) ? capabilityScene?.beams ?? [] : []}
+          beams={flat ? flatBeams : courseBeam}
           mode={sceneMode}
-          layer={presentation === "practice" ? "practice" : "skill"}
+          layer={swapped ? "practice" : "skill"}
           pose={currentPose}
-          selectedId={selectedId}
+          selectedId={selectedStageId}
           reducedMotion={reducedMotion}
-          onSelect={selectNode}
-          onBackground={() => setSelectedId(null)}
-          onPoseChange={(next) => { setPose(next === "flat" ? "flat" : next); }}
+          detailOpen={Boolean(effectiveSelection)}
+          onSelect={(id, kind) => {
+            if (kind === "assignment") {
+              setTab("course");
+              setSwapped(true);
+              const card = practiceByKnowledge.get(id.replace(/^(?:assignment:[^:]+:|group:|empty:)/, ""));
+              setSelection(card && card.kind === "group" ? { kind: "group", id: card.knowledgeId } : { kind: "practice", id: (card?.assignmentIds[0] ?? id) });
+              return;
+            }
+            if (kind === "capability") { if (flat) setSelection({ kind: "capability", id }); else openCapability(id); return; }
+            if (kind === "chapter" || kind === "chapter-empty") { setSelection(null); return; }
+            setTab("course");
+            setSwapped(false);
+            setSelection({ kind: "knowledge", id });
+          }}
+          onBackground={() => setSelection(null)}
+          onPoseChange={(next) => setPose(next === "flat" ? "flat" : next)}
           onSemanticZoom={(next, percent) => { setZoom((current) => current === next ? current : next); setZoomPercent((current) => current === percent ? current : percent); }}
           onFps={(fps, nodeCount, domCount) => {
             const value = { fps, nodes: nodeCount, dom: domCount };
             setPerf(value);
             (window as unknown as { __eduflowP4Perf?: typeof value }).__eduflowP4Perf = value;
           }}
-          selectedCard={selectedCard}
-          fitKey={`${courseId}:${courseLayout?.revision ?? ""}:${sceneMode}:${editPanelOpen ? "edit" : "view"}:${routeControl.view?.activeVersion?.id ?? "no-route"}`}
-          fitBounds={sceneMode === "course" ? courseFitBounds : undefined}
+          fitKey={`${courseId}:${courseLayout?.revision ?? ""}:${flat ? "flat" : "tree"}`}
+          instantFit={Boolean(enterSnapshot?.cards.length) && enterPhase !== "done"}
           aria-label={`${runtime.course.title} 三维课程场景`}
         />
-        {session ? <div className="ef-imm-status-legend" role="group" aria-label={`课程学习状态图例：已学 ${learnerState.counts.acquired}，在学 ${learnerState.counts.learning}，待学 ${learnerState.counts.pending}，合计 ${learnerState.counts.total}；当前标记 ${learnerState.counts.current}，目标标记 ${learnerState.counts.target}，不计入合计`}>
+        {authenticated ? <div className="ef-imm-status-legend" role="group" aria-label={`课程学习状态图例：已学 ${learnerState.counts.acquired}，在学 ${learnerState.counts.learning}，待学 ${learnerState.counts.pending}，合计 ${learnerState.counts.total}`}>
           <span className="ef-imm-status-legend-states">
             <span><i className="is-learned" />已学 {learnerState.counts.acquired}</span>
             <span><i className="is-learning" />在学 {learnerState.counts.learning}</span>
@@ -764,77 +1118,67 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
             <span className="ef-imm-status-legend-total">合计 <b>{learnerState.counts.total}</b></span>
           </span>
           <span className="ef-imm-status-legend-markers" aria-label="不计入状态合计的呈现标记">
-            <span title="当前学习节点标记，不计入状态合计"><i className="is-current" />当前 {learnerState.counts.current}</span>
-            <span title="课程/路线目标维度，与状态可重叠，不计入状态合计"><i className="is-target" />目标 {learnerState.counts.target}</span>
+            <span><i className="is-current" />当前 {learnerState.counts.current}</span>
+            <span><i className="is-target" />目标 {learnerState.counts.target}</span>
             <small>标记不计入</small>
           </span>
-        </div> : <div className="ef-imm-status-legend is-public" role="status"><Lock size={12} /><span>公开课程 · 可学 {courseNodes.length} · 登录后查看学习状态</span></div>}
-        <div className="ef-imm-controls" role="group" aria-label="场景控制">
+        </div> : <div className="ef-imm-status-legend is-public" role="status"><Lock size={12} /><span>公开课程 · 只读 · 登录后查看学习状态和路线</span></div>}
+
+        {!flat ? <div className="ef-imm-controls" role="group" aria-label="场景控制">
           <button type="button" onClick={() => stageRef.current?.zoomIn()} aria-label="放大场景"><Plus size={16} /></button>
           <button type="button" onClick={() => stageRef.current?.zoomOut()} aria-label="缩小场景"><Minus size={16} /></button>
           <button type="button" onClick={() => stageRef.current?.fit()} aria-label="适配全图"><Maximize2 size={16} /></button>
           <span>{zoomPercent}%</span>
           <button type="button" className={currentPose === "rotated" ? "is-on" : ""} onClick={() => { const next = currentPose === "rotated" ? "front" : "rotated"; setPose(next); stageRef.current?.setPose(next); }} aria-label="旋转场景" aria-pressed={currentPose === "rotated"}><RotateCcw size={16} /></button>
-          {presentation === "capability" && !editPanelOpen ? <button type="button" onClick={enterFlatten} disabled={!authenticated || !activeRoute} aria-label="编辑路线"><Edit3 size={16} /></button> : null}
-          {editPanelOpen ? <button type="button" onClick={leaveFlatten} aria-label="回到 3D"><RotateCcw size={16} /></button> : null}
-        </div>
-        <button type="button" className="ef-imm-list-toggle" onClick={() => setListOpen(true)} aria-expanded={listOpen}><List size={15} />结构列表</button>
+        </div> : null}
+
+        {tab === "course" && !flat ? <div className="ef-imm-toolbar" role="toolbar" aria-label="课程树工具">
+          <button type="button" aria-pressed={swapped} onClick={() => switchLayer(!swapped)}><Layers3 size={14} />切换到{swapped ? "技能树" : "实训树"}</button>
+          {authenticated ? <button type="button" aria-pressed={routeOn} onClick={() => setRouteOn((value) => !value)}><span className="ef-imm-switch" />我的路线</button> : null}
+          {authenticated ? <button type="button" onClick={enterFlatten} disabled={!capabilityLayout || !activeRoute}><Edit3 size={14} />调整路线</button> : null}
+          {authenticated && routeReady && !usingActiveRoute ? <span className="ef-imm-toolbar-note">个人路线未启用 · 按课程顺序（细虚线）</span> : null}
+        </div> : null}
+        {flat ? <div className="ef-imm-flatbar"><span><i />当前路线</span><span><i className="is-preview" />预览路线</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={leaveFlatten}>完成</button></div> : null}
       </div>
 
-      {listOpen ? <aside className="ef-imm-structure-list" aria-label="课程结构列表">
-        <header><div><span>替代视图</span><h2>课程结构</h2></div><button type="button" onClick={() => setListOpen(false)} aria-label="关闭结构列表"><X size={16} /></button></header>
-        <div className="ef-imm-list-body">
-          {courseChapters.map((chapter) => <section key={chapter.id}>
-            <button type="button" className="ef-imm-list-chapter" onClick={() => selectNode(chapter.id, "chapter")}>第 {chapter.displayNumber} 章 · {chapter.title}<small>{displayNodes.filter((node) => node.chapterId === chapter.id).length} 个知识 · {chapter.assignmentSummary.assignmentCount} 项实践</small></button>
-            <div>{displayNodes.filter((node) => node.chapterId === chapter.id).map((node) => <button type="button" key={node.id} onClick={() => selectNode(node.id, "knowledge")}><i className={`status-${node.displayStatus}`} />{node.title}<small>{node.displayLabel}</small></button>)}</div>
-          </section>)}
-          {presentation === "practice" || presentation === "route" ? <section><h3>实践</h3>{runtime.assignments.map((assignment) => <button type="button" key={assignment.id} onClick={() => selectNode(assignment.id, "assignment")}><FileText size={13} />{assignment.title}<small>{assignment.estimatedMinutes ?? 30} 分钟</small></button>)}</section> : null}
-        </div>
-      </aside> : null}
+      {!flat ? detailPanel : null}
 
-      {presentation === "route" && routePanelOpen ? <aside className="ef-imm-side-panel ef-imm-route-panel" aria-label="课程路线与调整预览">
-        <header><div><span>个人路线</span><h2>{activeRoute && activeRoute.snapshot.valid ? `我的路线 V${activeRoute.versionNumber}` : "课程顺序"}</h2><p>{activeRoute && !activeRoute.snapshot.valid ? "正式路线暂无有效步骤 · 显示课程顺序" : `${routeProjection.nodes.filter((node) => node.kind === "route").length} 步 · ${diff ? "预览调整中" : "按执行顺序"}`}</p></div><button type="button" onClick={() => setRoutePanelOpen(false)} aria-label="关闭路线面板"><X size={16} /></button></header>
-        {!session ? <div className="ef-imm-panel-note"><Lock size={14} />公开课程按课程顺序展示。登录后生成并保存你的个人路线版本。</div> : null}
-        {session && activeRoute ? <div className="ef-imm-version-row"><Pill tone={activeRoute.snapshot.valid ? "brand" : "warn"}>V{activeRoute.versionNumber}{activeRoute.snapshot.valid ? "" : " · 待调整"}</Pill><span>{activeRoute.snapshot.valid ? `${activeRoute.snapshot.selectedNodeIds.length} 项能力 · ${activeRoute.snapshot.executionSteps?.length ?? 0} 个执行步骤` : "当前没有可执行能力；进入路线编辑后预览并采用"}</span></div> : null}
-        <div className="ef-imm-route-steps">{routeProjection.nodes.filter((node) => node.kind === "route").slice(0, 14).map((node, index) => <button type="button" key={node.id} onClick={() => selectNode(node.id, "knowledge")} aria-current={node.current ? "step" : undefined}><b>{String(index + 1).padStart(2, "0")}</b><span>{node.title}<small>{node.meta}</small></span><ChevronRight size={13} /></button>)}</div>
-        {session && diff ? <section className="ef-imm-preview-card">
-          <PreviewBadge />
-          <h3>调整预览 · 尚未采用</h3>
-          <div className="ef-imm-preview-stats"><span><b>{preview?.route.orderedNodeIds.length ?? 0}</b>步骤</span><span><b>+{diff.addedNodeIds.length}</b>新增</span><span><b>−{diff.removedNodeIds.length}</b>移除</span></div>
-          <ul>{diff.addedNodeIds.slice(0, 5).map((id) => <li key={id} className="is-added">+ {runtime.course.id === id ? id : (routeControl.view?.activeVersion?.snapshot.titles[id] ?? graphData.knowledgeNodes.find((node) => node.id === id)?.title ?? id)}</li>)}{diff.removedNodeIds.slice(0, 4).map((id) => <li key={id} className="is-removed">− {routeControl.view?.activeVersion?.snapshot.titles[id] ?? id}</li>)}</ul>
-        </section> : null}
-        {session && activeRoute ? <div className="ef-imm-panel-actions">
-          <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={routeControl.busy} onClick={() => void routeControl.previewImpact()}>预览调整</button>
-          <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={routeControl.busy || !preview?.valid || !preview.execution?.complete} onClick={() => void routeControl.adopt()}>采用预览</button>
-          <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={enterFlatten}><Edit3 size={13} />进入路线编辑</button>
-        </div> : null}
-        {routeControl.error ? <p className="ef-imm-error" role="alert">{routeControl.error}</p> : null}
-      </aside> : null}
+      {tab === "route" && !flat && authenticated ? <CourseRouteView
+        layout={winding}
+        steps={routeStepInputs}
+        usingActiveRoute={usingActiveRoute}
+        routeVersionNumber={activeRoute?.versionNumber}
+        reducedMotion={reducedMotion}
+        continueStep={winding.currentIndex < 0 && routeCurrentId ? (() => {
+          const node = displayNodes.find((item) => item.id === routeCurrentId);
+          if (!node) return undefined;
+          const micro = microFor(node.id);
+          const assignment = runtime?.assignments.find((item) => node.assignmentIds.includes(item.id));
+          return { title: node.title, minutes: micro?.estimatedMinutes ?? assignment?.estimatedMinutes, meta: assignment ? `实践 ${String(assignment.order + 1).padStart(2, "0")}` : undefined, onStart: () => startKnowledge(node) };
+        })() : undefined}
+        onSelect={(step) => {
+          const kind: CourseSelection = displayNodes.some((node) => node.id === step.id) ? { kind: "knowledge", id: step.id } : { kind: "capability", id: step.id };
+          setSelection(kind);
+        }}
+        onStart={(step) => {
+          const node = displayNodes.find((item) => item.id === step.id);
+          if (node) startKnowledge(node);
+          else {
+            const micro = microLearningProvider?.getLesson(step.id);
+            if (micro) {
+              const target = createMicroLearningNavigation(step.id, { courseId, returnTo: `${location.pathname}${location.search}` });
+              navigate(target.to, { state: target.state });
+            }
+          }
+        }}
+        onAdjust={enterFlatten}
+      /> : null}
 
-      {editPanelOpen && capabilityScene ? <aside className="ef-imm-side-panel ef-imm-edit-panel" aria-label="路线编辑">
-        <header><div><span>能力模型 · 编辑路线</span><h2>调整路线</h2><p>{routeControl.view?.activeVersion ? `基于 V${routeControl.view.activeVersion.versionNumber}` : "当前没有正式路线"}</p></div><button type="button" onClick={leaveFlatten} aria-label="关闭路线编辑"><X size={16} /></button></header>
-        <div className="ef-imm-edit-tools">
-          <button type="button" className={routeControl.tool === "include" ? "is-on" : ""} onClick={() => routeControl.setTool("include")} aria-pressed={routeControl.tool === "include"}>必须经过</button>
-          <button type="button" className={routeControl.tool === "exclude" ? "is-on" : ""} onClick={() => routeControl.setTool("exclude")} aria-pressed={routeControl.tool === "exclude"}>不经过</button>
-        </div>
-        <section className="ef-imm-draft-constraints"><h3>约束</h3>
-          {routeControl.draft.includeNodeIds.length ? <ul>{routeControl.draft.includeNodeIds.map((id) => <li key={id}>必须经过 · {capabilityScene.nodes.find((node) => node.id === id)?.title ?? id}<button type="button" aria-label={`移除必须经过 ${id}`} onClick={() => routeControl.removeNodeConstraint(id)}>×</button></li>)}</ul> : <p>尚未添加「必须经过」。</p>}
-          {routeControl.draft.excludeNodeIds.length ? <ul>{routeControl.draft.excludeNodeIds.map((id) => <li key={id}>不经过 · {capabilityScene.nodes.find((node) => node.id === id)?.title ?? id}<button type="button" aria-label={`移除不经过 ${id}`} onClick={() => routeControl.removeNodeConstraint(id)}>×</button></li>)}</ul> : <p>尚未添加「不经过」。</p>}
-        </section>
-        {currentCapability ? <section className="ef-imm-node-inspector"><h3>{currentCapability.title}</h3><p>{currentCapability.bridge ? "课程外支撑能力" : currentCapability.current ? "已具备 · 可作为路线起点" : currentCapability.course ? "课程目标" : "中间能力"}</p><div><button type="button" disabled={routeControl.busy} onClick={() => routeControl.mark(currentCapability.id, "include")}>必须经过</button><button type="button" disabled={routeControl.busy} onClick={() => routeControl.mark(currentCapability.id, "exclude")}>不经过</button><button type="button" disabled={routeControl.busy} onClick={() => routeControl.undoNode(currentCapability.id)}>撤销</button></div></section> : <p className="ef-imm-panel-note">点击场景中的能力节点，选择「必须经过」或「不经过」。</p>}
-        {diff ? <section className="ef-imm-preview-card"><PreviewBadge /><h3>预览变化</h3><div className="ef-imm-preview-stats"><span><b>+{diff.addedNodeIds.length}</b>新增</span><span><b>−{diff.removedNodeIds.length}</b>移除</span><span><b>+{diff.addedEdgeIds.length}</b>关系</span></div><ul>{diff.addedNodeIds.map((id) => <li key={id} className="is-added">+ {capabilityScene.nodes.find((node) => node.id === id)?.title ?? id}</li>)}{diff.removedNodeIds.map((id) => <li key={id} className="is-removed">− {capabilityScene.nodes.find((node) => node.id === id)?.title ?? id}</li>)}</ul></section> : null}
-        {routeControl.preview && !routeControl.preview.valid ? <section className="ef-imm-preview-card is-conflict"><PreviewBadge /><h3>需要处理的结构冲突</h3><ul>{routeControl.preview.conflicts.slice(0, 5).map((conflict, index) => <li key={`${conflict.kind}:${index}`} className="is-removed">{conflict.rootNodeId ? `目标 ${capabilityScene.nodes.find((node) => node.id === conflict.rootNodeId)?.title ?? conflict.rootNodeId} ` : "知识前置"}：{conflict.kind === "target_without_acquired_path" ? "当前已具备能力没有通向它的路径" : conflict.kind === "include_exclude" ? "不能同时加入与排除" : conflict.kind === "excluded_hard_prerequisite" ? "必须前置被排除" : "关系不属于当前目标路径"}</li>)}</ul>{routeControl.preview.conflicts.some((conflict) => conflict.rootNodeId) ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => { const first = routeControl.preview?.valid ? null : routeControl.preview?.conflicts.find((conflict) => conflict.rootNodeId); if (first?.rootNodeId) routeControl.mark(first.rootNodeId, "exclude"); }}>排除第一个冲突目标</button> : null}</section> : null}
-        {routeControl.preview?.valid && routeControl.preview.execution?.issues.length ? <section className="ef-imm-preview-card is-conflict"><h3>需要选择真实支撑路径</h3><p>预览发现已选能力之间缺少真实关系。常见于排除了某条支撑路径，或新目标只能经由尚未选中的真实关系到达；系统不会自动把推荐关系加进路线。请选择一条候选真实关系，或撤销对应的排除。</p><ul>{routeControl.preview.execution.issues.map((issue) => <li key={`${issue.kind}:${issue.nodeId ?? issue.edgeId}`} className="is-removed">{issue.reason}{issue.candidateEdgeIds?.length ? <button type="button" className="ef-imm-inline-btn" onClick={() => routeControl.chooseEdge(issue.candidateEdgeIds![0], true)}>选择支撑</button> : null}</li>)}</ul></section> : null}
-        {routeControl.error ? <p className="ef-imm-error" role="alert">{routeControl.error}</p> : null}
-        <footer className="ef-imm-panel-actions">
-          <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={routeControl.busy} onClick={() => routeControl.replan()}>预览调整结果</button>
-          <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={routeControl.busy || !preview?.valid || !preview.execution?.complete} onClick={() => void routeControl.adopt()}>采用新路线</button>
-        </footer>
-      </aside> : null}
+      {flatPanel}
 
       {perfEnabled && perf ? <div className="ef-imm-perf" role="status">FPS {perf.fps} · 场景 {perf.nodes} · DOM {perf.dom}</div> : null}
 
-      {session ? <EduFlowAssistant className="ef-imm-assistant" context={{ ...coursePresentationContext({ courseId: runtime.course.id, presentation: presentation === "capability" ? "capability" : presentation === "route" ? "path" : "graph", design: false, routeVersionId: routeControl.view?.activeVersion?.id, graph: centerSelection, path: centerSelection, capability: centerSelection }), userRole: session.role, capabilities: session.capabilities }} contextLabel={runtime.course.title} drawerOpen={false} /> : null}
+      {session ? <EduFlowAssistant className="ef-imm-assistant" context={{ ...coursePresentationContext({ courseId: runtime.course.id, presentation: flat ? "capability" : tab === "route" ? "path" : "graph", design: false, routeVersionId: activeRoute?.id, graph: selectedKnowledgeId ? { knowledgeId: selectedKnowledgeId } : {}, path: selectedKnowledgeId ? { knowledgeId: selectedKnowledgeId } : {}, capability: currentCapability ? { knowledgeId: currentCapability.id } : {} }), userRole: session.role, capabilities: session.capabilities }} contextLabel={runtime.course.title} drawerOpen={false} /> : null}
     </main>
   );
 }

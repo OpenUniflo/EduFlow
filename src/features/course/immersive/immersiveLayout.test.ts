@@ -195,6 +195,20 @@ describe("immersive course layout", () => {
     expect(target.count).toBe(1);
   });
 
+  it("honours explicit course targets and leaves the rest as intermediate capability", () => {
+    const routed: CapabilityModel = {
+      ...model,
+      orderedNodeIds: ["K1", "K2", "K3", "B1"],
+      currentKnowledgeIds: ["K1"],
+      courseKnowledgeIds: ["K1", "K2", "K3"]
+    };
+    const layout = layoutCapabilityFlattenLayout(routed, { acquiredNodeIds: ["K1"], targetNodeIds: ["K2"] });
+    expect(layout.columns.find((column) => column.kind === "acquired")!.nodeIds).toEqual(["K1"]);
+    expect(layout.columns.find((column) => column.kind === "intermediate")!.nodeIds).toEqual(["B1", "K3"]);
+    expect(layout.columns.find((column) => column.kind === "target")!.nodeIds).toEqual(["K2"]);
+    expect(layout.columns.map((column) => column.label)).toEqual(["已获得", "中间能力", "目标"]);
+  });
+
   it("gives every vertical route step and chapter strip a non-touching slot", () => {
     const steps = ["K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8"].map((id, index) => ({
       id,

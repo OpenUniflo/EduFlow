@@ -1,5 +1,12 @@
 import { useEffect, useImperativeHandle, useRef, type ReactNode, type Ref } from "react";
 import * as THREE from "three";
+import {
+  COURSE_SAFE_BOTTOM,
+  COURSE_SAFE_RIGHT,
+  COURSE_SAFE_TOP,
+  computeCourseFit,
+  computeCoursePan
+} from "./immersiveViewport";
 
 /**
  * One three.js scene for every learner course presentation. Structural layout
@@ -11,7 +18,7 @@ export type StagePoint = { x: number; y: number; z: number };
 
 export type StageNode = {
   id: string;
-  kind: "knowledge" | "assignment" | "chapter" | "capability" | "route" | "route-chapter";
+  kind: "knowledge" | "assignment" | "chapter" | "chapter-empty" | "capability" | "route" | "route-chapter";
   title: string;
   x: number;
   y: number;
@@ -26,6 +33,17 @@ export type StageNode = {
   tone?: 1 | 2 | 3;
   index?: number;
   chapterId?: string;
+  /** Reflection layer card: dashed, translucent, never the pointer target. */
+  ghost?: boolean;
+  /** Empty reflection slot ("暂无对应实训"). */
+  empty?: boolean;
+  /** Selection relation state. */
+  dim?: boolean;
+  highlight?: boolean;
+  selected?: boolean;
+  /** Route step number and the "you are here" marker. */
+  step?: number;
+  here?: boolean;
 };
 
 export type StageChapter = {
@@ -45,7 +63,7 @@ export type StageEdge = {
   source?: string;
   target?: string;
   points: StagePoint[];
-  kind?: "plain" | "chapter";
+  kind?: "plain" | "knowledge" | "chapter" | "capability" | "practice";
   highlighted?: boolean;
 };
 
@@ -53,6 +71,10 @@ export type StageBeam = {
   id: string;
   kind: "current" | "preview";
   points: StagePoint[];
+  /** Selection outside the adopted route fades the pulse beam. */
+  dimmed?: boolean;
+  /** Course-order fallback: a thin dashed band, never the adopted route solid. */
+  fallback?: boolean;
 };
 
 export type CourseImmersiveStageHandle = {
@@ -64,6 +86,17 @@ export type CourseImmersiveStageHandle = {
   rotateBy(radians: number): void;
   zoomPercent(): number;
   setZoomPercent(percent: number): void;
+  getViewState(): StageViewState;
+  setViewState(state: StageViewState): void;
+};
+
+export type StageViewState = {
+  distance: number;
+  panX: number;
+  panY: number;
+  yaw: number;
+  pitch: number;
+  pose: "front" | "rotated" | "flat";
 };
 
 export type SemanticZoom = "far" | "mid" | "near";
@@ -83,8 +116,10 @@ type Props = {
   onPoseChange?(pose: "front" | "rotated" | "flat"): void;
   onSemanticZoom?(zoom: SemanticZoom, percent: number): void;
   onFps?(fps: number, nodeCount: number, domCount: number): void;
+  detailOpen?: boolean;
   fitKey?: string;
   fitBounds?: { x: number; y: number };
+  instantFit?: boolean;
   selectedCard?: ReactNode;
   className?: string;
   ref?: Ref<CourseImmersiveStageHandle>;
@@ -114,7 +149,20 @@ type Engine = {
   height: number;
   fitDistance: number;
   bounds: { x: number; y: number };
-  chapterLabels: Array<{ element: HTMLElement; point: THREE.Vector3 }>;
+  pxPerWorld: number;
+  panX: number;
+  panY: number;
+  minPanX: number;
+  maxPanX: number;
+  minPanY: number;
+  maxPanY: number;
+  horizontalOverflow: boolean;
+  safeLeft: number;
+  safeRight: number;
+  safeTop: number;
+  safeBottom: number;
+  detailShiftX: number;
+  chapterLabels: Array<{ element: HTMLElement; point: THREE.Vector3; width: number }>;
   semantic: SemanticZoom;
   lastZoomPercent: number;
   emitZoom(force?: boolean): void;
@@ -122,6 +170,7 @@ type Engine = {
   resize(): void;
   fit(animated?: boolean): void;
   targetFov: number;
+  cameraVersion: number;
   frame: number;
   disposed: boolean;
   resizeObserver: ResizeObserver | null;
@@ -183,7 +232,7 @@ function disposeGroup(target: THREE.Group) {
 
 export function CourseImmersiveStage({
   nodes, chapters = [], edges, beams = [], mode, layer, pose, selectedId, reducedMotion = false,
-  onSelect, onBackground, onPoseChange, onSemanticZoom, onFps, fitKey = "", fitBounds, selectedCard, className = "", ref, "aria-label": ariaLabel
+  onSelect, onBackground, onPoseChange, onSemanticZoom, onFps, detailOpen = false, fitKey = "", fitBounds, selectedCard, instantFit = false, className = "", ref, "aria-label": ariaLabel
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -208,9 +257,15 @@ export function CourseImmersiveStage({
   poseRef.current = pose;
   const reducedRef = useRef(reducedMotion);
   reducedRef.current = reducedMotion;
+  const detailOpenRef = useRef(detailOpen);
+  detailOpenRef.current = detailOpen;
+  const instantFitRef = useRef(instantFit);
+  instantFitRef.current = instantFit;
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
   const selectedIdRef = useRef<string | null>(selectedId ?? null);
   selectedIdRef.current = selectedId ?? null;
-  const targetPoseRef = useRef({ yaw: pose === "rotated" ? 0.68 : 0, pitch: pose === "rotated" ? -0.18 : 0 });
+  const targetPoseRef = useRef({ yaw: pose === "rotated" ? 1.05 : 0, pitch: pose === "rotated" ? -0.22 : 0 });
   const hasSelectedCardRef = useRef(Boolean(selectedCard));
   hasSelectedCardRef.current = Boolean(selectedCard);
 
@@ -246,8 +301,11 @@ export function CourseImmersiveStage({
     const engine: Engine = {
       renderer, scene, camera, group, edgeGroup, chapterGroup, beamGroup, packets: [], overviewPoints: null, colors,
       width: host.clientWidth, height: host.clientHeight, fitDistance: 2400,
-      bounds: { x: 700, y: 480 }, chapterLabels: [], semantic: "mid", lastZoomPercent: 100,
-      targetFov: 16, frame: 0, disposed: false, resizeObserver: null
+      bounds: { x: 700, y: 480 }, pxPerWorld: 1, panX: 0, panY: 0,
+      minPanX: -600, maxPanX: 600, minPanY: -600, maxPanY: 600, horizontalOverflow: false, detailShiftX: 0,
+      safeLeft: 40, safeRight: 28, safeTop: 120, safeBottom: 78,
+      chapterLabels: [], semantic: "mid", lastZoomPercent: 100,
+      targetFov: 16, cameraVersion: 0, frame: 0, disposed: false, resizeObserver: null
     } as unknown as Engine;
     engineRef.current = engine;
 
@@ -266,6 +324,7 @@ export function CourseImmersiveStage({
     }
     engine.emitZoom = emitZoom;
     function setCameraDistance(next: number, duration = 0) {
+      const version = ++engine.cameraVersion;
       const start = camera.position.z;
       if (!duration || reducedRef.current) {
         camera.position.z = next;
@@ -274,7 +333,7 @@ export function CourseImmersiveStage({
       }
       const started = performance.now();
       const step = () => {
-        if (engine.disposed) return;
+        if (engine.disposed || version !== engine.cameraVersion) return;
         const progress = Math.min(1, (performance.now() - started) / duration);
         camera.position.z = start + (next - start) * easeOut(progress);
         emitZoom();
@@ -284,30 +343,55 @@ export function CourseImmersiveStage({
     }
     engine.setCameraDistance = setCameraDistance;
     function resize() {
+      const widthChanged = Math.abs(engine.width - host!.clientWidth) > 1;
+      const heightChanged = Math.abs(engine.height - host!.clientHeight) > 1;
       engine.width = host!.clientWidth;
       engine.height = host!.clientHeight;
       renderer.setSize(Math.max(1, Math.round(engine.width)), Math.max(1, Math.round(engine.height)), false);
       camera.aspect = engine.width / Math.max(1, engine.height);
       camera.updateProjectionMatrix();
-      fit(false);
+      // The floating detail panel never resizes the stage. A real window resize
+      // keeps the readable width fit; it never lets a selection change zoom.
+      if (widthChanged || heightChanged) fit(false);
     }
     engine.resize = resize;
     function fit(animated = true) {
-      // Fit against the front lens, independent of a rotated preview frame.
+      // Width-only fit for the course tree: all chapter columns are laid out
+      // horizontally at a readable scale; extra height is browsed by panning.
+      // The flattened route editor fits the remaining free rectangle (the edit
+      // panel already narrows the stage) and pans vertically when it is tall.
+      const flatMode = modeRef.current === "flat";
+      const safeLeft = flatMode ? 24 : 40;
+      const safeRight = flatMode ? 24 : COURSE_SAFE_RIGHT;
+      const safeTop = flatMode ? 118 : COURSE_SAFE_TOP;
+      const safeBottom = flatMode ? 84 : COURSE_SAFE_BOTTOM;
+      engine.safeLeft = safeLeft;
+      engine.safeRight = safeRight;
+      engine.safeTop = safeTop;
+      engine.safeBottom = safeBottom;
+      const fit = computeCourseFit({
+        viewportWidth: Math.max(1, engine.width),
+        viewportHeight: Math.max(1, engine.height),
+        bounds: engine.bounds,
+        safeLeft,
+        safeRight,
+        safeTop,
+        safeBottom,
+        minScale: flatMode ? 0.35 : undefined,
+        maxScale: flatMode ? 1.05 : undefined
+      });
+      engine.pxPerWorld = fit.pxPerWorld;
+      engine.panX = fit.panX;
+      engine.panY = fit.panY;
+      engine.minPanX = fit.minPanX;
+      engine.maxPanX = fit.maxPanX;
+      engine.minPanY = fit.minPanY;
+      engine.maxPanY = fit.maxPanY;
+      engine.horizontalOverflow = fit.horizontalOverflow;
       const fov = THREE.MathUtils.degToRad(15);
-      // Keep the graph inside the usable area below the contextual top band and
-      // above the bottom controls; the column headers of the flat editor must
-      // never hide under the top bar.
-      const safeTop = 132;
-      const safeBottom = 78;
-      const usableHeight = Math.max(280, engine.height - safeTop - safeBottom);
-      const usableWidth = Math.max(320, engine.width - 56);
-      const zForHeight = (engine.bounds.y * 2 * (engine.height / usableHeight)) / (2 * Math.tan(fov / 2));
-      const zForWidth = (engine.bounds.x * 2 * (engine.width / usableWidth)) / (2 * Math.tan(fov / 2) * Math.max(0.4, camera.aspect));
-      engine.fitDistance = Math.max(zForHeight, zForWidth) * 1.1;
-      if (import.meta.env.DEV) (window as unknown as { __efFitDebug?: unknown }).__efFitDebug = { zForHeight, zForWidth, bounds: engine.bounds, fov: camera.fov, aspect: camera.aspect, width: engine.width, height: engine.height, usableHeight, usableWidth, fit: engine.fitDistance };
-      const densityScale = runtimeRef.current.size > 80 ? 1.26 : 1;
-      setCameraDistance(engine.fitDistance * densityScale, animated && !reducedRef.current ? 520 : 0);
+      engine.fitDistance = engine.height / (2 * Math.max(0.0001, fit.pxPerWorld) * Math.tan(fov / 2));
+      if (import.meta.env.DEV) (window as unknown as { __efFitDebug?: unknown }).__efFitDebug = { ...fit, bounds: engine.bounds, fit: engine.fitDistance, width: engine.width, height: engine.height };
+      setCameraDistance(engine.fitDistance, animated && !reducedRef.current ? 520 : 0);
     }
     engine.fit = fit;
     function projectToScreen(world: THREE.Vector3) {
@@ -325,50 +409,98 @@ export function CourseImmersiveStage({
     let lastDomSync = 0;
     function tick(now: number) {
       if (engine.disposed) return;
-      const delta = Math.max(0, Math.min(64, now - last));
+      const rawDelta = Math.max(0, now - last);
+      const delta = Math.min(64, rawDelta);
       last = now;
       const reduced = reducedRef.current;
       const runtime = runtimeRef.current;
       // Node tween: same nodes move to new coordinates (flatten/route); new
       // nodes fade in. No layout is computed here.
-      const smoothing = reduced ? 1 : 1 - Math.exp(-delta / 240);
+      const smoothing = reduced ? 1 : 1 - Math.exp(-rawDelta / 240);
       runtime.forEach((entry) => {
         entry.current = {
           x: entry.current.x + (entry.target.x - entry.current.x) * smoothing,
           y: entry.current.y + (entry.target.y - entry.current.y) * smoothing,
           z: entry.current.z + (entry.target.z - entry.current.z) * smoothing
         };
-        entry.fade = reduced ? 1 : Math.min(1, entry.fade + delta / 420);
+        entry.fade = reduced ? 1 : Math.min(1, entry.fade + rawDelta / 420);
         entry.object.position.set(entry.current.x, -entry.current.y, entry.current.z);
         entry.object.scale.setScalar(0.82 + entry.fade * 0.18);
       });
       const target = targetPoseRef.current;
-      const rotationSmoothing = reduced ? 1 : 1 - Math.exp(-delta / 150);
+      const rotationSmoothing = reduced ? 1 : 1 - Math.exp(-rawDelta / 150);
       group.rotation.y += (target.yaw - group.rotation.y) * rotationSmoothing;
       group.rotation.x += (target.pitch - group.rotation.x) * rotationSmoothing;
-      const rotated = Math.abs(group.rotation.y) > 0.24 || Math.abs(group.rotation.x) > 0.08;
+      const normalizedYaw = Math.atan2(Math.sin(group.rotation.y), Math.cos(group.rotation.y));
+      const rotated = Math.abs(normalizedYaw) > 0.24 || Math.abs(group.rotation.x) > 0.08;
       // The front pose is near-orthographic; rotating widens the lens so depth
       // between the course plane and the support plane is legible.
       engine.targetFov = rotated ? 18 : 15;
       if (Math.abs(camera.fov - engine.targetFov) > 0.05) {
-        const nextFov = camera.fov + (engine.targetFov - camera.fov) * (reduced ? 1 : 1 - Math.exp(-delta / 220));
+        const nextFov = camera.fov + (engine.targetFov - camera.fov) * (reduced ? 1 : 1 - Math.exp(-rawDelta / 220));
         camera.fov = Math.max(12, Math.min(24, nextFov));
         camera.updateProjectionMatrix();
       }
-      // Vertical safe-area bias: keep content below the contextual top band.
-      const halfWorldHeight = camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
-      const pxPerWorld = engine.height / Math.max(1, halfWorldHeight * 2);
-      const safeTop = 132;
-      const safeBottom = 78;
-      const verticalBias = engine.semantic === "near" ? 160 : (safeTop - safeBottom) / 2;
-      group.position.y = -verticalBias / Math.max(0.0001, pxPerWorld);
+      // Screen scale and pan envelope. Wheel/trackpad moves the group inside
+      // this envelope; only Ctrl/⌘+wheel changes the camera distance.
+      const fovTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+      const pxPerWorld = engine.height / Math.max(1, 2 * camera.position.z * fovTan);
+      engine.pxPerWorld = pxPerWorld;
+      const envelope = computeCoursePan({
+        viewportWidth: engine.width,
+        viewportHeight: engine.height,
+        bounds: engine.bounds,
+        pxPerWorld,
+        safeLeft: engine.safeLeft,
+        safeRight: engine.safeRight,
+        safeTop: engine.safeTop,
+        safeBottom: engine.safeBottom
+      });
+      engine.minPanX = envelope.minPanX;
+      engine.maxPanX = envelope.maxPanX;
+      engine.minPanY = envelope.minPanY;
+      engine.maxPanY = envelope.maxPanY;
+      engine.horizontalOverflow = envelope.horizontalOverflow;
+      engine.panX = Math.max(engine.minPanX, Math.min(engine.maxPanX, engine.panX));
+      engine.panY = Math.max(engine.minPanY, Math.min(engine.maxPanY, engine.panY));
+      // Capability support lives on a deeper plane. Front view keeps it under
+      // 10% and effectively invisible; rotating reveals it progressively.
+      const capAmount = Math.max(0, Math.min(1, (Math.abs(normalizedYaw) - 0.16) / (0.42 - 0.16)));
+      const capVis = capAmount * capAmount * (3 - 2 * capAmount);
+      // Keep the selected card in the free area by panning only. The floating
+      // detail panel is 372px wide plus 16px inset; the scene shifts left just
+      // enough, never zooming (the old workflow's 143%→183% jump).
+      let targetDetailShift = 0;
+      const specById = new Map(nodesRef.current.map((node) => [node.id, node] as const));
+      const selectedEntry = detailOpenRef.current && selectedIdRef.current ? runtimeRef.current.get(selectedIdRef.current) : null;
+      if (selectedEntry) {
+        const world = new THREE.Vector3();
+        selectedEntry.object.getWorldPosition(world);
+        const point = projectToScreen(world);
+        const spec = specById.get(selectedIdRef.current ?? "");
+        const halfCard = Math.max(50, (spec?.width ?? 176) * 0.5);
+        const baseX = point.x - engine.detailShiftX * pxPerWorld;
+        const baseY = point.y;
+        const panelStart = engine.width - 388;
+        if (baseX + halfCard > panelStart - 16) targetDetailShift = (panelStart - 16 - (baseX + halfCard)) / Math.max(0.0001, pxPerWorld);
+        else if (baseX - halfCard < 16) targetDetailShift = (16 - (baseX - halfCard)) / Math.max(0.0001, pxPerWorld);
+        const topLimit = 156;
+        const bottomLimit = engine.height - 108;
+        let targetPanY = engine.panY;
+        if (baseY < topLimit) targetPanY = engine.panY + (baseY - topLimit) / Math.max(0.0001, pxPerWorld);
+        else if (baseY > bottomLimit) targetPanY = engine.panY + (baseY - bottomLimit) / Math.max(0.0001, pxPerWorld);
+        engine.panY = Math.max(engine.minPanY, Math.min(engine.maxPanY, engine.panY + (targetPanY - engine.panY) * (reduced ? 1 : 1 - Math.exp(-rawDelta / 180))));
+      }
+      engine.detailShiftX += (targetDetailShift - engine.detailShiftX) * (reduced ? 1 : 1 - Math.exp(-rawDelta / 180));
+      group.position.y = engine.panY;
+      group.position.x = engine.panX + engine.detailShiftX;
       scene.updateMatrixWorld();
       if (import.meta.env.DEV) (window as unknown as { __efImmPose?: unknown }).__efImmPose = { yaw: group.rotation.y, target: target.yaw, pose: poseRef.current, mode: modeRef.current };
-      if (import.meta.env.DEV) (window as unknown as { __efImmDebug?: unknown }).__efImmDebug = { bounds: engine.bounds, fit: engine.fitDistance, cz: camera.position.z, fov: camera.fov, w: engine.width, h: engine.height, gy: group.position.y, zoom: engine.semantic };
-      const front = Math.abs(group.rotation.y) < 0.08 && poseRef.current !== "rotated";
+      if (import.meta.env.DEV) (window as unknown as { __efImmDebug?: unknown }).__efImmDebug = { bounds: engine.bounds, fit: engine.fitDistance, cz: camera.position.z, fov: camera.fov, w: engine.width, h: engine.height, gy: group.position.y, gx: group.position.x, panX: engine.panX, panY: engine.panY, zoom: engine.semantic, capVis, bridges: [...runtimeRef.current.entries()].filter(([id]) => specById.get(id)?.bridge).map(([id, entry]) => ({ id, x: entry.current.x, y: entry.current.y, z: entry.current.z })), samples: [...runtimeRef.current.entries()].filter(([id]) => ["R10", "A02", "AGC01"].includes(id)).map(([id, entry]) => ({ id, x: entry.current.x, y: entry.current.y, z: entry.current.z })) };
+      const front = Math.abs(normalizedYaw) < 0.08 && poseRef.current !== "rotated";
       const farOverview = engine.semantic === "far" && modeRef.current === "course" && layerRef.current === "skill";
       if (engine.overviewPoints) engine.overviewPoints.visible = farOverview;
-      const positions = new Map<string, { x: number; y: number; visible: boolean; scale: number }>();
+      const positions = new Map<string, { x: number; y: number; visible: boolean; scale: number; distance: number }>();
       // Far zoom is a chapter overview: node cards are display:none, so skip
       // their per-frame projection writes entirely. Large scenes also cap DOM
       // sync at ~30fps while the WebGL scene keeps its own frame cadence.
@@ -381,27 +513,53 @@ export function CourseImmersiveStage({
         const world = new THREE.Vector3();
         entry.object.getWorldPosition(world);
         const point = projectToScreen(world);
-        // Semantic zoom changes the card composition (dot → capsule → action
-        // card); the DOM itself stays at screen scale so action rows never
-        // overlap in the dense ELK layout.
-        const scale = Math.max(0.38, Math.min(1, engine.fitDistance / Math.max(1, camera.position.z)));
-        positions.set(id, { ...point, scale });
-        const bridgeHidden = modeRef.current === "capability" && front && element.dataset.bridge === "true";
+        const spec = specById.get(id);
+        // Cards are DOM, but their size must track the world footprint: when
+        // the stage narrows (detail panel) or the semantic zoom changes, world
+        // spacing and card size shrink together instead of overlapping.
+        const fovTan = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+        const pxPerWorldNow = engine.height / Math.max(1, 2 * camera.position.z * fovTan);
+        const worldWidth = spec?.width || 176;
+        const scale = Math.max(0.38, Math.min(1.3, (worldWidth * pxPerWorldNow) / 176));
+        const distance = camera.position.distanceTo(world);
+        positions.set(id, { ...point, scale, distance });
+        const bridgeFactor = spec?.bridge ? capVis : 1;
         const kind = element.dataset.kind;
-        const hidden = bridgeHidden || (farOverview && kind === "knowledge");
-        const layerFactor = modeRef.current !== "course" ? 1 : layerRef.current === "skill" && kind === "assignment" ? 0.12 : layerRef.current === "practice" && kind === "knowledge" ? 0.14 : 1;
-        const opacity = entry.fade * (hidden ? 0 : layerFactor);
+        const hidden = (spec?.bridge && capVis < 0.02)
+          || (farOverview && kind === "knowledge")
+          || (rotated && kind === "chapter-empty");
+        const ghost = Boolean(spec?.ghost);
+        const empty = Boolean(spec?.empty);
+        const dimmed = Boolean(spec?.dim);
+        const opacity = entry.fade * (hidden ? 0 : 1) * bridgeFactor * (ghost ? 0.52 : 1) * (dimmed ? 0.34 : 1) * (empty ? 0.72 : 1);
+        const pointer = hidden || ghost || empty ? "none" : "";
         if (element.dataset.lastHidden !== String(hidden)) {
           element.dataset.lastHidden = String(hidden);
           element.style.visibility = hidden ? "hidden" : "visible";
-          element.style.pointerEvents = hidden ? "none" : "";
+        }
+        if (element.dataset.lastPointer !== pointer) {
+          element.dataset.lastPointer = pointer;
+          element.style.pointerEvents = pointer;
         }
         if (element.dataset.lastOpacity !== opacity.toFixed(2)) {
           element.dataset.lastOpacity = opacity.toFixed(2);
           element.style.opacity = String(opacity);
         }
-        const cardYaw = (-group.rotation.y * 0.5).toFixed(3);
-        const transform = `translate3d(${point.x.toFixed(2)}px, ${point.y.toFixed(2)}px, 0) translate(-50%, -50%) scale(${scale.toFixed(3)}) rotateY(${cardYaw}rad)`;
+        // Reflection cards always paint behind their solid counterpart. Once
+        // rotated, screen depth decides, so the deeper support plane can sit in
+        // front when the camera turns around.
+        const layerZ = ghost || spec?.bridge ? 1 : 3;
+        const depthZ = Math.abs(normalizedYaw) > 0.24 || Math.abs(group.rotation.x) > 0.08
+          ? Math.max(1, 2000 - Math.round(distance))
+          : layerZ;
+        const zIndex = String(spec?.selected ? Math.max(60, depthZ) : depthZ);
+        if (element.dataset.lastZ !== zIndex) {
+          element.dataset.lastZ = zIndex;
+          element.style.zIndex = zIndex;
+        }
+        // Cards stay screen-facing while the scene orbits, so a full 360°
+        // rotation never mirrors text.
+        const transform = `translate3d(${point.x.toFixed(2)}px, ${point.y.toFixed(2)}px, 0) translate(-50%, -50%) scale(${scale.toFixed(3)})`;
         if (element.dataset.lastTransform !== transform) {
           element.dataset.lastTransform = transform;
           element.style.transform = transform;
@@ -409,62 +567,85 @@ export function CourseImmersiveStage({
         if (!point.visible) element.style.visibility = "hidden";
         else if (!hidden) element.style.visibility = "visible";
       });
-      // Rotated capability view: the support plane sits behind the course
-      // plane, so many labels project onto the same pixels. Keep only the
-      // highest-priority readable labels; the rest stay as dots and reveal
-      // their full name on hover (title + CSS hover).
+      // Rotated overlap: the farther card of two cards on the same plane
+      // collapses to its status dot. Reading offsetWidth here would fight the
+      // collapsed style, so the nominal card box is used.
       if (syncDom) {
-        const cull = modeRef.current === "capability" && Math.abs(group.rotation.y) > 0.24;
-        const hiddenLabels = new Set<string>();
+        const cull = Math.abs(normalizedYaw) > 0.24 && poseRef.current !== "flat";
+        const collapsed = new Set<string>();
         if (cull) {
-          const boxes: Array<{ id: string; x: number; y: number; w: number; h: number; bridge: boolean; priority: number }> = [];
+          const boxes: Array<{ id: string; x: number; y: number; w: number; h: number; distance: number; priority: number; layer: string }> = [];
           runtime.forEach((entry, id) => {
             const element = entry.element;
             const point = positions.get(id);
-            if (!element || !point || !point.visible || element.dataset.lastHidden === "true" || element.dataset.kind !== "capability") return;
-            const bridge = element.dataset.bridge === "true";
-            const current = element.classList.contains("is-current") || selectedIdRef.current === id;
-            const priority = current ? 500 : element.dataset.status === "completed" ? 300 : element.dataset.status === "learning" ? 200 : bridge ? 0 : 100;
+            const spec = specById.get(id);
+            if (!element || !point || !point.visible || element.dataset.lastHidden === "true" || !spec) return;
+            if (spec.kind === "chapter" || spec.kind === "route-chapter" || spec.kind === "chapter-empty") return;
+            if (spec.ghost) return;
+            // Capability names must stay legible after rotation; only cards on
+            // the same plane collapse into each other.
+            if (spec.bridge) return;
+            const layer = "front";
+            const priority = spec.selected ? 500 : spec.here ? 450 : spec.highlight ? 400 : spec.status === "completed" ? 300 : spec.status === "learning" ? 200 : 100;
             boxes.push({
-              id, x: point.x, y: point.y, bridge, priority,
-              // Use a stable nominal card box, not the collapsed width: reading
-              // offsetWidth while a label is hidden would immediately unhide it
-              // on the next frame (hide/unhide flicker). rotateY also widens the
-              // projected box, so keep a small safety margin.
-              w: 132,
-              h: 32
+              id,
+              x: point.x,
+              y: point.y,
+              distance: point.distance,
+              priority,
+              layer,
+              w: Math.max(16, (spec.width || 176) * point.scale),
+              h: Math.max(14, (spec.height || 40) * point.scale)
             });
           });
-          boxes.sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id));
+          boxes.sort((left, right) => left.distance - right.distance || right.priority - left.priority || left.id.localeCompare(right.id));
           const accepted: typeof boxes = [];
           boxes.forEach((box) => {
-            if (box.bridge) { hiddenLabels.add(box.id); return; }
-            const overlaps = accepted.some((other) => {
-              const width = Math.min(box.x + box.w / 2, other.x + other.w / 2) - Math.max(box.x - box.w / 2, other.x - other.w / 2);
-              const height = Math.min(box.y + box.h / 2, other.y + other.h / 2) - Math.max(box.y - box.h / 2, other.y - other.h / 2);
-              return width > 4 && height > 2;
-            });
-            if (overlaps) hiddenLabels.add(box.id);
+            const overlaps = accepted.some((other) => other.layer === box.layer
+              && Math.min(box.x + box.w / 2, other.x + other.w / 2) - Math.max(box.x - box.w / 2, other.x - other.w / 2) > 4
+              && Math.min(box.y + box.h / 2, other.y + other.h / 2) - Math.max(box.y - box.h / 2, other.y - other.h / 2) > 2);
+            if (overlaps) collapsed.add(box.id);
             else accepted.push(box);
           });
         }
         runtime.forEach((entry, id) => {
-          const element = entry.element;
-          if (!element || element.dataset.kind !== "capability") return;
-          const next = hiddenLabels.has(id) ? "true" : "false";
-          if (element.dataset.labelHidden !== next) element.dataset.labelHidden = next;
+          if (!entry.element) return;
+          const next = collapsed.has(id) ? "true" : "false";
+          if (entry.element.dataset.collapsed !== next) entry.element.dataset.collapsed = next;
         });
       }
-      // Chapter labels are DOM, but anchored to the same rotated world point.
-      engine.chapterLabels.forEach(({ element, point }) => {
+      // Capability / practice connector opacity follows the actual orbit and
+      // the front layer, not the last clicked pose.
+      engine.edgeGroup.children.forEach((child) => {
+        const kind = child.userData.layerKind;
+        if (kind !== "capability" && kind !== "practice") return;
+        const material = (child as THREE.Mesh | THREE.Line).material;
+        if (Array.isArray(material) || !material) return;
+        const base = typeof child.userData.baseOpacity === "number" ? child.userData.baseOpacity : 0.2;
+        const targetOpacity = kind === "capability" ? base * capVis : base * (layerRef.current === "practice" ? 1 : 0);
+        (material as THREE.Material & { opacity: number }).opacity = targetOpacity;
+      });
+      // Chapter labels are DOM, anchored to each chapter's top edge. They are
+      // always a single-line capsule: the column width clips the title and the
+      // full name lives in the native title tooltip. No collision cull may hide
+      // chapters 02/04/06.
+      engine.chapterLabels.forEach(({ element, point, width }) => {
         const world = group.localToWorld(point.clone());
         const screen = projectToScreen(world);
-        const transform = `translate3d(${screen.x.toFixed(1)}px, ${screen.y.toFixed(1)}px, 0) scaleX(${Math.cos(group.rotation.y).toFixed(3)})`;
+        const maxWidth = Math.max(96, Math.min(232, width * pxPerWorld * 0.92));
+        const maxWidthText = `${maxWidth.toFixed(1)}px`;
+        if (element.style.maxWidth !== maxWidthText) element.style.maxWidth = maxWidthText;
+        const meta = element.querySelector<HTMLElement>("em");
+        if (meta) meta.style.display = maxWidth < 150 ? "none" : "";
+        const compress = Math.max(0.24, Math.abs(Math.cos(group.rotation.y)));
+        const transform = `translate3d(${screen.x.toFixed(1)}px, ${screen.y.toFixed(1)}px, 0) scaleX(${compress.toFixed(3)})`;
         if (element.dataset.lastTransform !== transform) {
           element.dataset.lastTransform = transform;
           element.style.transform = transform;
         }
-        element.style.opacity = screen.visible ? "1" : "0";
+        // Single-line at every zoom. Rotating edge-on would stack the capsules
+        // over the cards, so the chapter strip yields to the capability layer.
+        element.style.opacity = screen.visible && compress > 0.25 && !rotated ? "1" : "0";
       });
       const selected = selectedIdRef.current ? positions.get(selectedIdRef.current) : null;
       if (hasSelectedCardRef.current && selectedRef.current && selected) {
@@ -564,36 +745,75 @@ export function CourseImmersiveStage({
 
     let dragging = false;
     let moved = false;
+    let panning = false;
+    let startedOnNode = false;
+    let suppressClick = false;
+    let startPointer = { x: 0, y: 0 };
     let lastPointer = { x: 0, y: 0 };
     function pointerDown(event: PointerEvent) {
-      if ((event.target as HTMLElement).closest("[data-stage-node], .ef-imm-chapter-label, .ef-imm-selected-card")) return;
+      // Cards and labels are draggable scene objects, not text. Only the
+      // floating detail card and browser chrome opt out.
+      if ((event.target as HTMLElement).closest(".ef-imm-selected-card, .ef-imm-detail, .ef-imm-stage button[data-immersive-control]")) return;
       dragging = true;
       moved = false;
+      startedOnNode = Boolean((event.target as HTMLElement).closest("[data-stage-node], .ef-imm-chapter-label"));
+      panning = event.shiftKey;
+      startPointer = { x: event.clientX, y: event.clientY };
       lastPointer = { x: event.clientX, y: event.clientY };
-      (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
     }
     function pointerMove(event: PointerEvent) {
       if (!dragging) return;
       const dx = event.clientX - lastPointer.x;
       const dy = event.clientY - lastPointer.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+      if (Math.hypot(event.clientX - startPointer.x, event.clientY - startPointer.y) > 4) moved = true;
       lastPointer = { x: event.clientX, y: event.clientY };
-      const nextYaw = Math.max(-1.05, Math.min(1.05, targetPoseRef.current.yaw + dx * 0.006));
-      const nextPitch = Math.max(-0.34, Math.min(0.34, targetPoseRef.current.pitch + dy * 0.004));
+      if (panning) {
+        const scale = Math.max(0.0001, engine.pxPerWorld);
+        engine.panX = Math.max(engine.minPanX, Math.min(engine.maxPanX, engine.panX + dx / scale));
+        engine.panY = Math.max(engine.minPanY, Math.min(engine.maxPanY, engine.panY - dy / scale));
+        return;
+      }
+      if (!moved) return;
+      // Free 360° orbit: yaw is unbounded, pitch stays comfortable.
+      const nextYaw = targetPoseRef.current.yaw + dx * 0.006;
+      const nextPitch = Math.max(-0.55, Math.min(0.55, targetPoseRef.current.pitch + dy * 0.004));
       targetPoseRef.current = { yaw: nextYaw, pitch: nextPitch };
-      poseRef.current = Math.abs(nextYaw) > 0.12 ? "rotated" : "front";
+      const normalized = Math.atan2(Math.sin(nextYaw), Math.cos(nextYaw));
+      poseRef.current = Math.abs(normalized) > 0.12 || Math.abs(nextPitch) > 0.08 ? "rotated" : "front";
       onPoseChangeRef.current?.(poseRef.current);
     }
     function pointerUp() {
       if (!dragging) return;
       dragging = false;
-      if (!moved) onBackgroundRef.current?.();
+      if (moved) {
+        // A drag that started on a card must rotate, never select text or fire
+        // the card's click. Swallow exactly the click that follows this release.
+        suppressClick = true;
+        window.setTimeout(() => { suppressClick = false; }, 0);
+      } else if (!startedOnNode) {
+        onBackgroundRef.current?.();
+      }
+    }
+    function swallowClick(event: MouseEvent) {
+      if (!suppressClick) return;
+      suppressClick = false;
+      event.preventDefault();
+      event.stopPropagation();
     }
     function wheel(event: WheelEvent) {
       event.preventDefault();
-      const next = Math.max(engine.fitDistance * 0.35, Math.min(engine.fitDistance * 2.6, camera.position.z + event.deltaY * 1.7));
-      camera.position.z = next;
-      emitZoom(true);
+      // Pinch on a trackpad arrives as Ctrl+wheel; buttons keep their zoom.
+      if (event.ctrlKey || event.metaKey) {
+        const next = Math.max(engine.fitDistance * 0.35, Math.min(engine.fitDistance * 2.6, camera.position.z + event.deltaY * 1.7));
+        camera.position.z = next;
+        emitZoom(true);
+        return;
+      }
+      const scale = Math.max(0.0001, engine.pxPerWorld);
+      const dx = event.deltaX + (event.shiftKey && !event.deltaX ? event.deltaY : 0);
+      const dy = event.shiftKey ? 0 : event.deltaY;
+      if (dx) engine.panX = Math.max(engine.minPanX, Math.min(engine.maxPanX, engine.panX - dx / scale));
+      if (dy) engine.panY = Math.max(engine.minPanY, Math.min(engine.maxPanY, engine.panY + dy / scale));
     }
     function doubleClick(event: MouseEvent) {
       if ((event.target as HTMLElement).closest("[data-stage-node], .ef-imm-chapter-label, .ef-imm-selected-card")) return;
@@ -604,6 +824,7 @@ export function CourseImmersiveStage({
     host.addEventListener("pointerdown", pointerDown);
     window.addEventListener("pointermove", pointerMove);
     window.addEventListener("pointerup", pointerUp);
+    host.addEventListener("click", swallowClick, true);
     host.addEventListener("wheel", wheel, { passive: false });
     host.addEventListener("dblclick", doubleClick);
     const observer = new ResizeObserver(() => resize());
@@ -618,6 +839,7 @@ export function CourseImmersiveStage({
       host.removeEventListener("pointerdown", pointerDown);
       window.removeEventListener("pointermove", pointerMove);
       window.removeEventListener("pointerup", pointerUp);
+      host.removeEventListener("click", swallowClick, true);
       host.removeEventListener("wheel", wheel);
       host.removeEventListener("dblclick", doubleClick);
       disposeGroup(edgeGroup);
@@ -645,7 +867,10 @@ export function CourseImmersiveStage({
         const object = new THREE.Object3D();
         object.position.set(target.x, -target.y, target.z);
         engine.group.add(object);
-        entry = { object, element: null, current: { ...target }, target, fade: reducedRef.current ? 1 : 0 };
+        // The Archive-entry overlay already shows these cards. Materialise the
+        // real cards fully before that overlay is removed, never fading them in
+        // after the page has gone blank.
+        entry = { object, element: null, current: { ...target }, target, fade: reducedRef.current || instantFitRef.current ? 1 : 0 };
         runtime.set(node.id, entry);
       } else {
         entry.target = target;
@@ -658,14 +883,24 @@ export function CourseImmersiveStage({
       entry.element?.remove();
       runtime.delete(id);
     });
-    // Practice cards are a presentation shadow inside the same chapter
-    // footprint; they never enlarge the fitted course frame.
-    const boundsNodes = nodes.filter((node) => node.kind !== "assignment");
-    const measured = boundsNodes.length ? boundsNodes : nodes;
-    const maxX = Math.max(360, ...measured.flatMap((node) => [Math.abs(node.x - node.width / 2), Math.abs(node.x + node.width / 2)]));
-    const maxY = Math.max(260, ...measured.flatMap((node) => [Math.abs(node.y - node.height / 2), Math.abs(node.y + node.height / 2)]));
+    // The flattened editor's cards and its column captions define the fit
+    // bounds; in the course tree the knowledge cards and chapter boxes do. The
+    // card footprint (not only its centre) is included so nothing is clipped.
+    const measured = mode === "flat"
+      ? nodes.filter((node) => node.kind === "capability" || node.kind === "route-chapter" || node.kind === "chapter-empty")
+      : nodes.filter((node) => node.kind === "knowledge" || node.kind === "chapter-empty");
+    const measuredX = [
+      ...measured.flatMap((node) => [node.x - node.width / 2, node.x + node.width / 2]),
+      ...chapters.flatMap((chapter) => [chapter.x - chapter.width / 2, chapter.x + chapter.width / 2])
+    ];
+    const measuredY = [
+      ...measured.flatMap((node) => [node.y - node.height / 2, node.y + node.height / 2]),
+      ...chapters.flatMap((chapter) => [chapter.y - chapter.height / 2, chapter.y + chapter.height / 2])
+    ];
+    const maxX = Math.max(360, ...measuredX.map((value) => Math.abs(value)));
+    const maxY = Math.max(260, ...measuredY.map((value) => Math.abs(value))) + 24;
     engine.bounds = fitBounds ? { x: Math.max(maxX, fitBounds.x), y: Math.max(maxY, fitBounds.y) } : { x: maxX, y: maxY };
-  }, [fitBounds, nodes]);
+  }, [chapters, fitBounds, mode, nodes]);
 
   // Attach DOM element refs after React commits. A fit happens only for a new
   // structural/presentation frame (fitKey), never for semantic-zoom DOM changes.
@@ -680,8 +915,12 @@ export function CourseImmersiveStage({
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
-    engine.fit(!reducedRef.current);
+    // Entering from the Archive measures card targets while the scene is
+    // hidden; fit instantly so the measured rectangles are the final ones.
+    engine.fit(!reducedRef.current && !instantFitRef.current);
   }, [fitKey]);
+
+
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -710,7 +949,7 @@ export function CourseImmersiveStage({
       roundedRect(shape, chapter.width, chapter.height, 18);
       const plate = new THREE.Mesh(
         new THREE.ShapeGeometry(shape),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: engine.semantic === "far" ? 0.16 : 0.1, depthWrite: false, side: THREE.DoubleSide })
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: engine.semantic === "far" ? 0.1 : 0.06, depthWrite: false, side: THREE.DoubleSide })
       );
       plate.position.set(chapter.x, -chapter.y, -18);
       engine.chapterGroup.add(plate);
@@ -730,7 +969,7 @@ export function CourseImmersiveStage({
       }
       engine.chapterGroup.add(new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(borderPoints),
-        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.52, depthWrite: false })
+        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.22, depthWrite: false })
       ));
       const element = document.createElement("button");
       element.type = "button";
@@ -739,17 +978,18 @@ export function CourseImmersiveStage({
       element.innerHTML = `<b>${String(chapter.displayNumber).padStart(2, "0")}</b><span></span><em></em>`;
       element.querySelector("span")!.textContent = chapter.title;
       element.querySelector("em")!.textContent = chapter.meta ?? "";
-      element.style.maxWidth = `${Math.min(250, Math.max(142, chapter.width * 0.62))}px`;
+      element.style.maxWidth = `${Math.min(232, Math.max(110, chapter.width * 0.9))}px`;
       element.setAttribute("aria-label", `第 ${chapter.displayNumber} 章 ${chapter.title}${chapter.meta ? `，${chapter.meta}` : ""}`);
+      element.title = `第 ${chapter.displayNumber} 章 · ${chapter.title}${chapter.meta ? ` · ${chapter.meta}` : ""}`;
       element.addEventListener("click", (event) => { event.stopPropagation(); onSelectRef.current?.(chapter.id, "chapter"); });
       hostRef.current?.appendChild(element);
       // Anchor inside the region's top-left, not above its top edge.
       const point = new THREE.Vector3(
-        chapter.x - chapter.width / 2 + 14,
-        -(chapter.y - chapter.height / 2 + 20),
+        chapter.x - chapter.width / 2 + 12,
+        -(chapter.y - chapter.height / 2 + 12),
         2
       );
-      engine.chapterLabels.push({ element, point });
+      engine.chapterLabels.push({ element, point, width: chapter.width });
     });
   }, [chapters]);
   // Far semantic zoom renders node status as scene points (no DOM capsules);
@@ -808,8 +1048,41 @@ export function CourseImmersiveStage({
     const engine = engineRef.current;
     if (!engine) return;
     disposeGroup(engine.edgeGroup);
-    const addTube = (points: StagePoint[], radius: number, color: string, opacity: number) => {
+    const points3d = (points: StagePoint[]) => points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
+    // Front-plane Knowledge dependencies are thin orthogonal lines behind the
+    // cards. Highlighting changes colour/opacity only; it must never become a
+    // thick tube that reads as if it were painted over the cards.
+    const addLine = (points: StagePoint[], color: string, opacity: number, kind: StageEdge["kind"], dashed = false) => {
       if (points.length < 2) return;
+      const geometry = new THREE.BufferGeometry().setFromPoints(points3d(points));
+      const initialOpacity = kind === "capability" || kind === "practice" ? 0 : opacity;
+      const material = dashed
+        ? new THREE.LineDashedMaterial({ color, transparent: true, opacity: initialOpacity, depthWrite: false, dashSize: 5, gapSize: 6 })
+        : new THREE.LineBasicMaterial({ color, transparent: true, opacity: initialOpacity, depthWrite: false });
+      const line = new THREE.Line(geometry, material);
+      if (dashed) line.computeLineDistances();
+      line.renderOrder = 0;
+      line.userData.layerKind = kind;
+      line.userData.baseOpacity = opacity;
+      engine.edgeGroup.add(line);
+    };
+    // With a selection open the unrelated dependency web fades almost away;
+    // the highlighted incident routes stay thin and orthogonal behind cards.
+    const hasHighlight = edges.some((edge) => edge.highlighted);
+    edges.forEach((edge) => {
+      if (edge.kind === "capability") addLine(edge.points, engine.colors.brand, edge.highlighted ? 0.88 : hasHighlight ? 0.08 : 0.62, "capability", true);
+      else if (edge.kind === "practice") addLine(edge.points, engine.colors.branch, edge.highlighted ? 0.78 : hasHighlight ? 0.08 : 0.34, "practice", true);
+      else if (edge.kind === "chapter") addLine(edge.points, engine.colors.line, 0.2, "chapter");
+      else addLine(edge.points, engine.colors.brand, edge.highlighted ? 0.92 : hasHighlight ? 0.06 : 0.24, "knowledge");
+    });
+  }, [edges]);
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    disposeGroup(engine.beamGroup);
+    engine.packets = [];
+    const points3d = (points: StagePoint[]) => points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
+    const linePath = (points: StagePoint[]) => {
       const path = new THREE.CurvePath<THREE.Vector3>();
       for (let index = 0; index < points.length - 1; index += 1) {
         const from = points[index];
@@ -819,23 +1092,9 @@ export function CourseImmersiveStage({
           new THREE.Vector3(to.x, -to.y, to.z)
         ));
       }
-      const geometry = new THREE.TubeGeometry(path, Math.max(2, points.length * 4), radius, 5, false);
-      const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.renderOrder = 1;
-      engine.edgeGroup.add(mesh);
+      return path;
     };
-    edges.forEach((edge) => {
-      if (edge.highlighted) addTube(edge.points, 3.0, engine.colors.brand, 1);
-      else addTube(edge.points, edge.kind === "chapter" ? 1.8 : 1.9, edge.kind === "chapter" ? engine.colors.line : engine.colors.branch, edge.kind === "chapter" ? 0.72 : 0.82);
-    });
-  }, [edges]);
-  useEffect(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    disposeGroup(engine.beamGroup);
-    engine.packets = [];
-    const addDashTube = (points: THREE.Vector3[], color: string, radius: number) => {
+    const addDashTube = (points: THREE.Vector3[], color: string, radius: number, opacity: number) => {
       const curve = new THREE.CatmullRomCurve3(points);
       const samples = curve.getSpacedPoints(56);
       for (let index = 0; index < samples.length - 1; index += 1) {
@@ -843,40 +1102,53 @@ export function CourseImmersiveStage({
         const path = new THREE.CurvePath<THREE.Vector3>();
         path.add(new THREE.LineCurve3(samples[index], samples[index + 1]));
         const geometry = new THREE.TubeGeometry(path, 1, radius, 5, false);
-        const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false });
+        const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
         const mesh = new THREE.Mesh(geometry, material);
-        mesh.renderOrder = 6;
+        mesh.renderOrder = 2;
         engine.beamGroup.add(mesh);
       }
     };
     beams.forEach((beam) => {
-      const points = beam.points.map((point) => new THREE.Vector3(point.x, -point.y, point.z + 14));
+      const points = beam.points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
       if (points.length < 2) return;
       const color = beam.kind === "current" ? engine.colors.brandInk : engine.colors.target;
       if (beam.kind === "current") {
-        const curve = new THREE.CatmullRomCurve3(points);
-        const flat = modeRef.current === "flat";
-        const geometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), flat ? 3.4 : 4.4, 8, false);
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: flat ? 0.66 : 0.78, depthWrite: false }));
-        mesh.renderOrder = 3;
-        engine.beamGroup.add(mesh);
-        const packetGeometry = new THREE.SphereGeometry(5.4, 12, 10);
-        const count = Math.min(8, Math.max(3, Math.floor(curve.getLength() / 90)));
+        if (beam.fallback) {
+          // Course-order fallback is intentionally weaker: a thin dashed line
+          // behind the cards, with no flowing pulse.
+          const geometry = new THREE.BufferGeometry().setFromPoints(points);
+          const material = new THREE.LineDashedMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.16 : 0.4, depthWrite: false, dashSize: 9, gapSize: 10 });
+          const line = new THREE.Line(geometry, material);
+          line.computeLineDistances();
+          line.renderOrder = 1;
+          engine.beamGroup.add(line);
+          return;
+        }
+        const curve = linePath(beam.points);
+        const geometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), 1.4, 6, false);
+        const glowGeometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), 3.4, 8, false);
+        const glow = new THREE.Mesh(glowGeometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.03 : 0.1, depthWrite: false }));
+        glow.renderOrder = 0;
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.16 : 0.55, depthWrite: false }));
+        mesh.renderOrder = 2;
+        engine.beamGroup.add(glow, mesh);
+        const packetGeometry = new THREE.SphereGeometry(2.2, 10, 8);
+        const count = Math.min(6, Math.max(2, Math.floor(curve.getLength() / 140)));
         for (let index = 0; index < count; index += 1) {
-          const packet = new THREE.Mesh(packetGeometry.clone(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.98, depthWrite: false }));
-          packet.renderOrder = 5;
+          const packet = new THREE.Mesh(packetGeometry.clone(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: beam.dimmed ? 0.2 : 0.92, depthWrite: false }));
+          packet.renderOrder = 3;
           engine.beamGroup.add(packet);
-          engine.packets.push({ mesh: packet, points: beam.points, progress: 0, speed: 0.00022, offset: index / count });
+          engine.packets.push({ mesh: packet, points: beam.points, progress: 0, speed: 0.0002, offset: index / count });
         }
       } else {
         // Preview: a distinct dashed light band, never the current-route solid.
-        addDashTube(points, color, 3.4);
+        addDashTube(points, color, 1.6, 0.7);
       }
     });
   }, [beams]);
   useEffect(() => {
     poseRef.current = pose;
-    targetPoseRef.current = pose === "rotated" ? { yaw: 0.68, pitch: -0.18 } : { yaw: 0, pitch: 0 };
+    targetPoseRef.current = pose === "rotated" ? { yaw: 1.05, pitch: -0.22 } : { yaw: 0, pitch: 0 };
   }, [pose]);
 
   useImperativeHandle(ref, () => ({
@@ -884,10 +1156,31 @@ export function CourseImmersiveStage({
     zoomOut: () => { const engine = engineRef.current; if (engine) engine.setCameraDistance(Math.min(engine.fitDistance * 2.6, engine.camera.position.z * 1.28), 260); },
     fit: () => engineRef.current?.fit(!reducedRef.current),
     resetPose: () => { poseRef.current = "front"; targetPoseRef.current = { yaw: 0, pitch: 0 }; onPoseChangeRef.current?.("front"); },
-    setPose: (value) => { poseRef.current = value; targetPoseRef.current = value === "rotated" ? { yaw: 0.68, pitch: -0.18 } : { yaw: 0, pitch: 0 }; onPoseChangeRef.current?.(value); },
-    rotateBy: (radians) => { targetPoseRef.current = { ...targetPoseRef.current, yaw: Math.max(-1.05, Math.min(1.05, targetPoseRef.current.yaw + radians)) }; },
+    setPose: (value) => { poseRef.current = value; targetPoseRef.current = value === "rotated" ? { yaw: 1.05, pitch: -0.22 } : { yaw: 0, pitch: 0 }; onPoseChangeRef.current?.(value); },
+    rotateBy: (radians) => { targetPoseRef.current = { ...targetPoseRef.current, yaw: targetPoseRef.current.yaw + radians }; },
     zoomPercent: () => engineRef.current?.lastZoomPercent ?? 100,
-    setZoomPercent: (percent) => { const engine = engineRef.current; if (!engine) return; engine.setCameraDistance(engine.fitDistance / Math.max(0.2, percent / 100), 320); }
+    setZoomPercent: (percent) => { const engine = engineRef.current; if (!engine) return; engine.setCameraDistance(engine.fitDistance / Math.max(0.2, percent / 100), 320); },
+    getViewState: () => {
+      const engine = engineRef.current;
+      return {
+        distance: engine?.camera.position.z ?? 2400,
+        panX: engine?.panX ?? 0,
+        panY: engine?.panY ?? 0,
+        yaw: targetPoseRef.current.yaw,
+        pitch: targetPoseRef.current.pitch,
+        pose: poseRef.current
+      };
+    },
+    setViewState: (state) => {
+      const engine = engineRef.current;
+      if (!engine) return;
+      targetPoseRef.current = { yaw: state.yaw, pitch: state.pitch };
+      poseRef.current = state.pose;
+      engine.panX = state.panX;
+      engine.panY = state.panY;
+      engine.detailShiftX = 0;
+      engine.setCameraDistance(state.distance, 0);
+    }
   }), []);
 
   return (
@@ -897,9 +1190,9 @@ export function CourseImmersiveStage({
       data-mode={mode}
       data-layer={layer}
       data-pose={pose}
-      aria-label={`${ariaLabel ?? "课程场景"}。拖拽旋转，滚轮缩放，双击空白回正，方向键与 1/2/3 切换视角。`}
+      aria-label={`${ariaLabel ?? "课程场景"}。拖拽旋转，滚轮上下平移，Ctrl/⌘+滚轮缩放，双击空白回正，方向键与 1/2/3 切换视角。`}
       aria-keyshortcuts="1 2 3 R F 0 + -"
-      title="拖拽旋转 · 滚轮缩放 · 双击空白回正"
+      title="拖拽旋转 · 滚轮上下平移 · Ctrl/⌘+滚轮缩放 · 双击空白回正"
     >
       <canvas ref={canvasRef} className="ef-imm-canvas" aria-hidden="true" />
       <div className="ef-imm-overlay">
@@ -912,12 +1205,10 @@ export function CourseImmersiveStage({
             data-status={node.status}
             data-bridge={node.bridge ? "true" : undefined}
             data-layer={mode === "course" ? (node.kind === "assignment" ? "practice" : "skill") : "course"}
-            className={`ef-imm-node ef-imm-node--${node.kind} ${node.current ? "is-current" : ""} ${node.kind === "assignment" ? "is-practice" : "is-skill"} ${node.tone ? `tone-${node.tone}` : ""} ${node.id.startsWith("flatten-column:") ? "is-flat-column" : ""}`}
+            className={`ef-imm-node ef-imm-node--${node.kind} ${node.current ? "is-current" : ""} ${node.kind === "assignment" ? "is-practice" : "is-skill"} ${node.tone ? `tone-${node.tone}` : ""} ${node.id.startsWith("flatten-column:") ? "is-flat-column" : ""} ${node.ghost ? "is-ghost" : ""} ${node.empty ? "is-empty" : ""} ${node.dim ? "is-dim" : ""} ${node.highlight ? "is-hl" : ""} ${node.selected ? "is-sel" : ""} ${node.step ? "has-step" : ""}`}
             style={node.kind === "assignment"
-              ? { width: `${Math.min(node.width, 100)}px`, height: "22px" }
-              : node.kind === "route-chapter"
-                ? { width: `${node.width}px`, height: `${node.height}px` }
-                : undefined}
+              ? { width: `${Math.min(node.width, 176)}px`, height: `${node.empty ? 28 : node.height}px` }
+              : { width: `${node.width}px`, height: `${node.height}px` }}
             role="button"
             tabIndex={0}
             aria-label={node.title}
@@ -925,15 +1216,16 @@ export function CourseImmersiveStage({
             onClick={(event) => { event.stopPropagation(); onSelect?.(node.kind === "route-chapter" ? node.chapterId ?? node.id : node.id, node.kind); }}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect?.(node.kind === "route-chapter" ? node.chapterId ?? node.id : node.id, node.kind); } }}
           >
-            {node.kind === "assignment" ? <><b className="ef-imm-node-index">{node.meta}</b><span className="ef-imm-node-copy"><strong>{node.title}</strong></span></> : null}
+            {node.kind === "assignment" ? <><b className="ef-imm-node-index">{node.empty ? "—" : node.meta}</b><span className="ef-imm-node-copy"><strong>{node.title}</strong></span></> : null}
+            {node.kind === "chapter-empty" ? <><i className="ef-imm-node-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small className="ef-imm-node-meta">{node.meta}</small></span></> : null}
             {node.kind === "route" ? <><i className="ef-imm-route-dot">{node.index ? String(node.index).padStart(2, "0") : null}</i><span className="ef-imm-node-copy"><strong>{node.title}</strong><small>{node.meta}</small><span className="ef-imm-node-detail">{node.detail}</span></span>{node.current ? <em className="ef-imm-here">你在这里</em> : null}</> : null}
-            {node.kind === "route-chapter" ? <><i className="ef-imm-route-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small>{node.detail}</small></span></> : null}
-            {node.kind === "knowledge" || node.kind === "capability" ? <><i className="ef-imm-node-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small className="ef-imm-node-meta">{node.meta}</small><span className="ef-imm-node-detail">{node.detail}</span></span></> : null}
+            {node.kind === "route-chapter" ? <><i className="ef-imm-route-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small>{node.meta ?? node.detail}</small></span></> : null}
+            {node.kind === "knowledge" || node.kind === "capability" ? <>{node.step ? <i className="ef-imm-step">{node.step}</i> : null}<i className="ef-imm-node-dot" /><span className="ef-imm-node-copy"><strong>{node.title}</strong><small className="ef-imm-node-meta">{node.meta}</small><span className="ef-imm-node-detail">{node.detail}</span></span>{node.here ? <em className="ef-imm-here">你在这里</em> : null}</> : null}
           </div>
         ))}
         {selectedCard ? <div ref={selectedRef} className="ef-imm-selected-card">{selectedCard}</div> : null}
       </div>
-      <div className="ef-imm-help" aria-hidden="true">拖拽旋转 · 滚轮缩放</div>
+      <div className="ef-imm-help" aria-hidden="true">拖拽旋转 · 滚轮上下平移 · Ctrl/⌘+滚轮缩放</div>
     </div>
   );
 }
