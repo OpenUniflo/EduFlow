@@ -1133,6 +1133,134 @@
   background: var(--line);
 }
 
+/* ---------- Card / segmented control / switch ---------- */
+.ef-ui-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: var(--sh-1);
+}
+
+.ef-ui-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--page);
+}
+
+.ef-ui-seg-option {
+  display: flex;
+  min-height: var(--ctl-32);
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-8);
+  border: 0;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  text-align: left;
+}
+
+.ef-ui-seg-option[aria-checked="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--sh-1);
+}
+
+.ef-ui-seg-label {
+  white-space: nowrap;
+}
+
+.ef-ui-seg-description {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-500);
+  white-space: normal;
+}
+
+.ef-ui-seg--cards {
+  display: grid;
+  gap: var(--sp-4);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.ef-ui-seg--cards .ef-ui-seg-option {
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 54px;
+  padding: var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+}
+
+.ef-ui-seg--cards .ef-ui-seg-option[aria-checked="true"] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  box-shadow: none;
+}
+
+.ef-ui-seg--cards .ef-ui-seg-option[aria-checked="true"] .ef-ui-seg-description {
+  color: var(--brand-ink);
+}
+
+.ef-ui-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex: 0 0 38px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: var(--line);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.ef-ui-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.ef-ui-switch[aria-checked="true"] {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+
+.ef-ui-switch[aria-checked="true"]::after {
+  transform: translateX(16px);
+}
+
+.ef-ui-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ---------- Preview marker ---------- */
 .ef-ui-preview-badge {
   display: inline-flex;

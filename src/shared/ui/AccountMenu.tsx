@@ -16,6 +16,8 @@ export type AccountMenuProps = {
   open: boolean;
   name: string;
   email: string;
+  /** Displayed under the name; N38 shows the user's role here. */
+  role?: string;
   onOpenPanel: () => void;
   items?: AccountMenuItem[];
   onLogout?: () => void;
@@ -29,7 +31,7 @@ export type AccountMenuProps = {
  * Account popover opened from the avatar. The first row is always
  * 「打开我的面板」; arrows move between rows and Escape closes/returns focus.
  */
-export function AccountMenu({ open, name, email, onOpenPanel, items = [], onLogout, onClose, returnFocusRef, className = "", id = "ef-account-menu" }: AccountMenuProps) {
+export function AccountMenu({ open, name, email, role, onOpenPanel, items = [], onLogout, onClose, returnFocusRef, className = "", id = "ef-account-menu" }: AccountMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const firstRef = useRef<HTMLButtonElement>(null);
   const controlRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -88,7 +90,7 @@ export function AccountMenu({ open, name, email, onOpenPanel, items = [], onLogo
         <Avatar name={name} size={40} personColor="me" />
         <div className="ef-ui-account-id">
           <div className="ef-ui-account-name">{name}</div>
-          <div className="ef-ui-account-email">{email}</div>
+          <div className="ef-ui-account-email">{role ?? email}</div>
         </div>
         <button
           ref={(node) => { firstRef.current = node; controlRefs.current[0] = node; }}
@@ -130,7 +132,7 @@ export function AccountMenu({ open, name, email, onOpenPanel, items = [], onLogo
             onKeyDown={(event) => onArrow(event, event.key === "ArrowUp" ? -1 : 1)}
             onClick={() => { onClose(); onLogout(); }}
           >
-            退出登录
+            退出
           </button>
         </>
       ) : null}

@@ -6,6 +6,8 @@ import { sampleWorkflowVersions } from "@/demo/preview/workflow/sampleWorkflowVe
 import { sampleWorkflowAssistantProposal } from "@/demo/preview/workflow/sampleWorkflowAssistantProposal";
 import type { AssistantProposalPreview } from "@/features/workflow/editor/v2/assistantProposalPreview";
 import type { WorkflowVersionPreview } from "@/features/workflow/pages/worksPreview";
+import type { SettingsPreview } from "@/features/settings/model/settingsPreview";
+import { sampleSettingsPreview } from "@/demo/preview/settings/sampleSettingsPreview";
 
 /**
  * Application-level injection of Feature Preview sources. The repository is
@@ -19,6 +21,8 @@ export type ApplicationPreviewServices = {
   workflowVersions: readonly WorkflowVersionPreview[];
   /** Synthetic N12 assistant proposal; the editor renders it read-only. */
   assistantProposal: AssistantProposalPreview;
+  /** Synthetic N26a settings preview: devices, notification toggles, privacy. */
+  settings: SettingsPreview;
   /** Binds preview-only public subsets to the hydrated active Knowledge catalog. */
   bindKnowledgeCatalog(nodeIds: readonly string[]): void;
 };
@@ -31,6 +35,7 @@ export function createPreviewApplicationServices(): ApplicationPreviewServices {
     courseSocialRepository: courseSocial,
     workflowVersions: sampleWorkflowVersions,
     assistantProposal: sampleWorkflowAssistantProposal,
+    settings: sampleSettingsPreview,
     bindKnowledgeCatalog: (nodeIds) => people.bindKnowledgeNodeIds(nodeIds)
   };
 }

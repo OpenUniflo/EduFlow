@@ -1,10 +1,11 @@
-import { Bell, BookOpen, Eye, GraduationCap, History, Home, LayoutGrid, LogIn, Network, Settings2, ShieldCheck, Users } from "lucide-react";
+import { Bell, Eye, GraduationCap, History, Home, LayoutGrid, LogIn, Network, Settings2, ShieldCheck, Users } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
 import { canManageCourses, canManageKnowledgeDomains } from "@/features/auth/capabilities";
 import { authGateState } from "@/features/auth/authRedirect";
+import { roleLabel } from "@/features/auth/roles";
 import { AccountMenu } from "@/shared/ui/AccountMenu";
 import { Avatar } from "@/shared/ui/Avatar";
 import { BrandMark } from "@/shared/ui/BrandMark";
@@ -65,15 +66,15 @@ export function GlobalNav({ session, onLogout }: { session?: MockSession | null;
         className="ef-nav-account"
         name={session.name}
         email={session.email}
+        role={roleLabel(session.role)}
         returnFocusRef={triggerRef}
         onClose={() => setAccountOpen(false)}
         onOpenPanel={() => navigate("/?panel=1")}
         items={[
-          { id: "visibility", label: "档案可见性与分享", icon: <Eye size={18} aria-hidden />, onSelect: () => navigate("/archive?panel=share") },
-          { id: "people", label: "关注的人", icon: <Users size={18} aria-hidden />, onSelect: () => navigate("/archive?panel=people") },
+          { id: "visibility", label: "档案可见性与分享", icon: <Eye size={18} aria-hidden />, kbd: "预览", onSelect: () => navigate("/archive?panel=share") },
+          { id: "people", label: "关注的人", icon: <Users size={18} aria-hidden />, kbd: "预览", onSelect: () => navigate("/archive?panel=people") },
           { id: "settings", label: "设置", icon: <Settings2 size={18} aria-hidden />, onSelect: () => navigate("/settings") },
-          { id: "notifications", label: "通知", icon: <Bell size={18} aria-hidden />, onSelect: () => navigate("/archive?panel=notifications") },
-          { id: "records", label: "学习记录", icon: <BookOpen size={18} aria-hidden />, onSelect: () => navigate("/records") }
+          { id: "notifications", label: "通知", icon: <Bell size={18} aria-hidden />, kbd: "预览", onSelect: () => navigate("/archive?panel=notifications") }
         ]}
         onLogout={onLogout ? () => onLogout() : undefined}
       />,

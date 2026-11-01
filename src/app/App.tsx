@@ -5,8 +5,13 @@ import { AuthProvider } from "@/features/auth/AuthContext";
 import type { MockSession } from "@/features/auth/types";
 import { canManageCourses, canManageKnowledgeDomains } from "@/features/auth/capabilities";
 import { AuthPage } from "@/features/auth/pages/AuthPage";
+import { ForgotPasswordPage } from "@/features/auth/pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
+import { isPasswordResetEnabled } from "@/features/auth/passwordReset";
 import { AppChrome } from "@/app/components/AppChrome";
-import { NotFoundPage, SettingsPage } from "@/app/pages/PlaceholderPages";
+import { NotFoundPage } from "@/app/pages/PlaceholderPages";
+import { SettingsPage } from "@/features/settings/pages/SettingsPage";
+import { EMPTY_SETTINGS_PREVIEW } from "@/features/settings/model/settingsForm";
 import { RecordsPage } from "@/features/records/pages/RecordsPage";
 import { PublicHomePage } from "@/app/pages/PublicHomePage";
 import { applicationServices, hydrateApplicationServices, hydratePublicApplicationServices, resetAuthenticatedApplicationServices } from "@/app/services/applicationServices";
@@ -30,6 +35,8 @@ import { AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeC
 import { authGateState, resolveAuthRedirect } from "@/features/auth/authRedirect";
 import { Button } from "@/shared/ui/Button";
 import { ArchivePage } from "@/features/archive/pages/ArchivePage";
+
+const passwordResetEnabled = isPasswordResetEnabled();
 
 function AssistantRuntimeBoundary({ session, children }: { session: MockSession | null; children: ReactNode }) {
   return session ? <AssistantRuntimeProvider session={session}><CapabilityEvidenceBoundary session={session}>{children}</CapabilityEvidenceBoundary></AssistantRuntimeProvider> : children;
@@ -75,7 +82,7 @@ export default function App() {
         const profile = await hydrateApplicationServices(authSession.user.id);
         if (!active) return;
         const name = profile.displayName || authSession.user.email?.split("@")[0] || "学习者";
-        setSession({ userId: authSession.user.id, name, email: authSession.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: authSession.user.created_at });
+        setSession({ userId: authSession.user.id, name, email: authSession.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: authSession.user.created_at, emailVerified: Boolean(authSession.user.email_confirmed_at) });
       } catch (error) {
         console.error("Post-login application initialization failed", error);
         if (authSession && error instanceof ApiRequestError && error.status === 401) {
@@ -129,7 +136,7 @@ export default function App() {
       return;
     }
     const name = profile.displayName || data.user.email?.split("@")[0] || "学习者";
-    setSession({ userId: data.user.id, name, email: data.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: data.user.created_at });
+    setSession({ userId: data.user.id, name, email: data.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: data.user.created_at, emailVerified: Boolean(data.user.email_confirmed_at) });
     navigate(resolveAuthRedirect(location.state), { replace: true });
   }
 
@@ -139,6 +146,26 @@ export default function App() {
     if (!data.session) return { confirmationRequired: true };
     await signIn({ email: input.email, password: input.password });
     return { confirmationRequired: false };
+  }
+
+  async function changePassword(input: { currentPassword: string; newPassword: string }) {
+    if (!session) throw new Error("登录状态已失效，请重新登录。");
+    // Re-verify the current password before allowing the update.
+    const { error: verifyError } = await supabaseClient.auth.signInWithPassword({ email: session.email, password: input.currentPassword });
+    if (verifyError) throw new Error("当前密码不正确，请重新输入。");
+    const { error } = await supabaseClient.auth.updateUser({ password: input.newPassword });
+    if (error) throw new Error("密码更新失败，请稍后重试。");
+  }
+
+  async function requestPasswordReset(email: string) {
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+    if (error) throw new Error("重置邮件发送失败，请稍后重试。");
+  }
+
+  async function updatePassword(newPassword: string) {
+    if (!session) throw new Error("恢复会话已失效，请重新申请重置邮件。");
+    const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+    if (error) throw new Error("密码更新失败，请重新申请重置邮件。");
   }
 
   async function reloadArchiveData() {
@@ -155,7 +182,7 @@ export default function App() {
       if (!data.session) { setSession(null); return; }
       const profile = await hydrateApplicationServices(data.session.user.id);
       const name = profile.displayName || data.session.user.email?.split("@")[0] || "学习者";
-      setSession({ userId: data.session.user.id, name, email: data.session.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: data.session.user.created_at });
+      setSession({ userId: data.session.user.id, name, email: data.session.user.email ?? "", role: profile.role, capabilities: profile.capabilities, createdAt: data.session.user.created_at, emailVerified: Boolean(data.session.user.email_confirmed_at) });
     } catch (error) {
       console.error("Post-login application initialization retry failed", error);
       if (error instanceof ApiRequestError && error.status === 401) {
@@ -183,12 +210,14 @@ export default function App() {
   if (startupError) return <ConnectionScreen error={startupError} onRetry={() => void retryStartup()} />;
 
   return (
-    <AuthProvider value={{ session, signIn, signUp, logout }}>
+    <AuthProvider value={{ session, signIn, signUp, logout, changePassword, requestPasswordReset, updatePassword }}>
       <AppChrome session={session} onLogout={logout}>
         <AssistantRuntimeBoundary session={session}>
           <Routes>
             <RouterRoute path="/login" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="login" />} />
             <RouterRoute path="/register" element={session ? <Navigate to={resolveAuthRedirect(location.state)} replace /> : <AuthPage mode="register" />} />
+            <RouterRoute path="/forgot-password" element={session ? <Navigate to="/" replace /> : <ForgotPasswordPage enabled={passwordResetEnabled} />} />
+            <RouterRoute path="/reset-password" element={<ResetPasswordPage enabled={passwordResetEnabled} />} />
             <RouterRoute path="/" element={session ? <LearningPage session={session} onLogout={logout} /> : <PublicHomePage />} />
             <RouterRoute path="/archive" element={<ArchivePage session={session} onRetry={reloadArchiveData} />} />
             <RouterRoute path="/learn/micro/:knowledgeId" element={<MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} />} />
@@ -205,7 +234,7 @@ export default function App() {
             <RouterRoute path="/courses/:courseId/materials/:materialId" element={<LessonPage session={session} onLogout={logout} />} />
             <RouterRoute path="/courses/:courseId/chapters/:chapterId" element={<CourseGraphPage session={session} onLogout={logout} microLearningProvider={applicationServices.microLearningRepository} />} />
             <RouterRoute path="/records" element={protectedElement(<RecordsPage />)} />
-            <RouterRoute path="/settings" element={protectedElement(<SettingsPage />)} />
+            <RouterRoute path="/settings" element={protectedElement(session ? <SettingsPage session={session} preview={applicationServices.preview?.settings ?? EMPTY_SETTINGS_PREVIEW} onDisplayNameChange={(name) => setSession((previous) => previous ? { ...previous, name } : previous)} /> : null)} />
             <RouterRoute path="/settings/*" element={protectedElement(<Navigate to="/settings" replace />)} />
             <RouterRoute path="/admin" element={!session ? protectedElement(null) : canManageKnowledgeDomains(session) ? <DomainManagementPage session={session} onLogout={logout} /> : <Navigate to="/" replace />} />
             <RouterRoute path="/admin/domains" element={<LegacyRedirect />} />

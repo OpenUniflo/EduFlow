@@ -1,12 +1,14 @@
-import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { BookOpen, Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import { resolveAuthRedirect } from "@/features/auth/authRedirect";
+import { isPasswordResetEnabled } from "@/features/auth/passwordReset";
 import { API_AUTHENTICATION_FAILURE_TTL_MS, getApiAuthenticationFailure, subscribeApiAuthenticationFailure } from "@/shared/api/apiClient";
 import { BrandMark } from "@/shared/ui/BrandMark";
 import { Button } from "@/shared/ui/Button";
 import { TextField } from "@/shared/ui/Field";
+import { AuthArt } from "./AuthArt";
 import "./auth.css";
 
 function passwordScore(value: string) {
@@ -40,6 +42,8 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const [authenticationFailure, setAuthenticationFailure] = useState(getApiAuthenticationFailure);
   const isRegister = mode === "register";
   const destination = location.state ? resolveAuthRedirect(location.state) : null;
+  const notice = !isRegister && location.state && typeof location.state === "object" && "notice" in location.state && typeof location.state.notice === "string" ? location.state.notice : "";
+  const passwordResetEnabled = isPasswordResetEnabled();
   const score = passwordScore(password);
 
   useEffect(() => {
@@ -73,37 +77,10 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
 
   return (
     <main className="ef-auth ef-shell-bg">
-      <section className="ef-auth-art" aria-hidden="true">
-        <svg className="ef-auth-stars" viewBox="0 0 900 600" preserveAspectRatio="xMidYMid slice">
-          <line x1="120" y1="460" x2="330" y2="470" />
-          <line x1="86" y1="260" x2="148" y2="228" />
-          <line x1="610" y1="352" x2="672" y2="246" />
-          <line x1="672" y1="246" x2="756" y2="286" />
-          <line x1="404" y1="208" x2="548" y2="118" />
-          <line x1="601" y1="322" x2="712" y2="276" />
-          <line x1="714" y1="276" x2="664" y2="364" />
-          <line x1="442" y1="142" x2="654" y2="90" />
-          <line x1="490" y1="204" x2="412" y2="62" />
-          <circle cx="120" cy="460" r="5" style={{ "--c": "var(--domain-1)" } as CSSProperties} />
-          <circle cx="330" cy="470" r="7" style={{ "--c": "var(--domain-2)" } as CSSProperties} />
-          <circle cx="86" cy="260" r="5" style={{ "--c": "var(--domain-1)" } as CSSProperties} />
-          <circle cx="148" cy="228" r="6" style={{ "--c": "var(--domain-3)" } as CSSProperties} />
-          <circle cx="610" cy="352" r="6" style={{ "--c": "var(--domain-5)" } as CSSProperties} />
-          <circle cx="672" cy="246" r="9" style={{ "--c": "var(--domain-4)" } as CSSProperties} />
-          <circle cx="756" cy="286" r="5" style={{ "--c": "var(--domain-1)" } as CSSProperties} />
-          <circle cx="404" cy="208" r="5" style={{ "--c": "var(--domain-5)" } as CSSProperties} />
-          <circle cx="548" cy="118" r="8" style={{ "--c": "var(--domain-2)" } as CSSProperties} />
-          <circle cx="601" cy="322" r="8" style={{ "--c": "var(--domain-6)" } as CSSProperties} />
-          <circle cx="712" cy="276" r="6" style={{ "--c": "var(--domain-1)" } as CSSProperties} />
-          <circle cx="664" cy="364" r="5" style={{ "--c": "var(--domain-2)" } as CSSProperties} />
-          <circle cx="442" cy="142" r="7" style={{ "--c": "var(--domain-4)" } as CSSProperties} />
-          <circle cx="654" cy="90" r="5" style={{ "--c": "var(--domain-1)" } as CSSProperties} />
-          <circle cx="490" cy="204" r="6" style={{ "--c": "var(--domain-1)" } as CSSProperties} />
-          <circle cx="412" cy="62" r="5" style={{ "--c": "var(--domain-3)" } as CSSProperties} />
-        </svg>
-        <h2>{isRegister ? "从一个目标开始" : "把知识连成一张可走的路"}</h2>
-        <p>{isRegister ? "告诉 EduFlow 你想做成什么，它会帮你找到课程、补齐前置知识。" : "在档案里看清自己学过什么，在对话里决定下一步。"}</p>
-      </section>
+      <AuthArt
+        title={isRegister ? "从一个目标开始" : "把知识连成一张可走的路"}
+        description={isRegister ? "告诉 EduFlow 你想做成什么，它会帮你找到课程、补齐前置知识。" : "在档案里看清自己学过什么，在对话里决定下一步。"}
+      />
 
       <form className="ef-auth-card ef-ui-glass ef-ui-glass--regular ef-ui-glass--r-24" onSubmit={submit} aria-labelledby="ef-auth-title">
         <div className="ef-auth-brand">
@@ -112,6 +89,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
         </div>
         <h1 id="ef-auth-title">{isRegister ? "创建账号" : "登录"}</h1>
         <p className="ef-auth-sub">{isRegister ? "注册后会保存学习进度、作品和路线。" : "继续你的学习路线。"}</p>
+        {notice ? <div className="ef-auth-success" role="status">{notice}</div> : null}
         {!isRegister && authenticationFailure ? (
           <div className="ef-auth-alert" role="alert" aria-label="登录状态提醒">
             <strong>登录状态已失效</strong>
@@ -172,6 +150,9 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
             </>
           ) : null}
         </div>
+        {!isRegister && passwordResetEnabled ? (
+          <div className="ef-auth-forgot"><button type="button" onClick={() => navigate("/forgot-password")}>忘记密码？</button></div>
+        ) : null}
         {isRegister ? (
           <label className="ef-auth-check">
             <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} required />

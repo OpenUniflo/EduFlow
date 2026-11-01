@@ -1,0 +1,340 @@
+/* N26a Settings. Design tokens and shared primitives only. */
+.ef-set-page {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  gap: var(--sp-16);
+  padding: var(--sp-24) var(--sp-24) calc(var(--sp-48) + var(--sp-48));
+  color: var(--ink);
+}
+
+.ef-set-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-16);
+}
+
+.ef-set-head-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-set-crumb {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-set-crumb b {
+  color: var(--ink-2);
+  font-weight: var(--fw-600);
+}
+
+.ef-set-head h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+  font-weight: var(--fw-700);
+  letter-spacing: -.4px;
+}
+
+.ef-set-sub {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-set-grid {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: var(--sp-16);
+  align-items: start;
+}
+
+.ef-set-rail {
+  position: sticky;
+  top: var(--sp-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+.ef-set-rail button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: 38px;
+  padding: 0 var(--sp-12);
+  border: 0;
+  border-radius: var(--r-12);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+  text-align: left;
+}
+
+.ef-set-rail button:hover,
+.ef-set-rail button.is-on {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-set-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+
+.ef-set-card {
+  scroll-margin-top: var(--sp-24);
+}
+
+.ef-set-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+
+.ef-set-card-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+  font-weight: var(--fw-700);
+}
+
+.ef-set-card-head > span {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-set-account {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+}
+
+.ef-set-account .ef-ui-avatar {
+  width: 52px;
+  height: 52px;
+  flex-basis: 52px;
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+}
+
+.ef-set-account-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-set-account-copy b {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+  font-weight: var(--fw-700);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-set-account-copy span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-set-rows {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.ef-set-row {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  gap: var(--sp-8);
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-set-row:last-child {
+  border-bottom: 0;
+}
+
+.ef-set-row-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.ef-set-row-copy b {
+  display: block;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-set-row-copy span {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-set-device-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border-radius: var(--r-8);
+  background: var(--page);
+  color: var(--muted);
+}
+
+.ef-set-name-form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-8);
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-set-name-form .ef-ui-field-wrap {
+  flex: 1;
+}
+
+.ef-set-form-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-set-password {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--page);
+}
+
+.ef-set-subhead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-8);
+}
+
+.ef-set-subhead b {
+  color: var(--ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-700);
+}
+
+.ef-set-subhead span {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-set-password-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-8);
+}
+
+.ef-set-password .ef-set-form-actions {
+  justify-content: flex-end;
+}
+
+.ef-set-status {
+  margin: 0;
+  padding: var(--sp-8) var(--sp-12);
+  border-radius: var(--r-8);
+  background: var(--target-soft);
+  color: var(--target);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-set-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-set-preview-note {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-set-never {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--page);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-set-never svg {
+  flex: 0 0 14px;
+  margin-top: 1px;
+}
+
+.ef-set-never b {
+  color: var(--ink-2);
+  font-weight: var(--fw-600);
+}
+
+@media (max-width: 900px) {
+  .ef-set-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ef-set-rail {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .ef-set-password-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

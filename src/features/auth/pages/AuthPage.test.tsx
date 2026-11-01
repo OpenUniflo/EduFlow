@@ -10,7 +10,7 @@ import { AuthPage } from "./AuthPage";
 
 const metadata = vi.hoisted(() => ({ current: null as ApiAuthenticationFailure | null }));
 vi.mock("@/shared/api/apiClient", () => ({ API_AUTHENTICATION_FAILURE_TTL_MS: 300000, getApiAuthenticationFailure: () => metadata.current, subscribeApiAuthenticationFailure: () => () => undefined }));
-const auth = { session: null, signIn: vi.fn(), signUp: vi.fn(), logout: vi.fn() };
+const auth = { session: null, signIn: vi.fn(), signUp: vi.fn(), logout: vi.fn(), changePassword: vi.fn(), requestPasswordReset: vi.fn(), updatePassword: vi.fn() };
 function markup(mode: "login" | "register" = "login") {
   return renderToStaticMarkup(<MemoryRouter><AuthProvider value={auth}><AuthPage mode={mode}/></AuthProvider></MemoryRouter>);
 }

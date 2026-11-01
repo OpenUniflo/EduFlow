@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
 import { GlobalNav } from "./GlobalNav";
 
-const AUTH_ROUTES = new Set(["/login", "/register"]);
+const AUTH_ROUTES = new Set(["/login", "/register", "/forgot-password", "/reset-password"]);
 
 /** Single primary chrome: the left rail. Auth pages use the board's split layout instead. */
 export function AppChrome({ session, onLogout, children }: { session: MockSession | null; onLogout: () => void; children: ReactNode }) {

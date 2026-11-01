@@ -1,27 +1,5 @@
-import { BookOpen, FileText, Home } from "lucide-react";
-import type { ReactNode } from "react";
+import { BookOpen, Home } from "lucide-react";
 import { Button } from "@/shared/ui/Button";
-
-export function SettingsPage() {
-  return <ComingSoonPage kicker="设置" title="设置" description="外观、通知与学习偏好会在这里集中管理。" icon={<FileText size={22} aria-hidden />} />;
-}
-
-export function ComingSoonPage({ kicker, title, description, icon }: { kicker: string; title: string; description: string; icon: ReactNode }) {
-  return (
-    <main className="ef-doc-page">
-      <header className="ef-doc-head">
-        <span className="ef-doc-kicker">{kicker}</span>
-        <h1>{title}</h1>
-        <p>{description}</p>
-      </header>
-      <section className="ef-empty" aria-labelledby="ef-coming-soon">
-        {icon}
-        <h2 id="ef-coming-soon">即将推出</h2>
-        <p>这一页还没有接入真实数据，等后续版本完成后再开放。</p>
-      </section>
-    </main>
-  );
-}
 
 /** 404 (N50). The search affordance arrives with ⌘K in P7, so it is not faked here. */
 export function NotFoundPage({ onHome, onArchive }: { onHome: () => void; onArchive: () => void }) {

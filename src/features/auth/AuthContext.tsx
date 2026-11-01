@@ -6,6 +6,9 @@ type AuthContextValue = {
   signIn: (input: { email: string; password: string }) => Promise<void>;
   signUp: (input: { name: string; email: string; password: string }) => Promise<{ confirmationRequired: boolean }>;
   logout: () => void;
+  changePassword: (input: { currentPassword: string; newPassword: string }) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);

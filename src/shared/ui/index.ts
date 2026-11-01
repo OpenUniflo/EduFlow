@@ -3,7 +3,10 @@ export { Avatar, AvatarStack, type AvatarProps, type AvatarSize, type PersonColo
 export { BrandMark, type BrandMarkProps, type BrandMarkVariant } from "./BrandMark";
 export { Bubble, ConversationCard, EventRow, type ConversationCardSize } from "./Conversation";
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./Button";
+export { Card, type CardProps } from "./Card";
 export { Textarea, TextField, type TextareaProps, type TextFieldProps } from "./Field";
+export { SegmentedControl, type SegmentedControlProps, type SegmentedOption } from "./SegmentedControl";
+export { Switch, type SwitchProps } from "./Switch";
 export { GlassDefs } from "./GlassDefs";
 export { GlassSurface, type GlassRadius, type GlassSurfaceProps, type GlassTone } from "./GlassSurface";
 export { HomeComposer, type ComposerContext, type HomeComposerProps } from "./HomeComposer";
