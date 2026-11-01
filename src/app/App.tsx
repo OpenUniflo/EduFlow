@@ -9,6 +9,7 @@ import { ForgotPasswordPage } from "@/features/auth/pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
 import { isPasswordResetEnabled } from "@/features/auth/passwordReset";
 import { AppChrome } from "@/app/components/AppChrome";
+import { GlobalCommandPalette } from "@/app/components/GlobalCommandPalette";
 import { NotFoundPage } from "@/app/pages/PlaceholderPages";
 import { SettingsPage } from "@/features/settings/pages/SettingsPage";
 import { EMPTY_SETTINGS_PREVIEW } from "@/features/settings/model/settingsForm";
@@ -23,7 +24,7 @@ import { CourseCreationWorkspacePage } from "@/features/course/pages/CourseCreat
 import { CourseGraphPage } from "@/features/course/pages/CourseGraphPage";
 import { AssignmentExperiencePage } from "@/features/course/pages/AssignmentExperiencePage";
 import { LessonPage } from "@/features/material/pages/LessonPage";
-import { DomainManagementPage } from "@/features/admin/domains/DomainManagementPage";
+import { AdminPage } from "@/features/admin/AdminPage";
 import { WorkflowLibraryPage } from "@/features/workflow/pages/WorkflowLibraryPage";
 import { retireLegacyWorkflowStorage } from "@/features/workflow/editor/v2/retireLegacyStorage";
 import { WorkflowV2Route } from "@/features/workflow/pages/WorkflowV2Entry";
@@ -236,7 +237,7 @@ export default function App() {
             <RouterRoute path="/records" element={protectedElement(<RecordsPage />)} />
             <RouterRoute path="/settings" element={protectedElement(session ? <SettingsPage session={session} preview={applicationServices.preview?.settings ?? EMPTY_SETTINGS_PREVIEW} onDisplayNameChange={(name) => setSession((previous) => previous ? { ...previous, name } : previous)} /> : null)} />
             <RouterRoute path="/settings/*" element={protectedElement(<Navigate to="/settings" replace />)} />
-            <RouterRoute path="/admin" element={!session ? protectedElement(null) : canManageKnowledgeDomains(session) ? <DomainManagementPage session={session} onLogout={logout} /> : <Navigate to="/" replace />} />
+            <RouterRoute path="/admin" element={!session ? protectedElement(null) : canManageKnowledgeDomains(session) ? <AdminPage session={session} previewUsers={applicationServices.preview?.adminUsers ?? []} /> : <Navigate to="/" replace />} />
             <RouterRoute path="/admin/domains" element={<LegacyRedirect />} />
             <RouterRoute path="/system/*" element={<LegacyRedirect />} />
             <RouterRoute path="/tasks/*" element={protectedElement(<Navigate to="/" replace />)} />
@@ -250,6 +251,7 @@ export default function App() {
           </Routes>
         </AssistantRuntimeBoundary>
       </AppChrome>
+      <GlobalCommandPalette session={session} />
     </AuthProvider>
   );
 }

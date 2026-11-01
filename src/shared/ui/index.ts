@@ -14,3 +14,4 @@ export { ObjectShell, ObjectShellSection, type ObjectShellProps, type ObjectShel
 export { shortDisplayName } from "./displayName";
 export { Chip, ContextPill, Pill, type ChipProps, type ContextPillProps, type PillTone } from "./Pill";
 export { PreviewBadge } from "./PreviewBadge";
+export { COMMAND_PALETTE_OPEN_EVENT, openCommandPalette, type CommandPaletteOpenDetail } from "./commandPaletteEvents";

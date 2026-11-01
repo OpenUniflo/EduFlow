@@ -13,3 +13,6 @@ Rules:
   `localStorage`, `indexedDB`, network or Supabase use.
 - Identities are visibly sample (`示例 · 阿青`, `@preview-aqing`), and every
   rendered preview region carries `<PreviewBadge />`.
+- N17 admin users (`admin/sampleAdminUsers.ts`) are an explicitly synthetic
+  directory: names start with `示例 ·`, emails use `example.eduflow.local`, and
+  the page never sends writes. Real Directory / role management is deferred.

@@ -8,6 +8,8 @@ import type { AssistantProposalPreview } from "@/features/workflow/editor/v2/ass
 import type { WorkflowVersionPreview } from "@/features/workflow/pages/worksPreview";
 import type { SettingsPreview } from "@/features/settings/model/settingsPreview";
 import { sampleSettingsPreview } from "@/demo/preview/settings/sampleSettingsPreview";
+import type { AdminPreviewUser } from "@/features/admin/users/adminUsersPreview";
+import { sampleAdminUsers } from "@/demo/preview/admin/sampleAdminUsers";
 
 /**
  * Application-level injection of Feature Preview sources. The repository is
@@ -23,6 +25,8 @@ export type ApplicationPreviewServices = {
   assistantProposal: AssistantProposalPreview;
   /** Synthetic N26a settings preview: devices, notification toggles, privacy. */
   settings: SettingsPreview;
+  /** Synthetic N17 admin directory; all identities are visibly sample. */
+  adminUsers: readonly AdminPreviewUser[];
   /** Binds preview-only public subsets to the hydrated active Knowledge catalog. */
   bindKnowledgeCatalog(nodeIds: readonly string[]): void;
 };
@@ -36,6 +40,7 @@ export function createPreviewApplicationServices(): ApplicationPreviewServices {
     workflowVersions: sampleWorkflowVersions,
     assistantProposal: sampleWorkflowAssistantProposal,
     settings: sampleSettingsPreview,
+    adminUsers: sampleAdminUsers,
     bindKnowledgeCatalog: (nodeIds) => people.bindKnowledgeNodeIds(nodeIds)
   };
 }

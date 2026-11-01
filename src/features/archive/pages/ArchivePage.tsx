@@ -300,6 +300,22 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     if (urlState.comparePersonIds.length) setSelectedPeopleIds(urlState.comparePersonIds);
   }, [model, urlState]);
 
+  // The app-owned ⌘K surface can deep-link the already-mounted Archive to a
+  // knowledge result; follow URL changes without resetting the camera.
+  useEffect(() => {
+    if (!model || !initialisedRef.current) return;
+    if (urlState.panel === "search") {
+      setSearchOpen(true);
+      setQuery(urlState.search);
+    }
+    if (urlState.focus.type === "knowledge" && model.nodeById.has(urlState.focus.id)) {
+      setSelectedId(urlState.focus.id);
+      sceneRef.current?.shiftForDetail(true);
+    } else if (urlState.focus.type === "course") {
+      setFocusedCourseId(urlState.focus.id);
+    }
+  }, [location.search, model, urlState]);
+
   // Person-centred layout: deterministic and cached; large graphs move to a worker.
   useEffect(() => {
     if (!layout || !model || !selectedPeopleIds.length) { setPersonLayout(null); return; }
@@ -604,7 +620,6 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); openSearch(); return; }
       if (event.key === "Escape") {
         event.preventDefault();
         if (socialOpen) { setSocialOpen(false); return; }

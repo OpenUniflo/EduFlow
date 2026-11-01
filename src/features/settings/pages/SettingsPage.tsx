@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Bell, KeyRound, Lock, MonitorSmartphone, ShieldCheck, UserRound } from "lucide-react";
+import { Bell, KeyRound, Lock, MonitorSmartphone, Search, ShieldCheck, UserRound } from "lucide-react";
 import { useAuth } from "@/features/auth/AuthContext";
 import { roleLabel } from "@/features/auth/roles";
 import type { MockSession } from "@/features/auth/types";
-import { Avatar, Button, Card, Pill, PreviewBadge, SegmentedControl, Switch, TextField } from "@/shared/ui";
+import { Avatar, Button, Card, Pill, PreviewBadge, SegmentedControl, Switch, TextField, openCommandPalette } from "@/shared/ui";
 import { updateDisplayName } from "../settingsApi";
 import { validateDisplayName, validatePasswordChange } from "../model/settingsForm";
 import type { ProfileVisibility, SettingsPreview } from "../model/settingsPreview";
@@ -148,6 +148,16 @@ export function SettingsPage({ session, preview, onDisplayNameChange }: Settings
           <div className="ef-set-crumb"><span>设置</span><span aria-hidden="true">/</span><b>账户与偏好</b></div>
           <h1>设置</h1>
           <span className="ef-set-sub">{displayName} · {role}</span>
+        </div>
+        <div className="ef-set-head-actions">
+          <Button
+            size="32"
+            variant="secondary"
+            icon={<Search size={14} aria-hidden />}
+            onClick={() => openCommandPalette({ source: "settings" })}
+          >
+            搜索设置 <kbd>⌘K</kbd>
+          </Button>
         </div>
       </header>
 

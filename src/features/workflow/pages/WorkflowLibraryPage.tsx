@@ -128,6 +128,14 @@ export function WorkflowLibraryPage({ userId, learnerStateService, onOpenWorkflo
   const scrollKey = `${userId}:${returnTo}`;
 
   useEffect(() => {
+    if (params.get("create") !== "1") return;
+    setCreating(true);
+    const next = new URLSearchParams(params);
+    next.delete("create");
+    setParams(next, { replace: true });
+  }, [params, setParams]);
+
+  useEffect(() => {
     let active = true;
     setLoading(true); setError("");
     void Promise.all([loadAllWorkflows(), learnerStateService.listMyPracticeSubmissions()]).then(([workflowItems, submissions]) => {

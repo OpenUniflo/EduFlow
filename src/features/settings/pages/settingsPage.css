@@ -51,6 +51,29 @@
   line-height: var(--lh-12);
 }
 
+.ef-set-head-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--sp-8);
+  padding-top: calc((var(--lh-12) + var(--sp-8)) + (var(--lh-28) - var(--ctl-32)) / 2);
+}
+
+.ef-set-head-actions kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 18px;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--page);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
 .ef-set-grid {
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr);

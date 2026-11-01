@@ -1,0 +1,592 @@
+/* N17 user & role preview. Tokens and shared UI only. */
+.ef-admin-users {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+
+.ef-admin-users-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  flex-wrap: wrap;
+}
+
+.ef-admin-users-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-admin-users-summary b {
+  color: var(--ink-2);
+  font-weight: var(--fw-600);
+}
+
+.ef-admin-users-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+}
+
+.ef-admin-users-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  flex-wrap: wrap;
+}
+
+.ef-admin-users-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+}
+
+.ef-admin-user-search {
+  width: 320px;
+}
+
+.ef-admin-user-search .ef-ui-field {
+  min-height: var(--ctl-40);
+}
+
+.ef-admin-users-filters .ef-ui-chip b {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-700);
+}
+
+.ef-admin-users-filters .ef-ui-chip[aria-pressed="true"] b {
+  color: var(--brand-ink);
+}
+
+.ef-admin-users-selects {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+}
+
+.ef-admin-select {
+  display: inline-flex;
+  min-height: var(--ctl-32);
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-8);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-admin-select select {
+  min-height: 28px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.ef-admin-batch {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid color-mix(in srgb, var(--brand) 26%, transparent);
+  border-radius: var(--r-12);
+  background: var(--brand-soft);
+}
+
+.ef-admin-batch-count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  color: var(--brand-ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-admin-batch-count b {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-full);
+  background: var(--brand);
+  color: var(--surface);
+  font-size: var(--fs-12);
+  line-height: 1;
+  font-weight: var(--fw-700);
+}
+
+.ef-admin-batch-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 var(--sp-4);
+  background: color-mix(in srgb, var(--brand) 26%, transparent);
+}
+
+.ef-admin-batch .ef-ui-btn--secondary {
+  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  box-shadow: none;
+}
+
+.ef-admin-batch .ef-ui-btn--ghost {
+  margin-left: auto;
+  color: var(--brand-ink);
+}
+
+.ef-admin-table-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: var(--sh-1);
+}
+
+.ef-admin-table-wrap {
+  overflow-x: auto;
+}
+
+.ef-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ef-admin-table th {
+  height: 44px;
+  padding: 0 var(--sp-12);
+  border-bottom: 1px solid var(--line);
+  background: var(--page);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ef-admin-table td {
+  padding: var(--sp-8) var(--sp-12);
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.ef-admin-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ef-admin-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--brand) 5%, var(--surface));
+}
+
+.ef-admin-table tbody tr.is-selected td {
+  background: color-mix(in srgb, var(--brand) 6%, var(--surface));
+}
+
+.ef-admin-table th:nth-child(1),
+.ef-admin-table td:nth-child(1) {
+  width: 42px;
+}
+
+.ef-admin-table th:nth-child(2) {
+  width: 18%;
+}
+
+.ef-admin-table th:nth-child(3) {
+  width: 22%;
+}
+
+.ef-admin-table th:nth-child(4) {
+  width: 15%;
+}
+
+.ef-admin-table th:nth-child(5) {
+  width: 13%;
+}
+
+.ef-admin-table th:nth-child(6) {
+  width: 10%;
+}
+
+.ef-admin-table th:nth-child(7) {
+  width: 10%;
+}
+
+.ef-admin-actions-col {
+  text-align: right;
+}
+
+.ef-admin-check {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--surface);
+  appearance: none;
+  cursor: pointer;
+  position: relative;
+}
+
+.ef-admin-check:checked {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+
+.ef-admin-check:checked::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 3px;
+  width: 8px;
+  height: 4px;
+  border-bottom: 1.8px solid var(--surface);
+  border-left: 1.8px solid var(--surface);
+  transform: rotate(-45deg);
+}
+
+.ef-admin-person {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-admin-person > div {
+  min-width: 0;
+}
+
+.ef-admin-person b {
+  display: block;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-admin-person span {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-admin-avatar {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-700);
+}
+
+.ef-admin-avatar.is-orange {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.ef-admin-avatar.is-cyan {
+  background: color-mix(in srgb, var(--p-cyan) 12%, var(--surface));
+  color: color-mix(in srgb, var(--p-cyan) 76%, var(--ink));
+}
+
+.ef-admin-avatar.is-rose {
+  background: color-mix(in srgb, var(--p-rose) 12%, var(--surface));
+  color: color-mix(in srgb, var(--p-rose) 76%, var(--ink));
+}
+
+.ef-admin-avatar.is-blue {
+  background: var(--acquired-soft);
+  color: var(--acquired);
+}
+
+.ef-admin-avatar.is-quiet {
+  background: var(--page);
+  color: var(--muted);
+}
+
+.ef-admin-mail {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-admin-roles {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.ef-admin-role {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  white-space: nowrap;
+}
+
+.ef-admin-role i {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--pending);
+}
+
+.ef-admin-role.is-admin {
+  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-admin-role.is-admin i {
+  background: var(--brand);
+}
+
+.ef-admin-role.is-teacher {
+  border-color: color-mix(in srgb, var(--acquired) 24%, transparent);
+  background: var(--acquired-soft);
+  color: color-mix(in srgb, var(--acquired) 76%, var(--ink));
+}
+
+.ef-admin-role.is-teacher i {
+  background: var(--acquired);
+}
+
+.ef-admin-role.is-student {
+  background: var(--page);
+}
+
+.ef-admin-org,
+.ef-admin-active {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-admin-active {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-admin-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-4);
+}
+
+.ef-admin-row-action {
+  min-height: 28px;
+  padding: 0 var(--sp-8);
+  border: 1px solid transparent;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  white-space: nowrap;
+}
+
+.ef-admin-row-action:hover {
+  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+  background: var(--brand-soft);
+}
+
+.ef-admin-row-more {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--muted);
+}
+
+.ef-admin-row-more:hover {
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-admin-empty {
+  display: flex;
+  min-height: 260px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  color: var(--muted);
+  text-align: center;
+}
+
+.ef-admin-empty b {
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  font-weight: var(--fw-600);
+}
+
+.ef-admin-empty p {
+  margin: 0;
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-admin-table-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  padding: var(--sp-12) var(--sp-16);
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  flex-wrap: wrap;
+}
+
+.ef-admin-pages {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.ef-admin-page-btn {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0 var(--sp-8);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-admin-page-btn:hover:not(:disabled) {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-admin-page-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.ef-admin-page-btn[aria-current="page"] {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--surface);
+}
+
+.ef-admin-page-gap {
+  color: var(--muted);
+}
+
+.ef-admin-preview-note {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-admin-toast {
+  position: fixed;
+  right: var(--sp-24);
+  bottom: var(--sp-24);
+  z-index: 100;
+  padding: var(--sp-8) var(--sp-12);
+  border-radius: var(--r-12);
+  background: var(--ink);
+  color: var(--surface);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(var(--sp-8));
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.ef-admin-toast.is-on {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 1180px) {
+  .ef-admin-user-search {
+    width: 250px;
+  }
+}
+
+@media (max-width: 900px) {
+  .ef-admin-user-search {
+    width: 100%;
+  }
+
+  .ef-admin-table {
+    min-width: 1020px;
+  }
+}
