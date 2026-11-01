@@ -50,7 +50,9 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
   const progress=formal ? routeExecutionProgress({userId,courseId,steps:formal,runs,acquiredNodeIds:routeData.input.currentNodeIds,facts:edges,selectedNodeIds:version?.snapshot.selectedNodeIds,selectedPrerequisiteEdges:version?.snapshot.prerequisiteEdges}) : null;
   const reachable=new Set(progress?.reachableNodeIds??routeData.input.currentNodeIds);
   if(progress && (!retainedScope || !runs.some(run=>run.status==='completed'&&run.edge_id===action.edge_id&&(run.node_id??null)===(action.node_id??null)&&run.action_id===actionId)) && !progress.availableStepIndexes.some(index=>runMatchesStep({edge_id:action.edge_id,node_id:action.node_id,action_id:actionId},formal![index]))) throw new ApiError(409,'route_step_not_available','该行动尚未进入可执行前沿；请先完成同一关系的前序行动或形成起点能力。已完成行动请使用再次执行。');
-  if (!formal && hasUnmetHardPrerequisite(targetId,reachable,routeData.input.prerequisiteEdges)) throw new ApiError(422,'target_prerequisite_required','请先形成目标能力的必要前置。');
+  // Hard incoming facts remain AND gates for a retained formal route too; the
+  // execution frontier only knows the chosen Step source, not every sibling.
+  if (hasUnmetHardPrerequisite(targetId,reachable,routeData.input.prerequisiteEdges)) throw new ApiError(422,'target_prerequisite_required','请先形成目标能力的必要前置。');
   const cost = evaluateAction(action, { sourceId, acquiredIds: new Set(routeData.input.currentNodeIds), routeExecutionReachableIds:reachable, binding: binding ?? undefined });
   if (!cost.available) throw new ApiError(422, 'action_conditions_unmet', cost.reasons.filter(reason => reason.code !== 'time' && reason.code !== 'difficulty').map(reason => reason.message).join('；'));
   let microPathId: string | null = null;

@@ -381,7 +381,9 @@ export function CourseImmersiveStage({
 
     function emitZoom(force = false) {
       const percent = Math.round((engine.fitDistance / Math.max(1, camera.position.z)) * 100);
-      const next: SemanticZoom = percent < 84 ? "far" : percent > 128 ? "near" : "mid";
+      // The flattened route editor needs every card at every fit; far zoom is
+      // a course-tree chapter overview that hides non-Knowledge cards.
+      const next: SemanticZoom = modeRef.current === "flat" ? "mid" : percent < 84 ? "far" : percent > 128 ? "near" : "mid";
       if (next !== engine.semantic || force) {
         engine.semantic = next;
         host!.setAttribute("data-zoom", next);
@@ -709,9 +711,13 @@ export function CourseImmersiveStage({
         const scale = Math.max(0.38, Math.min(1.3, pxPerWorldNow));
         const distance = camera.position.distanceTo(world);
         positions.set(id, { ...point, scale, distance });
-        const bridgeFactor = spec?.bridge ? capVis : 1;
+        // Flat route editing is a 2D planning surface: every capability card is
+        // a first-class member, so the rotated-plane capability reveal must not
+        // fade or hide non-course (bridge) cards there.
+        const flatMode = modeRef.current === "flat";
+        const bridgeFactor = spec?.bridge && !flatMode ? capVis : 1;
         const kind = element.dataset.kind;
-        const hidden = (spec?.bridge && capVis < 0.02)
+        const hidden = (!flatMode && spec?.bridge && capVis < 0.02)
           || (farOverview && kind === "knowledge")
           || (rotated && kind === "chapter-empty");
         const ghost = Boolean(spec?.ghost);

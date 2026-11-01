@@ -23,6 +23,7 @@ import { buildCourseGraphData } from "../runtime/courseRuntime";
 import { isCourseVisibleToViewer } from "../runtime/courseVisibility";
 import { buildProjectCapabilityModel } from "../capability/projectCapability";
 import { useRoutePlanning } from "../capability/useRoutePlanning";
+import { routeConflictCopy } from "../capability/routeConflictCopy";
 import { evaluatorOptions } from "../practice/practiceModel";
 import type { CourseAssignment, CourseSkillTreeNode, UserAssignmentStatus } from "../types";
 import { buildCoursePlane, type CoursePlaneLayout } from "@/features/archive/model/coursePlaneLayout";
@@ -862,6 +863,9 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     stageNodeCount: stageNodes.length,
     capabilityLayoutNodes: capabilityLayout?.nodes.length ?? null,
     flattenedNodes: flattenedLayout?.nodes.length ?? null,
+    flattenedColumns: flattenedLayout?.columns?.map((column) => ({ kind: column.kind, label: column.label, x: column.x, y: column.y, width: column.width, count: column.count, nodeIds: column.nodeIds })) ?? [],
+    flattenedPositions: Object.fromEntries((flattenedLayout?.nodes ?? []).map((node) => [node.id, { x: node.x, y: node.y, z: node.z }])),
+    flattenedEdges: flattenedLayout?.edges?.map((edge) => ({ id: edge.id, source: edge.source, target: edge.target, relation: edge.relation, strength: edge.strength, points: edge.points })) ?? [],
     stageNodeKinds: [...new Set(stageNodes.map((node) => node.kind))],
     capabilities: capabilityLayout?.bridgeNodes.map((node) => ({
       id: node.id, title: node.title, x: node.x, y: node.y, z: node.z,
@@ -1278,8 +1282,19 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
       </section>
       {currentCapability ? <section className="ef-imm-node-inspector"><h3>{currentCapability.title}</h3><p>{currentCapability.bridge ? "课程外支撑能力" : "课程知识"}</p><div><button type="button" disabled={routeControl.busy} onClick={() => routeControl.mark(currentCapability.id, "include")}>必须经过</button><button type="button" disabled={routeControl.busy} onClick={() => routeControl.mark(currentCapability.id, "exclude")}>不经过</button><button type="button" disabled={routeControl.busy} onClick={() => routeControl.undoNode(currentCapability.id)}>撤销</button></div></section> : <p className="ef-imm-panel-note">点击场景中的能力节点，选择「必须经过」或「不经过」。</p>}
       {diff ? <section className="ef-imm-preview-card"><h3>预览变化</h3><div className="ef-imm-preview-stats"><span><b>+{diff.addedNodeIds.length}</b>新增</span><span><b>−{diff.removedNodeIds.length}</b>移除</span><span><b>+{diff.addedEdgeIds.length}</b>关系</span></div><ul>{diff.addedNodeIds.map((id) => <li key={id} className="is-added">+ {knowledgeTitleById.get(id) ?? id}</li>)}{diff.removedNodeIds.map((id) => <li key={id} className="is-removed">− {knowledgeTitleById.get(id) ?? id}</li>)}</ul></section> : null}
-      {routeControl.preview && !routeControl.preview.valid ? <section className="ef-imm-preview-card is-conflict"><h3>需要处理的结构冲突</h3><ul>{routeControl.preview.conflicts.slice(0, 5).map((conflict, index) => <li key={`${conflict.kind}:${index}`} className="is-removed">{conflict.kind === "target_without_acquired_path" ? "当前已具备能力没有通向目标的路径" : conflict.kind === "include_exclude" ? "不能同时加入与排除" : conflict.kind === "excluded_hard_prerequisite" ? "必须前置被排除" : "关系不属于当前目标路径"}</li>)}</ul></section> : null}
-      {routeControl.preview?.valid && routeControl.preview.execution?.issues.length ? <section className="ef-imm-preview-card is-conflict"><h3>需要选择真实支撑路径</h3><p>预览发现已选能力之间缺少真实关系。系统不会自动把推荐关系加进路线。</p><ul>{routeControl.preview.execution.issues.slice(0, 5).map((issue) => <li key={`${issue.kind}:${issue.nodeId ?? issue.edgeId}`} className="is-removed">{issue.reason}{issue.candidateEdgeIds?.length ? <button type="button" className="ef-imm-inline-btn" onClick={() => routeControl.chooseEdge(issue.candidateEdgeIds![0], true)}>选择支撑</button> : null}</li>)}</ul></section> : null}
+      {routeControl.preview && !routeControl.preview.valid ? <section className="ef-imm-preview-card is-conflict"><h3>需要处理的结构冲突</h3><ul>{routeControl.preview.conflicts.slice(0, 5).map((conflict, index) => {
+        const copy = routeConflictCopy(conflict, (id) => knowledgeTitleById.get(id) ?? id);
+        return <li key={`${conflict.kind}:${index}`} className="is-removed"><strong>{copy.heading}</strong><br/>{copy.reason}
+          {copy.locateNodeId ? <button type="button" className="ef-imm-inline-btn" onClick={() => setSelection(capabilityLayout?.nodes.some((node) => node.id === copy.locateNodeId) ? { kind: "capability", id: copy.locateNodeId! } : { kind: "knowledge", id: copy.locateNodeId! })}>定位能力</button> : null}
+          {copy.removeNodeId ? <button type="button" className="ef-imm-inline-btn" disabled={routeControl.busy} onClick={() => routeControl.removeNodeConstraint(copy.removeNodeId!)}>移除此项约束</button> : null}
+          {copy.excludeTargetNodeId ? <button type="button" className="ef-imm-inline-btn" disabled={routeControl.busy} onClick={() => routeControl.mark(copy.excludeTargetNodeId!, "exclude")}>排除此目标</button> : null}
+        </li>;
+      })}{routeControl.preview.conflicts.length > 5 ? <li className="is-removed">还有 {routeControl.preview.conflicts.length - 5} 条</li> : null}</ul></section> : null}
+      {routeControl.preview?.valid && routeControl.preview.execution?.issues.length ? <section className="ef-imm-preview-card is-conflict"><h3>需要选择真实支撑路径</h3><p>预览发现已选能力之间缺少真实关系。系统不会自动把推荐关系加进路线。</p><ul>{routeControl.preview.execution.issues.slice(0, 5).map((issue) => {
+        const fact = issue.edgeId ? capabilityModel?.supportEdges.find((edge) => edge.id === issue.edgeId) : undefined;
+        const label = issue.nodeId ? knowledgeTitleById.get(issue.nodeId) ?? issue.nodeId : fact ? `${knowledgeTitleById.get(fact.source) ?? fact.source} → ${knowledgeTitleById.get(fact.target) ?? fact.target}` : issue.edgeId ?? "";
+        return <li key={`${issue.kind}:${issue.nodeId ?? issue.edgeId}`} className="is-removed">{label ? <><strong>{label}</strong>：</> : null}{issue.reason}{issue.kind === "action_required" ? "请在场景中选中该能力或关系，选择合法行动后重新预览。" : null}{issue.candidateEdgeIds?.length ? <button type="button" className="ef-imm-inline-btn" onClick={() => routeControl.chooseEdge(issue.candidateEdgeIds![0], true)}>选择支撑</button> : null}</li>;
+      })}{routeControl.preview.execution.issues.length > 5 ? <li className="is-removed">还有 {routeControl.preview.execution.issues.length - 5} 条</li> : null}</ul></section> : null}
       {routeControl.error ? <p className="ef-imm-error" role="alert">{routeControl.error}</p> : null}
       <footer className="ef-imm-panel-actions">
         <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={routeControl.busy} onClick={() => routeControl.replan()}>预览调整结果</button>

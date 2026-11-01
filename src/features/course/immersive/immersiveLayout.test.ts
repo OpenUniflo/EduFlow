@@ -330,3 +330,59 @@ describe("compressed capability layers", () => {
     expect(c3.x - c2.x).toBeGreaterThanOrEqual(40);
   });
 });
+
+describe("flattened route editor card geometry", () => {
+  it("draws every column member exactly once without overlap and anchors every edge on a card", () => {
+    const acquired = Array.from({ length: 7 }, (_, index) => `A${index}`);
+    const intermediate = Array.from({ length: 43 }, (_, index) => `M${index}`);
+    const targets = Array.from({ length: 23 }, (_, index) => `T${index}`);
+    const supportEdges = [
+      ...intermediate.map((id, index) => ({ id: `A0>${id}`, source: "A0", target: id, relation: "prerequisite" as const, strength: "hard" as const })),
+      ...targets.map((id, index) => ({ id: `${intermediate[index]}>${id}`, source: intermediate[index], target: id, relation: "prerequisite" as const, strength: "hard" as const }))
+    ];
+    const model: CapabilityModel = {
+      orderedNodeIds: [...acquired, ...intermediate, ...targets],
+      prerequisiteEdges: supportEdges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target, strength: "hard" })),
+      supportEdges,
+      courseKnowledgeIds: targets,
+      currentKnowledgeIds: acquired,
+      bridgeKnowledgeIds: intermediate,
+      actionableNodeIds: acquired,
+      connectedCourseKnowledgeIds: targets,
+      disconnectedCourseKnowledgeIds: []
+    };
+    const options = { acquiredNodeIds: acquired, targetNodeIds: targets };
+    const { positions, columns } = layoutCapabilityFlattenLayout(model, options);
+    expect(columns.map(column => [column.kind, column.count, column.nodeIds.length]).sort()).toEqual([
+      ["acquired", 7, 7], ["intermediate", 43, 43], ["target", 23, 23]
+    ].sort());
+    const all = columns.flatMap(column => column.nodeIds);
+    expect(all.sort()).toEqual([...acquired, ...intermediate, ...targets].sort());
+    expect(new Set(all.map(id => JSON.stringify(positions.get(id)))).size).toBe(all.length);
+    const boxes = all.map(id => {
+      const point = positions.get(id)!;
+      return { id, left: point.x - 75, right: point.x + 75, top: point.y - 23, bottom: point.y + 23 };
+    });
+    for (let left = 0; left < boxes.length; left += 1) for (let right = left + 1; right < boxes.length; right += 1) {
+      const a = boxes[left];
+      const b = boxes[right];
+      const overlap = Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.01
+        && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.01;
+      expect(overlap, `${a.id} overlaps ${b.id}`).toBe(false);
+    }
+    const spatial = {
+      courseId: "course", modelKey: "flat-geometry", columns: [],
+      nodes: model.orderedNodeIds.map(id => ({
+        id, kind: "capability" as const, title: id, x: 0, y: 0, z: 0, width: 150, height: 46,
+        status: "available" as const, current: acquired.includes(id), course: targets.includes(id), bridge: intermediate.includes(id)
+      })),
+      edges: supportEdges.map(edge => ({ ...edge, points: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }] })),
+      courseNodes: [], bridgeNodes: []
+    };
+    const flattened = flattenCapabilityLayout(spatial, model, options);
+    flattened.edges.forEach((edge, index) => {
+      expect(edge.points[0]).toMatchObject(positions.get(supportEdges[index].source)!);
+      expect(edge.points[1]).toMatchObject(positions.get(supportEdges[index].target)!);
+    });
+  });
+});

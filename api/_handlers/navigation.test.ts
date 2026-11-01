@@ -110,7 +110,7 @@ describe("Navigation authority pagination", () => {
     expect(chunks.every((chunk) => chunk.length === 1 || chunk.reduce((total, id) => total + encodeURIComponent(id).length + 3, 0) <= 4_000)).toBe(true);
   });
 
-  it("does not lose the unacquired hard prerequisite on page three when rejecting an unanchored route", async () => {
+  it("keeps the unacquired hard root from page three as a valid route start", async () => {
     const sourceIds = Array.from({ length: 1_201 }, (_, index) => `source-${String(index).padStart(4, "0")}`);
     const nodeIds = [...sourceIds, "target"];
     const tableRows: Record<string, Row[]> = {
@@ -129,9 +129,9 @@ describe("Navigation authority pagination", () => {
     await handler(request, first.response);
     const second = responseRecorder();
     await handler(request, second.response);
-    expect(first.statusCode()).toBe(422);
-    expect(first.body()).toMatchObject({error:{code:"route_constraints_conflict"}});
-    expect(second.statusCode()).toBe(422);
+    expect(first.statusCode()).toBe(200);
+    expect(JSON.stringify(first.body())).toContain("source-1200");
+    expect(second.statusCode()).toBe(200);
     expect(requirePublishedCourse).toHaveBeenCalledWith(userClient, "course");
   });
 

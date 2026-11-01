@@ -2,17 +2,23 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { KnowledgeEdge } from '@/features/knowledge/types';
 import type { RouteConflict, RouteConstraints } from '@/shared/learning/routePlanning';
+import { routeConflictCopy } from './routeConflictCopy';
 import type { RouteVersion } from '@/shared/learning/routeVersion';
 import { compareRouteActionOptions, isNodeScope, executionEdgeIds, sameActionScope, type CapabilityActionScope, type RouteActionOption, type RouteExecutionIssue, type RouteExecutionStep, type RouteActionChoice } from '@/shared/learning/routeExecution';
 import { routeDiff } from '@/shared/learning/routeDiff';
 import { relationLabel } from '@/shared/learning/routePresentation';
 import type { useRoutePlanning } from './useRoutePlanning';
 export function RouteConflicts({ conflicts, title, locate, undo, exclude }: { conflicts: RouteConflict[]; title(id: string): string; locate?(id:string):void; undo?(id:string):void; exclude?(id:string):void }) {
-  return <div className="route-conflicts" role="alert">{conflicts.map((conflict, index) => <p key={index}>
-    <strong>{conflict.rootNodeId ? `${conflict.rootKind === 'include' ? '无法加入' : '目标当前不可达'}：${title(conflict.rootNodeId)}` : '知识前置关系存在循环'}</strong><br/>
-    {conflict.kind === 'include_exclude' ? '同一能力不能同时加入和排除。' : conflict.kind === 'include_outside_model' ? '该能力不在当前项目能力模型中。' : conflict.kind === 'target_without_acquired_path' ? '当前已掌握能力没有通向此目标的有效路径；可排除此目标，或先学习必要的入口能力。' : conflict.kind === 'excluded_hard_prerequisite' ? `${title(conflict.nodeId!)} 是必须前置，但被当前路线排除。` : conflict.kind === 'hard_prerequisite_outside_path' ? `${title(conflict.rootNodeId!)} 需要的前置关系 ${title(conflict.nodeId!)} → ${title(conflict.rootNodeId!)} 不属于当前有效目标路径；请撤销 ${title(conflict.rootNodeId!)} 的加入或选择其他支路，不能绕过这个前置条件。` : conflict.kind === 'unavailable_hard_prerequisite' ? `${title(conflict.nodeId!)} 是必须前置，但当前不可用；可排除受影响目标，或联系课程维护者修复。` : '请联系课程维护者修正真实前置关系后再规划。'}
-    {locate&&conflict.nodeId?<button onClick={()=>locate(conflict.nodeId!)}>定位能力</button>:null}{undo&&conflict.nodeId&&conflict.constraint!=='knowledge_graph'?<button onClick={()=>undo(conflict.nodeId!)}>移除此项约束</button>:null}
-  {exclude&&conflict.rootNodeId?<button onClick={()=>exclude(conflict.rootNodeId!)}>排除此目标</button>:null}</p>)}</div>;
+  return <div className="route-conflicts" role="alert">{conflicts.map((conflict, index) => {
+    const copy = routeConflictCopy(conflict, title);
+    return <p key={index}>
+      <strong>{copy.heading}</strong><br/>
+      {copy.reason}
+      {locate && copy.locateNodeId ? <button onClick={() => locate(copy.locateNodeId!)}>定位能力</button> : null}
+      {undo && copy.removeNodeId ? <button onClick={() => undo(copy.removeNodeId!)}>移除此项约束</button> : null}
+      {exclude && copy.excludeTargetNodeId ? <button onClick={() => exclude(copy.excludeTargetNodeId!)}>排除此目标</button> : null}
+    </p>;
+  })}</div>;
 }
 export function HistoricalRoute({ version, current, actionTitles={} }: { version: RouteVersion; current?: RouteVersion|null; actionTitles?:Record<string,string>; restore?:()=>void; disabled?:boolean }) {
   const diff=current?routeDiff(current.snapshot,version.snapshot):null;
