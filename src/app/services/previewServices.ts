@@ -3,6 +3,8 @@ import type { CourseSocialRepository } from "@/features/course/immersive/courseS
 import { PreviewPeopleRepository } from "@/demo/preview/people/PreviewPeopleRepository";
 import { PreviewCourseSocialRepository } from "@/demo/preview/course/PreviewCourseSocialRepository";
 import { sampleWorkflowVersions } from "@/demo/preview/workflow/sampleWorkflowVersions";
+import { sampleWorkflowAssistantProposal } from "@/demo/preview/workflow/sampleWorkflowAssistantProposal";
+import type { AssistantProposalPreview } from "@/features/workflow/editor/v2/assistantProposalPreview";
 import type { WorkflowVersionPreview } from "@/features/workflow/pages/worksPreview";
 
 /**
@@ -15,6 +17,8 @@ export type ApplicationPreviewServices = {
   courseSocialRepository: CourseSocialRepository;
   /** Synthetic, read-only version history for the Works card menu preview. */
   workflowVersions: readonly WorkflowVersionPreview[];
+  /** Synthetic N12 assistant proposal; the editor renders it read-only. */
+  assistantProposal: AssistantProposalPreview;
   /** Binds preview-only public subsets to the hydrated active Knowledge catalog. */
   bindKnowledgeCatalog(nodeIds: readonly string[]): void;
 };
@@ -26,6 +30,7 @@ export function createPreviewApplicationServices(): ApplicationPreviewServices {
     peopleRepository: people,
     courseSocialRepository: courseSocial,
     workflowVersions: sampleWorkflowVersions,
+    assistantProposal: sampleWorkflowAssistantProposal,
     bindKnowledgeCatalog: (nodeIds) => people.bindKnowledgeNodeIds(nodeIds)
   };
 }

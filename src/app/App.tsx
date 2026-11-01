@@ -176,7 +176,7 @@ export default function App() {
   }
 
   const editor = routeWorkflowId && session
-    ? <WorkflowV2Route key={`${session.userId}:${routeWorkflowId}`} ownerId={session.userId} workflowId={routeWorkflowId} navigation={null} onBack={() => navigate(typeof location.state?.workflowLibraryReturn === "string" && /^\/works(?:\?|$)/.test(location.state.workflowLibraryReturn) ? location.state.workflowLibraryReturn : "/works")} onOpen={(id) => navigate(`/works/${id}`, { state: location.state })} launchContext={assignmentContext ?? undefined} />
+    ? <WorkflowV2Route key={`${session.userId}:${routeWorkflowId}`} ownerId={session.userId} workflowId={routeWorkflowId} navigation={null} onBack={() => navigate(typeof location.state?.workflowLibraryReturn === "string" && /^\/works(?:\?|$)/.test(location.state.workflowLibraryReturn) ? location.state.workflowLibraryReturn : "/works")} onOpen={(id) => navigate(`/works/${id}`, { state: location.state })} launchContext={assignmentContext ?? undefined} assistantProposal={applicationServices.preview?.assistantProposal ?? undefined} />
     : <NotFoundPage onHome={() => navigate("/")} onArchive={() => navigate("/archive")} />;
 
   if (!ready) return <ConnectionScreen />;

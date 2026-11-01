@@ -40,8 +40,6 @@ const LEGACY = [
   "src/features/course/capability/projectCapability.css",
   "src/features/course/path/coursePath.css",
   "src/features/evidence/evidence.css",
-  "src/features/workflow/editor/v2/nodePanel.css",
-  "src/features/workflow/editor/v2/workflowV2.css",
   "src/features/workflow/resources/resourceCenter.css",
   "src/features/workflow/resources/resourceEditor.css",
   "src/shared/components/conversationWorkbench.css",

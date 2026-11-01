@@ -5,10 +5,11 @@ import { workflowApiV2 } from "../application/v2/useWorkflowV2Controller";
 import type { WorkflowDocumentV2, WorkflowLaunchContext } from "../domain/v2/types";
 import { WorkflowCreateDialog } from "./WorkflowCreateDialog";
 import { LiveWorkflowEditor } from "../editor/v2/LiveWorkflowEditor";
+import type { AssistantProposalPreview } from "../editor/v2/assistantProposalPreview";
 import { LoadingCard } from "../editor/v2/LoadingCard";
 import "../editor/v2/workflowV2.css";
 
-export function WorkflowV2Route({ workflowId, ownerId, navigation, onBack, onOpen, launchContext }: { workflowId: string; ownerId: string; navigation: ReactNode; onBack: () => void; onOpen: (id: string) => void; launchContext?: WorkflowLaunchContext }) {
+export function WorkflowV2Route({ workflowId, ownerId, navigation, onBack, onOpen, launchContext, assistantProposal }: { workflowId: string; ownerId: string; navigation: ReactNode; onBack: () => void; onOpen: (id: string) => void; launchContext?: WorkflowLaunchContext; assistantProposal?: AssistantProposalPreview }) {
   const [document, setDocument] = useState<WorkflowDocumentV2 | null>(null);
   const [template, setTemplate] = useState<{workflowId:string;name:string;description:string}|null>(null);
   const [error, setError] = useState("");
@@ -19,6 +20,6 @@ export function WorkflowV2Route({ workflowId, ownerId, navigation, onBack, onOpe
     return () => { active = false; };
   }, [workflowId, ownerId, retry]);
   if(template)return <main className="wf-v2-loading">{navigation}<WorkflowCreateDialog initialTemplate={template} courseLaunch onClose={onBack} onCreated={id=>{setTemplate(null);if(id===workflowId)setRetry(value=>value+1);else onOpen(id);}}/></main>;
-  if (document) return <LiveWorkflowEditor key={`${ownerId}:${document.definition.workflowId}`} ownerId={ownerId} initial={document} navigation={navigation} launchContext={launchContext} onBack={onBack} onOpen={onOpen} />;
+  if (document) return <LiveWorkflowEditor key={`${ownerId}:${document.definition.workflowId}`} ownerId={ownerId} initial={document} navigation={navigation} launchContext={launchContext} assistantProposal={assistantProposal} onBack={onBack} onOpen={onOpen} />;
   return <main className="wf-v2-loading">{navigation}{error ? <section className="wf-loading-error"><h1>工作流暂时无法打开</h1><p role="alert">{error}</p><button onClick={() => setRetry(value => value + 1)}>重新加载</button><button onClick={onBack}>返回工作流库</button></section> : <LoadingCard/>}</main>;
 }
