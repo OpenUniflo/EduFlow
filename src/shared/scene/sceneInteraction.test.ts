@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   SCENE_CAMERA,
+  contentRadius,
+  distanceForScreenSpacing,
+  distanceForViewportRatio,
   doubleClickAction,
+  fitDistanceForRadius,
   focusPose,
   frontPose,
   isCameraDrag,
   isPanGesture,
+  medianNearestNeighbourDistance,
+  sceneCameraLimits,
   shouldSnapToFront,
-  zoomDistance
+  zoomDistance,
+  zoomPercent
 } from "./cameraInteraction";
 import {
   SELECTION_DIM_OPACITY,
@@ -56,6 +63,29 @@ describe("shared scene camera convention", () => {
       target: { x: 20, y: -10, z: 0 },
       position: { x: 20, y: -10, z: 500 }
     });
+    // A compact person layout needs a front pose below the legacy 180 floor.
+    expect(frontPose({ x: 0, y: 0, z: 0 }, 40, 30, 4000).position.z).toBe(40);
+  });
+
+  it("derives near / far distances from content instead of one shared floor", () => {
+    // Archive: 6 world-unit node spacing at 200 css px in a 900px-tall viewport.
+    const archive = sceneCameraLimits({ contentRadius: 900, viewportHeight: 900, adjacentSpacing: 6, nearSpacingPx: 200 });
+    expect(archive.minDistance).toBeCloseTo(37.08, 1);
+    expect(distanceForScreenSpacing(6, 200, 900)).toBeCloseTo(archive.minDistance);
+    // Course: a 64-unit card covers half the viewport height.
+    const course = sceneCameraLimits({ contentRadius: 1800, viewportHeight: 900, cardHeight: 64, nearCardViewportRatio: 0.5 });
+    expect(course.minDistance).toBeCloseTo(distanceForViewportRatio(64, 0.5), 2);
+    expect(course.minDistance).toBeCloseTo(175.86, 1);
+    expect(course.maxDistance).toBeGreaterThan(course.fitDistance);
+    // Percent is always relative to the fit-all distance and is not capped.
+    expect(zoomPercent(course.fitDistance, course.fitDistance)).toBe(100);
+    expect(zoomPercent(course.fitDistance, course.fitDistance / 40)).toBe(4000);
+  });
+
+  it("measures sparse person layouts from their real adjacency", () => {
+    expect(medianNearestNeighbourDistance([{ x: 0, y: 0, z: 0 }, { x: 4, y: 0, z: 0 }, { x: 100, y: 0, z: 0 }])).toBe(4);
+    expect(contentRadius([{ x: -100, y: 0, z: 0 }, { x: 100, y: 0, z: 0 }])).toBe(100);
+    expect(fitDistanceForRadius(100)).toBeGreaterThan(100);
   });
 });
 

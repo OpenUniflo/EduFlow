@@ -3209,6 +3209,25 @@ body:has(.ef-imm-page) {
   outline: none;
 }
 
+/* P4R8 route band: a 2D canvas layer above the CSS3D cards and the capability
+   plane. Page overlays (detail panel 46, toolbars 34, rails) live outside the
+   stage and stay above it; glyph holes keep card / label text readable. */
+.ef-imm-route-band {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ef-imm-route-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 /* The x-ray is a stage child: page overlays (detail panel, toolbars, rails)
    sit above the stage, so they naturally occlude it. */
 .ef-imm-tilt-xray {

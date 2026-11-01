@@ -639,13 +639,15 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     // both faces; the stage moves the band with the layer offset during the
     // 420ms swap. A missing practice is the "暂无对应实训" placeholder card.
     if (!authenticated || !routeReady || !routeOn || tab !== "course" || flat) return [];
-    const worldPoints = buildRouteTrack(routeOrder, routeTrack.cards);
-    if (worldPoints.length < 2) return [];
-    const points = worldPoints.map((point) => ({ x: point.x, y: -point.y, z: point.z }));
+    // P4R8: the band is the execution order itself. The stage resolves each id
+    // through its own drawn position (layer offset included), so a capability
+    // or intermediate node without a card is still an anchor.
+    if (routeOrder.length < 2) return [];
     return [{
       id: "course-route",
       kind: "current",
-      points,
+      points: [],
+      nodeIds: [...routeOrder],
       // Course-order and adopted routes share one pulse-beam style; only the
       // status-bar copy differs.
       dimmed: Boolean(effectiveSelection) && !selectionRelations.onRoute
@@ -989,11 +991,11 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
     // While editing, the current route stays visible but dimmed; the preview
     // route is a second flowing band in the target colour.
     const currentPoints = routeNodePoints(flattened, routeOrder);
-    if (currentPoints.length > 1) beams.push({ id: "flat-current", kind: "current", points: currentPoints, dimmed: true });
+    if (currentPoints.length > 1) beams.push({ id: "flat-current", kind: "current", points: currentPoints, nodeIds: [...routeOrder], dimmed: true });
     const preview = routeControl.preview?.valid ? routeControl.preview.route : null;
     if (preview) {
       const previewPoints = routeNodePoints(flattened, preview.orderedNodeIds);
-      if (previewPoints.length > 1) beams.push({ id: "flat-preview", kind: "preview", points: previewPoints });
+      if (previewPoints.length > 1) beams.push({ id: "flat-preview", kind: "preview", points: previewPoints, nodeIds: [...preview.orderedNodeIds] });
     }
     return beams;
   }, [capabilityLayout, capabilityModel, flat, flattenedLayout, routeControl.preview, routeOrder]);

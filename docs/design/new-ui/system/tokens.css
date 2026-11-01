@@ -41,6 +41,13 @@ html,body{margin:0}
   --course-intermediate:var(--pending); /* 课程页：灰 = 待学中间能力 */
   --course-learning-ring:var(--brand);   /* 在学只加外圈，不改主色 */
   --course-route-preview:var(--p-orange);/* 编辑路线预览光带：琥珀色 */
+  --course-route-track:var(--brand);     /* 路线淡轨迹：柔光底 + 细芯 */
+  --course-route-comet:color-mix(in srgb, var(--brand) 52%, var(--surface)); /* 路线亮段：品牌浅色调彗星 */
+  --course-route-comet-head:color-mix(in srgb, var(--brand) 38%, var(--surface)); /* 彗星头部：更亮的浅色调 */
+  --course-route-preview-track:var(--p-orange);
+  --course-route-preview-comet:color-mix(in srgb, var(--p-orange) 52%, var(--surface));
+  --course-route-preview-comet-head:color-mix(in srgb, var(--p-orange) 38%, var(--surface));
+  --course-capability-line:#8B87C9;  /* 课程页能力支撑边：品牌紫与待学灰之间 */
   --practice:#14A6A0;            /* 实训树实践卡竖条 / 编号 */
   --pending-soft:color-mix(in srgb, var(--pending) 18%, var(--surface));
   --warn:#B45309;                /* 警示文字，对白 5.02:1 */
@@ -52,6 +59,17 @@ html,body{margin:0}
   --p-orange:#F59E0B;
   --p-cyan:#06B6D4;
   --p-rose:#EC4899;
+  /* 人物直接边：保留人物色相，压深到对浅底 >=3:1。 */
+  --p-me-edge:var(--brand-ink);
+  --p-orange-edge:#B45309;
+  --p-cyan-edge:#0E7490;
+  --p-rose-edge:#BE185D;
+  /* 档案星图连线（对浅色背景的对比度经实测校准） */
+  --atlas-edge:#8B93B5;          /* 背景知识边 */
+  --atlas-direct-shared:#4338CA; /* 多人共享 / 跨人直接边：中性深色 */
+  --atlas-bridge:#6F6A9C;        /* 桥接边：>=2:1 且明显弱于直接边 */
+  --atlas-bridge-node:#B9B1FF;   /* 桥接节点空心圈 */
+  --atlas-star:#9AA6DA;
 
   /* 领域色：档案星图节点填充，仅用于知识领域，不参与状态语义 */
   --domain-1:#E07A7A;

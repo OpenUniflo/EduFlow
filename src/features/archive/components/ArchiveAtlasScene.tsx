@@ -19,7 +19,8 @@ import {
   pickScreenSpace,
   simplificationForAngle
 } from "@/shared/scene/tiltedPlane";
-import { SCENE_CAMERA, doubleClickAction, focusPose, frontPose, isCameraDrag, isPanGesture, shouldSnapToFront, zoomDistance } from "@/shared/scene/cameraInteraction";
+import { SCENE_CAMERA, contentRadius, doubleClickAction, focusPose, frontPose, isCameraDrag, isPanGesture, medianNearestNeighbourDistance, sceneCameraLimits, shouldSnapToFront, zoomDistance, zoomPercent } from "@/shared/scene/cameraInteraction";
+import { personConnections, personEdgeStyles } from "../model/personConnections";
 import { isPickable, cardNameOpacity, cardShowsOwnName } from "@/shared/scene/presentationRules";
 import { oneHopSelection } from "@/shared/scene/selection";
 import { selectionXraySegments } from "@/shared/scene/xray";
@@ -290,6 +291,12 @@ export default function ArchiveAtlasScene({
     highlightGeometry: LineSegmentsGeometry;
     globalLines: LineSegments2;
     globalGeometry: LineSegmentsGeometry;
+    /** Person core edges, coloured per person with vertex colours. */
+    personLines: LineSegments2;
+    personGeometry: LineSegmentsGeometry;
+    /** Bridge-node edges, neutral highlight at ~55% of the direct weight. */
+    bridgeLines: LineSegments2;
+    bridgeGeometry: LineSegmentsGeometry;
     domainSprites: THREE.Sprite[];
     topicSprites: THREE.Sprite[];
     domainLinks: Array<{ a: number; b: number; line: Line2; material: LineMaterial; count: number }>;
@@ -325,6 +332,20 @@ export default function ArchiveAtlasScene({
     return adjacency;
   }, [edges, nodeIndex, nodes.length]);
 
+  const personPlan = useMemo(() => personConnections({
+    people: people.map((person) => ({ colorKey: person.accent, nodeIds: person.nodeIds })),
+    edges,
+    nodeIds
+  }), [edges, nodeIds, people]);
+  const bridgeNodeIndices = useMemo(() => new Set(personPlan.bridgeNodeIds.flatMap((id) => {
+    const index = nodeIndex.get(id);
+    return index === undefined ? [] : [index];
+  })), [nodeIndex, personPlan]);
+  const personPlanRef = useRef(personPlan);
+  personPlanRef.current = personPlan;
+  const bridgeNodeIndicesRef = useRef(bridgeNodeIndices);
+  bridgeNodeIndicesRef.current = bridgeNodeIndices;
+
   const domainGroups = useMemo<DomainGroup[]>(() => {
     const groups = new Map<string, DomainGroup>();
     nodes.forEach((node, index) => {
@@ -359,7 +380,7 @@ export default function ArchiveAtlasScene({
   const lastCourseInsetsRef = useRef<{ left?: number; right?: number; top?: number; bottom?: number }>({});
   const referenceDistanceRef = useRef(1);
   const downRef = useRef<{ x: number; y: number; time: number; button: number; shift: boolean } | null>(null);
-  const paletteRef = useRef({ edge: "#8b93b5", bright: "#b9b1ff", brandInk: "#4338ca", star: "#9aa6da", global: "#ffb454" });
+  const paletteRef = useRef({ edge: "#8b93b5", bright: "#b9b1ff", bridge: "#6f6a9c", bridgeNode: "#b9b1ff", brandInk: "#4338ca", star: "#9aa6da", global: "#ffb454" });
   const labelPoolRef = useRef(new Map<string, HTMLDivElement>());
   const lastLabelFrameRef = useRef(0);
   const archiveLabelsRef = useRef({
@@ -496,6 +517,7 @@ export default function ArchiveAtlasScene({
     const engine = engineRef.current;
     if (!engine) return;
     engine.target = targetsForMode();
+    applyCameraLimits();
     presentationTargets();
     animationRef.current = {
       start: performance.now(),
@@ -540,7 +562,56 @@ export default function ArchiveAtlasScene({
 
   function cameraDistance() {
     const engine = engineRef.current;
-    return engine ? Math.max(SCENE_CAMERA.minDistance, engine.camera.position.distanceTo(engine.controls.target)) : SCENE_CAMERA.minDistance;
+    return engine ? Math.max(engine.controls.minDistance, engine.camera.position.distanceTo(engine.controls.target)) : SCENE_CAMERA.minDistance;
+  }
+
+  /**
+   * P4R8: the near limit follows the scene content, not the course card scale.
+   * A person layout spaces its nodes a few world units apart, so a fixed 180
+   * floor left the camera unable to ever reach a readable adjacent gap.
+   */
+  function applyCameraLimits() {
+    const engine = engineRef.current;
+    if (!engine) return;
+    // In person focus the core is the readable subject: measure its own
+    // adjacency, not the median of the outward halo, or a compact core would
+    // still be stuck tens of pixels apart.
+    const focused = propsRef.current.mode === "person" && propsRef.current.people.length
+      ? personPlanRef.current.coreNodeIds
+      : null;
+    const indices = focused
+      ? focused.flatMap((id) => { const index = engine.nodeIndex.get(id); return index === undefined ? [] : [index]; })
+      : Array.from({ length: propsRef.current.nodes.length }, (_unused, index) => index);
+    const points = indices.map((index) => ({
+      x: engine.target[index * 3],
+      y: engine.target[index * 3 + 1],
+      z: engine.target[index * 3 + 2]
+    }));
+    // Adjacency comes from the readable subject; the far limit must still
+    // contain every drawn node (the person halo / full knowledge web).
+    const allPoints = Array.from({ length: propsRef.current.nodes.length }, (_unused, index) => ({
+      x: engine.target[index * 3],
+      y: engine.target[index * 3 + 1],
+      z: engine.target[index * 3 + 2]
+    }));
+    const height = engine.renderer.domElement.clientHeight || 1;
+    const limits = sceneCameraLimits({
+      contentRadius: contentRadius(allPoints),
+      viewportHeight: height,
+      adjacentSpacing: medianNearestNeighbourDistance(points),
+      nearSpacingPx: 230
+    });
+    const limitsRef = engine as unknown as { minDistance?: number; maxDistance?: number; fitDistance?: number };
+    limitsRef.minDistance = limits.minDistance;
+    limitsRef.maxDistance = limits.maxDistance;
+    limitsRef.fitDistance = limits.fitDistance;
+    engine.controls.minDistance = limits.minDistance;
+    engine.controls.maxDistance = limits.maxDistance;
+    const distance = engine.camera.position.distanceTo(engine.controls.target);
+    if (distance < limits.minDistance - 0.001) {
+      const direction = engine.camera.position.clone().sub(engine.controls.target).normalize();
+      engine.camera.position.copy(engine.controls.target.clone().addScaledVector(direction, limits.minDistance));
+    }
   }
 
   function fitBoundsOf(indices: Iterable<number>, options: { inset?: SceneInsets; padding?: number; maxRatio?: number; direction?: THREE.Vector3; useTarget?: boolean } = {}) {
@@ -563,7 +634,7 @@ export default function ArchiveAtlasScene({
     const availableHeight = Math.max(180, height - top - bottom);
     // Pixels-per-world that make the fitted sphere occupy the free rectangle.
     const worldPerPixel = Math.min(availableWidth, availableHeight) / (2 * radius) / Math.max(1.01, options.padding ?? 1.08);
-    const distance = Math.max(240, Math.min(6000, height / (2 * FOV_T * Math.max(0.00001, worldPerPixel))));
+    const distance = Math.max(engine.controls.minDistance, Math.min(engine.controls.maxDistance, height / (2 * FOV_T * Math.max(0.00001, worldPerPixel))));
     const direction = options.direction ? options.direction.clone().normalize() : engine.camera.position.clone().sub(engine.controls.target).normalize();
     const rightVector = new THREE.Vector3().setFromMatrixColumn(engine.camera.matrixWorld, 0).normalize();
     const upVector = new THREE.Vector3().setFromMatrixColumn(engine.camera.matrixWorld, 1).normalize();
@@ -614,7 +685,7 @@ export default function ArchiveAtlasScene({
     // when returning from the course page.
     const widthScale = Math.min(1.35, availableWidth / planeWidth);
     const worldPerPixel = Math.max(MIN_CARD_SCALE, widthScale);
-    const distance = Math.max(240, Math.min(6000, height / (2 * FOV_T * Math.max(0.00001, worldPerPixel))));
+    const distance = Math.max(engine.controls.minDistance, Math.min(engine.controls.maxDistance, height / (2 * FOV_T * Math.max(0.00001, worldPerPixel))));
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
     const shiftX = (left - right) / 2;
@@ -738,7 +809,7 @@ export default function ArchiveAtlasScene({
       const engine = engineRef.current;
       if (!engine) return;
       const target = engine.controls.target;
-      const pose = frontPose({ x: target.x, y: target.y, z: target.z }, cameraDistance());
+      const pose = frontPose({ x: target.x, y: target.y, z: target.z }, cameraDistance(), engine.controls.minDistance, engine.controls.maxDistance);
       animateCamera(new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z), new THREE.Vector3(pose.target.x, pose.target.y, pose.target.z), 450);
     },
     shiftForDetail(open) {
@@ -796,6 +867,9 @@ export default function ArchiveAtlasScene({
     controls.screenSpacePanning = true;
     controls.minDistance = SCENE_CAMERA.minDistance;
     controls.maxDistance = SCENE_CAMERA.maxDistance;
+    // P4R8: the wheel dollies toward the cursor, while the toolbar keeps its
+    // centre-target animation.
+    controls.zoomToCursor = true;
     controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
 
     const count = nodes.length;
@@ -927,6 +1001,26 @@ export default function ArchiveAtlasScene({
     const globalSegments = makeSegmentLines("#ffb454", 2.6, 0.95);
     const globalLines = globalSegments.lines;
     const globalGeometry = globalSegments.geometry;
+    // P4R8 person focus: the person's own factual edges leave the faint star
+    // map web and become a coloured, clearly visible relation line.
+    const personGeometry = new LineSegmentsGeometry();
+    const personMaterial = new LineMaterial({ color: new THREE.Color("#ffffff"), linewidth: 2.8, transparent: true, opacity: 1, depthWrite: false, depthTest: false, vertexColors: true });
+    personMaterial.resolution.set(width * renderer.getPixelRatio(), height * renderer.getPixelRatio());
+    const personLines = new LineSegments2(personGeometry, personMaterial);
+    personLines.renderOrder = 7;
+    personLines.frustumCulled = false;
+    personLines.visible = false;
+    scene.add(personLines);
+    // A bridge is half a step away from the direct relation: a thin, muted
+    // neutral line that still clears 2:1 against the light canvas while the
+    // 2.8px saturated direct edge stays above 3:1.
+    const bridgeSegments = makeSegmentLines("#6f6a9c", 1.5, 0.82);
+    const bridgeLines = bridgeSegments.lines;
+    const bridgeGeometry = bridgeSegments.geometry;
+    // Semantic person edges must stay visible even when a translucent domain
+    // plane sits in front of their 3D segment.
+    bridgeSegments.material.depthTest = false;
+    bridgeLines.renderOrder = 6;
     // Course-internal factual dependencies. Primary brand, clearly stronger
     // than the archive's 0.16-opacity background edges; hover/selection adds a
     // bright overlay on the incident upstream/downstream routes.
@@ -1014,6 +1108,7 @@ export default function ArchiveAtlasScene({
       rings, ringGeometry, ringPosition, ringColor1, ringColor2, ringSplit, ringAlpha, ringSize, ringMaterial,
       edgeLines, edgeGeometry, edgePosition, edgeAlpha: edgeAlphaAttribute, edgeMaterial,
       highlightLines, highlightGeometry, globalLines, globalGeometry,
+      personLines, personGeometry, bridgeLines, bridgeGeometry,
       domainSprites, topicSprites, domainLinks, regionMeshes, starField,
       current, target,
       alpha: new Float32Array(count).fill(0.92), targetAlpha: new Float32Array(count).fill(0.92),
@@ -1072,6 +1167,142 @@ export default function ArchiveAtlasScene({
         hoveredId: () => (hoveredRef.current === null ? null : propsRef.current.nodes[hoveredRef.current]?.id ?? null),
         pointer: () => planePointer,
         personSets: () => propsRef.current.people.flatMap((person) => [...person.nodeIds]),
+        nodeIds: () => propsRef.current.nodes.map((node) => node.id),
+        nodeTitle: (id: string) => propsRef.current.nodes.find((node) => node.id === id)?.title ?? id,
+        nodeNeighbors: (id: string) => {
+          const index = engine.nodeIndex.get(id);
+          if (index === undefined) return [];
+          return engine.neighbors[index]
+            .map((neighbor) => propsRef.current.nodes[neighbor]?.id)
+            .filter((neighborId): neighborId is string => Boolean(neighborId));
+        },
+        nodeWorld: (id: string) => { const index = engine.nodeIndex.get(id); return index === undefined ? null : getPosition(index); },
+        personPlan: () => ({
+          directEdges: personPlanRef.current.directEdges,
+          bridgeNodeIds: personPlanRef.current.bridgeNodeIds,
+          bridgeEdges: personPlanRef.current.bridgeEdges
+        }),
+        personEdgeScreens: () => [...personPlanRef.current.directEdges, ...personPlanRef.current.bridgeEdges].flatMap((edge) => {
+          const source = engine.nodeIndex.get(edge.source);
+          const target = engine.nodeIndex.get(edge.target);
+          if (source === undefined || target === undefined) return [];
+          return [{
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            from: { x: Number(planeProject({ x: engine.current[source * 3], y: engine.current[source * 3 + 1], z: engine.current[source * 3 + 2] }).x.toFixed(1)), y: Number(planeProject({ x: engine.current[source * 3], y: engine.current[source * 3 + 1], z: engine.current[source * 3 + 2] }).y.toFixed(1)) },
+            to: { x: Number(planeProject({ x: engine.current[target * 3], y: engine.current[target * 3 + 1], z: engine.current[target * 3 + 2] }).x.toFixed(1)), y: Number(planeProject({ x: engine.current[target * 3], y: engine.current[target * 3 + 1], z: engine.current[target * 3 + 2] }).y.toFixed(1)) }
+          }];
+        }),
+        /**
+         * Every line that leaves the faint background web, with its style and
+         * whether at least one endpoint is currently outside the viewport.
+         * Used by the acceptance run to prove person focus exposes exactly the
+         * direct + bridge sets and nothing else.
+         */
+        brightLines: () => {
+          const mode = propsRef.current.mode;
+          const personMode = mode === "person" && propsRef.current.people.length > 0;
+          const selectedId = propsRef.current.selectedId ?? null;
+          const hoveredId = hoveredRef.current === null ? null : propsRef.current.nodes[hoveredRef.current]?.id ?? null;
+          const endpoint = (id: string) => {
+            const index = engine.nodeIndex.get(id);
+            if (index === undefined) return null;
+            const point = planeProject({ x: engine.current[index * 3], y: engine.current[index * 3 + 1], z: engine.current[index * 3 + 2] });
+            return { x: Number(point.x.toFixed(1)), y: Number(point.y.toFixed(1)), z: Number(point.z.toFixed(3)) };
+          };
+          const offscreen = (point: { x: number; y: number } | null) => Boolean(point
+            && (point.x < 0 || point.y < 0 || point.x > planeViewport.width || point.y > planeViewport.height));
+          const lines: Array<{
+            id: string; source: string; target: string; category: string;
+            color: string; width: number; opacity: number;
+            from: ReturnType<typeof endpoint>; to: ReturnType<typeof endpoint>; offscreen: boolean;
+          }> = [];
+          if (personMode) {
+            const plan = personPlanRef.current;
+            const selection = selectedId
+              ? oneHopSelection({
+                  selectedIds: [selectedId],
+                  nodeIds: propsRef.current.nodes.map((node) => node.id),
+                  edges: propsRef.current.edges
+                })
+              : null;
+            // Same pure rule the scene follows: with a selection the person
+            // network stands down and only the selection edges stay bright.
+            const styleById = new Map(personEdgeStyles({
+              selectedId,
+              selectionEdgeIds: selection?.edgeIds,
+              edges: propsRef.current.edges,
+              directEdges: plan.directEdges,
+              bridgeEdges: plan.bridgeEdges
+            }).map((entry) => [entry.id, entry.style]));
+            propsRef.current.edges.forEach((edge) => {
+              const style = styleById.get(edge.id);
+              if (!style || style === "dim") return;
+              const from = endpoint(edge.source);
+              const to = endpoint(edge.target);
+              const direct = plan.directEdges.find((candidate) => candidate.id === edge.id);
+              lines.push({
+                id: edge.id, source: edge.source, target: edge.target, category: style,
+                color: style === "selection"
+                  ? paletteRef.current.bright
+                  : style === "direct"
+                    ? direct?.colorKey
+                      ? cssVarValue(`--p-${direct.colorKey}-edge`, cssVarValue(`--p-${direct.colorKey}`, paletteRef.current.bright))
+                      : cssVarValue("--atlas-direct-shared", paletteRef.current.bright)
+                    : paletteRef.current.bridge,
+                width: style === "selection" ? 2.4 : style === "direct" ? 2.8 : 1.5,
+                opacity: style === "selection" ? 0.95 : style === "direct" ? 1 : 0.82,
+                from, to, offscreen: offscreen(from) || offscreen(to)
+              });
+            });
+          } else if (selectedId && mode !== "course" && mode !== "draft") {
+            const selected = engine.nodeIndex.get(selectedId);
+            if (selected !== undefined) {
+              engine.neighbors[selected].forEach((neighbor) => {
+                const source = propsRef.current.nodes[selected]?.id ?? selectedId;
+                const target = propsRef.current.nodes[neighbor]?.id;
+                if (!target) return;
+                const from = endpoint(source);
+                const to = endpoint(target);
+                lines.push({
+                  id: `${source}-${target}`, source, target, category: "selection",
+                  color: paletteRef.current.bright, width: 2.4, opacity: 0.95,
+                  from, to, offscreen: offscreen(from) || offscreen(to)
+                });
+              });
+            }
+          }
+          return {
+            mode, personMode, selectedId, hoveredId,
+            hoverDrawsEdges: false,
+            // With a selection no person-network edge keeps its own style; the
+            // reported counts describe what is drawn, not what the plan holds.
+            directCount: personMode && !selectedId ? personPlanRef.current.directEdges.length : 0,
+            bridgeCount: personMode && !selectedId ? personPlanRef.current.bridgeEdges.length : 0,
+            lines
+          };
+        },
+        lineMaterials: () => ({
+          person: {
+            color: `#${personMaterial.color.getHexString()}`, opacity: personMaterial.opacity, width: personMaterial.linewidth, visible: personLines.visible,
+            segments: personGeometry.getAttribute("instanceStart")?.count ?? 0,
+            vertexColors: personMaterial.vertexColors,
+            colors: Array.from(personGeometry.getAttribute("instanceColorStart")?.array ?? []).slice(0, 6),
+            endColors: Array.from(personGeometry.getAttribute("instanceColorEnd")?.array ?? []).slice(0, 6)
+          },
+          bridge: { color: `#${bridgeLines.material.color.getHexString()}`, opacity: bridgeLines.material.opacity, width: bridgeLines.material.linewidth, visible: bridgeLines.visible, segments: bridgeGeometry.getAttribute("instanceStart")?.count ?? 0 },
+          highlight: { color: `#${highlightLines.material.color.getHexString()}`, opacity: highlightLines.material.opacity, width: highlightLines.material.linewidth, visible: highlightLines.visible, segments: highlightGeometry.getAttribute("instanceStart")?.count ?? 0 }
+        }),
+        cameraDistance: () => camera.position.distanceTo(controls.target),
+        cameraLimits: () => ({ min: controls.minDistance, max: controls.maxDistance, reference: referenceDistanceRef.current }),
+        zoomPercent: () => zoomRef.current,
+        wheelDebug: () => wheelDebug,
+        spacing: (which: "current" | "target") => {
+          const source = which === "target" ? engine.target : engine.current;
+          const points = Array.from({ length: propsRef.current.nodes.length }, (_unused, index) => ({ x: source[index * 3], y: source[index * 3 + 1], z: source[index * 3 + 2] }));
+          return { median: medianNearestNeighbourDistance(points), radius: contentRadius(points) };
+        },
         mode: () => propsRef.current.mode,
         peopleSizes: () => propsRef.current.people.map((person) => person.nodeIds.size),
         chapterHover: () => chapterHover,
@@ -1123,6 +1354,8 @@ export default function ArchiveAtlasScene({
       globalSegments.material.resolution.set(nextWidth * renderer.getPixelRatio(), nextHeight * renderer.getPixelRatio());
       dependencySegments.material.resolution.set(nextWidth * renderer.getPixelRatio(), nextHeight * renderer.getPixelRatio());
       dependencyHotSegments.material.resolution.set(nextWidth * renderer.getPixelRatio(), nextHeight * renderer.getPixelRatio());
+      personLines.material.resolution.set(nextWidth * renderer.getPixelRatio(), nextHeight * renderer.getPixelRatio());
+      bridgeSegments.material.resolution.set(nextWidth * renderer.getPixelRatio(), nextHeight * renderer.getPixelRatio());
       // Do not leave labels from the previous viewport visible for a frame
       // while the debounced re-fit starts; the next frame draws them clamped.
       labelPoolRef.current.forEach((element) => { element.style.display = "none"; });
@@ -1154,6 +1387,8 @@ export default function ArchiveAtlasScene({
       paletteRef.current = {
         edge: cssVarValue("--atlas-edge", "#8b93b5"),
         bright: cssVarValue("--brand", "#7c6cf6"),
+        bridge: cssVarValue("--atlas-bridge", "#6f6a9c"),
+        bridgeNode: cssVarValue("--atlas-bridge-node", "#b9b1ff"),
         brandInk: cssVarValue("--brand-ink", "#4338ca"),
         star: cssVarValue("--atlas-star", "#9aa6da"),
         global: cssVarValue("--p-orange", "#e8a75a")
@@ -1164,6 +1399,7 @@ export default function ArchiveAtlasScene({
       globalLines.material.color.set(paletteRef.current.global);
       dependencyLines.material.color.set(paletteRef.current.bright);
       dependencyHotLines.material.color.set(paletteRef.current.brandInk);
+      bridgeLines.material.color.set(paletteRef.current.bridge);
       domainGroups.forEach((group, index) => domainSprites[index]?.material.color.set(resolveColor(group.color)));
       communityGroups.forEach((group, index) => topicSprites[index]?.material.color.set(resolveColor(group.color)));
       refreshPointColors();
@@ -1184,13 +1420,55 @@ export default function ArchiveAtlasScene({
       freezePlaneLabels();
       hidePlaneEx();
     };
-    const onWheel = () => {
+    let wheelDebug: unknown = null;
+    const wheelRaycaster = new THREE.Raycaster();
+    const wheelPlane = new THREE.Plane();
+    const wheelPoint = new THREE.Vector3();
+    const wheelDirection = new THREE.Vector3();
+    const onWheel = (event: WheelEvent) => {
+      // Cursor-centric dolly. The target and camera scale around the point
+      // under the pointer, so a node stays under the cursor while the wheel
+      // moves. The controls' own wheel listener is stopped; toolbar +/− still
+      // animates toward the orbit target.
+      event.preventDefault();
+      event.stopPropagation();
       cameraTweenRef.current.active = false;
       archiveLabelsRef.current.frozen = true;
       archiveLabelsRef.current.lastMoveAt = performance.now();
       freezePlaneLabels();
       schedulePlaneThaw(260);
       hidePlaneEx();
+      const rect = renderer.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const localX = event.clientX - rect.left;
+      const localY = event.clientY - rect.top;
+      // If the pointer is on a node, scale around that node's actual world
+      // position: its projection is then exactly invariant. Blank space uses
+      // the target plane.
+      const hit = pick(localX, localY);
+      let cursor = controls.target;
+      if (hit !== null) {
+        const point = getPosition(hit);
+        cursor = new THREE.Vector3(point.x, point.y, point.z);
+      } else {
+        wheelRaycaster.setFromCamera(new THREE.Vector2(
+          (localX / rect.width) * 2 - 1,
+          -(localY / rect.height) * 2 + 1
+        ), camera);
+        camera.getWorldDirection(wheelDirection);
+        wheelPlane.setFromNormalAndCoplanarPoint(wheelDirection, controls.target);
+        cursor = wheelRaycaster.ray.intersectPlane(wheelPlane, wheelPoint) ?? controls.target;
+      }
+      const distance = camera.position.distanceTo(controls.target);
+      const factor = Math.pow(0.95, controls.zoomSpeed * Math.abs(event.deltaY) * 0.01);
+      const next = Math.max(controls.minDistance, Math.min(controls.maxDistance, distance * factor));
+      wheelDebug = { hit, cursor: cursor.toArray(), distance, next, localX, localY };
+      if (Math.abs(next - distance) < 0.0001) return;
+      const scale = next / Math.max(0.0001, distance);
+      camera.position.sub(cursor).multiplyScalar(scale).add(cursor);
+      controls.target.sub(cursor).multiplyScalar(scale).add(cursor);
+      controls.update();
+      camera.updateMatrixWorld();
     };
     const snapFrontAfterDrag = () => {
       const currentMode = propsRef.current.mode;
@@ -1199,7 +1477,7 @@ export default function ArchiveAtlasScene({
         if (downRef.current) return;
         if (!shouldSnapToFront(planeAngle())) return;
         const target = controls.target.clone();
-        const pose = frontPose({ x: target.x, y: target.y, z: target.z }, camera.position.distanceTo(target));
+        const pose = frontPose({ x: target.x, y: target.y, z: target.z }, camera.position.distanceTo(target), controls.minDistance, controls.maxDistance);
         animateCamera(new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z), target, 450);
       }, SCENE_CAMERA.snapDelayMs);
     };
@@ -1239,7 +1517,7 @@ export default function ArchiveAtlasScene({
         return;
       }
       const target = controls.target.clone();
-      const pose = frontPose({ x: target.x, y: target.y, z: target.z }, camera.position.distanceTo(target));
+      const pose = frontPose({ x: target.x, y: target.y, z: target.z }, camera.position.distanceTo(target), controls.minDistance, controls.maxDistance);
       animateCamera(new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z), target, 450);
     };
     const onContextMenu = (event: MouseEvent) => event.preventDefault();
@@ -1279,7 +1557,7 @@ export default function ArchiveAtlasScene({
       startPresentationAnimation(160);
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
-    renderer.domElement.addEventListener("wheel", onWheel, { passive: true });
+    renderer.domElement.addEventListener("wheel", onWheel, { passive: false });
     renderer.domElement.addEventListener("pointerup", onPointerUp);
     renderer.domElement.addEventListener("pointermove", onPointerMove);
     renderer.domElement.addEventListener("pointerleave", onPointerLeave);
@@ -1404,7 +1682,7 @@ export default function ArchiveAtlasScene({
         levelRef.current = level;
         propsRef.current.onLevelChange?.(level);
       }
-      const percent = Math.round(Math.max(8, Math.min(800, referenceDistanceRef.current / Math.max(1, distanceToTarget) * 100)));
+      const percent = zoomPercent(referenceDistanceRef.current, distanceToTarget);
       if (percent !== zoomRef.current) {
         zoomRef.current = percent;
         propsRef.current.onZoomChange?.(percent);
@@ -1449,13 +1727,17 @@ export default function ArchiveAtlasScene({
       glowMaterial.uniforms.uAlpha.value = courseMode ? 0.45 : 1;
       edgeMaterial.uniforms.uMul.value = 1 - 0.68 * far;
 
+      const personFocusActive = currentMode === "person" && propsRef.current.people.length > 0;
       const pointUnit = pointMaterial.uniforms.uSize.value * cssScale;
       for (let index = 0; index < count; index += 1) {
         const cardVisible = visibleCardIndices.has(index);
         pointPosition.array[index * 3] = engine.current[index * 3];
         pointPosition.array[index * 3 + 1] = engine.current[index * 3 + 1];
         pointPosition.array[index * 3 + 2] = engine.current[index * 3 + 2];
-        pointAlpha.array[index] = cardVisible ? Math.min(0.24, engine.alpha[index]) : engine.alpha[index];
+        // A bridge node is an outline only: its factual adjacency is the
+        // message, not another filled star.
+        const hollow = personFocusActive && bridgeNodeIndicesRef.current.has(index);
+        pointAlpha.array[index] = hollow ? 0 : cardVisible ? Math.min(0.24, engine.alpha[index]) : engine.alpha[index];
         const baseSize = cardVisible ? 5 : (courseMode ? 9.4 : 11.5) * engine.size[index];
         pointSize.array[index] = baseSize;
         const depth = Math.max(1, -pointDepth
@@ -1578,6 +1860,13 @@ export default function ArchiveAtlasScene({
           color2 = owners[1] ? new THREE.Color(cssVarValue(`--p-${owners[1].accent === "me" ? "me" : owners[1].accent}`, "#22b8cf")) : color1;
           split = owners.length > 1 ? 1 : 0;
         }
+        if (personFocusActive && bridgeNodeIndicesRef.current.has(index)) {
+          // Hollow bridge marker: neutral outline, no filled point. The ring
+          // keeps the lighter tone while the bridge edge itself is muted.
+          ringAlphaValue = neighborSet && !neighborSet.has(index) ? 0.3 : 0.92;
+          color1 = new THREE.Color(paletteRef.current.bridgeNode);
+          split = 0;
+        }
         if (selected === index) { ringAlphaValue = 1; color1 = new THREE.Color("#ffffff"); split = 0; }
         if (searchSet.has(index) || assistantSet.has(index)) { ringAlphaValue = Math.max(ringAlphaValue, 0.9); color1 = new THREE.Color(searchSet.has(index) ? cssVarValue("--target", "#22a55e") : cssVarValue("--brand", "#7c6cf6")); split = 0; }
         ringPosition.array[index * 3] = engine.current[index * 3];
@@ -1617,7 +1906,13 @@ export default function ArchiveAtlasScene({
       // selection / hover incident edges
       const highlight: number[] = [];
       const hovered = hoveredRef.current;
-      const focusIndex = selected ?? hovered;
+      // P4R7: hover only lights the stroke ring. Edges are reserved for an
+      // explicit selection. P4R8 fix2: an explicit selection outranks the
+      // person network too — the selected node, its one-hop neighbours and
+      // their factual edges take the selection style in every mode, and the
+      // direct / bridge overlays below stand down.
+      const selectionActive = selected !== undefined;
+      const focusIndex = selected;
       if (focusIndex !== null && focusIndex !== undefined && !courseMode) {
         engine.neighbors[focusIndex].forEach((neighbor) => {
           highlight.push(engine.current[focusIndex * 3], engine.current[focusIndex * 3 + 1], engine.current[focusIndex * 3 + 2]);
@@ -1640,6 +1935,48 @@ export default function ArchiveAtlasScene({
       highlightLines.visible = highlight.length > 0;
       updateLineGeometry(globalGeometry, globalHighlight);
       globalLines.visible = globalHighlight.length > 0;
+
+      // Person focus: factual edges between the person's own Knowledge use the
+      // same fat-line highlight as a selection. Multi-person shared / cross
+      // edges take the neutral highlight; bridge edges keep a dimmer neutral.
+      // While a selection is active these overlays are not drawn at all: the
+      // person network falls back to the same ~20% background weight as every
+      // unrelated edge, so only one edge style (selection) is on screen.
+      const personMode = currentMode === "person" && propsRef.current.people.length > 0;
+      const personDirect: number[] = [];
+      const personColors: number[] = [];
+      const bridgeEdgePositions: number[] = [];
+      if (personMode && !selectionActive) {
+        const plan = personPlanRef.current;
+        plan.directEdges.forEach((edge) => {
+          const source = engine.nodeIndex.get(edge.source);
+          const target = engine.nodeIndex.get(edge.target);
+          if (source === undefined || target === undefined) return;
+          personDirect.push(engine.current[source * 3], engine.current[source * 3 + 1], engine.current[source * 3 + 2]);
+          personDirect.push(engine.current[target * 3], engine.current[target * 3 + 1], engine.current[target * 3 + 2]);
+          // The direct edge keeps the person's hue but uses its darker edge
+          // token so it clears 3:1 on the tinted canvas.
+          const color = new THREE.Color(edge.colorKey
+            ? cssVarValue(`--p-${edge.colorKey}-edge`, cssVarValue(`--p-${edge.colorKey}`, paletteRef.current.bright))
+            : cssVarValue("--atlas-direct-shared", paletteRef.current.bright));
+          personColors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+        });
+        plan.bridgeEdges.forEach((edge) => {
+          const source = engine.nodeIndex.get(edge.source);
+          const target = engine.nodeIndex.get(edge.target);
+          if (source === undefined || target === undefined) return;
+          bridgeEdgePositions.push(engine.current[source * 3], engine.current[source * 3 + 1], engine.current[source * 3 + 2]);
+          bridgeEdgePositions.push(engine.current[target * 3], engine.current[target * 3 + 1], engine.current[target * 3 + 2]);
+        });
+      }
+      if (personDirect.length >= 6) {
+        personGeometry.setPositions(personDirect);
+        if (personColors.length === personDirect.length) personGeometry.setColors(personColors);
+      }
+      personLines.visible = personDirect.length >= 6;
+      if (bridgeEdgePositions.length >= 6) bridgeGeometry.setPositions(bridgeEdgePositions);
+      bridgeLines.visible = bridgeEdgePositions.length >= 6;
+      bridgeLines.material.opacity = 0.82;
 
       // Course-internal prerequisite/enables routes. Every route is already
       // orthogonal and card-safe; hover/selection lifts the incident routes
@@ -2575,10 +2912,12 @@ export default function ArchiveAtlasScene({
             if (!node) continue;
             const forced = index === context.selected || index === hover || context.neighborSet?.has(index) || context.searchSet.has(index) || context.assistantSet.has(index);
             const core = personMode && coreNodeIds.has(node.id);
-            // Person-centred near view names only the focused people's core
-            // knowledge; every other node stays a point unless hovered, selected
-            // or a one-hop neighbour of the selection.
-            if (!forced && personMode && !core) continue;
+            const bridge = personMode && bridgeNodeIndicesRef.current.has(index);
+            // Person-centred near view names the focused people's core
+            // knowledge and the bridge nodes that join at least two of it;
+            // every other node stays a point unless hovered, selected or a
+            // one-hop neighbour of the selection.
+            if (!forced && personMode && !core && !bridge) continue;
             if (!forced && (knowledgeAlpha < 0.08 || engine.alpha[index] < 0.3)) continue;
             const point = project(getPosition(index));
             if (point.z > 1) continue;
@@ -2587,7 +2926,9 @@ export default function ArchiveAtlasScene({
             if (textKey && planeSideVisibleTexts.has(textKey)) continue;
             const width = estimateLabelWidth(text, "", "knowledge", forced);
             const height = labelHeight("knowledge");
-            const diameter = Math.max(12, (pointScreenCss[index] ?? 9) * 2.2);
+            // The marker's own screen diameter (not an inflated 2.2x box):
+            // at near zoom the old box hid most of the person's own names.
+            const diameter = Math.max(12, pointScreenCss[index] ?? 9);
             const key = `node:${node.id}`;
             knowledgeObstacles.push({ x: point.x - diameter / 2 - 4, y: point.y - diameter / 2 - 4, width: diameter + 8, height: diameter + 8 });
             knowledgeCandidates.push({
@@ -2600,7 +2941,7 @@ export default function ArchiveAtlasScene({
               width,
               height,
               // Core names are prioritised but never forced to a far slot.
-              priority: forced ? 2200 + (index === context.selected ? 300 : 0) : core ? 900 + engine.neighbors[index].length * 4 : 600 + engine.neighbors[index].length * 4,
+              priority: forced ? 2200 + (index === context.selected ? 300 : 0) : bridge ? 980 + engine.neighbors[index].length * 4 : core ? 900 + engine.neighbors[index].length * 4 : 600 + engine.neighbors[index].length * 4,
               alpha: forced ? 1 : knowledgeAlpha
             });
             indexByKnowledgeKey.set(key, index);
@@ -2621,7 +2962,9 @@ export default function ArchiveAtlasScene({
             if (textKey && planeSideVisibleTexts.has(textKey)) return;
             const width = estimateLabelWidth(text, "", "knowledge", true);
             const height = labelHeight("knowledge");
-            const diameter = Math.max(12, (pointScreenCss[index] ?? 9) * 2.2);
+            // The marker's own screen diameter (not an inflated 2.2x box):
+            // at near zoom the old box hid most of the person's own names.
+            const diameter = Math.max(12, pointScreenCss[index] ?? 9);
             const key = `node:${node.id}`;
             knowledgeObstacles.push({ x: point.x - diameter / 2 - 4, y: point.y - diameter / 2 - 4, width: diameter + 8, height: diameter + 8 });
             knowledgeCandidates.push({ key, nodeId: node.id, text, x: point.x, y: point.y, diameter, width, height, priority, alpha });
@@ -2795,6 +3138,19 @@ export default function ArchiveAtlasScene({
           level: context.level,
           candidateKeys: knowledgeCandidates.map((candidate) => candidate.key),
           candidateText: knowledgeCandidates.map((candidate) => candidate.text),
+          candidateRects: knowledgeCandidates.map((candidate) => ({
+            text: candidate.text,
+            x: Number(candidate.x.toFixed(1)),
+            y: Number(candidate.y.toFixed(1)),
+            width: Number(candidate.width.toFixed(1)),
+            height: candidate.height
+          })),
+          hudRects: hudRects.map((hud) => ({
+            x: Number(hud.x.toFixed(1)),
+            y: Number(hud.y.toFixed(1)),
+            width: Number(hud.width.toFixed(1)),
+            height: Number(hud.height.toFixed(1))
+          })),
           placedKeys: placedKnowledge.map((label) => label.key),
           placedOther: placedOther.length,
           blockedCount: blocked.length,
@@ -2941,9 +3297,12 @@ export default function ArchiveAtlasScene({
 
   useEffect(() => {
     if (!engineRef.current) return;
+    // People can arrive one render after the mode change; recompute the
+    // content-derived near limit from the focused core once they do.
+    if (mode === "person" && people.length) applyCameraLimits();
     presentationTargets();
     startPresentationAnimation(320);
-  }, [selectedId, searchIds, assistantIds, draftIds, people, reducedMotion]);
+  }, [selectedId, searchIds, assistantIds, draftIds, people, reducedMotion, mode]);
 
   useEffect(() => {
     if (!engineRef.current) return;

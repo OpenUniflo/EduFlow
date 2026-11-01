@@ -27,12 +27,13 @@ import {
   type TiltedSelectionLabelCandidate,
   type TiltedSelectionLabelMarker
 } from "@/shared/scene/tiltedPlane";
-import { SCENE_CAMERA, doubleClickAction, frontPose, isCameraDrag, isPanGesture, shouldSnapToFront, zoomDistance } from "@/shared/scene/cameraInteraction";
+import { SCENE_CAMERA, contentRadius, doubleClickAction, frontPose, isCameraDrag, isPanGesture, sceneCameraLimits, shouldSnapToFront, zoomDistance, zoomPercent } from "@/shared/scene/cameraInteraction";
 import { cardNameOpacity, cardShowsOwnName, hoverStyleFor, isPickable } from "@/shared/scene/presentationRules";
-import { LAYER_SWAP_MS, REFLECTION_OFFSET, layerMixAt, layerOffsetsAt, type LayerOffsets } from "./courseTreeLayout";
+import { COURSE_CARD_HEIGHT, LAYER_SWAP_MS, layerMixAt, layerOffsetsAt, type LayerOffsets } from "./courseTreeLayout";
 import { selectionXraySegments } from "@/shared/scene/xray";
 import { projectColorVar, projectToneFor } from "./projectColors";
-import { advancePulse, pulseCenters, routeMetrics, windowLengthForPixels } from "@/shared/scene/routePulse";
+import { advancePulse, routeMetrics } from "@/shared/scene/routePulse";
+import { buildRouteAnchorSequence, cometGradientStops, pointAtRouteDistance, routeBandComets, staggeredWindowCenters } from "./routeBand";
 import type {
   CourseImmersiveStageHandle,
   SemanticZoom,
@@ -108,6 +109,31 @@ type ChapterRuntime = {
   quad: Array<{ x: number; y: number }>;
 };
 
+type CapabilityLineRuntime = {
+  id: string;
+  source: string;
+  target: string;
+  line: Line2;
+  material: LineMaterial;
+  highlighted: boolean;
+};
+
+type RouteBandRuntime = {
+  id: string;
+  kind: StageBeam["kind"];
+  dimmed: boolean;
+  nodeIds: string[];
+  anchors: THREE.Vector3[];
+  cumulative: number[];
+  total: number;
+  stepDistance: number;
+  distance: number;
+  windowWorld: number;
+  color: string;
+  cometColor: string;
+  cometHead: string;
+};
+
 type EngineApi = {
   animateCamera(position: THREE.Vector3, target: THREE.Vector3, duration?: number): void;
   fit(animated?: boolean): void;
@@ -155,7 +181,15 @@ const smooth = (edge0: number, edge1: number, value: number) => {
 
 function cssColor(name: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  // Resolve var() chains and color-mix() through a probe: getPropertyValue
+  // returns the token expression, which THREE.Color cannot parse.
+  const probe = document.createElement("span");
+  probe.style.color = `var(${name})`;
+  probe.style.display = "none";
+  document.body.appendChild(probe);
+  const resolved = getComputedStyle(probe).color.trim();
+  probe.remove();
+  return resolved || fallback;
 }
 
 function escapeHtml(value: string) {
@@ -304,6 +338,7 @@ export function TiltedCourseStage({
     ringColor2: Float32Array;
     ringSplit: Float32Array;
     edgeGroup: THREE.Group;
+    capabilityGroup: THREE.Group;
     beamGroup: THREE.Group;
     chapterGroup: THREE.Group;
     occluderGroup: THREE.Group;
@@ -368,6 +403,15 @@ export function TiltedCourseStage({
     currentChapters: StageChapter[];
     currentEdges: StageEdge[];
     currentBeams: StageBeam[];
+    /** Dev-only acceptance probe: a comet forced across a card title. */
+    testComet: { x1: number; y1: number; x2: number; y2: number } | null;
+    capabilityLines: CapabilityLineRuntime[];
+    routeHost: HTMLDivElement;
+    routeTrackCanvas: HTMLCanvasElement;
+    routeCometCanvas: HTMLCanvasElement;
+    routeBands: RouteBandRuntime[];
+    minDistance: number;
+    maxDistance: number;
     layer: "skill" | "practice";
     layerMix: number;
     layerTarget: number;
@@ -408,6 +452,13 @@ export function TiltedCourseStage({
       pending: cssColor("--course-intermediate", "#94A3B8"),
       practice: cssColor("--practice", "#14A6A0"),
       preview: cssColor("--course-route-preview", "#F59E0B"),
+      routeTrack: cssColor("--course-route-track", "#6D5DF6"),
+      routeComet: cssColor("--course-route-comet", "#E3E0FE"),
+      routeCometHead: cssColor("--course-route-comet-head", "#F4F2FF"),
+      previewTrack: cssColor("--course-route-preview-track", "#F59E0B"),
+      previewComet: cssColor("--course-route-preview-comet", "#FAD8A0"),
+      previewCometHead: cssColor("--course-route-preview-comet-head", "#FEF5E7"),
+      capability: cssColor("--course-capability-line", "#8B87C9"),
       line: cssColor("--line-strong", "#CBD5E1"),
       ink: cssColor("--ink", "#0F172A")
     };
@@ -428,6 +479,9 @@ export function TiltedCourseStage({
     controls.screenSpacePanning = true;
     controls.minDistance = SCENE_CAMERA.minDistance;
     controls.maxDistance = SCENE_CAMERA.maxDistance;
+    // The wheel dollies toward the cursor; toolbar +/− still animates toward
+    // the orbit target (the screen centre).
+    controls.zoomToCursor = true;
     controls.minPolarAngle = 0.08;
     controls.maxPolarAngle = Math.PI - 0.08;
     controls.enablePan = true;
@@ -439,6 +493,7 @@ export function TiltedCourseStage({
     cssRenderer.domElement.style.zIndex = "2";
     host.appendChild(cssRenderer.domElement);
     const edgeGroup = new THREE.Group();
+    const capabilityGroup = new THREE.Group();
     const beamGroup = new THREE.Group();
     const chapterGroup = new THREE.Group();
     // Depth-only card quads. They are opaque to the depth buffer but write no
@@ -450,7 +505,7 @@ export function TiltedCourseStage({
     occluderMaterial.colorWrite = false;
     occluderMaterial.depthWrite = true;
     occluderMaterial.depthTest = true;
-    scene.add(edgeGroup, beamGroup, chapterGroup, occluderGroup);
+    scene.add(edgeGroup, capabilityGroup, beamGroup, chapterGroup, occluderGroup);
 
     const pointPositions = new Float32Array(512 * 3);
     const pointAlpha = new Float32Array(512);
@@ -522,12 +577,30 @@ export function TiltedCourseStage({
     const hoverRing = document.createElement("div");
     hoverRing.className = "ef-imm-tilt-hover-ring";
     host.appendChild(hoverRing);
+    // P4R8: the route band lives above the CSS3D cards and the capability
+    // plane, but below every page overlay (z-index 4 vs. overlays at 34+).
+    const routeHost = document.createElement("div");
+    routeHost.className = "ef-imm-route-band";
+    routeHost.setAttribute("aria-hidden", "true");
+    // Canvas, not SVG: the CSS3D cards create a composited layer that keeps
+    // dynamic SVG paths underneath it. A 2D canvas sibling reliably paints the
+    // band above the cards, and still lets us stroke gradients and punch
+    // glyph-shaped holes so card text keeps its contrast.
+    routeHost.innerHTML = `
+      <canvas class="ef-imm-route-canvas ef-imm-route-track-canvas" aria-hidden="true"></canvas>
+      <canvas class="ef-imm-route-canvas ef-imm-route-comet-canvas" aria-hidden="true"></canvas>`;
+    host.appendChild(routeHost);
+    const routeTrackCanvas = routeHost.querySelector(".ef-imm-route-track-canvas") as HTMLCanvasElement;
+    const routeCometCanvas = routeHost.querySelector(".ef-imm-route-comet-canvas") as HTMLCanvasElement;
+    const routeTrackCtx = routeTrackCanvas.getContext("2d")!;
+    const routeCometCtx = routeCometCanvas.getContext("2d")!;
+    const routeTextRects: Array<{ x: number; y: number; width: number; height: number }> = [];
 
     const engine = {
       renderer, cssRenderer, scene, cssScene, camera, controls, points, rings,
       pointPositions, pointAlpha, pointSize, pointColor,
       ringPositions, ringAlpha, ringSize, ringColor, ringColor2, ringSplit,
-      edgeGroup, beamGroup, chapterGroup, occluderGroup, flows: [],
+      edgeGroup, capabilityGroup, beamGroup, chapterGroup, occluderGroup, flows: [],
       cards: new Map<string, CardRuntime>(), chapters: new Map<string, ChapterRuntime>(),
       xrayHost, xraySvg, hoverRing,
       labels: new Map<string, HTMLDivElement>(), exRows: new Map<string, HTMLButtonElement>(),
@@ -544,14 +617,16 @@ export function TiltedCourseStage({
       dragging: false, moved: false, suppressClick: false,
       cameraTween: 0, cameraTweenStop: null as null | (() => void),
       externalHover: null as string | null, selected: null as string | null, detailOpen: false, reduced: false,
-      currentNodes: [] as StageNode[], currentChapters: [] as StageChapter[], currentEdges: [] as StageEdge[], currentBeams: [] as StageBeam[],
+      currentNodes: [] as StageNode[], currentChapters: [] as StageChapter[], currentEdges: [] as StageEdge[], currentBeams: [] as StageBeam[], testComet: null,
+      capabilityLines: [] as CapabilityLineRuntime[], routeHost, routeTrackCanvas, routeCometCanvas, routeBands: [] as RouteBandRuntime[],
+      minDistance: SCENE_CAMERA.minDistance, maxDistance: SCENE_CAMERA.maxDistance,
       layer: "skill" as "skill" | "practice",
       layerMix: 0, layerTarget: 0, layerSwapFrom: 0, layerSwapStarted: 0,
       occluders: [] as Array<{ x: number; y: number; width: number; height: number }>,
       capabilityReveal: false, lastSizeStage: "full" as "full" | "pill" | "dot",
       frameCount: 0, fpsStarted: performance.now(),
       emitZoom(force = false) {
-        const percent = Math.round((engine.fitDistance / Math.max(1, camera.position.distanceTo(controls.target))) * 100);
+        const percent = zoomPercent(engine.fitDistance, camera.position.distanceTo(controls.target));
         const next: SemanticZoom = percent < 84 ? "far" : percent > 128 ? "near" : "mid";
         if (engine.semantic !== next || force) {
           engine.semantic = next;
@@ -657,6 +732,20 @@ export function TiltedCourseStage({
       engine.pxPerWorld = scale;
       const distance = engine.height / (2 * scale * FOV_T);
       engine.fitDistance = distance;
+      // P4R8 fix1: at the nearest zoom one knowledge card is ~25–30% of the
+      // viewport height (220–260 px at 900 px), so the page stays useful.
+      // The far limit comes from the drawn content bounding box.
+      const worldPoints = currentNodes.map((node) => ({ x: node.x, y: -node.y, z: node.z }));
+      const limits = sceneCameraLimits({
+        contentRadius: contentRadius(worldPoints),
+        viewportHeight: engine.height,
+        cardHeight: COURSE_CARD_HEIGHT,
+        nearCardViewportRatio: 0.27
+      });
+      engine.minDistance = limits.minDistance;
+      engine.maxDistance = limits.maxDistance;
+      controls.minDistance = limits.minDistance;
+      controls.maxDistance = limits.maxDistance;
       const wasFitted = engine.fitted;
       engine.fitted = true;
       const visibleWidth = usableWidth / scale;
@@ -680,7 +769,7 @@ export function TiltedCourseStage({
     (engine as unknown as { fit(animated?: boolean): void }).fit = fit;
 
     function frontView() {
-      const distance = Math.max(520, camera.position.distanceTo(controls.target));
+      const distance = Math.max(engine.minDistance, camera.position.distanceTo(controls.target));
       const target = controls.target.clone();
       const position = target.clone().add(new THREE.Vector3(0, 0, distance));
       animateCamera(position, target, 620);
@@ -700,7 +789,7 @@ export function TiltedCourseStage({
     }
     function setOrbit(thetaDeg: number, pitchDeg = 0, duration = 620) {
       engine.userInteracted = true;
-      const distance = Math.max(160, camera.position.distanceTo(controls.target));
+      const distance = Math.max(engine.minDistance, camera.position.distanceTo(controls.target));
       const yaw = THREE.MathUtils.degToRad(thetaDeg);
       const pitch = THREE.MathUtils.degToRad(pitchDeg);
       const direction = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
@@ -1952,11 +2041,10 @@ export function TiltedCourseStage({
         engine.edgeGroup.add(line);
       };
       const hasSelection = Boolean(propsRef.current.selectedId);
+      disposeCapabilityLines();
       for (const edge of engine.currentEdges) {
         if (edge.kind === "capability") {
-          // Rest: a quiet 40% gray support web. Selected one-hop support links
-          // become a clear solid line, never a faint dashed one.
-          add(edge.points, edge.highlighted ? colors.brandInk : colors.pending, edge.highlighted ? 1 : hasSelection ? 0.05 : 0.4, !edge.highlighted, edge.kind, edge.pointWeights);
+          addCapabilityLine(edge);
         } else if (edge.kind === "practice") {
           add(edge.points, colors.practice, edge.highlighted ? 0.8 : 0.25, true, edge.kind);
           const line = engine.edgeGroup.children[engine.edgeGroup.children.length - 1];
@@ -1978,6 +2066,48 @@ export function TiltedCourseStage({
       }
       (engine as unknown as { lastEdgeMix?: number }).lastEdgeMix = undefined;
       updateEdgeGeometry();
+    }
+
+    function disposeCapabilityLines() {
+      engine.capabilityGroup.children.slice().forEach((child) => {
+        engine.capabilityGroup.remove(child);
+        if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
+          child.geometry.dispose();
+          const material = child.material as THREE.Material | THREE.Material[];
+          if (Array.isArray(material)) material.forEach((item) => item.dispose());
+          else material.dispose();
+        }
+      });
+      engine.capabilityLines = [];
+    }
+
+    function addCapabilityLine(edge: StageEdge) {
+      const source = nodeById(edge.source ?? "");
+      const target = nodeById(edge.target ?? "");
+      if (!source || !target || edge.points.length < 2) return;
+      const offsets = layerOffsetsAt(engine.layerMix);
+      const from = nodeWorldFor(source, offsets);
+      const to = nodeWorldFor(target, offsets);
+      const geometry = new LineGeometry();
+      geometry.setPositions([from.x, from.y, from.z, to.x, to.y, to.z]);
+      const highlighted = Boolean(edge.highlighted);
+      const material = new LineMaterial({
+        color: new THREE.Color(highlighted ? colors.brandInk : colors.capability),
+        linewidth: highlighted ? 2.5 : 1.5,
+        transparent: true,
+        opacity: highlighted ? 1 : 0.57,
+        depthWrite: false
+      });
+      const ratio = renderer.getPixelRatio();
+      material.resolution.set(engine.width * ratio, engine.height * ratio);
+      const line = new Line2(geometry, material);
+      line.frustumCulled = false;
+      line.renderOrder = 1;
+      line.userData.edgeId = edge.id;
+      line.userData.sourceId = edge.source;
+      line.userData.targetId = edge.target;
+      engine.capabilityGroup.add(line);
+      engine.capabilityLines.push({ id: edge.id, source: edge.source ?? "", target: edge.target ?? "", line, material, highlighted });
     }
 
     function updateEdgeGeometry() {
@@ -2044,168 +2174,293 @@ export function TiltedCourseStage({
       }
     }
 
+    function clearRouteBands() {
+      engine.routeBands = [];
+      routeTrackCtx.clearRect(0, 0, engine.width, engine.height);
+      routeCometCtx.clearRect(0, 0, engine.width, engine.height);
+    }
+
     /**
-     * Route anchors are semantic steps, not a spline control polygon. Cutting
-     * each corner with a small quadratic keeps the band on the anchors while
-     * preventing Catmull-Rom overshoot loops when consecutive lessons jump
-     * between chapters.
+     * Glyph-shaped holes for the comet. The canvas sits above the cards, but a
+     * light glowing line still lowers dark text contrast; punching the exact
+     * title / meta / badge boxes keeps the card copy at its normal contrast.
      */
-    function roundedRoutePoints(anchors: THREE.Vector3[], radius = 8) {
-      if (anchors.length < 3) return anchors;
-      const out: THREE.Vector3[] = [anchors[0]];
-      for (let index = 1; index < anchors.length - 1; index += 1) {
-        const previous = anchors[index - 1];
-        const current = anchors[index];
-        const next = anchors[index + 1];
-        const incoming = current.clone().sub(previous);
-        const outgoing = next.clone().sub(current);
-        const incomingLength = incoming.length();
-        const outgoingLength = outgoing.length();
-        if (incomingLength < 0.001 || outgoingLength < 0.001) { out.push(current); continue; }
-        const cut = Math.min(radius, incomingLength * 0.32, outgoingLength * 0.32);
-        const start = current.clone().add(incoming.normalize().multiplyScalar(-cut));
-        const end = current.clone().add(outgoing.normalize().multiplyScalar(cut));
-        for (let step = 0; step <= 6; step += 1) {
-          const t = step / 6;
-          const one = 1 - t;
-          out.push(new THREE.Vector3(
-            one * one * start.x + 2 * one * t * current.x + t * t * end.x,
-            one * one * start.y + 2 * one * t * current.y + t * t * end.y,
-            one * one * start.z + 2 * one * t * current.z + t * t * end.z
-          ));
-        }
-      }
-      out.push(anchors[anchors.length - 1]);
-      return out;
-    }
-
-    // The route band is a WebGL line under the CSS3D cards, but a translucent
-    // reflection (or a 3D stacking corner case) can still let it read through a
-    // card. Clip the band in screen space against the card bodies, leaving the
-    // left 30px lane free so it still passes through each step disc.
-    function attachBeamOccluders(material: LineMaterial) {
-      const uniforms = {
-        uOccluders: { value: Array.from({ length: 96 }, () => new THREE.Vector4()) },
-        uOccluderCount: { value: 0 }
-      };
-      material.userData.occluderUniforms = uniforms;
-      const previous = material.onBeforeCompile;
-      material.onBeforeCompile = (shader, renderer) => {
-        previous?.call(material, shader, renderer);
-        shader.uniforms.uOccluders = uniforms.uOccluders;
-        shader.uniforms.uOccluderCount = uniforms.uOccluderCount;
-        shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform vec4 uOccluders[96];\nuniform int uOccluderCount;\nbool efBeamOccluded(vec2 p) {\n  for (int i = 0; i < 96; i++) {\n    if (i >= uOccluderCount) break;\n    vec4 r = uOccluders[i];\n    if (p.x >= r.x && p.x <= r.x + r.z && p.y >= r.y && p.y <= r.y + r.w) return true;\n  }\n  return false;\n}')
-          .replace('void main() {', 'void main() {\n  if (efBeamOccluded(gl_FragCoord.xy)) discard;');
-        material.userData.occluderInjected = shader.fragmentShader.includes('efBeamOccluded');
-      };
-      const cacheKey = material.customProgramCacheKey.bind(material);
-      material.customProgramCacheKey = () => `${cacheKey()}:beam-occluder`;
-    }
-
-    function makePulseMaterial(color: string) {
-      const material = new LineMaterial({
-        color,
-        linewidth: 12,
-        transparent: true,
-        opacity: 1,
-        depthWrite: false
+    function updateRouteTextRects(force = false) {
+      const now = performance.now();
+      const last = (engine as unknown as { lastRouteMaskAt?: number }).lastRouteMaskAt ?? 0;
+      if (!force && now - last < 120) return;
+      (engine as unknown as { lastRouteMaskAt?: number }).lastRouteMaskAt = now;
+      const width = Math.max(1, engine.width);
+      const height = Math.max(1, engine.height);
+      const hostRect = hostEl.getBoundingClientRect();
+      routeTextRects.length = 0;
+      engine.cards.forEach((card) => {
+        if (card.opacity < 0.12 || card.angle.dot > 0.6) return;
+        const box = card.element.getBoundingClientRect();
+        if (box.width < 4 || box.height < 4) return;
+        card.element.querySelectorAll<HTMLElement>("strong, small, .ef-imm-node-actions span, .ef-imm-badge, .ef-imm-step, .ef-imm-node-index, .ef-imm-node-count").forEach((text) => {
+          const textContent = text.textContent?.trim();
+          if (!textContent) return;
+          const rect = text.getBoundingClientRect();
+          if (rect.width < 1 || rect.height < 1) return;
+          if (rect.right < 0 || rect.bottom < 0 || rect.left > width || rect.top > height) return;
+          routeTextRects.push({
+            x: rect.left - hostRect.left - 2,
+            y: rect.top - hostRect.top - 2,
+            width: rect.width + 4,
+            height: rect.height + 4
+          });
+        });
       });
-      const uniforms = {
-        uPulseA: { value: 0 },
-        uPulseB: { value: -10 },
-        uPulseWidth: { value: 0.02 },
-        uFlowOn: { value: 1 }
-      };
-      material.userData.flowUniforms = uniforms;
-      material.onBeforeCompile = (shader) => {
-        shader.uniforms.uPulseA = uniforms.uPulseA;
-        shader.uniforms.uPulseB = uniforms.uPulseB;
-        shader.uniforms.uPulseWidth = uniforms.uPulseWidth;
-        shader.uniforms.uFlowOn = uniforms.uFlowOn;
-        shader.vertexShader = shader.vertexShader
-          .replace('#include <common>', '#include <common>\nattribute float aRouteStart;\nattribute float aRouteEnd;\nvarying float vRouteDist;')
-          .replace('void main() {', 'void main() {\n  vRouteDist = ( position.y < 0.5 ) ? aRouteStart : aRouteEnd;');
-        shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', '#include <common>\nuniform float uPulseA;\nuniform float uPulseB;\nuniform float uPulseWidth;\nuniform float uFlowOn;\nvarying float vRouteDist;\nfloat efPulse(float d, float c, float w) {\n  if (w <= 0.00001) return 0.0;\n  float head = c + w * 0.5;\n  float start = c - w * 1.2;\n  if (d < start || d > head) return 0.0;\n  if (d > c) { float t = (head - d) / max(0.00001, head - c); return clamp(t / 0.35, 0.0, 1.0); }\n  float t = (d - start) / max(0.00001, c - start);\n  return pow(clamp(t, 0.0, 1.0), 1.8);\n}')
-          .replace('float alpha = opacity;', 'float alpha = opacity;\nif (uFlowOn < 0.5) { alpha = 0.0; } else {\n  float pulse = max(efPulse(vRouteDist, uPulseA, uPulseWidth), efPulse(vRouteDist, uPulseB, uPulseWidth));\n  alpha *= pulse;\n}');
-      };
-      material.customProgramCacheKey = () => "ef-route-pulse";
-      attachBeamOccluders(material);
-      return material;
+      // Node names are HTML pills above the band; punch them too so a comet
+      // can never wash out a name if the compositor orders the layers tightly.
+      engine.labels.forEach((element) => {
+        if (Number(element.style.opacity || 1) < 0.05) return;
+        const rect = element.getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2) return;
+        if (rect.right < 0 || rect.bottom < 0 || rect.left > width || rect.top > height) return;
+        routeTextRects.push({
+          x: rect.left - hostRect.left - 2,
+          y: rect.top - hostRect.top - 2,
+          width: rect.width + 4,
+          height: rect.height + 4
+        });
+      });
     }
 
     function rebuildBeams() {
-      engine.beamGroup.children.slice().forEach((child) => {
-        engine.beamGroup.remove(child);
-        const disposable = child as unknown as {
-          geometry?: { dispose?: () => void };
-          material?: { dispose?: () => void } | Array<{ dispose?: () => void }>;
-        };
-        disposable.geometry?.dispose?.();
-        if (Array.isArray(disposable.material)) disposable.material.forEach((material) => material.dispose?.());
-        else disposable.material?.dispose?.();
-      });
-      engine.flows = [];
-      beamMaterialsRef.current = [];
-      for (const beam of engine.currentBeams) {
-        const anchors = beam.points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
-        if (anchors.length < 2) continue;
-        const color = beam.kind === "current" ? colors.brandInk : colors.preview;
-        const samples = roundedRoutePoints(anchors);
-        const positions: number[] = [];
-        samples.forEach((point) => positions.push(point.x, point.y, point.z));
-        const dim = Boolean(beam.dimmed);
-        // Fat lines carry a pixel linewidth; zooming therefore never turns the
-        // route band into a world-space tube that swallows the cards.
-        const glowGeometry = new LineGeometry();
-        glowGeometry.setPositions(positions);
-        const glowMaterial = new LineMaterial({ color, linewidth: 10, transparent: true, opacity: dim ? 0.04 : 0.12, depthWrite: false });
-        attachBeamOccluders(glowMaterial);
-        glowMaterial.resolution.set(engine.width, engine.height);
-        const glow = new Line2(glowGeometry, glowMaterial);
-        glow.renderOrder = 0;
-        const coreGeometry = new LineGeometry();
-        coreGeometry.setPositions(positions);
-        const coreMaterial = new LineMaterial({ color, linewidth: 3, transparent: true, opacity: dim ? 0.3 : 0.68, depthWrite: false });
-        attachBeamOccluders(coreMaterial);
-        coreMaterial.resolution.set(engine.width, engine.height);
-        const core = new Line2(coreGeometry, coreMaterial);
-        core.renderOrder = 2;
-        engine.beamGroup.add(glow, core);
-        beamMaterialsRef.current.push(glowMaterial, coreMaterial);
-        // Constant-speed flowing windows instead of a moving ball. The pulse
-        // overlay shares the core polyline and only lights a distance window.
-        const sampleMetrics = routeMetrics(samples.map((point) => ({ x: point.x, y: point.y, z: point.z })));
-        const anchorMetrics = routeMetrics(beam.points);
-        const metrics = { ...sampleMetrics, stepDistance: anchorMetrics.stepDistance };
-        const cumulative = sampleMetrics.cumulative;
-        const routeStart = new Float32Array(Math.max(1, samples.length - 1));
-        const routeEnd = new Float32Array(Math.max(1, samples.length - 1));
-        for (let index = 0; index < samples.length - 1; index += 1) {
-          routeStart[index] = sampleMetrics.total > 0 ? cumulative[index] / sampleMetrics.total : 0;
-          routeEnd[index] = sampleMetrics.total > 0 ? cumulative[index + 1] / sampleMetrics.total : 1;
-        }
-        const pulseGeometry = new LineGeometry();
-        pulseGeometry.setPositions(positions);
-        pulseGeometry.setAttribute("aRouteStart", new THREE.InstancedBufferAttribute(routeStart, 1));
-        pulseGeometry.setAttribute("aRouteEnd", new THREE.InstancedBufferAttribute(routeEnd, 1));
-        const pulseMaterial = makePulseMaterial(color);
-        pulseMaterial.resolution.set(engine.width, engine.height);
-        const pulse = new Line2(pulseGeometry, pulseMaterial);
-        pulse.renderOrder = 3;
-        engine.beamGroup.add(pulse);
-        beamMaterialsRef.current.push(pulseMaterial);
-        const midpoint = samples[Math.floor(samples.length / 2)] ?? anchors[0];
-        engine.flows.push({
-          material: pulseMaterial,
-          metrics,
+      clearRouteBands();
+      updateRouteTextRects(true);
+      engine.currentBeams.forEach((beam) => {
+        const nodeIds = beam.nodeIds?.length
+          ? beam.nodeIds
+          : engine.currentNodes.map((node) => node.id).filter((id) => beam.points.some((point) => {
+            const node = nodeById(id);
+            return Boolean(node && Math.abs(node.x - point.x) < 0.5 && Math.abs(-node.y - point.y) < 0.5);
+          }));
+        if (nodeIds.length < 2) return;
+        const current = beam.kind === "current";
+        engine.routeBands.push({
+          id: beam.id,
+          kind: beam.kind,
+          dimmed: Boolean(beam.dimmed),
+          nodeIds: [...nodeIds],
+          anchors: [],
+          cumulative: [],
+          total: 0,
+          stepDistance: 0,
           distance: 0,
-          midpoint: midpoint.clone(),
-          samples: samples.map((point) => point.clone()),
-          pulseCount: metrics.total > 420 ? 2 : 1
+          windowWorld: 1,
+          color: current ? colors.routeTrack : colors.previewTrack,
+          cometColor: current ? colors.routeComet : colors.previewComet,
+          cometHead: current ? colors.routeCometHead : colors.previewCometHead
         });
+      });
+    }
+
+    /** Screen polyline through the current world anchors of a route band. */
+    function routeBandScreenAnchors(band: RouteBandRuntime) {
+      const anchors = buildRouteAnchorSequence(band.nodeIds, engine.currentNodes.map((node) => {
+        const world = nodeWorld(node);
+        return { id: node.id, x: world.x, y: world.y, z: world.z };
+      }));
+      return anchors.map((anchor) => {
+        const screen = project(anchor);
+        return { world: anchor, screen: { x: screen.x, y: screen.y } };
+      });
+    }
+
+    function routeBandPolyline(
+      anchors: ReturnType<typeof routeBandScreenAnchors>,
+      cumulative: number[],
+      start: number,
+      end: number
+    ) {
+      const total = cumulative[cumulative.length - 1] ?? 0;
+      const from = Math.max(0, start);
+      const to = Math.min(total, end);
+      if (to - from < 0.01 || anchors.length < 2) return [] as Array<{ x: number; y: number }>;
+      const distances = [from];
+      for (let index = 1; index < cumulative.length - 1; index += 1) {
+        const value = cumulative[index];
+        if (value > from && value < to) distances.push(value);
       }
+      distances.push(to);
+      return distances.map((distance) => routeBandScreenPoint(anchors, cumulative, distance));
+    }
+
+    function routeBandScreenPoint(
+      anchors: ReturnType<typeof routeBandScreenAnchors>,
+      cumulative: number[],
+      distance: number
+    ) {
+      if (!anchors.length) return { x: 0, y: 0 };
+      const total = cumulative[cumulative.length - 1] ?? 0;
+      const target = Math.max(0, Math.min(total, distance));
+      let index = 0;
+      while (index < cumulative.length - 2 && cumulative[index + 1] < target) index += 1;
+      const span = Math.max(0.0001, cumulative[index + 1] - cumulative[index]);
+      const t = Math.max(0, Math.min(1, (target - cumulative[index]) / span));
+      const a = anchors[index].screen;
+      const b = anchors[Math.min(anchors.length - 1, index + 1)].screen;
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    }
+
+    function routeColorWithAlpha(color: string, alpha: number) {
+      const srgb = /color\(\s*srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i.exec(color);
+      if (srgb) {
+        return `rgba(${Math.round(Number(srgb[1]) * 255)},${Math.round(Number(srgb[2]) * 255)},${Math.round(Number(srgb[3]) * 255)},${alpha})`;
+      }
+      const rgb = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i.exec(color);
+      if (rgb) {
+        return `rgba(${Math.round(Number(rgb[1]))},${Math.round(Number(rgb[2]))},${Math.round(Number(rgb[3]))},${alpha})`;
+      }
+      return `rgba(109,93,246,${alpha})`;
+    }
+
+    function strokeRoutePolyline(ctx: CanvasRenderingContext2D, points: Array<{ x: number; y: number }>) {
+      if (points.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let index = 1; index < points.length; index += 1) ctx.lineTo(points[index].x, points[index].y);
+      ctx.stroke();
+    }
+
+    function routeGradient(
+      ctx: CanvasRenderingContext2D,
+      color: string,
+      stops: ReturnType<typeof cometGradientStops>,
+      head: { x: number; y: number },
+      tail: { x: number; y: number },
+      headColor: string = color
+    ) {
+      const gradient = ctx.createLinearGradient(head.x, head.y, tail.x, tail.y);
+      stops.forEach((stop, index) => {
+        gradient.addColorStop(stop.offset, routeColorWithAlpha(index === 0 ? headColor : color, stop.opacity));
+      });
+      return gradient;
+    }
+
+    function syncRouteCanvasSize() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const width = Math.max(1, Math.round(engine.width * dpr));
+      const height = Math.max(1, Math.round(engine.height * dpr));
+      [routeTrackCanvas, routeCometCanvas].forEach((canvas) => {
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        const ctx = canvas === routeTrackCanvas ? routeTrackCtx : routeCometCtx;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      });
+      return { width: engine.width, height: engine.height };
+    }
+
+    function updateBeams(delta: number) {
+      const reduced = propsRef.current.reducedMotion;
+      const size = syncRouteCanvasSize();
+      updateRouteTextRects();
+      routeTrackCtx.clearRect(0, 0, size.width, size.height);
+      routeCometCtx.clearRect(0, 0, size.width, size.height);
+      if (!engine.routeBands.length) return;
+      engine.routeBands.forEach((band) => {
+        const anchors = routeBandScreenAnchors(band);
+        if (anchors.length < 2) return;
+        const worldAnchors = anchors.map((anchor) => anchor.world);
+        const metrics = routeMetrics(worldAnchors);
+        band.anchors = worldAnchors.map((anchor) => new THREE.Vector3(anchor.x, anchor.y, anchor.z));
+        band.cumulative = metrics.cumulative;
+        band.total = metrics.total;
+        band.stepDistance = metrics.stepDistance;
+        // 8px soft glow under a 2px core: one luminous ribbon, clearly wider
+        // than the 1.5px knowledge / capability edges.
+        const track = anchors.map((anchor) => anchor.screen);
+        routeTrackCtx.save();
+        routeTrackCtx.lineCap = "round";
+        routeTrackCtx.lineJoin = "round";
+        routeTrackCtx.strokeStyle = band.color;
+        routeTrackCtx.globalAlpha = reduced ? 0.10 : band.dimmed ? 0.05 : 0.12;
+        routeTrackCtx.lineWidth = 8;
+        strokeRoutePolyline(routeTrackCtx, track);
+        routeTrackCtx.globalAlpha = reduced ? 0.20 : band.dimmed ? 0.12 : 0.30;
+        routeTrackCtx.lineWidth = 2;
+        strokeRoutePolyline(routeTrackCtx, track);
+        routeTrackCtx.restore();
+        if (reduced || metrics.total <= 0.0001) return;
+        band.distance = advancePulse(band.distance, metrics, delta);
+        const midpoint = anchors[Math.floor(anchors.length / 2)].world;
+        const distanceToMid = camera.position.distanceTo(new THREE.Vector3(midpoint.x, midpoint.y, midpoint.z));
+        const worldPerPixel = (2 * Math.max(1, distanceToMid) * FOV_T) / Math.max(1, engine.height);
+        // Visible head-to-tail length is ~1.7x the shader window: 60–80px.
+        const windowWorld = 72 / 1.7 * worldPerPixel;
+        band.windowWorld = windowWorld;
+        const comets = routeBandComets(band.distance, metrics, windowWorld, { count: 3 });
+        comets.forEach((comet) => {
+          const points = routeBandPolyline(anchors, metrics.cumulative, comet.start, comet.end);
+          if (points.length < 2) return;
+          const head = routeBandScreenPoint(anchors, metrics.cumulative, comet.head);
+          const tail = routeBandScreenPoint(anchors, metrics.cumulative, comet.tail);
+          const safeTail = Math.hypot(tail.x - head.x, tail.y - head.y) < 0.5 ? { x: head.x - 0.5, y: head.y } : tail;
+          const halo = routeGradient(routeCometCtx, band.cometColor, cometGradientStops("halo"), head, safeTail);
+          const core = routeGradient(routeCometCtx, band.cometColor, cometGradientStops("core"), head, safeTail, band.cometHead);
+          routeCometCtx.save();
+          routeCometCtx.lineCap = "round";
+          routeCometCtx.lineJoin = "round";
+          routeCometCtx.globalAlpha = band.dimmed ? 0.38 : 1;
+          // Two soft halo strokes plus the 3px head-bright core. Multi-stroke
+          // keeps the glow soft without a per-frame canvas blur.
+          routeCometCtx.strokeStyle = halo;
+          routeCometCtx.globalAlpha *= 0.55;
+          routeCometCtx.lineWidth = 14;
+          strokeRoutePolyline(routeCometCtx, points);
+          routeCometCtx.globalAlpha = band.dimmed ? 0.38 : 1;
+          routeCometCtx.lineWidth = 10;
+          strokeRoutePolyline(routeCometCtx, points);
+          routeCometCtx.strokeStyle = core;
+          routeCometCtx.lineWidth = 3;
+          strokeRoutePolyline(routeCometCtx, points);
+          routeCometCtx.restore();
+        });
+      });
+      if (engine.testComet) {
+        const { x1, y1, x2, y2 } = engine.testComet;
+        const head = { x: x2, y: y2 };
+        const tail = { x: x1, y: y1 };
+        const points = [tail, head];
+        const halo = routeGradient(routeCometCtx, colors.routeComet, cometGradientStops("halo"), head, tail);
+        const core = routeGradient(routeCometCtx, colors.routeComet, cometGradientStops("core"), head, tail, colors.routeCometHead);
+        routeCometCtx.save();
+        routeCometCtx.lineCap = "round";
+        routeCometCtx.lineJoin = "round";
+        routeCometCtx.strokeStyle = halo;
+        routeCometCtx.globalAlpha = 0.55;
+        routeCometCtx.lineWidth = 14;
+        strokeRoutePolyline(routeCometCtx, points);
+        routeCometCtx.globalAlpha = 1;
+        routeCometCtx.lineWidth = 10;
+        strokeRoutePolyline(routeCometCtx, points);
+        routeCometCtx.strokeStyle = core;
+        routeCometCtx.lineWidth = 3;
+        strokeRoutePolyline(routeCometCtx, points);
+        routeCometCtx.restore();
+      }
+      // Punch the glyph boxes out of the comet layer only: the track stays
+      // continuous, the card title / meta keeps its original contrast.
+      routeCometCtx.save();
+      routeCometCtx.globalCompositeOperation = "destination-out";
+      // Remove most, not all, of the comet over a glyph box: text keeps a
+      // >=10:1 contrast while the glow stays visually continuous.
+      routeCometCtx.fillStyle = "rgba(0,0,0,0.86)";
+      routeTextRects.forEach((rect) => {
+        routeCometCtx.beginPath();
+        if (typeof routeCometCtx.roundRect === "function") {
+          routeCometCtx.roundRect(rect.x, rect.y, rect.width, rect.height, 3);
+        } else {
+          routeCometCtx.rect(rect.x, rect.y, rect.width, rect.height);
+        }
+        routeCometCtx.fill();
+      });
+      routeCometCtx.restore();
     }
 
     function resize() {
@@ -2225,6 +2480,9 @@ export function TiltedCourseStage({
       ringMaterial.uniforms.uRingMax.value = RING_MAX_PX * pixelRatio;
       ringMaterial.uniforms.uWidth.value = RING_WIDTH_PX * pixelRatio;
       beamMaterialsRef.current.forEach((material) => material.resolution.set(width, height));
+      engine.capabilityLines.forEach((capability) => capability.material.resolution.set(width * pixelRatio, height * pixelRatio));
+      syncRouteCanvasSize();
+      updateRouteTextRects(true);
       if (changed) fit(false);
     }
     (engine as unknown as { resize(): void }).resize = resize;
@@ -2271,10 +2529,6 @@ export function TiltedCourseStage({
         engine.layerTarget = layerTarget;
       }
       engine.layerMix = layerMixAt(engine.layerSwapFrom, engine.layerTarget, now - engine.layerSwapStarted, LAYER_SWAP_MS, engine.reduced);
-      // The route band follows the midpoint of the two offsets during the
-      // 420ms swap, so it visibly moves with the knowledge/practice layers.
-      const beamMix = 2 * engine.layerMix * (1 - engine.layerMix);
-      engine.beamGroup.position.set(REFLECTION_OFFSET.x * beamMix, -REFLECTION_OFFSET.y * beamMix, REFLECTION_OFFSET.z * beamMix);
       // The list rail is a ~35° affordance, not the first faint pixels of
       // the deeper plane.
       const capReveal = angle >= 33;
@@ -2335,53 +2589,18 @@ export function TiltedCourseStage({
           material.opacity = kind === "capability" ? 1 : 0.95;
         }
       });
+      const focusId = selected ?? hover;
+      const anySelected = Boolean(selected);
+      engine.capabilityLines.forEach((capability) => {
+        const lit = capability.highlighted
+          || (!anySelected && Boolean(focusId && (capability.source === focusId || capability.target === focusId)));
+        capability.material.linewidth = lit ? 2.5 : 1.5;
+        capability.material.opacity = lit ? 1 : anySelected ? 0.18 : 0.57;
+        capability.material.color.set(lit ? colors.brandInk : colors.capability);
+      });
     }
     function nodeByIdForPoint(point: TiltedPoint) {
       return engine.currentNodes.find((node) => Math.abs(node.x - point.x) < 0.5 && Math.abs(-node.y - point.y) < 0.5 && Math.abs(node.z - point.z) < 8) ?? null;
-    }
-
-    function updateBeams(delta: number) {
-      const reduced = propsRef.current.reducedMotion;
-      const pixelRatio = renderer.getPixelRatio();
-      const occluders = engine.occluders.slice(0, 96);
-      beamMaterialsRef.current.forEach((material) => {
-        const uniforms = material.userData.occluderUniforms as { uOccluders: { value: THREE.Vector4[] }; uOccluderCount: { value: number } } | undefined;
-        if (!uniforms) return;
-        uniforms.uOccluderCount.value = occluders.length;
-        occluders.forEach((rect, index) => {
-          const target = uniforms.uOccluders.value[index];
-          if (!target) return;
-          target.set(
-            rect.x * pixelRatio,
-            (engine.height - rect.y - rect.height) * pixelRatio,
-            rect.width * pixelRatio,
-            rect.height * pixelRatio
-          );
-        });
-      });
-      for (const flow of engine.flows) {
-        const uniforms = flow.material.userData.flowUniforms as {
-          uPulseA: { value: number };
-          uPulseB: { value: number };
-          uPulseWidth: { value: number };
-          uFlowOn: { value: number };
-        } | undefined;
-        if (!uniforms) continue;
-        if (reduced) {
-          uniforms.uFlowOn.value = 0;
-          continue;
-        }
-        uniforms.uFlowOn.value = 1;
-        flow.distance = advancePulse(flow.distance, flow.metrics, delta);
-        const centers = pulseCenters(flow.distance, flow.metrics);
-        uniforms.uPulseA.value = centers[0] ?? 0;
-        uniforms.uPulseB.value = centers[1] ?? -10;
-        // 40–80px screen window; convert through the camera distance at the
-        // route midpoint so the pulse reads as a light band, not a dot.
-        const distance = camera.position.distanceTo(flow.midpoint);
-        const worldPerPixel = (2 * Math.max(1, distance) * FOV_T) / Math.max(1, engine.height);
-        uniforms.uPulseWidth.value = windowLengthForPixels(64, worldPerPixel, flow.metrics);
-      }
     }
 
     // Interaction: left drag rotates; right / Shift drag pans; wheel zooms;
@@ -2455,16 +2674,50 @@ export function TiltedCourseStage({
       scheduleThaw(moved > 5 ? 240 : 0);
       propsRef.current.onPoseChange?.(angle() > 12 ? "rotated" : "front");
     }
+    const wheelRaycaster = new THREE.Raycaster();
+    const wheelPlane = new THREE.Plane();
+    const wheelPoint = new THREE.Vector3();
+    const wheelForward = new THREE.Vector3();
     function wheel(event: WheelEvent) {
       if ((event.target as HTMLElement).closest(".ef-imm-detail, .ef-imm-object-shell")) return;
       engine.userInteracted = true;
       event.preventDefault();
+      // Cursor-centric dolly on the canvas, before OrbitControls' host
+      // listener. Target and camera scale around the point under the pointer,
+      // so the node under the cursor does not slide while zooming.
+      event.stopPropagation();
       stopCameraTween();
       freezeLabels();
       scheduleThaw(300);
       hideExcentric();
-      // OrbitControls owns the actual dolly; we only freeze the label set and
-      // let the damping settle before recomputing it.
+      const rect = hostEl.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const localX = event.clientX - rect.left;
+      const localY = event.clientY - rect.top;
+      const hit = pickAt(localX, localY);
+      const hitNode = hit ? nodeById(hit) : null;
+      let cursor = controls.target;
+      if (hitNode) {
+        cursor = nodeWorld(hitNode);
+      } else {
+        wheelRaycaster.setFromCamera(new THREE.Vector2(
+          (localX / rect.width) * 2 - 1,
+          -(localY / rect.height) * 2 + 1
+        ), camera);
+        camera.getWorldDirection(wheelForward);
+        wheelPlane.setFromNormalAndCoplanarPoint(wheelForward, controls.target);
+        cursor = wheelRaycaster.ray.intersectPlane(wheelPlane, wheelPoint) ?? controls.target;
+      }
+      const distance = camera.position.distanceTo(controls.target);
+      const factor = Math.pow(0.95, controls.zoomSpeed * Math.abs(event.deltaY) * 0.01);
+      const next = Math.max(controls.minDistance, Math.min(controls.maxDistance, distance * factor));
+      if (Math.abs(next - distance) < 0.0001) return;
+      const scale = next / Math.max(0.0001, distance);
+      camera.position.sub(cursor).multiplyScalar(scale).add(cursor);
+      controls.target.sub(cursor).multiplyScalar(scale).add(cursor);
+      controls.update();
+      camera.updateMatrixWorld();
+      markLabelsDirty();
     }
     function doubleClick(event: MouseEvent) {
       engine.userInteracted = true;
@@ -2491,7 +2744,7 @@ export function TiltedCourseStage({
     hostEl.addEventListener("pointerdown", pointerDown, true);
     window.addEventListener("pointermove", pointerMove);
     window.addEventListener("pointerup", pointerUp);
-    hostEl.addEventListener("wheel", wheel, { passive: false });
+    canvas.addEventListener("wheel", wheel, { passive: false });
     hostEl.addEventListener("dblclick", doubleClick);
     hostEl.addEventListener("contextmenu", (event) => event.preventDefault());
     const resizeObserver = new ResizeObserver(() => resize());
@@ -2501,10 +2754,11 @@ export function TiltedCourseStage({
     if (import.meta.env.DEV) {
       (window as unknown as { __efTilt?: unknown }).__efTilt = {
         angle: () => tiltAngleDegrees(camera.position.clone().sub(controls.target)),
+        fit: () => { engine.fitted = false; engine.userInteracted = false; fit(true); },
         setOrbit: (thetaDeg: number, pitchDeg = 0) => setOrbit(thetaDeg, pitchDeg),
         setZoomPercent: (percent: number) => {
           const direction = camera.position.clone().sub(controls.target);
-          const distance = THREE.MathUtils.clamp(engine.fitDistance / Math.max(0.2, percent / 100), SCENE_CAMERA.minDistance, engine.controls.maxDistance);
+          const distance = THREE.MathUtils.clamp(engine.fitDistance / Math.max(0.2, percent / 100), engine.minDistance, engine.controls.maxDistance);
           animateCamera(controls.target.clone().add(direction.setLength(distance)), controls.target.clone(), 320);
         },
         zoomPercent: () => engine.lastZoomPercent,
@@ -2565,32 +2819,144 @@ export function TiltedCourseStage({
         },
         layer: () => engine.layer,
         layerState: () => ({ mix: Number(engine.layerMix.toFixed(3)), target: engine.layerTarget, from: engine.layerSwapFrom, started: engine.layerSwapStarted, reduced: engine.reduced }),
-        beams: () => engine.currentBeams.map((beam) => ({ id: beam.id, kind: beam.kind, points: beam.points.length, dimmed: Boolean(beam.dimmed) })),
-        pulses: () => engine.flows.map((flow) => {
-          const centers = pulseCenters(flow.distance, flow.metrics);
-          const sampleAt = (normalized: number) => {
-            const target = normalized * flow.metrics.total;
-            let index = 0;
-            while (index < flow.metrics.cumulative.length - 2 && flow.metrics.cumulative[index + 1] < target) index += 1;
-            const span = Math.max(0.0001, flow.metrics.cumulative[index + 1] - flow.metrics.cumulative[index]);
-            const t = Math.max(0, Math.min(1, (target - flow.metrics.cumulative[index]) / span));
-            const from = flow.samples[index];
-            const to = flow.samples[Math.min(flow.samples.length - 1, index + 1)];
-            return from.clone().lerp(to, t);
-          };
+        beams: () => engine.currentBeams.map((beam) => ({ id: beam.id, kind: beam.kind, points: beam.points.length, nodeIds: beam.nodeIds ?? [], dimmed: Boolean(beam.dimmed) })),
+        routeAnchors: () => engine.routeBands.map((band) => ({
+          id: band.id,
+          kind: band.kind,
+          nodeIds: band.nodeIds,
+          total: Number(band.total.toFixed(2)),
+          stepDistance: Number(band.stepDistance.toFixed(2)),
+          anchors: band.anchors.map((anchor, index) => {
+            const screen = project(anchor);
+            return { id: band.nodeIds[index], x: Number(screen.x.toFixed(1)), y: Number(screen.y.toFixed(1)) };
+          })
+        })),
+        pulses: () => engine.routeBands.map((band) => {
+          const metrics = { cumulative: band.cumulative, total: band.total, stepDistance: band.stepDistance, stepCount: band.anchors.length };
+          const centers = staggeredWindowCenters(band.distance, metrics, 3);
           return {
-            distance: Number(flow.distance.toFixed(2)),
-            total: Number(flow.metrics.total.toFixed(2)),
-            stepDistance: Number(flow.metrics.stepDistance.toFixed(2)),
+            id: band.id,
+            distance: Number(band.distance.toFixed(2)),
+            total: Number(band.total.toFixed(2)),
+            stepDistance: Number(band.stepDistance.toFixed(2)),
             centers,
             screens: centers.map((center) => {
-              const screen = project(sampleAt(center));
+              const world = pointAtRouteDistance(band.anchors.map((anchor, index) => ({ id: band.nodeIds[index] ?? String(index), x: anchor.x, y: anchor.y, z: anchor.z })), metrics, center);
+              const screen = world ? project(world) : { x: 0, y: 0 };
               return { x: Number(screen.x.toFixed(1)), y: Number(screen.y.toFixed(1)) };
             })
           };
         }),
+        pulsePaths: () => engine.routeBands.flatMap((band) => {
+          const anchors = routeBandScreenAnchors(band);
+          if (anchors.length < 2) return [];
+          const metrics = { cumulative: band.cumulative, total: band.total, stepDistance: band.stepDistance, stepCount: band.anchors.length };
+          return routeBandComets(band.distance, metrics, band.windowWorld, { count: 3 }).flatMap((comet) => {
+            const points = routeBandPolyline(anchors, band.cumulative, comet.start, comet.end);
+            const d = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+            const opacity = band.dimmed ? 0.38 : 1;
+            return [
+              { id: band.id, window: comet.window, layer: "halo", d, stroke: band.cometColor, width: "14/10", opacity },
+              { id: band.id, window: comet.window, layer: "core", d, stroke: band.cometColor, width: "3", opacity }
+            ];
+          });
+        }),
+        routeBandOpacity: () => engine.routeBands.map((band) => ({
+          id: band.id,
+          track: propsRef.current.reducedMotion ? 0.20 : band.dimmed ? 0.12 : 0.30,
+          glow: propsRef.current.reducedMotion ? 0.10 : band.dimmed ? 0.05 : 0.12
+        })),
+        routeBandStyle: () => engine.routeBands.map((band) => {
+          const anchors = routeBandScreenAnchors(band);
+          const metrics = { cumulative: band.cumulative, total: band.total, stepDistance: band.stepDistance, stepCount: band.anchors.length };
+          const comets = anchors.length >= 2
+            ? routeBandComets(band.distance, metrics, band.windowWorld, { count: 3 })
+            : [];
+          return {
+            id: band.id,
+            trackOpacity: propsRef.current.reducedMotion ? 0.20 : band.dimmed ? 0.12 : 0.30,
+            trackWidth: "2",
+            glowOpacity: propsRef.current.reducedMotion ? 0.10 : band.dimmed ? 0.05 : 0.12,
+            glowWidth: "8",
+            cometCoreWidth: "3",
+            cometHaloWidth: "14/10",
+            cometFilter: "canvas: multi-stroke glow",
+            cometMask: "canvas: destination-out glyph holes",
+            cometLengths: comets.map((comet) => {
+              const points = routeBandPolyline(anchors, band.cumulative, comet.start, comet.end);
+              let length = 0;
+              for (let index = 1; index < points.length; index += 1) length += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+              return Math.round(length);
+            }),
+            color: band.color,
+            cometColor: band.cometColor
+          };
+        }),
+        cometGeometry: () => engine.routeBands.flatMap((band) => {
+          const anchors = routeBandScreenAnchors(band);
+          const metrics = { cumulative: band.cumulative, total: band.total, stepDistance: band.stepDistance, stepCount: band.anchors.length };
+          if (anchors.length < 2) return [];
+          return routeBandComets(band.distance, metrics, band.windowWorld, { count: 3 }).map((comet) => {
+            const points = routeBandPolyline(anchors, band.cumulative, comet.start, comet.end);
+            return {
+              id: band.id,
+              window: comet.window,
+              d: points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" "),
+              head: routeBandScreenPoint(anchors, band.cumulative, comet.head),
+              tail: routeBandScreenPoint(anchors, band.cumulative, comet.tail),
+              stops: cometGradientStops("core").map((stop) => ({
+                offset: stop.offset,
+                opacity: stop.opacity,
+                color: band.cometColor
+              }))
+            };
+          });
+        }),
+        routeBandColors: () => ({
+          current: colors.routeTrack,
+          comet: colors.routeComet,
+          cometHead: colors.routeCometHead,
+          preview: colors.previewTrack,
+          previewComet: colors.previewComet,
+          previewCometHead: colors.previewCometHead
+        }),
         beamOffset: () => engine.beamGroup.position.toArray().map((value) => Number(value.toFixed(2))),
-        setBeamVisible: (value: boolean) => { engine.beamGroup.visible = value; },
+        setBeamVisible: (value: boolean) => { engine.beamGroup.visible = value; routeHost.style.display = value ? "" : "none"; },
+        routeTextRects: () => routeTextRects.map((rect) => ({ ...rect })),
+        drawTestComet: (x1: number, y1: number, x2: number, y2: number) => { engine.testComet = { x1, y1, x2, y2 }; },
+        clearTestComet: () => { engine.testComet = null; },
+        // Dev-only route injection: proves a route that contains cardless
+        // capability / intermediate ids gets anchors without writing state.
+        setRouteNodeIds: (ids: string[]) => {
+          if (!engine.currentBeams.length) return;
+          engine.currentBeams = [{ ...engine.currentBeams[0], nodeIds: [...ids], points: [] }];
+          rebuildBeams();
+        },
+        setPreviewRouteNodeIds: (ids: string[]) => {
+          if (!engine.currentBeams.length) return;
+          engine.currentBeams = [
+            { ...engine.currentBeams[0], nodeIds: [...engine.currentBeams[0].nodeIds ?? []], points: [] },
+            { id: "dev-preview", kind: "preview", points: [], nodeIds: [...ids] }
+          ];
+          rebuildBeams();
+        },
+        capabilityEdges: () => engine.capabilityLines.map((capability) => {
+          const source = nodeById(capability.source);
+          const target = nodeById(capability.target);
+          const sourceScreen = source ? project(nodeWorld(source)) : null;
+          const targetScreen = target ? project(nodeWorld(target)) : null;
+          return {
+            id: capability.id,
+            source: capability.source,
+            target: capability.target,
+            highlighted: capability.highlighted,
+            linewidth: capability.material.linewidth,
+            opacity: Number(capability.material.opacity.toFixed(3)),
+            color: `#${capability.material.color.getHexString()}`,
+            from: sourceScreen ? { x: Number(sourceScreen.x.toFixed(1)), y: Number(sourceScreen.y.toFixed(1)) } : null,
+            to: targetScreen ? { x: Number(targetScreen.x.toFixed(1)), y: Number(targetScreen.y.toFixed(1)) } : null
+          };
+        }),
         occluderInfo: () => ({
           count: engine.occluders.length,
           rects: engine.occluders,
@@ -2705,6 +3071,9 @@ export function TiltedCourseStage({
       engine.edgeGroup.children.slice().forEach((child) => {
         if (child instanceof THREE.Line) { child.geometry.dispose(); (child.material as THREE.Material).dispose(); }
       });
+      engine.capabilityLines.forEach((capability) => { capability.line.geometry.dispose(); capability.material.dispose(); });
+      engine.capabilityLines = [];
+      routeHost.remove();
       engine.beamGroup.children.slice().forEach((child) => {
         if (child instanceof THREE.Mesh) { child.geometry.dispose(); (child.material as THREE.Material).dispose(); }
         else if (child instanceof THREE.Line) { child.geometry.dispose(); (child.material as THREE.Material).dispose(); }
@@ -2815,7 +3184,7 @@ export function TiltedCourseStage({
       const api = apiRef.current;
       if (!engine || !api) return;
       const direction = engine.camera.position.clone().sub(engine.controls.target);
-      const distance = THREE.MathUtils.clamp(engine.fitDistance / Math.max(0.2, percent / 100), SCENE_CAMERA.minDistance, engine.controls.maxDistance);
+      const distance = THREE.MathUtils.clamp(engine.fitDistance / Math.max(0.2, percent / 100), engine.minDistance, engine.controls.maxDistance);
       api.animateCamera(engine.controls.target.clone().add(direction.setLength(distance)), engine.controls.target.clone(), 320);
     },
     getViewState: () => {

@@ -7,7 +7,8 @@ import {
   computeCourseFit,
   computeCoursePan
 } from "./immersiveViewport";
-import { advancePulse, pulseCenters, routeMetrics, windowLengthForPixels } from "@/shared/scene/routePulse";
+import { advancePulse, routeMetrics } from "@/shared/scene/routePulse";
+import { buildRouteAnchorSequence, pointAtRouteDistance, routeBandWindows, staggeredWindowCenters } from "./routeBand";
 
 /**
  * One three.js scene for every learner course presentation. Structural layout
@@ -86,6 +87,12 @@ export type StageBeam = {
   id: string;
   kind: "current" | "preview";
   points: StagePoint[];
+  /**
+   * P4R8: execution-order node ids. The stage resolves every id through the
+   * same drawn position the cards / points use, so cardless capability and
+   * intermediate nodes are on the band too. `points` stays for flat editing.
+   */
+  nodeIds?: string[];
   /** Selection outside the adopted route / route editing dims the beam. */
   dimmed?: boolean;
 };
@@ -153,6 +160,21 @@ type RuntimeNode = {
   fade: number;
 };
 
+type FlatRouteBand = {
+  id: string;
+  kind: StageBeam["kind"];
+  dimmed: boolean;
+  nodeIds: string[];
+  anchors: THREE.Vector3[];
+  cumulative: number[];
+  total: number;
+  stepDistance: number;
+  distance: number;
+  color: string;
+  track: SVGPathElement;
+  pulses: SVGPathElement[][];
+};
+
 type Engine = {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -161,6 +183,8 @@ type Engine = {
   edgeGroup: THREE.Group;
   chapterGroup: THREE.Group;
   beamGroup: THREE.Group;
+  routeBands: FlatRouteBand[];
+  routeSvg: SVGSVGElement | null;
   flows: Array<{
     material: THREE.ShaderMaterial;
     metrics: ReturnType<typeof routeMetrics>;
@@ -215,7 +239,15 @@ function cardOverlapRatio(
 
 function cssColor(name: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  // Resolve var() chains and color-mix() through a probe: getPropertyValue
+  // returns the token expression, which THREE.Color cannot parse.
+  const probe = document.createElement("span");
+  probe.style.color = `var(${name})`;
+  probe.style.display = "none";
+  document.body.appendChild(probe);
+  const resolved = getComputedStyle(probe).color.trim();
+  probe.remove();
+  return resolved || fallback;
 }
 
 function roundedRectTexture(fill: string, edge: string) {
@@ -271,6 +303,7 @@ export function CourseImmersiveStage({
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const routeSvgRef = useRef<SVGSVGElement>(null);
   const selectedRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const runtimeRef = useRef<Map<string, RuntimeNode>>(new Map());
@@ -336,7 +369,7 @@ export function CourseImmersiveStage({
     const beamGroup = new THREE.Group();
     group.add(edgeGroup, chapterGroup, beamGroup);
     const engine: Engine = {
-      renderer, scene, camera, group, edgeGroup, chapterGroup, beamGroup, flows: [], overviewPoints: null, colors,
+      renderer, scene, camera, group, edgeGroup, chapterGroup, beamGroup, routeBands: [], routeSvg: routeSvgRef.current, flows: [], overviewPoints: null, colors,
       width: host.clientWidth, height: host.clientHeight, fitDistance: 2400,
       bounds: { x: 700, y: 480 }, pxPerWorld: 1, panX: 0, panY: 0,
       minPanX: -600, maxPanX: 600, minPanY: -600, maxPanY: 600, horizontalOverflow: false, detailShiftX: 0,
@@ -441,6 +474,88 @@ export function CourseImmersiveStage({
         visible: point.z > -1 && point.z < 1
       };
     }
+    function flatRouteAnchors(band: FlatRouteBand) {
+      const runtime = runtimeRef.current;
+      const result: Array<{ id: string; world: THREE.Vector3; screen: { x: number; y: number } }> = [];
+      band.nodeIds.forEach((id) => {
+        const entry = runtime.get(id);
+        if (!entry) return;
+        const world = new THREE.Vector3(entry.current.x, -entry.current.y, entry.current.z).applyMatrix4(engine.group.matrixWorld);
+        const screen = projectToScreen(world);
+        result.push({ id, world, screen: { x: screen.x, y: screen.y } });
+      });
+      return result;
+    }
+
+    function flatRoutePath(
+      anchors: Array<{ world: THREE.Vector3; screen: { x: number; y: number } }>,
+      cumulative: number[],
+      start: number,
+      end: number
+    ) {
+      const total = cumulative[cumulative.length - 1] ?? 0;
+      const from = Math.max(0, start);
+      const to = Math.min(total, end);
+      if (to - from < 0.01 || anchors.length < 2) return "";
+      const distances = [from];
+      for (let index = 1; index < cumulative.length - 1; index += 1) {
+        if (cumulative[index] > from && cumulative[index] < to) distances.push(cumulative[index]);
+      }
+      distances.push(to);
+      return distances.map((distance) => {
+        let index = 0;
+        while (index < cumulative.length - 2 && cumulative[index + 1] < distance) index += 1;
+        const span = Math.max(0.0001, cumulative[index + 1] - cumulative[index]);
+        const t = Math.max(0, Math.min(1, (distance - cumulative[index]) / span));
+        const a = anchors[index].screen;
+        const b = anchors[Math.min(anchors.length - 1, index + 1)].screen;
+        return `${distance === from ? "M" : "L"} ${(a.x + (b.x - a.x) * t).toFixed(1)} ${(a.y + (b.y - a.y) * t).toFixed(1)}`;
+      }).join(" ");
+    }
+
+    function updateFlatRouteBands(delta: number) {
+      if (!engine.routeBands.length) return;
+      const reduced = reducedRef.current;
+      engine.routeSvg?.setAttribute("viewBox", `0 0 ${Math.max(1, engine.width)} ${Math.max(1, engine.height)}`);
+      engine.routeBands.forEach((band) => {
+        const anchors = flatRouteAnchors(band);
+        if (anchors.length < 2) {
+          band.track.setAttribute("d", "");
+          band.pulses.forEach((pulse) => pulse.forEach((path) => path.setAttribute("d", "")));
+          return;
+        }
+        const worldPoints = buildRouteAnchorSequence(band.nodeIds, anchors.map((anchor) => ({ id: anchor.id, x: anchor.world.x, y: anchor.world.y, z: anchor.world.z })));
+        const metrics = routeMetrics(worldPoints);
+        band.anchors = worldPoints.map((anchor) => new THREE.Vector3(anchor.x, anchor.y, anchor.z));
+        band.cumulative = metrics.cumulative;
+        band.total = metrics.total;
+        band.stepDistance = metrics.stepDistance;
+        band.track.setAttribute("d", flatRoutePath(anchors, metrics.cumulative, 0, metrics.total));
+        band.track.setAttribute("opacity", reduced ? "0.17" : band.dimmed ? "0.06" : "0.12");
+        if (reduced || metrics.total <= 0.0001) {
+          band.pulses.forEach((pulse) => pulse.forEach((path) => path.setAttribute("d", "")));
+          return;
+        }
+        band.distance = advancePulse(band.distance, metrics, delta);
+        const midpoint = anchors[Math.floor(anchors.length / 2)].world;
+        const distanceToMid = camera.position.distanceTo(midpoint);
+        const worldPerPixel = (2 * Math.max(1, distanceToMid) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / Math.max(1, engine.height);
+        const windowWorld = 60 / 1.7 * worldPerPixel;
+        const windows = routeBandWindows(band.distance, metrics, windowWorld, { count: 3, slices: 6 });
+        band.pulses.forEach((pulse) => pulse.forEach((path) => path.setAttribute("d", "")));
+        const sliceIndices = [0, 0, 0];
+        windows.forEach((window) => {
+          const pulse = band.pulses[window.window];
+          if (!pulse) return;
+          const path = pulse[Math.min(pulse.length - 1, sliceIndices[window.window]++)];
+          const d = flatRoutePath(anchors, metrics.cumulative, window.start, window.end);
+          if (!d) return;
+          path.setAttribute("d", d);
+          path.setAttribute("opacity", (window.intensity * (band.dimmed ? 0.32 : 0.86)).toFixed(3));
+        });
+      });
+    }
+
     let last = performance.now();
     let lastZone = 0;
     let frameCount = 0;
@@ -562,6 +677,7 @@ export function CourseImmersiveStage({
       group.position.y = engine.panY;
       group.position.x = engine.panX + engine.detailShiftX;
       scene.updateMatrixWorld();
+      updateFlatRouteBands(delta);
       if (import.meta.env.DEV) (window as unknown as { __efImmPose?: unknown }).__efImmPose = { yaw: group.rotation.y, target: target.yaw, pose: poseRef.current, mode: modeRef.current };
       if (import.meta.env.DEV) (window as unknown as { __efImmDebug?: unknown }).__efImmDebug = { bounds: engine.bounds, fit: engine.fitDistance, cz: camera.position.z, fov: camera.fov, w: engine.width, h: engine.height, gy: group.position.y, gx: group.position.x, panX: engine.panX, panY: engine.panY, zoom: engine.semantic, capVis, bridges: [...runtimeRef.current.entries()].filter(([id]) => specById.get(id)?.bridge).map(([id, entry]) => ({ id, x: entry.current.x, y: entry.current.y, z: entry.current.z })), samples: [...runtimeRef.current.entries()].filter(([id]) => ["R10", "A02", "AGC01"].includes(id)).map(([id, entry]) => ({ id, x: entry.current.x, y: entry.current.y, z: entry.current.z })) };
       const front = Math.abs(normalizedYaw) < 0.08 && poseRef.current !== "rotated";
@@ -773,16 +889,6 @@ export function CourseImmersiveStage({
         }
         card.style.opacity = selected.visible ? "1" : "0";
       }
-      engine.flows.forEach((flow) => {
-        const uniforms = flow.material.uniforms;
-        if (reduced) { uniforms.uFlowOn.value = 0; return; }
-        uniforms.uFlowOn.value = 1;
-        flow.distance = advancePulse(flow.distance, flow.metrics, delta);
-        const centers = pulseCenters(flow.distance, flow.metrics);
-        uniforms.uPulseA.value = centers[0] ?? 0;
-        uniforms.uPulseB.value = centers[1] ?? -10;
-        uniforms.uPulseWidth.value = windowLengthForPixels(64, 1 / Math.max(0.0001, engine.pxPerWorld), flow.metrics);
-      });
       renderer.render(scene, camera);
       frameCount += 1;
       if (now - fpsStarted > 700) {
@@ -1161,70 +1267,52 @@ export function CourseImmersiveStage({
   }, [edges]);
   useEffect(() => {
     const engine = engineRef.current;
-    if (!engine) return;
+    if (!engine || !engine.routeSvg) return;
     disposeGroup(engine.beamGroup);
     engine.flows = [];
-    const points3d = (points: StagePoint[]) => points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
-    const linePath = (points: StagePoint[]) => {
-      const path = new THREE.CurvePath<THREE.Vector3>();
-      for (let index = 0; index < points.length - 1; index += 1) {
-        const from = points[index];
-        const to = points[index + 1];
-        path.add(new THREE.LineCurve3(
-          new THREE.Vector3(from.x, -from.y, from.z),
-          new THREE.Vector3(to.x, -to.y, to.z)
-        ));
-      }
-      return path;
-    };
+    engine.routeBands = [];
+    const svg = engine.routeSvg;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.setAttribute("viewBox", `0 0 ${Math.max(1, engine.width)} ${Math.max(1, engine.height)}`);
+    const runtime = runtimeRef.current;
     beams.forEach((beam) => {
-      const points = beam.points.map((point) => new THREE.Vector3(point.x, -point.y, point.z));
-      if (points.length < 2) return;
-      const color = beam.kind === "current" ? engine.colors.brandInk : engine.colors.preview;
-      const dim = Boolean(beam.dimmed);
-      const curve = linePath(beam.points);
-      const geometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), beam.kind === "preview" ? 2.8 : 3.2, 8, false);
-      const glowGeometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 10), beam.kind === "preview" ? 6.5 : 7.5, 10, false);
-      const glow = new THREE.Mesh(glowGeometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: dim ? 0.05 : 0.11, depthWrite: false }));
-      glow.renderOrder = 0;
-      const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: dim ? 0.3 : 0.58, depthWrite: false }));
-      mesh.renderOrder = 2;
-      engine.beamGroup.add(glow, mesh);
-      // Same flowing light band as the 3D course tree: 1–2 windows with a
-      // fading tail travel at one step per second. Preview uses amber.
-      const anchorMetrics = routeMetrics(beam.points);
-      const metrics = { ...anchorMetrics, total: curve.getLength() };
-      const pulseMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-          uColor: { value: new THREE.Color(color) },
-          uPulseA: { value: 0 },
-          uPulseB: { value: -10 },
-          uPulseWidth: { value: 0.02 },
-          uFlowOn: { value: dim ? 0.55 : 1 }
-        },
-        vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-        fragmentShader: `uniform vec3 uColor; uniform float uPulseA; uniform float uPulseB; uniform float uPulseWidth; uniform float uFlowOn; varying vec2 vUv;
-          float efPulse(float d, float c, float w) {
-            if (w <= 0.00001) return 0.0;
-            float head = c + w * 0.5; float start = c - w * 1.2;
-            if (d < start || d > head) return 0.0;
-            if (d > c) { float t = (head - d) / max(0.00001, head - c); return clamp(t / 0.35, 0.0, 1.0); }
-            float t = (d - start) / max(0.00001, c - start);
-            return pow(clamp(t, 0.0, 1.0), 1.8);
-          }
-          void main() {
-            float pulse = max(efPulse(vUv.x, uPulseA, uPulseWidth), efPulse(vUv.x, uPulseB, uPulseWidth));
-            gl_FragColor = vec4(uColor, pulse * 0.9);
-          }`,
-        transparent: true,
-        depthWrite: false
+      const nodeIds = beam.nodeIds?.length ? beam.nodeIds : beam.points.flatMap((point) => {
+        const entry = [...runtime.entries()].find(([, value]) => Math.abs(value.current.x - point.x) < 0.5 && Math.abs(value.current.y - point.y) < 0.5);
+        return entry ? [entry[0]] : [];
       });
-      const pulse = new THREE.Mesh(geometry.clone(), pulseMaterial);
-      pulse.renderOrder = 3;
-      engine.beamGroup.add(pulse);
-      engine.flows.push({ material: pulseMaterial, metrics, distance: 0 });
+      if (nodeIds.length < 2) return;
+      const color = beam.kind === "current" ? engine.colors.brandInk : engine.colors.preview;
+      const track = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      track.setAttribute("fill", "none");
+      track.setAttribute("stroke", color);
+      track.setAttribute("stroke-width", "1.5");
+      track.setAttribute("stroke-linecap", "round");
+      track.setAttribute("stroke-linejoin", "round");
+      track.setAttribute("opacity", beam.dimmed ? "0.05" : "0.12");
+      svg.appendChild(track);
+      const pulses: SVGPathElement[][] = [];
+      for (let window = 0; window < 3; window += 1) {
+        const paths: SVGPathElement[] = [];
+        for (let slice = 0; slice < 6; slice += 1) {
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("fill", "none");
+          path.setAttribute("stroke", color);
+          path.setAttribute("stroke-width", "2.6");
+          path.setAttribute("stroke-linecap", "round");
+          path.setAttribute("stroke-linejoin", "round");
+          path.setAttribute("opacity", "0");
+          svg.appendChild(path);
+          paths.push(path);
+        }
+        pulses.push(paths);
+      }
+      engine.routeBands.push({
+        id: beam.id, kind: beam.kind, dimmed: Boolean(beam.dimmed), nodeIds: [...nodeIds],
+        anchors: [], cumulative: [], total: 0, stepDistance: 0, distance: 0, color, track, pulses
+      });
     });
   }, [beams]);
+
   useEffect(() => {
     // A drag reports its new pose through onPoseChange; do not snap the target
     // back to the canned rotated pose mid-gesture. Only an external pose
@@ -1336,6 +1424,9 @@ export function CourseImmersiveStage({
           </div>
         ))}
         {selectedCard ? <div ref={selectedRef} className="ef-imm-selected-card">{selectedCard}</div> : null}
+      </div>
+      <div className="ef-imm-route-band" aria-hidden="true">
+        <svg ref={routeSvgRef} className="ef-imm-route-svg" aria-hidden="true" />
       </div>
       <div className="ef-imm-help" aria-hidden="true">左键拖拽旋转 · 滚轮/双指缩放 · 右键或 Shift 拖拽平移</div>
     </div>
