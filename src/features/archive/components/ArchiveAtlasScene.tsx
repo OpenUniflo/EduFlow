@@ -19,7 +19,7 @@ import {
   pickScreenSpace,
   simplificationForAngle
 } from "@/shared/scene/tiltedPlane";
-import { SCENE_CAMERA, contentRadius, doubleClickAction, focusPose, frontPose, isCameraDrag, isPanGesture, medianNearestNeighbourDistance, sceneCameraLimits, shouldSnapToFront, zoomDistance, zoomPercent } from "@/shared/scene/cameraInteraction";
+import { SCENE_CAMERA, contentRadius, doubleClickAction, focusPose, frontPose, isCameraDrag, isPanGesture, medianNearestNeighbourDistance, sceneCameraLimits, shouldSnapToFront, wheelZoomFactor, zoomDistance, zoomPercent } from "@/shared/scene/cameraInteraction";
 import { personConnections, personEdgeStyles } from "../model/personConnections";
 import { isPickable, cardNameOpacity, cardShowsOwnName } from "@/shared/scene/presentationRules";
 import { oneHopSelection } from "@/shared/scene/selection";
@@ -1460,7 +1460,7 @@ export default function ArchiveAtlasScene({
         cursor = wheelRaycaster.ray.intersectPlane(wheelPlane, wheelPoint) ?? controls.target;
       }
       const distance = camera.position.distanceTo(controls.target);
-      const factor = Math.pow(0.95, controls.zoomSpeed * Math.abs(event.deltaY) * 0.01);
+      const factor = wheelZoomFactor(event.deltaY, event.deltaMode, controls.zoomSpeed, rect.height);
       const next = Math.max(controls.minDistance, Math.min(controls.maxDistance, distance * factor));
       wheelDebug = { hit, cursor: cursor.toArray(), distance, next, localX, localY };
       if (Math.abs(next - distance) < 0.0001) return;

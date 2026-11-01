@@ -27,7 +27,7 @@ import {
   type TiltedSelectionLabelCandidate,
   type TiltedSelectionLabelMarker
 } from "@/shared/scene/tiltedPlane";
-import { SCENE_CAMERA, contentRadius, doubleClickAction, frontPose, isCameraDrag, isPanGesture, sceneCameraLimits, shouldSnapToFront, zoomDistance, zoomPercent } from "@/shared/scene/cameraInteraction";
+import { SCENE_CAMERA, contentRadius, doubleClickAction, frontPose, isCameraDrag, isPanGesture, sceneCameraLimits, shouldSnapToFront, wheelZoomFactor, zoomDistance, zoomPercent } from "@/shared/scene/cameraInteraction";
 import { cardNameOpacity, cardShowsOwnName, hoverStyleFor, isPickable } from "@/shared/scene/presentationRules";
 import { COURSE_CARD_HEIGHT, LAYER_SWAP_MS, layerMixAt, layerOffsetsAt, type LayerOffsets } from "./courseTreeLayout";
 import { selectionXraySegments } from "@/shared/scene/xray";
@@ -2709,7 +2709,7 @@ export function TiltedCourseStage({
         cursor = wheelRaycaster.ray.intersectPlane(wheelPlane, wheelPoint) ?? controls.target;
       }
       const distance = camera.position.distanceTo(controls.target);
-      const factor = Math.pow(0.95, controls.zoomSpeed * Math.abs(event.deltaY) * 0.01);
+      const factor = wheelZoomFactor(event.deltaY, event.deltaMode, controls.zoomSpeed, rect.height);
       const next = Math.max(controls.minDistance, Math.min(controls.maxDistance, distance * factor));
       if (Math.abs(next - distance) < 0.0001) return;
       const scale = next / Math.max(0.0001, distance);

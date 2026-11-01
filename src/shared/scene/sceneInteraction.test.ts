@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_WHEEL_DELTA_PX,
   SCENE_CAMERA,
+  WHEEL_LINE_HEIGHT_PX,
   contentRadius,
   distanceForScreenSpacing,
   distanceForViewportRatio,
@@ -13,6 +15,7 @@ import {
   medianNearestNeighbourDistance,
   sceneCameraLimits,
   shouldSnapToFront,
+  wheelZoomFactor,
   zoomDistance,
   zoomPercent
 } from "./cameraInteraction";
@@ -86,6 +89,56 @@ describe("shared scene camera convention", () => {
     expect(medianNearestNeighbourDistance([{ x: 0, y: 0, z: 0 }, { x: 4, y: 0, z: 0 }, { x: 100, y: 0, z: 0 }])).toBe(4);
     expect(contentRadius([{ x: -100, y: 0, z: 0 }, { x: 100, y: 0, z: 0 }])).toBe(100);
     expect(fitDistanceForRadius(100)).toBeGreaterThan(100);
+  });
+});
+
+describe("cursor wheel zoom", () => {
+  it("pushes in on scroll up and pulls out on scroll down", () => {
+    const push = wheelZoomFactor(-100, 0, SCENE_CAMERA.zoomSpeed);
+    const pull = wheelZoomFactor(100, 0, SCENE_CAMERA.zoomSpeed);
+    expect(push).toBeLessThan(1);
+    expect(pull).toBeGreaterThan(1);
+    expect(1 / push).toBeCloseTo(pull, 12);
+  });
+
+  it("moves a trackpad's small delta only slightly", () => {
+    const push = wheelZoomFactor(-2, 0, SCENE_CAMERA.zoomSpeed);
+    const pull = wheelZoomFactor(2, 0, SCENE_CAMERA.zoomSpeed);
+    expect(push).toBeLessThan(1);
+    expect(push).toBeGreaterThan(0.999);
+    expect(pull).toBeGreaterThan(1);
+    expect(pull).toBeLessThan(1.001);
+  });
+
+  it("normalizes line and page delta modes to pixels", () => {
+    expect(wheelZoomFactor(-3, 1, 0.8)).toBe(wheelZoomFactor(-3 * WHEEL_LINE_HEIGHT_PX, 0, 0.8));
+    expect(wheelZoomFactor(-0.25, 2, 0.8, 800)).toBe(wheelZoomFactor(-200, 0, 0.8));
+    // A full page delta is capped like any other oversized event.
+    expect(wheelZoomFactor(-1, 2, 0.8, 900)).toBe(wheelZoomFactor(-MAX_WHEEL_DELTA_PX, 0, 0.8));
+  });
+
+  it("is the identity for zero delta", () => {
+    expect(wheelZoomFactor(0, 0, 0.8)).toBe(1);
+    expect(wheelZoomFactor(0, 1, 0.8)).toBe(1);
+    expect(wheelZoomFactor(0, 2, 0.8, 900)).toBe(1);
+  });
+
+  it("caps a single oversized positive or negative delta", () => {
+    expect(wheelZoomFactor(1_000_000, 0, 0.8)).toBe(wheelZoomFactor(MAX_WHEEL_DELTA_PX, 0, 0.8));
+    expect(wheelZoomFactor(-1_000_000, 0, 0.8)).toBe(wheelZoomFactor(-MAX_WHEEL_DELTA_PX, 0, 0.8));
+    expect(wheelZoomFactor(MAX_WHEEL_DELTA_PX, 0, 0.8)).toBeGreaterThan(1);
+    expect(wheelZoomFactor(-MAX_WHEEL_DELTA_PX, 0, 0.8)).toBeLessThan(1);
+  });
+
+  it("returns to the original distance after equal push and pull", () => {
+    for (const magnitude of [1, 8, 40, 100, MAX_WHEEL_DELTA_PX, 1_000_000]) {
+      const push = wheelZoomFactor(-magnitude, 0, 0.8);
+      const pull = wheelZoomFactor(magnitude, 0, 0.8);
+      expect(push).toBeLessThan(1);
+      expect(pull).toBeGreaterThan(1);
+      expect(push * pull).toBeCloseTo(1, 12);
+      expect(zoomDistance(zoomDistance(1200, pull, 100, 10_000), push, 100, 10_000)).toBeCloseTo(1200, 9);
+    }
   });
 });
 

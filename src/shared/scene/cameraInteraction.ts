@@ -53,6 +53,39 @@ export function zoomDistance(distance: number, factor: number, min: number = SCE
   return Math.max(min, Math.min(max, next));
 }
 
+/** Firefox reports line deltas; one line is roughly one 16px text row. */
+export const WHEEL_LINE_HEIGHT_PX = 16;
+/** Fallback viewport height when a page-mode wheel event has no canvas height. */
+export const WHEEL_PAGE_FALLBACK_PX = 900;
+/** Cap one event's normalized delta so a single gesture cannot cross the envelope. */
+export const MAX_WHEEL_DELTA_PX = 240;
+
+/**
+ * Distance factor for one wheel event. Positive deltaY (wheel down,
+ * two-finger swipe down) pulls the camera out, so the factor is > 1; negative
+ * deltaY pushes in, so the factor is < 1. Equal magnitudes therefore produce
+ * reciprocal factors and an equal push/pull returns to the original distance.
+ *
+ * Deltas are normalized to CSS pixels first: pixel as-is, line * 16, page *
+ * viewport height, then clamped to MAX_WHEEL_DELTA_PX so a coarse mouse notch
+ * or a trackpad momentum spike cannot skip a whole zoom segment.
+ */
+export function wheelZoomFactor(
+  deltaY: number,
+  deltaMode: number = 0,
+  zoomSpeed: number = SCENE_CAMERA.zoomSpeed,
+  viewportHeight: number = WHEEL_PAGE_FALLBACK_PX
+): number {
+  if (!Number.isFinite(deltaY) || deltaY === 0) return 1;
+  const height = Number.isFinite(viewportHeight) && viewportHeight > 0 ? viewportHeight : WHEEL_PAGE_FALLBACK_PX;
+  const perUnit = deltaMode === 1 ? WHEEL_LINE_HEIGHT_PX : deltaMode === 2 ? height : 1;
+  const normalized = deltaY * perUnit;
+  if (!Number.isFinite(normalized)) return 1;
+  const capped = Math.max(-MAX_WHEEL_DELTA_PX, Math.min(MAX_WHEEL_DELTA_PX, normalized));
+  const speed = Number.isFinite(zoomSpeed) ? Math.max(0, zoomSpeed) : SCENE_CAMERA.zoomSpeed;
+  return Math.pow(0.95, -speed * capped * 0.01);
+}
+
 /** A double click on a hit focuses that card; a blank double click goes front. */
 export function doubleClickAction(hitId: string | null): "focus" | "front" {
   return hitId ? "focus" : "front";
