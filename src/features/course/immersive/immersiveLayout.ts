@@ -595,10 +595,13 @@ export function buildCapabilitySceneLayout(courseLayout: ImmersiveCourseLayout, 
       target: edge.target,
       relation: edge.relation as "prerequisite" | "enables",
       strength: edge.strength,
-      points: edgeLine(
-        { x: source.x + source.width / 2, y: source.y, z: routeZ(source.id) },
-        { x: target.x - target.width / 2, y: target.y, z: routeZ(target.id) }
-      )
+      // Support relations are point-to-point, not orthogonal card routes:
+      // the capability markers have no card body to hide a folded segment, so
+      // a straight segment keeps the only visible vertices on the two nodes.
+      points: [
+        { x: source.x, y: source.y, z: routeZ(source.id) },
+        { x: target.x, y: target.y, z: routeZ(target.id) }
+      ]
     }];
   });
   return {
@@ -755,10 +758,10 @@ export function flattenCapabilityLayout(layout: ImmersiveCapabilityLayout, model
       const to = positions.get(edge.target) ?? { x: target?.x ?? 0, y: target?.y ?? 0 };
       return {
         ...edge,
-        points: edgeLine(
-          { x: from.x + (source?.width ?? 168) / 2, y: from.y, z: 4 },
-          { x: to.x - (target?.width ?? 168) / 2, y: to.y, z: 4 }
-        )
+        points: [
+          { x: from.x, y: from.y, z: 4 },
+          { x: to.x, y: to.y, z: 4 }
+        ]
       };
     })
   };

@@ -6,6 +6,7 @@ import {
   findExcentricCluster,
   layoutExcentric,
   layoutExcentricOutside,
+  layoutSelectionLabels,
   overlapRatio,
   panBoundsFor,
   panOffsetToBounds,
@@ -14,7 +15,8 @@ import {
   simplificationForView,
   tiltAngleDegrees,
   type ExcentricNode,
-  type TiltedLabelCandidate
+  type TiltedLabelCandidate,
+  type TiltedSelectionLabelCandidate
 } from "./tiltedPlane";
 
 const measure = (text: string) => text.length * 12;
@@ -189,6 +191,57 @@ describe("chooseTiltedLabels", () => {
     const chosen = chooseTiltedLabels(nodes, { ...baseOptions, previous: new Set(["a", "b"]) });
     const far = chosen.find((choice) => choice.id === "b");
     expect(far?.alpha).toBeCloseTo(0.6, 1);
+  });
+});
+
+describe("layoutSelectionLabels", () => {
+  const column = [
+    { id: "R08", text: "Evaluator", y: 340.5 },
+    { id: "R11", text: "Plan Monitoring", y: 366 },
+    { id: "R07", text: "Reflection", y: 391.4, selected: true },
+    { id: "R06", text: "Replanning", y: 416.9 },
+    { id: "R09", text: "Evaluator-Optimizer", y: 442.4 }
+  ];
+  const input: TiltedSelectionLabelCandidate[] = column.map((item, index) => ({
+    id: item.id,
+    x: 565.2,
+    y: item.y,
+    distance: 4440 - index * 6,
+    diameter: item.selected ? 34 : 8,
+    text: item.text,
+    width: Math.max(24, item.text.length * 7.2 + 18),
+    selected: item.selected
+  }));
+  // The selected node carries a 34px ring; the other nodes carry small points.
+  const markers = input.map((item) => {
+    const size = item.selected ? 34 : 16;
+    return { id: item.id, x: item.x - size / 2, y: item.y - size / 2, width: size, height: size };
+  });
+
+  it("keeps one name per related node in a dense same-column cluster", () => {
+    const chosen = layoutSelectionLabels(input, { width: 1440, height: 900, selectedId: "R07", markers });
+    expect(chosen).toHaveLength(input.length);
+    expect(chosen.map((choice) => choice.id).sort()).toEqual(input.map((item) => item.id).sort());
+    for (let index = 0; index < chosen.length; index += 1) {
+      for (let other = index + 1; other < chosen.length; other += 1) {
+        expect(overlapRatio(chosen[index].rect, chosen[other].rect)).toBe(0);
+      }
+      for (const marker of markers) {
+        expect(overlapRatio(chosen[index].rect, marker)).toBe(0);
+      }
+    }
+  });
+
+  it("moves names outward with a leader instead of dropping them when a HUD covers the anchor", () => {
+    const chosen = layoutSelectionLabels(input, {
+      width: 1440,
+      height: 900,
+      selectedId: "R07",
+      markers,
+      exclusions: [{ x: 0, y: 300, width: 760, height: 220 }]
+    });
+    expect(chosen).toHaveLength(input.length);
+    expect(chosen.filter((choice) => choice.leader).length).toBeGreaterThan(0);
   });
 });
 

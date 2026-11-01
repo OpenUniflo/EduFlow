@@ -769,7 +769,9 @@ export default function CourseImmersivePage({ session, microLearningProvider }: 
         actions: actionLabels(node.node),
         dim: Boolean(effectiveSelection) && !selected && !selectionRelations.mirrorKnowledgeIds.has(node.id) && !selectionRelations.knowledgeIds.has(node.id),
         mirror: Boolean(effectiveSelection) && selectionRelations.mirrorKnowledgeIds.has(node.id),
-        highlight: selectionRelations.knowledgeIds.has(node.id) && !selected && !selectionRelations.mirrorKnowledgeIds.has(node.id),
+        // Only the front face is lit: in the practice tree the Knowledge sheet
+        // is the reflection and the practice card owns the relation.
+        highlight: !swapped && selectionRelations.knowledgeIds.has(node.id) && !selected && !selectionRelations.mirrorKnowledgeIds.has(node.id),
         selected,
         step: step ?? undefined
       });

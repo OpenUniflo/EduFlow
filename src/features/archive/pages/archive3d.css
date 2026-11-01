@@ -870,11 +870,13 @@
   }
 }
 
-/* P4R3 x-ray: selected node, its edges and its name stay above cards and panels. */
+/* P4R3 x-ray: selected node and its edges stay above the cards but inside the
+   stage, so the map HUD, search, assistant and detail panels occlude it. */
 .ef-atlas-plane-xray {
-  position: fixed;
-  z-index: 3000;
-  overflow: visible;
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--dur-fast) var(--ease-out);

@@ -22,6 +22,7 @@ import {
 import { SCENE_CAMERA, doubleClickAction, focusPose, frontPose, isCameraDrag, isPanGesture, shouldSnapToFront, zoomDistance } from "@/shared/scene/cameraInteraction";
 import { isPickable, cardNameOpacity, cardShowsOwnName } from "@/shared/scene/presentationRules";
 import { oneHopSelection } from "@/shared/scene/selection";
+import { selectionXraySegments } from "@/shared/scene/xray";
 import { courseColorVar, courseToneForStatus } from "@/shared/scene/coursePalette";
 import type { PlaneChapter } from "../model/coursePlaneLayout";
 import type { PlaneDependencyRoute } from "../model/coursePlaneDependencies";
@@ -780,7 +781,9 @@ export default function ArchiveAtlasScene({
     const xrayHost = document.createElement("div");
     xrayHost.className = "ef-atlas-plane-xray";
     xrayHost.innerHTML = '<svg aria-hidden="true"></svg><div class="ef-atlas-plane-xray-name"></div>';
-    document.body.appendChild(xrayHost);
+    // Stage child, not document.body: page panels / strips own the higher
+    // layers and must occlude the guide lines and the selected ring.
+    container.appendChild(xrayHost);
     const xraySvg = xrayHost.querySelector("svg")!;
     const xrayName = xrayHost.querySelector<HTMLDivElement>(".ef-atlas-plane-xray-name")!;
     const camera = new THREE.PerspectiveCamera(FOV, width / height, 1, 20000);
@@ -1917,18 +1920,23 @@ export default function ArchiveAtlasScene({
     }
 
     function planeXray() {
-      if (!propsRef.current.selectedId) return null;
-      const index = engine.nodeIndex.get(propsRef.current.selectedId);
+      const selectedId = propsRef.current.selectedId;
+      if (!selectedId) return null;
+      const index = engine.nodeIndex.get(selectedId);
       if (index === undefined) return null;
       const point = getPosition(index);
+      const world = new THREE.Vector3(point.x, point.y, point.z);
       const screen = planeProject(point);
-      const distance = camera.position.distanceTo(new THREE.Vector3(point.x, point.y, point.z));
-      const segments: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
-      engine.neighbors[index].forEach((neighbor) => {
-        const other = getPosition(neighbor);
-        const projected = planeProject(other);
-        if (projected.z <= 1) segments.push({ x1: screen.x, y1: screen.y, x2: projected.x, y2: projected.y });
+      const distance = camera.position.distanceTo(world);
+      const guide = selectionXraySegments({
+        selectedId,
+        edges: propsRef.current.edges,
+        screenFor: (id) => {
+          const neighborIndex = engine.nodeIndex.get(id);
+          return neighborIndex === undefined ? null : planeProject(getPosition(neighborIndex));
+        }
       });
+      const segments = guide.segments;
       // Course-internal dependency routes also belong to the selected node.
       propsRef.current.planeDependencies.forEach((route) => {
         if (route.source !== propsRef.current.selectedId && route.target !== propsRef.current.selectedId) return;
@@ -1938,13 +1946,22 @@ export default function ArchiveAtlasScene({
           if (a.z <= 1 && b.z <= 1) segments.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y });
         }
       });
-      return { index, screen, distance, segments, title: propsRef.current.nodes[index]?.title ?? "" };
+      return { index, world, screen, distance, segments, title: propsRef.current.nodes[index]?.title ?? "" };
+    }
+    /** A sheet may occlude only when it is on a parallel plane 8+ units nearer
+     *  along the view ray; same-plane cards never count. */
+    function planeSheetInFront(world: { x: number; y: number; z: number }, xray: NonNullable<ReturnType<typeof planeXray>>) {
+      if (planeAngle() < 8) return false;
+      const delta = new THREE.Vector3(world.x, world.y, world.z).sub(xray.world);
+      if (Math.abs(delta.z) < 8) return false;
+      const toCamera = camera.position.clone().sub(xray.world).normalize();
+      return delta.dot(toCamera) >= 8;
     }
     function planeXrayBlocked(xray: NonNullable<ReturnType<typeof planeXray>>) {
       for (const [index, rect] of cardRects) {
         if (index === xray.index) continue;
         const runtime = planeCards.get(propsRef.current.nodes[index]?.id ?? "");
-        if (!runtime || runtime.distance >= xray.distance - 3) continue;
+        if (!runtime || !planeSheetInFront(runtime.object.position, xray)) continue;
         if (xray.screen.x >= rect.x - 4 && xray.screen.x <= rect.x + rect.width + 4
           && xray.screen.y >= rect.y - 4 && xray.screen.y <= rect.y + rect.height + 4) return true;
       }
@@ -1973,10 +1990,6 @@ export default function ArchiveAtlasScene({
       }
       const box = renderer.domElement.getBoundingClientRect();
       xrayHost.style.opacity = "1";
-      xrayHost.style.left = `${box.left}px`;
-      xrayHost.style.top = `${box.top}px`;
-      xrayHost.style.width = `${box.width}px`;
-      xrayHost.style.height = `${box.height}px`;
       xraySvg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
       xraySvg.setAttribute("width", String(box.width));
       xraySvg.setAttribute("height", String(box.height));
@@ -2053,7 +2066,8 @@ export default function ArchiveAtlasScene({
         // one-hop neighbours keep normal brightness.
         if (relatedIndices) opacity *= relatedIndices.has(runtime.index) ? 1 : 0.2;
         if (node.id === selectedId) opacity *= 1 - smoothStep(35, 38, angle);
-        if (xray && node.id !== selectedId && distance < xray.distance - 3) {
+        const related = Boolean(relatedIndices?.has(runtime.index));
+        if (xray && node.id !== selectedId && !related && planeSheetInFront(world, xray)) {
           const box = { x: screen.x - width * pxPerWorld / 2, y: screen.y - height * pxPerWorld / 2, width: width * pxPerWorld, height: height * pxPerWorld };
           const coversPoint = xray.screen.x >= box.x - 4 && xray.screen.x <= box.x + box.width + 4 && xray.screen.y >= box.y - 4 && xray.screen.y <= box.y + box.height + 4;
           if (coversPoint || xray.segments.some((segment) => segmentHitsRect(segment, { x: box.x - 4, y: box.y - 4, width: box.width + 8, height: box.height + 8 }))) opacity *= 0.16;
@@ -2061,7 +2075,7 @@ export default function ArchiveAtlasScene({
         runtime.width = width;
         runtime.height = height;
         runtime.opacity = opacity;
-        const related = !relatedIndices || relatedIndices.has(runtime.index);
+        const nameRelated = !relatedIndices || relatedIndices.has(runtime.index);
         const element = runtime.element;
         element.style.width = `${width.toFixed(2)}px`;
         element.style.height = `${height.toFixed(2)}px`;
@@ -2070,13 +2084,13 @@ export default function ArchiveAtlasScene({
         element.style.opacity = Math.max(0, Math.min(1, opacity)).toFixed(3);
         // One node, one name: an unrelated card keeps its body but hides its
         // copy, so a dimmed node never shows a second faded title.
-        element.style.setProperty("--name-op", cardNameOpacity(state.cardName, related).toFixed(3));
-        element.style.setProperty("--extra-op", (related ? state.extra : 0).toFixed(3));
+        element.style.setProperty("--name-op", cardNameOpacity(state.cardName, nameRelated).toFixed(3));
+        element.style.setProperty("--extra-op", (nameRelated ? state.extra : 0).toFixed(3));
         element.classList.toggle("is-pill", state.pill > 0.02);
         element.classList.toggle("is-dot", state.dot > 0.6);
         element.classList.toggle("is-hover", node.id === hoveredId);
         element.classList.toggle("is-sel", node.id === selectedId);
-        element.classList.toggle("is-hl", Boolean(relatedIndices && related && node.id !== selectedId));
+        element.classList.toggle("is-hl", Boolean(relatedIndices && nameRelated && node.id !== selectedId));
         element.classList.toggle("is-current", Boolean(node.isCurrent));
         runtime.object.visible = opacity > 0.004 && screen.z < 1;
         if (state.billboard <= 0.001) runtime.object.quaternion.set(0, 0, 0, 1);

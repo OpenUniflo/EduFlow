@@ -180,6 +180,12 @@ export type TiltedLabelChoice = {
   alpha: number;
   distance: number;
   priority: number;
+  /** Additional outward offset used when a name escapes a dense cluster or HUD panel. */
+  extra?: number;
+  /** Exact displacement from the immediate anchor (parked names far out). */
+  offset?: { x: number; y: number };
+  /** True when the name left its immediate anchor and needs a short leader line. */
+  leader?: boolean;
 };
 
 export type TiltedLabelOptions = {
@@ -299,6 +305,266 @@ export function chooseTiltedLabels(
       if (choice.priority <= 1) continue;
       choice.alpha = 1 - 0.4 * smoothstep(near, far, choice.distance);
     }
+  }
+  return chosen;
+}
+
+// ---------------------------------------------------------------------------
+// Selection names: the selected node plus every lit one-hop neighbour
+
+export type TiltedSelectionLabelCandidate = {
+  id: string;
+  x: number;
+  y: number;
+  /** Camera distance; smaller means nearer. */
+  distance: number;
+  /** Screen diameter of the node marker. */
+  diameter: number;
+  text: string;
+  /** Measured label width in CSS pixels. */
+  width: number;
+  selected?: boolean;
+};
+
+export type TiltedSelectionLabelMarker = TiltedLabelRect & { id: string };
+
+export type TiltedSelectionLabelOptions = {
+  width: number;
+  height: number;
+  lineHeight?: number;
+  margin?: number;
+  selectedId?: string;
+  /** Every related point / ring, including the selected node's ring. */
+  markers?: readonly TiltedSelectionLabelMarker[];
+  /** Page HUD rectangles (detail panel, toolbar, status / zoom bars, top bar). */
+  exclusions?: readonly TiltedLabelRect[];
+  /** Card bodies of other nodes; a selected name may sit over one if needed. */
+  cardBoxes?: readonly TiltedLabelRect[];
+  anchors?: readonly TiltedLabelAnchor[];
+  selectedAnchors?: readonly TiltedLabelAnchor[];
+  /** Outward offsets, tried from the immediate anchor outward. */
+  offsets?: readonly number[];
+};
+
+const SELECTION_ANCHORS: readonly TiltedLabelAnchor[] = ["above", "right", "below", "left"];
+const SELECTION_SELECTED_ANCHORS: readonly TiltedLabelAnchor[] = ["above", "left", "right", "below"];
+const SELECTION_OFFSETS: readonly number[] = [0, 14, 24, 36, 52, 72, 96, 126, 162, 206, 260, 326, 404, 500, 610];
+
+function expandRect(rect: TiltedLabelRect, padding: number): TiltedLabelRect {
+  return { x: rect.x - padding, y: rect.y - padding, width: rect.width + padding * 2, height: rect.height + padding * 2 };
+}
+
+function segmentHitsRect(segment: { x1: number; y1: number; x2: number; y2: number }, rect: TiltedLabelRect) {
+  const contains = (x: number, y: number) => x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+  if (contains(segment.x1, segment.y1) || contains(segment.x2, segment.y2)) return true;
+  const hit = (ax: number, ay: number, bx: number, by: number) => {
+    const denominator = (bx - ax) * (segment.y2 - segment.y1) - (by - ay) * (segment.x2 - segment.x1);
+    if (Math.abs(denominator) < 1e-6) return false;
+    const t = ((segment.x1 - ax) * (segment.y2 - segment.y1) - (segment.y1 - ay) * (segment.x2 - segment.x1)) / denominator;
+    const u = ((segment.x1 - ax) * (by - ay) - (segment.y1 - ay) * (bx - ax)) / denominator;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+  };
+  return hit(rect.x, rect.y, rect.x + rect.width, rect.y)
+    || hit(rect.x + rect.width, rect.y, rect.x + rect.width, rect.y + rect.height)
+    || hit(rect.x + rect.width, rect.y + rect.height, rect.x, rect.y + rect.height)
+    || hit(rect.x, rect.y + rect.height, rect.x, rect.y);
+}
+
+/**
+ * Short leader from the node marker edge to the near edge of a moved name.
+ * The start point always sits on the node, never on the label.
+ */
+export function labelLeaderFor(
+  node: { x: number; y: number; diameter: number },
+  anchor: TiltedLabelAnchor,
+  rect: TiltedLabelRect
+) {
+  const radius = Math.max(7, Math.min(24, node.diameter / 2 + 3));
+  if (anchor === "right") return { x1: node.x + radius, y1: node.y, x2: rect.x, y2: rect.y + rect.height / 2 };
+  if (anchor === "left") return { x1: node.x - radius, y1: node.y, x2: rect.x + rect.width, y2: rect.y + rect.height / 2 };
+  if (anchor === "below") return { x1: node.x, y1: node.y + radius, x2: rect.x + rect.width / 2, y2: rect.y };
+  return { x1: node.x, y1: node.y - radius, x2: rect.x + rect.width / 2, y2: rect.y + rect.height };
+}
+
+function leaderHitsLabelOrMarker(
+  segment: { x1: number; y1: number; x2: number; y2: number },
+  placed: readonly TiltedLabelRect[],
+  markers: readonly TiltedSelectionLabelMarker[],
+  ownId: string
+) {
+  // The line may not cut through another name; it also must not cross a
+  // related point / ring on its way out (except its own marker at the start).
+  for (const rect of placed) if (segmentHitsRect(segment, expandRect(rect, 1))) return true;
+  for (const marker of markers) {
+    if (marker.id === ownId) continue;
+    if (segmentHitsRect(segment, expandRect(marker, 1))) return true;
+  }
+  return false;
+}
+
+function selectionAnchorToward(rect: TiltedLabelRect, candidate: TiltedSelectionLabelCandidate): TiltedLabelAnchor {
+  const dx = rect.x + rect.width / 2 - candidate.x;
+  const dy = rect.y + rect.height / 2 - candidate.y;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "right" : "left";
+  return dy >= 0 ? "below" : "above";
+}
+
+function parkSelectionLabel(
+  candidate: TiltedSelectionLabelCandidate,
+  placed: readonly TiltedLabelRect[],
+  placedLeaders: readonly { x1: number; y1: number; x2: number; y2: number }[],
+  markers: readonly TiltedSelectionLabelMarker[],
+  exclusions: readonly TiltedLabelRect[],
+  cardBoxes: readonly TiltedLabelRect[],
+  options: Required<Pick<TiltedSelectionLabelOptions, "width" | "height" | "lineHeight" | "margin">>,
+  selected: boolean
+): TiltedLabelRect | null {
+  const fits = (rect: TiltedLabelRect) => {
+    if (rect.x < options.margin || rect.y < options.margin
+      || rect.x + rect.width > options.width - options.margin
+      || rect.y + rect.height > options.height - options.margin) return false;
+    if (placed.some((other) => overlapRatio(rect, other) > 0)) return false;
+    if (placedLeaders.some((leader) => segmentHitsRect(leader, expandRect(rect, 1)))) return false;
+    if (exclusions.some((other) => overlapRatio(rect, other) > 0)) return false;
+    // A name never covers any related point / ring, including its own.
+    if (markers.some((other) => overlapRatio(rect, other) > 0)) return false;
+    if (!selected && cardBoxes.some((other) => overlapRatio(rect, other) > 0)) return false;
+    return true;
+  };
+  const fitsWithLeader = (rect: TiltedLabelRect) => {
+    if (!fits(rect)) return false;
+    const anchor = selectionAnchorToward(rect, candidate);
+    const leader = labelLeaderFor(candidate, anchor, rect);
+    return !leaderHitsLabelOrMarker(leader, placed, markers, candidate.id);
+  };
+  // First walk outward around the node; this keeps dense columns readable
+  // (the preferred side slot is usually only one row away).
+  const maxRadius = Math.min(720, Math.hypot(options.width, options.height));
+  for (let radius = 26; radius <= maxRadius; radius += 22) {
+    const steps = Math.max(12, Math.round((Math.PI * 2 * radius) / 120));
+    for (let index = 0; index < steps; index += 1) {
+      const angle = (index / steps) * Math.PI * 2 - Math.PI / 2;
+      const rect = {
+        x: candidate.x + Math.cos(angle) * radius - candidate.width / 2,
+        y: candidate.y + Math.sin(angle) * radius - options.lineHeight / 2,
+        width: candidate.width,
+        height: options.lineHeight
+      };
+      if (fitsWithLeader(rect)) return rect;
+    }
+  }
+  // Last resort: a free slot anywhere in the stage, nearest first. This keeps
+  // the hard rule "a related node always keeps a name" even in a crowded pose.
+  let best: TiltedLabelRect | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  const step = 24;
+  for (let y = options.margin; y + options.lineHeight <= options.height - options.margin; y += step) {
+    for (let x = options.margin; x + candidate.width <= options.width - options.margin; x += step) {
+      const rect = { x, y, width: candidate.width, height: options.lineHeight };
+      if (!fitsWithLeader(rect)) continue;
+      const distance = Math.hypot(x + candidate.width / 2 - candidate.x, y + options.lineHeight / 2 - candidate.y);
+      if (distance < bestDistance) {
+        best = rect;
+        bestDistance = distance;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Selection layout: one name for the selected node and one for every related
+ * one-hop node. The set is never reduced by avoidance; a name that cannot sit
+ * beside its marker moves outward and gets a short leader line. The only
+ * allowed omissions happen before this call (out of frustum / HUD-covered).
+ */
+export function layoutSelectionLabels(
+  candidates: readonly TiltedSelectionLabelCandidate[],
+  options: TiltedSelectionLabelOptions
+): TiltedLabelChoice[] {
+  const lineHeight = options.lineHeight ?? 22;
+  const margin = options.margin ?? 8;
+  const selectedId = options.selectedId;
+  const markers = options.markers ?? [];
+  const exclusions = options.exclusions ?? [];
+  const cardBoxes = options.cardBoxes ?? [];
+  const anchors = options.anchors ?? SELECTION_ANCHORS;
+  const selectedAnchors = options.selectedAnchors ?? SELECTION_SELECTED_ANCHORS;
+  const offsets = options.offsets ?? SELECTION_OFFSETS;
+  const ordered = [...candidates].sort((left, right) => {
+    const leftSelected = left.selected || left.id === selectedId ? 0 : 1;
+    const rightSelected = right.selected || right.id === selectedId ? 0 : 1;
+    // Top-to-bottom packing keeps a dense vertical column readable: the upper
+    // names claim their side / above slot before the lower ones.
+    return leftSelected - rightSelected
+      || right.x - left.x
+      || right.distance - left.distance
+      || left.id.localeCompare(right.id);
+  });
+  const chosen: TiltedLabelChoice[] = [];
+  const placed: TiltedLabelRect[] = [];
+  const placedLeaders: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+  for (const candidate of ordered) {
+    const selected = Boolean(candidate.selected || candidate.id === selectedId);
+    const order = selected ? selectedAnchors : anchors;
+    let choice: TiltedLabelChoice | null = null;
+    for (const extra of offsets) {
+      for (const anchor of order) {
+        const base = labelRectForAnchor(candidate, anchor, candidate.width, lineHeight);
+        const shifted = {
+          ...base,
+          x: base.x + (anchor === "left" ? -extra : anchor === "right" ? extra : 0),
+          y: base.y + (anchor === "above" ? -extra : anchor === "below" ? extra : 0)
+        };
+        // A moved name is clamped into the stage; the immediate anchor is
+        // rejected when it would leave the stage.
+        const rect = extra > 0 ? {
+          ...shifted,
+          x: Math.max(margin, Math.min(shifted.x, options.width - margin - candidate.width)),
+          y: Math.max(margin, Math.min(shifted.y, options.height - margin - lineHeight))
+        } : shifted;
+        if (rect.x < margin || rect.y < margin
+          || rect.x + rect.width > options.width - margin
+          || rect.y + rect.height > options.height - margin) continue;
+        if (placed.some((other) => overlapRatio(rect, other) > 0)) continue;
+        // A new name may not be placed across an already drawn leader; later
+        // labels must respect the earlier name/leader pair.
+        if (placedLeaders.some((leader) => segmentHitsRect(leader, expandRect(rect, 1)))) continue;
+        if (exclusions.some((other) => overlapRatio(rect, other) > 0)) continue;
+        // Never cover any related point / circle (own marker included).
+        if (markers.some((other) => overlapRatio(rect, other) > 0)) continue;
+        if (!selected && cardBoxes.some((other) => overlapRatio(rect, other) > 0)) continue;
+        const leader = extra > 0 ? labelLeaderFor(candidate, anchor, rect) : null;
+        if (leader && leaderHitsLabelOrMarker(leader, placed, markers, candidate.id)) continue;
+        if (leader) placedLeaders.push(leader);
+        choice = {
+          id: candidate.id, anchor, rect, alpha: 1, distance: candidate.distance,
+          priority: selected ? 0 : 1, extra, leader: Boolean(leader)
+        };
+        break;
+      }
+      if (choice) break;
+    }
+    if (!choice) {
+      const parked = parkSelectionLabel(candidate, placed, placedLeaders, markers, exclusions, cardBoxes,
+        { width: options.width, height: options.height, lineHeight, margin }, selected);
+      if (parked) {
+        const anchor = selectionAnchorToward(parked, candidate);
+        const base = labelRectForAnchor(candidate, anchor, candidate.width, lineHeight);
+        const leader = labelLeaderFor(candidate, anchor, parked);
+        if (!leaderHitsLabelOrMarker(leader, placed, markers, candidate.id)) {
+          placedLeaders.push(leader);
+          choice = {
+            id: candidate.id, anchor, rect: parked, alpha: 1, distance: candidate.distance,
+            priority: selected ? 0 : 1, extra: 1, leader: true,
+            offset: { x: parked.x - base.x, y: parked.y - base.y }
+          };
+        }
+      }
+    }
+    if (!choice) continue;
+    chosen.push(choice);
+    placed.push(choice.rect);
   }
   return chosen;
 }
