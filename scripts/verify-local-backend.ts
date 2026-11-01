@@ -123,7 +123,8 @@ try {
   const importedAssignments = courses.body.courses
     .filter((item: any) => content.courseIds.includes(item.course.id))
     .flatMap((item: any) => item.assignments);
-  assert.deepEqual(importedAssignments.filter((item: any) => item.experience?.type === "answer"), [], "imported content must not contain answer Practices");
+  const importedAssignmentIds = importedAssignments.map((item: any) => `${item.courseId}:${item.id}`);
+  assert.equal(new Set(importedAssignmentIds).size, importedAssignmentIds.length, "imported Assignment identities must be unique");
   assert.ok(importedAssignments.every((item: any) => Boolean(item.mode && item.expectedOutput)), "every imported Practice must carry a submission contract");
   assertStatus(await invoke(coursesHandler, "GET", adminUser.token, undefined, { id: "missing-course" }), 404, "unknown course denial");
   const pdfMaterial = courses.body.courses.flatMap((item: any) => item.materials).find((item: any) => item.source?.kind === "pdf");
@@ -404,7 +405,7 @@ try {
   const evidenceCount=await server.from("knowledge_evidence").select("id",{count:"exact",head:true}).eq("user_id",adminUser.user.id).eq("event_type","micro_path_completed").eq("source_entity_id",agentPath.id);assert.ifError(evidenceCount.error);assert.equal(evidenceCount.count,1,"duplicate H5P completion must not duplicate Evidence");
   const startedKnowledge = await invoke(progressHandler, "GET", adminUser.token);
   assertStatus(startedKnowledge, 200, "Learning state after Micro");
-  assert.equal(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === agentPath.knowledgeId)?.status, "practicing", "Micro completion preserves the earlier submitted Assignment stage without manufacturing mastery");
+  assert.equal(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === agentPath.knowledgeId)?.status, "learned", "Required learn-path completion records learned without manufacturing mastery");
   assert.ok(startedKnowledge.body.userKnowledge.find((item: any) => item.nodeId === agentPath.knowledgeId)?.evidence?.some((item: any) => item.type === "micro_path_completed"));
 
   // Explicit local integration preconditions. Baseline verifier previously assumed
@@ -447,7 +448,7 @@ try {
   let authoredMicroComplete:any;for(const step of authoredPath.units[0].steps){authoredMicroComplete=await invoke(microHandler,"POST",ordinaryUser.token,{action:"complete-step",pathId:authoredPathId,unitId:authoredPath.units[0].id,stepId:step.id,submission:submissionFor(step,"authored")});assertStatus(authoredMicroComplete,200,`authored Micro ${step.id}`);assert.equal(authoredMicroComplete.body.correct,true);}
   assert.equal(authoredMicroComplete.body.completed, true, "second required authored Micro completion");
   const reverseProgress = await invoke(progressHandler, "GET", ordinaryUser.token);
-  assert.equal(reverseProgress.body.userKnowledge.find((item: any) => item.nodeId === agentPath.knowledgeId)?.status, "mastered", "mastery must be recomputed when required Micro completes after Assignment acceptance");
+  assert.equal(reverseProgress.body.userKnowledge.find((item: any) => item.nodeId === agentPath.knowledgeId)?.status, "learned", "Assignment acceptance and Micro completion must not manufacture mastery");
 
   const progressBody = {
     userId: ordinaryUser.user.id,

@@ -78,11 +78,28 @@ export function parseSnapshotValues(input: string): SnapshotValue[] {
   };
   skipWhitespace();
   while (index < input.length) {
-    if (input[index] === "'") {
+    const escapeString = (input[index] === "E" || input[index] === "e") && input[index + 1] === "'";
+    if (input[index] === "'" || escapeString) {
+      if (escapeString) index += 1;
       index += 1;
       let value = "";
       while (index < input.length) {
-        if (input[index] !== "'") {
+        if (escapeString && input[index] === "\\") {
+          const escaped = input[index + 1];
+          if (escaped === "n") value += "\n";
+          else if (escaped === "r") value += "\r";
+          else if (escaped === "t") value += "\t";
+          else if (escaped === "b") value += "\b";
+          else if (escaped === "f") value += "\f";
+          else if (escaped === "v") value += "\v";
+          else if (escaped === "x") {
+            const hex = input.slice(index + 2, index + 4);
+            if (!/^[0-9a-f]{2}$/i.test(hex)) throw new Error(`Malformed content snapshot hex escape near: ${input.slice(index, index + 8)}`);
+            value += String.fromCharCode(parseInt(hex, 16));
+            index += 2;
+          } else value += escaped;
+          index += 2;
+        } else if (input[index] !== "'") {
           value += input[index];
           index += 1;
         } else if (input[index + 1] === "'") {

@@ -48,6 +48,7 @@
     "test:workflow": "node scripts/workflow/checks/test.mjs",
     "workflow:report-fake-endpoints": "tsx scripts/workflow/local/report-fake-endpoints.ts",
     "content:import": "node --env-file=.env.local --import tsx scripts/content-import.ts",
+    "content:export": "node --env-file=.env.local --import tsx scripts/content-export.ts",
     "lint:css": "node scripts/lint-css.mjs",
     "tokens:sync": "node scripts/sync-design-tokens.mjs",
     "tokens:check": "node scripts/sync-design-tokens.mjs --check"

@@ -50,6 +50,14 @@ describe("content snapshot expectations", () => {
     ]);
   });
 
+  it("parses E-strings emitted for multiline content", () => {
+    expect(parseSnapshotValues("E'line one\\nline \\'two\\' \\\\ path', 'plain', 2")).toEqual([
+      "line one\nline 'two' \\ path",
+      "plain",
+      2
+    ]);
+  });
+
   it("parses only product-content INSERTs and ignores unrelated SQL", () => {
     const rows = parseContentSnapshotSql(fixtureSnapshot());
     expect(rows.get("courses")?.map((row) => row.id)).toEqual(["agentic-ai-golden", "python-engineering"]);
