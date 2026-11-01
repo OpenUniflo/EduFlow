@@ -1,10 +1,6 @@
-import { BookOpen, Clock3, FileText, Home } from "lucide-react";
+import { BookOpen, FileText, Home } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/shared/ui/Button";
-
-export function RecordsPage() {
-  return <ComingSoonPage kicker="学习记录" title="记录" description="热力图、时间线与学习证据会在这里汇总。" icon={<Clock3 size={22} aria-hidden />} />;
-}
 
 export function SettingsPage() {
   return <ComingSoonPage kicker="设置" title="设置" description="外观、通知与学习偏好会在这里集中管理。" icon={<FileText size={22} aria-hidden />} />;

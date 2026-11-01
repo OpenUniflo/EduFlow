@@ -6,6 +6,7 @@ import micro from "./_handlers/micro.js";
 import progress from "./_handlers/progress.js";
 import routePlan from "./_handlers/route-plan.js";
 import navigation from "./_handlers/navigation.js";
+import records from "./_handlers/records.js";
 import { methodNotAllowed } from "./_lib/http.js";
 
 export default async function learner(request: VercelRequest, response: VercelResponse) {
@@ -16,6 +17,7 @@ export default async function learner(request: VercelRequest, response: VercelRe
   if (request.query.resource === "micro") return micro(request, response);
   if (request.query.resource === "progress") return progress(request, response);
   if (request.query.resource === "navigation") return navigation(request, response);
+  if (request.query.resource === "records") return records(request, response);
   if (request.query.resource === "practice-submissions") return learning(request, response);
   return methodNotAllowed(response, ["GET", "POST", "PUT"]);
 }
