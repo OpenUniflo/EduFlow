@@ -10,6 +10,7 @@ import { evaluateAssignmentResponse, parseAssignmentResponse } from "../_lib/ass
 
 import { readAssignmentEligibility } from "../_lib/assignmentEligibility.js";
 import { requireAssignmentActionRun } from "../_lib/edgeActionRuns.js";
+import { readMyPracticeSubmissions } from "../_lib/practiceSubmissions.js";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
@@ -23,6 +24,10 @@ async function requireTeacher(userId: string) {
 
 export default handleApi(async (request: VercelRequest, response: VercelResponse) => {
   const { client, user } = await createUserSupabase(request);
+  if (request.query?.resource === "practice-submissions") {
+    if (request.method !== "GET") return methodNotAllowed(response, ["GET"]);
+    json(response, 200, await readMyPracticeSubmissions(client, user.id)); return;
+  }
   if (request.method === "GET") {
     const assignmentId = typeof request.query.assignmentId === "string" ? request.query.assignmentId : undefined;
     const learnerCourseId = typeof request.query.courseId === "string" ? request.query.courseId : undefined;

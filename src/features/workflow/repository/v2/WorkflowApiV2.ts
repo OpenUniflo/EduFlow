@@ -1,6 +1,6 @@
 import { apiRequest as sharedApiRequest, ApiRequestError, ApiResponseError } from "@/shared/api/apiClient";
 import { z } from "zod";
-import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail, ConnectionTestResult, ResourceReferenceRow } from "../../domain/v2/types";
+import type { WorkflowConfiguration, EditorDocumentV2, JsonValue, WorkflowCompileResult, WorkflowDefinitionV2, WorkflowDocumentV2, WorkflowEnvironment, WorkflowEventV2, WorkflowLaunchContext, WorkflowRunV2, WorkflowStepV2, WorkflowSummaryV2, WorkflowTool, WorkflowRevisionSummary, WorkflowLibraryQuery, WorkflowLibraryPage, WorkflowDeleteImpact, WorkflowThreadV2, WorkflowTemplateDetail, WorkflowTemplateSummary, ConnectionTestResult, ResourceReferenceRow } from "../../domain/v2/types";
 
 const endpoint = (resource: string, query: Record<string, string | number | undefined> = {}) => `/api/workflows?${new URLSearchParams({ resource, ...Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])) })}`;
 const runSubmissionReceipt = z.object({
@@ -92,8 +92,8 @@ export class WorkflowApiV2 {
   deleteImpact(id: string) { return apiRequest<WorkflowDeleteImpact>(endpoint("definitions",{id,op:"delete-impact"})); }
   remove(id: string, baseRevision: number) { return jsonRequest<{ok:boolean}>("definitions","DELETE",{baseRevision},{id,op:"delete"}); }
   rename(id: string, baseRevision: number, name: string) { return jsonRequest<{workflowId:string;revision:number}>("definitions","PATCH",{baseRevision,name},{id,op:"rename"}); }
-  templates() { return apiRequest<{items: {workflowId:string;name:string;description:string}[]}>(endpoint("templates")); }
-  template(templateId: string) { return apiRequest<WorkflowTemplateDetail>(endpoint("templates", { id: templateId })); }
+  templates(purpose?: "starter" | "course") { return apiRequest<{items: WorkflowTemplateSummary[]}>(endpoint("templates", { purpose })); }
+  template(templateId: string, purpose?: "starter" | "course") { return apiRequest<WorkflowTemplateDetail>(endpoint("templates", { id: templateId, purpose })); }
   useTemplate(templateId: string, options: {name?:string;fresh?:boolean;creationId?:string;environmentRef?:string;bindings?:{nodeId:string;graphPath:string[];field:"providerRef"|"toolRef";reference:string;modelRef?:string;contractDigest?:string}[]} = {}) { return jsonRequest<{workflowId:string;revision:number}>("definitions","POST",{templateId,...options},{op:"template"}); }
   get(workflowId: string, revision?: number) { return apiRequest<WorkflowDocumentV2>(endpoint("definitions", { id: workflowId, revision })); }
   create(definition: WorkflowDefinitionV2, editor: EditorDocumentV2, creationId?: string) { return jsonRequest<{ workflowId: string; revision: number; editorRevision: number }>("definitions", "POST", { definition, editor, ...(creationId ? {creationId} : {}) }); }

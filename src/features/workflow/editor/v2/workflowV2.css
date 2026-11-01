@@ -868,3 +868,12 @@ main.atlas-page-shell.wf-library-page{padding:0}
 .wf-node-fix{display:inline-flex;align-items:center;margin-left:auto;flex:0 0 auto;padding:1px 6px;border-radius:999px;background:#fdeef1;color:#a14454;font-size:9.5px;line-height:1.6;font-weight:600;white-space:nowrap}
 .wf-v2-node.needs-fix .wf-node-head{padding-right:0}
 .wf-test-block-reason{font-size:10.5px;color:#8a3f4c;line-height:1.5;margin:4px 0 0}
+.wf-empty-start-status{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:26px auto 0;max-width:560px;font-size:12px;color:#596a83}
+.wf-empty-start-status.is-error{flex-direction:column;color:#8a3d4c;background:#fff5f6;border:1px solid #f0cfd4;border-radius:12px;padding:14px 16px}
+.wf-empty-start-status.is-error p{margin:0;color:#8a3d4c}
+.wf-empty-start-status.is-error small{color:#7a6670}
+.wf-template-section-title{font-size:12px;font-weight:600;color:#596a83;margin:14px 3px 2px}
+.wf-template-load-error{margin:8px 3px;padding:10px 12px;border:1px solid #f0cfd4;border-radius:9px;background:#fff5f6;color:#8a3d4c}
+.wf-template-load-error p{margin:0 0 4px;font-size:12px;line-height:1.6}
+.wf-template-load-error button{margin-top:4px}
+.wf-dialog-start-list p{margin:6px 0}

@@ -194,14 +194,22 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
   const op = queryString(request, "op"); const id = queryString(request, "id"); const client = createServerSupabase();
   if (resource === "capabilities" && request.method === "GET") { json(response, 200, await workflowCompiler("/capabilities")); return true; }
   if (resource === "templates" && request.method === "GET") {
+    const requestedPurpose = queryString(request, "purpose");
+    if (requestedPurpose !== undefined && requestedPurpose !== "starter" && requestedPurpose !== "course") throw new ApiError(400, "INVALID_REQUEST", "Template purpose must be starter or course");
     if (id) {
       const templateId = workflowString(id);
-      const row = result(await client.from("workflow_templates").select("id,name,description,definition").eq("id", templateId).eq("definition->>schemaVersion", "2.0").maybeSingle()) as WorkflowRow | null;
+      let templateQuery = client.from("workflow_templates").select("id,name,description,definition,purpose").eq("id", templateId).eq("definition->>schemaVersion", "2.0");
+      if (requestedPurpose) templateQuery = templateQuery.eq("purpose", requestedPurpose);
+      const row = result(await templateQuery.maybeSingle()) as WorkflowRow | null;
       if (!row) throw new ApiError(404, "NOT_FOUND", "Workflow template not found");
-      json(response, 200, { workflowId: row.id, name: row.name, description: row.description, definition: row.definition }); return true;
+      json(response, 200, { workflowId: row.id, name: row.name, description: row.description, purpose: row.purpose, definition: row.definition }); return true;
     }
-    const rows = result(await client.from("workflow_templates").select("id,name,description,definition").eq("definition->>schemaVersion", "2.0").order("id")) as WorkflowRow[];
-    json(response, 200, { items: rows.map(row => ({ workflowId: row.id, name: row.name, description: row.description })) }); return true;
+    let templatesQuery = client.from("workflow_templates").select("id,name,description,definition,purpose").eq("definition->>schemaVersion", "2.0");
+    if (requestedPurpose) templatesQuery = templatesQuery.eq("purpose", requestedPurpose);
+    const rows = result(await templatesQuery.order("id")) as WorkflowRow[];
+    // Starter cards need their definition immediately for the empty canvas; course
+    // templates stay summaries because the editor loads the selected one on demand.
+    json(response, 200, { items: rows.map(row => ({ workflowId: row.id, name: row.name, description: row.description, purpose: row.purpose, ...(row.purpose === "starter" ? { definition: row.definition } : {}) })) }); return true;
   }
   if (resource === "p5" && request.method === "POST") {
     const body=workflowStrictBody(request.body,["action","workflowId","environmentRef","threadId","checkpointId","namespace","graphPath","before","input","updates","idempotencyKey","confirmExternalEffects","scope","collection","key","value","expectedVersion","ttlMinutes","offset"],["action"]);
@@ -272,7 +280,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       const body = workflowStrictBody(request.body, ["templateId", "name", "creationId", "fresh", "environmentRef", "bindings"], ["templateId"]);
       if (body.fresh !== undefined && typeof body.fresh !== "boolean") throw new ApiError(400,"INVALID_REQUEST","Invalid template creation mode");
       const templateId = workflowString(body.templateId);
-      const template = result(await client.from("workflow_templates").select("definition").eq("id",templateId).eq("definition->>schemaVersion","2.0").maybeSingle()) as WorkflowRow | null;
+      const template = result(await client.from("workflow_templates").select("definition,purpose").eq("id",templateId).eq("definition->>schemaVersion","2.0").maybeSingle()) as WorkflowRow | null;
       if (!template) throw new ApiError(404,"NOT_FOUND","Workflow template not found");
       const workflowId = body.fresh === true ? workflowUuid(body.creationId) : templateId;
       const existing = body.fresh === true ? null : result(await client.from("workflow_v2_definitions").select("workflow_id,current_revision").eq("owner_user_id",owner).eq("workflow_id",templateId).maybeSingle()) as WorkflowRow | null;
@@ -307,7 +315,7 @@ export async function handleWorkflowV2(request: VercelRequest, response: VercelR
       const nodes = boundDefinition.nodes as WorkflowRow[];
       const editor = { schemaVersion:1,workflowId,editorRevision:1,definitionRevision:1,nodes:Object.fromEntries(nodes.map((node,index)=>[String(node.id),{x:80+index*280,y:180}])),edges:{} };
       const validation = await workflowCompiler("/v1/document",{definition:boundDefinition});
-      json(response,201,await saveCreation(client,owner,boundDefinition,editor,validation.definitionHash,{sourceTemplateId:templateId,libraryGroup:"general"})); return true;
+      json(response,201,await saveCreation(client,owner,boundDefinition,editor,validation.definitionHash,{sourceTemplateId:templateId,sourceTemplatePurpose:template.purpose,libraryGroup:"general"})); return true;
     }
     if (request.method === "GET" && op === "library") {
       const params = z.object({search:z.string().max(200),scope:z.enum(["all","personal","course"]),sort:z.enum(["updated","name"]),page:z.coerce.number().int().min(1).max(1000000),pageSize:z.coerce.number().int().min(1).max(48)}).safeParse({search:queryString(request,"search")??"",scope:queryString(request,"scope")??"all",sort:queryString(request,"sort")??"updated",page:queryString(request,"page")??1,pageSize:queryString(request,"pageSize")??12});

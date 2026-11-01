@@ -16,5 +16,6 @@ export default async function learner(request: VercelRequest, response: VercelRe
   if (request.query.resource === "micro") return micro(request, response);
   if (request.query.resource === "progress") return progress(request, response);
   if (request.query.resource === "navigation") return navigation(request, response);
+  if (request.query.resource === "practice-submissions") return learning(request, response);
   return methodNotAllowed(response, ["GET", "POST", "PUT"]);
 }

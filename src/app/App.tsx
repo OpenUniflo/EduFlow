@@ -191,7 +191,7 @@ export default function App() {
             <RouterRoute path="/" element={session ? <LearningPage session={session} onLogout={logout} /> : <PublicHomePage />} />
             <RouterRoute path="/archive" element={<ArchivePage session={session} onRetry={reloadArchiveData} />} />
             <RouterRoute path="/learn/micro/:knowledgeId" element={<MicroLearningExperience session={session} onLogout={logout} repository={applicationServices.microLearningRepository} />} />
-            <RouterRoute path="/works" element={protectedElement(session ? <WorkflowLibraryPage userId={session.userId} courseRepository={applicationServices.courseRepository} learningProgressRepository={applicationServices.learningProgressRepository} onOpenWorkflow={(id, returnTo) => navigate(`/works/${id}`, { state: { workflowLibraryReturn: returnTo } })} /> : null)} />
+            <RouterRoute path="/works" element={protectedElement(session ? <WorkflowLibraryPage userId={session.userId} learnerStateService={applicationServices.learnerStateService} onOpenWorkflow={(id, returnTo) => navigate(`/works/${id}`, { state: { workflowLibraryReturn: returnTo } })} versionPreviews={applicationServices.preview?.workflowVersions ?? []} /> : null)} />
             <RouterRoute path="/works/:workflowId" element={protectedElement(editor)} />
             <RouterRoute path="/courses" element={<LegacyRedirect />} />
             <RouterRoute path="/courses/" element={<LegacyRedirect />} />

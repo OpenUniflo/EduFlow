@@ -15,7 +15,7 @@ export function WorkflowV2Route({ workflowId, ownerId, navigation, onBack, onOpe
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     let active = true; setDocument(null); setError("");
-    void workflowApiV2.get(workflowId).then(data => { if (active) setDocument(data); }).catch(async reason => { if (!active) return; if(reason instanceof ApiRequestError && reason.status===404){try{const source=(await workflowApiV2.templates()).items.find(item=>item.workflowId===workflowId);if(active&&source){setTemplate(source);return;}}catch{/* Show the original load error. */}}if(active)setError(workflowErrorMessage(reason)); });
+    void workflowApiV2.get(workflowId).then(data => { if (active) setDocument(data); }).catch(async reason => { if (!active) return; if(reason instanceof ApiRequestError && reason.status===404){try{const source=(await workflowApiV2.templates("course")).items.find(item=>item.workflowId===workflowId);if(active&&source){setTemplate(source);return;}}catch{/* Show the original load error. */}}if(active)setError(workflowErrorMessage(reason)); });
     return () => { active = false; };
   }, [workflowId, ownerId, retry]);
   if(template)return <main className="wf-v2-loading">{navigation}<WorkflowCreateDialog initialTemplate={template} courseLaunch onClose={onBack} onCreated={id=>{setTemplate(null);if(id===workflowId)setRetry(value=>value+1);else onOpen(id);}}/></main>;

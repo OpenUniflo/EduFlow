@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import "./workflowV2.css";
 
 /** Native modal dialog supplies keyboard trapping; closure restores the initiating control. */
 export function WorkflowDialog({ title, error, onClose, children, className = "" }: { title: string; error?: string; className?: string; onClose: () => void; children: ReactNode }) {

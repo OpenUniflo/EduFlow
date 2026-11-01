@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
-import { createStartingTemplate } from "../../../src/features/workflow/domain/v2/startingTemplates";
+import { applyStartingTemplate } from "../../../src/features/workflow/domain/v2/startingTemplates";
+import { syntheticStarterTemplate } from "../../fixtures/workflowTemplates";
 import { createEditorV2, createWorkflowV2 } from "../../../src/features/workflow/domain/v2/factory";
 import type { WorkflowDocumentV2 } from "../../../src/features/workflow/domain/v2/types";
 
@@ -17,7 +18,7 @@ async function request(resource: string, method = "GET", body?: unknown, query: 
   assert.ok(response.ok, `${resource}: ${response.status}`);
   return result;
 }
-const fixture = createStartingTemplate("search", createWorkflowV2("自动检查 · 起步流程与执行策略"), { providerRef: "provider", modelRef: "model", hnTool: { ref: "hn_search", contractDigest: "digest" } });
+const fixture = applyStartingTemplate(syntheticStarterTemplate(), createWorkflowV2("自动检查 · 起步流程与执行策略"), { providerRef: "provider", modelRef: "model", hnTool: { ref: "hn_search", contractDigest: "digest" } });
 fixture.definition.policy.authoring = { recursionLimit: 75, waitTimeoutMs: 604800000, checkpoint: "superstep" };
 fixture.definition.nodes.find(node => node.id === "answer")!.config.authoring = { cache: { ttlMs: 300000 }, errorHandler: { functionRef: "registered.error_handler" } };
 fixture.editor = { ...fixture.editor, ...createEditorV2(fixture.definition), nodes: { ...fixture.editor.nodes, answer: { x: 640, y: 140 } } };

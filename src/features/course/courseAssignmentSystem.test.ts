@@ -469,7 +469,8 @@ describe("Material and progress generalization", () => {
     expect(lessonPage).toContain('className="atlas-workflow-modal"');
     expect(lessonPage).toContain('className="atlas-workflow-modal-card glass-v2"');
     expect(lessonPage).not.toContain('className="atlas-workflow-card glass-v2"');
-    expect(workflowLibrary).toContain("wf-v2-library-card");
+    expect(workflowLibrary).toContain("ef-works-page");
+    expect(workflowLibrary).toContain("ef-works-card");
   });
 
   it("keeps Knowledge mastery independent from Assignment completion", () => {

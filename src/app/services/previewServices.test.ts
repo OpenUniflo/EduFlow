@@ -22,3 +22,11 @@ describe("Feature Preview injection", () => {
     expect(after.map((person) => person.visibility)).toEqual(["public", "public", "public", "public", "private"]);
   });
 });
+
+describe("Feature Preview version history", () => {
+  it("is injected read-only and clearly synthetic", () => {
+    expect(previewApplicationServices.workflowVersions.length).toBeGreaterThan(0);
+    expect(previewApplicationServices.workflowVersions.every((version) => version.label.includes("示例") && version.summary.includes("示例"))).toBe(true);
+    expect(previewApplicationServices.workflowVersions.map((version) => version.id)).toEqual(["sample-version-a", "sample-version-b", "sample-version-c"]);
+  });
+});

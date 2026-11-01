@@ -46,6 +46,16 @@ describe("content export rendering", () => {
     expect(sql.indexOf("values ('a'")).toBeLessThan(sql.indexOf("values ('b'"));
   });
 
+  it("exports the Workflow template purpose discriminator", () => {
+    const sql = renderContentSnapshot([{
+      table: "workflow_templates",
+      columns: [{ name: "id", type: "text" }, { name: "definition", type: "jsonb" }, { name: "purpose", type: "text" }],
+      primaryKey: ["id"],
+      rows: [{ id: "starter-assistant", definition: '{"schemaVersion":"2.0"}', purpose: "starter" }]
+    }], generatedAt);
+    expect(sql).toContain(`insert into public.workflow_templates (id, definition, purpose) values ('starter-assistant', '{"schemaVersion":"2.0"}', 'starter') on conflict (id) do update set definition = excluded.definition, purpose = excluded.purpose;`);
+  });
+
   it("uses do nothing when every exported column is part of the primary key", () => {
     const sql = renderContentSnapshot([table({
       table: "join_rows",
