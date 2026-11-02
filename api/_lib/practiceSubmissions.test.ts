@@ -38,6 +38,47 @@ describe("practice submission card data", () => {
     expect(practiceSubmissionContent(null)).toBeUndefined();
   });
 
+  it("uses the first meaningful JSON field instead of the raw payload", () => {
+    const task = "在已登录学习者的 Course 上解释真实 Knowledge 与学习目标";
+    expect(practiceSubmissionContent({
+      kind: "answer",
+      text: JSON.stringify({ project: "EduFlow Global Assistant", title: "   ", task: `${task}\n第二行` }),
+    })).toEqual({ kind: "answer", attachmentCount: 0, text: task });
+    expect(practiceSubmissionContent({
+      kind: "answer",
+      text: JSON.stringify({ task: "task 字段", answer: "answer 字段" }),
+    })?.text).toBe("task 字段");
+    const longTask = "长".repeat(100);
+    expect(practiceSubmissionContent({ kind: "answer", text: JSON.stringify({ task: longTask }) })?.text).toBe(longTask.slice(0, 80));
+  });
+
+  it("omits text when JSON has no usable top-level string field", () => {
+    expect(practiceSubmissionContent({
+      kind: "answer",
+      text: JSON.stringify({ project: "EduFlow Global Assistant", count: 3, nested: { task: "不是顶层" } }),
+    })).toEqual({ kind: "answer", attachmentCount: 0 });
+  });
+
+  it("omits text for JSON arrays", () => {
+    expect(practiceSubmissionContent({
+      kind: "answer",
+      text: JSON.stringify([{ task: "数组元素不算字段" }]),
+    })).toEqual({ kind: "answer", attachmentCount: 0 });
+  });
+
+  it("keeps plain text and unparsable JSON-looking text unchanged", () => {
+    expect(practiceSubmissionContent({
+      kind: "answer",
+      text: "普通作答\n第二行",
+    })).toEqual({ kind: "answer", attachmentCount: 0, text: "普通作答" });
+    const broken = '{ "task": "未闭合"';
+    expect(practiceSubmissionContent({ kind: "answer", text: broken })).toEqual({
+      kind: "answer",
+      attachmentCount: 0,
+      text: broken,
+    });
+  });
+
   it("resolves the 1-based chapter from the primary covered Knowledge", () => {
     const chapters = chapterNumbersByAssignment(
       [{ course_id: "c", assignment_id: "a", node_id: "later" }, { course_id: "c", assignment_id: "a", node_id: "primary" }],

@@ -68,6 +68,35 @@ function latestAttempts(attempts: readonly Row[]): Map<string, Row> {
   return latest;
 }
 
+function firstLineSummary(value: string): string | undefined {
+  return value.split(/\r?\n/).map(line => line.trim()).find(Boolean)?.slice(0, 80);
+}
+
+const SUMMARY_FIELDS = ["title", "summary", "task", "answer", "text", "content"] as const;
+
+/**
+ * A submission's answer may itself be serialized JSON. When the whole text is a JSON object or
+ * array, its first meaningful top-level string field is a better summary than the raw payload.
+ */
+function jsonSummary(value: string): { isJson: true; text?: string } | { isJson: false } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return { isJson: false };
+  }
+  if (!parsed || typeof parsed !== "object") return { isJson: false };
+  if (Array.isArray(parsed)) return { isJson: true };
+  const record = parsed as Row;
+  for (const key of SUMMARY_FIELDS) {
+    const field = record[key];
+    if (typeof field !== "string") continue;
+    const summary = firstLineSummary(field);
+    if (summary) return { isJson: true, text: summary };
+  }
+  return { isJson: true };
+}
+
 function linkDomainIn(value: string): string | undefined {
   const match = value.match(/https?:\/\/[^\s<>"'）)]+/i);
   if (!match) return undefined;
@@ -90,7 +119,8 @@ export function practiceSubmissionContent(value: unknown): PracticeSubmissionCon
     ? response.fileName.trim().slice(0, 120)
     : undefined;
   const rawText = typeof response.text === "string" ? response.text.trim() : "";
-  const firstLine = rawText.split(/\r?\n/).map(line => line.trim()).find(Boolean)?.slice(0, 80);
+  const extracted = rawText ? jsonSummary(rawText) : undefined;
+  const firstLine = extracted?.isJson ? extracted.text : firstLineSummary(rawText);
   const linkDomain = linkDomainIn(rawText);
   const content: PracticeSubmissionContent = { kind, attachmentCount };
   if (fileName) content.fileName = fileName;
