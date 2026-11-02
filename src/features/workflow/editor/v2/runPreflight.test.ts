@@ -28,6 +28,20 @@ describe("run preflight", () => {
     expect(issues).toContainEqual(expect.objectContaining({ id: "binding:answer:question:state", tab: "state" }));
     expect(issues).toContainEqual(expect.objectContaining({ id: "tool:search:digest" }));
   });
+  it("points a changed tool contract at the node panel refresh action", () => {
+    const search = createNodeV2("core.tool", "search"); search.config = { toolRef: "hn_search", contractDigest: "old" };
+    const definition = { ...createWorkflowV2(), nodes: [createNodeV2("core.start", "start"), search, createNodeV2("core.end", "end")] };
+    const issue = runPreflight({ definition, input: {}, environment, tools: [tool] }).find(item => item.id === "tool:search:digest");
+    expect(issue).toEqual(expect.objectContaining({ tab: "node", nodeId: "search", detail: "工具定义已更新，请在节点面板点「刷新工具配置」。" }));
+  });
+  it("blocks a required tool parameter that has no binding", () => {
+    const search = createNodeV2("core.tool", "search"); search.config = { toolRef: "hn_search", contractDigest: "digest" };
+    const definition = { ...createWorkflowV2(), nodes: [createNodeV2("core.start", "start"), search, createNodeV2("core.end", "end")] };
+    const requiredTool = { ...tool, inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } };
+    expect(runPreflight({ definition, input: {}, environment, tools: [requiredTool] })).toContainEqual(expect.objectContaining({
+      id: "tool:search:required:query", tab: "node", nodeId: "search", detail: "这是当前工具的必填参数，请在节点面板中接上。",
+    }));
+  });
   it("blocks State initialization and output sources that no longer exist", () => {
     const definition = { ...createWorkflowV2(), state: { ...createWorkflowV2().state, inputBindings: { answer: { source: "input" as const, pointer: "/missing", onMissing: { mode: "error" as const } } } }, outputBindings: { answer: stateBinding("/absent") } };
     const issues = runPreflight({ definition, input: {}, environment, tools: [] });

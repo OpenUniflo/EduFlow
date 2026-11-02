@@ -1,7 +1,8 @@
+import { useState } from "react";
 import type { JsonSchema, JsonValue, LlmConfigV2, WorkflowEnvironment, WorkflowNodeV2, WorkflowTool } from "../../domain/v2/types";
 import { SchemaForm } from "./SchemaForm";
 import { PromptEditor } from "./PromptEditor";
-import { reconcileToolInputs } from "../../domain/v2/toolParams";
+import { reconcileToolInputs, refreshToolContract, toolContractRefreshMessage } from "../../domain/v2/toolParams";
 import { useExtensions } from "./FunctionExecutionFields";
 import { CURRENT_TYPE_VERSIONS, isRetiredNode } from "../../domain/v2/nodeVersions";
 import { isFakeEndpointRef } from "../../resources/providerModel";
@@ -32,6 +33,7 @@ export function ProcessingFields({ node, environment, tools, stateSchema, onChan
   const { data: extensions } = useExtensions(environment?.environmentRef);
   const llmConfig = config as unknown as LlmConfigV2;
   const retired = isRetiredNode(node);
+  const [toolRefresh, setToolRefresh] = useState<{ nodeId: string; digest: string; text: string } | null>(null);
   function upgradeCandidate(kind: "provider" | "tool") {
     const ref = kind === "provider" ? providerRef : toolRef;
     if (!ref.startsWith("p4:") || !extensions) return null;
@@ -74,7 +76,22 @@ export function ProcessingFields({ node, environment, tools, stateSchema, onChan
         <PromptEditor prompt={llmConfig.prompt ?? { system: [], messages: [{ role: "user", content: [] }] }} inputs={node.inputs} onChange={prompt => update({ prompt: prompt as unknown as JsonValue })}/>
       </> : <p className="wf-field-note">旧版模型节点只保留定义；请删除后重新添加新版节点。</p>}
     </> : null}
-    {node.type === "core.tool" ? <>{(() => { const candidate = upgradeCandidate("tool"); return candidate ? <div className="wf-upgrade-hint" role="status"><span>已有 v{candidate.next.version}，本节点使用 v{candidate.current.version}；升级会按新参数 Schema 保留同名参数</span><button type="button" onClick={() => { const nextTool = tools.find(tool => tool.connectionRef === candidate.current.ref && tool.version === candidate.next.version); const previousSchema = selectedTool?.inputSchema ?? { type: "object", properties: {} }; const nextSchema = nextTool?.inputSchema ?? previousSchema; const reconciled = reconcileToolInputs(previousSchema, nextSchema, node.inputs); onChange({ config: { ...node.config, toolRef: candidate.next.connectionKey, contractDigest: nextTool?.contractDigest ?? "" }, inputs: reconciled.inputs }); }}>升级</button></div> : null; })()}<label data-config-field="config/toolRef">工具<select aria-label="执行工具" value={String(config.toolRef ?? "")} onChange={e => { const tool = tools.find(t => t.ref === e.target.value); if (node.typeVersion >= 2) { const previousSchema = selectedTool?.inputSchema ?? { type: "object", properties: {} }; const nextSchema = tool?.inputSchema ?? { type: "object", properties: {} }; const reconciled = reconcileToolInputs(previousSchema, nextSchema, node.inputs); onChange({ config: { ...node.config, toolRef: tool?.ref ?? "", contractDigest: tool?.contractDigest ?? "" }, inputs: reconciled.inputs }); return; } onChange({ config: { ...node.config, toolRef: tool?.ref ?? "", contractDigest: tool?.contractDigest ?? "" }, inputs: { arguments: { source: "literal", value: {} } } }); }}><option value="">选择已注册工具</option>{tools.map(tool => <option key={tool.ref} value={tool.ref} disabled={tool.available === false}>{tool.name}{tool.origin === "user" ? " · 我的连接" : ""}{tool.available === false ? "（不可用）" : ""}</option>)}</select></label>{toolRef.startsWith("p4:") && !selectedTool ? <p role="alert">原工具连接不可用，请重新选择工具。</p> : null}<p>{selectedTool?.description ?? "选择当前环境授权的工具。HTTP 与 MCP 服务通过注册连接调用。"}</p></> : null}
+    {node.type === "core.tool" ? <>
+      {(() => { const candidate = upgradeCandidate("tool"); return candidate ? <div className="wf-upgrade-hint" role="status"><span>已有 v{candidate.next.version}，本节点使用 v{candidate.current.version}；升级会按新参数 Schema 保留同名参数</span><button type="button" onClick={() => { const nextTool = tools.find(tool => tool.connectionRef === candidate.current.ref && tool.version === candidate.next.version); const previousSchema = selectedTool?.inputSchema ?? { type: "object", properties: {} }; const nextSchema = nextTool?.inputSchema ?? previousSchema; const reconciled = reconcileToolInputs(previousSchema, nextSchema, node.inputs); onChange({ config: { ...node.config, toolRef: candidate.next.connectionKey, contractDigest: nextTool?.contractDigest ?? "" }, inputs: reconciled.inputs }); }}>升级</button></div> : null; })()}
+      {selectedTool && selectedTool.available !== false && !retired && String(config.contractDigest ?? "") !== selectedTool.contractDigest
+        ? <div className="wf-upgrade-hint" role="status">
+          <span>工具定义已更新。刷新会按当前参数定义保留同名参数接线，并移除已不存在的参数。</span>
+          <button type="button" onClick={() => {
+            if (!selectedTool) return;
+            const refreshed = refreshToolContract({ config, inputs: node.inputs, tool: selectedTool });
+            setToolRefresh({ nodeId: node.id, digest: selectedTool.contractDigest, text: toolContractRefreshMessage(refreshed) });
+            onChange({ config: refreshed.config, inputs: refreshed.inputs });
+          }}>刷新工具配置</button>
+        </div>
+        : null}
+      {toolRefresh && toolRefresh.nodeId === node.id && toolRefresh.digest === String(config.contractDigest ?? "") ? <p className="wf-field-note" role="status">{toolRefresh.text}</p> : null}
+      <label data-config-field="config/toolRef">工具<select aria-label="执行工具" value={String(config.toolRef ?? "")} onChange={e => { const tool = tools.find(t => t.ref === e.target.value); if (node.typeVersion >= 2) { const previousSchema = selectedTool?.inputSchema ?? { type: "object", properties: {} }; const nextSchema = tool?.inputSchema ?? { type: "object", properties: {} }; const reconciled = reconcileToolInputs(previousSchema, nextSchema, node.inputs); onChange({ config: { ...node.config, toolRef: tool?.ref ?? "", contractDigest: tool?.contractDigest ?? "" }, inputs: reconciled.inputs }); return; } onChange({ config: { ...node.config, toolRef: tool?.ref ?? "", contractDigest: tool?.contractDigest ?? "" }, inputs: { arguments: { source: "literal", value: {} } } }); }}><option value="">选择已注册工具</option>{tools.map(tool => <option key={tool.ref} value={tool.ref} disabled={tool.available === false}>{tool.name}{tool.origin === "user" ? " · 我的连接" : ""}{tool.available === false ? "（不可用）" : ""}</option>)}</select></label>{toolRef.startsWith("p4:") && !selectedTool ? <p role="alert">原工具连接不可用，请重新选择工具。</p> : null}<p>{selectedTool?.description ?? "选择当前环境授权的工具。HTTP 与 MCP 服务通过注册连接调用。"}</p>
+    </> : null}
     {node.type === "core.transform" ? <label data-config-field="config/operationRef">处理函数<select aria-label="转换操作" value={String(config.operationRef ?? "")} onChange={e => { const operation = transformOperations[e.target.value]; onChange({ config: { ...node.config, operationRef: e.target.value, operationVersion: 1 }, inputs: Object.fromEntries(Object.entries(operation.inputs).map(([key,value]) => [key, node.inputs[key] ?? { source: "literal" as const, value }])) }); }}><option value="" disabled>选择处理函数</option>{Object.entries(transformOperations).map(([ref,item]) => <option key={ref} value={ref}>{item.label}</option>)}</select></label> : null}
     {["core.llm", "core.tool_dispatch"].includes(node.type) ? <details data-config-field="工具授权"><summary>允许调用的工具 · {refs.length}</summary><small>模型决定调用，工具节点执行；两处授权分别生效。</small>{tools.map(tool => <label className="wf-v2-checkbox" key={tool.ref}><input type="checkbox" checked={refs.includes(tool.ref)} disabled={tool.available === false} onChange={e => update({ allowedToolRefs: e.target.checked ? [...refs, tool.ref] : refs.filter(ref => ref !== tool.ref) })}/><span>{tool.name}<small>{tool.description}</small></span></label>)}{refs.filter(ref => !tools.some(tool => tool.ref === ref && tool.available !== false)).map(ref => <p role="alert" key={ref}>工具 {ref} 当前不可用，请重新授权。</p>)}</details> : null}
   </section>;

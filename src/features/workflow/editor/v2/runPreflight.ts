@@ -113,7 +113,10 @@ export function runPreflight({ definition, input, environment, tools, variableVa
         if (!tool || tool.available === false) issues.push({ id: `tool:${node.id}:unavailable`, title: `「${labelOf(node)}」的工具不可用`, detail: "工具连接已失效或未授权，请重新选择。", tab: "node", nodeId: node.id });
         else {
           const digest = typeof node.config.contractDigest === "string" ? node.config.contractDigest : "";
-          if (digest !== tool.contractDigest) issues.push({ id: `tool:${node.id}:digest`, title: `「${labelOf(node)}」的工具配置已变化`, detail: "请重新选择工具以刷新参数。", tab: "node", nodeId: node.id });
+          if (digest !== tool.contractDigest) issues.push({ id: `tool:${node.id}:digest`, title: `「${labelOf(node)}」的工具配置已变化`, detail: "工具定义已更新，请在节点面板点「刷新工具配置」。", tab: "node", nodeId: node.id });
+          for (const name of required(tool.inputSchema)) {
+            if (!Object.prototype.hasOwnProperty.call(node.inputs, name)) issues.push({ id: `tool:${node.id}:required:${name}`, title: `「${labelOf(node)}」的必填参数 ${name} 未接上`, detail: "这是当前工具的必填参数，请在节点面板中接上。", tab: "node", nodeId: node.id });
+          }
         }
       }
     }
