@@ -238,7 +238,7 @@ function ghostPeekHtml(node: StageNode) {
     return `<span class="ef-imm-ghost-peek"><strong>${escapeHtml(node.title)}</strong><small>${escapeHtml(node.statusLine ?? node.meta ?? "知识")}</small></span>`;
   }
   if (node.kind === "assignment") {
-    const code = node.code ? `实践 ${escapeHtml(node.code)}` : "实训";
+    const code = node.code ? `动手任务 ${escapeHtml(node.code)}` : "动手任务";
     return `<span class="ef-imm-ghost-peek"><strong><em>${code}</em>${escapeHtml(node.title)}</strong><small>${escapeHtml(node.statusLine ?? "")}</small></span>`;
   }
   return "";
@@ -587,8 +587,8 @@ export function TiltedCourseStage({
     // band above the cards, and still lets us stroke gradients and punch
     // glyph-shaped holes so card text keeps its contrast.
     routeHost.innerHTML = `
-      <canvas class="ef-imm-route-canvas ef-imm-route-track-canvas" aria-hidden="true"></canvas>
-      <canvas class="ef-imm-route-canvas ef-imm-route-comet-canvas" aria-hidden="true"></canvas>`;
+      <canvas class="ef-imm-route-band-canvas ef-imm-route-track-canvas" aria-hidden="true"></canvas>
+      <canvas class="ef-imm-route-band-canvas ef-imm-route-comet-canvas" aria-hidden="true"></canvas>`;
     host.appendChild(routeHost);
     const routeTrackCanvas = routeHost.querySelector(".ef-imm-route-track-canvas") as HTMLCanvasElement;
     const routeCometCanvas = routeHost.querySelector(".ef-imm-route-comet-canvas") as HTMLCanvasElement;

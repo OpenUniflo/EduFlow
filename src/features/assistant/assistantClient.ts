@@ -1,3 +1,4 @@
+import { DefaultChatTransport, readUIMessageStream, type UIMessage } from "ai";
 import { apiRequest } from "@/shared/api/apiClient";
 import { supabaseClient } from "@/shared/api/supabaseClient";
 import type { AssistantContextSnapshot, AssistantMessage, AssistantSession, AssistantSessionDetail, CourseCreationBrief } from "./assistantContract";
@@ -14,36 +15,6 @@ export function getAssistantSession(sessionId: string) {
 
 export async function getAssistantTimelineMessage(messageId: string) {
   return (await apiRequest<{ message: AssistantMessage }>(`/api/assistant?messageId=${encodeURIComponent(messageId)}`)).message;
-}
-
-export async function streamAssistantMessage(input: { sessionId?: string; message: string; context: AssistantContextSnapshot }, onDelta: (delta: string) => void, onSession?: (sessionId: string) => void) {
-  const { data } = await supabaseClient.auth.getSession();
-  const token = data.session?.access_token;
-  const response = await fetch("/api/assistant", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify(input)
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as { error?: { message?: string } };
-    throw new Error(body.error?.message ?? `Assistant request failed (${response.status})`);
-  }
-  const sessionId = response.headers.get("X-Assistant-Session-Id");
-  if (!sessionId || !response.body) throw new Error("Assistant stream was incomplete");
-  onSession?.(sessionId);
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let text = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const delta = decoder.decode(value, { stream: true });
-    text += delta;
-    onDelta(delta);
-  }
-  text += decoder.decode();
-  if (!text.trim()) throw new Error("Assistant returned an empty response");
-  return { sessionId, text };
 }
 
 type StructuredAssistantResult = { sessionId: string; assistantMessage: string; messageId?: string; status?: "ready" | "needs_clarification" | "no_match"; goalStatus?: "ready" | "needs_clarification"; catalogStatus?: "matched" | "no_match" };
@@ -66,4 +37,63 @@ export function prepareAssistantCourseBrief(input: { planningMessageId: string; 
 
 export function proposeCourseCreatorAdjustment(input: { briefMessageId: string; stage: CourseCreatorStage; instruction: string; current: CourseCreatorDesign; context: AssistantContextSnapshot }) {
   return apiRequest<{ sessionId: string; intent: "explain" | "edit"; proposal: CourseCreatorProposal }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "course-creator-proposal", ...input }) });
+}
+
+/** Server-owned template reply for a button action. Never calls the model. */
+export function recordAssistantButtonAction(input: {
+  kind: "micro-completed" | "micro-opened" | "route-started" | "segment-cleared" | "practice-opened" | "practice-submitted";
+  sessionId?: string | null;
+  pathId?: string;
+  knowledgeId?: string;
+  courseId?: string;
+  assignmentId?: string;
+  attemptId?: string;
+  resuming?: boolean;
+  forceNewSession?: boolean;
+  createSession?: boolean;
+  context: AssistantContextSnapshot;
+}) {
+  return apiRequest<{ sessionId: string | null; message: AssistantMessage | null }>("/api/assistant", {
+    method: "POST",
+    body: JSON.stringify({ action: "record-action", ...input })
+  });
+}
+
+/**
+ * Small adapter for the secondary workspace conversation. It reuses the AI
+ * SDK transport and UI-message reader instead of decoding the stream by hand.
+ */
+export async function streamAssistantMessage(input: { sessionId?: string; message: string; context: AssistantContextSnapshot }, onDelta: (delta: string) => void, onSession?: (sessionId: string) => void) {
+  const transport = new DefaultChatTransport<UIMessage>({
+    api: "/api/assistant",
+    headers: async () => {
+      const { data } = await supabaseClient.auth.getSession();
+      return (data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}) as Record<string, string>;
+    },
+    body: () => ({ sessionId: input.sessionId, context: input.context }),
+    fetch: async (request, init) => {
+      const response = await fetch(request, init);
+      const sessionId = response.headers.get("X-Assistant-Session-Id");
+      if (sessionId) onSession?.(sessionId);
+      return response;
+    }
+  });
+  const chunks = await transport.sendMessages({
+    trigger: "submit-message",
+    chatId: input.sessionId ?? "workspace",
+    messageId: undefined,
+    abortSignal: undefined,
+    messages: [{ id: crypto.randomUUID(), role: "user", parts: [{ type: "text", text: input.message }] }]
+  });
+  let emitted = 0;
+  let text = "";
+  for await (const message of readUIMessageStream({ stream: chunks })) {
+    text = message.parts.filter((part) => part.type === "text").map((part) => (part as { text: string }).text).join("");
+    if (text.length > emitted) {
+      onDelta(text.slice(emitted));
+      emitted = text.length;
+    }
+  }
+  if (!text.trim()) throw new Error("Assistant returned an empty response");
+  return { sessionId: input.sessionId ?? "", text };
 }

@@ -24,3 +24,24 @@
 
 /* The full Workbench already owns a conversation and stable Composer. */
 body:has(.conversation-workbench) .eduflow-assistant { display:none; }
+
+/* Reserve the floating trigger inside the bottom action bar, so neither the
+ * bar buttons nor the inspector content underneath are covered. */
+body:has(.ef-practice-page) .ef-practice-shell .ef-ui-obj-foot {
+  padding-right: calc(var(--sp-16) + 76px);
+}
+body:has(.creator-page) .creator-footer {
+  padding-right: calc(var(--sp-16) + 76px);
+}
+body:has(.creator-page) .creator-shell {
+  padding-bottom: calc(var(--sp-32) + 72px);
+}
+
+/* Micro Learning is an immersive bottom-action page: reserve the trigger's
+ * width inside the footer and completion footer instead of covering 继续. */
+body:has(.ef-micro-page) .ef-micro-shell .ef-ui-obj-foot {
+  padding-right: calc(var(--sp-16) + 76px);
+}
+body:has(.ef-micro-page) .ef-micro-shell .micro-completion-footer {
+  padding-right: calc(var(--sp-16) + 76px);
+}

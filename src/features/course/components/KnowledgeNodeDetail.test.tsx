@@ -10,7 +10,7 @@ const runtime = {course:{id:'course'},materials:[{id:'unrelated',title:'不相�
 const actions = {actions:[],bindings:[],runs:[],availableActionIds:[],availableMicroActionIds:[],start:vi.fn()} as unknown as ReturnType<typeof useEdgeActions>;
 it('renders Bridge core and source-oriented relations without requiring curriculum or leaking course materials', () => {
   const html = renderToStaticMarkup(<MemoryRouter><KnowledgeNodeDetail node={node} runtime={runtime} graph={{nodes:[node],edges:[],revisions:[]}} knowledge={[{nodeId:node.id,status:'learned'}]} relations={[{id:'out',source:'bridge',target:'target',relation:'enables',strength:1},{id:'in',source:'start',target:'bridge',relation:'prerequisite',strength:'hard'}]} learningPath={{id:"explicit-path",title:"起点学习内容"}} context="personal-route" actions={actions} onSelect={vi.fn()}/></MemoryRouter>);
-  for (const text of ['实际知识内容','已学会']) expect(html).toContain(text);
+  for (const text of ['实际知识内容','已学']) expect(html).toContain(text);
   expect(html).not.toContain('不相关课件');expect(html).not.toContain('未配置本课程教学覆盖');expect(html).not.toContain('补充能力 → target');
   expect(html).not.toContain('pathId=explicit-path'); expect(html).not.toContain('起点学习内容');
 });

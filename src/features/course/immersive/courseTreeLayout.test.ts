@@ -272,6 +272,18 @@ describe("course tree geometry", () => {
     ], 560);
     expect(second).toEqual(layout);
   });
+
+  it("keys repeated chapter banners by their execution position", () => {
+    const layout = buildWindingRoute([
+      { id: "K1", title: "知识一", chapterId: "ch1", chapterTitle: "第一章", chapterNumber: 1, status: "done", stateLabel: "已学" },
+      { id: "K2", title: "知识二", chapterId: "ch2", chapterTitle: "第二章", chapterNumber: 2, status: "done", stateLabel: "已学" },
+      { id: "K3", title: "知识三", chapterId: "ch1", chapterTitle: "第一章", chapterNumber: 1, status: "current", stateLabel: "待学" }
+    ], 560);
+    expect(layout.steps.map((step) => step.id)).toEqual(["K1", "K2", "K3"]);
+    expect(layout.headers.map((header) => header.chapterId)).toEqual(["ch1", "ch2", "ch1"]);
+    expect(new Set(layout.headers.map((header) => header.id)).size).toBe(3);
+    expect(layout.headers[0].id).not.toBe(layout.headers[2].id);
+  });
 });
 
 

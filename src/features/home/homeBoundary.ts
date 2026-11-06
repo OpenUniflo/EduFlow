@@ -11,10 +11,13 @@ export function resolveHomeBoundary(input: {
   activeKnowledgeCount: number;
   activeCourseCount: number;
   hasAnyLearningRecord: boolean;
+  /** Existing conversation content must stay usable when a refresh fails. */
+  hasConversation?: boolean;
 }): HomeBoundary {
   if (input.loading) return "loading";
-  if (input.error) return "error";
-  if (input.activeKnowledgeCount === 0 && input.activeCourseCount === 0 && !input.hasAnyLearningRecord) return "new-user";
+  const hasContent = input.activeKnowledgeCount > 0 || input.activeCourseCount > 0 || input.hasAnyLearningRecord || Boolean(input.hasConversation);
+  if (input.error && !hasContent) return "error";
+  if (!hasContent) return "new-user";
   return "ready";
 }
 
@@ -22,7 +25,7 @@ export function resolveHomeBoundary(input: {
 export function homeBoundaryMessage(boundary: HomeBoundary) {
   switch (boundary) {
     case "loading":
-      return "正在整理你的学习情况";
+      return "正在准备内容";
     case "error":
       return "学习数据加载失败，请检查网络后重试。";
     case "new-user":

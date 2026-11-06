@@ -33,7 +33,7 @@ describe("records formatting", () => {
     expect(recordStatusTone(event())).toBe("warn");
     expect(recordStatusLabel(event({ type: "practice", status: "passed" }))).toBe("已通过");
     expect(recordStatusLabel(event({ type: "evaluation", status: "passed" }))).toBe("通过");
-    expect(recordStatusLabel(event({ type: "micro", status: "learned" }))).toBe("已学习");
+    expect(recordStatusLabel(event({ type: "micro", status: "learned" }))).toBe("已学");
     expect(recordStatusLabel(event({ type: "route", status: "version", versionNumber: 4 }))).toBe("v4");
     expect(recordStatusTone(event({ type: "route", status: "version" }))).toBe("brand");
   });
@@ -41,7 +41,7 @@ describe("records formatting", () => {
   it("builds only real metadata fields and a compact date span", () => {
     expect(recordMetaParts(event())).toEqual(["AI Agent 开发基础", "第 2 章", "第 3 次", "得分 94 / 100", "2 条依据"]);
     expect(recordMetaParts(event({ type: "route", status: "version", meta: { source: "adjustment", addedSteps: 2, removedSteps: 1 } }))).toEqual(["AI Agent 开发基础", "调整路线", "+2 步 / −1 步"]);
-    expect(recordMetaParts(event({ type: "micro", status: "learned", meta: { estimatedMinutes: 6 } }))).toEqual(["AI Agent 开发基础", "约 6 分钟", "已学习"]);
+    expect(recordMetaParts(event({ type: "micro", status: "learned", meta: { estimatedMinutes: 6 } }))).toEqual(["AI Agent 开发基础", "约 6 分钟", "已学"]);
     expect(formatRecordDateRange("2026-09-01", "2026-11-02")).toBe("2026-09 – 2026-11");
     expect(formatRecordDateRange(null, null)).toBe("—");
   });

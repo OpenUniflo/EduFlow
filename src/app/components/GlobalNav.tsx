@@ -10,6 +10,8 @@ import { AccountMenu } from "@/shared/ui/AccountMenu";
 import { Avatar } from "@/shared/ui/Avatar";
 import { BrandMark } from "@/shared/ui/BrandMark";
 import { shortDisplayName } from "@/shared/ui/displayName";
+import { deriveHomeNavigation, type HomeNavId, type HomeNavSignals } from "@/features/home/homeMainline";
+import { useLearnerNavigationSignals } from "./useLearnerNavigationSignals";
 
 export type GlobalNavActive = "home" | "archive" | "works" | "records" | "teaching" | "admin";
 
@@ -20,18 +22,27 @@ export type GlobalNavItem = {
   icon: ComponentType<{ size?: number | string; "aria-hidden"?: boolean }>;
 };
 
-/** Learner workspaces first; role workspaces append without changing learner IA. */
-export function getPrimaryNavigationItems(session?: MockSession | null): GlobalNavItem[] {
-  const items: GlobalNavItem[] = [
-    { id: "home", to: "/", label: "首页", icon: Home },
-    { id: "archive", to: "/archive", label: "档案", icon: Network },
-    { id: "works", to: "/works", label: "作品", icon: LayoutGrid },
-    { id: "records", to: "/records", label: "记录", icon: History }
-  ];
-  if (!session) return items.slice(0, 2);
-  if (canManageCourses(session)) items.push({ id: "teaching", to: "/teaching", label: "教学", icon: GraduationCap });
-  if (canManageKnowledgeDomains(session)) items.push({ id: "admin", to: "/admin", label: "管理", icon: ShieldCheck });
-  return items;
+const learnerNavigationItems: Record<HomeNavId, GlobalNavItem> = {
+  home: { id: "home", to: "/", label: "首页", icon: Home },
+  archive: { id: "archive", to: "/archive", label: "地图", icon: Network },
+  works: { id: "works", to: "/works", label: "作品", icon: LayoutGrid },
+  records: { id: "records", to: "/records", label: "记录", icon: History },
+  teaching: { id: "teaching", to: "/teaching", label: "教学", icon: GraduationCap },
+  admin: { id: "admin", to: "/admin", label: "管理", icon: ShieldCheck }
+};
+
+/**
+ * Learner workspaces appear from real state; role workspaces append without
+ * changing learner IA. Guests and brand-new learners start with Home only;
+ * every other route stays reachable by URL, ⌘K and the Assistant.
+ */
+export function getPrimaryNavigationItems(session?: MockSession | null, signals: HomeNavSignals = { hasLearningRecord: false, hasPracticeActivity: false, hasFirstSegmentComplete: false }): GlobalNavItem[] {
+  if (!session) return [learnerNavigationItems.home];
+  return deriveHomeNavigation({
+    isTeacher: canManageCourses(session),
+    isAdmin: canManageKnowledgeDomains(session),
+    signals
+  }).map((id) => learnerNavigationItems[id]);
 }
 
 function NavItem({ item }: { item: GlobalNavItem }) {
@@ -44,8 +55,10 @@ function NavItem({ item }: { item: GlobalNavItem }) {
   );
 }
 
-export function GlobalNav({ session, onLogout }: { session?: MockSession | null; onLogout?: () => void }) {
+export function GlobalNav({ session, onLogout, navigationSignals }: { session?: MockSession | null; onLogout?: () => void; navigationSignals?: HomeNavSignals }) {
   const navigate = useNavigate();
+  const readSignals = useLearnerNavigationSignals(session ?? null);
+  const signals = navigationSignals ?? readSignals;
   const location = useLocation();
   const [accountOpen, setAccountOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -71,7 +84,7 @@ export function GlobalNav({ session, onLogout }: { session?: MockSession | null;
         onClose={() => setAccountOpen(false)}
         onOpenPanel={() => navigate("/?panel=1")}
         items={[
-          { id: "visibility", label: "档案可见性与分享", icon: <Eye size={18} aria-hidden />, kbd: "预览", onSelect: () => navigate("/archive?panel=share") },
+          { id: "visibility", label: "地图可见性与分享", icon: <Eye size={18} aria-hidden />, kbd: "预览", onSelect: () => navigate("/archive?panel=share") },
           { id: "people", label: "关注的人", icon: <Users size={18} aria-hidden />, kbd: "预览", onSelect: () => navigate("/archive?panel=people") },
           { id: "settings", label: "设置", icon: <Settings2 size={18} aria-hidden />, onSelect: () => navigate("/settings") },
           { id: "notifications", label: "通知", icon: <Bell size={18} aria-hidden />, kbd: "预览", onSelect: () => navigate("/archive?panel=notifications") }
@@ -89,7 +102,7 @@ export function GlobalNav({ session, onLogout }: { session?: MockSession | null;
           <BrandMark variant="rail" size={22} />
         </NavLink>
         <div className="ef-nav-grp">
-          {getPrimaryNavigationItems(session).map((item) => <NavItem key={item.id} item={item} />)}
+          {getPrimaryNavigationItems(session, signals).map((item) => <NavItem key={item.id} item={item} />)}
         </div>
         <div className="ef-nav-spacer" />
         {session ? (

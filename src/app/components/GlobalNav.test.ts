@@ -13,16 +13,30 @@ describe("rail display name", () => {
   });
 });
 
-describe("GlobalNav role visibility", () => {
-  it("shows the public pair to guests", () => expect(getPrimaryNavigationItems(null).map((item) => item.id)).toEqual(["home", "archive"]));
-  it("shows the four learner workspaces to students", () => expect(getPrimaryNavigationItems(session("student")).map((item) => item.id)).toEqual(["home", "archive", "works", "records"]));
-  it("adds Teaching for teachers", () => expect(getPrimaryNavigationItems(session("teacher")).map((item) => item.id)).toEqual(["home", "archive", "works", "records", "teaching"]));
-  it("adds Teaching and Admin for admins", () => expect(getPrimaryNavigationItems(session("admin")).map((item) => item.id)).toEqual(["home", "archive", "works", "records", "teaching", "admin"]));
-  it("routes every learner label to the new paths", () => expect(getPrimaryNavigationItems(session("student")).map((item) => [item.label, item.to])).toEqual([["首页", "/"], ["档案", "/archive"], ["作品", "/works"], ["记录", "/records"]]));
+const allSignals = { hasLearningRecord: true, hasPracticeActivity: true, hasFirstSegmentComplete: true };
+const freshSignals = { hasLearningRecord: false, hasPracticeActivity: false, hasFirstSegmentComplete: false };
+const learningSignals = { hasLearningRecord: true, hasPracticeActivity: false, hasFirstSegmentComplete: false };
+
+describe("GlobalNav progressive visibility", () => {
+  it("shows only Home to guests and brand-new learners", () => {
+    expect(getPrimaryNavigationItems(null).map((item) => item.id)).toEqual(["home"]);
+    expect(getPrimaryNavigationItems(session("student"), freshSignals).map((item) => item.id)).toEqual(["home"]);
+  });
+  it("grows the learner rail from real state", () => {
+    expect(getPrimaryNavigationItems(session("student"), learningSignals).map((item) => item.id)).toEqual(["home", "records"]);
+    expect(getPrimaryNavigationItems(session("student"), allSignals).map((item) => item.id)).toEqual(["home", "works", "records", "archive"]);
+  });
+  it("adds Teaching for teachers and Admin for admins regardless of learner state", () => {
+    expect(getPrimaryNavigationItems(session("teacher"), freshSignals).map((item) => item.id)).toEqual(["home", "archive", "works", "records", "teaching"]);
+    expect(getPrimaryNavigationItems(session("admin"), freshSignals).map((item) => item.id)).toEqual(["home", "archive", "works", "records", "teaching", "admin"]);
+  });
+  it("uses the new user-facing labels and paths", () => {
+    expect(getPrimaryNavigationItems(session("student"), allSignals).map((item) => [item.label, item.to])).toEqual([["首页", "/"], ["作品", "/works"], ["记录", "/records"], ["地图", "/archive"]]);
+  });
   it("does not infer a teaching or admin entry from capabilities the session does not have", () => {
     const restricted = session("student", []);
-    expect(getPrimaryNavigationItems(restricted).some((item) => item.id === "teaching" || item.id === "admin")).toBe(false);
+    expect(getPrimaryNavigationItems(restricted, allSignals).some((item) => item.id === "teaching" || item.id === "admin")).toBe(false);
     const domainAdmin = session("student", ["global-domain-admin"]);
-    expect(getPrimaryNavigationItems(domainAdmin).map((item) => item.id)).toContain("admin");
+    expect(getPrimaryNavigationItems(domainAdmin, allSignals).map((item) => item.id)).toContain("admin");
   });
 });

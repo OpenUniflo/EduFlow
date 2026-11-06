@@ -18,19 +18,19 @@ export function ArchivePeopleBar({ sessionName, people, selectedIds, onToggleMe,
 }) {
   const meActive = selectedIds.includes("me");
   return (
-    <nav className="ef-atlas-people ef-ui-glass ef-ui-glass--regular" role="toolbar" aria-label="档案人物">
+    <nav className="ef-atlas-people ef-ui-glass ef-ui-glass--regular" role="toolbar" aria-label="地图人物">
       <button type="button" className="ef-atlas-people-social" onClick={onOpenPeople} aria-label="人与分享" title="人与分享">
         <Users size={18} aria-hidden />
       </button>
       <span className="ef-atlas-people-sep" aria-hidden />
-      <button type="button" className={`ef-atlas-person-pill ${meActive ? "is-on" : ""}`} aria-pressed={meActive} onClick={(event) => onToggleMe(event.shiftKey)} title="我的档案（按住 Shift 可多选对比）">
+      <button type="button" className={`ef-atlas-person-pill ${meActive ? "is-on" : ""}`} aria-pressed={meActive} onClick={(event) => onToggleMe(event.shiftKey)} title="我的地图（按住 Shift 可多选对比）">
         <Avatar name={sessionName} size={24} personColor="me" decorative />
         <span>我</span>
       </button>
       {people.filter((person) => person.sample).slice(0, 4).map((person) => {
         const active = selectedIds.includes(person.id);
         return (
-          <button type="button" key={person.id} className={`ef-atlas-person-pill ${active ? "is-on" : ""}`} aria-pressed={active} onClick={(event) => onTogglePerson(person, event.shiftKey)} title={`${shortName(person)} 的档案（按住 Shift 可多选对比）`} data-preview="sample">
+          <button type="button" key={person.id} className={`ef-atlas-person-pill ${active ? "is-on" : ""}`} aria-pressed={active} onClick={(event) => onTogglePerson(person, event.shiftKey)} title={`${shortName(person)} 的地图（按住 Shift 可多选对比）`} data-preview="sample">
             <Avatar name={shortName(person)} size={24} personColor={person.accent as "me" | "orange" | "cyan" | "rose"} decorative />
             <span>{shortName(person)}</span>
           </button>

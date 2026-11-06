@@ -56,11 +56,11 @@ function PersonRow({ person, tab, selected, onCompare, onView, onPreviewAction }
       <div className="ef-archive-person-copy">
         <b>{person.displayName}</b>
         <span>{person.visibility === "private" ? "未公开学习进度 · 仅公开作品" : person.activityLabel}</span>
-        <small>{person.bio ?? "示例档案"} · {person.visibility === "private" ? "仅公开概览" : `${person.sharedKnowledgeIds?.length ?? person.sharedKnowledgeCount} 个公开知识`}</small>
+        <small>{person.bio ?? "示例地图"} · {person.visibility === "private" ? "仅公开概览" : `${person.sharedKnowledgeIds?.length ?? person.sharedKnowledgeCount} 个公开知识`}</small>
       </div>
       <div className="ef-archive-person-actions">
         <button type="button" className={selected ? "is-on" : ""} onClick={onCompare} aria-pressed={selected}>{selected ? "对比中" : "加入对比"}</button>
-        <button type="button" onClick={onView}>查看档案</button>
+        <button type="button" onClick={onView}>查看地图</button>
         <button type="button" className="ef-archive-person-secondary" onClick={onPreviewAction}>{tab === "followers" ? "回关" : "取消关注"}</button>
       </div>
     </article>
@@ -95,7 +95,7 @@ export function ArchivePeopleDialog({ open, tab, people, selectedIds, model, ses
   if (!open) return null;
   const footer = <><span><Lock size={12} aria-hidden />预览区域只读，不会写入，也不会生成真实分享链接</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={onClose}>完成</button></>;
   return (
-    <DialogShell title="人与分享" kicker="档案 · 社交预览" icon={<Users size={18} aria-hidden />} onClose={onClose} footer={footer} className="ef-archive-dialog--people">
+    <DialogShell title="人与分享" kicker="地图 · 社交预览" icon={<Users size={18} aria-hidden />} onClose={onClose} footer={footer} className="ef-archive-dialog--people">
       <nav className="ef-archive-dialog-tabs" aria-label="人与分享">
         <button type="button" className={tab === "following" ? "is-on" : ""} onClick={() => onTab("following")}>关注的人 {people.length}</button>
         <button type="button" className={tab === "followers" ? "is-on" : ""} onClick={() => onTab("followers")}>关注我的 {people.filter((person) => person.followsMe).length}</button>
@@ -139,7 +139,7 @@ export function ArchivePeopleDialog({ open, tab, people, selectedIds, model, ses
             <ArchiveMiniMap model={model} />
             <div className="ef-archive-share-card">
               <Avatar name={sessionName} size={40} personColor="me" decorative />
-              <div><b>{sessionName} · 公开档案</b><span>{model.stats.mine} 个公开知识 · {model.stats.learned} 已学 · {model.stats.learning} 在学</span></div>
+              <div><b>{sessionName} · 公开地图</b><span>{model.stats.mine} 个公开知识 · {model.stats.learned} 已学 · {model.stats.learning} 在学</span></div>
               <em>{shareScope === "private" ? "仅自己" : shareScope === "link" ? "有链接的人" : shareScope === "org" ? "组织内" : "关注我的人"}</em>
             </div>
             <div className="ef-archive-link-box"><span>预览中不会生成真实链接</span><button type="button" disabled><Copy size={13} aria-hidden />复制链接</button></div>
@@ -156,7 +156,7 @@ function ArchiveMiniMap({ model }: { model: ArchiveModel }) {
   const xs = nodes.map((node) => node.id.length).concat(1);
   const spread = Math.max(1, ...xs);
   return (
-    <div className="ef-archive-mini-map" aria-label="公开档案缩略星图" role="img">
+    <div className="ef-archive-mini-map" aria-label="公开地图缩略星图" role="img">
       <span className="ef-archive-mini-badge"><i aria-hidden />公开子集</span>
       {nodes.map((node, index) => (
         <i key={node.id} className={node.isMine ? "is-mine" : ""} style={{ left: `${8 + ((index * 37 + node.id.charCodeAt(0)) % 84)}%`, top: `${12 + ((index * 23 + node.id.length) % 72)}%`, background: node.color, opacity: node.isMine ? 0.9 : 0.4 }} />
@@ -170,11 +170,11 @@ export function ArchiveNotificationsDialog({ open, onClose }: { open: boolean; o
   if (!open) return null;
   const samples = [
     { id: "n1", icon: <Users size={15} aria-hidden />, title: "示例 · 阿青 公开了新的学习进度", detail: "3 门课程 · 本周 5 次学习", time: "今天 09:20" },
-    { id: "n2", icon: <UserRound size={15} aria-hidden />, title: "示例 · 周然 邀请你对比档案", detail: "仅包含公开知识，不含分数与失败尝试", time: "昨天 18:40" },
+    { id: "n2", icon: <UserRound size={15} aria-hidden />, title: "示例 · 周然 邀请你对比地图", detail: "仅包含公开知识，不含分数与失败尝试", time: "昨天 18:40" },
     { id: "n3", icon: <Bell size={15} aria-hidden />, title: "示例 · 本周学习回顾已生成", detail: "预览通知，不会发送真实消息", time: "10/27 08:00" }
   ];
   return (
-    <DialogShell title="通知" kicker="档案 · 通知预览" icon={<Bell size={18} aria-hidden />} onClose={onClose} className="ef-archive-dialog--notifications"
+    <DialogShell title="通知" kicker="地图 · 通知预览" icon={<Bell size={18} aria-hidden />} onClose={onClose} className="ef-archive-dialog--notifications"
       footer={<><span><Lock size={12} aria-hidden />预览数据，不会写入</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={onClose}>完成</button></>}>
       <ul className="ef-archive-notifications">
         {samples.map((sample) => <li key={sample.id} data-preview="sample"><span className="ef-archive-notification-icon">{sample.icon}</span><span><b>{sample.title}</b><small>{sample.detail}</small></span><time>{sample.time}</time></li>)}
@@ -248,14 +248,14 @@ export function ArchivePeerCard({ person, model, onClose, onCompare, onOpenCours
     domains.set(node.domainTitle, { color: current.color, count: current.count + 1 });
   });
   return (
-    <aside className="ef-archive-peer-card" aria-label={`${person.displayName} 的公开档案`} data-preview="sample">
+    <aside className="ef-archive-peer-card" aria-label={`${person.displayName} 的公开地图`} data-preview="sample">
       <header className="ef-archive-peer-head">
         <Avatar name={shortName(person)} size={40} personColor={person.accent} />
-        <div><b>{person.displayName}</b><span>公开档案 · 关注的人</span></div>
+        <div><b>{person.displayName}</b><span>公开地图 · 关注的人</span></div>
         <button type="button" className="ef-archive-dialog-close" onClick={onClose} aria-label="关闭"><X size={15} aria-hidden /></button>
       </header>
       <PreviewBadge />
-      <p className="ef-archive-peer-bio">{person.bio ?? "示例档案"}</p>
+      <p className="ef-archive-peer-bio">{person.bio ?? "示例地图"}</p>
       <div className="ef-archive-peer-stats">
         <span><b>{shared.length}</b><small>公开知识</small></span>
         <span><b>{overlap}</b><small>和你重合</small></span>
@@ -289,8 +289,8 @@ export function ArchiveCompareCard({ model, sessionName, peopleCount, onShare, o
     domains.set(node.domainTitle, { color: current.color, count: current.count + 1 });
   });
   return (
-    <aside className="ef-archive-compare-card" aria-label="我的档案 · 对比">
-      <header><Avatar name={sessionName} size={40} personColor="me" /><div><b>{sessionName}</b><span>我的档案 · 对比中</span></div><em>{peopleCount + 1} 人</em></header>
+    <aside className="ef-archive-compare-card" aria-label="我的地图 · 对比">
+      <header><Avatar name={sessionName} size={40} personColor="me" /><div><b>{sessionName}</b><span>我的地图 · 对比中</span></div><em>{peopleCount + 1} 人</em></header>
       <PreviewBadge />
       <div className="ef-archive-compare-stats">
         <span><b>{model.stats.mine}</b><small>我的知识</small></span>

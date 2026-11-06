@@ -28,11 +28,19 @@ export type AssistantContextSnapshot = {
   selectedObject?: string;
 };
 
+/** AI SDK UI message part stored on the server; card parts keep references only. */
+export type AssistantTimelinePart = { type: string; [key: string]: unknown };
+
 export type AssistantMessage = {
   id: string;
   sessionId: string;
   role: "user" | "assistant";
   content: string;
+  messageKind?: "utterance" | "action" | "goal_clarification";
+  /** Ordered text + display-card parts. Absent on pre-stage-3 rows. */
+  parts?: AssistantTimelinePart[];
+  /** Present when the server hid a malformed assistant row (for example protocol_leak). */
+  invalidReason?: string;
   structuredContent?: AssistantStructuredContent;
   context: AssistantContextSnapshot;
   createdAt: string;

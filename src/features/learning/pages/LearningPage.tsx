@@ -1,301 +1,530 @@
-import { PanelRight, Play } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, History, PanelRight, Play, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { applicationServices } from "@/app/services/applicationServices";
 import { useAssistantRuntime } from "@/features/assistant/AssistantRuntimeContext";
 import type { MockSession } from "@/features/auth/types";
-import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
 import { archiveHref } from "@/features/archive/model/atlasParams";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
-import { buildActiveLearningKnowledge } from "@/features/learning/recommendation/todayQueue";
 import { createMicroLearningNavigation, type MicroLearningPath } from "@/features/learning/micro/microLearning";
-import { microImmersiveHref, microSurfaceForPath } from "@/features/learning/micro/microSurface";
-import { defaultKnowledgeContextId, resolveKnowledgeLearningContext } from "@/features/learning/resources/knowledgeLearningResources";
+import { microImmersiveHref } from "@/features/learning/micro/microSurface";
 import { PracticeObject } from "@/features/course/practice/PracticeObject";
 import { InlineMicro } from "@/features/home/InlineMicro";
-import { CoursePreviewCard } from "@/features/home/CoursePreviewCard";
-import { rememberCourseOrigin } from "@/features/course/immersive/courseTransition";
-import { ConversationMicroCard } from "@/features/home/ConversationMicroCard";
 import { HomeConversation } from "@/features/home/HomeConversation";
+import { HomeRoutePanel } from "@/features/home/HomeRoutePanel";
 import { MyPanel } from "@/features/home/MyPanel";
-import { TodayOverview } from "@/features/home/TodayOverview";
-import { resolveHomeBoundary } from "@/features/home/homeBoundary";
-import { buildArchiveSummary } from "@/features/home/panelModel";
-import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
-import type { UserCourseState } from "@/features/course/types";
-import { Pill } from "@/shared/ui/Pill";
-import { EventRow } from "@/shared/ui/Conversation";
+import { EMPTY_HOME_MAINLINE_CONFIG, type HomeMainlineConfig } from "@/features/home/HomeMainlineConfigRepository";
+import { deriveHomeView, resolveHomeNextStep, shouldShowStarter, type HomeNextStep } from "@/features/home/homeMainline";
+import { buildHomeCourseProjection, type HomeMicroAsset } from "@/features/course/path/courseLearnerProjection";
+import type { CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
+import { buildHomeAssistantContext } from "@/features/home/homeAssistantContext";
+import { openPanelParams, openWorkspaceParams, removeWorkspaceParam } from "@/features/home/learningWorkspace";
+import { panelParamAction, reduceRightPanel, type RightPanel } from "@/features/home/rightPanel";
+import type { NavigationDecision } from "@/shared/learning/navigation";
+import type { AssistantCardActions } from "@/features/assistant/cards/AssistantCardView";
 import { shortDisplayName } from "@/shared/ui/displayName";
+import { HomeComposer } from "@/shared/ui/HomeComposer";
 import "@/features/home/home.css";
 
-type Workspace =
-  | { kind: "micro"; knowledgeId: string; courseId?: string; pathId: string; path: MicroLearningPath }
-  | { kind: "practice"; courseId: string; assignmentId: string; title: string }
-  | null;
-
-const dayLabels = ["日", "一", "二", "三", "四", "五", "六"];
+type PracticeWorkspace = Extract<RightPanel, { kind: "practice" }>;
+type MicroWorkspace = Extract<RightPanel, { kind: "micro" }>;
 
 export function LearningPage({ session, onLogout: _onLogout }: { session: MockSession; onLogout(): void }) {
   const navigate = useNavigate();
   const assistant = useAssistantRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
-  const panelOpen = searchParams.get("panel") === "1";
+  const [rightPanel, dispatchRightPanel] = useReducer(reduceRightPanel, searchParams.get("panel") === "1" ? { kind: "my" } as RightPanel : { kind: "none" } as RightPanel);
+  const [practiceCache, setPracticeCache] = useState<PracticeWorkspace | null>(null);
+  const [pendingMicroOpen, setPendingMicroOpen] = useState<string | null>(null);
+  const panelOpen = rightPanel.kind === "my";
+  const routePanelOpen = rightPanel.kind === "route";
+  const workspace: MicroWorkspace | PracticeWorkspace | null = rightPanel.kind === "micro" || rightPanel.kind === "practice" ? rightPanel : null;
+  const [config, setConfig] = useState<HomeMainlineConfig>(EMPTY_HOME_MAINLINE_CONFIG);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [navigationDecision, setNavigationDecision] = useState<NavigationDecision | null>(null);
+  const [navigationError, setNavigationError] = useState(false);
+  const [resumed, setResumed] = useState(() => {
+    try { return window.sessionStorage.getItem(`eduflow:home:resumed:${session.userId}`) === "1"; }
+    catch { return false; }
+  });
   const practiceParam = searchParams.get("practice");
   const microParam = searchParams.get("micro");
   const panelToggleRef = useRef<HTMLButtonElement>(null);
-  const [workspace, setWorkspace] = useState<Workspace>(null);
-  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
-  const [people, setPeople] = useState<readonly FollowedPerson[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [revision, setRevision] = useState(0);
-  const [removedContexts, setRemovedContexts] = useState<string[]>([]);
+  const forceNewSessionRef = useRef(false);
+  const resolvedPracticeParam = useRef<string | null>(null);
+  const resolvedMicroParam = useRef<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    setConfigLoaded(false);
+    void applicationServices.homeMainlineConfigRepository.load().then((value) => { if (live) { setConfig(value); setConfigLoaded(true); } });
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
+    try { window.sessionStorage.setItem(`eduflow:home:resumed:${session.userId}`, resumed ? "1" : "0"); } catch { /* storage may be unavailable */ }
+  }, [resumed, session.userId]);
+
+  useEffect(() => {
+    if (assistant.activeSessionId) forceNewSessionRef.current = false;
+  }, [assistant.activeSessionId]);
 
   useEffect(() => applicationServices.learningProgressRepository.subscribe(() => setRevision((value) => value + 1)), []);
   useEffect(() => applicationServices.userKnowledgeRepository.subscribe(() => setRevision((value) => value + 1)), []);
   useEffect(() => applicationServices.microLearningRepository.subscribe(() => setRevision((value) => value + 1)), []);
 
+  const panelParam = searchParams.get("panel") === "1";
+  const lastPanelParam = useRef(panelParam);
   useEffect(() => {
-    if (!practiceParam) return;
+    // Only URL changes may drive My; internal panel switches also rewrite the
+    // URL, but must not bounce back to My while the task/route panel opens.
+    const action = panelParamAction(lastPanelParam.current, panelParam, rightPanel.kind);
+    lastPanelParam.current = panelParam;
+    if (action) dispatchRightPanel(action);
+  }, [panelParam, rightPanel.kind]);
+
+  const records = useMemo(() => applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId), [revision, session.userId]);
+  const graph = useMemo(() => applicationServices.knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), [revision, session.userId]);
+  const runtimes = useMemo(() => applicationServices.courseRepository.listCourseRuntimes(), [revision]);
+  const activeCourses = useMemo(() => runtimes.flatMap((runtime) => {
+    const state = applicationServices.learningProgressRepository.getCourseState(session.userId, runtime.course.id);
+    return state.isActive ? [{ runtime, state }] : [];
+  }).sort((left, right) => (right.state.updatedAt ?? "").localeCompare(left.state.updatedAt ?? "") || left.runtime.course.title.localeCompare(right.runtime.course.title)), [runtimes, revision, session.userId]);
+
+  const starterRuntime = config.starterCourseId ? applicationServices.courseRepository.getCourse(config.starterCourseId) : undefined;
+  const focusRuntime = activeCourses[0]?.runtime ?? starterRuntime;
+  const focusCourseId = focusRuntime?.course.id;
+  const focusCourseState = focusCourseId
+    ? applicationServices.learningProgressRepository.getCourseState(session.userId, focusCourseId)
+    : undefined;
+
+  useEffect(() => {
+    if (!focusCourseId) { setNavigationDecision(null); return; }
+    let live = true;
+    setNavigationError(false);
+    void applicationServices.learnerStateService.getNavigation(focusCourseId)
+      .then((decision) => { if (live) setNavigationDecision(decision); })
+      .catch(() => { if (live) { setNavigationDecision(null); setNavigationError(true); } });
+    return () => { live = false; };
+  }, [focusCourseId, revision]);
+
+  const projection = useMemo(() => {
+    if (!focusRuntime || !focusCourseState) return null;
+    const titles = new Map(graph.nodes.map((node) => [node.id, node.title]));
+    return buildHomeCourseProjection({
+      runtime: focusRuntime,
+      records,
+      courseState: focusCourseState,
+      decision: navigationDecision,
+      microFor: (nodeId): HomeMicroAsset | undefined => {
+        const path = applicationServices.microLearningRepository.getPath(nodeId, { courseId: focusRuntime.course.id, mode: "learn" });
+        return path ? { pathId: path.id, title: path.title, estimatedMinutes: path.estimatedMinutes } : undefined;
+      },
+      titleFor: (nodeId) => titles.get(nodeId)
+    });
+  }, [focusCourseState, focusRuntime, graph.nodes, navigationDecision, records]);
+
+  const nextStep = useMemo(() => {
+    if (!navigationDecision || !focusRuntime) return null;
+    const action = navigationDecision.nextAction;
+    const micro = action.nodeId
+      ? applicationServices.microLearningRepository.getPath(action.nodeId, {
+          courseId: focusRuntime.course.id,
+          mode: "learn",
+          ...(action.resourceKind === "micro" && action.resourceId ? { pathId: action.resourceId } : {})
+        })
+      : null;
+    return resolveHomeNextStep({ decision: navigationDecision, runtime: focusRuntime, microTitle: micro?.title, microMinutes: micro?.estimatedMinutes });
+  }, [focusRuntime, navigationDecision]);
+
+  const hasLearningRecord = records.some((record) => record.status !== "explore");
+  const hasConversation = assistant.chatMessages.length > 0;
+  const hasRouteCard = assistant.chatMessages.some((message) => (message.parts ?? []).some((part) => {
+    if (part.type !== "tool-displayCard") return false;
+    const card = (part as { output?: { card?: { cardType?: string } } }).output?.card;
+    return card?.cardType === "route";
+  }));
+  const openMicroPathIds = new Set(assistant.chatMessages.flatMap((message) => (message.parts ?? []).flatMap((part) => {
+    if (part.type !== "tool-displayCard") return [];
+    const card = (part as { output?: { card?: { cardType?: string; pathId?: string } } }).output?.card;
+    if (card?.cardType !== "micro" || !card.pathId) return [];
+    return applicationServices.microLearningRepository.getPathProgress(card.pathId)?.status === "completed" ? [] : [card.pathId];
+  })));
+  const view = deriveHomeView({ hasLearningRecord, hasConversation, resumed });
+  const segment = projection?.segment;
+  const showStarter = shouldShowStarter({ configuredCourseId: config.starterCourseId, hasCourse: Boolean(starterRuntime), segmentStarted: Boolean(segment?.started) }) && configLoaded && !hasRouteCard;
+  const starterExample = config.examples.find((example) => example.kind === "start");
+  const freshExamples = config.examples.filter((example) => example.kind !== "start");
+  const recent = useMemo(() => [...records]
+    .filter((record) => record.status !== "explore")
+    .sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? ""))[0], [records]);
+  const recentTitle = recent ? (projection?.titleByNode.get(recent.nodeId) ?? graph.nodes.find((node) => node.id === recent.nodeId)?.title ?? recent.nodeId) : undefined;
+
+  useEffect(() => {
+    if (view !== "learning" || !pendingMicroOpen) return;
+    const fire = () => window.dispatchEvent(new CustomEvent("eduflow:open-micro", { detail: { pathId: pendingMicroOpen } }));
+    const first = window.setTimeout(fire, 180);
+    const retry = window.setTimeout(() => {
+      if (!document.querySelector(".ef-assistant-micro-body")) fire();
+      setPendingMicroOpen(null);
+    }, 800);
+    return () => { window.clearTimeout(first); window.clearTimeout(retry); };
+  }, [pendingMicroOpen, view]);
+
+  useEffect(() => {
+    if (!microParam) { resolvedMicroParam.current = null; return; }
+    if (resolvedMicroParam.current === microParam) return;
+    const [knowledgeId, pathId, ...courseParts] = microParam.split(":");
+    const courseId = courseParts.join(":") || undefined;
+    if (!knowledgeId || !pathId) return;
+    const path = applicationServices.microLearningRepository.getPath(knowledgeId, { courseId, mode: "learn", pathId });
+    if (path) {
+      setSearchParams((current) => {
+        if (!current.has("panel")) return current;
+        const next = new URLSearchParams(current);
+        next.delete("panel");
+        return next;
+      }, { replace: true });
+      dispatchRightPanel({ type: "open-micro", panel: { kind: "micro", knowledgeId, courseId, pathId, path } });
+      resolvedMicroParam.current = microParam;
+    }
+  }, [microParam, revision]);
+
+  useEffect(() => {
+    if (!practiceParam) { resolvedPracticeParam.current = null; return; }
+    if (resolvedPracticeParam.current === practiceParam) return;
     const [courseId, assignmentId] = practiceParam.split(":");
     if (!courseId || !assignmentId) return;
     const runtime = applicationServices.courseRepository.getCourse(courseId);
     const assignment = runtime?.assignments.find((item) => item.id === assignmentId);
-    if (runtime && assignment) setWorkspace({ kind: "practice", courseId, assignmentId, title: assignment.title });
-  }, [practiceParam]);
-
-  useEffect(() => {
-    if (!microParam) return;
-    const [knowledgeId, pathId, courseId] = microParam.split(":");
-    if (!knowledgeId || !pathId) return;
-    const path = applicationServices.microLearningRepository.getPath(knowledgeId, { courseId: courseId || undefined, mode: "learn", pathId });
-    if (path) setWorkspace({ kind: "micro", knowledgeId, courseId: courseId || undefined, pathId, path });
-  }, [microParam]);
-
-  useEffect(() => {
-    const repository = applicationServices.preview?.peopleRepository;
-    if (!repository) return;
-    let live = true;
-    void repository.listFollowed(session.userId).then((items) => { if (live) setPeople(items); }).catch(() => undefined);
-    return () => { live = false; };
-  }, [session.userId]);
-
-  const runtimes = useMemo(() => applicationServices.courseRepository.listCourseRuntimes(), [revision]);
-  const graph = useMemo(() => applicationServices.knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId)), [revision, session.userId]);
-  const records = useMemo(() => applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId), [revision, session.userId]);
-  const states = useMemo(() => runtimes.map((runtime) => applicationServices.learningProgressRepository.getCourseState(session.userId, runtime.course.id)), [revision, runtimes, session.userId]);
-  const items = useMemo(() => buildActiveLearningKnowledge({ runtimes, graph, userKnowledge: records, courseStates: states, microRepository: applicationServices.microLearningRepository }), [graph, records, runtimes, states]);
-  const current = items[0];
-  const archive = useMemo(() => buildArchiveSummary(records, new Map(graph.nodes.map((node) => [node.id, node.title]))), [graph.nodes, records]);
-  const nodeTitles = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node.title])), [graph.nodes]);
-
-  const courses = useMemo(() => runtimes.flatMap((runtime) => {
-    const state = states.find((candidate) => candidate.courseId === runtime.course.id);
-    if (!state || !state.isActive) return [];
-    const accepted = runtime.assignments.filter((assignment) => ["accepted", "completed"].includes(state.assignmentStates[assignment.id]?.status ?? "")).length;
-    const pending = runtime.assignments.filter((assignment) => !["accepted", "completed"].includes(state.assignmentStates[assignment.id]?.status ?? ""));
-    const progress = runtime.assignments.length ? Math.round(accepted / runtime.assignments.length * 100) : 0;
-    const lesson = runtime.lessons.find((item) => item.id === state.recentLessonId);
-    const chapter = lesson ? runtime.chapters.find((item) => item.id === lesson.chapterId) : undefined;
-    const next = pending[0];
-    return [{
-      runtime,
-      state,
-      progress,
-      currentChapter: chapter?.title,
-      nextLabel: next ? `下一步「${next.title}」· 约 ${next.estimatedMinutes ?? 25} 分钟` : "课程学习内容已完成，可查看档案关注新的知识"
-    } satisfies TodayCourse];
-  }).sort((left, right) => (right.state.updatedAt ?? "").localeCompare(left.state.updatedAt ?? "") || left.runtime.course.title.localeCompare(right.runtime.course.title)), [runtimes, states]);
-
-  const todayCourse = courses[0] ?? null;
-  const contextId = current ? defaultKnowledgeContextId(current.resources, selectedCourseId ?? undefined) : "standalone";
-  const selectedContext = current ? resolveKnowledgeLearningContext(current.resources, contextId) : null;
-  const microPath = selectedContext?.micro.path ?? null;
-  const microCourseId = selectedContext?.kind === "course" ? selectedContext.courseId : undefined;
-  const microComplex = microPath ? microSurfaceForPath(microPath) === "panel" : false;
-  const selectedPerson = people.find((person) => person.id === selectedPersonId) ?? null;
-  const selectedCourse = runtimes.find((runtime) => runtime.course.id === (selectedCourseId ?? todayCourse?.runtime.course.id));
-  const selectedCourseState = selectedCourse ? states.find((state) => state.courseId === selectedCourse.course.id) : undefined;
-  const microProgress = microPath ? applicationServices.microLearningRepository.getPathProgress(microPath.id) : undefined;
-  const microCompleteSteps = microPath ? (microProgress?.status === "completed" ? microPath.units.reduce((sum, unit) => sum + unit.steps.length, 0) : microPath.units.reduce((sum, unit) => sum + (applicationServices.microLearningRepository.getUnitProgress(unit.id)?.completedStepIds.length ?? 0), 0)) : 0;
-  const microTotalSteps = microPath ? microPath.units.reduce((sum, unit) => sum + unit.steps.length, 0) : 0;
-  const microCurrentUnit = microProgress?.currentUnitId ?? microPath?.units.find((unit) => applicationServices.microLearningRepository.getUnitProgress(unit.id)?.status !== "completed")?.id;
-
-  const week = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const days = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() - (6 - index));
-      return date;
-    });
-    const dateKey = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-    const activityKeys = new Set<string>();
-    for (const record of records) {
-      if (record.updatedAt) activityKeys.add(dateKey(new Date(record.updatedAt)));
-      for (const evidence of record.evidence ?? []) if (evidence.createdAt) activityKeys.add(dateKey(new Date(evidence.createdAt)));
+    if (runtime && assignment) {
+      setSearchParams((current) => {
+        if (!current.has("panel")) return current;
+        const next = new URLSearchParams(current);
+        next.delete("panel");
+        return next;
+      }, { replace: true });
+      const panel = { kind: "practice" as const, courseId, assignmentId, title: assignment.title };
+      setPracticeCache(panel);
+      dispatchRightPanel({ type: "open-practice", panel });
+      resolvedPracticeParam.current = practiceParam;
     }
-    const active = days.map((date) => activityKeys.has(dateKey(date)));
-    return { labels: days.map((date) => dayLabels[date.getDay()]), active, count: active.filter(Boolean).length };
-  }, [records]);
-
-  const boundary = resolveHomeBoundary({
-    loading: assistant.loading,
-    error: assistant.error || undefined,
-    activeKnowledgeCount: items.length,
-    activeCourseCount: courses.length,
-    hasAnyLearningRecord: records.length > 0
-  });
+  }, [practiceParam, runtimes]);
 
   useEffect(() => {
-    if (!panelOpen && !workspace) return;
+    if (!panelOpen && !workspace && !routePanelOpen) return;
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
-      if (workspace) { setWorkspace(null); return; }
+      if (workspace) { closeWorkspace(); return; }
+      if (routePanelOpen) { dispatchRightPanel({ type: "close" }); return; }
       if (panelOpen) { setPanel(false); panelToggleRef.current?.focus(); }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [panelOpen, workspace]);
+  }, [panelOpen, workspace, routePanelOpen]);
 
-  function setPanel(open: boolean) {
-    const next = new URLSearchParams(searchParams);
-    if (open) next.set("panel", "1"); else next.delete("panel");
-    setSearchParams(next, { replace: true });
+  function assistantContext() {
+    return buildHomeAssistantContext({
+      selectedCourseId: focusCourseId,
+      currentKnowledgeId: nextStep?.knowledgeId,
+      workspace,
+      removedContextIds: []
+    });
   }
 
-  function openPractice(courseId: string, assignmentId: string, title: string) {
-    setPanel(false);
-    setWorkspace({ kind: "practice", courseId, assignmentId, title });
-  }
-
-  function openMicroPanel() {
-    if (!current || !microPath) return;
-    setPanel(false);
-    setWorkspace({ kind: "micro", knowledgeId: current.knowledgeId, courseId: microCourseId, pathId: microPath.id, path: microPath });
-  }
-
-  function launchMicro() {
-    if (!current) return;
-    const courseId = microCourseId;
-    const target = createMicroLearningNavigation(current.knowledgeId,{courseId,returnTo:"/"});
-    navigate(target.to, { state: target.state });
-  }
-
-  function launchWorkspaceMicro() {
-    if (workspace?.kind !== "micro") return;
-    const target = microImmersiveHref(workspace.knowledgeId, { courseId: workspace.courseId, pathId: workspace.pathId, returnTo: "/" });
-    navigate(target.to, { state: target.state });
-  }
-
-  function contexts() {
-    const result: Array<{ id: string; label: string }> = [];
-    if (selectedCourse) result.push({ id: "course", label: selectedCourse.course.title });
-    if (current) result.push({ id: "knowledge", label: current.title });
-    if (selectedPerson) result.push({ id: "person", label: selectedPerson.displayName.replace("示例 · ", "") });
-    if (workspace?.kind === "practice") result.push({ id: "practice", label: `实践 · ${workspace.title}` });
-    if (workspace?.kind === "micro" && microPath) result.push({ id: "micro", label: `微学习 · ${microPath.title}` });
-    return result.filter((context) => !removedContexts.includes(context.id));
-  }
+  function markResumed() { setResumed(true); }
 
   async function send(message: string) {
-    const context = {
-      workspace: "learning" as const,
-      experienceMode: "learn" as const,
-      presentation: "today",
-      ...(selectedCourse ? { courseId: selectedCourse.course.id } : {}),
-      ...(current ? { knowledgeId: current.knowledgeId } : {})
-    };
-    return assistant.send(message, context);
+    markResumed();
+    return assistant.send(message, assistantContext());
   }
 
-  function openArchive() { navigate(archiveHref({ focus: "me" })); }
+  const cardActions: AssistantCardActions = {
+    openCourse: (courseId) => navigate(`/courses/${encodeURIComponent(courseId)}`),
+    openPractice: (courseId, assignmentId) => {
+      const runtime = runtimes.find((item) => item.course.id === courseId);
+      const assignment = runtime?.assignments.find((item) => item.id === assignmentId);
+      if (!assignment) return;
+      markResumed();
+      void openPractice(courseId, assignmentId, assignment.title);
+    },
+    openBrief: (messageId) => navigate(`/courses/create?briefId=${encodeURIComponent(messageId)}`),
+    openMaterial: (courseId, materialId, segmentId) => navigate(`/courses/${encodeURIComponent(courseId)}/materials/${encodeURIComponent(materialId)}${segmentId ? `?segment=${encodeURIComponent(segmentId)}` : ""}`),
+    openRoutePanel: (courseId) => {
+      if (courseId !== focusCourseId) { navigate(`/courses/${encodeURIComponent(courseId)}`); return; }
+      showRoutePanel();
+    },
+    openArchive: (focus) => navigate(archiveHref({ focus: focus === "me" || !focus ? "me" : focus as `knowledge:${string}` })),
+    recordMicroCompleted: (input) => {
+      void assistant.recordAction({ kind: "micro-completed", ...input }, assistantContext());
+    },
+    useCourse: (planningMessageId, courseId, context) => assistant.useExistingCourse(planningMessageId, courseId, context),
+    refineGoal: (planningMessageId, refinement, context) => assistant.refineGoal(planningMessageId, refinement, context),
+    prepareBrief: (planningMessageId, input, context) => assistant.prepareCourseBrief({ planningMessageId, ...input }, context)
+  };
 
-  const todayCard = current && microPath && boundary === "ready" ? (microComplex ? <div className="ef-home-today-micro">
-    <div className="ef-home-structured-head"><Pill tone="brand">复杂微学习</Pill><strong>{microPath.title}</strong></div>
-    <p>{microPath.description ?? `这条路径有 ${microPath.units.length} 个单元，适合在右侧工作区边看边做。`}</p>
-    <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={openMicroPanel}>在右侧工作区打开</button>
-  </div> : <InlineMicro path={microPath} knowledgeId={current.knowledgeId} courseId={microCourseId} session={session} surface="inline" onExpand={launchMicro} />) : undefined;
+  function showRoutePanel() {
+    dispatchRightPanel({ type: "open-route" });
+    if (searchParams.has("panel")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("panel");
+      setSearchParams(next, { replace: true });
+    }
+  }
 
-  return <main className={`ef-home ${panelOpen ? "has-panel" : ""} ${workspace ? "has-workspace" : ""}`} data-boundary={boundary} data-workspace={workspace?.kind ?? ""}>
-    <header className="ef-home-head">
+  function setPanel(open: boolean) {
+    dispatchRightPanel({ type: open ? "open-my" : "close" });
+    const base = open ? openPanelParams(searchParams, workspace?.kind) : new URLSearchParams(searchParams);
+    if (!open) base.delete("panel");
+    setSearchParams(base, { replace: true });
+  }
+
+  function showWorkspace(next: MicroWorkspace | PracticeWorkspace) {
+    const params = openWorkspaceParams(searchParams);
+    params.delete("micro");
+    params.delete("practice");
+    if (params.toString() !== searchParams.toString()) setSearchParams(params, { replace: true });
+    if (next.kind === "practice") { setPracticeCache(next); dispatchRightPanel({ type: "open-practice", panel: next }); }
+    else dispatchRightPanel({ type: "open-micro", panel: next });
+  }
+
+  function closeWorkspace() {
+    if (!workspace) return;
+    const next = removeWorkspaceParam(searchParams, workspace.kind);
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+    dispatchRightPanel({ type: "close" });
+  }
+
+  async function openPractice(courseId: string, assignmentId: string, title: string) {
+    await assistant.recordAction({ kind: "practice-opened", courseId, assignmentId, forceNewSession: forceNewSessionRef.current }, assistantContext());
+    forceNewSessionRef.current = false;
+    showWorkspace({ kind: "practice", courseId, assignmentId, title });
+  }
+
+  async function openMicroInConversation(step: HomeNextStep) {
+    if (!step.pathId || !step.knowledgeId) return false;
+    markResumed();
+    if (!openMicroPathIds.has(step.pathId)) {
+      await assistant.recordAction({
+        kind: "micro-opened",
+        pathId: step.pathId,
+        knowledgeId: step.knowledgeId,
+        courseId: step.courseId,
+        resuming: Boolean(applicationServices.microLearningRepository.getPathProgress(step.pathId)),
+        forceNewSession: forceNewSessionRef.current
+      }, assistantContext());
+      forceNewSessionRef.current = false;
+    }
+    setPendingMicroOpen(step.pathId);
+    return true;
+  }
+
+  async function startStarter() {
+    if (!config.starterCourseId) return;
+    markResumed();
+    dispatchRightPanel({ type: "close" });
+    await assistant.recordAction({ kind: "route-started", courseId: config.starterCourseId }, assistantContext());
+  }
+
+  async function continueNext() {
+    if (assistant.loading || assistant.sending) return;
+    markResumed();
+    if (!assistant.activeSessionId && assistant.sessions[0]) await assistant.selectSession(assistant.sessions[0].id);
+    if (!nextStep) {
+      if (showStarter) void startStarter();
+      else if (projection) { showRoutePanel(); }
+      else { dispatchRightPanel({ type: "open-my" }); }
+      return;
+    }
+    if (nextStep.kind === "micro" && await openMicroInConversation(nextStep)) return;
+    if (nextStep.kind === "practice" && nextStep.assignmentId) {
+      await openPractice(nextStep.courseId, nextStep.assignmentId, nextStep.title);
+      return;
+    }
+    navigate(`/courses/${encodeURIComponent(nextStep.courseId)}`);
+  }
+
+  function openRouteStep(action: CourseRouteStepAction) {
+    dispatchRightPanel({ type: "close" });
+    markResumed();
+    if (action.kind === "micro" && action.pathId) {
+      const path = applicationServices.microLearningRepository.getPath(action.nodeId, { courseId: focusCourseId, mode: "learn", pathId: action.pathId });
+      if (path) {
+        void openMicroInConversation({ courseId: focusCourseId, courseTitle: focusRuntime?.course.title ?? "", kind: "micro", title: path.title, nodeId: action.nodeId, knowledgeId: action.nodeId, pathId: path.id, minutes: path.estimatedMinutes });
+        return;
+      }
+    }
+    if (action.kind === "practice" && action.assignmentId && focusCourseId) {
+      openPractice(focusCourseId, action.assignmentId, action.step.title);
+      return;
+    }
+    if (focusCourseId) navigate(`/courses/${encodeURIComponent(focusCourseId)}`);
+  }
+
+  function openPracticeNext(step: { nodeId?: string; resourceKind: string; resourceId?: string; microPathId?: string; title: string }) {
+    if (!focusCourseId) return;
+    closeWorkspace();
+    if (step.microPathId && step.nodeId) {
+      void assistant.recordAction({ kind: "micro-opened", pathId: step.microPathId, knowledgeId: step.nodeId, courseId: focusCourseId, resuming: true }, assistantContext());
+      return;
+    }
+    if (step.resourceKind === "assignment" && step.resourceId) {
+      void openPractice(focusCourseId, step.resourceId, step.title);
+      return;
+    }
+    navigate(`/courses/${encodeURIComponent(focusCourseId)}`);
+  }
+
+  function newConversation() {
+    markResumed();
+    forceNewSessionRef.current = true;
+    void assistant.selectSession(null);
+    dispatchRightPanel({ type: "close" });
+  }
+
+  function selectSession(sessionId: string) {
+    forceNewSessionRef.current = false;
+    markResumed();
+    void assistant.selectSession(sessionId);
+    dispatchRightPanel({ type: "close" });
+  }
+
+  const showNextStrip = Boolean(nextStep) && !(showStarter && !segment?.started) && !(hasRouteCard && !segment?.started) && rightPanel.kind !== "route" && rightPanel.kind !== "practice";
+  const currentSegmentMicroInProgress = Boolean(nextStep?.pathId
+    && segment?.started
+    && segment.currentStep?.kind === "micro"
+    && segment.currentStep.pathId === nextStep.pathId
+    && applicationServices.microLearningRepository.getPathProgress(nextStep.pathId));
+  const nextMicroProgress = nextStep?.pathId ? applicationServices.microLearningRepository.getPathProgress(nextStep.pathId) : undefined;
+  const nextPracticeStatus = nextStep?.assignmentId ? focusCourseState?.assignmentStates[nextStep.assignmentId]?.status : undefined;
+  const nextPracticeStarted = Boolean(nextPracticeStatus && ["started", "submitted", "needs_revision"].includes(nextPracticeStatus));
+  const nextStepStarted = currentSegmentMicroInProgress
+    || nextMicroProgress?.status === "in_progress"
+    || nextPracticeStarted;
+  const nextStripLabel = nextPracticeStatus === "needs_revision" ? "需要修改" : nextStepStarted ? "正在做" : "下一步";
+  const nextStripAction = nextStep?.kind === "practice"
+    ? nextPracticeStatus === "needs_revision" ? "补充后再交" : nextPracticeStarted ? "继续" : "开始"
+    : "继续";
+  const progressChapter = projection?.chapters.find((chapter) => chapter.id === projection.currentChapterId);
+  const routeProgress = segment?.complete && progressChapter
+    ? `${progressChapter.learnedCount}/${progressChapter.nodeIds.length}`
+    : segment ? `${segment.completedCount}/${segment.steps.length}` : "";
+  const composer = <HomeComposer contexts={[]} onRemoveContext={() => undefined} onSubmit={(value) => void send(value)} disabled={assistant.sending || assistant.loading} hint={<span>Enter 发送 · Shift + Enter 换行</span>} />;
+
+  const nextStrip = nextStep && showNextStrip ? <div className="ef-home-next-strip" aria-label="下一步">
+    <span className="ef-home-next-label">{nextStripLabel}</span>
+    <span className="ef-home-next-copy"><strong>{nextStep.title}</strong><small>{nextStep.kind === "micro" ? "小练习" : "动手任务"}{nextStep.minutes ? ` · 约 ${nextStep.minutes} 分钟` : ""}</small></span>
+    <button type="button" className="ef-home-text-action" onClick={showRoutePanel}>路线 {routeProgress}</button>
+    <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => void continueNext()}>{nextStripAction}<ArrowRight size={14} /></button>
+  </div> : navigationError ? <p className="ef-home-next-error" role="alert">下一步暂时无法读取。<button type="button" onClick={() => setRevision((value) => value + 1)}>重试</button></p> : null;
+
+  const starterChip = showStarter && starterExample ? <div className="ef-home-example-row">
+    <button type="button" className="ef-ui-chip" onClick={() => void startStarter()}><Sparkles size={13} aria-hidden="true" />{starterExample.label}</button>
+  </div> : null;
+
+  return <main className={`ef-home ${panelOpen ? "has-panel" : ""} ${workspace ? "has-workspace" : ""} ${routePanelOpen ? "has-route" : ""}`} data-view={view} data-workspace={workspace?.kind ?? ""} data-strip={showNextStrip ? "1" : undefined}>
+    {view !== "fresh" ? <header className="ef-home-head">
       <div className="ef-home-head-copy">
-        <span className="ef-home-date">{formatToday()} · 最近 7 天 {week.count} 天有学习记录</span>
+        <span className="ef-home-date">{formatToday()}</span>
         <h1>{greeting()}，{shortDisplayName(session.name)}</h1>
-        <p>{todayCourse ? `今天把「${current?.title ?? todayCourse.runtime.chapters[0]?.title ?? "下一步"}」走完，约 ${todayCourse.runtime.assignments[0]?.estimatedMinutes ?? 18} 分钟。` : "从一个目标开始，EduFlow 从这件事开始帮你搭路线。"}</p>
       </div>
       <button ref={panelToggleRef} type="button" className={`ef-home-panel-toggle ${panelOpen ? "is-open" : ""}`} aria-pressed={panelOpen} aria-controls="ef-my-panel" onClick={() => setPanel(!panelOpen)}><PanelRight size={16} aria-hidden="true" />我的</button>
-    </header>
+    </header> : null}
 
-    {boundary === "new-user" ? <NewUserStart runtimes={runtimes} onSend={(prompt) => void send(prompt)} onOpenCourse={(courseId, origin) => { rememberCourseOrigin(courseId, origin); navigate(`/courses/${encodeURIComponent(courseId)}`); }} onOpenArchive={openArchive} /> : boundary === "ready" && !assistant.messages.length ? <TodayOverview session={session} course={todayCourse as TodayCourse | null} counts={{ learned: archive.learned, learning: archive.learning, practicing: archive.practicing, mastered: archive.mastered }} week={week} recentTitle={archive.recentTitle} onOpenCourse={(origin) => { if (!todayCourse) { openArchive(); return; } rememberCourseOrigin(todayCourse.runtime.course.id, origin); navigate(`/courses/${encodeURIComponent(todayCourse.runtime.course.id)}`); }} onOpenArchive={openArchive} /> : null}
-
-    <div className="ef-home-work">
+    {view === "fresh" ? <section className="ef-home-fresh" aria-label="开始对话">
+      <div className="ef-home-fresh-inner">
+        <h1>想聊点什么？</h1>
+        <p className="ef-home-fresh-sub">可以问问题、说说想学什么，或者只是随便看看。</p>
+        {composer}
+        {config.examples.length ? <div className="ef-home-example-row" aria-label="示例">
+          {config.examples.map((example) => <button key={example.id} type="button" className="ef-ui-chip" onClick={() => { if (example.kind === "start") void startStarter(); else void send(example.prompt); }}>{example.kind === "start" ? <Sparkles size={13} aria-hidden="true" /> : null}{example.label}</button>)}
+        </div> : null}
+      </div>
+    </section> : view === "returning" ? <section className="ef-home-return" aria-label="继续学习">
+      <div className="ef-home-return-inner">
+        <div className="ef-home-return-copy">
+          <h1>欢迎回来</h1>
+          <p>{recentTitle ? `上次学到「${recentTitle}」，接着往下走。` : "接着上次的路线继续。"}</p>
+        </div>
+        <div className="ef-home-return-card">
+          <span className="ef-home-return-icon" aria-hidden="true"><Play size={18} /></span>
+          <span className="ef-home-return-copy-step">
+            <small>{nextStep ? (nextStep.kind === "micro" ? "下一步 · 小练习" : "下一步 · 动手任务") : showStarter ? "从最简单的开始" : "查看路线"}{nextStep?.minutes ? ` · 约 ${nextStep.minutes} 分钟` : ""}</small>
+            <strong>{nextStep?.title ?? starterExample?.label ?? "打开你的学习路线"}</strong>
+          </span>
+          <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => void continueNext()} disabled={assistant.loading || assistant.sending}>{assistant.loading ? "正在准备…" : "继续"}<ArrowRight size={14} /></button>
+        </div>
+        {composer}
+        <div className="ef-home-return-links">
+          <button type="button" className="ef-home-text-action" onClick={() => setPanel(true)}><History size={13} aria-hidden="true" />查看历史对话</button>
+          <button type="button" className="ef-home-text-action" onClick={newConversation}>新对话</button>
+        </div>
+      </div>
+    </section> : <div className="ef-home-work">
       <div className="ef-home-column">
-        {boundary === "error" ? <div className="ef-home-error-banner" role="alert"><span><strong>首页加载失败</strong><small>请检查网络后重试；已有学习记录不会被清空。</small></span><button type="button" onClick={() => window.location.reload()}>重试</button></div> : null}
         <HomeConversation
-          messages={assistant.messages}
+          messages={assistant.chatMessages}
+          session={session}
+          cardActions={cardActions}
           loading={assistant.loading}
           sending={assistant.sending}
-          error={boundary === "error" ? "" : assistant.error}
-          contexts={contexts()}
-          onRemoveContext={(id) => setRemovedContexts((current) => [...current, id])}
+          error={assistant.error}
+          contexts={[]}
+          onRemoveContext={() => undefined}
           onSend={send}
-          suggestions={selectedPerson || boundary === "error" ? [] : boundary === "new-user" ? ["让 AI 会查我们自己的文档", "把重复的周报整理自动化", "搞懂 Agent 为什么总调错工具"] : current ? [`先来一道「${current.title}」的热身题`, "今天还有哪些安排？", "我上周的实践还差什么？"] : ["推荐一门适合我的课程", "我想先补提示工程", "查看本周学习安排"]}
-          todayCard={selectedPerson || assistant.messages.length ? undefined : todayCard}
-          eventRow={workspace?.kind === "practice" ? <EventRow icon={<Play size={15} />} title={<>已开始实践 <strong>{workspace.title}</strong></>} detail="在右侧工作区继续；提交后内容会被保存。" action={<Pill tone="brand" dot>进行中</Pill>} /> : undefined}
-          coursePreview={boundary === "ready" && assistant.messages.length && selectedCourse && !removedContexts.includes("course") ? <CoursePreviewCard course={selectedCourse} records={records} courseState={selectedCourseState} currentKnowledgeId={current?.knowledgeId} nodeTitles={nodeTitles} onOpenArchive={() => navigate(archiveHref({ focus: `course:${selectedCourse.course.id}` }))} /> : undefined}
-          microCard={boundary === "ready" && assistant.messages.length > 0 && current && microPath && microProgress?.status === "in_progress" ? <ConversationMicroCard path={microPath} progress={microProgress} currentUnitId={microCurrentUnit} completeSteps={microCompleteSteps} totalSteps={microTotalSteps} onOpen={() => microComplex ? openMicroPanel() : launchMicro()} /> : undefined}
-          previewPerson={selectedPerson}
-          onRetry={() => window.location.reload()}
+          suggestions={[]}
+          previewPerson={null}
+          onRetry={() => void assistant.retry()}
+          composerHeader={<>{nextStrip}{starterChip}</>}
         />
       </div>
+    </div>}
 
-      {panelOpen ? <MyPanel
+    {routePanelOpen && projection && focusRuntime ? <HomeRoutePanel
+      courseTitle={focusRuntime.course.title}
+      projection={projection}
+      decision={navigationDecision}
+      onClose={() => dispatchRightPanel({ type: "close" })}
+      onOpenTree={() => navigate(`/courses/${encodeURIComponent(focusRuntime.course.id)}?view=course`)}
+      onStart={openRouteStep}
+    /> : null}
+
+    {panelOpen ? <MyPanel
+      session={session}
+      open
+      loading={assistant.loading}
+      onClose={() => { setPanel(false); panelToggleRef.current?.focus(); }}
+      sessions={assistant.sessions}
+      activeSessionId={assistant.activeSessionId}
+      onNewConversation={newConversation}
+      onSelectSession={selectSession}
+    /> : null}
+
+    {workspace?.kind === "micro" ? <div className="ef-home-workspace" aria-label="小练习工作区">
+      <InlineMicro path={workspace.path} knowledgeId={workspace.knowledgeId} courseId={workspace.courseId} session={session} surface="panel" onClose={closeWorkspace} onExpand={() => {
+        const target = microImmersiveHref(workspace.knowledgeId, { courseId: workspace.courseId, pathId: workspace.pathId, returnTo: "/" });
+        navigate(target.to, { state: target.state });
+      }} />
+    </div> : null}
+
+    {practiceCache ? <div className={`ef-home-workspace${rightPanel.kind === "practice" ? "" : " is-hidden"}`} aria-label="动手任务工作区" aria-hidden={rightPanel.kind === "practice" ? undefined : true}>
+      <PracticeObject
+        key={`${practiceCache.courseId}:${practiceCache.assignmentId}`}
         session={session}
-        open
-        loading={assistant.loading}
-        onClose={() => { setPanel(false); panelToggleRef.current?.focus(); }}
-        selectedPersonId={selectedPersonId}
-        onSelectPerson={(person) => setSelectedPersonId(person?.id ?? null)}
-        selectedCourseId={selectedCourseId ?? todayCourse?.runtime.course.id ?? null}
-        onSelectCourse={(courseId) => { setSelectedCourseId(courseId); setRemovedContexts((current) => current.filter((id) => id !== "course")); }}
-        onOpenPractice={openPractice}
-        onOpenImmersivePractice={(courseId, assignmentId) => navigate(`/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignmentId)}`)}
-      /> : null}
-
-      {workspace ? <div className="ef-home-workspace" aria-label={workspace.kind === "micro" ? "微学习工作区" : "实践工作区"}>
-        {workspace.kind === "micro" && current ? <InlineMicro path={workspace.path} knowledgeId={workspace.knowledgeId} courseId={workspace.courseId} session={session} surface="panel" onClose={() => setWorkspace(null)} onExpand={launchWorkspaceMicro} /> : null}
-        {workspace.kind === "practice" ? <PracticeObject session={session} courseId={workspace.courseId} assignmentId={workspace.assignmentId} size="panel" onClose={() => setWorkspace(null)} onOpenImmersive={() => navigate(`/courses/${encodeURIComponent(workspace.courseId)}/assignments/${encodeURIComponent(workspace.assignmentId)}`)} onReturn={() => setWorkspace(null)} /> : null}
-      </div> : null}
-    </div>
+        courseId={practiceCache.courseId}
+        assignmentId={practiceCache.assignmentId}
+        size="panel"
+        assistantSessionId={assistant.activeSessionId ?? undefined}
+        onSubmitted={(attemptId) => { void assistant.recordAction({ kind: "practice-submitted", courseId: practiceCache.courseId, assignmentId: practiceCache.assignmentId, attemptId }, assistantContext()); }}
+        onResultPassed={() => { void assistant.recordAction({ kind: "segment-cleared", courseId: practiceCache.courseId, assignmentId: practiceCache.assignmentId }, assistantContext()); }}
+        onOpenNextStep={openPracticeNext}
+        onClose={closeWorkspace}
+        onOpenImmersive={() => navigate(`/courses/${encodeURIComponent(practiceCache.courseId)}/assignments/${encodeURIComponent(practiceCache.assignmentId)}`, { state: { returnTo: "/" } })}
+        onReturn={closeWorkspace}
+      />
+    </div> : null}
   </main>;
-}
-
-type TodayCourse = { runtime: CourseRuntimeData; state: UserCourseState; progress: number; currentChapter?: string; nextLabel: string };
-
-function NewUserStart({ runtimes, onSend, onOpenCourse, onOpenArchive }: { runtimes: CourseRuntimeData[]; onSend: (prompt: string) => void; onOpenCourse: (courseId: string, origin?: DOMRect) => void; onOpenArchive: () => void }) {
-  const scenarios = [
-    { title: "让 AI 会查我们自己的文档", hint: "RAG", prompt: "我想让 AI 会查我们自己的文档，现在它总是编。" },
-    { title: "把重复的周报整理自动化", hint: "工作流", prompt: "我想把重复的周报整理自动化。" },
-    { title: "搞懂 Agent 为什么总调错工具", hint: "工具调用", prompt: "我想搞懂 Agent 为什么总调错工具。" }
-  ];
-  const recommendations = runtimes.filter((runtime) => runtime.course.lifecycle === "published").slice(0, 3);
-  return <section className="ef-home-new-user" aria-label="新用户开始">
-    <article className="ef-home-new-card">
-      <header><span>开始</span><Pill tone="quiet">新用户</Pill></header>
-      <h2>你想先让 AI 帮你解决什么？</h2>
-      <p>不用先想课程。说一个具体场景，我先看看需要哪些知识。</p>
-      <div className="ef-home-scenarios">{scenarios.map((scenario) => <button key={scenario.title} type="button" onClick={() => onSend(scenario.prompt)}><span><strong>{scenario.title}</strong><small>{scenario.hint}</small></span><span aria-hidden="true">→</span></button>)}</div>
-    </article>
-    <article className="ef-home-new-card">
-      <header><span>推荐先学</span><Pill tone="quiet">{recommendations.length} 门</Pill></header>
-      <div className="ef-home-recommendations">{recommendations.map((runtime) => <button key={runtime.course.id} type="button" onClick={(event) => onOpenCourse(runtime.course.id, event.currentTarget.getBoundingClientRect())}><span><strong>{runtime.course.title}</strong><small>{runtime.chapters.length} 章 · {runtime.assignments.length} 项实践</small></span><ArrowRightIcon /></button>)}</div>
-      <button type="button" className="ef-home-text-link" onClick={onOpenArchive}>浏览全部档案 →</button>
-    </article>
-  </section>;
-}
-
-function ArrowRightIcon() {
-  return <span className="ef-home-arrow" aria-hidden="true">→</span>;
 }
 
 function greeting() {

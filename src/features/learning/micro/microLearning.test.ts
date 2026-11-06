@@ -7,6 +7,7 @@ import {
   createMicroLearningNavigation,
   isMicroInteractionCorrect,
   resolveMicroLearningReturnTarget,
+  resolveDisplayedMicroStep,
   firstMicroReviewStep,
   previousMicroReviewStep,
   nextMicroReviewStep,
@@ -32,13 +33,14 @@ describe("Micro Learning navigation", () => {
     expect(isMicroReviewSubmissionCorrect({type:"h5p",contentRef:"h5p/review",completionPolicy:"passed"},completedH5p)).toBe(false);
     expect(isMicroReviewSubmissionCorrect({type:"h5p",contentRef:"h5p/other"},completedH5p)).toBe(false);
   });
-  it("carries Learning Home as the explicit return target", () => {
+  it("keeps Learning Home as the return target and opens simple Micro in the conversation", () => {
     expect(createMicroLearningNavigation("syn-a", { courseId: "fixture-course-alpha", returnTo: "/" })).toEqual({
       to: "/learn/micro/syn-a?courseId=fixture-course-alpha",
       state: { returnTo: "/" }
     });
     const learningPage = readFileSync(join(process.cwd(), "src/features/learning/pages/LearningPage.tsx"), "utf8");
-    expect(learningPage).toContain('createMicroLearningNavigation(current.knowledgeId,{courseId,returnTo:"/"})');
+    expect(learningPage).toContain('kind: "micro-opened"');
+    expect(learningPage).toContain(`returnTo: "/"`);
   });
 
   it("carries the current Course route as the explicit return target", () => {
@@ -127,5 +129,28 @@ describe("Micro Learning assessment integrity", () => {
     expect(services).toContain("new ApiMicroLearningRepository()");
     expect(services).not.toContain("demoMicroLearningProvider");
     expect(runtime).not.toMatch(/(?:@\/demo|src\/demo|demoMicroLearningProvider)/);
+  });
+});
+
+describe("displayed step pinning", () => {
+  const path: MicroLearningPath = { id: "path", knowledgeId: "knowledge", scope: "global", title: "Pin", estimatedMinutes: 2, mode: "learn", required: true, status: "published", units: [
+    { id: "unit-1", pathId: "path", title: "One", position: 0, estimatedMinutes: 1, required: true, steps: [
+      { id: "step-1", kind: "interaction", title: "One", body: "One" },
+      { id: "step-2", kind: "interaction", title: "Two", body: "Two" }
+    ] },
+    { id: "unit-2", pathId: "path", title: "Two", position: 1, estimatedMinutes: 1, required: true, steps: [
+      { id: "step-3", kind: "interaction", title: "Three", body: "Three" }
+    ] }
+  ] };
+  it("keeps the submitted step while persisted progress has already advanced", () => {
+    const displayed = resolveDisplayedMicroStep(path, path.units[1], path.units[1].steps[0], { unitId: "unit-1", stepId: "step-1" });
+    expect(displayed.unit?.id).toBe("unit-1");
+    expect(displayed.step?.id).toBe("step-1");
+  });
+  it("falls back to the resume step after continue or when the pin is stale", () => {
+    expect(resolveDisplayedMicroStep(path, path.units[1], path.units[1].steps[0], null).step?.id).toBe("step-3");
+    const stale = resolveDisplayedMicroStep(path, path.units[1], path.units[1].steps[0], { unitId: "unit-1", stepId: "missing" });
+    expect(stale.unit?.id).toBe("unit-1");
+    expect(stale.step).toBeUndefined();
   });
 });

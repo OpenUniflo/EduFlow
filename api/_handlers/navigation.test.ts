@@ -135,6 +135,37 @@ describe("Navigation authority pagination", () => {
     expect(requirePublishedCourse).toHaveBeenCalledWith(userClient, "course");
   });
 
+  it("surfaces the first segment's real Assignment before a later Micro", async () => {
+    const tableRows: Record<string, Row[]> = {
+      curriculum_coverages: [
+        { id: "coverage-r10", course_id: "course", lesson_id: "lesson", node_id: "R10", display_order: 0 },
+        { id: "coverage-next", course_id: "course", lesson_id: "lesson", node_id: "NEXT", display_order: 1 }
+      ],
+      curriculum_lessons: [{ id: "lesson", course_id: "course", display_order: 0 }],
+      course_target_knowledge: [{ course_id: "course", knowledge_id: "NEXT", required: true }],
+      micro_learning_paths: [
+        { id: "micro-r10", knowledge_id: "R10", course_id: "course", required: true, status: "published", mode: "learn" },
+        { id: "micro-next", knowledge_id: "NEXT", course_id: "course", required: true, status: "published", mode: "learn" }
+      ],
+      user_micro_path_progress: [{ user_id: "learner", path_id: "micro-r10", status: "completed" }],
+      materials: [], material_knowledge_coverages: [], knowledge_edges: [],
+      knowledge_nodes: [{ id: "R10", current_revision_id: "revision-r10" }, { id: "NEXT", current_revision_id: "revision-next" }],
+      knowledge_node_revisions: [{ id: "revision-r10", title: "ReAct" }, { id: "revision-next", title: "Next" }],
+      user_knowledge_states: [{ user_id: "learner", node_id: "R10", status: "learned" }],
+      course_assignments: [{ id: "task-r10", course_id: "course", display_order: 0 }],
+      assignment_coverages: [{ id: "coverage-task", course_id: "course", assignment_id: "task-r10", node_id: "R10", required: true }],
+      performance_results: []
+    };
+    clients(tableRows);
+    const recorder = responseRecorder();
+    await handler({ method: "GET", query: { courseId: "course" }, headers: { authorization: "Bearer valid" } } as unknown as VercelRequest, recorder.response);
+    expect(recorder.statusCode()).toBe(200);
+    expect(recorder.body()).toMatchObject({
+      nextAction: { kind: "practice", nodeId: "R10", resourceKind: "assignment", resourceId: "task-r10", reasonCode: "complete_required_assignment" },
+      nextActionSource: "first_segment"
+    });
+  });
+
   it("uses the unique result id tie-break after user/course scoping", async () => {
     const evaluatedAt = "2026-09-05T00:00:00.000Z";
     const tableRows: Record<string, Row[]> = {

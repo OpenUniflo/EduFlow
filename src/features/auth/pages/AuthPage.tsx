@@ -79,7 +79,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
     <main className="ef-auth ef-shell-bg">
       <AuthArt
         title={isRegister ? "从一个目标开始" : "把知识连成一张可走的路"}
-        description={isRegister ? "告诉 EduFlow 你想做成什么，它会帮你找到课程、补齐前置知识。" : "在档案里看清自己学过什么，在对话里决定下一步。"}
+        description={isRegister ? "告诉 EduFlow 你想做成什么，它会帮你找到课程、补齐前置知识。" : "在我的地图里看清自己学过什么，在对话里决定下一步。"}
       />
 
       <form className="ef-auth-card ef-ui-glass ef-ui-glass--regular ef-ui-glass--r-24" onSubmit={submit} aria-labelledby="ef-auth-title">

@@ -6,6 +6,9 @@ import type { AssistantContextSnapshot } from "../../src/features/assistant/assi
 import { readEvidenceView } from "./evidenceRead.js";
 import { dataOrThrow } from "./query.js";
 import { planLearningGoal } from "./goalPlanningService.js";
+import { resolveGoalPlan, type GoalLanguageResolver } from "./goalPlanResolution.js";
+import { readNavigationDecision } from "./navigationDecision.js";
+import { ApiError } from "./http.js";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
@@ -17,7 +20,7 @@ async function roleFor(client: SupabaseClient, user: User) {
   return String(dataOrThrow(result.data as Row | null, result.error, "Assistant profile lookup")?.role ?? "student");
 }
 
-async function readableCourse(client: SupabaseClient, user: User, courseId: string) {
+export async function readableCourse(client: SupabaseClient, user: User, courseId: string) {
   const result = await client.from("courses").select("id,title,subtitle,description,target_outcome,lifecycle,generation_status").eq("id", courseId).maybeSingle();
   const course = dataOrThrow(result.data as Row | null, result.error, "Assistant Course lookup");
   if (!course) return null;
@@ -25,23 +28,46 @@ async function readableCourse(client: SupabaseClient, user: User, courseId: stri
   return null;
 }
 
+async function microDisplayTitles(client: SupabaseClient, nodeIds: string[], courseId?: string) {
+  const ids = [...new Set(nodeIds.filter(Boolean))];
+  const titles = new Map<string, string>();
+  if (!ids.length) return titles;
+  const result = await client.from("micro_learning_paths")
+    .select("knowledge_id,title,course_id")
+    .eq("status", "published")
+    .eq("mode", "learn")
+    .limit(2000);
+  const allRows = dataOrThrow(result.data as Row[] | null, result.error, "Assistant Micro display titles");
+  const rows = allRows.filter((row) => ids.includes(text(row, "knowledge_id")));
+  for (const id of ids) {
+    const matches = rows.filter((row) => text(row, "knowledge_id") === id);
+    const preferred = (courseId ? matches.find((row) => text(row, "course_id") === courseId) : undefined)
+      ?? matches.find((row) => row.course_id == null)
+      ?? matches[0];
+    if (preferred) titles.set(id, text(preferred, "title"));
+  }
+  return titles;
+}
+
 async function searchKnowledge(client: SupabaseClient, query: string) {
   const result = await client.from("knowledge_nodes").select("id,title,description,node_type,scope,status,tags").eq("status", "active").limit(300);
   const rows = dataOrThrow(result.data as Row[] | null, result.error, "Assistant Knowledge search");
+  const displayTitles = await microDisplayTitles(client, rows.map((row) => text(row, "id")));
   const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
   return rows.map((row) => {
     const haystack = [row.title, row.description, ...(Array.isArray(row.tags) ? row.tags : [])].join(" ").toLocaleLowerCase();
     return { row, score: terms.reduce((sum, term) => sum + (String(row.title).toLocaleLowerCase().includes(term) ? 3 : haystack.includes(term) ? 1 : 0), 0) };
   }).filter(({ score }) => score > 0).sort((a, b) => b.score - a.score || text(a.row, "id").localeCompare(text(b.row, "id"))).slice(0, 8).map(({ row }) => ({
-    id: text(row, "id"), title: text(row, "title"), description: limitText(row.description, 500), type: text(row, "node_type"), scope: text(row, "scope")
+    id: text(row, "id"), title: displayTitles.get(text(row, "id")) ?? text(row, "title"), formalTitle: text(row, "title"), description: limitText(row.description, 500), type: text(row, "node_type"), scope: text(row, "scope")
   }));
 }
 
-async function getKnowledge(client: SupabaseClient, nodeId: string) {
+export async function getKnowledge(client: SupabaseClient, nodeId: string) {
   const nodeResult = await client.from("knowledge_nodes").select("id,title,description,node_type,scope,status,mastery_criteria,tags").eq("id", nodeId).eq("status", "active").maybeSingle();
   const node = dataOrThrow(nodeResult.data as Row | null, nodeResult.error, "Assistant Knowledge lookup");
   if (!node) return null;
-  return { id: text(node, "id"), title: text(node, "title"), description: limitText(node.description), type: text(node, "node_type"), scope: text(node, "scope"), masteryCriteria: node.mastery_criteria, tags: node.tags ?? [] };
+  const displayTitle = (await microDisplayTitles(client, [nodeId])).get(nodeId) ?? text(node, "title");
+  return { id: text(node, "id"), title: displayTitle, formalTitle: text(node, "title"), description: limitText(node.description), type: text(node, "node_type"), scope: text(node, "scope"), masteryCriteria: node.mastery_criteria, tags: node.tags ?? [] };
 }
 
 async function getKnowledgeNeighbors(client: SupabaseClient, nodeId: string) {
@@ -51,7 +77,8 @@ async function getKnowledgeNeighbors(client: SupabaseClient, nodeId: string) {
   const ids = [...new Set(edges.flatMap((edge) => [text(edge, "source_node_id"), text(edge, "target_node_id")]).filter((id) => id !== nodeId))];
   const nodeResult = ids.length ? await client.from("knowledge_nodes").select("id,title").in("id", ids).eq("status", "active") : { data: [], error: null };
   const nodes = dataOrThrow(nodeResult.data as Row[] | null, nodeResult.error, "Assistant neighbor node lookup");
-  const titleById = new Map(nodes.map((node) => [text(node, "id"), text(node, "title")]));
+  const displayTitles = await microDisplayTitles(client, nodes.map((node) => text(node, "id")));
+  const titleById = new Map(nodes.map((node) => [text(node, "id"), displayTitles.get(text(node, "id")) ?? text(node, "title")]));
   return edges.filter((edge) => titleById.has(text(edge, "source_node_id") === nodeId ? text(edge, "target_node_id") : text(edge, "source_node_id"))).map((edge) => ({
     id: text(edge, "id"), sourceId: text(edge, "source_node_id"), sourceTitle: text(edge, "source_node_id") === nodeId ? undefined : titleById.get(text(edge, "source_node_id")),
     targetId: text(edge, "target_node_id"), targetTitle: text(edge, "target_node_id") === nodeId ? undefined : titleById.get(text(edge, "target_node_id")), relation: text(edge, "relation"), reason: limitText(edge.reason, 500)
@@ -68,7 +95,7 @@ async function searchCourses(client: SupabaseClient, user: User, query: string) 
     .map(({ row }) => ({ id: text(row, "id"), title: text(row, "title"), description: limitText(row.description, 500), targetOutcome: optionalText(row, "target_outcome"), lifecycle: text(row, "lifecycle") }));
 }
 
-async function getCourseContext(client: SupabaseClient, user: User, courseId: string, knowledgeId?: string) {
+export async function getCourseContext(client: SupabaseClient, user: User, courseId: string, knowledgeId?: string) {
   const course = await readableCourse(client, user, courseId);
   if (!course) return null;
   const [chaptersResult, lessonsResult, coverageResult, sequenceResult] = await Promise.all([
@@ -85,12 +112,13 @@ async function getCourseContext(client: SupabaseClient, user: User, courseId: st
   const nodeIds = [...new Set(coverages.map((coverage) => text(coverage, "node_id")))].slice(0, 100);
   const nodesResult = nodeIds.length ? await client.from("knowledge_nodes").select("id,title,description,status").in("id", nodeIds).eq("status", "active") : { data: [], error: null };
   const nodes = dataOrThrow(nodesResult.data as Row[] | null, nodesResult.error, "Assistant Course Knowledge lookup");
+  const displayTitles = await microDisplayTitles(client, nodes.map((row) => text(row, "id")), courseId);
   return {
     course: { id: text(course, "id"), title: text(course, "title"), description: limitText(course.description), targetOutcome: optionalText(course, "target_outcome"), lifecycle: text(course, "lifecycle") },
     chapters: chapters.map((row) => ({ id: text(row, "id"), title: text(row, "title"), order: Number(row.display_order), outcome: optionalText(row, "outcome") })),
     lessons: lessons.map((row) => ({ id: text(row, "id"), chapterId: text(row, "chapter_id"), title: text(row, "title"), order: Number(row.display_order) })),
     curriculumCoverage: coverages.slice(0, 100).map((row) => ({ lessonId: text(row, "lesson_id"), nodeId: text(row, "node_id"), role: text(row, "role"), order: Number(row.display_order) })),
-    knowledge: nodes.map((row) => ({ id: text(row, "id"), title: text(row, "title"), description: limitText(row.description, 500) })),
+    knowledge: nodes.map((row) => ({ id: text(row, "id"), title: displayTitles.get(text(row, "id")) ?? text(row, "title"), formalTitle: text(row, "title"), description: limitText(row.description, 500) })),
     curriculumSequence: sequences.map((row) => ({ sourceLessonId: text(row, "source_lesson_id"), targetLessonId: text(row, "target_lesson_id"), relationKind: "curriculum-sequence-not-knowledge-edge" }))
   };
 }
@@ -111,11 +139,12 @@ async function getMaterialContext(client: SupabaseClient, user: User, courseId: 
   const nodeIds = [...new Set(coverage.map((row) => text(row, "node_id")))];
   const nodesResult = nodeIds.length ? await client.from("knowledge_nodes").select("id,title,description").in("id", nodeIds).eq("status", "active") : { data: [], error: null };
   const nodes = dataOrThrow(nodesResult.data as Row[] | null, nodesResult.error, "Assistant Material Knowledge lookup");
+  const displayTitles = await microDisplayTitles(client, nodes.map((row) => text(row, "id")), courseId);
   return {
     material: { id: text(material, "id"), courseId, title: text(material, "title"), description: optionalText(material, "description"), type: text(material, "material_type") },
     segments: segments.map((row) => ({ id: text(row, "id"), order: Number(row.display_order), page: row.page == null ? undefined : Number(row.page), title: optionalText(row, "title"), section: optionalText(row, "section"), contentExcerpt: row.content == null ? undefined : JSON.stringify(row.content).slice(0, 6_000) })),
     knowledgeCoverage: coverage.map((row) => ({ segmentId: text(row, "segment_id"), nodeId: text(row, "node_id"), role: text(row, "role") })),
-    knowledge: nodes.map((row) => ({ id: text(row, "id"), title: text(row, "title"), description: limitText(row.description, 500) }))
+    knowledge: nodes.map((row) => ({ id: text(row, "id"), title: displayTitles.get(text(row, "id")) ?? text(row, "title"), formalTitle: text(row, "title"), description: limitText(row.description, 500) }))
   };
 }
 
@@ -133,7 +162,7 @@ async function searchMaterialContent(client: SupabaseClient, user: User, courseI
   }).filter(({ score }) => score > 0).sort((a, b) => b.score - a.score || Number(a.row.display_order) - Number(b.row.display_order)).slice(0, 8).map(({ row, serialized }) => ({ id: text(row, "id"), order: Number(row.display_order), page: row.page == null ? undefined : Number(row.page), title: optionalText(row, "title"), excerpt: serialized.slice(0, 1_500) }));
 }
 
-async function getAssignmentContext(client: SupabaseClient, user: User, courseId: string, assignmentId: string) {
+export async function getAssignmentContext(client: SupabaseClient, user: User, courseId: string, assignmentId: string) {
   if (!await readableCourse(client, user, courseId)) return null;
   const assignmentResult = await client.from("course_assignments").select("id,title,description,requirements,expected_output,acceptance_criteria,mode,workflow_template_id,estimated_minutes").eq("course_id", courseId).eq("id", assignmentId).maybeSingle();
   const assignment = dataOrThrow(assignmentResult.data as Row | null, assignmentResult.error, "Assistant Assignment lookup");
@@ -147,7 +176,8 @@ async function getAssignmentContext(client: SupabaseClient, user: User, courseId
   const nodeIds = coverage.map((row) => text(row, "node_id"));
   const nodesResult = nodeIds.length ? await client.from("knowledge_nodes").select("id,title").in("id", nodeIds).eq("status", "active") : { data: [], error: null };
   const nodes = dataOrThrow(nodesResult.data as Row[] | null, nodesResult.error, "Assistant Assignment Knowledge lookup");
-  return { assignment: { id: text(assignment, "id"), courseId, title: text(assignment, "title"), description: limitText(assignment.description), requirements: assignment.requirements, expectedOutput: text(assignment, "expected_output"), acceptanceCriteria: assignment.acceptance_criteria, mode: text(assignment, "mode"), workflowTemplateId: optionalText(assignment, "workflow_template_id"), estimatedMinutes: assignment.estimated_minutes == null ? undefined : Number(assignment.estimated_minutes) }, knowledgeCoverage: coverage, knowledge: nodes, directAssignmentDependencies: dependencies, distinction: "AssignmentDependency is a course teaching/execution prerequisite and is not a KnowledgeEdge." };
+  const displayTitles = await microDisplayTitles(client, nodes.map((row) => text(row, "id")), courseId);
+  return { assignment: { id: text(assignment, "id"), courseId, title: text(assignment, "title"), description: limitText(assignment.description), requirements: assignment.requirements, expectedOutput: text(assignment, "expected_output"), acceptanceCriteria: assignment.acceptance_criteria, mode: text(assignment, "mode"), workflowTemplateId: optionalText(assignment, "workflow_template_id"), estimatedMinutes: assignment.estimated_minutes == null ? undefined : Number(assignment.estimated_minutes) }, knowledgeCoverage: coverage, knowledge: nodes.map((row) => ({ ...row, title: displayTitles.get(text(row, "id")) ?? text(row, "title") })), directAssignmentDependencies: dependencies, distinction: "AssignmentDependency is a course teaching/execution prerequisite and is not a KnowledgeEdge." };
 }
 
 async function getMicroContext(client: SupabaseClient, pathId: string, unitId?: string, stepId?: string) {
@@ -178,14 +208,97 @@ async function getLearnerState(client: SupabaseClient, user: User, nodeId?: stri
   };
 }
 
+async function listReadableCourses(client: SupabaseClient, user: User) {
+  const result = await client.from("courses").select("id,title,subtitle,description,target_outcome,lifecycle,generation_status").limit(200);
+  let rows = dataOrThrow(result.data as Row[] | null, result.error, "Assistant readable Courses");
+  if (!["teacher", "admin"].includes(await roleFor(client, user))) rows = rows.filter((row) => text(row, "lifecycle") === "published");
+  return rows.map((row) => ({ id: text(row, "id"), title: text(row, "title"), description: limitText(row.description, 500), lifecycle: text(row, "lifecycle") }));
+}
+
+async function navigationForAssistant(client: SupabaseClient, user: User, context: AssistantContextSnapshot, courseId?: string) {
+  const resolvedCourseId = courseId ?? context.courseId;
+  if (!resolvedCourseId) {
+    return {
+      status: "course_required" as const,
+      message: "No Course context is available. Ask the learner which Course they want to learn, or offer one of these readable Courses.",
+      courses: await listReadableCourses(client, user)
+    };
+  }
+  const course = await readableCourse(client, user, resolvedCourseId);
+  if (!course) return { status: "course_not_available" as const, courseId: resolvedCourseId, message: "This Course is not visible to the authenticated learner." };
+  let decision: Awaited<ReturnType<typeof readNavigationDecision>>;
+  try {
+    decision = await readNavigationDecision(client, user.id, resolvedCourseId);
+  } catch (error) {
+    if (error instanceof ApiError) return { status: "course_not_available" as const, courseId: resolvedCourseId, message: error.message };
+    throw error;
+  }
+  const displayTitles = await microDisplayTitles(client, decision.path.map((item) => item.nodeId), resolvedCourseId);
+  let nextTitle = displayTitles.get(decision.nextAction.nodeId ?? "") ?? decision.path.find((item) => item.nodeId === decision.nextAction.nodeId)?.title;
+  if (decision.nextAction.resourceKind === "assignment" && decision.nextAction.resourceId) {
+    const assignmentResult = await client.from("course_assignments").select("title").eq("course_id", resolvedCourseId).eq("id", decision.nextAction.resourceId).maybeSingle();
+    const assignment = dataOrThrow(assignmentResult.data as Row | null, assignmentResult.error, "Assistant navigation Assignment title");
+    if (assignment) nextTitle = text(assignment, "title");
+  }
+  return {
+    status: "ready" as const,
+    courseId: resolvedCourseId,
+    courseTitle: text(course, "title"),
+    decisionId: decision.decisionId,
+    policyVersion: decision.policyVersion,
+    nextActionSource: decision.nextActionSource,
+    nextAction: { ...decision.nextAction, title: nextTitle },
+    path: decision.path.map((item) => ({ ...item, title: displayTitles.get(item.nodeId) ?? item.title })),
+    authority: "deterministic-navigation-engine"
+  };
+}
+
+async function planGoalForAssistant(
+  client: SupabaseClient,
+  goalText: string,
+  candidateKnowledgeIds: string[] | undefined,
+  resolver: GoalLanguageResolver | undefined,
+  onGoalPlan: ((plan: Awaited<ReturnType<typeof planLearningGoal>>) => void) | undefined
+) {
+  if (candidateKnowledgeIds?.length) {
+    const plan = await planLearningGoal(client, goalText, candidateKnowledgeIds);
+    onGoalPlan?.(plan);
+    return { status: plan.resolution.status, goalText, intentSummary: "", ...plan };
+  }
+  const resolved = await resolveGoalPlan(client, { goalText }, resolver);
+  if (resolved.status === "needs_clarification") {
+    return {
+      status: resolved.status, goalText,
+      intentSummary: resolved.language.intentSummary,
+      clarificationQuestion: resolved.language.clarificationQuestion
+    };
+  }
+  onGoalPlan?.(resolved.plan);
+  return {
+    status: resolved.status,
+    goalText: resolved.language.primaryOutcome,
+    intentSummary: resolved.language.intentSummary,
+    ...resolved.plan,
+    ...(resolved.status === "no_match" && "reason" in resolved.language ? { reason: resolved.language.reason } : {})
+  };
+}
+
+export type AssistantToolDependencies = {
+  /** Test seam only; production uses the same resolver as the `plan-goal` action. */
+  goalLanguageResolver?: GoalLanguageResolver;
+  /** Records the product plan so the display tool can nominate its result card. */
+  onGoalPlan?: (plan: Awaited<ReturnType<typeof planLearningGoal>>) => void;
+};
+
 function safe<T>(execute: () => Promise<T>) {
   return execute().catch((error) => ({ error: { code: "tool_failed", message: error instanceof Error ? error.message : "Tool failed" } }));
 }
 
-export function createAssistantTools(client: SupabaseClient, user: User, context: AssistantContextSnapshot) {
+export function createAssistantTools(client: SupabaseClient, user: User, context: AssistantContextSnapshot, dependencies: AssistantToolDependencies = {}) {
   const id = z.string().trim().min(1).max(240).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
   return {
-    planLearningGoal: tool({ description: "Resolve a learner Goal to real visible Knowledge, factual prerequisite closure, and deterministic existing-Course coverage/gaps. You may first search Knowledge and suggest candidate IDs, but this tool revalidates every ID. This tool never creates a Course or chooses a formal Next Action.", inputSchema: z.object({ goalText: z.string().trim().min(1).max(1000), candidateKnowledgeIds: z.array(id).max(20).optional() }), execute: ({ goalText, candidateKnowledgeIds }: { goalText: string; candidateKnowledgeIds?: string[] }) => safe(() => planLearningGoal(client, goalText, candidateKnowledgeIds)) }),
+    planLearningGoal: tool({ description: "Resolve a learner Goal to real visible Knowledge, factual prerequisite closure, and deterministic existing-Course coverage/gaps. You may first search Knowledge and suggest candidate IDs, but this tool revalidates every ID. This tool never creates a Course or chooses a formal Next Action.", inputSchema: z.object({ goalText: z.string().trim().min(1).max(1000), candidateKnowledgeIds: z.array(id).max(20).optional() }), execute: ({ goalText, candidateKnowledgeIds }: { goalText: string; candidateKnowledgeIds?: string[] }) => safe(() => planGoalForAssistant(client, goalText, candidateKnowledgeIds, dependencies.goalLanguageResolver, dependencies.onGoalPlan)) }),
+    getNavigationDecision: tool({ description: "Read the deterministic Navigation Engine's current Next Action and reason for one server-validated Course. Use this whenever the learner asks what to learn or do next. Never invent, rerank, replace, or override its decision. Without courseId it uses the page Course context or returns readable Courses.", inputSchema: z.object({ courseId: id.optional() }), execute: ({ courseId }: { courseId?: string }) => safe(async () => { console.info("assistant_tool getNavigationDecision"); return navigationForAssistant(client, user, context, courseId); }) }),
     searchKnowledge: tool({ description: "Search visible active EduFlow Knowledge by title, description, or tags.", inputSchema: z.object({ query: z.string().trim().min(1).max(300) }), execute: ({ query }: { query: string }) => safe(() => searchKnowledge(client, query)) }),
     getKnowledge: tool({ description: "Read one visible active KnowledgeNode by stable ID.", inputSchema: z.object({ nodeId: id }), execute: ({ nodeId }: { nodeId: string }) => safe(() => getKnowledge(client, nodeId)) }),
     getKnowledgeNeighbors: tool({ description: "Read factual prerequisite, enables, and related KnowledgeEdges for one visible KnowledgeNode.", inputSchema: z.object({ nodeId: id }), execute: ({ nodeId }: { nodeId: string }) => safe(() => getKnowledgeNeighbors(client, nodeId)) }),

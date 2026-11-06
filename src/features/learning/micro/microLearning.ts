@@ -139,3 +139,20 @@ export function resolveMicroResumeStep(unit: MicroUnit, progress: MicroUnitProgr
   const completed = new Set(progress?.completedStepIds ?? []);
   return unit.steps.find((step) => !completed.has(step.id)) ?? unit.steps.find((step) => step.id === currentStepId) ?? unit.steps[0];
 }
+
+/**
+ * Keeps the step a learner just submitted visible until they explicitly move
+ * on. Progress can advance immediately after a successful submission; without
+ * this pin the step panel would remount and its success/retry feedback would
+ * never be seen (Home inline Micro and the panel share this rule).
+ */
+export function resolveDisplayedMicroStep(
+  path: MicroLearningPath,
+  currentUnit: MicroUnit | undefined,
+  currentStep: MicroStep | undefined,
+  pinned: { unitId: string; stepId: string } | null
+) {
+  const unit = pinned ? path.units.find((item) => item.id === pinned.unitId) ?? currentUnit : currentUnit;
+  const step = unit ? (pinned ? unit.steps.find((item) => item.id === pinned.stepId) : currentStep) : undefined;
+  return { unit, step };
+}

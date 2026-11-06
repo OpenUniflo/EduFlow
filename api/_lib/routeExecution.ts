@@ -7,13 +7,26 @@ import { allRows } from './query.js';
 import { readAssignmentEligibility } from './assignmentEligibility.js';
 
 /** Authenticated catalog; resources never determine capability model membership. */
+async function readActionRows(client:SupabaseClient,column:'edge_id'|'node_id',ids:readonly string[],label:string) {
+  const unique=[...new Set(ids)];
+  const rows:Record<string,unknown>[]=[];
+  // PostgREST GET URLs are bounded. A large catalog route can carry hundreds of
+  // edges, so query stable chunks instead of letting the request fail with an
+  // empty error and a 500.
+  for(let index=0;index<unique.length;index+=100){
+    const chunk=unique.slice(index,index+100);
+    if(!chunk.length)continue;
+    rows.push(...await allRows(client.from('knowledge_edge_actions').select('*').eq('status','active').in(column,chunk).order('id'),label));
+  }
+  return rows;
+}
 export async function readRouteActionOptions(client:SupabaseClient,courseId:string,input:RoutePlanningInput,route:SelectedRoute & {executionSteps?:RouteExecutionStep[]},userId?:string):Promise<RouteActionOption[]> {
   const allFacts=[...input.prerequisiteEdges.map(edge=>({...edge,relation:'prerequisite' as const})),...(input.enablesEdges??[])];
   const facts=allFacts.filter(edge=>route.selectedNodeIds.includes(edge.source)&&route.selectedNodeIds.includes(edge.target));
   const roots=route.selectedNodeIds.filter(id=>isRouteNodeRoot(id,route,allFacts));
   const [edgeRows,nodeRows,bindingRows,paths,assignments,coverages]=await Promise.all([
-    facts.length?allRows(client.from('knowledge_edge_actions').select('*').eq('status','active').in('edge_id',facts.map(edge=>edge.id)).order('id'),'Route Edge Actions'):[],
-    roots.length?allRows(client.from('knowledge_edge_actions').select('*').eq('status','active').in('node_id',roots).order('id'),'Route Node Actions'):[],
+    facts.length?readActionRows(client,'edge_id',facts.map(edge=>edge.id),'Route Edge Actions'):[],
+    roots.length?readActionRows(client,'node_id',roots,'Route Node Actions'):[],
     allRows(client.from('course_action_bindings').select('*').eq('course_id',courseId).order('id'),'Route bindings'),
     allRows(client.from('micro_learning_paths').select('id,knowledge_id,course_id').eq('status','published').eq('mode','learn').order('id'),'Route Micro executors'),
     allRows(client.from('course_assignments').select('id,mode,experience').eq('course_id',courseId).order('id'),'Route Assignment executors'),

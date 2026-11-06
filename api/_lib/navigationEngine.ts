@@ -31,14 +31,14 @@ export function computeNavigationPlan(input: NavigationEngineInput): NavigationP
   const current = path.find((item) => item.state !== "learned" && item.state !== "skipped");
   if (!current) return { policyVersion: NAVIGATION_POLICY_VERSION, courseId: input.courseId, path, skippedNodeIds, nextAction: { kind: "next", resourceKind: "course", reasonCode: path.length ? "course_route_complete" : "course_route_empty", reason: path.length ? "当前课程学习内容已完成。" : "当前路线没有待达成项目目标。" } };
 
-  if(current.state==="blocked")return {policyVersion:NAVIGATION_POLICY_VERSION,courseId:input.courseId,path,skippedNodeIds,nextAction:{kind:"remediation",nodeId:current.nodeId,resourceKind:"course",reasonCode:"teaching_prerequisite_required",reason:`先完成前置 Knowledge：${current.blockedBy.join("、")}。`}};
+  if(current.state==="blocked")return {policyVersion:NAVIGATION_POLICY_VERSION,courseId:input.courseId,path,skippedNodeIds,nextAction:{kind:"remediation",nodeId:current.nodeId,resourceKind:"course",reasonCode:"teaching_prerequisite_required",reason:`先完成前置要点：${current.blockedBy.join("、")}。`}};
 
   const nodeId = current.nodeId;
   const micro = assetsForNode(input.microPaths, nodeId).filter((asset) => !input.completedMicroPathIds.includes(asset.id)).sort((left, right) => left.order-right.order || left.id.localeCompare(right.id))[0];
 
   if (micro) {
     const underway = input.knowledgeStatuses[nodeId] != null && input.knowledgeStatuses[nodeId] !== "explore";
-    return { policyVersion: NAVIGATION_POLICY_VERSION, courseId: input.courseId, path, skippedNodeIds, nextAction: { kind: underway ? "review" : "next", nodeId, resourceKind: "micro", resourceId: micro.id, reasonCode: underway ? "resume_required_micro" : "begin_required_micro", reason: underway ? "继续或复习尚未完成的必修 Micro。" : "从该 Knowledge 的必修 Micro 开始。" } };
+    return { policyVersion: NAVIGATION_POLICY_VERSION, courseId: input.courseId, path, skippedNodeIds, nextAction: { kind: underway ? "review" : "next", nodeId, resourceKind: "micro", resourceId: micro.id, reasonCode: underway ? "resume_required_micro" : "begin_required_micro", reason: underway ? "继续或复习还没完成的小练习。" : "先从这个要点的小练习开始。" } };
   }
   return { policyVersion: NAVIGATION_POLICY_VERSION, courseId: input.courseId, path, skippedNodeIds, nextAction: { kind: "next", nodeId, resourceKind: "course", reasonCode: "learning_content_unavailable", reason: "这一学习节点尚未准备可执行学习内容。" } };
 }

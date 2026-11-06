@@ -15,3 +15,86 @@
 .route-action-choice input { flex-shrink: 0; margin-top: 4px; }
 .route-action-choice span { min-width: 0; }
 .route-action-choice small,.route-planning ol small,.route-history-snapshot li small { display: block; font-size: 11px; color: var(--atlas-muted); overflow-wrap: anywhere; }
+
+/* ---------- Stage 4: default learner route page (no 3D) ---------- */
+.ef-course-route-page {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  gap: var(--sp-16);
+  max-width: 920px;
+  margin-inline: auto;
+  padding: var(--sp-24) var(--sp-24) var(--sp-40);
+}
+
+.ef-course-route-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-16);
+  padding: var(--sp-16) var(--sp-20);
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-course-route-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: var(--ctl-40);
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-course-route-title { min-width: 0; }
+.ef-course-route-title > span { color: var(--muted); font-size: var(--fs-12); }
+.ef-course-route-title h1 { margin: 0; overflow: hidden; font-size: var(--fs-20); line-height: var(--lh-20); text-overflow: ellipsis; white-space: nowrap; }
+.ef-course-route-title p { margin: 2px 0 0; color: var(--muted); font-size: var(--fs-12); line-height: var(--lh-12); }
+
+.ef-course-route-tabs { display: inline-flex; gap: var(--sp-4); padding: var(--sp-4); border-radius: var(--r-12); background: var(--page); }
+.ef-course-route-tabs button { display: inline-flex; align-items: center; gap: var(--sp-4); min-height: 32px; padding: 0 var(--sp-12); border: 0; border-radius: var(--r-8); background: transparent; color: var(--ink-2); font-size: var(--fs-13); font-weight: var(--fw-600); }
+.ef-course-route-tabs button.is-on { background: var(--surface); color: var(--brand-ink); box-shadow: var(--sh-1); }
+
+.ef-course-route-view { display: flex; flex-direction: column; gap: var(--sp-16); }
+.ef-course-route-banner { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); padding: var(--sp-12) var(--sp-16); border-radius: var(--r-12); background: var(--brand-soft); color: var(--brand-ink); font-size: var(--fs-13); font-weight: var(--fw-600); }
+.ef-course-route-banner span { display: inline-flex; align-items: center; gap: var(--sp-8); min-width: 0; }
+.ef-course-route-view .ef-imm-route-view {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  max-height: calc(100dvh - 260px);
+  overflow: hidden auto;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.ef-home-route-panel .ef-course-route-view .ef-imm-route-view {
+  max-height: none;
+  overflow: visible;
+}
+.ef-course-route-view .ef-imm-route-wrap { padding: var(--sp-8) 0 var(--sp-24); }
+.ef-course-route-folds { display: flex; flex-direction: column; gap: var(--sp-8); }
+.ef-course-route-fold { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); padding: var(--sp-12) var(--sp-16); border: 1px solid var(--line); border-radius: var(--r-12); background: var(--page); }
+.ef-course-route-fold span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.ef-course-route-fold strong { font-size: var(--fs-13); }
+.ef-course-route-fold small { color: var(--muted); font-size: var(--fs-12); }
+.ef-course-route-fold-progress { flex-direction: row !important; align-items: center; gap: var(--sp-4) !important; color: var(--muted); font-size: var(--fs-12); white-space: nowrap; }
+.ef-course-route-note { display: flex; align-items: center; gap: var(--sp-4); margin: 0; color: var(--muted); font-size: var(--fs-12); }
+.ef-course-route-error { padding: var(--sp-8) var(--sp-12); border-radius: var(--r-8); background: var(--warn-soft); color: var(--warn); font-size: var(--fs-13); }
+.ef-course-route-error button { margin-left: var(--sp-8); border: 0; background: transparent; color: inherit; font-weight: var(--fw-600); text-decoration: underline; }
+.ef-course-route-empty, .ef-course-route-missing { padding: var(--sp-32); border: 1px dashed var(--line-strong); border-radius: var(--r-24); background: var(--surface); text-align: center; }
+.ef-course-route-missing h1 { margin: 0 0 var(--sp-8); font-size: var(--fs-20); }
+.ef-course-route-missing p { margin: 0 0 var(--sp-16); color: var(--muted); }
+.ef-course-route-foot { display: flex; justify-content: space-between; gap: var(--sp-8); padding-top: var(--sp-8); }
+
+@media (max-width: 720px) {
+  .ef-course-route-page { padding: var(--sp-12); }
+  .ef-course-route-top { grid-template-columns: 1fr; }
+}

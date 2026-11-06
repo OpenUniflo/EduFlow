@@ -22,9 +22,9 @@ export function GlobalAssistantSurface({session,children,onUpdateCapabilities,fo
     return {contextLabel:'当前页面',context:{...fallbackAssistantContext(location.pathname),userRole:session.role,capabilities:session.capabilities}};
   },[location.pathname,session]);
   const props=foreground ?? (registration?.route===location.pathname?registration.props:fallback);
-  // Home is the full-chat surface and Micro is interaction-first; the floating
-  // contextual trigger would be a second, competing chrome there.
-  const hideFloating=!foreground&&(location.pathname==="/"||location.pathname.startsWith("/learn/micro/"));
+  // Home is the full-chat surface; every other page keeps the contextual
+  // trigger. Micro reserves room for it in the bottom action bar.
+  const hideFloating=!foreground&&location.pathname==="/";
   const surface=<AssistantSurface {...props} locked={false} onUpdateCapabilities={()=>onUpdateCapabilities(props.context?.courseId)}/>;
   return <RegistrationContext.Provider value={register}>{children}{!hideFloating?(portalContainer?createPortal(surface,portalContainer):surface):null}</RegistrationContext.Provider>;
 }

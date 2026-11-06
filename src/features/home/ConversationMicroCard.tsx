@@ -16,11 +16,11 @@ export function ConversationMicroCard({ path, progress, currentUnitId, completeS
   const unitIndex = Math.max(0, path.units.findIndex((unit) => unit.id === currentUnitId));
   const unit = path.units[unitIndex];
   const percent = totalSteps ? Math.round(completeSteps / totalSteps * 100) : 0;
-  return <ConversationCard size="s" label={`微学习进行中 ${path.title}`}>
+  return <ConversationCard size="s" label={`小练习进行中 ${path.title}`}>
     <ObjectShell
       size="s"
       icon={<BookOpen size={15} />}
-      kicker="微学习 · 进行中"
+      kicker="小练习 · 进行中"
       title={path.title}
       badge={<Pill tone="brand" dot>进行中</Pill>}
       context={<span>第 {unitIndex + 1} / {path.units.length} 单元 · 约 {path.estimatedMinutes} 分钟</span>}
@@ -28,7 +28,7 @@ export function ConversationMicroCard({ path, progress, currentUnitId, completeS
     >
       <div className="ef-home-micro-s">
         <div className="ef-home-micro-s-progress" aria-label={`${percent}%`}><i style={{ width: `${percent}%` }} /></div>
-        <p><strong>{unit?.title ?? "当前单元"}</strong><span>{completeSteps} / {totalSteps} 步 · 完成只记为已学习</span></p>
+        <p><strong>{unit?.title ?? "当前单元"}</strong><span>{completeSteps} / {totalSteps} 步</span></p>
       </div>
     </ObjectShell>
   </ConversationCard>;

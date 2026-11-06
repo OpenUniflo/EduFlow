@@ -65,9 +65,9 @@ export function panelSectionSource(section: "courses" | "recent" | "practices" |
 }
 
 const statusLabels: Record<string, string> = {
-  learning: "学习中",
-  learned: "已学习",
-  practicing: "实训中"
+  learning: "在学",
+  learned: "已学",
+  practicing: "动手任务中"
 };
 
 export function buildPanelPeople(input: {
@@ -123,7 +123,7 @@ export function buildTeacherReminders(submissions: ReadonlyArray<{ status: strin
   return [
     {
       id: "pending-practices",
-      label: `待审核实践 · ${pending.length} 项`,
+      label: `待审核动手任务 · ${pending.length} 项`,
       count: pending.length,
       source: panelSectionSource("teacher")
     }

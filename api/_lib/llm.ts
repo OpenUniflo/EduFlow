@@ -50,6 +50,9 @@ export class OpenAICompatibleJsonGenerationClient implements StructuredGeneratio
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
       let response: Response;
       try {
+        // Countable per-attempt evidence for the bounded acceptance run. No
+        // prompt, output, or credential is logged.
+        console.info(`llm_model_request stage=${input.stage} attempt=${attempt} model=${this.config.llmModel}`);
         response = await this.request(`${this.config.llmBaseUrl}/chat/completions`, {
           method: "POST",
           headers: { Authorization: `Bearer ${this.config.llmApiKey}`, "Content-Type": "application/json" },

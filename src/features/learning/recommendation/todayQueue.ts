@@ -22,6 +22,8 @@ export function buildActiveLearningKnowledge(input: { runtimes: CourseRuntimeDat
   return input.userKnowledge.flatMap((record): ActiveLearningKnowledge[] => {
     const node = nodeById.get(record.nodeId);
     if (!node || node.status !== "active" || !activeStatuses.has(record.status)) return [];
-    return [{ knowledgeId: node.id, title: node.title, description: node.description, status: record.status as ActiveLearningKnowledge["status"], updatedAt: record.updatedAt, resources: projectKnowledgeLearningResources({ knowledgeId: node.id, runtimes: input.runtimes, courseStates: input.courseStates, microRepository: input.microRepository }) }];
+    const resources = projectKnowledgeLearningResources({ knowledgeId: node.id, runtimes: input.runtimes, courseStates: input.courseStates, microRepository: input.microRepository });
+    const path = resources.courseContexts.find((context) => context.micro.path)?.micro.path ?? resources.standalone.micro.path;
+    return [{ knowledgeId: node.id, title: path?.title ?? node.title, description: node.description, status: record.status as ActiveLearningKnowledge["status"], updatedAt: record.updatedAt, resources }];
   }).sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "") || left.title.localeCompare(right.title) || left.knowledgeId.localeCompare(right.knowledgeId));
 }

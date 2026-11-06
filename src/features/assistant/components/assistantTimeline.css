@@ -1,0 +1,110 @@
+/* Ordered assistant turn: text bubbles and answer cards interleave. */
+
+.ef-assistant-turn {
+  display: grid;
+  gap: var(--sp-8);
+  width: 100%;
+  padding-left: 30px;
+  box-sizing: border-box;
+}
+
+.ef-assistant-turn.is-action { padding-left: 0; }
+
+.ef-assistant-text {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  min-width: 0;
+}
+
+.ef-assistant-text .ef-home-assistant-mark { margin-top: 12px; flex: 0 0 auto; }
+.ef-assistant-text .ef-ui-bubble { max-width: min(100%, 760px); }
+.ef-assistant-text .ef-ui-bubble.is-continuation { margin-top: -4px; }
+
+.ef-assistant-text .ef-assistant-md { font-size: var(--fs-14); line-height: var(--lh-14); color: var(--ink); }
+.ef-assistant-text .ef-assistant-md > :first-child { margin-top: 0; }
+.ef-assistant-text .ef-assistant-md > :last-child { margin-bottom: 0; }
+.ef-assistant-md p { margin: 0 0 var(--sp-8); }
+.ef-assistant-md ul,
+.ef-assistant-md ol { margin: 0 0 var(--sp-8); padding-left: 1.35em; }
+.ef-assistant-md li { margin: 0 0 var(--sp-4); }
+.ef-assistant-md li::marker { color: var(--muted); }
+.ef-assistant-md strong { font-weight: var(--fw-600); color: var(--ink); }
+.ef-assistant-md h1,
+.ef-assistant-md h2,
+.ef-assistant-md h3,
+.ef-assistant-md h4 { margin: var(--sp-12) 0 var(--sp-8); font-size: var(--fs-16); line-height: var(--lh-16); font-weight: var(--fw-600); }
+.ef-assistant-md h1:first-child,
+.ef-assistant-md h2:first-child,
+.ef-assistant-md h3:first-child,
+.ef-assistant-md h4:first-child { margin-top: 0; }
+.ef-assistant-md blockquote { margin: 0 0 var(--sp-8); padding: var(--sp-4) var(--sp-12); border-left: 3px solid var(--line-strong); color: var(--ink-2); }
+.ef-assistant-md code { padding: 1px 5px; border-radius: var(--r-8); background: var(--page); font-size: var(--fs-13); }
+.ef-assistant-md pre { margin: 0 0 var(--sp-8); padding: var(--sp-12); border-radius: var(--r-12); background: var(--page); overflow-x: auto; }
+.ef-assistant-md pre code { padding: 0; background: transparent; }
+.ef-assistant-md a { color: var(--brand-ink); text-decoration: underline; text-underline-offset: 2px; }
+.ef-assistant-md-table { width: 100%; overflow-x: auto; margin: 0 0 var(--sp-8); }
+.ef-assistant-md-table table { width: 100%; border-collapse: collapse; font-size: var(--fs-13); line-height: var(--lh-13); }
+.ef-assistant-md-table th,
+.ef-assistant-md-table td { padding: var(--sp-4) var(--sp-8); border: 1px solid var(--line); text-align: left; }
+.ef-assistant-md-table th { background: var(--page); font-weight: var(--fw-600); }
+.ef-assistant-md hr { border: 0; border-top: 1px solid var(--line); margin: var(--sp-12) 0; }
+
+.ef-assistant-md.is-streaming > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  background: var(--brand);
+  animation: ef-assistant-caret var(--dur-slow) steps(2, start) infinite;
+}
+
+@keyframes ef-assistant-caret { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .ef-assistant-md.is-streaming > :last-child::after { animation: none; }
+}
+
+.ef-assistant-action-row { margin: 0; }
+.ef-assistant-action-copy { font-size: var(--fs-13); line-height: var(--lh-13); color: var(--ink-2); }
+.ef-assistant-turn.is-action + .ef-ui-conversation-card,
+.ef-assistant-turn.is-action .ef-ui-conversation-card { margin-top: var(--sp-8); }
+
+@media (max-width: 1280px) {
+  .ef-assistant-turn { padding-left: 0; }
+}
+
+/* Restored goal-card actions in the unified timeline. */
+.ef-legacy-goal-actions,
+.ef-legacy-goal-footer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); margin-top: var(--sp-8); }
+.ef-home-structured-card li .ef-legacy-goal-actions button {
+  width: auto;
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  padding: 0 var(--sp-12);
+}
+.ef-home-structured-card li .ef-legacy-goal-actions button.ef-ui-btn--primary { background: var(--brand); border-color: var(--brand); color: var(--surface); }
+.ef-home-structured-card li .ef-legacy-goal-actions button:hover { border-color: var(--brand); background: var(--brand-soft); }
+.ef-home-structured-card li .ef-legacy-goal-actions button.ef-ui-btn--primary:hover { background: var(--brand-ink); color: var(--surface); }
+.ef-legacy-goal-refine { display: grid; gap: var(--sp-8); margin-top: var(--sp-8); padding-top: var(--sp-8); border-top: 1px solid var(--line); }
+.ef-legacy-goal-refine label { display: grid; gap: var(--sp-4); font-size: var(--fs-12); line-height: var(--lh-12); color: var(--ink-2); }
+.ef-legacy-goal-refine textarea { min-height: 64px; resize: vertical; padding: var(--sp-8); border: 1px solid var(--line-strong); border-radius: var(--r-12); background: var(--surface); color: var(--ink); font: inherit; }
+.ef-legacy-goal-refine fieldset { display: flex; flex-wrap: wrap; gap: var(--sp-12); border: 0; padding: 0; margin: 0; }
+.ef-legacy-goal-refine fieldset label { display: inline-flex; align-items: center; gap: var(--sp-4); }
+
+/* Button actions are timeline events, not learner chat bubbles. */
+.ef-assistant-action-user-row {
+  display: flex;
+  justify-content: center;
+  margin: var(--sp-12) 0;
+  padding: 0 var(--sp-8);
+}
+
+.ef-assistant-action-user-row span {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}

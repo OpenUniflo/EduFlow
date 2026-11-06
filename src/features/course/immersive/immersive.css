@@ -3220,7 +3220,7 @@ body:has(.ef-imm-page) {
   pointer-events: none;
 }
 
-.ef-imm-route-canvas {
+.ef-imm-route-band-canvas {
   position: absolute;
   inset: 0;
   width: 100%;

@@ -333,12 +333,12 @@ function TimelineCard({ data, groups, today, expandedId, onToggle, loadingMore, 
       ? <div className="ef-rec-state">
           <History size={30} aria-hidden="true" />
           <h2>{data.summary.totalActivities === 0 ? "还没有学习记录" : "没有匹配的记录"}</h2>
-          <p>{data.summary.totalActivities === 0 ? "完成一次微学习、提交实践或调整个人路线后，记录会出现在这里。" : "换一个类型、课程或时间范围试试。"}</p>
+          <p>{data.summary.totalActivities === 0 ? "完成一次小练习、提交动手任务或调整个人路线后，记录会出现在这里。" : "换一个类型、课程或时间范围试试。"}</p>
           <div className="ef-rec-state-actions">
             {filtering
               ? <Button variant="secondary" onClick={onReset}>清除筛选</Button>
               : <>
-                  <Link className="ef-ui-btn ef-ui-btn--secondary" to="/archive">去档案看看</Link>
+                  <Link className="ef-ui-btn ef-ui-btn--secondary" to="/archive">去我的地图看看</Link>
                   <Link className="ef-ui-btn ef-ui-btn--primary" to="/">回首页开始学习</Link>
                 </>}
           </div>
@@ -395,7 +395,7 @@ function EventRow({ event, timeZone, expanded, onToggle }: {
       {event.feedback?.items.length ? <ul className="ef-rec-feedback-items">
         {event.feedback.items.map((item, index) => <li key={`${item.label}:${index}`}><span>{item.label}</span>{item.value ? <b>{item.value}</b> : null}</li>)}
       </ul> : null}
-      {!event.feedback?.summary && !event.feedback?.comment && !event.feedback?.items.length ? <p>本次评价没有附带文字依据，可打开实践查看完整结果。</p> : null}
+      {!event.feedback?.summary && !event.feedback?.comment && !event.feedback?.items.length ? <p>本次评价没有附带文字依据，可打开动手任务查看完整结果。</p> : null}
       {event.links.length ? <div className="ef-rec-expand-actions">
         {event.links.map((link) => <Link key={`${link.kind}:${link.to}`} to={link.to}>
           {isEvaluation && link.kind === "practice" ? "查看评价" : link.label}

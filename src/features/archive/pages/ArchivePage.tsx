@@ -683,7 +683,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
         <section className="ef-archive-loading-card" role="status" aria-live="polite">
           <span className="ef-archive-loading-spinner" aria-hidden />
           <h1>正在生成星图</h1>
-          <p>正在按知识关系计算三维布局，完成后会自动进入档案。</p>
+          <p>正在按知识关系计算三维布局，完成后会自动进入我的地图。</p>
           <small>{layoutCached ? "已读取缓存，正在准备画面…" : "首次进入需要计算一次，之后会直接命中缓存。"}</small>
         </section>
       </main>

@@ -1,10 +1,11 @@
 import { lazy, Suspense } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { canDesignCourse } from "@/features/auth/capabilities";
 import type { MockSession } from "@/features/auth/types";
 import type { MicroLearningProvider } from "@/features/learning/micro/microLearning";
 import type { CourseDesignAssistantProvider } from "@/features/course/courseDesignAssistant";
 import { readCourseEnterSnapshot } from "../immersive/courseTransition";
+import { CourseLearnerRoutePage } from "./CourseLearnerRoutePage";
 
 export type CourseGraphPageProps = {
   session: MockSession | null;
@@ -64,13 +65,22 @@ function CourseRouteLoading({ courseId }: { courseId: string }) {
  */
 export function CourseGraphPage(props: CourseGraphPageProps) {
   const { courseId = "" } = useParams();
-  const designRoute = new URLSearchParams(window.location.search).get("experience") === "design";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const designRoute = searchParams.get("experience") === "design";
   const design = designRoute && canDesignCourse(props.session);
+  const tree = searchParams.get("view") === "course";
+  if (!design && !tree) {
+    return <CourseLearnerRoutePage
+      courseId={courseId}
+      session={props.session}
+      onOpenTree={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set("view", "course"); return next; })}
+    />;
+  }
   return (
     <Suspense fallback={<CourseRouteLoading courseId={courseId} />}>
       {design
         ? <CourseStudioPage key={`studio:${courseId}:${props.session?.userId ?? "anonymous"}`} {...props} />
-        : <LearnerCourseImmersivePage key={`learn:${courseId}:${props.session?.userId ?? "anonymous"}`} session={props.session} onLogout={props.onLogout} microLearningProvider={props.microLearningProvider} />}
+        : <LearnerCourseImmersivePage key={`learn:${courseId}:${props.session?.userId ?? "anonymous"}`} session={props.session} onLogout={props.onLogout} microLearningProvider={props.microLearningProvider} initialView="course" hideRouteView onBackToRoute={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.delete("view"); return next; })} />}
     </Suspense>
   );
 }

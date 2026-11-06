@@ -65,7 +65,10 @@
   transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
 
-.ef-home-panel-toggle:hover,
+.ef-home-panel-toggle:hover {
+  border-color: color-mix(in srgb, var(--brand) 34%, transparent);
+}
+
 .ef-home-panel-toggle.is-open {
   border-color: color-mix(in srgb, var(--brand) 34%, transparent);
   background: var(--brand-soft);
@@ -141,10 +144,20 @@
   position: relative;
   display: flex;
   min-width: 0;
+  flex: 1 1 0;
   flex-direction: column;
   gap: var(--sp-4);
+  overflow: hidden;
   color: var(--muted);
   font-size: var(--fs-12);
+  white-space: nowrap;
+}
+
+.ef-home-chapter-track small {
+  overflow: hidden;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -494,7 +507,7 @@
   min-height: 0;
   flex-direction: column;
   gap: var(--sp-12);
-  padding: var(--sp-4) var(--sp-4) var(--sp-16);
+  padding: var(--sp-4) var(--sp-4) var(--sp-32);
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -935,6 +948,38 @@
   padding: var(--sp-16);
 }
 
+.ef-home-micro-panel-state {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-16);
+  padding: var(--sp-8) 0 var(--sp-4);
+}
+
+.ef-home-micro-panel-description {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-home-micro-panel-state .ef-home-micro-cta {
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.ef-home-micro-panel-state .ef-home-micro-cta .ef-ui-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.ef-home-micro-panel-state .ef-home-micro-complete {
+  width: 100%;
+}
+
 .ef-home-micro-head {
   display: flex;
   flex-direction: column;
@@ -1087,14 +1132,14 @@
   height: 100%;
 }
 
-.ef-home-micro.is-panel {
+.ef-home-micro.is-panel-complex {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
   gap: var(--sp-16);
   align-items: start;
 }
 
-.ef-home-micro.is-panel .ef-home-micro-rail {
+.ef-home-micro.is-panel-complex .ef-home-micro-rail {
   max-height: none;
 }
 
@@ -2329,3 +2374,462 @@
   background: var(--surface);
   box-shadow: var(--sh-1);
 }
+
+/* Completion actions inside the right Micro panel reuse the immersive rhythm. */
+.ef-home-micro-panel-state .micro-completion-context{
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding-top: var(--sp-12);
+  border-top: 1px solid var(--line);
+}
+.ef-home-micro-panel-state .micro-completion-context h2{
+  margin: 0 0 var(--sp-4);
+  color: var(--ink);
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+}
+.ef-home-micro-panel-state .micro-completion-context > button{
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  text-align: left;
+}
+.ef-home-micro-panel-state .micro-completion-context button span{
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+.ef-home-micro-panel-state .micro-completion-context button span strong{
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+.ef-home-micro-panel-state .micro-completion-context button svg{ flex: 0 0 auto; }
+
+/* Inline Micro: fixed action row in the shell footer (panel) and a stable
+ * feedback slot + sticky actions inside the conversation card. */
+.ef-home-micro-foot-actions {
+  display: flex;
+  min-height: var(--ctl-32);
+  flex: 1;
+  justify-content: flex-end;
+}
+.ef-home-micro-foot-actions .ef-micro-foot {
+  justify-content: flex-end;
+}
+.ef-home-micro .micro-feedback-slot {
+  box-sizing: border-box;
+  min-height: 84px;
+  margin-top: var(--sp-12);
+}
+.ef-home-micro .micro-feedback-slot .micro-feedback {
+  margin-top: 0;
+}
+.ef-home-micro .micro-card {
+  padding-bottom: calc(var(--sp-24) + 64px);
+}
+.ef-home-micro .micro-card footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin-top: var(--sp-12);
+  padding: var(--sp-12) 0 var(--sp-4);
+  background: var(--surface);
+}
+.ef-home-micro .micro-card footer .ef-micro-foot-gap {
+  flex: 1;
+}
+
+.ef-home-micro-card .micro-feedback {
+  padding: var(--sp-8);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+/* "Back to latest" stays in the composer area, never in the message flow. */
+.ef-home-composer { position: relative; }
+.ef-home-jump-row {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-4) 0 var(--sp-8);
+}
+.ef-home-jump {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: var(--ctl-32);
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  box-shadow: var(--sh-2);
+  cursor: pointer;
+  z-index: 2;
+}
+.ef-home-jump:hover { border-color: var(--brand); color: var(--brand-ink); }
+.ef-home-jump:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ---------- Stage 4 conversation mainline ---------- */
+.ef-home.has-route {
+  --side-w: 560px;
+  padding-right: var(--sp-20);
+}
+
+.ef-home.has-route .ef-home-head {
+  padding-right: calc(var(--side-w) + var(--sp-20));
+}
+
+.ef-home.has-route .ef-home-work {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding-right: calc(var(--side-w) + var(--sp-20));
+}
+
+.ef-home.has-route .ef-home-route-panel {
+  position: fixed;
+  top: var(--panel-top);
+  right: var(--panel-right);
+  bottom: var(--panel-bottom);
+  z-index: 20;
+  width: var(--side-w);
+}
+
+.ef-home-fresh {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: var(--sp-16) 0 var(--sp-24);
+}
+
+.ef-home-fresh-inner {
+  display: flex;
+  width: min(640px, 100%);
+  flex-direction: column;
+  gap: var(--sp-16);
+  padding: var(--sp-8);
+}
+
+.ef-home-fresh h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+  font-weight: var(--fw-700);
+  letter-spacing: -.02em;
+  text-align: center;
+}
+
+.ef-home-fresh-sub {
+  margin: -8px 0 0;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.ef-home-example-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-8);
+}
+
+.ef-home-return {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: var(--sp-16) 0 var(--sp-24);
+}
+
+.ef-home-return-inner {
+  display: flex;
+  width: min(640px, 100%);
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+
+.ef-home-return-copy h1 {
+  margin: 0;
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+  font-weight: var(--fw-700);
+  letter-spacing: -.02em;
+}
+
+.ef-home-return-copy p {
+  margin: var(--sp-4) 0 0;
+  color: var(--ink-2);
+}
+
+.ef-home-return-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--surface);
+  box-shadow: var(--sh-2);
+}
+
+.ef-home-return-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  border-radius: var(--r-12);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-home-return-copy-step {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-home-return-copy-step small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-home-return-copy-step strong {
+  overflow: hidden;
+  font-size: var(--fs-16);
+  line-height: var(--lh-16);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-home-return-links {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-8);
+}
+
+.ef-home-text-action {
+  min-height: 32px;
+  padding: 0 var(--sp-8);
+  border: 0;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--brand-ink);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-home-text-action:hover {
+  background: var(--brand-soft);
+}
+
+/* Next-step strip: one main action, above the composer. */
+.ef-home-next-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  width: 100%;
+  padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-16);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--sh-1);
+}
+
+.ef-home-next-strip .ef-home-next-label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  white-space: nowrap;
+}
+
+.ef-home-next-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ef-home-next-copy strong {
+  overflow: hidden;
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-home-next-copy small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-home-next-strip .ef-home-text-action {
+  flex: 0 0 auto;
+  color: var(--ink-2);
+}
+
+/* Route side panel */
+.ef-home-route-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: var(--sh-2);
+}
+
+.ef-home-route-panel-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: var(--sp-16);
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-home-route-panel-head > div { min-width: 0; flex: 1; }
+.ef-home-route-panel-head span { color: var(--muted); font-size: var(--fs-12); }
+.ef-home-route-panel-head h2 { margin: 2px 0 0; font-size: var(--fs-20); line-height: var(--lh-20); }
+
+.ef-home-route-panel-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--sp-16);
+}
+
+.ef-home-route-panel-foot {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-16);
+  border-top: 1px solid var(--line);
+}
+
+.ef-home-route-panel-foot > span { color: var(--muted); font-size: var(--fs-12); }
+
+.ef-home.has-panel .ef-home-fresh { display: none; }
+
+@media (max-width: 1180px) {
+  .ef-home.has-route { --side-w: 380px; }
+}
+
+@media (max-width: 900px) {
+  .ef-home.has-route { padding-right: var(--sp-12); }
+  .ef-home.has-route .ef-home-head { padding-right: 0; }
+  .ef-home.has-route .ef-home-work { padding-right: 0; }
+  .ef-home.has-route .ef-home-route-panel { position: static; width: 100%; max-height: 70dvh; }
+}
+
+/* ---------- Stage 4 My panel: read-only overview + conversations ---------- */
+.ef-my-conversation-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  width: 100%;
+  min-height: 36px;
+  margin-bottom: var(--sp-8);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-12);
+  background: var(--surface);
+  color: var(--brand-ink);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-my-conversation-new:hover { border-color: var(--brand); background: var(--brand-soft); }
+
+.ef-my-conversation-list { display: flex; flex-direction: column; gap: 2px; }
+
+.ef-my-conversation {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  width: 100%;
+  padding: var(--sp-8) var(--sp-12);
+  border: 0;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.ef-my-conversation:hover { background: var(--page); }
+.ef-my-conversation.is-active { background: var(--brand-soft); color: var(--brand-ink); }
+.ef-my-conversation > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 1px; }
+.ef-my-conversation strong { overflow: hidden; font-size: var(--fs-13); font-weight: var(--fw-600); text-overflow: ellipsis; white-space: nowrap; }
+.ef-my-conversation small { color: var(--muted); font-size: var(--fs-12); }
+
+.ef-my-course-overview,
+.ef-my-task,
+.ef-my-recent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  padding: var(--sp-8) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ef-my-course-overview:last-child,
+.ef-my-task:last-child,
+.ef-my-recent-row:last-child { border-bottom: 0; }
+
+.ef-my-course-overview > span,
+.ef-my-task > span,
+.ef-my-recent-row > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 1px; }
+.ef-my-course-overview strong,
+.ef-my-task strong,
+.ef-my-recent-row strong { overflow: hidden; font-size: var(--fs-13); font-weight: var(--fw-600); text-overflow: ellipsis; white-space: nowrap; }
+.ef-my-course-overview small,
+.ef-my-task small,
+.ef-my-recent-row small { color: var(--muted); font-size: var(--fs-12); }
+.ef-my-course-bar { width: 88px; height: 6px; flex: 0 0 88px; overflow: hidden; border-radius: var(--r-full); background: var(--line); }
+.ef-my-course-bar i { display: block; height: 100%; border-radius: var(--r-full); background: var(--brand); }
+
+.ef-home-next-error { display: flex; align-items: center; gap: var(--sp-8); margin: 0; padding: var(--sp-8) var(--sp-12); border-radius: var(--r-8); background: var(--warn-soft); color: var(--warn); font-size: var(--fs-12); }
+.ef-home-next-error button { border: 0; background: transparent; color: inherit; font-weight: var(--fw-600); text-decoration: underline; }
+.ef-home-next-working { flex: 0 0 auto; color: var(--brand-ink); font-size: var(--fs-12); font-weight: var(--fw-600); white-space: nowrap; }
+
+/* While a side surface owns the current action, conversation cards must not
+   paint a second main-colour action. They stay clickable but read secondary. */
+.ef-home[data-strip="1"]:not(:has(.ef-assistant-micro-body)) .ef-home-timeline .ef-ui-btn--primary,
+.ef-home.has-panel .ef-home-timeline .ef-ui-btn--primary,
+.ef-home.has-workspace .ef-home-timeline .ef-ui-btn--primary,
+.ef-home.has-route .ef-home-timeline .ef-ui-btn--primary {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--brand-ink);
+  box-shadow: none;
+}
+
+/* An open inline Micro owns the action; the strip steps out of the way. */
+.ef-home:has(.ef-assistant-micro-body) .ef-home-next-strip {
+  display: none;
+}
+.ef-home-workspace.is-hidden { display: none; }

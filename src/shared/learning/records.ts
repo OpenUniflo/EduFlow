@@ -826,7 +826,7 @@ export function mapRecordEvents(input: RecordMappingInput): RecordEvent[] {
     const chapterNumber = courseId ? chapterByNode.get(key(courseId, nodeId)) : undefined;
     const links: RecordLink[] = [];
     const seen = new Set<string>();
-    if (path && text(path, "status") === "published") addLink(links, seen, { kind: "micro", label: "打开微学习", to: microPath(nodeId, courseId, text(path, "id")) });
+    if (path && text(path, "status") === "published") addLink(links, seen, { kind: "micro", label: "打开小练习", to: microPath(nodeId, courseId, text(path, "id")) });
     if (courseId && courseTitle.has(courseId)) addLink(links, seen, { kind: "course", label: "打开课程", to: coursePath(courseId) });
     if (nodeId && knowledgeTitle.has(nodeId)) addLink(links, seen, { kind: "knowledge", label: "查看知识", to: knowledgePath(courseId, nodeId) });
     const estimatedMinutes = numberValue(path, "estimated_minutes");
@@ -834,7 +834,7 @@ export function mapRecordEvents(input: RecordMappingInput): RecordEvent[] {
       id: `micro:${text(evidence, "id")}`,
       type: "micro",
       occurredAt,
-      title: knowledgeTitle.get(nodeId) || text(path, "title") || "微学习",
+      title: knowledgeTitle.get(nodeId) || text(path, "title") || "小练习",
       ...(courseId ? { courseId } : {}),
       ...(course ? { courseTitle: course } : {}),
       status: "learned",

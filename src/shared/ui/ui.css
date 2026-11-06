@@ -688,13 +688,13 @@
   gap: var(--sp-12);
   flex: 1;
   min-height: 0;
-  padding: 0 var(--sp-16);
+  padding: 0 var(--sp-16) var(--sp-16);
   overflow: auto;
 }
 
 .ef-ui-obj--s .ef-ui-obj-body {
   gap: var(--sp-8);
-  padding: 0 var(--sp-12);
+  padding: 0 var(--sp-12) var(--sp-12);
 }
 
 .ef-ui-obj-body--immersive {
@@ -953,11 +953,15 @@
 
 .ef-ui-composer-contexts {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--sp-8);
   margin-bottom: var(--sp-8);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.ef-ui-composer-contexts::-webkit-scrollbar { display: none; }
+.ef-ui-composer-contexts .ef-ui-ctx { flex: 0 1 auto; min-width: 0; max-width: 46%; }
 
 .ef-ui-composer-bar {
   display: flex;
@@ -1352,4 +1356,15 @@
   .ef-ui-account {
     width: min(320px, calc(100vw - 32px));
   }
+}
+
+/* The rounded field wrapper owns the focus ring; the inner control must not
+   draw a second square outline inside it. */
+.ef-ui-field .ef-ui-input:focus-visible,
+.ef-ui-field .ef-ui-textarea:focus-visible {
+  outline: none;
+}
+
+.ef-ui-field:focus-within {
+  border-color: var(--brand);
 }

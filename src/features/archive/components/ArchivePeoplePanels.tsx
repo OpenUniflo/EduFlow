@@ -20,7 +20,7 @@ function shortName(person: FollowedPerson) {
 function statusLabel(status: ArchiveNode["status"]) {
   if (status === "learning") return "在学";
   if (status === "learned") return "已学";
-  if (status === "practicing") return "实训中";
+  if (status === "practicing") return "动手任务中";
   if (status === "mastered") return "已掌握";
   return "可探索";
 }
@@ -80,19 +80,19 @@ export function ArchivePersonPanel({ model, people, view, sessionName, collapsed
     return (
       <button type="button" className="ef-atlas-strip ef-ui-glass ef-ui-glass--regular" onClick={onExpandStrip} aria-label="展开个人面板">
         {single ? <Avatar name={view === "me" ? sessionName : single.name} size={28} personColor={single.accent as "me" | "orange" | "cyan" | "rose"} decorative /> : <Users size={16} aria-hidden />}
-        <b>{view === "compare" ? `对比 · ${people.length} 人` : view === "me" ? "我的面板" : `${single?.name ?? ""} 的档案`}</b>
+        <b>{view === "compare" ? `对比 · ${people.length} 人` : view === "me" ? "我的面板" : `${single?.name ?? ""} 的地图`}</b>
         <span>展开</span>
       </button>
     );
   }
 
   return (
-    <aside className="ef-atlas-panel ef-atlas-person-panel ef-ui-glass ef-ui-glass--regular" aria-label={view === "compare" ? "对比面板" : view === "me" ? "我的面板" : "个人档案面板"}>
+    <aside className="ef-atlas-panel ef-atlas-person-panel ef-ui-glass ef-ui-glass--regular" aria-label={view === "compare" ? "对比面板" : view === "me" ? "我的面板" : "个人地图面板"}>
       <header className="ef-atlas-panel-head">
         {view === "compare" ? <span className="ef-atlas-panel-avatar"><Users size={20} aria-hidden /></span> : <Avatar name={view === "me" ? sessionName : single?.name ?? ""} size={40} personColor={(single?.accent ?? "me") as "me" | "orange" | "cyan" | "rose"} decorative />}
         <div className="ef-atlas-panel-title">
           <h2>{view === "compare" ? `对比 · ${people.map((person) => person.name).join(" 与 ")}` : view === "me" ? "我" : single?.name}</h2>
-          <p>{view === "me" ? `我的档案 · 本周学习 ${model.stats.weekDays} 天` : view === "compare" ? "节点外环按人物颜色分段" : "公开档案 · 预览 · 示例数据"}</p>
+          <p>{view === "me" ? `我的地图 · 本周学习 ${model.stats.weekDays} 天` : view === "compare" ? "节点外环按人物颜色分段" : "公开地图 · 预览 · 示例数据"}</p>
         </div>
         <button type="button" className="ef-atlas-icon-btn" onClick={onCollapse} aria-label="收起个人面板"><Minus size={15} aria-hidden /></button>
       </header>
@@ -224,7 +224,7 @@ export function ArchivePeopleSharePanel({ people, sessionName, collapsed, onExpa
         ))}
       </section>
       <section className="ef-atlas-panel-section">
-        <h3>谁能看到我的档案</h3>
+        <h3>谁能看到我的地图</h3>
         <div className="ef-atlas-seg">
           {scopes.map((item) => <button type="button" key={item.id} className={scope === item.id ? "is-on" : ""} onClick={() => setScope(item.id)} aria-pressed={scope === item.id}>{item.label}</button>)}
         </div>
@@ -237,7 +237,7 @@ export function ArchivePeopleSharePanel({ people, sessionName, collapsed, onExpa
         {shareCreated ? <button type="button" className="ef-atlas-mini-btn" onClick={() => { setShareCreated(false); setError("已撤销示例链接。"); }}>撤销</button> : null}
         {error ? <p className="ef-atlas-panel-note" role="status">{error}</p> : null}
       </section>
-      <footer className="ef-atlas-panel-foot"><span className="ef-atlas-panel-note"><Lock size={11} aria-hidden />示例身份 · 只读预览</span><span className="ef-atlas-panel-note">{sessionName} 的档案</span></footer>
+      <footer className="ef-atlas-panel-foot"><span className="ef-atlas-panel-note"><Lock size={11} aria-hidden />示例身份 · 只读预览</span><span className="ef-atlas-panel-note">{sessionName} 的地图</span></footer>
     </aside>
   );
 }

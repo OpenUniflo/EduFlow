@@ -1,16 +1,20 @@
-import { AlertTriangle, ArrowRight, BookOpen, RefreshCw, Sparkles, Target } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import type { AssistantMessage } from "@/features/assistant/assistantContract";
-import { Bubble, ConversationCard, EventRow } from "@/shared/ui/Conversation";
+import { AlertTriangle, ArrowRight, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import type { AssistantUIMessage } from "@/features/assistant/AssistantRuntimeContext";
+import type { AssistantCardActions } from "@/features/assistant/cards/AssistantCardView";
+import { AssistantTimeline } from "@/features/assistant/components/AssistantTimeline";
+import type { MockSession } from "@/features/auth/types";
+import { Bubble, ConversationCard } from "@/shared/ui/Conversation";
 import { HomeComposer, type ComposerContext } from "@/shared/ui/HomeComposer";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
-import { Pill } from "@/shared/ui/Pill";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
 import { archiveHref } from "@/features/archive/model/atlasParams";
+import { useNavigate } from "react-router-dom";
 
 export type HomeConversationProps = {
-  messages: AssistantMessage[];
+  messages: AssistantUIMessage[];
+  session: MockSession;
+  cardActions: AssistantCardActions;
   loading: boolean;
   sending: boolean;
   error: string;
@@ -18,137 +22,190 @@ export type HomeConversationProps = {
   onRemoveContext: (id: string) => void;
   onSend: (message: string) => Promise<boolean> | boolean;
   suggestions: string[];
-  todayCard?: ReactNode;
-  eventRow?: ReactNode;
-  coursePreview?: ReactNode;
-  microCard?: ReactNode;
   previewPerson: FollowedPerson | null;
   onRetry: () => void;
+  /** The one next-step entry sits above the composer, never in the page header. */
+  composerHeader?: ReactNode;
+  /** Starter hint belongs to the first-run Home only. */
+  showStarterHint?: boolean;
 };
 
-/** Home conversation workbench. It uses the Global Assistant session and never writes directly. */
-export function HomeConversation({ messages, loading, sending, error, contexts, onRemoveContext, onSend, suggestions, todayCard, eventRow, coursePreview, microCard, previewPerson, onRetry }: HomeConversationProps) {
-  const navigate = useNavigate();
+/** Home conversation workbench. It renders the Global Assistant timeline and never writes directly. */
+export function HomeConversation({ messages, session, cardActions, loading, sending, error, contexts, onRemoveContext, onSend, suggestions, previewPerson, onRetry, composerHeader, showStarterHint = false }: HomeConversationProps) {
   const timelineRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!messages.length && !sending) return;
+  const stickToLatest = useRef(true);
+  const programmaticUntil = useRef(0);
+  const [showJump, setShowJump] = useState(false);
+  const lastCount = useRef(0);
+  const lastSignature = useRef("");
+  const lastAssistantId = useRef<string | null>(null);
+  const pinReplyStart = useRef(false);
+
+  const signature = messages.map((message) => `${message.id}:${(message.parts ?? []).length}`).join("|");
+
+  const setScroll = useCallback((top: number) => {
     const node = timelineRef.current;
     if (!node) return;
-    node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
-  }, [messages.length, sending]);
+    programmaticUntil.current = performance.now() + 120;
+    node.scrollTop = Math.max(0, Math.min(top, node.scrollHeight - node.clientHeight));
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const node = timelineRef.current;
+    if (!node) return;
+    stickToLatest.current = true;
+    setShowJump(false);
+    programmaticUntil.current = performance.now() + (behavior === "smooth" ? 500 : 120);
+    node.scrollTo({ top: node.scrollHeight, behavior });
+  }, []);
+
+  const replyTurn = useCallback(() => {
+    const node = timelineRef.current;
+    if (!node) return null;
+    const turns = node.querySelectorAll<HTMLElement>(".ef-assistant-turn");
+    return turns.length ? turns[turns.length - 1] : null;
+  }, []);
+
+  /** Short replies stay fully visible; long replies keep their first line at the top. */
+  const positionCurrentReply = useCallback(() => {
+    // While the model is streaming, the reply start stays pinned; new text
+    // grows below. Settle only when the answer finishes.
+    if (sending) return;
+    const node = timelineRef.current;
+    const turn = replyTurn();
+    if (!node || !turn || !stickToLatest.current) return;
+    const available = node.clientHeight - 24;
+    const turnHeight = turn.getBoundingClientRect().height;
+    if (turnHeight <= available || !pinReplyStart.current) {
+      scrollToBottom("auto");
+      return;
+    }
+    const top = turn.getBoundingClientRect().top - node.getBoundingClientRect().top + node.scrollTop - 12;
+    setScroll(top);
+    setShowJump(false);
+  }, [replyTurn, scrollToBottom, sending, setScroll]);
+
+  const markUserScroll = useCallback(() => {
+    const node = timelineRef.current;
+    if (!node) return;
+    if (node.scrollHeight - node.scrollTop - node.clientHeight > 96) {
+      stickToLatest.current = false;
+      setShowJump(true);
+    }
+  }, []);
+
+  const onScroll = useCallback(() => {
+    const node = timelineRef.current;
+    if (!node) return;
+    if (performance.now() < programmaticUntil.current) return;
+    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    if (distance < 96) {
+      stickToLatest.current = true;
+      setShowJump(false);
+      return;
+    }
+    stickToLatest.current = false;
+    setShowJump(node.scrollHeight > node.clientHeight + 120);
+  }, []);
+
+  useEffect(() => {
+    const node = timelineRef.current;
+    if (!node) return;
+    const firstLoad = lastCount.current === 0 && messages.length > 0;
+    const grew = messages.length > lastCount.current || signature !== lastSignature.current;
+    const last = messages[messages.length - 1];
+    lastCount.current = messages.length;
+    lastSignature.current = signature;
+    if (!grew) return;
+    if (firstLoad) {
+      pinReplyStart.current = false;
+      scrollToBottom("auto");
+      lastAssistantId.current = last?.role === "assistant" ? last.id : null;
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => positionCurrentReply()));
+      window.setTimeout(positionCurrentReply, 240);
+      window.setTimeout(positionCurrentReply, 700);
+      return;
+    }
+    if (last?.role === "user") {
+      if (stickToLatest.current) scrollToBottom("auto");
+      return;
+    }
+    if (last?.role === "assistant" && last.id !== lastAssistantId.current) {
+      lastAssistantId.current = last.id;
+      pinReplyStart.current = true;
+      if (stickToLatest.current) {
+        const nodeTop = node.getBoundingClientRect().top;
+        const turn = replyTurn();
+        if (turn) setScroll(turn.getBoundingClientRect().top - nodeTop + node.scrollTop - 12);
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => positionCurrentReply()));
+      }
+    }
+  }, [messages, positionCurrentReply, replyTurn, scrollToBottom, sending, setScroll, signature]);
+
+  useEffect(() => {
+    if (sending) return;
+    const frame = window.requestAnimationFrame(() => window.requestAnimationFrame(() => positionCurrentReply()));
+    const timers = [180, 600].map((delay) => window.setTimeout(positionCurrentReply, delay));
+    return () => { window.cancelAnimationFrame(frame); timers.forEach((timer) => window.clearTimeout(timer)); };
+  }, [positionCurrentReply, sending]);
+
+  // Reliable follow: a size/mutation observer catches streaming text and async
+  // card hydration. No timed pin: once the learner scrolls up, stick is false.
+  useEffect(() => {
+    const node = timelineRef.current;
+    if (!node) return;
+    let frame = 0;
+    const schedule = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        positionCurrentReply();
+      });
+    };
+    const resize = new ResizeObserver(schedule);
+    resize.observe(node);
+    const turn = replyTurn();
+    if (turn) resize.observe(turn);
+    const mutation = new MutationObserver(schedule);
+    mutation.observe(node, { childList: true, subtree: true, characterData: true });
+    schedule();
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      resize.disconnect();
+      mutation.disconnect();
+    };
+  }, [positionCurrentReply, replyTurn]);
 
   if (loading) return <HomeConversationSkeleton contexts={contexts} onRemoveContext={onRemoveContext} onSend={onSend} />;
+  const lastMessage = messages[messages.length - 1];
+  const awaitingReply = !sending && messages.length > 0 && lastMessage?.role === "user";
+  const emptyAssistant = !sending && lastMessage?.role === "assistant" && !(lastMessage.parts ?? []).some((part) => (
+    (part.type === "text" && Boolean((part as { text?: string }).text?.trim())) || part.type === "tool-displayCard"
+  ));
+  const visibleError = error || (emptyAssistant ? "助手这次没有生成有效回复，请重试。" : awaitingReply ? "回复没有完成。请重试。" : "");
 
   return <section className="ef-home-conversation" aria-label="EduFlow 对话">
-    <div className="ef-home-timeline" ref={timelineRef} aria-live="polite" aria-relevant="additions text" aria-busy={sending}>
+    <div className="ef-home-timeline" ref={timelineRef} onScroll={onScroll} onWheel={() => markUserScroll()} onTouchMove={() => markUserScroll()} onClickCapture={(event) => { if ((event.target as HTMLElement).closest(".ef-ui-conversation-card")) stickToLatest.current = false; }} aria-live="polite" aria-relevant="additions text" aria-busy={sending}>
       <div className="ef-home-day"><span>今天</span></div>
-      <Bubble from="assistant" meta={<AssistantMeta />}>
+      {!messages.length ? <Bubble from="assistant" meta={<AssistantMeta />}>
         <p className="ef-home-copy">你好，我是 EduFlow。先从你最想解决的一件事说起，哪怕还很模糊也可以。</p>
-        <p className="ef-home-copy ef-home-muted">我会读取你的真实学习上下文；任何学习状态变更仍需要预览、校验和你的确认。</p>
-      </Bubble>
-      {eventRow}
+        {showStarterHint ? <p className="ef-home-copy ef-home-muted">也可以直接点「带我从最简单的开始」，先做几个小练习。</p> : null}
+      </Bubble> : null}
       {previewPerson ? <PreviewPersonCard person={previewPerson} /> : null}
       {!messages.length ? <div className="ef-home-suggestions" aria-label="建议提问">{suggestions.map((prompt) => <button key={prompt} type="button" className="ef-ui-chip" onClick={() => void onSend(prompt)}>{prompt}</button>)}</div> : null}
-      {todayCard}
-      {messages.map((message) => <MessageRow key={message.id} message={message} />)}
-      {coursePreview}
-      {microCard}
-      {sending ? <EventRow icon={<Sparkles size={15} />} title="正在整理你的学习情况" detail="EduFlow 正在读取对话上下文…" className="ef-home-thinking" /> : null}
-      {error ? <div className="ef-home-error" role="alert"><AlertTriangle size={15} aria-hidden="true" /><span>{error}</span><button type="button" onClick={onRetry}><RefreshCw size={13} />重试</button></div> : null}
+      <AssistantTimeline messages={messages} session={session} actions={cardActions} sending={sending} />
+      {visibleError ? <div className="ef-home-error" role="alert"><AlertTriangle size={15} aria-hidden="true" /><span>{visibleError}</span><button type="button" onClick={onRetry}><RefreshCw size={13} />重试</button></div> : null}
     </div>
     <div className="ef-home-composer">
-      <HomeComposer contexts={contexts} onRemoveContext={onRemoveContext} onSubmit={(value) => void onSend(value)} disabled={sending} hint={<span>Enter 发送 · Shift + Enter 换行 · 助手只提议，变更需要预览与确认</span>} />
+      {composerHeader}
+      {showJump ? <div className="ef-home-jump-row"><button type="button" className="ef-home-jump" onClick={() => scrollToBottom("smooth")}>回到最新<span aria-hidden="true">↓</span></button></div> : null}
+      <HomeComposer contexts={contexts} onRemoveContext={onRemoveContext} onSubmit={(value) => void onSend(value)} disabled={sending} hint={<span>Enter 发送 · Shift + Enter 换行</span>} />
     </div>
   </section>;
 }
 
-function renderInline(text: string): ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part, index) => part.startsWith("**") && part.endsWith("**")
-    ? <strong key={`b${index}`}>{part.slice(2, -2)}</strong>
-    : <span key={`t${index}`}>{part}</span>);
-}
-
-/** Small, safe markdown subset for assistant replies; no raw HTML is rendered. */
-function renderAssistantText(text: string): ReactNode[] {
-  const output: ReactNode[] = [];
-  let list: string[] = [];
-  let table: string[][] = [];
-  let key = 0;
-  const flushList = () => {
-    if (!list.length) return;
-    output.push(<ul key={`ul${key++}`}>{list.map((item, index) => <li key={`li${index}`}>{renderInline(item)}</li>)}</ul>);
-    list = [];
-  };
-  const flushTable = () => {
-    if (!table.length) return;
-    const rows = table.filter((row) => !row.every((cell) => /^:?-{2,}:?$/.test(cell)));
-    output.push(<div className="ef-home-md-table" key={`tb${key++}`}>{rows.map((row, rowIndex) => <div key={`tr${rowIndex}`}>{row.map((cell, cellIndex) => <span key={`td${cellIndex}`}>{renderInline(cell)}</span>)}</div>)}</div>);
-    table = [];
-  };
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) { flushList(); flushTable(); continue; }
-    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
-      flushList();
-      table.push(trimmed.slice(1, -1).split("|").map((cell) => cell.trim()));
-      continue;
-    }
-    flushTable();
-    const heading = /^(#{1,4})\s+(.*)$/.exec(trimmed);
-    if (heading) { flushList(); output.push(<strong className="ef-home-md-heading" key={`h${key++}`}>{renderInline(heading[2])}</strong>); continue; }
-    const bullet = /^[-*]\s+(.*)$/.exec(trimmed);
-    if (bullet) { list.push(bullet[1]); continue; }
-    flushList();
-    output.push(<p key={`p${key++}`}>{renderInline(trimmed)}</p>);
-  }
-  flushList(); flushTable();
-  return output;
-}
-
 function AssistantMeta() {
-  return <span className="ef-home-assistant-meta"><Sparkles size={12} aria-hidden="true" />EduFlow Assistant</span>;
-}
-
-function MessageRow({ message }: { message: AssistantMessage }) {
-  const structured = message.structuredContent;
-  const [expanded, setExpanded] = useState(false);
-  const long = message.role === "assistant" && message.content.length > 620;
-  const text = long && !expanded ? `${message.content.slice(0, 620)}…` : message.content;
-  const content = <div className="ef-home-message-content">
-    {message.role === "assistant" ? <div className="ef-home-copy ef-home-rich">{renderAssistantText(text || "正在回复…")}</div> : <p className="ef-home-copy">{message.content}</p>}
-    {long ? <button type="button" className="ef-home-expand" onClick={() => setExpanded((value) => !value)}>{expanded ? "收起" : `展开全文 · ${message.content.length} 字`}</button> : null}
-    {structured?.type === "course_search" ? <CourseSearchMini content={structured} /> : null}
-    {structured?.type === "course_creation_brief" ? <BriefMini content={structured} /> : null}
-  </div>;
-  return <div className="ef-home-message-row" data-role={message.role}>
-    {message.role === "assistant" ? <span className="ef-home-assistant-mark" aria-hidden="true"><Sparkles size={14} /></span> : null}
-    <Bubble from={message.role} meta={formatTime(message.createdAt)}>{content}</Bubble>
-  </div>;
-}
-
-function CourseSearchMini({ content }: { content: Extract<NonNullable<AssistantMessage["structuredContent"]>, { type: "course_search" }> }) {
-  const navigate = useNavigate();
-  const matches = content.plan.matches.slice(0, 3);
-  return <ConversationCard size="s" label="课程匹配结果">
-    <div className="ef-home-structured-card">
-      <div className="ef-home-structured-head"><Target size={15} aria-hidden="true" /><strong>课程匹配</strong><Pill tone="brand">{matches.length} 门</Pill></div>
-      <p>{content.intentSummary}</p>
-      <ul>{matches.map((match) => <li key={match.courseId}><button type="button" onClick={() => navigate(`/courses/${encodeURIComponent(match.courseId)}`)}><span><strong>{match.courseTitle}</strong><small>目标覆盖 {Math.round(match.targetCoverage * 100)}% · 必要范围 {Math.round(match.requiredCoverage * 100)}%</small></span><ArrowRight size={14} aria-hidden="true" /></button></li>)}</ul>
-      {!matches.length ? <p className="ef-home-muted">当前没有匹配的课程，可以继续和助手讨论目标。</p> : null}
-    </div>
-  </ConversationCard>;
-}
-
-function BriefMini({ content }: { content: Extract<NonNullable<AssistantMessage["structuredContent"]>, { type: "course_creation_brief" }> }) {
-  const navigate = useNavigate();
-  return <ConversationCard size="s" label="课程创建简报">
-    <div className="ef-home-structured-card">
-      <div className="ef-home-structured-head"><BookOpen size={15} aria-hidden="true" /><strong>课程创建简报</strong></div>
-      <p>{content.goal}</p>
-      <p className="ef-home-muted">目标知识 {content.targetKnowledge.length} 项 · 参考{content.referenceMaterialIntent === "upload_in_creator" ? "资料将在创建页上传" : "资料暂无"}</p>
-      <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate(`/courses/create?briefId=${encodeURIComponent(content.briefId)}`)}>进入课程创建<ArrowRight size={13} /></button>
-    </div>
-  </ConversationCard>;
+  return <span className="ef-home-assistant-meta">EduFlow Assistant</span>;
 }
 
 function PreviewPersonCard({ person }: { person: FollowedPerson }) {
@@ -159,15 +216,15 @@ function PreviewPersonCard({ person }: { person: FollowedPerson }) {
       <div className="ef-home-person-inner">
         <div className="ef-home-person-head">
           <span className={`ef-home-person-avatar accent-${person.accent}`} aria-hidden="true">{person.displayName.replace("示例 · ", "").slice(0, 1) || "友"}</span>
-          <span><strong>{person.displayName} · 学习进度</strong><small>{person.handle} · 公开档案</small></span>
+          <span><strong>{person.displayName} · 学习进度</strong><small>{person.handle} · 公开地图</small></span>
           <PreviewBadge />
         </div>
-        {isPrivate ? <div className="ef-home-person-private"><strong>对方未公开学习进度</strong><p>可以请 TA 分享，或先查看公开档案。预览不会展示分数、失败尝试、对话或 AI 评价。</p></div> : <div className="ef-home-person-progress">
-          <div><span>公开进度</span><strong>{person.sharedKnowledgeCount} 个知识</strong></div>
+        {isPrivate ? <div className="ef-home-person-private"><strong>对方未公开学习进度</strong><p>可以请 TA 分享，或先查看公开地图。预览不会展示分数、失败尝试、对话或 AI 评价。</p></div> : <div className="ef-home-person-progress">
+          <div><span>公开进度</span><strong>{person.sharedKnowledgeCount} 个要点</strong></div>
           <div className="ef-home-person-bar" aria-hidden="true"><i style={{ width: `${Math.min(100, person.sharedKnowledgeCount * 6)}%` }} /></div>
           <p>{person.activityLabel}</p>
         </div>}
-        <div className="ef-home-person-actions"><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate(archiveHref({ panel: "people" }))}>查看档案</button><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => navigate(archiveHref({ panel: "people", compare: [person.id] }))}>在档案中对比<ArrowRight size={13} /></button></div>
+        <div className="ef-home-person-actions"><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate(archiveHref({ panel: "people" }))}>查看地图</button><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => navigate(archiveHref({ panel: "people", compare: [person.id] }))}>在地图中对比<ArrowRight size={13} /></button></div>
       </div>
     </ConversationCard>
   </div>;
@@ -179,15 +236,10 @@ export function HomeConversationSkeleton({ contexts, onRemoveContext, onSend }: 
       <div className="ef-home-skeleton-row"><span className="ef-home-skeleton-avatar" /><span className="ef-home-skeleton-bubble" /></div>
       <div className="ef-home-skeleton-row is-user"><span className="ef-home-skeleton-bubble short" /></div>
       <div className="ef-home-skeleton-row"><span className="ef-home-skeleton-avatar" /><span className="ef-home-skeleton-bubble tall" /></div>
-      <div className="ef-home-skeleton-row"><span className="ef-home-skeleton-avatar" /><span className="ef-home-skeleton-line">正在整理你的学习情况</span></div>
+      <div className="ef-home-skeleton-row"><span className="ef-home-skeleton-avatar" /><span className="ef-home-skeleton-line">正在准备回答…</span></div>
     </div>
     <div className="ef-home-composer">
-      <HomeComposer contexts={contexts} onRemoveContext={onRemoveContext} onSubmit={(value) => void onSend(value)} hint={<span>Enter 发送 · Shift + Enter 换行 · 助手只提议，变更需要预览与确认</span>} />
+      <HomeComposer contexts={contexts} onRemoveContext={onRemoveContext} onSubmit={(value) => void onSend(value)} hint={<span>Enter 发送 · Shift + Enter 换行</span>} />
     </div>
   </section>;
-}
-
-function formatTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "已读" : date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }

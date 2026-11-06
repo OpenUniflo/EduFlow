@@ -26,7 +26,7 @@ export function ArchiveSearchPanel({ belowStrip, query, results, searching, onQu
   useEffect(() => { inputRef.current?.focus(); }, []);
   const noResult = Boolean(query.trim() && results?.empty && !searching);
   return (
-    <section className={`ef-archive-search-panel ${belowStrip ? "is-below-strip" : ""}`} aria-label="档案搜索">
+    <section className={`ef-archive-search-panel ${belowStrip ? "is-below-strip" : ""}`} aria-label="地图搜索">
       <header className="ef-archive-search-head">
         <span className="ef-archive-panel-kicker"><Search size={14} aria-hidden />搜索</span>
         <span className="ef-archive-panel-meta">{results ? `${results.knowledge.total} 个知识 · ${results.courses.total} 门课程 · ${results.people.total} 位同学` : "课程与知识"}</span>
@@ -87,7 +87,7 @@ export function ArchiveSearchPanel({ belowStrip, query, results, searching, onQu
               {results.people.items.slice(0, 2).map(({ person }) => (
                 <button type="button" key={person.id} className="ef-archive-result-row" data-preview="sample" onClick={() => onSelectPerson(person)}>
                   <Avatar name={shortName(person)} size={28} personColor={person.accent} decorative />
-                  <span><b>{person.displayName}</b><small>{person.visibility === "private" ? "未公开学习进度" : `公开 ${person.sharedKnowledgeIds?.length ?? person.sharedKnowledgeCount} 个知识`} · 示例档案</small></span>
+                  <span><b>{person.displayName}</b><small>{person.visibility === "private" ? "未公开学习进度" : `公开 ${person.sharedKnowledgeIds?.length ?? person.sharedKnowledgeCount} 个知识`} · 示例地图</small></span>
                   <ArrowRight size={13} aria-hidden />
                 </button>
               ))}

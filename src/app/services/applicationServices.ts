@@ -22,6 +22,7 @@ import type { UserCourseState } from "@/features/course/types";
 import type { UserCapability, UserRole } from "@/features/auth/types";
 import type { UserKnowledgeRecord } from "@/features/profile/types";
 import { previewApplicationServices, type ApplicationPreviewServices } from "./previewServices";
+import { SupabaseHomeMainlineConfigRepository, type HomeMainlineConfigRepository } from "@/features/home/HomeMainlineConfigRepository";
 
 export type ApplicationServices = {
   courseRepository: CourseRepository;
@@ -34,6 +35,7 @@ export type ApplicationServices = {
   domainGovernanceService: DomainGovernanceService;
   courseCreationService: CourseCreationService;
   courseAuthoringDraftRepository: CourseAuthoringDraftRepository;
+  homeMainlineConfigRepository: HomeMainlineConfigRepository;
   /** Feature Preview sources are injected here; real page wiring arrives in P1+. */
   preview?: ApplicationPreviewServices;
 };
@@ -43,8 +45,9 @@ const courseRepository = new ApiCourseRepository(knowledgeRepository);
 const userKnowledgeRepository = new ApiUserKnowledgeRepository();
 const learningProgressRepository = new ApiLearningProgressRepository();
 const microLearningRepository = new ApiMicroLearningRepository();
-const learnerStateService = new ApiLearnerStateService();
+const learnerStateService = new ApiLearnerStateService(refreshLearnerState);
 const courseAuthoringDraftRepository = new ApiCourseAuthoringDraftRepository();
+const homeMainlineConfigRepository = new SupabaseHomeMainlineConfigRepository();
 const domainGovernanceRepository = new ApiDomainGovernanceRepository();
 const domainGovernanceService = new DomainGovernanceService(knowledgeRepository, domainGovernanceRepository);
 
@@ -58,6 +61,7 @@ export const applicationServices: ApplicationServices = {
   domainGovernanceRepository,
   domainGovernanceService,
   courseAuthoringDraftRepository,
+  homeMainlineConfigRepository,
   courseCreationService: new BackendCourseCreationService(),
   preview: previewApplicationServices
 };

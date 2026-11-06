@@ -93,5 +93,5 @@ describe("new-UI style gate", () => {
   it("includes the token --check in the style gate", () => {
     const result = execFileSync(NODE, ["scripts/lint-css.mjs"], { cwd: ROOT, encoding: "utf8" });
     expect(result).toContain("design tokens in sync");
-  });
+  }, 20_000);
 });

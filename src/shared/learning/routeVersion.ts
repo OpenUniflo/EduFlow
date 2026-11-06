@@ -12,3 +12,7 @@ export type RoutePlanView = {
   activeVersion: RouteVersion | null; model: CapabilityModel | null; plan: RoutePlan;
   structureChanged: boolean; versions?: RouteVersion[]; execution?: RouteExecutionPlan;
 };
+/** The system-created first read is a recommendation until the learner adopts a route. */
+export function isRecommendedRoute(version: Pick<RouteVersion, "source"> | null | undefined): boolean {
+  return version?.source === "initial";
+}

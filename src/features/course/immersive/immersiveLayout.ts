@@ -809,7 +809,7 @@ export function layoutVerticalRouteFlow(steps: readonly VerticalRouteStep[], vie
   const headers: VerticalRouteHeader[] = [];
   let cursor = 0;
   let lastChapter = "";
-  unique.forEach((step) => {
+  unique.forEach((step, index) => {
     if (step.chapterId !== lastChapter) {
       lastChapter = step.chapterId;
       // Keep a clear runway before each chapter strip: route cards are taller
@@ -817,7 +817,7 @@ export function layoutVerticalRouteFlow(steps: readonly VerticalRouteStep[], vie
       cursor += 44;
       const count = unique.filter((item) => item.chapterId === step.chapterId).length;
       headers.push({
-        id: `route-chapter:${step.chapterId}`,
+        id: `route-chapter:${step.chapterId}:${index}`,
         chapterId: step.chapterId,
         title: `第 ${step.chapterNumber} 章 · ${step.chapterTitle}`,
         x: 0,

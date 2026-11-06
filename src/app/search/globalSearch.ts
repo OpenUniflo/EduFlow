@@ -65,7 +65,7 @@ export type GlobalSearchResults = {
 
 const PAGE_DEFINITIONS: Array<PageSearchItem & { requiresSession?: boolean; requiresTeaching?: boolean; requiresAdmin?: boolean }> = [
   { id: "home", title: "首页", path: "/", keywords: ["home", "今日", "学习"], requiresSession: false },
-  { id: "archive", title: "档案", path: "/archive", keywords: ["archive", "知识图谱", "知识", "星图"], requiresSession: false },
+  { id: "archive", title: "地图", path: "/archive", keywords: ["archive", "知识图谱", "知识", "星图", "我的地图"], requiresSession: false },
   { id: "works", title: "作品", path: "/works", keywords: ["works", "工作流", "实践", "提交"], requiresSession: true },
   { id: "records", title: "记录", path: "/records", keywords: ["records", "活动", "时间线"], requiresSession: true },
   { id: "settings", title: "设置", path: "/settings", keywords: ["settings", "账户", "通知", "隐私"], requiresSession: true },

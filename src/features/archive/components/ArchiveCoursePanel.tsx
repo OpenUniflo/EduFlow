@@ -27,7 +27,7 @@ function CourseRow({ course, focused, onFocus, onOpen, onOpenChapters }: { cours
       <button type="button" className="ef-archive-course-open" onClick={(event) => onOpen(event.currentTarget.getBoundingClientRect())} aria-label={`进入 ${course.title}`}><ArrowRight size={14} aria-hidden /></button>
       {focused ? (
         <div className="ef-archive-course-detail">
-          <div className="ef-archive-course-detail-progress"><span>实践进度 <b>{course.progress}%</b></span><i aria-hidden><b style={{ width: `${Math.max(0, Math.min(100, course.progress))}%` }} /></i></div>
+          <div className="ef-archive-course-detail-progress"><span>动手任务进度 <b>{course.progress}%</b></span><i aria-hidden><b style={{ width: `${Math.max(0, Math.min(100, course.progress))}%` }} /></i></div>
           <small>{course.nextLabel}</small>
           <div className="ef-archive-course-detail-actions">
             <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => onOpen(event.currentTarget.getBoundingClientRect())}>进入课程</button>
@@ -63,7 +63,7 @@ export function ArchiveCoursePanel({ model, focusedCourseId, guest, listMode, er
   const list = cached.length ? cached : model.nodes.slice().sort((left, right) => right.visualImportance - left.visualImportance).slice(0, 12);
 
   return (
-    <section className="ef-archive-course-panel" aria-label="档案课程浮层" data-error={error ? "true" : undefined}>
+    <section className="ef-archive-course-panel" aria-label="地图课程浮层" data-error={error ? "true" : undefined}>
       <header className="ef-archive-panel-head">
         <span className="ef-archive-panel-kicker"><BookOpen size={14} aria-hidden />{guest ? "公开课程" : "课程"}</span>
         <span className="ef-archive-panel-meta">{error ? "缓存" : guest ? `${publicCourses.length} 门` : hasHistory ? `${model.stats.weekDays} 天 · 本周` : "本周 0 天"}</span>
@@ -91,7 +91,7 @@ export function ArchiveCoursePanel({ model, focusedCourseId, guest, listMode, er
               <button type="button" key={node.id} onClick={() => onSelectCached(node.id)} className="ef-archive-cached-row">
                 <span className={`ef-archive-cached-dot status-${node.status}`} aria-hidden />
                 <span><b>{node.title}</b><small>{node.domainTitle} · {node.courseContexts[0]?.courseTitle ?? "全局知识"}</small></span>
-                <em>{node.status === "learning" ? "在学" : node.status === "learned" ? "已学" : node.status === "practicing" ? "实训" : node.status === "mastered" ? "掌握" : "可探索"}</em>
+                <em>{node.status === "learning" ? "在学" : node.status === "learned" ? "已学" : node.status === "practicing" ? "动手任务" : node.status === "mastered" ? "掌握" : "可探索"}</em>
               </button>
             ))}
           </div> : null}

@@ -14,14 +14,14 @@ import { formatRecordScore } from "@/shared/learning/recordsFeedback";
 import type { PillTone } from "@/shared/ui/Pill";
 
 export const RECORD_TYPE_LABELS: Record<RecordEventType, string> = {
-  micro: "微学习完成",
-  practice: "实践提交",
+  micro: "小练习完成",
+  practice: "动手任务提交",
   evaluation: "评价返回",
   route: "路线版本变更"
 };
 
 const STATUS_LABELS: Record<Exclude<RecordStatus, "version">, string> = {
-  learned: "已学习",
+  learned: "已学",
   pending: "审核中",
   needs_revision: "需修改",
   passed: "已通过"
@@ -96,7 +96,7 @@ export function recordMetaParts(event: RecordEvent): string[] {
     }
   }
   if (event.type === "evaluation" && event.meta.basisCount) parts.push(`${event.meta.basisCount} 条依据`);
-  if (event.type === "micro") parts.push("已学习");
+  if (event.type === "micro") parts.push("已学");
   return parts;
 }
 

@@ -80,7 +80,7 @@ export function ArchiveNodePanel({ node, model, edges, topicName, learners, onCl
     })
     .sort((left, right) => left.relation.localeCompare(right.relation) || left.node.title.localeCompare(right.node.title))
     .slice(0, 8);
-  const status = node.isMine ? (node.status === "learning" ? "在学" : node.status === "learned" ? "已学" : node.status === "practicing" ? "实训中" : node.status === "mastered" ? "已掌握" : "可探索") : "可探索";
+  const status = node.isMine ? (node.status === "learning" ? "在学" : node.status === "learned" ? "已学" : node.status === "practicing" ? "动手任务中" : node.status === "mastered" ? "已掌握" : "可探索") : "可探索";
   return (
     <aside className="ef-atlas-detail ef-ui-glass ef-ui-glass--regular" aria-label={`${node.title} 知识详情`}>
       <header>

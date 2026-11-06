@@ -15,6 +15,7 @@ import { RoutePlanningPanel } from './RoutePlanningPanel';
 import { actionAlternatives, branchesForActions, EdgeActionPanel, useEdgeActions } from '@/features/actions/EdgeActionPanel';
 import { projectCapabilityGraph, projectRouteOverlay, projectVisibleNodeIds } from './projectRoutePresentation';
 import { relationLabel } from '@/shared/learning/routePresentation';
+import { isRecommendedRoute } from '@/shared/learning/routeVersion';
 import './projectCapability.css';
 
 export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, onSelect, onRoute, authenticated = false, control, actionData, assistantIdentity, active = true }: {
@@ -37,6 +38,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
   }, [graph, runtime, knowledge, governance]);
   const structuralGraph = useMemo(() => projectCapabilityGraph(graph, result.model), [graph, result.model]);
   const currentRoute = control.view?.activeVersion?.snapshot ?? null;
+  const recommendedRoute = isRecommendedRoute(control.view?.activeVersion);
   const previewRoute = useMemo(()=>control.preview?.valid ? {...control.preview.route,executionSteps:control.preview.execution?.steps} : null,[control.preview]);
   const overlay = useMemo(() => projectRouteOverlay(structuralGraph, currentRoute, previewRoute), [structuralGraph, currentRoute, previewRoute]);
   const visibleIds = useMemo(() => projectVisibleNodeIds(structuralGraph), [structuralGraph]);
@@ -66,7 +68,7 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
           </> : null}
         </div>;
   const routeLegend = <div className="project-route-legend glass-v2" role="status" aria-label="路线图层说明">
-        {overlay.preview ? <><strong>路线预览 · 尚未采用</strong><span className="route-key-kept">保留</span><span className="route-key-added">新增</span><span className="route-key-removed">移除</span></> : <><strong>{control.view && !control.view.plan.valid ? '已采用路线 · 当前待重新确认' : '当前正式路线'}{control.view?.activeVersion ? ` V${control.view.activeVersion.versionNumber}` : ''}</strong><span>{overlay.nodes.length} 项能力 · {overlay.edges.length} 条真实关系</span></>}
+        {overlay.preview ? <><strong>路线预览 · 尚未采用</strong><span className="route-key-kept">保留</span><span className="route-key-added">新增</span><span className="route-key-removed">移除</span></> : <><strong>{recommendedRoute ? '推荐路线' : control.view && !control.view.plan.valid ? '已采用路线 · 当前待重新确认' : '当前正式路线'}{recommendedRoute ? control.view && !control.view.plan.valid ? ' · 当前待重新确认' : '' : control.view?.activeVersion ? ` V${control.view.activeVersion.versionNumber}` : ''}</strong><span>{overlay.nodes.length} 项能力 · {overlay.edges.length} 条真实关系</span></>}
         <small>普通线：真实关系 · 流光与箭头：执行方向</small>
       </div>;
   const focused = alternatives.find(item => item.action.id === actionId);
@@ -80,10 +82,10 @@ export function ProjectCapabilityView({ graph, runtime, knowledge, selectedId, o
         {!control.editing && authenticated ? <RoutePlanningPanel relations={structuralGraph.edges} control={control} title={title}/> : null}
       </div>
       {!control.editing?<details className="project-overview glass-v2" aria-label="项目概览">
-        <summary><strong>项目概览</strong><span>项目目标 · {control.view?.activeVersion ? `正式路线 V${control.view.activeVersion.versionNumber}` : '尚无正式路线'} · {visibleEdges.length} 条关系 / {visibleEdges.reduce((sum,edge)=>sum+(counts.get(edge.id)??0),0)} 个行动</span></summary>
+        <summary><strong>项目概览</strong><span>项目目标 · {control.view?.activeVersion ? recommendedRoute ? '推荐路线' : `正式路线 V${control.view.activeVersion.versionNumber}` : '尚无正式路线'} · {visibleEdges.length} 条关系 / {visibleEdges.reduce((sum,edge)=>sum+(counts.get(edge.id)??0),0)} 个行动</span></summary>
         <div className="project-overview-body">
           <section><h3>项目目标</h3><p>{runtime.course.targetOutcome??runtime.course.description}</p></section>
-          <section><h3>当前正式路线{control.view?.activeVersion?` V${control.view.activeVersion.versionNumber}`:''}</h3><p>{control.view?.activeVersion?.snapshot.valid?`${control.view.activeVersion.snapshot.orderedNodeIds.length} 项能力 · ${control.view.activeVersion.snapshot.executionSteps?.length??0} 个执行步骤`:'尚未采用可执行路线'}</p><p>正在执行 {actionData.runs.filter(run=>run.status==='in_progress').length} 项 · 历史完成 {actionData.runs.filter(run=>run.status==='completed').length} 次</p></section>
+          <section><h3>{recommendedRoute ? '推荐路线' : `当前正式路线${control.view?.activeVersion?` V${control.view.activeVersion.versionNumber}`:''}`}</h3><p>{control.view?.activeVersion?.snapshot.valid?`${control.view.activeVersion.snapshot.orderedNodeIds.length} 项能力 · ${control.view.activeVersion.snapshot.executionSteps?.length??0} 个执行步骤`:'尚未采用可执行路线'}</p><p>正在执行 {actionData.runs.filter(run=>run.status==='in_progress').length} 项 · 历史完成 {actionData.runs.filter(run=>run.status==='completed').length} 次</p></section>
           <section><h3>关系与行动</h3><p>{visibleEdges.length} 条真实关系 · {visibleEdges.reduce((sum,edge)=>sum+(counts.get(edge.id)??0),0)} 个可选行动</p><details className="project-relations-list"><summary>查看全部关系与行动</summary>{visibleEdges.map(edge=><button className="atlas-secondary" key={edge.id} onClick={()=>{onSelect(null);setActionId(null);setEdgeId(edge.id);}}><span>{title(edge.source)} → {title(edge.target)}</span><small>{edge.relation==='prerequisite'?relationLabel(edge):'能力支撑'} · {counts.get(edge.id)??0} 个行动方案</small></button>)}</details></section>
         </div>
       </details>:null}

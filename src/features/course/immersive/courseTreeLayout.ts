@@ -784,7 +784,7 @@ export function buildWindingRoute(stepInputs: readonly WindingStepInput[], width
       lastChapter = step.chapterId;
       y += 44;
       headers.push({
-        id: `route-chapter:${step.chapterId}`,
+        id: `route-chapter:${step.chapterId}:${index}`,
         chapterId: step.chapterId,
         title: step.chapterNumber > 0 ? `第 ${step.chapterNumber} 章 · ${step.chapterTitle}` : step.chapterTitle,
         x: center,

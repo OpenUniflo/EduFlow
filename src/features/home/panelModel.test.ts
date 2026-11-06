@@ -36,7 +36,7 @@ describe("My panel real / preview boundary", () => {
 describe("Home boundary state", () => {
   it("is driven by real loading, error and new-user inputs", () => {
     expect(resolveHomeBoundary({ loading: true, activeKnowledgeCount: 3, activeCourseCount: 1, hasAnyLearningRecord: true })).toBe("loading");
-    expect(resolveHomeBoundary({ loading: false, error: "network", activeKnowledgeCount: 3, activeCourseCount: 1, hasAnyLearningRecord: true })).toBe("error");
+    expect(resolveHomeBoundary({ loading: false, error: "network", activeKnowledgeCount: 3, activeCourseCount: 1, hasAnyLearningRecord: true })).toBe("ready");
     expect(resolveHomeBoundary({ loading: false, activeKnowledgeCount: 0, activeCourseCount: 0, hasAnyLearningRecord: false })).toBe("new-user");
     expect(resolveHomeBoundary({ loading: false, activeKnowledgeCount: 1, activeCourseCount: 0, hasAnyLearningRecord: true })).toBe("ready");
     expect(homeBoundaryMessage("error")).toContain("重试");

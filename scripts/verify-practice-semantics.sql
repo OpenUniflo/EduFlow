@@ -4,7 +4,7 @@ declare
  actor uuid; course text:='enterprise-vietnam-supply-collaboration'; route uuid;
  item record; chosen edge_action_runs; submitted record; duplicated record;
  prior uuid; quality text; before_uks text; after_uks text; before_history integer;
- tested integer:=0; micro record; micro_step_row record; path_nodes text[];
+ tested integer:=0; micro record; micro_step_row record; path_nodes text[]; micro_before text; micro_after text;
 begin
  select id into strict actor from auth.users where email='project-capability-a@eduflow.test';
  select active_version_id into strict route from personal_course_routes where user_id=actor and course_id=course;
@@ -53,12 +53,16 @@ begin
    end;
  end loop;
  if micro.id is null then raise exception 'No eligible real Micro for authority regression';end if;
+ select status into micro_before from user_knowledge_states where user_id=actor and node_id=micro.knowledge_id;
  perform start_micro_for_route_v2(actor,micro.id,course,route,path_nodes);
  for micro_step_row in select s.id,s.unit_id from micro_steps s join micro_units u on u.id=s.unit_id where u.path_id=micro.id order by u.position,s.position,s.id loop
    perform record_micro_step_completion_v2(actor,micro.id,micro_step_row.unit_id,micro_step_row.id,course,path_nodes,route);
  end loop;
- select md5(coalesce(jsonb_agg(s order by s.node_id)::text,'')) into after_uks from user_knowledge_states s where user_id=actor;
- if before_uks<>after_uks then raise exception 'Micro start/completion wrote UKS';end if;
  if not exists(select 1 from user_micro_path_progress where user_id=actor and path_id=micro.id and status='completed') then raise exception 'Micro progress broken';end if;
- raise notice 'PASS: % outcomes completed, duplicate stable, completed Run closed, repeat history, UKS and Route unchanged',tested;
+ select status into micro_after from user_knowledge_states where user_id=actor and node_id=micro.knowledge_id;
+ if micro_after is null or micro_after not in ('learning','learned','practicing','mastered') then raise exception 'Micro did not raise state to at least learning';end if;
+ if micro_before is not null and array_position(array['explore','learning','learned','practicing','mastered'],micro_after)
+   < array_position(array['explore','learning','learned','practicing','mastered'],micro_before) then raise exception 'Micro downgraded % to %',micro_before,micro_after;end if;
+ if micro_before is distinct from 'mastered' and micro_after='mastered' then raise exception 'Micro manufactured mastery';end if;
+ raise notice 'PASS: % outcomes completed, duplicate stable, completed Run closed, repeat history, Micro state monotonic, Route unchanged',tested;
 end $$;

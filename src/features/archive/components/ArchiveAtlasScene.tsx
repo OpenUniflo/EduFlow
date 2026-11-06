@@ -838,7 +838,7 @@ export default function ArchiveAtlasScene({
     renderer.setSize(width, height);
     renderer.setClearColor(0x000000, 0);
     renderer.domElement.className = "ef-atlas-canvas";
-    renderer.domElement.setAttribute("aria-label", "档案星图：拖拽旋转，滚轮缩放，右键平移");
+    renderer.domElement.setAttribute("aria-label", "我的地图：拖拽旋转，滚轮缩放，右键平移");
     renderer.domElement.tabIndex = 0;
     container.prepend(renderer.domElement);
 

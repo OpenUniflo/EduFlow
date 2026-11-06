@@ -59,8 +59,8 @@ function clientFor(errorTable?: string) {
 const user = { id: "learner-a" } as User;
 const context = { workspace: "material" as const, experienceMode: "learn" as const, courseId: "route-only", materialId: "shared-material", segmentId: "route-segment", knowledgeId: "K-visible" };
 
-async function execute(client: SupabaseClient, name: keyof ReturnType<typeof createAssistantTools>, input: unknown) {
-  const candidate = createAssistantTools(client, user, context)[name] as { execute: (input: unknown, options: unknown) => Promise<unknown> };
+async function execute(client: SupabaseClient, name: keyof ReturnType<typeof createAssistantTools>, input: unknown, dependencies?: Parameters<typeof createAssistantTools>[3]) {
+  const candidate = createAssistantTools(client, user, context, dependencies)[name] as { execute: (input: unknown, options: unknown) => Promise<unknown> };
   return candidate.execute(input, { toolCallId: "test", messages: [] });
 }
 
@@ -73,10 +73,41 @@ describe("Assistant read tool boundaries", () => {
 
   it("plans a Goal through product logic and rejects an invented candidate identity", async () => {
     expect(await execute(clientFor(), "planLearningGoal", { goalText: "Understand visible Knowledge", candidateKnowledgeIds: ["K-visible"] })).toMatchObject({
+      status: "ready",
       resolution: { status: "ready", targetKnowledge: [{ id: "K-visible" }] },
       matches: expect.arrayContaining([expect.objectContaining({ courseId: "route-only", targetCoverage: 1, recommendation: "use_existing" })])
     });
-    expect(await execute(clientFor(), "planLearningGoal", { goalText: "Invented", candidateKnowledgeIds: ["K-invented"] })).toMatchObject({ resolution: { status: "no_match", targetKnowledge: [] } });
+    expect(await execute(clientFor(), "planLearningGoal", { goalText: "Invented", candidateKnowledgeIds: ["K-invented"] })).toMatchObject({ status: "no_match", resolution: { status: "no_match", targetKnowledge: [] } });
+  });
+
+  it("resolves a Goal through the same language-adapter path when no candidate IDs are supplied", async () => {
+    const resolver = async () => ({
+      status: "ready" as const,
+      intentSummary: "Use our own documents",
+      primaryOutcome: "Build a citation-backed document assistant",
+      refinementIntent: "preserve_outcome" as const,
+      practiceEmphasis: true,
+      candidateKnowledgeIds: ["K-visible"],
+      targetReasons: [{ knowledgeId: "K-visible", reason: "Directly constitutes the requested capability" }]
+    });
+    expect(await execute(clientFor(), "planLearningGoal", { goalText: "我想让 AI 会查我们自己的文档" }, { goalLanguageResolver: resolver })).toMatchObject({
+      status: "ready",
+      goalText: "Build a citation-backed document assistant",
+      intentSummary: "Use our own documents",
+      resolution: { status: "ready", targetKnowledge: [{ id: "K-visible", title: "Visible Knowledge" }] },
+      matches: expect.arrayContaining([expect.objectContaining({ courseId: "route-only" })])
+    });
+  });
+
+  it("returns the language adapter's clarification and no-match business states instead of a false ready plan", async () => {
+    const clarification = async () => ({ status: "needs_clarification" as const, intentSummary: "Too broad", clarificationQuestion: "你希望先做出什么具体成果？" });
+    expect(await execute(clientFor(), "planLearningGoal", { goalText: "我想学 AI" }, { goalLanguageResolver: clarification })).toEqual({
+      status: "needs_clarification", goalText: "我想学 AI", intentSummary: "Too broad", clarificationQuestion: "你希望先做出什么具体成果？"
+    });
+    const noMatch = async () => ({ status: "no_match" as const, intentSummary: "Quantum hardware", primaryOutcome: "Build a quantum processor", practiceEmphasis: false, reason: "当前学习内容没有覆盖量子处理器" });
+    expect(await execute(clientFor(), "planLearningGoal", { goalText: "构建量子处理器" }, { goalLanguageResolver: noMatch })).toMatchObject({
+      status: "no_match", goalText: "Build a quantum processor", reason: "当前学习内容没有覆盖量子处理器", resolution: { status: "no_match" }
+    });
   });
 
   it("reads a structurally valid route-only Course without requiring optional assets", async () => {

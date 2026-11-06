@@ -45,10 +45,10 @@ export function PublicHomePage() {
             </article>
           ))}
           {!previewCourses.length ? <article className="ef-pub-card ef-pub-card-empty"><h3>公开课程正在准备中</h3><p>课程发布后会出现在这里。</p></article> : null}
-          <button type="button" className="ef-pub-map" onClick={() => navigate("/archive")} aria-label={`打开档案，浏览 ${graph.nodes.length} 个公开知识`}>
+          <button type="button" className="ef-pub-map" onClick={() => navigate("/archive")} aria-label={`打开我的地图，浏览 ${graph.nodes.length} 个公开知识`}>
             <Network size={40} aria-hidden />
             <span>知识星图</span>
-            <small>{graph.nodes.length} 个公开知识 · 在档案中浏览</small>
+            <small>{graph.nodes.length} 个公开知识 · 在我的地图中浏览</small>
             <ArrowRight size={16} aria-hidden />
           </button>
         </div>
@@ -58,7 +58,7 @@ export function PublicHomePage() {
         <h2 id="ef-pub-how">EduFlow 怎么陪你学</h2>
         <div className="ef-pub-how">
           <div><i><Target size={18} aria-hidden /></i><p><b>说出目标</b><span>助手帮你找到现成课程，或者为你生成一条个人课程。</span></p></div>
-          <div><i><Compass size={18} aria-hidden /></i><p><b>看清全貌</b><span>档案把学过的、在学的和下一步放在同一张图上。</span></p></div>
+          <div><i><Compass size={18} aria-hidden /></i><p><b>看清全貌</b><span>我的地图把学过的、在学的和下一步放在同一张图上。</span></p></div>
           <div><i><Wrench size={18} aria-hidden /></i><p><b>动手实践</b><span>做出作品并提交评估，学会的知识会被点亮。</span></p></div>
         </div>
       </section>

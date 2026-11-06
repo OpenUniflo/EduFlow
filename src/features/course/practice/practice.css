@@ -1296,3 +1296,362 @@
 .ef-practice-confirm.ef-practice-overlay-card {
   overflow: auto;
 }
+
+.ef-practice-eligibility {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: 1px solid color-mix(in srgb, var(--warn) 28%, transparent);
+  border-radius: var(--r-16);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.ef-practice-eligibility > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.ef-practice-eligibility-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-practice-eligibility-copy strong {
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-practice-eligibility-copy p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-practice-eligibility-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+}
+
+.ef-practice-draft-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ef-practice-draft-fieldset:disabled {
+  opacity: .72;
+}
+
+/* ---------- Stage 2: real AI evaluation ---------- */
+.ef-practice-result-hero.tone-unavailable,
+.ef-practice-result-hero.tone-handed_off {
+  border-color: color-mix(in srgb, var(--warn) 24%, transparent);
+  background: var(--warn-soft);
+}
+
+.ef-practice-result-hero.tone-evaluating {
+  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+  background: var(--brand-soft);
+}
+
+.ef-practice-spin {
+  animation: ef-practice-spin var(--dur-slow) linear infinite;
+}
+
+@keyframes ef-practice-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ef-practice-evaluation-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-practice-evaluation-progress p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  overflow-wrap: anywhere;
+}
+
+.ef-practice-evaluation-bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--brand) 14%, var(--surface));
+}
+
+.ef-practice-evaluation-bar > span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--brand);
+  animation: ef-practice-evaluation-slide calc(var(--dur-scene) * 3) var(--ease-inout) infinite;
+}
+
+@keyframes ef-practice-evaluation-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.ef-practice-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  margin-top: var(--sp-12);
+}
+
+.ef-practice-next {
+  margin: var(--sp-8) 0 0;
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-practice-criteria {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.ef-practice-criterion {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+}
+
+.ef-practice-criterion.is-pass {
+  border-color: color-mix(in srgb, var(--target) 24%, transparent);
+  background: color-mix(in srgb, var(--target) 6%, var(--surface));
+}
+
+.ef-practice-criterion.is-fail {
+  border-color: color-mix(in srgb, var(--warn) 24%, transparent);
+  background: color-mix(in srgb, var(--warn) 6%, var(--surface));
+}
+
+.ef-practice-criterion header {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.ef-practice-criterion header b {
+  color: var(--ink);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  font-weight: var(--fw-600);
+  overflow-wrap: anywhere;
+}
+
+.ef-practice-criterion-state {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--sp-4);
+  padding: 2px var(--sp-8);
+  border-radius: var(--r-full);
+  background: var(--page);
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-practice-criterion.is-pass .ef-practice-criterion-state {
+  background: var(--target-soft);
+  color: var(--target);
+}
+
+.ef-practice-criterion.is-fail .ef-practice-criterion-state {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.ef-practice-criterion p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  overflow-wrap: anywhere;
+}
+
+.ef-practice-criterion blockquote {
+  margin: var(--sp-4) 0 0;
+  padding: var(--sp-4) var(--sp-8);
+  border-left: 2px solid var(--line-strong);
+  border-radius: 0 var(--r-8) var(--r-8) 0;
+  background: var(--page);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  overflow-wrap: anywhere;
+}
+
+.ef-practice-criterion small {
+  color: var(--warn);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-practice-spin,
+  .ef-practice-evaluation-bar > span {
+    animation: none;
+  }
+}
+
+/* ---------- Stage 2 round 1: revision, primary text input, read-only result ---------- */
+.ef-practice-auth-card {
+  width: min(520px, 100%);
+  margin: max(10vh, var(--sp-32)) auto 0;
+  padding: var(--sp-24);
+  gap: var(--sp-16);
+}
+
+.ef-practice-auth-card > div:first-of-type {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.ef-practice-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+}
+
+.ef-practice-deliverable.is-optional {
+  border-style: dashed;
+  background: transparent;
+}
+
+.ef-practice-work-secondary {
+  margin-top: var(--sp-8);
+  padding-top: var(--sp-8);
+  border-top: 1px solid var(--line);
+}
+
+.ef-practice-work-secondary > summary {
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  cursor: pointer;
+}
+
+.ef-practice-work-secondary[open] > summary {
+  margin-bottom: var(--sp-8);
+}
+
+.ef-practice-previous {
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--surface);
+}
+
+.ef-practice-previous > summary {
+  color: var(--ink-2);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-600);
+  cursor: pointer;
+}
+
+.ef-practice-previous[open] > summary {
+  margin-bottom: var(--sp-8);
+}
+
+.ef-practice-next-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+
+.ef-practice-next-step strong {
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  overflow-wrap: anywhere;
+}
+
+.ef-practice-evaluator-readonly {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  background: var(--page);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-practice-evaluator-readonly strong {
+  color: var(--ink);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-practice-previous[open] > .ef-practice-criteria {
+  max-height: min(36vh, 320px);
+  overflow: auto;
+  padding-right: var(--sp-4);
+}
+
+/* Stage 4: requirements are the first thing the learner reads, collapsible. */
+.ef-practice-requirements-details {
+  border: 1px solid var(--line);
+  border-radius: var(--r-16);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.ef-practice-requirements-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-16);
+  color: var(--ink);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+  cursor: pointer;
+  list-style: none;
+}
+
+.ef-practice-requirements-details > summary::-webkit-details-marker { display: none; }
+.ef-practice-requirements-details > summary::after { content: "⌄"; color: var(--muted); }
+.ef-practice-requirements-details[open] > summary::after { content: "⌃"; }
+.ef-practice-requirements-details > summary span { color: var(--muted); font-size: var(--fs-12); font-weight: var(--fw-500); }
+.ef-practice-requirements-details .ef-practice-requirements { padding: 0 var(--sp-16) var(--sp-16); }
+.ef-practice-requirements-details .ef-ui-obj-section { padding-top: 0; }
+
+/* Author display rules on the work block must not defeat the closed <details>. */
+.ef-practice-work-secondary:not([open]) > .ef-practice-work {
+  display: none;
+}

@@ -42,7 +42,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
   const matches = presentation.plan?.matches.filter((match) => match.targetCoverage > 0 || match.requiredCoverage > 0).slice(0, 2) ?? [];
   const brief = presentation.brief;
 
-  const contextLabel = useMemo(() => goal.trim() || presentation.goalText || "档案 · 全局星图", [goal, presentation.goalText]);
+  const contextLabel = useMemo(() => goal.trim() || presentation.goalText || "我的地图 · 全局星图", [goal, presentation.goalText]);
 
   useEffect(() => {
     if (!seedGoal) return;
@@ -81,7 +81,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
     <aside className={`ef-archive-assistant is-${status}`} aria-label="EduFlow 小助手" aria-live="polite">
       <header>
         <span className="ef-archive-assistant-icon"><Sparkles size={15} aria-hidden /></span>
-        <div><b>EduFlow 小助手 · 档案</b><span>{status === "searching" ? "正在寻找" : status === "brief" ? "课程创建简报" : "只提议，不直接修改课程"}</span></div>
+        <div><b>EduFlow 小助手 · 我的地图</b><span>{status === "searching" ? "正在寻找" : status === "brief" ? "课程创建简报" : "只提议，不直接修改课程"}</span></div>
         <button type="button" className="ef-archive-assistant-collapse" onClick={() => onOpenChange(false)} aria-label="收起助手"><X size={14} aria-hidden /></button>
       </header>
 
@@ -114,7 +114,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
           <div className="ef-archive-assistant-query"><span>{contextLabel}</span></div>
           <div className="ef-archive-search-steps" role="status">
             <span className="is-done"><i aria-hidden>✓</i>理解学习目标</span>
-            <span className="is-active"><i aria-hidden /><Search size={11} />匹配知识节点</span>
+            <span className="is-active"><i aria-hidden /><Search size={11} />匹配要点</span>
             <span><i aria-hidden />比对已有课程</span>
           </div>
           <p className="ef-archive-assistant-note">正在查找与目标相关的知识与课程。地图只高亮已确认的命中，不会移动节点。</p>
