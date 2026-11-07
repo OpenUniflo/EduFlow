@@ -8,6 +8,7 @@ import {
   expandAssignmentCriteria,
   quoteAppearsInSubmission,
   referencesKnowledgeMastery,
+  modelErrorDetail,
   type AssignmentAiJudgment,
 } from "./assignmentAiEvaluation.js";
 
@@ -88,6 +89,55 @@ describe("AI evaluation deterministic rules", () => {
     });
     expect(feedback.code).toBe("ai_evaluation_passed");
     expect(feedback.criteria[0].quote).toHaveLength(longQuote.length);
+  });
+
+  it("accepts a failed criterion without a quote but rejects a passed criterion without one", () => {
+    const parsed = assignmentAiJudgmentSchema.parse({
+      summary: "部分标准没有证据。",
+      criteria: [
+        { passed: false, reason: "提交没有终止设计。", quote: "" },
+        { passed: false, reason: "提交没有机制解释。" }
+      ]
+    });
+    expect(parsed.criteria[0].quote).toBe("");
+    expect(parsed.criteria[1].quote).toBeUndefined();
+    expect(() => assignmentAiJudgmentSchema.parse({
+      summary: "通过但没有引用。",
+      criteria: [{ passed: true, reason: "看起来满足。", quote: "" }]
+    })).toThrow();
+  });
+
+  it("resolves a missing index by array position without weakening order checks", () => {
+    const parsed = assignmentAiJudgmentSchema.parse({
+      summary: "按顺序判断。",
+      criteria: [
+        { passed: true, reason: "有证据。", quote: "我执行了搜索工具" },
+        { passed: false, reason: "没有复核。", quote: "" }
+      ]
+    });
+    const feedback = deriveAssignmentAiFeedback({
+      criteria,
+      judgments: { summary: parsed.summary, criteria: parsed.criteria },
+      submission: "我执行了搜索工具。",
+      model: "m",
+      promptVersion: "v",
+    });
+    expect(feedback.criteria.map((item) => item.passed)).toEqual([true, false]);
+    expect(feedback.invalidQuoteCount).toBe(0);
+    expect(feedback.message).not.toContain("未能在提交内容中核对到");
+  });
+
+  it("puts validation issues before provider text and never logs the output value", () => {
+    const error = Object.assign(new Error('Type validation failed: Value: {"secret":"learner submission"}'), {
+      name: "AI_TypeValidationError",
+      cause: Object.assign(new Error('Type validation failed: Value: {"secret":"learner submission"}'), {
+        name: "AI_TypeValidationError",
+        issues: [{ path: ["criteria", 0, "index"], code: "invalid_type", message: "Invalid input: expected number, received undefined" }]
+      })
+    });
+    const detail = modelErrorDetail(error);
+    expect(detail.startsWith("issues=criteria.0.index:")).toBe(true);
+    expect(detail).not.toContain("learner submission");
   });
 
   it("rejects missing or duplicate criterion judgments as invalid output", () => {
@@ -222,7 +272,8 @@ describe("AI evaluation attempt orchestration", () => {
       serverClient: fakeClient({}, rpc), userId: "user-1", courseId: "course-1", assignmentId: "task-1", attemptId: "attempt-1", generator,
     });
     expect(generator).toHaveBeenCalledTimes(2);
-    expect(generator.mock.calls[1][0]).toMatchObject({ attempt: 2 });
+    expect(generator.mock.calls[1][0]).toMatchObject({ attempt: 2, attemptId: "attempt-1" });
+    expect(generator.mock.calls[0][0]).toMatchObject({ attempt: 1, attemptId: "attempt-1" });
     expect(response.status).toBe("accepted");
     expect(calls.some((call) => call.name === "record_assignment_ai_evaluation")).toBe(true);
     expect(calls.some((call) => call.name === "fail_assignment_ai_evaluation")).toBe(false);

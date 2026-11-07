@@ -8,6 +8,9 @@ describe("assistant card references", () => {
     expect(parseAssistantCardRef({ cardType: "micro", pathId: "path-1", knowledgeId: "node-1", courseId: "course-1" })).toEqual({ cardType: "micro", pathId: "path-1", knowledgeId: "node-1", courseId: "course-1" });
     expect(parseAssistantCardRef({ cardType: "practice", courseId: "course-1", assignmentId: "assignment-1" })).toEqual({ cardType: "practice", courseId: "course-1", assignmentId: "assignment-1" });
     expect(parseAssistantCardRef({ cardType: "evaluation", courseId: "course-1", assignmentId: "assignment-1", attemptId: "attempt-1" })).toEqual({ cardType: "evaluation", courseId: "course-1", assignmentId: "assignment-1", attemptId: "attempt-1" });
+    // Historical evaluation cards predate Attempt identities; keep them
+    // readable and let hydration fall back to the latest Attempt.
+    expect(parseAssistantCardRef({ cardType: "evaluation", courseId: "course-1", assignmentId: "assignment-1" })).toEqual({ cardType: "evaluation", courseId: "course-1", assignmentId: "assignment-1" });
     expect(parseAssistantCardRef({ cardType: "course_chapter", courseId: "course-1", chapterId: "chapter-1" })).toEqual({ cardType: "course_chapter", courseId: "course-1", chapterId: "chapter-1" });
     expect(parseAssistantCardRef({ cardType: "knowledge", nodeId: "node-1" })).toEqual({ cardType: "knowledge", nodeId: "node-1" });
     expect(parseAssistantCardRef({ cardType: "progress", courseIds: ["course-1", "course-1", "course-2"] })).toEqual({ cardType: "progress", courseIds: ["course-1", "course-2"] });

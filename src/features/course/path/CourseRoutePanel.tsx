@@ -1,4 +1,4 @@
-import { BookOpen, Check, Map as MapIcon } from "lucide-react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { NavigationDecision } from "@/shared/learning/navigation";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
 import { buildWindingRoute, type WindingStep, type WindingStepInput } from "@/features/course/immersive/courseTreeLayout";
@@ -13,48 +13,105 @@ export type CourseRouteStepAction = {
   assignmentId?: string;
 };
 
+export type CourseRouteMode = "side" | "page";
+
 /**
  * The learner route shown on the Course page and in the Home side panel. It is
- * a normal web view: one current chapter expanded, the rest folded, no 3D and
- * no layout authority beyond the Course's explicit order.
+ * a normal web document: every chapter of the Course on one continuous road,
+ * with no folded rows and no 3D. Layout is derived only from the Course order,
+ * the learner's status and the panel width; selection and scrolling live inside
+ * CourseRouteView and never recompute these coordinates.
  */
-export function CourseRoutePanel({ projection, decision, courseTitle, showHeader = true, width = 560, labelSide, labelWidth, onSelect, onStart }: {
+export function CourseRoutePanel({
+  projection,
+  decision,
+  courseTitle,
+  showHeader = true,
+  width = 560,
+  labelWidth,
+  mode = "side",
+  measureEpoch = 0,
+  courseCard = "full",
+  onSelect,
+  onStart,
+  onOpenTree
+}: {
   projection: HomeCourseProjection;
   decision?: NavigationDecision | null;
   courseTitle: string;
   showHeader?: boolean;
   width?: number;
-  labelSide?: "left" | "right";
   labelWidth?: number;
+  mode?: CourseRouteMode;
+  measureEpoch?: number;
+  /** Full course card on Home page form; progress-only card on the Course page. */
+  courseCard?: "full" | "progress";
   onSelect(action: CourseRouteStepAction): void;
   onStart(action: CourseRouteStepAction): void;
+  onOpenTree?(): void;
 }) {
-  const currentChapter = projection.chapters.find((chapter) => chapter.id === projection.currentChapterId) ?? projection.chapters[0];
-  const chapter = currentChapter;
-  const chapterNodes = chapter ? projection.orderedNodeIds.filter((nodeId) => chapter.nodeIds.includes(nodeId)) : [];
-  const stepInputs: WindingStepInput[] = chapterNodes.map((nodeId) => {
-    const micro = projection.microByNode.get(nodeId);
-    const practice = projection.practiceByNode.get(nodeId);
-    const nodeStatus = projection.knowledgeStatusByNode.get(nodeId);
-    const learned = satisfiesTeachingPrerequisite(nodeStatus);
+  const steps = useMemo<WindingStepInput[]>(() => {
     const opening = projection.segment.started && !projection.segment.complete ? projection.segment.currentStep?.nodeId : undefined;
-    const current = opening ? opening === nodeId : !learned && decision?.nextAction.nodeId === nodeId;
-    return {
-      id: nodeId,
-      title: projection.titleByNode.get(nodeId) ?? nodeId,
-      chapterId: chapter?.id ?? "",
-      chapterTitle: chapter?.title ?? courseTitle,
-      chapterNumber: chapter?.order ?? 1,
-      status: current ? "current" : learned ? "done" : "locked",
-      stateLabel: nodeStatus === "mastered" ? "已掌握" : nodeStatus === "practicing" ? "动手任务中" : learned ? "已学" : current ? "在学" : "待学",
-      ...(micro?.estimatedMinutes || practice?.estimatedMinutes ? { minutes: micro?.estimatedMinutes ?? practice?.estimatedMinutes } : {}),
-      meta: practice ? (micro ? "小练习 · 动手任务" : "动手任务") : micro ? "小练习" : undefined
-    };
-  });
+    const nextNodeId = decision?.nextAction.nodeId;
+    const chapterByNode = new Map<string, HomeCourseProjection["chapters"][number]>();
+    projection.chapters.forEach((chapter) => chapter.nodeIds.forEach((nodeId) => chapterByNode.set(nodeId, chapter)));
+    return projection.chapters.flatMap((chapter) => chapter.nodeIds.map((nodeId) => {
+      const micro = projection.microByNode.get(nodeId);
+      const practice = projection.practiceByNode.get(nodeId);
+      const nodeStatus = projection.knowledgeStatusByNode.get(nodeId);
+      const learned = satisfiesTeachingPrerequisite(nodeStatus);
+      const currentId = opening ?? nextNodeId;
+      const current = currentId === nodeId;
+      return {
+        id: nodeId,
+        title: projection.titleByNode.get(nodeId) ?? nodeId,
+        chapterId: chapterByNode.get(nodeId)?.id ?? chapter.id,
+        chapterTitle: chapterByNode.get(nodeId)?.title ?? chapter.title,
+        chapterNumber: chapterByNode.get(nodeId)?.order ?? chapter.order,
+        status: current ? "current" : learned ? "done" : "locked",
+        stateLabel: current ? "当前" : nodeStatus === "mastered" ? "已掌握" : nodeStatus === "practicing" ? "动手任务中" : learned ? "已学" : "待学",
+        learned,
+        ...(micro?.estimatedMinutes || practice?.estimatedMinutes ? { minutes: micro?.estimatedMinutes ?? practice?.estimatedMinutes } : {}),
+        meta: practice ? (micro ? "小练习 · 动手任务" : "动手任务") : micro ? "小练习" : undefined,
+        kind: micro ? "micro" : practice ? "practice" : "none"
+      } satisfies WindingStepInput;
+    }));
+  }, [decision?.nextAction.nodeId, projection]);
 
-  const layout = buildWindingRoute(stepInputs, width);
-  const done = chapter?.learnedCount ?? stepInputs.filter((step) => step.status === "done").length;
-  const folds = projection.chapters.filter((item) => item.id !== chapter?.id);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [hostWidth, setHostWidth] = useState<number | null>(null);
+  const lastSideWidth = useRef<number | null>(null);
+
+  // The route must follow the real container, including the 460px side panel
+  // at 1280 and the 420px one below it. Reserve 16px for a classic scrollbar.
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const measure = () => {
+      const next = Math.max(280, Math.floor(host.clientWidth / 8) * 8 - 16);
+      setHostWidth((current) => current === next ? current : next);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
+
+  const fittedWidth = Math.min(width, hostWidth ?? width);
+  // Switching side/page moves the same instance into a wider host; keep the
+  // side-form coordinates so scroll and selection cannot jump with the morph.
+  const effectiveWidth = mode === "page" && lastSideWidth.current ? lastSideWidth.current : fittedWidth;
+  useLayoutEffect(() => {
+    if (mode !== "page") lastSideWidth.current = fittedWidth;
+  }, [fittedWidth, mode]);
+
+  const cardWidth = effectiveWidth < 400 ? 120 : effectiveWidth < 480 ? 140 : effectiveWidth < 540 ? 160 : 200;
+  const maxLabelWidth = effectiveWidth < 400 ? 90 : effectiveWidth < 480 ? 110 : effectiveWidth < 540 ? 130 : 140;
+  const resolvedLabelWidth = Math.min(labelWidth ?? maxLabelWidth, maxLabelWidth);
+  const layout = useMemo(() => buildWindingRoute(steps, effectiveWidth), [effectiveWidth, steps]);
+  const total = steps.length;
+  const done = steps.filter((step) => step.learned).length;
 
   const actionFor = (step: WindingStep): CourseRouteStepAction => {
     const micro = projection.microByNode.get(step.id);
@@ -64,30 +121,26 @@ export function CourseRoutePanel({ projection, decision, courseTitle, showHeader
     return { step, nodeId: step.id, kind: "none" };
   };
 
-  return <div className="ef-course-route-view">
-    {chapter ? <div className="ef-course-route-banner" role="status">
-      <span><BookOpen size={14} aria-hidden="true" />第 {chapter.order} 章 · {chapter.title}</span>
-      <b>{done} / {chapter.nodeIds.length} 已学</b>
-    </div> : null}
+  return <div className="ef-course-route-host" ref={hostRef}>
     <CourseRouteView
       layout={layout}
-      steps={stepInputs}
+      steps={steps}
+      mode={mode}
+      measureEpoch={measureEpoch}
+      courseTitle={courseTitle}
+      courseTotal={total}
+      courseDone={done}
+      courseCard={courseCard}
+      cardWidth={cardWidth}
       usingActiveRoute
       routeRecommended
       reducedMotion={false}
       showHeader={showHeader}
       showAdjust={false}
-      labelSide={labelSide}
-      labelWidth={labelWidth}
+      labelWidth={resolvedLabelWidth}
       onSelect={(step) => onSelect(actionFor(step))}
       onStart={(step) => onStart(actionFor(step))}
+      onOpenTree={onOpenTree}
     />
-    {folds.length ? <div className="ef-course-route-folds" aria-label="其他章节">
-      {folds.map((item) => <div key={item.id} className="ef-course-route-fold">
-        <span><strong>第 {item.order} 章 · {item.title}</strong><small>{item.nodeIds.length} 个要点 · {item.microCount} 个小练习</small></span>
-        <span className="ef-course-route-fold-progress">{item.learnedCount === item.nodeIds.length && item.nodeIds.length ? <><Check size={13} aria-hidden="true" />已学完</> : `${item.learnedCount} / ${item.nodeIds.length}`}</span>
-      </div>)}
-    </div> : null}
-    <p className="ef-course-route-note"><MapIcon size={13} aria-hidden="true" />只展开当前章；完整结构和能力关系在课程树里查看。</p>
   </div>;
 }

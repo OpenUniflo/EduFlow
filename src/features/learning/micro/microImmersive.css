@@ -38,6 +38,37 @@
   display: flex;
   align-items: center;
   gap: var(--sp-8);
+}.ef-micro-foot-left{
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+}.ef-micro-inline-actions{
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--sp-4);
+}.ef-micro-inline-actions .ef-home-icon{
+  width: var(--ctl-32);
+  height: var(--ctl-32);
+  flex-basis: var(--ctl-32);
+}
+.ef-home-micro .micro-card footer .ef-micro-inline-actions button{
+  width: var(--ctl-32);
+  height: var(--ctl-32);
+  min-height: var(--ctl-32);
+  flex: 0 0 var(--ctl-32);
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+.ef-home-micro .micro-card footer .ef-micro-inline-actions button:hover{
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
 }.ef-micro-foot-gap{
   flex: 1;
   min-width: var(--sp-8);
@@ -230,11 +261,17 @@
   color: var(--surface);
   font-size: var(--fs-14);
   font-weight: var(--fw-600);
-}.ef-micro-shell .atlas-secondary,.ef-home-micro .atlas-secondary,.ef-micro-shell .micro-step--immersive footer button.atlas-secondary,.ef-home-micro .micro-card footer button.atlas-secondary,.ef-micro-shell .micro-step--immersive footer button:nth-child(1),.ef-home-micro .micro-card footer button:nth-child(1),.ef-micro-shell .micro-step--immersive footer button:nth-child(2),.ef-home-micro .micro-card footer button:nth-child(2){
+}.ef-micro-shell .atlas-secondary,.ef-home-micro .atlas-secondary,.ef-micro-shell .micro-step--immersive footer button.atlas-secondary,.ef-home-micro .micro-card footer button.atlas-secondary{
   border-color: var(--line-strong);
   background: var(--surface);
   color: var(--ink-2);
-}.ef-micro-shell .atlas-primary:disabled,.ef-home-micro .atlas-primary:disabled,.ef-micro-shell .atlas-secondary:disabled,.ef-home-micro .atlas-secondary:disabled,.ef-micro-shell .micro-step--immersive footer button:disabled,.ef-home-micro .micro-card footer button:disabled{
+}.ef-micro-shell .atlas-primary:disabled,.ef-home-micro .atlas-primary:disabled{
+  border-color: var(--line-strong);
+  background: var(--line);
+  color: var(--muted);
+  opacity: .85;
+  cursor: not-allowed;
+}.ef-micro-shell .atlas-secondary:disabled,.ef-home-micro .atlas-secondary:disabled,.ef-micro-shell .micro-step--immersive footer button:disabled,.ef-home-micro .micro-card footer button:disabled{
   opacity: .45;
   cursor: not-allowed;
 }.ef-micro-shell .micro-inline-explanation,.ef-home-micro .micro-inline-explanation{

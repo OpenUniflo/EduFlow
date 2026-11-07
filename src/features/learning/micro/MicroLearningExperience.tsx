@@ -99,7 +99,7 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
   const nextReview=()=>{if(!reviewCursor)return;const next=nextMicroReviewStep(path,reviewCursor);setReviewCursor(next&&!((!formalCompleted||pinned)&&next.unitId===formalUnit.id&&next.stepId===formalStep.id)&&!(next.unitId===progress?.currentUnitId&&next.stepId===progress?.currentStepId&&!formalCompleted)?next:null);};
   const [footerMount,setFooterMount]=useState<HTMLDivElement|null>(null);
   const courseTitle=courseId?applicationServices.courseRepository.getCourse(courseId)?.course.title??"课程小练习":"独立学习";
-  const minimize=()=>navigate(`/?micro=${encodeURIComponent(knowledgeId)}:${encodeURIComponent(path.id)}:${encodeURIComponent(courseId??"")}`);
+  const minimize=()=>navigate(`/?micro=${encodeURIComponent(knowledgeId)}:${encodeURIComponent(path.id)}:${encodeURIComponent(courseId??"")}&view=side`);
   const shellTools = <>
     <button type="button" className="ef-micro-icon" onClick={minimize} aria-label="缩小为侧面板" title="缩小为侧面板"><Minimize2 size={16} aria-hidden="true" /></button>
     <button type="button" className="ef-micro-icon" onClick={() => navigate(returnTarget)} aria-label="退出小练习"><X size={16} aria-hidden="true" /></button>
@@ -132,7 +132,7 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
   </main>;
 }
 
-export function MicroStepPanel({path,unitId,step,repository,session,review,active,busy,previous,onBack,onNext,onReturn,onComplete,variant="card",footerMount=null,footerMeta}:{path:MicroLearningPath;unitId:string;step:MicroStep;repository:MicroLearningRepository;session:MockSession|null;review:boolean;active:boolean;busy:boolean;previous:MicroReviewCursor|null;onBack(cursor:MicroReviewCursor):void;onNext():void;onReturn():void;onComplete?(submission?:Parameters<MicroLearningRepository["completeStep"]>[3],durationMs?:number):Promise<boolean>;variant?:"card"|"immersive";footerMount?:HTMLElement|null;footerMeta?:ReactNode}) {
+export function MicroStepPanel({path,unitId,step,repository,session,review,active,busy,previous,onBack,onNext,onReturn,onComplete,variant="card",footerMount=null,footerMeta,progressLabel,inlineFormActions,onFeedbackShown}:{path:MicroLearningPath;unitId:string;step:MicroStep;repository:MicroLearningRepository;session:MockSession|null;review:boolean;active:boolean;busy:boolean;previous:MicroReviewCursor|null;onBack(cursor:MicroReviewCursor):void;onNext():void;onReturn():void;onComplete?(submission?:Parameters<MicroLearningRepository["completeStep"]>[3],durationMs?:number):Promise<boolean>;variant?:"card"|"immersive";footerMount?:HTMLElement|null;footerMeta?:ReactNode;progressLabel?:ReactNode;inlineFormActions?:ReactNode;onFeedbackShown?():void}) {
   const [answer,setAnswer]=useState<MicroLearningAnswer>(()=>initialAnswer(step.interaction)),[touched,setTouched]=useState(false),[grading,setGrading]=useState<"success"|"retry"|"error"|null>(null),[whyOpen,setWhyOpen]=useState(false);
   const inFlight=useRef(false),interaction=step.interaction,feedbackRef=useRef<HTMLDivElement>(null),lastFeedbackRef=useRef<string|null>(null);
   // Client-reported visible elapsed time only; never used as an attainment signal.
@@ -157,22 +157,26 @@ export function MicroStepPanel({path,unitId,step,repository,session,review,activ
     if(!feedbackKey||previous===feedbackKey)return;
     // Scroll exactly once, after this feedback has committed. Subsequent
     // manual scrolling is never overridden.
-    const frame=window.requestAnimationFrame(()=>{const node=feedbackRef.current;if(node)scrollFeedbackIntoView(node);});
+    const frame=window.requestAnimationFrame(()=>{onFeedbackShown?.();const node=feedbackRef.current;if(node)scrollFeedbackIntoView(node);});
     return()=>window.cancelAnimationFrame(frame);
-  },[feedbackKey]);
+  },[feedbackKey,onFeedbackShown]);
   const demonstration=step.kind==="explanation"||step.kind==="summary";
   const immersive=variant==="immersive";
+  // Data-driven explanation: do not repeat the body when the only available
+  // explanation is the same content the learner is already reading.
+  const whyContent=[mechanism?.teaching?.explanation,step.retryFeedback].find((content)=>content!=null&&JSON.stringify(content)!==JSON.stringify(step.body));
+  const whyButton=whyContent?<button className="atlas-secondary" onClick={()=>setWhyOpen((value)=>!value)}>{whyOpen?"收起解释":"为什么？"}</button>:null;
   const previousButton=immersive||!previous?null:<button className="atlas-secondary" disabled={busy} onClick={()=>previous&&onBack(previous)}><ArrowLeft size={15}/>上一步</button>;
-  const whyButton=<button className="atlas-secondary" onClick={()=>setWhyOpen((value)=>!value)}>{whyOpen?"收起解释":"为什么？"}</button>;
   const primaryActions=review?<>{interaction&&!demonstration&&interaction.type!=="h5p"?<button className="atlas-secondary" disabled={!hasAnswer(answer)} onClick={()=>void completeCurrent()}>检查答案</button>:null}<button className="atlas-primary" onClick={onNext}>下一步<ArrowRight size={15}/></button></>:grading==="success"?<button className="atlas-primary" disabled={busy} onClick={onNext}>继续<ArrowRight size={15}/></button>:interaction?.type==="h5p"?<button className="atlas-primary" disabled>完成互动后继续<ArrowRight size={15}/></button>:<button className="atlas-primary" disabled={busy||Boolean(interaction&&(!hasAnswer(answer)||((interaction.type==="parameter-lab"||interaction.type==="matrix-tensor")&&!touched)))} onClick={()=>void completeCurrent()}>{busy?"保存中…":interaction&&!demonstration?"检查答案":"继续"}<ArrowRight size={15}/></button>;
-  const footerContent=<>{immersive?footerMeta:null}{previousButton}<span className="ef-micro-foot-gap" aria-hidden="true"/>{whyButton}<span className="ef-micro-foot-gap" aria-hidden="true"/>{primaryActions}</>;
+  // Left: persisted progress. Right: secondary controls first, primary last.
+  const footerContent=<><div className="ef-micro-foot-left">{immersive?footerMeta:<span className="ef-micro-foot-progress-text">{progressLabel}</span>}{inlineFormActions}</div><span className="ef-micro-foot-actions">{previousButton}{whyButton}{primaryActions}</span></>;
   return <article className={immersive?`micro-step micro-step--immersive micro-step-${grading??"active"}`:`micro-card micro-step-${grading??"active"}`}><span className="atlas-kicker">{review?"复习 · ":""}第 {(path.units.find((unit)=>unit.id===unitId)?.position??0)+1} 单元 · {microKindLabel[step.kind]}</span><h1>{step.title}</h1><MicroBody body={step.body}/>
     {review?<div className="micro-review-banner"><span>回看中 · 正式进度保持不变</span><button type="button" onClick={onReturn}>返回当前进度</button></div>:null}
     {interaction?.type==="h5p"?<H5PStep repository={repository} pathId={path.id} unitId={unitId} stepId={step.id} interaction={interaction} onResult={(eventId,result)=>void completeCurrent({kind:"h5p-result",contentRef:interaction.contentRef,eventId,result})}/>:interaction?<NativeInteraction step={step} answer={answer} completed={!active||(!review&&grading==="success")} demonstration={demonstration} onAnswer={(value)=>{setAnswer(value);setTouched(true);setGrading(null);}}/>:null}
     {immersive
       ? (feedback?<div ref={feedbackRef} className={`micro-feedback ${grading==="success"?"success":"retry"}`} role="status"><MicroBody body={feedback}/></div>:null)
       : <div className="micro-feedback-slot" role="status" aria-live="polite">{feedback?<div ref={feedbackRef} className={`micro-feedback ${grading==="success"?"success":"retry"}`}><MicroBody body={feedback}/></div>:null}</div>}
-    {whyOpen?<div className="micro-inline-explanation"><strong>机制解释</strong><MicroBody body={mechanism?.teaching?.explanation??step.retryFeedback??step.body}/><small>这是预先准备的教学解释；登录后可继续和 EduFlow 助手讨论当前步骤，不影响评分。</small></div>:null}
+    {whyOpen&&whyContent?<div className="micro-inline-explanation"><strong>机制解释</strong><MicroBody body={whyContent}/><small>这是预先准备的教学解释；{session?"可以":"登录后可"}继续和 EduFlow 助手讨论当前步骤，不影响评分。</small></div>:null}
     {footerMount ? createPortal(<div className="ef-micro-foot">{footerContent}</div>,footerMount) : <footer>{footerContent}</footer>}
   </article>;
 }

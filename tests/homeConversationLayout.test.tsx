@@ -48,12 +48,23 @@ function conversation(messages: AssistantUIMessage[], error = '') {
 const message = (parts: AssistantUIMessage['parts'], metadata?: AssistantUIMessage['metadata']): AssistantUIMessage => ({ id: 'm', role: 'assistant', parts, ...(metadata ? { metadata } : {}) });
 
 describe('Home conversation column anchor', () => {
-  it('keeps the composer after the timeline inside the conversation column', () => {
+  it('keeps the composer after the timeline inside one full-height scroller', () => {
     const html = conversation([]);
+    const scroller = html.indexOf('ef-home-scroller');
+    const title = html.indexOf('ef-home-titlebar');
     const timeline = html.indexOf('ef-home-timeline');
     const composer = html.indexOf('ef-home-composer');
-    expect(timeline).toBeGreaterThan(-1);
+    expect(scroller).toBeGreaterThan(-1);
+    expect(title).toBeGreaterThan(scroller);
+    expect(timeline).toBeGreaterThan(title);
     expect(composer).toBeGreaterThan(timeline);
+  });
+
+  it('renders the shared open question without the retired hardcoded greeting', () => {
+    const html = conversation([]);
+    expect(html).toContain('ef-home-empty');
+    expect(html).toContain('想聊点什么？');
+    expect(html).not.toContain('你好，我是 EduFlow');
   });
 
   it('shows an explicit empty-reply state and the retry action', () => {
@@ -61,6 +72,15 @@ describe('Home conversation column anchor', () => {
     expect(html).not.toContain('正在回复…');
     expect(html).toContain('这次没有生成回复，请重试。');
     expect(html).toContain('重试');
+  });
+
+  it('shows the stopped marker without a retry error', () => {
+    const html = conversation([
+      { id: 'u1', role: 'user', parts: [{ type: 'text', text: '分六点说明' }], metadata: { stopped: true } }
+    ]);
+    expect(html).toContain('已停止回复');
+    expect(html).not.toContain('回复没有完成。请重试。');
+    expect(html).not.toContain('>重试<');
   });
 
   it('shows the fixed hidden hint and never the original protocol text', () => {
@@ -115,12 +135,14 @@ describe('Home conversation column anchor', () => {
     expect(html).toContain('进入课程创建');
   });
 
-  it('fills the work area and column when a side panel is pushed open', () => {
+  it('fills the work area and keeps the bars sticky when a side panel is pushed open', () => {
     const work = rule('.ef-home.has-panel .ef-home-work,');
     expect(work).toContain('display: grid');
     expect(work).toContain('grid-template-columns: minmax(0, 1fr)');
     expect(rule('.ef-home-column {')).toContain('height: 100%');
     expect(rule('.ef-home-conversation {')).toContain('flex: 1');
-    expect(rule('.ef-home-composer {')).toContain('margin-top: auto');
+    expect(rule('.ef-home-scroller {')).toContain('overflow-y: auto');
+    expect(rule('.ef-home-titlebar {')).toContain('position: sticky');
+    expect(rule('.ef-home-composer {')).toContain('position: sticky');
   });
 });

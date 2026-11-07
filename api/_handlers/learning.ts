@@ -35,8 +35,10 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const learnerCourseId = typeof request.query.courseId === "string" ? request.query.courseId : undefined;
     if (assignmentId && learnerCourseId) {
       const actionRunId = typeof request.query.actionRunId === 'string' ? request.query.actionRunId : undefined;
+      const attemptId = typeof request.query.attemptId === 'string' ? request.query.attemptId : undefined;
       let attemptQuery = client.from("learning_attempts").select("id,attempt_number,response").eq("user_id",user.id).eq("course_id",learnerCourseId).eq("assignment_id",assignmentId);
-      if (actionRunId) attemptQuery = attemptQuery.eq('action_run_id', actionRunId);
+      if (attemptId) attemptQuery = attemptQuery.eq("id", attemptId);
+      else if (actionRunId) attemptQuery = attemptQuery.eq('action_run_id', actionRunId);
       const attemptResult = await attemptQuery.order("attempt_number",{ascending:false}).limit(1).maybeSingle();
       const attempt = dataOrThrow(attemptResult.data as Row|null,attemptResult.error,"Latest Assignment Attempt lookup");
       if (!attempt) { json(response,200,{result:null}); return; }

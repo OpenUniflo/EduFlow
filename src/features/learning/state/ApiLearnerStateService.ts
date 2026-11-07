@@ -24,7 +24,12 @@ export class ApiLearnerStateService {
   startMaterial(courseId: string, materialId: string, nodeId: string) { return apiRequest<{ status: string }>("/api/learning", { method: "POST", body: JSON.stringify({ action: "start-material", courseId, materialId, nodeId }) }); }
   startAssignment(courseId: string, assignmentId: string, actionRunId?: string, conversation = false, repeatAttemptId?: string) { return apiRequest<{ status: string }>("/api/learning", { method: "POST", body: JSON.stringify({ action: "start-assignment", courseId, assignmentId, actionRunId, conversation, ...(repeatAttemptId ? { repeatAttemptId } : {}) }) }); }
   submitAssignment(courseId: string, assignmentId: string, response: AssignmentResponse, idempotencyKey = crypto.randomUUID(), actionRunId?: string, conversation = false, evaluator: "teacher" | "ai" = "teacher", assistantSessionId?: string) { return apiRequest<AssignmentAttemptResult & { status: string; accepted: boolean; evaluatorKind?: string; feedback: AssignmentFeedback }>("/api/learning", { method: "POST", body: JSON.stringify({ action: "submit-assignment", courseId, assignmentId, response, idempotencyKey, actionRunId, conversation, evaluator, ...(assistantSessionId ? { assistantSessionId } : {}) }) }); }
-  getAssignmentResult(courseId: string, assignmentId: string, actionRunId?: string) { return apiRequest<{ result: AssignmentResult | null }>(`/api/learning?courseId=${encodeURIComponent(courseId)}&assignmentId=${encodeURIComponent(assignmentId)}${actionRunId ? `&actionRunId=${encodeURIComponent(actionRunId)}` : ''}`); }
+  getAssignmentResult(courseId: string, assignmentId: string, actionRunId?: string, attemptId?: string) {
+    const params = new URLSearchParams({ courseId, assignmentId });
+    if (actionRunId) params.set("actionRunId", actionRunId);
+    if (attemptId) params.set("attemptId", attemptId);
+    return apiRequest<{ result: AssignmentResult | null }>(`/api/learning?${params.toString()}`);
+  }
   async evaluateAssignment(courseId: string, assignmentId: string, attemptId: string, userId?: string) {
     const response = await apiRequest<AssignmentEvaluationResponse>("/api/learning", { method: "POST", body: JSON.stringify({ action: "evaluate-assignment", courseId, assignmentId, attemptId }), keepalive: true });
     // Refresh durable learner projections in the service boundary, not in a

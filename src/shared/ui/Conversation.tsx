@@ -40,7 +40,8 @@ export function EventRow({ icon, title, detail, action, children, className = ""
 export type ConversationCardSize = "s" | "l";
 
 /**
- * Conversation object card: S is 480px and centred in the column, L spans it.
+ * Conversation object card: every answer card spans the conversation column and
+ * shares its left edge with text and event rows.
  * ObjectShell owns the object layout; this wrapper owns the column placement.
  */
 export function ConversationCard({ size = "s", children, className = "", label }: {

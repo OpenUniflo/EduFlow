@@ -37,8 +37,12 @@ export type AssistantMessage = {
   role: "user" | "assistant";
   content: string;
   messageKind?: "utterance" | "action" | "goal_clarification";
+  /** Server-owned action identity; lets the timeline follow its own actions. */
+  dedupeKey?: string;
   /** Ordered text + display-card parts. Absent on pre-stage-3 rows. */
   parts?: AssistantTimelinePart[];
+  /** The learner stopped this turn; the marker lives in `parts` and is kept across reloads. */
+  stopped?: boolean;
   /** Present when the server hid a malformed assistant row (for example protocol_leak). */
   invalidReason?: string;
   structuredContent?: AssistantStructuredContent;
@@ -89,6 +93,8 @@ export type AssistantSession = {
   title?: string;
   createdAt: string;
   updatedAt: string;
+  /** The conversation created a personal Course, so it cannot be deleted. */
+  hasCourse?: boolean;
 };
 
 export type AssistantSessionDetail = AssistantSession & { messages: AssistantMessage[] };

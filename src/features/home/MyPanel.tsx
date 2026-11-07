@@ -1,9 +1,8 @@
-import { BookOpen, Check, Clock, ListChecks, Lock, MessageSquare, Plus, UserRound, X } from "lucide-react";
+import { BookOpen, ChevronRight, Clock, ListChecks, Lock, UserRound, X } from "lucide-react";
 import { useMemo } from "react";
 import { applicationServices } from "@/app/services/applicationServices";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
 import type { MockSession } from "@/features/auth/types";
-import type { AssistantSession } from "@/features/assistant/assistantContract";
 import type { UserKnowledgeRecord } from "@/features/profile/types";
 import "./home.css";
 
@@ -12,10 +11,9 @@ type PanelProps = {
   open: boolean;
   loading?: boolean;
   onClose: () => void;
-  sessions: AssistantSession[];
-  activeSessionId: string | null;
-  onNewConversation: () => void;
-  onSelectSession: (sessionId: string) => void;
+  onOpenCourse(courseId: string): void;
+  onOpenPractice(courseId: string, assignmentId: string, title: string): void;
+  onOpenRecent(nodeId: string): void;
 };
 
 const statusLabels: Record<string, string> = {
@@ -35,11 +33,12 @@ const assignmentLabels: Record<string, string> = {
 };
 
 /**
- * My panel is read-only overview: the active Course, its tasks and recent
- * learning, plus conversation history. It never restates the next step and
- * never duplicates the conversation's main action.
+ * My panel is a read-only personal overview: the active Course, real task
+ * states and recent learning. Every row opens its object. It holds no
+ * conversation list, no "new conversation" action and never restates the
+ * next step.
  */
-export function MyPanel({ session, open, loading = false, onClose, sessions, activeSessionId, onNewConversation, onSelectSession }: PanelProps) {
+export function MyPanel({ session, open, loading = false, onClose, onOpenCourse, onOpenPractice, onOpenRecent }: PanelProps) {
   const runtimes = useMemo(() => applicationServices.courseRepository.listCourseRuntimes(), []);
   const records = useMemo(() => applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId), [session.userId]);
   const courseStates = useMemo(() => new Map(runtimes.map((runtime) => [runtime.course.id, applicationServices.learningProgressRepository.getCourseState(session.userId, runtime.course.id)])), [runtimes, session.userId]);
@@ -50,8 +49,8 @@ export function MyPanel({ session, open, loading = false, onClose, sessions, act
     const nodeIds = [...new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId))];
     const status = new Map(records.map((record) => [record.nodeId, record.status]));
     const learned = nodeIds.filter((nodeId) => satisfiesTeachingPrerequisite(status.get(nodeId))).length;
-    return [{ id: runtime.course.id, title: runtime.course.title, learned, total: nodeIds.length }];
-  }), [courseStates, records, runtimes]);
+    return [{ id: runtime.course.id, title: runtime.course.title, learned, total: nodeIds.length, updatedAt: state.updatedAt ?? "" }];
+  }).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)), [courseStates, records, runtimes]);
 
   const tasks = useMemo(() => runtimes.flatMap((runtime) => {
     const state = courseStates.get(runtime.course.id);
@@ -59,7 +58,7 @@ export function MyPanel({ session, open, loading = false, onClose, sessions, act
     return runtime.assignments.flatMap((assignment) => {
       const status = state.assignmentStates[assignment.id]?.status;
       if (!status || status === "not_started") return [];
-      return [{ id: `${runtime.course.id}:${assignment.id}`, title: assignment.title, status }];
+      return [{ id: `${runtime.course.id}:${assignment.id}`, courseId: runtime.course.id, assignmentId: assignment.id, title: assignment.title, status }];
     });
   }).slice(0, 5), [courseStates, runtimes]);
 
@@ -78,6 +77,7 @@ export function MyPanel({ session, open, loading = false, onClose, sessions, act
   }, [records, runtimes, session.userId]);
 
   if (!open) return null;
+  const currentCourse = courses[0];
 
   return <aside id="ef-my-panel" className="ef-my-panel" aria-label="我的面板" aria-modal="false" data-open="true" aria-busy={loading || undefined}>
     <header className="ef-my-panel-head">
@@ -87,38 +87,30 @@ export function MyPanel({ session, open, loading = false, onClose, sessions, act
     </header>
 
     <div className="ef-my-panel-body">
-      <section className="ef-my-section" aria-labelledby="my-conversations">
-        <div className="ef-my-section-head"><h3 id="my-conversations"><MessageSquare size={14} aria-hidden="true" />对话</h3><small>{sessions.length} 条</small></div>
-        <button type="button" className="ef-my-conversation-new" onClick={onNewConversation}><Plus size={14} aria-hidden="true" />新对话</button>
-        <div className="ef-my-conversation-list">
-          {sessions.length ? sessions.slice(0, 8).map((item) => <button key={item.id} type="button" className={`ef-my-conversation ${item.id === activeSessionId ? "is-active" : ""}`} onClick={() => onSelectSession(item.id)} aria-current={item.id === activeSessionId ? "true" : undefined}>
-            <span><strong>{item.title?.trim() || "未命名对话"}</strong><small>{formatRelative(item.updatedAt)}</small></span>
-            {item.id === activeSessionId ? <Check size={14} aria-hidden="true" /> : null}
-          </button>) : <p className="ef-my-muted">还没有历史对话。</p>}
-        </div>
-      </section>
-
       <section className="ef-my-section" aria-labelledby="my-courses">
-        <div className="ef-my-section-head"><h3 id="my-courses"><BookOpen size={14} aria-hidden="true" />正在学</h3><small>{courses.length} 门</small></div>
-        {courses.length ? courses.slice(0, 3).map((course) => <div key={course.id} className="ef-my-course-overview">
-          <span><strong>{course.title}</strong><small>已学 {course.learned} / {course.total} 个要点</small></span>
-          <div className="ef-my-course-bar" aria-hidden="true"><i style={{ width: `${course.total ? Math.round(course.learned / course.total * 100) : 0}%` }} /></div>
-        </div>) : <p className="ef-my-muted">还没有开始学习。</p>}
+        <div className="ef-my-section-head"><h3 id="my-courses"><BookOpen size={14} aria-hidden="true" />当前课程</h3></div>
+        {currentCourse ? <button type="button" className="ef-my-row" onClick={() => onOpenCourse(currentCourse.id)}>
+          <span><strong>{currentCourse.title}</strong><small>已学 {currentCourse.learned} / {currentCourse.total} 个要点</small></span>
+          <span className="ef-my-course-bar" aria-hidden="true"><i style={{ width: `${currentCourse.total ? Math.round(currentCourse.learned / currentCourse.total * 100) : 0}%` }} /></span>
+          <ChevronRight size={14} aria-hidden="true" />
+        </button> : <p className="ef-my-muted">还没有开始学习。</p>}
       </section>
 
       <section className="ef-my-section" aria-labelledby="my-tasks">
-        <div className="ef-my-section-head"><h3 id="my-tasks"><ListChecks size={14} aria-hidden="true" />我的任务</h3><small>{tasks.length} 项</small></div>
-        {tasks.length ? tasks.map((task) => <div key={task.id} className="ef-my-task">
+        <div className="ef-my-section-head"><h3 id="my-tasks"><ListChecks size={14} aria-hidden="true" />任务状态</h3><small>{tasks.length} 项</small></div>
+        {tasks.length ? tasks.map((task) => <button key={task.id} type="button" className="ef-my-row" onClick={() => onOpenPractice(task.courseId, task.assignmentId, task.title)}>
           <span><strong>{task.title}</strong></span>
           <span className={`ef-my-status ${task.status === "needs_revision" ? "is-warn" : task.status === "accepted" || task.status === "completed" ? "" : "is-quiet"}`}>{assignmentLabels[task.status] ?? task.status}</span>
-        </div>) : <p className="ef-my-muted">当前没有动手任务。</p>}
+          <ChevronRight size={14} aria-hidden="true" />
+        </button>) : <p className="ef-my-muted">当前没有动手任务。</p>}
       </section>
 
       <section className="ef-my-section" aria-labelledby="my-recent">
         <div className="ef-my-section-head"><h3 id="my-recent"><Clock size={14} aria-hidden="true" />最近学习</h3><small>{recent.length} 条</small></div>
-        {recent.length ? recent.map((record) => <div key={record.nodeId} className="ef-my-recent-row">
+        {recent.length ? recent.map((record) => <button key={record.nodeId} type="button" className="ef-my-row" onClick={() => onOpenRecent(record.nodeId)}>
           <span><strong>{titles.get(record.nodeId) ?? record.nodeId}</strong><small>{statusLabels[record.status] ?? record.status}{record.updatedAt ? ` · ${formatRelative(record.updatedAt)}` : ""}</small></span>
-        </div>) : <p className="ef-my-muted">还没有学习记录。</p>}
+          <ChevronRight size={14} aria-hidden="true" />
+        </button>) : <p className="ef-my-muted">还没有学习记录。</p>}
       </section>
     </div>
 

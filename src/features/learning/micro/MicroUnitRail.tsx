@@ -30,7 +30,7 @@ export function MicroUnitRail({ path, currentUnitId, repository }: {
           );
         })}
       </ol>
-      <p className="ef-micro-rail-note">关闭工作区不会丢进度。已完成。</p>
+      <p className="ef-micro-rail-note">进度已保存；关闭工作区后仍可继续。</p>
     </nav>
   );
 }

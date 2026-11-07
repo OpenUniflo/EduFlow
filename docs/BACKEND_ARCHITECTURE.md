@@ -78,10 +78,10 @@ The server-only embedding boundary additionally requires:
 
 The server-only Phase 4.2 generation boundary additionally requires:
 
-- `LLM_PROVIDER=deepseek`
-- `LLM_BASE_URL=https://api.deepseek.com`
+- `LLM_PROVIDER` — any non-empty OpenAI-compatible provider label; there is no provider whitelist and no provider-name branching
+- `LLM_BASE_URL` — the provider's OpenAI-compatible base URL (for example `https://opencode.ai/inference/go/openai/v1` for opencode-go)
 - `LLM_API_KEY`
-- `LLM_MODEL`
+- `LLM_MODEL` (for example `deepseek-v4.1-flash` for opencode-go)
 
 The browser never receives these values. `/api/knowledge-generation` authorizes an authenticated Global Admin, consumes a completed private `CourseMaterial` artifact, runs bounded structured generation and domain validation, and commits Knowledge, relation provenance, Curriculum, and run status in one database transaction. Completed Phase 4.2 courses use the intermediate `curriculum-generated` status; Assignment generation remains a later phase.
 

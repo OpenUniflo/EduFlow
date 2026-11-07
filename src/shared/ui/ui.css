@@ -927,13 +927,20 @@
   width: 100%;
 }
 
-.ef-ui-conversation-card--s {
-  max-width: 480px;
-  margin-inline: auto;
-}
-
+.ef-ui-conversation-card--s,
 .ef-ui-conversation-card--l {
   width: 100%;
+}
+
+/* Cards are part of the answer: no nested scroll container. `clip` keeps the
+   rounded corners without creating a scrollport that would break sticky
+   action bars nested inside the card. */
+.ef-ui-conversation-card .ef-ui-obj {
+  overflow: clip;
+}
+
+.ef-ui-conversation-card .ef-ui-obj-body {
+  overflow: visible;
 }
 
 .ef-ui-conversation-card--s .ef-ui-obj,
@@ -965,8 +972,16 @@
 
 .ef-ui-composer-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--sp-8);
+}
+
+.ef-ui-composer-bar .ef-ui-textarea.ef-ui-composer-input {
+  min-height: var(--ctl-32);
+  padding: var(--sp-4) 0;
+  resize: none;
+  overflow-y: auto;
+  line-height: var(--lh-14);
 }
 
 .ef-ui-composer-bar .ef-ui-field-wrap {
@@ -1003,6 +1018,15 @@
 
 .ef-ui-send:hover:not(:disabled) {
   background: var(--brand-ink);
+}
+
+.ef-ui-send.is-stop {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.ef-ui-send.is-stop:hover:not(:disabled) {
+  background: var(--ink-2);
 }
 
 .ef-ui-send:disabled {

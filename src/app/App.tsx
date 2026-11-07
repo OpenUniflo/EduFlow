@@ -101,7 +101,6 @@ export default function App() {
     void restore();
     const { data } = supabaseClient.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT" && active) {
-        try { window.sessionStorage.removeItem(`eduflow:home:resumed:${session?.userId ?? ""}`); } catch { /* storage may be unavailable */ }
         resetAuthenticatedApplicationServices();
         setSession(null);
         void hydratePublicApplicationServices().catch((error) => { console.error("Public catalog rehydration failed", error); setStartupError("公开学习内容加载失败，请重试。"); });
@@ -114,7 +113,6 @@ export default function App() {
     [location.search, routeWorkflowId, ready]
   );
   async function logout() {
-    try { window.sessionStorage.removeItem(`eduflow:home:resumed:${session?.userId ?? ""}`); } catch { /* storage may be unavailable */ }
     await Promise.all([
       (applicationServices.learningProgressRepository as { flush?: () => Promise<unknown> }).flush?.()
     ]);

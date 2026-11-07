@@ -40,8 +40,9 @@ function mount(node: ReactNode) {
   return container;
 }
 
-function setInput(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+function setInput(input: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const prototype = input instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
   act(() => {
     setter?.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -119,13 +120,13 @@ describe("object shell and conversation geometry", () => {
     expect(immersive).toContain("画布");
   });
 
-  it("keeps S conversation cards 480px and centred while L spans the column", () => {
+  it("spans the conversation column with both S and L conversation cards", () => {
     const small = renderToStaticMarkup(<ConversationCard size="s" label="课程卡"><Bubble>摘要</Bubble></ConversationCard>);
     const large = renderToStaticMarkup(<ConversationCard size="l"><Bubble>摘要</Bubble></ConversationCard>);
     expect(small).toContain("ef-ui-conversation-card--s");
     expect(large).toContain("ef-ui-conversation-card--l");
-    expect(css).toMatch(/\.ef-ui-conversation-card--s\s*\{[^}]*max-width: 480px/);
-    expect(css).toMatch(/\.ef-ui-conversation-card--l\s*\{[^}]*width: 100%/);
+    expect(css).toMatch(/\.ef-ui-conversation-card--s,[\s\S]*?\.ef-ui-conversation-card--l\s*\{[^}]*width: 100%/);
+    expect(css).not.toMatch(/\.ef-ui-conversation-card--s\s*\{[^}]*max-width: 480px/);
     expect(renderToStaticMarkup(<EventRow title="已提交" detail="第 2 次" />)).toContain("ef-ui-event-row");
     expect(renderToStaticMarkup(<Bubble from="user">问题</Bubble>)).toContain("ef-ui-bubble--user");
   });
@@ -161,7 +162,7 @@ describe("keyboard and focus", () => {
     const container = mount(
       <HomeComposer contexts={[{ id: "c1", label: "课程 · 智能体" }]} onRemoveContext={removed} onSubmit={submitted} hint="Enter 发送" />
     );
-    const input = container.querySelector<HTMLInputElement>('input[aria-label="给助手发消息"]')!;
+    const input = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="给助手发消息"]')!;
     const send = container.querySelector<HTMLButtonElement>('button[aria-label="发送"]')!;
     expect(send.disabled).toBe(true);
     setInput(input, "  帮我解释一下  ");
@@ -172,6 +173,26 @@ describe("keyboard and focus", () => {
     expect(removed).toHaveBeenCalledWith("c1");
     input.focus();
     expect(document.activeElement).toBe(input);
+  });
+
+  it("keeps the draft editable while replying and turns send into stop", () => {
+    const submitted = vi.fn();
+    const stopped = vi.fn();
+    const container = mount(
+      <HomeComposer replying onStop={stopped} onSubmit={submitted} hint="Enter 发送" />
+    );
+    const input = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="给助手发消息"]')!;
+    const stop = container.querySelector<HTMLButtonElement>('button[aria-label="停止回复"]')!;
+    expect(input.disabled).toBe(false);
+    expect(stop.disabled).toBe(false);
+    setInput(input, "草稿还在");
+    key(input, "Enter");
+    expect(submitted).not.toHaveBeenCalled();
+    expect(input.value).toBe("草稿还在");
+    act(() => stop.click());
+    expect(stopped).toHaveBeenCalledTimes(1);
+    expect(submitted).not.toHaveBeenCalled();
+    expect(input.value).toBe("草稿还在");
   });
 
   it("opens on the account panel row, roves with arrows and returns focus on Escape", () => {

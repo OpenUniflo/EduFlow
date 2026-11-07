@@ -1,25 +1,40 @@
 /* Ordered assistant turn: text bubbles and answer cards interleave. */
 
+.ef-assistant-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+
 .ef-assistant-turn {
   display: grid;
   gap: var(--sp-8);
   width: 100%;
-  padding-left: 30px;
+  padding-left: 0;
   box-sizing: border-box;
 }
 
 .ef-assistant-turn.is-action { padding-left: 0; }
 
 .ef-assistant-text {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-8);
+  display: grid;
+  gap: var(--sp-4);
+  width: 100%;
   min-width: 0;
 }
 
-.ef-assistant-text .ef-home-assistant-mark { margin-top: 12px; flex: 0 0 auto; }
-.ef-assistant-text .ef-ui-bubble { max-width: min(100%, 760px); }
-.ef-assistant-text .ef-ui-bubble.is-continuation { margin-top: -4px; }
+.ef-assistant-body {
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+}
+
+.ef-assistant-time {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
 
 .ef-assistant-text .ef-assistant-md { font-size: var(--fs-14); line-height: var(--lh-14); color: var(--ink); }
 .ef-assistant-text .ef-assistant-md > :first-child { margin-top: 0; }
@@ -67,6 +82,19 @@
 }
 
 .ef-assistant-action-row { margin: 0; }
+.ef-assistant-completion-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--sp-8);
+  /* The event belongs to the answer below it: normal gap above, a little
+     tighter below, but never attached to the following text. */
+  margin-bottom: calc(var(--sp-4) * -1);
+  color: var(--muted);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+.ef-assistant-completion-row svg { flex: 0 0 auto; color: var(--target); }
 .ef-assistant-action-copy { font-size: var(--fs-13); line-height: var(--lh-13); color: var(--ink-2); }
 .ef-assistant-turn.is-action + .ef-ui-conversation-card,
 .ef-assistant-turn.is-action .ef-ui-conversation-card { margin-top: var(--sp-8); }
@@ -107,4 +135,14 @@
   color: var(--muted);
   font-size: var(--fs-12);
   line-height: var(--lh-12);
+}
+
+/* A stopped answer keeps its partial copy and marks the stop in muted text. */
+.ef-assistant-stopped {
+  margin: var(--sp-8) 0 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  text-align: left;
 }

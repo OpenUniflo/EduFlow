@@ -64,6 +64,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
   const [searchParams] = useSearchParams();
   const actionRunId = searchParams.get("actionRunId") || undefined;
   const repeatAttemptId = searchParams.get("repeatAttemptId") || undefined;
+  const requestedAttemptId = searchParams.get("attemptId") || undefined;
   const runtime = applicationServices.courseRepository.getCourse(courseId);
   const assignment = runtime?.assignments.find((item) => item.id === assignmentId);
   const compatibility = practiceCompatibility(assignment);
@@ -120,7 +121,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
     setResultLoaded(false); setResultError(""); setResult(null); setLatestAttemptNumber(undefined);
     setEvaluationPhase("idle"); setEvaluationError(""); setEvaluationElapsed(0);
     evaluationStartedFor.current = null;
-    void applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId)
+    void applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId, requestedAttemptId)
       .then(({ result: value }) => {
         if (!live) return;
         const attemptNumber = typeof value?.attemptNumber === "number" ? value.attemptNumber : undefined;
@@ -137,7 +138,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
       .catch(() => { if (live) setResultError("已保存的动手任务结果暂时无法读取，请重试。"); })
       .finally(() => { if (live) setResultLoaded(true); });
     return () => { live = false; };
-  }, [courseId, assignmentId, actionRunId, repeatAttemptId]);
+  }, [courseId, assignmentId, actionRunId, repeatAttemptId, requestedAttemptId]);
 
   useEffect(() => {
     submissionKey.current = crypto.randomUUID();
@@ -159,7 +160,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
     const tick = async () => {
       if (!live) return;
       try {
-        const { result: latest } = await applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId);
+        const { result: latest } = await applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId, requestedAttemptId);
         if (!live) return;
         if (latest && latest.attemptId === result.attemptId) {
           if (latest.outcome !== "pending") {
@@ -252,6 +253,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
 
   useEffect(() => {
     if (!repeatAttemptId || actionRunId) return;
+    window.dispatchEvent(new Event("eduflow:learner-action-start"));
     let live = true;
     void apiRequest("/api/learning", { method: "POST", body: JSON.stringify({ action: "start-assignment", courseId, assignmentId, repeatAttemptId }) })
       .then(() => refreshLearnerState(session.userId))
@@ -469,6 +471,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
   async function practiceAgain() {
     const previous = result;
     if (!previous || startingRevision) return;
+    window.dispatchEvent(new Event("eduflow:learner-action-start"));
     const previousEvaluator: PracticeEvaluator = previous.feedback?.evaluator === "ai" ? "ai" : "teacher";
     setStartingRevision(true); setError("");
     try {

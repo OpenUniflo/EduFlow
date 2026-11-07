@@ -66,6 +66,17 @@ describe("streaming protocol guard", () => {
     expect(guard.errors[0]).toBeInstanceOf(AssistantProtocolLeakError);
   });
 
+  it("drops a held protocol prefix when the learner aborts", async () => {
+    const guard = startGuard();
+    await guard.writer.write(delta("正常内容 <|DS"));
+    await guard.writer.write({ type: "abort", reason: "client_disconnected" } as Part);
+    await guard.writer.close();
+    await guard.pump;
+    const text = guard.chunks.join("");
+    expect(text).toBe("正常内容 ");
+    expect(text).not.toContain("<|DS");
+  });
+
   it("allows protocol text shown inside a fenced code block", async () => {
     const guard = startGuard();
     await guard.writer.write(delta("示例：\n```\n<|DSML| invoke name=\"lookup\">\n```\n结束"));

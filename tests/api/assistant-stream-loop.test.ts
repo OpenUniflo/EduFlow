@@ -11,7 +11,7 @@ vi.mock('../../api/_lib/env.js', () => ({ readLlmEnvironment: () => ({ llmModel:
 vi.mock('../../api/_lib/assistantTools.js', () => ({ createAssistantTools: mocks.tools }));
 import handler from '../../api/assistant';
 
-type Mode = 'tool-once' | 'multi-tool' | 'natural-text' | 'leak-final' | 'empty-final' | 'incomplete-final';
+type Mode = 'tool-once' | 'multi-tool' | 'natural-text' | 'leak-final' | 'empty-final' | 'incomplete-final' | 'hang-empty' | 'hang-text';
 
 function toolCallStream() {
   return {
@@ -45,9 +45,11 @@ function harness(mode: Mode) {
   const client = {
     from(table: string) {
       tables.push(table);
+      const filters: Array<[string, unknown]> = [];
+      let updateValue: Record<string, any> | undefined;
       const query: any = {
         select() { return query; },
-        eq() { return query; },
+        eq(column: string, value: unknown) { filters.push([column, value]); return query; },
         in() { return query; },
         or() { return query; },
         order() { return query; },
@@ -56,10 +58,15 @@ function harness(mode: Mode) {
           for (const row of Array.isArray(value) ? value : [value]) records.push({ ...row, id: String(records.length), sequence: records.length });
           return query;
         },
-        update() { return query; },
+        update(value: Record<string, any>) { updateValue = value; return query; },
         maybeSingle: async () => ({ data: table === 'assistant_sessions' ? { id: 'owned-session', user_id: 'owned' } : null, error: null }),
-        single: async () => ({ data: table === 'assistant_sessions' ? { id: 'owned-session', user_id: 'owned' } : null, error: null }),
+        single: async () => ({ data: table === 'assistant_sessions' ? { id: 'owned-session', user_id: 'owned' } : table === 'assistant_messages' ? records[records.length - 1] : null, error: null }),
         then(resolve: (result: unknown) => unknown) {
+          if (updateValue && table === 'assistant_messages') {
+            for (const record of records) {
+              if (filters.every(([column, value]) => record[column] === value)) Object.assign(record, updateValue);
+            }
+          }
           const data = table === 'assistant_messages' ? [...records].reverse() : null;
           return Promise.resolve({ data, error: null }).then(resolve);
         }
@@ -77,6 +84,8 @@ function harness(mode: Mode) {
       if (mode === 'leak-final') return phase1Calls === 1 ? toolCallStream() : simulatedText('<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name="lookup">');
       if (mode === 'incomplete-final') return phase1Calls === 1 ? toolCallStream() : simulatedText('这是半句话，推理还在展开而纯行动的');
       if (mode === 'empty-final') return simulatedText('');
+      if (mode === 'hang-empty') return { stream: new ReadableStream({ start(controller) { controller.enqueue({ type: 'stream-start', warnings: [] }); }, cancel() {} }), warnings: [] };
+      if (mode === 'hang-text') return { stream: new ReadableStream({ start(controller) { controller.enqueue({ type: 'stream-start', warnings: [] }); controller.enqueue({ type: 'text-start', id: 'answer' }); controller.enqueue({ type: 'text-delta', id: 'answer', delta: '已经生成的一段内容' }); }, cancel() {} }), warnings: [] };
       if (mode === 'natural-text') return simulatedText('Natural final answer.');
       if (mode === 'multi-tool') return phase1Calls <= 3 ? toolCallStream() : simulatedText('Natural final answer.');
       return phase1Calls === 1 ? toolCallStream() : simulatedText('Natural final answer.');
@@ -98,6 +107,7 @@ function responseRecorder() {
   let output = '';
   let body: unknown;
   const headers: Record<string, string> = {};
+  const closeHandlers: Array<() => void> = [];
   const response = {
     writableFinished: false,
     destroyed: false,
@@ -108,12 +118,12 @@ function responseRecorder() {
     writeHead(code: number) { status = code; },
     write(chunk: Uint8Array | string) { output += typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk); return true; },
     flush() { return undefined; },
-    once() { return response; },
+    once(event: string, handler: () => void) { if (event === 'close') closeHandlers.push(handler); return response; },
     end() { response.writableFinished = true; },
     on() { return response; },
     removeListener() { return response; }
   };
-  return { response: response as unknown as VercelResponse, status: () => status, output: () => output, body: () => body, headers: () => headers };
+  return { response: response as unknown as VercelResponse, status: () => status, output: () => output, body: () => body, headers: () => headers, disconnect: () => { for (const handler of closeHandlers) handler(); } };
 }
 
 it('streams one bounded answer loop with research + card tools', async () => {
@@ -190,6 +200,32 @@ it('does not persist an empty final answer', async () => {
   await call(recorder);
   expect(recorder.status()).toBe(200);
   expect(records.filter((record) => record.role === 'assistant')).toEqual([]);
+});
+
+it('marks the user turn as stopped when the client disconnects before any text', async () => {
+  const { records } = harness('hang-empty');
+  const recorder = responseRecorder();
+  const request = call(recorder);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  recorder.disconnect();
+  await request;
+  const user = records.find((record) => record.role === 'user') as Record<string, any>;
+  expect(user.parts).toContainEqual({ type: 'data-stopped', data: { reason: 'learner' } });
+  expect(records.filter((record) => record.role === 'assistant')).toEqual([]);
+});
+
+it('persists partial text and a stopped marker when the client stops mid-stream', async () => {
+  const { records } = harness('hang-text');
+  const recorder = responseRecorder();
+  const request = call(recorder);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  recorder.disconnect();
+  await request;
+  const assistant = records.find((record) => record.role === 'assistant') as Record<string, any>;
+  expect(assistant.content).toBe('已经生成的一段内容');
+  expect(assistant.parts).toContainEqual({ type: 'text', text: '已经生成的一段内容' });
+  expect(assistant.parts).toContainEqual({ type: 'data-stopped', data: { reason: 'learner' } });
+  expect(JSON.stringify(assistant.parts)).not.toContain('data-incomplete');
 });
 
 it('stores card parts as object references only', async () => {

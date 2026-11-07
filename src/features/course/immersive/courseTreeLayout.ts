@@ -723,6 +723,10 @@ export type WindingStepInput = {
   stateLabel: string;
   minutes?: number;
   meta?: string;
+  /** The real action this step can open; locked steps never fabricate one. */
+  kind?: "micro" | "practice" | "none";
+  /** True for learned/practicing/mastered; progress counts this, not just status. */
+  learned?: boolean;
 };
 
 export type WindingStep = WindingStepInput & { index: number; x: number; y: number; side: "left" | "right" };
@@ -746,10 +750,19 @@ export type WindingRouteLayout = {
   height: number;
 };
 
-const ROUTE_STEP_GAP = 144;
-const ROUTE_CHAPTER_HEIGHT = 44;
-const ROUTE_CHAPTER_GAP = 92;
-const ROUTE_START_CARD_HEIGHT = 150;
+/**
+ * Vertical rhythm of the road. A chapter banner sits on the same path as the
+ * steps: the gap above and below the banner is smaller than a normal step, so
+ * the last step of one chapter and the first step of the next stay closer than
+ * 1.5 ordinary step gaps (156px vs 144px), with no folded rows.
+ */
+export const ROUTE_STEP_GAP = 130;
+export const ROUTE_CHAPTER_HEIGHT = 44;
+export const ROUTE_CHAPTER_GAP = 52;
+/** Extra room after the current step for the one action card. */
+export const ROUTE_ACTION_SPACE = 112;
+
+type RoutePathPoint = { x: number; y: number; stepIndex?: number };
 
 function curvePath(points: ReadonlyArray<{ x: number; y: number }>) {
   if (!points.length) return "";
@@ -764,6 +777,10 @@ function curvePath(points: ReadonlyArray<{ x: number; y: number }>) {
 /**
  * Duolingo/Brilliant-style winding execution path. Positions are a pure
  * function of step order and chapter transitions; no graph layout runs.
+ *
+ * The sine phase follows the global step index, not the chapter-local index.
+ * A chapter boundary therefore only inserts a banner anchor on the same curve;
+ * it never restarts the wave and never produces a crease at the join.
  */
 export function buildWindingRoute(stepInputs: readonly WindingStepInput[], width = 560): WindingRouteLayout {
   const unique: WindingStepInput[] = [];
@@ -774,43 +791,55 @@ export function buildWindingRoute(stepInputs: readonly WindingStepInput[], width
     unique.push(step);
   });
   const center = Math.max(200, width) / 2;
-  const amplitude = Math.min(120, Math.max(200, width) * 0.22);
+  // Keep the wave inside the room a side card and its labels need. The default
+  // is deliberately narrower than the old 120px at typical panel widths.
+  const amplitude = Math.min(120, Math.max(30, 40 + (width - 500) * 0.5));
   const steps: WindingStep[] = [];
   const headers: WindingHeader[] = [];
+  const points: RoutePathPoint[] = [];
   let y = 0;
-  let lastChapter = "";
+
   unique.forEach((step, index) => {
-    if (step.chapterId !== lastChapter) {
-      lastChapter = step.chapterId;
-      y += 44;
+    if (index === 0 || unique[index - 1].chapterId !== step.chapterId) {
+      const top = index === 0 ? 16 : y + ROUTE_CHAPTER_GAP;
+      const headerY = top + ROUTE_CHAPTER_HEIGHT / 2;
       headers.push({
         id: `route-chapter:${step.chapterId}:${index}`,
         chapterId: step.chapterId,
         title: step.chapterNumber > 0 ? `第 ${step.chapterNumber} 章 · ${step.chapterTitle}` : step.chapterTitle,
         x: center,
-        y: y + ROUTE_CHAPTER_HEIGHT / 2,
-        width: Math.min(520, Math.max(240, width - 40)),
+        y: headerY,
+        width: Math.min(320, Math.max(220, width - 40)),
         height: ROUTE_CHAPTER_HEIGHT,
         stepCount: unique.filter((item) => item.chapterId === step.chapterId).length
       });
-      y += ROUTE_CHAPTER_HEIGHT + ROUTE_CHAPTER_GAP;
+      points.push({ x: center, y: headerY });
+      y = top + ROUTE_CHAPTER_HEIGHT + ROUTE_CHAPTER_GAP;
     }
     const x = center + Math.sin(index * 0.95) * amplitude;
-    steps.push({ ...step, index, x, y: y + 30, side: x <= center + 4 ? "right" : "left" });
-    y += ROUTE_STEP_GAP;
-    if (step.status === "current") y += ROUTE_START_CARD_HEIGHT;
+    steps.push({ ...step, index, x, y, side: x <= center + 4 ? "right" : "left" });
+    points.push({ x, y, stepIndex: index });
+    const next = unique[index + 1];
+    // A chapter join owns its own short transition; never add the current
+    // step's action space on top of it, or the two chapters drift apart.
+    if (next && next.chapterId === step.chapterId) {
+      y += ROUTE_STEP_GAP;
+      if (step.status === "current") y += ROUTE_ACTION_SPACE;
+    }
   });
+
   const currentIndex = steps.findIndex((step) => step.status === "current");
-  const path = curvePath(steps.map((step) => ({ x: step.x, y: step.y })));
-  const donePath = currentIndex >= 0 ? curvePath(steps.slice(0, currentIndex + 1).map((step) => ({ x: step.x, y: step.y }))) : "";
+  const doneEnd = currentIndex >= 0
+    ? points.findIndex((point) => point.stepIndex === currentIndex)
+    : -1;
   return {
     steps,
     headers,
-    path,
-    donePath,
+    path: curvePath(points),
+    donePath: doneEnd >= 0 ? curvePath(points.slice(0, doneEnd + 1)) : "",
     currentIndex,
     width: Math.max(200, width),
-    height: Math.max(240, y + 40)
+    height: Math.max(240, (steps[steps.length - 1]?.y ?? 0) + 180)
   };
 }
 

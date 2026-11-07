@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CoursePlaneLayout } from "@/features/archive/model/coursePlaneLayout";
 import type { CourseGraphData } from "../runtime/courseRuntime";
 import {
+  type WindingStepInput,
   COURSE_ROW_GAP,
   COURSE_ROW_PITCH,
   REFLECTION_OFFSET,
@@ -15,6 +16,9 @@ import {
   buildRouteTrack,
   buildWindingRoute,
   capabilityPathToTargets,
+  ROUTE_CHAPTER_GAP,
+  ROUTE_CHAPTER_HEIGHT,
+  ROUTE_STEP_GAP,
   courseSelectionRelations,
   positionPracticeCards,
   primaryKnowledgeByAssignment,
@@ -261,16 +265,56 @@ describe("course tree geometry", () => {
     expect(layout.steps).toHaveLength(3);
     expect(layout.headers.map((header) => header.chapterId)).toEqual(["ch1", "ch2"]);
     expect(layout.currentIndex).toBe(1);
-    expect(layout.path.startsWith("M ")).toBe(true);
+    expect(layout.path.startsWith(`M ${layout.headers[0].x.toFixed(1)} ${layout.headers[0].y.toFixed(1)}`)).toBe(true);
     expect(layout.donePath.length).toBeGreaterThan(0);
-    expect(layout.steps[1].y - layout.headers[0].y).toBeGreaterThan(80);
-    expect(layout.steps[2].y - layout.steps[1].y).toBeGreaterThan(200);
+    expect(layout.steps[1].y - layout.headers[0].y).toBeGreaterThan(60);
+    // The chapter join is its own short transition, always under 1.5 normal gaps.
+    expect(layout.steps[2].y - layout.steps[1].y).toBeLessThanOrEqual(ROUTE_STEP_GAP * 1.5);
+    expect(layout.steps[2].y - layout.steps[1].y).toBe(ROUTE_CHAPTER_HEIGHT + ROUTE_CHAPTER_GAP * 2);
     const second = buildWindingRoute([
       { id: "K1", title: "知识一", chapterId: "ch1", chapterTitle: "第一章", chapterNumber: 1, status: "done", stateLabel: "已学" },
       { id: "K2", title: "知识二", chapterId: "ch1", chapterTitle: "第一章", chapterNumber: 1, status: "current", stateLabel: "待学" },
       { id: "K3", title: "知识三", chapterId: "ch2", chapterTitle: "第二章", chapterNumber: 2, status: "locked", stateLabel: "待学" }
     ], 560);
     expect(second).toEqual(layout);
+  });
+
+  it("keeps every chapter on one road with banners on the path and no overlap", () => {
+    const inputs: WindingStepInput[] = [
+      { id: "K1", title: "知识一", chapterId: "ch1", chapterTitle: "第一章", chapterNumber: 1, status: "done", stateLabel: "已学" },
+      { id: "K2", title: "知识二", chapterId: "ch1", chapterTitle: "第一章", chapterNumber: 1, status: "done", stateLabel: "已学" },
+      { id: "K3", title: "知识三", chapterId: "ch2", chapterTitle: "第二章", chapterNumber: 2, status: "current", stateLabel: "在学" },
+      { id: "K4", title: "知识四", chapterId: "ch2", chapterTitle: "第二章", chapterNumber: 2, status: "locked", stateLabel: "待学" },
+      { id: "K5", title: "知识五", chapterId: "ch3", chapterTitle: "第三章", chapterNumber: 3, status: "locked", stateLabel: "待学" }
+    ];
+    const layout = buildWindingRoute(inputs, 560);
+    expect(layout.headers.map((header) => header.chapterId)).toEqual(["ch1", "ch2", "ch3"]);
+    expect(layout.headers.every((header) => header.x === 280)).toBe(true);
+    // Every banner centre is an anchor on the same SVG path.
+    for (const header of layout.headers) expect(layout.path).toContain(`${header.x.toFixed(1)} ${header.y.toFixed(1)}`);
+    // Adjacent chapters stay as close as a normal step, and never more than 1.5x.
+    for (let index = 1; index < layout.steps.length; index += 1) {
+      const previous = layout.steps[index - 1];
+      const step = layout.steps[index];
+      if (previous.chapterId !== step.chapterId) expect(step.y - previous.y).toBeLessThanOrEqual(ROUTE_STEP_GAP * 1.5);
+    }
+    // Banner boxes and node hit targets never intersect.
+    const banners = layout.headers.map((header) => ({
+      left: header.x - header.width / 2, right: header.x + header.width / 2,
+      top: header.y - header.height / 2, bottom: header.y + header.height / 2
+    }));
+    const nodes = layout.steps.map((step) => ({ left: step.x - 48, right: step.x + 48, top: step.y - 48, bottom: step.y + 48 }));
+    for (const banner of banners) for (const node of nodes) {
+      const overlap = Math.min(banner.right, node.right) - Math.max(banner.left, node.left) > 0
+        && Math.min(banner.bottom, node.bottom) - Math.max(banner.top, node.top) > 0;
+      expect(overlap).toBe(false);
+    }
+    // Ordinary same-chapter steps use the tight 130px pitch.
+    expect(layout.steps[1].y - layout.steps[0].y).toBe(ROUTE_STEP_GAP);
+    // The sine phase is global: a chapter boundary never restarts the wave.
+    layout.steps.forEach((step, index) => {
+      expect(step.x).toBeCloseTo(280 + Math.sin(index * 0.95) * 70, 5);
+    });
   });
 
   it("keys repeated chapter banners by their execution position", () => {

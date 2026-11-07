@@ -98,15 +98,14 @@ export function CourseLearnerRoutePage({ courseId, session, onOpenTree }: {
       decision={decision}
       courseTitle={courseTitle}
       showHeader={false}
-      onSelect={openAction}
+      mode="page"
+      courseCard="progress"
+      onSelect={() => undefined}
       onStart={openAction}
+      onOpenTree={onOpenTree}
     /> : <section className="ef-course-route-empty" role="status">
       <p>{authenticated ? "正在准备你的学习路线…" : "登录后可以查看学习状态和下一步。"}</p>
       {!authenticated ? <button type="button" className="ef-ui-btn ef-ui-btn--primary" onClick={() => navigate("/login", { state: { from: window.location.pathname } })}>登录</button> : null}
     </section>}
-    <footer className="ef-course-route-foot">
-      <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate("/")}><Home size={13} />回到首页</button>
-      <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={onOpenTree}><Network size={13} />看课程结构</button>
-    </footer>
   </main>;
 }

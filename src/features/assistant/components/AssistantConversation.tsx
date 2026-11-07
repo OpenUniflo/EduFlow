@@ -32,6 +32,8 @@ export function AssistantConversation({ context }: { context: AssistantContext }
       mode="assistant"
       loading={runtime.loading}
       sending={runtime.sending}
+      replying={runtime.replying}
+      onStop={runtime.stop}
       error={runtime.error}
       messages={visible.map((message) => ({
         id: message.id,

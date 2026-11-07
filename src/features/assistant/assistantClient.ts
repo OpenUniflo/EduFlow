@@ -5,8 +5,30 @@ import type { AssistantContextSnapshot, AssistantMessage, AssistantSession, Assi
 import type { GoalPlan } from "@/features/course/goal/goalPlanning";
 import type { CourseCreatorDesign, CourseCreatorProposal, CourseCreatorStage } from "@/features/course/creation/courseCreator";
 
-export async function listAssistantSessions() {
-  return (await apiRequest<{ sessions: AssistantSession[] }>("/api/assistant")).sessions;
+export type AssistantSessionPage = { sessions: AssistantSession[]; hasMore: boolean; nextCursor: string | null };
+
+export async function listAssistantSessions(input: { q?: string; cursor?: string | null; limit?: number } = {}): Promise<AssistantSessionPage> {
+  const params = new URLSearchParams();
+  if (input.q?.trim()) params.set("q", input.q.trim());
+  if (input.cursor) params.set("cursor", input.cursor);
+  if (input.limit) params.set("limit", String(input.limit));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  const page = await apiRequest<AssistantSessionPage>(`/api/assistant${suffix}`);
+  return { sessions: page.sessions, hasMore: Boolean(page.hasMore), nextCursor: page.nextCursor ?? null };
+}
+
+export function renameAssistantSession(sessionId: string, title: string) {
+  return apiRequest<{ session: AssistantSession }>("/api/assistant", {
+    method: "POST",
+    body: JSON.stringify({ action: "rename-session", sessionId, title })
+  });
+}
+
+export function deleteAssistantSession(sessionId: string) {
+  return apiRequest<{ deleted: true; sessionId: string }>("/api/assistant", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete-session", sessionId })
+  });
 }
 
 export function getAssistantSession(sessionId: string) {

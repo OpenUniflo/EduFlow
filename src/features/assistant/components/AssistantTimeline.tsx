@@ -1,32 +1,81 @@
-import { Sparkles, Target } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Check, Sparkles, Target } from "lucide-react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { applicationServices } from "@/app/services/applicationServices";
 import type { AssistantUIMessage } from "@/features/assistant/AssistantRuntimeContext";
 import type { AssistantContextSnapshot, AssistantStructuredContent, CourseCreationBrief, CourseSearchTimelineContent } from "@/features/assistant/assistantContract";
+import { collectSkippedCompletedCards } from "@/features/assistant/cardDedupe";
 import { AssistantCardView, type AssistantCardActions } from "@/features/assistant/cards/AssistantCardView";
+import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
 import { AssistantMarkdown } from "@/features/assistant/cards/AssistantMarkdown";
 import { PROTOCOL_HIDDEN_MESSAGE } from "@/features/assistant/protocolGuard";
 import type { MockSession } from "@/features/auth/types";
 import { Bubble, ConversationCard, EventRow } from "@/shared/ui/Conversation";
 import { Pill } from "@/shared/ui/Pill";
+import { conversationDayKey, formatConversationDay } from "@/shared/ui/conversationDates";
 import "./assistantTimeline.css";
 
 type TimelineTextPart = { type: "text"; text: string };
+
+/** Bubble-less assistant copy: the answer text shares the column left edge with cards. */
+export function AssistantText({ children, meta }: { children: ReactNode; meta?: ReactNode }) {
+  return <div className="ef-assistant-text" data-role="assistant">
+    <div className="ef-assistant-body">{children}</div>
+    {meta ? <small className="ef-assistant-time">{meta}</small> : null}
+  </div>;
+}
+
+function StoppedMarker() {
+  return <p className="ef-assistant-stopped" role="status">已停止回复</p>;
+}
 
 function isTextPart(part: unknown): part is TimelineTextPart {
   return Boolean(part) && typeof part === "object" && (part as { type?: string }).type === "text" && typeof (part as { text?: unknown }).text === "string";
 }
 
-export function AssistantTimeline({ messages, session, actions, sending }: {
+export function AssistantTimeline({ messages, session, actions, sending, showDaySeparators = false }: {
   messages: AssistantUIMessage[];
   session: MockSession;
   actions: AssistantCardActions;
   sending: boolean;
+  showDaySeparators?: boolean;
 }) {
-  // A path may be nominated by both a completion reply and an explicit
-  // Continue action. Keep only the newest card for that identity so one Micro
-  // never renders twice in the same conversation.
+  const [, setRevision] = useState(0);
+  useEffect(() => {
+    const unsubscribers = [
+      applicationServices.microLearningRepository.subscribe(() => setRevision((value) => value + 1)),
+      applicationServices.learningProgressRepository.subscribe(() => setRevision((value) => value + 1)),
+      applicationServices.userKnowledgeRepository.subscribe(() => setRevision((value) => value + 1))
+    ];
+    return () => { for (const unsubscribe of unsubscribers) unsubscribe(); };
+  }, []);
+
+  // Completed results are projected by object identity. The learner keeps the
+  // first card they saw; every later copy from a completion reply is hidden,
+  // including when the model switches between Micro and Knowledge cards.
+  const learnedNodes = new Set(applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId)
+    .filter((record) => satisfiesTeachingPrerequisite(record.status))
+    .map((record) => record.nodeId));
+  const completionLookup = {
+    isMicroCompleted: (pathId: string) => applicationServices.microLearningRepository.getPathProgress(pathId)?.status === "completed",
+    knowledgePathId: (card: { nodeId: string; pathId?: string; courseId?: string }) => {
+      const path = applicationServices.microLearningRepository.getPath(card.nodeId, {
+        mode: "learn",
+        ...(card.pathId ? { pathId: card.pathId } : {}),
+        ...(card.courseId ? { courseId: card.courseId } : {})
+      });
+      return path && applicationServices.microLearningRepository.getPathProgress(path.id)?.status === "completed" ? path.id : null;
+    },
+    isKnowledgeLearned: (nodeId: string) => learnedNodes.has(nodeId),
+    isPracticeCompleted: (card: { courseId: string; assignmentId: string }) => {
+      const state = applicationServices.learningProgressRepository.getCourseState(session.userId, card.courseId)?.assignmentStates[card.assignmentId]?.status;
+      return state === "accepted" || state === "completed";
+    }
+  };
+  const skippedCards = collectSkippedCompletedCards(messages, completionLookup);
+  // Unfinished Micro nominations keep the previous rule: a later explicit
+  // Continue action wins over an older recommendation. Completed paths are
+  // already owned by the first-seen projection above.
   const seenMicroPaths = new Set<string>();
-  const skippedCards = new Set<string>();
   for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
     const message = messages[messageIndex];
     const parts = message.parts ?? [];
@@ -35,19 +84,28 @@ export function AssistantTimeline({ messages, session, actions, sending }: {
       if (part.type !== "tool-displayCard") continue;
       const card = (part as { output?: { card?: { cardType?: string; pathId?: string } } }).output?.card;
       if (card?.cardType !== "micro" || !card.pathId) continue;
+      if (completionLookup.isMicroCompleted(card.pathId)) continue;
       if (seenMicroPaths.has(card.pathId)) skippedCards.add(`${message.id}:${partIndex}`);
       else seenMicroPaths.add(card.pathId);
     }
   }
+  let previousDay = "";
   return <div className="ef-assistant-timeline" data-sending={sending ? "true" : "false"}>
-    {messages.map((message, index) => <AssistantTimelineMessage
-      key={message.id}
-      message={message}
-      session={session}
-      actions={actions}
-      skippedCards={skippedCards}
-      streaming={sending && message.role === "assistant" && index === messages.length - 1}
-    />)}
+    {messages.map((message, index) => {
+      const day = conversationDayKey(message.metadata?.createdAt);
+      const showDay = showDaySeparators && day !== previousDay;
+      previousDay = day;
+      return <Fragment key={message.id}>
+        {showDay ? <div className="ef-home-day"><span>{formatConversationDay(message.metadata?.createdAt)}</span></div> : null}
+        <AssistantTimelineMessage
+          message={message}
+          session={session}
+          actions={actions}
+          skippedCards={skippedCards}
+          streaming={sending && message.role === "assistant" && index === messages.length - 1}
+        />
+      </Fragment>;
+    })}
     {sending && messages[messages.length - 1]?.role === "user" ? <EventRow icon={<Sparkles size={15} />} title="正在准备回答…" className="ef-home-thinking" /> : null}
   </div>;
 }
@@ -71,10 +129,18 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
 
   if (message.role === "user") {
     const text = textBlocks.map((part) => part.text).join("\n");
-    if (isAction) return <div className="ef-assistant-action-user-row" data-role="user"><span>{text}</span></div>;
-    return <div className="ef-home-message-row" data-role="user">
+    const marker = metadata?.stopped ? <StoppedMarker /> : null;
+    if (isAction) {
+      // Completion is a system event, not a chat bubble; button choices such as
+      // "带我从最简单的开始" remain learner messages.
+      if (/^完成(?:小练习|动手任务)[：:]/.test(text)) return <><div className="ef-assistant-completion-row" data-role="event"><Check size={14} aria-hidden="true" /><span>{text}</span></div>{marker}</>;
+      return <><div className="ef-home-message-row" data-role="user">
+        <Bubble from="user" meta={formatTime(metadata?.createdAt)}><p className="ef-home-copy">{text}</p></Bubble>
+      </div>{marker}</>;
+    }
+    return <><div className="ef-home-message-row" data-role="user">
       <Bubble from="user" meta={formatTime(metadata?.createdAt)}><p className="ef-home-copy">{text}</p></Bubble>
-    </div>;
+    </div>{marker}</>;
   }
 
   let textIndex = 0;
@@ -85,12 +151,9 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
       textIndex += 1;
       const text = hidden ? PROTOCOL_HIDDEN_MESSAGE : part.text;
       if (!text.trim()) continue;
-      ordered.push({ kind: "text", node: <div className={`ef-assistant-text${first ? " is-first" : ""}`} data-role="assistant" key={`text-${partIndex}`}>
-        {first ? <span className="ef-home-assistant-mark" aria-hidden="true"><Sparkles size={14} /></span> : null}
-        <Bubble from="assistant" meta={first ? formatTime(metadata?.createdAt) : undefined} className={first ? "" : "is-continuation"}>
-          <AssistantMarkdown text={text} streaming={streaming && partIndex === parts.length - 1} />
-        </Bubble>
-      </div> });
+      ordered.push({ kind: "text", node: <AssistantText key={`text-${partIndex}`} meta={first ? formatTime(metadata?.createdAt) : undefined}>
+        <AssistantMarkdown text={text} streaming={streaming && partIndex === parts.length - 1} />
+      </AssistantText> });
       continue;
     }
     if (part.type === "tool-displayCard") {
@@ -120,23 +183,23 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
     ordered.push({ kind: "text", node: <EventRow key="tool-progress" icon={<Sparkles size={15} />} title={toolLabel[toolName] ?? "正在准备回答…"} className="ef-assistant-tool-progress" /> });
   }
 
-  if (!isAction && !pendingTool && nonEmptyText.length === 0 && !ordered.some((entry) => entry.kind === "card")) {
-    ordered.push({ kind: "text", node: <div className="ef-assistant-text is-first" data-role="assistant" key="fallback">
-      <span className="ef-home-assistant-mark" aria-hidden="true"><Sparkles size={14} /></span>
-      <Bubble from="assistant" meta={formatTime(metadata?.createdAt)}>
-        <p className="ef-home-copy ef-home-muted">{streaming ? "正在回复…" : "这次没有生成回复，请重试。"}</p>
-      </Bubble>
-    </div> });
+  if (!isAction && !pendingTool && !metadata?.stopped && nonEmptyText.length === 0 && !ordered.some((entry) => entry.kind === "card")) {
+    ordered.push({ kind: "text", node: <AssistantText key="fallback" meta={formatTime(metadata?.createdAt)}>
+      <p className="ef-home-copy ef-home-muted">{streaming ? "正在回复…" : "这次没有生成回复，请重试。"}</p>
+    </AssistantText> });
   }
   const cardNodes = ordered.filter((entry) => entry.kind === "card").map((entry) => entry.node);
   const content = ordered.map((entry) => entry.node);
 
   return <>
-    <div className={`ef-assistant-turn${isAction ? " is-action" : ""}`} data-role="assistant" data-message-kind={metadata?.messageKind ?? "utterance"}>
-      {isAction && totalText ? <EventRow icon={<Sparkles size={15} />} title={<span className="ef-assistant-action-copy">{textBlocks.map((part) => part.text).join(" ")}</span>} className="ef-assistant-action-row" /> : null}
+    <div className={`ef-assistant-turn${isAction ? " is-action" : ""}`} data-role="assistant" data-message-id={message.id} data-message-kind={metadata?.messageKind ?? "utterance"}>
+      {isAction && totalText ? <AssistantText meta={formatTime(metadata?.createdAt)}>
+        <AssistantMarkdown text={textBlocks.map((part) => part.text).join("\n")} streaming={streaming} />
+      </AssistantText> : null}
       {isAction ? cardNodes : content}
     </div>
     {legacy ? <LegacyStructuredCard content={legacy} messageId={message.id} actions={actions} context={context} /> : null}
+    {metadata?.stopped ? <StoppedMarker /> : null}
   </>;
 }
 

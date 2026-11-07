@@ -33,7 +33,7 @@ export type AssistantCardRef =
   | { cardType: "route"; courseId: string }
   | { cardType: "micro"; pathId: string; knowledgeId: string; courseId?: string }
   | { cardType: "practice"; courseId: string; assignmentId: string }
-  | { cardType: "evaluation"; courseId: string; assignmentId: string; attemptId: string }
+  | { cardType: "evaluation"; courseId: string; assignmentId: string; attemptId?: string }
   | { cardType: "course_chapter"; courseId: string; chapterId: string }
   | { cardType: "course_match"; courseIds: string[]; targetKnowledgeIds: string[]; goalText: string }
   | { cardType: "brief"; messageId: string }
@@ -121,7 +121,9 @@ export function parseAssistantCardRef(value: unknown): AssistantCardRef | null {
       const courseId = one("courseId");
       const assignmentId = one("assignmentId");
       const attemptId = one("attemptId");
-      return courseId && assignmentId && attemptId ? { cardType: "evaluation", courseId, assignmentId, attemptId } : null;
+      // Historical cards were written before attempt identities were stored;
+      // keep them readable and fall back to the latest Attempt at read time.
+      return courseId && assignmentId ? { cardType: "evaluation", courseId, assignmentId, ...(attemptId ? { attemptId } : {}) } : null;
     }
     case "course_chapter": {
       const courseId = one("courseId");

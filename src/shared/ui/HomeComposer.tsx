@@ -1,8 +1,7 @@
-import { ArrowUp } from "lucide-react";
-import { useId, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { GlassSurface } from "./GlassSurface";
 import { ContextPill } from "./Pill";
-import { TextField } from "./Field";
+import { ComposerActionButton, composerHint, onComposerKeyDown } from "./ComposerAction";
 import "./ui.css";
 
 export type ComposerContext = { id: string; label: string };
@@ -14,14 +13,17 @@ export type HomeComposerProps = {
   defaultValue?: string;
   onChange?: (value: string) => void;
   onSubmit?: (value: string) => void;
+  onStop?: () => void;
   placeholder?: string;
   hint?: ReactNode;
   submitLabel?: string;
   disabled?: boolean;
+  /** A reply is active: the field stays editable, the send control becomes stop. */
+  replying?: boolean;
   className?: string;
 };
 
-/** Home conversation composer: context pills, one field, one explicit send action. */
+/** Home conversation composer: context pills, one field, one explicit send/stop action. */
 export function HomeComposer({
   contexts = [],
   onRemoveContext,
@@ -29,35 +31,46 @@ export function HomeComposer({
   defaultValue = "",
   onChange,
   onSubmit,
+  onStop,
   placeholder = "问点什么，或把材料交给助手…",
   hint,
   submitLabel = "发送",
   disabled = false,
+  replying = false,
   className = ""
 }: HomeComposerProps) {
   const [draft, setDraft] = useState(defaultValue);
   const inputId = useId();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const current = value ?? draft;
-  const canSend = !disabled && current.trim().length > 0;
+  const canSend = !disabled && !replying && current.trim().length > 0;
 
   function update(next: string) {
     if (value === undefined) setDraft(next);
     onChange?.(next);
   }
 
-  function submit(event?: FormEvent) {
-    event?.preventDefault();
+  function sendDraft() {
     if (!canSend) return;
     onSubmit?.(current.trim());
     if (value === undefined) setDraft("");
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      submit();
+  function submit(event?: FormEvent) {
+    event?.preventDefault();
+    if (replying) {
+      onStop?.();
+      return;
     }
+    sendDraft();
   }
+
+  useLayoutEffect(() => {
+    const element = inputRef.current;
+    if (!element) return;
+    element.style.height = "auto";
+    element.style.height = `${Math.min(Math.max(element.scrollHeight, 32), 160)}px`;
+  }, [current]);
 
   return (
     <form className={`ef-ui-composer-wrap ${className}`.trim()} onSubmit={submit} aria-label="向助手发送消息">
@@ -70,21 +83,26 @@ export function HomeComposer({
           </div>
         ) : null}
         <div className="ef-ui-composer-bar">
-          <TextField
-            id={inputId}
-            aria-label="给助手发消息"
-            placeholder={placeholder}
-            value={current}
-            disabled={disabled}
-            onChange={(event) => update(event.target.value)}
-            onKeyDown={onKeyDown}
-            autoComplete="off"
-          />
-          <button type="submit" className="ef-ui-send" aria-label={submitLabel} title={submitLabel} disabled={!canSend}>
-            <ArrowUp size={16} aria-hidden="true" />
-          </button>
+          <div className="ef-ui-field-wrap">
+            <div className="ef-ui-field">
+              <textarea
+                ref={inputRef}
+                id={inputId}
+                className="ef-ui-textarea ef-ui-composer-input"
+                aria-label="给助手发消息"
+                placeholder={placeholder}
+                value={current}
+                rows={1}
+                disabled={disabled}
+                onChange={(event) => update(event.target.value)}
+                onKeyDown={(event) => onComposerKeyDown(event, replying, sendDraft)}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <ComposerActionButton replying={replying} canSend={canSend} onSend={sendDraft} onStop={onStop} idleLabel={submitLabel} />
         </div>
-        {hint ? <p className="ef-ui-composer-hint">{hint}</p> : null}
+        {hint || replying ? <p className="ef-ui-composer-hint">{replying ? composerHint(true) : hint}</p> : null}
       </GlassSurface>
     </form>
   );

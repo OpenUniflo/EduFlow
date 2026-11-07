@@ -46,11 +46,18 @@ export function scrollFeedbackIntoView(feedback: HTMLElement) {
   const footerRect = footer?.getBoundingClientRect();
   const isDocument = container === document.scrollingElement || container === document.documentElement || container === document.body;
   const containerRect = isDocument ? { top: 0, bottom: window.innerHeight } : container.getBoundingClientRect();
-  // A card footer is sticky inside the scrolling timeline, so its top moves
-  // with the scroll and is not a stable occluder during the first frame. Use
-  // its height and leave a small gap; panel/immersive footers sit outside the
-  // scroll container, where their top edge is stable.
-  const footerTop = card && footerRect ? containerRect.bottom - footerRect.height - 16 : footerRect?.top;
+  // In the Home conversation the card footer is sticky above the composer,
+  // while the composer itself overlays the bottom of the scroller. Use the
+  // footer's actual (or soon-to-be sticky) top so feedback is not hidden
+  // behind either bar. Panel/immersive footers sit outside the scroll
+  // container, where their top edge is already stable.
+  const composer = container.querySelector?.(".ef-home-composer");
+  const composerTop = composer?.getBoundingClientRect().top;
+  const footerTop = footerRect
+    ? composerTop == null
+      ? footerRect.top
+      : Math.min(footerRect.top, composerTop - footerRect.height - 8)
+    : undefined;
   const delta = feedbackScrollDelta({
     top: box.top,
     bottom: box.bottom,

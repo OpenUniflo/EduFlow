@@ -40,6 +40,13 @@ export function createProtocolGuardTransform(): TransformStream<AnyPart, AnyPart
 
   return new TransformStream<AnyPart, AnyPart>({
     transform(part, controller) {
+      // A learner stop is not a finished answer. Never release a held suffix on
+      // abort: it may be a protocol opener that has not arrived completely yet.
+      if (part.type === "abort") {
+        buffers.clear();
+        controller.enqueue(part);
+        return;
+      }
       if (part.type !== "text-delta") {
         flush(controller);
         controller.enqueue(part);

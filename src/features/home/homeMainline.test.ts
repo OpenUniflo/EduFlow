@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import type { NavigationDecision } from "@/shared/learning/navigation";
-import { deriveHomeNavigation, deriveHomeView, resolveHomeNextStep, shouldShowStarter } from "./homeMainline";
+import { deriveHomeNavigation, deriveHomeView, resolveHomeNextStep, routeStripLabel, shouldShowStarter } from "./homeMainline";
 import { applyMainlineNext } from "@/shared/learning/mainlineNext";
 
 const runtime = {
@@ -20,17 +20,16 @@ const decision = {
   nextAction: { kind: "next", nodeId: "R10", resourceKind: "micro", resourceId: "path-r10", reasonCode: "continue", reason: "继续" }
 } as NavigationDecision;
 
-describe("home three states", () => {
+describe("home two states", () => {
   it("is fresh only without a conversation and learning record", () => {
     expect(deriveHomeView({ hasLearningRecord: false, hasConversation: false })).toBe("fresh");
   });
-  it("is learning while a conversation is active or after Continue", () => {
-    expect(deriveHomeView({ hasLearningRecord: false, hasConversation: true })).toBe("learning");
-    expect(deriveHomeView({ hasLearningRecord: true, hasConversation: true, resumed: true })).toBe("learning");
+  it("lands directly in the conversation whenever any history exists", () => {
+    expect(deriveHomeView({ hasLearningRecord: false, hasConversation: true })).toBe("conversation");
+    expect(deriveHomeView({ hasLearningRecord: true, hasConversation: true })).toBe("conversation");
   });
-  it("is returning when learning records exist and the learner has not resumed", () => {
-    expect(deriveHomeView({ hasLearningRecord: true, hasConversation: true })).toBe("returning");
-    expect(deriveHomeView({ hasLearningRecord: true, hasConversation: false })).toBe("returning");
+  it("starts a new conversation with the next step when records exist without a conversation", () => {
+    expect(deriveHomeView({ hasLearningRecord: true, hasConversation: false })).toBe("conversation");
   });
 });
 
@@ -101,5 +100,17 @@ describe("starter visibility", () => {
     expect(shouldShowStarter({ configuredCourseId: "course-a", hasCourse: false, segmentStarted: false })).toBe(false);
     expect(shouldShowStarter({ configuredCourseId: "course-a", hasCourse: true, segmentStarted: true })).toBe(false);
     expect(shouldShowStarter({ configuredCourseId: "course-a", hasCourse: true, segmentStarted: false })).toBe(true);
+  });
+});
+
+describe("route strip progress label", () => {
+  it("keeps the first-segment denominator until the segment completes", () => {
+    expect(routeStripLabel({ complete: false, completedCount: 3, steps: [1, 2, 3, 4] }, { learnedCount: 3, nodeIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] })).toBe("第一段 3/4");
+  });
+
+  it("switches to the course route after the first segment completes", () => {
+    expect(routeStripLabel({ complete: true, completedCount: 4, steps: [1, 2, 3, 4] }, { learnedCount: 4, nodeIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] })).toBe("路线 4/10");
+    expect(routeStripLabel({ complete: true, completedCount: 4, steps: [1, 2, 3, 4] }, null)).toBe("路线 4/4");
+    expect(routeStripLabel(null)).toBe("");
   });
 });

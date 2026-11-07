@@ -1,5 +1,5 @@
-/* Cards are part of the assistant answer: S cards centre in the column, L
-   cards span it. No page-state cards live here. */
+/* Cards are part of the assistant answer: every card spans the conversation
+   column and shares its left edge with text and event rows. */
 
 .ef-assistant-card-copy {
   margin: 0;
@@ -154,7 +154,7 @@
   border-radius: var(--r-24);
   background: var(--surface);
   box-shadow: var(--sh-1);
-  overflow: hidden;
+  overflow: clip;
 }
 .ef-assistant-card-actions { display: inline-flex; align-items: center; gap: var(--sp-8); flex-wrap: wrap; justify-content: flex-end; }
 .ef-assistant-micro { border: 0; background: transparent; padding: 0; }
@@ -179,6 +179,8 @@
   color: var(--brand-ink);
 }
 .ef-card-compact-copy { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.ef-card-compact-copy.is-inline { display: flex; align-items: baseline; gap: var(--sp-8); }
+.ef-card-compact-copy.is-inline small { flex: 0 0 auto; font-size: var(--fs-14); line-height: var(--lh-14); white-space: nowrap; }
 .ef-card-compact-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-14); line-height: var(--lh-14); font-weight: var(--fw-600); color: var(--ink); }
 .ef-card-compact-copy small { color: var(--muted); font-size: var(--fs-12); line-height: var(--lh-12); }
 .ef-card-text-action {
@@ -208,41 +210,31 @@
 .ef-card-icon:hover { color: var(--ink); border-color: var(--line-strong); }
 .ef-card-icon:focus-visible, .ef-card-text-action:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
-/* Keep an expanded step inside the viewport; its action bar stays reachable. */
-.ef-assistant-micro-frame { scroll-margin-top: 104px; }
-.ef-assistant-micro-body {
-  max-height: min(calc(100dvh - 450px), 520px);
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-}
+/* The expanded step grows with its content: no nested scroll container. */
+.ef-assistant-micro-frame { scroll-margin-top: 104px; width: 100%; }
+.ef-assistant-card-frame { width: 100%; }
+.ef-assistant-micro-body { min-height: 0; }
 .ef-assistant-micro-body .micro-card {
   padding-bottom: 0;
 }
-.ef-assistant-micro-body .micro-card footer {
+.ef-assistant-micro-body .ef-home-micro .micro-card footer {
   position: sticky;
-  bottom: 0;
+  bottom: var(--ef-composer-h, 112px);
   z-index: 4;
   margin-top: var(--sp-12);
-  padding: var(--sp-12) 0 var(--sp-4);
+  padding: var(--sp-12) 0 var(--sp-8);
   border-top: 1px solid var(--line);
   background: var(--surface);
 }
 .ef-assistant-micro-body .micro-card footer .ef-micro-foot-gap { flex: 1; }
+/* Only the conversation removes the reserved feedback height; panels and the
+   immersive runner keep it. */
+.ef-assistant-micro-body .ef-home-micro .micro-feedback-slot { min-height: 0; }
+.ef-assistant-micro-body .ef-home-micro .micro-feedback-slot:empty { display: none; margin-top: 0; }
 .ef-assistant-micro-body .micro-spatial-zones { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .ef-assistant-micro-body .micro-spatial-zone > div { min-width: 0; }
 .ef-assistant-micro-body .micro-spatial-card { min-width: 0; }
 .ef-assistant-micro-body .micro-spatial-card > button:not(.micro-spatial-handle) { min-width: 0; overflow-wrap: anywhere; }
-@media (max-width: 900px) {
-  .ef-assistant-micro-body { max-height: calc(100dvh - 300px); }
-}
-
-/* When a card expands, leave enough trailing scroll room to bring the whole
-   step and its sticky action bar above the composer. */
-.ef-home-timeline:has(.ef-assistant-micro-body) {
-  padding-bottom: 240px;
-}
 
 .ef-ui-obj-foot .ef-assistant-card-foot { width: auto; flex: 1; min-width: 0; }
 .ef-ui-obj-foot .ef-assistant-card-actions { min-width: 0; }

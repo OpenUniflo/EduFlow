@@ -1,5 +1,6 @@
 /* P2 Home conversation workbench, My panel and boundary states. Tokens only. */
 .ef-home {
+  position: relative;
   display: flex;
   height: 100dvh;
   flex-direction: column;
@@ -9,46 +10,11 @@
   color: var(--ink);
 }
 
-.ef-home-head {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-24);
-  padding-left: var(--sp-4);
-}
-
-.ef-home-head-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--sp-4);
-}
-
-.ef-home-date {
-  color: var(--muted);
-  font-size: var(--fs-12);
-  line-height: var(--lh-12);
-  font-weight: var(--fw-600);
-}
-
-.ef-home-head h1 {
-  margin: 0;
-  color: var(--ink);
-  font-size: var(--fs-28);
-  line-height: var(--lh-28);
-  font-weight: var(--fw-700);
-  letter-spacing: -.02em;
-}
-
-.ef-home-head p {
-  margin: 0;
-  color: var(--ink-2);
-  font-size: var(--fs-14);
-  line-height: var(--lh-14);
-}
-
 .ef-home-panel-toggle {
+  position: absolute;
+  top: var(--sp-12);
+  right: var(--sp-20);
+  z-index: 40;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -429,7 +395,7 @@
 
 .ef-home {
   --side-w: 0px;
-  --panel-top: var(--sp-16);
+  --panel-top: 64px;
   --panel-right: var(--sp-20);
   --panel-bottom: var(--sp-16);
 }
@@ -448,9 +414,21 @@
   --side-w: 400px;
 }
 
-.ef-home.has-panel .ef-home-head,
-.ef-home.has-workspace .ef-home-head {
-  padding-right: calc(var(--side-w) + var(--sp-20));
+/* Learning: one full-height scroller fills the main area; the panel only
+   shrinks the scroller, never the fixed top-right toggle. */
+.ef-home[data-view="conversation"] {
+  gap: 0;
+  padding: 0;
+}
+
+.ef-home[data-view="conversation"] .ef-home-work {
+  padding-bottom: 0;
+}
+
+.ef-home[data-view="conversation"].has-panel,
+.ef-home[data-view="conversation"].has-workspace,
+.ef-home[data-view="conversation"].has-route {
+  padding-right: 0;
 }
 
 /* The side panel floats with board insets and pushes the conversation into
@@ -483,7 +461,7 @@
 
 .ef-home-column {
   display: flex;
-  width: min(760px, 100%);
+  width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
@@ -494,6 +472,7 @@
 /* The timeline scrolls above the composer; the composer stays on the column
    bottom whether the panel is open or the conversation is short. */
 .ef-home-conversation {
+  --ef-strip-h: 64px;
   display: flex;
   height: 100%;
   min-height: 0;
@@ -501,15 +480,78 @@
   flex-direction: column;
 }
 
+/* The scroller fills the whole main area so the wheel works on margins, the
+   title bar, the composer and cards. Content stays on one 760 column. */
+.ef-home-scroller {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  overflow-anchor: none;
+  outline: none;
+}
+
+.ef-home-titlebar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  min-height: 64px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: var(--sp-12) 0;
+}
+
+.ef-home-titlebar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  -webkit-mask: linear-gradient(var(--ink) 72%, transparent);
+  mask: linear-gradient(var(--ink) 72%, transparent);
+  pointer-events: none;
+}
+
+.ef-home-titlebar-inner {
+  width: min(760px, calc(100% - 48px));
+  min-width: 0;
+  margin: 0 auto;
+}
+
+.ef-home-titlebar h1 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-14);
+  line-height: var(--lh-14);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ef-home-timeline {
   display: flex;
-  flex: 1;
+  width: min(760px, calc(100% - 48px));
   min-height: 0;
+  flex: 1 0 auto;
   flex-direction: column;
   gap: var(--sp-12);
-  padding: var(--sp-4) var(--sp-4) var(--sp-32);
-  overflow-y: auto;
-  scrollbar-width: thin;
+  margin: 0 auto;
+  padding: var(--sp-4) 0 var(--ef-strip-h, 64px);
+}
+
+.ef-home-tail-space {
+  width: 1px;
+  height: 0;
+  flex: 0 0 auto;
 }
 
 .ef-home-day {
@@ -695,10 +737,34 @@
 }
 
 .ef-home-composer {
-  width: 100%;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  width: min(760px, calc(100% - 48px));
   flex: 0 0 auto;
-  margin-top: auto;
-  padding-top: var(--sp-8);
+  margin: 0 auto;
+  padding: var(--sp-8) 0 var(--sp-12);
+}
+
+.ef-home-composer::before {
+  content: "";
+  position: absolute;
+  inset: -16px 0 0;
+  z-index: -1;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  -webkit-mask: linear-gradient(transparent, var(--ink) 24px);
+  mask: linear-gradient(transparent, var(--ink) 24px);
+  pointer-events: none;
+}
+
+/* The strip floats above the composer without taking layout space. Extend the
+   existing composer fade/blur to its top edge so text behind the gap cannot be
+   read, while the strip itself stays an opaque token surface. */
+.ef-home-composer[data-strip="1"]::before {
+  inset: calc(-1 * (var(--ef-strip-h, 64px) + var(--sp-16))) 0 0;
+  -webkit-mask: linear-gradient(transparent, var(--ink) calc(var(--ef-strip-h, 64px) + var(--sp-8)));
+  mask: linear-gradient(transparent, var(--ink) calc(var(--ef-strip-h, 64px) + var(--sp-8)));
 }
 
 .ef-home-composer .ef-ui-composer {
@@ -2003,6 +2069,30 @@
   }
 }
 
+@media (prefers-reduced-transparency: reduce) {
+  .ef-home-titlebar::before {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: linear-gradient(var(--page) 70%, transparent);
+  }
+
+  .ef-home-composer::before {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: linear-gradient(transparent, var(--page) 24px);
+  }
+
+  .ef-home-composer[data-strip="1"]::before {
+    background: linear-gradient(transparent, var(--page) calc(var(--ef-strip-h, 64px) + var(--sp-8)));
+  }
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .ef-home-composer[data-strip="1"]::before {
+    background: linear-gradient(transparent, var(--page) calc(var(--ef-strip-h, 64px) + var(--sp-8)));
+  }
+}
+
 @media (max-width: 1320px) {
   .ef-home.has-workspace {
     --side-w: min(680px, 50vw);
@@ -2033,9 +2123,16 @@
 }
 
 @media (max-width: 900px) {
-  .ef-home {
+  html body {
+    min-width: 0;
+    overflow: auto;
+  }
+
+  .ef-home,
+  .ef-home[data-view="conversation"] {
     height: auto;
     min-height: 100dvh;
+    gap: var(--sp-16);
     padding: var(--sp-16) var(--sp-12) 88px;
   }
 
@@ -2048,11 +2145,6 @@
   .ef-home.has-workspace .ef-home-work {
     display: grid;
     grid-template-columns: 1fr;
-    padding-right: 0;
-  }
-
-  .ef-home.has-panel .ef-home-head,
-  .ef-home.has-workspace .ef-home-head {
     padding-right: 0;
   }
 
@@ -2376,7 +2468,8 @@
 }
 
 /* Completion actions inside the right Micro panel reuse the immersive rhythm. */
-.ef-home-micro-panel-state .micro-completion-context{
+.ef-home-micro-panel-state .micro-completion-context,
+.ef-home-micro-completion-context{
   display: flex;
   width: 100%;
   flex-direction: column;
@@ -2384,13 +2477,15 @@
   padding-top: var(--sp-12);
   border-top: 1px solid var(--line);
 }
-.ef-home-micro-panel-state .micro-completion-context h2{
+.ef-home-micro-panel-state .micro-completion-context h2,
+.ef-home-micro-completion-context h2{
   margin: 0 0 var(--sp-4);
   color: var(--ink);
   font-size: var(--fs-16);
   line-height: var(--lh-16);
 }
-.ef-home-micro-panel-state .micro-completion-context > button{
+.ef-home-micro-panel-state .micro-completion-context > button,
+.ef-home-micro-completion-context > button{
   display: flex;
   width: 100%;
   align-items: center;
@@ -2398,7 +2493,8 @@
   gap: var(--sp-12);
   text-align: left;
 }
-.ef-home-micro-panel-state .micro-completion-context button span{
+.ef-home-micro-panel-state .micro-completion-context button span,
+.ef-home-micro-completion-context button span{
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -2406,11 +2502,13 @@
   font-size: var(--fs-12);
   line-height: var(--lh-12);
 }
-.ef-home-micro-panel-state .micro-completion-context button span strong{
+.ef-home-micro-panel-state .micro-completion-context button span strong,
+.ef-home-micro-completion-context button span strong{
   font-size: var(--fs-14);
   line-height: var(--lh-14);
 }
-.ef-home-micro-panel-state .micro-completion-context button svg{ flex: 0 0 auto; }
+.ef-home-micro-panel-state .micro-completion-context button svg,
+.ef-home-micro-completion-context button svg{ flex: 0 0 auto; }
 
 /* Inline Micro: fixed action row in the shell footer (panel) and a stable
  * feedback slot + sticky actions inside the conversation card. */
@@ -2432,7 +2530,7 @@
   margin-top: 0;
 }
 .ef-home-micro .micro-card {
-  padding-bottom: calc(var(--sp-24) + 64px);
+  padding-bottom: 0;
 }
 .ef-home-micro .micro-card footer {
   position: sticky;
@@ -2452,15 +2550,24 @@
   line-height: var(--lh-12);
 }
 
-/* "Back to latest" stays in the composer area, never in the message flow. */
-.ef-home-composer { position: relative; }
-.ef-home-jump-row {
-  display: flex;
-  justify-content: center;
-  padding: var(--sp-4) 0 var(--sp-8);
+/* The strip and "back to latest" float above the composer; neither takes part
+   in layout, so showing either never changes the scroll range. */
+.ef-home-strip-anchor {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  z-index: 4;
+  padding-bottom: var(--sp-8);
 }
+
+.ef-home-strip-anchor[hidden] { display: none; }
+
 .ef-home-jump {
-  position: static;
+  position: absolute;
+  bottom: calc(100% + var(--sp-8));
+  left: 50%;
+  z-index: 5;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-4);
@@ -2474,8 +2581,11 @@
   line-height: var(--lh-12);
   box-shadow: var(--sh-2);
   cursor: pointer;
-  z-index: 2;
+  transform: translateX(-50%);
 }
+
+.ef-home-jump[hidden] { display: none; }
+.ef-home-composer[data-strip="1"] .ef-home-jump { bottom: calc(100% + var(--ef-strip-h, 64px) + var(--sp-8)); }
 .ef-home-jump:hover { border-color: var(--brand); color: var(--brand-ink); }
 .ef-home-jump:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
@@ -2485,23 +2595,60 @@
   padding-right: var(--sp-20);
 }
 
-.ef-home.has-route .ef-home-head {
-  padding-right: calc(var(--side-w) + var(--sp-20));
-}
-
 .ef-home.has-route .ef-home-work {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   padding-right: calc(var(--side-w) + var(--sp-20));
 }
 
-.ef-home.has-route .ef-home-route-panel {
+.ef-home.has-route .ef-home-route-panel-host {
   position: fixed;
   top: var(--panel-top);
   right: var(--panel-right);
   bottom: var(--panel-bottom);
   z-index: 20;
   width: var(--side-w);
+  min-height: 0;
+}
+.ef-home.has-route.is-route-page { padding-right: var(--sp-20); }
+.ef-home.has-route.is-route-page .ef-home-work { padding-right: 0; }
+
+.ef-home-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  margin: auto 0;
+  padding: var(--sp-24) var(--sp-8);
+  text-align: center;
+}
+
+.ef-home-empty h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-28);
+  line-height: var(--lh-28);
+  font-weight: var(--fw-700);
+  letter-spacing: -.02em;
+}
+
+.ef-home-empty p {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.ef-home-suggestions.is-empty {
+  justify-content: center;
+  padding-bottom: var(--sp-24);
+}
+
+.ef-home-starter-slot {
+  display: flex;
+  justify-content: center;
+  padding-bottom: var(--sp-8);
+}
+
+.ef-home-starter-slot .ef-home-example-row {
+  justify-content: center;
 }
 
 .ef-home-fresh {
@@ -2545,85 +2692,6 @@
   gap: var(--sp-8);
 }
 
-.ef-home-return {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  align-items: center;
-  justify-content: center;
-  overflow-y: auto;
-  padding: var(--sp-16) 0 var(--sp-24);
-}
-
-.ef-home-return-inner {
-  display: flex;
-  width: min(640px, 100%);
-  flex-direction: column;
-  gap: var(--sp-16);
-}
-
-.ef-home-return-copy h1 {
-  margin: 0;
-  font-size: var(--fs-28);
-  line-height: var(--lh-28);
-  font-weight: var(--fw-700);
-  letter-spacing: -.02em;
-}
-
-.ef-home-return-copy p {
-  margin: var(--sp-4) 0 0;
-  color: var(--ink-2);
-}
-
-.ef-home-return-card {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-12);
-  padding: var(--sp-16);
-  border: 1px solid var(--line);
-  border-radius: var(--r-16);
-  background: var(--surface);
-  box-shadow: var(--sh-2);
-}
-
-.ef-home-return-icon {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  place-items: center;
-  border-radius: var(--r-12);
-  background: var(--brand-soft);
-  color: var(--brand-ink);
-}
-
-.ef-home-return-copy-step {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.ef-home-return-copy-step small {
-  color: var(--muted);
-  font-size: var(--fs-12);
-}
-
-.ef-home-return-copy-step strong {
-  overflow: hidden;
-  font-size: var(--fs-16);
-  line-height: var(--lh-16);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ef-home-return-links {
-  display: flex;
-  justify-content: center;
-  gap: var(--sp-8);
-}
-
 .ef-home-text-action {
   min-height: 32px;
   padding: 0 var(--sp-8);
@@ -2648,7 +2716,7 @@
   padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-16);
   border: 1px solid var(--line);
   border-radius: var(--r-12);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: var(--surface);
   box-shadow: var(--sh-1);
 }
 
@@ -2687,8 +2755,21 @@
 }
 
 /* Route side panel */
+.ef-route-slot,
+.ef-route-page-slot,
+.ef-route-instance {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+.ef-home-route-panel-host[hidden] { display: none; }
+
 .ef-home-route-panel {
   display: flex;
+  width: 100%;
+  height: 100%;
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
@@ -2697,6 +2778,40 @@
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   box-shadow: var(--sh-2);
 }
+.ef-home-route-panel[data-at="page"] {
+  border-radius: var(--r-24);
+  background: var(--surface);
+  box-shadow: var(--sh-3);
+}
+
+/* Native modal page form: one route instance moved into the top layer. */
+.ef-home-route-page {
+  width: min(1280px, calc(100vw - 48px));
+  height: min(900px, calc(100dvh - 48px));
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  overflow: visible;
+}
+.ef-home-route-page::backdrop {
+  background: color-mix(in srgb, var(--ink) 30%, transparent);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+.ef-home-route-page[open] { animation: ef-route-page-in var(--dur-fast) var(--ease-out); }
+@keyframes ef-route-page-in { from { opacity: 0; } to { opacity: 1; } }
+.ef-home-route-panel[data-at="page"] .ef-home-route-panel-foot { display: none; }
+.ef-home-route-panel[data-at="page"] .ef-home-route-panel-body { padding-bottom: var(--sp-16); }
+.ef-home-route-panel[data-at="page"] .ef-course-route-shell { height: 100%; min-height: 0; }
+
+.ef-home-route-panel-tools { display: inline-flex; flex: 0 0 auto; align-items: center; gap: var(--sp-8); margin-left: auto; }
+.ef-course-route-modes { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r-8); background: var(--page); }
+.ef-course-route-modes button { display: inline-flex; align-items: center; gap: var(--sp-4); min-height: 28px; padding: 0 var(--sp-8); border: 0; border-radius: var(--r-8); background: transparent; color: var(--muted); font: inherit; font-size: var(--fs-12); font-weight: var(--fw-600); cursor: pointer; }
+.ef-course-route-modes button[aria-pressed="true"] { background: var(--surface); color: var(--brand-ink); box-shadow: var(--sh-1); }
 
 .ef-home-route-panel-head {
   display: flex;
@@ -2707,8 +2822,9 @@
   border-bottom: 1px solid var(--line);
 }
 
-.ef-home-route-panel-head > div { min-width: 0; flex: 1; }
+.ef-home-route-panel-head > div:first-child { min-width: 0; flex: 1; }
 .ef-home-route-panel-head span { color: var(--muted); font-size: var(--fs-12); }
+.ef-home-route-panel-head .ef-home-route-panel-subtitle { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ef-home-route-panel-head h2 { margin: 2px 0 0; font-size: var(--fs-20); line-height: var(--lh-20); }
 
 .ef-home-route-panel-body {
@@ -2716,8 +2832,8 @@
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  overflow-y: auto;
-  padding: var(--sp-16);
+  overflow: hidden;
+  padding: var(--sp-12) var(--sp-16) var(--sp-16);
 }
 
 .ef-home-route-panel-foot {
@@ -2740,9 +2856,9 @@
 
 @media (max-width: 900px) {
   .ef-home.has-route { padding-right: var(--sp-12); }
-  .ef-home.has-route .ef-home-head { padding-right: 0; }
   .ef-home.has-route .ef-home-work { padding-right: 0; }
-  .ef-home.has-route .ef-home-route-panel { position: static; width: 100%; max-height: 70dvh; }
+  .ef-home.has-route .ef-home-route-panel-host { position: static; width: 100%; max-height: 70dvh; }
+  .ef-course-route-modes { display: none; }
 }
 
 /* ---------- Stage 4 My panel: read-only overview + conversations ---------- */
@@ -2833,3 +2949,142 @@
   display: none;
 }
 .ef-home-workspace.is-hidden { display: none; }
+
+
+/* While the running inline practice's action bar is in the viewport it shares
+   the composer band with "回到最新"; hide the jump until the practice scrolls
+   completely out and content remains below. This is a direct geometry check,
+   never the docked-composer `data-micro-bar` flag. */
+.ef-home-scroller[data-micro-jump-hidden="1"] .ef-home-jump { display: none; }
+
+/* The inline Micro action bar docks directly on the composer. The composer
+   becomes an opaque surface so no card content can show through the seam. */
+.ef-home[data-micro-form="inline"] .ef-home-scroller[data-micro-bar="1"] .ef-home-composer {
+  background: var(--surface);
+  border-radius: var(--r-24) var(--r-24) 0 0;
+}
+.ef-home[data-micro-form="inline"] .ef-home-scroller[data-micro-bar="1"] .ef-home-composer::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: 0;
+  left: 0;
+  height: 4px;
+  border-radius: var(--r-24) var(--r-24) 0 0;
+  background: var(--surface);
+  pointer-events: none;
+}
+.ef-home[data-micro-form="inline"] .ef-home-scroller[data-micro-bar="1"] .ef-home-composer .ef-ui-composer {
+  border-radius: 0 0 var(--r-24) var(--r-24);
+  background: var(--surface);
+  box-shadow: none;
+}
+.ef-home[data-micro-form="inline"] .ef-home-scroller[data-micro-bar="1"] .ef-home-composer::before {
+  display: none;
+}
+
+/* ---------- Stage D: conversation history column and My overview ---------- */
+.ef-home-body {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.ef-home-body > .ef-home-work {
+  min-width: 0;
+  flex: 1;
+}
+
+.ef-home-titlebar-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-home-titlebar h1 {
+  min-width: 0;
+  flex: 1;
+}
+
+.ef-home-history-expand {
+  width: var(--ctl-32);
+  height: var(--ctl-32);
+  flex: 0 0 var(--ctl-32);
+  margin-left: calc(-1 * var(--sp-4));
+}
+
+.ef-home[data-history="closed"] .ef-home-titlebar-inner {
+  padding-left: 0;
+}
+
+.ef-my-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  padding: var(--sp-8) 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.ef-my-row:last-child {
+  border-bottom: 0;
+}
+
+.ef-my-row:hover {
+  color: var(--brand-ink);
+}
+
+.ef-my-row > span:first-child {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ef-my-row strong {
+  overflow: hidden;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-my-row small {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-my-row > svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+/* Panels must still leave the conversation at least 640px wide at the
+   1280–1440 acceptance widths; history auto-collapses when it does not. */
+@media (min-width: 901px) {
+  .ef-home[data-view="conversation"] .ef-home-body {
+    padding-left: var(--sp-12);
+  }
+
+  .ef-home.has-route {
+    --side-w: min(560px, max(420px, calc(100vw - 820px)));
+  }
+
+  .ef-home.has-workspace[data-workspace="micro"] {
+    --side-w: min(680px, max(420px, calc(100vw - 820px)));
+  }
+}
+
+@media (max-width: 900px) {
+  .ef-home-body {
+    min-height: calc(100dvh - 160px);
+  }
+}

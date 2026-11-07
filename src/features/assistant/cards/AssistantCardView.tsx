@@ -1,24 +1,26 @@
-import { BarChart3, BookOpen, ChevronUp, ClipboardCheck, FileText, Layers, Lightbulb, Maximize2, Network, Play, Route, Target, Wrench } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { BarChart3, BookOpen, ChevronUp, ClipboardCheck, FileText, Layers, Lightbulb, Maximize2, Network, PanelRight, Play, Route, Target, Wrench } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
 import type { AssistantContextSnapshot } from "../assistantContract";
 import { parseAssistantCardRef, type AssistantCardDisplay, type AssistantCardRef, type AssistantCardStatus } from "../assistantCards";
-import { InlineMicro } from "@/features/home/InlineMicro";
+import { MicroFormSwitch, MicroSlot, useMicroEntry, useMicroHost } from "@/features/home/MicroHost";
 import { buildHomeCourseProjection } from "@/features/course/path/courseLearnerProjection";
 import { projectLearnedMap, summarizeFirstSegment } from "@/shared/learning/firstSegment";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { ConversationCard } from "@/shared/ui/Conversation";
 import { useNavigate } from "react-router-dom";
-import { microImmersiveHref } from "@/features/learning/micro/microSurface";
 import { ObjectShell } from "@/shared/ui/ObjectShell";
 import { Pill, type PillTone } from "@/shared/ui/Pill";
+import { useConversationCardRegistry } from "@/shared/ui/conversationCardRegistry";
 import "./assistantCards.css";
 
 export type AssistantCardActions = {
   openCourse(courseId: string): void;
   openPractice(courseId: string, assignmentId: string): void;
+  /** Open one historical Attempt's saved result; fallback is the latest. */
+  openPracticeAttempt?(courseId: string, assignmentId: string, attemptId: string): void;
   openBrief(messageId: string): void;
   openMaterial(courseId: string, materialId: string, segmentId?: string): void;
   openRoutePanel?(courseId: string): void;
@@ -91,14 +93,23 @@ function Frame({ card, display, footer, tools, children, size = "s" }: {
   </ConversationCard>;
 }
 
-/** One-line completed card: same surface and token spacing, no competing primary action. */
-function CompactCard({ card, display, icon, onReview }: { card: AssistantCardRef; display: AssistantCardDisplay; icon: ReactNode; onReview: () => void }) {
-  return <ConversationCard size="s" label={`${display.kicker ?? "已完成"} ${display.title}`}>
+/** One-line collapsed card: same surface and token spacing, no competing primary action. */
+function CompactCard({ card, display, icon, onAction, statusLabel = "已完成", statusTone = "ok", actionLabel = "再看一遍", note }: {
+  card: AssistantCardRef;
+  display: AssistantCardDisplay;
+  icon: ReactNode;
+  onAction: () => void;
+  statusLabel?: string;
+  statusTone?: NonNullable<AssistantCardStatus["tone"]>;
+  actionLabel?: string;
+  note?: string;
+}) {
+  return <ConversationCard size="s" label={`${display.kicker ?? statusLabel} ${display.title}`}>
     <div className="ef-card-compact">
       <span className="ef-card-compact-icon" aria-hidden="true">{icon}</span>
-      <span className="ef-card-compact-copy"><strong>{display.title}</strong></span>
-      <Pill tone="ok" dot>已完成</Pill>
-      <button type="button" className="ef-card-text-action" onClick={onReview}>再看一遍</button>
+      <span className={`ef-card-compact-copy${note ? " is-inline" : ""}`}><strong>{display.title}</strong>{note ? <small>{note}</small> : null}</span>
+      <Pill tone={statusTone} dot>{statusLabel}</Pill>
+      <button type="button" className="ef-card-text-action" onClick={onAction}>{actionLabel}</button>
     </div>
   </ConversationCard>;
 }
@@ -107,33 +118,149 @@ function actionButton(label: string, onClick: () => void) {
   return <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={onClick}>{label}</button>;
 }
 
+/** Report the one card that owns the current next step so the strip can hide. */
+function useNextStepCardRegistration(frameRef: RefObject<HTMLDivElement | null>, matches: boolean) {
+  const registry = useConversationCardRegistry();
+  useEffect(() => {
+    if (!registry || !matches) return;
+    const element = frameRef.current;
+    if (!element) return;
+    registry.register(element);
+    return () => registry.unregister(element);
+  }, [matches, registry]);
+}
+
+type MicroEntry = ReturnType<typeof useMicroEntry>;
+
+/** The latest mounted card is the inline target; Host moves the one runner here. */
+function MicroFrameShell({ pathId, cardKey, cardType, children }: { pathId: string; cardKey: string; cardType: string; children: ReactNode }) {
+  const { registerCard } = useMicroHost();
+  const ref = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    return registerCard(pathId, cardKey, node, cardType);
+  }, [registerCard, pathId, cardKey, cardType]);
+  return <div className="ef-assistant-micro-frame" ref={ref} data-card-type={cardType} data-path-id={pathId}>{children}</div>;
+}
+
+function MicroFormTools({ entry, title }: { entry: MicroEntry; title: string }) {
+  const { setForm } = useMicroHost();
+  return <span className="ef-assistant-micro-tools">
+    <MicroFormSwitch current={entry.form} onChange={setForm} label={`切换 ${title} 的形态`} />
+    <button type="button" className="ef-card-icon" onClick={entry.collapse} aria-label="收起小练习" title="收起"><ChevronUp size={15} aria-hidden="true" /></button>
+  </span>;
+}
+
+function MicroEntryActions({ entry, label, note, extra }: { entry: MicroEntry; label: string; note?: ReactNode; extra?: ReactNode }) {
+  return <div className="ef-assistant-card-foot">
+    <span>{note}</span>
+    <span className="ef-assistant-card-actions">
+      {extra}
+      <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void entry.openWithStart("focus")}><Maximize2 size={14} aria-hidden="true" />沉浸</button>
+      <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void entry.openWithStart("side")}><PanelRight size={14} aria-hidden="true" />侧边</button>
+      <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" data-micro-action="open" disabled={entry.starting} onClick={() => void entry.openWithStart()}>
+        <Play size={14} aria-hidden="true" />{entry.starting ? "正在开始…" : label}
+      </button>
+    </span>
+  </div>;
+}
+
+function MicroAway({ entry }: { entry: MicroEntry }) {
+  const mode = entry.form === "focus" ? "正在沉浸模式中" : "正在右侧进行";
+  const title = entry.path?.title ?? "小练习";
+  return <ConversationCard size="s" label={`小练习 ${title}`}>
+    <div className="ef-card-compact ef-micro-away" data-micro-away={entry.form}>
+      <span className="ef-card-compact-icon" aria-hidden="true"><BookOpen size={17} /></span>
+      <span className="ef-card-compact-copy"><strong>{title}</strong><small>{mode}</small></span>
+      <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => entry.open("inline")}>回到对话</button>
+    </div>
+  </ConversationCard>;
+}
+
+/** Shared Micro/Knowledge card summary, entry points and inline placement. */
+function MicroPracticeCard({ card, cardType, display, entry }: { card: AssistantCardRef; cardType: "micro" | "knowledge"; display: AssistantCardDisplay; entry: MicroEntry }) {
+  const slotKey = useId();
+  const { slotOwner, cardOwner, hasCardType } = useMicroHost();
+  if (!entry.path) return null;
+  const minutes = entry.path.estimatedMinutes;
+  const total = entry.totalSteps;
+  const kicker = `小练习 · 约 ${minutes} 分钟`;
+  const liveDisplay: AssistantCardDisplay = {
+    ...display,
+    kicker,
+    title: entry.path.title || display.title,
+    description: entry.path.description ?? display.description,
+    meta: [],
+    status: entry.completed ? { label: "已完成", tone: "ok" } : entry.progress ? { label: "进行中", tone: "brand" } : { label: "未开始", tone: "quiet" }
+  };
+  const open = entry.active && entry.form !== "closed";
+  // A completion result knowledge card and the working Micro card can both
+  // reference the same path; keep the one completed line, not two.
+  if (cardType === "knowledge" && entry.completed && hasCardType(entry.pathId, "micro")) return null;
+  if (entry.completed && !open) {
+    return <MicroFrameShell pathId={entry.pathId} cardKey={slotKey} cardType={cardType}>
+      <CompactCard
+        card={card}
+        display={{ ...liveDisplay, kicker }}
+        icon={<BookOpen size={17} />}
+        onAction={() => entry.open("inline")}
+      />
+    </MicroFrameShell>;
+  }
+  const latestCard = cardOwner(entry.pathId);
+  const isLatestCard = !latestCard || latestCard === slotKey;
+  if (entry.active && (entry.form === "side" || entry.form === "focus") && isLatestCard) {
+    return <MicroFrameShell pathId={entry.pathId} cardKey={slotKey} cardType={cardType}><MicroAway entry={entry} /></MicroFrameShell>;
+  }
+  const activeInline = entry.active && entry.form === "inline";
+  const owner = slotOwner(entry.pathId);
+  // Only the latest card owns the running DOM. Older cards keep a hidden slot
+  // registered so ownership can fall back cleanly when the newest card unmounts.
+  const inline = activeInline && isLatestCard && (!owner || owner === slotKey);
+  const standby = activeInline && !inline ? <MicroSlot pathId={entry.pathId} slotKey={slotKey} className="ef-assistant-micro-body ef-micro-slot-standby" /> : null;
+  const footer = inline ? undefined : <MicroEntryActions
+    entry={entry}
+    label={entry.progress ? "继续这道小练习" : "开始这道小练习"}
+    note={entry.progress ? `${entry.completeSteps} / ${total} 步` : ""}
+  />;
+  const body = inline ? <MicroSlot pathId={entry.pathId} slotKey={slotKey} /> : standby;
+  return <MicroFrameShell pathId={entry.pathId} cardKey={slotKey} cardType={cardType}>
+    <Frame
+      card={card}
+      display={{ ...liveDisplay, description: inline ? undefined : liveDisplay.description }}
+      size={inline ? "l" : "s"}
+      footer={footer}
+      tools={inline ? <MicroFormTools entry={entry} title={entry.path.title} /> : undefined}
+    >
+      {body}
+    </Frame>
+  </MicroFrameShell>;
+}
+
 function RouteCard({ card, display, actions, session }: CardProps) {
+  const slotKey = useId();
   const action = display.action;
-  const micro = useMicroInline({
-    pathId: action?.kind === "micro" ? action.pathId : undefined,
+  const microPathId = action?.kind === "micro" ? action.pathId : undefined;
+  const entry = useMicroEntry({
+    pathId: microPathId,
     knowledgeId: action?.kind === "micro" ? action.knowledgeId : undefined,
     courseId: action?.kind === "micro" ? action.courseId : card.cardType === "route" ? card.courseId : undefined,
-    userId: session.userId,
-    actions
+    userId: session.userId
   });
   const frameRef = useRef<HTMLDivElement>(null);
-  const scrollCardIntoView = useCallback(() => {
-    window.requestAnimationFrame(() => {
-      const frame = frameRef.current;
-      const scroller = frame?.closest<HTMLElement>(".ef-home-timeline");
-      if (!frame || !scroller) return;
-      const top = Math.max(0, frame.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 8);
-      scroller.scrollTo({ top, behavior: "smooth" });
-      window.setTimeout(() => {
-        if (Math.abs(scroller.scrollTop - top) > 2) scroller.scrollTop = top;
-      }, 420);
-    });
-  }, []);
-  useEffect(() => { if (micro.expanded) scrollCardIntoView(); }, [micro.expanded, scrollCardIntoView]);
+  const registry = useConversationCardRegistry();
+  const { slotOwner, cardOwner, registerCard } = useMicroHost();
+  const routePathId = microPathId;
+  const setFrameRef = useCallback((node: HTMLDivElement | null) => {
+    frameRef.current = node;
+    if (!node || !routePathId) return;
+    return registerCard(routePathId, slotKey, node, "route");
+  }, [registerCard, routePathId, slotKey]);
+  const matchesNextStep = Boolean(routePathId && registry?.nextStep?.kind === "micro" && registry.nextStep.pathId === routePathId);
+  useNextStepCardRegistration(frameRef, matchesNextStep);
   if (card.cardType !== "route") return null;
-  const primary = action?.kind === "micro" && micro.path
-    ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={micro.starting} onClick={() => void micro.toggle()}>
-        <Play size={14} aria-hidden="true" />{micro.starting ? "正在开始…" : micro.progress ? "继续当前这一步" : action.label || "开始当前这一步"}
+  const primary = action?.kind === "micro" && entry.path
+    ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" data-micro-action="open" disabled={entry.starting} onClick={() => void entry.openWithStart()}>
+        <Play size={14} aria-hidden="true" />{entry.starting ? "正在开始…" : entry.progress ? "继续当前这一步" : action.label || "开始当前这一步"}
       </button>
     : action?.kind === "practice"
       ? actionButton(action.label || "打开动手任务", () => actions.openPractice(action.courseId, action.assignmentId))
@@ -141,37 +268,78 @@ function RouteCard({ card, display, actions, session }: CardProps) {
         ? actionButton(action.label || "打开课程", () => actions.openCourse(action.courseId))
         : null;
   const collapsed = display.status?.label === "进行中" || display.status?.label === "已完成";
-  if (collapsed && !micro.expanded) return <Frame
-    card={card}
-    display={{ ...display, description: undefined, steps: undefined, meta: display.meta?.slice(0, 1) }}
-    size="s"
-    footer={<div className="ef-assistant-card-foot">
-      <span>{display.meta?.[0] ?? "起步路线"}</span>
-      <span className="ef-assistant-card-actions"><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => actions.openRoutePanel ? actions.openRoutePanel(card.courseId) : actions.openCourse(card.courseId)}>查看完整路线</button></span>
-    </div>}
-  />;
-  const footer = <div className="ef-assistant-card-foot">
-    <span>{display.steps?.length ?? 0} 步</span>
-    <span className="ef-assistant-card-actions">{micro.expanded ? null : primary}<button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => actions.openCourse(card.courseId)}>查看完整路线</button></span>
+  const activeInline = entry.active && entry.form === "inline";
+  const owner = routePathId ? slotOwner(routePathId) : null;
+  const latestCard = routePathId ? cardOwner(routePathId) : null;
+  const isLatestCard = !latestCard || latestCard === slotKey;
+  const inline = activeInline && isLatestCard && (!owner || owner === slotKey);
+  const standby = activeInline && !inline && routePathId ? <MicroSlot pathId={routePathId} slotKey={slotKey} className="ef-assistant-micro-body ef-micro-slot-standby" /> : null;
+  if (entry.active && (entry.form === "side" || entry.form === "focus") && isLatestCard) {
+    return <div className="ef-assistant-micro-frame" ref={setFrameRef} data-card-type="route" data-path-id={routePathId}>
+      <MicroAway entry={entry} />
+    </div>;
+  }
+  if (collapsed && !inline) return <div className="ef-assistant-micro-frame" ref={setFrameRef} data-card-type="route" data-path-id={routePathId}>
+    <CompactCard
+      card={card}
+      display={{ ...display, title: display.title || "你的起步路线" }}
+      icon={<Route size={17} />}
+      statusLabel={display.status?.label ?? "进行中"}
+      statusTone={display.status?.tone ?? "brand"}
+      actionLabel="查看完整路线"
+      note={display.meta?.[0]}
+      onAction={() => actions.openRoutePanel ? actions.openRoutePanel(card.courseId) : actions.openCourse(card.courseId)}
+    />
+    {standby}
   </div>;
-  const tools = micro.expanded ? <button type="button" className="ef-card-icon" onClick={() => micro.setExpanded(false)} aria-label="收起小练习" title="收起"><ChevronUp size={15} aria-hidden="true" /></button> : undefined;
-  return <div className="ef-assistant-micro-frame" ref={frameRef}>
-    <Frame card={card} display={micro.expanded ? { ...display, description: undefined, meta: [] } : display} size="l" footer={footer} tools={tools}>
-      {micro.expanded && micro.path
-        ? <div className="ef-assistant-micro-body"><InlineMicro path={micro.path} knowledgeId={micro.knowledgeId} courseId={micro.courseId} session={session} surface="inline" hideHeader onCompleted={micro.finish} onStepChange={scrollCardIntoView} /></div>
-        : null}
+  const footer = inline ? undefined : <div className="ef-assistant-card-foot">
+    <span>{display.steps?.length ?? 0} 步</span>
+    <span className="ef-assistant-card-actions">
+      <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => actions.openRoutePanel ? actions.openRoutePanel(card.courseId) : actions.openCourse(card.courseId)}>查看完整路线</button>
+      {entry.path ? <>
+        <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void entry.openWithStart("focus")}><Maximize2 size={14} aria-hidden="true" />沉浸</button>
+        <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void entry.openWithStart("side")}><PanelRight size={14} aria-hidden="true" />侧边</button>
+        {primary}
+      </> : primary}
+    </span>
+  </div>;
+  const tools = inline ? <MicroFormTools entry={entry} title={entry.path?.title ?? display.title} /> : undefined;
+  const runningDisplay = entry.path
+    ? { ...display, title: entry.path.title, kicker: `小练习 · 约 ${entry.path.estimatedMinutes} 分钟`, description: undefined, meta: [], steps: undefined }
+    : display;
+  return <div className="ef-assistant-micro-frame" ref={setFrameRef} data-card-type="route" data-path-id={routePathId}>
+    <Frame
+      card={card}
+      display={inline ? runningDisplay : display}
+      size={inline ? "l" : "l"}
+      footer={footer}
+      tools={tools}
+    >
+      {inline ? <MicroSlot pathId={entry.pathId} slotKey={slotKey} /> : standby}
     </Frame>
   </div>;
 }
 
 function PracticeCard({ card, display, actions }: CardProps) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const registry = useConversationCardRegistry();
+  const matchesNextStep = Boolean(card.cardType === "practice" && registry?.nextStep?.kind === "practice" && registry.nextStep.assignmentId === card.assignmentId);
+  useNextStepCardRegistration(frameRef, matchesNextStep);
   if (card.cardType !== "practice") return null;
-  return <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>{display.status?.label ?? "动手做一次"}</span><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => actions.openPractice(card.courseId, card.assignmentId)}>{display.actionLabel ?? "打开动手任务"}</button></div>} />;
+  return <div className="ef-assistant-card-frame" ref={frameRef} data-card-type="practice" data-assignment-id={card.assignmentId} data-course-id={card.courseId}>
+    <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>{display.status?.label ?? "动手做一次"}</span><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => actions.openPractice(card.courseId, card.assignmentId)}>{display.actionLabel ?? "打开动手任务"}</button></div>} />
+  </div>;
 }
 
 function EvaluationCard({ card, display, actions }: CardProps) {
   if (card.cardType !== "evaluation") return null;
-  return <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>来自这次提交</span>{actionButton(display.actionLabel ?? "查看评价", () => actions.openPractice(card.courseId, card.assignmentId))}</div>} />;
+  const open = () => {
+    if (card.attemptId && actions.openPracticeAttempt) actions.openPracticeAttempt(card.courseId, card.assignmentId, card.attemptId);
+    else actions.openPractice(card.courseId, card.assignmentId);
+  };
+  return <div className="ef-assistant-card-frame" data-card-type="evaluation" data-attempt-id={card.attemptId ?? ""} data-course-id={card.courseId} data-assignment-id={card.assignmentId}>
+    <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>来自这次提交</span>{actionButton(display.actionLabel ?? "查看评价", open)}</div>} />
+  </div>;
 }
 
 function ChapterCard({ card, display, actions }: CardProps) {
@@ -192,59 +360,23 @@ function CourseMatchCard({ card, display, actions }: CardProps) {
 }
 
 function KnowledgeCard({ card, display, actions, session }: CardProps) {
-  const navigate = useNavigate();
-  const micro = useMicroInline({
+  const entry = useMicroEntry({
     pathId: card.cardType === "knowledge" ? card.pathId : undefined,
     knowledgeId: card.cardType === "knowledge" ? card.nodeId : undefined,
     courseId: card.cardType === "knowledge" ? card.courseId : undefined,
-    userId: session.userId,
-    actions
+    userId: session.userId
   });
   const frameRef = useRef<HTMLDivElement>(null);
-  const scrollCardIntoView = useCallback(() => {
-    window.requestAnimationFrame(() => {
-      const frame = frameRef.current;
-      const scroller = frame?.closest<HTMLElement>(".ef-home-timeline");
-      if (!frame || !scroller) return;
-      const top = Math.max(0, frame.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 8);
-      scroller.scrollTo({ top, behavior: "smooth" });
-      window.setTimeout(() => {
-        if (Math.abs(scroller.scrollTop - top) > 2) scroller.scrollTop = top;
-      }, 420);
-    });
-  }, []);
-  useEffect(() => { if (micro.expanded) scrollCardIntoView(); }, [micro.expanded, scrollCardIntoView]);
+  const registry = useConversationCardRegistry();
+  const matchesNextStep = Boolean(entry.pathId && registry?.nextStep?.kind === "micro" && registry.nextStep.pathId === entry.pathId);
+  useNextStepCardRegistration(frameRef, matchesNextStep);
   if (card.cardType !== "knowledge") return null;
-  const hasPractice = Boolean(micro.path);
-  const minutes = micro.path?.estimatedMinutes;
-  const fullScreen = () => {
-    if (!micro.path) return;
-    const target = microImmersiveHref(micro.knowledgeId, { ...(micro.courseId ? { courseId: micro.courseId } : {}), pathId: micro.pathId, returnTo: "/" });
-    navigate(target.to, { state: target.state });
-  };
-  const primary = micro.completed
-    ? null
-    : <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={micro.starting} onClick={() => void micro.toggle()}>
-        <Play size={14} aria-hidden="true" />{micro.starting ? "正在开始…" : micro.progress ? "继续这道小练习" : "开始这道小练习"}
-      </button>;
-  const footer = hasPractice && !micro.expanded && !micro.completed ? <div className="ef-assistant-card-foot">
-    <span />
-    <span className="ef-assistant-card-actions">{primary}<button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" onClick={fullScreen} aria-label="全屏进入小练习"><Maximize2 size={14} aria-hidden="true" />全屏</button></span>
-  </div> : undefined;
-  const tools = micro.completed && !micro.expanded
-    ? <button type="button" className="ef-card-text-action" onClick={() => micro.setExpanded(true)}>再看一遍</button>
-    : micro.expanded
-      ? <button type="button" className="ef-card-icon" onClick={() => micro.setExpanded(false)} aria-label="收起小练习" title="收起"><ChevronUp size={15} aria-hidden="true" /></button>
-      : undefined;
-  const liveDisplay = {
-    ...display,
-    status: micro.completed ? { label: "已学", tone: "ok" as const } : micro.progress ? { label: "进行中", tone: "brand" as const } : display.status
-  };
-  return <div className="ef-assistant-micro-frame" ref={frameRef}>
-    <Frame card={card} display={micro.expanded ? { ...liveDisplay, description: undefined, meta: [] } : liveDisplay} size={micro.expanded ? "l" : "s"} footer={footer} tools={tools}>
-      {micro.expanded && micro.path ? <div className="ef-assistant-micro-body"><InlineMicro path={micro.path} knowledgeId={micro.knowledgeId} courseId={micro.courseId} session={session} surface="inline" hideHeader onCompleted={micro.finish} onStepChange={scrollCardIntoView} /></div> : null}
-    </Frame>
-  </div>;
+  if (!entry.path) {
+    return <div className="ef-assistant-card-frame" ref={frameRef} data-card-type="knowledge">
+      <Frame card={card} display={display} />
+    </div>;
+  }
+  return <div ref={frameRef} className="ef-assistant-card-frame"><MicroPracticeCard card={card} cardType="knowledge" display={display} entry={entry} /></div>;
 }
 
 function ProgressCard({ card, display, actions }: CardProps) {
@@ -264,150 +396,24 @@ function MaterialCard({ card, display, actions }: CardProps) {
   return <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>只读资料</span>{actionButton(display.actionLabel ?? "查看资料", () => actions.openMaterial(card.courseId, card.materialId, card.segmentId))}</div>} />;
 }
 
-type MicroInlineInput = { pathId?: string; knowledgeId?: string; courseId?: string; userId?: string; actions: AssistantCardActions };
-const completedMicroPaths = new Set<string>();
-
-/** Shared inline Micro state for the Micro, Knowledge and Route cards. */
-function useMicroInline({ pathId, knowledgeId, courseId, userId, actions }: MicroInlineInput) {
-  const [revision, setRevision] = useState(0);
-  const [expanded, setExpanded] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const recorded = useRef(false);
-  const actionsRef = useRef(actions);
-  actionsRef.current = actions;
-  useEffect(() => applicationServices.microLearningRepository.subscribe(() => setRevision((value) => value + 1)), []);
-  const path = useMemo(() => {
-    if (!knowledgeId) return null;
-    void revision;
-    return applicationServices.microLearningRepository.getPath(knowledgeId, {
-      ...(courseId ? { courseId } : {}),
-      mode: "learn",
-      ...(pathId ? { pathId } : {})
-    });
-  }, [courseId, knowledgeId, pathId, revision]);
-  const actualPathId = path?.id ?? pathId ?? "";
-  const progress = actualPathId ? applicationServices.microLearningRepository.getPathProgress(actualPathId) : undefined;
-  const completed = progress?.status === "completed";
-  const start = useCallback(async () => {
-    if (!path || starting) return;
-    if (progress) { setExpanded(true); return; }
-    setStarting(true);
-    try {
-      await applicationServices.microLearningRepository.start(path.id, courseId);
-      if (userId) void refreshLearnerState(userId).catch(() => undefined);
-      setExpanded(true);
-    } finally {
-      setStarting(false);
-    }
-  }, [courseId, path, progress, starting]);
-  const toggle = useCallback(() => {
-    if (expanded) setExpanded(false);
-    else if (progress) setExpanded(true);
-    else void start();
-  }, [expanded, progress, start]);
-  const finish = useCallback(() => {
-    if (recorded.current || !actualPathId || !knowledgeId) return;
-    if (completedMicroPaths.has(actualPathId)) { recorded.current = true; return; }
-    completedMicroPaths.add(actualPathId);
-    recorded.current = true;
-    window.setTimeout(() => {
-      setExpanded(false);
-      actionsRef.current.recordMicroCompleted({ pathId: actualPathId, knowledgeId, ...(courseId ? { courseId } : {}) });
-    }, 700);
-  }, [actualPathId, courseId, knowledgeId]);
-  useEffect(() => {
-    if (completed) finish();
-  }, [completed, finish]);
-  return { path, pathId: actualPathId, knowledgeId: knowledgeId ?? "", courseId, progress, completed, expanded, setExpanded, starting, start, toggle, finish };
-}
-
 /**
- * Micro card: one click starts/continues the real path, expands to the wider
- * L card, pins its own action area, and collapses to one line when completed.
+ * Micro card: the Host owns the runner, so the card only supplies the summary,
+ * the three entry points and the latest inline slot.
  */
-function MicroCard({ card, display, session, actions }: CardProps) {
-  const navigate = useNavigate();
-  const micro = useMicroInline({
+function MicroCard({ card, display, session }: CardProps) {
+  const entry = useMicroEntry({
     pathId: card.cardType === "micro" ? card.pathId : undefined,
     knowledgeId: card.cardType === "micro" ? card.knowledgeId : undefined,
     courseId: card.cardType === "micro" ? card.courseId : undefined,
-    userId: session.userId,
-    actions
+    userId: session.userId
   });
   const frameRef = useRef<HTMLDivElement>(null);
-  const scrollCardIntoView = useCallback(() => {
-    window.requestAnimationFrame(() => {
-      const frame = frameRef.current;
-      const scroller = frame?.closest<HTMLElement>(".ef-home-timeline");
-      if (!frame || !scroller) return;
-      const top = Math.max(0, frame.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 8);
-      scroller.scrollTo({ top, behavior: "smooth" });
-      window.setTimeout(() => {
-        if (Math.abs(scroller.scrollTop - top) > 2) scroller.scrollTop = top;
-      }, 420);
-    });
-  }, []);
-  useEffect(() => {
-    if (micro.expanded) scrollCardIntoView();
-  }, [micro.expanded, scrollCardIntoView]);
-  useEffect(() => {
-    if (card.cardType !== "micro" || !micro.path) return;
-    const open = (event: Event) => {
-      const pathId = (event as CustomEvent<{ pathId?: string }>).detail?.pathId;
-      if (pathId !== micro.pathId) return;
-      if (micro.expanded) scrollCardIntoView();
-      else void micro.toggle();
-    };
-    window.addEventListener("eduflow:open-micro", open);
-    return () => window.removeEventListener("eduflow:open-micro", open);
-  }, [card, micro.expanded, micro.path, micro.pathId, micro.toggle, scrollCardIntoView]);
+  const registry = useConversationCardRegistry();
+  const matchesNextStep = Boolean(entry.pathId && registry?.nextStep?.kind === "micro" && registry.nextStep.pathId === entry.pathId);
+  useNextStepCardRegistration(frameRef, matchesNextStep);
   if (card.cardType !== "micro") return null;
-  if (!micro.path) return null;
-
-  const pathTitle = micro.path.title || display.title;
-  const minutes = micro.path.estimatedMinutes;
-  const liveDisplay = {
-    ...display,
-    title: pathTitle,
-    status: micro.completed ? { label: "已完成", tone: "ok" as const } : micro.progress ? { label: "进行中", tone: "brand" as const } : { label: "未开始", tone: "quiet" as const }
-  };
-  if (micro.completed && !micro.expanded) {
-    return <CompactCard
-      card={card}
-      display={{ ...liveDisplay, kicker: "小练习" }}
-      icon={<BookOpen size={17} />}
-      onReview={() => micro.setExpanded(true)}
-    />;
-  }
-
-  const fullScreen = () => {
-    if (!micro.path) return;
-    const target = microImmersiveHref(micro.knowledgeId, { ...(micro.courseId ? { courseId: micro.courseId } : {}), pathId: micro.pathId, returnTo: "/" });
-    navigate(target.to, { state: target.state });
-  };
-  const primaryLabel = micro.starting ? "正在开始…" : micro.progress ? "继续这道小练习" : "开始这道小练习";
-  const footer = micro.expanded ? undefined : <div className="ef-assistant-card-foot">
-    <span />
-    <span className="ef-assistant-card-actions">
-      <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={micro.starting} onClick={() => void micro.toggle()}>
-        <Play size={14} aria-hidden="true" />{primaryLabel}
-      </button>
-      <button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" onClick={fullScreen} aria-label="全屏进入小练习">
-        <Maximize2 size={14} aria-hidden="true" />全屏
-      </button>
-    </span>
-  </div>;
-  const tools = micro.expanded ? <button type="button" className="ef-card-icon" onClick={() => micro.setExpanded(false)} aria-label="收起小练习" title="收起">
-    <ChevronUp size={15} aria-hidden="true" />
-  </button> : undefined;
-
-  return <div className="ef-assistant-micro-frame" ref={frameRef}>
-    <Frame card={card} display={micro.expanded ? { ...liveDisplay, description: undefined, meta: [] } : liveDisplay} size={micro.expanded ? "l" : "s"} footer={footer} tools={tools}>
-      {micro.expanded ? <div className="ef-assistant-micro-body">
-        <InlineMicro path={micro.path} knowledgeId={micro.knowledgeId} courseId={micro.courseId} session={session} surface="inline" hideHeader onCompleted={micro.finish} onStepChange={scrollCardIntoView} />
-      </div> : null}
-    </Frame>
-  </div>;
+  if (!entry.path) return null;
+  return <div ref={frameRef} className="ef-assistant-card-frame"><MicroPracticeCard card={card} cardType="micro" display={display} entry={entry} /></div>;
 }
 
 function SegmentSummaryCard({ card, session, actions }: { card: AssistantCardRef; session: MockSession; actions: AssistantCardActions }) {
@@ -534,7 +540,11 @@ function useHydratedCard(card: AssistantCardRef | null, initial: AssistantCardDi
   useEffect(() => {
     if (!card) return;
     let live = true;
-    void hydrateCard(card, session).then((next) => { if (live && next) setDisplay(next); }).catch(() => undefined);
+    void hydrateCard(card, session).then((next) => {
+      if (!live || !next) return;
+      setDisplay(next);
+      window.requestAnimationFrame(() => window.dispatchEvent(new CustomEvent("eduflow:conversation-card-hydrated")));
+    }).catch(() => undefined);
     return () => { live = false; };
   }, [card, revision, session]);
   return display;
@@ -573,7 +583,7 @@ async function hydrateCard(card: AssistantCardRef, session: MockSession): Promis
     case "evaluation": {
       const runtime = runtimeFor(card.courseId);
       const assignment = runtime?.assignments.find((item) => item.id === card.assignmentId);
-      const { result } = await applicationServices.learnerStateService.getAssignmentResult(card.courseId, card.assignmentId);
+      const { result } = await applicationServices.learnerStateService.getAssignmentResult(card.courseId, card.assignmentId, undefined, card.attemptId);
       if (!assignment || !result) return null;
       const outcome = result.outcome;
       return {
