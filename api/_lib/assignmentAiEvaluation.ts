@@ -8,7 +8,6 @@ import { ApiError } from "./http.js";
 import { dataOrThrow } from "./query.js";
 import { parseAssignmentResponse } from "./assignmentEvaluator.js";
 import { createServerSupabase } from "./supabase.js";
-import { recordEvaluationTimeline } from "./assistantTimeline.js";
 
 type Row = Record<string, unknown>;
 
@@ -423,12 +422,12 @@ export function modelErrorDetail(error: unknown) {
 export async function evaluateAssignmentAttempt(input: AssignmentAiEvaluationInput): Promise<AssignmentAiEvaluationResponse> {
   const serverClient = input.serverClient ?? createServerSupabase();
   const attemptResult = await input.userClient.from("learning_attempts")
-    .select("id,user_id,course_id,assignment_id,attempt_number,response,submitted_at")
+    .select("id,user_id,course_id,assignment_id,attempt_number,response,submitted_at,withdrawn_at")
     .eq("id", input.attemptId).eq("user_id", input.userId)
     .eq("course_id", input.courseId).eq("assignment_id", input.assignmentId)
     .maybeSingle();
   const attempt = dataOrThrow(attemptResult.data as Row | null, attemptResult.error, "AI evaluation Attempt");
-  if (!attempt) throw new ApiError(404, "practice_attempt_unavailable", "本人正式实践不可用。");
+  if (!attempt || attempt.withdrawn_at) throw new ApiError(404, "practice_attempt_unavailable", "本人正式实践不可用。");
   const assignmentResult = await input.userClient.from("course_assignments")
     .select("id,title,description,requirements,expected_output,acceptance_criteria,experience,mode")
     .eq("course_id", input.courseId).eq("id", input.assignmentId).maybeSingle();
@@ -446,10 +445,8 @@ export async function evaluateAssignmentAttempt(input: AssignmentAiEvaluationInp
     const latest = await loadLatestResult(serverClient, input.attemptId);
     const result = dataOrThrow(latest.data as Row | null, latest.error, "AI evaluation final Result");
     if (!result) throw new ApiError(409, "ai_evaluation_result_unavailable", "这次提交的结果暂时无法读取，请刷新重试。");
-    await recordEvaluationTimeline(serverClient, {
-      userId: input.userId, courseId: input.courseId, assignmentId: input.assignmentId,
-      attemptId: input.attemptId, resultId: text(result, "id"), outcome: text(result, "outcome")
-    }).catch(() => undefined);
+    // The Result is visible through the Assignment state; it does not append a
+    // conversation operation message.
     return responseFromResult(input.attemptId, result);
   }
   if (claimStatus === "handed_off") return { status: "handed_off", attemptId: input.attemptId, evaluationStatus: "handed_off" };
@@ -565,12 +562,8 @@ export async function evaluateAssignmentAttempt(input: AssignmentAiEvaluationInp
   }
   const written = (recorded.data as Row[] | null)?.[0];
   if (!written) throw new ApiError(500, "ai_evaluation_write_failed", "AI 评价结果暂时无法保存，本次提交仍然保留。可以重试。");
-  // The Result owns its timeline entry: it appears even when the learner has
-  // already left the practice panel. Idempotent by Attempt + Result.
-  await recordEvaluationTimeline(serverClient, {
-    userId: input.userId, courseId: input.courseId, assignmentId: input.assignmentId,
-    attemptId: input.attemptId, resultId: String(written.result_id), outcome
-  }).catch(() => undefined);
+  // The Result is visible through the Assignment state; it does not append a
+  // conversation operation message (batch 1).
   return {
     status: outcome === "passed" ? "accepted" : "needs_revision",
     accepted: outcome === "passed",
@@ -592,10 +585,10 @@ export async function handoffAssignmentEvaluation(input: {
 }) {
   const serverClient = input.serverClient ?? createServerSupabase();
   const attemptResult = await input.userClient.from("learning_attempts")
-    .select("id").eq("id", input.attemptId).eq("user_id", input.userId)
+    .select("id,withdrawn_at").eq("id", input.attemptId).eq("user_id", input.userId)
     .eq("course_id", input.courseId).eq("assignment_id", input.assignmentId).maybeSingle();
   const attempt = dataOrThrow(attemptResult.data as Row | null, attemptResult.error, "AI evaluation handoff Attempt");
-  if (!attempt) throw new ApiError(404, "practice_attempt_unavailable", "本人正式实践不可用。");
+  if (!attempt || attempt.withdrawn_at) throw new ApiError(404, "practice_attempt_unavailable", "本人正式实践不可用。");
   const result = await serverClient.rpc("handoff_assignment_ai_evaluation", { p_user_id: input.userId, p_attempt_id: input.attemptId });
   const status = dataOrThrow(result.data as string | null, result.error, "AI evaluation handoff");
   if (status === "unavailable") throw new ApiError(404, "practice_attempt_unavailable", "本人正式实践不可用。");

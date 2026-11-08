@@ -51,7 +51,8 @@
     "content:export": "node --env-file=.env.local --import tsx scripts/content-export.ts",
     "lint:css": "node scripts/lint-css.mjs",
     "tokens:sync": "node scripts/sync-design-tokens.mjs",
-    "tokens:check": "node scripts/sync-design-tokens.mjs --check"
+    "tokens:check": "node scripts/sync-design-tokens.mjs --check",
+    "learner:reset:local": "node --env-file=.env.local --import tsx scripts/reset-local-learner.ts"
   },
   "dependencies": {
     "3d-force-graph": "1.79.1",

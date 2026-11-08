@@ -5,15 +5,16 @@ import { ComposerActionButton, onComposerKeyDown } from '@/shared/ui/ComposerAct
 import './conversationWorkspace.css';
 
 export type ConversationItem = { id: string; role: 'user' | 'assistant'; content: ReactNode };
-export function ConversationWorkspace({ mode, messages, loading = false, sending = false, replying = false, composerDisabled = false, error, onRetry, onSend, onStop, onAttachment, composerActions, children, placeholder = '发消息，继续讨论…' }: {
+export function ConversationWorkspace({ mode, messages, loading = false, sending = false, replying = false, composerDisabled = false, error, onRetry, onSend, onStop, onAttachment, composerActions, children, placeholder = '发消息，继续讨论…', insertText, insertKey }: {
   mode: 'assistant' | 'practice' | 'capability-update'; messages: ConversationItem[]; loading?: boolean; sending?: boolean; replying?: boolean; composerDisabled?: boolean;
   error?: string; onRetry?: () => void; onSend: (text: string) => Promise<boolean | void>; onStop?: () => void; onAttachment?: (file: File) => void;
-  composerActions?: ReactNode; children?: ReactNode; placeholder?: string;
+  composerActions?: ReactNode; children?: ReactNode; placeholder?: string; insertText?: string; insertKey?: string;
 }) {
   const reduced = useReducedMotion();
-  const [draft, setDraft] = useState(''); const bottom = useRef<HTMLDivElement>(null); const timeline = useRef<HTMLDivElement>(null);
+  const [draft, setDraft] = useState(''); const bottom = useRef<HTMLDivElement>(null); const timeline = useRef<HTMLDivElement>(null); const lastInsertKey = useRef<string | null>(null);
   const nearBottom = useRef(false); const input = useRef<HTMLTextAreaElement>(null); const file = useRef<HTMLInputElement>(null);
   useEffect(() => { if (nearBottom.current) timeline.current?.scrollTo({ top: timeline.current.scrollHeight, behavior: 'instant' }); }, [messages, sending]);
+  useEffect(() => { if (!insertText || !insertKey || lastInsertKey.current === insertKey) return; lastInsertKey.current = insertKey; setDraft(current => current.trim() ? `${current.trimEnd()}\n${insertText}` : insertText); window.requestAnimationFrame(() => { input.current?.focus(); const next = input.current?.value.length ?? 0; input.current?.setSelectionRange(next, next); }); }, [insertKey, insertText]);
   async function send() { const original=draft;const text = original.trim(); if (!text || sending || replying || composerDisabled) return; const focus=document.activeElement;nearBottom.current=true;if (await onSend(text) !== false) { setDraft(current=>current===original?'':current); if(document.activeElement===focus&&(focus===input.current||focus?.getAttribute('aria-label')==='发送对话消息'))input.current?.focus({ preventScroll: true }); } }
   return <div className={`conversation-workspace mode-${mode}`}>
     <div className="conversation-timeline" ref={timeline} role="log" aria-label="对话时间线" aria-live="polite" onScroll={() => { const el = timeline.current; if (el) nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; }}>

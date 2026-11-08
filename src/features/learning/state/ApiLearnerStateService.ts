@@ -1,5 +1,5 @@
 import { apiRequest } from "@/shared/api/apiClient";
-import type { AssignmentAttemptResult, AssignmentEvaluationResponse, AssignmentFeedback, AssignmentResponse, AssignmentResult } from "@/shared/learning/assignmentAttempt";
+import type { AssignmentAttemptHistoryItem, AssignmentAttemptResult, AssignmentEvaluationResponse, AssignmentFeedback, AssignmentResponse, AssignmentResult, AssignmentSubmissionSummary } from "@/shared/learning/assignmentAttempt";
 import type { NavigationDecision } from "@/shared/learning/navigation";
 import type { MyPracticeSubmission } from "@/shared/learning/practiceSubmission";
 
@@ -28,7 +28,10 @@ export class ApiLearnerStateService {
     const params = new URLSearchParams({ courseId, assignmentId });
     if (actionRunId) params.set("actionRunId", actionRunId);
     if (attemptId) params.set("attemptId", attemptId);
-    return apiRequest<{ result: AssignmentResult | null }>(`/api/learning?${params.toString()}`);
+    return apiRequest<{ result: AssignmentResult | null; history: AssignmentAttemptHistoryItem[]; summary: AssignmentSubmissionSummary }>(`/api/learning?${params.toString()}`);
+  }
+  withdrawAssignmentAttempt(courseId: string, assignmentId: string, attemptId: string, source: "panel" | "assistant" = "panel") {
+    return apiRequest<{ withdrawn: boolean; attemptId: string; alreadyWithdrawn: boolean; restoredStatus: string | null }>("/api/learning", { method: "POST", body: JSON.stringify({ action: "withdraw-attempt", courseId, assignmentId, attemptId, source }) });
   }
   async evaluateAssignment(courseId: string, assignmentId: string, attemptId: string, userId?: string) {
     const response = await apiRequest<AssignmentEvaluationResponse>("/api/learning", { method: "POST", body: JSON.stringify({ action: "evaluate-assignment", courseId, assignmentId, attemptId }), keepalive: true });

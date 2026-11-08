@@ -21,7 +21,8 @@ import { ArchiveCourseFocusBar, ArchiveDraftFocusBar, ArchiveLevelChip, ArchiveN
 import { SceneZoomToolbar } from "@/shared/scene/SceneZoomToolbar";
 import { ArchiveSearchPanel } from "../components/ArchiveSearchPanel";
 import type { ArchiveAtlasSceneHandle } from "../components/ArchiveAtlasScene";
-import { archiveCourseKnowledgeIds, buildArchiveModel, searchArchive, type ArchiveModel } from "../model/atlasModel";
+import { archiveCourseKnowledgeIds, searchArchive, type ArchiveModel } from "../model/atlasModel";
+import { useArchiveModelData } from "../model/useArchiveModel";
 import { communityByNodeId, detectAtlasCommunities } from "../model/atlasCommunities";
 import { readAtlas3DLayoutCache, type Atlas3DLayout } from "../model/atlas3dLayout";
 import { requestAtlas3DLayout } from "../model/atlas3dLayoutClient";
@@ -72,39 +73,8 @@ function shortName(person: FollowedPerson) {
 }
 
 function useArchiveData(session: MockSession | null, refreshToken: number) {
-  const governance = useDomainGovernance();
-  const [revision, setRevision] = useState(0);
-  useEffect(() => {
-    const unsubscribers = [
-      applicationServices.userKnowledgeRepository.subscribe(() => setRevision((value) => value + 1)),
-      applicationServices.learningProgressRepository.subscribe(() => setRevision((value) => value + 1)),
-      applicationServices.microLearningRepository.subscribe(() => setRevision((value) => value + 1))
-    ];
-    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
-  }, []);
-
-  const runtimes = useMemo(() => {
-    try {
-      return applicationServices.courseRepository.listCourseRuntimes().filter((runtime) => isCourseVisibleToViewer(runtime.course, session?.userId));
-    } catch {
-      return [];
-    }
-  }, [revision, refreshToken, session?.userId]);
-  const courseStates = useMemo(() => {
-    if (!session) return new Map();
-    return new Map(runtimes.map((runtime) => [runtime.course.id, applicationServices.learningProgressRepository.getCourseState(session.userId, runtime.course.id)]));
-  }, [refreshToken, revision, runtimes, session]);
-  const graph = useMemo(() => session
-    ? applicationServices.knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId))
-    : applicationServices.knowledgeRepository.getVisibleGraph(globalKnowledgeAccess), [refreshToken, revision, session]);
-  const records = useMemo(() => session ? applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId) : [], [refreshToken, revision, session]);
-  const built = useMemo(() => {
-    try {
-      return { model: buildArchiveModel({ graph, governance, runtimes, records, courseStates }) };
-    } catch (error) {
-      return { model: null, error };
-    }
-  }, [courseStates, governance, graph, records, runtimes]);
+  const data = useArchiveModelData(session, refreshToken);
+  const built = useMemo(() => ({ model: data.model, error: data.error }), [data.model, data.error]);
   const cachedLayout = useMemo(
     () => built.model ? readAtlas3DLayoutCache(built.model.nodes, built.model.edges) : null,
     [built.model]
@@ -142,7 +112,7 @@ function useArchiveData(session: MockSession | null, refreshToken: number) {
   const layout = layoutResult?.model === built.model ? layoutResult.layout : cachedLayout;
   const layoutElapsed = layoutResult?.model === built.model ? layoutResult.elapsed : 0;
   const layoutCached = layoutResult?.model === built.model ? layoutResult.cached : Boolean(cachedLayout);
-  return { model: built.model, layout, layoutElapsed, layoutCached, error: built.error, revision, runtimes, graph, records, courseStates };
+  return { ...data, model: built.model, layout, layoutElapsed, layoutCached, error: built.error };
 }
 
 function ArchiveAssistantBridge({ session, model, context, seedGoal, open, onOpenChange, onPresentation, onOpenBrief }: {

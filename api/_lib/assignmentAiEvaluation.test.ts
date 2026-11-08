@@ -232,6 +232,17 @@ describe("Knowledge mastery criterion expansion", () => {
 });
 
 describe("AI evaluation attempt orchestration", () => {
+  it("never claims or finalizes a withdrawn Attempt, so a late model result cannot count back", async () => {
+    const rpc = vi.fn();
+    const withdrawn = { ...attempt, withdrawn_at: "2026-11-07T00:00:00Z" };
+    await expect(evaluateAssignmentAttempt({
+      userClient: fakeClient({ learning_attempts: [withdrawn], course_assignments: [assignment] }, rpc),
+      serverClient: fakeClient({}, rpc), userId: "user-1", courseId: "course-1", assignmentId: "task-1", attemptId: "attempt-1",
+      generator: vi.fn(),
+    })).rejects.toMatchObject({ status: 404, code: "practice_attempt_unavailable" });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("keeps the Attempt pending when the model fails and writes no Result", async () => {
     const calls: string[] = [];
     const rpc = vi.fn((name: string) => {

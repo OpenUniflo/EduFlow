@@ -7,24 +7,19 @@
  * product state. Card data is never authored by the model.
  */
 
-export const ASSISTANT_MAX_CARDS = 3;
-
-export function cardLimitReached(accepted: number): boolean {
-  return accepted >= ASSISTANT_MAX_CARDS;
-}
-
 export const assistantCardTypes = [
   "route",
   "micro",
   "practice",
+  "submission",
   "evaluation",
   "course_chapter",
   "course_match",
   "brief",
   "knowledge",
+  "mini_map",
   "progress",
-  "material",
-  "segment_summary"
+  "material"
 ] as const;
 
 export type AssistantCardType = (typeof assistantCardTypes)[number];
@@ -32,15 +27,16 @@ export type AssistantCardType = (typeof assistantCardTypes)[number];
 export type AssistantCardRef =
   | { cardType: "route"; courseId: string }
   | { cardType: "micro"; pathId: string; knowledgeId: string; courseId?: string }
-  | { cardType: "practice"; courseId: string; assignmentId: string }
+  | { cardType: "practice"; courseId: string; assignmentId: string; compact?: boolean }
+  | { cardType: "submission"; courseId: string; assignmentId: string }
   | { cardType: "evaluation"; courseId: string; assignmentId: string; attemptId?: string }
   | { cardType: "course_chapter"; courseId: string; chapterId: string }
   | { cardType: "course_match"; courseIds: string[]; targetKnowledgeIds: string[]; goalText: string }
   | { cardType: "brief"; messageId: string }
-  | { cardType: "knowledge"; nodeId: string; pathId?: string; courseId?: string }
+  | { cardType: "knowledge"; nodeId: string }
+  | { cardType: "mini_map"; nodeId: string }
   | { cardType: "progress"; courseIds: string[] }
-  | { cardType: "material"; courseId: string; materialId: string; segmentId?: string }
-  | { cardType: "segment_summary"; courseId: string };
+  | { cardType: "material"; courseId: string; materialId: string; segmentId?: string };
 
 export type AssistantCardStatusTone = "ok" | "warn" | "brand" | "quiet";
 
@@ -115,7 +111,12 @@ export function parseAssistantCardRef(value: unknown): AssistantCardRef | null {
     case "practice": {
       const courseId = one("courseId");
       const assignmentId = one("assignmentId");
-      return courseId && assignmentId ? { cardType: "practice", courseId, assignmentId } : null;
+      return courseId && assignmentId ? { cardType: "practice", courseId, assignmentId, ...(source.compact === true ? { compact: true } : {}) } : null;
+    }
+    case "submission": {
+      const courseId = one("courseId");
+      const assignmentId = one("assignmentId");
+      return courseId && assignmentId ? { cardType: "submission", courseId, assignmentId } : null;
     }
     case "evaluation": {
       const courseId = one("courseId");
@@ -144,9 +145,11 @@ export function parseAssistantCardRef(value: unknown): AssistantCardRef | null {
     }
     case "knowledge": {
       const nodeId = one("nodeId");
-      const pathId = one("pathId");
-      const courseId = one("courseId");
-      return nodeId ? { cardType: "knowledge", nodeId, ...(pathId ? { pathId } : {}), ...(courseId ? { courseId } : {}) } : null;
+      return nodeId ? { cardType: "knowledge", nodeId } : null;
+    }
+    case "mini_map": {
+      const nodeId = one("nodeId");
+      return nodeId ? { cardType: "mini_map", nodeId } : null;
     }
     case "progress": {
       const courseIds = ids(source.courseIds, 8);
@@ -158,10 +161,6 @@ export function parseAssistantCardRef(value: unknown): AssistantCardRef | null {
       if (!courseId || !materialId) return null;
       const segmentId = one("segmentId");
       return { cardType: "material", courseId, materialId, ...(segmentId ? { segmentId } : {}) };
-    }
-    case "segment_summary": {
-      const courseId = one("courseId");
-      return courseId ? { cardType: "segment_summary", courseId } : null;
     }
     default:
       return null;
@@ -178,13 +177,14 @@ export function cardHistoryLabel(ref: AssistantCardRef): string {
     case "route": return "一段起步路线";
     case "micro": return "一个小练习";
     case "practice": return "一个动手任务";
+    case "submission": return "一份提交表单";
     case "evaluation": return "一条实践评价结果";
     case "course_chapter": return "一个课程章节";
     case "course_match": return "一份课程匹配结果";
     case "brief": return "一份课程创建简报";
-    case "knowledge": return "一个知识要点";
+    case "knowledge": return "一个知识点";
+    case "mini_map": return "一张知识点关系小地图";
     case "progress": return "一份学习进度";
     case "material": return "一段资料";
-    case "segment_summary": return "一份第一段小结";
   }
 }

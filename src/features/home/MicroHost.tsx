@@ -21,12 +21,18 @@ import {
 } from "./microPresence";
 
 /** Paths already reported to the Assistant in this browser session. */
-const recordedMicroCompletions = new Set<string>();
 const MORPH_MS = 400;
 const GROW_MS = 240;
 const EASE_OUT = [0.2, 0.8, 0.2, 1] as const;
 
 type SlotEntry = { element: HTMLElement; key: string; kind?: string };
+
+/** A card must be mounted in this conversation before inline becomes a target. */
+function timelineHasCard(pathId: string): boolean {
+  if (typeof document === "undefined" || !pathId) return false;
+  const escaped = pathId.replace(/["\\]/g, "\\$&");
+  return Boolean(document.querySelector(`.ef-home-timeline [data-card-type][data-path-id="${escaped}"]`));
+}
 type SlotRegistry = Map<string, SlotEntry[]>;
 
 export type MicroHostController = {
@@ -35,6 +41,7 @@ export type MicroHostController = {
   revision: number;
   slotVersion: number;
   slotOwner(pathId: string): string | null;
+  cardSlot(pathId: string, key?: string): HTMLElement | null;
   cardOwner(pathId: string): string | null;
   hasCardType(pathId: string, kind: string): boolean;
   open(input: MicroOpenInput, form?: MicroForm): void;
@@ -54,13 +61,14 @@ export type MicroHostController = {
   dialogSlotRef: RefObject<HTMLDivElement | null>;
 };
 
-type MicroHostValue = Pick<MicroHostController, "presence" | "revision" | "slotVersion" | "slotOwner" | "cardOwner" | "hasCardType" | "open" | "setForm" | "close" | "clear" | "dismissSide" | "registerSlot" | "registerCard">;
+type MicroHostValue = Pick<MicroHostController, "presence" | "revision" | "slotVersion" | "slotOwner" | "cardSlot" | "cardOwner" | "hasCardType" | "open" | "setForm" | "close" | "clear" | "dismissSide" | "registerSlot" | "registerCard">;
 
 const EMPTY_MICRO_HOST: MicroHostValue = {
   presence: null,
   revision: 0,
   slotVersion: 0,
   slotOwner: () => null,
+  cardSlot: () => null,
   cardOwner: () => null,
   hasCardType: () => false,
   open: () => undefined,
@@ -103,36 +111,9 @@ function focusWithoutScroll(element: HTMLElement | null | undefined) {
   if (element?.isConnected && element.getClientRects().length) element.focus({ preventScroll: true });
 }
 
-/** Next card after the completed one, or its review control. */
-function completionFrames(pathId: string) {
-  const frames = [...document.querySelectorAll<HTMLElement>(".ef-assistant-micro-frame")].filter((frame) => frame.dataset.pathId === pathId);
-  const completed = frames.find((frame) => frame.querySelector(".ef-card-compact")) ?? null;
-  return { completed, frames };
-}
-
-function completionNextPrimary(pathId: string): HTMLElement | null {
-  const { completed } = completionFrames(pathId);
-  if (!completed) return null;
-  const cards = [...document.querySelectorAll<HTMLElement>(".ef-ui-conversation-card")];
-  const next = cards.find((card) => (
-    card.getClientRects().length > 0
-    && !completed.contains(card)
-    && Boolean(completed.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING)
-  ));
-  if (!next) return null;
-  return next.querySelector<HTMLElement>('[data-micro-action="open"]:not([disabled]), .ef-ui-btn--primary:not([disabled])')
-    ?? next.querySelector<HTMLElement>('.ef-assistant-card-foot .ef-ui-btn--secondary:not([disabled]), .ef-assistant-card-foot button:not([disabled])');
-}
-
-function completionReviewControl(pathId: string): HTMLElement | null {
-  const { completed } = completionFrames(pathId);
-  return completed?.querySelector<HTMLElement>(".ef-card-text-action") ?? null;
-}
-
 export function useMicroHostController(options: {
   session: MockSession;
   conversationKey: string | null;
-  recordCompleted(input: { pathId: string; knowledgeId: string; courseId?: string }): void;
 }): MicroHostController {
   const { session, conversationKey } = options;
   const reducedMotion = Boolean(useReducedMotion());
@@ -153,8 +134,6 @@ export function useMicroHostController(options: {
   const dialogSlotRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
-  const recordCompletedRef = useRef(options.recordCompleted);
-  recordCompletedRef.current = options.recordCompleted;
   const focusReturnRef = useRef<HTMLElement | null>(null);
   const restoreFocusRef = useRef<{ pathId: string; form: MicroForm } | null>(null);
   const pendingHeightRef = useRef<{ pathId: string; height: number } | null>(null);
@@ -163,8 +142,6 @@ export function useMicroHostController(options: {
   const transitionOriginRef = useRef<DOMRect | null>(null);
   const inlineSettleFrame = useRef(0);
   const inlineSettleCleanup = useRef<(() => void) | null>(null);
-  const completionFocusTimer = useRef(0);
-  const completionFocusCleanup = useRef<(() => void) | null>(null);
   const previousConversationKey = useRef(conversationKey);
   const previousForm = useRef<MicroForm | "none">("none");
   const inlineUserScrolledRef = useRef(false);
@@ -186,6 +163,10 @@ export function useMicroHostController(options: {
   }, []);
   const latestSlot = useCallback((pathId: string) => visibleSlot(pathId)?.element ?? null, [visibleSlot]);
   const slotOwner = useCallback((pathId: string) => visibleSlot(pathId)?.key ?? null, [visibleSlot]);
+  const cardSlot = useCallback((pathId: string, key?: string) => {
+    if (!key) return null;
+    return (slots.current.get(pathId) ?? []).find((entry) => entry.key === key)?.element ?? null;
+  }, []);
   const cardOwner = useCallback((pathId: string) => latest(cards.current.get(pathId))?.key ?? null, []);
   const hasCardType = useCallback((pathId: string, kind: string) => (cards.current.get(pathId) ?? []).some((entry) => entry.kind === kind), []);
 
@@ -384,13 +365,16 @@ export function useMicroHostController(options: {
 
   const open = useCallback((input: MicroOpenInput, form?: MicroForm) => {
     const current = stateRef.current.presence;
+    const hasInlineCard = timelineHasCard(input.pathId) || Boolean(input.cardKey);
     inlineUserScrolledRef.current = false;
     // The single Micro entry starts a fresh scroll-follow window, whether it
     // came from a card button, the next-step strip or a route step.
     window.dispatchEvent(new Event("eduflow:learner-action-start"));
     captureOrigin();
-    const base = preferredForm(input);
-    const next = form ?? base;
+    const preferred = preferredForm(input);
+    const base: MicroNonFocusForm = preferred === "inline" && !hasInlineCard ? "side" : preferred;
+    let next: MicroForm = form ?? base;
+    if (next === "inline" && !hasInlineCard) next = "side";
     if (current?.form === "focus" && next !== "focus") restoreFocusRef.current = { pathId: current.pathId, form: next };
     if ((current?.form === "inline" && next === "closed") || ((!current || current.form === "closed") && next === "inline")) {
       requestHeight(current && current.pathId === input.pathId ? current.pathId : input.pathId);
@@ -399,18 +383,21 @@ export function useMicroHostController(options: {
     if (next !== "focus") restoreFocusRef.current = { pathId: input.pathId, form: next };
     if (next !== "closed") writeMicroFormPreference(next);
     dispatch({ type: "open", input, form: next, defaultForm: base });
-  }, [captureOrigin, preferredForm, requestHeight]);
+  }, [captureOrigin, latestCard, preferredForm, requestHeight]);
 
   const setForm = useCallback((form: MicroForm) => {
     const current = stateRef.current.presence;
     if (!current || current.form === form) return;
+    // A conversation card must exist before the runner can move into it. Never
+    // leave an invisible inline state behind.
+    if (form === "inline" && !timelineHasCard(current.pathId)) return;
     captureOrigin();
     if (form === "focus") focusReturnRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (form !== "focus") restoreFocusRef.current = { pathId: current.pathId, form };
     if ((current.form === "inline" && form === "closed") || (current.form === "closed" && form === "inline")) requestHeight(current.pathId);
     if (form !== "closed") writeMicroFormPreference(form);
     dispatch({ type: "set-form", form });
-  }, [captureOrigin, requestHeight]);
+  }, [captureOrigin, latestCard, requestHeight]);
 
   const close = useCallback(() => setForm("closed"), [setForm]);
 
@@ -430,74 +417,13 @@ export function useMicroHostController(options: {
     setForm(current.returnForm);
   }, [setForm]);
 
-  const cancelCompletionFocus = useCallback(() => {
-    if (completionFocusTimer.current) window.clearTimeout(completionFocusTimer.current);
-    completionFocusTimer.current = 0;
-    completionFocusCleanup.current?.();
-    completionFocusCleanup.current = null;
-  }, []);
-
-  const focusAfterCompletion = useCallback((pathId: string) => {
-    cancelCompletionFocus();
-    let settled = false;
-    const finish = (target: HTMLElement | null) => {
-      if (settled) return;
-      settled = true;
-      cancelCompletionFocus();
-      focusWithoutScroll(target);
-    };
-    const initial = completionNextPrimary(pathId);
-    if (initial) { finish(initial); return; }
-    const cancelOnPointer = () => cancelCompletionFocus();
-    document.addEventListener("pointerdown", cancelOnPointer, { capture: true, once: true });
-    const timeline = document.querySelector<HTMLElement>(".ef-home-timeline") ?? document.body;
-    // The completion reply and its next card are loaded after the action
-    // reply round-trip. A mutation observer alone can miss the mount; poll the
-    // same lookup for the short settle window so focus lands on that card as
-    // soon as it exists, without fighting the follow scroll.
-    const check = () => {
-      const next = completionNextPrimary(pathId);
-      if (next) finish(next);
-    };
-    const observer = new MutationObserver(check);
-    observer.observe(timeline, { childList: true, subtree: true });
-    const poll = window.setInterval(check, 80);
-    completionFocusCleanup.current = () => {
-      window.clearInterval(poll);
-      observer.disconnect();
-      document.removeEventListener("pointerdown", cancelOnPointer, { capture: true });
-    };
-    completionFocusTimer.current = window.setTimeout(() => {
-      completionFocusTimer.current = 0;
-      cancelCompletionFocus();
-      focusWithoutScroll(completionReviewControl(pathId));
-    }, 3200);
-  }, [cancelCompletionFocus]);
-
   const handleCompleted = useCallback(() => {
     const current = stateRef.current.presence;
     if (!current) return;
-    const key = `${session.userId}:${current.pathId}`;
-    if (!recordedMicroCompletions.has(key)) {
-      recordedMicroCompletions.add(key);
-      recordCompletedRef.current({
-        pathId: current.pathId,
-        knowledgeId: current.knowledgeId,
-        ...(current.courseId ? { courseId: current.courseId } : {})
-      });
-    }
-    restoreFocusRef.current = null;
-    // Completion always returns to the conversation, including a dialog that
-    // was opened directly from a not-started card.
-    dialogClose();
+    // Completion updates the same card in place. Never collapse, hide or move
+    // it; the learner decides when to close it.
     if (current.form === "inline") requestHeight(current.pathId);
-    // Keep the mounted runner parked (one instance, completed state) so the
-    // card can collapse without creating or duplicating a result.
-    dispatch({ type: "set-form", form: "closed" });
-    focusAfterCompletion(current.pathId);
-  }, [dialogClose, focusAfterCompletion, requestHeight, session.userId]);
-
-  useEffect(() => () => cancelCompletionFocus(), [cancelCompletionFocus]);
+  }, [requestHeight]);
 
   const stopInlineSettle = useCallback(() => {
     if (inlineSettleFrame.current) window.cancelAnimationFrame(inlineSettleFrame.current);
@@ -646,7 +572,9 @@ export function useMicroHostController(options: {
       });
     } else {
       dialogClose();
-      const target = presence.form === "side" ? sideSlotRef.current : latestSlot(presence.pathId);
+      const target = presence.form === "side"
+        ? sideSlotRef.current
+        : cardSlot(presence.pathId, presence.cardKey) ?? (presence.cardKey ? null : latestSlot(presence.pathId));
       if (target) place(target, origin, MORPH_MS);
       else park();
     }
@@ -682,7 +610,7 @@ export function useMicroHostController(options: {
     }
     return () => undefined;
     // slotsVersion re-attaches when a card slot appears/disappears; form decides the target.
-  }, [state.presence, slotsVersion, reducedMotion, stopInlineSettle]);
+  }, [state.presence, slotsVersion, reducedMotion, stopInlineSettle, cardSlot, latestSlot]);
 
   useLayoutEffect(() => {
     const was = previousForm.current;
@@ -699,6 +627,7 @@ export function useMicroHostController(options: {
     revision,
     slotVersion: slotsVersion,
     slotOwner,
+    cardSlot,
     cardOwner,
     hasCardType,
     open,
@@ -708,7 +637,7 @@ export function useMicroHostController(options: {
     dismissSide,
     registerSlot,
     registerCard
-  }), [state.presence, revision, slotsVersion, slotOwner, cardOwner, hasCardType, open, setForm, close, clear, dismissSide, registerSlot, registerCard]);
+  }), [state.presence, revision, slotsVersion, slotOwner, cardSlot, cardOwner, hasCardType, open, setForm, close, clear, dismissSide, registerSlot, registerCard]);
 
   return {
     ...value,
@@ -725,12 +654,13 @@ export function useMicroHostController(options: {
 }
 
 export function MicroHostProvider({ host, children }: { host: MicroHostController; children: ReactNode }) {
-  const { presence, revision, slotVersion, slotOwner, cardOwner, hasCardType, open, setForm, close, clear, dismissSide, registerSlot, registerCard } = host;
+  const { presence, revision, slotVersion, slotOwner, cardSlot, cardOwner, hasCardType, open, setForm, close, clear, dismissSide, registerSlot, registerCard } = host;
   const value = useMemo<MicroHostValue>(() => ({
     presence,
     revision,
     slotVersion,
     slotOwner,
+    cardSlot,
     cardOwner,
     hasCardType,
     open,
@@ -740,7 +670,7 @@ export function MicroHostProvider({ host, children }: { host: MicroHostControlle
     dismissSide,
     registerSlot,
     registerCard
-  }), [presence, revision, slotVersion, slotOwner, cardOwner, hasCardType, open, setForm, close, clear, dismissSide, registerSlot, registerCard]);
+  }), [presence, revision, slotVersion, slotOwner, cardSlot, cardOwner, hasCardType, open, setForm, close, clear, dismissSide, registerSlot, registerCard]);
   return <MicroHostContext.Provider value={value}>{children}</MicroHostContext.Provider>;
 }
 
@@ -749,9 +679,9 @@ export function useMicroHost(): MicroHostValue {
 }
 
 /** One entry for the Micro, Knowledge and Route cards. */
-export function useMicroEntry(input: { pathId?: string; knowledgeId?: string; courseId?: string; userId?: string }) {
+export function useMicroEntry(input: { pathId?: string; knowledgeId?: string; courseId?: string; userId?: string; cardKey?: string }) {
   const host = useMicroHost();
-  const { pathId, knowledgeId, courseId, userId } = input;
+  const { pathId, knowledgeId, courseId, userId, cardKey } = input;
   const [starting, setStarting] = useState(false);
   const path = useMemo(() => {
     if (!knowledgeId) return null;
@@ -776,8 +706,8 @@ export function useMicroEntry(input: { pathId?: string; knowledgeId?: string; co
   const completeSteps = completed ? totalSteps : Math.max(countedSteps, progress ? resumeIndex : 0);
   const open = useCallback((nextForm?: MicroForm) => {
     if (!path || !knowledgeId) return;
-    host.open({ pathId: path.id, knowledgeId, ...(courseId ? { courseId } : {}) }, nextForm);
-  }, [courseId, host, knowledgeId, path]);
+    host.open({ pathId: path.id, knowledgeId, ...(courseId ? { courseId } : {}), ...(cardKey ? { cardKey } : {}) }, nextForm);
+  }, [cardKey, courseId, host, knowledgeId, path]);
   /** The card's primary/secondary entries get the real runner started first. */
   const openWithStart = useCallback(async (nextForm?: MicroForm) => {
     if (!path || !knowledgeId || starting) return;
@@ -792,8 +722,8 @@ export function useMicroEntry(input: { pathId?: string; knowledgeId?: string; co
       }
       setStarting(false);
     }
-    host.open({ pathId: path.id, knowledgeId, ...(courseId ? { courseId } : {}) }, nextForm);
-  }, [courseId, host, knowledgeId, path, progress, starting, userId]);
+    host.open({ pathId: path.id, knowledgeId, ...(courseId ? { courseId } : {}), ...(cardKey ? { cardKey } : {}) }, nextForm);
+  }, [cardKey, courseId, host, knowledgeId, path, progress, starting, userId]);
   return { path, pathId: actualPathId, knowledgeId: knowledgeId ?? "", courseId, progress, completed, active, form, starting, totalSteps, completeSteps, open, openWithStart, collapse: host.close, dismiss: host.dismissSide };
 }
 
@@ -816,9 +746,9 @@ export function MicroCardAnchor({ pathId, cardKey, children }: { pathId: string;
   return <>{children(ref)}</>;
 }
 
-export function MicroFormSwitch({ current, onChange, label = "切换小练习形态" }: { current: MicroForm; onChange(form: MicroForm): void; label?: string }) {
+export function MicroFormSwitch({ current, onChange, label = "切换小练习形态", allowInline = true }: { current: MicroForm; onChange(form: MicroForm): void; label?: string; allowInline?: boolean }) {
   const forms: Array<{ form: Exclude<MicroForm, "closed">; label: string; icon: ReactNode }> = [
-    { form: "inline", label: "对话内", icon: <MessageSquare size={13} aria-hidden="true" /> },
+    ...(allowInline ? [{ form: "inline" as const, label: "对话内", icon: <MessageSquare size={13} aria-hidden="true" /> }] : []),
     { form: "side", label: "侧边", icon: <PanelRight size={13} aria-hidden="true" /> },
     { form: "focus", label: "沉浸", icon: <Maximize2 size={13} aria-hidden="true" /> }
   ];
@@ -909,7 +839,7 @@ export function MicroHostLayer({ host, session }: { host: MicroHostController; s
       session={session}
       surface={panelForm ? "panel" : "inline"}
       hideHeader={!panelForm}
-      formControls={panelForm ? <MicroFormSwitch current={form} onChange={host.setForm} label={`切换 ${path.title} 的形态`} /> : undefined}
+      formControls={panelForm ? <MicroFormSwitch current={form} onChange={host.setForm} label={`切换 ${path.title} 的形态`} allowInline={timelineHasCard(presence.pathId)} /> : undefined}
       onFormChange={host.setForm}
       onCompleted={host.handleCompleted}
       onClose={panelForm ? host.close : undefined}

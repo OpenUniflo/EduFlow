@@ -126,7 +126,7 @@
   visibility: hidden;
 }
 .ef-course-route-shell.is-ready .ef-imm-route-view { visibility: visible; }
-.ef-course-route-shell .ef-imm-route-wrap { margin: 0 auto; padding: 0 0 var(--sp-48); }
+.ef-course-route-shell .ef-imm-route-wrap { margin: 0 auto; padding: 56px 0 var(--sp-48); }
 .ef-course-route-shell .ef-imm-route-svg { overflow: hidden; }
 .ef-course-route-error { padding: var(--sp-8) var(--sp-12); border-radius: var(--r-8); background: var(--warn-soft); color: var(--warn); font-size: var(--fs-13); }
 .ef-course-route-error button { margin-left: var(--sp-8); border: 0; background: transparent; color: inherit; font-weight: var(--fw-600); text-decoration: underline; }

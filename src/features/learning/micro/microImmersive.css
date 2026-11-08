@@ -288,7 +288,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-12);
-  margin: var(--sp-8) 0;
+  margin: var(--sp-12) 0 var(--sp-20);
   padding: var(--sp-8) var(--sp-12);
   border-radius: var(--r-8);
   background: var(--warn-soft);
@@ -636,3 +636,14 @@
   justify-content: flex-start;
   margin-top: var(--sp-8);
 }
+
+.micro-step-complete {
+  display: flex;
+  width: min(960px, 100%);
+  flex-direction: column;
+  gap: var(--sp-20);
+  margin: 0 auto;
+  padding: var(--sp-8) 0 var(--sp-24);
+}
+
+.micro-step-complete .micro-completion-next { align-self: flex-start; }

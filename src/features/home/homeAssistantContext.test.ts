@@ -72,3 +72,42 @@ describe("buildHomeAssistantContext", () => {
     expect(removed.selectedObject).toBeUndefined();
   });
 });
+
+describe("buildHomeAssistantContext active object", () => {
+  it("sends the open object identity instead of the focus identities", () => {
+    const practice = buildHomeAssistantContext({
+      selectedCourseId: "focus",
+      currentKnowledgeId: "focus-knowledge",
+      workspace: null,
+      removedContextIds: [],
+      activeObject: { kind: "practice", courseId: "course-2", assignmentId: "assignment-9", title: "任务" },
+      objectContextVisible: true
+    });
+    expect(practice).toMatchObject({ courseId: "course-2", assignmentId: "assignment-9", presentation: "practice" });
+    expect(practice.knowledgeId).toBeUndefined();
+
+    const route = buildHomeAssistantContext({
+      selectedCourseId: "focus",
+      currentKnowledgeId: "focus-knowledge",
+      workspace: null,
+      removedContextIds: [],
+      activeObject: { kind: "route", courseId: "course-3", title: "路线" },
+      objectContextVisible: true
+    });
+    expect(route).toMatchObject({ courseId: "course-3", presentation: "route" });
+    expect(route.knowledgeId).toBeUndefined();
+  });
+
+  it("carries no object identity after the learner removes the tag", () => {
+    const context = buildHomeAssistantContext({
+      selectedCourseId: "focus",
+      currentKnowledgeId: "focus-knowledge",
+      workspace: { kind: "practice", courseId: "course-2", assignmentId: "assignment-9" },
+      removedContextIds: [],
+      activeObject: { kind: "practice", courseId: "course-2", assignmentId: "assignment-9", title: "任务" },
+      objectContextVisible: false
+    });
+    expect(context).toEqual({ workspace: "learning", experienceMode: "learn", presentation: "today" });
+    expect(() => parseAssistantContext(context)).not.toThrow();
+  });
+});

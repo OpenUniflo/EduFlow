@@ -133,7 +133,7 @@ export default handleApi(async (request, response) => {
     if (body.operation === 'start' && ['selected', 'in_progress'].includes(run.status)) {
       const context = await requireActionExecution(client, user.id, run.course_id, run.action_id, run.status === 'in_progress' || run.execution_snapshot.repeatedFromRunId ? true : undefined);
       expectedVersionId = body.routeVersionId ?? context.routeVersionId;
-      if (context.microPathId !== run.micro_path_id) throw new ApiError(409, 'micro_path_changed', '微学习内容已变化，请重新选择行动。');
+      if (context.microPathId !== run.micro_path_id) throw new ApiError(409, 'micro_path_changed', '小练习内容已变化，请重新选择行动。');
     }
     const result = await server.rpc('transition_route_action_v3', { p_user_id: user.id, p_run_id: run.id, p_operation: body.operation, p_expected_version_id: expectedVersionId });
     if (result.error) throw new ApiError(result.error.code === 'P0002' ? 404 : 409, 'action_transition_rejected', '执行状态、资源或结果资料已变化，请刷新后检查。');

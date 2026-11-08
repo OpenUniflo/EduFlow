@@ -6,18 +6,34 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const mocks = vi.hoisted(() => ({ provider: vi.fn(), client: vi.fn(), tools: vi.fn() }));
 vi.mock('@ai-sdk/openai-compatible', () => ({ createOpenAICompatible: () => mocks.provider }));
-vi.mock('../../api/_lib/supabase.js', () => ({ createUserSupabase: mocks.client }));
+vi.mock('../../api/_lib/supabase.js', () => ({ createUserSupabase: mocks.client, createServerSupabase: () => ({}) }));
 vi.mock('../../api/_lib/env.js', () => ({ readLlmEnvironment: () => ({ llmModel: 'test-model', llmBaseUrl: 'https://test.invalid', llmApiKey: 'test-only' }) }));
-vi.mock('../../api/_lib/assistantTools.js', () => ({ createAssistantTools: mocks.tools }));
+vi.mock('../../api/_lib/assistantTools.js', () => ({ createAssistantTools: mocks.tools, assistantPlugins: [], assistantWriteTools: {} }));
 import handler from '../../api/assistant';
 
-type Mode = 'tool-once' | 'multi-tool' | 'natural-text' | 'leak-final' | 'empty-final' | 'incomplete-final' | 'hang-empty' | 'hang-text';
+type Mode = 'tool-once' | 'multi-tool' | 'natural-text' | 'leak-final' | 'empty-final' | 'incomplete-final' | 'hang-empty' | 'hang-text' | 'discard-text';
 
 function toolCallStream() {
   return {
     stream: simulateReadableStream({
       chunks: [
         { type: 'stream-start', warnings: [] },
+        { type: 'tool-call', toolCallId: crypto.randomUUID(), toolName: 'lookup', input: '{}' },
+        { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_calls' }, usage: usage() }
+      ] as any
+    }),
+    warnings: []
+  };
+}
+
+function toolCallWithTextStream() {
+  return {
+    stream: simulateReadableStream({
+      chunks: [
+        { type: 'stream-start', warnings: [] },
+        { type: 'text-start', id: 'answer' },
+        { type: 'text-delta', id: 'answer', delta: 'INVISIBLE PREAMBLE' },
+        { type: 'text-end', id: 'answer' },
         { type: 'tool-call', toolCallId: crypto.randomUUID(), toolName: 'lookup', input: '{}' },
         { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_calls' }, usage: usage() }
       ] as any
@@ -82,6 +98,7 @@ function harness(mode: Mode) {
     doStream: async (options) => {
       phase1Calls += 1;
       if (mode === 'leak-final') return phase1Calls === 1 ? toolCallStream() : simulatedText('<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name="lookup">');
+      if (mode === 'discard-text') return phase1Calls === 1 ? toolCallWithTextStream() : simulatedText('VISIBLE FINAL ANSWER');
       if (mode === 'incomplete-final') return phase1Calls === 1 ? toolCallStream() : simulatedText('这是半句话，推理还在展开而纯行动的');
       if (mode === 'empty-final') return simulatedText('');
       if (mode === 'hang-empty') return { stream: new ReadableStream({ start(controller) { controller.enqueue({ type: 'stream-start', warnings: [] }); }, cancel() {} }), warnings: [] };
@@ -138,6 +155,18 @@ it('streams one bounded answer loop with research + card tools', async () => {
   expect(new Set(recorder.output().match(/"type":"[a-z-]+"/g) ?? []).size).toBeGreaterThan(0);
 });
 
+it('shows the model its own earlier prose so it does not repeat it', async () => {
+  const { model, records } = harness('discard-text');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  const secondPrompt = JSON.stringify((model.doStreamCalls[1] as any).prompt);
+  expect(secondPrompt).toContain('INVISIBLE PREAMBLE');
+  expect(secondPrompt).toContain('lookup');
+  expect(records.filter((record) => record.role === 'assistant').map((record) => record.content)).toEqual(['INVISIBLE PREAMBLEVISIBLE FINAL ANSWER']);
+  expect(recorder.output()).toContain('INVISIBLE PREAMBLE');
+});
+
 it('handles several tool rounds and still produces one clean answer', async () => {
   const { records, read, model } = harness('multi-tool');
   const recorder = responseRecorder();
@@ -170,7 +199,7 @@ it('does not send a marked protocol leak back to the model', async () => {
   const sent = (model.doStreamCalls[0] as any).prompt as Array<{ role: string; content: unknown }>;
   const serialized = JSON.stringify(sent);
   expect(serialized).not.toContain('DSML');
-  expect(serialized).toContain('earlier question');
+  expect(serialized).not.toContain('earlier question');
   expect(serialized).toContain('Which course is available?');
 });
 

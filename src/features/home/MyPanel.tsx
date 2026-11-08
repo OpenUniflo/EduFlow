@@ -1,5 +1,5 @@
 import { BookOpen, ChevronRight, Clock, ListChecks, Lock, UserRound, X } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { applicationServices } from "@/app/services/applicationServices";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
 import type { MockSession } from "@/features/auth/types";
@@ -11,9 +11,11 @@ type PanelProps = {
   open: boolean;
   loading?: boolean;
   onClose: () => void;
-  onOpenCourse(courseId: string): void;
-  onOpenPractice(courseId: string, assignmentId: string, title: string): void;
+  onOpenCourse(courseId: string, origin?: DOMRect): void;
+  onOpenPractice(courseId: string, assignmentId: string, title: string, origin?: DOMRect): void;
   onOpenRecent(nodeId: string): void;
+  /** Task cards visible in the current conversation, so My never contradicts them. */
+  extraAssignmentKeys?: readonly string[];
 };
 
 const statusLabels: Record<string, string> = {
@@ -38,10 +40,19 @@ const assignmentLabels: Record<string, string> = {
  * conversation list, no "new conversation" action and never restates the
  * next step.
  */
-export function MyPanel({ session, open, loading = false, onClose, onOpenCourse, onOpenPractice, onOpenRecent }: PanelProps) {
-  const runtimes = useMemo(() => applicationServices.courseRepository.listCourseRuntimes(), []);
-  const records = useMemo(() => applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId), [session.userId]);
-  const courseStates = useMemo(() => new Map(runtimes.map((runtime) => [runtime.course.id, applicationServices.learningProgressRepository.getCourseState(session.userId, runtime.course.id)])), [runtimes, session.userId]);
+export function MyPanel({ session, open, loading = false, onClose, onOpenCourse, onOpenPractice, onOpenRecent, extraAssignmentKeys = [] }: PanelProps) {
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const unsubscribers = [
+      applicationServices.learningProgressRepository.subscribe(() => setRevision((value) => value + 1)),
+      applicationServices.userKnowledgeRepository.subscribe(() => setRevision((value) => value + 1)),
+      applicationServices.microLearningRepository.subscribe(() => setRevision((value) => value + 1))
+    ];
+    return () => { for (const unsubscribe of unsubscribers) unsubscribe(); };
+  }, []);
+  const runtimes = useMemo(() => applicationServices.courseRepository.listCourseRuntimes(), [revision]);
+  const records = useMemo(() => applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId), [revision, session.userId]);
+  const courseStates = useMemo(() => new Map(runtimes.map((runtime) => [runtime.course.id, applicationServices.learningProgressRepository.getCourseState(session.userId, runtime.course.id)])), [runtimes, revision, session.userId]);
 
   const courses = useMemo(() => runtimes.flatMap((runtime) => {
     const state = courseStates.get(runtime.course.id);
@@ -52,15 +63,22 @@ export function MyPanel({ session, open, loading = false, onClose, onOpenCourse,
     return [{ id: runtime.course.id, title: runtime.course.title, learned, total: nodeIds.length, updatedAt: state.updatedAt ?? "" }];
   }).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)), [courseStates, records, runtimes]);
 
+  const currentCourseId = courses[0]?.id;
+  // Kept for the Home caller's contract; the task list is intentionally not
+  // filtered by conversation state.
+  void extraAssignmentKeys;
   const tasks = useMemo(() => runtimes.flatMap((runtime) => {
     const state = courseStates.get(runtime.course.id);
-    if (!state?.isActive) return [];
-    return runtime.assignments.flatMap((assignment) => {
-      const status = state.assignmentStates[assignment.id]?.status;
-      if (!status || status === "not_started") return [];
-      return [{ id: `${runtime.course.id}:${assignment.id}`, courseId: runtime.course.id, assignmentId: assignment.id, title: assignment.title, status }];
+    if (!state) return [];
+    // Product decision: My lists every task in the learner's Courses, not only
+    // the active Course. A removed Course keeps its real Assignment history.
+    if (!state.isActive && !Object.keys(state.assignmentStates).length) return [];
+    return runtime.assignments.map((assignment) => {
+      const key = `${runtime.course.id}:${assignment.id}`;
+      const status = state.assignmentStates[assignment.id]?.status ?? "not_started";
+      return { id: key, courseId: runtime.course.id, assignmentId: assignment.id, title: assignment.title, status };
     });
-  }).slice(0, 5), [courseStates, runtimes]);
+  }).sort((left, right) => Number(right.courseId === currentCourseId) - Number(left.courseId === currentCourseId) || left.title.localeCompare(right.title, "zh-CN")), [courseStates, currentCourseId, runtimes]);
 
   const recent = useMemo(() => [...records]
     .filter((record) => record.status !== "explore")
@@ -74,7 +92,7 @@ export function MyPanel({ session, open, loading = false, onClose, onOpenCourse,
       if (path) map.set(record.nodeId, path.title);
     }
     return map;
-  }, [records, runtimes, session.userId]);
+  }, [records, revision, runtimes, session.userId]);
 
   if (!open) return null;
   const currentCourse = courses[0];
@@ -89,8 +107,8 @@ export function MyPanel({ session, open, loading = false, onClose, onOpenCourse,
     <div className="ef-my-panel-body">
       <section className="ef-my-section" aria-labelledby="my-courses">
         <div className="ef-my-section-head"><h3 id="my-courses"><BookOpen size={14} aria-hidden="true" />当前课程</h3></div>
-        {currentCourse ? <button type="button" className="ef-my-row" onClick={() => onOpenCourse(currentCourse.id)}>
-          <span><strong>{currentCourse.title}</strong><small>已学 {currentCourse.learned} / {currentCourse.total} 个要点</small></span>
+        {currentCourse ? <button type="button" className="ef-my-row" onClick={(event) => onOpenCourse(currentCourse.id, event.currentTarget.getBoundingClientRect())}>
+          <span className="ef-my-row-main"><BookOpen size={14} aria-hidden="true" /><span><strong>{currentCourse.title}</strong><small>已学 {currentCourse.learned} / {currentCourse.total} 个要点</small></span></span>
           <span className="ef-my-course-bar" aria-hidden="true"><i style={{ width: `${currentCourse.total ? Math.round(currentCourse.learned / currentCourse.total * 100) : 0}%` }} /></span>
           <ChevronRight size={14} aria-hidden="true" />
         </button> : <p className="ef-my-muted">还没有开始学习。</p>}
@@ -98,7 +116,7 @@ export function MyPanel({ session, open, loading = false, onClose, onOpenCourse,
 
       <section className="ef-my-section" aria-labelledby="my-tasks">
         <div className="ef-my-section-head"><h3 id="my-tasks"><ListChecks size={14} aria-hidden="true" />任务状态</h3><small>{tasks.length} 项</small></div>
-        {tasks.length ? tasks.map((task) => <button key={task.id} type="button" className="ef-my-row" onClick={() => onOpenPractice(task.courseId, task.assignmentId, task.title)}>
+        {tasks.length ? tasks.map((task) => <button key={task.id} type="button" className="ef-my-row" onClick={(event) => onOpenPractice(task.courseId, task.assignmentId, task.title, event.currentTarget.getBoundingClientRect())}>
           <span><strong>{task.title}</strong></span>
           <span className={`ef-my-status ${task.status === "needs_revision" ? "is-warn" : task.status === "accepted" || task.status === "completed" ? "" : "is-quiet"}`}>{assignmentLabels[task.status] ?? task.status}</span>
           <ChevronRight size={14} aria-hidden="true" />

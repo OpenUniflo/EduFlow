@@ -20,8 +20,7 @@ const actions: AssistantCardActions = {
   openCourse: () => undefined,
   openPractice: () => undefined,
   openBrief: () => undefined,
-  openMaterial: () => undefined,
-  recordMicroCompleted: () => undefined
+  openMaterial: () => undefined
 };
 
 function conversation(messages: AssistantUIMessage[], error = '') {
@@ -67,10 +66,10 @@ describe('Home conversation column anchor', () => {
     expect(html).not.toContain('你好，我是 EduFlow');
   });
 
-  it('shows an explicit empty-reply state and the retry action', () => {
-    const html = conversation([message([])], '助手这次没有生成有效回复，请重试。');
+  it('shows one explicit empty-reply state and the retry action', () => {
+    const html = conversation([message([])], '回复没有完成，请重试。');
     expect(html).not.toContain('正在回复…');
-    expect(html).toContain('这次没有生成回复，请重试。');
+    expect(html).toContain('回复没有完成，请重试。');
     expect(html).toContain('重试');
   });
 
@@ -79,7 +78,7 @@ describe('Home conversation column anchor', () => {
       { id: 'u1', role: 'user', parts: [{ type: 'text', text: '分六点说明' }], metadata: { stopped: true } }
     ]);
     expect(html).toContain('已停止回复');
-    expect(html).not.toContain('回复没有完成。请重试。');
+    expect(html).not.toContain('回复没有完成，请重试。');
     expect(html).not.toContain('>重试<');
   });
 

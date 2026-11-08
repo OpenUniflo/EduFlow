@@ -39,8 +39,9 @@ describe("Micro Learning navigation", () => {
       state: { returnTo: "/" }
     });
     const learningPage = readFileSync(join(process.cwd(), "src/features/learning/pages/LearningPage.tsx"), "utf8");
-    expect(learningPage).toContain('kind: "micro-opened"');
-    expect(learningPage).toContain(`returnTo: "/"`);
+    expect(learningPage).toContain("microHost.open({\n      pathId: step.pathId");
+    expect(learningPage).not.toContain('kind: "micro-opened"');
+    expect(learningPage).not.toContain("recordAction");
   });
 
   it("carries the current Course route as the explicit return target", () => {
@@ -74,7 +75,7 @@ describe("Micro Learning navigation", () => {
   it("renders an honest unsupported deep-link fallback inside the Micro page", () => {
     const source = readFileSync(join(process.cwd(), "src/features/learning/micro/MicroLearningExperience.tsx"), "utf8");
     expect(source).toContain('className="micro-unsupported"');
-    expect(source).toContain("该知识暂不支持快速学习");
+    expect(source).toContain("该知识暂不支持小练习");
     expect(source).toContain("返回来源");
   });
 });
@@ -120,7 +121,9 @@ describe("Micro Learning assessment integrity", () => {
     expect(reviewBranch).not.toContain("repository.completeStep");
     expect(reviewBranch).not.toContain("refreshLearnerState");
     expect(source).toContain("repository.completeStep(path.id,unitId,stepId");
-    expect(source).toContain("主动复习不会清空进度，也不会改变已获得的学习状态");
+    expect(source).toContain("MicroStepList");
+    expect(source).toContain("setReviewCursor({ unitId, stepId })");
+    expect(source).not.toContain("micro-card micro-complete");
   });
 
   it("keeps the production Micro composition root database-backed without a Demo fallback", () => {

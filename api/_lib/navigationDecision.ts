@@ -68,10 +68,14 @@ export async function readNavigationDecision(client: SupabaseClient, userId: str
   const courseNodeIds = new Set(route.orderedNodeIds);
   const nodeIds = route.orderedNodeIds;
   const assignmentIds = assignmentRows.map((row) => text(row, "id"));
-  const [globalMicro, resultHistory] = await Promise.all([
+  const [globalMicro, allResultHistory, withdrawnAttemptRows] = await Promise.all([
     fetchNavigationRowsByChunks(nodeIds, (chunk) => client.from("micro_learning_paths").select("id,knowledge_id,required").is("course_id", null).eq("scope", "global").eq("status", "published").eq("mode", "learn").in("knowledge_id", chunk).order("knowledge_id").order("id"), "Global Micro navigation lookup"),
-    fetchNavigationRowsByChunks(assignmentIds, (chunk) => client.from("performance_results").select("id,assignment_id,outcome,evaluated_at,version").eq("user_id", userId).eq("course_id", courseId).in("assignment_id", chunk).order("evaluated_at", { ascending: false }).order("version", { ascending: false }).order("id", { ascending: false }), "Navigation PerformanceResult lookup")
+    fetchNavigationRowsByChunks(assignmentIds, (chunk) => client.from("performance_results").select("id,attempt_id,assignment_id,outcome,evaluated_at,version").eq("user_id", userId).eq("course_id", courseId).in("assignment_id", chunk).order("evaluated_at", { ascending: false }).order("version", { ascending: false }).order("id", { ascending: false }), "Navigation PerformanceResult lookup"),
+    fetchNavigationRowsByChunks(assignmentIds, (chunk) => client.from("learning_attempts").select("id,assignment_id").eq("user_id", userId).eq("course_id", courseId).in("assignment_id", chunk).not("withdrawn_at", "is", null).order("id"), "Navigation withdrawn Attempt lookup")
   ]);
+  // A withdrawn Attempt never supplies an Assignment outcome to navigation.
+  const withdrawnAttemptIds = new Set(withdrawnAttemptRows.map((row) => text(row, "id")));
+  const resultHistory = allResultHistory.filter((row) => !withdrawnAttemptIds.has(text(row, "attempt_id")));
   const revisionIds = nodes.map((row) => text(row, "current_revision_id"));
   const revisions = await fetchNavigationRowsByChunks(revisionIds, (chunk) => client.from("knowledge_node_revisions").select("id,title").in("id", chunk).order("id"), "Navigation Knowledge title lookup");
   const titleByRevision = new Map(revisions.map((row) => [text(row, "id"), text(row, "title")]));

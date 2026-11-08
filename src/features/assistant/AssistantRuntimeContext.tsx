@@ -4,8 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { MockSession } from "@/features/auth/types";
 import { supabaseClient } from "@/shared/api/supabaseClient";
 import type { AssistantContextSnapshot, AssistantMessage, AssistantSession, AssistantStructuredContent, AssistantTimelinePart } from "./assistantContract";
-import { deleteAssistantSession, getAssistantSession, listAssistantSessions, planAssistantGoal, prepareAssistantCourseBrief, recordAssistantButtonAction, refineAssistantGoal, renameAssistantSession, selectAssistantCourse } from "./assistantClient";
-import { ApiRequestError } from "@/shared/api/apiClient";
+import { deleteAssistantSession, getAssistantSession, listAssistantSessions, planAssistantGoal, prepareAssistantCourseBrief, refineAssistantGoal, renameAssistantSession, selectAssistantCourse } from "./assistantClient";
+import { ApiRequestError, apiRequest } from "@/shared/api/apiClient";
+import { refreshLearnerState } from "@/app/services/applicationServices";
 
 type AssistantMetadata = {
   createdAt?: string;
@@ -44,20 +45,27 @@ type RuntimeValue = {
   replying: boolean;
   error: string;
   selectSession(sessionId: string | null): Promise<void>;
-  send(message: string, context: AssistantContextSnapshot): Promise<boolean>;
+  send(message: string, context: AssistantContextSnapshot, extras?: AssistantSendExtras): Promise<boolean>;
   stop(): Promise<void>;
   retry(): Promise<boolean>;
   planGoal(goalText: string, context: AssistantContextSnapshot): Promise<boolean>;
   refineGoal(planningMessageId: string, refinement: string, context: AssistantContextSnapshot): Promise<void>;
   useExistingCourse(planningMessageId: string, courseId: string, context: AssistantContextSnapshot): Promise<string>;
   prepareCourseBrief(input: { planningMessageId: string; sourceCourseId?: string; requestedAdjustments?: string; referenceMaterialIntent: "none" | "upload_in_creator" }, context: AssistantContextSnapshot): Promise<void>;
-  recordAction(input: { kind: "micro-completed" | "micro-opened" | "route-started" | "segment-cleared" | "practice-opened" | "practice-submitted"; pathId?: string; knowledgeId?: string; courseId?: string; assignmentId?: string; attemptId?: string; resuming?: boolean; forceNewSession?: boolean }, context: AssistantContextSnapshot): Promise<void>;
   reloadSessions(): Promise<AssistantSession[]>;
+};
+
+export type AssistantSendAttachment = { id: string; name: string };
+export type AssistantSendExtras = {
+  attachments?: AssistantSendAttachment[];
+  draft?: { note?: string; link?: string };
+  mentions?: string[];
+  links?: string[];
 };
 
 const AssistantRuntimeContext = createContext<RuntimeValue | null>(null);
 
-const allowedPartTypes = new Set(["text", "tool-displayCard"]);
+const allowedPartTypes = new Set(["text", "tool-displayCard", "data-tool-progress", "data-follow-ups", "data-attachment", "data-write-result"]);
 
 function textOfParts(parts: readonly AssistantTimelinePart[] | undefined): string {
   if (!parts?.length) return "";
@@ -108,12 +116,16 @@ function hasVisibleReply(message: AssistantUIMessage | undefined): boolean {
   ));
 }
 
-function friendlyError(message: string): string {
-  if (/protocol_leak/i.test(message)) return "助手这次的回复格式异常，正在重试…";
-  if (/assistant_provider_unavailable|assistant_stream_failed|provider/i.test(message)) return "助手暂时不可用，请重试。";
-  if (/assistant_empty_response|没有生成有效回复|empty/i.test(message)) return "助手这次没有生成有效回复，请重试。";
-  if (/Failed to fetch|network|NetworkError/i.test(message)) return "网络连接中断，回复没有完成。请重试。";
-  return message;
+export const ASSISTANT_REPLY_FAILURE = "回复没有完成，请重试。";
+
+/** One learner-facing failure wording; the retry control is the only next step. */
+function friendlyError(_message: string): string {
+  return ASSISTANT_REPLY_FAILURE;
+}
+
+/** Operation rows are never rendered; structured Brief/Search rows stay. */
+function visibleMessages(messages: AssistantMessage[]): AssistantMessage[] {
+  return messages.filter((message) => message.messageKind !== "action" || Boolean(message.structuredContent));
 }
 
 export function AssistantRuntimeProvider({ session, children }: { session: MockSession; children: ReactNode }) {
@@ -138,9 +150,9 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   const [clarificationMessageId, setClarificationMessageId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(activeSessionId);
   const lastContextRef = useRef<AssistantContextSnapshot>({ workspace: "learning", experienceMode: "learn" });
+  const sendExtrasRef = useRef<AssistantSendExtras>({});
   const lastMessageRef = useRef("");
   const lastSendOkRef = useRef(false);
-  const retriedRef = useRef(0);
   const chatRef = useRef<ReturnType<typeof useChat<AssistantUIMessage>> | null>(null);
   const chatApiRef = useRef<{ setMessages: ReturnType<typeof useChat<AssistantUIMessage>>["setMessages"]; current: () => ReturnType<typeof useChat<AssistantUIMessage>> }>(null!);
   /**
@@ -213,7 +225,14 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       const { data } = await supabaseClient.auth.getSession();
       return (data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}) as Record<string, string>;
     },
-    body: () => ({ sessionId: sessionIdRef.current ?? undefined, context: lastContextRef.current }),
+    body: () => ({
+      sessionId: sessionIdRef.current ?? undefined,
+      context: lastContextRef.current,
+      ...(sendExtrasRef.current.attachments?.length ? { attachments: sendExtrasRef.current.attachments.map((attachment) => attachment.id) } : {}),
+      ...(sendExtrasRef.current.draft ? { draft: sendExtrasRef.current.draft } : {}),
+      ...(sendExtrasRef.current.mentions?.length ? { mentions: sendExtrasRef.current.mentions } : {}),
+      ...(sendExtrasRef.current.links?.length ? { links: sendExtrasRef.current.links } : {})
+    }),
     fetch: async (input, init) => {
       // The chat only exposes its own abort controller once response headers
       // arrive. Keep a transport-level controller so "stop" also covers the
@@ -253,10 +272,6 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       // An aborted request is not a provider failure and must never retry.
       if (stoppedRef.current) return;
       setManualError(friendlyError(error.message));
-      if (retriedRef.current < 1) {
-        retriedRef.current += 1;
-        window.setTimeout(() => { void chatRef.current?.regenerate().catch(() => undefined); }, 0);
-      }
     },
     onFinish: ({ isAbort }) => {
       if (stoppedRef.current || isAbort) {
@@ -271,14 +286,8 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       const last = chatRef.current?.messages[chatRef.current.messages.length - 1];
       const hasText = Boolean(last?.parts?.some((part) => part.type === "text" && (part as { text?: string }).text?.trim()));
       const hasCard = Boolean(last?.parts?.some((part) => part.type === "tool-displayCard"));
-      if (last?.role === "assistant" && !hasText && !hasCard && retriedRef.current < 1) {
-        retriedRef.current += 1;
-        setManualError("助手这次没有生成有效回复，正在重试…");
-        window.setTimeout(() => { void chatRef.current?.regenerate().catch(() => undefined); }, 0);
-        return;
-      }
       if (last?.role === "assistant" && !hasText && !hasCard) {
-        setManualError("助手这次没有生成有效回复，请重试。");
+        setManualError(ASSISTANT_REPLY_FAILURE);
         return;
       }
       lastSendOkRef.current = true;
@@ -286,6 +295,52 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   });
   chatRef.current = chat;
   chatApiRef.current = { setMessages: chat.setMessages, current: () => chatRef.current! };
+
+  // Every write tool emits one structured result part. The client reacts to
+  // that part, never to the model's prose or a particular tool name.
+  const handledWriteResults = useRef(new Set<string>());
+  useEffect(() => {
+    for (const message of chat.messages) {
+      for (const part of message.parts ?? []) {
+        if (part.type !== "data-write-result" || !part.data || typeof part.data !== "object") continue;
+        const data = part.data as {
+          id?: string; ok?: boolean; title?: string; card?: { courseId?: string; assignmentId?: string };
+          attemptId?: string; evaluationPending?: boolean;
+        };
+        if (!data.id || handledWriteResults.current.has(data.id)) continue;
+        handledWriteResults.current.add(data.id);
+        window.dispatchEvent(new CustomEvent("eduflow:write-result", { detail: data }));
+        void refreshLearnerState(session.userId).catch(() => undefined);
+        if (data.evaluationPending && data.attemptId && data.card?.courseId && data.card.assignmentId) {
+          const { courseId, assignmentId } = data.card;
+          void apiRequest("/api/learning", {
+            method: "POST",
+            body: JSON.stringify({ action: "evaluate-assignment", courseId, assignmentId, attemptId: data.attemptId }),
+            keepalive: true
+          }).then(async () => {
+            await refreshLearnerState(session.userId).catch(() => undefined);
+            window.dispatchEvent(new CustomEvent("eduflow:write-result", { detail: data }));
+          }).catch(() => undefined);
+        }
+      }
+    }
+  }, [chat.messages, session.userId]);
+
+  const handledToolEvents = useRef(new Set<string>());
+  useEffect(() => {
+    for (const message of chat.messages) {
+      for (const part of message.parts ?? []) {
+        const source = part as { type?: string; toolCallId?: string; state?: string; output?: Record<string, unknown> };
+        if (source.state !== "output-available" || !source.output) continue;
+        const key = source.toolCallId ?? `${source.type}:${String(source.output.attemptId ?? source.output.panel ?? "")}`;
+        if (handledToolEvents.current.has(key)) continue;
+        if (source.type === "tool-openWorkspacePanel" && source.output.status === "opened") {
+          handledToolEvents.current.add(key);
+          window.dispatchEvent(new CustomEvent("eduflow:open-panel", { detail: source.output }));
+        }
+      }
+    }
+  }, [chat.messages, session.userId]);
 
   const incompleteHandled = useRef<string | null>(null);
   useEffect(() => {
@@ -295,13 +350,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     if (stoppedRef.current) return;
     if (!last.parts?.some((part) => part.type === "data-incomplete")) return;
     incompleteHandled.current = last.id;
-    if (retriedRef.current < 1) {
-      retriedRef.current += 1;
-      setManualError("回答没有完整生成，正在重试…");
-      window.setTimeout(() => { void chatRef.current?.regenerate().catch(() => undefined); }, 0);
-    } else {
-      setManualError("回答没有完整生成，请重试。");
-    }
+    setManualError(ASSISTANT_REPLY_FAILURE);
   }, [chat.messages, chat.status]);
 
   const reloadSessions = useCallback(async () => {
@@ -354,7 +403,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     const detail = await getAssistantSession(sessionId);
     rememberSession(sessionId);
     setActiveSessionTitle(detail.title ?? "");
-    chatApiRef.current.setMessages(detail.messages.map(toUIMessage));
+    chatApiRef.current.setMessages(visibleMessages(detail.messages).map(toUIMessage));
     return detail;
   }, [rememberSession]);
 
@@ -374,8 +423,8 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       attempts += 1;
       try {
         const detail = await getAssistantSession(sessionId);
-        const last = detail.messages[detail.messages.length - 1];
-        chatApiRef.current.setMessages(detail.messages.map(toUIMessage));
+        const last = visibleMessages(detail.messages)[visibleMessages(detail.messages).length - 1];
+        chatApiRef.current.setMessages(visibleMessages(detail.messages).map(toUIMessage));
         if (last?.role === "assistant") {
           setPendingReply(false);
           stopReplyPoll();
@@ -388,7 +437,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       if (attempts >= 30) {
         setPendingReply(false);
         stopReplyPoll();
-        setManualError("回复仍未完成，请重试。");
+        setManualError(ASSISTANT_REPLY_FAILURE);
         return;
       }
       replyPollRef.current = window.setTimeout(tick, 1500);
@@ -426,8 +475,8 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       if (newChatEpoch.current !== epoch) return;
       rememberSession(sessionId);
       setActiveSessionTitle(detail.title ?? "");
-      chatApiRef.current.setMessages(detail.messages.map(toUIMessage));
-      const last = detail.messages[detail.messages.length - 1];
+      chatApiRef.current.setMessages(visibleMessages(detail.messages).map(toUIMessage));
+      const last = visibleMessages(detail.messages)[visibleMessages(detail.messages).length - 1];
       if (last?.role === "user" && !last.stopped) {
         setPendingReply(true);
         pollForReply(sessionId);
@@ -520,18 +569,18 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     return () => { active = false; };
   }, [newChatKey, reloadSessions, rememberSession, selectSession, storageKey]);
 
-  const send = useCallback(async (content: string, context: AssistantContextSnapshot) => {
+  const send = useCallback(async (content: string, context: AssistantContextSnapshot, extras: AssistantSendExtras = {}) => {
     const message = content.trim();
     const api = chatApiRef.current.current();
     if (!message || pendingSendRef.current || api.status === "streaming" || api.status === "submitted") return false;
     setManualError("");
     lastContextRef.current = context;
+    sendExtrasRef.current = extras;
     lastMessageRef.current = message;
     lastSendOkRef.current = false;
     stoppedRef.current = false;
     streamSessionRef.current = sessionIdRef.current;
     streamEpochRef.current = sessionEpochRef.current;
-    retriedRef.current = 0;
     stopReplyPoll();
     setPendingReply(false);
     pendingSendRef.current = true;
@@ -545,10 +594,11 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       return lastSendOkRef.current || !chatRef.current?.error;
     } catch (sendError) {
       if (stoppedRef.current) return false;
-      setManualError(sendError instanceof Error ? friendlyError(sendError.message) : "Assistant 暂时不可用");
+      setManualError(sendError instanceof Error ? friendlyError(sendError.message) : ASSISTANT_REPLY_FAILURE);
       return false;
     } finally {
       pendingSendRef.current = false;
+      sendExtrasRef.current = {};
       setPendingSend(false);
     }
   }, [reloadSessions, stopReplyPoll]);
@@ -571,7 +621,6 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
 
   const retry = useCallback(async () => {
     setManualError("");
-    retriedRef.current = 1;
     try {
       await chatApiRef.current.current().regenerate();
       return true;
@@ -636,43 +685,19 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     } finally { setPendingAction(false); }
   }, [reloadStructuredSession]);
 
-  const recordAction = useCallback(async (input: { kind: "micro-completed" | "micro-opened" | "route-started" | "segment-cleared" | "practice-opened" | "practice-submitted"; pathId?: string; knowledgeId?: string; courseId?: string; assignmentId?: string; attemptId?: string; resuming?: boolean; forceNewSession?: boolean }, context: AssistantContextSnapshot) => {
-    const sessionId = input.forceNewSession ? null : sessionIdRef.current;
-    const createsNew = input.forceNewSession === true || ((window.localStorage.getItem(newChatKey) === "1") && (input.kind === "practice-opened" || input.kind === "micro-opened"));
-    try {
-      const result = await recordAssistantButtonAction({
-        ...input, sessionId,
-        createSession: createsNew,
-        context
-      });
-      // A delayed action from before "New conversation" must not resurrect the
-      // old thread. The new-chat marker only yields to a newly created thread.
-      const stillWanted = createsNew || !window.localStorage.getItem(newChatKey) || result.sessionId === sessionIdRef.current;
-      if (result.sessionId && stillWanted) {
-        if (result.sessionId !== sessionIdRef.current) rememberSession(result.sessionId);
-        if (result.message) {
-          await loadSession(result.sessionId);
-          await reloadSessions();
-        }
-      }
-    } catch {
-      // A template reply is a convenience; the learning mutation already succeeded.
-    }
-  }, [loadSession, reloadSessions, rememberSession]);
-
   const messages = useMemo(() => chat.messages.map((message) => toLegacy(message, activeSessionId)), [activeSessionId, chat.messages]);
   const replying = pendingSend || chat.status === "streaming" || chat.status === "submitted";
   const sending = pendingAction || pendingReply || replying;
   const error = manualError
     || (chat.error ? friendlyError(chat.error.message) : "")
-    || (chat.status === "error" ? "网络连接中断，回复没有完成。请重试。" : "");
+    || (chat.status === "error" ? ASSISTANT_REPLY_FAILURE : "");
 
   const value = useMemo<RuntimeValue>(() => ({
     session, sessions, activeSessionId, activeSessionTitle, sessionsHasMore, sessionsQuery, sessionsLoadingMore,
     chatMessages: chat.messages, messages, loading, sending, replying, error,
     selectSession, searchSessions, loadMoreSessions, renameSession, deleteSession,
-    send, stop, retry, planGoal, refineGoal, useExistingCourse, prepareCourseBrief, recordAction, reloadSessions
-  }), [activeSessionId, activeSessionTitle, chat.messages, deleteSession, error, loadMoreSessions, loading, messages, planGoal, prepareCourseBrief, recordAction, refineGoal, reloadSessions, renameSession, replying, retry, searchSessions, selectSession, send, sending, session, sessions, sessionsHasMore, sessionsLoadingMore, sessionsQuery, stop, useExistingCourse]);
+    send, stop, retry, planGoal, refineGoal, useExistingCourse, prepareCourseBrief, reloadSessions
+  }), [activeSessionId, activeSessionTitle, chat.messages, deleteSession, error, loadMoreSessions, loading, messages, planGoal, prepareCourseBrief, refineGoal, reloadSessions, renameSession, replying, retry, searchSessions, selectSession, send, sending, session, sessions, sessionsHasMore, sessionsLoadingMore, sessionsQuery, stop, useExistingCourse]);
 
   return <AssistantRuntimeContext.Provider value={value}>{children}</AssistantRuntimeContext.Provider>;
 }

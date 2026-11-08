@@ -43,7 +43,7 @@ export function ObjectShell({
         {icon ? <span className="ef-ui-obj-icon" aria-hidden="true">{icon}</span> : null}
         <div className="ef-ui-obj-copy">
           {kicker ? <div className="ef-ui-obj-kicker">{kicker}</div> : null}
-          <h2 className="ef-ui-obj-title" id={titleId}>{title}</h2>
+          <h2 className="ef-ui-obj-title" id={titleId} title={title}>{title}</h2>
           {context ? <div className="ef-ui-obj-context">{context}</div> : null}
         </div>
         {badge ? <div className="ef-ui-obj-badge">{badge}</div> : null}

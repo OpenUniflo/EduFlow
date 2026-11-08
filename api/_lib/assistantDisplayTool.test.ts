@@ -34,10 +34,11 @@ describe("assistant display card permissions", () => {
     expect(await readableCourse(courseClient(published, "student"), user, "course-1")).toEqual(published);
   });
 
-  it("enforces the three-card ceiling before any lookup", async () => {
+  it("does not cap the number of cards by count", async () => {
     const tool = createDisplayCardTool({} as SupabaseClient, user, { workspace: "learning", experienceMode: "learn" }, { accepted: 3 });
     const result = await tool.execute?.({ cardType: "knowledge", nodeId: "node-1" }, { toolCallId: "call-1", messages: [] } as never);
-    expect(result).toEqual({ skipped: "card_limit_reached" });
+    expect(result).not.toEqual({ skipped: "card_limit_reached" });
+    expect(result).toEqual({ skipped: "card_lookup_failed" });
   });
 
   it("skips an invalid or unavailable nomination without failing the answer", async () => {

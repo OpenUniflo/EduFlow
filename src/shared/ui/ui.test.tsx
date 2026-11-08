@@ -103,7 +103,7 @@ describe("object shell and conversation geometry", () => {
   it("renders all four object-shell sizes with the same header/footer contract", () => {
     for (const size of ["s", "l", "panel", "immersive"] as const) {
       const html = renderToStaticMarkup(
-        <ObjectShell size={size} title="对象" kicker="微学习" badge={<Pill>进行中</Pill>} footer={<Button>继续</Button>}>
+        <ObjectShell size={size} title="对象" kicker="小练习" badge={<Pill>进行中</Pill>} footer={<Button>继续</Button>}>
           <ObjectShellSection title="要求" description="一句话目标"><p>正文</p></ObjectShellSection>
         </ObjectShell>
       );
@@ -168,7 +168,7 @@ describe("keyboard and focus", () => {
     setInput(input, "  帮我解释一下  ");
     expect(send.disabled).toBe(false);
     key(input, "Enter");
-    expect(submitted).toHaveBeenCalledWith("帮我解释一下");
+    expect(submitted).toHaveBeenCalledWith("帮我解释一下", { mentions: [], links: [] });
     act(() => { container.querySelector<HTMLButtonElement>('button[aria-label="移除 课程 · 智能体"]')!.click(); });
     expect(removed).toHaveBeenCalledWith("c1");
     input.focus();

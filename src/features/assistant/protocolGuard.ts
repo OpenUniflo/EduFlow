@@ -11,12 +11,31 @@
 const PIPE = "[|｜]";
 const DSML_TAG = new RegExp(`<\\s*/?\\s*${PIPE}{1,2}\\s*DSML\\s*${PIPE}{1,2}`, "i");
 const BARE_TOOL_START = /^<(invoke|parameter)\s+name\s*=/i;
-const STRUCTURED_TOOL_TAG = /<\s*\/?\s*(tool_use|tool_call|function_call|tool_result|function_result)\b/i;
+const STRUCTURED_TOOL_TAG = /<\s*\/?\s*(tool_use|tool_call|function_call|tool_result|function_result|ds_safety)\b/i;
 const TOOL_TAG = /^<\s*(\/?)\s*(invoke|parameter)\b([^>]*)>$/i;
 const TOOL_NAME_ATTRIBUTE = /^\s+name\s*=/i;
 
 export const PROTOCOL_LEAK_REASON = "protocol_leak";
 export const PROTOCOL_HIDDEN_MESSAGE = "这条回复格式异常，已隐藏";
+/** Legacy model-history marker that must never reach a learner or a prompt. */
+export const CARD_HISTORY_MARKER_PREFIX = "[此回复展示的卡片：";
+const CARD_HISTORY_MARKER = /\[此回复展示的卡片：[^\]]*\]/g;
+
+export function stripCardHistoryMarkers(text: string): string {
+  return text.replace(CARD_HISTORY_MARKER, "");
+}
+
+/** Length of a trailing prefix that may still become a card-history marker. */
+export function heldCardHistorySuffixLength(text: string): number {
+  const tail = text.slice(-64);
+  for (let index = 0; index < tail.length; index += 1) {
+    if (tail[index] !== "[") continue;
+    const suffix = tail.slice(index);
+    if (CARD_HISTORY_MARKER_PREFIX.startsWith(suffix)) return suffix.length;
+    if (suffix.startsWith(CARD_HISTORY_MARKER_PREFIX) && !suffix.includes("]")) return suffix.length;
+  }
+  return 0;
+}
 
 /**
  * A bare invoke/parameter call block only: the trimmed reply starts with a
@@ -91,7 +110,8 @@ const STREAM_MARKER_OPENERS = [
   "<tool_call",
   "<function_call",
   "<tool_result",
-  "<function_result"
+  "<function_result",
+  "<ds_safety"
 ];
 const STREAM_HOLD_MAX = 24;
 
@@ -119,6 +139,7 @@ export function protocolLeakInProgress(text: string): boolean {
   if (tool && !insideFence(lower, tool.index)) return true;
   const structured = STRUCTURED_TOOL_TAG.exec(text);
   if (structured && !insideFence(lower, structured.index)) return true;
+  if (lower.includes("<ds_safety")) return true;
   return false;
 }
 
@@ -184,9 +205,25 @@ export function filterModelHistoryRows<T extends Record<string, unknown>>(rows: 
   return rows.filter((row) => isModelHistoryRow(row as unknown as AssistantHistoryRow));
 }
 
+/**
+ * A persisted user turn with no assistant reply is a failed or stopped turn.
+ * It must stay visible in the timeline but must never be answered again as
+ * part of the next request. The current turn is appended after this history.
+ */
+export function historyWithoutUnansweredTail<T extends { role?: unknown }>(rows: readonly T[]): T[] {
+  // Remove every user turn that has no assistant row before the next user turn,
+  // not only a trailing run. A failed question stays visible in the timeline
+  // but must never be silently answered again after a later question.
+  return rows.filter((row, index) => {
+    if (String(row.role) !== "user") return true;
+    const next = rows[index + 1];
+    return Boolean(next) && String(next.role) !== "user";
+  });
+}
+
 /** List/detail responses must never return leaked protocol text to a browser. */
 export function visibleAssistantContent(row: AssistantHistoryRow): string {
-  const content = String(row.content);
+  const content = stripCardHistoryMarkers(String(row.content)).trim();
   if (row.role === "assistant" && (Boolean(row.invalid_reason) || hasAssistantProtocolLeak(content))) return PROTOCOL_HIDDEN_MESSAGE;
   return content;
 }

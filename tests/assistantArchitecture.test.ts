@@ -53,10 +53,10 @@ describe("Global Assistant architecture", () => {
 
   it("keeps Next Action authority outside the LLM while exposing the deterministic decision", () => {
     const source = read("api/assistant.ts");
-    expect(source).toContain("EduFlow has an authoritative deterministic Navigation Engine");
+    expect(source).toContain("EduFlow has a server-owned Navigation Engine");
     expect(source).not.toContain("There is no authoritative Navigation Engine");
-    expect(read("api/_lib/assistantTools.ts")).toContain("getNavigationDecision");
-    expect(read("api/_lib/assistantTools.ts")).toContain("readNavigationDecision(client, user.id, resolvedCourseId)");
+    expect(read("api/_lib/plugins/navigation.ts")).toContain("getNavigationDecision");
+    expect(read("api/_lib/assistantData.ts")).toContain("readNavigationDecision(client, user.id, resolvedCourseId)");
     expect(read("api/_handlers/navigation.ts")).toContain("readNavigationDecision(client, user.id, courseId)");
   });
 
@@ -66,7 +66,8 @@ describe("Global Assistant architecture", () => {
     expect(source).toContain("Never print tool or function names");
     expect(source).toContain("Micro = 小练习");
     expect(source).toContain("Cards are part of the answer, never page state");
-    expect(source).toContain("at most 3 cards");
+    expect(source).not.toContain("at most 3 cards");
+    expect(source).toContain("no fixed per-answer card count");
     expect(source).toContain("Answer first");
     expect(source).toContain("Do not interrogate");
     expect(source).toContain("Do not persist");
@@ -102,13 +103,15 @@ describe("Global Assistant architecture", () => {
     expect(read("src/features/assistant/AssistantRuntimeContext.tsx")).toContain("window.localStorage.setItem(storageKey, sessionId)");
   });
 
-  it("keeps button actions outside the model and evaluation results server-written", () => {
+  it("retires operation messages and keeps learning mutations out of the timeline", () => {
     const source = read("api/assistant.ts");
     const timeline = read("api/_lib/assistantTimeline.ts");
     const evaluation = read("api/_lib/assignmentAiEvaluation.ts");
-    expect(source).toContain('body.action === "record-action"');
-    expect(timeline).toContain("recordButtonAction");
-    expect(timeline).toContain("dedupe_key");
-    expect(evaluation).toContain("recordEvaluationTimeline");
+    const runtime = read("src/features/assistant/AssistantRuntimeContext.tsx");
+    expect(source).toContain("assistant_action_records_retired");
+    expect(timeline).not.toContain("recordButtonAction");
+    expect(timeline).not.toContain("recordEvaluationTimeline");
+    expect(evaluation).not.toContain("recordEvaluationTimeline");
+    expect(runtime).not.toContain("recordAction");
   });
 });

@@ -193,7 +193,7 @@ export async function readMyPracticeSubmissions(client: SupabaseClient, userId: 
   const courseIds = [...new Set(states.map(state => text(state, "course_id")))];
   const assignmentIds = [...new Set(states.map(state => text(state, "assignment_id")))];
   const [attempts, coverages, coursesResult, assignmentsResult] = await Promise.all([
-    allRows(client.from("learning_attempts").select("id,course_id,assignment_id,attempt_number,response,submitted_at").eq("user_id", userId).in("course_id", courseIds).in("assignment_id", assignmentIds).order("attempt_number", { ascending: false }), "Practice submission attempts"),
+    allRows(client.from("learning_attempts").select("id,course_id,assignment_id,attempt_number,response,submitted_at").eq("user_id", userId).in("course_id", courseIds).in("assignment_id", assignmentIds).is("withdrawn_at", null).order("attempt_number", { ascending: false }), "Practice submission attempts"),
     client.from("assignment_coverages").select("course_id,assignment_id,node_id").in("course_id", courseIds).in("assignment_id", assignmentIds),
     client.from("courses").select("id,title").in("id", courseIds),
     client.from("course_assignments").select("course_id,id,title").in("course_id", courseIds).in("id", assignmentIds),

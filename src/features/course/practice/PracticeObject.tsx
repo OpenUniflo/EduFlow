@@ -1,6 +1,6 @@
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, Clock, FileText, GitBranch,
-  Link2, LoaderCircle, Lock, Maximize2, Paperclip, Plus, RefreshCw, RotateCcw, Search, Send, Upload, X
+  AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, Clock, FileText, GitBranch, PenLine,
+  Link2, LoaderCircle, Lock, Maximize2, Paperclip, Plus, RefreshCw, RotateCcw, Search, Send, Upload, Wrench, X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -16,7 +16,7 @@ import type { WorkflowRevisionSummary, WorkflowSummaryV2 } from "@/features/work
 import { WorkflowCreateDialog } from "@/features/workflow/pages/WorkflowCreateDialog";
 import { uploadEvidence } from "@/features/evidence/evidenceClient";
 import { apiRequest } from "@/shared/api/apiClient";
-import type { AssignmentFeedback, AssignmentResult } from "@/shared/learning/assignmentAttempt";
+import type { AssignmentAttemptHistoryItem, AssignmentFeedback, AssignmentResult, AssignmentSubmissionSummary } from "@/shared/learning/assignmentAttempt";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
 import { ObjectShell, ObjectShellSection } from "@/shared/ui/ObjectShell";
 import { Button } from "@/shared/ui/Button";
@@ -72,6 +72,9 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
   const aiAvailable = aiEvaluationAvailable(compatibility, assignment?.acceptanceCriteria);
   const [revision, setRevision] = useState(0);
   const [result, setResult] = useState<LoadedResult | null>(null);
+  const [attemptHistory, setAttemptHistory] = useState<AssignmentAttemptHistoryItem[]>([]);
+  const [historySummary, setHistorySummary] = useState<AssignmentSubmissionSummary | null>(null);
+  const [withdrawingAttemptId, setWithdrawingAttemptId] = useState<string | null>(null);
   const [latestAttemptNumber, setLatestAttemptNumber] = useState<number | undefined>(undefined);
   const [resultLoaded, setResultLoaded] = useState(false);
   const [resultError, setResultError] = useState("");
@@ -118,14 +121,19 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
   useEffect(() => { if (!aiAvailable) setEvaluator("teacher"); }, [aiAvailable]);
   useEffect(() => {
     let live = true;
-    setResultLoaded(false); setResultError(""); setResult(null); setLatestAttemptNumber(undefined);
+    setResultLoaded(false); setResultError(""); setResult(null); setAttemptHistory([]); setHistorySummary(null); setLatestAttemptNumber(undefined);
     setEvaluationPhase("idle"); setEvaluationError(""); setEvaluationElapsed(0);
     evaluationStartedFor.current = null;
     void applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId, requestedAttemptId)
-      .then(({ result: value }) => {
+      .then(({ result: value, history, summary }) => {
         if (!live) return;
+        const historyItems = Array.isArray(history) ? history : [];
+        setAttemptHistory(historyItems);
+        setHistorySummary(summary ?? null);
         const attemptNumber = typeof value?.attemptNumber === "number" ? value.attemptNumber : undefined;
+        const historyNumber = historyItems.reduce((maximum, item) => Math.max(maximum, item.attemptNumber), 0);
         if (attemptNumber) setLatestAttemptNumber(attemptNumber);
+        else if (historyNumber) setLatestAttemptNumber(historyNumber);
         const loaded = value && value.attemptId !== repeatAttemptId ? value as LoadedResult : null;
         setResult(loaded);
         if (loaded?.feedback?.evaluator === "ai" || loaded?.feedback?.requestedEvaluator === "ai") {
@@ -139,6 +147,29 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
       .finally(() => { if (live) setResultLoaded(true); });
     return () => { live = false; };
   }, [courseId, assignmentId, actionRunId, repeatAttemptId, requestedAttemptId]);
+
+  useEffect(() => {
+    function onWriteResult(event: Event) {
+      const detail = (event as CustomEvent<{ card?: { courseId?: string; assignmentId?: string } }>).detail ?? {};
+      const card = detail.card;
+      if (card?.courseId && card.courseId !== courseId) return;
+      if (card?.assignmentId && card.assignmentId !== assignmentId) return;
+      submissionKey.current = crypto.randomUUID();
+      void applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId, requestedAttemptId)
+        .then((loaded) => {
+          const historyItems = loaded.history ?? [];
+          setAttemptHistory(historyItems);
+          setHistorySummary(loaded.summary ?? null);
+          setResult((loaded.result as LoadedResult | null) ?? null);
+          const historyNumber = historyItems.reduce((maximum, item) => Math.max(maximum, item.attemptNumber), 0);
+          setLatestAttemptNumber(loaded.result?.attemptNumber ?? (historyNumber || undefined));
+          if (!loaded.result) { setEvaluationPhase("idle"); setEvaluationError(""); setNextStep(null); }
+        })
+        .catch(() => undefined);
+    }
+    window.addEventListener("eduflow:write-result", onWriteResult);
+    return () => window.removeEventListener("eduflow:write-result", onWriteResult);
+  }, [actionRunId, assignmentId, courseId, requestedAttemptId]);
 
   useEffect(() => {
     submissionKey.current = crypto.randomUUID();
@@ -444,13 +475,21 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
       );
       onSubmitted?.(submitted.attemptId);
       const attachments = (payload.attachmentSourceIds ?? []).map((id, index) => ({ id, title: draft.attachmentNames[index] ?? `附件 ${index + 1}` }));
+      const nextAttemptNumber = editingAttemptNumber ?? ((latestAttemptNumber ?? 0) + 1);
+      const nowIso = new Date().toISOString();
+      setLatestAttemptNumber(nextAttemptNumber);
+      setAttemptHistory((current) => [{
+        attemptId: submitted.attemptId, attemptNumber: nextAttemptNumber, submittedAt: nowIso, withdrawn: false,
+        resultId: submitted.resultId, outcome: submitted.outcome,
+        ...(submitted.evaluatorKind ? { evaluatorKind: submitted.evaluatorKind } : {})
+      }, ...current.filter((item) => item.attemptId !== submitted.attemptId)]);
       const loaded: LoadedResult = {
         ...submitted,
-        attemptNumber: editingAttemptNumber ?? ((latestAttemptNumber ?? 0) + 1),
+        attemptNumber: nextAttemptNumber,
         accepted: false,
         feedback: submitted.feedback,
         evaluatorKind: submitted.evaluatorKind,
-        evaluatedAt: new Date().toISOString(),
+        evaluatedAt: nowIso,
         response: payload,
         attachments,
         ...(evaluator === "ai" ? { evaluation: { status: "running" } } : {})
@@ -466,6 +505,28 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "提交失败，未确认保存结果。请检查网络后重试。");
     } finally { setBusy(false); }
+  }
+
+  async function withdrawAttempt(attemptId: string) {
+    if (withdrawingAttemptId) return;
+    setWithdrawingAttemptId(attemptId); setError("");
+    try {
+      await applicationServices.learnerStateService.withdrawAssignmentAttempt(courseId, assignmentId, attemptId, "panel");
+      submissionKey.current = crypto.randomUUID();
+      const loaded = await applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId, requestedAttemptId);
+      const historyItems = loaded.history ?? [];
+      setAttemptHistory(historyItems);
+      setHistorySummary(loaded.summary ?? null);
+      setResult((loaded.result as LoadedResult | null) ?? null);
+      const historyNumber = historyItems.reduce((maximum, item) => Math.max(maximum, item.attemptNumber), 0);
+      setLatestAttemptNumber(loaded.result?.attemptNumber ?? (historyNumber || undefined));
+      if (!loaded.result) { setEvaluationPhase("idle"); setNextStep(null); }
+      await refreshLearnerState(session.userId).catch(() => undefined);
+    } catch (withdrawError) {
+      setError(withdrawError instanceof Error ? withdrawError.message : "这次提交暂时无法撤回，请稍后重试。");
+    } finally {
+      setWithdrawingAttemptId(null);
+    }
   }
 
   async function practiceAgain() {
@@ -555,10 +616,10 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
     <div className="ef-practice-confirm-head">
       <span className="ef-practice-overlay-kicker">提交确认 · 本次尝试</span>
       <h3 id="practice-confirm-title">确认提交这次动手任务？</h3>
-      <p>以下内容会随这次尝试一起提交，提交后不可修改，也不能撤回。如需调整，请返回修改。</p>
+      <p>以下内容会随这次尝试一起提交，提交后不可修改；如果交错了，可以在提交记录里撤回。</p>
     </div>
     {submissionItems}
-    <p className="ef-practice-warning" role="note"><AlertTriangle size={15} aria-hidden="true" />提交后不可修改，也不能撤回。如需调整，只能开始新的尝试。</p>
+    <p className="ef-practice-warning" role="note"><AlertTriangle size={15} aria-hidden="true" />提交内容会保存为只读记录；交错了可以撤回这次提交，再重新提交。</p>
     {evaluatorSection}
     {error ? <p className="ef-practice-error" role="alert">{error}</p> : null}
     <div className="ef-practice-overlay-actions">
@@ -649,7 +710,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
   </div>;
   const draftHint = <p className="ef-practice-note"><Lock size={13} aria-hidden="true" />备注、链接、附件或关联作品至少提供一项；支持 UTF-8 的 .txt、.md、.csv，最多 4 份。正式提交后内容才会保存。</p>;
 
-  const draftSection = <ObjectShellSection icon={<GitBranch size={15} />} title="我的提交草稿" description="只有你可见" actions={<Pill tone="quiet">草稿</Pill>}>
+  const draftSection = <ObjectShellSection icon={<PenLine size={15} />} title="我的提交草稿" description="只有你可见" actions={<Pill tone="quiet">草稿</Pill>}>
     {isInstruction ? <>
       {noteField}
       {linkField}
@@ -692,8 +753,28 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
     <summary>要求与交付 <span>先看清要交什么，再开始写</span></summary>
     {requirements}
   </details>;
+  const historyDescription = historySummary
+    ? `${historySummary.totalSubmissions} 次提交 · ${historySummary.withdrawnSubmissions} 次已撤回 · ${historySummary.countingSubmissions} 次计入`
+    : `${attemptHistory.length} 次提交 · 撤回不计入进度`;
+  const historySection = attemptHistory.length ? <ObjectShellSection icon={<Clock size={15} />} title="提交记录" description={historyDescription}>
+    <ul className="ef-practice-attempt-history">
+      {attemptHistory.map((attempt) => {
+        const withdrawn = Boolean(attempt.withdrawnAt);
+        return <li key={attempt.attemptId} className={withdrawn ? "is-withdrawn" : ""}>
+          <span className="ef-practice-attempt-number">第 {attempt.attemptNumber} 次</span>
+          <span className="ef-practice-attempt-meta">{formatTime(attempt.submittedAt)}{withdrawn ? ` · 已撤回 · ${attempt.withdrawalSource === "assistant" ? "对话撤回" : "面板撤回"}` : attempt.outcome === "passed" ? " · 已通过" : attempt.outcome === "failed" ? " · 需要修改" : attempt.outcome === "pending" ? " · 待评价" : ""}</span>
+          {withdrawn
+            ? <Pill tone="quiet">已撤回</Pill>
+            : <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={Boolean(withdrawingAttemptId)} onClick={() => void withdrawAttempt(attempt.attemptId)}>{withdrawingAttemptId === attempt.attemptId ? "撤回中…" : "撤回"}</button>}
+        </li>;
+      })}
+    </ul>
+    <p className="ef-practice-note">撤回后这次提交会保留在记录里，但不再计入完成、评价或掌握度。</p>
+  </ObjectShellSection> : null;
+
   const draftBody = <div className="ef-practice-draft">
     {eligibilityNotice}
+    {historySection}
     {revisionView}
     {size === "panel" ? requirementsBlock : null}
     {blocked ? <fieldset disabled className="ef-practice-draft-fieldset">{draftSection}</fieldset> : draftSection}
@@ -777,9 +858,10 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
           <Pill tone={resultView.tone === "accepted" ? "ok" : resultView.tone === "revision" || resultView.tone === "unavailable" ? "warn" : "quiet"} dot>{resultView.label}</Pill>
           <span className="ef-practice-result-source">{evaluatorLabel}</span>
         </div>
-        <div className="ef-practice-result-meta">{evaluatedLabel ? <><span>{evaluatedLabel}</span><span aria-hidden="true">·</span></> : null}<span>第 {attemptNumber} 次尝试</span></div>
+        <div className="ef-practice-result-meta">{evaluatedLabel ? <><span>{evaluatedLabel}</span><span aria-hidden="true">·</span></> : null}<span>当前计入：第 {attemptNumber} 次尝试</span></div>
       </div>
     </div>
+    {historySection}
     {nextStep ? <ObjectShellSection icon={<ArrowRight size={15} />} title="下一步" description={nextStep.minutes ? `约 ${nextStep.minutes} 分钟` : undefined}>
       <div className="ef-practice-next-step">
         <strong>{nextStep.title}</strong>
@@ -855,19 +937,27 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
     return <div className="ef-practice-footer"><span>{blocked && eligibility ? <><AlertTriangle size={13} aria-hidden="true" />{eligibility.reason}</> : <><RotateCcw size={13} aria-hidden="true" />自动保存于 {savedLabel}</>}</span><div><Button variant="secondary" size="32" onClick={() => setPreviewOpen(true)} disabled={!ready || blocked}>查看提交</Button><Button variant="primary" size="32" disabled={!canSubmit || !ready || submitting || blocked || (eligibility ? !eligibility.canStart && !assignmentStatus : false)} onClick={() => setConfirming(true)}>提交<ArrowRight size={14} /></Button></div></div>;
   })();
 
+  const identityStatus = result?.outcome === "passed" ? { label: "已通过", tone: "ok" as const }
+    : result?.outcome === "failed" ? { label: "需要修改", tone: "warn" as const }
+    : result?.outcome === "pending" ? { label: "待评价", tone: "warn" as const }
+    : assignmentStatus === "accepted" || assignmentStatus === "completed" ? { label: "已通过", tone: "ok" as const }
+    : assignmentStatus === "needs_revision" ? { label: "需要修改", tone: "warn" as const }
+    : assignmentStatus === "submitted" ? { label: "待评价", tone: "warn" as const }
+    : assignmentStatus === "started" ? { label: "进行中", tone: "brand" as const }
+    : viewState === "disabled" ? { label: "已停用", tone: "danger" as const }
+    : { label: "未开始", tone: "quiet" as const };
   const tools = <div className="ef-practice-tools">
     {size === "immersive" ? <button type="button" className="ef-home-icon" onClick={returnToLearning} aria-label="返回学习来源" title="返回学习来源"><ArrowLeft size={15} /></button> : null}
-    <Pill tone={viewState === "result" ? (resultView?.tone === "accepted" ? "ok" : resultView?.tone === "revision" || resultView?.tone === "unavailable" ? "warn" : "quiet") : viewState === "disabled" ? "danger" : "quiet"}>{viewState === "result" ? "结果" : viewState === "confirm" ? "确认" : viewState === "disabled" ? "已停用" : viewState === "workflow" ? "画布" : "草稿"}</Pill>
     {size === "panel" && onOpenImmersive ? <button type="button" className="ef-home-icon" onClick={onOpenImmersive} aria-label="沉浸打开动手任务"><Maximize2 size={15} /></button> : null}
     {onClose ? <button type="button" className="ef-home-icon" onClick={onClose} aria-label="关闭动手任务面板"><X size={15} /></button> : null}
   </div>;
 
-  const kicker = <span>{practiceAttemptKicker(attemptNumber)}</span>;
+  const kicker = <span>{result?.attemptNumber ? `动手任务 · 计入评价：第 ${result.attemptNumber} 次尝试` : practiceAttemptKicker(attemptNumber)}</span>;
   const context = <span>{courseTitle}{chapter ? ` · ${chapter.title}` : ""} · 约 {assignment.estimatedMinutes ?? 25} 分钟</span>;
 
   if (size === "immersive") {
     return <main className="ef-practice-page">
-      <ObjectShell size="immersive" className="ef-practice-shell" title={assignment.title} kicker={kicker} context={context} tools={tools} overlay={overlay} stage={<>{body}{resultError ? <p className="ef-practice-error" role="alert">{resultError}</p> : null}</>} inspector={<>{requirements}{result ? <div className="ef-practice-evaluator-readonly"><span>评估者</span><strong>{evaluatorLabel}</strong></div> : evaluatorSection}</>} inspectorTitle="任务与评估" footer={footer} />
+      <ObjectShell size="immersive" className="ef-practice-shell" title={assignment.title} kicker={kicker} context={context} icon={<Wrench size={17} />} badge={<Pill tone={identityStatus.tone} dot>{identityStatus.label}</Pill>} tools={tools} overlay={overlay} stage={<>{body}{resultError ? <p className="ef-practice-error" role="alert">{resultError}</p> : null}</>} inspector={<>{requirements}{result ? <div className="ef-practice-evaluator-readonly"><span>评估者</span><strong>{evaluatorLabel}</strong></div> : evaluatorSection}</>} inspectorTitle="任务与评估" footer={footer} />
       {createOpen ? <WorkflowCreateDialog onClose={() => setCreateOpen(false)} onCreated={(id) => {
         setCreateOpen(false);
         void workflowApiV2.listPage({ search: "", scope: "all", sort: "updated", page: 1, pageSize: 24 }).then((page) => {
@@ -879,7 +969,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
     </main>;
   }
 
-  return <ObjectShell size="panel" className="ef-practice-shell" title={assignment.title} kicker={kicker} context={context} tools={tools} footer={footer} overlay={overlay}>
+  return <ObjectShell size="panel" className="ef-practice-shell" title={assignment.title} kicker={kicker} context={context} icon={<Wrench size={17} />} badge={<Pill tone={identityStatus.tone} dot>{identityStatus.label}</Pill>} tools={tools} footer={footer} overlay={overlay}>
     {body}
     {resultError ? <p className="ef-practice-error" role="alert">{resultError}</p> : null}
     {createOpen ? <WorkflowCreateDialog onClose={() => setCreateOpen(false)} onCreated={(id) => {

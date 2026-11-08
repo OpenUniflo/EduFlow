@@ -3,7 +3,7 @@ import type { NavigationDecision } from "@/shared/learning/navigation";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
 import { buildWindingRoute, type WindingStep, type WindingStepInput } from "@/features/course/immersive/courseTreeLayout";
 import { CourseRouteView } from "@/features/course/immersive/CourseRouteView";
-import type { HomeCourseProjection } from "./courseLearnerProjection";
+import { resolveCourseRouteAction, type HomeCourseProjection } from "./courseLearnerProjection";
 
 export type CourseRouteStepAction = {
   step: WindingStep;
@@ -116,8 +116,18 @@ export function CourseRoutePanel({
   const actionFor = (step: WindingStep): CourseRouteStepAction => {
     const micro = projection.microByNode.get(step.id);
     const practice = projection.practiceByNode.get(step.id);
-    if (micro) return { step, nodeId: step.id, kind: "micro", pathId: micro.pathId };
-    if (practice) return { step, nodeId: step.id, kind: "practice", assignmentId: practice.assignmentId };
+    const currentStep = projection.segment.currentStep;
+    const practiceStatus = projection.segment.steps.find((item) => item.kind === "practice" && item.nodeId === step.id)?.status;
+    const choice = resolveCourseRouteAction({
+      nodeId: step.id,
+      ...(micro ? { micro } : {}),
+      ...(practice ? { practice } : {}),
+      ...(currentStep ? { currentStep: { nodeId: currentStep.nodeId, kind: currentStep.kind } } : {}),
+      microLearned: satisfiesTeachingPrerequisite(projection.knowledgeStatusByNode.get(step.id)),
+      practiceDone: practiceStatus === "done"
+    });
+    if (choice.kind === "micro") return { step, nodeId: step.id, kind: "micro", pathId: choice.pathId };
+    if (choice.kind === "practice") return { step, nodeId: step.id, kind: "practice", assignmentId: choice.assignmentId };
     return { step, nodeId: step.id, kind: "none" };
   };
 

@@ -16,6 +16,8 @@ export type MicroOpenInput = {
   pathId: string;
   knowledgeId: string;
   courseId?: string;
+  /** The stable conversation card (message id + part index) that opened it. */
+  cardKey?: string;
 };
 
 export type MicroPresence = MicroOpenInput & {
@@ -61,7 +63,7 @@ export function reduceMicroPresence(state: MicroPresenceState, action: MicroPres
         const returnForm = target === "focus"
           ? nonFocusForm(previous.form, previous.returnForm)
           : target;
-        if (previous.form === target && previous.knowledgeId === action.input.knowledgeId && previous.courseId === action.input.courseId && previous.returnForm === returnForm) return state;
+        if (previous.form === target && previous.knowledgeId === action.input.knowledgeId && previous.courseId === action.input.courseId && previous.cardKey === action.input.cardKey && previous.returnForm === returnForm) return state;
         return { presence: { ...previous, ...action.input, form: target, returnForm } };
       }
       return {
@@ -105,12 +107,9 @@ export function formatMicroParam(input: MicroOpenInput): string {
   return [input.knowledgeId, input.pathId, input.courseId ?? ""].join(":");
 }
 
-/**
- * Only side and focus are addressable. A conversation-inline form needs a
- * specific card to host it, so a reload falls back to the side workspace.
- */
-export function parseMicroView(value: string | null | undefined): Exclude<MicroForm, "closed" | "inline"> | null {
-  return value === "side" || value === "focus" ? value : null;
+/** Every open form is addressable; `card` identifies the inline card that owns it. */
+export function parseMicroView(value: string | null | undefined): Exclude<MicroForm, "closed"> | null {
+  return value === "inline" || value === "side" || value === "focus" ? value : null;
 }
 
 /** localStorage is a preference only; private browsing and quota errors are ignored. */

@@ -684,7 +684,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
   const actionRow = useCallback((node: CourseSkillTreeNode): ReactNode => {
     const actions: ReactNode[] = [];
     const micro = microLearningProvider?.getLesson(node.id, { courseId }) ?? microLearningProvider?.getLesson(node.id);
-    if (micro) actions.push(<span key="micro">微学习 · {micro.estimatedMinutes ?? 8} 分钟</span>);
+    if (micro) actions.push(<span key="micro">小练习 · {micro.estimatedMinutes ?? 8} 分钟</span>);
     const assignment = runtime?.assignments.find((item) => node.assignmentIds.includes(item.id));
     if (assignment) actions.push(<span key="practice">动手任务 {String(assignment.order + 1).padStart(2, "0")}{assignment.estimatedMinutes ? ` · ${assignment.estimatedMinutes} 分钟` : ""}</span>);
     const materialContext = node.materialContexts[0];
@@ -697,7 +697,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
   const actionLabels = useCallback((node: CourseSkillTreeNode): string[] => {
     const actions: string[] = [];
     const micro = microLearningProvider?.getLesson(node.id, { courseId }) ?? microLearningProvider?.getLesson(node.id);
-    if (micro) actions.push(`微学习 · ${micro.estimatedMinutes ?? 8} 分钟`);
+    if (micro) actions.push(`小练习 · ${micro.estimatedMinutes ?? 8} 分钟`);
     const assignment = runtime?.assignments.find((item) => node.assignmentIds.includes(item.id));
     if (assignment) actions.push(`动手任务 ${String(assignment.order + 1).padStart(2, "0")}${assignment.estimatedMinutes ? ` · ${assignment.estimatedMinutes} 分钟` : ""}`);
     const materialContext = node.materialContexts[0];
@@ -757,7 +757,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
       const selected = effectiveSelection?.kind === "knowledge" && effectiveSelection.id === node.id;
       const step = authenticated && routeReady && routeOn ? routeStepNumber(routeOrder, node.id) : null;
       const micro = microFor(node.id);
-      const statusLine = [display?.displayLabel, micro ? `微学习 ${micro.estimatedMinutes ?? 8} 分钟` : null].filter(Boolean).join(" · ");
+      const statusLine = [display?.displayLabel, micro ? `小练习 ${micro.estimatedMinutes ?? 8} 分钟` : null].filter(Boolean).join(" · ");
       nodes.push({
         id: node.id,
         kind: "knowledge",
@@ -1179,7 +1179,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
           {!session ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={openLogin}><LogIn size={13} />登录后开始学习</button> : null}
           {session && (currentPractice || currentGroup) && primaryAssignment ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => void launchAssignment(primaryAssignment)}><FileText size={13} />{detailAssignments.length > 1 ? "开始动手任务组" : "开始动手任务"}</button> : null}
           {session && !currentPractice && !currentGroup && selectedStageKnowledge ? (
-            selectedStageKnowledge && selectedMicro ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => startKnowledge(selectedStageKnowledge)}><Sparkles size={13} />开始微学习{selectedMicro.estimatedMinutes ? ` · ${selectedMicro.estimatedMinutes} 分钟` : ""}</button>
+            selectedStageKnowledge && selectedMicro ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => startKnowledge(selectedStageKnowledge)}><Sparkles size={13} />开始小练习{selectedMicro.estimatedMinutes ? ` · ${selectedMicro.estimatedMinutes} 分钟` : ""}</button>
               : primaryAssignment ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => startKnowledge(selectedStageKnowledge)}><FileText size={13} />{detailAssignments.length > 1 ? "开始动手任务组" : "开始动手任务"}</button>
                 : <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled>暂无学习资源</button>
           ) : null}

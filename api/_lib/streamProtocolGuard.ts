@@ -1,5 +1,5 @@
 import type { TextStreamPart, ToolSet } from "ai";
-import { heldProtocolSuffixLength, protocolLeakInProgress } from "../../src/features/assistant/protocolGuard.js";
+import { heldCardHistorySuffixLength, heldProtocolSuffixLength, protocolLeakInProgress, stripCardHistoryMarkers } from "../../src/features/assistant/protocolGuard.js";
 
 export class AssistantProtocolLeakError extends Error {
   readonly code = "protocol_leak";
@@ -24,7 +24,8 @@ export function createProtocolGuardTransform(): TransformStream<AnyPart, AnyPart
   const buffers = new Map<string, string>();
 
   const release = (controller: TransformStreamDefaultController<AnyPart>, id: string, delta: string) => {
-    if (delta) controller.enqueue({ type: "text-delta", id, text: delta } as AnyPart);
+    const text = stripCardHistoryMarkers(delta);
+    if (text) controller.enqueue({ type: "text-delta", id, text } as AnyPart);
   };
 
   const flush = (controller: TransformStreamDefaultController<AnyPart>, id?: string) => {
@@ -55,7 +56,7 @@ export function createProtocolGuardTransform(): TransformStream<AnyPart, AnyPart
       const id = part.id;
       const buffer = (buffers.get(id) ?? "") + part.text;
       if (protocolLeakInProgress(buffer)) throw new AssistantProtocolLeakError();
-      const hold = heldProtocolSuffixLength(buffer);
+      const hold = Math.max(heldProtocolSuffixLength(buffer), heldCardHistorySuffixLength(buffer));
       const safe = hold ? buffer.slice(0, buffer.length - hold) : buffer;
       if (safe) release(controller, id, safe);
       buffers.set(id, hold ? buffer.slice(buffer.length - hold) : "");

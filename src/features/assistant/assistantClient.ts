@@ -61,26 +61,6 @@ export function proposeCourseCreatorAdjustment(input: { briefMessageId: string; 
   return apiRequest<{ sessionId: string; intent: "explain" | "edit"; proposal: CourseCreatorProposal }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "course-creator-proposal", ...input }) });
 }
 
-/** Server-owned template reply for a button action. Never calls the model. */
-export function recordAssistantButtonAction(input: {
-  kind: "micro-completed" | "micro-opened" | "route-started" | "segment-cleared" | "practice-opened" | "practice-submitted";
-  sessionId?: string | null;
-  pathId?: string;
-  knowledgeId?: string;
-  courseId?: string;
-  assignmentId?: string;
-  attemptId?: string;
-  resuming?: boolean;
-  forceNewSession?: boolean;
-  createSession?: boolean;
-  context: AssistantContextSnapshot;
-}) {
-  return apiRequest<{ sessionId: string | null; message: AssistantMessage | null }>("/api/assistant", {
-    method: "POST",
-    body: JSON.stringify({ action: "record-action", ...input })
-  });
-}
-
 /**
  * Small adapter for the secondary workspace conversation. It reuses the AI
  * SDK transport and UI-message reader instead of decoding the stream by hand.

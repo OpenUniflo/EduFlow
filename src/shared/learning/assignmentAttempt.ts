@@ -36,6 +36,38 @@ export type AssignmentFeedback = {
   [key: string]: unknown;
 };
 
+export type AssignmentAttemptHistoryItem = {
+  attemptId: string;
+  attemptNumber: number;
+  submittedAt: string;
+  withdrawn: boolean;
+  withdrawnAt?: string;
+  withdrawalSource?: "panel" | "assistant" | string;
+  resultId?: string;
+  outcome?: PerformanceOutcome;
+  evaluatorKind?: string;
+};
+
+export type AssignmentSubmissionSummary = {
+  totalSubmissions: number;
+  withdrawnSubmissions: number;
+  countingSubmissions: number;
+  latestCountingSubmission: (AssignmentAttemptHistoryItem & { status: "passed" | "needs_revision" | "pending" | "submitted" }) | null;
+};
+
+export function summarizeAssignmentAttempts(history: readonly AssignmentAttemptHistoryItem[]): AssignmentSubmissionSummary {
+  const latest = history.find((item) => !item.withdrawnAt) ?? null;
+  return {
+    totalSubmissions: history.length,
+    withdrawnSubmissions: history.filter((item) => Boolean(item.withdrawnAt)).length,
+    countingSubmissions: history.filter((item) => !item.withdrawnAt).length,
+    latestCountingSubmission: latest ? {
+      ...latest,
+      status: latest.outcome === "passed" ? "passed" : latest.outcome === "failed" ? "needs_revision" : latest.outcome === "pending" ? "pending" : "submitted"
+    } : null
+  };
+}
+
 export type AssignmentEvaluationInfo = {
   status: "running" | "succeeded" | "failed" | "handed_off" | string;
   errorCode?: string;

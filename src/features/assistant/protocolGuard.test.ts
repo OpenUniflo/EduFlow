@@ -5,6 +5,9 @@ import {
   cleanFinalAnswer,
   filterModelHistoryRows,
   hasAssistantProtocolLeak,
+  historyWithoutUnansweredTail,
+  heldCardHistorySuffixLength,
+  stripCardHistoryMarkers,
   invalidReasonForRow,
   selectLoopFinalText,
   visibleAssistantContent
@@ -32,6 +35,11 @@ describe("assistant protocol leak detection", () => {
     expect(hasAssistantProtocolLeak('  <tool_call name="lookup">\n{"q":"x"}</tool_call>')).toBe(true);
     expect(hasAssistantProtocolLeak('回答前 <function_call name="x">')).toBe(true);
     expect(assistantProtocolLeakRule('<tool_use name="searchKnowledge">')).toBe("tool_tag");
+  });
+
+  it("detects provider safety metadata as protocol text", () => {
+    expect(hasAssistantProtocolLeak('<ds_safety>[用户未成年]否 [分类]其他</ds_safety>')).toBe(true);
+    expect(assistantProtocolLeakRule('<ds_safety>[判定]正常</ds_safety>')).toBe("tool_tag");
   });
 
   it("allows a fenced tool_use example", () => {
@@ -112,5 +120,46 @@ describe("model history filtering", () => {
     expect(visibleAssistantContent(rows[2])).toBe(normalToolDiscussion);
     expect(invalidReasonForRow(rows[4])).toBe("protocol_leak");
     expect(invalidReasonForRow(rows[2])).toBeUndefined();
+  });
+});
+
+describe("failed question history", () => {
+  it("drops a trailing user turn that has no assistant reply", () => {
+    const rows = [
+      { role: "user", content: "Q0" },
+      { role: "assistant", content: "A0" },
+      { role: "user", content: "failed Q1" }
+    ];
+    expect(historyWithoutUnansweredTail(rows)).toEqual([rows[0], rows[1]]);
+    expect(historyWithoutUnansweredTail([...rows, { role: "user", content: "Q2" }])).toEqual([rows[0], rows[1]]);
+  });
+
+  it("drops an earlier failed question after a later question is answered", () => {
+    const rows = [
+      { role: "user", content: "failed question" },
+      { role: "user", content: "later question" },
+      { role: "assistant", content: "later answer" }
+    ];
+    expect(historyWithoutUnansweredTail(rows)).toEqual([rows[1], rows[2]]);
+  });
+
+  it("keeps a complete exchange untouched", () => {
+    const rows = [
+      { role: "user", content: "Q0" },
+      { role: "assistant", content: "A0" }
+    ];
+    expect(historyWithoutUnansweredTail(rows)).toEqual(rows);
+  });
+});
+
+describe("card history marker guard", () => {
+  it("strips a complete legacy marker but keeps the answer text", () => {
+    expect(stripCardHistoryMarkers("正文\n[此回复展示的卡片：一个动手任务]")).toBe("正文\n");
+    expect(stripCardHistoryMarkers("没有问题")).toBe("没有问题");
+  });
+
+  it("holds a partial marker across stream chunks", () => {
+    expect(heldCardHistorySuffixLength("正文 [此回复展示的卡片")).toBeGreaterThan(0);
+    expect(heldCardHistorySuffixLength("正文 [此回复展示的卡片：一个动手任务]")).toBe(0);
   });
 });

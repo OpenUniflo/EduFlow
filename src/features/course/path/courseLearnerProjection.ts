@@ -108,3 +108,33 @@ export function buildHomeCourseProjection(input: {
     ...(current ? { currentChapterId: current.id, currentChapterTitle: current.title } : {})
   };
 }
+
+export type CourseRouteActionChoice =
+  | { kind: "micro"; pathId: string; assignmentId?: undefined }
+  | { kind: "practice"; assignmentId: string; pathId?: undefined }
+  | { kind: "none"; pathId?: undefined; assignmentId?: undefined };
+
+/**
+ * The one action the current route step should open. Preference follows the
+ * first-segment step, not asset existence: a completed Micro with an open
+ * practice opens the practice. The old asset-first rule reopened learned Micros.
+ */
+export function resolveCourseRouteAction(input: {
+  nodeId: string;
+  micro?: { pathId: string };
+  practice?: { assignmentId: string };
+  currentStep?: { nodeId: string; kind: "micro" | "practice" };
+  microLearned: boolean;
+  practiceDone: boolean;
+}): CourseRouteActionChoice {
+  const { micro, practice, currentStep, nodeId } = input;
+  if (currentStep?.nodeId === nodeId) {
+    if (currentStep.kind === "practice" && practice) return { kind: "practice", assignmentId: practice.assignmentId };
+    if (currentStep.kind === "micro" && micro) return { kind: "micro", pathId: micro.pathId };
+  }
+  if (micro && !input.microLearned) return { kind: "micro", pathId: micro.pathId };
+  if (practice && !input.practiceDone) return { kind: "practice", assignmentId: practice.assignmentId };
+  if (micro) return { kind: "micro", pathId: micro.pathId };
+  if (practice) return { kind: "practice", assignmentId: practice.assignmentId };
+  return { kind: "none" };
+}

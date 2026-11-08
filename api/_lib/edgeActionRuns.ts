@@ -59,7 +59,7 @@ export async function requireActionExecution(client: SupabaseClient, userId: str
   if (action.type === 'micro_learning') {
     const paths = await availableMicroPaths(client, courseId);
     const path = paths.find(path => path.id === binding?.micro_path_id && path.knowledge_id === targetId);
-    if (!path) throw new ApiError(422, 'action_micro_unavailable', '该能力尚无已发布的微学习内容，请选择其他行动。');
+    if (!path) throw new ApiError(422, 'action_micro_unavailable', '该能力尚无已发布的小练习内容，请选择其他行动。');
     // Existing Micro authority owns teaching eligibility; never initialize a route from Action execution.
     if (!await readActiveVersion(client, userId, courseId)) throw new ApiError(409, 'route_not_initialized', '请先打开课程路线。');
     if(formal) { /* Formal Action authority already validated the exact Step and local order. */ }
@@ -84,7 +84,7 @@ export async function requireActionMicroEligibility(client: SupabaseClient, user
   if(runId) {
     const result=await client.from('edge_action_runs').select('*').eq('id',runId).eq('user_id',userId).eq('course_id',courseId).maybeSingle();
     const run=dataOrThrow(result.data,result.error,'Micro Action eligibility') as ActionRun|null;
-    if(!run || run.execution_snapshot.targetId!==nodeId || !['selected','in_progress','completed'].includes(run.status)) throw new ApiError(404,'micro_action_unavailable','微学习执行上下文不可用。');
+    if(!run || run.execution_snapshot.targetId!==nodeId || !['selected','in_progress','completed'].includes(run.status)) throw new ApiError(404,'micro_action_unavailable','小练习执行上下文不可用。');
     if(run.status!=='completed') await requireActionExecution(client,userId,courseId,run.action_id,run.status==='in_progress'||run.execution_snapshot.repeatedFromRunId?true:undefined);
     const version=await readActiveVersion(client,userId,courseId);
     if(version?.snapshot.executionSteps!==undefined) return {...version.snapshot,activeVersionId:version.id};

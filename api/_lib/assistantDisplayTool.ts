@@ -2,7 +2,9 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { tool } from "ai";
 import { z } from "zod";
 import type { AssistantContextSnapshot } from "../../src/features/assistant/assistantContract.js";
-import { cardLimitReached, type AssistantCardDisplay, type AssistantCardRef, type AssistantCardStatus, type AssistantCardStatusTone, type AssistantCardStep } from "../../src/features/assistant/assistantCards.js";
+import { type AssistantCardDisplay, type AssistantCardRef, type AssistantCardStatus, type AssistantCardStatusTone, type AssistantCardStep } from "../../src/features/assistant/assistantCards.js";
+import { assistantCardDisplaySchema, assistantComponentCatalog } from "../../src/features/assistant/componentCatalog.js";
+import { knowledgeStateLabel, knowledgeStateTone, type KnowledgeState } from "../../src/shared/learning/knowledgePresentation.js";
 import type { GoalPlan } from "../../src/features/course/goal/goalPlanning.js";
 import { dataOrThrow } from "./query.js";
 import { getAssignmentContext, getCourseContext, getKnowledge, readableCourse } from "./assistantTools.js";
@@ -22,15 +24,17 @@ const id = z.string().trim().min(1).max(240).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*
  * skipped without failing the answer.
  */
 export const assistantDisplayCardInput = z.discriminatedUnion("cardType", [
-  z.object({ cardType: z.literal("route"), courseId: id }),
-  z.object({ cardType: z.literal("micro"), knowledgeId: id, courseId: id.optional(), pathId: id.optional() }),
-  z.object({ cardType: z.literal("practice"), courseId: id, assignmentId: id }),
-  z.object({ cardType: z.literal("evaluation"), courseId: id, assignmentId: id, attemptId: z.string().uuid().optional() }),
-  z.object({ cardType: z.literal("course_chapter"), courseId: id, chapterId: id }),
-  z.object({ cardType: z.literal("knowledge"), nodeId: id }),
-  z.object({ cardType: z.literal("progress"), courseId: id.optional() }),
-  z.object({ cardType: z.literal("material"), courseId: id, materialId: id, segmentId: id.optional() }),
-  z.object({ cardType: z.literal("course_match") })
+  z.object({ cardType: z.literal("route"), courseId: id }).passthrough(),
+  z.object({ cardType: z.literal("micro"), knowledgeId: id, courseId: id.optional(), pathId: id.optional() }).passthrough(),
+  z.object({ cardType: z.literal("practice"), courseId: id, assignmentId: id, compact: z.boolean().optional() }).passthrough(),
+  z.object({ cardType: z.literal("submission"), courseId: id, assignmentId: id }).passthrough(),
+  z.object({ cardType: z.literal("evaluation"), courseId: id, assignmentId: id, attemptId: z.string().uuid().optional() }).passthrough(),
+  z.object({ cardType: z.literal("course_chapter"), courseId: id, chapterId: id }).passthrough(),
+  z.object({ cardType: z.literal("knowledge"), nodeId: id }).passthrough(),
+  z.object({ cardType: z.literal("mini_map"), nodeId: id }).passthrough(),
+  z.object({ cardType: z.literal("progress"), courseId: id.optional() }).passthrough(),
+  z.object({ cardType: z.literal("material"), courseId: id, materialId: id, segmentId: id.optional() }).passthrough(),
+  z.object({ cardType: z.literal("course_match") }).passthrough()
 ]);
 export type AssistantDisplayCardInput = z.infer<typeof assistantDisplayCardInput>;
 
@@ -112,25 +116,33 @@ async function buildRouteCard(client: SupabaseClient, user: User, courseId: stri
   };
 }
 
-async function resolveMicroPath(client: SupabaseClient, input: Extract<AssistantDisplayCardInput, { cardType: "micro" }>) {
+async function resolveMicroPath(client: SupabaseClient, user: User, input: Extract<AssistantDisplayCardInput, { cardType: "micro" }>) {
   let query = client.from("micro_learning_paths")
     .select("id,knowledge_id,course_id,title,description,estimated_minutes,mode,status")
     .eq("status", "published").eq("knowledge_id", input.knowledgeId);
   if (input.pathId) query = query.eq("id", input.pathId);
   const result = await query.limit(20);
   const rows = dataOrThrow(result.data as Row[] | null, result.error, "Display Micro lookup");
-  return rows.find((row) => input.courseId && text(row, "course_id") === input.courseId)
-    ?? rows.find((row) => input.courseId && row.course_id == null)
-    ?? rows.find((row) => row.course_id == null)
-    ?? rows[0]
-    ?? null;
+  const readable = async (row: Row | undefined) => {
+    if (!row) return false;
+    const courseId = optionalText(row, "course_id");
+    return !courseId || Boolean(await readableCourse(client, user, courseId));
+  };
+  if (input.pathId) return rows[0] && await readable(rows[0]) ? rows[0] : null;
+  // With a Course context, never silently replace it with another Course's
+  // practice for the same Knowledge. The model must choose another real object.
+  const candidates = input.courseId
+    ? rows.filter((row) => text(row, "course_id") === input.courseId || row.course_id == null)
+    : rows;
+  for (const row of candidates) if (await readable(row)) return row;
+  return null;
 }
 
 async function buildMicroCard(client: SupabaseClient, user: User, input: Extract<AssistantDisplayCardInput, { cardType: "micro" }>): Promise<AssistantDisplayCardOutput | null> {
   const knowledge = await getKnowledge(client, input.knowledgeId);
   if (!knowledge) return null;
   if (input.courseId && !await readableCourse(client, user, input.courseId)) return null;
-  const path = await resolveMicroPath(client, input);
+  const path = await resolveMicroPath(client, user, input);
   if (!path) return null;
   const pathId = text(path, "id");
   const courseId = optionalText(path, "course_id");
@@ -148,16 +160,32 @@ async function buildMicroCard(client: SupabaseClient, user: User, input: Extract
     : { data: [], error: null };
   const completedRows = dataOrThrow(completedResult.data as Row[] | null, completedResult.error, "Display Micro completion lookup");
   const completed = progressStatus === "completed" ? total : completedRows.reduce((sum, row) => sum + (Array.isArray(row.completed_step_ids) ? row.completed_step_ids.length : 0), 0);
+  const doneStepIds = new Set(completedRows.flatMap((row) => Array.isArray(row.completed_step_ids) ? row.completed_step_ids.map(String) : []));
+  let stepRows: Row[] = [];
+  if (unitIds.length) {
+    const stepResult = await client.from("micro_steps").select("id,unit_id,title,position").in("unit_id", unitIds);
+    stepRows = dataOrThrow(stepResult.data as Row[] | null, stepResult.error, "Display Micro step order");
+  }
+  stepRows.sort((left, right) => {
+    const unitOrder = (id: string) => units.findIndex((unit) => text(unit, "id") === id);
+    return unitOrder(text(left, "unit_id")) - unitOrder(text(right, "unit_id")) || Number(left.position) - Number(right.position);
+  });
+  const courseTitle = courseId ? optionalText(await readableCourse(client, user, courseId) ?? {}, "title") ?? "课程" : "独立学习";
   return {
     card: { cardType: "micro", pathId, knowledgeId: input.knowledgeId, ...(courseId ? { courseId } : {}) },
     display: {
       title: text(path, "title"),
       kicker: "小练习",
       description: optionalText(path, "description"),
-      meta: [`约 ${minutes(path.estimated_minutes) ?? 0} 分钟`, `${completed} / ${total} 步`],
+      meta: [`约 ${minutes(path.estimated_minutes) ?? 0} 分钟`, `${completed} / ${total} 步`, courseTitle],
       status: statusOf(progressStatus || "not_started"),
       percent: total ? Math.round(completed / total * 100) : 0,
-      actionLabel: progressStatus === "completed" ? "重新展开" : progressStatus === "in_progress" ? "继续" : "开始"
+      steps: stepRows.slice(0, 12).map((step) => ({
+        id: text(step, "id"),
+        title: text(step, "title"),
+        state: progressStatus === "completed" || doneStepIds.has(text(step, "id")) ? "done" as const : "quiet" as const
+      })),
+      actionLabel: progressStatus === "completed" ? "再看一遍" : progressStatus === "in_progress" ? "继续" : "开始"
     }
   };
 }
@@ -169,7 +197,7 @@ async function buildPracticeCard(client: SupabaseClient, user: User, input: Extr
   const state = dataOrThrow(stateResult.data as Row | null, stateResult.error, "Display Assignment state lookup");
   const estimated = context.assignment.estimatedMinutes;
   return {
-    card: { cardType: "practice", courseId: input.courseId, assignmentId: input.assignmentId },
+    card: { cardType: "practice", courseId: input.courseId, assignmentId: input.assignmentId, ...(input.compact ? { compact: true } : {}) },
     display: {
       title: context.assignment.title,
       kicker: "动手任务",
@@ -181,9 +209,28 @@ async function buildPracticeCard(client: SupabaseClient, user: User, input: Extr
   };
 }
 
+async function buildSubmissionCard(client: SupabaseClient, user: User, input: Extract<AssistantDisplayCardInput, { cardType: "submission" }>): Promise<AssistantDisplayCardOutput | null> {
+  const context = await getAssignmentContext(client, user, input.courseId, input.assignmentId);
+  if (!context) return null;
+  const stateResult = await client.from("user_assignment_states").select("status").eq("user_id", user.id).eq("course_id", input.courseId).eq("assignment_id", input.assignmentId).maybeSingle();
+  const state = dataOrThrow(stateResult.data as Row | null, stateResult.error, "Display submission state lookup");
+  const estimated = context.assignment.estimatedMinutes;
+  return {
+    card: { cardType: "submission", courseId: input.courseId, assignmentId: input.assignmentId },
+    display: {
+      title: context.assignment.title,
+      kicker: "提交表单",
+      description: "填写备注、附上文件或链接，提交后由评估者给出结果。",
+      meta: [estimated == null ? "动手做一次" : `约 ${estimated} 分钟`, `${context.knowledge.length} 个要点`],
+      status: statusOf(optionalText(state ?? {}, "status") ?? "not_started"),
+      actionLabel: "打开提交表单"
+    }
+  };
+}
+
 async function buildEvaluationCard(client: SupabaseClient, user: User, input: Extract<AssistantDisplayCardInput, { cardType: "evaluation" }>): Promise<AssistantDisplayCardOutput | null> {
   if (!await readableCourse(client, user, input.courseId)) return null;
-  const attemptQuery = client.from("learning_attempts").select("id,attempt_number").eq("user_id", user.id).eq("course_id", input.courseId).eq("assignment_id", input.assignmentId);
+  const attemptQuery = client.from("learning_attempts").select("id,attempt_number").eq("user_id", user.id).eq("course_id", input.courseId).eq("assignment_id", input.assignmentId).is("withdrawn_at", null);
   const attemptResult = input.attemptId
     ? await attemptQuery.eq("id", input.attemptId).maybeSingle()
     : await attemptQuery.order("attempt_number", { ascending: false }).limit(1).maybeSingle();
@@ -283,22 +330,35 @@ async function buildCourseMatchCard(client: SupabaseClient, user: User, state: A
 async function buildKnowledgeCard(client: SupabaseClient, user: User, nodeId: string): Promise<AssistantDisplayCardOutput | null> {
   const knowledge = await getKnowledge(client, nodeId);
   if (!knowledge) return null;
-  const [stateResult, microResult] = await Promise.all([
-    client.from("user_knowledge_states").select("status").eq("user_id", user.id).eq("node_id", nodeId).maybeSingle(),
-    client.from("micro_learning_paths").select("id,course_id,title,estimated_minutes").eq("knowledge_id", nodeId).eq("status", "published").eq("mode", "learn").limit(1)
-  ]);
+  const stateResult = await client.from("user_knowledge_states").select("status").eq("user_id", user.id).eq("node_id", nodeId).maybeSingle();
   const state = dataOrThrow(stateResult.data as Row | null, stateResult.error, "Display Knowledge state lookup");
-  const micro = dataOrThrow(microResult.data as Row[] | null, microResult.error, "Display Knowledge Micro lookup")[0];
-  const status = optionalText(state ?? {}, "status");
+  const status = (optionalText(state ?? {}, "status") ?? "explore") as KnowledgeState;
   return {
-    card: { cardType: "knowledge", nodeId, ...(micro ? { pathId: text(micro, "id") } : {}), ...(micro && optionalText(micro, "course_id") ? { courseId: text(micro, "course_id") } : {}) },
+    card: { cardType: "knowledge", nodeId },
     display: {
-      title: micro ? text(micro, "title") : knowledge.title,
-      kicker: "要点",
+      title: knowledge.title,
+      kicker: "知识点",
       description: typeof knowledge.description === "string" ? knowledge.description : undefined,
-      meta: [micro ? `约 ${minutes(micro.estimated_minutes) ?? 0} 分钟` : "暂无可做的小练习"],
-      status: status ? statusOf(status === "learning" ? "in_progress" : status) : { label: "未开始", tone: "quiet" },
-      ...(micro ? { actionLabel: "开始这道小练习" } : {})
+      meta: [knowledge.scope === "global" ? "公开知识" : knowledge.scope === "tenant" ? "组织知识" : "个人知识"],
+      status: { label: knowledgeStateLabel[status] ?? knowledgeStateLabel.explore, tone: knowledgeStateTone(status) },
+      actionLabel: "查看知识点"
+    }
+  };
+}
+
+async function buildMiniMapCard(client: SupabaseClient, user: User, nodeId: string): Promise<AssistantDisplayCardOutput | null> {
+  const knowledge = await getKnowledge(client, nodeId);
+  if (!knowledge) return null;
+  const edgeResult = await client.from("knowledge_edges").select("id").or(`source_node_id.eq.${nodeId},target_node_id.eq.${nodeId}`).eq("lifecycle_status", "active").limit(60);
+  const edges = dataOrThrow(edgeResult.data as Row[] | null, edgeResult.error, "Display mini map edge lookup");
+  return {
+    card: { cardType: "mini_map", nodeId },
+    display: {
+      title: knowledge.title,
+      kicker: "小地图",
+      description: "这张图只画这个知识点周围真实存在的关系。",
+      meta: [`${edges.length} 条关系`],
+      actionLabel: "在档案中查看"
     }
   };
 }
@@ -359,10 +419,12 @@ async function build(client: SupabaseClient, user: User, context: AssistantConte
     case "route": return buildRouteCard(client, user, input.courseId);
     case "micro": return buildMicroCard(client, user, input);
     case "practice": return buildPracticeCard(client, user, input);
+    case "submission": return buildSubmissionCard(client, user, input);
     case "evaluation": return buildEvaluationCard(client, user, input);
     case "course_chapter": return buildChapterCard(client, user, input);
     case "course_match": return buildCourseMatchCard(client, user, state);
     case "knowledge": return buildKnowledgeCard(client, user, input.nodeId);
+    case "mini_map": return buildMiniMapCard(client, user, input.nodeId);
     case "progress": return buildProgressCard(client, user, input.courseId ?? context.courseId);
     case "material": return buildMaterialCard(client, user, input);
   }
@@ -372,16 +434,17 @@ export function createDisplayCardTool(client: SupabaseClient, user: User, contex
   return tool({
     description: [
       "Show one product card inside the answer. Nominate only a card type and existing object IDs returned by EduFlow tools.",
-      "Available cardType values: route (courseId), micro (knowledgeId, optional courseId/pathId), practice (courseId, assignmentId), evaluation (courseId, assignmentId), course_chapter (courseId, chapterId), knowledge (nodeId), progress (optional courseId), material (courseId, materialId, optional segmentId), course_match (no IDs; uses the latest planLearningGoal result).",
-      "Call this at the exact point in your reply where the card belongs. Never call it more than 3 times. Never describe the card contents or repeat its numbers in the text.",
+      `Available cardType values from the product component directory: ${assistantComponentCatalog.filter((component) => component.nominatable !== false).map((component) => `${component.cardType} (${component.label})`).join(", ")}.`,
+      "Fields by cardType: route (courseId), micro (knowledgeId, optional courseId/pathId), practice (courseId, assignmentId), submission (courseId, assignmentId), evaluation (courseId, assignmentId, optional attemptId), course_chapter (courseId, chapterId), knowledge (nodeId), mini_map (nodeId), progress (optional courseId), material (courseId, materialId, optional segmentId), course_match (no IDs; uses the latest planLearningGoal result).",
+      "After a successful submitAssignment, call displayCard practice with compact true to add the one-line task card that shares the live state; the original task card updates in place. Call this at the exact point in your reply where the card belongs. Use only as many cards as the answer needs; there is no fixed count. Never describe the card contents or repeat its numbers in the text.",
       "Every ID must come from a real tool result. If you do not have a valid ID, do not call the tool."
     ].join(" "),
     inputSchema: assistantDisplayCardInput,
     execute: async (input: AssistantDisplayCardInput): Promise<AssistantDisplayCardOutput> => {
-      if (cardLimitReached(state.accepted)) return { skipped: "card_limit_reached" };
       try {
         const output = await build(client, user, context, input, state);
         if (!output || "skipped" in output) return { skipped: "card_not_available" };
+        assistantCardDisplaySchema.parse(output.display);
         state.accepted += 1;
         console.info(`assistant_card type=${output.card.cardType} index=${state.accepted}`);
         return output;

@@ -89,7 +89,7 @@ export function auditCourseAssetCoverage(runtime: CourseRuntimeData, options: { 
   if (assignments.missingKnowledgeCount) issues.push({
     code: "missing-assignment-coverage",
     severity: "warning",
-    message: `${assignments.missingKnowledgeCount} 个课程学习内容尚无实践任务覆盖`
+    message: `${assignments.missingKnowledgeCount} 个课程学习内容尚无动手任务覆盖`
   });
   if (materials.missingKnowledgeCount) issues.push({
     code: "missing-material-coverage",

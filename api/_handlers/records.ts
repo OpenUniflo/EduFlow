@@ -157,6 +157,7 @@ export async function readRecords(
     allRows(client.from("learning_attempts")
       .select("id,course_id,assignment_id,attempt_number,response,submitted_at,action_run_id")
       .eq("user_id", userId)
+      .is("withdrawn_at", null)
       .order("submitted_at", { ascending: false }), "Learning records practice attempts"),
     allRows(client.from("performance_results")
       .select("id,attempt_id,course_id,assignment_id,version,outcome,score,feedback,evaluator_kind,evaluated_at")

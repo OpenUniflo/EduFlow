@@ -1,7 +1,9 @@
-import { Maximize2, Network, PanelRight, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowRight, Maximize2, Network, PanelRight, Route, X } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { animate, useReducedMotion } from "motion/react";
+import { expandPanelFromRect, contractPanelToRect } from "@/shared/ui/panelMorph";
+import { Pill } from "@/shared/ui/Pill";
 import type { NavigationDecision } from "@/shared/learning/navigation";
 import { CourseRoutePanel, type CourseRouteMode, type CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
 import type { HomeCourseProjection } from "@/features/course/path/courseLearnerProjection";
@@ -15,12 +17,16 @@ const EASE_OUT = [0.2, 0.8, 0.2, 1] as const;
  * container that is moved between the side slot and a native modal dialog, so
  * switching 侧边 / 整页 never remounts the route or loses its scroll/selection.
  */
-export function HomeRoutePanel({ courseTitle, projection, decision, onClose, onOpenTree, onStart, onModeChange }: {
+export function HomeRoutePanel({ courseId, originRect, courseTitle, projection, decision, onClose, onOpenTree, onOpenCourse, onInteract, onStart, onModeChange }: {
+  courseId: string;
+  originRect?: DOMRect | null;
   courseTitle: string;
   projection: HomeCourseProjection;
   decision?: NavigationDecision | null;
   onClose(): void;
   onOpenTree(): void;
+  onOpenCourse(): void;
+  onInteract?(): void;
   onStart(action: CourseRouteStepAction): void;
   onModeChange?(mode: CourseRouteMode): void;
 }) {
@@ -32,7 +38,9 @@ export function HomeRoutePanel({ courseTitle, projection, decision, onClose, onO
   const dialogRef = useRef<HTMLDialogElement>(null);
   const pageSlot = useRef<HTMLDivElement>(null);
   const animation = useRef<ReturnType<typeof animate> | null>(null);
-  const originRect = useRef<DOMRect | null>(null);
+  const modeOrigin = useRef<DOMRect | null>(null);
+  const entered = useRef(false);
+  const closing = useRef(false);
   const scrollPosition = useRef(0);
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -52,7 +60,7 @@ export function HomeRoutePanel({ courseTitle, projection, decision, onClose, onO
     if (next === modeRef.current) return;
     const scroller = container.querySelector<HTMLElement>(".ef-imm-route-view");
     if (scroller) scrollPosition.current = scroller.scrollTop;
-    originRect.current = container.getBoundingClientRect();
+    modeOrigin.current = container.getBoundingClientRect();
     restoreScrollPending.current = true;
     setMode(next);
   };
@@ -79,10 +87,10 @@ export function HomeRoutePanel({ courseTitle, projection, decision, onClose, onO
   useLayoutEffect(() => {
     const target = mode === "page" ? pageSlot.current : sideSlot.current;
     if (!target) return;
-    const from = originRect.current ?? container.getBoundingClientRect();
+    const from = modeOrigin.current ?? container.getBoundingClientRect();
     const scrollTop = scrollPosition.current;
     if (container.parentElement !== target) target.appendChild(container);
-    originRect.current = null;
+    modeOrigin.current = null;
     // Reparenting a scroll container can reset its offset in Chromium; keep
     // the exact reading position across the form change.
     const restoreScroll = () => {
@@ -121,6 +129,35 @@ export function HomeRoutePanel({ courseTitle, projection, decision, onClose, onO
     });
   }, [container, mode, reducedMotion]);
 
+  // The panel grows from the card/row that opened it, never from the screen
+  // edge. Reduced motion opens at its final size directly.
+  useLayoutEffect(() => {
+    if (entered.current) return;
+    entered.current = true;
+    void expandPanelFromRect(container, originRect, reducedMotion);
+  }, [container, originRect, reducedMotion]);
+
+  const closeWithMorph = useCallback(async () => {
+    if (closing.current) return;
+    closing.current = true;
+    await contractPanelToRect(container, originRect, reducedMotion);
+    onClose();
+  }, [container, onClose, originRect, reducedMotion]);
+
+  // The side panel owns its close so it contracts back before unmount. Page
+  // mode keeps its existing Esc-to-side behaviour.
+  useEffect(() => {
+    if (mode === "page") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void closeWithMorph();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [closeWithMorph, mode]);
+
   // Esc in page form returns to the side form; the global Home listener must
   // not close the whole route.
   useEffect(() => {
@@ -150,18 +187,20 @@ export function HomeRoutePanel({ courseTitle, projection, decision, onClose, onO
     >
       <div ref={pageSlot} className="ef-route-page-slot" />
     </dialog>
-    {createPortal(<section className="ef-home-route-panel" data-at={mode} aria-label="课程路线">
+    {createPortal(<section className="ef-home-route-panel" data-at={mode} data-course-id={courseId} aria-label="课程路线" onPointerDown={onInteract}>
       <header className="ef-home-route-panel-head">
-        <div>
-          <span className="ef-home-route-panel-subtitle" title={`${courseTitle} · 共 ${projection.chapters.length} 章`}>{courseTitle} · 共 {projection.chapters.length} 章</span>
-          <h2>你的学习路线</h2>
+        <span className="ef-home-route-panel-icon" aria-hidden="true"><Route size={16} /></span>
+        <div className="ef-home-route-panel-title">
+          <span className="ef-home-route-panel-subtitle" title={`你的学习路线 · 共 ${projection.chapters.length} 章`}>你的学习路线 · 共 {projection.chapters.length} 章</span>
+          <h2>{courseTitle}</h2>
         </div>
+        <Pill tone={projection.segment.complete ? "ok" : projection.segment.started ? "brand" : "quiet"} dot>{projection.segment.complete ? "已完成" : projection.segment.started ? "进行中" : "未开始"}</Pill>
         <div className="ef-home-route-panel-tools">
           {narrow ? null : <div className="ef-course-route-modes" role="group" aria-label="切换路线显示方式">
-            <button type="button" aria-pressed={mode === "side"} onClick={() => changeMode("side")}><PanelRight size={13} aria-hidden="true" />侧边</button>
-            <button type="button" aria-pressed={mode === "page"} onClick={() => changeMode("page")}><Maximize2 size={13} aria-hidden="true" />整页</button>
+            <button type="button" aria-pressed={mode === "side"} aria-label="侧边显示" title="侧边显示" onClick={() => changeMode("side")}><PanelRight size={13} aria-hidden="true" /><span>侧边</span></button>
+            <button type="button" aria-pressed={mode === "page"} aria-label="整页显示" title="整页显示" onClick={() => changeMode("page")}><Maximize2 size={13} aria-hidden="true" /><span>整页</span></button>
           </div>}
-          <button type="button" className="ef-home-icon" onClick={onClose} aria-label="关闭路线面板"><X size={16} /></button>
+          <button type="button" className="ef-home-icon" onClick={() => void closeWithMorph()} aria-label="关闭路线面板"><X size={16} /></button>
         </div>
       </header>
       <div className="ef-home-route-panel-body">
@@ -181,7 +220,10 @@ export function HomeRoutePanel({ courseTitle, projection, decision, onClose, onO
       </div>
       <footer className="ef-home-route-panel-foot">
         <span>一条路线走完所有章节</span>
-        <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={onOpenTree}><Network size={13} />立体视图</button>
+        <span className="ef-home-route-panel-actions">
+          <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={onOpenTree}><Network size={13} />立体视图</button>
+          <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={onOpenCourse} aria-label={`进入课程 ${courseTitle}`}>进入课程<ArrowRight size={13} /></button>
+        </span>
       </footer>
     </section>, container)}
   </>;

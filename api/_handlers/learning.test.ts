@@ -154,3 +154,44 @@ it('opening Material records activity membership without writing formal capabili
  mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});mocks.server.mockReturnValue({from:query});
  expect((await call('start-material',{materialId:'material',nodeId:'node'})).status).toBe(200);expect(writes).toEqual(['user_course_states']);
 });
+
+describe('Assignment Attempt withdrawal endpoint', () => {
+  beforeEach(() => {
+    writes=[];
+    tables={courses:[{id:'course',lifecycle:'published'}],course_assignments:[{id:'task',course_id:'course'}],assignment_coverages:[{course_id:'course',assignment_id:'task',node_id:'node'}],user_assignment_states:[{user_id:'learner',course_id:'course',assignment_id:'task',status:'needs_revision'}]};
+    mocks.user.mockResolvedValue({user:{id:'learner'},client:{from:query}});
+  });
+  it('rejects another learner\'s Attempt before calling the withdrawal RPC', async () => {
+    tables.learning_attempts=[{id:'attempt',user_id:'someone-else',course_id:'course',assignment_id:'task'}];
+    const rpc=vi.fn();
+    mocks.server.mockReturnValue({from:query,rpc});
+    const result=await call('withdraw-attempt',{attemptId:'attempt',source:'panel'});
+    expect(result.status).toBe(404);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it('validates the learner, source and Attempt server-side and delegates the transaction', async () => {
+    tables.learning_attempts=[{id:'attempt',user_id:'learner',course_id:'course',assignment_id:'task'}];
+    const rpc=vi.fn(async(name:string,args:Row)=>name==='withdraw_learning_attempt'
+      ? {data:[{attempt_id:'attempt',course_id:'course',assignment_id:'task',already_withdrawn:false,restored_status:'started'}],error:null,args}
+      : {data:null,error:null});
+    mocks.server.mockReturnValue({from:query,rpc});
+    const result=await call('withdraw-attempt',{attemptId:'attempt',source:'panel'});
+    expect(result).toMatchObject({status:200,body:{withdrawn:true,alreadyWithdrawn:false,restoredStatus:'started'}});
+    expect(rpc).toHaveBeenCalledWith('withdraw_learning_attempt',{p_user_id:'learner',p_attempt_id:'attempt',p_source:'panel'});
+    expect(writes).toEqual([]);
+  });
+  it('is idempotent for the same Attempt and never withdraws twice', async () => {
+    tables.learning_attempts=[{id:'attempt',user_id:'learner',course_id:'course',assignment_id:'task'}];
+    const rpc=vi.fn(async()=>({data:[{attempt_id:'attempt',course_id:'course',assignment_id:'task',already_withdrawn:true,restored_status:null}],error:null}));
+    mocks.server.mockReturnValue({from:query,rpc});
+    expect(await call('withdraw-attempt',{attemptId:'attempt',source:'assistant'})).toMatchObject({status:200,body:{alreadyWithdrawn:true}});
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+  it('rejects an unknown withdrawal source', async () => {
+    tables.learning_attempts=[{id:'attempt',user_id:'learner',course_id:'course',assignment_id:'task'}];
+    const rpc=vi.fn();
+    mocks.server.mockReturnValue({from:query,rpc});
+    expect((await call('withdraw-attempt',{attemptId:'attempt',source:'browser'})).status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+});

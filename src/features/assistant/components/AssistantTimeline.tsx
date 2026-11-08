@@ -1,11 +1,9 @@
-import { Check, Sparkles, Target } from "lucide-react";
+import { AlertTriangle, Check, Sparkles, Target } from "lucide-react";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { applicationServices } from "@/app/services/applicationServices";
-import type { AssistantUIMessage } from "@/features/assistant/AssistantRuntimeContext";
+import { ASSISTANT_REPLY_FAILURE, type AssistantUIMessage } from "@/features/assistant/AssistantRuntimeContext";
 import type { AssistantContextSnapshot, AssistantStructuredContent, CourseCreationBrief, CourseSearchTimelineContent } from "@/features/assistant/assistantContract";
-import { collectSkippedCompletedCards } from "@/features/assistant/cardDedupe";
 import { AssistantCardView, type AssistantCardActions } from "@/features/assistant/cards/AssistantCardView";
-import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
 import { AssistantMarkdown } from "@/features/assistant/cards/AssistantMarkdown";
 import { PROTOCOL_HIDDEN_MESSAGE } from "@/features/assistant/protocolGuard";
 import type { MockSession } from "@/features/auth/types";
@@ -32,12 +30,21 @@ function isTextPart(part: unknown): part is TimelineTextPart {
   return Boolean(part) && typeof part === "object" && (part as { type?: string }).type === "text" && typeof (part as { text?: unknown }).text === "string";
 }
 
-export function AssistantTimeline({ messages, session, actions, sending, showDaySeparators = false }: {
+function WriteResultRow({ data, actions }: { data: { toolName: string; ok: boolean; title: string; detail?: string; card?: { courseId: string; assignmentId: string } }; actions: AssistantCardActions }) {
+  return <div className={`ef-assistant-write-result${data.ok ? " is-ok" : " is-failed"}`} data-write-result={data.toolName} role="status">
+    <span className="ef-assistant-write-result-icon" aria-hidden="true">{data.ok ? <Check size={13} /> : <AlertTriangle size={13} />}</span>
+    <span><strong>{data.title}</strong>{data.detail ? <small>{data.detail}</small> : null}</span>
+    {data.card ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => actions.openPractice(data.card!.courseId, data.card!.assignmentId)}>查看任务</button> : null}
+  </div>;
+}
+
+export function AssistantTimeline({ messages, session, actions, sending, showDaySeparators = false, onSuggestion }: {
   messages: AssistantUIMessage[];
   session: MockSession;
   actions: AssistantCardActions;
   sending: boolean;
   showDaySeparators?: boolean;
+  onSuggestion?: (text: string) => void;
 }) {
   const [, setRevision] = useState(0);
   useEffect(() => {
@@ -49,46 +56,7 @@ export function AssistantTimeline({ messages, session, actions, sending, showDay
     return () => { for (const unsubscribe of unsubscribers) unsubscribe(); };
   }, []);
 
-  // Completed results are projected by object identity. The learner keeps the
-  // first card they saw; every later copy from a completion reply is hidden,
-  // including when the model switches between Micro and Knowledge cards.
-  const learnedNodes = new Set(applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId)
-    .filter((record) => satisfiesTeachingPrerequisite(record.status))
-    .map((record) => record.nodeId));
-  const completionLookup = {
-    isMicroCompleted: (pathId: string) => applicationServices.microLearningRepository.getPathProgress(pathId)?.status === "completed",
-    knowledgePathId: (card: { nodeId: string; pathId?: string; courseId?: string }) => {
-      const path = applicationServices.microLearningRepository.getPath(card.nodeId, {
-        mode: "learn",
-        ...(card.pathId ? { pathId: card.pathId } : {}),
-        ...(card.courseId ? { courseId: card.courseId } : {})
-      });
-      return path && applicationServices.microLearningRepository.getPathProgress(path.id)?.status === "completed" ? path.id : null;
-    },
-    isKnowledgeLearned: (nodeId: string) => learnedNodes.has(nodeId),
-    isPracticeCompleted: (card: { courseId: string; assignmentId: string }) => {
-      const state = applicationServices.learningProgressRepository.getCourseState(session.userId, card.courseId)?.assignmentStates[card.assignmentId]?.status;
-      return state === "accepted" || state === "completed";
-    }
-  };
-  const skippedCards = collectSkippedCompletedCards(messages, completionLookup);
-  // Unfinished Micro nominations keep the previous rule: a later explicit
-  // Continue action wins over an older recommendation. Completed paths are
-  // already owned by the first-seen projection above.
-  const seenMicroPaths = new Set<string>();
-  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
-    const message = messages[messageIndex];
-    const parts = message.parts ?? [];
-    for (let partIndex = parts.length - 1; partIndex >= 0; partIndex -= 1) {
-      const part = parts[partIndex];
-      if (part.type !== "tool-displayCard") continue;
-      const card = (part as { output?: { card?: { cardType?: string; pathId?: string } } }).output?.card;
-      if (card?.cardType !== "micro" || !card.pathId) continue;
-      if (completionLookup.isMicroCompleted(card.pathId)) continue;
-      if (seenMicroPaths.has(card.pathId)) skippedCards.add(`${message.id}:${partIndex}`);
-      else seenMicroPaths.add(card.pathId);
-    }
-  }
+  const unanswered = unansweredUserMessages(messages);
   let previousDay = "";
   return <div className="ef-assistant-timeline" data-sending={sending ? "true" : "false"}>
     {messages.map((message, index) => {
@@ -101,8 +69,9 @@ export function AssistantTimeline({ messages, session, actions, sending, showDay
           message={message}
           session={session}
           actions={actions}
-          skippedCards={skippedCards}
           streaming={sending && message.role === "assistant" && index === messages.length - 1}
+          unanswered={unanswered.has(message.id)}
+          onSuggestion={onSuggestion}
         />
       </Fragment>;
     })}
@@ -110,16 +79,19 @@ export function AssistantTimeline({ messages, session, actions, sending, showDay
   </div>;
 }
 
-export function AssistantTimelineMessage({ message, session, actions, streaming = false, skippedCards }: {
+export function AssistantTimelineMessage({ message, session, actions, streaming = false, unanswered = false, onSuggestion }: {
   message: AssistantUIMessage;
   session: MockSession;
   actions: AssistantCardActions;
   streaming?: boolean;
-  skippedCards?: ReadonlySet<string>;
+  unanswered?: boolean;
+  onSuggestion?: (text: string) => void;
 }) {
   const metadata = message.metadata;
   const legacy = metadata?.structuredContent;
   const isAction = metadata?.messageKind === "action";
+  // Structured Brief/Search action rows remain readable; operation rows are
+  // filtered before they reach the timeline.
   const hidden = Boolean(metadata?.invalidReason);
   const parts = message.parts ?? [];
   const textBlocks = parts.filter(isTextPart);
@@ -129,22 +101,30 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
 
   if (message.role === "user") {
     const text = textBlocks.map((part) => part.text).join("\n");
+    const files = parts.flatMap((part) => part.type === "data-attachment" && part.data && typeof part.data === "object"
+      ? [{ id: String((part.data as { id?: string }).id ?? ""), title: String((part.data as { title?: string }).title ?? "附件") }]
+      : []);
     const marker = metadata?.stopped ? <StoppedMarker /> : null;
-    if (isAction) {
-      // Completion is a system event, not a chat bubble; button choices such as
-      // "带我从最简单的开始" remain learner messages.
-      if (/^完成(?:小练习|动手任务)[：:]/.test(text)) return <><div className="ef-assistant-completion-row" data-role="event"><Check size={14} aria-hidden="true" /><span>{text}</span></div>{marker}</>;
-      return <><div className="ef-home-message-row" data-role="user">
-        <Bubble from="user" meta={formatTime(metadata?.createdAt)}><p className="ef-home-copy">{text}</p></Bubble>
-      </div>{marker}</>;
-    }
+    if (isAction) return null;
     return <><div className="ef-home-message-row" data-role="user">
-      <Bubble from="user" meta={formatTime(metadata?.createdAt)}><p className="ef-home-copy">{text}</p></Bubble>
-    </div>{marker}</>;
+      <Bubble from="user" meta={formatTime(metadata?.createdAt)}>
+        {text ? <p className="ef-home-copy">{text}</p> : null}
+        {files.length ? <ul className="ef-assistant-user-files">{files.map((file) => <li key={file.id}><span aria-hidden="true">▤</span>{file.title}</li>)}</ul> : null}
+      </Bubble>
+    </div>{unanswered ? <p className="ef-assistant-no-reply">没有回复</p> : null}{marker}</>;
   }
 
   let textIndex = 0;
-  const ordered: Array<{ kind: "text" | "card"; node: ReactNode }> = [];
+  const ordered: Array<{ kind: "text" | "card" | "meta"; node: ReactNode }> = [];
+  const followUps = parts.flatMap((part) => part.type === "data-follow-ups" && part.data && typeof part.data === "object" && Array.isArray((part.data as { items?: unknown }).items)
+    ? ((part.data as { items: unknown[] }).items.flatMap((item) => {
+        if (typeof item === "string" && item.trim()) return [{ text: item.trim() }];
+        if (item && typeof item === "object" && typeof (item as { text?: unknown }).text === "string") {
+          return [{ text: String((item as { text: string }).text).trim() }];
+        }
+        return [];
+      }).slice(0, 3))
+    : []);
   for (const [partIndex, part] of parts.entries()) {
     if (isTextPart(part)) {
       const first = textIndex === 0;
@@ -156,11 +136,33 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
       </AssistantText> });
       continue;
     }
-    if (part.type === "tool-displayCard") {
-      if (skippedCards?.has(`${message.id}:${partIndex}`)) continue;
-      const output = (part as { output?: unknown }).output;
-      ordered.push({ kind: "card", node: <AssistantCardView key={`card-${partIndex}`} output={output} session={session} actions={actions} /> });
+    if (part.type === "data-tool-progress" && part.data && typeof part.data === "object") {
+      const label = String((part.data as { label?: unknown }).label ?? "完成一步");
+      ordered.push({ kind: "meta", node: <details key={`tool-${partIndex}`} className="ef-assistant-tool-progress-details" data-tool-progress="true">
+        <summary><Sparkles size={13} aria-hidden="true" /><span>{label}</span></summary>
+        <p>已完成</p>
+      </details> });
+      continue;
     }
+    if (part.type === "data-write-result" && part.data && typeof part.data === "object") {
+      const data = part.data as { toolName?: unknown; ok?: unknown; title?: unknown; detail?: unknown; card?: { courseId: string; assignmentId: string } };
+      if (typeof data.toolName === "string" && typeof data.ok === "boolean" && typeof data.title === "string") {
+        ordered.push({ kind: "meta", node: <WriteResultRow key={`write-${partIndex}`} data={{ toolName: data.toolName, ok: data.ok, title: data.title, ...(typeof data.detail === "string" ? { detail: data.detail } : {}), ...(data.card ? { card: data.card } : {}) }} actions={actions} /> });
+      }
+      continue;
+    }
+    if (part.type === "tool-displayCard") {
+      const output = (part as { output?: unknown }).output;
+      const toolCallId = (part as { toolCallId?: unknown }).toolCallId;
+      const cardKey = typeof toolCallId === "string" && toolCallId ? toolCallId : `${message.id}:${partIndex}`;
+      ordered.push({ kind: "card", node: <AssistantCardView key={`card-${partIndex}`} output={output} session={session} actions={actions} cardKey={cardKey} /> });
+    }
+  }
+
+  if (followUps.length && !streaming) {
+    ordered.push({ kind: "meta", node: <div key="follow-ups" className="ef-assistant-followups" aria-label="后续建议">
+      {followUps.map((suggestion) => <button key={suggestion.text} type="button" className="ef-ui-chip" onClick={() => onSuggestion?.(suggestion.text)}>{suggestion.text}</button>)}
+    </div> });
   }
 
   const pendingToolPart = streaming && totalText === 0
@@ -173,6 +175,7 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
       getNavigationDecision: "正在确认下一步",
       getCourseContext: "正在查看课程",
       getLearnerState: "正在查看学习进度",
+      searchMicro: "正在查找小练习",
       getMicroContext: "正在查看小练习",
       getAssignmentContext: "正在查看任务",
       getMaterialContext: "正在查看资料",
@@ -185,22 +188,44 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
 
   if (!isAction && !pendingTool && !metadata?.stopped && nonEmptyText.length === 0 && !ordered.some((entry) => entry.kind === "card")) {
     ordered.push({ kind: "text", node: <AssistantText key="fallback" meta={formatTime(metadata?.createdAt)}>
-      <p className="ef-home-copy ef-home-muted">{streaming ? "正在回复…" : "这次没有生成回复，请重试。"}</p>
+      <p className="ef-home-copy ef-home-muted">{streaming ? "正在回复…" : ASSISTANT_REPLY_FAILURE}</p>
     </AssistantText> });
   }
-  const cardNodes = ordered.filter((entry) => entry.kind === "card").map((entry) => entry.node);
   const content = ordered.map((entry) => entry.node);
 
   return <>
     <div className={`ef-assistant-turn${isAction ? " is-action" : ""}`} data-role="assistant" data-message-id={message.id} data-message-kind={metadata?.messageKind ?? "utterance"}>
-      {isAction && totalText ? <AssistantText meta={formatTime(metadata?.createdAt)}>
-        <AssistantMarkdown text={textBlocks.map((part) => part.text).join("\n")} streaming={streaming} />
-      </AssistantText> : null}
-      {isAction ? cardNodes : content}
+      {content}
     </div>
     {legacy ? <LegacyStructuredCard content={legacy} messageId={message.id} actions={actions} context={context} /> : null}
     {metadata?.stopped ? <StoppedMarker /> : null}
   </>;
+}
+
+function hasAssistantPayload(message: AssistantUIMessage) {
+  return (message.parts ?? []).some((part) => (
+    (part.type === "text" && Boolean((part as { text?: string }).text?.trim()))
+    || part.type === "tool-displayCard"
+    || part.type === "data-follow-ups"
+  ));
+}
+
+/** A failed turn followed by another question gets one grey line, not a new reply. */
+function unansweredUserMessages(messages: AssistantUIMessage[]) {
+  const unanswered = new Set<string>();
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index];
+    if (message.role !== "user") continue;
+    let answered = false;
+    let laterUser = false;
+    for (let next = index + 1; next < messages.length; next += 1) {
+      const candidate = messages[next];
+      if (candidate.role === "user") { laterUser = true; break; }
+      if (hasAssistantPayload(candidate)) { answered = true; break; }
+    }
+    if (laterUser && !answered) unanswered.add(message.id);
+  }
+  return unanswered;
 }
 
 function LegacyStructuredCard({ content, messageId, actions, context }: { content: AssistantStructuredContent; messageId: string; actions: AssistantCardActions; context: AssistantContextSnapshot }) {

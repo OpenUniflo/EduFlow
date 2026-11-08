@@ -3,10 +3,11 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
-import { resolveDisplayedMicroStep, resolveMicroResumeStep, type MicroLearningPath } from "@/features/learning/micro/microLearning";
+import { nextMicroReviewStep, previousMicroReviewStep, resolveDisplayedMicroStep, resolveMicroResumeStep, type MicroLearningPath } from "@/features/learning/micro/microLearning";
 import { resolveMicroCompletionContext } from "@/features/learning/micro/microCompletionContext";
 import { MicroStepPanel } from "@/features/learning/micro/MicroLearningExperience";
 import { MicroUnitRail } from "@/features/learning/micro/MicroUnitRail";
+import { MicroStepList } from "@/features/learning/micro/MicroStepList";
 import { microSurfaceForPath } from "@/features/learning/micro/microSurface";
 import { ObjectShell } from "@/shared/ui/ObjectShell";
 import type { NavigationDecision } from "@/shared/learning/navigation";
@@ -43,6 +44,7 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pinned, setPinned] = useState<{ unitId: string; stepId: string } | null>(null);
+  const [reviewing, setReviewing] = useState<{ unitId: string; stepId: string } | null>(null);
   const [completionDecision, setCompletionDecision] = useState<NavigationDecision | null>(null);
   const [completionNavigationError, setCompletionNavigationError] = useState(false);
   const [completionAttempt, setCompletionAttempt] = useState(0);
@@ -81,7 +83,7 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
     });
     return () => window.cancelAnimationFrame(frame);
   }, [displayedStep?.id]);
-  const showCompleted = completed && !pinned;
+  const showCompleted = completed && !pinned && !reviewing;
   const steps = path.units.reduce((total, unit) => total + unit.steps.length, 0);
   const countedSteps = path.units.reduce((total, unit) => total + (applicationServices.microLearningRepository.getUnitProgress(unit.id)?.completedStepIds.length ?? 0), 0);
   // Resuming from a persisted current step is authoritative: the side header
@@ -205,28 +207,47 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
   </ObjectShell>;
   const panelShell = (content: ReactNode) => shell(content, true, progress && displayedUnit && displayedStep && !showCompleted ? <div ref={setFooterMount} className="ef-micro-foot-host" /> : undefined);
 
+  if (reviewing) {
+    const reviewUnit = path.units.find((unit) => unit.id === reviewing.unitId);
+    const reviewStep = reviewUnit?.steps.find((step) => step.id === reviewing.stepId);
+    if (reviewUnit && reviewStep) {
+      const previous = previousMicroReviewStep(path, reviewing);
+      const next = nextMicroReviewStep(path, reviewing);
+      const reviewBody = <MicroStepPanel
+        key={`review:${path.id}:${reviewUnit.id}:${reviewStep.id}`}
+        path={path}
+        unitId={reviewUnit.id}
+        step={reviewStep}
+        repository={applicationServices.microLearningRepository}
+        session={session}
+        review
+        active
+        busy={false}
+        previous={previous}
+        footerMount={panel ? footerMount : null}
+        onBack={(cursor) => setReviewing(cursor)}
+        onNext={() => setReviewing(next)}
+        onReturn={() => setReviewing(null)}
+      />;
+      if (panel) return panelShell(reviewBody);
+      return shell(reviewBody, false);
+    }
+  }
+
   if (showCompleted) {
     if (panel) return panelShell(<div className="ef-home-micro-panel-state">
-      <div className="ef-home-micro-complete">
-        <strong>这条小练习路径已完成</strong>
-        <p>可以随时回到沉浸页复习，进度会保留。</p>
-      </div>
+      <MicroStepList path={path} repository={applicationServices.microLearningRepository} onSelect={(unitId, stepId) => setReviewing({ unitId, stepId })} />
       {completionActions.length || completionNavigationError ? <section className="micro-completion-context" aria-label="继续学习与相关内容">
         <h2>继续学习 / 相关内容</h2>
         {nextCompletionAction ? <button type="button" className="atlas-primary micro-completion-next" onClick={() => openCompletionAction(nextCompletionAction)}><span>继续下一项<strong>{nextCompletionAction.title}</strong></span><ArrowRight size={17} aria-hidden="true" /></button> : null}
         {completionActions.filter((action) => action.kind !== "next").map((action) => <button type="button" key={action.href} className="atlas-secondary micro-completion-related" onClick={() => openCompletionAction(action)}><span>{action.kind === "material" ? "相关资料" : "相关练习"}<strong>{action.title}</strong></span><ArrowRight size={15} aria-hidden="true" /></button>)}
         {completionNavigationError ? <div className="micro-feedback retry" role="alert">下一步暂时无法加载；学习进度已保存。<button type="button" className="atlas-secondary" onClick={() => setCompletionAttempt((value) => value + 1)}>重试下一步</button></div> : null}
       </section> : null}
-      <div className="ef-home-micro-cta">
-        <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={openFocus}>在沉浸页复习<ArrowRight size={14} aria-hidden="true" /></button>
-      </div>
     </div>);
     return shell(<div className="ef-home-micro is-inline">
       {hideHeader ? null : header}
-      <div className="ef-home-micro-done-row">
-        <span>已完成</span>
-        <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={openFocus}>复习<ArrowRight size={14} aria-hidden="true" /></button>
-      </div>
+      <div className="ef-home-micro-done-row"><span>已完成</span>{inlineFormActions}</div>
+      <MicroStepList path={path} repository={applicationServices.microLearningRepository} onSelect={(unitId, stepId) => setReviewing({ unitId, stepId })} />
       {completionActions.length || completionNavigationError ? <section className="micro-completion-context ef-home-micro-completion-context" aria-label="继续学习与相关内容">
         <h2>继续学习 / 相关内容</h2>
         {nextCompletionAction ? <button type="button" className="atlas-primary micro-completion-next" onClick={() => openCompletionAction(nextCompletionAction)}><span>继续下一项<strong>{nextCompletionAction.title}</strong></span><ArrowRight size={17} aria-hidden="true" /></button> : null}

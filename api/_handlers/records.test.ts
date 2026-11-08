@@ -11,6 +11,7 @@ function fakeClient(tables: Record<string, Row[]>): SupabaseClient {
     const builder = {
       select: () => builder,
       eq: (column: string, value: unknown) => { rows = rows.filter((row) => row[column] === value); return builder; },
+      is: (column: string, value: unknown) => { rows = rows.filter((row) => value === null ? row[column] == null : row[column] === value); return builder; },
       in: (column: string, values: unknown[]) => { rows = rows.filter((row) => values.includes(row[column])); return builder; },
       order: () => builder,
       range: (fromIndex: number, toIndex: number) => Promise.resolve({ data: rows.slice(fromIndex, toIndex + 1), error: null }),

@@ -410,8 +410,13 @@
   padding-right: var(--sp-20);
 }
 
+.ef-home.has-knowledge {
+  --side-w: 392px;
+  padding-right: var(--sp-20);
+}
+
 .ef-home[data-workspace="practice"].has-workspace {
-  --side-w: 400px;
+  --side-w: 440px;
 }
 
 /* Learning: one full-height scroller fills the main area; the panel only
@@ -427,21 +432,24 @@
 
 .ef-home[data-view="conversation"].has-panel,
 .ef-home[data-view="conversation"].has-workspace,
-.ef-home[data-view="conversation"].has-route {
+.ef-home[data-view="conversation"].has-route,
+.ef-home[data-view="conversation"].has-knowledge {
   padding-right: 0;
 }
 
 /* The side panel floats with board insets and pushes the conversation into
    the remaining space instead of covering it. */
 .ef-home.has-panel .ef-home-work,
-.ef-home.has-workspace .ef-home-work {
+.ef-home.has-workspace .ef-home-work,
+.ef-home.has-knowledge .ef-home-work {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   padding-right: calc(var(--side-w) + var(--sp-20));
 }
 
 .ef-home.has-panel .ef-my-panel,
-.ef-home.has-workspace .ef-home-workspace {
+.ef-home.has-workspace .ef-home-workspace,
+.ef-home.has-knowledge .ef-home-knowledge-panel-host {
   position: fixed;
   top: var(--panel-top);
   right: var(--panel-right);
@@ -1046,6 +1054,11 @@
   width: 100%;
 }
 
+.ef-home-micro-panel-state > .ef-micro-step-list {
+  width: 100%;
+  align-self: stretch;
+}
+
 .ef-home-micro-head {
   display: flex;
   flex-direction: column;
@@ -1284,7 +1297,8 @@
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .ef-my-panel {
+  .ef-my-panel,
+  .ef-home-route-panel {
     background: var(--surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -2142,14 +2156,16 @@
   }
 
   .ef-home.has-panel .ef-home-work,
-  .ef-home.has-workspace .ef-home-work {
+  .ef-home.has-workspace .ef-home-work,
+  .ef-home.has-knowledge .ef-home-work {
     display: grid;
     grid-template-columns: 1fr;
     padding-right: 0;
   }
 
   .ef-home.has-panel .ef-my-panel,
-  .ef-home.has-workspace .ef-home-workspace {
+  .ef-home.has-workspace .ef-home-workspace,
+  .ef-home.has-knowledge .ef-home-knowledge-panel-host {
     position: static;
     width: 100%;
     height: auto;
@@ -2773,14 +2789,16 @@
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-line);
   border-radius: var(--r-24);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  background: var(--glass-regular);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
+  backdrop-filter: blur(36px) saturate(180%);
   box-shadow: var(--sh-2);
 }
 .ef-home-route-panel[data-at="page"] {
   border-radius: var(--r-24);
-  background: var(--surface);
+  background: var(--glass-regular);
   box-shadow: var(--sh-3);
 }
 
@@ -2822,7 +2840,7 @@
   border-bottom: 1px solid var(--line);
 }
 
-.ef-home-route-panel-head > div:first-child { min-width: 0; flex: 1; }
+.ef-home-route-panel-head > .ef-home-route-panel-title { min-width: 0; flex: 1; }
 .ef-home-route-panel-head span { color: var(--muted); font-size: var(--fs-12); }
 .ef-home-route-panel-head .ef-home-route-panel-subtitle { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ef-home-route-panel-head h2 { margin: 2px 0 0; font-size: var(--fs-20); line-height: var(--lh-20); }
@@ -3075,7 +3093,7 @@
   }
 
   .ef-home.has-route {
-    --side-w: min(560px, max(420px, calc(100vw - 820px)));
+    --side-w: min(560px, max(500px, calc(100vw - 820px)));
   }
 
   .ef-home.has-workspace[data-workspace="micro"] {
@@ -3087,4 +3105,38 @@
   .ef-home-body {
     min-height: calc(100dvh - 160px);
   }
+}
+
+.ef-home-route-panel-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border-radius: var(--r-12);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
+}
+
+.ef-home-route-panel-actions { display: inline-flex; align-items: center; gap: var(--sp-8); }
+.ef-home-route-panel-head > .ef-ui-pill { flex: 0 0 auto; }
+
+.ef-my-row > .ef-my-row-main {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+.ef-my-row-main > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ef-my-row-main > svg { flex: 0 0 auto; color: var(--brand-ink); }
+
+@media (max-width: 1400px) {
+  .ef-home-route-panel .ef-course-route-modes button span { display: none; }
+  .ef-home-route-panel .ef-course-route-modes button { padding: 0 var(--sp-8); }
 }

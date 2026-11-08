@@ -1,4 +1,4 @@
-import { ArrowRight, PanelRight, Sparkles } from "lucide-react";
+import { PanelRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
@@ -13,16 +13,21 @@ import { MicroHostLayer, MicroHostProvider, useMicroHostController } from "@/fea
 import { formatMicroParam, parseMicroParam, parseMicroView } from "@/features/home/microPresence";
 import { HomeRoutePanel } from "@/features/home/HomeRoutePanel";
 import { MyPanel } from "@/features/home/MyPanel";
+import { KnowledgePanel } from "@/features/home/KnowledgePanel";
 import { EMPTY_HOME_MAINLINE_CONFIG, type HomeMainlineConfig } from "@/features/home/HomeMainlineConfigRepository";
-import { deriveHomeView, resolveHomeNextStep, routeStripLabel, shouldShowStarter, type HomeNextStep } from "@/features/home/homeMainline";
+import { deriveHomeView, resolveHomeNextStep, type HomeNextStep } from "@/features/home/homeMainline";
 import { buildHomeCourseProjection, type HomeMicroAsset } from "@/features/course/path/courseLearnerProjection";
 import type { CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
 import { buildHomeAssistantContext } from "@/features/home/homeAssistantContext";
 import { openPanelParams, openWorkspaceParams, removeWorkspaceParam } from "@/features/home/learningWorkspace";
 import { panelParamAction, reduceRightPanel, type RightPanel } from "@/features/home/rightPanel";
+import { ActiveAssistantObjectContext, activeObjectKey, type ActiveAssistantObject } from "@/features/assistant/activeObject";
+import { useReducedMotion } from "motion/react";
+import { expandPanelFromRect, contractPanelToRect } from "@/shared/ui/panelMorph";
 import type { NavigationDecision } from "@/shared/learning/navigation";
 import type { AssistantCardActions } from "@/features/assistant/cards/AssistantCardView";
-import { HomeComposer } from "@/shared/ui/HomeComposer";
+import { HomeComposer, type ComposerAttachment, type ComposerExtras } from "@/shared/ui/HomeComposer";
+import { uploadEvidence } from "@/features/evidence/evidenceClient";
 import "@/features/home/home.css";
 
 type PracticeWorkspace = Extract<RightPanel, { kind: "practice" }>;
@@ -34,15 +39,22 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
   const [rightPanel, dispatchRightPanel] = useReducer(reduceRightPanel, searchParams.get("panel") === "1" ? { kind: "my" } as RightPanel : { kind: "none" } as RightPanel);
   const [practiceCache, setPracticeCache] = useState<PracticeWorkspace | null>(null);
   const [routeMode, setRouteMode] = useState<"side" | "page">("side");
+  const [panelOrigin, setPanelOrigin] = useState<DOMRect | null>(null);
+  const [dismissedObjectKey, setDismissedObjectKey] = useState<string | null>(null);
+  const reducedMotion = Boolean(useReducedMotion());
+  const practicePanelRef = useRef<HTMLDivElement>(null);
+  const practiceClosing = useRef(false);
   const panelOpen = rightPanel.kind === "my";
   const routePanelOpen = rightPanel.kind === "route";
+  const routeCourseId = rightPanel.kind === "route" ? rightPanel.courseId : null;
+  const knowledgeNodeId = rightPanel.kind === "knowledge" ? rightPanel.nodeId : null;
+  const knowledgePanelOpen = Boolean(knowledgeNodeId);
   const routePageOpen = routePanelOpen && routeMode === "page";
   const workspace: PracticeWorkspace | null = rightPanel.kind === "practice" ? rightPanel : null;
   const [config, setConfig] = useState<HomeMainlineConfig>(EMPTY_HOME_MAINLINE_CONFIG);
-  const [configLoaded, setConfigLoaded] = useState(false);
   const [revision, setRevision] = useState(0);
   const [navigationDecision, setNavigationDecision] = useState<NavigationDecision | null>(null);
-  const [navigationError, setNavigationError] = useState(false);
+  const [routeDecision, setRouteDecision] = useState<NavigationDecision | null>(null);
   const narrow = useMediaQuery("(max-width: 900px)");
   const historyPreferenceKey = `eduflow:home:history:${session.userId}`;
   const [historyPreference, setHistoryPreference] = useState(() => readHistoryPreference(historyPreferenceKey));
@@ -55,15 +67,11 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
   const practiceParam = searchParams.get("practice");
   const microParam = searchParams.get("micro");
   const panelToggleRef = useRef<HTMLButtonElement>(null);
-  const forceNewSessionRef = useRef(false);
   const resolvedPracticeParam = useRef<string | null>(null);
   const resolvedMicroParam = useRef<string | null>(null);
   const microHost = useMicroHostController({
     session,
-    conversationKey: assistant.activeSessionId ?? null,
-    recordCompleted: (input) => {
-      void assistant.recordAction({ kind: "micro-completed", ...input }, assistantContext());
-    }
+    conversationKey: assistant.activeSessionId ?? null
   });
   const microForm = microHost.presence?.form ?? "closed";
   // Immersive is a modal over the form it came from. Keep that form's layout
@@ -141,14 +149,9 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
 
   useEffect(() => {
     let live = true;
-    setConfigLoaded(false);
-    void applicationServices.homeMainlineConfigRepository.load().then((value) => { if (live) { setConfig(value); setConfigLoaded(true); } });
+    void applicationServices.homeMainlineConfigRepository.load().then((value) => { if (live) { setConfig(value); } });
     return () => { live = false; };
   }, []);
-
-  useEffect(() => {
-    if (assistant.activeSessionId) forceNewSessionRef.current = false;
-  }, [assistant.activeSessionId]);
 
   useEffect(() => applicationServices.learningProgressRepository.subscribe(() => setRevision((value) => value + 1)), []);
   useEffect(() => applicationServices.userKnowledgeRepository.subscribe(() => setRevision((value) => value + 1)), []);
@@ -178,32 +181,38 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
   const focusCourseState = focusCourseId
     ? applicationServices.learningProgressRepository.getCourseState(session.userId, focusCourseId)
     : undefined;
+  const routeRuntime = routeCourseId ? applicationServices.courseRepository.getCourse(routeCourseId) : undefined;
+  const routeCourseState = routeCourseId
+    ? applicationServices.learningProgressRepository.getCourseState(session.userId, routeCourseId)
+    : undefined;
 
   useEffect(() => {
     if (!focusCourseId) { setNavigationDecision(null); return; }
     let live = true;
-    setNavigationError(false);
     void applicationServices.learnerStateService.getNavigation(focusCourseId)
       .then((decision) => { if (live) setNavigationDecision(decision); })
-      .catch(() => { if (live) { setNavigationDecision(null); setNavigationError(true); } });
+      .catch(() => { if (live) setNavigationDecision(null); });
     return () => { live = false; };
   }, [focusCourseId, revision]);
 
+  useEffect(() => {
+    if (!routePanelOpen || !routeCourseId) { setRouteDecision(null); return; }
+    let live = true;
+    void applicationServices.learnerStateService.getNavigation(routeCourseId)
+      .then((decision) => { if (live) setRouteDecision(decision); })
+      .catch(() => { if (live) setRouteDecision(null); });
+    return () => { live = false; };
+  }, [routePanelOpen, routeCourseId, revision]);
+
+  const graphTitles = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node.title])), [graph.nodes]);
   const projection = useMemo(() => {
     if (!focusRuntime || !focusCourseState) return null;
-    const titles = new Map(graph.nodes.map((node) => [node.id, node.title]));
-    return buildHomeCourseProjection({
-      runtime: focusRuntime,
-      records,
-      courseState: focusCourseState,
-      decision: navigationDecision,
-      microFor: (nodeId): HomeMicroAsset | undefined => {
-        const path = applicationServices.microLearningRepository.getPath(nodeId, { courseId: focusRuntime.course.id, mode: "learn" });
-        return path ? { pathId: path.id, title: path.title, estimatedMinutes: path.estimatedMinutes } : undefined;
-      },
-      titleFor: (nodeId) => titles.get(nodeId)
-    });
-  }, [focusCourseState, focusRuntime, graph.nodes, navigationDecision, records]);
+    return projectHomeCourse(focusRuntime, focusCourseState, records, graphTitles, navigationDecision);
+  }, [focusCourseState, focusRuntime, graphTitles, navigationDecision, records]);
+  const routeProjection = useMemo(() => {
+    if (!routeRuntime || !routeCourseState) return null;
+    return projectHomeCourse(routeRuntime, routeCourseState, records, graphTitles, routeDecision);
+  }, [graphTitles, records, routeCourseState, routeDecision, routeRuntime]);
 
   const nextStep = useMemo(() => {
     if (!navigationDecision || !focusRuntime) return null;
@@ -218,23 +227,48 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     return resolveHomeNextStep({ decision: navigationDecision, runtime: focusRuntime, microTitle: micro?.title, microMinutes: micro?.estimatedMinutes });
   }, [focusRuntime, navigationDecision]);
 
+  const activeObject = useMemo<ActiveAssistantObject | null>(() => {
+    const presence = microHost.presence;
+    if (presence && presence.form !== "closed") {
+      if (presence.form === "inline"
+        && !microHost.hasCardType(presence.pathId, "micro")
+        && !microHost.hasCardType(presence.pathId, "knowledge")
+        && !microHost.hasCardType(presence.pathId, "route")) return null;
+      const path = applicationServices.microLearningRepository.getPath(presence.knowledgeId, {
+        mode: "learn",
+        pathId: presence.pathId,
+        ...(presence.courseId ? { courseId: presence.courseId } : {})
+      });
+      return {
+        kind: "micro",
+        pathId: presence.pathId,
+        knowledgeId: presence.knowledgeId,
+        ...(presence.courseId ? { courseId: presence.courseId } : {}),
+        title: path?.title ?? "小练习"
+      };
+    }
+    if (rightPanel.kind === "knowledge") {
+      const node = applicationServices.knowledgeRepository.getNode(rightPanel.nodeId, userKnowledgeAccess(session.userId));
+      return { kind: "knowledge", nodeId: rightPanel.nodeId, title: node?.title ?? "知识点" };
+    }
+    if (rightPanel.kind === "practice") return { kind: "practice", courseId: rightPanel.courseId, assignmentId: rightPanel.assignmentId, title: rightPanel.title };
+    if (rightPanel.kind === "route") return { kind: "route", courseId: rightPanel.courseId, title: routeRuntime?.course.title ?? "课程路线" };
+    return null;
+  }, [microHost.hasCardType, microHost.presence, microHost.slotVersion, rightPanel, routeRuntime]);
+  const activeObjectIdentity = activeObjectKey(activeObject);
+  const objectContextVisible = Boolean(activeObject) && activeObjectIdentity !== dismissedObjectKey;
+  const contexts = objectContextVisible && activeObject ? [{ id: "active-object", label: activeObject.title }] : [];
+
+  const cardAssignmentKeys = useMemo(() => assistant.chatMessages.flatMap((message) => (message.parts ?? []).flatMap((part) => {
+    if (part.type !== "tool-displayCard") return [];
+    const card = (part as { output?: { card?: { cardType?: string; courseId?: string; assignmentId?: string } } }).output?.card;
+    if ((card?.cardType === "practice" || card?.cardType === "evaluation") && card.courseId && card.assignmentId) return [`${card.courseId}:${card.assignmentId}`];
+    return [];
+  })), [assistant.chatMessages]);
+
   const hasLearningRecord = records.some((record) => record.status !== "explore");
   const hasConversation = assistant.chatMessages.length > 0 || Boolean(assistant.activeSessionId) || assistant.sessions.length > 0;
-  const hasRouteCard = assistant.chatMessages.some((message) => (message.parts ?? []).some((part) => {
-    if (part.type !== "tool-displayCard") return false;
-    const card = (part as { output?: { card?: { cardType?: string } } }).output?.card;
-    return card?.cardType === "route";
-  }));
-  const openMicroPathIds = new Set(assistant.chatMessages.flatMap((message) => (message.parts ?? []).flatMap((part) => {
-    if (part.type !== "tool-displayCard") return [];
-    const card = (part as { output?: { card?: { cardType?: string; pathId?: string } } }).output?.card;
-    if (card?.cardType !== "micro" || !card.pathId) return [];
-    return applicationServices.microLearningRepository.getPathProgress(card.pathId)?.status === "completed" ? [] : [card.pathId];
-  })));
   const view = deriveHomeView({ hasLearningRecord, hasConversation });
-  const segment = projection?.segment;
-  const showStarter = shouldShowStarter({ configuredCourseId: config.starterCourseId, hasCourse: Boolean(starterRuntime), segmentStarted: Boolean(segment?.started) }) && configLoaded && !hasRouteCard;
-  const starterExample = config.examples.find((example) => example.kind === "start");
   useEffect(() => {
     if (!microParam) { resolvedMicroParam.current = null; return; }
     if (resolvedMicroParam.current === microParam) return;
@@ -249,6 +283,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     // Inline is the natural restore when the card is still in the conversation;
     // a timeout below falls back to the side workspace only when it is absent.
     const view = parseMicroView(searchParams.get("view")) ?? "inline";
+    const cardKey = searchParams.get("card") ?? undefined;
     resolvedMicroParam.current = microParam;
     dispatchRightPanel({ type: "close" });
     if (searchParams.has("panel") || searchParams.has("practice")) {
@@ -257,7 +292,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       next.delete("practice");
       setSearchParams(next, { replace: true });
     }
-    microHost.open(input, view);
+    microHost.open({ ...input, ...(cardKey ? { cardKey } : {}) }, view);
   }, [microParam, revision, searchParams, setSearchParams, microHost.open]);
 
   // One address for the one running instance: form and path are shareable, and
@@ -266,19 +301,20 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     const presence = microHost.presence;
     if (!presence) return;
     const value = presence.form === "closed" ? null : formatMicroParam(presence);
-    // Inline has no address of its own; a reload opens the same path in the side
-    // workspace instead of pointing at a card that may not exist yet.
-    // Only immersive needs an address of its own. A plain micro address means
-    // "back into the card if it exists", never a forced side view.
-    const view = presence.form === "focus" ? "focus" : null;
+    // The form and the owning conversation card are part of the address, so a
+    // reload restores the same card (inline), side workspace or immersive form.
+    const view = presence.form === "closed" ? null : presence.form;
+    const card = presence.form === "closed" ? null : presence.cardKey ?? null;
     const currentMicro = searchParams.get("micro");
     const currentView = searchParams.get("view");
-    if (value === currentMicro && view === currentView) return;
+    const currentCard = searchParams.get("card");
+    if (value === currentMicro && view === currentView && card === currentCard) return;
     const next = new URLSearchParams(searchParams);
     if (value) {
       next.set("micro", value);
       if (view) next.set("view", view); else next.delete("view");
-    } else { next.delete("micro"); next.delete("view"); }
+      if (card) next.set("card", card); else next.delete("card");
+    } else { next.delete("micro"); next.delete("view"); next.delete("card"); }
     // Keep the applied value while a close is clearing the address. Resetting
     // it here lets a stale render re-open the path (especially a just-completed
     // immersive dialog) before `microParam` becomes null. The null branch above
@@ -293,12 +329,12 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
   useEffect(() => {
     const presence = microHost.presence;
     if (!presence || presence.form !== "inline" || assistant.loading) return;
-    if (microHost.slotOwner(presence.pathId)) return;
+    if (microHost.cardSlot(presence.pathId, presence.cardKey) || (!presence.cardKey && microHost.slotOwner(presence.pathId))) return;
     const timer = window.setTimeout(() => {
-      if (!microHost.slotOwner(presence.pathId)) microHost.setForm("side");
+      if (!microHost.cardSlot(presence.pathId, presence.cardKey) && (presence.cardKey || !microHost.slotOwner(presence.pathId))) microHost.setForm("side");
     }, 2000);
     return () => window.clearTimeout(timer);
-  }, [microHost.presence, microHost.slotOwner, microHost.slotVersion, microHost.setForm, assistant.loading]);
+  }, [microHost.presence, microHost.cardSlot, microHost.slotOwner, microHost.slotVersion, microHost.setForm, assistant.loading]);
 
   const previousPanelKind = useRef(rightPanel.kind);
   useEffect(() => {
@@ -365,43 +401,126 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       selectedCourseId: focusCourseId,
       currentKnowledgeId: nextStep?.knowledgeId,
       workspace: microWorkspace ?? workspace,
-      removedContextIds: []
+      removedContextIds: [],
+      activeObject,
+      objectContextVisible
     });
   }
 
-  async function send(message: string) {
-    return assistant.send(message, assistantContext());
+  const [freshAttachments, setFreshAttachments] = useState<ComposerAttachment[]>([]);
+  const [freshAttachmentError, setFreshAttachmentError] = useState("");
+
+  async function addFreshFiles(files: File[]) {
+    setFreshAttachmentError("");
+    const room = 4 - freshAttachments.filter((attachment) => !attachment.uploading).length;
+    if (room <= 0) { setFreshAttachmentError("每次最多附 4 份文件。"); return; }
+    const accepted: Array<{ file: File; key: string }> = [];
+    for (const file of files.slice(0, room)) {
+      if (!/\.(txt|md|csv)$/i.test(file.name)) { setFreshAttachmentError("当前只支持 .txt、.md、.csv 文本文件；图片和 PDF 暂时无法读取。"); continue; }
+      if (file.size > 1_048_576) { setFreshAttachmentError(`${file.name} 超过 1 MB。`); continue; }
+      accepted.push({ file, key: `upload:${crypto.randomUUID()}` });
+    }
+    if (!accepted.length) return;
+    setFreshAttachments((current) => [...current, ...accepted.map(({ file, key }) => ({ id: key, name: file.name, uploading: true }))]);
+    for (const { file, key } of accepted) {
+      try {
+        const sourceId = await uploadEvidence(file, {});
+        setFreshAttachments((current) => current.map((attachment) => attachment.id === key ? { id: sourceId, name: file.name } : attachment));
+      } catch (uploadFailure) {
+        setFreshAttachments((current) => current.filter((attachment) => attachment.id !== key));
+        setFreshAttachmentError(uploadFailure instanceof Error ? uploadFailure.message : "文件上传失败，请重试。");
+      }
+    }
   }
+
+  async function send(message: string, extras?: ComposerExtras & { attachments?: ComposerAttachment[] }) {
+    let draft: { note?: string; link?: string } | undefined;
+    if (activeObject?.kind === "practice") {
+      try {
+        const raw = window.sessionStorage.getItem(`eduflow.practice-draft:${session.userId}:${activeObject.courseId}:${activeObject.assignmentId}`);
+        if (raw) {
+          const parsed = JSON.parse(raw) as { note?: unknown; link?: unknown };
+          const note = typeof parsed.note === "string" ? parsed.note.slice(0, 8_000) : undefined;
+          const link = typeof parsed.link === "string" ? parsed.link.slice(0, 2_000) : undefined;
+          if (note || link) draft = { ...(note ? { note } : {}), ...(link ? { link } : {}) };
+        }
+      } catch { /* an unsaved draft is optional context, never authority */ }
+    }
+    return assistant.send(message, assistantContext(), {
+      ...(extras?.attachments?.length ? { attachments: extras.attachments.map((attachment) => ({ id: attachment.id, name: attachment.name })) } : {}),
+      ...(extras?.mentions?.length ? { mentions: extras.mentions.map((mention) => mention.value) } : {}),
+      ...(extras?.links?.length ? { links: extras.links } : {}),
+      ...(draft ? { draft } : {})
+    });
+  }
+
+  const openPanelRef = useRef<(detail: Record<string, unknown>) => void>(() => undefined);
+  useEffect(() => {
+    const handler = (event: Event) => openPanelRef.current((event as CustomEvent<Record<string, unknown>>).detail ?? {});
+    window.addEventListener("eduflow:open-panel", handler);
+    return () => window.removeEventListener("eduflow:open-panel", handler);
+  }, []);
+  openPanelRef.current = (detail) => {
+    const panel = String(detail.panel ?? "");
+    const courseId = typeof detail.courseId === "string" ? detail.courseId : focusCourseId;
+    if (panel === "assignment") {
+      const assignmentId = typeof detail.assignmentId === "string" ? detail.assignmentId : undefined;
+      const runtime = runtimes.find((item) => item.course.id === courseId);
+      const assignment = assignmentId ? runtime?.assignments.find((item) => item.id === assignmentId) : undefined;
+      if (courseId && assignmentId && assignment) { void openPractice(courseId, assignmentId, assignment.title); return; }
+    }
+    if (panel === "route" && courseId) { showRoutePanel(courseId); return; }
+    if (panel === "material" && courseId && typeof detail.materialId === "string") {
+      navigate(`/courses/${encodeURIComponent(courseId)}/materials/${encodeURIComponent(detail.materialId)}${typeof detail.segmentId === "string" ? `?segment=${encodeURIComponent(detail.segmentId)}` : ""}`);
+      return;
+    }
+    if (panel === "records") { navigate("/records"); return; }
+    if (panel === "my") { setPanel(true); return; }
+    if (panel === "map") {
+      const nodeId = typeof detail.nodeId === "string" ? detail.nodeId : undefined;
+      navigate(archiveHref({ focus: nodeId ? `knowledge:${nodeId}` : "me" }));
+    }
+  };
 
   const cardActions: AssistantCardActions = {
     openCourse: (courseId) => navigate(`/courses/${encodeURIComponent(courseId)}`),
-    openPractice: (courseId, assignmentId) => {
+    openPractice: (courseId, assignmentId, origin) => {
       const runtime = runtimes.find((item) => item.course.id === courseId);
       const assignment = runtime?.assignments.find((item) => item.id === assignmentId);
       if (!assignment) return;
-      void openPractice(courseId, assignmentId, assignment.title);
+      void openPractice(courseId, assignmentId, assignment.title, origin);
     },
     openPracticeAttempt: (courseId, assignmentId, attemptId) => {
       navigate(`/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignmentId)}?attemptId=${encodeURIComponent(attemptId)}`, { state: { returnTo: "/" } });
     },
     openBrief: (messageId) => navigate(`/courses/create?briefId=${encodeURIComponent(messageId)}`),
     openMaterial: (courseId, materialId, segmentId) => navigate(`/courses/${encodeURIComponent(courseId)}/materials/${encodeURIComponent(materialId)}${segmentId ? `?segment=${encodeURIComponent(segmentId)}` : ""}`),
-    openRoutePanel: (courseId) => {
-      if (courseId !== focusCourseId) { navigate(`/courses/${encodeURIComponent(courseId)}`); return; }
-      showRoutePanel();
-    },
+    openRoutePanel: (courseId, origin) => showRoutePanel(courseId, origin),
     openArchive: (focus) => navigate(archiveHref({ focus: focus === "me" || !focus ? "me" : focus as `knowledge:${string}` })),
-    recordMicroCompleted: (input) => {
-      void assistant.recordAction({ kind: "micro-completed", ...input }, assistantContext());
-    },
+    openKnowledgePanel,
+    openRecords: () => navigate("/records"),
     useCourse: (planningMessageId, courseId, context) => assistant.useExistingCourse(planningMessageId, courseId, context),
     refineGoal: (planningMessageId, refinement, context) => assistant.refineGoal(planningMessageId, refinement, context),
     prepareBrief: (planningMessageId, input, context) => assistant.prepareCourseBrief({ planningMessageId, ...input }, context)
   };
 
-  function showRoutePanel() {
+  function openKnowledgePanel(nodeId: string) {
     microHost.dismissSide();
-    dispatchRightPanel({ type: "open-route" });
+    setDismissedObjectKey(null);
+    dispatchRightPanel({ type: "open-knowledge", nodeId });
+    if (searchParams.has("panel")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("panel");
+      setSearchParams(next, { replace: true });
+    }
+  }
+
+  function showRoutePanel(courseId = focusCourseId, origin?: DOMRect) {
+    if (!courseId) return;
+    microHost.dismissSide();
+    setPanelOrigin(origin ?? null);
+    dispatchRightPanel({ type: "open-route", courseId });
+    setDismissedObjectKey(null);
     if (searchParams.has("panel")) {
       const next = new URLSearchParams(searchParams);
       next.delete("panel");
@@ -428,9 +547,17 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
 
   function closeWorkspace() {
     if (!workspace) return;
-    const next = removeWorkspaceParam(searchParams, workspace.kind);
-    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
-    dispatchRightPanel({ type: "close" });
+    const finish = () => {
+      const next = removeWorkspaceParam(searchParams, workspace.kind);
+      if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+      dispatchRightPanel({ type: "close" });
+    };
+    if (practiceClosing.current) return;
+    practiceClosing.current = true;
+    void contractPanelToRect(practicePanelRef.current, panelOrigin, reducedMotion).then(() => {
+      practiceClosing.current = false;
+      finish();
+    });
   }
 
   function announceLearnerActionStart() {
@@ -438,27 +565,17 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     window.dispatchEvent(new Event("eduflow:learner-action-start"));
   }
 
-  async function openPractice(courseId: string, assignmentId: string, title: string) {
+  async function openPractice(courseId: string, assignmentId: string, title: string, origin?: DOMRect) {
     announceLearnerActionStart();
     microHost.dismissSide();
-    await assistant.recordAction({ kind: "practice-opened", courseId, assignmentId, forceNewSession: forceNewSessionRef.current }, assistantContext());
-    forceNewSessionRef.current = false;
+    setPanelOrigin(origin ?? null);
+    setDismissedObjectKey(null);
+    practiceClosing.current = false;
     showWorkspace({ kind: "practice", courseId, assignmentId, title });
   }
 
   async function openMicroInConversation(step: HomeNextStep) {
     if (!step.pathId || !step.knowledgeId) return false;
-    if (!openMicroPathIds.has(step.pathId)) {
-      await assistant.recordAction({
-        kind: "micro-opened",
-        pathId: step.pathId,
-        knowledgeId: step.knowledgeId,
-        courseId: step.courseId,
-        resuming: Boolean(applicationServices.microLearningRepository.getPathProgress(step.pathId)),
-        forceNewSession: forceNewSessionRef.current
-      }, assistantContext());
-      forceNewSessionRef.current = false;
-    }
     const path = applicationServices.microLearningRepository.getPath(step.knowledgeId, {
       mode: "learn",
       pathId: step.pathId,
@@ -480,49 +597,27 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     return true;
   }
 
-  async function startStarter() {
-    if (!config.starterCourseId) return;
+  function openRouteStep(action: CourseRouteStepAction, courseId: string) {
     dispatchRightPanel({ type: "close" });
-    await assistant.recordAction({ kind: "route-started", courseId: config.starterCourseId }, assistantContext());
-  }
-
-  async function continueNext() {
-    if (assistant.loading || assistant.sending) return;
-    if (!nextStep) {
-      if (showStarter) void startStarter();
-      else if (projection) { showRoutePanel(); }
-      else { dispatchRightPanel({ type: "open-my" }); }
-      return;
-    }
-    if (nextStep.kind === "micro" && await openMicroInConversation(nextStep)) return;
-    if (nextStep.kind === "practice" && nextStep.assignmentId) {
-      await openPractice(nextStep.courseId, nextStep.assignmentId, nextStep.title);
-      return;
-    }
-    navigate(`/courses/${encodeURIComponent(nextStep.courseId)}`);
-  }
-
-  function openRouteStep(action: CourseRouteStepAction) {
-    dispatchRightPanel({ type: "close" });
+    const courseRuntime = applicationServices.courseRepository.getCourse(courseId);
     if (action.kind === "micro" && action.pathId) {
-      const path = applicationServices.microLearningRepository.getPath(action.nodeId, { courseId: focusCourseId, mode: "learn", pathId: action.pathId });
+      const path = applicationServices.microLearningRepository.getPath(action.nodeId, { courseId, mode: "learn", pathId: action.pathId });
       if (path) {
-        void openMicroInConversation({ courseId: focusCourseId, courseTitle: focusRuntime?.course.title ?? "", kind: "micro", title: path.title, nodeId: action.nodeId, knowledgeId: action.nodeId, pathId: path.id, minutes: path.estimatedMinutes });
+        void openMicroInConversation({ courseId, courseTitle: courseRuntime?.course.title ?? "", kind: "micro", title: path.title, nodeId: action.nodeId, knowledgeId: action.nodeId, pathId: path.id, minutes: path.estimatedMinutes });
         return;
       }
     }
-    if (action.kind === "practice" && action.assignmentId && focusCourseId) {
-      openPractice(focusCourseId, action.assignmentId, action.step.title);
+    if (action.kind === "practice" && action.assignmentId) {
+      openPractice(courseId, action.assignmentId, action.step.title);
       return;
     }
-    if (focusCourseId) navigate(`/courses/${encodeURIComponent(focusCourseId)}`);
+    navigate(`/courses/${encodeURIComponent(courseId)}`);
   }
 
   function openPracticeNext(step: { nodeId?: string; resourceKind: string; resourceId?: string; microPathId?: string; title: string }) {
     if (!focusCourseId) return;
     closeWorkspace();
     if (step.microPathId && step.nodeId) {
-      void assistant.recordAction({ kind: "micro-opened", pathId: step.microPathId, knowledgeId: step.nodeId, courseId: focusCourseId, resuming: true }, assistantContext());
       microHost.open({ pathId: step.microPathId, knowledgeId: step.nodeId, courseId: focusCourseId });
       return;
     }
@@ -546,91 +641,82 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       dispatchRightPanel({ type: "close" });
       return;
     }
-    forceNewSessionRef.current = true;
     void assistant.selectSession(null);
     dispatchRightPanel({ type: "close" });
   }
 
   function selectSession(sessionId: string) {
-    forceNewSessionRef.current = false;
     void assistant.selectSession(sessionId);
     dispatchRightPanel({ type: "close" });
   }
 
-  function openMyCourse(courseId: string) {
+  function openMyCourse(courseId: string, origin?: DOMRect) {
     setPanel(false);
-    navigate(`/courses/${encodeURIComponent(courseId)}`);
+    showRoutePanel(courseId, origin);
   }
 
-  function openMyPractice(courseId: string, assignmentId: string, title: string) {
+  function openMyPractice(courseId: string, assignmentId: string, title: string, origin?: DOMRect) {
     setPanel(false);
-    void openPractice(courseId, assignmentId, title);
+    void openPractice(courseId, assignmentId, title, origin);
   }
 
   function openMyRecent(nodeId: string) {
     setPanel(false);
-    const path = activeCourses.map(({ runtime }) => applicationServices.microLearningRepository.getPath(nodeId, { courseId: runtime.course.id, mode: "learn" })).find(Boolean)
-      ?? applicationServices.microLearningRepository.getPath(nodeId, { mode: "learn" });
+    // Recent learning is not limited to the active Course: resolve the path
+    // inside the Course that actually owns it before falling back to Global.
+    const owned = runtimes.flatMap((runtime) => {
+      const path = applicationServices.microLearningRepository.getPath(nodeId, { courseId: runtime.course.id, mode: "learn" });
+      return path ? [{ runtime, path }] : [];
+    })[0];
+    const path = owned?.path ?? applicationServices.microLearningRepository.getPath(nodeId, { mode: "learn" });
     if (path) {
-      microHost.open({ pathId: path.id, knowledgeId: nodeId, ...(focusCourseId ? { courseId: focusCourseId } : {}) });
+      microHost.open({ pathId: path.id, knowledgeId: nodeId, ...(owned ? { courseId: owned.runtime.course.id } : {}) });
       return;
     }
+    if (owned) { showRoutePanel(owned.runtime.course.id); return; }
     if (focusCourseId) navigate(`/courses/${encodeURIComponent(focusCourseId)}`);
     else navigate("/records");
   }
 
-  const showNextStrip = Boolean(nextStep) && !(showStarter && !segment?.started) && !(hasRouteCard && !segment?.started) && rightPanel.kind !== "route" && rightPanel.kind !== "practice";
-  const currentSegmentMicroInProgress = Boolean(nextStep?.pathId
-    && segment?.started
-    && segment.currentStep?.kind === "micro"
-    && segment.currentStep.pathId === nextStep.pathId
-    && applicationServices.microLearningRepository.getPathProgress(nextStep.pathId));
-  const nextMicroProgress = nextStep?.pathId ? applicationServices.microLearningRepository.getPathProgress(nextStep.pathId) : undefined;
-  const nextPracticeStatus = nextStep?.assignmentId ? focusCourseState?.assignmentStates[nextStep.assignmentId]?.status : undefined;
-  const nextPracticeStarted = Boolean(nextPracticeStatus && ["started", "submitted", "needs_revision"].includes(nextPracticeStatus));
-  const nextStepStarted = currentSegmentMicroInProgress
-    || nextMicroProgress?.status === "in_progress"
-    || nextPracticeStarted;
-  const nextStripLabel = nextPracticeStatus === "needs_revision" ? "需要修改" : nextStepStarted ? "正在做" : "下一步";
-  const nextStripAction = nextStep?.kind === "practice"
-    ? nextPracticeStatus === "needs_revision" ? "补充后再交" : nextPracticeStarted ? "继续" : "开始"
-    : "继续";
-  const nextStepCard = useMemo(() => nextStep?.kind === "micro" && nextStep.pathId
-    ? { kind: "micro" as const, pathId: nextStep.pathId }
-    : nextStep?.kind === "practice" && nextStep.assignmentId
-      ? { kind: "practice" as const, assignmentId: nextStep.assignmentId }
-      : null, [nextStep?.kind, nextStep?.pathId, nextStep?.assignmentId]);
+  function removeContext(id: string) {
+    if (id !== "active-object" || !activeObjectIdentity) return;
+    setDismissedObjectKey(activeObjectIdentity);
+  }
+
   const conversationTitle = assistant.activeSessionTitle.trim() || assistant.sessions.find((item) => item.id === assistant.activeSessionId)?.title?.trim() || "新对话";
-  const progressChapter = projection?.chapters.find((chapter) => chapter.id === projection.currentChapterId);
-  // The first segment keeps its route-card denominator until it is complete;
-  // only then does the label become the broader course route.
-  const routeProgress = routeStripLabel(segment, progressChapter);
-  const composer = <HomeComposer contexts={[]} onRemoveContext={() => undefined} onSubmit={(value) => void send(value)} onStop={() => void assistant.stop()} disabled={assistant.loading || (assistant.sending && !assistant.replying)} replying={assistant.replying && !assistant.loading} hint={<span>Enter 发送 · Shift + Enter 换行</span>} />;
+  const composer = <HomeComposer
+    contexts={contexts}
+    onRemoveContext={removeContext}
+    onSubmit={(value, extras) => void send(value, { ...extras, attachments: freshAttachments.filter((attachment) => !attachment.uploading) }).then((ok) => { if (ok) { setFreshAttachments([]); setFreshAttachmentError(""); } })}
+    onStop={() => void assistant.stop()}
+    disabled={assistant.loading || (assistant.sending && !assistant.replying)}
+    replying={assistant.replying && !assistant.loading}
+    attachments={freshAttachments}
+    onAddFiles={(files) => void addFreshFiles(files)}
+    onRemoveAttachment={(id) => setFreshAttachments((current) => current.filter((attachment) => attachment.id !== id))}
+    attachmentError={freshAttachmentError}
+    uploadingAttachments={freshAttachments.some((attachment) => attachment.uploading)}
+    placeholder="问知识点、看路线、读资料，或拖入 .txt / .md / .csv 交任务"
+    hint={<span>Enter 发送 · Shift + Enter 换行 · @ 提及 · / 功能</span>}
+  />;
 
-  const nextStrip = nextStep && showNextStrip ? <div className="ef-home-next-strip" aria-label="下一步">
-    <span className="ef-home-next-label">{nextStripLabel}</span>
-    <span className="ef-home-next-copy"><strong>{nextStep.title}</strong><small>{nextStep.kind === "micro" ? "小练习" : "动手任务"}{nextStep.minutes ? ` · 约 ${nextStep.minutes} 分钟` : ""}</small></span>
-    <button type="button" className="ef-home-text-action" onClick={showRoutePanel}>{routeProgress}</button>
-    <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => void continueNext()}>{nextStripAction}<ArrowRight size={14} /></button>
-  </div> : navigationError ? <p className="ef-home-next-error" role="alert">下一步暂时无法读取。<button type="button" onClick={() => setRevision((value) => value + 1)}>重试</button></p> : null;
+  useEffect(() => {
+    if (rightPanel.kind !== "practice" || !practiceCache || practiceClosing.current) return;
+    void expandPanelFromRect(practicePanelRef.current, panelOrigin, reducedMotion);
+  }, [panelOrigin, practiceCache, reducedMotion, rightPanel.kind]);
 
-  const starterEntry = showStarter && starterExample ? <div className="ef-home-example-row">
-    <button type="button" className="ef-ui-chip" onClick={() => void startStarter()}><Sparkles size={13} aria-hidden="true" />{starterExample.label}</button>
-  </div> : null;
-  const promptExamples = config.examples.filter((example) => example.kind !== "start");
-  const emptyExamples = promptExamples.map((example) => ({ id: example.id, label: example.label, onSelect: () => void send(example.prompt) }));
+  const emptyExamples = config.examples.map((example) => ({ id: example.id, label: example.label, onSelect: () => void send(example.prompt) }));
 
-  return <MicroHostProvider host={microHost}><main className={`ef-home ${panelOpen ? "has-panel" : ""} ${workspace || sideMicro ? "has-workspace" : ""} ${routePanelOpen ? "has-route" : ""} ${routePageOpen ? "is-route-page" : ""}`} data-view={view} data-history={historyOpen ? "open" : "closed"} data-micro-form={microForm} data-workspace={sideMicro ? "micro" : workspace?.kind ?? ""} data-route-page={routePageOpen ? "1" : undefined} data-strip={showNextStrip ? "1" : undefined}>
+  return <ActiveAssistantObjectContext.Provider value={activeObject}><MicroHostProvider host={microHost}><main onPointerDownCapture={(event) => { if ((event.target as Element | null)?.closest?.(".ef-assistant-micro-frame, .ef-home-route-panel, .ef-home-workspace, .ef-home-knowledge-panel-host")) setDismissedObjectKey(null); }} className={`ef-home ${panelOpen ? "has-panel" : ""} ${workspace || sideMicro ? "has-workspace" : ""} ${routePanelOpen ? "has-route" : ""} ${knowledgePanelOpen ? "has-knowledge" : ""} ${routePageOpen ? "is-route-page" : ""}`} data-view={view} data-history={historyOpen ? "open" : "closed"} data-micro-form={microForm} data-workspace={sideMicro ? "micro" : workspace?.kind ?? ""} data-route-page={routePageOpen ? "1" : undefined}>
     <button ref={panelToggleRef} type="button" className={`ef-home-panel-toggle ${panelOpen ? "is-open" : ""}`} aria-pressed={panelOpen} aria-controls="ef-my-panel" onClick={() => setPanel(!panelOpen)}><PanelRight size={16} aria-hidden="true" />我的</button>
 
     {view === "fresh" ? <section className="ef-home-fresh" aria-label="开始对话">
       <div className="ef-home-fresh-inner">
         <h1>想聊点什么？</h1>
         <p className="ef-home-fresh-sub">可以问问题、说说想学什么，或者只是随便看看。</p>
-        {starterEntry}
         {composer}
-        {promptExamples.length ? <div className="ef-home-example-row" aria-label="示例">
-          {promptExamples.map((example) => <button key={example.id} type="button" className="ef-ui-chip" onClick={() => void send(example.prompt)}>{example.label}</button>)}
+        {emptyExamples.length ? <div className="ef-home-example-row" aria-label="示例">
+          {emptyExamples.map((example) => <button key={example.id} type="button" className="ef-ui-chip" onClick={example.onSelect}>{example.label}</button>)}
         </div> : null}
       </div>
     </section> : <div className="ef-home-body">
@@ -662,19 +748,15 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
             replying={assistant.replying}
             onStop={() => void assistant.stop()}
             error={assistant.error}
-            contexts={[]}
-            onRemoveContext={() => undefined}
+            contexts={contexts}
+            onRemoveContext={removeContext}
             onSend={send}
             suggestions={[]}
             emptyExamples={emptyExamples}
             emptyTitle="想聊点什么？"
             emptyDescription="可以问问题、说说想学什么，或者只是随便看看。"
-            starterEntry={starterEntry}
             previewPerson={null}
             onRetry={() => void assistant.retry()}
-            composerHeader={nextStrip}
-            hasNextStepStrip={Boolean(nextStep && showNextStrip)}
-            nextStepCard={nextStepCard}
             title={conversationTitle}
             conversationKey={assistant.activeSessionId}
             onExpandHistory={historyOpen ? undefined : () => toggleHistory(true)}
@@ -684,15 +766,29 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       </div>
     </div>}
 
-    {routePanelOpen && projection && focusRuntime ? <HomeRoutePanel
-      courseTitle={focusRuntime.course.title}
-      projection={projection}
-      decision={navigationDecision}
+    {routePanelOpen && routeProjection && routeRuntime && routeCourseId ? <HomeRoutePanel
+      courseId={routeCourseId}
+      originRect={panelOrigin}
+      courseTitle={routeRuntime.course.title}
+      projection={routeProjection}
+      decision={routeDecision}
       onModeChange={setRouteMode}
       onClose={() => dispatchRightPanel({ type: "close" })}
-      onOpenTree={() => navigate(`/courses/${encodeURIComponent(focusRuntime.course.id)}?view=course`)}
-      onStart={openRouteStep}
+      onOpenTree={() => navigate(`/courses/${encodeURIComponent(routeCourseId)}?view=course`)}
+      onOpenCourse={() => navigate(`/courses/${encodeURIComponent(routeCourseId)}`)}
+      onStart={(action) => openRouteStep(action, routeCourseId)}
+      onInteract={() => setDismissedObjectKey(null)}
     /> : null}
+
+    {knowledgeNodeId ? <div className="ef-home-knowledge-panel-host">
+      <KnowledgePanel
+        session={session}
+        nodeId={knowledgeNodeId}
+        onClose={() => dispatchRightPanel({ type: "close" })}
+        onOpenCourse={(courseId) => navigate(`/courses/${encodeURIComponent(courseId)}`)}
+        onSelectNode={(nodeId) => dispatchRightPanel({ type: "open-knowledge", nodeId })}
+      />
+    </div> : null}
 
     {panelOpen ? <MyPanel
       session={session}
@@ -702,9 +798,10 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       onOpenCourse={openMyCourse}
       onOpenPractice={openMyPractice}
       onOpenRecent={openMyRecent}
+      extraAssignmentKeys={cardAssignmentKeys}
     /> : null}
 
-    {practiceCache ? <div className={`ef-home-workspace${rightPanel.kind === "practice" ? "" : " is-hidden"}`} aria-label="动手任务工作区" aria-hidden={rightPanel.kind === "practice" ? undefined : true}>
+    {practiceCache ? <div ref={practicePanelRef} onPointerDown={() => setDismissedObjectKey(null)} className={`ef-home-workspace${rightPanel.kind === "practice" ? "" : " is-hidden"}`} aria-label="动手任务工作区" aria-hidden={rightPanel.kind === "practice" ? undefined : true}>
       <PracticeObject
         key={`${practiceCache.courseId}:${practiceCache.assignmentId}`}
         session={session}
@@ -712,8 +809,6 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
         assignmentId={practiceCache.assignmentId}
         size="panel"
         assistantSessionId={assistant.activeSessionId ?? undefined}
-        onSubmitted={(attemptId) => { void assistant.recordAction({ kind: "practice-submitted", courseId: practiceCache.courseId, assignmentId: practiceCache.assignmentId, attemptId }, assistantContext()); }}
-        onResultPassed={() => { void assistant.recordAction({ kind: "segment-cleared", courseId: practiceCache.courseId, assignmentId: practiceCache.assignmentId }, assistantContext()); }}
         onOpenNextStep={openPracticeNext}
         onClose={closeWorkspace}
         onOpenImmersive={() => navigate(`/courses/${encodeURIComponent(practiceCache.courseId)}/assignments/${encodeURIComponent(practiceCache.assignmentId)}`, { state: { returnTo: "/" } })}
@@ -722,7 +817,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     </div> : null}
 
     <MicroHostLayer host={microHost} session={session} />
-  </main></MicroHostProvider>;
+  </main></MicroHostProvider></ActiveAssistantObjectContext.Provider>;
 }
 
 function readHistoryPreference(key: string) {
@@ -740,4 +835,25 @@ function useMediaQuery(query: string) {
     return () => media.removeEventListener("change", update);
   }, [query]);
   return matches;
+}
+
+/** One projection for the focus Course and any Course opened in the route panel. */
+function projectHomeCourse(
+  runtime: NonNullable<ReturnType<typeof applicationServices.courseRepository.getCourse>>,
+  courseState: ReturnType<typeof applicationServices.learningProgressRepository.getCourseState>,
+  records: ReturnType<typeof applicationServices.userKnowledgeRepository.getUserKnowledge>,
+  titles: ReadonlyMap<string, string>,
+  decision: NavigationDecision | null
+) {
+  return buildHomeCourseProjection({
+    runtime,
+    records,
+    courseState,
+    ...(decision ? { decision } : {}),
+    microFor: (nodeId): HomeMicroAsset | undefined => {
+      const path = applicationServices.microLearningRepository.getPath(nodeId, { courseId: runtime.course.id, mode: "learn" });
+      return path ? { pathId: path.id, title: path.title, estimatedMinutes: path.estimatedMinutes } : undefined;
+    },
+    titleFor: (nodeId) => titles.get(nodeId)
+  });
 }

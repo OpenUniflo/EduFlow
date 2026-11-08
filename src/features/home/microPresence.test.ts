@@ -109,7 +109,7 @@ describe("micro presence reducer", () => {
   it("accepts only the three addressable forms", () => {
     expect(parseMicroView("focus")).toBe("focus");
     expect(parseMicroView("side")).toBe("side");
-    expect(parseMicroView("inline")).toBeNull();
+    expect(parseMicroView("inline")).toBe("inline");
     expect(parseMicroView("closed")).toBeNull();
     expect(parseMicroView(null)).toBeNull();
   });

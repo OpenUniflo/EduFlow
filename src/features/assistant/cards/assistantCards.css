@@ -211,8 +211,8 @@
 .ef-card-icon:focus-visible, .ef-card-text-action:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /* The expanded step grows with its content: no nested scroll container. */
-.ef-assistant-micro-frame { scroll-margin-top: 104px; width: 100%; }
-.ef-assistant-card-frame { width: 100%; }
+.ef-assistant-micro-frame { position: relative; scroll-margin-top: 104px; width: 100%; }
+.ef-assistant-card-frame { position: relative; width: 100%; }
 .ef-assistant-micro-body { min-height: 0; }
 .ef-assistant-micro-body .micro-card {
   padding-bottom: 0;
@@ -295,4 +295,96 @@
   font-size: var(--fs-12);
   font-weight: var(--fw-600);
   text-anchor: middle;
+}
+
+/* The object open in the Home workspace owns one clear card highlight. */
+.ef-assistant-card-frame,
+.ef-assistant-micro-frame {
+  border-radius: var(--r-24);
+}
+
+.ef-assistant-card-frame.is-context-active::after,
+.ef-assistant-micro-frame.is-context-active::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  border: 2px solid var(--brand);
+  border-radius: var(--r-24);
+  pointer-events: none;
+}
+
+.ef-assistant-card-frame.is-context-active .ef-ui-obj,
+.ef-assistant-micro-frame.is-context-active .ef-ui-obj,
+.ef-assistant-card-frame.is-context-active .ef-card-compact,
+.ef-assistant-micro-frame.is-context-active .ef-card-compact {
+  background: color-mix(in srgb, var(--brand-soft) 58%, var(--surface));
+  box-shadow: var(--sh-2);
+  transition: background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-assistant-card-frame.is-context-active .ef-ui-obj,
+  .ef-assistant-micro-frame.is-context-active .ef-ui-obj,
+  .ef-assistant-card-frame.is-context-active .ef-card-compact,
+  .ef-assistant-micro-frame.is-context-active .ef-card-compact {
+    transition: none;
+  }
+}
+
+/* Knowledge cards keep their Micro entry and expose the real map as a second path. */
+.ef-assistant-card-map-link {
+  display: block;
+  margin: calc(-1 * var(--sp-8)) 0 var(--sp-8) var(--sp-16);
+}
+
+/* Knowledge cards use the Archive node's dot-and-label language, not a Micro. */
+.ef-assistant-knowledge-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--brand);
+  border: 2px solid var(--brand-soft);
+}
+
+.ef-assistant-card-frame[data-card-type="knowledge"] .ef-ui-obj-badge {
+  margin-left: auto;
+}
+
+.ef-assistant-mini-map {
+  overflow-x: auto;
+  padding: var(--sp-8);
+  border-radius: var(--r-12);
+  background: var(--page);
+}
+
+.ef-assistant-mini-map svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.ef-assistant-mini-map .ef-assistant-map-node {
+  fill: var(--muted);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.ef-assistant-mini-map g.is-center .ef-assistant-map-node {
+  fill: var(--brand);
+  stroke: var(--brand-soft);
+  stroke-width: 5;
+}
+
+.ef-assistant-mini-map .ef-assistant-map-edge.is-prerequisite { stroke: var(--warn); }
+.ef-assistant-mini-map .ef-assistant-map-edge.is-enables { stroke: var(--brand); }
+.ef-assistant-mini-map .ef-assistant-map-edge.is-related { stroke: var(--line-strong); }
+
+/* Tool progress is an in-order one-line event, like Claude/ChatGPT. */
+.ef-assistant-tool-progress-details > p {
+  margin: var(--sp-4) 0 0;
+  padding-left: var(--sp-20);
+  color: var(--muted);
+  font-size: var(--fs-12);
 }

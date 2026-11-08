@@ -105,7 +105,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const effectiveCourse = body.contextCourseId ?? pathCourseId;
     if(user && body.actionRunId && effectiveCourse) {
       const run=await client.from('edge_action_runs').select('id').eq('id',body.actionRunId).eq('user_id',user.id).eq('course_id',effectiveCourse).eq('micro_path_id',body.pathId).maybeSingle();
-      if(!dataOrThrow(run.data,run.error,'Micro Action start')) throw new ApiError(404,'micro_action_unavailable','微学习执行记录不匹配。');
+      if(!dataOrThrow(run.data,run.error,'Micro Action start')) throw new ApiError(404,'micro_action_unavailable','小练习执行记录不匹配。');
     }
     const authorization = user && effectiveCourse ? body.actionRunId ? await requireActionMicroEligibility(client,user.id,effectiveCourse,text(path,"knowledge_id"),true,body.actionRunId) : await requireMicroTeachingEligibility(client, user.id, effectiveCourse, text(path, "knowledge_id")) : null;
     if (body.contextCourseId) {
@@ -148,7 +148,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   if (effectiveCourseId) {
     if (user && body.actionRunId) {
       const runResult = await client.from('edge_action_runs').select('id').eq('id', body.actionRunId).eq('user_id', user.id).eq('course_id', effectiveCourseId).eq('micro_path_id', body.pathId).maybeSingle();
-      if (!dataOrThrow(runResult.data, runResult.error, 'Micro action context')) throw new ApiError(404, 'micro_action_unavailable', '该微学习执行记录不存在。');
+      if (!dataOrThrow(runResult.data, runResult.error, 'Micro action context')) throw new ApiError(404, 'micro_action_unavailable', '该小练习执行记录不存在。');
       authorization = await requireActionMicroEligibility(client, user.id, effectiveCourseId, text(path, 'knowledge_id'), true, body.actionRunId);
     } else if (user) authorization = await requireMicroTeachingEligibility(client, user.id, effectiveCourseId, text(path, "knowledge_id"));
     else await requireCourseKnowledge(client, effectiveCourseId, text(path, "knowledge_id"));

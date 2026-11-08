@@ -1,17 +1,17 @@
 import { AlertTriangle, ArrowRight, PanelLeft, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { AssistantUIMessage } from "@/features/assistant/AssistantRuntimeContext";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { ASSISTANT_REPLY_FAILURE, type AssistantUIMessage } from "@/features/assistant/AssistantRuntimeContext";
 import type { AssistantCardActions } from "@/features/assistant/cards/AssistantCardView";
-import { AssistantText, AssistantTimeline } from "@/features/assistant/components/AssistantTimeline";
+import { AssistantTimeline } from "@/features/assistant/components/AssistantTimeline";
 import type { MockSession } from "@/features/auth/types";
 import { ConversationCard } from "@/shared/ui/Conversation";
-import { ConversationCardRegistryContext, type ConversationNextStepCard } from "@/shared/ui/conversationCardRegistry";
-import { HomeComposer, type ComposerContext } from "@/shared/ui/HomeComposer";
+import { HomeComposer, type ComposerAttachment, type ComposerContext, type ComposerExtras } from "@/shared/ui/HomeComposer";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
 import { archiveHref } from "@/features/archive/model/atlasParams";
 import { useNavigate } from "react-router-dom";
 import { useConversationScroll } from "./useConversationScroll";
+import { uploadEvidence } from "@/features/evidence/evidenceClient";
 
 export type HomeConversationProps = {
   messages: AssistantUIMessage[];
@@ -24,22 +24,14 @@ export type HomeConversationProps = {
   onStop?: () => void;
   contexts: ComposerContext[];
   onRemoveContext: (id: string) => void;
-  onSend: (message: string) => Promise<boolean> | boolean;
+  onSend: (message: string, extras?: ComposerExtras & { attachments?: ComposerAttachment[] }) => Promise<boolean> | boolean;
   suggestions: string[];
-  /** Database-configured prompt examples; the first-run start entry is separate. */
+  /** Database-configured fresh-state example questions. */
   emptyExamples?: Array<{ id: string; label: string; onSelect(): void }>;
   emptyTitle?: string;
   emptyDescription?: string;
-  /** "带我从最简单的开始" stays in the composer band before the first segment. */
-  starterEntry?: ReactNode;
   previewPerson: FollowedPerson | null;
   onRetry: () => void;
-  /** The one next-step entry sits above the composer, never in the page header. */
-  composerHeader?: ReactNode;
-  /** The composer header contains the next-step strip (not just a starter chip). */
-  hasNextStepStrip?: boolean;
-  /** The card that owns the current next step; the strip steps aside while it is visible. */
-  nextStepCard?: ConversationNextStepCard | null;
   /** Current conversation title, shown in the sticky title bar. */
   title?: string;
   /** Identifies the loaded conversation so a switch returns to its latest content. */
@@ -48,28 +40,19 @@ export type HomeConversationProps = {
   onExpandHistory?: () => void;
   /** Changes when the available conversation width changes (history/panel). */
   layoutEpoch?: string;
+  /** Every model-offered follow-up fills the composer; nothing is sent automatically. */
+  onSuggestion?: (text: string) => void;
 };
 
 /** Home conversation workbench. It renders the Global Assistant timeline and never writes directly. */
-export function HomeConversation({ messages, session, cardActions, loading, sending, replying = false, error, onStop = () => undefined, contexts, onRemoveContext, onSend, suggestions, emptyExamples, emptyTitle, emptyDescription, starterEntry, previewPerson, onRetry, composerHeader, hasNextStepStrip = false, nextStepCard = null, title, conversationKey = null, onExpandHistory, layoutEpoch = "" }: HomeConversationProps) {
+export function HomeConversation({ messages, session, cardActions, loading, sending, replying = false, error, onStop = () => undefined, contexts, onRemoveContext, onSend, suggestions, emptyExamples, emptyTitle, emptyDescription, previewPerson, onRetry, title, conversationKey = null, onExpandHistory, layoutEpoch = "", onSuggestion }: HomeConversationProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const titleBarRef = useRef<HTMLElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const tailRef = useRef<HTMLDivElement>(null);
-  const [stripSuppressed, setStripSuppressed] = useState(false);
-  const registeredCards = useRef(new Set<HTMLElement>());
-  const [registryVersion, setRegistryVersion] = useState(0);
-
-  const registerCard = useCallback((element: HTMLElement) => {
-    registeredCards.current.add(element);
-    setRegistryVersion((value) => value + 1);
-  }, []);
-  const unregisterCard = useCallback((element: HTMLElement) => {
-    registeredCards.current.delete(element);
-    setRegistryVersion((value) => value + 1);
-  }, []);
-  const registry = useMemo(() => ({ nextStep: nextStepCard, register: registerCard, unregister: unregisterCard }), [nextStepCard, registerCard, unregisterCard]);
-
+  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState("");
+  const [suggestionInsertion, setSuggestionInsertion] = useState<{ id: string; text: string } | null>(null);
   const { showJump, onScroll, onWheel, onTouchMove, onPointerDown, scrollToLatest, syncComposer } = useConversationScroll({
     conversationKey,
     messages,
@@ -173,30 +156,6 @@ export function HomeConversation({ messages, session, cardActions, loading, send
   }, [cancelAnchorLock, captureAnchor, layoutEpoch, scrollerRef]);
   useEffect(() => cancelAnchorLock, [cancelAnchorLock]);
 
-  // Observe only the card that owns the next step. The root margin uses the
-  // stable title/composer heights, never the strip's own height.
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    setStripSuppressed(false);
-    if (!scroller || !nextStepCard) return;
-    const cards = [...registeredCards.current];
-    if (!cards.length) return;
-    const intersecting = new Set<Element>();
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) intersecting.add(entry.target);
-        else intersecting.delete(entry.target);
-      }
-      setStripSuppressed(intersecting.size > 0);
-    }, {
-      root: scroller,
-      rootMargin: `-${(titleBarRef.current?.offsetHeight ?? 64) + 8}px 0px -${(composerRef.current?.offsetHeight ?? 96) + 16}px 0px`,
-      threshold: 0
-    });
-    for (const card of cards) observer.observe(card);
-    return () => observer.disconnect();
-  }, [nextStepCard, registryVersion]);
-
   if (loading) return <HomeConversationSkeleton contexts={contexts} onRemoveContext={onRemoveContext} onSend={onSend} title={title} />;
   const lastMessage = messages[messages.length - 1];
   const lastStopped = Boolean(lastMessage?.metadata?.stopped);
@@ -204,11 +163,53 @@ export function HomeConversation({ messages, session, cardActions, loading, send
   const emptyAssistant = !sending && !lastStopped && lastMessage?.role === "assistant" && !(lastMessage.parts ?? []).some((part) => (
     (part.type === "text" && Boolean((part as { text?: string }).text?.trim())) || part.type === "tool-displayCard"
   ));
-  const visibleError = error || (emptyAssistant ? "助手这次没有生成有效回复，请重试。" : awaitingReply ? "回复没有完成。请重试。" : "");
-  const stripShown = Boolean(composerHeader) && hasNextStepStrip && !stripSuppressed;
+  const visibleError = error || (emptyAssistant || awaitingReply ? ASSISTANT_REPLY_FAILURE : "");
 
-  return <ConversationCardRegistryContext.Provider value={registry}>
-    <section className="ef-home-conversation" aria-label="EduFlow 对话">
+  async function addFiles(files: File[]) {
+    setAttachmentError("");
+    const room = 4 - attachments.filter((attachment) => !attachment.uploading).length;
+    if (room <= 0) { setAttachmentError("每次最多附 4 份文件。"); return; }
+    const accepted: Array<{ file: File; key: string }> = [];
+    for (const file of files.slice(0, room)) {
+      if (!/\.(txt|md|csv)$/i.test(file.name)) {
+        setAttachmentError("当前只支持 .txt、.md、.csv 文本文件；图片和 PDF 暂时无法读取，也不会假装看过。");
+        continue;
+      }
+      if (file.size > 1_048_576) { setAttachmentError(`${file.name} 超过 1 MB，请选择更小的文件。`); continue; }
+      accepted.push({ file, key: `upload:${crypto.randomUUID()}` });
+    }
+    if (!accepted.length) return;
+    setAttachments((current) => [...current, ...accepted.map(({ file, key }) => ({ id: key, name: file.name, uploading: true }))]);
+    for (const { file, key } of accepted) {
+      try {
+        const sourceId = await uploadEvidence(file, {});
+        setAttachments((current) => current.map((attachment) => attachment.id === key ? { id: sourceId, name: file.name } : attachment));
+      } catch (uploadFailure) {
+        setAttachments((current) => current.filter((attachment) => attachment.id !== key));
+        setAttachmentError(uploadFailure instanceof Error ? uploadFailure.message : "文件上传失败，请重试。");
+      }
+    }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((current) => current.filter((attachment) => attachment.id !== id));
+  }
+
+  function send(value: string, extras: ComposerExtras) {
+    const ready = attachments.filter((attachment) => !attachment.uploading);
+    void Promise.resolve(onSend(value, { ...extras, attachments: ready })).then((ok) => {
+      if (ok === false) return;
+      setAttachments([]);
+      setAttachmentError("");
+    });
+  }
+
+  return <section
+    className="ef-home-conversation"
+    aria-label="EduFlow 对话"
+    onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
+    onDrop={(event) => { if (!event.dataTransfer.files.length) return; event.preventDefault(); void addFiles(Array.from(event.dataTransfer.files)); }}
+  >
       <div
         className="ef-home-scroller"
         ref={scrollerRef}
@@ -243,19 +244,39 @@ export function HomeConversation({ messages, session, cardActions, loading, send
               ? emptyExamples.map((example) => <button key={example.id} type="button" className="ef-ui-chip" onClick={example.onSelect}>{example.label}</button>)
               : suggestions.map((prompt) => <button key={prompt} type="button" className="ef-ui-chip" onClick={() => void onSend(prompt)}>{prompt}</button>)}
           </div> : null}
-          <AssistantTimeline messages={messages} session={session} actions={cardActions} sending={sending} showDaySeparators />
+          <AssistantTimeline
+            messages={messages}
+            session={session}
+            actions={cardActions}
+            sending={sending}
+            showDaySeparators
+            onSuggestion={onSuggestion ?? ((text) => setSuggestionInsertion({ id: crypto.randomUUID(), text }))}
+          />
           {visibleError ? <div className="ef-home-error" role="alert"><AlertTriangle size={15} aria-hidden="true" /><span>{visibleError}</span><button type="button" onClick={onRetry}><RefreshCw size={13} />重试</button></div> : null}
           <div className="ef-home-tail-space" ref={tailRef} aria-hidden="true" />
         </div>
-        <div className="ef-home-composer" ref={composerRef} data-strip={stripShown ? "1" : undefined}>
-          {starterEntry ? <div className="ef-home-starter-slot">{starterEntry}</div> : null}
-          {composerHeader ? <div className="ef-home-strip-anchor" hidden={!stripShown}>{composerHeader}</div> : null}
+        <div className="ef-home-composer" ref={composerRef}>
           <button type="button" className="ef-home-jump" hidden={!showJump} onClick={() => scrollToLatest("auto")}>回到最新<span aria-hidden="true">↓</span></button>
-          <HomeComposer contexts={contexts} onRemoveContext={onRemoveContext} onSubmit={(value) => void onSend(value)} onStop={() => void onStop()} disabled={sending && !replying} replying={replying} hint={<span>Enter 发送 · Shift + Enter 换行</span>} />
+          <HomeComposer
+            contexts={contexts}
+            onRemoveContext={onRemoveContext}
+            onSubmit={send}
+            onStop={() => void onStop()}
+            disabled={sending && !replying}
+            replying={replying}
+            attachments={attachments}
+            onAddFiles={(files) => void addFiles(files)}
+            onRemoveAttachment={removeAttachment}
+            attachmentError={attachmentError}
+            uploadingAttachments={attachments.some((attachment) => attachment.uploading)}
+            insertText={suggestionInsertion?.text}
+            insertKey={suggestionInsertion?.id}
+            placeholder="问知识点、看路线、读资料，或拖入 .txt / .md / .csv 交任务"
+            hint={<span>Enter 发送 · Shift + Enter 换行 · @ 提及 · / 功能</span>}
+          />
         </div>
       </div>
-    </section>
-  </ConversationCardRegistryContext.Provider>;
+    </section>;
 }
 
 function PreviewPersonCard({ person }: { person: FollowedPerson }) {

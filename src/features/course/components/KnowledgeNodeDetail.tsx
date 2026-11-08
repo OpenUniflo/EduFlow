@@ -8,13 +8,14 @@ import type { UserKnowledgeRecord } from '@/features/profile/types';
 import type { CourseSkillTreeNode } from '../types';
 import type { CourseRuntimeData } from '../runtime/courseRuntime';
 import { actionAlternatives, EdgeActionPanel, type useEdgeActions } from '@/features/actions/EdgeActionPanel';
+import { knowledgeStateLabel } from '@/shared/learning/knowledgePresentation';
 import { satisfiesTeachingPrerequisite } from '@/shared/learning/teachingPrerequisites';
 import { relationLabel } from '@/shared/learning/routePresentation';
 import type { CapabilityRelation } from '@/shared/learning/routePlanning';
 import { buildMaterialDeepLink, resolveKnowledgeMaterialEntry } from '@/features/material/materialNavigation';
 import { Link, useLocation } from 'react-router-dom';
 
-export const knowledgeStateLabel = { explore: '尚未具备', learning: '在学', learned: '已学', practicing: '动手任务中', mastered: '已掌握' };
+export { knowledgeStateLabel } from '@/shared/learning/knowledgePresentation';
 export function KnowledgeNodeDetail({ node, courseNode, runtime, graph, knowledge, relations, context, actions, onSelect, initialEdgeId, initialActionId, learningPath, assistantIdentity, routeVersionId,routeSteps,onAdjustRoute }: {
   routeSteps?:RouteExecutionStep[];onAdjustRoute?():void;assistantIdentity?: Pick<AssistantContext, "userRole" | "capabilities">; routeVersionId?: string;
   learningPath?: { id: string; title: string }; initialEdgeId?: string | null; initialActionId?:string|null; node: KnowledgeNode; courseNode?: CourseSkillTreeNode | null; runtime: CourseRuntimeData; graph: KnowledgeGraph;

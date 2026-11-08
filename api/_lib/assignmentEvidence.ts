@@ -8,7 +8,7 @@ import { parseEvidenceText } from '../../src/features/evidence/diagnosis.js';
 export async function assignmentEvidenceSource(client: SupabaseClient, server: SupabaseClient, userId: string, attemptId: string) {
   const attemptResult = await client.from('learning_attempts').select('*').eq('id',attemptId).eq('user_id',userId).maybeSingle();
   const attempt = dataOrThrow(attemptResult.data,attemptResult.error,'Assignment evidence ownership');
-  if (!attempt) throw new ApiError(404,'attempt_not_found','Formal submission unavailable');
+  if (!attempt || attempt.withdrawn_at) throw new ApiError(404,'attempt_not_found','Formal submission unavailable');
   const result = await client.from('performance_results').select('id,outcome').eq('attempt_id',attemptId).order('version',{ascending:false}).limit(1).maybeSingle();
   const performance = dataOrThrow(result.data,result.error,'Assignment evidence result');
   if (!performance) throw new ApiError(409,'result_required','Formal result required');
