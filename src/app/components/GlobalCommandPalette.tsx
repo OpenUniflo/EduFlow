@@ -59,7 +59,7 @@ const PAGE_ICONS: Record<GlobalSearchPageId, ComponentType<{ size?: number | str
 const GROUP_LABELS = {
   pages: "页面",
   courses: "课程",
-  knowledge: "知识",
+  knowledge: "知识点",
   actions: "操作"
 } as const;
 
@@ -300,7 +300,7 @@ export function GlobalCommandPalette({ session }: { session: MockSession | null 
         <h2 id={`${dialogId}-title`} className="ef-sr">全局搜索</h2>
         <div className="ef-cmdk-search">
           <Search size={20} aria-hidden="true" />
-          <label className="ef-sr" htmlFor={`${dialogId}-input`}>搜索课程、知识、页面或操作</label>
+          <label className="ef-sr" htmlFor={`${dialogId}-input`}>搜索课程、知识点、页面或操作</label>
           <input
             ref={inputRef}
             id={`${dialogId}-input`}
@@ -313,7 +313,7 @@ export function GlobalCommandPalette({ session }: { session: MockSession | null 
             aria-activedescendant={activeOptionId}
             autoComplete="off"
             spellCheck={false}
-            placeholder="搜索课程、知识、页面或操作"
+            placeholder="搜索课程、知识点、页面或操作"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -363,7 +363,7 @@ export function GlobalCommandPalette({ session }: { session: MockSession | null 
           <span className="ef-cmdk-key"><kbd><CornerDownLeft size={12} aria-hidden="true" /></kbd>打开</span>
           <span className="ef-cmdk-key"><kbd>esc</kbd>关闭</span>
           <span className="ef-cmdk-stats" aria-live="polite">
-            {results.pages.items.length} 个页面 · {results.courses.items.length} 门课程 · {results.knowledge.items.length} 个知识 · {results.actions.items.length} 个操作
+            {results.pages.items.length} 个页面 · {results.courses.items.length} 门课程 · {results.knowledge.items.length} 个知识点 · {results.actions.items.length} 个操作
           </span>
         </footer>
       </section>

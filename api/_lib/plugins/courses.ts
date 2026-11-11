@@ -11,6 +11,10 @@ export const coursesPlugin: AssistantPlugin = {
     { cardType: "course_chapter", panel: "route" },
     { cardType: "course_match", panel: "route" }
   ],
+  progress: {
+    searchCourses: "查找课程",
+    getCourseContext: "读取课程路线",
+  },
   tools: ({ client, user }) => ({
     searchCourses: tool({
       description: "Search Courses readable by the authenticated user.",

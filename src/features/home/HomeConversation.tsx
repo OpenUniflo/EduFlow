@@ -1,6 +1,6 @@
 import { AlertTriangle, ArrowRight, PanelLeft, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ASSISTANT_REPLY_FAILURE, type AssistantUIMessage } from "@/features/assistant/AssistantRuntimeContext";
+import { ASSISTANT_NO_REPLY, ASSISTANT_REPLY_FAILURE, type AssistantUIMessage } from "@/features/assistant/AssistantRuntimeContext";
 import type { AssistantCardActions } from "@/features/assistant/cards/AssistantCardView";
 import { AssistantTimeline } from "@/features/assistant/components/AssistantTimeline";
 import type { MockSession } from "@/features/auth/types";
@@ -12,6 +12,7 @@ import { archiveHref } from "@/features/archive/model/atlasParams";
 import { useNavigate } from "react-router-dom";
 import { useConversationScroll } from "./useConversationScroll";
 import { uploadEvidence } from "@/features/evidence/evidenceClient";
+import { attachmentCountMessage, attachmentFileError, attachmentRoom } from "@/shared/assistant/attachments";
 
 export type HomeConversationProps = {
   messages: AssistantUIMessage[];
@@ -160,22 +161,22 @@ export function HomeConversation({ messages, session, cardActions, loading, send
   const lastMessage = messages[messages.length - 1];
   const lastStopped = Boolean(lastMessage?.metadata?.stopped);
   const awaitingReply = !sending && !lastStopped && messages.length > 0 && lastMessage?.role === "user";
-  const emptyAssistant = !sending && !lastStopped && lastMessage?.role === "assistant" && !(lastMessage.parts ?? []).some((part) => (
+  const lastFailed = lastMessage?.role === "assistant" && (lastMessage.parts ?? []).some((part) => part.type === "data-failed");
+  const emptyAssistant = !sending && !lastStopped && !lastFailed && lastMessage?.role === "assistant" && !(lastMessage.parts ?? []).some((part) => (
     (part.type === "text" && Boolean((part as { text?: string }).text?.trim())) || part.type === "tool-displayCard"
   ));
-  const visibleError = error || (emptyAssistant || awaitingReply ? ASSISTANT_REPLY_FAILURE : "");
+  // A persisted failed turn renders its own inline reason and retry control;
+  // only a trailing user turn (no assistant row at all) uses the page banner.
+  const visibleError = error || (awaitingReply ? ASSISTANT_NO_REPLY : emptyAssistant ? ASSISTANT_REPLY_FAILURE : "");
 
   async function addFiles(files: File[]) {
     setAttachmentError("");
-    const room = 4 - attachments.filter((attachment) => !attachment.uploading).length;
-    if (room <= 0) { setAttachmentError("每次最多附 4 份文件。"); return; }
+    const room = attachmentRoom(attachments.filter((attachment) => !attachment.uploading).length);
+    if (room <= 0) { setAttachmentError(attachmentCountMessage()); return; }
     const accepted: Array<{ file: File; key: string }> = [];
     for (const file of files.slice(0, room)) {
-      if (!/\.(txt|md|csv)$/i.test(file.name)) {
-        setAttachmentError("当前只支持 .txt、.md、.csv 文本文件；图片和 PDF 暂时无法读取，也不会假装看过。");
-        continue;
-      }
-      if (file.size > 1_048_576) { setAttachmentError(`${file.name} 超过 1 MB，请选择更小的文件。`); continue; }
+      const fileError = attachmentFileError(file);
+      if (fileError) { setAttachmentError(fileError); continue; }
       accepted.push({ file, key: `upload:${crypto.randomUUID()}` });
     }
     if (!accepted.length) return;
@@ -251,12 +252,18 @@ export function HomeConversation({ messages, session, cardActions, loading, send
             sending={sending}
             showDaySeparators
             onSuggestion={onSuggestion ?? ((text) => setSuggestionInsertion({ id: crypto.randomUUID(), text }))}
+            onRetry={onRetry}
           />
           {visibleError ? <div className="ef-home-error" role="alert"><AlertTriangle size={15} aria-hidden="true" /><span>{visibleError}</span><button type="button" onClick={onRetry}><RefreshCw size={13} />重试</button></div> : null}
           <div className="ef-home-tail-space" ref={tailRef} aria-hidden="true" />
         </div>
         <div className="ef-home-composer" ref={composerRef}>
-          <button type="button" className="ef-home-jump" hidden={!showJump} onClick={() => scrollToLatest("auto")}>回到最新<span aria-hidden="true">↓</span></button>
+          {/* The jump control has a permanent slot in the composer band, so
+              showing it never changes the scroll range and it never sits over
+              readable answer text. */}
+          <div className="ef-home-jump-slot">
+            <button type="button" className="ef-home-jump" data-visible={showJump ? "true" : "false"} tabIndex={showJump ? 0 : -1} onClick={() => scrollToLatest("auto")}>回到最新<span aria-hidden="true">↓</span></button>
+          </div>
           <HomeComposer
             contexts={contexts}
             onRemoveContext={onRemoveContext}
@@ -291,7 +298,7 @@ function PreviewPersonCard({ person }: { person: FollowedPerson }) {
           <PreviewBadge />
         </div>
         {isPrivate ? <div className="ef-home-person-private"><strong>对方未公开学习进度</strong><p>可以请 TA 分享，或先查看公开地图。预览不会展示分数、失败尝试、对话或 AI 评价。</p></div> : <div className="ef-home-person-progress">
-          <div><span>公开进度</span><strong>{person.sharedKnowledgeCount} 个要点</strong></div>
+          <div><span>公开进度</span><strong>{person.sharedKnowledgeCount} 个知识点</strong></div>
           <div className="ef-home-person-bar" aria-hidden="true"><i style={{ width: `${Math.min(100, person.sharedKnowledgeCount * 6)}%` }} /></div>
           <p>{person.activityLabel}</p>
         </div>}

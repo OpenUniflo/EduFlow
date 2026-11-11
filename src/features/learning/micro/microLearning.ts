@@ -101,6 +101,7 @@ export interface MicroLearningProvider {
 export interface MicroLearningRepository extends MicroLearningProvider {
   hydrate(userId:string):Promise<void>;
   getPath(knowledgeId:string, context?:{courseId?:string; mode?:MicroLearningPath["mode"];pathId?:string}):MicroLearningPath|null;
+  listPathsForKnowledge(knowledgeId:string, context?:{mode?:MicroLearningPath["mode"]}):MicroLearningPath[];
   getPathProgress(pathId:string):MicroPathProgress|undefined;
   getUnitProgress(unitId:string):MicroUnitProgress|undefined;
   start(pathId:string, contextCourseId?:string):Promise<void>;

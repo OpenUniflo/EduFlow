@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ApiError } from "./http.js";
 import { dataOrThrow } from "./query.js";
+import { ATTACHMENT_LIMIT, attachmentLimitMessage } from "../../src/shared/assistant/attachments.js";
 
 type Row = Record<string, unknown>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MAX_FILES = 4;
+const MAX_FILES = ATTACHMENT_LIMIT;
 const MAX_FILE_CHARACTERS = 24_000;
 const MAX_TOTAL_CHARACTERS = 40_000;
 
@@ -12,7 +13,7 @@ export type AssistantAttachment = { sourceId: string; title: string; text: strin
 
 export function parseAssistantAttachmentIds(value: unknown): string[] {
   if (value == null) return [];
-  if (!Array.isArray(value) || value.length > MAX_FILES) throw new ApiError(400, "invalid_assistant_attachments", "每次最多附 4 份文本文件");
+  if (!Array.isArray(value) || value.length > MAX_FILES) throw new ApiError(400, "invalid_assistant_attachments", attachmentLimitMessage());
   const ids = value.filter((item): item is string => typeof item === "string" && UUID.test(item));
   if (ids.length !== value.length || new Set(ids).size !== ids.length) throw new ApiError(400, "invalid_assistant_attachments", "附件身份无效");
   return ids;

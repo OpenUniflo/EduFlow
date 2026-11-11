@@ -1,3 +1,4 @@
+import { ATTACHMENT_LIMIT } from "../../src/shared/assistant/attachments.js";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { ApiError } from "./http.js";
 import { dataOrThrow } from "./query.js";
@@ -39,7 +40,7 @@ function buildResponse(assignment: Row, input: AssistantSubmissionInput): Assign
   const link = input.link?.trim().slice(0, 2_000) ?? "";
   if (link && !/^https?:\/\/[^\s]+$/i.test(link)) throw new ApiError(400, "invalid_assignment_link", "链接必须以 http:// 或 https:// 开头");
   const body = [note, ...(link ? [`链接：${link}`] : [])].filter(Boolean).join("\n");
-  const ids = [...new Set(input.attachmentSourceIds ?? [])].slice(0, 4);
+  const ids = [...new Set(input.attachmentSourceIds ?? [])].slice(0, ATTACHMENT_LIMIT);
   if (!body && !ids.length) throw new ApiError(400, "invalid_assignment_response", "请提供备注、链接或一份本人文件");
   const experience = (assignment.experience ?? null) as Row | null;
   const kind = experience?.type === "code" || experience?.type === "trace" ? "code" : "answer";

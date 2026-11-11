@@ -7,6 +7,11 @@ export const knowledgePlugin: AssistantPlugin = {
   id: "knowledge",
   title: "知识与地图",
   cards: [{ cardType: "knowledge", panel: "map" }, { cardType: "mini_map", panel: "map" }],
+  progress: {
+    searchKnowledge: "查找知识点",
+    getKnowledge: "读取知识点",
+    getKnowledgeNeighbors: "查看知识关联",
+  },
   tools: ({ client }) => ({
     searchKnowledge: tool({
       description: "Search visible active EduFlow Knowledge by title, description, or tags.",

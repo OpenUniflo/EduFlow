@@ -156,7 +156,7 @@ export function WorkflowCreateDialog({ initialTemplate, courseLaunch = false, on
     </button>;
   });
 
-  return <WorkflowDialog title={courseLaunch ? "从实训模板创建工作流" : "新建工作流"} error={error} className="wf-library-dialog wf-create-dialog" onClose={() => { if (!pending.current) onClose(); }}>
+  return <WorkflowDialog title={courseLaunch ? "从动手任务模板创建工作流" : "新建工作流"} error={error} className="wf-library-dialog wf-create-dialog" onClose={() => { if (!pending.current) onClose(); }}>
     <p className="wf-dialog-intro">选择空白画布或起步流程，创建后可继续编辑。</p>
     <fieldset disabled={busy} className="wf-create-options">
       {!courseLaunch ? <button type="button" className={`wf-template-option ${!selected ? "selected" : ""}`} aria-pressed={!selected} onClick={() => choose(null)}><FilePlus2 size={22}/><span><strong>空白工作流</strong><small>只有入口和结束，从头搭建自己的流程。</small></span></button> : null}
@@ -176,7 +176,7 @@ export function WorkflowCreateDialog({ initialTemplate, courseLaunch = false, on
           {!templatesLoading && !templatesError && !visibleTemplates.length ? <p role="status">没有匹配的模板，试试其他关键词。</p> : null}
         </div>
       </details> : null}
-      {courseLaunch && initialTemplate ? <div className="wf-template-grid" aria-label="实训模板"><button type="button" className="wf-template-option selected" aria-pressed="true"><GitBranch size={20}/><span><strong>{initialTemplate.name}</strong><small>{initialTemplate.description}</small></span></button></div> : null}
+      {courseLaunch && initialTemplate ? <div className="wf-template-grid" aria-label="动手任务模板"><button type="button" className="wf-template-option selected" aria-pressed="true"><GitBranch size={20}/><span><strong>{initialTemplate.name}</strong><small>{initialTemplate.description}</small></span></button></div> : null}
       {requirements.length ? <section className="wf-field-note" aria-label="模板执行能力"><strong>这个模板需要</strong><ul>{requirements.map(item => <li key={`${item.kind}:${item.label}`}>{item.kind === "model" ? "模型" : "工具"} · {item.label}<small>：{item.detail}</small></li>)}</ul><small>创建时绑定当前账号的连接；缺少能力时不能创建。</small></section> : null}
       {!courseLaunch && selected && (detailLoading || detailError || unresolved.length) ? <section className="wf-field-note" aria-label="绑定执行能力">
         <strong>绑定执行能力</strong>

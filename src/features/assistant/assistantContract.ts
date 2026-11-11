@@ -43,6 +43,8 @@ export type AssistantMessage = {
   parts?: AssistantTimelinePart[];
   /** The learner stopped this turn; the marker lives in `parts` and is kept across reloads. */
   stopped?: boolean;
+  /** The server persisted a failed generation; partial text/cards are kept. */
+  failedReason?: string;
   /** Present when the server hid a malformed assistant row (for example protocol_leak). */
   invalidReason?: string;
   structuredContent?: AssistantStructuredContent;

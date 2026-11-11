@@ -5,8 +5,20 @@ import type { MockSession } from "@/features/auth/types";
 import type { AssistantContextSnapshot } from "../assistantContract";
 import { cardMatchesActiveObject, useActiveAssistantObject } from "../activeObject";
 import { parseAssistantCardRef, type AssistantCardDisplay, type AssistantCardRef, type AssistantCardStatus } from "../assistantCards";
-import { knowledgeStateLabel, knowledgeStateTone } from "@/shared/learning/knowledgePresentation";
-import { buildKnowledgeNeighborhood } from "../knowledgeMiniMap";
+import type { AssistantObjectTarget } from "../objectTarget";
+import { buildKnowledgeNeighborhood, miniMapRelationLabel } from "../knowledgeMiniMap";
+import {
+  chapterCardDisplay,
+  courseMatchCardDisplay,
+  evaluationCardDisplay,
+  knowledgeCardDisplay,
+  materialCardDisplay,
+  microCardDisplay,
+  miniMapCardDisplay,
+  practiceCardDisplay,
+  progressCardDisplay,
+  routeCardDisplay
+} from "../cardDisplay";
 import { MicroFormSwitch, MicroSlot, useMicroEntry, useMicroHost } from "@/features/home/MicroHost";
 import { buildHomeCourseProjection } from "@/features/course/path/courseLearnerProjection";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
@@ -16,18 +28,13 @@ import { ObjectShell } from "@/shared/ui/ObjectShell";
 import { Pill, type PillTone } from "@/shared/ui/Pill";
 import "./assistantCards.css";
 
+/**
+ * Cards have exactly one action: open the object they describe in the shared
+ * Object Shell. There is no card-specific page entry; the panel itself offers
+ * an explicit "open page" action when the surface has one.
+ */
 export type AssistantCardActions = {
-  openCourse(courseId: string): void;
-  openPractice(courseId: string, assignmentId: string, origin?: DOMRect): void;
-  /** Open one historical Attempt's saved result; fallback is the latest. */
-  openPracticeAttempt?(courseId: string, assignmentId: string, attemptId: string): void;
-  openBrief(messageId: string): void;
-  openMaterial(courseId: string, materialId: string, segmentId?: string): void;
-  openRoutePanel?(courseId: string, origin?: DOMRect): void;
-  openArchive?(focus?: string): void;
-  /** Knowledge cards open the Archive detail panel beside the conversation. */
-  openKnowledgePanel?(nodeId: string, origin?: DOMRect): void;
-  openRecords?(): void;
+  openObject(target: AssistantObjectTarget, origin?: DOMRect, trigger?: HTMLElement | null): void;
   useCourse?(planningMessageId: string, courseId: string, context: AssistantContextSnapshot): Promise<string>;
   refineGoal?(planningMessageId: string, refinement: string, context: AssistantContextSnapshot): Promise<void>;
   prepareBrief?(planningMessageId: string, input: { sourceCourseId?: string; requestedAdjustments?: string; referenceMaterialIntent: "none" | "upload_in_creator" }, context: AssistantContextSnapshot): Promise<void>;
@@ -102,7 +109,7 @@ function CompactCard({ card, display, icon, onAction, statusLabel = "已完成",
   card: AssistantCardRef;
   display: AssistantCardDisplay;
   icon: ReactNode;
-  onAction: (origin?: DOMRect) => void;
+  onAction: (event: { currentTarget: EventTarget | null }) => void;
   statusLabel?: string;
   statusTone?: NonNullable<AssistantCardStatus["tone"]>;
   actionLabel?: string;
@@ -113,13 +120,9 @@ function CompactCard({ card, display, icon, onAction, statusLabel = "已完成",
       <span className="ef-card-compact-icon" aria-hidden="true">{icon}</span>
       <span className={`ef-card-compact-copy${note ? " is-inline" : ""}`}><strong>{display.title}</strong>{note ? <small>{note}</small> : null}</span>
       <Pill tone={statusTone} dot>{statusLabel}</Pill>
-      <button type="button" className="ef-card-text-action" onClick={(event) => onAction(cardRect(event))}>{actionLabel}</button>
+      <button type="button" className="ef-card-text-action" onClick={(event) => onAction(event)}>{actionLabel}</button>
     </div>
   </ConversationCard>;
-}
-
-function actionButton(label: string, onClick: () => void) {
-  return <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={onClick}>{label}</button>;
 }
 
 /** The card itself is the Object Shell origin; never the viewport edge. */
@@ -127,6 +130,11 @@ function cardRect(event: { currentTarget: EventTarget | null }): DOMRect | undef
   const target = event.currentTarget;
   if (!(target instanceof Element)) return undefined;
   return target.closest<HTMLElement>("[data-card-type]")?.getBoundingClientRect();
+}
+
+function openTarget(event: { currentTarget: EventTarget | null }, actions: AssistantCardActions, target: AssistantObjectTarget) {
+  const trigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  actions.openObject(target, cardRect(event), trigger);
 }
 
 type MicroEntry = ReturnType<typeof useMicroEntry>;
@@ -183,18 +191,21 @@ function MicroPracticeCard({ card, display, entry, cardKey }: { card: AssistantC
   if (!entry.path) return null;
   const active = entry.active && entry.form !== "closed";
   const owner = active && host.presence?.cardKey === cardKey && host.presence?.pathId === entry.pathId;
-  const minutes = entry.path.estimatedMinutes;
   const total = entry.totalSteps;
-  const kicker = `小练习 · 约 ${minutes} 分钟`;
-  const liveDisplay: AssistantCardDisplay = {
-    ...display,
-    kicker,
-    title: entry.path.title || display.title,
-    description: entry.path.description ?? display.description,
-    meta: [courseMeta(entry), `${entry.completeSteps} / ${total} 步`].filter(Boolean) as string[],
-    status: entry.completed ? { label: "已完成", tone: "ok" } : entry.progress ? { label: "进行中", tone: "brand" } : { label: "未开始", tone: "quiet" },
-    steps: display.steps?.length ? display.steps : microSteps(entry)
-  };
+  const courseTitle = courseMeta(entry, card.cardType === "micro" ? card.courseId : undefined, card.cardType === "micro" ? card.knowledgeId : undefined);
+  const liveDisplay = microCardDisplay(
+    { cardType: "micro", pathId: entry.pathId, knowledgeId: entry.knowledgeId, ...(entry.courseId ? { courseId: entry.courseId } : {}) },
+    {
+      title: entry.path.title,
+      ...(entry.path.description ? { description: entry.path.description } : {}),
+      estimatedMinutes: entry.path.estimatedMinutes,
+      totalSteps: total,
+      completedCount: entry.completeSteps,
+      progressStatus: entry.completed ? "completed" : entry.progress ? "in_progress" : "not_started",
+      ...(courseTitle ? { courseTitle } : {}),
+      steps: microSteps(entry)
+    }
+  );
   if (owner && (entry.form === "side" || entry.form === "focus")) {
     return <MicroFrameShell pathId={entry.pathId} cardKey={cardKey} cardType="micro"><MicroAway entry={entry} /></MicroFrameShell>;
   }
@@ -217,18 +228,28 @@ function MicroPracticeCard({ card, display, entry, cardKey }: { card: AssistantC
   </MicroFrameShell>;
 }
 
-function courseMeta(entry: MicroEntry) {
-  const course = entry.courseId ? applicationServices.courseRepository.getCourse(entry.courseId) : undefined;
-  return course?.course.title ?? (entry.courseId ? "课程" : "独立学习");
+function courseMeta(entry: MicroEntry, courseId?: string, knowledgeId?: string) {
+  const direct = courseId ? applicationServices.courseRepository.getCourse(courseId) : undefined;
+  if (direct) return direct.course.title;
+  if (entry.courseId) return applicationServices.courseRepository.getCourse(entry.courseId)?.course.title;
+  // A published path may have no course_id while its Knowledge is still taught
+  // by a Course. Resolve the owning Course instead of showing a learner-facing
+  // "independent" badge that has no action behind it.
+  if (knowledgeId) {
+    const owner = applicationServices.courseRepository.listCourseRuntimes()
+      .find((runtime) => runtime.curriculumCoverages.some((coverage) => coverage.nodeId === knowledgeId));
+    return owner?.course.title;
+  }
+  return undefined;
 }
 
-function microSteps(entry: MicroEntry): NonNullable<AssistantCardDisplay["steps"]> {
+function microSteps(entry: MicroEntry) {
   if (!entry.path) return [];
   return entry.path.units.flatMap((unit) => unit.steps.map((step) => {
     const progress = applicationServices.microLearningRepository.getUnitProgress(unit.id);
     const done = entry.completed || Boolean(progress?.completedStepIds.includes(step.id));
-    return { id: step.id, title: step.title, state: done ? "done" as const : "quiet" as const };
-  })).slice(0, 12);
+    return { id: step.id, title: step.title, done };
+  }));
 }
 
 /** The knowledge card is the Archive node, not a Micro runner. */
@@ -236,15 +257,12 @@ function KnowledgeCard({ card, display, actions }: CardProps) {
   if (card.cardType !== "knowledge") return null;
   const active = useActiveAssistantObject();
   const isActive = cardMatchesActiveObject(active, { kind: "knowledge", nodeId: card.nodeId });
-  const open = actions.openKnowledgePanel
-    ? (event: { currentTarget: EventTarget | null }) => actions.openKnowledgePanel?.(card.nodeId, cardRect(event))
-    : actions.openArchive ? () => actions.openArchive?.(`knowledge:${card.nodeId}`) : undefined;
   return <div className={`ef-assistant-card-frame${isActive ? " is-context-active" : ""}`} data-card-type="knowledge" data-node-id={card.nodeId}>
     <Frame
       card={card}
       display={display}
       icon={<span className="ef-assistant-knowledge-dot" aria-hidden="true" />}
-      footer={<div className="ef-assistant-card-foot"><span>知识点档案</span><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={open}>{display.actionLabel ?? "查看知识点"}</button></div>}
+      footer={<div className="ef-assistant-card-foot"><span>知识点档案</span><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "knowledge", nodeId: card.nodeId })}>{display.actionLabel ?? "查看知识点"}</button></div>}
     />
   </div>;
 }
@@ -257,26 +275,34 @@ function MiniMapCard({ card, display, actions, session }: CardProps) {
     const graph = applicationServices.knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId));
     return buildKnowledgeNeighborhood(graph, card.nodeId);
   }, [card, revision, session.userId]);
+  const active = useActiveAssistantObject();
   if (card.cardType !== "mini_map" || !layout) return null;
   const byId = new Map(layout.nodes.map((node) => [node.id, node]));
-  return <div className="ef-assistant-card-frame" data-card-type="mini_map" data-node-id={card.nodeId}>
+  const isActive = cardMatchesActiveObject(active, { kind: "knowledge", nodeId: card.nodeId });
+  return <div className={`ef-assistant-card-frame${isActive ? " is-context-active" : ""}`} data-card-type="mini_map" data-node-id={card.nodeId}>
     <Frame
       card={card}
       display={display}
-      footer={<div className="ef-assistant-card-foot"><span>只画真实关系</span><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => actions.openArchive?.(`knowledge:${card.nodeId}`)}>{display.actionLabel ?? "在档案中查看"}</button></div>}
+      footer={<div className="ef-assistant-card-foot"><span>只画真实关系</span><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "knowledge", nodeId: card.nodeId })}>{display.actionLabel ?? "在档案中查看"}</button></div>}
     >
       <div className="ef-assistant-mini-map">
-        <svg width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} role="img" aria-label={`${display.title} 的关系小地图`}>
+        <svg width="100%" viewBox={`0 0 ${layout.width} ${layout.height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={`${display.title} 的关系小地图`}>
           {layout.edges.map((edge) => {
             const source = byId.get(edge.source);
             const target = byId.get(edge.target);
             return source && target ? <line key={edge.id} x1={source.x} y1={source.y} x2={target.x} y2={target.y} className={`ef-assistant-map-edge is-${edge.relation}`} /> : null;
           })}
           {layout.nodes.map((node) => <g key={node.id} className={node.center ? "is-center" : ""}>
+            <title>{node.title}</title>
             <circle cx={node.x} cy={node.y} r={node.center ? 9 : 6} className="ef-assistant-map-node" />
-            {node.center ? <text x={node.x} y={node.y + 24} className="ef-assistant-map-label">{display.title}</text> : null}
+            <text x={node.labelX} y={node.labelY} textAnchor={node.anchor} className={`ef-assistant-map-label${node.center ? " is-center" : ""}`}>
+              {node.lines.map((line, index) => <tspan key={index} x={node.labelX} dy={index === 0 ? 0 : 13}>{line}</tspan>)}
+            </text>
           </g>)}
         </svg>
+        <div className="ef-assistant-map-legend" aria-label="关系图例">
+          {Object.entries(miniMapRelationLabel).map(([relation, label]) => <span key={relation}><i className={`is-${relation}`} aria-hidden="true" />{label}</span>)}
+        </div>
         {!layout.nodes.length ? <p className="ef-assistant-card-copy">这个知识点还没有可显示的关系。</p> : null}
       </div>
     </Frame>
@@ -303,9 +329,9 @@ function RouteCard({ card, display, actions, session, cardKey }: CardProps & { c
         <Play size={14} aria-hidden="true" />{entry.starting ? "正在开始…" : entry.completed ? "再看一遍" : entry.progress ? "继续当前这一步" : action.label || "开始当前这一步"}
       </button>
     : action?.kind === "practice"
-      ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => actions.openPractice(action.courseId, action.assignmentId, cardRect(event))}>{action.label || "打开动手任务"}</button>
+      ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "practice", courseId: action.courseId, assignmentId: action.assignmentId })}>{action.label || "打开动手任务"}</button>
       : action?.kind === "course"
-        ? actionButton(action.label || "打开课程", () => actions.openCourse(action.courseId))
+        ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "route", courseId: action.courseId })}>{action.label || "查看完整路线"}</button>
         : null;
   const owner = Boolean(entry.active && entry.form !== "closed" && host.presence?.cardKey === cardKey && host.presence?.pathId === microPathId);
   const inline = owner && entry.form === "inline";
@@ -317,7 +343,7 @@ function RouteCard({ card, display, actions, session, cardKey }: CardProps & { c
   const footer = inline ? undefined : <div className="ef-assistant-card-foot">
     <span>{display.steps?.length ?? 0} 步</span>
     <span className="ef-assistant-card-actions">
-      <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={(event) => actions.openRoutePanel ? actions.openRoutePanel(card.courseId, cardRect(event)) : actions.openCourse(card.courseId)}>查看完整路线</button>
+      <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "route", courseId: card.courseId })}>查看完整路线</button>
       {entry.path ? <>
         <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void entry.openWithStart("focus")}><Maximize2 size={14} aria-hidden="true" />沉浸</button>
         <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void entry.openWithStart("side")}><PanelRight size={14} aria-hidden="true" />侧边</button>
@@ -353,7 +379,7 @@ function PracticeCard({ card, display, actions }: CardProps) {
         card={card}
         display={display}
         icon={<Wrench size={17} />}
-        onAction={(origin) => actions.openPractice(card.courseId, card.assignmentId, origin)}
+        onAction={(event) => openTarget(event, actions, { kind: "practice", courseId: card.courseId, assignmentId: card.assignmentId })}
         statusLabel={display.status?.label ?? "已更新"}
         statusTone={display.status?.tone ?? "ok"}
         actionLabel={display.actionLabel ?? "查看任务"}
@@ -362,7 +388,7 @@ function PracticeCard({ card, display, actions }: CardProps) {
     </div>;
   }
   return <div className={`ef-assistant-card-frame${isActive ? " is-context-active" : ""}`} ref={frameRef} data-card-type="practice" data-assignment-id={card.assignmentId} data-course-id={card.courseId}>
-    <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>{display.status?.label ?? "动手做一次"}</span><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={(event) => actions.openPractice(card.courseId, card.assignmentId, cardRect(event))}>{display.actionLabel ?? "打开动手任务"}</button></div>} />
+    <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>{display.status?.label ?? "动手做一次"}</span><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "practice", courseId: card.courseId, assignmentId: card.assignmentId })}>{display.actionLabel ?? "打开动手任务"}</button></div>} />
   </div>;
 }
 
@@ -371,7 +397,7 @@ function SubmissionCard({ card, display, actions }: CardProps) {
   if (card.cardType !== "submission") return null;
   const isActive = cardMatchesActiveObject(active, { kind: "practice", courseId: card.courseId, assignmentId: card.assignmentId });
   return <div className={`ef-assistant-card-frame${isActive ? " is-context-active" : ""}`} data-card-type="submission" data-assignment-id={card.assignmentId} data-course-id={card.courseId}>
-    <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>{display.status?.label ?? "可提交"}</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => actions.openPractice(card.courseId, card.assignmentId, cardRect(event))}>{display.actionLabel ?? "打开提交表单"}</button></div>} />
+    <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>{display.status?.label ?? "可提交"}</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "practice", courseId: card.courseId, assignmentId: card.assignmentId })}>{display.actionLabel ?? "打开提交表单"}</button></div>} />
   </div>;
 }
 
@@ -379,25 +405,23 @@ function EvaluationCard({ card, display, actions }: CardProps) {
   const active = useActiveAssistantObject();
   if (card.cardType !== "evaluation") return null;
   const isActive = cardMatchesActiveObject(active, { kind: "practice", courseId: card.courseId, assignmentId: card.assignmentId });
-  const open = (origin?: DOMRect) => {
-    if (card.attemptId && actions.openPracticeAttempt) actions.openPracticeAttempt(card.courseId, card.assignmentId, card.attemptId);
-    else actions.openPractice(card.courseId, card.assignmentId, origin);
-  };
   return <div className={`ef-assistant-card-frame${isActive ? " is-context-active" : ""}`} data-card-type="evaluation" data-attempt-id={card.attemptId ?? ""} data-course-id={card.courseId} data-assignment-id={card.assignmentId}>
-    <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>来自这次提交</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => open(cardRect(event))}>{display.actionLabel ?? "查看评价"}</button></div>} />
+    <Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>来自这次提交</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "practice", courseId: card.courseId, assignmentId: card.assignmentId, ...(card.attemptId ? { attemptId: card.attemptId } : {}) })}>{display.actionLabel ?? "查看评价"}</button></div>} />
   </div>;
 }
 
 function ChapterCard({ card, display, actions }: CardProps) {
+  const active = useActiveAssistantObject();
   if (card.cardType !== "course_chapter") return null;
-  return <div className="ef-assistant-card-frame" data-card-type="course_chapter" data-course-id={card.courseId} data-chapter-id={card.chapterId}><Frame card={card} display={display} size="l" footer={<div className="ef-assistant-card-foot"><span>{display.meta?.[0] ?? ""}</span>{actionButton(display.actionLabel ?? "打开这一章", () => actions.openCourse(card.courseId))}</div>} /></div>;
+  const isActive = cardMatchesActiveObject(active, { kind: "route", courseId: card.courseId });
+  return <div className={`ef-assistant-card-frame${isActive ? " is-context-active" : ""}`} data-card-type="course_chapter" data-course-id={card.courseId} data-chapter-id={card.chapterId}><Frame card={card} display={display} size="l" footer={<div className="ef-assistant-card-foot"><span>{display.meta?.[0] ?? ""}</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "route", courseId: card.courseId, chapterId: card.chapterId })}>{display.actionLabel ?? "打开这一章"}</button></div>} /></div>;
 }
 
 function CourseMatchCard({ card, display, actions }: CardProps) {
   if (card.cardType !== "course_match") return null;
   return <div className="ef-assistant-card-frame" data-card-type="course_match"><Frame card={card} display={display} size="l" footer={<div className="ef-assistant-card-foot"><span>目标：{card.goalText}</span></div>}>
     <div className="ef-assistant-card-choices">
-      {(display.items ?? []).map((item) => <button key={item.id} type="button" className="ef-assistant-card-choice" onClick={() => actions.openCourse(item.id)}>
+      {(display.items ?? []).map((item) => <button key={item.id} type="button" className="ef-assistant-card-choice" onClick={(event) => openTarget(event, actions, { kind: "route", courseId: item.id })}>
         <span><strong>{item.title}</strong>{item.meta ? <small>{item.meta}</small> : null}</span>
         <span aria-hidden="true">→</span>
       </button>)}
@@ -407,9 +431,9 @@ function CourseMatchCard({ card, display, actions }: CardProps) {
 
 function ProgressCard({ card, display, actions }: CardProps) {
   if (card.cardType !== "progress") return null;
-  return <div className="ef-assistant-card-frame" data-card-type="progress"><Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>只显示正在学的课程</span><button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" onClick={() => actions.openRecords?.()}>查看记录</button><button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" onClick={() => actions.openCourse(card.courseIds[0] ?? "")}>继续学习</button></div>}>
+  return <div className="ef-assistant-card-frame" data-card-type="progress"><Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>只显示正在学的课程</span><button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "records" })}>查看记录</button>{card.courseIds[0] ? <button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "route", courseId: card.courseIds[0] })}>继续学习</button> : null}</div>}>
     <div className="ef-assistant-card-choices">
-      {(display.items ?? []).map((item) => <button key={item.id} type="button" className="ef-assistant-card-choice" onClick={() => actions.openCourse(item.id)}>
+      {(display.items ?? []).map((item) => <button key={item.id} type="button" className="ef-assistant-card-choice" onClick={(event) => openTarget(event, actions, { kind: "route", courseId: item.id })}>
         <span><strong>{item.title}</strong>{item.meta ? <small>{item.meta}</small> : null}</span>
         <span aria-hidden="true">→</span>
       </button>)}
@@ -418,8 +442,10 @@ function ProgressCard({ card, display, actions }: CardProps) {
 }
 
 function MaterialCard({ card, display, actions }: CardProps) {
+  const active = useActiveAssistantObject();
   if (card.cardType !== "material") return null;
-  return <div className="ef-assistant-card-frame" data-card-type="material" data-course-id={card.courseId} data-material-id={card.materialId}><Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>只读资料</span>{actionButton(display.actionLabel ?? "查看资料", () => actions.openMaterial(card.courseId, card.materialId, card.segmentId))}</div>} /></div>;
+  const isActive = cardMatchesActiveObject(active, { kind: "material", courseId: card.courseId, materialId: card.materialId });
+  return <div className={`ef-assistant-card-frame${isActive ? " is-context-active" : ""}`} data-card-type="material" data-course-id={card.courseId} data-material-id={card.materialId}><Frame card={card} display={display} footer={<div className="ef-assistant-card-foot"><span>只读资料</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => openTarget(event, actions, { kind: "material", courseId: card.courseId, materialId: card.materialId, ...(card.segmentId ? { segmentId: card.segmentId } : {}) })}>{display.actionLabel ?? "查看资料"}</button></div>} /></div>;
 }
 
 /** Micro card: the Host owns the runner; this card owns the inline slot. */
@@ -436,7 +462,11 @@ function MicroCard({ card, display, session, cardKey }: CardProps & { cardKey: s
 }
 
 function BriefCard({ messageId, display, actions }: { messageId?: string; display: AssistantCardDisplay; actions: AssistantCardActions }) {
-  return <Frame card={{ cardType: "brief", messageId: messageId ?? "legacy" }} display={display} footer={<div className="ef-assistant-card-foot"><span>未创建课程</span>{actionButton("进入课程创建", () => { if (messageId) actions.openBrief(messageId); })}</div>} />;
+  const active = useActiveAssistantObject();
+  const isActive = Boolean(messageId) && cardMatchesActiveObject(active, { kind: "brief", messageId: messageId! });
+  return <div className={`ef-assistant-card-frame${isActive ? " is-context-active" : ""}`} data-card-type="brief" data-message-id={messageId ?? ""}>
+    <Frame card={{ cardType: "brief", messageId: messageId ?? "legacy" }} display={display} footer={<div className="ef-assistant-card-foot"><span>未创建课程</span><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={(event) => { if (messageId) openTarget(event, actions, { kind: "brief", messageId }); }}>查看课程简介</button></div>} />
+  </div>;
 }
 
 /** Shared entry for every card part in the conversation timeline. */
@@ -495,28 +525,34 @@ function useHydratedCard(card: AssistantCardRef | null, initial: AssistantCardDi
 async function hydrateCard(card: AssistantCardRef, session: MockSession): Promise<AssistantCardDisplay | null> {
   const runtimes = applicationServices.courseRepository.listCourseRuntimes();
   const runtimeFor = (courseId: string) => runtimes.find((runtime) => runtime.course.id === courseId);
+  const courseForKnowledge = (knowledgeId: string) => runtimes.find((runtime) => runtime.curriculumCoverages.some((coverage) => coverage.nodeId === knowledgeId));
   const records = applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId);
   const statusByNode = new Map(records.map((record) => [record.nodeId, record.status]));
   switch (card.cardType) {
     case "micro": {
       const path = applicationServices.microLearningRepository.getPath(card.knowledgeId, { ...(card.courseId ? { courseId: card.courseId } : {}), mode: "learn", pathId: card.pathId });
       if (!path) return null;
+      const courseId = card.courseId ?? courseForKnowledge(card.knowledgeId)?.course.id;
+      const course = courseId ? applicationServices.courseRepository.getCourse(courseId) : undefined;
       const progress = applicationServices.microLearningRepository.getPathProgress(card.pathId);
-      const completed = progress?.status === "completed";
-      const course = card.courseId ? applicationServices.courseRepository.getCourse(card.courseId) : undefined;
       const totalSteps = path.units.reduce((total, unit) => total + unit.steps.length, 0);
-      const doneSteps = path.units.reduce((total, unit) => total + (applicationServices.microLearningRepository.getUnitProgress(unit.id)?.completedStepIds.length ?? 0), 0);
-      return {
-        title: path.title, kicker: "小练习", description: path.description,
-        meta: [`约 ${path.estimatedMinutes} 分钟`, `${completed ? totalSteps : doneSteps} / ${totalSteps} 步`, course?.course.title ?? "独立学习"],
-        status: completed ? { label: "已完成", tone: "ok" } : progress ? { label: "进行中", tone: "brand" } : { label: "未开始", tone: "quiet" },
+      const completedCount = progress?.status === "completed"
+        ? totalSteps
+        : path.units.reduce((total, unit) => total + (applicationServices.microLearningRepository.getUnitProgress(unit.id)?.completedStepIds.length ?? 0), 0);
+      return microCardDisplay(card, {
+        title: path.title,
+        ...(path.description ? { description: path.description } : {}),
+        estimatedMinutes: path.estimatedMinutes,
+        totalSteps,
+        completedCount,
+        progressStatus: progress?.status ?? "not_started",
+        ...(course?.course.title ? { courseTitle: course.course.title } : {}),
         steps: path.units.flatMap((unit) => unit.steps.map((step) => ({
           id: step.id,
           title: step.title,
-          state: completed || Boolean(applicationServices.microLearningRepository.getUnitProgress(unit.id)?.completedStepIds.includes(step.id)) ? "done" as const : "quiet" as const
-        }))).slice(0, 12),
-        actionLabel: completed ? "再看一遍" : progress ? "继续" : "开始"
-      };
+          done: progress?.status === "completed" || Boolean(applicationServices.microLearningRepository.getUnitProgress(unit.id)?.completedStepIds.includes(step.id))
+        })))
+      });
     }
     case "practice":
     case "submission": {
@@ -524,27 +560,28 @@ async function hydrateCard(card: AssistantCardRef, session: MockSession): Promis
       const assignment = runtime?.assignments.find((item) => item.id === card.assignmentId);
       if (!assignment) return null;
       const state = applicationServices.learningProgressRepository.getCourseState(session.userId, card.courseId)?.assignmentStates[card.assignmentId]?.status;
-      const passed = state === "accepted" || state === "completed";
-      return {
-        title: assignment.title, kicker: "动手任务", description: assignment.description,
-        meta: [assignment.estimatedMinutes ? `约 ${assignment.estimatedMinutes} 分钟` : "动手做一次"],
-        status: statusLabel(state),
-        actionLabel: passed ? "查看结果" : state === "needs_revision" ? "补充后再交" : state === "started" ? "继续动手任务" : "打开动手任务"
-      };
+      return practiceCardDisplay(card.cardType, {
+        title: assignment.title,
+        ...(assignment.description ? { description: assignment.description } : {}),
+        ...(assignment.estimatedMinutes != null ? { estimatedMinutes: assignment.estimatedMinutes } : {}),
+        knowledgeCount: runtime?.assignmentCoverages.filter((coverage) => coverage.assignmentId === card.assignmentId).length ?? 0,
+        status: state
+      });
     }
     case "evaluation": {
       const runtime = runtimeFor(card.courseId);
       const assignment = runtime?.assignments.find((item) => item.id === card.assignmentId);
       const { result } = await applicationServices.learnerStateService.getAssignmentResult(card.courseId, card.assignmentId, undefined, card.attemptId);
       if (!assignment || !result) return null;
-      const outcome = result.outcome;
-      return {
-        title: assignment.title, kicker: "动手任务评价",
-        description: typeof result.feedback?.message === "string" ? result.feedback.message : undefined,
-        meta: [result.attemptNumber ? `第 ${result.attemptNumber} 次提交` : "这次提交"],
-        status: outcome === "passed" ? { label: "已通过", tone: "ok" } : outcome === "failed" ? { label: "需要修改", tone: "warn" } : { label: "评价中", tone: "quiet" },
-        actionLabel: "查看评价"
-      };
+      const criteria = result.feedback?.criteria ?? [];
+      return evaluationCardDisplay({
+        assignmentTitle: assignment.title,
+        ...(result.attemptNumber ? { attemptNumber: result.attemptNumber } : {}),
+        outcome: result.outcome,
+        ...(typeof result.feedback?.message === "string" ? { feedbackMessage: result.feedback.message } : {}),
+        criteriaPassed: criteria.filter((criterion) => criterion.passed).length,
+        criteriaTotal: criteria.length
+      });
     }
     case "course_chapter": {
       const runtime = runtimeFor(card.courseId);
@@ -552,31 +589,34 @@ async function hydrateCard(card: AssistantCardRef, session: MockSession): Promis
       if (!runtime || !chapter) return null;
       const lessonIds = new Set(runtime.lessons.filter((lesson) => lesson.chapterId === chapter.id).map((lesson) => lesson.id));
       const nodeIds = [...new Set(runtime.curriculumCoverages.filter((coverage) => lessonIds.has(coverage.lessonId)).map((coverage) => coverage.nodeId))];
-      const done = nodeIds.filter((nodeId) => satisfiesTeachingPrerequisite(statusByNode.get(nodeId))).length;
-      return {
-        title: chapter.title, kicker: `第 ${chapter.order} 章`, description: chapter.outcome,
-        meta: [`${nodeIds.length} 个要点`, `${done} 个已学`],
-        status: done >= nodeIds.length && nodeIds.length ? { label: "已学完", tone: "ok" } : done ? { label: "在学", tone: "brand" } : { label: "未开始", tone: "quiet" },
-        percent: nodeIds.length ? Math.round(done / nodeIds.length * 100) : 0, actionLabel: "打开这一章"
-      };
+      return chapterCardDisplay({
+        title: chapter.title,
+        order: chapter.order,
+        ...(chapter.outcome ? { outcome: chapter.outcome } : {}),
+        nodeCount: nodeIds.length,
+        learnedCount: nodeIds.filter((nodeId) => satisfiesTeachingPrerequisite(statusByNode.get(nodeId))).length
+      });
     }
     case "course_match": {
-      const targets = new Set(card.targetKnowledgeIds);
-      const items = card.courseIds.flatMap((courseId) => {
-        const runtime = runtimeFor(courseId);
-        if (!runtime) return [];
-        const covered = new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId));
-        const matched = [...targets].filter((id) => covered.has(id)).length;
-        const microCount = [...targets].filter((id) => applicationServices.microLearningRepository.getPath(id, { courseId, mode: "learn" })).length;
-        return [{
-          id: courseId, title: runtime.course.title,
-          meta: `${microCount ? `可立刻开始 · ${microCount} 个真实小练习 · ` : "暂不能立刻开始 · "}目标覆盖 ${targets.size ? Math.round(matched / targets.size * 100) : 0}%`,
-          state: "quiet" as const, microCount, matched
-        }];
+      const targetTitles = card.targetKnowledgeIds.flatMap((nodeId) => {
+        const node = applicationServices.knowledgeRepository.getNode(nodeId, userKnowledgeAccess(session.userId));
+        return node ? [node.title] : [];
       });
-      items.sort((left, right) => Number(right.microCount > 0) - Number(left.microCount > 0) || right.microCount - left.microCount || right.matched - left.matched || left.title.localeCompare(right.title));
-      if (!items.length) return null;
-      return { title: "课程匹配", kicker: items.some((item) => item.microCount > 0) ? "可以马上开始的课程" : "课程匹配", items, actionLabel: "查看课程" };
+      return courseMatchCardDisplay(card, {
+        goalText: card.goalText,
+        targetKnowledgeIds: card.targetKnowledgeIds,
+        targetTitles,
+        courses: card.courseIds.flatMap((courseId) => {
+          const runtime = runtimeFor(courseId);
+          if (!runtime) return [];
+          return [{
+            id: courseId,
+            title: runtime.course.title,
+            coveredNodeIds: new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId)),
+            microNodeIds: new Set(card.targetKnowledgeIds.filter((nodeId) => Boolean(applicationServices.microLearningRepository.getPath(nodeId, { courseId, mode: "learn" }))))
+          }];
+        })
+      });
     }
     case "route": {
       const runtime = runtimeFor(card.courseId);
@@ -594,81 +634,55 @@ async function hydrateCard(card: AssistantCardRef, session: MockSession): Promis
         },
         titleFor: (nodeId) => applicationServices.knowledgeRepository.getNode(nodeId, userKnowledgeAccess(session.userId))?.title
       });
-      const segment = projection.segment;
-      const current = segment.currentStep;
-      const currentMicro = current?.kind === "micro" ? current : undefined;
-      const currentPractice = current?.kind === "practice" ? current : undefined;
-      const action = currentMicro
-        ? { kind: "micro" as const, pathId: currentMicro.pathId, knowledgeId: currentMicro.nodeId, courseId: card.courseId, label: "开始当前这一步" }
-        : currentPractice
-          ? { kind: "practice" as const, courseId: card.courseId, assignmentId: currentPractice.assignmentId, label: "打开动手任务" }
-          : { kind: "course" as const, courseId: card.courseId, label: "打开课程" };
-      return {
-        title: runtime.course.title,
-        kicker: "课程路线 · 起步",
-        description: segment.complete ? "第一段已经完成。" : `${segment.steps.filter((step) => step.kind === "micro").length} 个小练习 + ${segment.steps.filter((step) => step.kind === "practice").length} 个动手任务${segment.totalMinutes ? `，约 ${segment.totalMinutes} 分钟` : ""}。`,
-        meta: [`${segment.completedCount} / ${segment.steps.length} 步`, segment.boundaryNodeId ? "到第一个动手任务" : "起步内容"],
-        status: segment.complete ? { label: "已完成", tone: "ok" } : segment.started ? { label: "进行中", tone: "brand" } : { label: "未开始", tone: "quiet" },
-        steps: segment.steps.map((step) => ({
-          id: step.id,
-          title: step.title,
-          state: step.status === "done" ? "done" as const : step.status === "now" ? "now" as const : "quiet" as const,
-          ...(step.minutes ? { meta: `${step.kind === "practice" ? "动手任务" : "小练习"} · 约 ${step.minutes} 分钟` } : { meta: step.kind === "practice" ? "动手任务" : "小练习" })
-        })),
-        action
-      };
+      return routeCardDisplay({ courseId: card.courseId, courseTitle: runtime.course.title, segment: projection.segment });
     }
     case "knowledge": {
       const node = applicationServices.knowledgeRepository.getNode(card.nodeId, userKnowledgeAccess(session.userId));
       if (!node) return null;
-      const status = (statusByNode.get(card.nodeId) ?? "explore") as keyof typeof knowledgeStateLabel;
-      return {
-        title: node.title, kicker: "知识点", description: node.description,
-        meta: [node.scope === "global" ? "公开知识" : node.scope === "tenant" ? "组织知识" : "个人知识"],
-        status: { label: knowledgeStateLabel[status] ?? knowledgeStateLabel.explore, tone: knowledgeStateTone(status) },
-        actionLabel: "查看知识点"
-      };
+      return knowledgeCardDisplay({
+        title: node.title,
+        ...(node.description ? { description: node.description } : {}),
+        scope: node.scope,
+        status: statusByNode.get(card.nodeId) ?? "explore"
+      });
     }
     case "mini_map": {
       const node = applicationServices.knowledgeRepository.getNode(card.nodeId, userKnowledgeAccess(session.userId));
       if (!node) return null;
       const graph = applicationServices.knowledgeRepository.getVisibleGraph(userKnowledgeAccess(session.userId));
-      const count = graph.edges.filter((edge) => edge.source === card.nodeId || edge.target === card.nodeId).length;
-      return { title: node.title, kicker: "小地图", description: "这张图只画这个知识点周围真实存在的关系。", meta: [`${count} 条关系`], actionLabel: "在档案中查看" };
+      const edgeCount = graph.edges.filter((edge) => edge.source === card.nodeId || edge.target === card.nodeId).length;
+      return miniMapCardDisplay({ title: node.title, edgeCount });
     }
     case "progress": {
-      const items = card.courseIds.flatMap((courseId) => {
-        const runtime = runtimeFor(courseId);
-        if (!runtime) return [];
-        const nodeIds = [...new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId))];
-        const done = nodeIds.filter((nodeId) => satisfiesTeachingPrerequisite(statusByNode.get(nodeId))).length;
-        return [{ id: courseId, title: runtime.course.title, meta: `${done} / ${nodeIds.length} 个要点已学`, state: done >= nodeIds.length && nodeIds.length ? "done" as const : done ? "now" as const : "quiet" as const }];
+      const learnedNodeIds = new Set(records.filter((record) => satisfiesTeachingPrerequisite(record.status)).map((record) => record.nodeId));
+      const display = progressCardDisplay({
+        courses: card.courseIds.flatMap((courseId) => {
+          const runtime = runtimeFor(courseId);
+          if (!runtime) return [];
+          return [{
+            id: courseId,
+            title: runtime.course.title,
+            nodeIds: [...new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId))],
+            learnedNodeIds
+          }];
+        })
       });
-      return items.length ? { title: "学习进度", kicker: "我的课程", items, actionLabel: "继续学习" } : null;
+      return display;
     }
     case "material": {
       const runtime = runtimeFor(card.courseId);
       const material = runtime?.materials.find((item) => item.id === card.materialId);
       if (!material) return null;
       const segment = card.segmentId ? material.segments.find((item) => item.id === card.segmentId) : undefined;
-      return {
-        title: material.title, kicker: "资料片段",
-        description: segment ? [segment.section, segment.title].filter(Boolean).join(" · ") : material.description,
-        meta: [segment?.page ? `第 ${segment.page} 页` : "学习资料"], actionLabel: "查看资料"
-      };
+      return materialCardDisplay({
+        title: material.title,
+        ...(material.description ? { description: material.description } : {}),
+        ...(segment?.section ? { segmentSection: segment.section } : {}),
+        ...(segment?.title ? { segmentTitle: segment.title } : {}),
+        ...(segment?.page == null ? {} : { page: segment.page })
+      });
     }
     case "brief":
       return null;
   }
-}
-
-function statusLabel(status: string | undefined): AssistantCardStatus {
-  if (status === "mastered") return { label: "已掌握", tone: "ok" };
-  if (status === "accepted" || status === "completed") return { label: "已通过", tone: "ok" };
-  if (status === "learned") return { label: "已学", tone: "ok" };
-  if (status === "practicing") return { label: "动手任务中", tone: "brand" };
-  if (status === "submitted") return { label: "待评价", tone: "warn" };
-  if (status === "needs_revision") return { label: "需要修改", tone: "warn" };
-  if (status === "started" || status === "in_progress") return { label: "进行中", tone: "brand" };
-  return { label: "未开始", tone: "quiet" };
 }

@@ -184,19 +184,27 @@ export function cleanFinalAnswer(text: string): string | null {
 export type AssistantHistoryRow = {
   role: string;
   content: unknown;
+  parts?: unknown;
   message_kind?: unknown;
   invalid_reason?: unknown;
 };
 
+/** A failed generation is visible in the timeline but never replayed to the model. */
+export function rowHasFailureMarker(parts: unknown): boolean {
+  return Array.isArray(parts) && parts.some((part) => Boolean(part) && typeof part === "object" && (part as { type?: unknown }).type === "data-failed");
+}
+
 /**
  * One filter for every assistant message that can reach a model request.
- * Action audit prose is excluded, invalid rows are excluded, and an assistant
- * row that still contains protocol structure is excluded even when an older
- * database row has not been marked yet.
+ * Action audit prose is excluded, invalid rows are excluded, a failed turn is
+ * excluded so its question stays unanswered, and an assistant row that still
+ * contains protocol structure is excluded even when an older database row has
+ * not been marked yet.
  */
 export function isModelHistoryRow(row: AssistantHistoryRow): boolean {
   if (row.message_kind === "action") return false;
   if (row.invalid_reason != null && String(row.invalid_reason).trim()) return false;
+  if (row.role === "assistant" && rowHasFailureMarker(row.parts)) return false;
   if (row.role === "assistant" && hasAssistantProtocolLeak(String(row.content))) return false;
   return true;
 }

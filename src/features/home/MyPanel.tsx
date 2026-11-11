@@ -2,6 +2,8 @@ import { BookOpen, ChevronRight, Clock, ListChecks, Lock, UserRound, X } from "l
 import { useEffect, useMemo, useState } from "react";
 import { applicationServices } from "@/app/services/applicationServices";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
+import { knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
+import { assignmentStatusPresentation } from "@/shared/learning/assignmentPresentation";
 import type { MockSession } from "@/features/auth/types";
 import type { UserKnowledgeRecord } from "@/features/profile/types";
 import "./home.css";
@@ -18,21 +20,13 @@ type PanelProps = {
   extraAssignmentKeys?: readonly string[];
 };
 
-const statusLabels: Record<string, string> = {
-  learning: "在学",
-  learned: "已学",
-  practicing: "动手任务中",
-  mastered: "已掌握"
-};
+const statusLabels = new Proxy({} as Record<string, string>, {
+  get: (_target, key) => knowledgeStateLabelFor(String(key))
+});
 
-const assignmentLabels: Record<string, string> = {
-  not_started: "未开始",
-  started: "进行中",
-  submitted: "待评价",
-  needs_revision: "需要修改",
-  accepted: "已通过",
-  completed: "已通过"
-};
+const assignmentLabels = new Proxy({} as Record<string, string>, {
+  get: (_target, key) => assignmentStatusPresentation(String(key)).label
+});
 
 /**
  * My panel is a read-only personal overview: the active Course, real task
@@ -82,8 +76,7 @@ export function MyPanel({ session, open, loading = false, onClose, onOpenCourse,
 
   const recent = useMemo(() => [...records]
     .filter((record) => record.status !== "explore")
-    .sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? ""))
-    .slice(0, 3), [records]);
+    .sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "")), [records]);
   const titles = useMemo(() => {
     const map = new Map(applicationServices.knowledgeRepository.getVisibleGraph({ visibleScopes: ["global", "tenant", "user"], userId: session.userId }).nodes.map((node) => [node.id, node.title]));
     for (const record of records) {
@@ -108,7 +101,7 @@ export function MyPanel({ session, open, loading = false, onClose, onOpenCourse,
       <section className="ef-my-section" aria-labelledby="my-courses">
         <div className="ef-my-section-head"><h3 id="my-courses"><BookOpen size={14} aria-hidden="true" />当前课程</h3></div>
         {currentCourse ? <button type="button" className="ef-my-row" onClick={(event) => onOpenCourse(currentCourse.id, event.currentTarget.getBoundingClientRect())}>
-          <span className="ef-my-row-main"><BookOpen size={14} aria-hidden="true" /><span><strong>{currentCourse.title}</strong><small>已学 {currentCourse.learned} / {currentCourse.total} 个要点</small></span></span>
+          <span className="ef-my-row-main"><BookOpen size={14} aria-hidden="true" /><span><strong>{currentCourse.title}</strong><small>已学 {currentCourse.learned} / {currentCourse.total} 个知识点</small></span></span>
           <span className="ef-my-course-bar" aria-hidden="true"><i style={{ width: `${currentCourse.total ? Math.round(currentCourse.learned / currentCourse.total * 100) : 0}%` }} /></span>
           <ChevronRight size={14} aria-hidden="true" />
         </button> : <p className="ef-my-muted">还没有开始学习。</p>}

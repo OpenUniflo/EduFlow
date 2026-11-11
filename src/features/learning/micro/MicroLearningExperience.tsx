@@ -48,7 +48,19 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
   const recommendationDecisionId = typeof location.state?.recommendationDecisionId === "string" ? location.state.recommendationDecisionId : undefined;
   const [revision,setRevision]=useState(0),[navigationAttempt,setNavigationAttempt]=useState(0),[pinned,setPinned]=useState<MicroReviewCursor|null>(null),[reviewCursor,setReviewCursor]=useState<MicroReviewCursor|null>(null),[busy,setBusy]=useState(false),[navigationDecision,setNavigationDecision]=useState<NavigationDecision|null>(null),[navigationError,setNavigationError]=useState(false),[startError,setStartError]=useState(false);
   useEffect(()=>repository.subscribe(()=>setRevision((value)=>value+1)),[repository]);
-  const path=useMemo(()=>repository.getPath(knowledgeId,{courseId,mode:"learn",pathId:requestedPathId}),[courseId,knowledgeId,repository,revision,requestedPathId]);
+  const pathCandidates=useMemo(()=>repository.listPathsForKnowledge(knowledgeId,{mode:"learn"}),[knowledgeId,repository,revision]);
+  const path=useMemo(()=>{
+    if(requestedPathId)return repository.getPath(knowledgeId,{mode:"learn",pathId:requestedPathId});
+    if(courseId)return repository.getPath(knowledgeId,{courseId,mode:"learn"});
+    // A direct link without Course context must resolve uniquely; otherwise
+    // the page asks which real 小练习 the learner means.
+    return pathCandidates.length===1?pathCandidates[0]:null;
+  },[courseId,knowledgeId,pathCandidates,repository,requestedPathId]);
+  const owningCourse=useMemo(()=>{
+    const pathCourseId=courseId??path?.courseId;
+    if(pathCourseId)return applicationServices.courseRepository.getCourse(pathCourseId);
+    return applicationServices.courseRepository.listCourseRuntimes().find(runtime=>runtime.curriculumCoverages.some(coverage=>coverage.nodeId===knowledgeId));
+  },[courseId,knowledgeId,path?.courseId,revision]);
   const progress=path?repository.getPathProgress(path.id):undefined;
   const actionReady = !actionRunId || Boolean(actionProgress);
   useEffect(()=>{if(path&&!actionRunId&&actionReady&&progress?.status!=="completed"&&progress?.status!=="in_progress"){setStartError(false);void repository.start(path.id,courseId).catch(()=>setStartError(true));}},[courseId,path,progress?.status,repository,actionReady,actionRunId]);
@@ -78,7 +90,7 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
     window.addEventListener("keydown",onKeyDown);
     return()=>window.removeEventListener("keydown",onKeyDown);
   },[navigate,returnTarget]);
-  const context=session?{workspace:"learning" as const,experienceMode:"learn" as const,userRole:session.role,capabilities:session.capabilities,courseId,knowledgeId}:undefined;
+  const context=session?{workspace:"learning" as const,experienceMode:"learn" as const,userRole:session.role,capabilities:session.capabilities,...(owningCourse?{courseId:owningCourse.course.id}:{}),knowledgeId}:undefined;
   const complete=useCallback(async(unitId:string,stepId:string,submission?:Parameters<MicroLearningRepository["completeStep"]>[3],clientDurationMs?:number)=>{
     if(!path)return false;
     setBusy(true);setPinned({unitId,stepId});
@@ -86,6 +98,9 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
     finally { setBusy(false); }
   },[courseId,path,repository,session,recommendationDecisionId,actionRunId]);
   if(actionRunId&&!actionProgress)return <MicroShellFallback title={actionError?'无法继续本次行动':'正在读取本次行动…'} body={actionError||'正在核对执行资源和起点能力。'} onBack={()=>navigate(returnTarget)}/>;
+  if(!path&&pathCandidates.length>1)return <MicroShellFallback title="选择一个小练习" body={`这个知识点有 ${pathCandidates.length} 份已发布的小练习，请选择一份继续。`} note="请选择一份小练习；选择前不会记录进度。" onBack={()=>navigate(returnTarget)}>
+    <div className="micro-unsupported-choices">{pathCandidates.map(candidate=><button key={candidate.id} type="button" className="atlas-secondary" onClick={()=>navigate(`/learn/micro/${encodeURIComponent(knowledgeId)}?pathId=${encodeURIComponent(candidate.id)}${candidate.courseId?`&courseId=${encodeURIComponent(candidate.courseId)}`:""}`)}><span>{candidate.title}<small>{candidate.courseId?applicationServices.courseRepository.getCourse(candidate.courseId)?.course.title??"课程小练习":"小练习"} · 约 {candidate.estimatedMinutes} 分钟</small></span><ArrowRight size={15}/></button>)}</div>
+  </MicroShellFallback>;
   if(!path)return <MicroShellFallback title="该知识暂不支持小练习" body="当前还没有已发布的 MicroLearningPath。你仍然可以返回来源，或继续查看关联课件。" onBack={()=>navigate(returnTarget)}/>;
   if(!unit||!step||!formalUnit||!formalStep)return <MicroShellFallback title="该小练习内容尚未完整发布" body="这条学习内容还没有完整发布。" onBack={()=>navigate(returnTarget)}/>;
   const total=path.units.reduce((sum,item)=>sum+item.steps.length,0);
@@ -99,7 +114,7 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
   const previous=previousMicroReviewStep(path,{unitId:unit.id,stepId:step.id});
   const nextReview=()=>{if(!reviewCursor)return;const next=nextMicroReviewStep(path,reviewCursor);setReviewCursor(next&&!((!formalCompleted||pinned)&&next.unitId===formalUnit.id&&next.stepId===formalStep.id)&&!(next.unitId===progress?.currentUnitId&&next.stepId===progress?.currentStepId&&!formalCompleted)?next:null);};
   const [footerMount,setFooterMount]=useState<HTMLDivElement|null>(null);
-  const courseTitle=courseId?applicationServices.courseRepository.getCourse(courseId)?.course.title??"课程小练习":"独立学习";
+  const courseTitle=owningCourse?.course.title;
   const minimize=()=>navigate(`/?micro=${encodeURIComponent(knowledgeId)}:${encodeURIComponent(path.id)}:${encodeURIComponent(courseId??"")}&view=side`);
   const shellTools = <>
     <button type="button" className="ef-micro-icon" onClick={minimize} aria-label="缩小为侧面板" title="缩小为侧面板"><Minimize2 size={16} aria-hidden="true" /></button>
@@ -131,7 +146,7 @@ export function MicroLearningExperience({session,onLogout,repository}:{session:M
     </div>
   </div>;
   return <main className="micro-learning-page ef-micro-page">
-    <ObjectShell size="immersive" className="ef-micro-shell" icon={<BookOpen size={18} />} title={showCompleted ? `${path.title}` : step.title} kicker={showCompleted ? <span>小练习 · 路径已完成</span> : <span>小练习 · {path.title}</span>} context={<span>{courseTitle}</span>} badge={showCompleted ? <Pill tone="ok">已完成</Pill> : <Pill tone="quiet">约 {path.estimatedMinutes} 分钟</Pill>} tools={shellTools} stage={stage} footer={showCompleted ? undefined : <div ref={setFooterMount} className="ef-micro-foot-host" />} inspector={<MicroUnitRail path={path} currentUnitId={unit.id} repository={repository} />} inspectorTitle="单元路径" />
+    <ObjectShell size="immersive" className="ef-micro-shell" icon={<BookOpen size={18} />} title={showCompleted ? `${path.title}` : step.title} kicker={showCompleted ? <span>小练习 · 路径已完成</span> : <span>小练习 · {path.title}</span>} context={courseTitle?<span>{courseTitle}</span>:undefined} badge={showCompleted ? <Pill tone="ok">已完成</Pill> : <Pill tone="quiet">约 {path.estimatedMinutes} 分钟</Pill>} tools={shellTools} stage={stage} footer={showCompleted ? undefined : <div ref={setFooterMount} className="ef-micro-foot-host" />} inspector={<MicroUnitRail path={path} currentUnitId={unit.id} repository={repository} />} inspectorTitle="单元路径" />
     <EduFlowAssistant context={context ? { ...context, presentation: actionRunId ? "micro-action" : "micro-learning", actionRunId, microPathId: path.id, microUnitId: unit.id, microStepId: step.id } : undefined} locked={!session} contextLabel={path.title} />
   </main>;
 }
@@ -185,12 +200,12 @@ export function MicroStepPanel({path,unitId,step,repository,session,review,activ
   </article>;
 }
 
-function MicroShellFallback({title,body,onBack}:{title:string;body:string;onBack():void}) {
+function MicroShellFallback({title,body,onBack,children,note="当前内容暂时无法学习；本步骤不会被跳过。"}:{title:string;body:string;onBack():void;children?:ReactNode;note?:string}) {
   const navigate=useNavigate();
-  return <main className="micro-learning-page ef-micro-page"><ObjectShell size="immersive" className="ef-micro-shell" title={title} kicker="小练习" context="沉浸学习" tools={<button type="button" className="ef-micro-icon" onClick={onBack} aria-label="退出小练习"><X size={16}/></button>} stage={<Unsupported title={title} body={body} onBack={onBack}/>} inspector={<div className="ef-micro-rail"><p className="ef-micro-rail-note">当前内容暂时无法学习；本步骤不会被跳过。</p><button type="button" className="ef-micro-rail-link" onClick={()=>navigate("/")}>返回首页</button></div>} inspectorTitle="单元路径"/></main>;
+  return <main className="micro-learning-page ef-micro-page"><ObjectShell size="immersive" className="ef-micro-shell" title={title} kicker="小练习" context="沉浸学习" tools={<button type="button" className="ef-micro-icon" onClick={onBack} aria-label="退出小练习"><X size={16}/></button>} stage={<Unsupported title={title} body={body} onBack={onBack}>{children}</Unsupported>} inspector={<div className="ef-micro-rail"><p className="ef-micro-rail-note">{note}</p><button type="button" className="ef-micro-rail-link" onClick={()=>navigate("/")}>返回首页</button></div>} inspectorTitle="单元路径"/></main>;
 }
 
-function Unsupported({title,body,onBack}:{title:string;body:string;onBack():void}) { return <section className="micro-unsupported"><button className="micro-unsupported-back" onClick={onBack}><ArrowLeft size={16}/>返回</button><div><span className="atlas-kicker">小练习</span><h1>{title}</h1><p>{body}</p><button className="atlas-primary" onClick={onBack}>返回来源<ArrowRight size={15}/></button></div></section>; }
+function Unsupported({title,body,onBack,children}:{title:string;body:string;onBack():void;children?:ReactNode}) { return <section className="micro-unsupported"><button className="micro-unsupported-back" onClick={onBack}><ArrowLeft size={16}/>返回</button><div><span className="atlas-kicker">小练习</span><h1>{title}</h1><p>{body}</p>{children}<button className="atlas-primary" onClick={onBack}>返回来源<ArrowRight size={15}/></button></div></section>; }
 
 function H5PStep({repository,pathId,unitId,stepId,interaction,onResult}:{repository:MicroLearningRepository;pathId:string;unitId:string;stepId:string;interaction:Extract<MicroInteraction,{type:"h5p"}>;onResult(eventId:string,result:H5PResult):void}) {
   const [descriptor,setDescriptor]=useState<H5PContentDescriptor|null>(null),[error,setError]=useState(false),[attempt,setAttempt]=useState(0);

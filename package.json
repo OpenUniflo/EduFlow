@@ -52,7 +52,8 @@
     "lint:css": "node scripts/lint-css.mjs",
     "tokens:sync": "node scripts/sync-design-tokens.mjs",
     "tokens:check": "node scripts/sync-design-tokens.mjs --check",
-    "learner:reset:local": "node --env-file=.env.local --import tsx scripts/reset-local-learner.ts"
+    "learner:reset:local": "node --env-file=.env.local --import tsx scripts/reset-local-learner.ts",
+    "check:bottom-overlap": "node scripts/check-bottom-overlap.mjs"
   },
   "dependencies": {
     "3d-force-graph": "1.79.1",

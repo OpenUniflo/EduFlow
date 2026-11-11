@@ -6,7 +6,7 @@ import type { UserKnowledgeRecord, UserKnowledgeStatus } from "@/features/profil
  * membership are intentionally not inputs: they are not learning evidence.
  */
 export type LearnerStateCategory = "acquired" | "learning" | "pending";
-export type LearnerStateLabel = "已学" | "在学" | "待学";
+export type LearnerStateLabel = "已学" | "在学" | "未开始";
 
 export type LearnerNodeState = {
   nodeId: string;
@@ -48,7 +48,7 @@ export function learnerCategory(status: UserKnowledgeStatus | null | undefined):
 export function learnerLabel(category: LearnerStateCategory): LearnerStateLabel {
   if (category === "acquired") return "已学";
   if (category === "learning") return "在学";
-  return "待学";
+  return "未开始";
 }
 
 /** Stage/CSS status for dots and capsules; never used as the legend's source. */

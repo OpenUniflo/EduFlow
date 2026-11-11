@@ -226,7 +226,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
   const courseNodes = graphData?.knowledgeNodes ?? [];
   const learnerState = useMemo(() => summarizeLearnerState(learnerKnowledge, courseNodes.map((node) => node.id)), [courseNodes, learnerKnowledge]);
   const learnerById = useMemo(() => new Map(learnerState.nodes.map((node) => [node.nodeId, node])), [learnerState.nodes]);
-  const learnerFor = useCallback((id: string): LearnerNodeState => learnerById.get(id) ?? { nodeId: id, status: null, category: "pending", label: "待学", current: false }, [learnerById]);
+  const learnerFor = useCallback((id: string): LearnerNodeState => learnerById.get(id) ?? { nodeId: id, status: null, category: "pending", label: "未开始", current: false }, [learnerById]);
   const recordById = useMemo(() => new Map(learnerKnowledge.map((record) => [record.nodeId, record])), [learnerKnowledge]);
   const displayNodes = useMemo(() => courseNodes.map((node) => {
     const learner = learnerFor(node.id);
@@ -681,31 +681,27 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
     });
   }, [authenticated, courseLayout, displayNodes, flat, swapped]);
 
-  const actionRow = useCallback((node: CourseSkillTreeNode): ReactNode => {
-    const actions: ReactNode[] = [];
+  /** One card-sized primary action; the detail panel still lists every asset. */
+  const primaryActionFor = useCallback((node: CourseSkillTreeNode): { key: string; text: string } | null => {
     const micro = microLearningProvider?.getLesson(node.id, { courseId }) ?? microLearningProvider?.getLesson(node.id);
-    if (micro) actions.push(<span key="micro">小练习 · {micro.estimatedMinutes ?? 8} 分钟</span>);
+    if (micro) return { key: "micro", text: `小练习 · ${micro.estimatedMinutes ?? 8} 分钟` };
     const assignment = runtime?.assignments.find((item) => node.assignmentIds.includes(item.id));
-    if (assignment) actions.push(<span key="practice">动手任务 {String(assignment.order + 1).padStart(2, "0")}{assignment.estimatedMinutes ? ` · ${assignment.estimatedMinutes} 分钟` : ""}</span>);
+    if (assignment) return { key: "practice", text: `动手任务 ${String(assignment.order + 1).padStart(2, "0")}${assignment.estimatedMinutes ? ` · ${assignment.estimatedMinutes} 分钟` : ""}` };
     const materialContext = node.materialContexts[0];
     const material = materialContext && runtime ? runtime.materials.find((item) => item.id === materialContext.materialId) : null;
     const segment = material && materialContext ? material.segments.find((item) => item.id === materialContext.primarySegmentId) : null;
-    if (segment?.page) actions.push(<span key="material">资料 p.{String(segment.page).padStart(2, "0")}</span>);
-    return actions.length ? <span className="ef-imm-actions">{actions}</span> : null;
+    return segment?.page ? { key: "material", text: `资料 p.${String(segment.page).padStart(2, "0")}` } : null;
   }, [courseId, microLearningProvider, runtime]);
 
+  const actionRow = useCallback((node: CourseSkillTreeNode): ReactNode => {
+    const primary = primaryActionFor(node);
+    return primary ? <span className="ef-imm-actions"><span title={primary.text}>{primary.text}</span></span> : null;
+  }, [primaryActionFor]);
+
   const actionLabels = useCallback((node: CourseSkillTreeNode): string[] => {
-    const actions: string[] = [];
-    const micro = microLearningProvider?.getLesson(node.id, { courseId }) ?? microLearningProvider?.getLesson(node.id);
-    if (micro) actions.push(`小练习 · ${micro.estimatedMinutes ?? 8} 分钟`);
-    const assignment = runtime?.assignments.find((item) => node.assignmentIds.includes(item.id));
-    if (assignment) actions.push(`动手任务 ${String(assignment.order + 1).padStart(2, "0")}${assignment.estimatedMinutes ? ` · ${assignment.estimatedMinutes} 分钟` : ""}`);
-    const materialContext = node.materialContexts[0];
-    const material = materialContext && runtime ? runtime.materials.find((item) => item.id === materialContext.materialId) : null;
-    const segment = material && materialContext ? material.segments.find((item) => item.id === materialContext.primarySegmentId) : null;
-    if (segment?.page) actions.push(`资料 p.${String(segment.page).padStart(2, "0")}`);
-    return actions;
-  }, [courseId, microLearningProvider, runtime]);
+    const primary = primaryActionFor(node);
+    return primary ? [primary.text] : [];
+  }, [primaryActionFor]);
 
   const stageNodes = useMemo<StageNode[]>(() => {
     if (flat && capabilityLayout) {
@@ -756,8 +752,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
       const status = display?.displayStatus ?? (authenticated ? learnerStageStatus("pending") : "available");
       const selected = effectiveSelection?.kind === "knowledge" && effectiveSelection.id === node.id;
       const step = authenticated && routeReady && routeOn ? routeStepNumber(routeOrder, node.id) : null;
-      const micro = microFor(node.id);
-      const statusLine = [display?.displayLabel, micro ? `小练习 ${micro.estimatedMinutes ?? 8} 分钟` : null].filter(Boolean).join(" · ");
+      const statusLine = display?.displayLabel;
       nodes.push({
         id: node.id,
         kind: "knowledge",
@@ -822,7 +817,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
         count: card.count,
         status: card.status === "accepted" ? "completed" : card.status === "started" || card.status === "submitted" || card.status === "needs_revision" ? "learning" : "available",
         meta: card.kind === "empty" ? "—" : card.code,
-        statusLine: card.kind === "empty" ? "暂无对应动手任务" : `${card.kind === "shadow" ? "见主位置 · " : ""}${statusText}${coverage ? ` · 覆盖 ${coverage} 个知识` : ""}`,
+        statusLine: card.kind === "empty" ? "暂无对应动手任务" : `${card.kind === "shadow" ? "见主位置 · " : ""}${statusText}${coverage ? ` · 覆盖 ${coverage} 个知识点` : ""}`,
         empty: card.kind === "empty" || card.kind === "shadow",
         dim: Boolean(effectiveSelection) && !selected && !selectionRelations.practiceKnowledgeIds.has(card.knowledgeId),
         // A Knowledge card and its practice reflection are two faces of one
@@ -863,6 +858,9 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
     }
     return nodes;
   }, [actionLabels, actionRow, assignmentById, assignmentKnowledge, authenticated, capabilityAcquiredIds, capabilityLayout, courseLayout, displayNodes, effectiveSelection, flat, flattenedLayout, knowledgeTitleById, learnerById, microFor, practiceByKnowledge, routeCurrentId, routeOn, routeOrder, routeReady, selectionRelations, targetNodeSet]);
+
+  const currentMarkerCount = stageNodes.filter((node) => node.current).length;
+  const targetMarkerCount = stageNodes.filter((node) => node.target).length;
 
   if (import.meta.env.DEV) (window as unknown as { __efPage?: unknown }).__efPage = {
     flat,
@@ -1066,10 +1064,10 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
   const primaryAssignment = detailAssignments[0];
   const capabilityTitle = currentCapability ? (knowledgeTitleById.get(currentCapability.id) ?? currentCapability.title) : null;
   const detailTitle = currentGroup ? currentGroup.title : currentPractice?.title ?? capabilityTitle ?? currentKnowledge?.title ?? "课程节点";
-  const detailKicker = currentCapability ? "前置能力 · 课程外" : currentPractice || currentGroup ? "动手任务" : "要点";
-  const detailContext = knowledgeForDetail ? `第 ${knowledgeForDetail.lesson} 课 · ${courseChapters.find((chapter) => chapter.id === knowledgeForDetail.chapterId)?.title ?? ""}` : currentCapability?.bridge ? "位于课程知识后方" : "";
+  const detailKicker = currentCapability ? "前置能力 · 课程外" : currentPractice || currentGroup ? "动手任务" : "知识点";
+  const detailContext = knowledgeForDetail ? `第 ${knowledgeForDetail.lesson} 课 · ${courseChapters.find((chapter) => chapter.id === knowledgeForDetail.chapterId)?.title ?? ""}` : currentCapability?.bridge ? "位于课程知识点后方" : "";
   const currentCapabilityAcquired = Boolean(currentCapability && capabilityAcquiredIds.has(currentCapability.id));
-  const detailLabel = currentCapability ? (authenticated ? (currentCapabilityAcquired ? "已具备" : "未具备") : "前置能力") : authenticated ? selectedLearner?.label ?? "待学" : "公开";
+  const detailLabel = currentCapability ? (authenticated ? (currentCapabilityAcquired ? "已具备" : "未具备") : "前置能力") : authenticated ? selectedLearner?.label ?? "未开始" : "公开";
   const detailTone = currentCapability ? (currentCapabilityAcquired ? "acquired" : "quiet") : authenticated ? learnerTone(selectedLearner) : "target";
 
   const capabilityCount = capabilityLayout?.bridgeNodes.length ?? 0;
@@ -1106,7 +1104,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
   };
   const supportCopy = useCallback((item: { direct: number; indirect: number }) => {
     if (item.direct && item.indirect) return `直接 ${item.direct} · 间接 ${item.indirect}`;
-    if (item.direct) return `${item.direct} 个知识`;
+    if (item.direct) return `${item.direct} 个知识点`;
     if (item.indirect) return `直接 0 · 间接 ${item.indirect}`;
     return "经间接路径支撑";
   }, []);
@@ -1133,7 +1131,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
   const capabilityPanel = capListOpen && capRailVisible && !flat && tab === "course" ? (
     <aside className={`ef-imm-cap-panel ${effectiveSelection ? "is-with-detail" : ""}`} aria-label="能力层清单">
       <header>
-        <div><span>前置能力 · {capabilityCount}</span><h2>能力层</h2><p>按掌握情况分组 · 支撑课程知识</p></div>
+        <div><span>前置能力 · {capabilityCount}</span><h2>能力层</h2><p>按掌握情况分组 · 支撑课程知识点</p></div>
         <button type="button" onClick={() => setCapListOpen(false)} aria-label="收起能力层清单"><X size={15} /></button>
       </header>
       <input value={capsQuery} onChange={(event) => setCapsQuery(event.target.value)} type="search" placeholder="搜索能力名称…" aria-label="搜索能力名称" />
@@ -1168,6 +1166,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
     <ObjectShell
       size="panel"
       className="ef-imm-detail"
+      dataFloatingPanel
       icon={currentCapability ? <Network size={16} /> : currentPractice || currentGroup ? <FileText size={16} /> : <BookOpen size={16} />}
       kicker={detailKicker}
       title={detailTitle}
@@ -1215,7 +1214,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
 
       {(currentPractice || currentGroup) && selectionKnowledgeIds.length ? (
         <section className="ef-imm-detail-section">
-          <h3>覆盖的知识 · {selectionKnowledgeIds.length}</h3>
+          <h3>覆盖的知识点 · {selectionKnowledgeIds.length}</h3>
           {selectionKnowledgeIds.map((id) => <button type="button" key={id} className="ef-imm-detail-link" onClick={() => openKnowledge(id)}><i />{knowledgeTitleById.get(id) ?? id}</button>)}
         </section>
       ) : null}
@@ -1226,7 +1225,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
             <h3>支撑这门课里的 · 直接 {capabilitySupportCounts.get(currentCapability.id)?.direct ?? 0} · 间接 {capabilitySupportCounts.get(currentCapability.id)?.indirect ?? 0}</h3>
             {(capabilitySupports.get(currentCapability.id) ?? []).length
               ? (capabilitySupports.get(currentCapability.id) ?? []).map((id) => <button type="button" key={id} className="ef-imm-detail-link" onClick={() => openKnowledge(id)}><i />{knowledgeTitleById.get(id) ?? id}</button>)
-              : <p>尚未连接课程知识。</p>}
+              : <p>尚未连接课程知识点。</p>}
           </section>
           <section className="ef-imm-detail-section">
             <h3>说明</h3>
@@ -1286,7 +1285,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
         {routeControl.draft.includeNodeIds.length ? <ul>{routeControl.draft.includeNodeIds.map((id) => <li key={id}>必须经过 · {knowledgeTitleById.get(id) ?? id}<button type="button" aria-label={`移除必须经过 ${id}`} onClick={() => routeControl.removeNodeConstraint(id)}>×</button></li>)}</ul> : <p>尚未添加「必须经过」。</p>}
         {routeControl.draft.excludeNodeIds.length ? <ul>{routeControl.draft.excludeNodeIds.map((id) => <li key={id}>不经过 · {knowledgeTitleById.get(id) ?? id}<button type="button" aria-label={`移除不经过 ${id}`} onClick={() => routeControl.removeNodeConstraint(id)}>×</button></li>)}</ul> : <p>尚未添加「不经过」。</p>}
       </section>
-      {currentCapability ? <section className="ef-imm-node-inspector"><h3>{currentCapability.title}</h3><p>{currentCapability.bridge ? "课程外支撑能力" : "课程知识"}</p><div><button type="button" disabled={routeControl.busy} onClick={() => routeControl.mark(currentCapability.id, "include")}>必须经过</button><button type="button" disabled={routeControl.busy} onClick={() => routeControl.mark(currentCapability.id, "exclude")}>不经过</button><button type="button" disabled={routeControl.busy} onClick={() => routeControl.undoNode(currentCapability.id)}>撤销</button></div></section> : <p className="ef-imm-panel-note">点击场景中的能力节点，选择「必须经过」或「不经过」。</p>}
+      {currentCapability ? <section className="ef-imm-node-inspector"><h3>{currentCapability.title}</h3><p>{currentCapability.bridge ? "课程外支撑能力" : "课程知识点"}</p><div><button type="button" disabled={routeControl.busy} onClick={() => routeControl.mark(currentCapability.id, "include")}>必须经过</button><button type="button" disabled={routeControl.busy} onClick={() => routeControl.mark(currentCapability.id, "exclude")}>不经过</button><button type="button" disabled={routeControl.busy} onClick={() => routeControl.undoNode(currentCapability.id)}>撤销</button></div></section> : <p className="ef-imm-panel-note">点击场景中的能力节点，选择「必须经过」或「不经过」。</p>}
       {diff ? <section className="ef-imm-preview-card"><h3>预览变化</h3><div className="ef-imm-preview-stats"><span><b>+{diff.addedNodeIds.length}</b>新增</span><span><b>−{diff.removedNodeIds.length}</b>移除</span><span><b>+{diff.addedEdgeIds.length}</b>关系</span></div><ul>{diff.addedNodeIds.map((id) => <li key={id} className="is-added">+ {knowledgeTitleById.get(id) ?? id}</li>)}{diff.removedNodeIds.map((id) => <li key={id} className="is-removed">− {knowledgeTitleById.get(id) ?? id}</li>)}</ul></section> : null}
       {routeControl.preview && !routeControl.preview.valid ? <section className="ef-imm-preview-card is-conflict"><h3>需要处理的结构冲突</h3><ul>{routeControl.preview.conflicts.slice(0, 5).map((conflict, index) => {
         const copy = routeConflictCopy(conflict, (id) => knowledgeTitleById.get(id) ?? id);
@@ -1320,7 +1319,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
           <span className="ef-imm-crumb"><span>{onBackToRoute ? "← 路线" : "← 我的地图"}</span><b>{runtime.course.title}</b></span>
           {authenticated
             ? <span className="ef-imm-progress-pill"><b>{progress}%</b><i><b style={{ width: `${progress}%` }} /></i><span>已学 {completedCount} / {courseNodes.length}{currentTitle ? ` · 当前：${currentTitle}` : ""}</span></span>
-            : <span className="ef-imm-public-pill"><Lock size={12} />公开课程 · {courseChapters.length} 章 · {courseNodes.length} 个知识</span>}
+            : <span className="ef-imm-public-pill"><Lock size={12} />公开课程 · {courseChapters.length} 章 · {courseNodes.length} 个知识点</span>}
         </div>
         <nav className="ef-imm-segmented" aria-label="课程视图" role="tablist">
           <button type="button" role="tab" aria-selected={tab === "course" && !flat} className={tab === "course" && !flat ? "is-on" : ""} onClick={() => switchTab("course")}>课程树</button>
@@ -1426,20 +1425,18 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
             aria-label={`${runtime.course.title} 三维课程场景`}
           />
         )}
-        {authenticated ? <div className="ef-imm-status-legend" role="group" aria-label={`课程学习状态图例：已学 ${learnerState.counts.acquired}，在学 ${learnerState.counts.learning}，待学 ${learnerState.counts.pending}，合计 ${learnerState.counts.total}`}>
+        {authenticated ? <div className="ef-imm-status-legend ef-bottom-legend" role="group" aria-label={`课程学习状态图例：已学 ${learnerState.counts.acquired}，在学 ${learnerState.counts.learning}，未开始 ${learnerState.counts.pending}，合计 ${learnerState.counts.total}`}>
           <span className="ef-imm-status-legend-states">
             <span><i className="is-learned" />已学 {learnerState.counts.acquired}</span>
             <span><i className="is-learning" />在学 {learnerState.counts.learning}</span>
-            <span><i className="is-pending" />待学 {learnerState.counts.pending}</span>
+            <span><i className="is-pending" />未开始 {learnerState.counts.pending}</span>
             <span className="ef-imm-status-legend-total">合计 <b>{learnerState.counts.total}</b></span>
           </span>
-          <span className="ef-imm-status-legend-markers" aria-label="不计入状态合计的呈现标记">
-            <span><i className="is-current" />当前 {learnerState.counts.current}</span>
-            <span><i className="is-target" />目标 {learnerState.counts.target}</span>
-            {capabilityCount > 0 ? <span><i className="is-capability" />前置能力 {capabilityCount}</span> : null}
-            <small>标记不计入</small>
+          <span className="ef-imm-status-legend-markers" aria-label="不计入状态合计的呈现标记" title="当前、目标、前置能力不计入状态合计">
+            <span><i className="is-current" />当前 {currentMarkerCount}</span>
+            <span><i className="is-target" />目标 {targetMarkerCount}</span>
+            {capabilityCount > 0 ? <span title={`拖动旋转可查看 ${capabilityCount} 个前置能力`}><i className="is-capability" />前置能力 {capabilityCount}</span> : null}
           </span>
-          {capabilityCount > 0 && pose === "front" && !flat && tab === "course" ? <span className="ef-imm-cap-hint">拖动旋转可查看 {capabilityCount} 个前置能力</span> : null}
         </div> : <div className="ef-imm-status-legend is-public" role="status"><Lock size={12} /><span>公开课程 · 只读 · 登录后查看学习状态和路线</span></div>}
 
         {!flat && tab !== "route" ? <SceneZoomToolbar
@@ -1453,7 +1450,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
 
         {tab === "course" && !flat ? <div className="ef-imm-toolbar" role="toolbar" aria-label="课程树工具">
           <button type="button" aria-pressed={swapped} onClick={() => switchLayer(!swapped)}><Layers3 size={14} />切换到{swapped ? "技能树" : "动手任务"}</button>
-          {authenticated ? <button type="button" aria-pressed={routeOn} onClick={() => setRouteOn((value) => !value)}><span className="ef-imm-switch" />{recommendedRoute ? "推荐路线" : "我的路线"}</button> : null}
+          {authenticated ? <button type="button" aria-pressed={routeOn} onClick={() => setRouteOn((value) => !value)}><span className="ef-imm-switch" />{routeOn ? "隐藏路线" : "显示路线"}</button> : null}
           {authenticated && ROUTE_ADJUSTMENT_ENABLED ? <button type="button" onClick={enterFlatten} disabled={!capabilityLayout || !activeRoute}><Edit3 size={14} />调整路线</button> : null}
           {authenticated && routeReady && !usingActiveRoute ? <span className="ef-imm-toolbar-note">个人路线未启用 · 按课程顺序</span> : null}
           {authenticated && routeReady && usingActiveRoute ? <span className="ef-imm-toolbar-note">{recommendedRoute ? "推荐路线" : "个人路线 · 已采用"}</span> : null}

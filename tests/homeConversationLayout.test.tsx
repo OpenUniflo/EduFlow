@@ -110,7 +110,7 @@ describe('Home conversation column anchor', () => {
     expect(second).toBeGreaterThan(card);
   });
 
-  it('renders a legacy Course Search card from structured content', () => {
+  it('renders a legacy Course Search result from structured content', () => {
     const html = conversation([message([{ type: 'text', text: '我找到了这些课程。' }], {
       structuredContent: {
         type: 'course_search', schemaVersion: 1, planningId: 'p1', goalText: '搞懂 Agent', intentSummary: '围绕 Agent 的学习目标',
@@ -118,8 +118,8 @@ describe('Home conversation column anchor', () => {
       }
     })]);
     expect(html).toContain('我找到了这些课程。');
-    expect(html).toContain('课程匹配');
     expect(html).toContain('课程匹配结果');
+    expect(html).toContain('暂无匹配课程');
   });
 
   it('renders a legacy Course Creation Brief with its creation entry', () => {
@@ -131,7 +131,7 @@ describe('Home conversation column anchor', () => {
     })]);
     expect(html).toContain('课程创建简报');
     expect(html).toContain('做一个能查文档的 Agent');
-    expect(html).toContain('进入课程创建');
+    expect(html).toContain('查看课程简介');
   });
 
   it('fills the work area and keeps the bars sticky when a side panel is pushed open', () => {

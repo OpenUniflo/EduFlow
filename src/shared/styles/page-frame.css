@@ -1,0 +1,86 @@
+/*
+ * One global-navigation placeholder.
+ *
+ * The app shell already offsets document-flow content. Pages that position
+ * chrome with `position: fixed` cannot inherit that offset, so they use the
+ * same shared variable instead of page-specific magic numbers. Change the rail
+ * width or gap once and every page follows.
+ */
+:root {
+  --ef-global-nav-rail: var(--nav-w);
+  --ef-global-nav-gap: var(--sp-12);
+  --ef-page-left: calc(var(--ef-global-nav-rail) + var(--ef-global-nav-gap));
+}
+
+.ef-app-main {
+  margin-left: var(--ef-page-left);
+}
+
+/* Material reader: fixed header, outline and reading column start to the
+ * right of the rail. These are the same three edges on every width. */
+.ef-app-main .atlas-lesson-page.material-reader-current {
+  --material-header-left: calc(var(--ef-page-left) + var(--material-shell-margin));
+}
+
+.ef-app-main .material-reader-current .atlas-lesson-header {
+  left: var(--material-header-left);
+}
+
+.ef-app-main .material-reader-current .atlas-lesson-outline {
+  left: calc(var(--ef-page-left) + var(--material-shell-margin));
+}
+
+.ef-app-main .material-reader-current .atlas-lesson-scroll {
+  left: calc(var(--ef-page-left) + var(--material-shell-margin) + var(--material-left) + var(--material-panel-gap));
+}
+
+@media (max-width: 900px) {
+  :root {
+    --ef-global-nav-rail: 0px;
+    --ef-global-nav-gap: 0px;
+  }
+
+  .ef-app-main .material-reader-current .atlas-lesson-header {
+    left: var(--material-shell-margin);
+  }
+
+  .ef-app-main .material-reader-current .atlas-lesson-outline {
+    left: var(--material-shell-margin);
+  }
+}
+
+/* One floating-Assistant footprint shared by every page. Bottom-right page
+   controls and right-side panels read these values instead of adding local
+   offsets. --ef-floating-avoid-right is set by the Assistant when a marked
+   right panel is open, so the trigger moves outside it. */
+:root {
+  --ef-assistant-trigger-size: 52px;
+  --ef-assistant-trigger-inset: var(--sp-24);
+  --ef-assistant-trigger-gap: var(--sp-12);
+  --ef-assistant-safe-right: calc(var(--ef-assistant-trigger-inset) + var(--ef-assistant-trigger-size) + var(--ef-assistant-trigger-gap));
+  --ef-assistant-safe-bottom: calc(var(--ef-assistant-trigger-inset) + var(--ef-assistant-trigger-size));
+}
+
+/* One shared bottom layout. The left zone keeps the Archive level chip clear;
+   the right zone reserves the scene toolbar, the Assistant trigger and any
+   open right panel. Legends live in the space between. */
+:root {
+  --ef-bottom-left-zone: 260px;
+  --ef-bottom-right-zone: calc(var(--ef-assistant-safe-right) + 320px);
+  --ef-bottom-right-zone-active: max(var(--ef-bottom-right-zone), calc(var(--ef-floating-avoid-right, 0px) + var(--ef-assistant-safe-right)));
+}
+
+.ef-bottom-legend.ef-bottom-legend {
+  left: calc(var(--ef-bottom-left-zone) + (100% - var(--ef-bottom-left-zone) - var(--ef-bottom-right-zone-active)) / 2);
+  max-width: calc(100% - var(--ef-bottom-left-zone) - var(--ef-bottom-right-zone-active));
+  transform: translateX(-50%);
+  overflow: hidden;
+}
+
+@media (max-width: 1180px) {
+  .ef-bottom-legend.ef-bottom-legend {
+    left: var(--sp-16);
+    max-width: calc(100% - 290px);
+    transform: none;
+  }
+}

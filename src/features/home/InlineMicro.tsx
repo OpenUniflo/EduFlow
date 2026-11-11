@@ -179,7 +179,7 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
     <Pill tone={completed ? "ok" : progress ? "brand" : "quiet"} dot>{completed ? "已完成" : progress ? "进行中" : "未开始"}</Pill>
     <span>约 {path.estimatedMinutes} 分钟</span>
     <span>{completeSteps} / {steps} 步</span>
-    {courseId ? <span>{applicationServices.courseRepository.getCourse(courseId)?.course.title ?? "课程"}</span> : <span>独立学习</span>}
+    {courseId ? <span>{applicationServices.courseRepository.getCourse(courseId)?.course.title ?? "课程"}</span> : null}
   </div>;
 
   const header = <div className="ef-home-micro-head">

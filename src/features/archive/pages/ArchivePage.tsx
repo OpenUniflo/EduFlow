@@ -29,6 +29,7 @@ import { requestAtlas3DLayout } from "../model/atlas3dLayoutClient";
 import { requestPersonLayout } from "../model/personLayoutClient";
 import type { PersonLayout } from "../model/personLayout";
 import { buildCoursePlane, buildDraftPlane, type CoursePlaneLayout } from "../model/coursePlaneLayout";
+import { selectCurrentChapterId } from "../model/courseCurrentChapter";
 import { deriveAssistantPresentation, type ArchiveAssistantPresentation } from "../model/assistantPresentation";
 import { parseArchiveSearch, type ArchivePanel } from "../model/atlasParams";
 import "./archive.css";
@@ -183,6 +184,11 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       return null;
     }
   }, [courseStates, focusedRuntime, graph, records, session]);
+  // The course plane opens on the chapter the learner is actually on. This is
+  // a projection of real course state; it only chooses a camera anchor.
+  const currentChapterId = useMemo(() => focusedGraphData
+    ? selectCurrentChapterId({ chapters: focusedGraphData.chapters, nodes: focusedGraphData.knowledgeNodes })
+    : null, [focusedGraphData]);
   // Both the Archive course bar and the course page read the same projection:
   // learned/practicing/mastered all count as 已学.
   const focusedLearned = useMemo(() => focusedGraphData
@@ -345,7 +351,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
 
   const selectedNodeRef = useRef(false);
   selectedNodeRef.current = Boolean(selectedNode);
-  const fitCourseInView = useCallback(() => {
+  const fitCourseInView = useCallback((mode: "readable" | "all" = "readable") => {
     if (!focusedCourse && !draftActive) return;
     if (!sceneReady) return;
     sceneRef.current?.fitCourse({
@@ -353,8 +359,11 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       right: selectedNodeRef.current ? 392 : 12,
       top: 188,
       bottom: 96
+    }, {
+      mode,
+      ...(mode === "readable" && currentChapterId ? { anchorChapterId: currentChapterId } : {})
     });
-  }, [draftActive, focusedCourse, leftInset, sceneReady]);
+  }, [currentChapterId, draftActive, focusedCourse, leftInset, sceneReady]);
 
   const fitPersonFocus = useCallback(() => {
     if (!sceneReady || !personFocusIdsRef.current.length) return;
@@ -393,7 +402,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       else fitCourseInView();
     }, 120);
     return () => window.clearTimeout(timer);
-  }, [fitCourseInView, focusedCourse, reducedMotion, scenePlanePositions, sceneReady]);
+  }, [currentChapterId, fitCourseInView, focusedCourse, reducedMotion, scenePlanePositions, sceneReady]);
 
   useEffect(() => {
     if (!sceneReady) return;
@@ -699,7 +708,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       {!session ? (
         <div className="ef-atlas-guest">
           <button type="button" className="ef-atlas-guest-login" onClick={() => navigate("/login", { state: authGateState(location) })}>登录</button>
-          <span><Lock size={11} aria-hidden />未登录 · 仅公开知识</span>
+          <span><Lock size={11} aria-hidden />未登录 · 仅公开可见知识点</span>
         </div>
       ) : (
         <ArchivePeopleBar
@@ -789,14 +798,14 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
         onZoomIn={() => sceneRef.current?.zoomBy(0.82)}
         onZoomOut={() => sceneRef.current?.zoomBy(1.22)}
         onFit={() => {
-          if (focusedCourse || assistantDraft) sceneRef.current?.fitCourse({ left: leftInset + 12, right: 12, top: 188, bottom: 96 });
+          if (focusedCourse || assistantDraft) sceneRef.current?.fitCourse({ left: leftInset + 12, right: 12, top: 188, bottom: 96 }, { mode: "all" });
           else sceneRef.current?.resetView();
         }}
         onFront={() => sceneRef.current?.frontView()}
       />
 
-      <div className="ef-atlas-legend" aria-live="polite">
-        {!session ? <span><i className="is-public" aria-hidden />公开知识 {model.stats.totalNodes}</span> : null}
+      <div className="ef-atlas-legend ef-bottom-legend" aria-live="polite">
+        {!session ? <span><i className="is-public" aria-hidden />公开可见知识点 {model.stats.totalNodes}</span> : null}
         {session && !selectedPeopleIds.length ? <span><i className="is-me" aria-hidden />我的知识 {model.stats.mine}</span> : null}
         {selectedPeople.length ? selectedPeople.map((person) => <span key={person.id}><i style={{ background: `var(--p-${person.accent})` }} aria-hidden />{person.name} {person.nodeIds.size}</span>) : null}
         {assistant.state === "results" || assistant.state === "searching" ? <span><i className="is-hit" aria-hidden />助手命中 {assistant.candidateIds.length}</span> : null}

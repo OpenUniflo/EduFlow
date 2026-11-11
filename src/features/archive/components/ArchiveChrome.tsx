@@ -1,6 +1,7 @@
 import { ArrowRight, BookOpen, ChevronRight, Lock, X } from "lucide-react";
 import type { ArchiveCourse, ArchiveEdge, ArchiveModel, ArchiveNode } from "../model/atlasModel";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
+import { knowledgeScopeLabelFor, knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 
 export function ArchiveLevelChip({ level }: { level: number }) {
   return (
@@ -25,7 +26,7 @@ export function ArchiveCourseFocusBar({ course, learned, leftInset = 0, onOpen }
     >
       <div className="ef-atlas-coursebar-title">
         <span className="ef-atlas-coursebar-mark" aria-hidden>{course.title.slice(0, 1)}</span>
-        <span><b>{course.title}</b><small>点空白处返回星图</small></span>
+        <span><b>{course.title}</b><small>点空白处返回星图 · 右键平移 · 适配全图看全部</small></span>
       </div>
       <div className="ef-atlas-coursebar-progress">
         <span className="ef-atlas-progress-track" aria-hidden><i style={{ width: `${Math.max(0, Math.min(100, course.progress))}%` }} /></span>
@@ -49,7 +50,7 @@ export function ArchiveDraftFocusBar({ title, knowledgeCount, weeks, leftInset =
         <span><b>{title}</b><small>课程创建简报 · 草稿未创建</small></span>
       </div>
       <div className="ef-atlas-draft-meta">
-        <span>知识范围 <b>{knowledgeCount}</b></span>
+        <span>知识点范围 <b>{knowledgeCount}</b></span>
         <span>预计 <b>{weeks}</b> 周</span>
       </div>
       <span className="ef-atlas-draft-hint">点空白处返回星图</span>
@@ -80,9 +81,9 @@ export function ArchiveNodePanel({ node, model, edges, topicName, learners, onCl
     })
     .sort((left, right) => left.relation.localeCompare(right.relation) || left.node.title.localeCompare(right.node.title))
     .slice(0, 8);
-  const status = node.isMine ? (node.status === "learning" ? "在学" : node.status === "learned" ? "已学" : node.status === "practicing" ? "动手任务中" : node.status === "mastered" ? "已掌握" : "可探索") : "可探索";
+  const status = node.isMine ? knowledgeStateLabelFor(node.status) : knowledgeScopeLabelFor(node.scope);
   return (
-    <aside className="ef-atlas-detail ef-ui-glass ef-ui-glass--regular" aria-label={`${node.title} 知识详情`}>
+    <aside className="ef-atlas-detail ef-ui-glass ef-ui-glass--regular" data-floating-panel aria-label={`${node.title} 知识详情`}>
       <header>
         <div>
           <span className="ef-atlas-detail-kicker"><i style={{ background: node.color }} aria-hidden />{node.domainTitle}<em>·</em>{topicName}</span>
@@ -91,8 +92,8 @@ export function ArchiveNodePanel({ node, model, edges, topicName, learners, onCl
         <button type="button" className="ef-atlas-icon-btn" onClick={onClose} aria-label="关闭知识详情"><X size={15} aria-hidden /></button>
       </header>
       <div className="ef-atlas-detail-badges">
-        <span className={`ef-atlas-status status-${node.status}`}>{node.isMine ? `我的知识 · ${status}` : "公开学习内容"}</span>
-        {node.scope !== "global" ? <span>{node.scope === "tenant" ? "组织知识" : "个人知识"}</span> : null}
+        <span className={`ef-atlas-status status-${node.status}`}>{node.isMine ? `我的知识 · ${status}` : knowledgeScopeLabelFor(node.scope)}</span>
+        {node.isMine ? <span>{knowledgeScopeLabelFor(node.scope)}</span> : null}
       </div>
       <p className="ef-atlas-detail-description">{node.description}</p>
       {learners.length ? (
@@ -105,7 +106,7 @@ export function ArchiveNodePanel({ node, model, edges, topicName, learners, onCl
       ) : null}
       {neighbours.length ? (
         <section>
-          <h3>相邻知识 · {neighbours.length}</h3>
+          <h3>相邻知识点 · {neighbours.length}</h3>
           <div>
             {neighbours.map((item) => (
               <button type="button" key={`${item.node.id}:${item.relation}`} onClick={() => onSelectNode(item.node.id)}>

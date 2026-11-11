@@ -647,3 +647,9 @@
 }
 
 .micro-step-complete .micro-completion-next { align-self: flex-start; }
+
+/* h5p-standalone `div` mode: the player renders in this document, not in an
+   about:blank iframe. Give the real content a readable stage. */
+.micro-h5p-host .h5p-content,
+.micro-h5p-host .h5p-iframe { min-height: 320px; }
+.micro-h5p-host .h5p-content > * { max-width: 100%; }

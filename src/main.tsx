@@ -7,6 +7,7 @@ import "@/shared/styles/tokens.css";
 import "@/shared/styles/shell.css";
 import "@/shared/styles/legacy.css";
 import "@/shared/styles/product.css";
+import "@/shared/styles/page-frame.css";
 
 const router = createBrowserRouter([{ path: "*", element: <App /> }]);
 

@@ -1,5 +1,6 @@
 import type { MockSession } from "@/features/auth/types";
 import { canManageCourses, canManageKnowledgeDomains } from "@/features/auth/capabilities";
+import { knowledgeScopeLabelFor, knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 import type { DomainGovernanceState } from "@/features/knowledge/domain/DomainGovernanceRepository";
 import type { KnowledgeGraph } from "@/features/knowledge/types";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
@@ -82,13 +83,9 @@ export function buildPageSearchItems(session: Pick<MockSession, "role" | "capabi
   }).map(({ requiresSession: _session, requiresTeaching: _teaching, requiresAdmin: _admin, ...page }) => page);
 }
 
-const STATUS_LABEL: Record<UserKnowledgeStatus | "explore", string> = {
-  learning: "在学",
-  learned: "已学",
-  practicing: "练习中",
-  mastered: "已掌握",
-  explore: "目标"
-};
+const STATUS_LABEL = new Proxy({} as Record<UserKnowledgeStatus | "explore", string>, {
+  get: (_target, key) => knowledgeStateLabelFor(String(key))
+});
 
 function courseStateMeta(course: ArchiveCourse) {
   if (course.state === "active") return `${course.chapterCount} 章 · ${course.progress}%`;
@@ -118,7 +115,7 @@ function nodeCourseLocation(node: ArchiveNode, runtimes: readonly CourseRuntimeD
 
 function knowledgeMeta(node: ArchiveNode, runtimes: readonly CourseRuntimeData[]) {
   const location = nodeCourseLocation(node, runtimes);
-  const status = node.isCurrent ? "当前" : STATUS_LABEL[node.status];
+  const status = node.isCurrent ? "当前" : node.isMine ? STATUS_LABEL[node.status] : knowledgeScopeLabelFor(node.scope);
   return location ? `第 ${location.chapter} 章 · ${status}` : `${node.domainTitle} · ${status}`;
 }
 

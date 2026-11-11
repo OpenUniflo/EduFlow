@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Target } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { archiveHref } from "@/features/archive/model/atlasParams";
 import { useAssistantRuntime } from "../AssistantRuntimeContext";
 import { snapshotAssistantContext, type AssistantContext } from "../assistantContext";
 import type { AssistantCardActions } from "../cards/AssistantCardView";
+import type { AssistantObjectTarget } from "../objectTarget";
 import { AssistantTimelineMessage } from "./AssistantTimeline";
 import { ConversationWorkspace } from "../conversation/ConversationWorkspace";
 
@@ -14,18 +13,19 @@ import { ConversationWorkspace } from "../conversation/ConversationWorkspace";
  */
 export function AssistantConversation({ context }: { context: AssistantContext }) {
   const runtime = useAssistantRuntime();
-  const navigate = useNavigate();
   const [goalMode, setGoalMode] = useState(false);
   const [suggestionInsertion, setSuggestionInsertion] = useState<{ id: string; text: string } | null>(null);
   const visible = runtime.chatMessages.slice(-8);
   const contextSnapshot = snapshotAssistantContext(context);
   const actions: AssistantCardActions = {
-    openCourse: (courseId) => navigate(`/courses/${encodeURIComponent(courseId)}`),
-    openPractice: (courseId, assignmentId) => navigate(`/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignmentId)}`, { state: { returnTo: "/" } }),
-    openBrief: (messageId) => navigate(`/courses/create?briefId=${encodeURIComponent(messageId)}`),
-    openArchive: (focus) => navigate(archiveHref({ focus: focus as `knowledge:${string}` | "me" | undefined })),
-    openRecords: () => navigate("/records"),
-    openMaterial: (courseId, materialId, segmentId) => navigate(`/courses/${encodeURIComponent(courseId)}/materials/${encodeURIComponent(materialId)}${segmentId ? `?segment=${encodeURIComponent(segmentId)}` : ""}`),
+    // The page-owned Object Shell host is the only panel owner. A card never
+    // navigates; it announces the object it describes and stays on this page.
+    openObject: (target: AssistantObjectTarget) => {
+      // The object panel owns the screen while it is open; collapse the
+      // floating surface instead of stacking a second right-hand column.
+      window.dispatchEvent(new Event("eduflow:assistant-close"));
+      window.dispatchEvent(new CustomEvent("eduflow:open-object", { detail: target }));
+    },
     useCourse: (planningMessageId, courseId, context) => runtime.useExistingCourse(planningMessageId, courseId, context),
     refineGoal: (planningMessageId, refinement, context) => runtime.refineGoal(planningMessageId, refinement, context),
     prepareBrief: (planningMessageId, input, context) => runtime.prepareCourseBrief({ planningMessageId, ...input }, context)

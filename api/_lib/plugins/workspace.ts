@@ -8,6 +8,10 @@ export const workspacePlugin: AssistantPlugin = {
   id: "workspace",
   title: "面板控制",
   cards: [],
+  progress: {
+    suggestFollowUps: "整理后续建议",
+    openWorkspacePanel: "打开面板",
+  },
   tools: ({ client, user, context }) => ({
     suggestFollowUps: tool({
       description: "Offer zero to three short next-message suggestions after an answer. For a substantive learning answer with a useful next step, provide one to three; omit only for small talk, a plain fact, an error, or when there is genuinely nothing useful to suggest. The client only fills the chosen sentence into the input box; it never sends it automatically.",

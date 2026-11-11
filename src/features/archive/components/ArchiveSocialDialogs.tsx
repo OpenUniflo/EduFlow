@@ -4,6 +4,7 @@ import type { FollowedPerson } from "@/features/profile/people/PeopleRepository"
 import type { ArchiveModel } from "../model/atlasModel";
 import { Avatar } from "@/shared/ui/Avatar";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
+import { knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 
 function shortName(person: FollowedPerson) {
   return person.displayName.replace(/^示例\s*·\s*/, "");
@@ -56,7 +57,7 @@ function PersonRow({ person, tab, selected, onCompare, onView, onPreviewAction }
       <div className="ef-archive-person-copy">
         <b>{person.displayName}</b>
         <span>{person.visibility === "private" ? "未公开学习进度 · 仅公开作品" : person.activityLabel}</span>
-        <small>{person.bio ?? "示例地图"} · {person.visibility === "private" ? "仅公开概览" : `${person.sharedKnowledgeIds?.length ?? person.sharedKnowledgeCount} 个公开知识`}</small>
+        <small>{person.bio ?? "示例地图"} · {person.visibility === "private" ? "仅公开概览" : `${person.sharedKnowledgeIds?.length ?? person.sharedKnowledgeCount} 个公开可见知识点`}</small>
       </div>
       <div className="ef-archive-person-actions">
         <button type="button" className={selected ? "is-on" : ""} onClick={onCompare} aria-pressed={selected}>{selected ? "对比中" : "加入对比"}</button>
@@ -130,7 +131,7 @@ export function ArchivePeopleDialog({ open, tab, people, selectedIds, model, ses
             ))}
             <div className="ef-archive-share-section"><b>分项</b><span>链接与预览同步</span></div>
             <label className="ef-archive-switch"><input type="checkbox" checked={shareProgress} onChange={(event) => setShareProgress(event.target.checked)} /><span /><span><b>学习进度</b><small>{model.stats.learned} 已学 · {model.stats.learning} 在学</small></span></label>
-            <label className="ef-archive-switch"><input type="checkbox" checked={shareRoute} onChange={(event) => setShareRoute(event.target.checked)} /><span /><span><b>路线</b><small>只包含公开知识，不含分数</small></span></label>
+            <label className="ef-archive-switch"><input type="checkbox" checked={shareRoute} onChange={(event) => setShareRoute(event.target.checked)} /><span /><span><b>路线</b><small>只包含公开可见知识点，不含分数</small></span></label>
             <label className="ef-archive-switch"><input type="checkbox" checked={shareWorks} onChange={(event) => setShareWorks(event.target.checked)} /><span /><span><b>作品</b><small>精选作品，不含分数与失败尝试</small></span></label>
             <div className="ef-archive-never"><Lock size={12} aria-hidden /><span><b>永不展示</b> 分数、失败尝试、对话与 AI 评价细节。</span></div>
           </div>
@@ -139,7 +140,7 @@ export function ArchivePeopleDialog({ open, tab, people, selectedIds, model, ses
             <ArchiveMiniMap model={model} />
             <div className="ef-archive-share-card">
               <Avatar name={sessionName} size={40} personColor="me" decorative />
-              <div><b>{sessionName} · 公开地图</b><span>{model.stats.mine} 个公开知识 · {model.stats.learned} 已学 · {model.stats.learning} 在学</span></div>
+              <div><b>{sessionName} · 公开地图</b><span>{model.stats.mine} 个公开可见知识点 · {model.stats.learned} 已学 · {model.stats.learning} 在学</span></div>
               <em>{shareScope === "private" ? "仅自己" : shareScope === "link" ? "有链接的人" : shareScope === "org" ? "组织内" : "关注我的人"}</em>
             </div>
             <div className="ef-archive-link-box"><span>预览中不会生成真实链接</span><button type="button" disabled><Copy size={13} aria-hidden />复制链接</button></div>
@@ -170,7 +171,7 @@ export function ArchiveNotificationsDialog({ open, onClose }: { open: boolean; o
   if (!open) return null;
   const samples = [
     { id: "n1", icon: <Users size={15} aria-hidden />, title: "示例 · 阿青 公开了新的学习进度", detail: "3 门课程 · 本周 5 次学习", time: "今天 09:20" },
-    { id: "n2", icon: <UserRound size={15} aria-hidden />, title: "示例 · 周然 邀请你对比地图", detail: "仅包含公开知识，不含分数与失败尝试", time: "昨天 18:40" },
+    { id: "n2", icon: <UserRound size={15} aria-hidden />, title: "示例 · 周然 邀请你对比地图", detail: "仅包含公开可见知识点，不含分数与失败尝试", time: "昨天 18:40" },
     { id: "n3", icon: <Bell size={15} aria-hidden />, title: "示例 · 本周学习回顾已生成", detail: "预览通知，不会发送真实消息", time: "10/27 08:00" }
   ];
   return (
@@ -216,7 +217,7 @@ export function ArchivePeoplePicker({ open, people, selectedIds, onClose, onTogg
           return (
             <div className="ef-archive-picker-row" key={person.id} data-preview="sample">
               <Avatar name={shortName(person)} size={32} personColor={person.accent} decorative />
-              <span><b>{shortName(person)}</b><small>{person.visibility === "private" ? "未公开学习进度" : `公开 ${person.sharedKnowledgeIds?.length ?? person.sharedKnowledgeCount} 个知识`}</small></span>
+              <span><b>{shortName(person)}</b><small>{person.visibility === "private" ? "未公开学习进度" : `公开 ${person.sharedKnowledgeIds?.length ?? person.sharedKnowledgeCount} 个知识点`}</small></span>
               <button type="button" disabled={selected || selectedIds.length >= 3} onClick={() => onToggle(person)}>{selected ? <><Check size={12} aria-hidden />已选</> : "加入对比"}</button>
             </div>
           );
@@ -257,7 +258,7 @@ export function ArchivePeerCard({ person, model, onClose, onCompare, onOpenCours
       <PreviewBadge />
       <p className="ef-archive-peer-bio">{person.bio ?? "示例地图"}</p>
       <div className="ef-archive-peer-stats">
-        <span><b>{shared.length}</b><small>公开知识</small></span>
+        <span><b>{shared.length}</b><small>公开可见知识点</small></span>
         <span><b>{overlap}</b><small>和你重合</small></span>
         <span><b>{Math.max(0, shared.length - overlap)}</b><small>她有你没有</small></span>
       </div>
@@ -303,7 +304,7 @@ export function ArchiveCompareCard({ model, sessionName, peopleCount, onShare, o
         ))}
       </div>
       <div className="ef-archive-compare-actions"><button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={onShare}>分享</button><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={onVisibility}>可见性<ArrowRight size={13} aria-hidden /></button></div>
-      <p className="ef-archive-peer-note"><button type="button" className="ef-archive-text-btn" onClick={onFitMine}>本周学习 {model.stats.weekDays} 天 · {model.stats.mine} 个知识</button></p>
+      <p className="ef-archive-peer-note"><button type="button" className="ef-archive-text-btn" onClick={onFitMine}>本周学习 {model.stats.weekDays} 天 · {model.stats.mine} 个知识点</button></p>
     </aside>
   );
 }
@@ -327,10 +328,10 @@ export function ArchiveCompareNodeCard({ node, people, sessionName, onClose, onA
       <div className="ef-archive-compare-node-list">
         {people.map((person) => {
           const shared = Boolean(person.sharedKnowledgeIds?.includes(node.id));
-          const status = shared ? (person.sharedKnowledgeStatuses?.[node.id] === "learning" ? "在学" : "已学") : "没有";
+          const status = shared ? knowledgeStateLabelFor(person.sharedKnowledgeStatuses?.[node.id]) : "没有";
           return <div key={person.id} className={shared ? "is-yes" : ""}><i style={{ background: `var(--p-${person.accent === "me" ? "me" : person.accent})` }} aria-hidden /><b>{shortName(person)}</b><span>{status}</span></div>;
         })}
-        <div className={node.isMine ? "is-yes" : ""}><i style={{ background: "var(--p-me)" }} aria-hidden /><b>{sessionName}</b><span>{node.isMine ? (node.status === "learning" ? "在学" : node.status === "learned" || node.status === "mastered" ? "已学" : "目标") : "没有"}</span></div>
+        <div className={node.isMine ? "is-yes" : ""}><i style={{ background: "var(--p-me)" }} aria-hidden /><b>{sessionName}</b><span>{node.isMine ? knowledgeStateLabelFor(node.status) : "没有"}</span></div>
       </div>
       <div className="ef-archive-compare-node-actions">
         <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => setLearned(true)} disabled={learned || node.isMine}>{learned ? "已加入目标" : "我也想学"}</button>

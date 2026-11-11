@@ -24,7 +24,7 @@ export function mainlineNextAction(decision: NavigationPlan, segment: FirstSegme
     resourceKind: "assignment",
     resourceId: current.assignmentId,
     reasonCode: "complete_required_assignment",
-    reason: "要点已经学过，接下来动手做一次。"
+    reason: "知识点已经学过，接下来动手做一次。"
   };
 }
 

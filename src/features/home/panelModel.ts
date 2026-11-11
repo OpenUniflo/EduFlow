@@ -1,3 +1,4 @@
+import { knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
 import type { UserKnowledgeRecord } from "@/features/profile/types";
 
@@ -64,11 +65,9 @@ export function panelSectionSource(section: "courses" | "recent" | "practices" |
   return section === "people" ? "preview" : "real";
 }
 
-const statusLabels: Record<string, string> = {
-  learning: "在学",
-  learned: "已学",
-  practicing: "动手任务中"
-};
+const statusLabels = new Proxy({} as Record<string, string>, {
+  get: (_target, key) => knowledgeStateLabelFor(String(key))
+});
 
 export function buildPanelPeople(input: {
   people: readonly FollowedPerson[];

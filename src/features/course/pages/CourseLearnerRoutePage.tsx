@@ -1,7 +1,8 @@
 import { ArrowLeft, Home, Network, Route } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { applicationServices } from "@/app/services/applicationServices";
+import { archiveHref } from "@/features/archive/model/atlasParams";
 import type { MockSession } from "@/features/auth/types";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { createMicroLearningNavigation } from "@/features/learning/micro/microLearning";
@@ -15,12 +16,14 @@ import "../path/coursePath.css";
  * navigation decision as Home and never mounts the three.js scene. The Course
  * tree is a user action and loads its own chunk.
  */
-export function CourseLearnerRoutePage({ courseId, session, onOpenTree }: {
+export function CourseLearnerRoutePage({ courseId, focusChapterId, session, onOpenTree }: {
   courseId: string;
+  focusChapterId?: string;
   session: MockSession | null;
   onOpenTree(): void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [revision, setRevision] = useState(0);
   const [decision, setDecision] = useState<NavigationDecision | null>(null);
@@ -45,6 +48,12 @@ export function CourseLearnerRoutePage({ courseId, session, onOpenTree }: {
   const courseState = session
     ? applicationServices.learningProgressRepository.getCourseState(session.userId, courseId)
     : { userId: "", courseId, isActive: false, assignmentStates: {}, materialStates: {}, updatedAt: "" };
+
+  const focusNodeId = useMemo(() => {
+    if (!focusChapterId || !runtime) return undefined;
+    const lessonIds = new Set(runtime.lessons.filter((lesson) => lesson.chapterId === focusChapterId).map((lesson) => lesson.id));
+    return runtime.curriculumCoverages.find((coverage) => lessonIds.has(coverage.lessonId))?.nodeId;
+  }, [focusChapterId, runtime]);
 
   const projection = useMemo(() => {
     if (!runtime) return null;
@@ -81,11 +90,17 @@ export function CourseLearnerRoutePage({ courseId, session, onOpenTree }: {
 
   return <main className="ef-course-route-page">
     <header className="ef-course-route-top">
-      <button type="button" className="ef-course-route-back" onClick={() => navigate("/")} aria-label="回到首页"><ArrowLeft size={16} /><span>首页</span></button>
+      <button type="button" className="ef-course-route-back" onClick={() => {
+        // Design §10.6: the Course page's back control is "← 档案" and returns
+        // to the Archive course plane (§10.5). An explicit entry state wins.
+        const state = location.state as { returnTo?: unknown } | null;
+        const returnTo = typeof state?.returnTo === "string" ? state.returnTo : archiveHref({ focus: `course:${courseId}` });
+        navigate(returnTo);
+      }} aria-label="返回档案课程平面"><ArrowLeft size={16} /><span>档案</span></button>
       <div className="ef-course-route-title">
         <span>课程</span>
         <h1>{courseTitle}</h1>
-        <p>{runtime.chapters.length} 章 · {new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId)).size} 个要点{authenticated ? "" : " · 登录后可查看学习状态"}</p>
+        <p>{runtime.chapters.length} 章 · {new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId)).size} 个知识点{authenticated ? "" : " · 登录后可查看学习状态"}</p>
       </div>
       <nav className="ef-course-route-tabs" aria-label="课程视图">
         <button type="button" role="tab" aria-selected className="is-on"><Route size={14} />路线</button>
@@ -99,6 +114,7 @@ export function CourseLearnerRoutePage({ courseId, session, onOpenTree }: {
       courseTitle={courseTitle}
       showHeader={false}
       mode="page"
+      focusNodeId={focusNodeId}
       courseCard="progress"
       onSelect={() => undefined}
       onStart={openAction}

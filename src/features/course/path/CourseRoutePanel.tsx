@@ -4,6 +4,7 @@ import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequ
 import { buildWindingRoute, type WindingStep, type WindingStepInput } from "@/features/course/immersive/courseTreeLayout";
 import { CourseRouteView } from "@/features/course/immersive/CourseRouteView";
 import { resolveCourseRouteAction, type HomeCourseProjection } from "./courseLearnerProjection";
+import { knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 
 export type CourseRouteStepAction = {
   step: WindingStep;
@@ -31,6 +32,7 @@ export function CourseRoutePanel({
   labelWidth,
   mode = "side",
   measureEpoch = 0,
+  focusNodeId,
   courseCard = "full",
   onSelect,
   onStart,
@@ -44,6 +46,8 @@ export function CourseRoutePanel({
   labelWidth?: number;
   mode?: CourseRouteMode;
   measureEpoch?: number;
+  /** Open the route at this Knowledge step (chapter/card deep link). */
+  focusNodeId?: string;
   /** Full course card on Home page form; progress-only card on the Course page. */
   courseCard?: "full" | "progress";
   onSelect(action: CourseRouteStepAction): void;
@@ -62,6 +66,20 @@ export function CourseRoutePanel({
       const learned = satisfiesTeachingPrerequisite(nodeStatus);
       const currentId = opening ?? nextNodeId;
       const current = currentId === nodeId;
+      const choice = resolveCourseRouteAction({
+        nodeId,
+        ...(micro ? { micro } : {}),
+        ...(practice ? { practice } : {}),
+        ...(projection.segment.currentStep ? { currentStep: { nodeId: projection.segment.currentStep.nodeId, kind: projection.segment.currentStep.kind } } : {}),
+        microLearned: learned,
+        practiceDone: projection.segment.steps.find((item) => item.kind === "practice" && item.nodeId === nodeId)?.status === "done"
+      });
+      const chosenMinutes = choice.kind === "micro" ? micro?.estimatedMinutes : choice.kind === "practice" ? practice?.estimatedMinutes : undefined;
+      const meta = choice.kind === "micro"
+        ? `小练习${practice ? " · 之后有动手任务" : ""}`
+        : choice.kind === "practice"
+          ? "动手任务"
+          : undefined;
       return {
         id: nodeId,
         title: projection.titleByNode.get(nodeId) ?? nodeId,
@@ -69,11 +87,11 @@ export function CourseRoutePanel({
         chapterTitle: chapterByNode.get(nodeId)?.title ?? chapter.title,
         chapterNumber: chapterByNode.get(nodeId)?.order ?? chapter.order,
         status: current ? "current" : learned ? "done" : "locked",
-        stateLabel: current ? "当前" : nodeStatus === "mastered" ? "已掌握" : nodeStatus === "practicing" ? "动手任务中" : learned ? "已学" : "待学",
+        stateLabel: current ? "当前" : knowledgeStateLabelFor(nodeStatus),
         learned,
-        ...(micro?.estimatedMinutes || practice?.estimatedMinutes ? { minutes: micro?.estimatedMinutes ?? practice?.estimatedMinutes } : {}),
-        meta: practice ? (micro ? "小练习 · 动手任务" : "动手任务") : micro ? "小练习" : undefined,
-        kind: micro ? "micro" : practice ? "practice" : "none"
+        ...(chosenMinutes ? { minutes: chosenMinutes } : {}),
+        ...(meta ? { meta } : {}),
+        kind: choice.kind === "micro" ? "micro" : choice.kind === "practice" ? "practice" : "none"
       } satisfies WindingStepInput;
     }));
   }, [decision?.nextAction.nodeId, projection]);
@@ -137,6 +155,7 @@ export function CourseRoutePanel({
       steps={steps}
       mode={mode}
       measureEpoch={measureEpoch}
+      focusStepId={focusNodeId}
       courseTitle={courseTitle}
       courseTotal={total}
       courseDone={done}

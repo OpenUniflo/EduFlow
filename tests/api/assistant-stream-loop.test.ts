@@ -11,7 +11,7 @@ vi.mock('../../api/_lib/env.js', () => ({ readLlmEnvironment: () => ({ llmModel:
 vi.mock('../../api/_lib/assistantTools.js', () => ({ createAssistantTools: mocks.tools, assistantPlugins: [], assistantWriteTools: {} }));
 import handler from '../../api/assistant';
 
-type Mode = 'tool-once' | 'multi-tool' | 'natural-text' | 'leak-final' | 'empty-final' | 'incomplete-final' | 'hang-empty' | 'hang-text' | 'discard-text';
+type Mode = 'tool-once' | 'multi-tool' | 'natural-text' | 'leak-final' | 'empty-final' | 'comma-final' | 'length-final' | 'tool-loop-ten' | 'hang-empty' | 'hang-text' | 'discard-text';
 
 function toolCallStream() {
   return {
@@ -99,7 +99,9 @@ function harness(mode: Mode) {
       phase1Calls += 1;
       if (mode === 'leak-final') return phase1Calls === 1 ? toolCallStream() : simulatedText('<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name="lookup">');
       if (mode === 'discard-text') return phase1Calls === 1 ? toolCallWithTextStream() : simulatedText('VISIBLE FINAL ANSWER');
-      if (mode === 'incomplete-final') return phase1Calls === 1 ? toolCallStream() : simulatedText('这是半句话，推理还在展开而纯行动的');
+      if (mode === 'comma-final') return phase1Calls === 1 ? toolCallStream() : simulatedText('这里还有三点：');
+      if (mode === 'length-final') return simulatedText('这是被截断的半句话，推理还在展开而纯行动的', 'length');
+      if (mode === 'tool-loop-ten') return toolCallStream();
       if (mode === 'empty-final') return simulatedText('');
       if (mode === 'hang-empty') return { stream: new ReadableStream({ start(controller) { controller.enqueue({ type: 'stream-start', warnings: [] }); }, cancel() {} }), warnings: [] };
       if (mode === 'hang-text') return { stream: new ReadableStream({ start(controller) { controller.enqueue({ type: 'stream-start', warnings: [] }); controller.enqueue({ type: 'text-start', id: 'answer' }); controller.enqueue({ type: 'text-delta', id: 'answer', delta: '已经生成的一段内容' }); }, cancel() {} }), warnings: [] };
@@ -203,7 +205,21 @@ it('does not send a marked protocol leak back to the model', async () => {
   expect(serialized).toContain('Which course is available?');
 });
 
-it('surfaces a protocol leak as a stream error and persists no assistant row', async () => {
+it('does not replay a persisted failed turn to the model', async () => {
+  const { records, model } = harness('natural-text');
+  records.push(
+    { id: 'old-user', sequence: 0, role: 'user', content: 'old failed question', message_kind: 'utterance', invalid_reason: null },
+    { id: 'old-failed', sequence: 1, role: 'assistant', content: 'partial failed answer', message_kind: 'utterance', invalid_reason: null, parts: [{ type: 'text', text: 'partial failed answer' }, { type: 'data-failed', data: { reason: 'length' } }] }
+  );
+  const recorder = responseRecorder();
+  await call(recorder);
+  const sent = JSON.stringify((model.doStreamCalls[0] as any).prompt);
+  expect(sent).not.toContain('old failed question');
+  expect(sent).not.toContain('partial failed answer');
+  expect(sent).toContain('Which course is available?');
+});
+
+it('persists a failed row for a protocol leak without storing protocol text', async () => {
   const { records, model } = harness('leak-final');
   const recorder = responseRecorder();
   await call(recorder);
@@ -211,24 +227,54 @@ it('surfaces a protocol leak as a stream error and persists no assistant row', a
   expect(recorder.output()).not.toContain('DSML');
   expect(recorder.output()).not.toContain('Natural final answer.');
   expect(model.doStreamCalls).toHaveLength(2);
-  expect(records.filter((record) => record.role === 'assistant')).toEqual([]);
+  const assistant = records.filter((record) => record.role === 'assistant');
+  expect(assistant).toHaveLength(1);
+  expect(assistant[0].content).toBe('');
+  expect(assistant[0].parts).toEqual([{ type: 'data-failed', data: { reason: 'protocol' } }]);
 });
 
-it('marks a mid-sentence answer as incomplete and persists nothing', async () => {
-  const { records } = harness('incomplete-final');
+it('does not guess incompleteness from a trailing colon', async () => {
+  const { records } = harness('comma-final');
   const recorder = responseRecorder();
   await call(recorder);
   expect(recorder.status()).toBe(200);
-  expect(recorder.output()).toContain('data-incomplete');
-  expect(records.filter((record) => record.role === 'assistant')).toEqual([]);
+  expect(recorder.output()).not.toContain('data-failed');
+  const assistant = records.filter((record) => record.role === 'assistant');
+  expect(assistant).toHaveLength(1);
+  expect(assistant[0].content).toBe('这里还有三点：');
+  expect(JSON.stringify(assistant[0].parts)).not.toContain('data-failed');
 });
 
-it('does not persist an empty final answer', async () => {
+it('marks a finish reason of length as failed and keeps the partial answer', async () => {
+  const { records } = harness('length-final');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  expect(recorder.output()).toContain('data-failed');
+  const assistant = records.filter((record) => record.role === 'assistant');
+  expect(assistant).toHaveLength(1);
+  expect(assistant[0].content).toBe('这是被截断的半句话，推理还在展开而纯行动的');
+  expect(assistant[0].parts).toContainEqual({ type: 'data-failed', data: { reason: 'length' } });
+});
+
+it('persists an empty final answer as one failed turn', async () => {
   const { records } = harness('empty-final');
   const recorder = responseRecorder();
   await call(recorder);
   expect(recorder.status()).toBe(200);
-  expect(records.filter((record) => record.role === 'assistant')).toEqual([]);
+  const assistant = records.filter((record) => record.role === 'assistant');
+  expect(assistant).toHaveLength(1);
+  expect(assistant[0].parts).toEqual([{ type: 'data-failed', data: { reason: 'empty' } }]);
+});
+
+it('forbids tools on the final step of the bounded loop', async () => {
+  const { model } = harness('tool-loop-ten');
+  const recorder = responseRecorder();
+  await call(recorder);
+  expect(recorder.status()).toBe(200);
+  expect(model.doStreamCalls).toHaveLength(10);
+  const last = model.doStreamCalls[model.doStreamCalls.length - 1] as any;
+  expect(last.toolChoice).toEqual({ type: 'none' });
 });
 
 it('marks the user turn as stopped when the client disconnects before any text', async () => {

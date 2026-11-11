@@ -4,7 +4,7 @@ import { ProfileEmptyState } from "./ProfileEmptyState";
 
 function courseStatusLabel(status: ProfileCourseProgress["status"]) {
   if (status === "completed") return "已完成";
-  if (status === "learning") return "学习中";
+  if (status === "learning") return "在学";
   return "未开始";
 }
 

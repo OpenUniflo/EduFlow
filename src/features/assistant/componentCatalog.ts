@@ -27,8 +27,8 @@ export const assistantCardDisplaySchema = z.object({
   description: z.string().trim().max(2_000).optional(),
   meta: z.array(z.string().trim().max(240)).max(6).optional(),
   status: z.object({ label: z.string().trim().min(1).max(40), tone: z.enum(["ok", "warn", "brand", "quiet"]) }).optional(),
-  steps: z.array(z.object({ id: z.string(), title: z.string(), meta: z.string().optional(), state: z.enum(["done", "now", "quiet"]) })).max(12).optional(),
-  items: z.array(z.object({ id: z.string(), title: z.string(), meta: z.string().optional(), state: z.enum(["done", "now", "quiet"]).optional() })).max(8).optional(),
+  steps: z.array(z.object({ id: z.string(), title: z.string(), meta: z.string().optional(), state: z.enum(["done", "now", "quiet"]) })).max(200).optional(),
+  items: z.array(z.object({ id: z.string(), title: z.string(), meta: z.string().optional(), state: z.enum(["done", "now", "quiet"]).optional() })).max(50).optional(),
   percent: z.number().min(0).max(100).optional(),
   actionLabel: z.string().trim().max(40).optional(),
   action: z.discriminatedUnion("kind", [
@@ -72,7 +72,7 @@ export const assistantComponentCatalog: CatalogComponent[] = [
   },
   {
     id: "progress", cardType: "progress", panel: "records", ref: assistantComponentRefSchemas.progress as z.ZodType<AssistantCardRef>,
-    label: "学习进度卡", purpose: "正在学的课程和已学要点数量。", when: "学习者问自己学到哪了、整体进度如何。"
+    label: "学习进度卡", purpose: "正在学的课程和已学知识点数量。", when: "学习者问自己学到哪了、整体进度如何。"
   },
   {
     id: "route", cardType: "route", panel: "route", ref: assistantComponentRefSchemas.route as z.ZodType<AssistantCardRef>,
@@ -84,7 +84,7 @@ export const assistantComponentCatalog: CatalogComponent[] = [
   },
   {
     id: "knowledge", cardType: "knowledge", panel: "map", ref: assistantComponentRefSchemas.knowledge as z.ZodType<AssistantCardRef>,
-    label: "知识点卡", purpose: "一个知识节点是什么、我学到哪了；点开在右侧档案详情里查看。", when: "学习者问一个概念或要点的含义、自己的掌握状态。它不是小练习，不会开始练习。"
+    label: "知识点卡", purpose: "一个知识节点是什么、我学到哪了；点开在右侧档案详情里查看。", when: "学习者问一个概念或知识点的含义、自己的掌握状态。它不是小练习，不会开始练习。"
   },
   {
     id: "mini_map", cardType: "mini_map", panel: "map", ref: assistantComponentRefSchemas.mini_map as z.ZodType<AssistantCardRef>,
@@ -96,7 +96,7 @@ export const assistantComponentCatalog: CatalogComponent[] = [
   },
   {
     id: "micro", cardType: "micro", panel: "route", ref: assistantComponentRefSchemas.micro as z.ZodType<AssistantCardRef>,
-    label: "小练习卡", purpose: "课程里的互动小练习，几分钟，边学边答，可就地做。", when: "学习者想做个小练习、练一下某个要点，或想继续没做完的小练习。不是动手任务。"
+    label: "小练习卡", purpose: "课程里的互动小练习，几分钟，边学边答，可就地做。", when: "学习者想做个小练习、练一下某个知识点，或想继续没做完的小练习。不是动手任务。"
   },
   {
     id: "course_match", cardType: "course_match", panel: "route", ref: assistantComponentRefSchemas.course_match as z.ZodType<AssistantCardRef>,

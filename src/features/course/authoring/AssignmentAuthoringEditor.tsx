@@ -38,7 +38,7 @@ export function AssignmentAuthoringEditor({ assignments, coverages, courseId, kn
     setTitle(""); setDescription(""); setRequirements(""); setExpectedOutput(""); setCriteria("");
   };
   const edit = (assignment: CourseAssignment) => {
-    const nextTitle = window.prompt("实训标题", assignment.title);
+    const nextTitle = window.prompt("动手任务标题", assignment.title);
     if (!nextTitle?.trim()) return;
     const nextDescription = window.prompt("目标与说明", assignment.description);
     if (!nextDescription?.trim()) return;

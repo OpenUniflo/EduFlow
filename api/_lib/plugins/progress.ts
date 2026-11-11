@@ -8,6 +8,10 @@ export const progressPlugin: AssistantPlugin = {
   id: "progress",
   title: "进度与记录",
   cards: [{ cardType: "progress", panel: "records" }],
+  progress: {
+    getLearnerState: "读取学习进度",
+    getEvidenceContext: "读取学习记录",
+  },
   tools: ({ client, user }) => ({
     getLearnerState: tool({
       description: "Read only the authenticated learner's real Knowledge and Course state.",

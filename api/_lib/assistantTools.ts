@@ -8,15 +8,8 @@ import { readPracticeReview } from "./practiceContext.js";
 import { getAssignmentContext, getCourseContext, getKnowledge, getLearnerState, getMaterialContext, getMicroContext, readableCourse } from "./assistantData.js";
 export { getAssignmentContext, getCourseContext, getKnowledge, getKnowledgeNeighbors, getLearnerState, getMaterialContext, getMicroContext, navigationForAssistant, readableCourse, searchCourses, searchKnowledge, searchMaterialContent, searchMaterials, searchMicro } from "./assistantData.js";
 import type { AssistantToolDependencies } from "./plugins/types.js";
-import { planningPlugin } from "./plugins/planning.js";
-import { knowledgePlugin } from "./plugins/knowledge.js";
-import { microPlugin } from "./plugins/micro.js";
-import { coursesPlugin } from "./plugins/courses.js";
-import { materialsPlugin } from "./plugins/materials.js";
-import { progressPlugin } from "./plugins/progress.js";
-import { navigationPlugin } from "./plugins/navigation.js";
-import { assignmentPlugin } from "./plugins/assignment.js";
-import { workspacePlugin } from "./plugins/workspace.js";
+import { assistantPlugins } from "./plugins/index.js";
+export { assistantPlugins } from "./plugins/index.js";
 
 type Row = Record<string, unknown>;
 
@@ -27,18 +20,6 @@ export type { AssistantToolDependencies } from "./plugins/types.js";
  * cards it can nominate and the existing panel those cards open. Core context
  * resolution stays here because it spans plugins.
  */
-export const assistantPlugins = [
-  planningPlugin,
-  knowledgePlugin,
-  microPlugin,
-  coursesPlugin,
-  materialsPlugin,
-  progressPlugin,
-  navigationPlugin,
-  assignmentPlugin,
-  workspacePlugin
-] as const;
-
 export const assistantWriteTools = Object.assign({}, ...assistantPlugins.map((plugin) => plugin.writes ?? {}));
 
 export function createAssistantTools(client: SupabaseClient, user: User, context: AssistantContextSnapshot, dependencies: AssistantToolDependencies = {}) {

@@ -4,6 +4,7 @@ import type { ArchiveCourse, ArchiveModel, ArchiveNode } from "../model/atlasMod
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
 import { Avatar } from "@/shared/ui/Avatar";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
+import { knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 
 export type PanelPerson = {
   id: string;
@@ -18,11 +19,7 @@ function shortName(person: FollowedPerson) {
 }
 
 function statusLabel(status: ArchiveNode["status"]) {
-  if (status === "learning") return "在学";
-  if (status === "learned") return "已学";
-  if (status === "practicing") return "动手任务中";
-  if (status === "mastered") return "已掌握";
-  return "可探索";
+  return knowledgeStateLabelFor(status);
 }
 
 function domainCoverage(model: ArchiveModel, people: readonly PanelPerson[]) {
@@ -47,7 +44,7 @@ function CourseRow({ course, onFocus }: { course: ArchiveCourse; onFocus: (id: s
       <span className="ef-atlas-panel-course-mark" aria-hidden>{course.title.slice(0, 1)}</span>
       <span className="ef-atlas-panel-course-copy">
         <b>{course.title}</b>
-        <small>{course.state === "draft" ? `草稿 · ${course.knowledgeCount} 个知识` : `${course.progress}% · ${course.nextLabel}`}</small>
+        <small>{course.state === "draft" ? `草稿 · ${course.knowledgeCount} 个知识点` : `${course.progress}% · ${course.nextLabel}`}</small>
       </span>
       <ChevronRight size={14} aria-hidden />
     </button>
@@ -69,6 +66,11 @@ export function ArchivePersonPanel({ model, people, view, sessionName, collapsed
 }) {
   const coverage = useMemo(() => domainCoverage(model, people), [model, people]);
   const courses = useMemo(() => personCourses(model, people), [model, people]);
+  // One active-Course projection feeds both the count and the list. The old
+  // "正在学习" list used every related Course while the count used only active
+  // ones, so the same panel disagreed with itself.
+  const activeCourses = useMemo(() => courses.filter((course) => course.state === "active"), [courses]);
+  const listedCourses = view === "me" ? activeCourses : courses;
   const mine = model.nodes.filter((node) => node.isMine);
   const learning = mine.filter((node) => node.status === "learning" || node.status === "practicing");
   const recent = mine.filter((node) => node.updatedAt).slice().sort((left, right) => (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "")).slice(0, 3);
@@ -113,11 +115,11 @@ export function ArchivePersonPanel({ model, people, view, sessionName, collapsed
           <>
             <span><b>{model.stats.mine}</b><small>我的知识</small></span>
             <span><b>{learning.length}</b><small>在学</small></span>
-            <span><b>{model.courses.filter((course) => course.state === "active").length}</b><small>在学课程</small></span>
+            <span><b>{activeCourses.length}</b><small>在学课程</small></span>
           </>
         ) : view === "compare" ? (
           <>
-            <span><b>{coreCount}</b><small>并集知识</small></span>
+            <span><b>{coreCount}</b><small>并集知识点</small></span>
             <span><b>{people.length}</b><small>对比人物</small></span>
             <span><b>{courses.length}</b><small>相关课程</small></span>
           </>
@@ -132,9 +134,9 @@ export function ArchivePersonPanel({ model, people, view, sessionName, collapsed
 
       <section className="ef-atlas-panel-section">
         <h3>{view === "me" ? "正在学习" : "相关课程"}</h3>
-        {courses.slice(0, 4).map((course) => <CourseRow key={course.id} course={course} onFocus={onFocusCourse} />)}
-        {!courses.length ? <p className="ef-atlas-panel-empty">还没有关联课程。</p> : null}
-        {view === "me" && courses.length ? <button type="button" className="ef-atlas-panel-more" onClick={() => onFocusCourse(courses[0].id)}>在星图中查看第一门课 <ArrowRight size={12} aria-hidden /></button> : null}
+        {listedCourses.slice(0, 4).map((course) => <CourseRow key={course.id} course={course} onFocus={onFocusCourse} />)}
+        {!listedCourses.length ? <p className="ef-atlas-panel-empty">{view === "me" ? "还没有在学课程。" : "还没有关联课程。"}</p> : null}
+        {view === "me" && listedCourses.length ? <button type="button" className="ef-atlas-panel-more" onClick={() => onFocusCourse(listedCourses[0].id)}>在星图中查看第一门课 <ArrowRight size={12} aria-hidden /></button> : null}
       </section>
 
       <section className="ef-atlas-panel-section">
@@ -217,7 +219,7 @@ export function ArchivePeopleSharePanel({ people, sessionName, collapsed, onExpa
         {people.filter((person) => person.sample).map((person) => (
           <div className="ef-atlas-person-row" key={person.id} data-preview="sample">
             <Avatar name={shortName(person)} size={28} personColor={person.accent as "me" | "orange" | "cyan" | "rose"} decorative />
-            <span><b>{shortName(person)}</b><small>{person.visibility === "private" ? "仅公开作品" : `公开 ${person.sharedKnowledgeIds?.length ?? person.sharedKnowledgeCount} 个知识`}</small></span>
+            <span><b>{shortName(person)}</b><small>{person.visibility === "private" ? "仅公开作品" : `公开 ${person.sharedKnowledgeIds?.length ?? person.sharedKnowledgeCount} 个知识点`}</small></span>
             <button type="button" className="ef-atlas-mini-btn" onClick={() => onView(person)}><Eye size={12} aria-hidden />查看</button>
             <button type="button" className="ef-atlas-mini-btn" onClick={() => onCompare(person)}>对比</button>
           </div>

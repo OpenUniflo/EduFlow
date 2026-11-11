@@ -15,6 +15,8 @@ type AssistantMetadata = {
   dedupeKey?: string;
   invalidReason?: string;
   stopped?: boolean;
+  /** The server persisted a failed generation; partial text/cards stay visible. */
+  failedReason?: string;
   structuredContent?: AssistantStructuredContent;
   context?: AssistantContextSnapshot;
 };
@@ -65,7 +67,7 @@ export type AssistantSendExtras = {
 
 const AssistantRuntimeContext = createContext<RuntimeValue | null>(null);
 
-const allowedPartTypes = new Set(["text", "tool-displayCard", "data-tool-progress", "data-follow-ups", "data-attachment", "data-write-result"]);
+const allowedPartTypes = new Set(["text", "tool-displayCard", "data-tool-progress", "data-follow-ups", "data-attachment", "data-write-result", "data-failed"]);
 
 function textOfParts(parts: readonly AssistantTimelinePart[] | undefined): string {
   if (!parts?.length) return "";
@@ -85,6 +87,7 @@ function toUIMessage(message: AssistantMessage): AssistantUIMessage {
       ...(message.dedupeKey ? { dedupeKey: message.dedupeKey } : {}),
       ...(message.invalidReason ? { invalidReason: message.invalidReason } : {}),
       ...(message.stopped ? { stopped: true } : {}),
+      ...(message.failedReason ? { failedReason: message.failedReason } : {}),
       ...(message.structuredContent ? { structuredContent: message.structuredContent } : {}),
       context: message.context
     }
@@ -102,6 +105,7 @@ function toLegacy(message: AssistantUIMessage, sessionId: string | null): Assist
     ...(message.metadata?.dedupeKey ? { dedupeKey: message.metadata.dedupeKey } : {}),
     ...(message.metadata?.invalidReason ? { invalidReason: message.metadata.invalidReason } : {}),
     ...(message.metadata?.stopped ? { stopped: true } : {}),
+    ...(message.metadata?.failedReason ? { failedReason: message.metadata.failedReason } : {}),
     ...(message.metadata?.structuredContent ? { structuredContent: message.metadata.structuredContent } : {}),
     parts,
     context: message.metadata?.context ?? { workspace: "learning", experienceMode: "learn" },
@@ -117,6 +121,7 @@ function hasVisibleReply(message: AssistantUIMessage | undefined): boolean {
 }
 
 export const ASSISTANT_REPLY_FAILURE = "回复没有完成，请重试。";
+export const ASSISTANT_NO_REPLY = "没有回答，可重试。";
 
 /** One learner-facing failure wording; the retry control is the only next step. */
 function friendlyError(_message: string): string {
@@ -144,7 +149,6 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   const loadingMoreRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [pendingAction, setPendingAction] = useState(false);
-  const [pendingReply, setPendingReply] = useState(false);
   const [pendingSend, setPendingSend] = useState(false);
   const [manualError, setManualError] = useState("");
   const [clarificationMessageId, setClarificationMessageId] = useState<string | null>(null);
@@ -181,7 +185,6 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       return next;
     });
   }, []);
-  const replyPollRef = useRef<number | null>(null);
   const newChatEpoch = useRef(0);
   const stoppedRef = useRef(false);
   const streamSessionRef = useRef<string | null>(null);
@@ -189,6 +192,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   const streamEpochRef = useRef(0);
   const sendAbortRef = useRef<AbortController | null>(null);
   const pendingSendRef = useRef(false);
+  const retryTargetRef = useRef<{ userId: string; assistantMessageId?: string } | null>(null);
 
   const rememberSession = useCallback((sessionId: string | null) => {
     sessionIdRef.current = sessionId;
@@ -231,7 +235,8 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       ...(sendExtrasRef.current.attachments?.length ? { attachments: sendExtrasRef.current.attachments.map((attachment) => attachment.id) } : {}),
       ...(sendExtrasRef.current.draft ? { draft: sendExtrasRef.current.draft } : {}),
       ...(sendExtrasRef.current.mentions?.length ? { mentions: sendExtrasRef.current.mentions } : {}),
-      ...(sendExtrasRef.current.links?.length ? { links: sendExtrasRef.current.links } : {})
+      ...(sendExtrasRef.current.links?.length ? { links: sendExtrasRef.current.links } : {}),
+      ...(retryTargetRef.current ? { retry: retryTargetRef.current } : {})
     }),
     fetch: async (input, init) => {
       // The chat only exposes its own abort controller once response headers
@@ -276,8 +281,6 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     onFinish: ({ isAbort }) => {
       if (stoppedRef.current || isAbort) {
         stoppedRef.current = true;
-        stopReplyPoll();
-        setPendingReply(false);
         setManualError("");
         markStoppedLocally();
         return;
@@ -286,8 +289,11 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       const last = chatRef.current?.messages[chatRef.current.messages.length - 1];
       const hasText = Boolean(last?.parts?.some((part) => part.type === "text" && (part as { text?: string }).text?.trim()));
       const hasCard = Boolean(last?.parts?.some((part) => part.type === "tool-displayCard"));
-      if (last?.role === "assistant" && !hasText && !hasCard) {
-        setManualError(ASSISTANT_REPLY_FAILURE);
+      const failed = Boolean(last?.parts?.some((part) => part.type === "data-failed"));
+      if (!last || last.role !== "assistant" || failed || (!hasText && !hasCard)) {
+        // The failed turn renders its own inline reason and retry control; a
+        // second page-level banner would duplicate it.
+        setManualError("");
         return;
       }
       lastSendOkRef.current = true;
@@ -341,17 +347,6 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       }
     }
   }, [chat.messages, session.userId]);
-
-  const incompleteHandled = useRef<string | null>(null);
-  useEffect(() => {
-    if (chat.status !== "ready") return;
-    const last = chat.messages[chat.messages.length - 1];
-    if (!last || last.role !== "assistant" || incompleteHandled.current === last.id) return;
-    if (stoppedRef.current) return;
-    if (!last.parts?.some((part) => part.type === "data-incomplete")) return;
-    incompleteHandled.current = last.id;
-    setManualError(ASSISTANT_REPLY_FAILURE);
-  }, [chat.messages, chat.status]);
 
   const reloadSessions = useCallback(async () => {
     const page = await listAssistantSessions({ q: sessionsQueryRef.current });
@@ -407,47 +402,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     return detail;
   }, [rememberSession]);
 
-  const stopReplyPoll = useCallback(() => {
-    if (replyPollRef.current != null) {
-      window.clearTimeout(replyPollRef.current);
-      replyPollRef.current = null;
-    }
-  }, []);
-
-  /** A persisted user turn can precede the first token. Wait for the
-   *  server-owned answer instead of showing a failed empty turn. */
-  const pollForReply = useCallback((sessionId: string) => {
-    stopReplyPoll();
-    let attempts = 0;
-    const tick = async () => {
-      attempts += 1;
-      try {
-        const detail = await getAssistantSession(sessionId);
-        const last = visibleMessages(detail.messages)[visibleMessages(detail.messages).length - 1];
-        chatApiRef.current.setMessages(visibleMessages(detail.messages).map(toUIMessage));
-        if (last?.role === "assistant") {
-          setPendingReply(false);
-          stopReplyPoll();
-          void reloadSessions().catch(() => undefined);
-          return;
-        }
-      } catch {
-        // A transient poll failure must not discard the visible user turn.
-      }
-      if (attempts >= 30) {
-        setPendingReply(false);
-        stopReplyPoll();
-        setManualError(ASSISTANT_REPLY_FAILURE);
-        return;
-      }
-      replyPollRef.current = window.setTimeout(tick, 1500);
-    };
-    replyPollRef.current = window.setTimeout(tick, 1200);
-  }, [reloadSessions, stopReplyPoll]);
-
   const selectSession = useCallback(async (sessionId: string | null) => {
-    stopReplyPoll();
-    setPendingReply(false);
     setManualError("");
     setClarificationMessageId(null);
     // Switching during a reply aborts it in the old conversation. The user
@@ -476,18 +431,13 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       rememberSession(sessionId);
       setActiveSessionTitle(detail.title ?? "");
       chatApiRef.current.setMessages(visibleMessages(detail.messages).map(toUIMessage));
-      const last = visibleMessages(detail.messages)[visibleMessages(detail.messages).length - 1];
-      if (last?.role === "user" && !last.stopped) {
-        setPendingReply(true);
-        pollForReply(sessionId);
-      }
     }
     catch (loadError) {
       rememberSession(null);
       chatApiRef.current.setMessages([]);
       setManualError(loadError instanceof Error ? friendlyError(loadError.message) : "对话加载失败");
     } finally { setLoading(false); }
-  }, [newChatKey, pollForReply, rememberSession, stopReplyPoll]);
+  }, [newChatKey, rememberSession]);
 
   const sessionError = useCallback((error: unknown, fallback: string): SessionActionResult => {
     const code = error instanceof ApiRequestError ? error.code ?? "request_failed" : "request_failed";
@@ -518,8 +468,6 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
         // Reuse the stage C stop path, then give the server a moment to persist
         // the stopped turn before the session row disappears underneath it.
         stoppedRef.current = true;
-        stopReplyPoll();
-        setPendingReply(false);
         setManualError("");
         sendAbortRef.current?.abort();
         try { await api.stop(); } catch { /* the abort still ends the stream */ }
@@ -550,7 +498,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     }
     void reloadSessions().catch(() => undefined);
     return { ok: true };
-  }, [markStoppedLocally, reloadSessions, selectSession, sessionError, stopReplyPoll]);
+  }, [markStoppedLocally, reloadSessions, selectSession, sessionError]);
 
   useEffect(() => {
     let active = true;
@@ -581,8 +529,6 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     stoppedRef.current = false;
     streamSessionRef.current = sessionIdRef.current;
     streamEpochRef.current = sessionEpochRef.current;
-    stopReplyPoll();
-    setPendingReply(false);
     pendingSendRef.current = true;
     setPendingSend(true);
     try {
@@ -591,7 +537,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       // A background session-list refresh is secondary and must never turn a
       // successful answer into a page-level load failure.
       await reloadSessions().catch(() => undefined);
-      return lastSendOkRef.current || !chatRef.current?.error;
+      return lastSendOkRef.current;
     } catch (sendError) {
       if (stoppedRef.current) return false;
       setManualError(sendError instanceof Error ? friendlyError(sendError.message) : ASSISTANT_REPLY_FAILURE);
@@ -601,15 +547,13 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       sendExtrasRef.current = {};
       setPendingSend(false);
     }
-  }, [reloadSessions, stopReplyPoll]);
+  }, [reloadSessions]);
 
   const stop = useCallback(async () => {
     const api = chatApiRef.current.current();
     const pending = sendAbortRef.current != null && api.status !== "streaming" && api.status !== "submitted";
     if (!pending && api.status !== "streaming" && api.status !== "submitted") return;
     stoppedRef.current = true;
-    stopReplyPoll();
-    setPendingReply(false);
     setManualError("");
     // Give the already-created request a brief chance to reach the server so
     // its user turn is persisted, then abort before the model can answer.
@@ -617,18 +561,29 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     sendAbortRef.current?.abort();
     try { await api.stop(); } catch { /* the abort still ends the stream */ }
     markStoppedLocally();
-  }, [markStoppedLocally, stopReplyPoll]);
+  }, [markStoppedLocally]);
 
   const retry = useCallback(async () => {
     setManualError("");
+    const messages = chatApiRef.current.current().messages;
+    const lastUser = [...messages].reverse().find((message) => message.role === "user");
+    const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+    if (!lastUser) return false;
+    retryTargetRef.current = {
+      userId: lastUser.id,
+      ...(lastAssistant?.id ? { assistantMessageId: lastAssistant.id } : {})
+    };
     try {
+      // Regenerate the same turn; the server reuses its user row and replaces
+      // the failed assistant row, so a reload never shows a duplicate.
       await chatApiRef.current.current().regenerate();
       return true;
     } catch {
-      if (!lastMessageRef.current) return false;
-      return send(lastMessageRef.current, lastContextRef.current);
+      return false;
+    } finally {
+      retryTargetRef.current = null;
     }
-  }, [send]);
+  }, []);
 
   const reloadStructuredSession = useCallback(async (sessionId: string) => {
     await loadSession(sessionId);
@@ -687,7 +642,9 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
 
   const messages = useMemo(() => chat.messages.map((message) => toLegacy(message, activeSessionId)), [activeSessionId, chat.messages]);
   const replying = pendingSend || chat.status === "streaming" || chat.status === "submitted";
-  const sending = pendingAction || pendingReply || replying;
+  // `sending` is current-page activity only. A persisted user turn without an
+  // assistant row is a failure, not an in-flight reply.
+  const sending = pendingAction || replying;
   const error = manualError
     || (chat.error ? friendlyError(chat.error.message) : "")
     || (chat.status === "error" ? ASSISTANT_REPLY_FAILURE : "");

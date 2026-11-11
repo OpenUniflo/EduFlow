@@ -1,3 +1,4 @@
+import { ATTACHMENT_LIMIT } from "@/shared/assistant/attachments";
 import type { AssignmentFeedback, AssignmentResponse } from "@/shared/learning/assignmentAttempt";
 import type { CourseAssignment } from "@/features/course/types";
 
@@ -106,13 +107,13 @@ export function buildPracticeResponse(
 ): AssignmentResponse | null {
   if (!canSubmitPractice(compatibility)) return null;
   const text = practiceSubmissionText(draft);
-  const attachmentSourceIds = [...new Set(draft.attachmentIds)].slice(0, 4);
+  const attachmentSourceIds = [...new Set(draft.attachmentIds)].slice(0, ATTACHMENT_LIMIT);
   if (!text.trim() && !attachmentSourceIds.length) return null;
   if (compatibility === "legacy-code" || compatibility === "legacy-trace") {
     return {
       kind: "code",
       ...(text.trim() ? { code: text } : {}),
-      ...(draft.attachmentNames.length ? { fileName: draft.attachmentNames.slice(0, 4).join("、") } : {}),
+      ...(draft.attachmentNames.length ? { fileName: draft.attachmentNames.slice(0, ATTACHMENT_LIMIT).join("、") } : {}),
       ...(attachmentSourceIds.length ? { attachmentSourceIds } : {})
     };
   }
@@ -138,7 +139,7 @@ export function draftFromPracticeResult(
     if (trimmed.startsWith("关联作品：")) continue;
     noteLines.push(line);
   }
-  const ids = [...new Set(response.attachmentSourceIds ?? [])].slice(0, 4);
+  const ids = [...new Set(response.attachmentSourceIds ?? [])].slice(0, ATTACHMENT_LIMIT);
   const attachmentNames = ids.map((id, index) => attachments.find((attachment) => attachment.id === id)?.title ?? `附件 ${index + 1}`);
   return {
     note: noteLines.join("\n").trim(),

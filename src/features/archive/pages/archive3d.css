@@ -480,7 +480,7 @@
 .ef-atlas-zoom {
   position: absolute;
   z-index: 30;
-  right: 88px;
+  right: var(--ef-assistant-safe-right);
   bottom: var(--sp-16);
   display: inline-flex;
   align-items: center;

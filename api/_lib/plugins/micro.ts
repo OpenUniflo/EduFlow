@@ -7,6 +7,10 @@ export const microPlugin: AssistantPlugin = {
   id: "micro",
   title: "小练习",
   cards: [{ cardType: "micro", panel: "route" }],
+  progress: {
+    searchMicro: "查找小练习",
+    getMicroContext: "读取小练习",
+  },
   tools: ({ client, user, context }) => ({
     searchMicro: tool({
       description: "Find real published 小练习 (interactive Micro paths) the learner can start. Filter by a Knowledge node and/or a title query. Prefer the current Course; results say which Course each 小练习 belongs to. A 小练习 is not a 动手任务 (Course Assignment).",

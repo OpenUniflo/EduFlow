@@ -235,3 +235,49 @@
 .ef-assistant-write-result > span:nth-child(2) { flex: 1; min-width: 0; }
 .ef-assistant-write-result strong { display: block; color: var(--ink); font-size: var(--fs-12); font-weight: var(--fw-600); }
 .ef-assistant-write-result small { display: block; color: var(--muted); font-size: var(--fs-12); }
+
+/* One failed-answer state for live, persisted and reloaded turns. */
+.ef-assistant-failed {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  margin-top: var(--sp-8);
+  padding: var(--sp-8) var(--sp-12);
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
+  border-radius: var(--r-12);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+}
+
+.ef-assistant-failed button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-assistant-tool-progress-details {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-assistant-tool-progress-details > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  min-height: 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.ef-assistant-tool-progress-details > summary::-webkit-details-marker {
+  display: none;
+}

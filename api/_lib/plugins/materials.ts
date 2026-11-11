@@ -7,6 +7,11 @@ export const materialsPlugin: AssistantPlugin = {
   id: "materials",
   title: "资料与阅读器",
   cards: [{ cardType: "material", panel: "reader" }],
+  progress: {
+    searchMaterials: "查找资料",
+    getMaterialContext: "读取资料",
+    searchMaterialContent: "查找资料片段",
+  },
   tools: ({ client, user }) => ({
     searchMaterials: tool({
       description: "Search readable Course Materials by title or description. Use this before getMaterialContext when the learner asks which material to read.",

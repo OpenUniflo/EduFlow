@@ -8,13 +8,16 @@ describe("Global Assistant architecture", () => {
     const source = read("api/assistant.ts");
     expect(source).toContain("streamText");
     expect(source).toContain("stepCountIs(TOOL_LOOP_MAX_STEPS)");
+    expect(source).toContain("prepareStep");
+    expect(source).toContain('toolChoice: "none"');
+    expect(source).toContain("TOOL_LOOP_MAX_STEPS = 10");
+    expect(source).toContain("Independent read-only lookups belong in the same step");
     expect(source).toContain("toUIMessageStream");
     expect(source).toContain("pipeUIMessageStreamToResponse");
     expect(source).toContain("createDisplayCardTool");
     expect(source).toContain("createProtocolGuardTransform");
     expect(source).toContain("createAssistantTools");
     expect(source).not.toContain("pipeTextStreamToResponse");
-    expect(source).not.toContain('toolChoice: "none"');
   });
 
   it("authenticates server-side and persists user-owned sessions with RLS", () => {

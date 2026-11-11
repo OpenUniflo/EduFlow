@@ -1,7 +1,7 @@
 import type { UIMessageChunk } from "ai";
 import type { AssistantCardRef } from "../../src/features/assistant/assistantCards.js";
 import type { TimelinePart } from "./assistantTimeline.js";
-import { assistantToolLabel } from "../../src/features/assistant/toolLabels.js";
+import { assistantToolProgressLabel } from "./toolProgress.js";
 import { normalizeFollowUps, type FollowUpSuggestion } from "./assistantSuggestions.js";
 import type { WriteToolDefinition } from "./plugins/types.js";
 
@@ -50,7 +50,9 @@ export function createAssistantUiTimeline(options: { writeTools?: Record<string,
         toolNameByCall.set(chunk.toolCallId, toolName);
         toolInputByCall.set(chunk.toolCallId, chunk.input);
         if (!PRESENTATION_TOOLS.has(toolName)) {
-          recorder.parts.push({ type: "data-tool-progress", data: { toolName, label: assistantToolLabel(toolName) } });
+          const part: TimelinePart = { type: "data-tool-progress", data: { toolName, label: assistantToolProgressLabel(toolName) } };
+          recorder.parts.push(part);
+          controller.enqueue(part as UIMessageChunk);
         }
         controller.enqueue(chunk);
         return;

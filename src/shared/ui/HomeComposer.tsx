@@ -1,6 +1,7 @@
 import { FileText, Link2, Paperclip, Plus, Search, X } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { apiRequest } from "@/shared/api/apiClient";
+import { ATTACHMENT_LIMIT } from "@/shared/assistant/attachments";
 import { GlassSurface } from "./GlassSurface";
 import { ContextPill } from "./Pill";
 import { ComposerActionButton, composerHint, onComposerKeyDown } from "./ComposerAction";
@@ -11,6 +12,7 @@ export type ComposerAttachment = { id: string; name: string; uploading?: boolean
 export type ComposerMention = { id: string; kind: "task" | "course" | "knowledge" | "material"; label: string; value: string };
 export type ComposerExtras = { mentions: ComposerMention[]; links: string[] };
 type MentionCandidate = { id: string; kind: ComposerMention["kind"]; label: string; meta?: string; value: string };
+type MentionPage = { items: MentionCandidate[]; total: number; hasMore: boolean; nextCursor: string | null };
 type SlashCommand = { id: string; label: string; detail: string; prompt: string };
 type Menu = { kind: "at" | "slash"; query: string; start: number } | null;
 
@@ -75,6 +77,11 @@ export function HomeComposer({
   const [menu, setMenu] = useState<Menu>(null);
   const [candidates, setCandidates] = useState<MentionCandidate[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
+  const [mentionTotal, setMentionTotal] = useState(0);
+  const [mentionHasMore, setMentionHasMore] = useState(false);
+  const [mentionCursor, setMentionCursor] = useState<string | null>(null);
+  const [mentionLoadingMore, setMentionLoadingMore] = useState(false);
+  const mentionEpoch = useRef(0);
   const [addOpen, setAddOpen] = useState(false);
   const [linkDraft, setLinkDraft] = useState<string | null>(null);
   const [localError, setLocalError] = useState("");
@@ -89,16 +96,55 @@ export function HomeComposer({
 
   useEffect(() => {
     if (menu?.kind !== "at") return;
-    let live = true;
+    const epoch = ++mentionEpoch.current;
+    setCandidates([]);
+    setMentionTotal(0);
+    setMentionHasMore(false);
+    setMentionCursor(null);
+    setMentionLoadingMore(false);
     const timer = window.setTimeout(() => {
       setMenuLoading(true);
-      void apiRequest<{ items: MentionCandidate[] }>(`/api/assistant?resource=mentions&q=${encodeURIComponent(menu.query)}`)
-        .then((result) => { if (live) setCandidates(result.items ?? []); })
-        .catch(() => { if (live) setCandidates([]); })
-        .finally(() => { if (live) setMenuLoading(false); });
+      void apiRequest<MentionPage>(`/api/assistant?resource=mentions&q=${encodeURIComponent(menu.query)}&limit=20`)
+        .then((result) => {
+          if (epoch !== mentionEpoch.current) return;
+          setCandidates(result.items ?? []);
+          setMentionTotal(result.total ?? 0);
+          setMentionHasMore(Boolean(result.hasMore));
+          setMentionCursor(result.nextCursor ?? null);
+        })
+        .catch(() => {
+          if (epoch !== mentionEpoch.current) return;
+          setCandidates([]);
+          setMentionTotal(0);
+          setMentionHasMore(false);
+          setMentionCursor(null);
+        })
+        .finally(() => { if (epoch === mentionEpoch.current) setMenuLoading(false); });
     }, 140);
-    return () => { live = false; window.clearTimeout(timer); };
+    return () => { window.clearTimeout(timer); };
   }, [menu?.kind, menu?.query]);
+
+  async function loadMoreMentions() {
+    if (menu?.kind !== "at" || !mentionHasMore || mentionLoadingMore) return;
+    const epoch = mentionEpoch.current;
+    setMentionLoadingMore(true);
+    try {
+      const query = menu.query;
+      const result = await apiRequest<MentionPage>(`/api/assistant?resource=mentions&q=${encodeURIComponent(query)}&limit=20${mentionCursor ? `&cursor=${encodeURIComponent(mentionCursor)}` : ""}`);
+      if (epoch !== mentionEpoch.current) return;
+      setCandidates((current) => {
+        const seen = new Set(current.map((item) => item.value));
+        return [...current, ...(result.items ?? []).filter((item) => !seen.has(item.value))];
+      });
+      setMentionTotal(result.total ?? 0);
+      setMentionHasMore(Boolean(result.hasMore));
+      setMentionCursor(result.nextCursor ?? null);
+    } catch {
+      /* the menu keeps what is already loaded */
+    } finally {
+      if (epoch === mentionEpoch.current) setMentionLoadingMore(false);
+    }
+  }
 
   function update(next: string, caret = next.length) {
     if (value === undefined) setDraft(next);
@@ -233,17 +279,23 @@ export function HomeComposer({
           </span>)}
         </div> : null}
         {showMenu ? <div className="ef-ui-composer-menu" role="listbox" aria-label={menu?.kind === "at" ? "提及对象" : "常用功能"}>
-          {menu?.kind === "at" ? (candidates.length ? candidates.map((candidate) => <button key={candidate.value} type="button" role="option" aria-selected={false} onClick={() => selectMention(candidate)}>
-            <span className="ef-ui-composer-menu-icon" aria-hidden="true">{candidate.kind === "task" ? <FileText size={13} /> : <Search size={13} />}</span>
-            <span><strong>{candidate.label}</strong><small>{candidate.meta ?? kindLabel(candidate.kind)}</small></span>
-          </button>) : <p role="status">{menuLoading ? "正在查找…" : "没有匹配的对象"}</p>)
+          {menu?.kind === "at" ? (candidates.length ? <>
+            {candidates.map((candidate) => <button key={candidate.value} type="button" role="option" aria-selected={false} onClick={() => selectMention(candidate)}>
+              <span className="ef-ui-composer-menu-icon" aria-hidden="true">{candidate.kind === "task" ? <FileText size={13} /> : <Search size={13} />}</span>
+              <span><strong>{candidate.label}</strong><small>{candidate.meta ?? kindLabel(candidate.kind)}</small></span>
+            </button>)}
+            <div className="ef-ui-composer-menu-foot">
+              <span>共 {mentionTotal} 项 · 已显示 {candidates.length} 项</span>
+              {mentionHasMore ? <button type="button" onClick={() => void loadMoreMentions()} disabled={mentionLoadingMore}>{mentionLoadingMore ? "正在加载…" : "加载更多"}</button> : null}
+            </div>
+          </> : <p role="status">{menuLoading ? "正在查找…" : "没有匹配的对象"}</p>)
             : slashResults.map((command) => <button key={command.id} type="button" role="option" aria-selected={false} onClick={() => runCommand(command)}>
               <span className="ef-ui-composer-menu-icon" aria-hidden="true">/</span>
               <span><strong>{command.label}</strong><small>{command.detail}</small></span>
             </button>)}
         </div> : null}
         {addOpen ? <div className="ef-ui-composer-menu ef-ui-composer-add-menu" role="menu" aria-label="添加内容">
-          <button type="button" role="menuitem" onClick={() => { setAddOpen(false); fileRef.current?.click(); }}><Paperclip size={13} aria-hidden="true" /><span><strong>上传文件</strong><small>支持 .txt、.md、.csv，最多 4 份</small></span></button>
+          <button type="button" role="menuitem" onClick={() => { setAddOpen(false); fileRef.current?.click(); }}><Paperclip size={13} aria-hidden="true" /><span><strong>上传文件</strong><small>支持 .txt、.md、.csv，最多 {ATTACHMENT_LIMIT} 份</small></span></button>
           <button type="button" role="menuitem" onClick={() => { setLinkDraft(""); setAddOpen(false); }}><Link2 size={13} aria-hidden="true" /><span><strong>添加链接</strong><small>仓库、演示或运行记录</small></span></button>
         </div> : null}
         {linkDraft != null ? <div className="ef-ui-composer-link-row">

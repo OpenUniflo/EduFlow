@@ -7,6 +7,7 @@ import { useAssistantRuntime } from "@/features/assistant/AssistantRuntimeContex
 import type { AssistantContextSnapshot } from "@/features/assistant/assistantContract";
 import type { ArchiveModel } from "../model/atlasModel";
 import { deriveAssistantPresentation, type ArchiveAssistantPresentation } from "../model/assistantPresentation";
+import { knowledgeScopeLabelFor, knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 
 export function GuestAssistantCard({ onLogin, onRegister }: { onLogin: () => void; onRegister: () => void }) {
   return (
@@ -114,7 +115,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
           <div className="ef-archive-assistant-query"><span>{contextLabel}</span></div>
           <div className="ef-archive-search-steps" role="status">
             <span className="is-done"><i aria-hidden>✓</i>理解学习目标</span>
-            <span className="is-active"><i aria-hidden /><Search size={11} />匹配要点</span>
+            <span className="is-active"><i aria-hidden /><Search size={11} />匹配知识点</span>
             <span><i aria-hidden />比对已有课程</span>
           </div>
           <p className="ef-archive-assistant-note">正在查找与目标相关的知识与课程。地图只高亮已确认的命中，不会移动节点。</p>
@@ -126,7 +127,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
         <>
           <div className="ef-archive-assistant-query"><span>{contextLabel}</span></div>
           <p className="ef-archive-assistant-lede">{presentation.intentSummary || "我已经把目标对应到可用的知识与课程。"}</p>
-          <div className="ef-archive-assistant-stats"><span><b>{targetCount}</b>目标知识</span><span><b>{prerequisiteCount}</b>必要前置</span><span><b>{presentation.matchCount}</b>门相关课程</span></div>
+          <div className="ef-archive-assistant-stats"><span><b>{targetCount}</b>目标知识点</span><span><b>{prerequisiteCount}</b>必要前置</span><span><b>{presentation.matchCount}</b>门相关课程</span></div>
           {presentation.candidateIds.length ? <CandidateList model={model} ids={presentation.candidateIds} /> : null}
           {matches.length ? <div className="ef-archive-assistant-matches">
             {matches.map((match) => (
@@ -155,12 +156,12 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
           <div className="ef-archive-brief-head"><span className="ef-archive-brief-icon"><BookOpen size={15} aria-hidden /></span><div><b>课程创建简报</b><span>{brief.goal}</span></div><em>草稿 · 未创建</em></div>
           <dl className="ef-archive-brief-list">
             <div><dt>目标</dt><dd>{brief.goal}</dd></div>
-            <div><dt>知识范围</dt><dd>{brief.targetKnowledge.length} 个知识</dd></div>
-            <div><dt>已有基础</dt><dd>{brief.targetKnowledge.filter((item) => model.mineNodeIds.has(item.id)).length} 个知识你已学过</dd></div>
+            <div><dt>知识范围</dt><dd>{brief.targetKnowledge.length} 个知识点</dd></div>
+            <div><dt>已有基础</dt><dd>{brief.targetKnowledge.filter((item) => model.mineNodeIds.has(item.id)).length} 个知识点你已学过</dd></div>
             <div><dt>参考资料</dt><dd>{brief.referenceMaterialIntent === "upload_in_creator" ? "在课程创建页上传" : "暂时没有（不影响创建）"}</dd></div>
             {brief.requestedAdjustments ? <div><dt>调整需求</dt><dd>{brief.requestedAdjustments}</dd></div> : null}
           </dl>
-          <div className="ef-archive-brief-knowledge" aria-label="简报知识范围">
+          <div className="ef-archive-brief-knowledge" aria-label="简报知识点范围">
             {brief.targetKnowledge.slice(0, 8).map((item, index) => <span key={item.id} title={item.title}><i aria-hidden>{index + 1}</i>{item.title}</span>)}
             {brief.targetKnowledge.length > 8 ? <span>+{brief.targetKnowledge.length - 8}</span> : null}
           </div>
@@ -170,7 +171,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
           </div>
           <button type="button" className="ef-archive-text-btn" onClick={() => { setShowAdjustments(true); void lockBrief(); }} disabled={runtime.sending}>继续调整简报范围</button>
           <p className="ef-archive-assistant-foot"><Lock size={11} aria-hidden />助手只提议；课程创建仍需预览、校验并确认。</p>
-          {draftCount ? <span className="ef-archive-sr-status">地图已标出 {draftCount} 个简报知识</span> : null}
+          {draftCount ? <span className="ef-archive-sr-status">地图已标出 {draftCount} 个简报知识点</span> : null}
         </>
       ) : null}
 
@@ -184,5 +185,5 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
 
 function CandidateList({ model, ids }: { model: ArchiveModel; ids: readonly string[] }) {
   const nodes = ids.flatMap((id) => { const node = model.nodeById.get(id); return node ? [node] : []; });
-  return <div className="ef-archive-candidate-list" aria-label="候选知识"><div className="ef-archive-result-head"><b>候选知识</b><span>{nodes.length} 个 · 按匹配度</span></div>{nodes.slice(0, 6).map((node, index) => <div key={node.id} className="ef-archive-candidate"><span className="ef-archive-result-number">{String(index + 1).padStart(2, "0")}</span><span><b>{node.title}</b><small>{node.domainTitle} · {node.isMine ? (node.status === "learning" ? "在学" : "已学") : "可探索"}</small></span><em className={node.isMine ? "is-mine" : ""}>{node.isMine ? "已找到" : "候选"}</em></div>)}</div>;
+  return <div className="ef-archive-candidate-list" aria-label="候选知识点"><div className="ef-archive-result-head"><b>候选知识点</b><span>{nodes.length} 个 · 按匹配度</span></div>{nodes.slice(0, 6).map((node, index) => <div key={node.id} className="ef-archive-candidate"><span className="ef-archive-result-number">{String(index + 1).padStart(2, "0")}</span><span><b>{node.title}</b><small>{node.domainTitle} · {node.isMine ? knowledgeStateLabelFor(node.status) : knowledgeScopeLabelFor(node.scope)}</small></span><em className={node.isMine ? "is-mine" : ""}>{node.isMine ? "已找到" : "候选"}</em></div>)}</div>;
 }

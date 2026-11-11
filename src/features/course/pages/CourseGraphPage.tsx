@@ -64,7 +64,7 @@ function CourseRouteLoading({ courseId }: { courseId: string }) {
  * A session never switches renderer inside a running view.
  */
 export function CourseGraphPage(props: CourseGraphPageProps) {
-  const { courseId = "" } = useParams();
+  const { courseId = "", chapterId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const designRoute = searchParams.get("experience") === "design";
   const design = designRoute && canDesignCourse(props.session);
@@ -72,6 +72,7 @@ export function CourseGraphPage(props: CourseGraphPageProps) {
   if (!design && !tree) {
     return <CourseLearnerRoutePage
       courseId={courseId}
+      focusChapterId={chapterId}
       session={props.session}
       onOpenTree={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set("view", "course"); return next; })}
     />;

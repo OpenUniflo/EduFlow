@@ -48,6 +48,8 @@ export type AssistantPlugin = {
   title: string;
   tools(context: AssistantPluginContext): Record<string, unknown>;
   cards: AssistantPluginCard[];
+  /** The plugin owns the learner-facing progress wording for its own tools. */
+  progress: Record<string, string>;
   writes?: Record<string, WriteToolDefinition>;
 };
 

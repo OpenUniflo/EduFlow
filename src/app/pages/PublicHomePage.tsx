@@ -45,10 +45,10 @@ export function PublicHomePage() {
             </article>
           ))}
           {!previewCourses.length ? <article className="ef-pub-card ef-pub-card-empty"><h3>公开课程正在准备中</h3><p>课程发布后会出现在这里。</p></article> : null}
-          <button type="button" className="ef-pub-map" onClick={() => navigate("/archive")} aria-label={`打开我的地图，浏览 ${graph.nodes.length} 个公开知识`}>
+          <button type="button" className="ef-pub-map" onClick={() => navigate("/archive")} aria-label={`打开我的地图，浏览 ${graph.nodes.length} 个公开可见知识点`}>
             <Network size={40} aria-hidden />
             <span>知识星图</span>
-            <small>{graph.nodes.length} 个公开知识 · 在我的地图中浏览</small>
+            <small>{graph.nodes.length} 个公开可见知识点 · 在我的地图中浏览</small>
             <ArrowRight size={16} aria-hidden />
           </button>
         </div>

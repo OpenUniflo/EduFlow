@@ -2,13 +2,24 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { tool } from "ai";
 import { z } from "zod";
 import type { AssistantContextSnapshot } from "../../src/features/assistant/assistantContract.js";
-import { type AssistantCardDisplay, type AssistantCardRef, type AssistantCardStatus, type AssistantCardStatusTone, type AssistantCardStep } from "../../src/features/assistant/assistantCards.js";
+import { type AssistantCardDisplay, type AssistantCardRef } from "../../src/features/assistant/assistantCards.js";
 import { assistantCardDisplaySchema, assistantComponentCatalog } from "../../src/features/assistant/componentCatalog.js";
-import { knowledgeStateLabel, knowledgeStateTone, type KnowledgeState } from "../../src/shared/learning/knowledgePresentation.js";
+import {
+  chapterCardDisplay,
+  courseMatchCardDisplay,
+  evaluationCardDisplay,
+  knowledgeCardDisplay,
+  materialCardDisplay,
+  microCardDisplay,
+  miniMapCardDisplay,
+  practiceCardDisplay,
+  progressCardDisplay,
+  routeCardDisplay
+} from "../../src/features/assistant/cardDisplay.js";
+import { buildFirstSegment, type AssignmentProgressStatus, type FirstSegmentMicroAsset, type FirstSegmentPracticeAsset, type LearnerEvidenceStatus } from "../../src/shared/learning/firstSegment.js";
 import type { GoalPlan } from "../../src/features/course/goal/goalPlanning.js";
 import { dataOrThrow } from "./query.js";
 import { getAssignmentContext, getCourseContext, getKnowledge, readableCourse } from "./assistantTools.js";
-import { readNavigationDecision } from "./navigationDecision.js";
 
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key]);
@@ -45,80 +56,75 @@ export type AssistantDisplayCardState = {
 
 export type AssistantDisplayCardOutput = { card: AssistantCardRef; display: AssistantCardDisplay } | { skipped: string };
 
-const statusLabels: Record<string, { label: string; tone: AssistantCardStatusTone }> = {
-  not_started: { label: "未开始", tone: "quiet" },
-  started: { label: "进行中", tone: "brand" },
-  in_progress: { label: "进行中", tone: "brand" },
-  submitted: { label: "待评价", tone: "warn" },
-  accepted: { label: "已通过", tone: "ok" },
-  completed: { label: "已完成", tone: "ok" },
-  needs_revision: { label: "需要修改", tone: "warn" },
-  learned: { label: "已学习", tone: "ok" },
-  practicing: { label: "练习中", tone: "brand" },
-  mastered: { label: "已掌握", tone: "ok" },
-  explore: { label: "未开始", tone: "quiet" }
-};
+function orderedNodeIds(course: NonNullable<Awaited<ReturnType<typeof getCourseContext>>>): string[] {
+  const lessonOrder = new Map(course.lessons.map((lesson) => [lesson.id, lesson.order]));
+  return [...course.curriculumCoverage]
+    .sort((left, right) => (lessonOrder.get(left.lessonId) ?? Number.MAX_SAFE_INTEGER) - (lessonOrder.get(right.lessonId) ?? Number.MAX_SAFE_INTEGER)
+      || left.order - right.order
+      || left.nodeId.localeCompare(right.nodeId))
+    .map((coverage) => coverage.nodeId)
+    .filter((nodeId, index, values) => values.indexOf(nodeId) === index);
+}
 
-function statusOf(value: unknown, fallback?: string): AssistantCardStatus {
-  const key = typeof value === "string" ? value : "";
-  return statusLabels[key] ?? { label: fallback ?? "状态未知", tone: "quiet" };
+async function routeFirstSegment(client: SupabaseClient, user: User, courseId: string): Promise<{ courseTitle: string; segment: ReturnType<typeof buildFirstSegment> } | null> {
+  const course = await getCourseContext(client, user, courseId);
+  if (!course) return null;
+  const ordered = orderedNodeIds(course);
+  if (!ordered.length) return null;
+  const assignmentIds = course.assignments.map((assignment) => assignment.id);
+  const [microResult, assignmentCoverageResult, knowledgeStateResult, assignmentStateResult] = await Promise.all([
+    client.from("micro_learning_paths").select("id,knowledge_id,course_id,title,estimated_minutes,scope,status,mode").in("knowledge_id", ordered).eq("status", "published").eq("mode", "learn"),
+    assignmentIds.length
+      ? client.from("assignment_coverages").select("assignment_id,node_id,required").eq("course_id", courseId).in("assignment_id", assignmentIds)
+      : { data: [], error: null },
+    client.from("user_knowledge_states").select("node_id,status").eq("user_id", user.id).in("node_id", ordered),
+    assignmentIds.length
+      ? client.from("user_assignment_states").select("assignment_id,status").eq("user_id", user.id).eq("course_id", courseId).in("assignment_id", assignmentIds)
+      : { data: [], error: null }
+  ]);
+  const microRows = dataOrThrow(microResult.data as Row[] | null, microResult.error, "Route card Micro lookup");
+  const coverageRows = dataOrThrow(assignmentCoverageResult.data as Row[] | null, assignmentCoverageResult.error, "Route card Assignment coverage lookup");
+  const knowledgeRows = dataOrThrow(knowledgeStateResult.data as Row[] | null, knowledgeStateResult.error, "Route card Knowledge state lookup");
+  const assignmentRows = dataOrThrow(assignmentStateResult.data as Row[] | null, assignmentStateResult.error, "Route card Assignment state lookup");
+  const microByNode = new Map<string, FirstSegmentMicroAsset>();
+  for (const nodeId of ordered) {
+    const preferred = microRows.find((row) => text(row, "knowledge_id") === nodeId && text(row, "course_id") === courseId)
+      ?? microRows.find((row) => text(row, "knowledge_id") === nodeId && row.course_id == null && text(row, "scope") === "global")
+      ?? microRows.find((row) => text(row, "knowledge_id") === nodeId);
+    if (preferred) microByNode.set(nodeId, {
+      pathId: text(preferred, "id"),
+      title: text(preferred, "title"),
+      ...(minutes(preferred.estimated_minutes) != null ? { estimatedMinutes: minutes(preferred.estimated_minutes)! } : {})
+    });
+  }
+  const assignmentOrder = new Map(course.assignments.map((assignment) => [assignment.id, assignment.order]));
+  const practiceByNode = new Map<string, FirstSegmentPracticeAsset>();
+  for (const coverage of [...coverageRows].sort((left, right) => (assignmentOrder.get(text(left, "assignment_id")) ?? 0) - (assignmentOrder.get(text(right, "assignment_id")) ?? 0) || text(left, "assignment_id").localeCompare(text(right, "assignment_id")))) {
+    const nodeId = text(coverage, "node_id");
+    if (practiceByNode.has(nodeId)) continue;
+    const assignment = course.assignments.find((item) => item.id === text(coverage, "assignment_id"));
+    if (!assignment) continue;
+    practiceByNode.set(nodeId, { assignmentId: assignment.id, title: assignment.title });
+  }
+  const knowledgeStatusByNode = new Map<string, LearnerEvidenceStatus>(knowledgeRows.map((row) => [text(row, "node_id"), text(row, "status") as LearnerEvidenceStatus]));
+  const assignmentStatusByAssignment = new Map<string, AssignmentProgressStatus>(assignmentRows.map((row) => [text(row, "assignment_id"), text(row, "status") as AssignmentProgressStatus]));
+  const segment = buildFirstSegment({ orderedNodeIds: ordered, microByNode, practiceByNode, knowledgeStatusByNode, assignmentStatusByAssignment });
+  return segment.steps.length ? { courseTitle: course.course.title, segment } : null;
 }
 
 async function buildRouteCard(client: SupabaseClient, user: User, courseId: string): Promise<AssistantDisplayCardOutput | null> {
   if (!await readableCourse(client, user, courseId)) return null;
-  const decision = await readNavigationDecision(client, user.id, courseId);
-  const course = await getCourseContext(client, user, courseId);
-  if (!course) return null;
-  const start = Math.max(0, decision.path.findIndex((item) => item.state === "underway" || item.state === "eligible"));
-  const route = decision.path.slice(start, start + 4);
-  if (!route.length) return null;
-  const nodeIds = route.map((item) => item.nodeId);
-  const microResult = await client.from("micro_learning_paths")
-    .select("id,knowledge_id,course_id,title,estimated_minutes,mode,status")
-    .in("knowledge_id", nodeIds).eq("status", "published").eq("mode", "learn");
-  const microRows = dataOrThrow(microResult.data as Row[] | null, microResult.error, "Route card Micro lookup");
-  const microMinutes = new Map<string, number>();
-  const microTitles = new Map<string, string>();
-  for (const nodeId of nodeIds) {
-    const preferred = microRows.find((row) => text(row, "knowledge_id") === nodeId && text(row, "course_id") === courseId)
-      ?? microRows.find((row) => text(row, "knowledge_id") === nodeId && row.course_id == null)
-      ?? microRows.find((row) => text(row, "knowledge_id") === nodeId);
-    const value = preferred ? minutes(preferred.estimated_minutes) : undefined;
-    if (value != null) microMinutes.set(nodeId, value);
-    if (preferred) microTitles.set(nodeId, text(preferred, "title"));
-  }
-  const steps: AssistantCardStep[] = route.map((item) => ({
-    id: item.nodeId,
-    title: microTitles.get(item.nodeId) ?? item.title,
-    state: item.state === "learned" ? "done" : item.nodeId === decision.nextAction.nodeId ? "now" : "quiet",
-    ...(microMinutes.has(item.nodeId) ? { meta: `约 ${microMinutes.get(item.nodeId)} 分钟` } : {})
-  }));
-  const nextTitle = decision.nextAction.nodeId ? (microTitles.get(decision.nextAction.nodeId) ?? decision.path.find((item) => item.nodeId === decision.nextAction.nodeId)?.title) : undefined;
-  const nextMicro = decision.nextAction.resourceKind === "micro"
-    ? microRows.find((row) => text(row, "id") === decision.nextAction.resourceId)
-      ?? microRows.find((row) => text(row, "knowledge_id") === decision.nextAction.nodeId)
-    : undefined;
-  const action: AssistantCardDisplay["action"] = nextMicro
-    ? { kind: "micro", pathId: text(nextMicro, "id"), knowledgeId: decision.nextAction.nodeId ?? text(nextMicro, "knowledge_id"), ...(optionalText(nextMicro, "course_id") ? { courseId: text(nextMicro, "course_id") } : { courseId }), label: "开始当前这一步" }
-    : decision.nextAction.resourceKind === "assignment" && decision.nextAction.resourceId
-      ? { kind: "practice", courseId, assignmentId: decision.nextAction.resourceId, label: "打开动手任务" }
-      : { kind: "course", courseId, label: "打开课程" };
+  const route = await routeFirstSegment(client, user, courseId);
+  if (!route) return null;
   return {
     card: { cardType: "route", courseId },
-    display: {
-      title: course.course.title,
-      kicker: "起步路线",
-      description: nextTitle ? `从「${nextTitle}」开始，这一段是接下来要走的路。` : "这一段是接下来要走的路。",
-      meta: [`${route.length} 步`],
-      steps,
-      action
-    }
+    display: routeCardDisplay({ courseId, courseTitle: route.courseTitle, segment: route.segment })
   };
 }
 
 async function resolveMicroPath(client: SupabaseClient, user: User, input: Extract<AssistantDisplayCardInput, { cardType: "micro" }>) {
   let query = client.from("micro_learning_paths")
-    .select("id,knowledge_id,course_id,title,description,estimated_minutes,mode,status")
+    .select("id,knowledge_id,course_id,title,description,estimated_minutes,mode,status,scope")
     .eq("status", "published").eq("knowledge_id", input.knowledgeId);
   if (input.pathId) query = query.eq("id", input.pathId);
   const result = await query.limit(20);
@@ -129,13 +135,22 @@ async function resolveMicroPath(client: SupabaseClient, user: User, input: Extra
     return !courseId || Boolean(await readableCourse(client, user, courseId));
   };
   if (input.pathId) return rows[0] && await readable(rows[0]) ? rows[0] : null;
-  // With a Course context, never silently replace it with another Course's
-  // practice for the same Knowledge. The model must choose another real object.
   const candidates = input.courseId
     ? rows.filter((row) => text(row, "course_id") === input.courseId || row.course_id == null)
     : rows;
   for (const row of candidates) if (await readable(row)) return row;
   return null;
+}
+
+/** A Course owns this Knowledge when its curriculum covers it; the path's own course_id is not the only source. */
+async function courseForKnowledge(client: SupabaseClient, user: User, knowledgeId: string, preferredCourseId?: string): Promise<string | undefined> {
+  if (preferredCourseId && await readableCourse(client, user, preferredCourseId)) return preferredCourseId;
+  const result = await client.from("curriculum_coverages").select("course_id").eq("node_id", knowledgeId).order("course_id").limit(40);
+  const rows = dataOrThrow(result.data as Row[] | null, result.error, "Micro owning Course lookup");
+  for (const courseId of [...new Set(rows.map((row) => text(row, "course_id")))]) {
+    if (await readableCourse(client, user, courseId)) return courseId;
+  }
+  return undefined;
 }
 
 async function buildMicroCard(client: SupabaseClient, user: User, input: Extract<AssistantDisplayCardInput, { cardType: "micro" }>): Promise<AssistantDisplayCardOutput | null> {
@@ -145,15 +160,17 @@ async function buildMicroCard(client: SupabaseClient, user: User, input: Extract
   const path = await resolveMicroPath(client, user, input);
   if (!path) return null;
   const pathId = text(path, "id");
-  const courseId = optionalText(path, "course_id");
+  const courseId = optionalText(path, "course_id") ?? await courseForKnowledge(client, user, input.knowledgeId, input.courseId);
   const unitsResult = await client.from("micro_units").select("id,position").eq("path_id", pathId).order("position");
   const units = dataOrThrow(unitsResult.data as Row[] | null, unitsResult.error, "Display Micro unit lookup");
   const unitIds = units.map((unit) => text(unit, "id"));
-  const stepsResult = unitIds.length ? await client.from("micro_steps").select("id,unit_id").in("unit_id", unitIds) : { data: [], error: null };
+  const stepsResult = unitIds.length
+    ? await client.from("micro_steps").select("id,unit_id,title,position").in("unit_id", unitIds)
+    : { data: [], error: null };
   const steps = dataOrThrow(stepsResult.data as Row[] | null, stepsResult.error, "Display Micro step lookup");
   const progressResult = await client.from("user_micro_path_progress").select("status,current_unit_id").eq("user_id", user.id).eq("path_id", pathId).maybeSingle();
   const progress = dataOrThrow(progressResult.data as Row | null, progressResult.error, "Display Micro progress lookup");
-  const progressStatus = optionalText(progress ?? {}, "status") ?? "not_started";
+  const progressStatus = (optionalText(progress ?? {}, "status") ?? "not_started") as "not_started" | "in_progress" | "completed";
   const total = steps.length;
   const completedResult = unitIds.length
     ? await client.from("user_micro_unit_progress").select("completed_step_ids").eq("user_id", user.id).in("unit_id", unitIds)
@@ -161,32 +178,27 @@ async function buildMicroCard(client: SupabaseClient, user: User, input: Extract
   const completedRows = dataOrThrow(completedResult.data as Row[] | null, completedResult.error, "Display Micro completion lookup");
   const completed = progressStatus === "completed" ? total : completedRows.reduce((sum, row) => sum + (Array.isArray(row.completed_step_ids) ? row.completed_step_ids.length : 0), 0);
   const doneStepIds = new Set(completedRows.flatMap((row) => Array.isArray(row.completed_step_ids) ? row.completed_step_ids.map(String) : []));
-  let stepRows: Row[] = [];
-  if (unitIds.length) {
-    const stepResult = await client.from("micro_steps").select("id,unit_id,title,position").in("unit_id", unitIds);
-    stepRows = dataOrThrow(stepResult.data as Row[] | null, stepResult.error, "Display Micro step order");
-  }
-  stepRows.sort((left, right) => {
-    const unitOrder = (id: string) => units.findIndex((unit) => text(unit, "id") === id);
+  steps.sort((left, right) => {
+    const unitOrder = (unitId: string) => units.findIndex((unit) => text(unit, "id") === unitId);
     return unitOrder(text(left, "unit_id")) - unitOrder(text(right, "unit_id")) || Number(left.position) - Number(right.position);
   });
-  const courseTitle = courseId ? optionalText(await readableCourse(client, user, courseId) ?? {}, "title") ?? "课程" : "独立学习";
+  const courseTitle = courseId ? optionalText(await readableCourse(client, user, courseId) ?? {}, "title") : undefined;
   return {
     card: { cardType: "micro", pathId, knowledgeId: input.knowledgeId, ...(courseId ? { courseId } : {}) },
-    display: {
+    display: microCardDisplay({ cardType: "micro", pathId, knowledgeId: input.knowledgeId, ...(courseId ? { courseId } : {}) }, {
       title: text(path, "title"),
-      kicker: "小练习",
-      description: optionalText(path, "description"),
-      meta: [`约 ${minutes(path.estimated_minutes) ?? 0} 分钟`, `${completed} / ${total} 步`, courseTitle],
-      status: statusOf(progressStatus || "not_started"),
-      percent: total ? Math.round(completed / total * 100) : 0,
-      steps: stepRows.slice(0, 12).map((step) => ({
+      ...(optionalText(path, "description") ? { description: optionalText(path, "description")! } : {}),
+      estimatedMinutes: minutes(path.estimated_minutes) ?? 0,
+      totalSteps: total,
+      completedCount: completed,
+      progressStatus,
+      ...(courseTitle ? { courseTitle } : {}),
+      steps: steps.map((step) => ({
         id: text(step, "id"),
         title: text(step, "title"),
-        state: progressStatus === "completed" || doneStepIds.has(text(step, "id")) ? "done" as const : "quiet" as const
-      })),
-      actionLabel: progressStatus === "completed" ? "再看一遍" : progressStatus === "in_progress" ? "继续" : "开始"
-    }
+        done: progressStatus === "completed" || doneStepIds.has(text(step, "id"))
+      }))
+    })
   };
 }
 
@@ -195,17 +207,15 @@ async function buildPracticeCard(client: SupabaseClient, user: User, input: Extr
   if (!context) return null;
   const stateResult = await client.from("user_assignment_states").select("status").eq("user_id", user.id).eq("course_id", input.courseId).eq("assignment_id", input.assignmentId).maybeSingle();
   const state = dataOrThrow(stateResult.data as Row | null, stateResult.error, "Display Assignment state lookup");
-  const estimated = context.assignment.estimatedMinutes;
   return {
     card: { cardType: "practice", courseId: input.courseId, assignmentId: input.assignmentId, ...(input.compact ? { compact: true } : {}) },
-    display: {
+    display: practiceCardDisplay("practice", {
       title: context.assignment.title,
-      kicker: "动手任务",
-      description: typeof context.assignment.description === "string" ? context.assignment.description : undefined,
-      meta: [estimated == null ? "动手做一次" : `约 ${estimated} 分钟`, `${context.knowledge.length} 个要点`],
-      status: statusOf(optionalText(state ?? {}, "status") ?? "not_started"),
-      actionLabel: "打开动手任务"
-    }
+      ...(typeof context.assignment.description === "string" ? { description: context.assignment.description } : {}),
+      ...(context.assignment.estimatedMinutes != null ? { estimatedMinutes: context.assignment.estimatedMinutes } : {}),
+      knowledgeCount: context.knowledge.length,
+      status: optionalText(state ?? {}, "status") ?? "not_started"
+    })
   };
 }
 
@@ -214,17 +224,15 @@ async function buildSubmissionCard(client: SupabaseClient, user: User, input: Ex
   if (!context) return null;
   const stateResult = await client.from("user_assignment_states").select("status").eq("user_id", user.id).eq("course_id", input.courseId).eq("assignment_id", input.assignmentId).maybeSingle();
   const state = dataOrThrow(stateResult.data as Row | null, stateResult.error, "Display submission state lookup");
-  const estimated = context.assignment.estimatedMinutes;
   return {
     card: { cardType: "submission", courseId: input.courseId, assignmentId: input.assignmentId },
-    display: {
+    display: practiceCardDisplay("submission", {
       title: context.assignment.title,
-      kicker: "提交表单",
       description: "填写备注、附上文件或链接，提交后由评估者给出结果。",
-      meta: [estimated == null ? "动手做一次" : `约 ${estimated} 分钟`, `${context.knowledge.length} 个要点`],
-      status: statusOf(optionalText(state ?? {}, "status") ?? "not_started"),
-      actionLabel: "打开提交表单"
-    }
+      ...(context.assignment.estimatedMinutes != null ? { estimatedMinutes: context.assignment.estimatedMinutes } : {}),
+      knowledgeCount: context.knowledge.length,
+      status: optionalText(state ?? {}, "status") ?? "not_started"
+    })
   };
 }
 
@@ -244,18 +252,16 @@ async function buildEvaluationCard(client: SupabaseClient, user: User, input: Ex
   const outcome = optionalText(result ?? {}, "outcome") || "pending";
   const feedback = (result?.feedback ?? {}) as Row;
   const criteria = Array.isArray(feedback.criteria) ? feedback.criteria as Row[] : [];
-  const passed = criteria.filter((criterion) => criterion.passed === true).length;
-  const status = outcome === "passed" ? { label: "已通过", tone: "ok" as const } : outcome === "failed" ? { label: "需要修改", tone: "warn" as const } : { label: "评价中", tone: "quiet" as const };
   return {
     card: { cardType: "evaluation", courseId: input.courseId, assignmentId: input.assignmentId, attemptId: text(attempt, "id") },
-    display: {
-      title: text(assignment, "title"),
-      kicker: "动手任务评价",
-      description: typeof feedback.message === "string" ? feedback.message : undefined,
-      meta: [`第 ${Number(attempt.attempt_number)} 次提交`, criteria.length ? `${passed} / ${criteria.length} 条标准通过` : "等待逐条评价"],
-      status,
-      actionLabel: "查看评价"
-    }
+    display: evaluationCardDisplay({
+      assignmentTitle: text(assignment, "title"),
+      ...(Number(attempt.attempt_number) ? { attemptNumber: Number(attempt.attempt_number) } : {}),
+      outcome: outcome === "passed" ? "passed" : outcome === "failed" ? "failed" : "pending",
+      ...(typeof feedback.message === "string" ? { feedbackMessage: feedback.message } : {}),
+      criteriaPassed: criteria.filter((criterion) => criterion.passed === true).length,
+      criteriaTotal: criteria.length
+    })
   };
 }
 
@@ -269,18 +275,15 @@ async function buildChapterCard(client: SupabaseClient, user: User, input: Extra
   const stateResult = nodeIds.length ? await client.from("user_knowledge_states").select("node_id,status").eq("user_id", user.id).in("node_id", nodeIds) : { data: [], error: null };
   const states = dataOrThrow(stateResult.data as Row[] | null, stateResult.error, "Display Chapter progress lookup");
   const learned = new Set(states.filter((row) => ["learned", "practicing", "mastered"].includes(text(row, "status"))).map((row) => text(row, "node_id")));
-  const done = nodeIds.filter((nodeId) => learned.has(nodeId)).length;
   return {
     card: { cardType: "course_chapter", courseId: input.courseId, chapterId: input.chapterId },
-    display: {
+    display: chapterCardDisplay({
       title: chapter.title,
-      kicker: `第 ${chapter.order} 章`,
-      description: chapter.outcome,
-      meta: [`${nodeIds.length} 个要点`, `${done} 个已学`],
-      status: done >= nodeIds.length && nodeIds.length ? { label: "已学完", tone: "ok" } : done ? { label: "学习中", tone: "brand" } : { label: "未开始", tone: "quiet" },
-      percent: nodeIds.length ? Math.round(done / nodeIds.length * 100) : 0,
-      actionLabel: "打开这一章"
-    }
+      order: chapter.order,
+      ...(chapter.outcome ? { outcome: chapter.outcome } : {}),
+      nodeCount: nodeIds.length,
+      learnedCount: nodeIds.filter((nodeId) => learned.has(nodeId)).length
+    })
   };
 }
 
@@ -297,33 +300,26 @@ async function buildCourseMatchCard(client: SupabaseClient, user: User, state: A
   ]);
   const microRows = dataOrThrow(microResult.data as Row[] | null, microResult.error, "Course match card Micro readiness");
   const coverageRows = dataOrThrow(coverageResult.data as Row[] | null, coverageResult.error, "Course match card coverage");
-  const microCount = (courseId: string) => {
-    const covered = new Set(coverageRows.filter((row) => text(row, "course_id") === courseId).map((row) => text(row, "node_id")));
-    return new Set(microRows.filter((row) => covered.has(text(row, "knowledge_id")) && (text(row, "course_id") === courseId || row.course_id == null)).map((row) => text(row, "knowledge_id"))).size;
+  const courses = allMatches.map((match) => {
+    const coveredNodeIds = new Set(coverageRows.filter((row) => text(row, "course_id") === match.courseId).map((row) => text(row, "node_id")));
+    const microNodeIds = new Set(microRows.filter((row) => coveredNodeIds.has(text(row, "knowledge_id")) && (text(row, "course_id") === match.courseId || row.course_id == null)).map((row) => text(row, "knowledge_id")));
+    return { id: match.courseId, title: match.courseTitle, coveredNodeIds, microNodeIds };
+  });
+  for (const course of courses) if (!await readableCourse(client, user, course.id)) return null;
+  const card = {
+    cardType: "course_match" as const,
+    courseIds: courses.map((course) => course.id),
+    targetKnowledgeIds: targetIds,
+    goalText: plan.resolution.goalText.slice(0, 400)
   };
-  const startable = (courseId: string) => microCount(courseId) > 0;
-  allMatches.sort((left, right) => Number(startable(right.courseId)) - Number(startable(left.courseId)) || microCount(right.courseId) - microCount(left.courseId) || right.targetCoverage - left.targetCoverage || left.courseTitle.localeCompare(right.courseTitle));
-  const matches = allMatches.slice(0, 3);
-  for (const match of matches) if (!await readableCourse(client, user, match.courseId)) return null;
   return {
-    card: {
-      cardType: "course_match",
-      courseIds: matches.map((match) => match.courseId),
+    card,
+    display: courseMatchCardDisplay(card, {
+      goalText: card.goalText,
       targetKnowledgeIds: targetIds,
-      goalText: plan.resolution.goalText.slice(0, 400)
-    },
-    display: {
-      title: "课程匹配",
-      kicker: matches.some((match) => startable(match.courseId)) ? "可以马上开始的课程" : "课程匹配",
-      description: plan.resolution.targetKnowledge.slice(0, 3).map((item) => item.title).join("、"),
-      items: matches.map((match) => ({
-        id: match.courseId,
-        title: match.courseTitle,
-        meta: `${startable(match.courseId) ? `可立刻开始 · ${microCount(match.courseId)} 个真实小练习 · ` : "暂不能立刻开始 · "}目标覆盖 ${Math.round(match.targetCoverage * 100)}% · 必要范围 ${Math.round(match.requiredCoverage * 100)}%`,
-        state: startable(match.courseId) ? "now" : "quiet"
-      })),
-      actionLabel: "查看课程"
-    }
+      targetTitles: plan.resolution.targetKnowledge.map((item) => item.title),
+      courses
+    })
   };
 }
 
@@ -332,17 +328,14 @@ async function buildKnowledgeCard(client: SupabaseClient, user: User, nodeId: st
   if (!knowledge) return null;
   const stateResult = await client.from("user_knowledge_states").select("status").eq("user_id", user.id).eq("node_id", nodeId).maybeSingle();
   const state = dataOrThrow(stateResult.data as Row | null, stateResult.error, "Display Knowledge state lookup");
-  const status = (optionalText(state ?? {}, "status") ?? "explore") as KnowledgeState;
   return {
     card: { cardType: "knowledge", nodeId },
-    display: {
+    display: knowledgeCardDisplay({
       title: knowledge.title,
-      kicker: "知识点",
-      description: typeof knowledge.description === "string" ? knowledge.description : undefined,
-      meta: [knowledge.scope === "global" ? "公开知识" : knowledge.scope === "tenant" ? "组织知识" : "个人知识"],
-      status: { label: knowledgeStateLabel[status] ?? knowledgeStateLabel.explore, tone: knowledgeStateTone(status) },
-      actionLabel: "查看知识点"
-    }
+      ...(typeof knowledge.description === "string" ? { description: knowledge.description } : {}),
+      scope: knowledge.scope,
+      status: optionalText(state ?? {}, "status") ?? "explore"
+    })
   };
 }
 
@@ -353,43 +346,41 @@ async function buildMiniMapCard(client: SupabaseClient, user: User, nodeId: stri
   const edges = dataOrThrow(edgeResult.data as Row[] | null, edgeResult.error, "Display mini map edge lookup");
   return {
     card: { cardType: "mini_map", nodeId },
-    display: {
-      title: knowledge.title,
-      kicker: "小地图",
-      description: "这张图只画这个知识点周围真实存在的关系。",
-      meta: [`${edges.length} 条关系`],
-      actionLabel: "在档案中查看"
-    }
+    display: miniMapCardDisplay({ title: knowledge.title, edgeCount: edges.length })
   };
 }
 
 async function buildProgressCard(client: SupabaseClient, user: User, courseId?: string): Promise<AssistantDisplayCardOutput | null> {
   let stateQuery = client.from("user_course_states").select("course_id,is_active,updated_at").eq("user_id", user.id).eq("is_active", true);
   if (courseId) stateQuery = stateQuery.eq("course_id", courseId);
-  const stateResult = await stateQuery.order("updated_at", { ascending: false }).limit(8);
+  const stateResult = await stateQuery.order("updated_at", { ascending: false });
   const states = dataOrThrow(stateResult.data as Row[] | null, stateResult.error, "Display progress Course lookup");
   if (!states.length) return null;
   const courseIds = states.map((row) => text(row, "course_id"));
-  const courseResult = await client.from("courses").select("id,title").in("id", courseIds);
+  const [courseResult, coverageResult, knowledgeResult] = await Promise.all([
+    client.from("courses").select("id,title").in("id", courseIds),
+    client.from("curriculum_coverages").select("course_id,node_id").in("course_id", courseIds),
+    client.from("user_knowledge_states").select("node_id,status").eq("user_id", user.id)
+  ]);
   const courses = dataOrThrow(courseResult.data as Row[] | null, courseResult.error, "Display progress title lookup");
-  const titleById = new Map(courses.map((course) => [text(course, "id"), text(course, "title")]));
-  const coverageResult = await client.from("curriculum_coverages").select("course_id,node_id").in("course_id", courseIds);
   const coverages = dataOrThrow(coverageResult.data as Row[] | null, coverageResult.error, "Display progress coverage lookup");
-  const knowledgeResult = await client.from("user_knowledge_states").select("node_id,status").eq("user_id", user.id);
   const knowledge = dataOrThrow(knowledgeResult.data as Row[] | null, knowledgeResult.error, "Display progress Knowledge lookup");
-  const learned = new Set(knowledge.filter((row) => ["learned", "practicing", "mastered"].includes(text(row, "status"))).map((row) => text(row, "node_id")));
-  const items = courseIds.flatMap((courseIdValue) => {
-    const nodes = [...new Set(coverages.filter((coverage) => text(coverage, "course_id") === courseIdValue).map((coverage) => text(coverage, "node_id")))];
-    const title = titleById.get(courseIdValue);
-    if (!title) return [];
-    const done = nodes.filter((nodeId) => learned.has(nodeId)).length;
-    return [{ id: courseIdValue, title, meta: `${done} / ${nodes.length} 个要点已学`, state: done >= nodes.length && nodes.length ? "done" as const : done ? "now" as const : "quiet" as const }];
+  const titleById = new Map(courses.map((course) => [text(course, "id"), text(course, "title")]));
+  const learnedNodeIds = new Set(knowledge.filter((row) => ["learned", "practicing", "mastered"].includes(text(row, "status"))).map((row) => text(row, "node_id")));
+  const display = progressCardDisplay({
+    courses: courseIds.flatMap((courseIdValue) => {
+      const title = titleById.get(courseIdValue);
+      if (!title) return [];
+      return [{
+        id: courseIdValue,
+        title,
+        nodeIds: [...new Set(coverages.filter((coverage) => text(coverage, "course_id") === courseIdValue).map((coverage) => text(coverage, "node_id")))],
+        learnedNodeIds
+      }];
+    })
   });
-  if (!items.length) return null;
-  return {
-    card: { cardType: "progress", courseIds: items.map((item) => item.id) },
-    display: { title: "学习进度", kicker: "我的课程", items, actionLabel: "继续学习" }
-  };
+  if (!display) return null;
+  return { card: { cardType: "progress", courseIds }, display };
 }
 
 async function buildMaterialCard(client: SupabaseClient, user: User, input: Extract<AssistantDisplayCardInput, { cardType: "material" }>): Promise<AssistantDisplayCardOutput | null> {
@@ -404,13 +395,15 @@ async function buildMaterialCard(client: SupabaseClient, user: User, input: Extr
   }
   return {
     card: { cardType: "material", courseId: input.courseId, materialId: input.materialId, ...(input.segmentId ? { segmentId: input.segmentId } : {}) },
-    display: {
+    display: materialCardDisplay({
       title: text(material, "title"),
-      kicker: "资料片段",
-      description: segment ? [optionalText(segment, "section"), optionalText(segment, "title")].filter(Boolean).join(" · ") : optionalText(material, "description"),
-      meta: [segment?.page == null ? "学习资料" : `第 ${Number(segment.page)} 页`],
-      actionLabel: "查看资料"
-    }
+      ...(optionalText(material, "description") ? { description: optionalText(material, "description")! } : {}),
+      ...(segment ? {
+        ...(optionalText(segment, "section") ? { segmentSection: optionalText(segment, "section")! } : {}),
+        ...(optionalText(segment, "title") ? { segmentTitle: optionalText(segment, "title")! } : {}),
+        ...(segment.page == null ? {} : { page: Number(segment.page) })
+      } : {})
+    })
   };
 }
 

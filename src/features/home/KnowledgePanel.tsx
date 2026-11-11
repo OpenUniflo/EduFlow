@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MockSession } from "@/features/auth/types";
 import { ArchiveNodePanel } from "@/features/archive/components/ArchiveChrome";
+import { PanelActions } from "./PanelActions";
 import { communityByNodeId, detectAtlasCommunities } from "@/features/archive/model/atlasCommunities";
 import { useArchiveModelData } from "@/features/archive/model/useArchiveModel";
 import "./knowledgePanel.css";
@@ -9,9 +10,10 @@ import "./knowledgePanel.css";
  * The same Archive detail panel, hosted beside the Home conversation. It reads
  * the Archive page's shared graph/model path and never starts a Micro.
  */
-export function KnowledgePanel({ session, nodeId, onClose, onOpenCourse, onSelectNode }: {
+export function KnowledgePanel({ session, nodeId, archiveHref, onClose, onOpenCourse, onSelectNode }: {
   session: MockSession;
   nodeId: string;
+  archiveHref: string;
   onClose(): void;
   onOpenCourse(courseId: string, origin?: DOMRect): void;
   onSelectNode(nodeId: string): void;
@@ -35,5 +37,6 @@ export function KnowledgePanel({ session, nodeId, onClose, onOpenCourse, onSelec
       onSelectNode={(id) => { setSelectedId(id); onSelectNode(id); }}
       onOpenCourse={onOpenCourse}
     />
+    <div className="ef-home-knowledge-actions"><PanelActions expand={{ kind: "page", href: archiveHref }} /></div>
   </aside>;
 }

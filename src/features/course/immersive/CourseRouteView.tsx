@@ -19,6 +19,8 @@ type Props = {
   showHeader?: boolean;
   showAdjust?: boolean;
   labelWidth?: number;
+  /** A card may ask the route to open at one chapter or step, not only the current step. */
+  focusStepId?: string;
   mode?: CourseRouteMode;
   measureEpoch?: number;
   courseCard?: "full" | "progress";
@@ -109,7 +111,7 @@ const RouteStepRow = memo(function RouteStepRow({ step, isCurrent, isSelected, l
  */
 export function CourseRouteView({
   layout, steps, usingActiveRoute, routeRecommended = false, routeVersionNumber, reducedMotion,
-  continueStep, showHeader = true, showAdjust = true, labelWidth = 180, mode = "side", measureEpoch = 0,
+  continueStep, showHeader = true, showAdjust = true, labelWidth = 180, focusStepId, mode = "side", measureEpoch = 0,
   courseCard = "full", cardWidth = 200,
   courseTitle, courseTotal = layout.steps.length, courseDone = layout.steps.filter((step) => step.learned ?? step.status === "done").length,
   onSelect, onStart, onAdjust, onOpenTree
@@ -127,6 +129,7 @@ export function CourseRouteView({
   const suppressScrollEnd = useRef(false);
   const [ready, setReady] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const focusIndex = focusStepId ? layout.steps.findIndex((step) => step.id === focusStepId) : -1;
   const [activeHeaderId, setActiveHeaderId] = useState<string | null>(null);
   const [placement, setPlacement] = useState<Placement | null>(null);
   const [measureVersion, setMeasureVersion] = useState(0);
@@ -165,7 +168,7 @@ export function CourseRouteView({
   // animation from the top, and it survives a portal move to the page form.
   useLayoutEffect(() => {
     const scroller = scrollRef.current;
-    const target = layout.currentIndex >= 0 ? layout.steps[layout.currentIndex] : null;
+    const target = focusStepId && focusIndex >= 0 ? layout.steps[focusIndex] : layout.currentIndex >= 0 ? layout.steps[layout.currentIndex] : null;
     if (!scroller) return;
     if (!target) {
       setActiveHeaderId(layout.headers[0]?.id ?? null);
@@ -189,21 +192,21 @@ export function CourseRouteView({
     const observer = new ResizeObserver(() => { if (apply()) observer.disconnect(); });
     observer.observe(scroller);
     return () => observer.disconnect();
-  }, [layout]);
+  }, [focusIndex, focusStepId, layout]);
 
   // A later structural revision gets the same one-shot positioning, but only
   // after the panel was already positioned once.
   useLayoutEffect(() => {
     if (!ready || positionedLayout.current === layout) return;
     const scroller = scrollRef.current;
-    const target = layout.currentIndex >= 0 ? layout.steps[layout.currentIndex] : null;
+    const target = focusStepId && focusIndex >= 0 ? layout.steps[focusIndex] : layout.currentIndex >= 0 ? layout.steps[layout.currentIndex] : null;
     if (!scroller || !target) return;
     suppressScrollEnd.current = true;
     scroller.scrollTop = Math.max(0, target.y - scroller.clientHeight * 0.5);
     window.setTimeout(() => { suppressScrollEnd.current = false; }, 160);
     positionedLayout.current = layout;
     setActiveHeaderId(headerForStep(layout, target)?.id ?? null);
-  }, [layout, ready]);
+  }, [focusIndex, focusStepId, layout, ready]);
 
   // The portal host restores scrollTop after moving between forms; ignore the
   // resulting scrollend so it cannot move the sticky bar back a chapter.
@@ -409,12 +412,12 @@ export function CourseRouteView({
       {courseCard === "full" ? <>
         <span className="ef-course-route-card-kicker"><BookOpen size={15} aria-hidden="true" />课程</span>
         <h2>{courseTitle}</h2>
-        <p>{layout.headers.length} 章 · {courseTotal} 个要点</p>
+        <p>{layout.headers.length} 章 · {courseTotal} 个知识点</p>
       </> : <span className="ef-course-route-card-kicker">课程进度</span>}
       <div className="ef-course-route-card-progress" role="progressbar" aria-valuemin={0} aria-valuemax={courseTotal} aria-valuenow={courseDone} aria-label={`课程进度 已学 ${courseDone} / ${courseTotal}`}>
         <i style={{ width: `${courseTotal ? (courseDone / courseTotal) * 100 : 0}%` }} />
       </div>
-      <small>已学 {courseDone} / {courseTotal} 个要点</small>
+      <small>已学 {courseDone} / {courseTotal} 个知识点</small>
       <div className="ef-course-route-card-chapter">
         <span>当前章节</span>
         <b>{currentChapterHeader?.title ?? activeHeader?.title ?? courseTitle}</b>
@@ -499,10 +502,10 @@ export function CourseRouteView({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="ef-imm-route-action-copy">
-              <small>{selected.status === "current" ? "当前步骤" : selected.status === "done" ? "已学" : "待学"}</small>
+              <small>{selected.status === "current" ? "当前步骤" : selected.status === "done" ? "已学" : "未开始"}</small>
               <b title={selected.title}>{selected.title}</b>
             </div>
-            {selected.status === "locked" ? <span className="ef-imm-route-action-locked" title="完成前面的要点后解锁">未解锁</span> : selected.kind === "none" ? <span className="ef-imm-route-action-locked">无任务</span> : <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => onStart(selected)}><Play size={14} />{stepActionLabel(selected)}</button>}
+            {selected.status === "locked" ? <span className="ef-imm-route-action-locked" title="完成前面的知识点后解锁">未解锁</span> : selected.kind === "none" ? <span className="ef-imm-route-action-locked">无任务</span> : <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => onStart(selected)}><Play size={14} />{stepActionLabel(selected)}</button>}
           </div> : null}
           {!current && layout.steps.length ? <div className="ef-imm-route-complete" style={{ top: `${layout.steps[layout.steps.length - 1].y + 74}px` }}>
             <b><Flag size={16} />路线已完成</b>

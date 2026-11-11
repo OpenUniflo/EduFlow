@@ -43,7 +43,6 @@ export type MicroHostController = {
   slotOwner(pathId: string): string | null;
   cardSlot(pathId: string, key?: string): HTMLElement | null;
   cardOwner(pathId: string): string | null;
-  hasCardType(pathId: string, kind: string): boolean;
   open(input: MicroOpenInput, form?: MicroForm): void;
   setForm(form: MicroForm): void;
   close(): void;
@@ -61,7 +60,7 @@ export type MicroHostController = {
   dialogSlotRef: RefObject<HTMLDivElement | null>;
 };
 
-type MicroHostValue = Pick<MicroHostController, "presence" | "revision" | "slotVersion" | "slotOwner" | "cardSlot" | "cardOwner" | "hasCardType" | "open" | "setForm" | "close" | "clear" | "dismissSide" | "registerSlot" | "registerCard">;
+type MicroHostValue = Pick<MicroHostController, "presence" | "revision" | "slotVersion" | "slotOwner" | "cardSlot" | "cardOwner" | "open" | "setForm" | "close" | "clear" | "dismissSide" | "registerSlot" | "registerCard">;
 
 const EMPTY_MICRO_HOST: MicroHostValue = {
   presence: null,
@@ -70,7 +69,6 @@ const EMPTY_MICRO_HOST: MicroHostValue = {
   slotOwner: () => null,
   cardSlot: () => null,
   cardOwner: () => null,
-  hasCardType: () => false,
   open: () => undefined,
   setForm: () => undefined,
   close: () => undefined,
@@ -168,7 +166,6 @@ export function useMicroHostController(options: {
     return (slots.current.get(pathId) ?? []).find((entry) => entry.key === key)?.element ?? null;
   }, []);
   const cardOwner = useCallback((pathId: string) => latest(cards.current.get(pathId))?.key ?? null, []);
-  const hasCardType = useCallback((pathId: string, kind: string) => (cards.current.get(pathId) ?? []).some((entry) => entry.kind === kind), []);
 
   const registerIn = useCallback((map: SlotRegistry, pathId: string, entry: SlotEntry) => {
     const list = (map.get(pathId) ?? []).filter((item) => item.element !== entry.element);
@@ -629,7 +626,6 @@ export function useMicroHostController(options: {
     slotOwner,
     cardSlot,
     cardOwner,
-    hasCardType,
     open,
     setForm,
     close,
@@ -637,7 +633,7 @@ export function useMicroHostController(options: {
     dismissSide,
     registerSlot,
     registerCard
-  }), [state.presence, revision, slotsVersion, slotOwner, cardSlot, cardOwner, hasCardType, open, setForm, close, clear, dismissSide, registerSlot, registerCard]);
+  }), [state.presence, revision, slotsVersion, slotOwner, cardSlot, cardOwner, open, setForm, close, clear, dismissSide, registerSlot, registerCard]);
 
   return {
     ...value,
@@ -654,7 +650,7 @@ export function useMicroHostController(options: {
 }
 
 export function MicroHostProvider({ host, children }: { host: MicroHostController; children: ReactNode }) {
-  const { presence, revision, slotVersion, slotOwner, cardSlot, cardOwner, hasCardType, open, setForm, close, clear, dismissSide, registerSlot, registerCard } = host;
+  const { presence, revision, slotVersion, slotOwner, cardSlot, cardOwner, open, setForm, close, clear, dismissSide, registerSlot, registerCard } = host;
   const value = useMemo<MicroHostValue>(() => ({
     presence,
     revision,
@@ -662,7 +658,6 @@ export function MicroHostProvider({ host, children }: { host: MicroHostControlle
     slotOwner,
     cardSlot,
     cardOwner,
-    hasCardType,
     open,
     setForm,
     close,
@@ -670,7 +665,7 @@ export function MicroHostProvider({ host, children }: { host: MicroHostControlle
     dismissSide,
     registerSlot,
     registerCard
-  }), [presence, revision, slotVersion, slotOwner, cardSlot, cardOwner, hasCardType, open, setForm, close, clear, dismissSide, registerSlot, registerCard]);
+  }), [presence, revision, slotVersion, slotOwner, cardSlot, cardOwner, open, setForm, close, clear, dismissSide, registerSlot, registerCard]);
   return <MicroHostContext.Provider value={value}>{children}</MicroHostContext.Provider>;
 }
 

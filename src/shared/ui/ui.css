@@ -1492,6 +1492,29 @@
 .ef-ui-composer-menu > button strong { display: block; font-size: var(--fs-13); font-weight: var(--fw-600); }
 .ef-ui-composer-menu > button small { display: block; color: var(--muted); font-size: var(--fs-12); }
 .ef-ui-composer-menu > p { margin: 0; padding: var(--sp-8); color: var(--muted); font-size: var(--fs-12); }
+.ef-ui-composer-menu-foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  margin-top: var(--sp-4);
+  padding: var(--sp-8);
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+.ef-ui-composer-menu-foot button {
+  padding: var(--sp-4) var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-8);
+  background: var(--surface);
+  color: var(--brand-ink);
+  font: inherit;
+  cursor: pointer;
+}
 .ef-ui-composer-menu-icon {
   display: grid;
   place-items: center;

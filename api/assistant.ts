@@ -20,8 +20,7 @@ import { createDisplayCardTool, type AssistantDisplayCardState } from "./_lib/as
 import { buildAssistantLearnerFacts, learnerFactsPrompt, type LearnerFacts } from "./_lib/assistantLearnerFacts.js";
 import { cardCatalogPrompt } from "../src/features/assistant/componentCatalog.js";
 import { createProtocolGuardTransform, AssistantProtocolLeakError } from "./_lib/streamProtocolGuard.js";
-import { insertAssistantRowOnce, isVisibleTimelineRow, modelHistoryMessages, persistedParts, timelineParts, touchSession, type TimelinePart } from "./_lib/assistantTimeline.js";
-import { looksIncompleteAnswer } from "../src/features/assistant/answerCompleteness.js";
+import { hasFailureMarker, insertAssistantRowOnce, isVisibleTimelineRow, modelHistoryMessages, persistedParts, timelineParts, failureReasonFromParts, touchSession, type TimelinePart } from "./_lib/assistantTimeline.js";
 import { appendStoppedMarker, canPersistStoppedReply, hasStoppedMarker, stoppedReplyContent } from "../src/features/assistant/stoppedReply.js";
 import { decodeSessionCursor, encodeSessionCursor, escapeLikePattern, isCourseReferenceConflict, normalizeSessionId, normalizeSessionTitle, sessionListLimit } from "./_lib/assistantSessions.js";
 import { createAssistantUiTimeline } from "./_lib/assistantUiStream.js";
@@ -29,12 +28,15 @@ import { createAssistantUiTimeline } from "./_lib/assistantUiStream.js";
 type Row = Record<string, unknown>;
 const text = (row: Row, key: string) => String(row[key] ?? "");
 
+const TOOL_LOOP_MAX_STEPS = 10;
+
 const ASSISTANT_CORE_POLICY = `You are EduFlow Assistant, one global learner-facing assistant across EduFlow pages.
 Use EduFlow tools for product facts. The browser context contains only stable entity identities; tools are authoritative and enforce visibility.
 Never guess inaccessible or missing Course, Knowledge, Material, Segment, Assignment, or learner state.
 Knowledge prerequisite/enables/related facts come only from KnowledgeEdges. CurriculumSequence is teaching order, not a factual prerequisite.
 Learner-facing prose must be natural Simplified Chinese unless the learner writes in another language. Name things only by the visible Course, Knowledge, Material, and Assignment titles returned by tools. Never print tool or function names, schema keys, internal identifiers, enum values, resource kinds, or database IDs (for example planLearningGoal, Next Action, eligible, blocked, Micro, RAG06, or aiad-l1-r10). Never copy internal product wording into prose: do not say "Knowledge", "Micro", "必修", "必修小练习", "必修 Micro", "Next Action", "resourceKind", "UKS", "导航建议", "导航决策", or "系统建议". Translate product states and kinds into learner language: eligible = 可以开始, blocked = 暂时还不能开始, Micro = 小练习, Material = 学习资料, Assignment = 动手任务, Knowledge = 要点. Use the learner-facing title returned by the tool. A Knowledge card uses the Knowledge node title; a 小练习 card uses the Micro path title. Never translate or invent a title yourself. If a display title is unavailable, describe the item without exposing an ID.
 Never write a process preamble such as "我先帮你查看", "我先确认一下", or "让我查一下". Call a tool and then answer; the interface shows the tool progress. The first visible words must be the answer itself.
+Independent read-only lookups belong in the same step: call every tool you already know you need in parallel instead of spending one step per lookup. You have at most ${TOOL_LOOP_MAX_STEPS} steps. The final step cannot call tools, so by then use the information already gathered and write the complete answer.
 Every text block you write is shown and persisted immediately, in order, together with tool progress and cards. You will see your earlier text in the next step. Never repeat, paraphrase, or restate what you already wrote; if a tool call follows a complete answer, continue only with the new information.
 Never invent a course, a duration, a percentage, or a progress fact. You may write a short explanatory exercise in prose, but it is not a card and never counts as a learning record. If the learner asks for a real 小练习, find one with searchMicro/getMicroContext and nominate it with displayCard; if no real object exists, say plainly that it is not available.
 Course progress, Assignment completion, Material progress, and Learner Knowledge state/mastery are distinct.
@@ -97,7 +99,7 @@ async function sessionHasCourse(client: Awaited<ReturnType<typeof createUserSupa
 }
 
 function messageJson(row: Row) {
-  const historyRow = row as { role: string; content: unknown; invalid_reason?: unknown };
+  const historyRow = row as { role: string; content: unknown; parts?: unknown; invalid_reason?: unknown };
   const invalidReason = invalidReasonForRow(historyRow);
   return {
     id: String(row.id), sessionId: String(row.session_id), role: String(row.role),
@@ -107,6 +109,7 @@ function messageJson(row: Row) {
     ...(typeof row.dedupe_key === "string" && row.dedupe_key ? { dedupeKey: row.dedupe_key } : {}),
     parts: timelineParts(row),
     ...(hasStoppedMarker(row.parts) ? { stopped: true } : {}),
+    ...(failureReasonFromParts(row.parts) ? { failedReason: failureReasonFromParts(row.parts) } : {}),
     structuredContent: invalidReason ? undefined : safeAssistantStructuredContent(row.structured_content),
     context: row.context_snapshot, createdAt: String(row.created_at)
   };
@@ -186,8 +189,25 @@ async function persistAssistantReplyOnce(
   context: AssistantContextSnapshot,
   parts: TimelinePart[],
   clientMessageId?: string,
-  assistantMessageId?: string
+  assistantMessageId?: string,
+  replaceFailedMessageId?: string
 ) {
+  // A retry replaces the persisted failed turn instead of appending a second
+  // answer (and never inserts a second user turn).
+  if (replaceFailedMessageId) {
+    const found = await client.from("assistant_messages").select("*").eq("id", replaceFailedMessageId).eq("session_id", sessionId).eq("role", "assistant").maybeSingle();
+    const existing = dataOrThrow(found.data as Row | null, found.error, "Assistant retry target lookup");
+    if (existing && hasFailureMarker(existing.parts)) {
+      const update = await client.from("assistant_messages").update({
+        content,
+        parts,
+        context_snapshot: context
+      }).eq("id", replaceFailedMessageId).select("*").single();
+      const row = dataOrThrow(update.data as Row | null, update.error, "Assistant retry replacement");
+      await touchSession(client, sessionId);
+      return row;
+    }
+  }
   const key = clientMessageId ?? assistantMessageId;
   const row = await insertAssistantRowOnce(client, {
     session_id: sessionId, role: "assistant", content, message_kind: "utterance",
@@ -224,12 +244,11 @@ async function currentPlanForCard(client: Awaited<ReturnType<typeof createUserSu
 
 type ResponseMessage = AssistantModelMessage | ToolModelMessage;
 
-// `api/assistant.ts` has a 120s Vercel maxDuration. The two phases are
-// sequential, so the worst case is a 60s tool loop plus at most two 25s final
-// calls (110s), leaving 10s for auth, tool data access, persistence and response.
+// `api/assistant.ts` has a 120s Vercel maxDuration. The final answer is written
+// in the last loop step, so the loop gets 90s and leaves 30s for auth, tool
+// data access, persistence and response.
 const ASSISTANT_PROVIDER_NAME = "eduflow";
-const TOOL_LOOP_MAX_STEPS = 6;
-const TOOL_LOOP_TIMEOUT = { totalMs: 60_000, stepMs: 25_000, chunkMs: 15_000 } as const;
+const TOOL_LOOP_TIMEOUT = { totalMs: 90_000, stepMs: 25_000, chunkMs: 15_000 } as const;
 function modelStepLog(phase: string, stepNumber: number, finishReason: string, modelId: string) {
   // Countable per-step evidence for the real-model acceptance run. No prompt,
   // history, tool result, user content, or key is logged.
@@ -279,7 +298,8 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     if (request.query.resource === "mentions") {
       const query = typeof request.query.q === "string" ? request.query.q.trim().slice(0, 80) : "";
       const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
-      const matches = (value: string) => !terms.length || terms.every((term) => value.toLocaleLowerCase().includes(term));
+      const limit = Math.min(50, Math.max(1, Number(request.query.limit) || 20));
+      const offset = Math.max(0, Number(request.query.cursor) || 0);
       const [coursesResult, assignmentsResult, knowledgeResult, materialsResult] = await Promise.all([
         client.from("courses").select("id,title,lifecycle,owner_user_id").limit(200),
         client.from("course_assignments").select("course_id,id,title").limit(2000),
@@ -289,19 +309,56 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const courses = dataOrThrow(coursesResult.data as Row[] | null, coursesResult.error, "Mention Courses");
       const published = new Set(courses.filter((course) => text(course, "lifecycle") === "published" || text(course, "owner_user_id") === user.id).map((course) => text(course, "id")));
       const courseTitle = new Map(courses.map((course) => [text(course, "id"), text(course, "title")]));
-      const tasks = dataOrThrow(assignmentsResult.data as Row[] | null, assignmentsResult.error, "Mention Assignments")
-        .filter((row) => published.has(text(row, "course_id")) && matches(`${text(row, "title")} ${courseTitle.get(text(row, "course_id")) ?? ""}`))
-        .slice(0, 6)
-        .map((row) => ({ id: `task:${text(row, "course_id")}:${text(row, "id")}`, kind: "task" as const, label: text(row, "title"), meta: `动手任务 · ${courseTitle.get(text(row, "course_id")) ?? ""}`, value: `task:${text(row, "course_id")}:${text(row, "id")}` }));
-      const courseItems = courses.filter((row) => published.has(text(row, "id")) && matches(text(row, "title")))
-        .slice(0, 4).map((row) => ({ id: `course:${text(row, "id")}`, kind: "course" as const, label: text(row, "title"), meta: "课程路线", value: `course:${text(row, "id")}` }));
-      const knowledgeItems = dataOrThrow(knowledgeResult.data as Row[] | null, knowledgeResult.error, "Mention Knowledge")
-        .filter((row) => matches(`${text(row, "title")} ${String(row.description ?? "")}`))
-        .slice(0, 4).map((row) => ({ id: `knowledge:${text(row, "id")}`, kind: "knowledge" as const, label: text(row, "title"), meta: "知识点", value: `knowledge:${text(row, "id")}` }));
-      const materialItems = dataOrThrow(materialsResult.data as Row[] | null, materialsResult.error, "Mention Materials")
-        .filter((row) => published.has(text(row, "course_id")) && matches(`${text(row, "title")} ${courseTitle.get(text(row, "course_id")) ?? ""}`))
-        .slice(0, 4).map((row) => ({ id: `material:${text(row, "course_id")}:${text(row, "id")}`, kind: "material" as const, label: text(row, "title"), meta: `资料 · ${courseTitle.get(text(row, "course_id")) ?? ""}`, value: `material:${text(row, "course_id")}:${text(row, "id")}` }));
-      json(response, 200, { items: [...tasks, ...courseItems, ...knowledgeItems, ...materialItems].slice(0, 12) }); return;
+      type MentionItem = { id: string; kind: "task" | "course" | "knowledge" | "material"; label: string; meta: string; value: string };
+      const candidates: Array<MentionItem & { score: number }> = [];
+      const scoreFor = (label: string, secondary: string) => {
+        const labelText = label.toLocaleLowerCase();
+        const haystack = `${labelText} ${secondary.toLocaleLowerCase()}`;
+        if (!terms.every((term) => haystack.includes(term))) return -1;
+        if (!terms.length) return 1;
+        let score = 0;
+        for (const term of terms) {
+          if (labelText === term) score += 120;
+          else if (labelText.startsWith(term)) score += 70;
+          else if (labelText.includes(term)) score += 35;
+          else score += 10;
+        }
+        // A shorter label is a more precise match; never let type quotas decide.
+        score += Math.max(0, 20 - Math.min(20, Math.floor(label.length / 4)));
+        return score;
+      };
+      for (const row of dataOrThrow(assignmentsResult.data as Row[] | null, assignmentsResult.error, "Mention Assignments")) {
+        const courseId = text(row, "course_id");
+        if (!published.has(courseId)) continue;
+        const courseName = courseTitle.get(courseId) ?? "";
+        const score = scoreFor(text(row, "title"), `${courseName} 动手任务`);
+        if (score < 0) continue;
+        candidates.push({ id: `task:${courseId}:${text(row, "id")}`, kind: "task", label: text(row, "title"), meta: `动手任务 · ${courseName}`, value: `task:${courseId}:${text(row, "id")}`, score });
+      }
+      for (const row of courses) {
+        if (!published.has(text(row, "id"))) continue;
+        const score = scoreFor(text(row, "title"), "课程路线");
+        if (score < 0) continue;
+        candidates.push({ id: `course:${text(row, "id")}`, kind: "course", label: text(row, "title"), meta: "课程路线", value: `course:${text(row, "id")}`, score });
+      }
+      for (const row of dataOrThrow(knowledgeResult.data as Row[] | null, knowledgeResult.error, "Mention Knowledge")) {
+        const score = scoreFor(text(row, "title"), `${String(row.description ?? "")} 知识点`);
+        if (score < 0) continue;
+        candidates.push({ id: `knowledge:${text(row, "id")}`, kind: "knowledge", label: text(row, "title"), meta: "知识点", value: `knowledge:${text(row, "id")}`, score });
+      }
+      for (const row of dataOrThrow(materialsResult.data as Row[] | null, materialsResult.error, "Mention Materials")) {
+        const courseId = text(row, "course_id");
+        if (!published.has(courseId)) continue;
+        const courseName = courseTitle.get(courseId) ?? "";
+        const score = scoreFor(text(row, "title"), `${courseName} 资料`);
+        if (score < 0) continue;
+        candidates.push({ id: `material:${courseId}:${text(row, "id")}`, kind: "material", label: text(row, "title"), meta: `资料 · ${courseName}`, value: `material:${courseId}:${text(row, "id")}`, score });
+      }
+      candidates.sort((left, right) => right.score - left.score || left.label.length - right.label.length || left.label.localeCompare(right.label) || left.value.localeCompare(right.value));
+      const total = candidates.length;
+      const page = candidates.slice(offset, offset + limit).map(({ score: _score, ...item }) => item);
+      const nextCursor = offset + page.length < total ? String(offset + page.length) : null;
+      json(response, 200, { items: page, total, hasMore: nextCursor != null, nextCursor }); return;
     }
     const sessionId = typeof request.query.sessionId === "string" ? request.query.sessionId : undefined;
     if (!sessionId) {
@@ -337,7 +394,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
   }
   if (request.method !== "POST") return methodNotAllowed(response, ["GET", "POST"]);
 
-  const body = request.body as { action?: unknown; sessionId?: unknown; title?: unknown; messages?: unknown; kind?: unknown; pathId?: unknown; knowledgeId?: unknown; message?: unknown; clarificationMessageId?: unknown; planningMessageId?: unknown; briefMessageId?: unknown; stage?: unknown; instruction?: unknown; current?: unknown; goalText?: unknown; refinement?: unknown; courseId?: unknown; sourceCourseId?: unknown; requestedAdjustments?: unknown; referenceMaterialIntent?: unknown; context?: unknown; attachments?: unknown; draft?: unknown; mentions?: unknown; links?: unknown };
+  const body = request.body as { action?: unknown; sessionId?: unknown; title?: unknown; messages?: unknown; kind?: unknown; pathId?: unknown; knowledgeId?: unknown; message?: unknown; clarificationMessageId?: unknown; planningMessageId?: unknown; briefMessageId?: unknown; stage?: unknown; instruction?: unknown; current?: unknown; goalText?: unknown; refinement?: unknown; courseId?: unknown; sourceCourseId?: unknown; requestedAdjustments?: unknown; referenceMaterialIntent?: unknown; context?: unknown; attachments?: unknown; draft?: unknown; mentions?: unknown; links?: unknown; retry?: unknown };
   if (body.action === "workspace-session" || body.action === "workspace-event") {
     json(response, 200, await workspaceAssistantAction(client, user.id, request.body)); return;
   }
@@ -601,7 +658,32 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     headers: llmRequestHeaders(sessionId)
   });
   const model = provider(env.llmModel);
-  const userRow = await persistUserMessageOnce(client, sessionId, message, context, clientUser.id, turnAttachments.map((attachment) => ({ id: attachment.sourceId, title: attachment.title })));
+  // A retry of a failed turn reuses its user row and replaces the failed
+  // assistant row. It must never append a second copy of the question or a
+  // second answer, before or after a refresh.
+  const retryBody = body.retry && typeof body.retry === "object" && !Array.isArray(body.retry) ? body.retry as Row : null;
+  const retryUserId = typeof retryBody?.userId === "string" ? retryBody.userId.slice(0, 80) : undefined;
+  const retryAssistantId = typeof retryBody?.assistantMessageId === "string" ? retryBody.assistantMessageId.slice(0, 80) : undefined;
+  let userRow: Row | null = null;
+  let replaceFailedMessageId: string | undefined;
+  if (retryUserId) {
+    const byId = await client.from("assistant_messages").select("*").eq("id", retryUserId).eq("session_id", sessionId).eq("role", "user").maybeSingle();
+    userRow = dataOrThrow(byId.data as Row | null, byId.error, "Assistant retry user lookup");
+    if (!userRow) {
+      const byKey = await client.from("assistant_messages").select("*").eq("dedupe_key", `utterance:${sessionId}:${retryUserId}:user`).maybeSingle();
+      userRow = dataOrThrow(byKey.data as Row | null, byKey.error, "Assistant retry user dedupe lookup");
+    }
+    if (userRow) {
+      const failedLookup = retryAssistantId
+        ? await client.from("assistant_messages").select("*").eq("id", retryAssistantId).eq("session_id", sessionId).eq("role", "assistant").maybeSingle()
+        : await client.from("assistant_messages").select("*").eq("session_id", sessionId).eq("role", "assistant").gt("sequence", userRow.sequence).order("sequence", { ascending: true }).limit(1).maybeSingle();
+      const failedRow = dataOrThrow(failedLookup.data as Row | null, failedLookup.error, "Assistant retry failed-row lookup");
+      if (failedRow && hasFailureMarker(failedRow.parts)) replaceFailedMessageId = String(failedRow.id);
+    }
+  }
+  if (!userRow) {
+    userRow = await persistUserMessageOnce(client, sessionId, message, context, clientUser.id, turnAttachments.map((attachment) => ({ id: attachment.sourceId, title: attachment.title })));
+  }
   console.info(`assistant_user_persisted session=${sessionId}`);
   messages.push({ role: "user", content: message });
 
@@ -643,6 +725,9 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     abortSignal: abortController.signal,
     tools: { ...createAssistantTools(client, user, context, { onGoalPlan: (plan) => { cardState.lastPlan = plan; }, turnId: clientUser.id ?? crypto.randomUUID(), attachmentSourceIds: turnAttachments.map((attachment) => attachment.sourceId), links: turnLinks, sessionId }), displayCard: createDisplayCardTool(client, user, context, cardState) },
     stopWhen: stepCountIs(TOOL_LOOP_MAX_STEPS),
+    // Every question ends with prose: the last step cannot call tools, so the
+    // model must answer from the information it already gathered.
+    prepareStep: ({ stepNumber }) => stepNumber >= TOOL_LOOP_MAX_STEPS - 1 ? { toolChoice: "none" as const } : undefined,
     timeout: TOOL_LOOP_TIMEOUT,
     providerOptions,
     experimental_transform: () => createProtocolGuardTransform() as TransformStream<any, any>,
@@ -668,20 +753,33 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       console.info(`assistant_stream_${outcome.aborted ? "stopped" : "finished"} session=${sessionId} is_aborted=${isAborted} is_cancelled=${Boolean(isCancelled)} outcome=${streamOutcome.status}`);
     }
   });
-  // Do not persist or accept a half sentence. A structural incompleteness at
-  // finish becomes a data part so the client retries once; the server also
-  // skips persistence.
-  const quality = { incomplete: false };
+  // Completeness comes only from the model's finish reason and structured
+  // parts. Punctuation or wording is never used to guess whether an answer is
+  // finished. A failed turn is persisted with its partial text and cards plus
+  // one failure marker, so a reload shows exactly the same state.
+  const quality: { finishReason: string; failureReason: string | null } = { finishReason: "", failureReason: null };
   let seenText = "";
+  let seenCards = 0;
+  let failureSent = false;
   const qualityStream = uiStream.pipeThrough(timeline.transform).pipeThrough(new TransformStream<UIMessageChunk, UIMessageChunk>({
     transform(chunk, controller) {
       if (chunk.type === "text-delta") seenText += chunk.delta;
+      if (chunk.type === "tool-output-available" && (chunk as { toolName?: string }).toolName === "displayCard") seenCards += 1;
+      if (chunk.type === "error" && !quality.failureReason) {
+        quality.failureReason = "provider";
+        failureSent = true;
+        controller.enqueue({ type: "data-failed", data: { reason: "provider" } } as unknown as UIMessageChunk);
+      }
       if (chunk.type === "finish") {
-        const finishReason = (chunk as { finishReason?: string }).finishReason;
-        console.info(`assistant_quality finish=${finishReason ?? "none"} chars=${seenText.length} incomplete=${looksIncompleteAnswer(seenText)}`);
-        if (finishReason === "length" || looksIncompleteAnswer(seenText)) {
-          quality.incomplete = true;
-          controller.enqueue({ type: "data-incomplete", data: { reason: finishReason === "length" ? "length" : "incomplete" } } as unknown as UIMessageChunk);
+        const finishReason = (chunk as { finishReason?: string }).finishReason ?? "";
+        quality.finishReason = finishReason;
+        if (finishReason === "length") quality.failureReason = "length";
+        else if (finishReason === "content-filter" || finishReason === "error" || finishReason === "tool-calls") quality.failureReason = "provider";
+        else if (!seenText.trim() && seenCards === 0) quality.failureReason = "empty";
+        console.info(`assistant_quality finish=${finishReason || "none"} chars=${seenText.length} cards=${seenCards} failed=${quality.failureReason ?? "none"}`);
+        if (quality.failureReason && !failureSent) {
+          failureSent = true;
+          controller.enqueue({ type: "data-failed", data: { reason: quality.failureReason } } as unknown as UIMessageChunk);
         }
       }
       controller.enqueue(chunk);
@@ -714,11 +812,22 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
 
   try {
     const stopped = outcome.aborted === true;
-    const parts = persistedParts(timeline.recorder.parts);
-    const text = assistantText(parts);
-    if (outcome.failure === "protocol_leak" || hasAssistantProtocolLeak(text)) {
+    let parts: TimelinePart[] = [];
+    let text = "";
+    let protocolFailure = outcome.failure === "protocol_leak";
+    try {
+      parts = persistedParts(timeline.recorder.parts);
+      text = assistantText(parts);
+      if (hasAssistantProtocolLeak(text)) protocolFailure = true;
+    } catch {
+      protocolFailure = true;
+    }
+    if (protocolFailure) {
+      // Protocol structure never reaches the learner or the database. The
+      // turn is still persisted as one failed answer so retry and reload agree.
       console.error(`assistant_response_failed reason=protocol_leak_persist model=${env.llmModel}`);
-      if (stopped) await markUserMessageStopped(client, userRow);
+      if (stopped) { await markUserMessageStopped(client, userRow); return; }
+      await persistAssistantReplyOnce(client, sessionId, "", context, [{ type: "data-failed", data: { reason: "protocol" } }], clientUser.id, outcome.message?.id, replaceFailedMessageId);
       return;
     }
     if (stopped) {
@@ -731,19 +840,23 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
         return;
       }
       const content = stoppedReplyContent(text, parts);
-      await persistAssistantReplyOnce(client, sessionId, content, context, appendStoppedMarker(parts), clientUser.id, outcome.message?.id);
+      await persistAssistantReplyOnce(client, sessionId, content, context, appendStoppedMarker(parts), clientUser.id, outcome.message?.id, replaceFailedMessageId);
       console.info(`assistant_reply_stopped_persisted session=${sessionId} chars=${text.length} parts=${parts.length}`);
       return;
     }
-    if (!text) {
-      console.error(`assistant_response_failed reason=${outcome.failure ?? "empty"} model=${env.llmModel}`);
+    const hasCards = parts.some((part) => part.type === "tool-displayCard");
+    const failureReason = quality.failureReason
+      ?? outcome.failure
+      ?? (!text.trim() && !hasCards ? "empty" : null);
+    if (failureReason) {
+      // Keep everything that was generated; a failed answer is never silently
+      // discarded and never shown as complete.
+      const failedParts: TimelinePart[] = [...parts, { type: "data-failed", data: { reason: failureReason } }];
+      await persistAssistantReplyOnce(client, sessionId, text, context, failedParts, clientUser.id, outcome.message?.id, replaceFailedMessageId);
+      console.error(`assistant_response_failed reason=${failureReason} chars=${text.length} cards=${hasCards ? "yes" : "no"} model=${env.llmModel}`);
       return;
     }
-    if (quality.incomplete) {
-      console.error(`assistant_response_failed reason=incomplete model=${env.llmModel}`);
-      return;
-    }
-    await persistAssistantReplyOnce(client, sessionId, text, context, parts, clientUser.id, outcome.message?.id);
+    await persistAssistantReplyOnce(client, sessionId, text, context, parts, clientUser.id, outcome.message?.id, replaceFailedMessageId);
   } catch (error) {
     console.error("Assistant timeline persistence failed", error instanceof Error ? error.message.slice(0, 200) : "unknown");
   }

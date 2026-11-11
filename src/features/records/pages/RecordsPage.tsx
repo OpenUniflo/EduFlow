@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   BookOpen,
@@ -75,6 +75,9 @@ function errorMessage(error: unknown): string {
 }
 
 export function RecordsPage() {
+  const location = useLocation();
+  const requestedReturn = (location.state as { returnTo?: unknown } | null)?.returnTo;
+  const returnTo = typeof requestedReturn === "string" && /^\/(?!\/)/.test(requestedReturn) ? requestedReturn : null;
   const [params, setParams] = useSearchParams();
   const timeZone = useMemo(browserTimeZone, []);
   const typesParam = params.get("types") ?? "";
@@ -174,7 +177,7 @@ export function RecordsPage() {
   return <main className="ef-rec-page">
     <header className="ef-rec-head">
       <div className="ef-rec-copy">
-        <nav className="ef-rec-crumb" aria-label="面包屑"><Link to="/">首页</Link><span aria-hidden="true">/</span><b>记录</b></nav>
+        <nav className="ef-rec-crumb" aria-label="面包屑"><Link to={returnTo ?? "/"}>{returnTo ? "返回对话" : "首页"}</Link><span aria-hidden="true">/</span><b>记录</b></nav>
         <h1>记录</h1>
         <p className="ef-rec-sum" aria-live="polite">
           {error ? <b>记录暂时不可用</b> : loading && !data ? <b>正在读取记录…</b> : <>
@@ -218,6 +221,7 @@ export function RecordsPage() {
                   onLoadMore={() => void loadMore()}
                   filtering={filtering}
                   onReset={resetFilters}
+                  returnTo={returnTo}
                 />
               </>}
       </section>
@@ -312,7 +316,7 @@ function HeatmapCard({ summary, monthLabels }: {
   </article>;
 }
 
-function TimelineCard({ data, groups, today, expandedId, onToggle, loadingMore, moreError, onLoadMore, filtering, onReset }: {
+function TimelineCard({ data, groups, today, expandedId, onToggle, loadingMore, moreError, onLoadMore, filtering, onReset, returnTo }: {
   data: RecordsResponse;
   groups: ReturnType<typeof groupRecordEventsByDay>;
   today: string;
@@ -323,6 +327,7 @@ function TimelineCard({ data, groups, today, expandedId, onToggle, loadingMore, 
   onLoadMore: () => void;
   filtering: boolean;
   onReset: () => void;
+  returnTo?: string | null;
 }) {
   return <section className="ef-rec-timeline" aria-labelledby="ef-rec-timeline-title">
     <div className="ef-rec-timeline-head">
@@ -339,7 +344,7 @@ function TimelineCard({ data, groups, today, expandedId, onToggle, loadingMore, 
               ? <Button variant="secondary" onClick={onReset}>清除筛选</Button>
               : <>
                   <Link className="ef-ui-btn ef-ui-btn--secondary" to="/archive">去我的地图看看</Link>
-                  <Link className="ef-ui-btn ef-ui-btn--primary" to="/">回首页开始学习</Link>
+                  <Link className="ef-ui-btn ef-ui-btn--primary" to={returnTo ?? "/"}>{returnTo ? "返回对话" : "回首页开始学习"}</Link>
                 </>}
           </div>
         </div>

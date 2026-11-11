@@ -60,7 +60,7 @@ describe("first segment derivation", () => {
     expect(segment.completedCount).toBe(0);
   });
 
-  it("falls back to the first three Micro paths only when the Course has no Assignment", () => {
+  it("uses the real curriculum end when the Course has no Assignment", () => {
     const segment = buildFirstSegment({
       orderedNodeIds: ordered,
       microByNode,
@@ -68,7 +68,7 @@ describe("first segment derivation", () => {
       knowledgeStatusByNode: new Map(),
       assignmentStatusByAssignment: new Map()
     });
-    expect(segment.steps).toHaveLength(3);
+    expect(segment.steps).toHaveLength(4);
     expect(segment.boundaryNodeId).toBeUndefined();
   });
 });

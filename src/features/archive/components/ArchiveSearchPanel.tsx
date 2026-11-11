@@ -4,6 +4,7 @@ import type { FollowedPerson } from "@/features/profile/people/PeopleRepository"
 import type { ArchiveSearchResults } from "../model/atlasModel";
 import { Avatar } from "@/shared/ui/Avatar";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
+import { knowledgeScopeLabelFor, knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 
 function shortName(person: FollowedPerson) {
   return person.displayName.replace(/^示例\s*·\s*/, "");
@@ -29,12 +30,12 @@ export function ArchiveSearchPanel({ belowStrip, query, results, searching, onQu
     <section className={`ef-archive-search-panel ${belowStrip ? "is-below-strip" : ""}`} aria-label="地图搜索">
       <header className="ef-archive-search-head">
         <span className="ef-archive-panel-kicker"><Search size={14} aria-hidden />搜索</span>
-        <span className="ef-archive-panel-meta">{results ? `${results.knowledge.total} 个知识 · ${results.courses.total} 门课程 · ${results.people.total} 位同学` : "课程与知识"}</span>
+        <span className="ef-archive-panel-meta">{results ? `${results.knowledge.total} 个知识点 · ${results.courses.total} 门课程 · ${results.people.total} 位同学` : "课程与知识"}</span>
         <button type="button" className="ef-archive-search-close" onClick={onClose} aria-label="关闭搜索"><X size={14} aria-hidden /></button>
       </header>
       <label className="ef-archive-search-field">
         <Search size={15} aria-hidden />
-        <input ref={inputRef} value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索课程、知识或同学" aria-label="搜索课程、知识或同学" />
+        <input ref={inputRef} value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索课程、知识点或同学" aria-label="搜索课程、知识点或同学" />
         {query ? <button type="button" onClick={() => onQueryChange("")} aria-label="清除搜索"><X size={13} aria-hidden /></button> : <kbd>⌘K</kbd>}
       </label>
       {!query.trim() ? <p className="ef-archive-search-hint">输入知识、课程或同学的名字。搜索只改变镜头与高亮，不移动节点。</p> : null}
@@ -57,16 +58,16 @@ export function ArchiveSearchPanel({ belowStrip, query, results, searching, onQu
       {results && !noResult ? (
         <div className="ef-archive-search-results">
           {results.knowledge.items.length ? (
-            <section className="ef-archive-result-group" aria-label="知识">
-              <div className="ef-archive-result-head"><b>知识</b><span>{results.knowledge.total} 个命中</span></div>
+            <section className="ef-archive-result-group" aria-label="知识点">
+              <div className="ef-archive-result-head"><b>知识点</b><span>{results.knowledge.total} 个命中</span></div>
               {results.knowledge.items.slice(0, 3).map(({ node, hitIndex }) => (
                 <button type="button" key={node.id} className="ef-archive-result-row" onClick={() => onSelectNode(node.id)}>
                   <span className="ef-archive-result-number">{String(hitIndex + 1).padStart(2, "0")}</span>
-                  <span><b>{node.title}</b><small>{node.domainTitle} · {node.isMine ? (node.status === "learning" ? "在学" : node.status === "learned" ? "已学" : "我的知识") : "可探索"} · 命中 {node.courseContexts.length} 门课程</small></span>
+                  <span><b>{node.title}</b><small>{node.domainTitle} · {node.isMine ? knowledgeStateLabelFor(node.status) : knowledgeScopeLabelFor(node.scope)} · 命中 {node.courseContexts.length} 门课程</small></span>
                   <ArrowRight size={13} aria-hidden />
                 </button>
               ))}
-              {results.knowledge.total > 3 ? <p className="ef-archive-result-more">地图上还有 {Math.min(5, results.knowledge.total) - 3} 个命中知识</p> : null}
+              {results.knowledge.total > 3 ? <p className="ef-archive-result-more">地图上还有 {Math.min(5, results.knowledge.total) - 3} 个命中知识点</p> : null}
             </section>
           ) : null}
           {results.courses.items.length ? (
@@ -75,7 +76,7 @@ export function ArchiveSearchPanel({ belowStrip, query, results, searching, onQu
               {results.courses.items.slice(0, 3).map(({ course, matchedKnowledgeIds }) => (
                 <button type="button" key={course.id} className="ef-archive-result-row" onClick={() => onFocusCourse(course.id)}>
                   <span className="ef-archive-result-course"><BookOpen size={14} aria-hidden /></span>
-                  <span><b title={course.title}>{course.title}</b><small>命中 {matchedKnowledgeIds.length} 个知识 · {course.knowledgeCount} 个知识 · {course.chapterCount} 章</small></span>
+                  <span><b title={course.title}>{course.title}</b><small>命中 {matchedKnowledgeIds.length} 个知识点 · {course.knowledgeCount} 个知识点 · {course.chapterCount} 章</small></span>
                   <em>{course.state === "active" ? `在学 ${course.progress}%` : course.state === "draft" ? "草稿" : "未加入"}</em>
                 </button>
               ))}

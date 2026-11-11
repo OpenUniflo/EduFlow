@@ -4,9 +4,10 @@
  * The first segment is derived from the Course's explicit curriculum order and
  * its real Micro / Assignment assets: every Micro up to the first Assignment,
  * then that Assignment. Nothing here knows a Course identity, title or duration
- * ahead of time; a Course without an Assignment falls back to its first three
- * Micro paths. This module is pure so the Home route card, the summary card,
- * the route panel and server-side completion checks share one definition.
+ * ahead of time; a Course without an Assignment uses its real curriculum end
+ * rather than a fixed count. This module is pure so the Home route card, the
+ * summary card, the route panel and server-side completion checks share one
+ * definition.
  */
 import { satisfiesTeachingPrerequisite } from "./teachingPrerequisites.js";
 
@@ -47,12 +48,9 @@ export function buildFirstSegment(input: {
   practiceByNode: ReadonlyMap<string, FirstSegmentPracticeAsset>;
   knowledgeStatusByNode: ReadonlyMap<string, LearnerEvidenceStatus>;
   assignmentStatusByAssignment?: ReadonlyMap<string, AssignmentProgressStatus>;
-  /** Used only when the Course has no Assignment at all. */
-  fallbackMicroLimit?: number;
 }): FirstSegment {
   const steps: FirstSegmentStep[] = [];
   let boundaryNodeId: string | undefined;
-  const fallbackLimit = Math.max(1, input.fallbackMicroLimit ?? 3);
 
   for (const nodeId of input.orderedNodeIds) {
     const micro = input.microByNode.get(nodeId);
@@ -83,7 +81,6 @@ export function buildFirstSegment(input: {
       boundaryNodeId = nodeId;
       break;
     }
-    if (!boundaryNodeId && !input.orderedNodeIds.some((candidate) => input.practiceByNode.has(candidate)) && steps.filter((step) => step.kind === "micro").length >= fallbackLimit) break;
   }
 
   const resolved = steps.map((step) => ({ ...step }));

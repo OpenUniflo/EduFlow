@@ -189,8 +189,8 @@ export function createGeneratedArticleDraft(input: { runtime: CourseRuntimeData;
   const id = `draft-material-${(input.createId ?? (() => crypto.randomUUID()))()}`; const order = Math.max(-1, ...input.runtime.materials.map((material) => material.order)) + 1;
   return { id, courseId: input.runtime.course.id, order, title: `${input.nodeTitle} · AI 课件草稿`, description: `围绕“${input.nodeTitle}”生成的 Article Material，供教师继续预览与修改。`, type: "article", duration: "12 分钟", segments: [
     { id: `${id}-overview`, order: 0, title: "学习目标与核心概念", content: { lead: `理解 ${input.nodeTitle} 的核心目标、适用边界与关键术语。`, bullets: ["明确可观察的学习目标", "建立概念与工程场景的联系", "识别常见误区"], visual: "overview" } },
-    { id: `${id}-example`, order: 1, title: "工程示例", content: { lead: `通过一个最小工程案例拆解 ${input.nodeTitle}。`, paragraphs: ["先确认输入、输出与约束，再观察关键决策如何影响结果。", "示例保留可复核的中间产物，便于课堂讨论与后续实训。"], visual: "flow" } },
-    { id: `${id}-practice`, order: 2, title: "检查与延伸", content: { lead: "使用以下问题检查理解，并为对应实训准备证据。", bullets: ["能否解释为什么采用该方案？", "失败时最先检查哪一项？", "产出如何被后续课程步骤复用？"], visual: "practice" } }
+    { id: `${id}-example`, order: 1, title: "工程示例", content: { lead: `通过一个最小工程案例拆解 ${input.nodeTitle}。`, paragraphs: ["先确认输入、输出与约束，再观察关键决策如何影响结果。", "示例保留可复核的中间产物，便于课堂讨论与后续动手任务。"], visual: "flow" } },
+    { id: `${id}-practice`, order: 2, title: "检查与延伸", content: { lead: "使用以下问题检查理解，并为对应动手任务准备证据。", bullets: ["能否解释为什么采用该方案？", "失败时最先检查哪一项？", "产出如何被后续课程步骤复用？"], visual: "practice" } }
   ] };
 }
 

@@ -1,3 +1,4 @@
+import { ATTACHMENT_LIMIT } from "../../../src/shared/assistant/attachments.js";
 import { tool } from "ai";
 import { z } from "zod";
 import { getAssignmentContext } from "../assistantData.js";
@@ -18,6 +19,12 @@ export const assignmentPlugin: AssistantPlugin = {
     { cardType: "submission", panel: "assignment" },
     { cardType: "evaluation", panel: "assignment" }
   ],
+  progress: {
+    getAssignmentContext: "读取任务要求",
+    getPracticeReviewContext: "读取这次提交",
+    submitAssignment: "提交动手任务",
+    withdrawAssignmentSubmission: "撤回提交",
+  },
   writes: {
     submitAssignment: {
       label: "提交动手任务",
@@ -128,7 +135,7 @@ export const assignmentPlugin: AssistantPlugin = {
           if (row) resolvedAssignmentId = text(row, "assignment_id");
         }
         if (!resolvedAssignmentId) return { status: "assignment_required" };
-        const ids = [...new Set(attachmentSourceIds ?? dependencies.attachmentSourceIds ?? [])].slice(0, 4);
+        const ids = [...new Set(attachmentSourceIds ?? dependencies.attachmentSourceIds ?? [])].slice(0, ATTACHMENT_LIMIT);
         const turnId = dependencies.turnId ?? `${Date.now()}`;
         const idempotencyKey = `assistant:${turnId}:${resolvedAssignmentId}`.slice(0, 160);
         const resolvedLink = link ?? dependencies.links?.[0];

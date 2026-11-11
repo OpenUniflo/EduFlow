@@ -20,6 +20,7 @@ describe("assistant component catalog", () => {
     expect(assistantCardDisplaySchema.parse({ title: "任务", status: { label: "待评价", tone: "warn" }, meta: ["约 15 分钟"] }))
       .toMatchObject({ title: "任务" });
     expect(() => assistantCardDisplaySchema.parse({ title: "任务", html: "<script>" })).toThrow();
-    expect(() => assistantCardDisplaySchema.parse({ title: "任务", items: Array.from({ length: 9 }, (_, index) => ({ id: String(index), title: "x" })) })).toThrow();
+    expect(assistantCardDisplaySchema.parse({ title: "任务", items: Array.from({ length: 9 }, (_, index) => ({ id: String(index), title: "x" })) }).items).toHaveLength(9);
+    expect(() => assistantCardDisplaySchema.parse({ title: "任务", items: Array.from({ length: 51 }, (_, index) => ({ id: String(index), title: "x" })) })).toThrow();
   });
 });

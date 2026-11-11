@@ -39,6 +39,14 @@ export function buildHomeAssistantContext(input: HomeAssistantContextInput): Ass
     } else if (input.activeObject.kind === "knowledge") {
       context.knowledgeId = input.activeObject.nodeId;
       context.presentation = "knowledge";
+    } else if (input.activeObject.kind === "material") {
+      context.courseId = input.activeObject.courseId;
+      context.materialId = input.activeObject.materialId;
+      context.presentation = "material";
+    } else if (input.activeObject.kind === "records") {
+      context.presentation = "records";
+    } else if (input.activeObject.kind === "brief") {
+      context.presentation = "brief";
     } else {
       context.courseId = input.activeObject.courseId;
       context.knowledgeId = input.activeObject.knowledgeId;

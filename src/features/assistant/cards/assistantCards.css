@@ -353,7 +353,6 @@
 }
 
 .ef-assistant-mini-map {
-  overflow-x: auto;
   padding: var(--sp-8);
   border-radius: var(--r-12);
   background: var(--page);
@@ -361,7 +360,7 @@
 
 .ef-assistant-mini-map svg {
   display: block;
-  max-width: 100%;
+  width: 100%;
   height: auto;
 }
 
@@ -377,9 +376,54 @@
   stroke-width: 5;
 }
 
+.ef-assistant-mini-map .ef-assistant-map-edge {
+  stroke-width: 1.6;
+  opacity: .9;
+}
+
 .ef-assistant-mini-map .ef-assistant-map-edge.is-prerequisite { stroke: var(--warn); }
 .ef-assistant-mini-map .ef-assistant-map-edge.is-enables { stroke: var(--brand); }
 .ef-assistant-mini-map .ef-assistant-map-edge.is-related { stroke: var(--line-strong); }
+
+.ef-assistant-mini-map .ef-assistant-map-label {
+  fill: var(--ink-2);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+  paint-order: stroke;
+  stroke: var(--page);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.ef-assistant-mini-map .ef-assistant-map-label.is-center {
+  fill: var(--brand-ink);
+}
+
+.ef-assistant-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8) var(--sp-16);
+  padding: var(--sp-8) var(--sp-4) 0;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.ef-assistant-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
+
+.ef-assistant-map-legend i {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 2px solid var(--line-strong);
+}
+
+.ef-assistant-map-legend i.is-prerequisite { border-color: var(--warn); }
+.ef-assistant-map-legend i.is-enables { border-color: var(--brand); }
+.ef-assistant-map-legend i.is-related { border-color: var(--line-strong); }
 
 /* Tool progress is an in-order one-line event, like Claude/ChatGPT. */
 .ef-assistant-tool-progress-details > p {

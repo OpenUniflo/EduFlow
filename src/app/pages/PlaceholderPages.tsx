@@ -23,10 +23,10 @@ export function NotFoundPage({ onHome, onArchive }: { onHome: () => void; onArch
         type="button"
         className="ef-nf-search ef-ui-glass ef-ui-glass--regular ef-ui-glass--r-full"
         onClick={() => openCommandPalette({ source: "404" })}
-        aria-label="打开全局搜索：搜索课程、知识或页面"
+        aria-label="打开全局搜索：搜索课程、知识点或页面"
       >
         <Search size={18} aria-hidden />
-        <span>搜索课程、知识或页面</span>
+        <span>搜索课程、知识点或页面</span>
         <kbd>⌘K</kbd>
       </button>
     </main>

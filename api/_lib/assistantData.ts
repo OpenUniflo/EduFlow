@@ -270,7 +270,7 @@ export async function searchMicro(client: SupabaseClient, user: User, input: { q
         description: limitText(optionalText(row, "description")),
         estimatedMinutes: row.estimated_minutes == null ? undefined : Number(row.estimated_minutes),
         courseId,
-        courseTitle: courseId ? visibleCourses.get(courseId) : "独立学习",
+        courseTitle: courseId ? visibleCourses.get(courseId) : "未归属课程",
         inCurrentCourse: Boolean(currentCourseId && courseId === currentCourseId),
         scope: text(row, "scope")
       };
@@ -286,7 +286,7 @@ export async function getMicroContext(client: SupabaseClient, user: User, pathId
   const pathCourseId = optionalText(path, "course_id");
   const pathCourse = pathCourseId ? await readableCourse(client, user, pathCourseId) : null;
   if (pathCourseId && !pathCourse) return null;
-  const courseTitle = optionalText(pathCourse ?? {}, "title") ?? "独立学习";
+  const courseTitle = optionalText(pathCourse ?? {}, "title") ?? "未归属课程";
   const unitsResult = await client.from("micro_units").select("id,title,description,position,estimated_minutes,required").eq("path_id", pathId).order("position");
   let units = dataOrThrow(unitsResult.data as Row[] | null, unitsResult.error, "Assistant Micro unit lookup");
   if (unitId) units = units.filter((unit) => text(unit, "id") === unitId);

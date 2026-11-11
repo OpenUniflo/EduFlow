@@ -211,7 +211,7 @@ describe("course tree geometry", () => {
     // second time as a solid card. K2 keeps a dashed identity placeholder.
     expect([...cards.values()].filter((card) => card.kind === "assignment" && card.assignmentIds.includes("A2"))).toHaveLength(0);
     expect(cards.get("K2")).toMatchObject({ kind: "shadow", assignmentIds: ["A2"], code: "02" });
-    expect(cards.get("K3")).toMatchObject({ kind: "empty", title: "暂无对应实训" });
+    expect(cards.get("K3")).toMatchObject({ kind: "empty", title: "暂无对应动手任务" });
     expect(assignmentKnowledgeMap(graphData).get("A2")).toEqual(["K1", "K2"]);
     expect(primaryKnowledgeByAssignment(graphData).get("A2")).toBe("K1");
   });

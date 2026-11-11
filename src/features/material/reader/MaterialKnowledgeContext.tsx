@@ -15,7 +15,7 @@ export function MaterialKnowledgeContext({ projection, selectedKnowledgeId, pinn
   onAssignment(assignmentId: string): void;
 }) {
   const effectiveKnowledgeId = pinnedKnowledgeId ?? selectedKnowledgeId;
-  return <aside className="atlas-lesson-knowledge glass-v2">
+  return <aside className="atlas-lesson-knowledge glass-v2" data-floating-panel>
     <button className="atlas-lesson-collapse" onClick={onToggle} aria-label="折叠知识上下文">{collapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}</button>
     {!collapsed ? <>
       <div className="atlas-outline-head"><Network size={16} /><span><strong>Knowledge Context</strong><small>MaterialKnowledgeCoverage</small></span></div>
@@ -26,7 +26,7 @@ export function MaterialKnowledgeContext({ projection, selectedKnowledgeId, pinn
       </> : null}
       <div className={`atlas-knowledge-mode ${pinnedKnowledgeId ? "pinned" : "auto"}`}><span>{pinnedKnowledgeId ? <><Pin size={12} />已固定 {effectiveKnowledge?.title ?? pinnedKnowledgeId}</> : "随内容联动"}</span><button className={`atlas-knowledge-pin ${pinnedKnowledgeId ? "active" : ""}`} disabled={!effectiveKnowledge} onClick={onTogglePin}>{pinnedKnowledgeId ? <PinOff size={12} /> : <Pin size={12} />}{pinnedKnowledgeId ? "取消固定" : "固定"}</button></div>
       {effectiveKnowledge ? <section className="atlas-active-knowledge"><h2>{effectiveKnowledge.title}</h2>{effectiveKnowledge.roles.length ? <div className="atlas-active-knowledge-roles">{effectiveKnowledge.roles.map((role) => <span key={role}>{role}</span>)}</div> : null}<p>{effectiveKnowledge.description}</p></section> : <p className="atlas-material-empty">当前页暂无可查看的 Knowledge Detail。</p>}
-      {effectiveKnowledge && knowledgeAssignmentContexts.length ? <section className="atlas-drawer-section"><h3>关联实训</h3><div className="atlas-assignment-switcher">{knowledgeAssignmentContexts.map((context) => <button key={context.assignmentId} onClick={() => onAssignment(context.assignmentId)}><strong>{context.assignment.title}</strong><small>{context.state?.status ?? "not-started"}</small><ArrowRight size={13} /></button>)}</div></section> : effectiveKnowledge ? <p className="atlas-material-empty">该 KnowledgeNode 暂无关联实训。</p> : null}
+      {effectiveKnowledge && knowledgeAssignmentContexts.length ? <section className="atlas-drawer-section"><h3>关联动手任务</h3><div className="atlas-assignment-switcher">{knowledgeAssignmentContexts.map((context) => <button key={context.assignmentId} onClick={() => onAssignment(context.assignmentId)}><strong>{context.assignment.title}</strong><small>{context.state?.status ?? "not-started"}</small><ArrowRight size={13} /></button>)}</div></section> : effectiveKnowledge ? <p className="atlas-material-empty">该 KnowledgeNode 暂无关联动手任务。</p> : null}
     </> : null}
   </aside>;
 }

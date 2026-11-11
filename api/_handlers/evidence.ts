@@ -1,3 +1,4 @@
+import { ATTACHMENT_MAX_BYTES } from "../../src/shared/assistant/attachments.js";
 import { assignmentEvidenceSource } from '../_lib/assignmentEvidence.js';
 import { readEvidenceView } from '../_lib/evidenceRead.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -12,7 +13,7 @@ import { diagnoseEvidence,EvidenceDiagnosisError, EVIDENCE_PROMPT_VERSION, EVIDE
 import { practiceContextsForSource } from '../_lib/practiceContext.js';
 
 export const maxDuration=300;
-const uploadSchema=z.object({action:z.literal('upload'),title:z.string().trim().min(1).max(240),contentType:z.enum(['text/plain','text/markdown','text/csv']),size:z.number().int().min(1).max(1048576),courseId:z.string().optional(),assignmentId:z.string().optional(),actionRunId:z.string().uuid().optional(),supplement:z.boolean().optional()}).strict();
+const uploadSchema=z.object({action:z.literal('upload'),title:z.string().trim().min(1).max(240),contentType:z.enum(['text/plain','text/markdown','text/csv']),size:z.number().int().min(1).max(ATTACHMENT_MAX_BYTES),courseId:z.string().optional(),assignmentId:z.string().optional(),actionRunId:z.string().uuid().optional(),supplement:z.boolean().optional()}).strict();
 const sourceSchema=z.object({action:z.enum(['parse','archive','download']),sourceId:z.string().uuid()}).strict();
 const diagnosisSchema=z.object({action:z.literal('diagnose'),sourceIds:z.array(z.string().uuid()).min(1).max(5)}).strict();
 const confirmationSchema=z.object({action:z.enum(['confirm','reject']),proposalIds:z.array(z.string().uuid()).min(1).max(50),runId:z.string().uuid().optional()}).strict();

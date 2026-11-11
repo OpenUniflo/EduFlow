@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import type { CourseAssignment, CurriculumChapter, CurriculumCoverage, CurriculumLesson } from "@/features/course/types";
 import type { UserKnowledgeRecord } from "@/features/profile/types";
-import { buildCoursePreview } from "./CoursePreviewCard";
+import { buildCoursePreview } from "./coursePreviewProjection";
 import { buildChapterProgress } from "./courseChapterProgress";
 
 function chapter(id: string, order: number): CurriculumChapter {

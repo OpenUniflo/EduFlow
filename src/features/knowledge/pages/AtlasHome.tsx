@@ -10,7 +10,7 @@ import { canManageKnowledgeDomains } from "@/features/auth/capabilities";
 import { globalKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import type { CourseIntent } from "@/features/course/creation/courseIntent";
 
-const generationStages = ["读取课件", "识别章节", "提取知识节点", "分析前置依赖", "生成实训目标", "完成课程"];
+const generationStages = ["读取课件", "识别章节", "提取知识节点", "分析前置依赖", "生成动手任务目标", "完成课程"];
 
 export function AtlasHome({ session, onLogout }: { session: MockSession; onLogout: () => void }) {
   const navigate = useNavigate();
@@ -91,7 +91,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
         <div className="atlas-home-heading">
           <span className="atlas-kicker">LEARN BY DISCOVERY</span>
           <h1>从知识星图中探索，或创建一门课程</h1>
-          <p>上传课件并补充要求，自动生成课程技能树、关联课件与配套实训。</p>
+          <p>上传课件并补充要求，自动生成课程技能树、关联课件与配套动手任务。</p>
         </div>
         <div className="atlas-creator">
           {files.length ? (
@@ -141,7 +141,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
           {selected.courseContexts.length > 1 ? <section className="atlas-node-dependencies"><h3>关联课程 {selected.courseContexts.length}</h3><div>{selected.courseContexts.map((context) => <button key={context.courseId} onClick={() => navigate(`/courses/${context.courseId}`)}><ArrowRight size={12} />{context.courseTitle}</button>)}</div></section> : null}
           <div className="atlas-panel-actions">
             <button className="atlas-primary" disabled={!selected.courseContexts.length} onClick={() => selected.courseContexts.length === 1 && navigate(`/courses/${selected.courseContexts[0].courseId}`)}>{selected.courseContexts.length > 1 ? "请选择关联课程" : "查看对应课程"} <ArrowRight size={16} /></button>
-            <button className="atlas-secondary" onClick={() => { setPrompt(`围绕“${selected.title}”创建一门课程，设计清晰的前置依赖与实训。`); setSelectedId(null); }}>基于此主题创建</button>
+            <button className="atlas-secondary" onClick={() => { setPrompt(`围绕“${selected.title}”创建一门课程，设计清晰的前置依赖与动手任务。`); setSelectedId(null); }}>基于此主题创建</button>
           </div>
         </aside>
       ) : null}

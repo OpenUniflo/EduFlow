@@ -1,3 +1,4 @@
+import { practiceHref } from "./practiceLink.js";
 /**
  * Learning records projection.
  *
@@ -523,7 +524,7 @@ function microPath(knowledgeId: string, courseId: string | undefined, pathId: st
 }
 
 function conversationPath(courseId: string, assignmentId: string): string {
-  return `/?practice=${encodeURIComponent(`${courseId}:${assignmentId}`)}`;
+  return practiceHref(courseId, assignmentId);
 }
 
 function addLink(links: RecordLink[], seen: Set<string>, link: RecordLink): void {

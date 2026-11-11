@@ -1,14 +1,13 @@
-import { AlertTriangle, Check, Sparkles, Target } from "lucide-react";
+import { AlertTriangle, Check, RefreshCw, Sparkles } from "lucide-react";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { applicationServices } from "@/app/services/applicationServices";
 import { ASSISTANT_REPLY_FAILURE, type AssistantUIMessage } from "@/features/assistant/AssistantRuntimeContext";
-import type { AssistantContextSnapshot, AssistantStructuredContent, CourseCreationBrief, CourseSearchTimelineContent } from "@/features/assistant/assistantContract";
+import type { AssistantStructuredContent, CourseCreationBrief, CourseSearchTimelineContent } from "@/features/assistant/assistantContract";
 import { AssistantCardView, type AssistantCardActions } from "@/features/assistant/cards/AssistantCardView";
 import { AssistantMarkdown } from "@/features/assistant/cards/AssistantMarkdown";
 import { PROTOCOL_HIDDEN_MESSAGE } from "@/features/assistant/protocolGuard";
 import type { MockSession } from "@/features/auth/types";
-import { Bubble, ConversationCard, EventRow } from "@/shared/ui/Conversation";
-import { Pill } from "@/shared/ui/Pill";
+import { Bubble, EventRow } from "@/shared/ui/Conversation";
 import { conversationDayKey, formatConversationDay } from "@/shared/ui/conversationDates";
 import "./assistantTimeline.css";
 
@@ -34,17 +33,18 @@ function WriteResultRow({ data, actions }: { data: { toolName: string; ok: boole
   return <div className={`ef-assistant-write-result${data.ok ? " is-ok" : " is-failed"}`} data-write-result={data.toolName} role="status">
     <span className="ef-assistant-write-result-icon" aria-hidden="true">{data.ok ? <Check size={13} /> : <AlertTriangle size={13} />}</span>
     <span><strong>{data.title}</strong>{data.detail ? <small>{data.detail}</small> : null}</span>
-    {data.card ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => actions.openPractice(data.card!.courseId, data.card!.assignmentId)}>查看任务</button> : null}
+    {data.card ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => actions.openObject({ kind: "practice", courseId: data.card!.courseId, assignmentId: data.card!.assignmentId })}>查看任务</button> : null}
   </div>;
 }
 
-export function AssistantTimeline({ messages, session, actions, sending, showDaySeparators = false, onSuggestion }: {
+export function AssistantTimeline({ messages, session, actions, sending, showDaySeparators = false, onSuggestion, onRetry }: {
   messages: AssistantUIMessage[];
   session: MockSession;
   actions: AssistantCardActions;
   sending: boolean;
   showDaySeparators?: boolean;
   onSuggestion?: (text: string) => void;
+  onRetry?: () => void;
 }) {
   const [, setRevision] = useState(0);
   useEffect(() => {
@@ -71,7 +71,9 @@ export function AssistantTimeline({ messages, session, actions, sending, showDay
           actions={actions}
           streaming={sending && message.role === "assistant" && index === messages.length - 1}
           unanswered={unanswered.has(message.id)}
+          isLast={index === messages.length - 1}
           onSuggestion={onSuggestion}
+          onRetry={onRetry}
         />
       </Fragment>;
     })}
@@ -79,13 +81,15 @@ export function AssistantTimeline({ messages, session, actions, sending, showDay
   </div>;
 }
 
-export function AssistantTimelineMessage({ message, session, actions, streaming = false, unanswered = false, onSuggestion }: {
+export function AssistantTimelineMessage({ message, session, actions, streaming = false, unanswered = false, isLast = false, onSuggestion, onRetry }: {
   message: AssistantUIMessage;
   session: MockSession;
   actions: AssistantCardActions;
   streaming?: boolean;
   unanswered?: boolean;
+  isLast?: boolean;
   onSuggestion?: (text: string) => void;
+  onRetry?: () => void;
 }) {
   const metadata = message.metadata;
   const legacy = metadata?.structuredContent;
@@ -97,7 +101,7 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
   const textBlocks = parts.filter(isTextPart);
   const nonEmptyText = textBlocks.filter((part) => part.text.trim().length > 0);
   const totalText = nonEmptyText.reduce((sum, part) => sum + part.text.length, 0);
-  const context = metadata?.context ?? ({ workspace: "learning", experienceMode: "learn" } satisfies AssistantContextSnapshot);
+  const failed = parts.some((part) => part.type === "data-failed");
 
   if (message.role === "user") {
     const text = textBlocks.map((part) => part.text).join("\n");
@@ -137,11 +141,10 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
       continue;
     }
     if (part.type === "data-tool-progress" && part.data && typeof part.data === "object") {
-      const label = String((part.data as { label?: unknown }).label ?? "完成一步");
-      ordered.push({ kind: "meta", node: <details key={`tool-${partIndex}`} className="ef-assistant-tool-progress-details" data-tool-progress="true">
-        <summary><Sparkles size={13} aria-hidden="true" /><span>{label}</span></summary>
-        <p>已完成</p>
-      </details> });
+      // The tool plugin declared this label when it registered; the timeline
+      // only renders the persisted/streamed value and never maps tool names.
+      const label = String((part.data as { label?: unknown }).label ?? "读取产品数据");
+      ordered.push({ kind: "meta", node: <details key={`tool-${partIndex}`} className="ef-assistant-tool-progress-details" data-tool-progress="true"><summary><Sparkles size={12} aria-hidden="true" /><span>{label}</span></summary></details> });
       continue;
     }
     if (part.type === "data-write-result" && part.data && typeof part.data === "object") {
@@ -165,28 +168,7 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
     </div> });
   }
 
-  const pendingToolPart = streaming && totalText === 0
-    ? parts.find((part) => part.type.startsWith("tool-") && part.type !== "tool-displayCard")
-    : undefined;
-  const pendingTool = Boolean(pendingToolPart);
-  if (!isAction && pendingToolPart) {
-    const toolName = pendingToolPart.type.slice("tool-".length);
-    const toolLabel: Record<string, string> = {
-      getNavigationDecision: "正在确认下一步",
-      getCourseContext: "正在查看课程",
-      getLearnerState: "正在查看学习进度",
-      searchMicro: "正在查找小练习",
-      getMicroContext: "正在查看小练习",
-      getAssignmentContext: "正在查看任务",
-      getMaterialContext: "正在查看资料",
-      searchKnowledge: "正在查找要点",
-      searchCourses: "正在查找课程",
-      planLearningGoal: "正在整理目标"
-    };
-    ordered.push({ kind: "text", node: <EventRow key="tool-progress" icon={<Sparkles size={15} />} title={toolLabel[toolName] ?? "正在准备回答…"} className="ef-assistant-tool-progress" /> });
-  }
-
-  if (!isAction && !pendingTool && !metadata?.stopped && nonEmptyText.length === 0 && !ordered.some((entry) => entry.kind === "card")) {
+  if (!isAction && !metadata?.stopped && !failed && nonEmptyText.length === 0 && !ordered.some((entry) => entry.kind === "card" || entry.kind === "meta")) {
     ordered.push({ kind: "text", node: <AssistantText key="fallback" meta={formatTime(metadata?.createdAt)}>
       <p className="ef-home-copy ef-home-muted">{streaming ? "正在回复…" : ASSISTANT_REPLY_FAILURE}</p>
     </AssistantText> });
@@ -197,7 +179,12 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
     <div className={`ef-assistant-turn${isAction ? " is-action" : ""}`} data-role="assistant" data-message-id={message.id} data-message-kind={metadata?.messageKind ?? "utterance"}>
       {content}
     </div>
-    {legacy ? <LegacyStructuredCard content={legacy} messageId={message.id} actions={actions} context={context} /> : null}
+    {legacy ? <LegacyStructuredCard content={legacy} messageId={message.id} session={session} actions={actions} /> : null}
+    {failed ? <div className="ef-assistant-failed" role="alert">
+      <AlertTriangle size={14} aria-hidden="true" />
+      <span>{ASSISTANT_REPLY_FAILURE}</span>
+      {isLast && onRetry ? <button type="button" onClick={onRetry}><RefreshCw size={12} aria-hidden="true" />重试</button> : null}
+    </div> : null}
     {metadata?.stopped ? <StoppedMarker /> : null}
   </>;
 }
@@ -228,96 +215,64 @@ function unansweredUserMessages(messages: AssistantUIMessage[]) {
   return unanswered;
 }
 
-function LegacyStructuredCard({ content, messageId, actions, context }: { content: AssistantStructuredContent; messageId: string; actions: AssistantCardActions; context: AssistantContextSnapshot }) {
-  if (content.type === "course_search") return <LegacyCourseSearch content={content} messageId={messageId} actions={actions} context={context} />;
-  if (content.type === "course_creation_brief") return <LegacyBrief content={content} messageId={messageId} actions={actions} context={context} />;
+/**
+ * Legacy structured rows store their own plan/brief payload. They are only
+ * adapted into the same card references and display props the current cards
+ * use; there is no second view implementation.
+ */
+function LegacyStructuredCard({ content, messageId, session, actions }: { content: AssistantStructuredContent; messageId: string; session: MockSession; actions: AssistantCardActions }) {
+  if (content.type === "course_search") return <LegacyCourseSearchCard content={content} session={session} actions={actions} />;
+  if (content.type === "course_creation_brief") return <LegacyBriefCard content={content} messageId={messageId} session={session} actions={actions} />;
   return null;
 }
 
-function LegacyCourseSearch({ content, messageId, actions, context }: { content: CourseSearchTimelineContent; messageId: string; actions: AssistantCardActions; context: AssistantContextSnapshot }) {
-  const matches = content.plan.matches.slice(0, 3);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [refining, setRefining] = useState(false);
-  const [refinement, setRefinement] = useState("");
-  const [error, setError] = useState("");
-  async function useCourse(courseId: string) {
-    if (!actions.useCourse || busy) return;
-    setBusy(`use:${courseId}`); setError("");
-    try { const selected = await actions.useCourse(messageId, courseId, context); actions.openCourse(selected); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "课程选择失败，请重试。"); }
-    finally { setBusy(null); }
-  }
-  async function prepare(sourceCourseId?: string) {
-    if (!actions.prepareBrief || busy) return;
-    setBusy(sourceCourseId ? `brief:${sourceCourseId}` : "brief"); setError("");
-    try { await actions.prepareBrief(messageId, { ...(sourceCourseId ? { sourceCourseId } : {}), referenceMaterialIntent: "none" }, context); setRefining(false); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "创建需求整理失败，请重试。"); }
-    finally { setBusy(null); }
-  }
-  async function refine() {
-    if (!actions.refineGoal || !refinement.trim() || busy) return;
-    setBusy("refine"); setError("");
-    try { await actions.refineGoal(messageId, refinement.trim(), context); setRefinement(""); setRefining(false); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "继续寻找失败，请重试。"); }
-    finally { setBusy(null); }
-  }
-  return <ConversationCard size="s" label="课程匹配结果">
-    <div className="ef-home-structured-card">
-      <div className="ef-home-structured-head"><Target size={15} aria-hidden="true" /><strong>课程匹配</strong><Pill tone="brand">{matches.length} 门</Pill></div>
-      <p>{content.intentSummary}</p>
-      <ul>{matches.map((match) => <li key={match.courseId}>
-        <button type="button" onClick={() => actions.openCourse(match.courseId)}><span><strong>{match.courseTitle}</strong><small>目标覆盖 {Math.round(match.targetCoverage * 100)}% · 必要范围 {Math.round(match.requiredCoverage * 100)}%</small></span><span aria-hidden="true">→</span></button>
-        {actions.useCourse ? <div className="ef-legacy-goal-actions">
-          <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={Boolean(busy)} onClick={() => void useCourse(match.courseId)}>{busy === `use:${match.courseId}` ? "正在加入…" : "使用这门课程"}</button>
-          {actions.prepareBrief ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={Boolean(busy)} onClick={() => void prepare(match.courseId)}>基于这门课程创建</button> : null}
-        </div> : null}
-      </li>)}</ul>
-      {!matches.length ? <p className="ef-home-muted">当前没有匹配的课程，可以继续和助手讨论目标。</p> : null}
-      {error ? <p className="ef-home-error" role="alert">{error}</p> : null}
-      {actions.refineGoal || actions.prepareBrief ? <div className="ef-legacy-goal-footer">
-        {actions.refineGoal ? <button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" disabled={Boolean(busy)} onClick={() => setRefining((value) => !value)}>继续寻找</button> : null}
-        {actions.prepareBrief ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={Boolean(busy)} onClick={() => void prepare()}>创建个性化学习路线</button> : null}
-      </div> : null}
-      {refining ? <div className="ef-legacy-goal-refine">
-        <label><span>这些结果哪里不符合你的预期？</span><textarea value={refinement} onChange={(event) => setRefinement(event.target.value)} placeholder="例如：太理论了，我希望一个月内做出项目" /></label>
-        <div className="ef-legacy-goal-actions"><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={!refinement.trim() || Boolean(busy)} onClick={() => void refine()}>{busy === "refine" ? "重新搜索中…" : "重新搜索"}</button><button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" onClick={() => setRefining(false)}>取消</button></div>
-      </div> : null}
-    </div>
-  </ConversationCard>;
+function LegacyCourseSearchCard({ content, session, actions }: { content: CourseSearchTimelineContent; session: MockSession; actions: AssistantCardActions }) {
+  const matches = content.plan.matches;
+  if (!matches.length) return <p className="ef-home-structured-note">课程匹配结果 · 暂无匹配课程</p>;
+  const targetKnowledgeIds = content.plan.resolution.targetKnowledge.map((item) => item.id);
+  return <AssistantCardView
+    output={{
+      card: {
+        cardType: "course_match",
+        courseIds: matches.map((match) => match.courseId),
+        targetKnowledgeIds,
+        goalText: content.goalText
+      },
+      display: {
+        title: "课程匹配",
+        kicker: "课程匹配结果",
+        description: content.intentSummary,
+        items: matches.map((match) => ({
+          id: match.courseId,
+          title: match.courseTitle,
+          meta: `目标覆盖 ${Math.round(match.targetCoverage * 100)}% · 必要范围 ${Math.round(match.requiredCoverage * 100)}%`,
+          state: "quiet" as const
+        })),
+        actionLabel: "查看课程"
+      }
+    }}
+    session={session}
+    actions={actions}
+    cardKey={`legacy-course-search:${content.planningId}`}
+  />;
 }
 
-function LegacyBrief({ content, messageId, actions, context }: { content: CourseCreationBrief; messageId: string; actions: AssistantCardActions; context: AssistantContextSnapshot }) {
-  const [editing, setEditing] = useState(false);
-  const [adjustments, setAdjustments] = useState(content.requestedAdjustments ?? "");
-  const [intent, setIntent] = useState<"none" | "upload_in_creator">(content.referenceMaterialIntent);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  async function prepare() {
-    if (!actions.prepareBrief || busy) return;
-    setBusy(true); setError("");
-    try {
-      await actions.prepareBrief(content.planningMessageId, { ...(content.sourceCourseId ? { sourceCourseId: content.sourceCourseId } : {}), ...(adjustments.trim() ? { requestedAdjustments: adjustments.trim() } : {}), referenceMaterialIntent: intent }, context);
-      setEditing(false);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "创建需求整理失败，请重试。"); }
-    finally { setBusy(false); }
-  }
-  return <ConversationCard size="s" label="课程创建简报">
-    <div className="ef-home-structured-card">
-      <div className="ef-home-structured-head"><strong>课程创建简报</strong></div>
-      <p>{content.goal}</p>
-      <p className="ef-home-muted">目标要点 {content.targetKnowledge.length} 项 · 参考{content.referenceMaterialIntent === "upload_in_creator" ? "资料将在创建页上传" : "资料暂无"}</p>
-      <div className="ef-legacy-goal-actions">
-        {actions.prepareBrief ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={busy} onClick={() => setEditing((value) => !value)}>{editing ? "收起修改" : "修改需求"}</button> : null}
-        <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => actions.openBrief(messageId)}>进入课程创建<span aria-hidden="true">→</span></button>
-      </div>
-      {editing ? <div className="ef-legacy-goal-refine">
-        <label><span>调整学习偏好或限制</span><textarea value={adjustments} onChange={(event) => setAdjustments(event.target.value)} placeholder="例如：缩短路线、增加动手任务、调整难度" /></label>
-        <fieldset><legend>参考资料</legend><label><input type="radio" checked={intent === "upload_in_creator"} onChange={() => setIntent("upload_in_creator")} />在创建页上传</label><label><input type="radio" checked={intent === "none"} onChange={() => setIntent("none")} />暂时没有</label></fieldset>
-        <div className="ef-legacy-goal-actions"><button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" disabled={busy} onClick={() => void prepare()}>{busy ? "正在整理…" : "重新生成简报"}</button><button type="button" className="ef-ui-btn ef-ui-btn--ghost ef-ui-btn--32" onClick={() => setEditing(false)}>取消</button></div>
-      </div> : null}
-      {error ? <p className="ef-home-error" role="alert">{error}</p> : null}
-    </div>
-  </ConversationCard>;
+function LegacyBriefCard({ content, messageId, session, actions }: { content: CourseCreationBrief; messageId: string; session: MockSession; actions: AssistantCardActions }) {
+  return <AssistantCardView
+    output={{
+      card: { cardType: "brief", messageId },
+      display: {
+        title: content.goal,
+        kicker: "课程创建简报",
+        description: content.requestedAdjustments ?? "课程创建简报",
+        meta: [`目标知识点 ${content.targetKnowledge.length} 项`, content.referenceMaterialIntent === "upload_in_creator" ? "资料在创建页上传" : "资料暂无"],
+        actionLabel: "查看课程简介"
+      }
+    }}
+    session={session}
+    actions={actions}
+    cardKey={`legacy-brief:${messageId}`}
+  />;
 }
 
 function formatTime(value?: string) {

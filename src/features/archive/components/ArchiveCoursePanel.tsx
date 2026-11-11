@@ -1,5 +1,6 @@
 import { ArrowRight, BookOpen, FileText, Layers3, List, Map, Search, Sparkles } from "lucide-react";
 import type { ArchiveCourse, ArchiveModel } from "../model/atlasModel";
+import { knowledgeScopeLabelFor, knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 
 function ProgressRing({ value }: { value: number }) {
   const safe = Math.max(0, Math.min(100, Math.round(value)));
@@ -77,7 +78,7 @@ export function ArchiveCoursePanel({ model, focusedCourseId, guest, listMode, er
       ) : (
         <button type="button" className="ef-archive-search-trigger" onClick={onOpenSearch}>
           <Search size={15} aria-hidden />
-          <span>搜索课程、知识或同学</span>
+          <span>搜索课程、知识点或同学</span>
           <kbd>⌘K</kbd>
         </button>
       )}
@@ -86,12 +87,12 @@ export function ArchiveCoursePanel({ model, focusedCourseId, guest, listMode, er
         <>
           <p className="ef-archive-cached-note"><span aria-hidden>●</span>{listMode ? "星图暂时不可用，已改用列表查看。" : "星图缓存已保留；切到列表可查看缓存知识。"}</p>
           {listMode ? <div className="ef-archive-cached-list">
-            <div className="ef-archive-cached-head"><b>已缓存的知识</b><span>{cached.length || list.length} / {model.nodes.length}</span></div>
+            <div className="ef-archive-cached-head"><b>已缓存的知识点</b><span>{cached.length || list.length} / {model.nodes.length}</span></div>
             {list.map((node) => (
               <button type="button" key={node.id} onClick={() => onSelectCached(node.id)} className="ef-archive-cached-row">
                 <span className={`ef-archive-cached-dot status-${node.status}`} aria-hidden />
-                <span><b>{node.title}</b><small>{node.domainTitle} · {node.courseContexts[0]?.courseTitle ?? "全局知识"}</small></span>
-                <em>{node.status === "learning" ? "在学" : node.status === "learned" ? "已学" : node.status === "practicing" ? "动手任务" : node.status === "mastered" ? "掌握" : "可探索"}</em>
+                <span><b>{node.title}</b><small>{node.domainTitle} · {node.courseContexts[0]?.courseTitle ?? "全局知识点"}</small></span>
+                <em>{node.isMine ? knowledgeStateLabelFor(node.status) : knowledgeScopeLabelFor(node.scope)}</em>
               </button>
             ))}
           </div> : null}

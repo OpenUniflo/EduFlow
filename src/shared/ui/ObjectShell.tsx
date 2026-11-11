@@ -20,6 +20,8 @@ export type ObjectShellProps = {
   overlay?: ReactNode;
   children?: ReactNode;
   className?: string;
+  /** Marks a right-side panel that the floating Assistant must move outside. */
+  dataFloatingPanel?: boolean;
   "aria-label"?: string;
 };
 
@@ -29,13 +31,14 @@ export type ObjectShellProps = {
  * split used by course and practice editors.
  */
 export function ObjectShell({
-  size, title, titleId, kicker, icon, context, badge, tools, footer, stage, inspector, inspectorTitle = "检查器", overlay, children, className = "", "aria-label": ariaLabel
+  size, title, titleId, kicker, icon, context, badge, tools, footer, stage, inspector, inspectorTitle = "检查器", overlay, children, className = "", dataFloatingPanel = false, "aria-label": ariaLabel
 }: ObjectShellProps) {
   const immersive = size === "immersive";
   return (
     <section
       className={`ef-ui-obj ef-ui-obj--${size} ${className}`.trim()}
       data-size={size}
+      data-floating-panel={dataFloatingPanel ? "true" : undefined}
       aria-label={ariaLabel ?? title}
       aria-labelledby={titleId}
     >

@@ -26,18 +26,25 @@ import { oneHopSelection } from "@/shared/scene/selection";
 import { selectionXraySegments } from "@/shared/scene/xray";
 import { courseColorVar, courseToneForStatus } from "@/shared/scene/coursePalette";
 import type { PlaneChapter } from "../model/coursePlaneLayout";
+import { coursePlaneScale, coursePlaneTarget } from "../model/courseFit";
 import type { PlaneDependencyRoute } from "../model/coursePlaneDependencies";
 import type { CourseEnterSnapshot, ArchiveCourseView } from "@/features/course/immersive/courseTransition";
 
 export type ScenePerson = { id: string; name: string; accent: string; nodeIds: ReadonlySet<string> };
 export type SceneMode = "default" | "person" | "course" | "draft";
 export type SceneInsets = { left?: number; right?: number; top?: number; bottom?: number };
+export type CourseFitOptions = {
+  /** `readable` keeps the smallest body text legible; `all` fits every chapter. */
+  mode?: "readable" | "all";
+  /** Centre the readable view on this chapter (the learner's current chapter). */
+  anchorChapterId?: string;
+};
 
 export type ArchiveAtlasSceneHandle = {
   zoomBy(factor: number): void;
   fitAll(options?: { insets?: SceneInsets; padding?: number }): void;
   fitIds(ids: Iterable<string>, options?: { padding?: number; maxRatio?: number; insets?: SceneInsets }): void;
-  fitCourse(insets?: SceneInsets): void;
+  fitCourse(insets?: SceneInsets, options?: CourseFitOptions): void;
   resetView(): void;
   frontView(): void;
   shiftForDetail(open: boolean): void;
@@ -113,8 +120,6 @@ const DETAIL_WIDTH = 372;
 const PLANE_BACK = 760;
 const CARD_NATURAL_WIDTH = 176;
 const CARD_NATURAL_HEIGHT = 40;
-/** Keep the world-space 14px card title at ~12px on screen. */
-const MIN_CARD_SCALE = 0.86;
 function cssVarValue(name: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
   let value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -377,7 +382,7 @@ export default function ArchiveAtlasScene({
   const modePositionsRef = useRef<Record<string, Vec3> | null>(modePositions ?? null);
   const planePositionsRef = useRef<Record<string, Vec3> | null>(planePositions ?? null);
   const detailShiftRef = useRef(0);
-  const lastCourseInsetsRef = useRef<{ left?: number; right?: number; top?: number; bottom?: number }>({});
+  const lastCourseFitRef = useRef<{ insets: SceneInsets; options: CourseFitOptions }>({ insets: {}, options: { mode: "readable" } });
   const referenceDistanceRef = useRef(1);
   const downRef = useRef<{ x: number; y: number; time: number; button: number; shift: boolean } | null>(null);
   const paletteRef = useRef({ edge: "#8b93b5", bright: "#b9b1ff", bridge: "#6f6a9c", bridgeNode: "#b9b1ff", brandInk: "#4338ca", star: "#9aa6da", global: "#ffb454" });
@@ -595,12 +600,22 @@ export default function ArchiveAtlasScene({
       z: engine.target[index * 3 + 2]
     }));
     const height = engine.renderer.domElement.clientHeight || 1;
-    const limits = sceneCameraLimits({
-      contentRadius: contentRadius(allPoints),
-      viewportHeight: height,
-      adjacentSpacing: medianNearestNeighbourDistance(points),
-      nearSpacingPx: 230
-    });
+    const coursePlane = propsRef.current.mode === "course" || propsRef.current.mode === "draft";
+    const limits = sceneCameraLimits(coursePlane
+      ? {
+          contentRadius: contentRadius(allPoints),
+          viewportHeight: height,
+          // A readable course plane zooms in beyond the whole-plane fit; the
+          // near limit must follow the card size, not the fit-all distance.
+          cardHeight: propsRef.current.planeCardSize?.height ?? CARD_NATURAL_HEIGHT,
+          nearCardViewportRatio: 0.5
+        }
+      : {
+          contentRadius: contentRadius(allPoints),
+          viewportHeight: height,
+          adjacentSpacing: medianNearestNeighbourDistance(points),
+          nearSpacingPx: 230
+        });
     const limitsRef = engine as unknown as { minDistance?: number; maxDistance?: number; fitDistance?: number };
     limitsRef.minDistance = limits.minDistance;
     limitsRef.maxDistance = limits.maxDistance;
@@ -648,10 +663,11 @@ export default function ArchiveAtlasScene({
     animateCamera(position, target, 600);
   }
 
-  function fitCoursePlane(insets: SceneInsets = {}) {
+  function fitCoursePlane(insets: SceneInsets = {}, options: CourseFitOptions = {}) {
     const engine = engineRef.current;
     if (!engine || !planePositions) return;
-    lastCourseInsetsRef.current = insets;
+    const fitOptions: CourseFitOptions = { mode: options.mode ?? "readable", ...(options.anchorChapterId ? { anchorChapterId: options.anchorChapterId } : {}) };
+    lastCourseFitRef.current = { insets, options: fitOptions };
     const width = engine.renderer.domElement.clientWidth || 1;
     const height = engine.renderer.domElement.clientHeight || 1;
     // Insets are already canvas-local (the page measures the panel against the
@@ -678,28 +694,41 @@ export default function ArchiveAtlasScene({
     const maxY = Math.max(...values.map((value) => value.y + halfCardHeight), ...chapters.map((chapter) => chapter.y));
     const planeWidth = Math.max(80, maxX - minX);
     const planeHeight = Math.max(80, maxY - minY);
-    // Course-plane focus keeps the cards readable (width fit with the same
-    // floor the Archive always used). Tall courses are aligned to the top of
-    // the free area instead of being centred under the people/course bars;
-    // the rest is browsed by zooming/panning, and the exact camera is restored
-    // when returning from the course page.
-    const widthScale = Math.min(1.35, availableWidth / planeWidth);
-    const worldPerPixel = Math.max(MIN_CARD_SCALE, widthScale);
-    const distance = Math.max(engine.controls.minDistance, Math.min(engine.controls.maxDistance, height / (2 * FOV_T * Math.max(0.00001, worldPerPixel))));
+    const fitScale = Math.min(1.35, availableWidth / planeWidth, availableHeight / planeHeight);
+    // The card's world font is the design system's 16px token. Requiring the
+    // smallest body token (12px) on screen gives the default readable floor;
+    // no magic pixel constant is introduced here.
+    const minReadablePx = Number.parseFloat(cssVarValue("--fs-12", "12")) || 12;
+    const cardWorldFontPx = Number.parseFloat(cssVarValue("--fs-16", "16")) || 16;
+    // Default: readable cards, centred on the current chapter when the whole
+    // plane cannot fit. "适配全图" explicitly requests the complete view.
+    const scale = coursePlaneScale({
+      mode: fitOptions.mode ?? "readable",
+      fitScale,
+      minReadablePx,
+      cardWorldFontPx
+    });
+    const pxPerWorld = Math.max(0.00001, scale);
+    const distance = Math.max(engine.controls.minDistance, Math.min(engine.controls.maxDistance, height / (2 * FOV_T * pxPerWorld)));
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
-    const shiftX = (left - right) / 2;
-    const shiftY = (top - bottom) / 2;
-    const contentWidth = planeWidth * worldPerPixel;
-    const contentHeight = planeHeight * worldPerPixel;
-    const targetX = contentWidth > availableWidth + 1
-      ? minX + (width / 2 - left) / worldPerPixel
-      : centerX - shiftX / worldPerPixel;
-    const targetY = contentHeight > availableHeight + 1
-      ? maxY - (height / 2 - top) / worldPerPixel
-      : centerY + shiftY / worldPerPixel;
-    const target = new THREE.Vector3(targetX, targetY, 0);
-    const position = new THREE.Vector3(targetX, targetY, distance);
+    const anchor = fitOptions.mode === "readable" && fitOptions.anchorChapterId
+      ? chapters.find((chapter) => chapter.id === fitOptions.anchorChapterId)
+      : undefined;
+    const targetPoint = coursePlaneTarget({
+      mode: fitOptions.mode ?? "readable",
+      ...(anchor ? { anchor } : {}),
+      centerX,
+      centerY,
+      viewportWidth: width,
+      viewportHeight: height,
+      insets: { left, right, top, bottom },
+      pxPerWorld,
+      edgePadding: EDGE_PADDING,
+      availableHeight
+    });
+    const target = new THREE.Vector3(targetPoint.x, targetPoint.y, 0);
+    const position = new THREE.Vector3(target.x, target.y, distance);
     referenceDistanceRef.current = distance;
     animateCamera(position, target, 600);
   }
@@ -799,10 +828,10 @@ export default function ArchiveAtlasScene({
       if (!indices.length) { fitBoundsOf(Array.from({ length: propsRef.current.nodes.length }, (_, index) => index), { padding: 1.08, inset: options.insets }); return; }
       fitBoundsOf(indices, { padding: options.padding ?? 1.55, inset: options.insets, useTarget: true });
     },
-    fitCourse(insets) { planeLabelsApiRef.current?.freeze(); planeLabelsApiRef.current?.thaw(320); fitCoursePlane(insets); },
+    fitCourse(insets, options) { planeLabelsApiRef.current?.freeze(); planeLabelsApiRef.current?.thaw(320); fitCoursePlane(insets, options); },
     resetView() {
       const currentMode = propsRef.current.mode;
-      if (currentMode === "course" || currentMode === "draft") { fitCoursePlane(lastCourseInsetsRef.current); return; }
+      if (currentMode === "course" || currentMode === "draft") { fitCoursePlane(lastCourseFitRef.current.insets, lastCourseFitRef.current.options); return; }
       fitBoundsOf(Array.from({ length: propsRef.current.nodes.length }, (_, index) => index), { padding: 1.08 });
     },
     frontView() {

@@ -47,21 +47,21 @@ describe("course learner-state projection", () => {
     expect(nodes.filter((node) => node.category === "pending")).toHaveLength(counts.pending);
   });
 
-  it("puts Knowledge without UserKnowledgeState into 待学", () => {
+  it("puts Knowledge without UserKnowledgeState into 未开始", () => {
     const { counts, nodes } = summarizeLearnerState([record("K19", "mastered", "2026-10-01T00:00:00.000Z")], courseIds);
     expect(counts).toMatchObject({ acquired: 1, learning: 0, pending: 30, total: 31, target: 30, current: 0, currentId: null });
     expect(nodes.find((node) => node.nodeId === "K19")?.label).toBe("已学");
-    expect(nodes.find((node) => node.nodeId === "K20")?.label).toBe("待学");
+    expect(nodes.find((node) => node.nodeId === "K20")?.label).toBe("未开始");
     expect(nodes.find((node) => node.nodeId === "K20")?.status).toBeNull();
   });
 
-  it("treats explore as 待学 but keeps it in the status total", () => {
+  it("treats explore as 未开始 but keeps it in the status total", () => {
     const { counts, nodes } = summarizeLearnerState([
       record("K00", "learning", "2026-10-01T00:00:00.000Z"),
       record("K01", "explore", "2026-10-02T00:00:00.000Z")
     ], courseIds);
     expect(counts).toMatchObject({ acquired: 0, learning: 1, pending: 30, explore: 1, total: 31, target: 31 });
-    expect(nodes.find((node) => node.nodeId === "K01")?.label).toBe("待学");
+    expect(nodes.find((node) => node.nodeId === "K01")?.label).toBe("未开始");
   });
 
   it("ignores records outside the Course", () => {

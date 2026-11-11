@@ -221,7 +221,7 @@ export function buildPracticeCards(graphData: CourseGraphData): Map<string, Cour
         kind: "empty",
         assignmentIds: [],
         count: 0,
-        title: "暂无对应实训",
+        title: "暂无对应动手任务",
         code: "",
         status: "not_started",
         x: 0,
@@ -719,7 +719,7 @@ export type WindingStepInput = {
   chapterTitle: string;
   chapterNumber: number;
   status: "done" | "current" | "locked";
-  /** Read-only label from learnerStateProjection: 已学 / 在学 / 待学. */
+  /** Read-only label from learnerStateProjection: 已学 / 在学 / 未开始. */
   stateLabel: string;
   minutes?: number;
   meta?: string;

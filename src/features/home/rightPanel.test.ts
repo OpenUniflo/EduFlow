@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 import { panelParamAction, reduceRightPanel, type RightPanel } from "./rightPanel";
 
 const practice = { kind: "practice" as const, courseId: "course", assignmentId: "task", title: "Task" };
-const states: RightPanel[] = [{ kind: "none" }, { kind: "my" }, { kind: "route", courseId: "course" }, practice];
+const states: RightPanel[] = [
+  { kind: "none" },
+  { kind: "my" },
+  { kind: "route", courseId: "course" },
+  practice,
+  { kind: "knowledge", nodeId: "k1" },
+  { kind: "material", courseId: "course", materialId: "m1" },
+  { kind: "records" },
+  { kind: "brief", messageId: "b1" }
+];
 
 describe("right panel mutual exclusion", () => {
   for (const from of states) {
@@ -10,6 +19,10 @@ describe("right panel mutual exclusion", () => {
       expect(reduceRightPanel(from, { type: "open-my" })).toEqual({ kind: "my" });
       expect(reduceRightPanel(from, { type: "open-route", courseId: "course" })).toEqual({ kind: "route", courseId: "course" });
       expect(reduceRightPanel(from, { type: "open-practice", panel: practice })).toEqual(practice);
+      expect(reduceRightPanel(from, { type: "open-knowledge", nodeId: "k1" })).toEqual({ kind: "knowledge", nodeId: "k1" });
+      expect(reduceRightPanel(from, { type: "open-material", courseId: "course", materialId: "m1", segmentId: "s1" })).toEqual({ kind: "material", courseId: "course", materialId: "m1", segmentId: "s1" });
+      expect(reduceRightPanel(from, { type: "open-records" })).toEqual({ kind: "records" });
+      expect(reduceRightPanel(from, { type: "open-brief", messageId: "b1" })).toEqual({ kind: "brief", messageId: "b1" });
       expect(reduceRightPanel(from, { type: "close" })).toEqual({ kind: "none" });
     });
   }

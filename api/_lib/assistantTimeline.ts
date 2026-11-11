@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ModelMessage, ToolCallPart, ToolResultPart } from "ai";
 import { cardHistoryLabel, type AssistantCardRef } from "../../src/features/assistant/assistantCards.js";
-import { assistantToolLabel } from "../../src/features/assistant/toolLabels.js";
+import { assistantToolProgressLabel } from "./toolProgress.js";
 import { normalizeFollowUps, type FollowUpSuggestion } from "./assistantSuggestions.js";
 import { hasAssistantProtocolLeak, stripCardHistoryMarkers, visibleAssistantContent, type AssistantHistoryRow } from "../../src/features/assistant/protocolGuard.js";
 import { dataOrThrow } from "./query.js";
@@ -22,14 +22,30 @@ export type TimelineProgressPart = { type: "data-tool-progress"; data: { toolNam
 export type TimelineFollowUpPart = { type: "data-follow-ups"; data: { items: FollowUpSuggestion[] } };
 export type TimelineAttachmentPart = { type: "data-attachment"; data: { id: string; title: string } };
 export type TimelineWriteResultPart = { type: "data-write-result"; data: { toolName: string; ok: boolean; title: string; detail?: string; card?: AssistantCardRef } };
-export type TimelinePart = TimelineTextPart | TimelineCardPart | TimelineProgressPart | TimelineFollowUpPart | TimelineAttachmentPart | { type: string; [key: string]: unknown };
+export type TimelineFailurePart = { type: "data-failed"; data: { reason: string } };
+export type TimelinePart = TimelineTextPart | TimelineCardPart | TimelineProgressPart | TimelineFollowUpPart | TimelineAttachmentPart | TimelineFailurePart | { type: string; [key: string]: unknown };
+
+/** A failed generation is persisted (partial text/cards + one marker) and can be retried. */
+export function isFailurePart(part: unknown): part is TimelineFailurePart {
+  return Boolean(part) && typeof part === "object" && (part as Row).type === "data-failed";
+}
+
+export function failureReasonFromParts(parts: unknown): string | undefined {
+  if (!Array.isArray(parts)) return undefined;
+  const failure = parts.find(isFailurePart);
+  return failure ? String(failure.data?.reason ?? "failed").slice(0, 40) : undefined;
+}
+
+export function hasFailureMarker(parts: unknown): boolean {
+  return failureReasonFromParts(parts) !== undefined;
+}
 
 function progressPart(part: Row): TimelineProgressPart | null {
   const type = typeof part.type === "string" ? part.type : "";
   if (!type.startsWith("tool-") || type === "tool-displayCard" || type === "tool-suggestFollowUps") return null;
   if (part.state !== "output-available") return null;
   const toolName = type.slice("tool-".length);
-  return { type: "data-tool-progress", data: { toolName, label: assistantToolLabel(toolName) } };
+  return { type: "data-tool-progress", data: { toolName, label: assistantToolProgressLabel(toolName) } };
 }
 
 function followUpPart(part: Row): TimelineFollowUpPart | null {
@@ -82,6 +98,10 @@ export function persistedParts(parts: readonly unknown[]): TimelinePart[] {
       const data = source.data as Row;
       const items = Array.isArray(data.items) ? normalizeFollowUps(data.items) : [];
       if (items.length) output.push({ type: "data-follow-ups", data: { items } });
+      continue;
+    }
+    if (isFailurePart(part)) {
+      output.push({ type: "data-failed", data: { reason: String(part.data.reason ?? "failed").slice(0, 40) } });
       continue;
     }
     const progress = progressPart(source);
@@ -145,6 +165,10 @@ export function timelineParts(row: Row): TimelinePart[] {
       if (source.type === "data-attachment" && source.data && typeof source.data === "object") {
         const data = source.data as Row;
         if (typeof data.id === "string" && typeof data.title === "string") parts.push({ type: "data-attachment", data: { id: data.id, title: data.title.slice(0, 240) } });
+        continue;
+      }
+      if (isFailurePart(part)) {
+        parts.push({ type: "data-failed", data: { reason: String((source.data as Row).reason ?? "failed").slice(0, 40) } });
         continue;
       }
       const progress = progressPart(source);
@@ -235,7 +259,24 @@ export async function insertAssistantRowOnce(client: SupabaseClient, row: Row): 
   if (key) {
     const existing = await client.from("assistant_messages").select("*").eq("dedupe_key", key).maybeSingle();
     const found = dataOrThrow(existing.data as Row | null, existing.error, "Assistant timeline dedupe lookup");
-    if (found) return found;
+    if (found) {
+      // A retry of a failed turn reuses the same dedupe key. Replace the failed
+      // row in place so a refresh never shows both the failure and the retry.
+      if (hasFailureMarker(found.parts)) {
+        const update = await client.from("assistant_messages")
+          .update({
+            content: String(row.content ?? ""),
+            parts: row.parts,
+            structured_content: row.structured_content ?? null,
+            context_snapshot: row.context_snapshot
+          })
+          .eq("id", found.id)
+          .select("*")
+          .single();
+        return dataOrThrow(update.data as Row | null, update.error, "Assistant failed timeline replacement");
+      }
+      return found;
+    }
   }
   const write = await client.from("assistant_messages").insert(row).select("*").single();
   if (write.error?.code === "23505" && key) {

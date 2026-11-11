@@ -45,7 +45,7 @@
   --course-route-preview-comet:color-mix(in srgb, var(--p-orange) 52%, var(--surface));
   --course-route-preview-comet-head:color-mix(in srgb, var(--p-orange) 38%, var(--surface));
   --course-capability-line:#8B87C9;  /* 课程页能力支撑边：品牌紫与待学灰之间 */
-  --practice:#14A6A0;            /* 实训树实践卡竖条 / 编号 */
+  --practice:#14A6A0;            /* 动手任务树实践卡竖条 / 编号 */
   --pending-soft:color-mix(in srgb, var(--pending) 18%, var(--surface));
   --warn:#B45309;                /* 警示文字，对白 5.02:1 */
   --warn-soft:color-mix(in srgb, var(--warn) 12%, var(--surface));

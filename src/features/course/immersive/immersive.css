@@ -367,10 +367,6 @@
   right: 412px;
 }
 
-.ef-imm-stage-wrap.has-panel .ef-imm-status-legend {
-  left: calc(50% - 206px);
-}
-
 .ef-imm-canvas {
   position: absolute;
   inset: 0;
@@ -597,16 +593,17 @@
 .ef-imm-actions {
   display: flex;
   min-width: 0;
-  flex-wrap: wrap;
-  gap: 2px;
   max-width: 100%;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .ef-imm-actions span {
   display: inline-flex;
+  max-width: 100%;
   height: 14px;
   align-items: center;
+  overflow: hidden;
   padding: 0 3px;
   border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--line));
   border-radius: var(--r-full);
@@ -615,6 +612,7 @@
   font-size: var(--fs-12);
   line-height: var(--lh-12);
   font-weight: var(--fw-500);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1083,7 +1081,7 @@
 
 .ef-imm-controls {
   position: absolute;
-  right: var(--sp-20);
+  right: var(--ef-assistant-safe-right);
   bottom: var(--sp-20);
   display: flex;
   align-items: center;
@@ -1761,18 +1759,19 @@
 }
 
 
-/* P1 shell position: above the left rail, never over the legend. */
+/* One Assistant trigger position across pages: bottom-right, clear of the
+   left navigation rail, the route toolbar and the legend. */
 .eduflow-assistant.course-design-assistant.ef-imm-assistant {
   z-index: 100;
-  right: auto;
-  bottom: 104px;
-  left: 20px;
-  align-items: flex-start;
+  right: calc(var(--ef-floating-avoid-right, 0px) + var(--ef-assistant-trigger-inset));
+  bottom: var(--ef-assistant-trigger-inset);
+  left: auto;
+  align-items: flex-end;
 }
 
 .eduflow-assistant.course-design-assistant.ef-imm-assistant.drawer-open {
-  right: auto;
-  left: 20px;
+  right: var(--sp-24);
+  left: auto;
 }
 
 .eduflow-assistant.course-design-assistant.ef-imm-assistant .course-design-assistant-panel {
@@ -1781,8 +1780,9 @@
 
 @media (max-width: 1180px) {
   .eduflow-assistant.course-design-assistant.ef-imm-assistant {
-    bottom: 92px;
-    left: 14px;
+    right: calc(var(--ef-floating-avoid-right, 0px) + var(--ef-assistant-trigger-inset));
+    bottom: var(--ef-assistant-trigger-inset);
+    left: auto;
   }
 }
 
@@ -2153,8 +2153,9 @@
   position: absolute;
   z-index: 34;
   bottom: 64px;
-  left: 50%;
+  left: calc((100% - var(--ef-bottom-right-zone-active)) / 2);
   display: flex;
+  max-width: calc(100% - var(--ef-bottom-right-zone-active) - var(--sp-16));
   align-items: center;
   gap: var(--sp-4);
   padding: 6px;

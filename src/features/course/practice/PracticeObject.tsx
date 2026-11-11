@@ -1,6 +1,7 @@
+import { ATTACHMENT_LIMIT } from "@/shared/assistant/attachments";
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Check, ChevronDown, Clock, FileText, GitBranch, PenLine,
-  Link2, LoaderCircle, Lock, Maximize2, Paperclip, Plus, RefreshCw, RotateCcw, Search, Send, Upload, Wrench, X
+  Link2, LoaderCircle, Lock, Paperclip, Plus, RefreshCw, RotateCcw, Search, Send, Upload, Wrench, X
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -21,6 +22,7 @@ import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequ
 import { ObjectShell, ObjectShellSection } from "@/shared/ui/ObjectShell";
 import { Button } from "@/shared/ui/Button";
 import { Pill } from "@/shared/ui/Pill";
+import { PanelActions } from "@/features/home/PanelActions";
 import { Textarea, TextField } from "@/shared/ui/Field";
 import {
   aiEvaluationAvailable, buildPracticeResponse, canSubmitPractice, draftFromPracticeResult, evaluatorOptions, practiceAttemptKicker,
@@ -40,9 +42,10 @@ export type PracticeObjectProps = {
   session: MockSession;
   courseId: string;
   assignmentId: string;
+  /** Open one historical submission while keeping the same task panel. */
+  attemptId?: string;
   size: "panel" | "immersive";
   onClose?: () => void;
-  onOpenImmersive?: () => void;
   onReturn?: () => void;
   /** Conversation thread that should receive the submission / result. */
   assistantSessionId?: string;
@@ -58,13 +61,13 @@ export type PracticeObjectProps = {
  * route. It keeps the real Attempt/PerformanceResult authorities: the client
  * never chooses pass/fail and the AI evaluator path never writes.
  */
-export function PracticeObject({ session, courseId, assignmentId, size, onClose, onOpenImmersive, onReturn, assistantSessionId, onSubmitted, onResultPassed, onOpenNextStep }: PracticeObjectProps) {
+export function PracticeObject({ session, courseId, assignmentId, attemptId: requestedAttemptProp, size, onClose, onReturn, assistantSessionId, onSubmitted, onResultPassed, onOpenNextStep }: PracticeObjectProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const actionRunId = searchParams.get("actionRunId") || undefined;
   const repeatAttemptId = searchParams.get("repeatAttemptId") || undefined;
-  const requestedAttemptId = searchParams.get("attemptId") || undefined;
+  const requestedAttemptId = requestedAttemptProp || searchParams.get("attemptId") || undefined;
   const runtime = applicationServices.courseRepository.getCourse(courseId);
   const assignment = runtime?.assignments.find((item) => item.id === assignmentId);
   const compatibility = practiceCompatibility(assignment);
@@ -234,7 +237,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
       if (!raw) return;
       const value = JSON.parse(raw) as Partial<PracticeDraft>;
       if (typeof value.note !== "string" || typeof value.link !== "string") return;
-      setDraft({ ...emptyDraft, ...value, attachmentIds: Array.isArray(value.attachmentIds) ? value.attachmentIds.slice(0, 4) : [], attachmentNames: Array.isArray(value.attachmentNames) ? value.attachmentNames.slice(0, 4) : [] });
+      setDraft({ ...emptyDraft, ...value, attachmentIds: Array.isArray(value.attachmentIds) ? value.attachmentIds.slice(0, ATTACHMENT_LIMIT) : [], attachmentNames: Array.isArray(value.attachmentNames) ? value.attachmentNames.slice(0, ATTACHMENT_LIMIT) : [] });
     } catch { /* draft restore is best effort */ }
   }, [draftKey]);
 
@@ -398,11 +401,11 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
 
   async function attach(file: File) {
     beginPracticeOnInput();
-    if (draft.attachmentIds.length >= 4) { setError("每次动手任务最多选择 4 份附件。"); return; }
+    if (draft.attachmentIds.length >= ATTACHMENT_LIMIT) { setError(`每次动手任务最多选择 ${ATTACHMENT_LIMIT} 份附件。`); return; }
     setUploading(true); setError(""); setUploadProgress("正在上传…");
     try {
       const id = await uploadEvidence(file, { courseId, assignmentId, actionRunId });
-      setDraft((current) => ({ ...current, attachmentIds: [...current.attachmentIds, id].slice(0, 4), attachmentNames: [...current.attachmentNames, file.name].slice(0, 4) }));
+      setDraft((current) => ({ ...current, attachmentIds: [...current.attachmentIds, id].slice(0, ATTACHMENT_LIMIT), attachmentNames: [...current.attachmentNames, file.name].slice(0, ATTACHMENT_LIMIT) }));
       setUploadProgress("已保存原始文件");
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "上传失败，请重试。");
@@ -571,7 +574,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
   const pickerWork = works.find((item) => item.workflowId === pickerWorkId) ?? works[0] ?? null;
 
   const requirements = <div className="ef-practice-requirements">
-    <ObjectShellSection icon={<FileText size={15} />} title="要求" description={`${coverages.length} 个关联知识`} actions={<Pill tone={checklistCounts.attached === checklistCounts.total ? "ok" : "quiet"}>{checklistCounts.attached} / {checklistCounts.total} 已附</Pill>}>
+    <ObjectShellSection icon={<FileText size={15} />} title="要求" description={`${coverages.length} 个关联知识点点`} actions={<Pill tone={checklistCounts.attached === checklistCounts.total ? "ok" : "quiet"}>{checklistCounts.attached} / {checklistCounts.total} 已附</Pill>}>
       <p className="ef-practice-goal">{assignment.description}</p>
       <div className="ef-practice-deliverables" aria-label="交付物检查清单">
         {checklist.map((item) => <div key={item.id} className={`ef-practice-deliverable ${item.done ? "is-done" : ""} ${item.required ? "" : "is-optional"}`}>
@@ -590,7 +593,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
       <dl className="ef-practice-facts">
         {learnerExpectedOutput ? <div><dt>预期输出</dt><dd>{learnerExpectedOutput}</dd></div> : null}
         <div><dt>验收标准</dt><dd>{displayAcceptanceCriteria.join("；") || "由评估者依据任务要求评价"}</dd></div>
-        <div><dt>关联知识</dt><dd>{coverages.map((coverage) => nodeTitle.get(coverage.nodeId) ?? coverage.nodeId).join("、") || "无"}</dd></div>
+        <div><dt>关联知识点</dt><dd>{coverages.map((coverage) => nodeTitle.get(coverage.nodeId) ?? coverage.nodeId).join("、") || "无"}</dd></div>
       </dl>
     </details>
   </div>;
@@ -708,7 +711,7 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
       <Button variant="secondary" size="32" icon={<Search size={15} aria-hidden="true" />} onClick={() => setWorkPicker(true)}>从我的作品选择</Button>
     </div>}
   </div>;
-  const draftHint = <p className="ef-practice-note"><Lock size={13} aria-hidden="true" />备注、链接、附件或关联作品至少提供一项；支持 UTF-8 的 .txt、.md、.csv，最多 4 份。正式提交后内容才会保存。</p>;
+  const draftHint = <p className="ef-practice-note"><Lock size={13} aria-hidden="true" />备注、链接、附件或关联作品至少提供一项；支持 UTF-8 的 .txt、.md、.csv，最多 {ATTACHMENT_LIMIT} 份。正式提交后内容才会保存。</p>;
 
   const draftSection = <ObjectShellSection icon={<PenLine size={15} />} title="我的提交草稿" description="只有你可见" actions={<Pill tone="quiet">草稿</Pill>}>
     {isInstruction ? <>
@@ -926,15 +929,18 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
     default: body = !resultLoaded ? <PracticeSkeleton /> : draftBody;
   }
 
+  const panelExpand = size === "panel"
+    ? <PanelActions expand={{ kind: "page", href: `/courses/${encodeURIComponent(courseId)}/assignments/${encodeURIComponent(assignmentId)}${requestedAttemptId ? `?attemptId=${encodeURIComponent(requestedAttemptId)}` : ""}` }} />
+    : null;
   const footer = (() => {
-    if (viewState === "disabled") return <div className="ef-practice-footer"><span>只读 · 不会保存</span><Button variant="secondary" onClick={onReturn ?? (() => navigate(`/courses/${encodeURIComponent(courseId)}`))}>返回课程</Button></div>;
-    if (viewState === "workflow") return <div className="ef-practice-footer"><span>工作流执行</span><Button variant="secondary" onClick={onReturn ?? (() => navigate(`/courses/${encodeURIComponent(courseId)}`))}>返回课程</Button></div>;
+    if (viewState === "disabled") return <div className="ef-practice-footer"><span>只读 · 不会保存</span><div><Button variant="secondary" onClick={onReturn ?? (() => navigate(`/courses/${encodeURIComponent(courseId)}`))}>返回课程</Button></div></div>;
+    if (viewState === "workflow") return <div className="ef-practice-footer"><span>工作流执行</span><div><Button variant="secondary" onClick={onReturn ?? (() => navigate(`/courses/${encodeURIComponent(courseId)}`))}>返回课程</Button></div></div>;
     if (viewState === "result") {
       const actions = practiceResultActions(resultView?.tone ?? "pending");
       const resultStatus = evaluationRunning ? "正式结果 · 评价中" : evaluationFailed ? "正式结果 · 待重试" : evaluationHandedOff ? "正式结果 · 待老师验收" : "正式结果 · 只读";
-      return <div className="ef-practice-footer"><span>{resultStatus}</span><div><Button variant="secondary" size="32" onClick={returnToLearning}><ArrowLeft size={14} />回到学习</Button>{actions.showViewSubmission ? <Button variant="secondary" size="32" onClick={revealSubmission} disabled={!result}>查看提交</Button> : null}{actions.showPracticeAgain ? <Button variant="primary" size="32" onClick={practiceAgain} loading={startingRevision} disabled={busy}>补充后再交<ArrowRight size={14} /></Button> : null}</div></div>;
+      return <div className="ef-practice-footer"><span>{resultStatus}</span><div>{panelExpand}<Button variant="secondary" size="32" onClick={returnToLearning}><ArrowLeft size={14} />回到学习</Button>{actions.showViewSubmission ? <Button variant="secondary" size="32" onClick={revealSubmission} disabled={!result}>查看提交</Button> : null}{actions.showPracticeAgain ? <Button variant="primary" size="32" onClick={practiceAgain} loading={startingRevision} disabled={busy}>补充后再交<ArrowRight size={14} /></Button> : null}</div></div>;
     }
-    return <div className="ef-practice-footer"><span>{blocked && eligibility ? <><AlertTriangle size={13} aria-hidden="true" />{eligibility.reason}</> : <><RotateCcw size={13} aria-hidden="true" />自动保存于 {savedLabel}</>}</span><div><Button variant="secondary" size="32" onClick={() => setPreviewOpen(true)} disabled={!ready || blocked}>查看提交</Button><Button variant="primary" size="32" disabled={!canSubmit || !ready || submitting || blocked || (eligibility ? !eligibility.canStart && !assignmentStatus : false)} onClick={() => setConfirming(true)}>提交<ArrowRight size={14} /></Button></div></div>;
+    return <div className="ef-practice-footer"><span>{blocked && eligibility ? <><AlertTriangle size={13} aria-hidden="true" />{eligibility.reason}</> : <><RotateCcw size={13} aria-hidden="true" />自动保存于 {savedLabel}</>}</span><div>{panelExpand}<Button variant="secondary" size="32" onClick={() => setPreviewOpen(true)} disabled={!ready || blocked}>查看提交</Button><Button variant="primary" size="32" disabled={!canSubmit || !ready || submitting || blocked || (eligibility ? !eligibility.canStart && !assignmentStatus : false)} onClick={() => setConfirming(true)}>提交<ArrowRight size={14} /></Button></div></div>;
   })();
 
   const identityStatus = result?.outcome === "passed" ? { label: "已通过", tone: "ok" as const }
@@ -948,7 +954,6 @@ export function PracticeObject({ session, courseId, assignmentId, size, onClose,
     : { label: "未开始", tone: "quiet" as const };
   const tools = <div className="ef-practice-tools">
     {size === "immersive" ? <button type="button" className="ef-home-icon" onClick={returnToLearning} aria-label="返回学习来源" title="返回学习来源"><ArrowLeft size={15} /></button> : null}
-    {size === "panel" && onOpenImmersive ? <button type="button" className="ef-home-icon" onClick={onOpenImmersive} aria-label="沉浸打开动手任务"><Maximize2 size={15} /></button> : null}
     {onClose ? <button type="button" className="ef-home-icon" onClick={onClose} aria-label="关闭动手任务面板"><X size={15} /></button> : null}
   </div>;
 

@@ -68,7 +68,7 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver, entry
   useEffect(() => {
     let alive = true;
     if(isTeacher){if(!brief)setBrief({goal:"",targetKnowledge:[],availableKnowledgeIds:graph.nodes.filter((node)=>node.status==="active").map((node)=>node.id),profile:{courseType:"standard",authoringRole:"teacher",visibility:"platform-published",source:"teacher-manual"}});return()=>{alive=false;};}
-    if (!briefMessageId) { setBriefError("请从 Assistant 的 Course Creation Brief 进入创建流程。"); return; }
+    if (!briefMessageId) { setBriefError("还没有课程创建简报。"); return; }
     void getAssistantTimelineMessage(briefMessageId).then((message) => {
       if (!alive) return;
       if (message.structuredContent?.type !== "course_creation_brief") throw new Error("该 Assistant timeline 项不是 Course Creation Brief");
@@ -142,6 +142,12 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver, entry
       ? auditCourseAssetCoverage(previewRuntime, { microKnowledgeIds: executableMicroKnowledgeIds, practiceEmphasis: Boolean(design?.assets.desiredAssignmentKnowledgeIds.length) })
       : null;
 
+  function openAssistantForBrief() {
+    const trigger = document.querySelector<HTMLButtonElement>(".course-design-assistant-trigger");
+    if (trigger?.getAttribute("aria-expanded") !== "true") trigger?.click();
+    window.setTimeout(() => document.querySelector<HTMLTextAreaElement>(".eduflow-assistant-panel textarea")?.focus(), 80);
+  }
+
   function queueManualRequirements() {
     setPendingProposal(proposalFor("requirements", "需求手动调整", [
       { type: "setRequirement", field: "goal", value: manualGoal.trim() }, { type: "setRequirement", field: "learnerFoundation", value: manualFoundation.trim() },
@@ -203,8 +209,12 @@ export function CourseCreationWorkspacePage({ session, onLogout, resolver, entry
     finally { setPublishing(false); }
   }
 
-  if (briefError) return <main className="atlas-page-shell creator-page"><section className="creator-error glass-v2"><h1>无法开始 Course Creator</h1><p>{briefError}</p><button className="atlas-primary" onClick={() => navigate(isTeacher?"/teaching":"/")}>{isTeacher?"返回教学管理":"返回首页"}</button></section></main>;
-  if (!design || !brief) return <main className="atlas-page-shell creator-page"><section className="creator-error glass-v2"><Sparkles/><h1>正在读取课程创建上下文…</h1></section></main>;
+  if (briefError) return <main className="atlas-page-shell creator-page"><section className="creator-error ef-ui-glass ef-ui-glass--regular ef-ui-glass--r-24" aria-labelledby="creator-error-title"><div className="creator-error-head"><span className="creator-error-icon" aria-hidden="true"><Sparkles size={20} /></span><div className="creator-error-copy"><span className="creator-error-kicker">课程创建</span><h1 id="creator-error-title">无法开始课程创建</h1><p>{briefError}</p><p className="creator-error-next">EduFlow Assistant 会先根据你的目标整理课程创建简报，然后才能进入六步创建。下一步：打开 EduFlow Assistant 整理简报，或回到档案选择已有课程。</p></div></div><div className="creator-error-actions">{isTeacher ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => navigate("/teaching")}>返回教学管理</button> : <>
+    <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={openAssistantForBrief}>打开 EduFlow Assistant 整理简报</button>
+    <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate("/archive")}>打开我的档案</button>
+    <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => navigate("/")}>返回首页</button>
+  </>}</div></section></main>;
+  if (!design || !brief) return <main className="atlas-page-shell creator-page"><section className="creator-error ef-ui-glass ef-ui-glass--regular ef-ui-glass--r-24"><Sparkles/><h1>正在读取课程创建上下文…</h1></section></main>;
 
   const stage = courseCreatorStages[stageIndex];
   const displayRuntime = persistedRuntime ?? previewRuntime!;

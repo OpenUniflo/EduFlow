@@ -47,7 +47,7 @@ export type StageNode = {
   chapterId?: string;
   /** Reflection layer card: dashed, translucent, never the pointer target. */
   ghost?: boolean;
-  /** Empty reflection slot ("暂无对应实训"). */
+  /** Empty reflection slot ("暂无对应动手任务"). */
   empty?: boolean;
   /** Selection relation state. */
   dim?: boolean;
