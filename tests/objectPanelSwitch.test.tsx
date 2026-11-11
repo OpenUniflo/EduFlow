@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { panelForTarget } from "@/features/home/panelForTarget";
-import { reduceRightPanel, type RightPanel } from "@/features/home/rightPanel";
+import { initialRightPanelState, reduceRightPanel, type RightPanel } from "@/features/home/rightPanel";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
@@ -34,6 +34,6 @@ describe("one Object Shell dispatch for every host", () => {
 
   it("accepts the shared panel action in the right-panel reducer", () => {
     const panel: RightPanel = { kind: "material", courseId: "course", materialId: "material" };
-    expect(reduceRightPanel({ kind: "none" }, { type: "open-panel", panel })).toEqual(panel);
+    expect(reduceRightPanel(initialRightPanelState(), { type: "open-panel", panel }).current).toEqual(panel);
   });
 });

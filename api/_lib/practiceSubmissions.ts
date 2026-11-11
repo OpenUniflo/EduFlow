@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { chapterDisplayNumbers, type ChapterOrdinalInput } from "../../src/shared/learning/chapterNumbering.js";
 import { allRows, dataOrThrow } from "./query.js";
 
 type Row = Record<string, unknown>;
@@ -27,7 +28,7 @@ export type PracticeSubmissionItem = {
   updatedAt: string;
   submittedAt?: string;
   acceptedAt?: string;
-  /** 1-based chapter order derived from the Assignment's primary covered Knowledge, when known. */
+  /** One-based chapter display ordinal derived from the Assignment's primary covered Knowledge, when known. */
   chapterNumber?: number;
   /** Latest persisted PerformanceResult score, only when it is a real number. */
   score?: number;
@@ -155,7 +156,20 @@ export function chapterNumbersByAssignment(
   }
   const lessonByKey = new Map(lessons.map(lesson => [`${text(lesson, "course_id")}:${text(lesson, "id")}`, lesson]));
   const lessonOrder = new Map(lessons.map(lesson => [`${text(lesson, "course_id")}:${text(lesson, "id")}`, number(lesson, "display_order")]));
-  const chapterOrder = new Map(chapters.map(chapter => [`${text(chapter, "course_id")}:${text(chapter, "id")}`, number(chapter, "display_order")]));
+  const chaptersByCourse = new Map<string, ChapterOrdinalInput[]>();
+  for (const chapter of chapters) {
+    const courseId = text(chapter, "course_id");
+    const chapterId = text(chapter, "id");
+    if (!courseId || !chapterId) continue;
+    const rows = chaptersByCourse.get(courseId) ?? [];
+    const displayOrder = number(chapter, "display_order");
+    rows.push({ id: chapterId, order: Number.isFinite(displayOrder) ? displayOrder : undefined });
+    chaptersByCourse.set(courseId, rows);
+  }
+  const chapterNumber = new Map<string, number>();
+  for (const [courseId, rows] of chaptersByCourse) {
+    for (const [chapterId, displayNumber] of chapterDisplayNumbers(rows)) chapterNumber.set(`${courseId}:${chapterId}`, displayNumber);
+  }
   const result = new Map<string, number>();
   for (const [key, nodes] of nodesByAssignment) {
     const courseId = key.slice(0, key.indexOf(":"));
@@ -169,9 +183,9 @@ export function chapterNumbersByAssignment(
     if (!coverage) continue;
     const lesson = lessonByKey.get(`${courseId}:${text(coverage, "lesson_id")}`);
     if (!lesson) continue;
-    const order = chapterOrder.get(`${courseId}:${text(lesson, "chapter_id")}`);
-    if (order === undefined || !Number.isInteger(order)) continue;
-    result.set(key, order + 1);
+    const displayNumber = chapterNumber.get(`${courseId}:${text(lesson, "chapter_id")}`);
+    if (displayNumber === undefined) continue;
+    result.set(key, displayNumber);
   }
   return result;
 }

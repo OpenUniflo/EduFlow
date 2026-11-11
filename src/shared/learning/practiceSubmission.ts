@@ -20,7 +20,7 @@ export type MyPracticeSubmission = {
   updatedAt: string;
   submittedAt?: string;
   acceptedAt?: string;
-  /** 1-based chapter order when the Assignment coverage resolves to one. */
+  /** One-based chapter display ordinal when the Assignment coverage resolves to one. */
   chapterNumber?: number;
   /** Latest persisted score; omitted when the PerformanceResult has none. */
   score?: number;

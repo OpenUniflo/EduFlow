@@ -8,6 +8,7 @@ import type { UserCourseState } from "@/features/course/types";
 import type { UserKnowledgeRecord, UserKnowledgeStatus } from "@/features/profile/types";
 import { buildArchiveModel, type ArchiveCourse, type ArchiveNode } from "@/features/archive/model/atlasModel";
 import { isCourseVisibleToViewer } from "@/features/course/runtime/courseVisibility";
+import { chapterDisplayNumber } from "@/shared/learning/chapterNumbering";
 
 export type GlobalSearchPageId = "home" | "archive" | "works" | "records" | "settings" | "teaching" | "admin";
 export type GlobalSearchActionId = "new-workflow" | "continue-course" | "open-records" | "open-settings" | "open-assistant";
@@ -105,10 +106,8 @@ function nodeCourseLocation(node: ArchiveNode, runtimes: readonly CourseRuntimeD
       .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))[0];
     if (!coverage) continue;
     const lesson = runtime.lessons.find((item) => item.id === coverage.lessonId);
-    const chapterIndex = lesson
-      ? runtime.chapters.slice().sort((left, right) => left.order - right.order || left.id.localeCompare(right.id)).findIndex((item) => item.id === lesson.chapterId)
-      : -1;
-    if (chapterIndex >= 0) return { course: runtime.course, chapter: chapterIndex + 1 };
+    const chapter = lesson ? chapterDisplayNumber(runtime.chapters, lesson.chapterId) : undefined;
+    if (chapter !== undefined) return { course: runtime.course, chapter };
   }
   return null;
 }

@@ -42,6 +42,7 @@ describe("ResourceCenterDialog", () => {
     expect(html).toContain('data-resource-section="mcp" data-resource-count="1"');
     expect(html).toContain('data-resource-section="functions" data-resource-count="2"');
     expect(html).toContain("我的 DeepSeek");
+    expect(html).toContain("已启用 2 个模型 · deepseek-chat、deepseek-reasoner");
     expect(html).not.toContain("还没有模型供应商");
   });
 

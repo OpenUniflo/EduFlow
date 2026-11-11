@@ -12,7 +12,7 @@ import pytest
 from eduflow_workflow import extensions, tools
 from eduflow_workflow.compiler import compile_definition, validate_structure
 from eduflow_workflow.contracts import ExecutionError
-from eduflow_workflow.extensions import fetch_model_ids, hydrate_connections, http_test_preview, parse_model_ids, validate_connection
+from eduflow_workflow.extensions import fetch_model_ids, hydrate_connections, http_test_preview, parse_model_ids, reusable_secret_ref, validate_connection
 from eduflow_workflow.registry import NODE_DESCRIPTORS, OPERATIONS, Registry
 from eduflow_workflow.runtime import RunExecution
 from test_contracts import sample
@@ -159,6 +159,24 @@ async def test_deepseek_models_use_the_shared_pattern_with_the_official_base_url
         await validate_connection({'type': 'deepseek', 'modelRefs': ['bad model']}, 'synthetic-key', {})
     with pytest.raises(ExecutionError):
         await validate_connection({'type': 'deepseek', 'modelRefs': ['deepseek-chat']}, '', {})
+
+
+def test_saved_provider_key_is_reused_only_for_the_same_target():
+    rows = [
+        {'kind': 'connection', 'ref': 'models', 'version': 1, 'disabled': False, 'content': {'type': 'openai-compatible', 'baseUrl': 'https://models.example/v1', 'secretRef': 'vault:one'}},
+        {'kind': 'connection', 'ref': 'models', 'version': 2, 'disabled': False, 'content': {'type': 'openai-compatible', 'baseUrl': 'https://models.example/v1', 'secretRef': 'vault:two'}},
+    ]
+    assert reusable_secret_ref(rows, 'models', {'type': 'openai-compatible', 'baseUrl': 'https://models.example/v1/'}) == 'vault:two'
+    assert reusable_secret_ref(rows, 'models', {'type': 'openai-compatible', 'baseUrl': 'https://other.example/v1'}) is None
+    assert reusable_secret_ref(rows, 'models', {'type': 'deepseek'}) is None
+    assert reusable_secret_ref([], 'models', {'type': 'deepseek'}) is None
+
+
+async def test_reused_credential_satisfies_remote_model_validation(local_fixtures, allow_destination):
+    content = await validate_connection(model_content(), '', local_env(), credential_reused=True)
+    assert content['type'] == 'openai-compatible'
+    with pytest.raises(ExecutionError):
+        await validate_connection(model_content(), '', local_env(), credential_reused=False)
 
 
 async def test_connection_grammar_is_a_closed_whitelist(local_fixtures):
@@ -435,6 +453,34 @@ def catalog_body(ref='models'):
 def install_fake_storage(monkeypatch, rows):
     monkeypatch.setattr(extensions, 'Storage', lambda url: FakeStorage(rows))
     monkeypatch.setenv('WORKFLOW_DATABASE_URL', 'postgresql://fixture')
+
+
+class PublishStorage:
+    def __init__(self, rows):
+        self.rows = rows
+        self.saved = None
+
+    async def call(self, name, *args):
+        if name == 'p4_catalog_read':
+            return copy.deepcopy(self.rows)
+        if name == 'p4_connection_save':
+            self.saved = args
+            return {'ok': True}
+        raise AssertionError(name)
+
+
+async def test_publish_reuses_the_saved_provider_secret_when_only_models_change(monkeypatch, local_fixtures, allow_destination):
+    rows = [{'kind': 'connection', 'ref': 'models', 'version': 1, 'disabled': False, 'content': {'type': 'openai-compatible', 'name': 'Gateway', 'baseUrl': 'https://models.example/v1', 'modelRefs': ['model-a'], 'secretRef': 'vault:one'}}]
+    storage = PublishStorage(rows)
+    monkeypatch.setattr(extensions, 'Storage', lambda url: storage)
+    monkeypatch.setenv('WORKFLOW_DATABASE_URL', 'postgresql://fixture')
+    body = {'ownerId': 'a', 'environmentRef': 'local', 'action': 'publish', 'kind': 'connection', 'ref': 'models', 'version': 2, 'content': model_content(modelRefs=['model-a', 'model-b'])}
+    await extensions.catalog_operation(body, FakeRegistry(local_env()))
+    assert storage.saved is not None
+    content = storage.saved[4]
+    assert content['secretRef'] == 'vault:one'
+    assert content['modelRefs'] == ['model-a', 'model-b']
+    assert storage.saved[5] == ''
 
 
 async def test_catalog_test_returns_the_unified_model_result(monkeypatch, local_fixtures):

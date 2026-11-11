@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CourseAssignment } from "@/features/course/types";
-import { aiEvaluationAvailable, buildPracticeResponse, canSubmitPractice, draftFromPracticeResult, evaluatorOptions, isLearnerFacingExpectedOutput, learnerAcceptanceCriteria, practiceAttemptKicker, practiceChecklist, practiceChecklistCounts, practiceCompatibility, practiceFeedbackText, practiceOutcomeView, practiceResultActions, practiceSubmissionText, practiceViewState, shouldStartPracticeOnInput } from "./practiceModel";
+import { aiEvaluationAvailable, buildPracticeResponse, canSubmitPractice, draftFromPracticeResult, evaluatorOptions, isLearnerFacingExpectedOutput, learnerAcceptanceCriteria, practiceAttemptKicker, practiceChecklist, practiceChecklistCounts, practiceCompatibility, practiceFeedbackText, practiceOutcomeView, practiceResultActions, practiceSubmissionText, practiceViewState, practiceWithdrawConfirmation, shouldStartPracticeOnInput } from "./practiceModel";
 
 const unified: CourseAssignment = {
   id: "a", courseId: "c", order: 0, title: "实践", description: "d", requirements: [], expectedOutput: "o",
@@ -91,6 +91,14 @@ describe("practice attempt and result actions", () => {
     expect(practiceResultActions("pending")).toEqual({ showViewSubmission: true, showPracticeAgain: false });
     expect(practiceResultActions("evaluating")).toEqual({ showViewSubmission: true, showPracticeAgain: false });
     expect(practiceResultActions("unavailable")).toEqual({ showViewSubmission: true, showPracticeAgain: false });
+  });
+});
+
+describe("practice withdrawal confirmation", () => {
+  it("uses the same confirmation for every attempt and states that the record is kept", () => {
+    expect(practiceWithdrawConfirmation(1)).toMatchObject({ kicker: "撤回确认 · 第 1 次提交", title: "确认撤回这次提交？" });
+    expect(practiceWithdrawConfirmation(3).description).toBe("这次提交会保留在记录里并标为已撤回，不再计入完成和评价。");
+    expect(practiceWithdrawConfirmation().kicker).toContain("?");
   });
 });
 

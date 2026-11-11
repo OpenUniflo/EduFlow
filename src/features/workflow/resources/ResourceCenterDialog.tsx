@@ -4,9 +4,10 @@ import { workflowApiV2 } from "../application/v2/useWorkflowV2Controller";
 import { workflowErrorMessage } from "../repository/v2/WorkflowApiV2";
 import type { ConnectionTestResult, JsonValue, WorkflowConfiguration, WorkflowTool } from "../domain/v2/types";
 import { useExtensions, type FunctionVersion } from "../editor/v2/FunctionExecutionFields";
-import { latestConnectionsOfType, resourceCounts, groupCatalogByRef } from "./resourceModel";
+import { latestConnectionsOfType, modelRefsOf, platformApiTools, resourceCounts, groupCatalogByRef } from "./resourceModel";
 import { ResourceTestPanel } from "./ResourceTestPanel";
 import { apiDisplayUrl } from "./apiResourceModel";
+import { providerModelSummary } from "./providerModel";
 import { ResourceEditor, type ResourceEditorTarget } from "./ResourceEditor";
 import { VariableTable } from "./VariableTable";
 import { RESOURCE_SECTIONS, resourceSectionMeta, type ResourceCenterProps, type ResourceSection } from "./resourceTypes";
@@ -124,7 +125,7 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
   if (!open) return null;
 
   const meta = resourceSectionMeta(section);
-  const counts = resourceCounts({ connections: data?.connections, functions: data?.functions, variables: configuration?.variables });
+  const counts = resourceCounts({ connections: data?.connections, functions: data?.functions, variables: configuration?.variables, tools });
   const countFor = (id: ResourceSection): number | undefined => id === "variables" ? counts.variables : data ? counts[id] : undefined;
   const query = search.trim().toLowerCase();
   const matches = (values: (string | undefined)[]) => !query || values.some(value => String(value ?? "").toLowerCase().includes(query));
@@ -139,11 +140,11 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
       return <>
         {providers.map(entry => {
           const name = String(entry.content.name ?? entry.ref);
-          const models = Array.isArray(entry.content.modelRefs) ? entry.content.modelRefs.map(String) : [];
+          const models = modelRefsOf(entry.content);
           const key = `${entry.ref}@${entry.version}`;
           return <article className="wf-resource-center-row" key={key}>
             <span className="wf-resource-center-icon is-model" aria-hidden="true"><Sparkles size={17}/></span>
-            <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{name}</strong></div><div className="wf-resource-center-meta">{models.length} 个模型{models[0] ? ` · ${models[0]} 已启用` : ""}</div><div className="wf-resource-center-sub">v{entry.version} · {entry.hasCredential ? "已配置凭据" : "无凭据"}</div></div>
+            <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{name}</strong></div><div className="wf-resource-center-meta">{providerModelSummary(models)}</div><div className="wf-resource-center-sub">v{entry.version} · {entry.hasCredential ? "已配置凭据" : "无凭据"}</div></div>
             <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${name}`} title="编辑" disabled={Boolean(busyKey)} onClick={() => openEditor({ kind: "provider", mode: "edit", ref: entry.ref })}><Pencil size={15}/></button>
             <button type="button" className="wf-resource-center-test" disabled={Boolean(busyKey) || entry.disabled} onClick={() => void testConnection({ ref: entry.ref, version: entry.version })}>{busyKey === key ? "测试中…" : "测试"}</button>
             <details className="wf-resource-menu" open={menuOpen === key} onToggle={event => setMenuOpen((event.target as HTMLDetailsElement).open ? key : null)}><summary aria-label={`更多操作 ${name}`} aria-expanded={menuOpen === key}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled={busyKey === key || entry.disabled} onClick={() => void disable("connection", entry.ref, entry.version, name)}>停用此连接</button></div></details>
@@ -155,15 +156,18 @@ export function ResourceCenterDialog({ open, environmentRef, initialSection, int
     }
     if (section === "apis") {
       const apis = latestConnectionsOfType(data.connections.filter(entry => matches([String(entry.content.name ?? entry.ref), entry.ref, String(entry.content.baseUrl ?? "")])), "http");
-      const platformTools = tools.filter(tool => (tool.origin ?? "environment") !== "user" && !tool.connectionRef && (tool.ref === "hn_search" || /hacker news/i.test(tool.name)) && matches([tool.name, tool.ref]));
+      const platformTools = platformApiTools(tools).filter(tool => matches([tool.name, tool.ref]));
       return <>
-        {platformTools.map(tool => <article className="wf-resource-center-row" key={tool.ref}>
-          <span className="wf-resource-center-icon is-api" aria-hidden="true"><Server size={17}/></span>
-          <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{tool.ref === "hn_search" ? "Hacker News 搜索" : tool.name}</strong><span className="wf-resource-panel-badge is-platform">平台提供</span></div><div className="wf-resource-center-url"><span className="wf-resource-center-method">GET</span><code>hn.algolia.com/api/v1/search</code></div><div className="wf-resource-center-sub">4 个参数 · 平台提供的连接，编辑后保存为你的副本</div></div>
-          <button type="button" className="wf-resource-center-iconbtn" aria-label="编辑 Hacker News 搜索" title="编辑" onClick={() => openEditor({ kind: "api", mode: "create", platformTool: tool })}><Pencil size={15}/></button>
-          <button type="button" className="wf-resource-center-test" onClick={() => openEditor({ kind: "api", mode: "create", platformTool: tool })}>测试</button>
-          <details className="wf-resource-menu"><summary aria-label={`更多操作 ${tool.name}`}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled>平台连接不可停用</button></div></details>
-        </article>)}
+        {platformTools.map(tool => {
+          const paramCount = tool.inputSchema && typeof tool.inputSchema === "object" && tool.inputSchema.properties && typeof tool.inputSchema.properties === "object" && !Array.isArray(tool.inputSchema.properties) ? Object.keys(tool.inputSchema.properties).length : 0;
+          return <article className="wf-resource-center-row" key={tool.ref}>
+            <span className="wf-resource-center-icon is-api" aria-hidden="true"><Server size={17}/></span>
+            <div className="wf-resource-center-copy"><div className="wf-resource-center-title"><strong>{tool.name || tool.ref}</strong><span className="wf-resource-panel-badge is-platform">平台提供</span></div><div className="wf-resource-center-url"><span className="wf-resource-center-method">API</span><code>{tool.ref}</code></div><div className="wf-resource-center-sub">{paramCount} 个参数 · {tool.description || "平台提供的连接，编辑后保存为你的副本"}</div></div>
+            <button type="button" className="wf-resource-center-iconbtn" aria-label={`编辑 ${tool.name || tool.ref}`} title="编辑" onClick={() => openEditor({ kind: "api", mode: "create", platformTool: tool })}><Pencil size={15}/></button>
+            <button type="button" className="wf-resource-center-test" onClick={() => openEditor({ kind: "api", mode: "create", platformTool: tool })}>测试</button>
+            <details className="wf-resource-menu"><summary aria-label={`更多操作 ${tool.name || tool.ref}`}><MoreHorizontal size={15}/></summary><div className="wf-resource-menu-panel"><button type="button" disabled>平台连接不可停用</button></div></details>
+          </article>;
+        })}
         {apis.map(entry => {
           const name = String(entry.content.name ?? entry.ref);
           const key = `${entry.ref}@${entry.version}`;

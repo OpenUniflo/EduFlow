@@ -118,6 +118,32 @@ describe("provider editor", () => {
     expect(textOf(tree).match(/测试模型/g)).toHaveLength(1);
   });
 
+  it("shows the current provider as a read-only identity instead of the preset grid", () => {
+    const { tree } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    expect(find(tree, item => item.props["aria-label"] === "选择模型供应商")).toBeUndefined();
+    expect(find(tree, item => item.props["aria-label"] === "当前模型供应商")).toBeDefined();
+    expect(textOf(tree)).toContain("要换一家请新建模型供应商");
+  });
+
+  it("reuses the saved key when only the enabled models change", async () => {
+    const { tree } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    (input(tree, "手动添加模型").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "team-model-2" } });
+    const afterModel = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    const add = find(afterModel.tree, item => item.type === "button" && textOf(item) === "添加");
+    expect(add).toBeDefined();
+    (add!.props.onClick as () => void)();
+    const afterAdd = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
+    const save = saveButton(afterAdd.tree);
+    expect(save.props.disabled).toBe(false);
+    (save.props.onClick as () => void)();
+    await flush();
+    expect(api.extension).toHaveBeenCalledWith("local", {
+      action: "publish", kind: "connection", ref: "team_gateway", version: 2,
+      content: { type: "openai-compatible", name: "团队网关", baseUrl: "https://old.example.com/v1", modelRefs: ["team-model", "team-model-2"] },
+      credential: "",
+    });
+  });
+
   it("writes an edited existing address into the next version", async () => {
     const { tree: initial, onSaved, onClose } = render({ kind: "provider", mode: "edit", ref: "team_gateway" });
     expect(input(initial, "模型 Base URL").props.value).toBe("https://old.example.com/v1");
@@ -125,6 +151,7 @@ describe("provider editor", () => {
     (input(initial, "模型 Base URL").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "https://new.example.com/v1" } });
     const afterAddress = render({ kind: "provider", mode: "edit", ref: "team_gateway" }, onSaved, onClose);
     expect(input(afterAddress.tree, "模型 Base URL").props.value).toBe("https://new.example.com/v1");
+    expect(saveButton(afterAddress.tree).props.disabled).toBe(true);
 
     const key = input(afterAddress.tree, "模型 API Key");
     (key.props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "sk-local-test" } });

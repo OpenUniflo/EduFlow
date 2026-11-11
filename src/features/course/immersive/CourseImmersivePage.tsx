@@ -15,6 +15,7 @@ import { useOptionalUserCourseState } from "@/features/learning/progress/progres
 import { createMicroLearningNavigation, type MicroLearningProvider, type MicroLesson } from "@/features/learning/micro/microLearning";
 import { buildMaterialDeepLink } from "@/features/material/materialNavigation";
 import { globalKnowledgeAccess, userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
+import { chapterNumberLabel } from "@/shared/learning/chapterNumbering";
 import { routeDiff } from "@/shared/learning/routeDiff";
 import { isRecommendedRoute } from "@/shared/learning/routeVersion";
 import { SceneZoomToolbar } from "@/shared/scene/SceneZoomToolbar";
@@ -1065,7 +1066,8 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
   const capabilityTitle = currentCapability ? (knowledgeTitleById.get(currentCapability.id) ?? currentCapability.title) : null;
   const detailTitle = currentGroup ? currentGroup.title : currentPractice?.title ?? capabilityTitle ?? currentKnowledge?.title ?? "课程节点";
   const detailKicker = currentCapability ? "前置能力 · 课程外" : currentPractice || currentGroup ? "动手任务" : "知识点";
-  const detailContext = knowledgeForDetail ? `第 ${knowledgeForDetail.lesson} 课 · ${courseChapters.find((chapter) => chapter.id === knowledgeForDetail.chapterId)?.title ?? ""}` : currentCapability?.bridge ? "位于课程知识点后方" : "";
+  const detailChapter = knowledgeForDetail ? courseChapters.find((chapter) => chapter.id === knowledgeForDetail.chapterId) : undefined;
+  const detailContext = knowledgeForDetail ? [chapterNumberLabel(detailChapter?.displayNumber), detailChapter?.title].filter(Boolean).join(" · ") : currentCapability?.bridge ? "位于课程知识点后方" : "";
   const currentCapabilityAcquired = Boolean(currentCapability && capabilityAcquiredIds.has(currentCapability.id));
   const detailLabel = currentCapability ? (authenticated ? (currentCapabilityAcquired ? "已具备" : "未具备") : "前置能力") : authenticated ? selectedLearner?.label ?? "未开始" : "公开";
   const detailTone = currentCapability ? (currentCapabilityAcquired ? "acquired" : "quiet") : authenticated ? learnerTone(selectedLearner) : "target";

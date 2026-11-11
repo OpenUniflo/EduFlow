@@ -675,11 +675,13 @@
   z-index: 60;
   bottom: var(--sp-20);
   left: var(--sp-12);
-  display: grid;
+  display: flex;
   width: 460px;
-  max-height: min(640px, calc(100vh - 180px));
+  max-height: min(640px, calc(100vh - 82px));
+  max-height: min(640px, calc(100dvh - 82px));
+  flex-direction: column;
   gap: 8px;
-  overflow: auto;
+  overflow: hidden;
   padding: var(--sp-16);
   border: 1px solid var(--glass-line);
   border-radius: var(--r-24);
@@ -687,7 +689,10 @@
   box-shadow: var(--sh-3);
   backdrop-filter: blur(22px) saturate(160%);
 }
-.ef-archive-assistant > header { display: flex; align-items: flex-start; gap: 8px; }
+.ef-archive-assistant > header { display: flex; flex: 0 0 auto; align-items: flex-start; gap: 8px; }
+.ef-archive-assistant-body { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; gap: var(--sp-8); overflow: auto; overscroll-behavior: contain; }
+.ef-archive-assistant-body > * { min-width: 0; }
+.ef-archive-assistant-footbar { flex: 0 0 auto; padding-top: var(--sp-8); border-top: 1px solid var(--line); }
 .ef-archive-assistant > header > div { display: grid; flex: 1; gap: 1px; }
 .ef-archive-assistant > header b { font-size: var(--fs-13); }
 .ef-archive-assistant > header span { color: var(--muted); font-size: var(--fs-12); }
@@ -696,8 +701,8 @@
 .ef-archive-assistant-collapse-text { border: 0; color: var(--muted); background: transparent; font-size: var(--fs-12); }
 .ef-archive-assistant-collapse { display: grid; width: 26px; height: 26px; place-items: center; border: 1px solid var(--line); border-radius: var(--r-8); background: var(--surface); }
 .ef-archive-assistant-collapse-text { justify-self: start; padding: 0; }
-.ef-archive-assistant > strong { font-size: var(--fs-16); }
-.ef-archive-assistant > p { margin: 0; color: var(--muted); font-size: var(--fs-12); line-height: var(--lh-13); }
+.ef-archive-assistant > strong, .ef-archive-assistant-body > strong { font-size: var(--fs-16); }
+.ef-archive-assistant > p, .ef-archive-assistant-body > p { margin: 0; color: var(--muted); font-size: var(--fs-12); line-height: var(--lh-13); }
 .ef-archive-assistant.is-locked { width: 320px; }
 .ef-archive-assistant.is-locked > strong { font-size: var(--fs-13); }
 .ef-archive-assistant-actions { display: flex; gap: 6px; }

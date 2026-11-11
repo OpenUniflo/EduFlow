@@ -4,7 +4,7 @@ import type { CatalogConnection } from "./resourceModel";
 import {
   addModelSummary, canSaveModelDraft, draftModelsFor, filterProviderCards, isProbeConnection, isLocalProvider,
   latestVisibleProviders, mergeModelSelection, modelRowsFor, modelSelectionDirty, modelSourceLabel, modelUsageCount,
-  nextProviderVersion, probeConnectionContent, probeConnectionRef, providerDraftIssue, providerPublishRequest,
+  nextProviderVersion, probeConnectionContent, probeConnectionRef, providerCredentialRequiredOnSave, providerDraftIssue, providerModelSummary, providerPublishRequest,
   providerTestIssue, providerTestStatusLabel, providerUsageCount, providerVersions, stagedModelChanges,
   stagedProviderSummary, toggleDraftModel, firstUserModelProvider, userModelProviders,
 } from "./providerModel";
@@ -170,6 +170,25 @@ describe("dialog validation", () => {
 
   it("requires a credential for DeepSeek", () => {
     expect(providerDraftIssue({ ...base, type: "deepseek", name: "DeepSeek", ref: "my_deepseek", baseUrl: "https://api.deepseek.com", models: ["deepseek-chat"] })).toContain("API Key");
+  });
+});
+
+describe("provider model summary", () => {
+  it("reports the enabled model count and every enabled name", () => {
+    expect(providerModelSummary(["deepseek-flash", "deepseek-reasoner"])).toBe("已启用 2 个模型 · deepseek-flash、deepseek-reasoner");
+    expect(providerModelSummary([])).toBe("未启用模型");
+  });
+});
+
+describe("provider credential reuse", () => {
+  it("reuses a saved key when only the enabled model list changed", () => {
+    expect(providerCredentialRequiredOnSave({ existing: connection("deepseek", 1, openai()), type: "openai-compatible", baseUrl: "https://models.example/v1/", credential: "" })).toBe(false);
+  });
+
+  it("requires a fresh key when the address changed or the saved version has none", () => {
+    expect(providerCredentialRequiredOnSave({ existing: connection("deepseek", 1, openai()), type: "openai-compatible", baseUrl: "https://new.example.com/v1", credential: "" })).toBe(true);
+    expect(providerCredentialRequiredOnSave({ existing: connection("deepseek", 1, openai(), { hasCredential: false }), type: "openai-compatible", baseUrl: "https://models.example/v1", credential: "" })).toBe(true);
+    expect(providerCredentialRequiredOnSave({ existing: connection("deepseek", 1, openai()), type: "openai-compatible", baseUrl: "https://new.example.com/v1", credential: "sk-test" })).toBe(false);
   });
 });
 

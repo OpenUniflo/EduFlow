@@ -173,13 +173,13 @@ describe("records row mapping", () => {
     const events = mapRecordEvents(base);
     expect(events.map((item) => item.type).sort()).toEqual(["evaluation", "micro", "practice", "route"]);
     const micro = events.find((item) => item.type === "micro")!;
-    expect(micro).toMatchObject({ status: "learned", title: "Knowledge One", courseTitle: "Course One", meta: { chapterNumber: 2, estimatedMinutes: 6 } });
+    expect(micro).toMatchObject({ status: "learned", title: "Knowledge One", courseTitle: "Course One", meta: { chapterNumber: 1, estimatedMinutes: 6 } });
     expect(micro.links.map((link) => link.kind)).toEqual(["micro", "course", "knowledge"]);
     const practice = events.find((item) => item.type === "practice")!;
-    expect(practice).toMatchObject({ status: "passed", title: "Practice One", meta: { chapterNumber: 2, attemptNumber: 2 } });
+    expect(practice).toMatchObject({ status: "passed", title: "Practice One", meta: { chapterNumber: 1, attemptNumber: 2 } });
     expect(practice.links.map((link) => link.kind)).toEqual(["practice", "course", "knowledge", "workflow", "conversation"]);
     const evaluation = events.find((item) => item.type === "evaluation")!;
-    expect(evaluation).toMatchObject({ status: "passed", meta: { chapterNumber: 2, attemptNumber: 2, score: 100, scoreMax: 100, scoreConverted: true, basisCount: 2 } });
+    expect(evaluation).toMatchObject({ status: "passed", meta: { chapterNumber: 1, attemptNumber: 2, score: 100, scoreMax: 100, scoreConverted: true, basisCount: 2 } });
     expect(evaluation.feedback).toEqual({ summary: "老师验收通过", comment: "完成得很好", items: [{ label: "功能", value: "20 / 40" }] });
     const route = events.find((item) => item.type === "route")!;
     expect(route).toMatchObject({ status: "version", versionNumber: 3, meta: { addedSteps: 2, removedSteps: 1, source: "adjustment" } });
@@ -202,8 +202,8 @@ describe("records row mapping", () => {
   });
 
   it("derives chapter numbers from the primary coverage and keeps real feedback fields only", () => {
-    expect(chapterNumbersByKnowledge(base.curriculumCoverages, base.lessons, base.chapters).get("c1:k1")).toBe(2);
-    expect(chapterNumbersByAssignment(base.assignmentCoverages, base.curriculumCoverages, base.lessons, base.chapters).get("c1:a1")).toBe(2);
+    expect(chapterNumbersByKnowledge(base.curriculumCoverages, base.lessons, base.chapters).get("c1:k1")).toBe(1);
+    expect(chapterNumbersByAssignment(base.assignmentCoverages, base.curriculumCoverages, base.lessons, base.chapters).get("c1:a1")).toBe(1);
     expect(parseRecordFeedback({ code: "x" })).toEqual({ summary: "评价已返回，请打开实践查看完整结果", items: [] });
     expect(parseRecordFeedback({ message: "", items: [] })).toBeUndefined();
     expect(parseRecordFeedback({ criteria: { Clarity: 8, Depth: "good" } })).toBeUndefined();

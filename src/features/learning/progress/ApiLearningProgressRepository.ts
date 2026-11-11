@@ -36,7 +36,8 @@ export class ApiLearningProgressRepository implements LearningProgressRepository
 
   updateAssignmentState(userId: string, courseId: string, assignmentId: string, assignment: UserAssignmentState) {
     const current = this.getCourseState(userId, courseId);
-    this.persist({ ...current, assignmentStates: { ...current.assignmentStates, [assignmentId]: { ...assignment, assignmentId } }, updatedAt: now() });
+    const updatedAt = assignment.updatedAt ?? now();
+    this.persist({ ...current, assignmentStates: { ...current.assignmentStates, [assignmentId]: { ...assignment, assignmentId, updatedAt } }, updatedAt });
   }
 
   updateMaterialState(userId: string, courseId: string, materialId: string, update: Partial<UserMaterialState>) {

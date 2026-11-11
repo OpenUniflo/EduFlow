@@ -16,7 +16,7 @@ import { buildHomeCourseProjection, type HomeMicroAsset } from "@/features/cours
 import type { CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
 import { buildHomeAssistantContext } from "@/features/home/homeAssistantContext";
 import { openPanelParams, openWorkspaceParams, removeWorkspaceParam } from "@/features/home/learningWorkspace";
-import { panelParamAction, reduceRightPanel, type RightPanel } from "@/features/home/rightPanel";
+import { panelParamAction, panelBackLabel, previousRightPanel, reduceRightPanel, initialRightPanelState, type RightPanel } from "@/features/home/rightPanel";
 import { rightPanelFromParams, rightPanelParams } from "@/features/home/panelParams";
 import { ObjectPanelSwitch } from "@/features/home/ObjectPanelSwitch";
 import { panelForTarget } from "@/features/home/panelForTarget";
@@ -30,6 +30,7 @@ import type { AssistantCardActions } from "@/features/assistant/cards/AssistantC
 import { HomeComposer, type ComposerAttachment, type ComposerExtras } from "@/shared/ui/HomeComposer";
 import { uploadEvidence } from "@/features/evidence/evidenceClient";
 import { attachmentCountMessage, attachmentFileError, attachmentRoom } from "@/shared/assistant/attachments";
+import { shouldHandleShellEscape } from "@/shared/ui/escapeLayer";
 import "@/features/home/home.css";
 
 type PracticeWorkspace = Extract<RightPanel, { kind: "practice" }>;
@@ -38,7 +39,9 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
   const navigate = useNavigate();
   const assistant = useAssistantRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [rightPanel, dispatchRightPanel] = useReducer(reduceRightPanel, rightPanelFromParams(searchParams));
+  const [panelHistory, dispatchRightPanel] = useReducer(reduceRightPanel, rightPanelFromParams(searchParams), initialRightPanelState);
+  const rightPanel = panelHistory.current;
+  const previousPanel = previousRightPanel(panelHistory);
   const [practiceCache, setPracticeCache] = useState<PracticeWorkspace | null>(null);
   const [routeMode, setRouteMode] = useState<"side" | "page">("side");
   const [panelOrigin, setPanelOrigin] = useState<DOMRect | null>(null);
@@ -420,14 +423,15 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     }
   }, [practiceParam, runtimes]);
 
-  // One Escape path for every Object Shell. A nested modal (route page, Micro
-  // immersive, expanded material) owns its own level and returns one step.
+  // One Escape path for every Object Shell. A modal layer — native dialog or
+  // an aria-modal overlay such as a submit/withdraw confirmation — owns the
+  // key and closes itself; the shell behind it stays open. This is checked at
+  // keydown time, so listener registration order cannot close the panel first.
   useEffect(() => {
     if (!panelVisible && !workspace && microForm === "closed") return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (!shouldHandleShellEscape(event)) return;
       if (microForm === "focus") return;
-      if (typeof document !== "undefined" && document.querySelector("dialog[open]")) return;
       if (microForm === "side") { microHost.close(); return; }
       if (workspace) { closeWorkspace(); return; }
       if (rightPanel.kind !== "none") { closeActivePanel(); return; }
@@ -585,6 +589,12 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     }
   }
 
+  function goBackPanel() {
+    if (previousPanel.kind === "none") return;
+    dispatchRightPanel({ type: "back" });
+    setDismissedObjectKey(null);
+  }
+
   function closeActivePanel() {
     if (rightPanel.kind === "none") return;
     if (rightPanel.kind === "my") {
@@ -601,7 +611,9 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
 
   function setPanel(open: boolean) {
     if (open) {
-      panelTriggerRef.current = panelToggleRef.current;
+      // Preserve the trigger of an object My opens over, so Back can contract
+      // to the card that started it. My itself opens from its top toggle.
+      if (rightPanel.kind === "none") panelTriggerRef.current = panelToggleRef.current;
       microHost.dismissSide();
     }
     dispatchRightPanel({ type: open ? "open-my" : "close" });
@@ -729,12 +741,10 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
   }
 
   function openMyCourse(courseId: string, origin?: DOMRect) {
-    setPanel(false);
     showRoutePanel(courseId, origin);
   }
 
   function openMyPractice(courseId: string, assignmentId: string, title: string, origin?: DOMRect) {
-    setPanel(false);
     void openPractice(courseId, assignmentId, title, origin);
   }
 
@@ -858,6 +868,8 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       open
       loading={assistant.loading}
       onClose={() => { setPanel(false); panelToggleRef.current?.focus(); }}
+      onBack={previousPanel.kind === "none" ? undefined : goBackPanel}
+      backLabel={panelBackLabel(previousPanel)}
       onOpenCourse={openMyCourse}
       onOpenPractice={openMyPractice}
       onOpenRecent={openMyRecent}
@@ -879,6 +891,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
         onModeChange: setRouteMode,
         originRect: panelOrigin,
         originElement: panelTriggerRef.current,
+        ...(previousPanel.kind !== "none" ? { onBack: goBackPanel, backLabel: panelBackLabel(previousPanel) } : {}),
         onStart: (action) => openRouteStep(action, routeCourseId),
         onInteract: () => setDismissedObjectKey(null)
       } : null}

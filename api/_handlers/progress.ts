@@ -29,7 +29,8 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const courseStates = dataOrThrow(coursesResult.data as Row[] | null, coursesResult.error, "UserCourseState query").map((course) => {
       const courseId = String(course.course_id);
       const assignmentStates = Object.fromEntries(assignmentRows.filter((row) => row.course_id === courseId).map((row) => [String(row.assignment_id), {
-        assignmentId: String(row.assignment_id), status: String(row.status), progress: row.progress == null ? undefined : Number(row.progress)
+        assignmentId: String(row.assignment_id), status: String(row.status), progress: row.progress == null ? undefined : Number(row.progress),
+        updatedAt: row.updated_at == null ? undefined : String(row.updated_at)
       }]));
       const materialStates = Object.fromEntries(materialRows.filter((row) => row.course_id === courseId).map((row) => [String(row.material_id), {
         materialId: String(row.material_id), recentSegmentId: row.recent_segment_id ?? undefined,
@@ -68,7 +69,7 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
     const acceptedIds = new Set(canonicalAssignments.filter(row=>row.status==="accepted").map(row=>String(row.assignment_id)));
     const assignmentRows = Object.values(state.assignmentStates).filter(item=>item.status!=="accepted"&&!acceptedIds.has(String(item.assignmentId))).map((item) => ({
       user_id: user.id, course_id: state.courseId, assignment_id: String(item.assignmentId), status: String(item.status),
-      progress: item.progress == null ? null : Number(item.progress), updated_at: updatedAt
+      progress: item.progress == null ? null : Number(item.progress), updated_at: item.updatedAt ?? updatedAt
     }));
     if (assignmentRows.length) {
       const result = await client.from("user_assignment_states").upsert(assignmentRows);
@@ -83,9 +84,9 @@ export default handleApi(async (request: VercelRequest, response: VercelResponse
       const result = await client.from("user_material_states").upsert(materialRows);
       dataOrThrow(result.data, result.error, "UserMaterialState update");
     }
-    const savedResult=await client.from("user_assignment_states").select("assignment_id,status,progress").eq("user_id",user.id).eq("course_id",state.courseId);
+    const savedResult=await client.from("user_assignment_states").select("assignment_id,status,progress,updated_at").eq("user_id",user.id).eq("course_id",state.courseId);
     const savedAssignments=dataOrThrow(savedResult.data as Row[]|null,savedResult.error,"Saved Assignment state lookup");
-    const assignmentStates=Object.fromEntries(savedAssignments.map(row=>[String(row.assignment_id),{assignmentId:String(row.assignment_id),status:String(row.status),progress:row.progress}]));
+    const assignmentStates=Object.fromEntries(savedAssignments.map(row=>[String(row.assignment_id),{assignmentId:String(row.assignment_id),status:String(row.status),progress:row.progress,...(row.updated_at == null ? {} : {updatedAt:String(row.updated_at)})}]));
     json(response, 200, { state: { ...state, assignmentStates, userId: user.id, isActive: true, updatedAt } });
     return;
   }

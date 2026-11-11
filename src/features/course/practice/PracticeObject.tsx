@@ -17,8 +17,9 @@ import type { WorkflowRevisionSummary, WorkflowSummaryV2 } from "@/features/work
 import { WorkflowCreateDialog } from "@/features/workflow/pages/WorkflowCreateDialog";
 import { uploadEvidence } from "@/features/evidence/evidenceClient";
 import { apiRequest } from "@/shared/api/apiClient";
-import type { AssignmentAttemptHistoryItem, AssignmentFeedback, AssignmentResult, AssignmentSubmissionSummary } from "@/shared/learning/assignmentAttempt";
+import { applyAttemptEvaluation, summarizeAssignmentAttempts, type AssignmentAttemptHistoryItem, type AssignmentFeedback, type AssignmentResult } from "@/shared/learning/assignmentAttempt";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
+import { shouldHandleShellEscape } from "@/shared/ui/escapeLayer";
 import { ObjectShell, ObjectShellSection } from "@/shared/ui/ObjectShell";
 import { Button } from "@/shared/ui/Button";
 import { Pill } from "@/shared/ui/Pill";
@@ -26,7 +27,7 @@ import { PanelActions } from "@/features/home/PanelActions";
 import { Textarea, TextField } from "@/shared/ui/Field";
 import {
   aiEvaluationAvailable, buildPracticeResponse, canSubmitPractice, draftFromPracticeResult, evaluatorOptions, practiceAttemptKicker,
-  practiceChecklist, practiceChecklistCounts, practiceCompatibility, practiceEvaluatorLabel, practiceOutcomeView,
+  practiceChecklist, practiceChecklistCounts, practiceCompatibility, practiceEvaluatorLabel, practiceOutcomeView, practiceWithdrawConfirmation,
   isLearnerFacingExpectedOutput, learnerAcceptanceCriteria, practiceResultActions, practiceViewState, shouldStartPracticeOnInput,
   type PracticeDraft, type PracticeEvaluator
 } from "./practiceModel";
@@ -56,6 +57,35 @@ export type PracticeObjectProps = {
   onOpenNextStep?: (step: { nodeId?: string; resourceKind: string; resourceId?: string; microPathId?: string; title: string }) => void;
 };
 
+/** Shared confirmation overlay used by submit and withdraw in this object. */
+function PracticeConfirmDialog({ titleId, kicker, title, description, children, cancelLabel, confirmLabel, confirmIcon, busy = false, confirmDisabled = false, onCancel, onConfirm }: {
+  titleId: string;
+  kicker: string;
+  title: string;
+  description?: ReactNode;
+  children?: ReactNode;
+  cancelLabel: string;
+  confirmLabel: string;
+  confirmIcon?: ReactNode;
+  busy?: boolean;
+  confirmDisabled?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return <div className="ef-practice-confirm ef-practice-overlay-card" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+    <div className="ef-practice-confirm-head">
+      <span className="ef-practice-overlay-kicker">{kicker}</span>
+      <h3 id={titleId}>{title}</h3>
+      {description ? <p>{description}</p> : null}
+    </div>
+    {children}
+    <div className="ef-practice-overlay-actions">
+      <Button variant="secondary" onClick={onCancel}>{cancelLabel}</Button>
+      <Button variant="primary" loading={busy} disabled={confirmDisabled} onClick={onConfirm}>{confirmLabel}{confirmIcon}</Button>
+    </div>
+  </div>;
+}
+
 /**
  * One practice object for the Home side panel and the assignment immersive
  * route. It keeps the real Attempt/PerformanceResult authorities: the client
@@ -76,8 +106,8 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
   const [revision, setRevision] = useState(0);
   const [result, setResult] = useState<LoadedResult | null>(null);
   const [attemptHistory, setAttemptHistory] = useState<AssignmentAttemptHistoryItem[]>([]);
-  const [historySummary, setHistorySummary] = useState<AssignmentSubmissionSummary | null>(null);
   const [withdrawingAttemptId, setWithdrawingAttemptId] = useState<string | null>(null);
+  const [withdrawCandidateId, setWithdrawCandidateId] = useState<string | null>(null);
   const [latestAttemptNumber, setLatestAttemptNumber] = useState<number | undefined>(undefined);
   const [resultLoaded, setResultLoaded] = useState(false);
   const [resultError, setResultError] = useState("");
@@ -118,21 +148,21 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
   const evaluationToken = useRef(0);
   const evaluationStartedFor = useRef<string | null>(null);
   const draftKey = `eduflow.practice-draft:${session.userId}:${courseId}:${assignmentId}`;
+  const historySummary = useMemo(() => summarizeAssignmentAttempts(attemptHistory), [attemptHistory]);
 
   useEffect(() => applicationServices.learningProgressRepository.subscribe(() => setRevision((value) => value + 1)), []);
   useEffect(() => applicationServices.userKnowledgeRepository.subscribe(() => setRevision((value) => value + 1)), []);
   useEffect(() => { if (!aiAvailable) setEvaluator("teacher"); }, [aiAvailable]);
   useEffect(() => {
     let live = true;
-    setResultLoaded(false); setResultError(""); setResult(null); setAttemptHistory([]); setHistorySummary(null); setLatestAttemptNumber(undefined);
+    setResultLoaded(false); setResultError(""); setResult(null); setAttemptHistory([]); setLatestAttemptNumber(undefined);
     setEvaluationPhase("idle"); setEvaluationError(""); setEvaluationElapsed(0);
     evaluationStartedFor.current = null;
     void applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId, requestedAttemptId)
-      .then(({ result: value, history, summary }) => {
+      .then(({ result: value, history }) => {
         if (!live) return;
         const historyItems = Array.isArray(history) ? history : [];
         setAttemptHistory(historyItems);
-        setHistorySummary(summary ?? null);
         const attemptNumber = typeof value?.attemptNumber === "number" ? value.attemptNumber : undefined;
         const historyNumber = historyItems.reduce((maximum, item) => Math.max(maximum, item.attemptNumber), 0);
         if (attemptNumber) setLatestAttemptNumber(attemptNumber);
@@ -162,7 +192,6 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
         .then((loaded) => {
           const historyItems = loaded.history ?? [];
           setAttemptHistory(historyItems);
-          setHistorySummary(loaded.summary ?? null);
           setResult((loaded.result as LoadedResult | null) ?? null);
           const historyNumber = historyItems.reduce((maximum, item) => Math.max(maximum, item.attemptNumber), 0);
           setLatestAttemptNumber(loaded.result?.attemptNumber ?? (historyNumber || undefined));
@@ -194,11 +223,12 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
     const tick = async () => {
       if (!live) return;
       try {
-        const { result: latest } = await applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId, requestedAttemptId);
+        const { result: latest, history: latestHistory } = await applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId, requestedAttemptId);
         if (!live) return;
         if (latest && latest.attemptId === result.attemptId) {
           if (latest.outcome !== "pending") {
             setResult(latest);
+            setAttemptHistory(latestHistory);
             setEvaluationPhase("done");
             await refreshLearnerState(session.userId).catch(() => undefined);
             return;
@@ -273,17 +303,19 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
   }, [pickerWorkId, workPicker, works]);
 
   useEffect(() => {
-    if (!confirming && !workPicker && !previewOpen) return;
+    if (!confirming && !workPicker && !previewOpen && !withdrawCandidateId) return;
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       event.preventDefault();
-      if (confirming) setConfirming(false);
-      else if (workPicker) setWorkPicker(false);
+      // Match the overlay render priority so Escape closes the layer on top.
+      if (workPicker) setWorkPicker(false);
+      else if (confirming) setConfirming(false);
+      else if (withdrawCandidateId) setWithdrawCandidateId(null);
       else setPreviewOpen(false);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [confirming, previewOpen, workPicker]);
+  }, [confirming, previewOpen, withdrawCandidateId, workPicker]);
 
   useEffect(() => {
     if (!repeatAttemptId || actionRunId) return;
@@ -309,13 +341,14 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
   useEffect(() => {
     if (size !== "immersive" || typeof window === "undefined") return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape" || event.defaultPrevented || confirming || workPicker || previewOpen) return;
+      if (!shouldHandleShellEscape(event)) return;
+      if (confirming || workPicker || previewOpen || withdrawCandidateId) return;
       event.preventDefault();
       if (onReturn) onReturn(); else navigate(`/courses/${encodeURIComponent(courseId)}`);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [confirming, courseId, navigate, onReturn, previewOpen, size, workPicker]);
+  }, [confirming, courseId, navigate, onReturn, previewOpen, size, withdrawCandidateId, workPicker]);
 
   const knowledge = useMemo(() => applicationServices.userKnowledgeRepository.getUserKnowledge(session.userId), [revision, session.userId]);
   const courseState = applicationServices.learningProgressRepository.getCourseState(session.userId, courseId);
@@ -429,16 +462,21 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
       if (token !== evaluationToken.current) return;
       if (evaluated.status === "evaluating") { setEvaluationPhase("evaluating"); return; }
       if (evaluated.status === "handed_off") { setEvaluationPhase("handed_off"); return; }
+      const outcome = evaluated.outcome ?? (evaluated.status === "accepted" ? "passed" : evaluated.status === "needs_revision" ? "failed" : undefined);
       setResult((current) => current && current.attemptId === attemptId ? {
         ...current,
         resultId: evaluated.resultId ?? current.resultId,
-        outcome: evaluated.outcome ?? current.outcome,
+        outcome: outcome ?? current.outcome,
         accepted: Boolean(evaluated.accepted),
         feedback: evaluated.feedback ?? current.feedback,
         evaluatorKind: "ai",
         evaluatedAt: new Date().toISOString(),
         evaluation: { status: "succeeded" }
       } : current);
+      if (outcome) setAttemptHistory((current) => applyAttemptEvaluation(current, attemptId, {
+        outcome,
+        ...(evaluated.resultId ? { resultId: evaluated.resultId } : {}),
+      }));
       setEvaluationPhase("done");
     } catch (evaluationFailure) {
       if (token !== evaluationToken.current) return;
@@ -510,7 +548,7 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
     } finally { setBusy(false); }
   }
 
-  async function withdrawAttempt(attemptId: string) {
+  async function withdrawSubmission(attemptId: string) {
     if (withdrawingAttemptId) return;
     setWithdrawingAttemptId(attemptId); setError("");
     try {
@@ -519,7 +557,6 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
       const loaded = await applicationServices.learnerStateService.getAssignmentResult(courseId, assignmentId, actionRunId, requestedAttemptId);
       const historyItems = loaded.history ?? [];
       setAttemptHistory(historyItems);
-      setHistorySummary(loaded.summary ?? null);
       setResult((loaded.result as LoadedResult | null) ?? null);
       const historyNumber = historyItems.reduce((maximum, item) => Math.max(maximum, item.attemptNumber), 0);
       setLatestAttemptNumber(loaded.result?.attemptNumber ?? (historyNumber || undefined));
@@ -529,6 +566,7 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
       setError(withdrawError instanceof Error ? withdrawError.message : "这次提交暂时无法撤回，请稍后重试。");
     } finally {
       setWithdrawingAttemptId(null);
+      setWithdrawCandidateId(null);
     }
   }
 
@@ -615,21 +653,16 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
     {draft.note.trim() ? <li><FileText size={15} aria-hidden="true" /><span><strong>备注</strong><small>{draft.note.trim().slice(0, 160)}</small></span><Pill tone="quiet">已附</Pill></li> : null}
   </ul>;
 
-  const confirmOverlay = <div className="ef-practice-confirm ef-practice-overlay-card" role="dialog" aria-modal="true" aria-labelledby="practice-confirm-title">
-    <div className="ef-practice-confirm-head">
-      <span className="ef-practice-overlay-kicker">提交确认 · 本次尝试</span>
-      <h3 id="practice-confirm-title">确认提交这次动手任务？</h3>
-      <p>以下内容会随这次尝试一起提交，提交后不可修改；如果交错了，可以在提交记录里撤回。</p>
-    </div>
+  const confirmOverlay = <PracticeConfirmDialog titleId="practice-confirm-title" kicker="提交确认 · 本次尝试" title="确认提交这次动手任务？" description="以下内容会随这次尝试一起提交，提交后不可修改；如果交错了，可以在提交记录里撤回。" cancelLabel="返回修改" confirmLabel="确认提交" confirmIcon={<Send size={15} />} busy={busy} confirmDisabled={!ready} onCancel={() => setConfirming(false)} onConfirm={() => void submit()}>
     {submissionItems}
     <p className="ef-practice-warning" role="note"><AlertTriangle size={15} aria-hidden="true" />提交内容会保存为只读记录；交错了可以撤回这次提交，再重新提交。</p>
     {evaluatorSection}
     {error ? <p className="ef-practice-error" role="alert">{error}</p> : null}
-    <div className="ef-practice-overlay-actions">
-      <Button variant="secondary" onClick={() => setConfirming(false)}>返回修改</Button>
-      <Button variant="primary" loading={busy} onClick={() => void submit()} disabled={!ready}>确认提交<Send size={15} /></Button>
-    </div>
-  </div>;
+  </PracticeConfirmDialog>;
+
+  const withdrawAttempt = attemptHistory.find((attempt) => attempt.attemptId === withdrawCandidateId);
+  const withdrawConfirmation = practiceWithdrawConfirmation(withdrawAttempt?.attemptNumber);
+  const withdrawOverlay = withdrawCandidateId ? <PracticeConfirmDialog titleId="practice-withdraw-title" kicker={withdrawConfirmation.kicker} title={withdrawConfirmation.title} description={withdrawConfirmation.description} cancelLabel="保留提交" confirmLabel="确认撤回" busy={withdrawingAttemptId === withdrawCandidateId} onCancel={() => setWithdrawCandidateId(null)} onConfirm={() => void withdrawSubmission(withdrawCandidateId)} /> : null;
 
   const workPickerOverlay = <div className="ef-practice-work-picker ef-practice-overlay-card" role="dialog" aria-modal="true" aria-labelledby="practice-pick-title">
     <div className="ef-practice-work-picker-head">
@@ -756,9 +789,7 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
     <summary>要求与交付 <span>先看清要交什么，再开始写</span></summary>
     {requirements}
   </details>;
-  const historyDescription = historySummary
-    ? `${historySummary.totalSubmissions} 次提交 · ${historySummary.withdrawnSubmissions} 次已撤回 · ${historySummary.countingSubmissions} 次计入`
-    : `${attemptHistory.length} 次提交 · 撤回不计入进度`;
+  const historyDescription = `${historySummary.totalSubmissions} 次提交 · ${historySummary.withdrawnSubmissions} 次已撤回 · ${historySummary.countingSubmissions} 次计入`;
   const historySection = attemptHistory.length ? <ObjectShellSection icon={<Clock size={15} />} title="提交记录" description={historyDescription}>
     <ul className="ef-practice-attempt-history">
       {attemptHistory.map((attempt) => {
@@ -768,7 +799,7 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
           <span className="ef-practice-attempt-meta">{formatTime(attempt.submittedAt)}{withdrawn ? ` · 已撤回 · ${attempt.withdrawalSource === "assistant" ? "对话撤回" : "面板撤回"}` : attempt.outcome === "passed" ? " · 已通过" : attempt.outcome === "failed" ? " · 需要修改" : attempt.outcome === "pending" ? " · 待评价" : ""}</span>
           {withdrawn
             ? <Pill tone="quiet">已撤回</Pill>
-            : <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={Boolean(withdrawingAttemptId)} onClick={() => void withdrawAttempt(attempt.attemptId)}>{withdrawingAttemptId === attempt.attemptId ? "撤回中…" : "撤回"}</button>}
+            : <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" disabled={Boolean(withdrawingAttemptId)} onClick={() => setWithdrawCandidateId(attempt.attemptId)}>{withdrawingAttemptId === attempt.attemptId ? "撤回中…" : "撤回"}</button>}
         </li>;
       })}
     </ul>
@@ -918,7 +949,7 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
     {error ? <p className="ef-practice-error" role="alert">{error}</p> : null}
   </div> : null;
 
-  const overlay = workPicker ? workPickerOverlay : confirming ? confirmOverlay : previewOpen ? previewOverlay : undefined;
+  const overlay = workPicker ? workPickerOverlay : confirming ? confirmOverlay : withdrawOverlay ?? (previewOpen ? previewOverlay : undefined);
 
   let body: ReactNode;
   switch (viewState) {

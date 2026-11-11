@@ -40,7 +40,8 @@ export function isValidUserCourseState(value: unknown, expectedUserId?: string, 
   const assignmentsValid = Object.entries(value.assignmentStates).every(([key, state]) => isRecord(state)
     && state.assignmentId === key
     && ["not-started", "in-progress", "completed"].includes(String(state.status))
-    && (state.progress === undefined || isValidProgress(state.progress)));
+    && (state.progress === undefined || isValidProgress(state.progress))
+    && (state.updatedAt === undefined || typeof state.updatedAt === "string"));
   const materialsValid = Object.entries(value.materialStates).every(([key, state]) => isRecord(state)
     && state.materialId === key
     && typeof state.updatedAt === "string"
@@ -118,7 +119,8 @@ export class LocalStorageLearningProgressRepository implements LearningProgressR
 
   updateAssignmentState(userId: string, courseId: string, assignmentId: string, state: UserAssignmentState) {
     const current = this.getCourseState(userId, courseId);
-    this.save({ ...current, isActive: true, assignmentStates: { ...current.assignmentStates, [assignmentId]: { ...state, assignmentId } }, updatedAt: new Date().toISOString() });
+    const updatedAt = state.updatedAt ?? new Date().toISOString();
+    this.save({ ...current, isActive: true, assignmentStates: { ...current.assignmentStates, [assignmentId]: { ...state, assignmentId, updatedAt } }, updatedAt });
   }
 
   updateMaterialState(userId: string, courseId: string, materialId: string, state: Partial<UserMaterialState>) {

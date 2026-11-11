@@ -1,4 +1,4 @@
-import type { JsonValue } from "../domain/v2/types";
+import type { JsonValue, WorkflowTool } from "../domain/v2/types";
 import type { Extensions, FunctionVersion } from "../editor/v2/FunctionExecutionFields";
 
 /** One managed connection returned by the Workflow extensions catalog. */
@@ -130,16 +130,22 @@ export type ResourceCounts = {
   variables?: number;
 };
 
+/** Platform-provided API tools are listed beside user HTTP connections. */
+export function platformApiTools(tools: readonly WorkflowTool[]): WorkflowTool[] {
+  return tools.filter(tool => (tool.origin ?? "environment") !== "user" && !tool.connectionRef);
+}
+
 /** Navigation counts for the resource center. Null data renders as an empty badge, not a fake zero. */
 export function resourceCounts(input: {
   connections?: readonly CatalogConnection[] | null;
   functions?: readonly FunctionVersion[] | null;
   variables?: readonly { key: string }[] | null;
+  tools?: readonly WorkflowTool[] | null;
 }): ResourceCounts {
   const connections = input.connections ?? null;
   return {
     providers: connections ? latestConnectionsOfType(connections, "provider").length : undefined,
-    apis: connections ? latestConnectionsOfType(connections, "http").length : undefined,
+    apis: connections ? latestConnectionsOfType(connections, "http").length + platformApiTools(input.tools ?? []).length : undefined,
     mcp: connections ? latestConnectionsOfType(connections, "mcp-http").length : undefined,
     functions: input.functions ? groupCatalogByRef(input.functions).length : undefined,
     variables: input.variables ? input.variables.length : undefined,

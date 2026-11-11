@@ -108,6 +108,16 @@ describe("batch 2: no hard-coded tool or count rules", () => {
     expect(assistantCardDisplaySchema.parse({ title: "x", steps: Array.from({ length: 13 }, (_, index) => ({ id: String(index), title: "s", state: "quiet" as const })) }).steps).toHaveLength(13);
   });
 
+  it("lists every assistant candidate and counts the panel and map from the same ids", () => {
+    const panel = read("src/features/archive/components/ArchiveAssistantPanel.tsx");
+    expect(panel).not.toContain("candidatePreview");
+    expect(panel).not.toContain(".slice(0, 6)");
+    expect(panel).toContain("<span>{nodes.length} 个 · 按匹配度</span>");
+    expect(panel).toContain("{nodes.map((node, index) =>");
+    expect(read("src/features/archive/pages/ArchivePage.tsx")).toContain("助手命中 {assistant.candidateIds.length}");
+    expect(read("src/features/archive/model/assistantPresentation.ts")).not.toContain("candidatePreview");
+  });
+
   it("shares one attachment limit and validator", () => {
     const policy = read("src/shared/assistant/attachments.ts");
     expect(policy).toContain("ATTACHMENT_LIMIT = 4");

@@ -3094,6 +3094,11 @@
   font-size: var(--fs-12);
 }
 
+.ef-my-row small.ef-my-course-next {
+  color: var(--brand-ink);
+  font-weight: var(--fw-600);
+}
+
 .ef-my-row > svg {
   flex: 0 0 auto;
   color: var(--muted);

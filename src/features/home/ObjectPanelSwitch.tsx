@@ -31,6 +31,8 @@ export type ObjectPanelRoute = {
   onModeChange?(mode: CourseRouteMode): void;
   originRect?: DOMRect | null;
   originElement?: HTMLElement | null;
+  onBack?(): void;
+  backLabel?: string;
   onStart(action: CourseRouteStepAction, courseId: string): void;
   onInteract?(): void;
 };
@@ -104,6 +106,8 @@ export function ObjectPanelSwitch({
         courseTitle={route.runtime.course.title}
         projection={route.projection}
         decision={route.decision}
+        {...(route.onBack ? { onBack: route.onBack } : {})}
+        {...(route.backLabel ? { backLabel: route.backLabel } : {})}
         {...(route.onModeChange ? { onModeChange: route.onModeChange } : {})}
         onClose={onClose}
         onStart={(action) => route.onStart(action, route.panel.courseId)}

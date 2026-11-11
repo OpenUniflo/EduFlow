@@ -85,7 +85,7 @@ export function CourseRoutePanel({
         title: projection.titleByNode.get(nodeId) ?? nodeId,
         chapterId: chapterByNode.get(nodeId)?.id ?? chapter.id,
         chapterTitle: chapterByNode.get(nodeId)?.title ?? chapter.title,
-        chapterNumber: chapterByNode.get(nodeId)?.order ?? chapter.order,
+        chapterNumber: chapterByNode.get(nodeId)?.displayNumber ?? chapter.displayNumber,
         status: current ? "current" : learned ? "done" : "locked",
         stateLabel: current ? "当前" : knowledgeStateLabelFor(nodeStatus),
         learned,

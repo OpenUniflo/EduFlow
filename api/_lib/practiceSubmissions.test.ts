@@ -97,6 +97,17 @@ describe("practice submission card data", () => {
       ]
     );
     expect(chapters.get("c:a")).toBe(1);
+    const sparse = chapterNumbersByAssignment(
+      [{ course_id: "c", assignment_id: "a", node_id: "primary" }],
+      [{ course_id: "c", id: "coverage-primary", node_id: "primary", lesson_id: "lesson-1", role: "introduce", display_order: 0 }],
+      [{ course_id: "c", id: "lesson-1", chapter_id: "chapter-1", display_order: 0 }],
+      [
+        { course_id: "c", id: "chapter-1", display_order: 10 },
+        { course_id: "c", id: "chapter-2", display_order: 20 },
+        { course_id: "c", id: "chapter-3", display_order: 40 },
+      ]
+    );
+    expect(sparse.get("c:a")).toBe(1);
     expect(chapterNumbersByAssignment([], [], [], []).size).toBe(0);
   });
 });

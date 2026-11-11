@@ -74,6 +74,9 @@
 .wf-editor-provider[aria-pressed="true"] .wf-editor-provider-mark{background:#5666c9;color:#fff}
 .wf-editor-provider>span:not(.wf-editor-provider-mark){flex:1;min-width:0;font-size:12px;font-weight:600}
 .wf-editor-provider .wf-editor-provider-mark{width:26px;height:26px;flex:0 0 26px;min-width:26px}
+.wf-editor-provider.is-locked{cursor:default;border-color:var(--line);background:var(--page)}
+.wf-editor-provider.is-locked>span:not(.wf-editor-provider-mark){display:grid;gap:2px}
+.wf-editor-provider.is-locked small{color:var(--muted);font-size:var(--fs-12);font-weight:inherit}
 .wf-editor-model-list{margin-top:6px;border:1px solid #e4e8ef;border-radius:9px;overflow:hidden;background:#fff}
 .wf-editor-model-row{display:flex;align-items:flex-start;gap:10px;padding:7px 11px;border-bottom:1px solid #eef1f6;background:#f7f9ff;margin:0;cursor:pointer}
 .wf-editor-model-row input{width:15px;height:15px;margin:2px 0 0;flex-shrink:0;accent-color:#5666c9}

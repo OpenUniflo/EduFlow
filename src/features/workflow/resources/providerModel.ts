@@ -26,6 +26,12 @@ export function providerModelRefs(entry: { content: Record<string, JsonValue> })
   return modelRefsOf(entry.content);
 }
 
+/** One truthful line for provider cards: enabled count and the enabled names. */
+export function providerModelSummary(models: readonly string[]): string {
+  if (!models.length) return "未启用模型";
+  return `已启用 ${models.length} 个模型 · ${models.join("、")}`;
+}
+
 export function providerTypeLabel(entry: { content: Record<string, JsonValue> }): string {
   return connectionTypeLabel(typeof entry.content.type === "string" ? entry.content.type : "");
 }
@@ -84,6 +90,26 @@ export function nextProviderVersion(entry: { version: number }): number {
 }
 
 /** A new version keeps unrelated fields but must apply the edited address/name/type, not the old content. */
+/**
+ * A provider edit may reuse its server-side managed credential only while the
+ * credential target (type + address) is unchanged. Model-list edits do not
+ * invalidate the key; changing the address does.
+ */
+export function providerCredentialRequiredOnSave(input: {
+  existing?: { content: Record<string, JsonValue>; hasCredential?: boolean } | null;
+  type: string;
+  baseUrl: string;
+  credential: string;
+}): boolean {
+  if (!credentialRequiredFor(input.type, input.baseUrl)) return false;
+  if (input.credential.trim()) return false;
+  const existing = input.existing;
+  if (!existing?.hasCredential) return true;
+  const existingType = typeof existing.content.type === "string" ? existing.content.type : "";
+  if (existingType !== input.type) return true;
+  return normalizeBaseUrl(providerAddress(existing)) !== normalizeBaseUrl(input.baseUrl);
+}
+
 export function providerPublishContent(
   entry: ProviderConnection,
   models: readonly string[],

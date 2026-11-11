@@ -55,6 +55,19 @@ export type AssignmentSubmissionSummary = {
   latestCountingSubmission: (AssignmentAttemptHistoryItem & { status: "passed" | "needs_revision" | "pending" | "submitted" }) | null;
 };
 
+/** Update the one immutable submission row in place after its evaluator returns. */
+export function applyAttemptEvaluation(
+  history: readonly AssignmentAttemptHistoryItem[],
+  attemptId: string,
+  update: { outcome?: PerformanceOutcome; resultId?: string },
+): AssignmentAttemptHistoryItem[] {
+  return history.map((item) => item.attemptId === attemptId ? {
+    ...item,
+    ...(update.resultId ? { resultId: update.resultId } : {}),
+    ...(update.outcome ? { outcome: update.outcome } : {}),
+  } : item);
+}
+
 export function summarizeAssignmentAttempts(history: readonly AssignmentAttemptHistoryItem[]): AssignmentSubmissionSummary {
   const latest = history.find((item) => !item.withdrawnAt) ?? null;
   return {

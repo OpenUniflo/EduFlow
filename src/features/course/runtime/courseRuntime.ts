@@ -12,6 +12,7 @@ import { defaultCourseUnlockPolicy, type CourseUnlockPolicy } from "./courseUnlo
 import { compareCourseCurriculumContexts, compareCourseKnowledgeOrder, selectPrimaryCurriculumCoverage } from "../curriculum/curriculumOrdering";
 import { sortAssignments } from "../../material/materialOrdering";
 import { MATERIAL_COVERAGE_ROLE_PRIORITY } from "../../material/materialCoverageOrdering";
+import { chapterDisplayNumbers } from "@/shared/learning/chapterNumbering";
 
 export type CourseRuntimeData = {
   course: Course;
@@ -340,13 +341,14 @@ export function buildCourseGraphData(runtime: CourseRuntimeData, userState: User
   const aggregatedChapterEdges = Array.from(projectedChapterEdgeByPair.values()).sort((left, right) => left.source.localeCompare(right.source) || left.target.localeCompare(right.target));
   assertDirectedAcyclic(runtime.chapters.map((chapter) => chapter.id), aggregatedChapterEdges);
   const chapterEdges = transitiveReduction(runtime.chapters.map((chapter) => chapter.id), aggregatedChapterEdges);
+  const chapterDisplayNumberById = chapterDisplayNumbers(runtime.chapters);
   const chapters: CourseChapterProjection[] = [...runtime.chapters].sort((left, right) => left.order - right.order || left.id.localeCompare(right.id)).map((chapter, chapterIndex) => {
     const chapterLessonIds = new Set(runtime.lessons.filter((lesson) => lesson.chapterId === chapter.id).map((lesson) => lesson.id));
     const chapterNodeIds = new Set(runtime.curriculumCoverages.filter((coverage) => chapterLessonIds.has(coverage.lessonId)).map((coverage) => coverage.nodeId));
     const summary = summarizeAssignmentIds(runtime.assignmentCoverages.filter((coverage) => chapterNodeIds.has(coverage.nodeId)).map((coverage) => coverage.assignmentId), assignmentStateById, assignmentOrderById);
     const knowledgeEvidenceCount = Array.from(chapterNodeIds).filter((nodeId) => userKnowledgeById.has(nodeId)).length;
     const knowledgeProgress = chapterNodeIds.size ? Math.round(Array.from(chapterNodeIds).reduce((sum, nodeId) => sum + (userKnowledgeById.get(nodeId)?.mastery ?? 0), 0) / chapterNodeIds.size) : 0;
-    return { ...chapter, displayNumber: chapterIndex + 1, lessonCount: chapterLessonIds.size, knowledgeProgress, knowledgeEvidenceCount, assignmentSummary: { chapterId: chapter.id, ...summary, outcome: chapter.outcome } };
+    return { ...chapter, displayNumber: chapterDisplayNumberById.get(chapter.id) ?? chapterIndex + 1, lessonCount: chapterLessonIds.size, knowledgeProgress, knowledgeEvidenceCount, assignmentSummary: { chapterId: chapter.id, ...summary, outcome: chapter.outcome } };
   });
   const aggregate = summarizeAssignmentIds(sortAssignments(runtime.assignments).map((assignment) => assignment.id), assignmentStateById, assignmentOrderById);
   return { courseId: runtime.course.id, revision: runtime.revision, chapters, knowledgeNodes, knowledgeEdges, chapterEdges, assignmentSummary: { courseId: runtime.course.id, ...aggregate } };

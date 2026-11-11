@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarizeAssignmentAttempts, type AssignmentAttemptHistoryItem } from "./assignmentAttempt";
+import { applyAttemptEvaluation, summarizeAssignmentAttempts, type AssignmentAttemptHistoryItem } from "./assignmentAttempt";
 
 const attempt = (attemptNumber: number, withdrawn: boolean, outcome?: "passed" | "failed" | "pending"): AssignmentAttemptHistoryItem => ({
   attemptId: `a${attemptNumber}`,
@@ -28,5 +28,16 @@ describe("summarizeAssignmentAttempts", () => {
   it("returns no latest counting attempt when every submission was withdrawn", () => {
     const summary = summarizeAssignmentAttempts([attempt(2, true), attempt(1, true)]);
     expect(summary).toMatchObject({ totalSubmissions: 2, withdrawnSubmissions: 2, countingSubmissions: 0, latestCountingSubmission: null });
+  });
+});
+
+describe("applyAttemptEvaluation", () => {
+  it("updates the evaluated submission in place so the list and summary share one record", () => {
+    const pending = [attempt(1, false, "pending")];
+    expect(summarizeAssignmentAttempts(pending).countingSubmissions).toBe(1);
+    const evaluated = applyAttemptEvaluation(pending, "a1", { outcome: "failed", resultId: "r1" });
+    expect(evaluated[0]).toMatchObject({ attemptId: "a1", outcome: "failed", resultId: "r1" });
+    expect(summarizeAssignmentAttempts(evaluated).latestCountingSubmission).toMatchObject({ attemptNumber: 1, status: "needs_revision" });
+    expect(pending[0].outcome).toBe("pending");
   });
 });

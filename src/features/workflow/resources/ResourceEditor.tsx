@@ -5,7 +5,7 @@ import { workflowErrorMessage } from "../repository/v2/WorkflowApiV2";
 import type { ConnectionTestResult, JsonSchema, JsonValue, WorkflowTool } from "../domain/v2/types";
 import { useExtensions, type Extensions, type FunctionVersion } from "../editor/v2/FunctionExecutionFields";
 import { groupCatalogByRef, type CatalogConnection } from "./resourceModel";
-import { latestVisibleProviders, providerAddress, providerBaseUrlIssue, providerDisplayName, providerModelRefs, providerPublishContent, providerTypeLabel, probeConnectionContent, probeConnectionRef } from "./providerModel";
+import { latestVisibleProviders, providerAddress, providerBaseUrlIssue, providerCredentialRequiredOnSave, providerDisplayName, providerModelRefs, providerPublishContent, providerTypeLabel, probeConnectionContent, probeConnectionRef } from "./providerModel";
 import { findProviderPreset, providerRefFromPreset, uniqueProviderRef, visibleProviderPresets, DEEPSEEK_BASE_URL, credentialRequiredFor, normalizeBaseUrl } from "./providerPresets";
 import {
   API_AUTH_TYPES, API_BODY_MODES, API_DEFAULT_URL_HINT, API_METHODS, API_PARAM_SOURCES, apiContentFromDraft, apiDisplayUrl, apiDraftFromContent, apiDraftIssue,
@@ -124,7 +124,8 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
   // Worker: DeepSeek only accepts the official base URL, while OpenAI-compatible gateways need one.
   const addressIssue = type === "deepseek" ? "" : providerBaseUrlIssue(type, baseUrl, import.meta.env.DEV);
   const testIssue = addressIssue || (!testModel ? "请先选择或添加一个模型。" : credentialNeeded && !credential.trim() && !existing ? "请先填写 API Key。" : "");
-  const saveIssue = addressIssue || (!name.trim() ? "请填写名称。" : !models.length ? "请至少启用一个模型。" : credentialNeeded && !credential.trim() ? "保存新版本需要重新填写 API Key（只写不读）。" : "");
+  const credentialRequired = providerCredentialRequiredOnSave({ existing, type, baseUrl, credential });
+  const saveIssue = addressIssue || (!name.trim() ? "请填写名称。" : !models.length ? "请至少启用一个模型。" : credentialRequired ? "保存新版本需要重新填写 API Key（只写不读）。" : "");
 
   function choosePreset(id: string) {
     const next = findProviderPreset(id);
@@ -195,11 +196,13 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
         {!testResult.ok && testResult.error ? <div className="wf-editor-test-block"><h4>错误</h4><div className="wf-editor-test-line"><span>{testResult.error.message}</span></div></div> : null}
       </div> : null}
     </TestPane>} feedback={feedback} busy={busy} saveDisabled={Boolean(saveIssue)} onClose={onClose} onSave={() => void save()}>
-    <Section title="供应商" hint="选择一家，保存后就是一个独立的模型供应商">
-      <div className="wf-editor-provider-grid" role="group" aria-label="选择模型供应商">
-        {existing ? <button type="button" className="wf-editor-provider" aria-pressed={presetId === "existing"} onClick={() => setPresetId("existing")}><span className="wf-editor-provider-mark">{name.slice(0, 1)}</span><span>{name}</span><Check size={14}/></button> : null}
-        {visibleProviderPresets(true).map(item => <button type="button" key={item.id} className="wf-editor-provider" aria-pressed={!existing && presetId === item.id} onClick={() => choosePreset(item.id)}><span className="wf-editor-provider-mark">{item.label.slice(0, 1)}</span><span>{item.id === "custom-openai" ? "OpenAI 兼容" : item.label}</span>{!existing && presetId === item.id ? <Check size={14}/> : null}</button>)}
-      </div>
+    <Section title="供应商" hint={existing ? "编辑已有供应商时类型不变" : "选择一家，保存后就是一个独立的模型供应商"}>
+      {existing ? <div className="wf-editor-provider is-locked" aria-label="当前模型供应商">
+        <span className="wf-editor-provider-mark">{name.slice(0, 1)}</span>
+        <span><strong>{name}</strong><small>{providerTypeLabel(existing)} · 要换一家请新建模型供应商</small></span>
+      </div> : <div className="wf-editor-provider-grid" role="group" aria-label="选择模型供应商">
+        {visibleProviderPresets(true).map(item => <button type="button" key={item.id} className="wf-editor-provider" aria-pressed={presetId === item.id} onClick={() => choosePreset(item.id)}><span className="wf-editor-provider-mark">{item.label.slice(0, 1)}</span><span>{item.id === "custom-openai" ? "OpenAI 兼容" : item.label}</span>{presetId === item.id ? <Check size={14}/> : null}</button>)}
+      </div>}
     </Section>
     <Section title="连接" hint="API 地址和 Key 只保存在这个供应商里，不会写进节点" extra={<span className="wf-editor-hint">{credentialNeeded ? "需要凭据" : "本地地址无需凭据"}</span>}>
       <Field label="API 地址">
@@ -215,7 +218,7 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
         {addressIssue ? <span className="wf-editor-field-error" role="alert">{addressIssue}</span> : null}
       </Field>
       {type === "deepseek" ? <p className="wf-editor-hint">DeepSeek 固定使用官方地址。使用代理或其他地址请选择「OpenAI 兼容」。</p> : null}
-      <Field label={<>{name || "供应商"} API Key{docsUrl ? <> <a className="wf-editor-docs-link" href={docsUrl} target="_blank" rel="noreferrer">去哪里获取</a></> : null}</>}><input aria-label="模型 API Key" type="password" autoComplete="new-password" value={credential} onChange={event => setCredential(event.target.value)} placeholder={existing ? "重新输入 Key 才能保存新版本" : `粘贴 ${name || "供应商"} API Key`}/></Field>
+      <Field label={<>{name || "供应商"} API Key{docsUrl ? <> <a className="wf-editor-docs-link" href={docsUrl} target="_blank" rel="noreferrer">去哪里获取</a></> : null}</>}><input aria-label="模型 API Key" type="password" autoComplete="new-password" value={credential} onChange={event => setCredential(event.target.value)} placeholder={existing ? credentialRequired ? existing.hasCredential ? "改动地址后需重新输入 Key" : "请填写 API Key" : "留空则沿用已保存的 Key" : `粘贴 ${name || "供应商"} API Key`}/></Field>
       <p className="wf-editor-hint">密钥只用于调用这个供应商，页面上不会再次显示完整内容。</p>
     </Section>
     <Section title="可用模型" hint={`勾选要出现在节点里的模型，已选 ${models.length} 个`}>

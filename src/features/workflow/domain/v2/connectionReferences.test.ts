@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JsonValue, WorkflowDefinitionV2, WorkflowNodeV2, WorkflowTool } from "./types";
-import { applyCapabilityBindings, applyConnectionUpdates, connectionReferences, connectionUpdates, unresolvedCapabilities, type CapabilityBinding, type ConnectionCatalogEntry } from "./connectionReferences";
+import { applyCapabilityBindings, applyConnectionUpdates, connectionReferences, connectionUpdates, referencedResourceUpdates, unresolvedCapabilities, type CapabilityBinding, type ConnectionCatalogEntry } from "./connectionReferences";
 
 const policy = { timeoutMs: 120000, nodeTimeoutMs: 30000, maxNodeExecutions: 50, maxToolCalls: 10, maxInputBytes: 65536, maxStateBytes: 1048576, maxEventBytes: 65536, maxOutputTokens: 2048, maxAttempts: 1 };
 
@@ -54,6 +54,31 @@ describe("connection references", () => {
     expect(references.filter(reference => reference.graphPath.join("/") === "sub")).toHaveLength(2);
     expect(references.some(reference => reference.field === "allowedToolRefs" && reference.index === 0)).toBe(true);
     expect(references.some(reference => reference.oldRef === "environment-tool")).toBe(false);
+  });
+
+  it("counts one update per referenced resource, not one per node", () => {
+    const definition = emptyDefinition();
+    definition.nodes = [
+      node("llm-1", "core.llm", { providerRef: "p4:owner:model:1", modelRef: "deepseek-flash" }),
+      node("llm-2", "core.llm", { providerRef: "p4:owner:model:1", modelRef: "deepseek-flash" }),
+      node("llm-3", "core.llm", { providerRef: "p4:owner:model:1", modelRef: "deepseek-flash" }),
+    ];
+    const detailed = connectionUpdates({ definition, connections, tools: [] });
+    expect(detailed).toHaveLength(3);
+    expect(referencedResourceUpdates({ definition, connections, tools: [] })).toEqual([
+      expect.objectContaining({ kind: "provider", connectionRef: "model", version: 2 }),
+    ]);
+  });
+
+  it("keeps a confirmation requirement when one shared provider usage would lose its model", () => {
+    const definition = emptyDefinition();
+    definition.nodes = [
+      node("llm-1", "core.llm", { providerRef: "p4:owner:model:1", modelRef: "deepseek-flash" }),
+      node("llm-2", "core.llm", { providerRef: "p4:owner:model:1", modelRef: "missing-model" }),
+    ];
+    const updates = referencedResourceUpdates({ definition, connections, tools: [] });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ connectionRef: "model", requiresConfirmation: true });
   });
 
   it("offers upgrades for openai-compatible providers, not only DeepSeek", () => {

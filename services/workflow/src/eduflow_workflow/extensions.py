@@ -127,7 +127,24 @@ async def assert_destination(base_url,env,path='/'):
     from .tools import safe_http_url
     await safe_http_url({'baseUrl':base_url,'path':path},env,{})
 
-async def validate_connection(content,credential,env):
+def reusable_secret_ref(rows,ref,content):
+    """Reuse the latest saved credential only when the provider target is unchanged.
+
+    The browser never sees this reference; the publish request may omit the
+    credential when an owner edits only the enabled model list of an existing
+    provider.
+    """
+    previous=max((row for row in rows if row.get('kind')=='connection' and row.get('ref')==ref and not row.get('disabled')),key=lambda row:int(row.get('version') or 0),default=None)
+    if previous is None: return None
+    saved=previous.get('content') or {}
+    secret=saved.get('secretRef')
+    if not isinstance(secret,str) or not secret: return None
+    if saved.get('type')!=content.get('type'): return None
+    if content.get('type') not in ('deepseek','openai-compatible'): return None
+    if content.get('type')=='openai-compatible' and str(saved.get('baseUrl','')).rstrip('/')!=str(content.get('baseUrl','')).rstrip('/'): return None
+    return secret
+
+async def validate_connection(content,credential,env,credential_reused=False):
     """Validate and normalize a connection publish payload; credentials never enter content."""
     c=dict(content)
     if set(c)-CONNECTION_FIELDS or c.get('type') not in CONNECTION_TYPES: raise ExecutionError('INVALID_CONNECTION','Supported types: HTTP, DeepSeek, MCP HTTP, OpenAI-compatible')
@@ -138,11 +155,11 @@ async def validate_connection(content,credential,env):
     ctype=c['type']
     if ctype=='deepseek':
         if c.get('baseUrl',DEEPSEEK_BASE_URL)!=DEEPSEEK_BASE_URL: raise ExecutionError('INVALID_CONNECTION','Use the official DeepSeek base URL')
-        if not credential: raise ExecutionError('INVALID_CONNECTION','Provide a DeepSeek credential')
+        if not credential and not credential_reused: raise ExecutionError('INVALID_CONNECTION','Provide a DeepSeek credential')
         c['modelRefs']=model_refs(c.get('modelRefs'))
         return c
     if ctype=='openai-compatible':
-        return await validate_model_connection(c,credential,env)
+        return await validate_model_connection(c,credential,env,credential_reused)
     raw=c.get('baseUrl' if ctype=='http' else 'url','');parsed=urlparse(raw)
     if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment: raise ExecutionError('INVALID_CONNECTION','Provide a valid HTTP endpoint without credentials')
     if ctype=='http' and (not isinstance(c.get('path','/'),str) or len(c.get('path','/'))>2000): raise ExecutionError('INVALID_CONNECTION','Provide a bounded HTTP path')
@@ -163,7 +180,7 @@ async def validate_connection(content,credential,env):
     elif not isinstance(c.get('allowedToolNames'),list) or not c['allowedToolNames'] or any(not isinstance(v,str) for v in c['allowedToolNames']): raise ExecutionError('INVALID_CONNECTION','Select allowed MCP tool names')
     return c
 
-async def validate_model_connection(c,credential,env):
+async def validate_model_connection(c,credential,env,credential_reused=False):
     """OpenAI-compatible gateways: one provider, many explicitly enabled models (R8)."""
     if set(c)-OPENAI_COMPATIBLE_FIELDS: raise ExecutionError('INVALID_CONNECTION','Unsupported OpenAI-compatible connection field')
     raw=c.get('baseUrl')
@@ -173,7 +190,7 @@ async def validate_model_connection(c,credential,env):
     local_http=parsed.scheme=='http' and parsed.hostname in LOCAL_LOOPBACK_HOSTS and local_fixtures_allowed(env)
     if parsed.scheme=='http' and not local_http: raise ExecutionError('INVALID_CONNECTION','Plain HTTP is only allowed for local fixture environments')
     if c.get('credentialHeader','Authorization')!='Authorization': raise ExecutionError('INVALID_CONNECTION','Only the Authorization header is supported for model connections')
-    if not credential and not local_http: raise ExecutionError('INVALID_CONNECTION','Provide a credential for the model provider')
+    if not credential and not credential_reused and not local_http: raise ExecutionError('INVALID_CONNECTION','Provide a credential for the model provider')
     c['baseUrl']=raw.rstrip('/')
     if not c['baseUrl'] or urlparse(c['baseUrl']).hostname!=parsed.hostname: raise ExecutionError('INVALID_CONNECTION','Provide a valid OpenAI-compatible base URL')
     c['modelRefs']=model_refs(c.get('modelRefs'))
@@ -352,7 +369,10 @@ async def catalog_operation(body,registry):
             if c.get(key,{}).get('type','object')!='object': raise ExecutionError('INVALID_FUNCTION_SCHEMA','Function interfaces must be objects')
         c={**c,'inputSchema':c.get('inputSchema',{'type':'object'}),'outputSchema':c.get('outputSchema',{'type':'object'})}
         return await store.call('p4_catalog_save',owner,ref,kind,name,version,c,False)
-    c=await validate_connection(c,credential,env)
+    rows=await store.call('p4_catalog_read',owner,ref)
+    reused_secret=reusable_secret_ref(rows,name,c) if not credential else None
+    c=await validate_connection(c,credential,env,credential_reused=bool(reused_secret))
+    if reused_secret: c={**c,'secretRef':reused_secret}
     return await store.call('p4_connection_save',owner,ref,name,version,c,credential)
 
 def http_connection_tool(c,r,key,headers,env):

@@ -1,9 +1,10 @@
-import { Route, X } from "lucide-react";
+import { ArrowLeft, Route, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { animate, useReducedMotion } from "motion/react";
 import { expandPanelFromRect, contractPanelToRect } from "@/shared/ui/panelMorph";
 import { Pill } from "@/shared/ui/Pill";
+import { Button } from "@/shared/ui/Button";
 import { PanelActions } from "./PanelActions";
 import type { NavigationDecision } from "@/shared/learning/navigation";
 import { CourseRoutePanel, type CourseRouteMode, type CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
@@ -18,7 +19,7 @@ const EASE_OUT = [0.2, 0.8, 0.2, 1] as const;
  * container that is moved between the side slot and a native modal dialog, so
  * switching 侧边 / 整页 never remounts the route or loses its scroll/selection.
  */
-export function HomeRoutePanel({ courseId, chapterId, originRect, originElement, focusNodeId, courseTitle, projection, decision, onClose, onInteract, onStart, onModeChange }: {
+export function HomeRoutePanel({ courseId, chapterId, originRect, originElement, focusNodeId, courseTitle, projection, decision, onClose, onBack, backLabel = "返回", onInteract, onStart, onModeChange }: {
   courseId: string;
   chapterId?: string;
   originRect?: DOMRect | null;
@@ -28,6 +29,8 @@ export function HomeRoutePanel({ courseId, chapterId, originRect, originElement,
   projection: HomeCourseProjection;
   decision?: NavigationDecision | null;
   onClose(): void;
+  onBack?(): void;
+  backLabel?: string;
   onInteract?(): void;
   onStart(action: CourseRouteStepAction): void;
   onModeChange?(mode: CourseRouteMode): void;
@@ -195,6 +198,7 @@ export function HomeRoutePanel({ courseId, chapterId, originRect, originElement,
     </dialog>
     {createPortal(<section className="ef-home-route-panel" data-at={mode} data-course-id={courseId} aria-label="课程路线" onPointerDown={onInteract}>
       <header className="ef-home-route-panel-head">
+        {onBack ? <Button variant="ghost" size="32" icon={<ArrowLeft size={14} aria-hidden="true" />} onClick={onBack} aria-label={backLabel}>{backLabel}</Button> : null}
         <span className="ef-home-route-panel-icon" aria-hidden="true"><Route size={16} /></span>
         <div className="ef-home-route-panel-title">
           <span className="ef-home-route-panel-subtitle" title={`你的学习路线 · 共 ${projection.chapters.length} 章`}>你的学习路线 · 共 {projection.chapters.length} 章</span>

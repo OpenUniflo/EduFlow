@@ -42,7 +42,7 @@ import { WorkflowOverview } from "./WorkflowOverview";
 import { ModelStreamFeed } from "./ModelStreamFeed";
 import { SessionHistoryWorkspace } from "./SessionHistoryWorkspace";
 import { EnvironmentPanel } from "./EnvironmentPanel";
-import { applyCapabilityBindings, connectionUpdates, unresolvedCapabilities } from "../../domain/v2/connectionReferences";
+import { applyCapabilityBindings, referencedResourceUpdates, unresolvedCapabilities } from "../../domain/v2/connectionReferences";
 import { GRAPH_OUTPUT_NODE_ID, stateFieldConsumers, stateFieldProducers } from "../../domain/v2/dataFlow";
 import { readOutputPointer } from "../../domain/v2/runData";
 import { toolParamRows } from "../../domain/v2/toolParams";
@@ -848,7 +848,7 @@ export function LiveWorkflowEditor({ initial, ownerId, navigation, launchContext
   async function openVersions() { navigateGraph([]); setSnapshotFocus(null); setDialog("versions"); await controller.operation(async () => setRevisions((await workflowApiV2.revisions(rootController.definition.workflowId)).items)); }
   async function restore() { if (!snapshot) return; const candidate = { definition: { ...snapshot.definition, revision: rootController.definition.revision }, editor: { ...snapshot.editor, editorRevision: rootController.editor.editorRevision, definitionRevision: rootController.definition.revision, edges: Object.fromEntries(snapshot.definition.transitions.map(edge => [edge.id, { ...snapshot.editor.edges[edge.id], routing: snapshot.editor.edges[edge.id]?.routing ?? {version:1,mode:"auto" as const} }])) } }; const saved = await controller.restoreDocument(candidate); if (saved) { setSnapshot(null); setDialog(null); } }
   const { data: extensionCatalog, refresh: refreshExtensions } = useExtensions(controller.environmentRef);
-  const resourceUpdates = useMemo(() => extensionCatalog ? connectionUpdates({ definition: rootController.definition, connections: extensionCatalog.connections, tools: controller.tools }) : [], [extensionCatalog, rootController.definition, controller.tools]);
+  const resourceUpdates = useMemo(() => extensionCatalog ? referencedResourceUpdates({ definition: rootController.definition, connections: extensionCatalog.connections, tools: controller.tools }) : [], [extensionCatalog, rootController.definition, controller.tools]);
   const currentRunId = controller.observedRunId ?? controller.history[0]?.runId ?? null;
   const usesSessionFeatures = rootController.definition.nodes.some(node => node.type === "core.memory" || node.type === "core.subgraph" || Boolean(node.config.authoring))
     || Boolean(rootController.definition.policy.authoring)

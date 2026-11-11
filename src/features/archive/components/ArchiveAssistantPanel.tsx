@@ -1,5 +1,6 @@
 import { ArrowRight, BookOpen, Lock, Search, Sparkles, Target, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useReducedMotion } from "motion/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
 import { canManageCourses } from "@/features/auth/capabilities";
@@ -36,7 +37,10 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
   const [localError, setLocalError] = useState("");
   const [adjustments, setAdjustments] = useState("");
   const [showAdjustments, setShowAdjustments] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = Boolean(useReducedMotion());
   const status = runtime.sending ? "searching" : presentation.state;
+  const currentStep = status === "results" && showAdjustments ? "adjust" : status;
   const targetCount = presentation.targetIds.length;
   const prerequisiteCount = presentation.prerequisiteIds.length;
   const draftCount = presentation.draftIds.length;
@@ -44,6 +48,13 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
   const brief = presentation.brief;
 
   const contextLabel = useMemo(() => goal.trim() || presentation.goalText || "我的地图 · 全局星图", [goal, presentation.goalText]);
+
+  // Every state advance (search started, results shown, adjustments revealed,
+  // brief locked) lands on the next step instead of below the scroll fold.
+  useEffect(() => {
+    const step = bodyRef.current?.querySelector<HTMLElement>(`[data-assistant-step="${currentStep}"]`);
+    step?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: reducedMotion ? "auto" : "smooth" });
+  }, [currentStep, reducedMotion]);
 
   useEffect(() => {
     if (!seedGoal) return;
@@ -85,12 +96,12 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
         <div><b>EduFlow 小助手 · 我的地图</b><span>{status === "searching" ? "正在寻找" : status === "brief" ? "课程创建简报" : "只提议，不直接修改课程"}</span></div>
         <button type="button" className="ef-archive-assistant-collapse" onClick={() => onOpenChange(false)} aria-label="收起助手"><X size={14} aria-hidden /></button>
       </header>
-
+      <div className="ef-archive-assistant-body" ref={bodyRef}>
       {status === "idle" ? (
         <>
           <strong>想学什么？我帮你找一条路线</strong>
           <p>说出目标，我只会提议知识范围和课程；锁定后进入现有的课程创建流程，仍需预览、校验与确认。</p>
-          <form className="ef-archive-assistant-form" onSubmit={(event) => { event.preventDefault(); void findRoute(); }}>
+          <form className="ef-archive-assistant-form" data-assistant-step="idle" onSubmit={(event) => { event.preventDefault(); void findRoute(); }}>
             <textarea
               value={goal}
               onChange={(event) => setGoal(event.target.value)}
@@ -113,7 +124,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
       {status === "searching" ? (
         <>
           <div className="ef-archive-assistant-query"><span>{contextLabel}</span></div>
-          <div className="ef-archive-search-steps" role="status">
+          <div className="ef-archive-search-steps" role="status" data-assistant-step="searching">
             <span className="is-done"><i aria-hidden>✓</i>理解学习目标</span>
             <span className="is-active"><i aria-hidden /><Search size={11} />匹配知识点</span>
             <span><i aria-hidden />比对已有课程</span>
@@ -126,7 +137,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
       {status === "results" ? (
         <>
           <div className="ef-archive-assistant-query"><span>{contextLabel}</span></div>
-          <p className="ef-archive-assistant-lede">{presentation.intentSummary || "我已经把目标对应到可用的知识与课程。"}</p>
+          <p className="ef-archive-assistant-lede" data-assistant-step="results">{presentation.intentSummary || "我已经把目标对应到可用的知识与课程。"}</p>
           <div className="ef-archive-assistant-stats"><span><b>{targetCount}</b>目标知识点</span><span><b>{prerequisiteCount}</b>必要前置</span><span><b>{presentation.matchCount}</b>门相关课程</span></div>
           {presentation.candidateIds.length ? <CandidateList model={model} ids={presentation.candidateIds} /> : null}
           {matches.length ? <div className="ef-archive-assistant-matches">
@@ -142,7 +153,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
             <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => setShowAdjustments((value) => !value)} disabled={runtime.sending}><Target size={13} aria-hidden />锁定成形</button>
             <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={() => void findRoute(presentation.goalText)} disabled={runtime.sending}>重新寻找</button>
           </div>
-          {showAdjustments ? <div className="ef-archive-assistant-adjust">
+          {showAdjustments ? <div className="ef-archive-assistant-adjust" data-assistant-step="adjust">
             <label><span>还有哪些偏好或限制？（可选）</span><textarea value={adjustments} onChange={(event) => setAdjustments(event.target.value)} placeholder="例如：更偏实践、只有三周、不要额外资料" rows={2} /></label>
             <button type="button" onClick={() => void lockBrief()} disabled={runtime.sending}>生成课程创建简报</button>
             <small>简报只包含真实知识范围；进入创建后仍走 Proposal → Preview → 校验 → 确认。</small>
@@ -153,7 +164,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
       {status === "brief" && brief ? (
         <>
           <div className="ef-archive-brief-say"><span className="ef-archive-assistant-icon"><Sparkles size={14} aria-hidden /></span><p>我整理好了课程创建简报。确认范围后可以开始创建，也可以继续搜索更合适的课程。</p></div>
-          <div className="ef-archive-brief-head"><span className="ef-archive-brief-icon"><BookOpen size={15} aria-hidden /></span><div><b>课程创建简报</b><span>{brief.goal}</span></div><em>草稿 · 未创建</em></div>
+          <div className="ef-archive-brief-head" data-assistant-step="brief"><span className="ef-archive-brief-icon"><BookOpen size={15} aria-hidden /></span><div><b>课程创建简报</b><span>{brief.goal}</span></div><em>草稿 · 未创建</em></div>
           <dl className="ef-archive-brief-list">
             <div><dt>目标</dt><dd>{brief.goal}</dd></div>
             <div><dt>知识范围</dt><dd>{brief.targetKnowledge.length} 个知识点</dd></div>
@@ -178,12 +189,13 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
       {status !== "brief" && presentation.state === "brief" && !brief ? <p className="ef-archive-assistant-error">简报暂不可用，请重试。</p> : null}
       {runtime.error || localError ? <p className="ef-archive-assistant-error" role="alert">{runtime.error || localError}</p> : null}
       {status === "brief" ? <button type="button" className="ef-archive-assistant-open" onClick={() => onOpenBrief(presentation.briefMessageId ?? "")}>在对话中查看完整简报</button> : null}
-      <button type="button" className="ef-archive-assistant-collapse-text" onClick={() => onOpenChange(false)}>收起助手</button>
+      </div>
+      <footer className="ef-archive-assistant-footbar"><button type="button" className="ef-archive-assistant-collapse-text" onClick={() => onOpenChange(false)}>收起助手</button></footer>
     </aside>
   );
 }
 
 function CandidateList({ model, ids }: { model: ArchiveModel; ids: readonly string[] }) {
   const nodes = ids.flatMap((id) => { const node = model.nodeById.get(id); return node ? [node] : []; });
-  return <div className="ef-archive-candidate-list" aria-label="候选知识点"><div className="ef-archive-result-head"><b>候选知识点</b><span>{nodes.length} 个 · 按匹配度</span></div>{nodes.slice(0, 6).map((node, index) => <div key={node.id} className="ef-archive-candidate"><span className="ef-archive-result-number">{String(index + 1).padStart(2, "0")}</span><span><b>{node.title}</b><small>{node.domainTitle} · {node.isMine ? knowledgeStateLabelFor(node.status) : knowledgeScopeLabelFor(node.scope)}</small></span><em className={node.isMine ? "is-mine" : ""}>{node.isMine ? "已找到" : "候选"}</em></div>)}</div>;
+  return <div className="ef-archive-candidate-list" aria-label="候选知识点"><div className="ef-archive-result-head"><b>候选知识点</b><span>{nodes.length} 个 · 按匹配度</span></div>{nodes.map((node, index) => <div key={node.id} className="ef-archive-candidate"><span className="ef-archive-result-number">{String(index + 1).padStart(2, "0")}</span><span><b>{node.title}</b><small>{node.domainTitle} · {node.isMine ? knowledgeStateLabelFor(node.status) : knowledgeScopeLabelFor(node.scope)}</small></span><em className={node.isMine ? "is-mine" : ""}>{node.isMine ? "已找到" : "候选"}</em></div>)}</div>;
 }

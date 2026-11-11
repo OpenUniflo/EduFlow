@@ -3,6 +3,7 @@ import type { UserCourseState } from "@/features/course/types";
 import type { UserKnowledgeRecord } from "@/features/profile/types";
 import type { NavigationDecision } from "@/shared/learning/navigation";
 import { buildFirstSegment, type AssignmentProgressStatus, type FirstSegment, type LearnerEvidenceStatus } from "@/shared/learning/firstSegment";
+import { chapterDisplayNumbers } from "@/shared/learning/chapterNumbering";
 import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequisites";
 
 export type HomeMicroAsset = { pathId: string; title: string; estimatedMinutes?: number };
@@ -11,6 +12,8 @@ export type CourseChapterGroup = {
   id: string;
   title: string;
   order: number;
+  /** One-based presentation ordinal; `order` remains persisted curriculum data. */
+  displayNumber: number;
   nodeIds: string[];
   microCount: number;
   learnedCount: number;
@@ -83,12 +86,14 @@ export function buildHomeCourseProjection(input: {
     knowledgeStatusByNode: statusByNode,
     assignmentStatusByAssignment: assignmentStatus
   });
+  const displayNumberById = chapterDisplayNumbers(input.runtime.chapters);
   const chapters = [...input.runtime.chapters].sort((left, right) => left.order - right.order).map((chapter): CourseChapterGroup => {
     const nodeIds = orderedNodeIds.filter((nodeId) => chapterForNode(input.runtime, nodeId)?.id === chapter.id);
     return {
       id: chapter.id,
       title: chapter.title,
       order: chapter.order,
+      displayNumber: displayNumberById.get(chapter.id) ?? 0,
       nodeIds,
       microCount: nodeIds.filter((nodeId) => microByNode.has(nodeId)).length,
       learnedCount: nodeIds.filter((nodeId) => satisfiesTeachingPrerequisite(statusByNode.get(nodeId))).length

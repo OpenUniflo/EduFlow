@@ -24,6 +24,15 @@ export function practiceResultActions(tone: PracticeOutcomeTone): PracticeResult
   };
 }
 
+/** The same withdrawal confirmation is used before every panel withdrawal, evaluated or not. */
+export function practiceWithdrawConfirmation(attemptNumber?: number) {
+  return {
+    kicker: `撤回确认 · 第 ${attemptNumber ?? "?"} 次提交`,
+    title: "确认撤回这次提交？",
+    description: "这次提交会保留在记录里并标为已撤回，不再计入完成和评价。",
+  };
+}
+
 /** One practice task, one attempt at a time. The number is the attempt being edited or reviewed. */
 export function practiceAttemptKicker(attemptNumber: number) {
   return `动手任务 · 第 ${Math.max(1, Math.round(attemptNumber))} 次尝试`;

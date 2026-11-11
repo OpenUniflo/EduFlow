@@ -9,6 +9,7 @@ import { panelForTarget } from "@/features/home/panelForTarget";
 import type { CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
 import { useCourseProjection } from "@/features/course/path/useCourseProjection";
 import type { MockSession } from "@/features/auth/types";
+import { shouldHandleShellEscape } from "@/shared/ui/escapeLayer";
 import { expandPanelFromRect } from "@/shared/ui/panelMorph";
 import { ActiveAssistantObjectContext, type ActiveAssistantObject } from "./activeObject";
 import { useAssistantRuntime } from "./AssistantRuntimeContext";
@@ -83,8 +84,7 @@ export function GlobalObjectHost({ session, children }: { session: MockSession; 
   useEffect(() => {
     if (panel.kind === "none" || panel.kind === "route") return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      if (document.querySelector("dialog[open]")) return;
+      if (!shouldHandleShellEscape(event)) return;
       closePanel();
     }
     window.addEventListener("keydown", onKeyDown);

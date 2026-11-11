@@ -26,6 +26,7 @@ import {
   recordFeedbackItemText,
   recordFeedbackSummary
 } from "./recordsFeedback.js";
+import { chapterDisplayNumbers, type ChapterOrdinalInput } from "./chapterNumbering.js";
 
 export const DEFAULT_RECORD_TIME_ZONE = "Asia/Shanghai";
 
@@ -620,7 +621,7 @@ export function parseRecordFeedback(value: unknown, outcome?: string, evaluatorK
 function chapterOrderMaps(
   lessons: readonly RawRecordRow[],
   chapters: readonly RawRecordRow[]
-): { lessonOrder: Map<string, number>; lessonChapter: Map<string, string>; chapterOrder: Map<string, number> } {
+): { lessonOrder: Map<string, number>; lessonChapter: Map<string, string>; chapterNumber: Map<string, number> } {
   const lessonOrder = new Map<string, number>();
   const lessonChapter = new Map<string, string>();
   for (const lesson of lessons) {
@@ -630,14 +631,20 @@ function chapterOrderMaps(
     lessonOrder.set(key(courseId, lessonId), numberValue(lesson, "display_order") ?? Number.MAX_SAFE_INTEGER);
     lessonChapter.set(key(courseId, lessonId), text(lesson, "chapter_id"));
   }
-  const chapterOrder = new Map<string, number>();
+  const chaptersByCourse = new Map<string, ChapterOrdinalInput[]>();
   for (const chapter of chapters) {
     const courseId = text(chapter, "course_id");
     const chapterId = text(chapter, "id");
     if (!courseId || !chapterId) continue;
-    chapterOrder.set(key(courseId, chapterId), numberValue(chapter, "display_order") ?? Number.MAX_SAFE_INTEGER);
+    const rows = chaptersByCourse.get(courseId) ?? [];
+    rows.push({ id: chapterId, order: numberValue(chapter, "display_order") });
+    chaptersByCourse.set(courseId, rows);
   }
-  return { lessonOrder, lessonChapter, chapterOrder };
+  const chapterNumber = new Map<string, number>();
+  for (const [courseId, rows] of chaptersByCourse) {
+    for (const [chapterId, number] of chapterDisplayNumbers(rows)) chapterNumber.set(key(courseId, chapterId), number);
+  }
+  return { lessonOrder, lessonChapter, chapterNumber };
 }
 
 function coverageSort(left: RawRecordRow, right: RawRecordRow, courseId: string, maps: ReturnType<typeof chapterOrderMaps>): number {
@@ -675,8 +682,8 @@ export function chapterNumbersByKnowledge(
     const first = rows[0];
     const lessonId = text(first, "lesson_id");
     const chapterId = maps.lessonChapter.get(key(courseId, lessonId));
-    const order = chapterId ? maps.chapterOrder.get(key(courseId, chapterId)) : undefined;
-    if (order !== undefined && Number.isInteger(order)) result.set(identity, order + 1);
+    const number = chapterId ? maps.chapterNumber.get(key(courseId, chapterId)) : undefined;
+    if (number !== undefined) result.set(identity, number);
   }
   return result;
 }
@@ -718,8 +725,8 @@ export function chapterNumbersByAssignment(
     const first = candidates[0];
     if (!first) continue;
     const chapterId = maps.lessonChapter.get(key(courseId, text(first, "lesson_id")));
-    const order = chapterId ? maps.chapterOrder.get(key(courseId, chapterId)) : undefined;
-    if (order !== undefined && Number.isInteger(order)) result.set(identity, order + 1);
+    const number = chapterId ? maps.chapterNumber.get(key(courseId, chapterId)) : undefined;
+    if (number !== undefined) result.set(identity, number);
   }
   return result;
 }
