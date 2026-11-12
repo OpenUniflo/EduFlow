@@ -38,12 +38,12 @@ describe("Archive social preview boundary", () => {
     const repository = new PreviewPeopleRepository();
     repository.bindKnowledgeNodeIds(Array.from({ length: 40 }, (_, index) => `K${index}`));
     const people = await repository.listFollowed("owner");
-    const bar = renderToStaticMarkup(<ArchivePeopleBar sessionName="P3" people={people} selectedIds={[people[0].id]} onToggleMe={() => {}} onTogglePerson={() => {}} onOpenPeople={() => {}} onOpenSearch={() => {}} />);
+    const bar = renderToStaticMarkup(<ArchivePeopleBar sessionName="P3" people={people} selectedIds={[people[0].id]} courseCount={3} coursesOpen={false} onToggleMe={() => {}} onTogglePerson={() => {}} onOpenPeople={() => {}} onOpenSearch={() => {}} onOpenCourses={() => {}} />);
     expect(bar).toContain("预览 · 示例数据");
     expect(bar).toContain("示例");
     expect(bar).toContain('data-preview="sample"');
     expect(firstSharedStatus(people)).toBeDefined();
-    const fullBar = renderToStaticMarkup(<ArchivePeopleBar sessionName="P3" people={people} selectedIds={people.slice(0, 3).map((person) => person.id)} onToggleMe={() => {}} onTogglePerson={() => {}} onOpenPeople={() => {}} onOpenSearch={() => {}} />);
+    const fullBar = renderToStaticMarkup(<ArchivePeopleBar sessionName="P3" people={people} selectedIds={people.slice(0, 3).map((person) => person.id)} courseCount={3} coursesOpen={false} onToggleMe={() => {}} onTogglePerson={() => {}} onOpenPeople={() => {}} onOpenSearch={() => {}} onOpenCourses={() => {}} />);
     expect(fullBar).toContain("预览 · 示例数据");
     expect(fullBar).toContain('aria-pressed="true"');
     const guest = renderToStaticMarkup(<GuestAssistantCard onLogin={() => {}} onRegister={() => {}} />);

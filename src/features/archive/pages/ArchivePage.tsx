@@ -1,6 +1,6 @@
 import { Lock, Network, RefreshCcw } from "lucide-react";
 import { useReducedMotion } from "motion/react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { applicationServices } from "@/app/services/applicationServices";
 import { useAssistantRuntime, AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeContext";
@@ -21,10 +21,11 @@ import type { FollowedPerson } from "@/features/profile/people/PeopleRepository"
 import { ArchivePeopleBar } from "../components/ArchivePeopleBar";
 import { ArchivePersonPanel, ArchivePeopleSharePanel, type PanelPerson } from "../components/ArchivePeoplePanels";
 import { ArchiveAssistantPanel, GuestAssistantCard } from "../components/ArchiveAssistantPanel";
-import { ArchiveCourseFocusBar, ArchiveDraftFocusBar, ArchiveLevelChip, ArchiveNodePanel } from "../components/ArchiveChrome";
+import { ArchiveCourseFocusBar, ArchiveCourseMini, ArchiveDraftFocusBar, ArchiveLevelChip, ArchiveNodePanel } from "../components/ArchiveChrome";
 import { SceneZoomToolbar } from "@/shared/scene/SceneZoomToolbar";
 import { ArchiveSearchPanel } from "../components/ArchiveSearchPanel";
 import type { ArchiveAtlasSceneHandle } from "../components/ArchiveAtlasScene";
+import type { PopoverAnchor } from "../model/anchoredPopover";
 import { archiveCourseKnowledgeIds, searchArchive, type ArchiveModel } from "../model/atlasModel";
 import { useArchiveModelData } from "../model/useArchiveModel";
 import { communityByNodeId, detectAtlasCommunities } from "../model/atlasCommunities";
@@ -175,6 +176,8 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   const [level, setLevel] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(urlState.panel === "search");
+  const [coursesOpen, setCoursesOpen] = useState(false);
+  const [coursesAnchor, setCoursesAnchor] = useState<PopoverAnchor | null>(null);
   const [query, setQuery] = useState(urlState.search);
   const [focusedCourseId, setFocusedCourseId] = useState<string | null>(urlState.focus.type === "course" ? urlState.focus.id : null);
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>(urlState.comparePersonIds);
@@ -472,9 +475,23 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
 
   const openSearch = useCallback(() => {
     setAssistantOpen(false);
+    setCoursesOpen(false);
     setSearchOpen(true);
     setPanelParam("search");
   }, [setPanelParam]);
+
+  const toggleCourses = useCallback((event: MouseEvent<HTMLButtonElement>) => {
+    const opening = !coursesOpen;
+    setCoursesOpen(opening);
+    if (opening) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      setCoursesAnchor({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom });
+      setSearchOpen(false);
+      setAssistantOpen(false);
+      setSelectedId(null);
+      sceneRef.current?.shiftForDetail(false);
+    }
+  }, [coursesOpen]);
 
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
@@ -492,6 +509,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
 
   const openCourse = useCallback((courseId: string, origin?: DOMRect, focusKnowledgeId?: string) => {
     if (!courseId || leavingForCourse) return;
+    setCoursesOpen(false);
     // Capture the exact course-plane cards and camera before the Archive panels
     // fade. The entry overlay replays those rectangles, and returning restores
     // the same camera instead of refitting a clipped plane.
@@ -511,6 +529,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
 
   const focusCourse = useCallback((courseId: string) => {
     if (!courseId) return;
+    setCoursesOpen(false);
     courseFramedRef.current = false;
     void preloadCourseImmersive().catch(() => undefined);
     setSelectedId(null);
@@ -544,6 +563,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
 
   const selectNode = useCallback((id: string | null) => {
     setSelectedId(id);
+    if (id) setCoursesOpen(false);
     sceneRef.current?.shiftForDetail(Boolean(id));
     if (id) {
       const next = new URLSearchParams(searchParams);
@@ -618,11 +638,12 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
 
   const closeDetailOrFocus = useCallback(() => {
     if (selectedId) { selectNode(null); return; }
+    if (coursesOpen) { setCoursesOpen(false); return; }
     if (focusedCourse) { clearCourseFocus(); return; }
     if (searchOpen) { closeSearch(); return; }
     if (draftActive) return;
     if (selectedPeopleIds.length) { clearPeople(); return; }
-  }, [clearCourseFocus, clearPeople, closeSearch, draftActive, focusedCourse, searchOpen, selectedId, selectNode, selectedPeopleIds.length]);
+  }, [clearCourseFocus, clearPeople, closeSearch, coursesOpen, draftActive, focusedCourse, searchOpen, selectedId, selectNode, selectedPeopleIds.length]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -737,6 +758,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       {!session ? (
         <div className="ef-atlas-guest">
           <button type="button" className="ef-atlas-guest-login" onClick={() => navigate("/login", { state: authGateState(location) })}>登录</button>
+          <button type="button" className="ef-atlas-guest-courses" aria-pressed={coursesOpen} onClick={toggleCourses}>课程</button>
           <span><Lock size={11} aria-hidden />未登录 · 仅公开可见知识点</span>
         </div>
       ) : (
@@ -744,12 +766,25 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
           sessionName={session.name}
           people={people}
           selectedIds={selectedPeopleIds}
+          courseCount={model.courses.length}
+          coursesOpen={coursesOpen}
           onToggleMe={toggleMe}
           onTogglePerson={togglePerson}
           onOpenPeople={() => setSocialOpen((value) => !value)}
           onOpenSearch={() => { if (searchOpen) closeSearch(); else openSearch(); }}
+          onOpenCourses={toggleCourses}
         />
       )}
+
+      {coursesOpen && coursesAnchor ? (
+        <ArchiveCourseMini
+          model={model}
+          anchor={coursesAnchor}
+          onClose={() => setCoursesOpen(false)}
+          onFocusCourse={focusCourse}
+          onOpenCourse={(id) => openCourse(id)}
+        />
+      ) : null}
 
       {socialOpen && session ? (
         <ArchivePeopleSharePanel
@@ -819,7 +854,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
         />
       ) : null}
 
-      {focusedCourse ? null : <ArchiveLevelChip level={level} />}
+      {focusedCourse ? null : <ArchiveLevelChip level={level} onSelect={(next) => sceneRef.current?.zoomToLevel(next)} />}
       <SceneZoomToolbar
         className="ef-atlas-zoom ef-ui-glass ef-ui-glass--regular"
         percent={percent}

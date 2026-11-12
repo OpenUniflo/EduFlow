@@ -1,4 +1,5 @@
-import { Plus, Search, Users } from "lucide-react";
+import { BookOpen, Plus, Search, Users } from "lucide-react";
+import type { MouseEvent } from "react";
 import type { FollowedPerson } from "@/features/profile/people/PeopleRepository";
 import { Avatar } from "@/shared/ui/Avatar";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
@@ -7,14 +8,17 @@ function shortName(person: FollowedPerson) {
   return person.displayName.replace(/^示例\s*·\s*/, "");
 }
 
-export function ArchivePeopleBar({ sessionName, people, selectedIds, onToggleMe, onTogglePerson, onOpenPeople, onOpenSearch }: {
+export function ArchivePeopleBar({ sessionName, people, selectedIds, courseCount, coursesOpen, onToggleMe, onTogglePerson, onOpenPeople, onOpenSearch, onOpenCourses }: {
   sessionName: string;
   people: readonly FollowedPerson[];
   selectedIds: readonly string[];
+  courseCount: number;
+  coursesOpen: boolean;
   onToggleMe: (shift: boolean) => void;
   onTogglePerson: (person: FollowedPerson, shift: boolean) => void;
   onOpenPeople: () => void;
   onOpenSearch: () => void;
+  onOpenCourses: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   const meActive = selectedIds.includes("me");
   return (
@@ -37,6 +41,7 @@ export function ArchivePeopleBar({ sessionName, people, selectedIds, onToggleMe,
         );
       })}
       <button type="button" className="ef-atlas-people-add" onClick={onOpenPeople} aria-label="添加关注的人" title="添加关注的人"><Plus size={15} aria-hidden /></button>
+      <button type="button" className="ef-atlas-people-courses" aria-pressed={coursesOpen} onClick={onOpenCourses} aria-label={`课程入口，${courseCount} 门`} title="从课程进入地图或课程页"><BookOpen size={15} aria-hidden /><span>课程</span><em>{courseCount}</em></button>
       <button type="button" className="ef-atlas-people-search" onClick={onOpenSearch} aria-label="搜索 ⌘K" title="搜索 ⌘K"><Search size={16} aria-hidden /></button>
       <PreviewBadge className="ef-atlas-people-preview" />
     </nav>

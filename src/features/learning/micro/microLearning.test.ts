@@ -12,9 +12,33 @@ import {
   previousMicroReviewStep,
   nextMicroReviewStep,
   isMicroReviewSubmissionCorrect,
+  microStepPosition,
+  microStepPositionDetailLabel,
+  microStepPositionLabel,
+  microUnitStepPositionLabel,
   type MicroLearningPath,
   type MicroStep
 } from "./microLearning";
+
+describe("Micro Learning step progress", () => {
+  const path: MicroLearningPath = { id: "path", knowledgeId: "knowledge", scope: "global", title: "Progress", estimatedMinutes: 5, mode: "learn", required: true, status: "published", units: [
+    { id: "unit-a", pathId: "path", title: "A", position: 0, estimatedMinutes: 2, required: true, steps: [{ id: "a1", kind: "summary", title: "A1", body: "A1" }, { id: "a2", kind: "summary", title: "A2", body: "A2" }] },
+    { id: "unit-b", pathId: "path", title: "B", position: 1, estimatedMinutes: 3, required: true, steps: [{ id: "b1", kind: "summary", title: "B1", body: "B1" }, { id: "b2", kind: "summary", title: "B2", body: "B2" }, { id: "b3", kind: "summary", title: "B3", body: "B3" }] }
+  ] };
+
+  it("counts the current step in both the unit and the whole path", () => {
+    const position = microStepPosition(path, "unit-b", "b2")!;
+    expect(position).toEqual({ unitIndex: 2, unitCount: 2, stepIndex: 2, stepCount: 3, globalStepIndex: 4, globalStepCount: 5 });
+    expect(microStepPositionLabel(position)).toBe("第 4 / 5 步");
+    expect(microUnitStepPositionLabel(position)).toBe("第 2 / 2 单元 · 第 2 / 3 步");
+    expect(microStepPositionDetailLabel(position)).toBe("第 4 / 5 步 · 第 2 / 2 单元 · 第 2 / 3 步");
+  });
+
+  it("does not invent progress for a missing unit or step", () => {
+    expect(microStepPosition(path, "missing", "b2")).toBeNull();
+    expect(microStepPosition(path, "unit-b", "missing")).toBeNull();
+  });
+});
 
 describe("Micro Learning navigation", () => {
   it("replays required steps locally without changing persisted completion", () => {

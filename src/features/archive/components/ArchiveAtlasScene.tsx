@@ -27,6 +27,7 @@ import { selectionXraySegments } from "@/shared/scene/xray";
 import { courseColorVar, courseToneForStatus } from "@/shared/scene/coursePalette";
 import type { PlaneChapter } from "../model/coursePlaneLayout";
 import { coursePlaneScale, coursePlaneTarget } from "../model/courseFit";
+import { atlasLevelCameraDistance, type AtlasMapLevel } from "../model/atlasLevelZoom";
 import type { PlaneDependencyRoute } from "../model/coursePlaneDependencies";
 import type { CourseEnterSnapshot, ArchiveCourseView } from "@/features/course/immersive/courseTransition";
 
@@ -42,6 +43,7 @@ export type CourseFitOptions = {
 
 export type ArchiveAtlasSceneHandle = {
   zoomBy(factor: number): void;
+  zoomToLevel(level: AtlasMapLevel): void;
   fitAll(options?: { insets?: SceneInsets; padding?: number }): void;
   fitIds(ids: Iterable<string>, options?: { padding?: number; maxRatio?: number; insets?: SceneInsets }): void;
   fitCourse(insets?: SceneInsets, options?: CourseFitOptions): void;
@@ -817,6 +819,20 @@ export default function ArchiveAtlasScene({
       const distance = zoomDistance(direction.length(), factor, engine.controls.minDistance, engine.controls.maxDistance);
       const target = engine.controls.target.clone();
       animateCamera(target.clone().add(direction.setLength(distance)), target, 260);
+    },
+    zoomToLevel(level) {
+      const engine = engineRef.current;
+      if (!engine) return;
+      planeLabelsApiRef.current?.freeze();
+      planeLabelsApiRef.current?.thaw(420);
+      const worldRadius = Math.max(120, ...Object.values(basePositions).map((position) => Math.hypot(position.x, position.y, position.z)));
+      const direction = engine.camera.position.clone().sub(engine.controls.target);
+      const distance = atlasLevelCameraDistance(level, worldRadius, {
+        min: engine.controls.minDistance,
+        max: engine.controls.maxDistance
+      });
+      const target = engine.controls.target.clone();
+      animateCamera(target.clone().add(direction.setLength(distance)), target, 420);
     },
     fitAll(options = {}) {
       fitBoundsOf(Array.from({ length: propsRef.current.nodes.length }, (_, index) => index), { padding: options.padding ?? 1.08, inset: options.insets, useTarget: true });

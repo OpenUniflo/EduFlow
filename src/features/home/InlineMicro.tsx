@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { applicationServices, refreshLearnerState } from "@/app/services/applicationServices";
 import type { MockSession } from "@/features/auth/types";
-import { nextMicroReviewStep, previousMicroReviewStep, resolveDisplayedMicroStep, resolveMicroResumeStep, type MicroLearningPath } from "@/features/learning/micro/microLearning";
-import { resolveMicroCompletionContext } from "@/features/learning/micro/microCompletionContext";
+import { microStepPosition, microStepPositionLabel, nextMicroReviewStep, previousMicroReviewStep, resolveDisplayedMicroStep, resolveMicroResumeStep, type MicroLearningPath } from "@/features/learning/micro/microLearning";
+import { resolveMicroCompletionContext, resolveMicroCompletionPrimary } from "@/features/learning/micro/microCompletionContext";
 import { MicroStepPanel } from "@/features/learning/micro/MicroLearningExperience";
 import { MicroUnitRail } from "@/features/learning/micro/MicroUnitRail";
 import { MicroStepList } from "@/features/learning/micro/MicroStepList";
@@ -47,6 +47,7 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
   const [reviewing, setReviewing] = useState<{ unitId: string; stepId: string } | null>(null);
   const [completionDecision, setCompletionDecision] = useState<NavigationDecision | null>(null);
   const [completionNavigationError, setCompletionNavigationError] = useState(false);
+  const [completionNavigationLoading, setCompletionNavigationLoading] = useState(false);
   const [completionAttempt, setCompletionAttempt] = useState(0);
   const [footerMount, setFooterMount] = useState<HTMLDivElement | null>(null);
   const stepRegionRef = useRef<HTMLDivElement>(null);
@@ -85,14 +86,19 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
   }, [displayedStep?.id]);
   const showCompleted = completed && !pinned && !reviewing;
   const steps = path.units.reduce((total, unit) => total + unit.steps.length, 0);
-  const countedSteps = path.units.reduce((total, unit) => total + (applicationServices.microLearningRepository.getUnitProgress(unit.id)?.completedStepIds.length ?? 0), 0);
-  // Resuming from a persisted current step is authoritative: the side header
-  // must never claim 0 / N while the learner is already on step 4.
-  const resumeIndex = currentUnit && currentStep
-    ? path.units.filter((unit) => unit.position < currentUnit.position).reduce((total, unit) => total + unit.steps.length, 0) + Math.max(0, currentUnit.steps.findIndex((step) => step.id === currentStep.id))
-    : 0;
-  const completeSteps = completed ? steps : Math.max(countedSteps, progress ? resumeIndex : 0);
-  const progressLabel = completed ? `${steps} / ${steps} 步 · 已完成` : progress ? `${completeSteps} / ${steps} 步 · 进度已保存` : `共 ${steps} 步 · 约 ${path.estimatedMinutes} 分钟`;
+  // Every visible count is the current step (never a completed count). The
+  // completed view names the real last step instead of guessing a position.
+  const lastUnit = path.units[path.units.length - 1];
+  const lastStep = lastUnit?.steps[lastUnit.steps.length - 1];
+  const completedPosition = lastUnit && lastStep ? microStepPosition(path, lastUnit.id, lastStep.id) : null;
+  const displayedPosition = displayedUnit && displayedStep ? microStepPosition(path, displayedUnit.id, displayedStep.id) : null;
+  const activePosition = !completed && (progress?.status === "in_progress" || started) ? displayedPosition : null;
+  const progressLabel = completed
+    ? completedPosition ? `${microStepPositionLabel(completedPosition)} · 已完成` : `共 ${steps} 步 · 已完成`
+    : activePosition ? `${microStepPositionLabel(activePosition)} · 进度已保存`
+    : `共 ${steps} 步 · 约 ${path.estimatedMinutes} 分钟`;
+  const metaPosition = completed ? completedPosition : activePosition;
+  const metaPositionLabel = metaPosition ? microStepPositionLabel(metaPosition) : completed ? `${steps} / ${steps} 步` : `共 ${steps} 步`;
   const complex = microSurfaceForPath(path) === "panel";
   const panel = surface === "panel";
 
@@ -141,10 +147,13 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
     let live = true;
     setCompletionDecision(null);
     setCompletionNavigationError(false);
+    setCompletionNavigationLoading(false);
     if (!showCompleted || !courseId) return () => { live = false; };
+    setCompletionNavigationLoading(true);
     void applicationServices.learnerStateService.getNavigation(courseId)
       .then((decision) => { if (live) setCompletionDecision(decision); })
-      .catch(() => { if (live) setCompletionNavigationError(true); });
+      .catch(() => { if (live) setCompletionNavigationError(true); })
+      .finally(() => { if (live) setCompletionNavigationLoading(false); });
     return () => { live = false; };
   }, [completionAttempt, courseId, showCompleted]);
 
@@ -155,7 +164,7 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
     decision: completionDecision,
     hasMicro: (nodeId) => Boolean(applicationServices.microLearningRepository.getPath(nodeId, { courseId, mode: "learn" }))
   });
-  const nextCompletionAction = completionActions.find((action) => action.kind === "next");
+  const completionPrimary = resolveMicroCompletionPrimary({ actions: completionActions, courseId, returnTo: "/" });
 
   function openCompletionAction(action: (typeof completionActions)[number]) {
     const state = {
@@ -164,6 +173,15 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
       microPathId: action.kind === "next" && completionDecision?.nextAction.resourceKind === "micro" ? completionDecision.nextAction.resourceId : undefined
     };
     navigate(action.href, { state });
+  }
+
+  function openCompletionPrimary() {
+    if (completionPrimary.kind === "next") {
+      const action = completionActions.find((item) => item.kind === "next");
+      if (action) openCompletionAction(action);
+      return;
+    }
+    navigate(completionPrimary.href);
   }
 
   const titleTools = <div className="ef-home-micro-tools">
@@ -178,7 +196,7 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
   const meta = <div className="ef-home-micro-meta">
     <Pill tone={completed ? "ok" : progress ? "brand" : "quiet"} dot>{completed ? "已完成" : progress ? "进行中" : "未开始"}</Pill>
     <span>约 {path.estimatedMinutes} 分钟</span>
-    <span>{completeSteps} / {steps} 步</span>
+    <span>{metaPositionLabel}</span>
     {courseId ? <span>{applicationServices.courseRepository.getCourse(courseId)?.course.title ?? "课程"}</span> : null}
   </div>;
 
@@ -237,9 +255,11 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
   if (showCompleted) {
     if (panel) return panelShell(<div className="ef-home-micro-panel-state">
       <MicroStepList path={path} repository={applicationServices.microLearningRepository} onSelect={(unitId, stepId) => setReviewing({ unitId, stepId })} />
+      {completionNavigationLoading
+        ? <button type="button" className="atlas-primary micro-completion-next" disabled>正在读取下一步…<ArrowRight size={17} aria-hidden="true" /></button>
+        : <button type="button" className="atlas-primary micro-completion-next" onClick={openCompletionPrimary}><span>{completionPrimary.kind === "next" ? <>下一步：<strong>{completionPrimary.title}</strong></> : completionPrimary.title}</span><ArrowRight size={17} aria-hidden="true" /></button>}
       {completionActions.length || completionNavigationError ? <section className="micro-completion-context" aria-label="继续学习与相关内容">
         <h2>继续学习 / 相关内容</h2>
-        {nextCompletionAction ? <button type="button" className="atlas-primary micro-completion-next" onClick={() => openCompletionAction(nextCompletionAction)}><span>继续下一项<strong>{nextCompletionAction.title}</strong></span><ArrowRight size={17} aria-hidden="true" /></button> : null}
         {completionActions.filter((action) => action.kind !== "next").map((action) => <button type="button" key={action.href} className="atlas-secondary micro-completion-related" onClick={() => openCompletionAction(action)}><span>{action.kind === "material" ? "相关资料" : "相关练习"}<strong>{action.title}</strong></span><ArrowRight size={15} aria-hidden="true" /></button>)}
         {completionNavigationError ? <div className="micro-feedback retry" role="alert">下一步暂时无法加载；学习进度已保存。<button type="button" className="atlas-secondary" onClick={() => setCompletionAttempt((value) => value + 1)}>重试下一步</button></div> : null}
       </section> : null}
@@ -248,9 +268,11 @@ export function InlineMicro({ path, knowledgeId, courseId, session, surface, hid
       {hideHeader ? null : header}
       <div className="ef-home-micro-done-row"><span>已完成</span>{inlineFormActions}</div>
       <MicroStepList path={path} repository={applicationServices.microLearningRepository} onSelect={(unitId, stepId) => setReviewing({ unitId, stepId })} />
+      {completionNavigationLoading
+        ? <button type="button" className="atlas-primary micro-completion-next" disabled>正在读取下一步…<ArrowRight size={17} aria-hidden="true" /></button>
+        : <button type="button" className="atlas-primary micro-completion-next" onClick={openCompletionPrimary}><span>{completionPrimary.kind === "next" ? <>下一步：<strong>{completionPrimary.title}</strong></> : completionPrimary.title}</span><ArrowRight size={17} aria-hidden="true" /></button>}
       {completionActions.length || completionNavigationError ? <section className="micro-completion-context ef-home-micro-completion-context" aria-label="继续学习与相关内容">
         <h2>继续学习 / 相关内容</h2>
-        {nextCompletionAction ? <button type="button" className="atlas-primary micro-completion-next" onClick={() => openCompletionAction(nextCompletionAction)}><span>继续下一项<strong>{nextCompletionAction.title}</strong></span><ArrowRight size={17} aria-hidden="true" /></button> : null}
         {completionActions.filter((action) => action.kind !== "next").map((action) => <button type="button" key={action.href} className="atlas-secondary micro-completion-related" onClick={() => openCompletionAction(action)}><span>{action.kind === "material" ? "相关资料" : "相关练习"}<strong>{action.title}</strong></span><ArrowRight size={15} aria-hidden="true" /></button>)}
         {completionNavigationError ? <div className="micro-feedback retry" role="alert">下一步暂时无法加载；学习进度已保存。<button type="button" className="atlas-secondary" onClick={() => setCompletionAttempt((value) => value + 1)}>重试下一步</button></div> : null}
       </section> : null}

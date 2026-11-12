@@ -215,14 +215,16 @@ export function GlobalCommandPalette({ session }: { session: MockSession | null 
       icon: actionIcon(item.id),
       onSelect: () => runAction(item)
     }));
-    return [...pages, ...courses, ...knowledge, ...actions];
+    // Keyboard order is the visual group order, not a fixed type list.
+    const byGroup: Record<(typeof results.groupOrder)[number], Entry[]> = { pages, courses, knowledge, actions };
+    return results.groupOrder.flatMap((group) => byGroup[group]);
   }, [location.pathname, navigate, results, runAction]);
 
-  const groups = useMemo(() => (["pages", "courses", "knowledge", "actions"] as const).map((key) => ({
+  const groups = useMemo(() => (results?.groupOrder ?? []).map((key) => ({
     key,
     label: GROUP_LABELS[key],
     entries: entries.filter((entry) => entry.group === key)
-  })).filter((group) => group.entries.length > 0), [entries]);
+  })).filter((group) => group.entries.length > 0), [entries, results]);
 
   useEffect(() => {
     if (!open || !entries.length) return;

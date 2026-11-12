@@ -2855,6 +2855,14 @@
 .ef-home-route-panel-head span { color: var(--muted); font-size: var(--fs-12); }
 .ef-home-route-panel-head .ef-home-route-panel-subtitle { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ef-home-route-panel-head h2 { margin: 2px 0 0; font-size: var(--fs-20); line-height: var(--lh-20); }
+/* The side form has a fixed narrow slot: keep the Course title to two lines
+   for every title, never by shortening a particular Course name. */
+.ef-home-route-panel[data-at="side"] .ef-home-route-panel-head h2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 
 .ef-home-route-panel-body {
   display: flex;

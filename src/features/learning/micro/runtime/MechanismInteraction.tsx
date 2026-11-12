@@ -5,10 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Background, Handle, MarkerType, Position, ReactFlow, type NodeProps } from "@xyflow/react";
 import { motion, useReducedMotion } from "motion/react";
 import "@xyflow/react/dist/style.css";
-import { flowAdvance, simulationTrajectory, transformationCells, transformationEvents, type FlowDefinition, type MechanismAnswer, type MicroMechanism, type SimulationDefinition, type TransformationDefinition } from "@/shared/learning/microMechanisms";
+import { flowAdvance, flowStepLimit, simulationTrajectory, transformationCells, transformationEvents, type FlowDefinition, type MechanismAnswer, type MicroMechanism, type SimulationDefinition, type TransformationDefinition } from "@/shared/learning/microMechanisms";
 import { TimelineControls, useTeachingTimeline } from "./TeachingTimeline";
 
-type Props<T = MicroMechanism> = { definition: T; disabled: boolean; demonstration?: boolean; onAnswer(answer: MechanismAnswer): void };
+type Props<T = MicroMechanism> = { definition: T; disabled: boolean; demonstration?: boolean; feedbackVisible?: boolean; onAnswer(answer: MechanismAnswer): void };
 function useReport(answer: MechanismAnswer, onAnswer: Props["onAnswer"]) {
   const handler = useRef(onAnswer); handler.current = onAnswer;
   const serialized = JSON.stringify(answer);
@@ -22,20 +22,31 @@ function FlowNode({ data }: NodeProps) {
   return <div className={`micro-execution-node ${data.active ? "active" : ""}`}><Handle type="target" position={Position.Left}/><strong>{String(data.label)}</strong>{data.active ? <small>当前执行</small> : null}<Handle type="source" position={Position.Right}/></div>;
 }
 const nodeTypes = { execution: FlowNode };
-function FlowInteraction({ definition, disabled, demonstration = false, onAnswer }: Props<FlowDefinition>) {
+function FlowInteraction({ definition, disabled, demonstration = false, feedbackVisible = false, onAnswer }: Props<FlowDefinition>) {
   const canvas=useRef<HTMLDivElement>(null),instance=useRef<{fitView(options:{padding:number;duration:number}):Promise<boolean>}|null>(null);
   useEffect(()=>{const element=canvas.current;if(!element)return;const observer=new ResizeObserver(()=>{void instance.current?.fitView({padding:.2,duration:0});});observer.observe(element);return()=>observer.disconnect();},[]);
   const [selectedEdges,setSelectedEdges]=useState<string[]>([]);
   const [edgeIds, setEdgeIds] = useState(definition.initialEdgeIds), [error, setError] = useState<LearningContent | null>(null);
   const firstBlocked = definition.events.findIndex((event) => event.edgeId && !edgeIds.includes(event.edgeId));
-  const timeline = useTeachingTimeline(firstBlocked < 0 ? definition.events.length : firstBlocked, disabled);
+  const stepLimit = flowStepLimit(definition, edgeIds);
+  const timeline = useTeachingTimeline(stepLimit, disabled);
   const event = definition.events[timeline.cursor - 1];
   const nodes = useMemo(() => definition.nodes.map((node) => ({ id: node.id, type: "execution", position: { x: node.x, y: node.y }, data: { label: node.label, active: event?.nodeId === node.id }, draggable: false })), [definition.nodes, event?.nodeId]);
   const edges = definition.edges.filter((edge) => edgeIds.includes(edge.id)).map((edge) => ({ id: edge.id, selected:selectedEdges.includes(edge.id), source: edge.from, target: edge.to, label: edge.label, animated: event?.edgeId === edge.id, markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: event?.edgeId === edge.id ? "#596ce0" : "#9ba8bb", strokeWidth: event?.edgeId === edge.id ? 3 : 1.5 } }));
   useReport({ kind: "flow", edgeIds, executed: timeline.cursor }, onAnswer);
   const edit = (next: string[]) => { if(disabled||demonstration)return; setSelectedEdges([]);timeline.reset(); setError(null); setEdgeIds(next); };
-  const step = () => { const next = flowAdvance(definition, edgeIds, timeline.cursor); setError(next.error ? definition.teaching?.feedback?.[next.reason]??next.error : null); if (!next.error) timeline.step(); };
-  return <div className="micro-mechanism" data-demonstration={demonstration}><p className="micro-operation-help" hidden={demonstration}>从节点右侧端点拖到下一节点左侧端点连接；选中连线按 Backspace 删除。下方连接按钮也可用键盘操作。修改连接后从头执行。</p><div ref={canvas} className="micro-flow-canvas"><ReactFlow onInit={(flow)=>{instance.current=flow;}} nodes={nodes} edges={edges} nodeTypes={nodeTypes} zoomOnScroll={false} preventScrolling={false} nodesDraggable={false} nodesConnectable={!disabled&&!demonstration} elementsSelectable={!disabled&&!demonstration} deleteKeyCode={disabled||demonstration?null:["Backspace","Delete"]} onEdgesChange={(changes)=>setSelectedEdges((current)=>changes.reduce((ids,change)=>change.type==="select"?change.selected?[...ids,change.id]:ids.filter((id)=>id!==change.id):ids,current))} onConnect={({ source, target }) => { const edge = definition.edges.find((item) => item.from === source && item.to === target); if (!edge) { setError(definition.teaching?.feedback?.["invalid-edge"]??"此连接不在定义中。"); return; } edit([...new Set([...edgeIds, edge.id])]); }} onEdgesDelete={(deleted) => edit(edgeIds.filter((id) => !deleted.some((edge) => edge.id === id)))} fitView fitViewOptions={{ padding: .2 }} minZoom={.3} maxZoom={1.5} proOptions={{ hideAttribution: true }}><Background gap={18}/></ReactFlow></div><div className="micro-flow-connections" aria-label="流程连接"><button type="button" onClick={()=>void instance.current?.fitView({padding:.2,duration:0})}>适应画布</button>{!demonstration&&definition.edges.map((edge) => <button type="button" key={edge.id} disabled={disabled} aria-pressed={edgeIds.includes(edge.id)} onClick={() => edit(edgeIds.includes(edge.id) ? edgeIds.filter((id) => id !== edge.id) : [...edgeIds, edge.id])}>{edgeIds.includes(edge.id) ? "断开" : "连接"} {edge.label}</button>)}</div><TimelineControls timeline={timeline} length={definition.events.length} disabled={disabled} onStep={step} onReset={() => { timeline.reset();setError(null);setEdgeIds(definition.initialEdgeIds); }}/>{error ? <div className="micro-mechanism-error" role="alert"><RichTextContent body={error}/></div> : null}{event ? <Cue title={event.title}>{event.message}<br/>{event.explanation}</Cue> : <Cue title="准备执行">点击单步，观察当前节点、流动连线和消息；播放可连续执行。</Cue>}{firstBlocked >= 0 && timeline.cursor === firstBlocked ? <div className="micro-mechanism-error" role="status"><RichTextContent body={definition.teaching?.feedback?.["missing-required-edge"]??flowAdvance(definition, edgeIds, timeline.cursor).error}/></div> : null}</div>;
+  const step = () => {
+    const next = flowAdvance(definition, edgeIds, timeline.cursor);
+    if (next.error) {
+      // The blocked-edge notice below is the one place that explains this
+      // state; clicking 单步 must not render a second copy of it.
+      if (next.reason !== "missing-required-edge") setError(definition.teaching?.feedback?.[next.reason] ?? next.error);
+      return;
+    }
+    setError(null);
+    timeline.step();
+  };
+  return <div className="micro-mechanism" data-demonstration={demonstration}><p className="micro-operation-help" hidden={demonstration}>从节点右侧端点拖到下一节点左侧端点连接；选中连线按 Backspace 删除。下方连接按钮也可用键盘操作。修改连接后从头执行。</p><div ref={canvas} className="micro-flow-canvas"><ReactFlow onInit={(flow)=>{instance.current=flow;}} nodes={nodes} edges={edges} nodeTypes={nodeTypes} zoomOnScroll={false} preventScrolling={false} nodesDraggable={false} nodesConnectable={!disabled&&!demonstration} elementsSelectable={!disabled&&!demonstration} deleteKeyCode={disabled||demonstration?null:["Backspace","Delete"]} onEdgesChange={(changes)=>setSelectedEdges((current)=>changes.reduce((ids,change)=>change.type==="select"?change.selected?[...ids,change.id]:ids.filter((id)=>id!==change.id):ids,current))} onConnect={({ source, target }) => { const edge = definition.edges.find((item) => item.from === source && item.to === target); if (!edge) { setError(definition.teaching?.feedback?.["invalid-edge"]??"此连接不在定义中。"); return; } edit([...new Set([...edgeIds, edge.id])]); }} onEdgesDelete={(deleted) => edit(edgeIds.filter((id) => !deleted.some((edge) => edge.id === id)))} fitView fitViewOptions={{ padding: .2 }} minZoom={.3} maxZoom={1.5} proOptions={{ hideAttribution: true }}><Background gap={18}/></ReactFlow></div><div className="micro-flow-connections" aria-label="流程连接"><button type="button" onClick={()=>void instance.current?.fitView({padding:.2,duration:0})}>适应画布</button>{!demonstration&&definition.edges.map((edge) => <button type="button" key={edge.id} disabled={disabled} aria-pressed={edgeIds.includes(edge.id)} onClick={() => edit(edgeIds.includes(edge.id) ? edgeIds.filter((id) => id !== edge.id) : [...edgeIds, edge.id])}>{edgeIds.includes(edge.id) ? "断开" : "连接"} {edge.label}</button>)}</div><TimelineControls timeline={timeline} length={stepLimit} disabled={disabled} disabledReason={firstBlocked >= 0 ? "需要先补齐当前互动缺少的连接，才能继续单步。" : undefined} onStep={step} onReset={() => { timeline.reset();setError(null);setEdgeIds(definition.initialEdgeIds); }}/>{!feedbackVisible && error ? <div className="micro-mechanism-error" role="alert"><RichTextContent body={error}/></div> : null}{event ? <Cue title={event.title}>{event.message}<br/>{event.explanation}</Cue> : <Cue title="准备执行">点击单步，观察当前节点、流动连线和消息；播放可连续执行。</Cue>}{!feedbackVisible && firstBlocked >= 0 && timeline.cursor === firstBlocked ? <div className="micro-mechanism-error" role="status"><RichTextContent body={definition.teaching?.feedback?.["missing-required-edge"]??flowAdvance(definition, edgeIds, timeline.cursor).error}/></div> : null}</div>;
 }
 function SimulationInteraction({ definition, disabled, demonstration = false, onAnswer }: Props<SimulationDefinition>) {
   const reduced = useReducedMotion();

@@ -141,6 +141,52 @@ export function resolveMicroResumeStep(unit: MicroUnit, progress: MicroUnitProgr
   return unit.steps.find((step) => !completed.has(step.id)) ?? unit.steps.find((step) => step.id === currentStepId) ?? unit.steps[0];
 }
 
+export type MicroStepPosition = {
+  /** 1-based unit and in-unit step position for the current location. */
+  unitIndex: number;
+  unitCount: number;
+  stepIndex: number;
+  stepCount: number;
+  /** 1-based position in the whole path; all labels count the current step. */
+  globalStepIndex: number;
+  globalStepCount: number;
+};
+
+/**
+ * One source for every Micro step label: the current step (never a completed
+ * count) in both its Unit and the whole path, from the real ordered step list.
+ */
+export function microStepPosition(path: MicroLearningPath, unitId: string, stepId: string): MicroStepPosition | null {
+  const unitIndex = path.units.findIndex((unit) => unit.id === unitId);
+  if (unitIndex < 0) return null;
+  const unit = path.units[unitIndex];
+  const stepIndex = unit.steps.findIndex((step) => step.id === stepId);
+  if (stepIndex < 0) return null;
+  return {
+    unitIndex: unitIndex + 1,
+    unitCount: path.units.length,
+    stepIndex: stepIndex + 1,
+    stepCount: unit.steps.length,
+    globalStepIndex: path.units.slice(0, unitIndex).reduce((sum, item) => sum + item.steps.length, 0) + stepIndex + 1,
+    globalStepCount: path.units.reduce((sum, item) => sum + item.steps.length, 0)
+  };
+}
+
+/** Global current-step label, e.g. 第 2 / 7 步. */
+export function microStepPositionLabel(position: MicroStepPosition) {
+  return `第 ${position.globalStepIndex} / ${position.globalStepCount} 步`;
+}
+
+/** Unit-scoped current-step label, e.g. 第 1 / 2 单元 · 第 2 / 4 步. */
+export function microUnitStepPositionLabel(position: MicroStepPosition) {
+  return `第 ${position.unitIndex} / ${position.unitCount} 单元 · 第 ${position.stepIndex} / ${position.stepCount} 步`;
+}
+
+/** Both scopes from the same position, e.g. 第 2 / 7 步 · 第 1 / 2 单元 · 第 2 / 4 步. */
+export function microStepPositionDetailLabel(position: MicroStepPosition) {
+  return `${microStepPositionLabel(position)} · ${microUnitStepPositionLabel(position)}`;
+}
+
 /**
  * Keeps the step a learner just submitted visible until they explicitly move
  * on. Progress can advance immediately after a successful submission; without

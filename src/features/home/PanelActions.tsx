@@ -4,22 +4,24 @@ import { courseEntryState, type CourseEntrySource } from "@/features/course/page
 
 /**
  * Every panel declares exactly one expand destination:
- * - a dedicated page URL, or
- * - an overlay opener when the object has no dedicated page.
+ * - a dedicated page URL,
+ * - an in-place page form when the panel already owns a larger mounted form,
+ * - or an overlay opener when the object has no dedicated page.
  *
  * The component owns the label, placement and return-to-conversation state, so
  * panels cannot grow their own "放大" plus "进入页面" pair.
  */
 export type PanelExpandTarget =
   | { kind: "page"; href: string; courseEntry?: { source: CourseEntrySource; returnTo: string } }
+  | { kind: "in-place"; onOpen(): void }
   | { kind: "overlay"; onOpen(): void }
   | { kind: "none" };
 
-export function PanelActions({ expand }: { expand: PanelExpandTarget }) {
+export function PanelActions({ expand, variant = "primary" }: { expand: PanelExpandTarget; variant?: "primary" | "secondary" }) {
   const navigate = useNavigate();
   if (expand.kind === "none") return null;
   const open = () => {
-    if (expand.kind === "overlay") { expand.onOpen(); return; }
+    if (expand.kind === "overlay" || expand.kind === "in-place") { expand.onOpen(); return; }
     const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     const returnTo = expand.courseEntry?.returnTo ?? current;
     navigate(expand.href, {
@@ -27,6 +29,6 @@ export function PanelActions({ expand }: { expand: PanelExpandTarget }) {
     });
   };
   return <div className="ef-object-panel-actions">
-    <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={open}><Maximize2 size={13} aria-hidden="true" />放大</button>
+    <button type="button" className={`ef-ui-btn ef-ui-btn--${variant} ef-ui-btn--32`} onClick={open}><Maximize2 size={13} aria-hidden="true" />放大</button>
   </div>;
 }

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check, X } from "lucide-react";
 import { CategorizeInteraction, OrderingInteraction } from "./runtime/SpatialInteraction";
+import { nativeChoiceOptionStates, type ChoiceOptionState } from "@/shared/learning/nativeMicroInteraction";
 import type { MicroInteraction, MicroLearningAnswer, MicroStep } from "./microLearning";
 const Mechanism=lazy(()=>import("./runtime/MechanismInteraction"));
 const MiniWorkflow=lazy(()=>import("./MiniWorkflowInteraction"));
@@ -14,13 +15,28 @@ export function initialAnswer(interaction?:MicroInteraction):MicroLearningAnswer
   if(interaction.type==="matrix-tensor")return [...interaction.initialValues];
   return "";
 }
-export function NativeInteraction({step,answer,completed,demonstration=false,onAnswer}:{step:MicroStep;answer:MicroLearningAnswer;completed:boolean;demonstration?:boolean;onAnswer(value:MicroLearningAnswer):void}) {
+function optionMarker(state: ChoiceOptionState) {
+  if (state.state === "idle") return null;
+  const label = state.state === "correct" ? (state.selected ? "正确" : "正确答案") : "错误";
+  return <span className={`micro-choice-state is-${state.state}`} aria-hidden="true">{state.state === "correct" ? <Check size={13} /> : <X size={13} />}{label}</span>;
+}
+
+function optionAriaLabel(option: string, state: ChoiceOptionState | undefined) {
+  if (!state || state.state === "idle") return option;
+  return `${option}，${state.state === "correct" ? (state.selected ? "你的选择正确" : "正确答案") : "你的选择错误"}`;
+}
+
+function optionClassName(base: string, state: ChoiceOptionState | undefined) {
+  return [base, state?.state === "correct" ? "is-correct" : state?.state === "incorrect" ? "is-incorrect" : ""].filter(Boolean).join(" ");
+}
+
+export function NativeInteraction({step,answer,completed,revealed=false,demonstration=false,onAnswer}:{step:MicroStep;answer:MicroLearningAnswer;completed:boolean;revealed?:boolean;demonstration?:boolean;onAnswer(value:MicroLearningAnswer):void}) {
   const interaction=step.interaction!;
-  if(interaction.type==="choice")return <div className="micro-interaction choice">{interaction.options.map((option)=><button key={option} disabled={completed} className={answer===option?"selected":""} onClick={()=>onAnswer(option)}>{option}</button>)}</div>;
-  if(interaction.type==="multiple-choice") { const selected=Array.isArray(answer)&&answer.every((item)=>typeof item==="number")?answer as number[]:[];return <div className="micro-interaction multiple-choice" role="group" aria-label="多选题">{interaction.options.map((option,index)=><button key={option} role="checkbox" aria-checked={selected.includes(index)} disabled={completed} className={selected.includes(index)?"selected":""} onClick={()=>onAnswer(selected.includes(index)?selected.filter((item)=>item!==index):[...selected,index])}><span>{selected.includes(index)?"✓":""}</span>{option}</button>)}</div>; }
+  if(interaction.type==="choice") { const states=nativeChoiceOptionStates(interaction,answer,revealed);return <div className="micro-interaction choice" role="group" aria-label="单选题">{interaction.options.map((option,index)=><button key={option} disabled={completed} className={optionClassName(answer===option?"selected":"",states?.[index])} aria-label={optionAriaLabel(option,states?.[index])} onClick={()=>onAnswer(option)}><span className="micro-choice-label">{option}</span>{states?.[index]?optionMarker(states[index]):null}</button>)}</div>; }
+  if(interaction.type==="multiple-choice") { const selected=Array.isArray(answer)&&answer.every((item)=>typeof item==="number")?answer as number[]:[];const states=nativeChoiceOptionStates(interaction,answer,revealed);return <div className="micro-interaction multiple-choice" role="group" aria-label="多选题">{interaction.options.map((option,index)=><button key={option} role="checkbox" aria-checked={selected.includes(index)} aria-label={optionAriaLabel(option,states?.[index])} disabled={completed} className={optionClassName(selected.includes(index)?"selected":"",states?.[index])} onClick={()=>onAnswer(selected.includes(index)?selected.filter((item)=>item!==index):[...selected,index])}><span className="micro-choice-label">{option}</span>{states?.[index]?optionMarker(states[index]):null}</button>)}</div>; }
   if(interaction.type==="fill-blank")return <label className="micro-fill-blank"><span>填写答案</span><input disabled={completed} value={typeof answer==="string"?answer:""} onChange={(event)=>onAnswer(event.target.value)} autoComplete="off"/></label>;
   if(interaction.type==="trace")return <div className="micro-interaction trace">{interaction.steps.map((item,index)=><button key={item.id} disabled={completed} className={answer===item.id?"selected":""} onClick={()=>onAnswer(item.id)}><span>{index+1}</span>{item.label}</button>)}</div>;
-  if(interaction.type==="flow-execution"||interaction.type==="simulation"||interaction.type==="data-transform")return <Suspense fallback={<p>正在加载互动机制…</p>}><Mechanism definition={interaction} demonstration={demonstration} disabled={completed} onAnswer={onAnswer}/></Suspense>;
+  if(interaction.type==="flow-execution"||interaction.type==="simulation"||interaction.type==="data-transform")return <Suspense fallback={<p>正在加载互动机制…</p>}><Mechanism definition={interaction} demonstration={demonstration} disabled={completed} feedbackVisible={revealed} onAnswer={onAnswer}/></Suspense>;
   if(interaction.type==="categorize") { const value=Array.isArray(answer)&&answer.every((item)=>typeof item==="string")?answer as string[]:[];return <CategorizeInteraction definition={interaction} value={value} disabled={completed} onChange={onAnswer}/>; }
   if(interaction.type==="ordering") { const value=Array.isArray(answer)&&answer.every((item)=>typeof item==="string")?answer as string[]:rotate(interaction.items);return <OrderingInteraction value={value} disabled={completed} onChange={onAnswer}/>; }
   if(interaction.type==="mini-workflow") { const value=Array.isArray(answer)&&answer.every((item)=>typeof item==="string")?answer as string[]:rotate(interaction.nodes);return <Suspense fallback={<p>正在加载 Workflow 互动…</p>}><MiniWorkflow items={interaction.nodes} value={value} disabled={completed} onChange={onAnswer} onReset={()=>onAnswer(rotate(interaction.nodes))}/></Suspense>; }

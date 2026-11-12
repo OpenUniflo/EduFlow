@@ -69,6 +69,16 @@ describe("one panel expand action", () => {
     expect(read("src/features/course/pages/CourseLearnerRoutePage.tsx")).toContain("focusNodeId={focusNodeId}");
   });
 
+  it("keeps the side route header to two lines and puts 进入课程 in the footer", () => {
+    const route = read("src/features/home/HomeRoutePanel.tsx");
+    expect(route).toContain('{mode === "page" ? <Button variant="ghost"');
+    expect(route).toContain('<PanelActions expand={{ kind: "in-place", onOpen: () => changeMode("page") }} variant="secondary"');
+    expect(route).toContain('<Button variant="primary" size="32" icon={<ArrowRight size={14} aria-hidden="true" />} onClick={enterCourse}>进入课程</Button>');
+    const css = read("src/features/home/home.css");
+    expect(css).toContain('.ef-home-route-panel[data-at="side"] .ef-home-route-panel-head h2');
+    expect(css).toContain("-webkit-line-clamp: 2");
+  });
+
   it("keeps the route and task dedicated pages", () => {
     const route = read("src/features/home/HomeRoutePanel.tsx");
     expect(route).toContain("/chapters/");

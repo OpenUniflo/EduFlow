@@ -1,13 +1,69 @@
 import { ArrowRight, BookOpen, ChevronRight, Lock, X } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { ArchiveCourse, ArchiveEdge, ArchiveModel, ArchiveNode } from "../model/atlasModel";
+import { anchoredPopoverPosition, type PopoverAnchor } from "../model/anchoredPopover";
 import { PreviewBadge } from "@/shared/ui/PreviewBadge";
 import { knowledgeScopeLabelFor, knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 
-export function ArchiveLevelChip({ level }: { level: number }) {
+export function ArchiveLevelChip({ level, onSelect }: { level: number; onSelect(level: 0 | 1 | 2): void }) {
   return (
-    <div className="ef-atlas-level ef-ui-glass ef-ui-glass--regular" aria-label="当前星图层级">
-      {["领域", "主题", "知识"].map((label, index) => <span key={label} className={index === level ? "is-on" : ""}>{label}</span>)}
+    <div className="ef-atlas-level ef-ui-glass ef-ui-glass--regular" role="group" aria-label="地图显示层级">
+      {["领域", "主题", "知识"].map((label, index) => <button key={label} type="button" className={index === level ? "is-on" : ""} aria-pressed={index === level} onClick={() => onSelect(index as 0 | 1 | 2)}>{label}</button>)}
     </div>
+  );
+}
+
+const COURSE_STATE_LABEL: Record<ArchiveCourse["state"], string> = {
+  active: "在学",
+  draft: "草稿",
+  recommended: "可加入",
+  published: "已发布"
+};
+
+/** The always-reachable Course entry: existing Courses only, never a fake row. */
+export function ArchiveCourseMini({ model, anchor, onClose, onFocusCourse, onOpenCourse }: {
+  model: ArchiveModel;
+  anchor: PopoverAnchor;
+  onClose(): void;
+  onFocusCourse(courseId: string): void;
+  onOpenCourse(courseId: string): void;
+}) {
+  const panelRef = useRef<HTMLElement>(null);
+  const [position, setPosition] = useState(() => anchoredPopoverPosition(
+    anchor,
+    { width: 348, height: 460 },
+    { width: typeof window === "undefined" ? 1440 : window.innerWidth, height: typeof window === "undefined" ? 900 : window.innerHeight }
+  ));
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const reposition = () => {
+      const rect = panel.getBoundingClientRect();
+      setPosition(anchoredPopoverPosition(
+        anchor,
+        { width: rect.width, height: rect.height },
+        { width: window.innerWidth, height: window.innerHeight }
+      ));
+    };
+    reposition();
+    window.addEventListener("resize", reposition);
+    return () => window.removeEventListener("resize", reposition);
+  }, [anchor]);
+  return (
+    <section ref={panelRef} className="ef-archive-course-mini ef-atlas-courses" aria-label="课程入口" style={{ left: position.left, top: position.top }}>
+      <header><span><BookOpen size={13} aria-hidden />课程</span><button type="button" onClick={onClose}>收起</button></header>
+      {model.courses.map((course) => (
+        <div key={course.id} className="ef-archive-course-mini-row">
+          <button type="button" className="ef-archive-course-mini-main" onClick={() => onFocusCourse(course.id)} title={`在星图中查看 ${course.title}`}>
+            <b>{course.title}</b>
+            <small>{COURSE_STATE_LABEL[course.state]} · {course.nextLabel}</small>
+          </button>
+          <em>{course.progress}%</em>
+          <button type="button" className="ef-archive-course-mini-go ef-atlas-course-enter" onClick={() => onOpenCourse(course.id)} aria-label={`进入课程 ${course.title}`}>进入<ArrowRight size={12} aria-hidden /></button>
+        </div>
+      ))}
+      {!model.courses.length ? <p className="ef-archive-muted">还没有可进入的课程。</p> : null}
+    </section>
   );
 }
 

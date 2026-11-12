@@ -36,7 +36,7 @@ export type KnowledgeSearchItem = {
   meta: string;
   keywords: string[];
   status: UserKnowledgeStatus | "explore";
-  isCurrent: boolean;
+  updatedAt?: string;
 };
 
 export type ActionSearchItem = {
@@ -56,13 +56,24 @@ export type GlobalSearchData = {
 };
 
 export type RankedGroup<T> = { items: T[]; total: number };
+export type SearchGroupKey = "pages" | "courses" | "knowledge" | "actions";
 export type GlobalSearchResults = {
   query: string;
   pages: RankedGroup<PageSearchItem>;
   courses: RankedGroup<CourseSearchItem>;
   knowledge: RankedGroup<KnowledgeSearchItem>;
   actions: RankedGroup<ActionSearchItem>;
+  /** Groups ordered by their best match; exact/prefix title hits always lead. */
+  groupOrder: SearchGroupKey[];
   empty: boolean;
+};
+
+/** Stable type order only breaks a same-relevance tie. */
+const SEARCH_GROUP_TYPE_RANK: Record<SearchGroupKey, number> = {
+  pages: 0,
+  courses: 1,
+  knowledge: 2,
+  actions: 3
 };
 
 const PAGE_DEFINITIONS: Array<PageSearchItem & { requiresSession?: boolean; requiresTeaching?: boolean; requiresAdmin?: boolean }> = [
@@ -83,10 +94,6 @@ export function buildPageSearchItems(session: Pick<MockSession, "role" | "capabi
     return true;
   }).map(({ requiresSession: _session, requiresTeaching: _teaching, requiresAdmin: _admin, ...page }) => page);
 }
-
-const STATUS_LABEL = new Proxy({} as Record<UserKnowledgeStatus | "explore", string>, {
-  get: (_target, key) => knowledgeStateLabelFor(String(key))
-});
 
 function courseStateMeta(course: ArchiveCourse) {
   if (course.state === "active") return `${course.chapterCount} 章 · ${course.progress}%`;
@@ -112,9 +119,14 @@ function nodeCourseLocation(node: ArchiveNode, runtimes: readonly CourseRuntimeD
   return null;
 }
 
+/** Search shows the object's real state; "当前" belongs only to the route's navigation step. */
+export function knowledgeSearchStatus(node: Pick<ArchiveNode, "isMine" | "status" | "scope">) {
+  return node.isMine ? knowledgeStateLabelFor(node.status) : knowledgeScopeLabelFor(node.scope);
+}
+
 function knowledgeMeta(node: ArchiveNode, runtimes: readonly CourseRuntimeData[]) {
   const location = nodeCourseLocation(node, runtimes);
-  const status = node.isCurrent ? "当前" : node.isMine ? STATUS_LABEL[node.status] : knowledgeScopeLabelFor(node.scope);
+  const status = knowledgeSearchStatus(node);
   return location ? `第 ${location.chapter} 章 · ${status}` : `${node.domainTitle} · ${status}`;
 }
 
@@ -132,8 +144,7 @@ function buildKnowledgeItems(model: ReturnType<typeof buildArchiveModel>, runtim
   const statusRank: Record<UserKnowledgeStatus | "explore", number> = { learning: 0, practicing: 1, learned: 2, mastered: 3, explore: 4 };
   return model.nodes
     .slice()
-    .sort((left, right) => Number(right.isCurrent) - Number(left.isCurrent)
-      || statusRank[left.status] - statusRank[right.status]
+    .sort((left, right) => statusRank[left.status] - statusRank[right.status]
       || right.visualImportance - left.visualImportance
       || left.title.localeCompare(right.title, "zh-CN"))
     .map((node) => ({
@@ -142,7 +153,7 @@ function buildKnowledgeItems(model: ReturnType<typeof buildArchiveModel>, runtim
       meta: knowledgeMeta(node, runtimes),
       keywords: knowledgeKeywords(node, runtimes),
       status: node.status,
-      isCurrent: node.isCurrent
+      ...(node.updatedAt ? { updatedAt: node.updatedAt } : {})
     }));
 }
 
@@ -259,43 +270,92 @@ function fuzzyLatinMatch(haystack: string, query: string) {
   }));
 }
 
-/** Null means no match; lower is a stronger title-first hit. */
-export function relevance(title: string, description: readonly string[], rawQuery: string): number | null {
+/**
+ * Relevance tiers: 0 exact title, 1 title prefix, 2 title contains, 3 any other
+ * field (including a fuzzy Latin hit). Lower is stronger.
+ */
+export type SearchRelevanceTier = 0 | 1 | 2 | 3;
+export type SearchScore = { relevance: SearchRelevanceTier; updatedAt: number };
+
+export function relevanceScore(title: string, fields: readonly string[], rawQuery: string): SearchRelevanceTier | null {
   const query = normalize(rawQuery);
-  if (!query) return 0;
+  if (!query) return null;
   const normalizedTitle = normalize(title);
   if (normalizedTitle === query) return 0;
   if (normalizedTitle.startsWith(query)) return 1;
   if (normalizedTitle.includes(query)) return 2;
-  const normalizedExtras = description.map(normalize).filter(Boolean);
-  if (normalizedExtras.some((value) => value.includes(query))) return 3;
-  const rawText = [title, ...description].join(" ");
-  if (fuzzyLatinMatch(rawText, rawQuery)) return 4;
+  const normalizedFields = fields.map(normalize).filter(Boolean);
+  if (normalizedFields.some((value) => value.includes(query))) return 3;
+  if (fuzzyLatinMatch([title, ...fields].join(" "), rawQuery)) return 3;
   return null;
 }
 
-function rankGroup<T extends { title: string; keywords: string[] }>(items: T[], rawQuery: string) {
+function updatedAtValue(value: string | undefined) {
+  const time = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(time) ? time : 0;
+}
+
+export function scoreSearchItem(
+  item: { title: string; keywords: readonly string[]; updatedAt?: string },
+  rawQuery: string
+): SearchScore | null {
+  const relevance = relevanceScore(item.title, item.keywords, rawQuery);
+  return relevance === null ? null : { relevance, updatedAt: updatedAtValue(item.updatedAt) };
+}
+
+/** Null means no match; lower is a stronger title-first hit. */
+export function relevance(title: string, description: readonly string[], rawQuery: string): number | null {
+  const tier = relevanceScore(title, description, rawQuery);
+  if (tier === null) return null;
+  // Preserve the original legacy score scale consumed by older callers.
+  return tier === 3 ? 4 : tier;
+}
+
+type RankedGroupResult<T> = RankedGroup<T> & { best: SearchScore | null };
+
+function rankGroup<T extends { title: string; keywords: string[]; updatedAt?: string }>(items: T[], rawQuery: string): RankedGroupResult<T> {
   const query = rawQuery.trim();
-  if (!query) return { items: items.slice(), total: items.length };
+  if (!query) return { items: items.slice(), total: items.length, best: null };
   const ranked = items
-    .map((item, index) => ({ item, index, score: relevance(item.title, item.keywords, query) }))
-    .filter((entry): entry is { item: T; index: number; score: number } => entry.score !== null)
-    .sort((left, right) => left.score - right.score || left.index - right.index);
-  return { items: ranked.map((entry) => entry.item), total: ranked.length };
+    .map((item, index) => ({ item, index, score: scoreSearchItem(item, query) }))
+    .filter((entry): entry is { item: T; index: number; score: SearchScore } => entry.score !== null)
+    .sort((left, right) => left.score.relevance - right.score.relevance
+      || right.score.updatedAt - left.score.updatedAt
+      || left.index - right.index);
+  return {
+    items: ranked.map((entry) => entry.item),
+    total: ranked.length,
+    best: ranked[0]?.score ?? null
+  };
 }
 
 export function filterGlobalSearch(data: GlobalSearchData, rawQuery: string, limits: Partial<Record<"pages" | "courses" | "knowledge" | "actions", number>> = {}): GlobalSearchResults {
   const query = rawQuery.trim();
-  const pages = rankGroup(data.pages, query);
-  const courses = rankGroup(data.courses, query);
-  const knowledge = rankGroup(data.knowledge, query);
-  const actions = rankGroup(data.actions, query);
+  const ranked = {
+    pages: rankGroup(data.pages, query),
+    courses: rankGroup(data.courses, query),
+    knowledge: rankGroup(data.knowledge, query),
+    actions: rankGroup(data.actions, query)
+  } satisfies Record<SearchGroupKey, RankedGroupResult<unknown>>;
+  const baseOrder: SearchGroupKey[] = ["pages", "courses", "knowledge", "actions"];
+  const groupOrder = baseOrder
+    .filter((key) => !query || ranked[key].total > 0)
+    .slice()
+    .sort((left, right) => {
+      if (!query) return 0;
+      const leftBest = ranked[left].best!;
+      const rightBest = ranked[right].best!;
+      return leftBest.relevance - rightBest.relevance
+        || SEARCH_GROUP_TYPE_RANK[left] - SEARCH_GROUP_TYPE_RANK[right]
+        || rightBest.updatedAt - leftBest.updatedAt;
+    });
   return {
     query,
-    pages: { items: pages.items.slice(0, limits.pages ?? (query ? 8 : 7)), total: pages.total },
-    courses: { items: courses.items.slice(0, limits.courses ?? 3), total: courses.total },
-    knowledge: { items: knowledge.items.slice(0, limits.knowledge ?? 3), total: knowledge.total },
-    actions: { items: actions.items.slice(0, limits.actions ?? 6), total: actions.total },
-    empty: pages.total + courses.total + knowledge.total + actions.total === 0
+    pages: { items: ranked.pages.items.slice(0, limits.pages ?? (query ? 8 : 7)), total: ranked.pages.total },
+    courses: { items: ranked.courses.items.slice(0, limits.courses ?? 3), total: ranked.courses.total },
+    knowledge: { items: ranked.knowledge.items.slice(0, limits.knowledge ?? 3), total: ranked.knowledge.total },
+    actions: { items: ranked.actions.items.slice(0, limits.actions ?? 6), total: ranked.actions.total },
+    groupOrder,
+    empty: ranked.pages.total + ranked.courses.total + ranked.knowledge.total + ranked.actions.total === 0
   };
 }

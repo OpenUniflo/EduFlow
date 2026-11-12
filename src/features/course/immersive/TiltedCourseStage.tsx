@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, type Ref } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CSS3DObject, CSS3DRenderer } from "three/examples/jsm/renderers/CSS3DRenderer.js";
@@ -36,6 +36,7 @@ import {
   type LayerOffsets
 } from "./courseTreeLayout";
 import { selectionXraySegments } from "@/shared/scene/xray";
+import { beginDetailCameraRestore, cancelDetailCameraRestore, takeDetailCameraRestore, type DetailCameraRestore } from "./detailCameraRestore";
 import { projectColorVar, projectToneFor } from "./projectColors";
 import { advancePulse, routeMetrics } from "@/shared/scene/routePulse";
 import { buildRouteAnchorSequence, cometGradientStops, pointAtRouteDistance, routeBandComets, staggeredWindowCenters } from "./routeBand";
@@ -405,6 +406,8 @@ export function TiltedCourseStage({
     externalHover: string | null;
     selected: string | null;
     detailOpen: boolean;
+    /** Camera before an automatic reveal panned for the open detail panel. */
+    detailReveal: DetailCameraRestore | null;
     reduced: boolean;
     currentNodes: StageNode[];
     currentChapters: StageChapter[];
@@ -434,6 +437,10 @@ export function TiltedCourseStage({
 
   const propsRef = useRef({ nodes, chapters, edges, beams, layer, selectedId, hoverId, reducedMotion, detailOpen, externalHoverId, rightInset, onSelect, onBackground, onPoseChange, onCapabilityReveal, onSemanticZoom, onFps, onHoverNode, onReady });
   propsRef.current = { nodes, chapters, edges, beams, layer, selectedId, hoverId, reducedMotion, detailOpen, externalHoverId, rightInset, onSelect, onBackground, onPoseChange, onCapabilityReveal, onSemanticZoom, onFps, onHoverNode, onReady };
+  const cancelDetailReveal = useCallback(() => {
+    const engine = runtimeRef.current;
+    if (engine) engine.detailReveal = cancelDetailCameraRestore(engine.detailReveal);
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -623,7 +630,7 @@ export function TiltedCourseStage({
       down: null as null | { x: number; y: number; button: number; shift: boolean; onLabel: boolean },
       dragging: false, moved: false, suppressClick: false,
       cameraTween: 0, cameraTweenStop: null as null | (() => void),
-      externalHover: null as string | null, selected: null as string | null, detailOpen: false, reduced: false,
+      externalHover: null as string | null, selected: null as string | null, detailOpen: false, detailReveal: null as DetailCameraRestore | null, reduced: false,
       currentNodes: [] as StageNode[], currentChapters: [] as StageChapter[], currentEdges: [] as StageEdge[], currentBeams: [] as StageBeam[], testComet: null,
       capabilityLines: [] as CapabilityLineRuntime[], routeHost, routeTrackCanvas, routeCometCanvas, routeBands: [] as RouteBandRuntime[],
       minDistance: SCENE_CAMERA.minDistance, maxDistance: SCENE_CAMERA.maxDistance,
@@ -647,6 +654,10 @@ export function TiltedCourseStage({
       }
     } as unknown as NonNullable<typeof runtimeRef.current>;
     runtimeRef.current = engine;
+
+    const cancelPendingDetailReveal = () => {
+      engine.detailReveal = cancelDetailCameraRestore(engine.detailReveal);
+    };
 
     const colorFor = (node: StageNode) => {
       if (node.kind === "assignment") return colors.practice;
@@ -818,6 +829,12 @@ export function TiltedCourseStage({
       const desiredX = Math.max(minX, Math.min(maxX, screen.x));
       const desiredY = Math.max(minY, Math.min(maxY, screen.y));
       if (Math.abs(desiredX - screen.x) < 0.5 && Math.abs(desiredY - screen.y) < 0.5) return;
+      // Remember the pre-panel camera once. A later selection change while the
+      // panel stays open keeps this same baseline.
+      engine.detailReveal = beginDetailCameraRestore(engine.detailReveal, {
+        position: camera.position.toArray() as [number, number, number],
+        target: controls.target.toArray() as [number, number, number]
+      });
       // The selection moved the camera; a later resize must not undo it.
       engine.userInteracted = true;
       const distance = camera.position.distanceTo(controls.target);
@@ -2699,6 +2716,7 @@ export function TiltedCourseStage({
         if (Math.hypot(event.clientX - engine.down.x, event.clientY - engine.down.y) > 5) {
           engine.moved = true;
           engine.suppressClick = true;
+          cancelPendingDetailReveal();
           hideExcentric();
         }
         return;
@@ -2783,6 +2801,7 @@ export function TiltedCourseStage({
       const factor = wheelZoomFactor(event.deltaY, event.deltaMode, controls.zoomSpeed, rect.height);
       const next = Math.max(controls.minDistance, Math.min(controls.maxDistance, distance * factor));
       if (Math.abs(next - distance) < 0.0001) return;
+      cancelPendingDetailReveal();
       const scale = next / Math.max(0.0001, distance);
       camera.position.sub(cursor).multiplyScalar(scale).add(cursor);
       controls.target.sub(cursor).multiplyScalar(scale).add(cursor);
@@ -2792,6 +2811,7 @@ export function TiltedCourseStage({
     }
     function doubleClick(event: MouseEvent) {
       engine.userInteracted = true;
+      cancelPendingDetailReveal();
       const rect = hostEl.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
@@ -3193,6 +3213,25 @@ export function TiltedCourseStage({
     engine.labelsDirty = true;
   }, [detailOpen, selectedId]);
 
+  const detailWasOpen = useRef(false);
+  useEffect(() => {
+    const wasOpen = detailWasOpen.current;
+    detailWasOpen.current = detailOpen;
+    if (!wasOpen || detailOpen) return;
+    const engine = runtimeRef.current;
+    if (!engine) return;
+    // Only the automatic reveal is undone. A drag, wheel or toolbar camera
+    // action during the panel cancelled the restore, so the user's view stays.
+    const pose = takeDetailCameraRestore(engine.detailReveal);
+    engine.detailReveal = null;
+    if (!pose) return;
+    apiRef.current?.animateCamera(
+      new THREE.Vector3(...pose.position),
+      new THREE.Vector3(...pose.target),
+      320
+    );
+  }, [detailOpen]);
+
   useEffect(() => {
     const engine = runtimeRef.current;
     if (!engine || !engine.currentNodes.length) return;
@@ -3204,6 +3243,7 @@ export function TiltedCourseStage({
       const engine = runtimeRef.current;
       const api = apiRef.current;
       if (!engine || !api) return;
+      cancelDetailReveal();
       const direction = engine.camera.position.clone().sub(engine.controls.target);
       api.animateCamera(engine.controls.target.clone().add(direction.setLength(zoomDistance(direction.length(), SCENE_CAMERA.zoomInFactor))), engine.controls.target.clone(), 260);
     },
@@ -3211,12 +3251,14 @@ export function TiltedCourseStage({
       const engine = runtimeRef.current;
       const api = apiRef.current;
       if (!engine || !api) return;
+      cancelDetailReveal();
       const direction = engine.camera.position.clone().sub(engine.controls.target);
       api.animateCamera(engine.controls.target.clone().add(direction.setLength(zoomDistance(direction.length(), SCENE_CAMERA.zoomOutFactor))), engine.controls.target.clone(), 260);
     },
     fit: () => {
       const engine = runtimeRef.current;
       if (!engine) return;
+      cancelDetailReveal();
       engine.userInteracted = false;
       apiRef.current?.fit(!reducedMotion);
     },
@@ -3224,6 +3266,7 @@ export function TiltedCourseStage({
       const engine = runtimeRef.current;
       const api = apiRef.current;
       if (!engine || !api) return;
+      cancelDetailReveal();
       const distance = engine.fitDistance;
       const target = engine.controls.target.clone();
       api.animateCamera(target.clone().add(new THREE.Vector3(0, 0, distance)), target, 620);
@@ -3232,6 +3275,7 @@ export function TiltedCourseStage({
       const engine = runtimeRef.current;
       const api = apiRef.current;
       if (!engine || !api) return;
+      cancelDetailReveal();
       if (value === "rotated") {
         const distance = engine.camera.position.distanceTo(engine.controls.target);
         const target = engine.controls.target.clone();
@@ -3245,6 +3289,7 @@ export function TiltedCourseStage({
       const engine = runtimeRef.current;
       const api = apiRef.current;
       if (!engine || !api) return;
+      cancelDetailReveal();
       const offset = engine.camera.position.clone().sub(engine.controls.target);
       offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), radians);
       api.animateCamera(engine.controls.target.clone().add(offset), engine.controls.target.clone(), 400);
@@ -3254,6 +3299,7 @@ export function TiltedCourseStage({
       const engine = runtimeRef.current;
       const api = apiRef.current;
       if (!engine || !api) return;
+      cancelDetailReveal();
       const direction = engine.camera.position.clone().sub(engine.controls.target);
       const distance = THREE.MathUtils.clamp(engine.fitDistance / Math.max(0.2, percent / 100), engine.minDistance, engine.controls.maxDistance);
       api.animateCamera(engine.controls.target.clone().add(direction.setLength(distance)), engine.controls.target.clone(), 320);
@@ -3278,6 +3324,7 @@ export function TiltedCourseStage({
     setViewState: (state: StageViewState) => {
       const api = apiRef.current;
       if (!api) return;
+      cancelDetailReveal();
       const target = new THREE.Vector3(state.panX, -state.panY, 0);
       const cosPitch = Math.cos(state.pitch);
       const direction = new THREE.Vector3(
@@ -3287,11 +3334,12 @@ export function TiltedCourseStage({
       );
       api.animateCamera(target.clone().add(direction.multiplyScalar(state.distance)), target, 0);
     },
-    focusCapabilities: () => apiRef.current?.capPresetView(),
+    focusCapabilities: () => { cancelDetailReveal(); apiRef.current?.capPresetView(); },
     locate: (id: string) => {
       const engine = runtimeRef.current;
       const api = apiRef.current;
       if (!engine || !api) return;
+      cancelDetailReveal();
       const node = engine.currentNodes.find((entry) => entry.id === id);
       if (!node) return;
       const now = engine.camera.position.distanceTo(engine.controls.target);
@@ -3305,8 +3353,8 @@ export function TiltedCourseStage({
     reveal: (id: string) => {
       apiRef.current?.reveal(id);
     },
-    front: () => apiRef.current?.frontView()
-  }), [detailOpen, reducedMotion]);
+    front: () => { cancelDetailReveal(); apiRef.current?.frontView(); }
+  }), [cancelDetailReveal, detailOpen, reducedMotion]);
 
   return (
     <div

@@ -2,7 +2,7 @@ import { resolveMicroResumeStep } from "@/features/learning/micro/microLearning"
 import { describe, expect, it, vi } from "vitest";
 import { syntheticFlow, syntheticMicroPaths, syntheticSimulation, syntheticTransformation } from "./fixtures/micro";
 import { isNativeMicroInteractionCorrect, validateNativeMicroInteraction } from "@/shared/learning/nativeMicroInteraction";
-import { scheduleTimelineTick, mechanismMessage, flowAdvance, mechanismFeedback, simulationTrajectory, timelineReducer, transformationCells, transformationEvents, type FlowDefinition, type SimulationDefinition, type TransformationDefinition } from "@/shared/learning/microMechanisms";
+import { scheduleTimelineTick, mechanismMessage, flowAdvance, flowStepLimit, mechanismFeedback, simulationTrajectory, timelineReducer, transformationCells, transformationEvents, type FlowDefinition, type SimulationDefinition, type TransformationDefinition } from "@/shared/learning/microMechanisms";
 
 const interactions = syntheticMicroPaths.flatMap((path) => path.units.flatMap((unit) => unit.steps.flatMap((step) => step.interaction ? [step.interaction] : [])));
 const flow = syntheticFlow as FlowDefinition;
@@ -24,6 +24,8 @@ describe("Micro V2 instructional definitions", () => {
 });
 describe("causal execution and grading", () => {
   it("fails at the missing result connection and requires actual complete replay", () => {
+    expect(flowStepLimit(flow, ["request", "call"])).toBe(3);
+    expect(flowStepLimit(flow, flow.correctEdgeIds)).toBe(flow.events.length);
     expect(flowAdvance(flow, ["request","call"], 3).error).toContain("回传");
     expect(flowAdvance(flow, flow.correctEdgeIds, 3).executed).toBe(4);
     expect(mechanismFeedback(flow, {kind:"flow",edgeIds:flow.correctEdgeIds,executed:2}).correct).toBe(false);

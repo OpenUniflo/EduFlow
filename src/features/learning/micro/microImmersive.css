@@ -194,6 +194,50 @@
   border-color: var(--brand);
   background: var(--brand-soft);
   color: var(--brand-ink);
+}.ef-micro-shell .micro-interaction.choice button,.ef-home-micro .micro-interaction.choice button,.ef-micro-shell .micro-interaction.multiple-choice button,.ef-home-micro .micro-interaction.multiple-choice button{
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}.ef-micro-shell .micro-interaction.choice button > .micro-choice-label,.ef-home-micro .micro-interaction.choice button > .micro-choice-label,.ef-micro-shell .micro-interaction.multiple-choice button > .micro-choice-label,.ef-home-micro .micro-interaction.multiple-choice button > .micro-choice-label{
+  display: block;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  flex: 1 1 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}.ef-micro-shell .micro-choice-state,.ef-home-micro .micro-choice-state{
+  display: inline-flex;
+  min-width: var(--sp-40);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-4);
+  white-space: nowrap;
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}.ef-micro-shell .micro-interaction button.is-correct,.ef-home-micro .micro-interaction button.is-correct{
+  border-color: var(--target);
+  background: var(--target-soft);
+  color: var(--ink);
+}.ef-micro-shell .micro-interaction button.is-incorrect,.ef-home-micro .micro-interaction button.is-incorrect{
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}.ef-micro-shell .micro-choice-state.is-correct,.ef-home-micro .micro-choice-state.is-correct{
+  color: var(--target);
+}.ef-micro-shell .micro-choice-state.is-incorrect,.ef-home-micro .micro-choice-state.is-incorrect{
+  color: var(--danger);
 }.ef-micro-shell .micro-interaction.multiple-choice,.ef-home-micro .micro-interaction.multiple-choice{
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -647,6 +691,14 @@
 }
 
 .micro-step-complete .micro-completion-next { align-self: flex-start; }
+
+.micro-timeline-controls .micro-timeline-reason {
+  flex-basis: 100%;
+  margin-left: 0;
+  color: var(--warn);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
 
 /* h5p-standalone `div` mode: the player renders in this document, not in an
    about:blank iframe. Give the real content a readable stage. */

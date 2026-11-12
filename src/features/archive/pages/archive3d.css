@@ -261,6 +261,35 @@
   background: color-mix(in srgb, var(--surface) 78%, transparent);
 }
 
+.ef-atlas-people-courses {
+  display: inline-flex;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-8);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-full);
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+}
+
+.ef-atlas-people-courses:hover,
+.ef-atlas-people-courses[aria-pressed="true"] {
+  border-color: var(--brand);
+  color: var(--surface);
+  background: var(--brand);
+}
+
+.ef-atlas-people-courses em {
+  color: inherit;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  opacity: .8;
+}
+
 .ef-atlas-people-social:hover,
 .ef-atlas-people-add:hover,
 .ef-atlas-people-search:hover,
@@ -305,6 +334,9 @@
 
 .ef-atlas-guest span { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: var(--fs-12); }
 .ef-atlas-guest-login { height: 32px; padding: 0 16px; border: 0; border-radius: var(--r-full); color: var(--surface); background: var(--brand); font-size: var(--fs-13); font-weight: var(--fw-700); }
+.ef-atlas-guest-courses { height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--r-full); color: var(--brand-ink); background: var(--surface); font-size: var(--fs-12); font-weight: var(--fw-600); }
+.ef-atlas-guest-courses:hover,
+.ef-atlas-guest-courses[aria-pressed="true"] { border-color: var(--brand); color: var(--surface); background: var(--brand); }
 
 .ef-atlas-panel {
   position: absolute;
@@ -474,8 +506,16 @@
   box-shadow: var(--sh-1);
 }
 
-.ef-atlas-level span { padding: 4px 11px; border-radius: var(--r-full); color: var(--muted); font-size: var(--fs-12); }
-.ef-atlas-level span.is-on { color: var(--surface); background: var(--brand); }
+.ef-atlas-level button {
+  padding: 4px 11px;
+  border: 0;
+  border-radius: var(--r-full);
+  color: var(--muted);
+  background: transparent;
+  font-size: var(--fs-12);
+}
+.ef-atlas-level button:hover { color: var(--brand-ink); background: var(--brand-soft); }
+.ef-atlas-level button.is-on { color: var(--surface); background: var(--brand); }
 
 .ef-atlas-zoom {
   position: absolute;

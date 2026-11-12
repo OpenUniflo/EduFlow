@@ -1,12 +1,13 @@
-import { ArrowLeft, Route, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Route, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { animate, useReducedMotion } from "motion/react";
+import { useNavigate } from "react-router-dom";
 import { expandPanelFromRect, contractPanelToRect } from "@/shared/ui/panelMorph";
 import { Pill } from "@/shared/ui/Pill";
 import { Button } from "@/shared/ui/Button";
 import { PanelActions } from "./PanelActions";
-import type { CourseEntrySource } from "@/features/course/pages/courseEntry";
+import { courseEntryState, type CourseEntrySource } from "@/features/course/pages/courseEntry";
 import type { NavigationDecision } from "@/shared/learning/navigation";
 import { CourseRoutePanel, type CourseRouteMode, type CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
 import type { HomeCourseProjection } from "@/features/course/path/courseLearnerProjection";
@@ -39,6 +40,7 @@ export function HomeRoutePanel({ courseId, chapterId, originRect, originElement,
   onStart(action: CourseRouteStepAction): void;
   onModeChange?(mode: CourseRouteMode): void;
 }) {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<CourseRouteMode>("side");
   const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 900px)").matches);
   const reducedMotion = Boolean(useReducedMotion());
@@ -157,6 +159,19 @@ export function HomeRoutePanel({ courseId, chapterId, originRect, originElement,
     onClose();
   }, [container, onClose, originElement, originRect, reducedMotion]);
 
+  // 放大 stays inside Home as the panel's page form; entering the Course page
+  // is an explicit, separate action.
+  const enterCourse = useCallback(() => {
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const returnTo = entryReturnTo ?? current;
+    const href = chapterId
+      ? `/courses/${encodeURIComponent(courseId)}/chapters/${encodeURIComponent(chapterId)}`
+      : `/courses/${encodeURIComponent(courseId)}`;
+    navigate(href, {
+      state: { ...courseEntryState(entrySource, returnTo), returnTo }
+    });
+  }, [chapterId, courseId, entryReturnTo, entrySource, navigate]);
+
   // The side panel owns its close so it contracts back before unmount. Page
   // mode keeps its existing Esc-to-side behaviour.
   useEffect(() => {
@@ -210,6 +225,7 @@ export function HomeRoutePanel({ courseId, chapterId, originRect, originElement,
         </div>
         <Pill tone={projection.segment.complete ? "ok" : projection.segment.started ? "brand" : "quiet"} dot>{projection.segment.complete ? "已完成" : projection.segment.started ? "进行中" : "未开始"}</Pill>
         <div className="ef-home-route-panel-tools">
+          {mode === "page" ? <Button variant="ghost" size="32" icon={<ArrowRight size={14} aria-hidden="true" />} onClick={enterCourse}>进入课程</Button> : null}
           <button type="button" className="ef-home-icon" onClick={() => void closeWithMorph()} aria-label="关闭路线面板"><X size={16} /></button>
         </div>
       </header>
@@ -230,14 +246,10 @@ export function HomeRoutePanel({ courseId, chapterId, originRect, originElement,
       </div>
       <footer className="ef-home-route-panel-foot">
         <span>一条路线走完所有章节</span>
-        <PanelActions expand={{
-          kind: "page",
-          href: chapterId ? `/courses/${encodeURIComponent(courseId)}/chapters/${encodeURIComponent(chapterId)}` : `/courses/${encodeURIComponent(courseId)}`,
-          courseEntry: {
-            source: entrySource,
-            returnTo: entryReturnTo ?? `${window.location.pathname}${window.location.search}${window.location.hash}`
-          }
-        }} />
+        <div className="ef-home-route-panel-actions">
+          <PanelActions expand={{ kind: "in-place", onOpen: () => changeMode("page") }} variant="secondary" />
+          <Button variant="primary" size="32" icon={<ArrowRight size={14} aria-hidden="true" />} onClick={enterCourse}>进入课程</Button>
+        </div>
       </footer>
     </section>, container)}
   </>;

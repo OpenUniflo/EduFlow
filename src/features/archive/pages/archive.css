@@ -232,6 +232,32 @@
 .ef-archive-course-mini-go:hover { color: var(--brand-ink); border-color: var(--brand); }
 .ef-archive-course-mini .ef-archive-muted { margin: 0; }
 
+/* Discoverable Course entry from the people bar. Existing Courses only. */
+.ef-atlas-courses {
+  position: fixed;
+  top: auto;
+  right: auto;
+  left: auto;
+  width: min(348px, calc(100vw - 48px));
+  max-height: min(460px, calc(100dvh - 48px));
+  overflow: auto;
+  z-index: 46;
+}
+.ef-atlas-courses .ef-archive-course-mini-main small { line-height: var(--lh-12); }
+.ef-atlas-course-enter {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-8);
+  color: var(--brand-ink);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-600);
+  white-space: nowrap;
+}
+
 .ef-archive-panel-head,
 .ef-archive-search-head {
   display: flex;
