@@ -314,3 +314,15 @@
 @media(max-width:700px){.wf-resource-dialog{inset:8px}.wf-resource-body{flex-direction:column}.wf-resource-nav{width:auto;flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid #e4e8ef;padding:8px}.wf-resource-nav button{width:auto;white-space:nowrap}.wf-resource-center-toolbar{flex-wrap:wrap}.wf-resource-center-search{order:3;width:100%}.wf-resource-center-search input{width:100%}.wf-resource-center-new{order:2}}
 .wf-resource-dialog label.wf-resource-center-search{display:flex;flex-direction:row;align-items:center;gap:6px;margin:0}
 .wf-resource-dialog label.wf-resource-center-search input{min-height:34px;border:0;padding:0}
+
+.wf-resource-model-warning {
+  display: block;
+  margin-top: 2px;
+  color: var(--warn);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+.wf-resource-panel-badge.is-mine {
+  color: var(--ink-2);
+  background: var(--page);
+}

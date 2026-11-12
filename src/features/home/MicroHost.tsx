@@ -753,7 +753,7 @@ export function MicroFormSwitch({ current, onChange, label = "切换小练习形
 }
 
 /** Side workspace, modal dialog and the one fixed portal container. */
-export function MicroHostLayer({ host, session }: { host: MicroHostController; session: MockSession }) {
+export function MicroHostLayer({ host, session, sideVisible = true }: { host: MicroHostController; session: MockSession; sideVisible?: boolean }) {
   const reducedMotion = Boolean(useReducedMotion());
   const presence = host.presence;
   const path = host.path;
@@ -812,7 +812,7 @@ export function MicroHostLayer({ host, session }: { host: MicroHostController; s
 
   return <>
     <div ref={host.parkingRef} className="ef-micro-parking" hidden aria-hidden="true" />
-    {form === "side" ? <div className="ef-home-workspace ef-micro-side" aria-label="小练习工作区">
+    {form === "side" ? <div className="ef-home-workspace ef-micro-side" aria-label="小练习工作区" hidden={!sideVisible}>
       <div ref={host.sideSlotRef} className="ef-micro-side-slot" />
     </div> : null}
     <dialog

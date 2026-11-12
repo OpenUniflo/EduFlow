@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import type { AssistantSession } from "@/features/assistant/assistantContract";
 import { assistantSessionSourceLabel } from "@/features/assistant/assistantSessionScope";
 import type { SessionActionResult } from "@/features/assistant/AssistantRuntimeContext";
-import { formatConversationDay, conversationDayKey } from "@/shared/ui/conversationDates";
+import { formatConversationDay, formatConversationUpdatedAt, conversationDayKey } from "@/shared/ui/conversationDates";
 import { ConfirmDialog } from "@/features/workflow/editor/v2/ConfirmDialog";
 import "./conversationHistory.css";
 
@@ -83,6 +83,15 @@ export function ConversationHistory({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [menu]);
+
+  const titleCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const session of sessions) {
+      const title = session.title?.trim() || "未命名对话";
+      counts.set(title, (counts.get(title) ?? 0) + 1);
+    }
+    return counts;
+  }, [sessions]);
 
   const groups = useMemo(() => {
     const now = new Date();
@@ -202,10 +211,17 @@ export function ConversationHistory({
                   <button type="button" className="ef-history-icon ef-home-icon" onClick={() => void commitRename()} disabled={rename.busy} aria-label="保存名称">保存</button>
                 </div>;
               }
+              const title = session.title?.trim() || "未命名对话";
+              const source = assistantSessionSourceLabel(session.source);
+              const sameTitle = (titleCounts.get(title) ?? 0) > 1;
+              const updated = formatConversationUpdatedAt(session.updatedAt);
               return <div key={session.id} className={`ef-history-row${active ? " is-active" : ""}`} data-session-id={session.id}>
-                <button type="button" className="ef-history-pick" onClick={() => chooseSession(session.id)} aria-current={active ? "true" : undefined} title={session.title?.trim() || "未命名对话"}>
-                  <span className="ef-history-title">{session.title?.trim() || "未命名对话"}</span>
-                  {assistantSessionSourceLabel(session.source) ? <small className="ef-history-source">{assistantSessionSourceLabel(session.source)}</small> : null}
+                <button type="button" className="ef-history-pick" onClick={() => chooseSession(session.id)} aria-current={active ? "true" : undefined} title={title}>
+                  <span className="ef-history-copy">
+                    <span className="ef-history-title">{title}</span>
+                    {sameTitle && (updated || source) ? <small className="ef-history-meta">{[updated, source].filter(Boolean).join(" · ")}</small> : null}
+                  </span>
+                  {!sameTitle && source ? <small className="ef-history-source">{source}</small> : null}
                 </button>
                 <button
                   type="button"

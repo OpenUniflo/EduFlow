@@ -10,7 +10,8 @@ const states: RightPanel[] = [
   { kind: "knowledge", nodeId: "k1" },
   { kind: "material", courseId: "course", materialId: "m1" },
   { kind: "records" },
-  { kind: "brief", messageId: "b1" }
+  { kind: "brief", messageId: "b1" },
+  { kind: "micro", pathId: "path", knowledgeId: "k1" }
 ];
 
 describe("right panel mutual exclusion", () => {

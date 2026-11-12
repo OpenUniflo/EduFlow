@@ -19,7 +19,9 @@ export type RightPanel =
   | { kind: "knowledge"; nodeId: string }
   | { kind: "material"; courseId: string; materialId: string; segmentId?: string }
   | { kind: "records" }
-  | { kind: "brief"; messageId: string };
+  | { kind: "brief"; messageId: string }
+  /** The side form of the running Micro; its presence lives in MicroHost. */
+  | { kind: "micro"; pathId: string; knowledgeId: string; courseId?: string; cardKey?: string };
 
 export type RightPanelAction =
   | { type: "close" }
@@ -31,6 +33,7 @@ export type RightPanelAction =
   | { type: "open-material"; courseId: string; materialId: string; segmentId?: string }
   | { type: "open-records" }
   | { type: "open-brief"; messageId: string }
+  | { type: "open-micro"; panel: Extract<RightPanel, { kind: "micro" }> }
   | { type: "open-panel"; panel: RightPanel };
 
 export type RightPanelState = {
@@ -60,6 +63,7 @@ export function panelKey(panel: RightPanel): string {
     case "material": return `material:${panel.courseId}:${panel.materialId}:${panel.segmentId ?? ""}`;
     case "records": return "records";
     case "brief": return `brief:${panel.messageId}`;
+    case "micro": return `micro:${panel.pathId}:${panel.cardKey ?? ""}`;
   }
 }
 
@@ -73,6 +77,7 @@ export function panelBackLabel(panel: RightPanel): string {
     case "material": return "返回资料";
     case "records": return "返回记录";
     case "brief": return "返回课程简报";
+    case "micro": return "返回小练习";
     case "none": return "返回";
   }
 }
@@ -119,6 +124,9 @@ export function reduceRightPanel(state: RightPanelState, action: RightPanelActio
     });
     case "open-records": return openPanel(state, { kind: "records" });
     case "open-brief": return openPanel(state, { kind: "brief", messageId: action.messageId });
+    case "open-micro": return state.current.kind === "micro"
+      ? { current: action.panel, history: state.history }
+      : openPanel(state, action.panel);
     case "open-panel": return openPanel(state, action.panel);
   }
 }

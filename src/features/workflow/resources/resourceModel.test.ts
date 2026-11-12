@@ -87,6 +87,15 @@ describe("resourceCounts", () => {
       .toEqual({ providers: 1, apis: 1, mcp: 1, functions: 2, variables: 2 });
   });
 
+  it("deduplicates the same platform tool ref without hiding distinct same-name resources", () => {
+    const tools = [
+      { ref: "hn_search", name: "Hacker News 搜索", contractDigest: "d", inputSchema: { type: "object" } },
+      { ref: "hn_search", name: "Hacker News 搜索", contractDigest: "d", inputSchema: { type: "object" } },
+      { ref: "hn_search_copy", name: "Hacker News 搜索", contractDigest: "d", inputSchema: { type: "object" } },
+    ] as const;
+    expect(platformApiTools(tools).map(tool => tool.ref)).toEqual(["hn_search", "hn_search_copy"]);
+  });
+
   it("counts platform API rows together with user HTTP connections", () => {
     const tools = [
       { ref: "hn_search", name: "Hacker News 搜索", contractDigest: "d", inputSchema: { type: "object" }, origin: "environment" as const },

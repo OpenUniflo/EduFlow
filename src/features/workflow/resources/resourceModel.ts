@@ -132,7 +132,16 @@ export type ResourceCounts = {
 
 /** Platform-provided API tools are listed beside user HTTP connections. */
 export function platformApiTools(tools: readonly WorkflowTool[]): WorkflowTool[] {
-  return tools.filter(tool => (tool.origin ?? "environment") !== "user" && !tool.connectionRef);
+  const seen = new Set<string>();
+  return tools.filter(tool => {
+    if ((tool.origin ?? "environment") === "user" || tool.connectionRef) return false;
+    // One stable tool reference is one row even when the environment returns it
+    // through more than one discovery path. Distinct refs with the same display
+    // name are still distinct resources and stay visible with their source.
+    if (seen.has(tool.ref)) return false;
+    seen.add(tool.ref);
+    return true;
+  });
 }
 
 /** Navigation counts for the resource center. Null data renders as an empty badge, not a fake zero. */

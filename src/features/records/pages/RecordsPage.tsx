@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
@@ -183,11 +183,7 @@ export function RecordsPage() {
           {error ? <b>记录暂时不可用</b> : loading && !data ? <b>正在读取记录…</b> : <>
             <b>{data?.resultTotal ?? 0} 条记录</b>
             <span className="ef-rec-sep" aria-hidden="true" />
-            <span>近 7 天 {summary?.last7Days ?? 0} 天</span>
-            <span className="ef-rec-sep" aria-hidden="true" />
-            <span>连续 {summary?.currentStreak ?? 0} 天</span>
-            <span className="ef-rec-sep" aria-hidden="true" />
-            <span>本月 {summary?.monthActivities ?? 0} 次活动</span>
+            <span>近 7 天有 {summary?.last7Days ?? 0} 天在学习</span>
           </>}
         </p>
       </div>
@@ -263,6 +259,17 @@ function HeatmapCard({ summary, monthLabels }: {
   monthLabels: Array<{ label: string; column: number }>;
 }) {
   const [tip, setTip] = useState<{ left: number; top: number; text: string } | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // The current week is the rightmost column. Start at the recent end so a
+  // learner never has to discover a hidden horizontal scroll to see today.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const scroller = scrollRef.current;
+      if (scroller) scroller.scrollLeft = scroller.scrollWidth;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [summary.endDate, summary.startDate]);
 
   function showTip(event: ReactMouseEvent<HTMLSpanElement>, day: RecordDay) {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -287,12 +294,12 @@ function HeatmapCard({ summary, monthLabels }: {
       {[0, 1, 2, 3, 4].map((level) => <i key={level} className={`ef-rec-legend-cell ef-rec-level-${level}`} />)}
       <span>多</span>
     </div>
-    <div className="ef-rec-heat-scroll">
+    <div className="ef-rec-heat-scroll" ref={scrollRef}>
       <div className="ef-rec-heat-wrap">
         <div className="ef-rec-days" aria-hidden="true"><span>一</span><span>三</span><span>五</span></div>
         <div>
           <div className="ef-rec-months" aria-hidden="true">
-            {monthLabels.map((month) => <span key={`${month.label}:${month.column}`} style={{ gridColumn: `${month.column} / span ${Math.min(4, 54 - month.column)}` }}>{month.label}</span>)}
+            {monthLabels.map((month) => <span key={`${month.label}:${month.column}`} style={{ gridColumn: `${month.column} / span ${Math.min(4, 54 - month.column)}`, ...(month.column >= 50 ? { justifySelf: "end" as const } : {}) }}>{month.label}</span>)}
           </div>
           <div className="ef-rec-grid" role="img" aria-label={`最近 53 周学习活动热力图，共 ${summary.windowActivities} 次活动`}>
             {summary.days.map((day) => {
@@ -432,7 +439,6 @@ function FilterCard({ data, types, range, courseId, loading, resetDisabled, onTo
   onReset: () => void;
 }) {
   const counts = data?.counts;
-  const summary = data?.summary;
   return <div className="ef-rec-filter ef-ui-glass ef-ui-glass--regular ef-ui-glass--r-24" aria-label="记录筛选" aria-busy={loading || undefined}>
     <div className="ef-rec-filter-head">
       <b>筛选</b>
@@ -469,7 +475,7 @@ function FilterCard({ data, types, range, courseId, loading, resetDisabled, onTo
       </div>
     </div>
     <div className="ef-rec-scope">
-      <span>当前 <b>{data?.resultTotal ?? 0}</b> 条 · <b>{summary?.totalActivities ?? 0}</b> 次活动</span>
+      <span>当前筛选 <b>{data?.resultTotal ?? 0}</b> 条记录</span>
       <span title={data?.scope.from && data.scope.to ? `${data.scope.from} – ${data.scope.to}` : undefined}>{formatRecordDateRange(data?.scope.from ?? null, data?.scope.to ?? null)}</span>
     </div>
   </div>;

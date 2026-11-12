@@ -235,3 +235,8 @@
   padding: 0;
   overflow: visible;
 }
+
+/* A side Micro keeps its mounted runner while another panel owns the screen. */
+.ef-micro-side[hidden] {
+  display: none;
+}

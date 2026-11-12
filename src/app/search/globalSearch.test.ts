@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPageSearchItems, filterGlobalSearch, knowledgeSearchStatus, relevance, relevanceScore, type GlobalSearchData } from "./globalSearch";
+import { buildPageSearchItems, filterGlobalSearch, knowledgeCourseMeta, knowledgeSearchStatus, relevance, relevanceScore, type GlobalSearchData } from "./globalSearch";
 
 const data: GlobalSearchData = {
   pages: buildPageSearchItems({ role: "admin", capabilities: ["global-domain-admin"] }),
@@ -87,6 +87,11 @@ describe("global search model", () => {
       ]
     };
     expect(filterGlobalSearch(recent, "ReAct").knowledge.items.map((item) => item.id)).toEqual(["k-new", "k-old"]);
+  });
+
+  it("puts the owning Course before a Knowledge chapter and truncates long titles", () => {
+    expect(knowledgeCourseMeta("Agent 工程实践", 4, "在学")).toBe("Agent 工程实践 · 第 4 章 · 在学");
+    expect(knowledgeCourseMeta("一门名字特别特别长的课程", 2, "未开始", 6)).toBe("一门名字特别… · 第 2 章 · 未开始");
   });
 
   it("shows truthful Knowledge states and never invents 当前 from recency", () => {

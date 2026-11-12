@@ -744,7 +744,7 @@ export function PracticeObject({ session, courseId, assignmentId, attemptId: req
       <Button variant="secondary" size="32" icon={<Search size={15} aria-hidden="true" />} onClick={() => setWorkPicker(true)}>从我的作品选择</Button>
     </div>}
   </div>;
-  const draftHint = <p className="ef-practice-note"><Lock size={13} aria-hidden="true" />备注、链接、附件或关联作品至少提供一项；支持 UTF-8 的 .txt、.md、.csv，最多 {ATTACHMENT_LIMIT} 份。正式提交后内容才会保存。</p>;
+  const draftHint = <p className="ef-practice-note"><Lock size={13} aria-hidden="true" />备注、链接、附件或关联作品至少提供一项；支持 UTF-8 的 .txt、.md、.csv，最多 {ATTACHMENT_LIMIT} 份。草稿会自动保存在当前浏览器会话；正式提交后才会成为可评价的提交记录。</p>;
 
   const draftSection = <ObjectShellSection icon={<PenLine size={15} />} title="我的提交草稿" description="只有你可见" actions={<Pill tone="quiet">草稿</Pill>}>
     {isInstruction ? <>

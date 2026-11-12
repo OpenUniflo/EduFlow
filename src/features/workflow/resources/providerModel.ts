@@ -289,3 +289,43 @@ export function probeConnectionRef(): string {
     : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   return `${PROBE_REF_PREFIX}${suffix}`;
 }
+
+/** Every model this provider ever enabled, newest and older versions alike. */
+export function providerHistoricalModelRefs(entry: ProviderConnection, connections: readonly ProviderConnection[]): string[] {
+  const seen = new Set<string>();
+  for (const version of connections.filter(item => item.ref === entry.ref)) {
+    for (const model of providerModelRefs(version)) seen.add(model);
+  }
+  return [...seen];
+}
+
+/** Editor rows keep models that were enabled before or returned by the last test. */
+export function providerEditorModelRows(
+  current: readonly string[],
+  historical: readonly string[],
+  discovered: readonly string[],
+): string[] {
+  return [...new Set([...current, ...historical, ...discovered])];
+}
+
+export function providerEditorModelSourceLabel(
+  model: string,
+  current: readonly string[],
+  historical: readonly string[],
+  discovered: readonly string[],
+): string {
+  if (current.includes(model)) return discovered.includes(model) ? "从供应商获取" : "已启用";
+  if (discovered.includes(model)) return "从供应商获取";
+  if (historical.includes(model)) return "曾启用";
+  return "可用";
+}
+
+/** True when an enabled model is absent from the last successful provider model list. */
+export function modelMissingFromProviderTest(
+  model: string,
+  enabled: readonly string[],
+  testModels: readonly string[] | undefined,
+  testOk: boolean,
+): boolean {
+  return Boolean(testOk && testModels && enabled.includes(model) && !testModels.includes(model));
+}

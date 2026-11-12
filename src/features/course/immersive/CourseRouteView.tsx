@@ -77,7 +77,7 @@ const RouteStepRow = memo(function RouteStepRow({ step, isCurrent, isSelected, l
       className={`ef-imm-route-step is-${step.status}${isSelected ? " is-selected" : ""}`}
       style={{ left: `${step.x}px`, top: `${step.y - 48}px` }}
       data-route-interactive
-      aria-label={`${step.title} · ${isCurrent ? "当前" : step.stateLabel}`}
+      aria-label={`${step.title} · ${isCurrent ? "当前" : step.status === "locked" ? "未解锁" : step.stateLabel}`}
       aria-current={isCurrent ? "step" : undefined}
       onClick={() => onChoose(step)}
     >
@@ -94,7 +94,7 @@ const RouteStepRow = memo(function RouteStepRow({ step, isCurrent, isSelected, l
       onClick={() => onChoose(step)}
     >
       <b>{step.title}</b>
-      <small>{isCurrent ? "当前" : step.stateLabel}{step.minutes ? ` · ${step.minutes} 分钟` : ""}{step.meta ? ` · ${step.meta}` : ""}</small>
+      <small>{isCurrent ? "当前" : step.status === "locked" ? "未解锁" : step.stateLabel}{step.minutes ? ` · ${step.minutes} 分钟` : ""}{step.meta ? ` · ${step.meta}` : ""}</small>
     </button>
   </div>;
 });
@@ -467,10 +467,10 @@ export function CourseRouteView({
             onClick={(event) => event.stopPropagation()}
           >
             <div className="ef-imm-route-action-copy">
-              <small>{selected.status === "current" ? "当前步骤" : selected.status === "done" ? "已学" : "未开始"}</small>
+              <small>{selected.status === "current" ? "当前步骤" : selected.status === "done" ? "已学" : selected.status === "locked" ? "未解锁" : selected.stateLabel}</small>
               <b title={selected.title}>{selected.title}</b>
             </div>
-            {selected.status === "locked" ? <span className="ef-imm-route-action-locked" title="完成前面的知识点后解锁">未解锁</span> : selected.kind === "none" ? <span className="ef-imm-route-action-locked">无任务</span> : <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => onStart(selected)}><Play size={14} />{stepActionLabel(selected)}</button>}
+            {selected.status === "locked" ? <span className="ef-imm-route-action-locked" title="完成前置知识点后解锁">完成前置知识点后解锁</span> : selected.kind === "none" ? <span className="ef-imm-route-action-locked">无任务</span> : <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={() => onStart(selected)}><Play size={14} />{stepActionLabel(selected)}</button>}
           </div> : null}
           {!current && layout.steps.length ? <div className="ef-imm-route-complete" style={{ top: `${layout.steps[layout.steps.length - 1].y + 74}px` }}>
             <b><Flag size={16} />路线已完成</b>

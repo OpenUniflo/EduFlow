@@ -1,0 +1,111 @@
+/* Virtualized Material outline: only the visible chapter rows are mounted. */
+.atlas-lesson-outline .atlas-outline-list {
+  position: relative;
+}
+
+.atlas-outline-virtual {
+  position: relative;
+  width: 100%;
+}
+
+.atlas-outline-row {
+  box-sizing: border-box;
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+}
+
+.atlas-outline-group {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-8);
+  border: 0;
+  border-radius: var(--r-8);
+  color: var(--ink-2);
+  background: transparent;
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  text-align: left;
+}
+
+.atlas-outline-group:hover,
+.atlas-outline-group.is-open {
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
+  color: var(--brand-ink);
+}
+
+.atlas-outline-group strong {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-weight: var(--fw-600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-outline-group small {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+
+.atlas-outline-item {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: var(--sp-8);
+  align-items: center;
+  padding: var(--sp-8);
+  border: 1px solid transparent;
+  border-radius: var(--r-8);
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--surface) 52%, transparent);
+  text-align: left;
+}
+
+.atlas-outline-item > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: var(--r-8);
+  background: var(--surface);
+  font-size: var(--fs-12);
+}
+
+.atlas-outline-item strong,
+.atlas-outline-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-outline-item strong {
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.atlas-outline-item small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.atlas-outline-item:hover {
+  border-color: var(--line);
+}
+
+.atlas-outline-item.active {
+  border-color: color-mix(in srgb, var(--brand) 35%, transparent);
+  color: var(--brand-ink);
+  background: color-mix(in srgb, var(--brand) 9%, var(--surface));
+}

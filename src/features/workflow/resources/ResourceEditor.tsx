@@ -5,7 +5,7 @@ import { workflowErrorMessage } from "../repository/v2/WorkflowApiV2";
 import type { ConnectionTestResult, JsonSchema, JsonValue, WorkflowTool } from "../domain/v2/types";
 import { useExtensions, type Extensions, type FunctionVersion } from "../editor/v2/FunctionExecutionFields";
 import { groupCatalogByRef, type CatalogConnection } from "./resourceModel";
-import { latestVisibleProviders, providerAddress, providerBaseUrlIssue, providerCredentialRequiredOnSave, providerDisplayName, providerModelRefs, providerPublishContent, providerTypeLabel, probeConnectionContent, probeConnectionRef } from "./providerModel";
+import { latestVisibleProviders, modelMissingFromProviderTest, providerAddress, providerBaseUrlIssue, providerCredentialRequiredOnSave, providerDisplayName, providerEditorModelRows, providerEditorModelSourceLabel, providerHistoricalModelRefs, providerModelRefs, providerPublishContent, providerTypeLabel, probeConnectionContent, probeConnectionRef } from "./providerModel";
 import { findProviderPreset, providerRefFromPreset, uniqueProviderRef, visibleProviderPresets, DEEPSEEK_BASE_URL, credentialRequiredFor, normalizeBaseUrl } from "./providerPresets";
 import {
   API_AUTH_TYPES, API_BODY_MODES, API_DEFAULT_URL_HINT, API_METHODS, API_PARAM_SOURCES, apiContentFromDraft, apiDisplayUrl, apiDraftFromContent, apiDraftIssue,
@@ -118,7 +118,9 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
 
   const ref = existing?.ref ?? uniqueProviderRef(providerRefFromPreset(presetId === "existing" ? "deepseek" : presetId), existingRefs);
   const targetVersion = existing ? existing.version + 1 : 1;
-  const candidates = [...new Set([...models, ...discovered])];
+  const historicalModels = existing ? providerHistoricalModelRefs(existing, data.connections) : [];
+  const candidates = providerEditorModelRows(models, historicalModels, discovered);
+  const testedModels = testResult?.ok ? testResult.models : undefined;
   const credentialNeeded = credentialRequiredFor(type, baseUrl);
   const docsUrl = providerDocsUrl(type, baseUrl);
   // Worker: DeepSeek only accepts the official base URL, while OpenAI-compatible gateways need one.
@@ -149,12 +151,16 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
     const probe = existing ? "" : probeConnectionRef();
     try {
       if (existing) {
-        setTestResult(await workflowApiV2.testExtension(environmentRef, { ref: existing.ref, version: existing.version, testModel, testMessage: "请用一句话确认连接可用。" }));
+        const result = await workflowApiV2.testExtension(environmentRef, { ref: existing.ref, version: existing.version, testModel, testMessage: "请用一句话确认连接可用。" });
+        setTestResult(result);
+        if (result.ok) setDiscovered(result.models ?? []);
       } else {
         const content = probeConnectionContent({ type, baseUrl });
         content.modelRefs = [...new Set([...models, testModel])];
         await workflowApiV2.extension(environmentRef, { action: "publish", kind: "connection", ref: probe, version: 1, content, credential });
-        setTestResult(await workflowApiV2.testExtension(environmentRef, { ref: probe, version: 1, testModel, testMessage: "请用一句话确认连接可用。" }));
+        const result = await workflowApiV2.testExtension(environmentRef, { ref: probe, version: 1, testModel, testMessage: "请用一句话确认连接可用。" });
+        setTestResult(result);
+        if (result.ok) setDiscovered(result.models ?? []);
       }
     } catch (reason) {
       setFeedback({ ok: false, text: workflowErrorMessage(reason) });
@@ -223,7 +229,10 @@ function ProviderEditor({ environmentRef, target, onClose, onSaved, data, refres
     </Section>
     <Section title="可用模型" hint={`勾选要出现在节点里的模型，已选 ${models.length} 个`}>
       <div className="wf-editor-model-list">
-        {candidates.length ? candidates.map(model => <label key={model} className="wf-editor-model-row"><input type="checkbox" aria-label={`启用模型 ${model}`} checked={models.includes(model)} onChange={event => setModels(current => event.target.checked ? (current.includes(model) ? current : [...current, model]) : current.filter(item => item !== model))}/><span><code>{model}</code><small>{discovered.includes(model) ? "从供应商获取" : "已启用"}</small></span></label>) : <div className="wf-editor-model-row"><span><small>测试连接后会列出可用模型；也可以手动填写模型名。</small></span></div>}
+        {candidates.length ? candidates.map(model => {
+          const missing = modelMissingFromProviderTest(model, models, testedModels, Boolean(testResult?.ok));
+          return <label key={model} className="wf-editor-model-row"><input type="checkbox" aria-label={`启用模型 ${model}`} checked={models.includes(model)} onChange={event => setModels(current => event.target.checked ? (current.includes(model) ? current : [...current, model]) : current.filter(item => item !== model))}/><span><code>{model}</code><small>{providerEditorModelSourceLabel(model, models, historicalModels, discovered)}</small>{missing ? <small className="wf-editor-model-warning">上次测试未在供应商返回的模型列表中找到</small> : null}</span></label>;
+        }) : <div className="wf-editor-model-row"><span><small>测试连接后会列出可用模型；也可以手动填写模型名。</small></span></div>}
         <div className="wf-editor-model-add"><input aria-label="手动添加模型" value={manualModel} onChange={event => setManualModel(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addManualModel(); } }} placeholder="列表里没有？输入模型名"/><button type="button" onClick={addManualModel}>添加</button></div>
       </div>
     </Section>

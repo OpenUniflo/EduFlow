@@ -124,10 +124,17 @@ export function knowledgeSearchStatus(node: Pick<ArchiveNode, "isMine" | "status
   return node.isMine ? knowledgeStateLabelFor(node.status) : knowledgeScopeLabelFor(node.scope);
 }
 
+/** A chapter number only means something together with the Course that owns it. */
+export function knowledgeCourseMeta(courseTitle: string, chapter: number, status: string, maxTitle = 16): string {
+  const characters = Array.from(courseTitle);
+  const title = characters.length > maxTitle ? `${characters.slice(0, maxTitle).join("")}…` : courseTitle;
+  return `${title} · 第 ${chapter} 章 · ${status}`;
+}
+
 function knowledgeMeta(node: ArchiveNode, runtimes: readonly CourseRuntimeData[]) {
   const location = nodeCourseLocation(node, runtimes);
   const status = knowledgeSearchStatus(node);
-  return location ? `第 ${location.chapter} 章 · ${status}` : `${node.domainTitle} · ${status}`;
+  return location ? knowledgeCourseMeta(location.course.title, location.chapter, status) : `${node.domainTitle} · ${status}`;
 }
 
 function knowledgeKeywords(node: ArchiveNode, runtimes: readonly CourseRuntimeData[]) {

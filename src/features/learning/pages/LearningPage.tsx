@@ -17,7 +17,7 @@ import { buildHomeCourseProjection, type HomeMicroAsset } from "@/features/cours
 import type { CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
 import { buildHomeAssistantContext } from "@/features/home/homeAssistantContext";
 import { openPanelParams, openWorkspaceParams, removeWorkspaceParam } from "@/features/home/learningWorkspace";
-import { panelParamAction, panelBackLabel, previousRightPanel, reduceRightPanel, initialRightPanelState, type RightPanel } from "@/features/home/rightPanel";
+import { panelKey, panelParamAction, panelBackLabel, previousRightPanel, reduceRightPanel, initialRightPanelState, type RightPanel } from "@/features/home/rightPanel";
 import { rightPanelFromParams, rightPanelParams } from "@/features/home/panelParams";
 import { ObjectPanelSwitch } from "@/features/home/ObjectPanelSwitch";
 import { panelForTarget } from "@/features/home/panelForTarget";
@@ -91,6 +91,20 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
   // never animates the history column or reflows the page behind the scrim.
   const microLayoutForm = microForm === "focus" ? microHost.presence?.returnForm ?? "inline" : microForm;
   const sideMicro = microLayoutForm === "side";
+  const microPanel = useMemo<Extract<RightPanel, { kind: "micro" }> | null>(() => {
+    const presence = microHost.presence;
+    if (!presence || microLayoutForm !== "side") return null;
+    return {
+      kind: "micro",
+      pathId: presence.pathId,
+      knowledgeId: presence.knowledgeId,
+      ...(presence.courseId ? { courseId: presence.courseId } : {}),
+      ...(presence.cardKey ? { cardKey: presence.cardKey } : {})
+    };
+  }, [microHost.presence, microLayoutForm]);
+  const microPanelKey = microPanel ? panelKey(microPanel) : null;
+  const previousMicroPanelKey = useRef<string | null>(null);
+  const sideMicroVisible = rightPanel.kind === "micro" && Boolean(microPanel);
   const panelVisible = rightPanel.kind !== "none" || sideMicro;
 
   useEffect(() => {
@@ -382,25 +396,22 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     return () => window.clearTimeout(timer);
   }, [microHost.presence, microHost.cardSlot, microHost.slotOwner, microHost.slotVersion, microHost.setForm, assistant.loading]);
 
-  const previousPanelKind = useRef(rightPanel.kind);
+  // The side Micro is one panel kind in the same history stack as My, the
+  // route and a task. MicroHost still owns its presence; this effect only keeps
+  // the panel stack in sync so Back can restore the running practice.
   useEffect(() => {
-    const previous = previousPanelKind.current;
-    previousPanelKind.current = rightPanel.kind;
-    if (rightPanel.kind !== "none" && previous === "none" && microHost.presence?.form === "side") microHost.dismissSide();
-  }, [rightPanel.kind, microHost.presence?.form, microHost.dismissSide]);
-
-  // A side Micro and My/the route/a task are mutually exclusive. When the
-  // side form is chosen while one of them is open, the side form wins.
-  useEffect(() => {
-    if (microForm !== "side" || rightPanel.kind === "none") return;
-    dispatchRightPanel({ type: "close" });
-    if (searchParams.has("panel") || searchParams.has("practice")) {
-      const next = new URLSearchParams(searchParams);
-      next.delete("panel");
-      next.delete("practice");
-      setSearchParams(next, { replace: true });
+    if (!microPanel) {
+      previousMicroPanelKey.current = null;
+      if (rightPanel.kind === "micro") dispatchRightPanel({ type: "close" });
+      return;
     }
-  }, [microForm, rightPanel.kind, searchParams, setSearchParams]);
+    if (previousMicroPanelKey.current === microPanelKey) {
+      if (rightPanel.kind === "none") dispatchRightPanel({ type: "open-micro", panel: microPanel });
+      return;
+    }
+    previousMicroPanelKey.current = microPanelKey;
+    dispatchRightPanel({ type: "open-micro", panel: microPanel });
+  }, [microPanel, microPanelKey, rightPanel.kind]);
 
   useEffect(() => {
     if (!practiceParam) { resolvedPracticeParam.current = null; return; }
@@ -544,7 +555,6 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
     panelTriggerRef.current = trigger ?? null;
     setPanelOrigin(origin ?? null);
     setDismissedObjectKey(null);
-    microHost.dismissSide();
     panelLayoutGraceUntil.current = performance.now() + 500;
     const nextPanel = panelForTarget(target);
     if (nextPanel.kind === "route") {
@@ -578,7 +588,6 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
 
   function showRoutePanel(courseId = focusCourseId, origin?: DOMRect, nodeId?: string, chapterId?: string) {
     if (!courseId) return;
-    microHost.dismissSide();
     setPanelOrigin(origin ?? null);
     panelLayoutGraceUntil.current = performance.now() + 500;
     dispatchRightPanel({ type: "open-route", courseId, ...(nodeId ? { nodeId } : {}), ...(chapterId ? { chapterId } : {}) });
@@ -598,6 +607,10 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
 
   function closeActivePanel() {
     if (rightPanel.kind === "none") return;
+    if (rightPanel.kind === "micro") {
+      microHost.close();
+      return;
+    }
     if (rightPanel.kind === "my") {
       setPanel(false);
       panelToggleRef.current?.focus({ preventScroll: true });
@@ -615,7 +628,6 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       // Preserve the trigger of an object My opens over, so Back can contract
       // to the card that started it. My itself opens from its top toggle.
       if (rightPanel.kind === "none") panelTriggerRef.current = panelToggleRef.current;
-      microHost.dismissSide();
     }
     dispatchRightPanel({ type: open ? "open-my" : "close" });
     const base = open ? openPanelParams(searchParams, workspace?.kind) : new URLSearchParams(searchParams);
@@ -657,7 +669,6 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
 
   async function openPractice(courseId: string, assignmentId: string, title: string, origin?: DOMRect, attemptId?: string) {
     announceLearnerActionStart();
-    microHost.dismissSide();
     setPanelOrigin(origin ?? null);
     setDismissedObjectKey(null);
     panelLayoutGraceUntil.current = performance.now() + 500;
@@ -805,7 +816,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
 
   const emptyExamples = config.examples.map((example) => ({ id: example.id, label: example.label, onSelect: () => void send(example.prompt) }));
 
-  return <ActiveAssistantObjectContext.Provider value={activeObject}><MicroHostProvider host={microHost}><main onPointerDownCapture={(event) => { if ((event.target as Element | null)?.closest?.(".ef-assistant-micro-frame, .ef-home-route-panel, .ef-home-workspace, .ef-home-knowledge-panel-host, .ef-home-object-panel-host")) setDismissedObjectKey(null); }} className={`ef-home ${panelOpen ? "has-panel" : ""} ${workspace || sideMicro ? "has-workspace" : ""} ${routePanelOpen ? "has-route" : ""} ${knowledgePanelOpen ? "has-knowledge" : ""} ${materialPanel ? "has-material" : ""} ${recordsPanelOpen ? "has-records" : ""} ${briefPanel ? "has-brief" : ""} ${routePageOpen ? "is-route-page" : ""}`} data-view={view} data-history={historyOpen ? "open" : "closed"} data-micro-form={microForm} data-workspace={sideMicro ? "micro" : workspace?.kind ?? ""} data-route-page={routePageOpen ? "1" : undefined}>
+  return <ActiveAssistantObjectContext.Provider value={activeObject}><MicroHostProvider host={microHost}><main onPointerDownCapture={(event) => { if ((event.target as Element | null)?.closest?.(".ef-assistant-micro-frame, .ef-home-route-panel, .ef-home-workspace, .ef-home-knowledge-panel-host, .ef-home-object-panel-host")) setDismissedObjectKey(null); }} className={`ef-home ${panelOpen ? "has-panel" : ""} ${workspace || sideMicroVisible ? "has-workspace" : ""} ${routePanelOpen ? "has-route" : ""} ${knowledgePanelOpen ? "has-knowledge" : ""} ${materialPanel ? "has-material" : ""} ${recordsPanelOpen ? "has-records" : ""} ${briefPanel ? "has-brief" : ""} ${routePageOpen ? "is-route-page" : ""}`} data-view={view} data-history={historyOpen ? "open" : "closed"} data-micro-form={microForm} data-workspace={sideMicroVisible ? "micro" : workspace?.kind ?? ""} data-route-page={routePageOpen ? "1" : undefined}>
     <button ref={panelToggleRef} type="button" className={`ef-home-panel-toggle ${panelOpen ? "is-open" : ""}`} aria-pressed={panelOpen} aria-controls="ef-my-panel" onClick={() => setPanel(!panelOpen)}><PanelRight size={16} aria-hidden="true" />我的</button>
 
     {view === "fresh" ? <section className="ef-home-fresh" aria-label="开始对话">
@@ -858,7 +869,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
             title={conversationTitle}
             conversationKey={assistant.activeSessionId}
             onExpandHistory={historyOpen ? undefined : () => toggleHistory(true)}
-            layoutEpoch={`${historyOpen}|${panelVisible}|${rightPanel.kind}|${sideMicro}`}
+            layoutEpoch={`${historyOpen}|${panelVisible}|${rightPanel.kind}|${sideMicroVisible}`}
           />
         </div>
       </div>
@@ -917,7 +928,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       }}
     />
 
-    <MicroHostLayer host={microHost} session={session} />
+    <MicroHostLayer host={microHost} session={session} sideVisible={sideMicroVisible} />
   </main></MicroHostProvider></ActiveAssistantObjectContext.Provider>;
 }
 

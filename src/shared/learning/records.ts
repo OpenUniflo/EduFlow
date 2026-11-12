@@ -349,16 +349,21 @@ export function summarizeEvents(events: readonly Pick<RecordEvent, "occurredAt">
 /** Month labels for the 53 heatmap columns (labels are placed on week columns). */
 export function monthLabelsForDays(days: readonly RecordDay[]): Array<{ label: string; column: number }> {
   const labels: Array<{ label: string; column: number }> = [];
+  const weeks = Math.min(53, Math.floor(days.length / 7));
+  const lastDate = weeks ? days[(weeks - 1) * 7]?.date : undefined;
+  const currentMonth = lastDate ? monthKey(lastDate) : "";
   let previous = "";
   let lastColumn = -99;
-  for (let column = 0; column < Math.min(53, Math.floor(days.length / 7)); column += 1) {
+  for (let column = 0; column < weeks; column += 1) {
     const date = days[column * 7]?.date;
     if (!date) continue;
     const key = monthKey(date);
     if (key === previous) continue;
     previous = key;
-    // N14 labels alternate months so the multi-column labels never crowd.
-    if (column > 50 || (labels.length && column + 1 - lastColumn < 8)) continue;
+    // Alternate month labels so the multi-column labels never crowd, but the
+    // current month is always labeled at its first week column so the rightmost
+    // activity is not left without a scale.
+    if (key !== currentMonth && labels.length && column + 1 - lastColumn < 8) continue;
     labels.push({ label: `${Number(key.slice(5))} 月`, column: column + 1 });
     lastColumn = column + 1;
   }

@@ -365,8 +365,8 @@ function CourseGraphWorkspace({ session, onLogout, courseDesignAssistantProvider
   function applyAssistantProposal(response:CourseDesignAssistantResponse) {
     if(!response.proposal||!effectiveBaseRuntime||!draftState)return;
     const result=validateCourseAuthoringProposal(effectiveBaseRuntime,baseKnowledgeGraph,draftState,response.proposal);
-    if(!result.valid){setDesignActionNotice(`AI Proposal 未应用：${result.validation.fatal[0]?.message ?? "校验失败"}`);return;}
-    if (updateAuthoringDraft(() => result.state)) setDesignActionNotice("AI Proposal 已验证并应用，可使用 Undo 撤回。");
+    if(!result.valid){setDesignActionNotice(`助手提议未应用：${result.validation.fatal[0]?.message ?? "校验失败"}`);return;}
+    if (updateAuthoringDraft(() => result.state)) setDesignActionNotice("助手提议已验证并应用，可撤销。");
   }
 
   async function publishCourse() {

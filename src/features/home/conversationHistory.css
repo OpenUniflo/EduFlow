@@ -154,10 +154,26 @@
   text-align: left;
 }
 
-.ef-history-title {
+.ef-history-copy {
+  display: flex;
   min-width: 0;
   flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ef-history-title {
+  min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-history-meta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

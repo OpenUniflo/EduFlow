@@ -1,6 +1,7 @@
 import { BookOpen, X } from "lucide-react";
 import { applicationServices } from "@/app/services/applicationServices";
 import { sortMaterialSegments } from "@/features/material/materialOrdering";
+import { materialSegmentCountLabel } from "@/shared/learning/materialPresentation";
 import { MaterialPageView } from "@/features/material/reader/MaterialPageView";
 import { PanelActions } from "./PanelActions";
 
@@ -37,7 +38,7 @@ export function MaterialPanel({ courseId, materialId, segmentId, onClose }: {
   return <aside className="ef-object-panel" aria-label={`${material.title} 资料面板`}>
     <header className="ef-object-panel-head">
       <span className="ef-object-panel-icon" aria-hidden="true"><BookOpen size={16} /></span>
-      <div><span>资料 · {segments.length} 段</span><h2>{material.title}</h2></div>
+      <div><span>资料 · {materialSegmentCountLabel(material.type, segments.length)}</span><h2>{material.title}</h2></div>
       <button type="button" className="ef-home-icon" onClick={onClose} aria-label="关闭资料面板"><X size={15} /></button>
     </header>
     <div className="ef-object-panel-body"><MaterialPageView material={material} segment={segment} /></div>

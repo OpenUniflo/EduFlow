@@ -4,7 +4,6 @@ import { satisfiesTeachingPrerequisite } from "@/shared/learning/teachingPrerequ
 import { buildWindingRoute, type WindingStep, type WindingStepInput } from "@/features/course/immersive/courseTreeLayout";
 import { CourseRouteView } from "@/features/course/immersive/CourseRouteView";
 import { resolveCourseRouteAction, type HomeCourseProjection } from "./courseLearnerProjection";
-import { knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
 
 export type CourseRouteStepAction = {
   step: WindingStep;
@@ -82,7 +81,7 @@ export function CourseRoutePanel({
         chapterTitle: chapterByNode.get(nodeId)?.title ?? chapter.title,
         chapterNumber: chapterByNode.get(nodeId)?.displayNumber ?? chapter.displayNumber,
         status: current ? "current" : learned ? "done" : "locked",
-        stateLabel: current ? "当前" : knowledgeStateLabelFor(nodeStatus),
+        stateLabel: current ? "当前" : learned ? "已学" : "未解锁",
         learned,
         ...(chosenMinutes ? { minutes: chosenMinutes } : {}),
         ...(meta ? { meta } : {}),

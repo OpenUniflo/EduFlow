@@ -80,6 +80,9 @@ export function rightPanelParams(params: URLSearchParams, panel: RightPanel): UR
       next.set("object", "brief");
       next.set("objectMessageId", panel.messageId);
       break;
+    case "micro":
+      // The Micro form owns `micro`/`view`/`card`; the panel stack only adds history.
+      break;
     case "none": break;
   }
   return next;

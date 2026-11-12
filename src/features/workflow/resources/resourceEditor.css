@@ -183,3 +183,8 @@
 .wf-editor label.wf-editor-model-row>span{flex:1;min-width:0}
 .wf-editor label.wf-editor-model-row code{display:block;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#263348}
 .wf-editor label.wf-editor-model-row small{display:block;margin-top:1px;font-size:10px;color:#596a83}
+
+.wf-editor-model-warning {
+  color: var(--warn) !important;
+  line-height: 1.45;
+}

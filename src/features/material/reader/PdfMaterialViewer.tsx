@@ -6,10 +6,11 @@ import type { MaterialSegment } from "@/features/course/types";
 import { getMaterialSourceUrl } from "@/features/material/ApiMaterialStorageService";
 import { selectPageAtReadingAnchor, type MaterialNavigationRequest, type VisiblePageCandidate } from "./materialReaderState";
 import { createPdfPageRecoveryGuard, loadPdfWithFreshSource, resolvePdfSourceUrl } from "./pdfSourceLifecycle";
+import { windowedRange } from "./virtualWindow";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, initialAspectRatio, onFatalError }: {
+function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, initialAspectRatio, render, onFatalError }: {
   document: PDFDocumentProxy;
   page: number;
   segment: MaterialSegment;
@@ -17,6 +18,7 @@ function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, 
   zoom: number;
   active: boolean;
   initialAspectRatio: number;
+  render: boolean;
   onFatalError(reason: unknown): void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -26,7 +28,7 @@ function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, 
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || availableWidth <= 0) return;
+    if (!canvas || availableWidth <= 0 || !render) return;
     let cancelled = false;
     let renderTask: RenderTask | null = null;
     setRendered(false);
@@ -56,11 +58,11 @@ function PdfPageCanvas({ document, page, segment, availableWidth, zoom, active, 
       cancelled = true;
       renderTask?.cancel();
     };
-  }, [availableWidth, document, onFatalError, page, zoom]);
+  }, [availableWidth, document, onFatalError, page, render, zoom]);
 
   return <article className={`atlas-pdf-page ${active ? "current" : ""}`} data-segment-id={segment.id} data-page-number={page} style={{ width: availableWidth > 0 ? `${Math.round(availableWidth * zoom)}px` : "min(100%, 820px)", aspectRatio: `1 / ${aspectRatio}` }}>
-    <canvas ref={canvasRef} aria-label={`PDF 第 ${page} 页`} />
-    {!rendered ? <div className="atlas-pdf-page-loading">{renderError ? <><AlertTriangle size={20} /><span>第 {page} 页渲染失败</span></> : <><LoaderCircle size={20} className="atlas-spin" /><span>正在渲染第 {page} 页</span></>}</div> : null}
+    {render || rendered ? <canvas ref={canvasRef} aria-label={`PDF 第 ${page} 页`} /> : null}
+    {render && !rendered ? <div className="atlas-pdf-page-loading">{renderError ? <><AlertTriangle size={20} /><span>第 {page} 页渲染失败</span></> : <><LoaderCircle size={20} className="atlas-spin" /><span>正在渲染第 {page} 页</span></>}</div> : null}
   </article>;
 }
 
@@ -79,7 +81,7 @@ export function PdfMaterialViewer({ courseId, materialId, staticSourceUrl, sourc
 }) {
   const rootRef = useRef<HTMLElement>(null);
   const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
-  const [pageAspectRatios, setPageAspectRatios] = useState<Map<number, number>>(new Map());
+  const [defaultAspectRatio, setDefaultAspectRatio] = useState(1.414);
   const [availableWidth, setAvailableWidth] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -91,6 +93,7 @@ export function PdfMaterialViewer({ courseId, materialId, staticSourceUrl, sourc
     pageRecoveryGuardRef.current = createPdfPageRecoveryGuard(() => setReloadKey((value) => value + 1));
   }
   const pageBySegmentId = useMemo(() => new Map(segments.map((segment) => [segment.id, segment.page ?? segment.order])), [segments]);
+  const visible = windowedRange(activePage - 1, segments.length, 2);
   const recoverDocumentAfterPageFailure = useCallback((reason: unknown) => {
     if (pageRecoveryGuardRef.current!.recover(reason)) pendingRecoveryPageRef.current = activePageRef.current;
   }, []);
@@ -117,7 +120,6 @@ export function PdfMaterialViewer({ courseId, materialId, staticSourceUrl, sourc
     let disposed = false;
     let loadingTask: ReturnType<typeof getDocument> | null = null;
     setDocument(null);
-    setPageAspectRatios(new Map());
     setError(null);
     loadPdfWithFreshSource({
       resolveSourceUrl: () => resolvePdfSourceUrl(staticSourceUrl, () => getMaterialSourceUrl(courseId, materialId)),
@@ -127,21 +129,21 @@ export function PdfMaterialViewer({ courseId, materialId, staticSourceUrl, sourc
         try {
           const loaded = await loadingTask.promise;
           if (loaded.numPages !== sourcePageCount) throw new Error(`PDF page count ${loaded.numPages} does not match Material source ${sourcePageCount}`);
-          const ratios = await Promise.all(Array.from({ length: loaded.numPages }, async (_, index) => {
-            const page = index + 1;
-            const viewport = (await loaded.getPage(page)).getViewport({ scale: 1 });
-            return [page, viewport.height / viewport.width] as const;
-          }));
-          return { loaded, ratios };
+          // Read one real page ratio for stable placeholders. Each visible page
+          // measures itself when its canvas is actually mounted; the reader never
+          // opens all 307 PDF pages up front.
+          const firstPage = await loaded.getPage(1);
+          const viewport = firstPage.getViewport({ scale: 1 });
+          return { loaded, aspectRatio: viewport.height / viewport.width };
         } catch (reason) {
           await loadingTask.destroy();
           loadingTask = null;
           throw reason;
         }
       }
-    }).then(async ({ loaded, ratios }) => {
+    }).then(async ({ loaded, aspectRatio }) => {
       if (disposed) return loadingTask?.destroy();
-      setPageAspectRatios(new Map(ratios));
+      setDefaultAspectRatio(aspectRatio);
       setDocument(loaded);
     }).catch((reason: unknown) => {
       if (disposed) return;
@@ -199,9 +201,9 @@ export function PdfMaterialViewer({ courseId, materialId, staticSourceUrl, sourc
 
   return <section className="atlas-lesson-scroll atlas-pdf-scroll" ref={rootRef}>
     {error ? <div className="atlas-pdf-state atlas-pdf-error"><AlertTriangle size={28} /><h2>课件 PDF 加载失败</h2><p>{error}</p><button className="atlas-primary" onClick={reloadManually}><RotateCcw size={15} />重新加载</button></div> : !document ? <div className="atlas-pdf-state"><LoaderCircle size={30} className="atlas-spin" /><h2>正在加载原始 PDF</h2><p>首次打开可能需要几秒钟。</p></div> : <div className="atlas-pdf-pages" style={{ "--pdf-zoom": zoom } as React.CSSProperties}>
-      {segments.map((segment) => {
+      {segments.map((segment, index) => {
         const page = segment.page ?? segment.order;
-        return <PdfPageCanvas key={segment.id} document={document} page={page} segment={segment} availableWidth={availableWidth} zoom={zoom} active={page === activePage} initialAspectRatio={pageAspectRatios.get(page) ?? 1.414} onFatalError={recoverDocumentAfterPageFailure} />;
+        return <PdfPageCanvas key={segment.id} document={document} page={page} segment={segment} availableWidth={availableWidth} zoom={zoom} active={page === activePage} initialAspectRatio={defaultAspectRatio} render={index >= visible.start && index < visible.end} onFatalError={recoverDocumentAfterPageFailure} />;
       })}
     </div>}
   </section>;

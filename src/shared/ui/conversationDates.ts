@@ -28,3 +28,21 @@ export function formatConversationDay(value: string | Date | undefined, now: Dat
     day: "numeric"
   }).format(date);
 }
+
+/**
+ * Secondary line for a conversation row. Two conversations may share a title,
+ * so the list uses their real last-update instant to keep them distinguishable
+ * without rewriting the learner's title.
+ */
+export function formatConversationUpdatedAt(value: string | Date | undefined, locale = "zh-CN"): string {
+  const date = value instanceof Date ? value : value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).format(date);
+}

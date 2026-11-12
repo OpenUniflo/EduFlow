@@ -164,7 +164,7 @@ export function AssistantTimelineMessage({ message, session, actions, streaming 
 
   if (followUps.length && !streaming) {
     ordered.push({ kind: "meta", node: <div key="follow-ups" className="ef-assistant-followups" aria-label="后续建议">
-      {followUps.map((suggestion) => <button key={suggestion.text} type="button" className="ef-ui-chip" onClick={() => onSuggestion?.(suggestion.text)}>{suggestion.text}</button>)}
+      {followUps.map((suggestion) => <button key={suggestion.text} type="button" className="ef-ui-chip" title={suggestion.text} onClick={() => onSuggestion?.(suggestion.text)}>{suggestion.text}</button>)}
     </div> });
   }
 

@@ -180,7 +180,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
           {showAdjustments ? <div className="ef-archive-assistant-adjust" data-assistant-step="adjust">
             <label><span>还有哪些偏好或限制？（可选）</span><textarea value={adjustments} onChange={(event) => setAdjustments(event.target.value)} placeholder="例如：更偏实践、只有三周、不要额外资料" rows={2} /></label>
             <button type="button" onClick={() => void lockBrief()} disabled={runtime.sending}>生成课程创建简报</button>
-            <small>简报只包含真实知识范围；进入创建后仍走 Proposal → Preview → 校验 → 确认。</small>
+            <small>简报只包含真实知识范围；进入创建后会先生成提议和预览，校验通过并经你确认后才会应用。</small>
           </div> : null}
         </>
       ) : null}

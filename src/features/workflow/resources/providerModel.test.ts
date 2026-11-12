@@ -7,6 +7,7 @@ import {
   nextProviderVersion, probeConnectionContent, probeConnectionRef, providerCredentialRequiredOnSave, providerDraftIssue, providerModelSummary, providerPublishRequest,
   providerTestIssue, providerTestStatusLabel, providerUsageCount, providerVersions, stagedModelChanges,
   stagedProviderSummary, toggleDraftModel, firstUserModelProvider, userModelProviders,
+  providerHistoricalModelRefs, providerEditorModelRows, providerEditorModelSourceLabel, modelMissingFromProviderTest,
 } from "./providerModel";
 
 const connection = (ref: string, version: number, content: Record<string, JsonValue>, extra: Partial<CatalogConnection> = {}): CatalogConnection => ({
@@ -215,5 +216,24 @@ describe("user model provider selection", () => {
     expect(userModelProviders(providers).map(item => item.ref)).toEqual(["local-env-deepseek"]);
     expect(firstUserModelProvider(providers)?.ref).toBe("local-env-deepseek");
     expect(firstUserModelProvider([provider("deepseek", "environment")])).toBeUndefined();
+  });
+});
+
+describe("provider editor model history", () => {
+  it("keeps a removed model as an unchecked, previously enabled row", () => {
+    const oldVersion = connection("gateway", 1, openai({ modelRefs: ["model-a", "model-b"] }));
+    const newVersion = connection("gateway", 2, openai({ modelRefs: ["model-a"] }));
+    const historical = providerHistoricalModelRefs(newVersion, [oldVersion, newVersion]);
+    const rows = providerEditorModelRows(["model-a"], historical, []);
+    expect(rows).toEqual(["model-a", "model-b"]);
+    expect(providerEditorModelSourceLabel("model-b", ["model-a"], historical, [])).toBe("曾启用");
+  });
+
+  it("adds models returned by the last test and warns about enabled models that are missing", () => {
+    const rows = providerEditorModelRows(["manual-model"], [], ["listed-a", "listed-b"]);
+    expect(rows).toEqual(["manual-model", "listed-a", "listed-b"]);
+    expect(modelMissingFromProviderTest("manual-model", ["manual-model"], ["listed-a"], true)).toBe(true);
+    expect(modelMissingFromProviderTest("listed-a", ["listed-a"], ["listed-a"], true)).toBe(false);
+    expect(modelMissingFromProviderTest("manual-model", ["manual-model"], undefined, true)).toBe(false);
   });
 });

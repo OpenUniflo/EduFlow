@@ -15,7 +15,25 @@ export function ConversationWorkspace({ mode, messages, loading = false, sending
   const nearBottom = useRef(false); const input = useRef<HTMLTextAreaElement>(null); const file = useRef<HTMLInputElement>(null);
   useEffect(() => { if (nearBottom.current) timeline.current?.scrollTo({ top: timeline.current.scrollHeight, behavior: 'instant' }); }, [messages, sending]);
   useEffect(() => { if (!insertText || !insertKey || lastInsertKey.current === insertKey) return; lastInsertKey.current = insertKey; setDraft(current => current.trim() ? `${current.trimEnd()}\n${insertText}` : insertText); window.requestAnimationFrame(() => { input.current?.focus(); const next = input.current?.value.length ?? 0; input.current?.setSelectionRange(next, next); }); }, [insertKey, insertText]);
-  async function send() { const original=draft;const text = original.trim(); if (!text || sending || replying || composerDisabled) return; const focus=document.activeElement;nearBottom.current=true;if (await onSend(text) !== false) { setDraft(current=>current===original?'':current); if(document.activeElement===focus&&(focus===input.current||focus?.getAttribute('aria-label')==='发送对话消息'))input.current?.focus({ preventScroll: true }); } }
+  async function send() {
+    const original = draft;
+    const text = original.trim();
+    if (!text || sending || replying || composerDisabled) return;
+    const focus = document.activeElement;
+    nearBottom.current = true;
+    // The sent text belongs to the user turn now. Clear the composer before
+    // the stream starts; a rejected send restores it only when the learner has
+    // not already started typing something new.
+    setDraft("");
+    try {
+      const accepted = await onSend(text);
+      if (accepted === false) setDraft(current => current ? current : original);
+    } catch (error) {
+      setDraft(current => current ? current : original);
+      throw error;
+    }
+    if (document.activeElement === focus && (focus === input.current || focus?.getAttribute("aria-label") === "发送对话消息")) input.current?.focus({ preventScroll: true });
+  }
   return <div className={`conversation-workspace mode-${mode}`}>
     <div className="conversation-timeline" ref={timeline} role="log" aria-label="对话时间线" aria-live="polite" onScroll={() => { const el = timeline.current; if (el) nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; }}>
       {loading ? <p role="status">正在恢复对话…</p> : null}

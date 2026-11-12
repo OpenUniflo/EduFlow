@@ -52,7 +52,8 @@ describe("records time-zone buckets", () => {
     expect(new Date(`${days[days.length - 1]?.date}T00:00:00Z`).getUTCDay()).toBe(0);
     expect(monthLabelsForDays(days)[0]).toEqual({ label: "11 月", column: 1 });
     expect(monthLabelsForDays(days).length).toBeLessThanOrEqual(7);
-    expect(monthLabelsForDays(days).map((month) => month.label)).toEqual(["11 月", "1 月", "3 月", "5 月", "7 月", "9 月"]);
+    expect(monthLabelsForDays(days).map((month) => month.label)).toEqual(["11 月", "1 月", "3 月", "5 月", "7 月", "9 月", "11 月"]);
+    expect(monthLabelsForDays(days)[monthLabelsForDays(days).length - 1]).toEqual({ label: "11 月", column: 53 });
   });
 
   it("maps counts to the five legend levels", () => {

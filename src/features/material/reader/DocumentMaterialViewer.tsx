@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { Material } from "@/features/course/types";
 import { selectPageAtReadingAnchor, type MaterialNavigationRequest, type VisiblePageCandidate } from "./materialReaderState";
 import { sortMaterialSegments } from "../materialOrdering";
+import { windowedRange } from "./virtualWindow";
 
 export function DocumentMaterialViewer({ material, activeSegmentId, zoom, navigationRequest, onVisibleSegmentChange, onNavigationSettled }: {
   material: Material;
@@ -12,6 +13,9 @@ export function DocumentMaterialViewer({ material, activeSegmentId, zoom, naviga
   onNavigationSettled(token: number): void;
 }) {
   const rootRef = useRef<HTMLElement>(null);
+  const segments = useMemo(() => sortMaterialSegments(material), [material]);
+  const activeIndex = Math.max(0, segments.findIndex((segment) => segment.id === activeSegmentId));
+  const visible = windowedRange(activeIndex, segments.length, 2);
 
   useEffect(() => {
     if (!navigationRequest) return;
@@ -44,15 +48,19 @@ export function DocumentMaterialViewer({ material, activeSegmentId, zoom, naviga
 
   return <section className="atlas-lesson-scroll" ref={rootRef}>
     <div className="atlas-lesson-pages" style={{ "--lesson-zoom": zoom } as React.CSSProperties}>
-      {sortMaterialSegments(material).map((segment) => {
-        const content = segment.content ?? {};
-        return <article className={`atlas-lesson-slide atlas-slide-${content.visual ?? (content.table ? "comparison" : content.code ? "trace" : "overview")} ${segment.id === activeSegmentId ? "current" : ""}`} key={segment.id} data-segment-id={segment.id} data-page-number={segment.page ?? segment.order}>
-          <div className="atlas-slide-number">{String(segment.page ?? segment.order).padStart(2, "0")}</div><span className="atlas-kicker">{segment.section ?? material.title}</span><h2>{segment.title}</h2>
-          {content.lead ? <p className="atlas-slide-lead">{content.lead}</p> : null}
-          {content.paragraphs?.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-          {content.bullets?.length ? <ul>{content.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul> : null}
-          {content.code ? <pre><code>{content.code}</code></pre> : null}
-          {content.table ? <div className="atlas-table-wrap"><table><thead><tr>{content.table.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{content.table.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => <td key={`${rowIndex}-${index}`}>{cell}</td>)}</tr>)}</tbody></table></div> : null}
+      {segments.map((segment, index) => {
+        const near = index >= visible.start && index < visible.end;
+        const content = near ? segment.content ?? {} : null;
+        return <article className={`atlas-lesson-slide ${content ? `atlas-slide-${content.visual ?? (content.table ? "comparison" : content.code ? "trace" : "overview")}` : "is-placeholder"} ${segment.id === activeSegmentId ? "current" : ""}`} key={segment.id} data-segment-id={segment.id} data-page-number={segment.page ?? segment.order}>
+          <div className="atlas-slide-number">{String(segment.page ?? segment.order).padStart(2, "0")}</div>
+          {content ? <>
+            <span className="atlas-kicker">{segment.section ?? material.title}</span><h2>{segment.title}</h2>
+            {content.lead ? <p className="atlas-slide-lead">{content.lead}</p> : null}
+            {content.paragraphs?.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+            {content.bullets?.length ? <ul>{content.bullets.map((bullet) => <li key={bullet}>{bullet}</li>)}</ul> : null}
+            {content.code ? <pre><code>{content.code}</code></pre> : null}
+            {content.table ? <div className="atlas-table-wrap"><table><thead><tr>{content.table.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{content.table.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => <td key={`${rowIndex}-${index}`}>{cell}</td>)}</tr>)}</tbody></table></div> : null}
+          </> : <div className="atlas-slide-placeholder" aria-hidden="true" />}
         </article>;
       })}
     </div>

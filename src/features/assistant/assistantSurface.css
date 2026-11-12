@@ -3,11 +3,11 @@
 .eduflow-assistant .eduflow-assistant-panel :is(.conversation-workspace,.conversation-timeline,.conversation-message,.conversation-message-content,.conversation-composer) { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .eduflow-assistant .eduflow-assistant-panel .conversation-timeline { overflow-x: clip; }
 .eduflow-assistant .eduflow-assistant-panel .conversation-message-content { overflow-x: clip; }
-.eduflow-assistant .eduflow-assistant-panel header { gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--atlas-border, #e3e8ef); }
-.eduflow-assistant .eduflow-assistant-panel header > div:first-child { min-width: 0; justify-content: flex-start; }
-.eduflow-assistant .eduflow-assistant-panel header span { min-width: 0; gap: 5px; }
-.eduflow-assistant .eduflow-assistant-panel header strong { font-size: 14px; color: var(--atlas-ink); }
-.eduflow-assistant .eduflow-assistant-panel header small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--atlas-muted); }
+.eduflow-assistant .eduflow-assistant-panel > header { gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--atlas-border, #e3e8ef); }
+.eduflow-assistant .eduflow-assistant-panel > header > div:first-child { min-width: 0; justify-content: flex-start; }
+.eduflow-assistant .eduflow-assistant-panel > header span { min-width: 0; gap: 5px; }
+.eduflow-assistant .eduflow-assistant-panel > header strong { font-size: 14px; color: var(--atlas-ink); }
+.eduflow-assistant .eduflow-assistant-panel > header small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--atlas-muted); }
 .eduflow-assistant .assistant-window-controls { flex-shrink: 0; gap: 4px; }
 .eduflow-assistant .assistant-window-controls button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; color: var(--atlas-muted); background: transparent; cursor: pointer; }
 .eduflow-assistant .assistant-window-controls button:hover, .eduflow-assistant .assistant-window-controls button[aria-pressed="true"] { color: var(--atlas-brand); background: #eef1ff; }
@@ -72,4 +72,20 @@ body:has(.ef-micro-page) .ef-micro-shell .ef-ui-obj-foot {
 }
 body:has(.ef-micro-page) .ef-micro-shell .micro-completion-footer {
   padding-right: calc(var(--sp-16) + 76px);
+}
+
+/* Follow-up chips are model copy, not a fixed strip. In the narrow floating
+ * panel they wrap instead of being clipped, and the full text stays in title. */
+.eduflow-assistant .ef-assistant-followups {
+  min-width: 0;
+  max-width: 100%;
+}
+.eduflow-assistant .ef-assistant-followups .ef-ui-chip {
+  max-width: 100%;
+  height: auto;
+  min-height: var(--ctl-32);
+  padding-block: var(--sp-4);
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: left;
 }
