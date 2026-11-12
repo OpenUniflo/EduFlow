@@ -52,6 +52,27 @@ describe("Archive assistant presentation", () => {
     expect(presentation.draftIds).toEqual([]);
   });
 
+  it("keeps a result bound to the request message even when another result is newer", () => {
+    const otherSearch: CourseSearchTimelineContent = { ...searchContent, goalText: "另一个目标", intentSummary: "另一个请求", plan };
+    const presentation = deriveAssistantPresentation({
+      messages: [message("m1", "assistant", searchContent), message("m3", "assistant", briefContent), message("m4", "assistant", otherSearch)],
+      model,
+      sending: false,
+      planningMessageId: "m1"
+    });
+    expect(presentation.state).toBe("brief");
+    expect(presentation.searchMessageId).toBe("m1");
+    expect(presentation.briefMessageId).toBe("m3");
+    expect(presentation.goalText).toBe("做一个能查资料的 Agent");
+  });
+
+  it("shows nothing while a new request has no bound result yet", () => {
+    const presentation = deriveAssistantPresentation({ messages, model, sending: true, planningMessageId: null });
+    expect(presentation.state).toBe("idle");
+    expect(presentation.candidateIds).toEqual([]);
+    expect(presentation.goalText).toBeUndefined();
+  });
+
   it("computes prerequisite depth with factual edges only, cycle safely", () => {
     expect(draftDepthByTarget(["T1"], [...model.edges, { source: "T1", target: "P2", relation: "prerequisite" }]).get("T1")).toBe(0);
     expect(draftDepthByTarget([], model.edges).size).toBe(0);

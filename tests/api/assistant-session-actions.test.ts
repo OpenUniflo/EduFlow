@@ -6,7 +6,7 @@ vi.mock("../../api/_lib/supabase.js", () => ({ createUserSupabase }));
 
 import handler from "../../api/assistant";
 
-type SessionRow = { id: string; user_id: string; title: string; created_at: string; updated_at: string };
+type SessionRow = { id: string; user_id: string; title: string; source?: string; created_at: string; updated_at: string };
 type MessageRow = { id: string; session_id: string };
 
 const LEARNER = "11111111-1111-4111-8111-111111111111";
@@ -15,10 +15,10 @@ const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")
 
 function database() {
   const sessions: SessionRow[] = [
-    { id: id(1), user_id: LEARNER, title: "100% 完成", created_at: "2026-11-07T08:00:00+00:00", updated_at: "2026-11-07T10:00:00+00:00" },
-    { id: id(2), user_id: LEARNER, title: "snake_case 命名", created_at: "2026-11-07T08:00:00+00:00", updated_at: "2026-11-07T09:00:00+00:00" },
-    { id: id(3), user_id: LEARNER, title: "第三条", created_at: "2026-11-07T08:00:00+00:00", updated_at: "2026-11-07T08:00:00+00:00" },
-    { id: id(4), user_id: OTHER, title: "别人的对话", created_at: "2026-11-07T08:00:00+00:00", updated_at: "2026-11-07T07:00:00+00:00" }
+    { id: id(1), user_id: LEARNER, title: "100% 完成", source: "home", created_at: "2026-11-07T08:00:00+00:00", updated_at: "2026-11-07T10:00:00+00:00" },
+    { id: id(2), user_id: LEARNER, title: "snake_case 命名", source: "page:archive", created_at: "2026-11-07T08:00:00+00:00", updated_at: "2026-11-07T09:00:00+00:00" },
+    { id: id(3), user_id: LEARNER, title: "第三条", source: "home", created_at: "2026-11-07T08:00:00+00:00", updated_at: "2026-11-07T08:00:00+00:00" },
+    { id: id(4), user_id: OTHER, title: "别人的对话", source: "home", created_at: "2026-11-07T08:00:00+00:00", updated_at: "2026-11-07T07:00:00+00:00" }
   ];
   const messages: MessageRow[] = [
     { id: id(101), session_id: id(3) },
@@ -189,6 +189,18 @@ describe("Assistant conversation history API", () => {
     const result = await get(database(), {});
     const session = result.body().sessions.find((item: { title: string }) => item.title === "100% 完成");
     expect(session.hasCourse).toBe(true);
+  });
+
+  it("filters a contextual conversation source and rejects an arbitrary source", async () => {
+    const db = database();
+    const contextual = await get(db, { source: "page:archive" });
+    expect(contextual.status()).toBe(200);
+    expect(contextual.body().sessions.map((session: { title: string }) => session.title)).toEqual(["snake_case 命名"]);
+    expect(contextual.body().sessions[0].source).toBe("page:archive");
+
+    const rejected = await get(db, { source: "home;drop table" });
+    expect(rejected.status()).toBe(400);
+    expect(rejected.body()).toMatchObject({ error: { code: "invalid_assistant_source" } });
   });
 
   it("renames only the learner's own conversation", async () => {

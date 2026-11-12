@@ -27,6 +27,29 @@ function lastStructured<T extends AssistantMessage["structuredContent"]>(message
   return null;
 }
 
+/** The newest Brief created from this exact Course Search message. */
+function briefForSearch(messages: readonly AssistantMessage[], searchMessageId: string) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.structuredContent?.type !== "course_creation_brief") continue;
+    if (message.structuredContent.planningMessageId === searchMessageId) return { message, content: message.structuredContent };
+  }
+  return null;
+}
+
+function idlePresentation(error?: string): ArchiveAssistantPresentation {
+  return {
+    state: "idle",
+    candidateIds: [],
+    targetIds: [],
+    prerequisiteIds: [],
+    draftIds: [],
+    draftDepth: new Map(),
+    matchCount: 0,
+    ...(error ? { error } : {})
+  };
+}
+
 /** Prerequisite distance from the brief's target Knowledge, using real edges only. */
 export function draftDepthByTarget(targetIds: readonly string[], edges: readonly Pick<ArchiveEdge, "source" | "target" | "relation">[]) {
   const prerequisitesByTarget = new Map<string, string[]>();
@@ -49,9 +72,22 @@ export function deriveAssistantPresentation(input: {
   model: ArchiveModel;
   sending: boolean;
   error?: string;
+  /**
+   * `undefined` follows the newest result; a message id shows only the result
+   * created by that request; `null` shows nothing while a new request runs.
+   */
+  planningMessageId?: string | null;
 }): ArchiveAssistantPresentation {
-  const search = lastStructured<CourseSearchTimelineContent>(input.messages, "course_search");
-  const brief = lastStructured<CourseCreationBrief>(input.messages, "course_creation_brief");
+  if (input.planningMessageId === null) return idlePresentation(input.error);
+  const search = input.planningMessageId
+    ? (() => {
+        const message = input.messages.find((candidate) => candidate.id === input.planningMessageId && candidate.structuredContent?.type === "course_search");
+        return message?.structuredContent?.type === "course_search" ? { message, content: message.structuredContent } : null;
+      })()
+    : lastStructured<CourseSearchTimelineContent>(input.messages, "course_search");
+  const brief = input.planningMessageId
+    ? (search ? briefForSearch(input.messages, search.message.id) : null)
+    : lastStructured<CourseCreationBrief>(input.messages, "course_creation_brief");
   const briefIsNewer = Boolean(brief && (!search || input.messages.indexOf(brief.message) > input.messages.indexOf(search.message)));
   const plan = search?.content.plan;
   const targetIds = briefIsNewer && brief ? brief.content.targetKnowledge.map((item) => item.id) : plan?.resolution.targetKnowledge.map((item) => item.id) ?? [];
@@ -63,19 +99,19 @@ export function deriveAssistantPresentation(input: {
   const state = briefIsNewer ? "brief" : input.sending ? "searching" : search ? "results" : "idle";
   return {
     state,
-    searchMessageId: search?.message.id,
-    briefMessageId: briefIsNewer ? brief?.message.id : undefined,
-    goalText: briefIsNewer ? brief?.content.goal : search?.content.goalText,
-    intentSummary: search?.content.intentSummary,
-    plan,
+    ...(search?.message.id ? { searchMessageId: search.message.id } : {}),
+    ...(briefIsNewer && brief?.message.id ? { briefMessageId: brief.message.id } : {}),
+    ...(briefIsNewer ? (brief?.content.goal ? { goalText: brief.content.goal } : {}) : (search?.content.goalText ? { goalText: search.content.goalText } : {})),
+    ...(search?.content.intentSummary ? { intentSummary: search.content.intentSummary } : {}),
+    ...(plan ? { plan } : {}),
     candidateIds,
     targetIds,
     prerequisiteIds,
-    brief: briefIsNewer ? brief?.content : undefined,
+    ...(briefIsNewer && brief?.content ? { brief: brief.content } : {}),
     draftIds,
     draftDepth,
     matchCount: meaningfulMatches.length,
-    error: input.error
+    ...(input.error ? { error: input.error } : {})
   };
 }
 

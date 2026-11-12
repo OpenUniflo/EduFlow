@@ -39,7 +39,7 @@ export async function workspaceAssistantAction(client: SupabaseClient, userId: s
     const session = dataOrThrow(existing.data, existing.error, 'Workspace conversation lookup');
     if (session) return { sessionId: session.id };
     const id = stableId(`${userId}:${title}`);
-    const created = await client.from('assistant_sessions').upsert({ id, user_id: userId, title },{onConflict:'id',ignoreDuplicates:true});
+    const created = await client.from('assistant_sessions').upsert({ id, user_id: userId, title, source: 'workspace' },{onConflict:'id',ignoreDuplicates:true});
     dataOrThrow(created.data, created.error, 'Workspace conversation creation'); return {sessionId:id};
   }
   if (typeof body.sessionId !== 'string') throw new ApiError(400, 'session_required', 'Session required');

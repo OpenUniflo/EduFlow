@@ -1,6 +1,9 @@
 export const assistantWorkspaces = ["learning", "explore", "courses", "canvas", "teaching", "system", "material", "messages"] as const;
 export type AssistantWorkspace = (typeof assistantWorkspaces)[number];
 
+/** Assistant entry points a page can claim from the floating surface. */
+export type AssistantSurfaceCapability = "goal-planning";
+
 export type AssistantContextSnapshot = {
   workspace: AssistantWorkspace;
   experienceMode: "learn" | "design";
@@ -19,6 +22,7 @@ export type AssistantContextSnapshot = {
   segmentId?: string;
   assignmentId?: string;
   workflowId?: string;
+  workflowNodeId?: string;
   runId?: string;
   actionId?: string;
   taskId?: string;
@@ -95,6 +99,8 @@ export type AssistantSession = {
   title?: string;
   createdAt: string;
   updatedAt: string;
+  /** Conversation partition: Home, a page entry, the Archive panel or a workspace. */
+  source?: string;
   /** The conversation created a personal Course, so it cannot be deleted. */
   hasCourse?: boolean;
 };
@@ -151,7 +157,7 @@ export function parseAssistantStructuredContent(value: unknown): AssistantStruct
   throw new Error("Assistant structured content type is unsupported");
 }
 
-const optionalIdentityKeys = ["repeatAttemptId", "presentation", "edgeId", "routeVersionId", "actionRunId", "evidenceSourceId", "diagnosisRunId", "courseId", "chapterId", "lessonId", "knowledgeId", "materialId", "segmentId", "assignmentId", "workflowId", "runId", "actionId", "taskId", "microPathId", "microUnitId", "microStepId", "selectedObject"] as const;
+const optionalIdentityKeys = ["repeatAttemptId", "presentation", "edgeId", "routeVersionId", "actionRunId", "evidenceSourceId", "diagnosisRunId", "courseId", "chapterId", "lessonId", "knowledgeId", "materialId", "segmentId", "assignmentId", "workflowId", "workflowNodeId", "runId", "actionId", "taskId", "microPathId", "microUnitId", "microStepId", "selectedObject"] as const;
 
 export function parseAssistantContext(value: unknown): AssistantContextSnapshot {
   if (!value || typeof value !== "object") throw new Error("Assistant context is required");

@@ -5,6 +5,7 @@ import type { MockSession } from "@/features/auth/types";
 import { supabaseClient } from "@/shared/api/supabaseClient";
 import type { AssistantContextSnapshot, AssistantMessage, AssistantSession, AssistantStructuredContent, AssistantTimelinePart } from "./assistantContract";
 import { deleteAssistantSession, getAssistantSession, listAssistantSessions, planAssistantGoal, prepareAssistantCourseBrief, refineAssistantGoal, renameAssistantSession, selectAssistantCourse } from "./assistantClient";
+import { ASSISTANT_HOME_SOURCE, normalizeAssistantSessionSource } from "./assistantSessionScope";
 import { ApiRequestError, apiRequest } from "@/shared/api/apiClient";
 import { refreshLearnerState } from "@/app/services/applicationServices";
 
@@ -25,8 +26,18 @@ export type AssistantUIMessage = UIMessage<AssistantMetadata>;
 
 export type SessionActionResult = { ok: true } | { ok: false; code: string; message: string };
 
+export type AssistantGoalPlanResult = {
+  ok: boolean;
+  sessionId?: string;
+  messageId?: string;
+  status?: "ready" | "needs_clarification" | "no_match";
+  assistantMessage?: string;
+};
+
 type RuntimeValue = {
   session: MockSession;
+  /** Conversation partition for this runtime instance. */
+  scope: string;
   sessions: AssistantSession[];
   activeSessionId: string | null;
   activeSessionTitle: string;
@@ -50,7 +61,7 @@ type RuntimeValue = {
   send(message: string, context: AssistantContextSnapshot, extras?: AssistantSendExtras): Promise<boolean>;
   stop(): Promise<void>;
   retry(): Promise<boolean>;
-  planGoal(goalText: string, context: AssistantContextSnapshot): Promise<boolean>;
+  planGoal(goalText: string, context: AssistantContextSnapshot): Promise<AssistantGoalPlanResult>;
   refineGoal(planningMessageId: string, refinement: string, context: AssistantContextSnapshot): Promise<void>;
   useExistingCourse(planningMessageId: string, courseId: string, context: AssistantContextSnapshot): Promise<string>;
   prepareCourseBrief(input: { planningMessageId: string; sourceCourseId?: string; requestedAdjustments?: string; referenceMaterialIntent: "none" | "upload_in_creator" }, context: AssistantContextSnapshot): Promise<void>;
@@ -133,11 +144,13 @@ function visibleMessages(messages: AssistantMessage[]): AssistantMessage[] {
   return messages.filter((message) => message.messageKind !== "action" || Boolean(message.structuredContent));
 }
 
-export function AssistantRuntimeProvider({ session, children }: { session: MockSession; children: ReactNode }) {
-  const storageKey = `eduflow:assistant:active:${session.userId}`;
-  const newChatKey = `eduflow:assistant:new:${session.userId}`;
+export function AssistantRuntimeProvider({ session, scope = ASSISTANT_HOME_SOURCE, children }: { session: MockSession; scope?: string; children: ReactNode }) {
+  const normalizedScope = useMemo(() => normalizeAssistantSessionSource(scope), [scope]);
+  const isHome = normalizedScope === ASSISTANT_HOME_SOURCE;
+  const storageKey = isHome ? `eduflow:assistant:active:${session.userId}` : `eduflow:assistant:active:${session.userId}:${normalizedScope}`;
+  const newChatKey = isHome ? `eduflow:assistant:new:${session.userId}` : `eduflow:assistant:new:${session.userId}:${normalizedScope}`;
   const [sessions, setSessions] = useState<AssistantSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => window.localStorage.getItem(storageKey));
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => typeof window === "undefined" ? null : window.localStorage.getItem(storageKey));
   const [activeSessionTitle, setActiveSessionTitle] = useState("");
   const [sessionsHasMore, setSessionsHasMore] = useState(false);
   const [sessionsQuery, setSessionsQuery] = useState("");
@@ -153,6 +166,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   const [manualError, setManualError] = useState("");
   const [clarificationMessageId, setClarificationMessageId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(activeSessionId);
+  const sourceRef = useRef(normalizedScope);
   const lastContextRef = useRef<AssistantContextSnapshot>({ workspace: "learning", experienceMode: "learn" });
   const sendExtrasRef = useRef<AssistantSendExtras>({});
   const lastMessageRef = useRef("");
@@ -194,19 +208,21 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   const pendingSendRef = useRef(false);
   const retryTargetRef = useRef<{ userId: string; assistantMessageId?: string } | null>(null);
 
-  const rememberSession = useCallback((sessionId: string | null) => {
+  const rememberSession = useCallback((sessionId: string | null, source?: string) => {
     sessionIdRef.current = sessionId;
     setActiveSessionId(sessionId);
     if (sessionId) {
       const known = sessionsRef.current.find((item) => item.id === sessionId);
       setActiveSessionTitle(known?.title ?? "");
+      sourceRef.current = source ?? known?.source ?? normalizedScope;
       window.localStorage.setItem(storageKey, sessionId);
       window.localStorage.removeItem(newChatKey);
     } else {
       setActiveSessionTitle("");
+      sourceRef.current = normalizedScope;
       window.localStorage.removeItem(storageKey);
     }
-  }, [newChatKey, storageKey]);
+  }, [newChatKey, normalizedScope, storageKey]);
 
   /**
    * The server creates the session before it sends the first byte. Show that
@@ -214,10 +230,10 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
    * highlighted while the reply is still streaming; the finished reply replaces
    * it with the server's canonical page.
    */
-  const rememberCreatedSession = useCallback((sessionId: string, title: string) => {
+  const rememberCreatedSession = useCallback((sessionId: string, title: string, source: string) => {
     if (sessionsRef.current.some((item) => item.id === sessionId)) return;
     const now = new Date().toISOString();
-    const session = { id: sessionId, title: title.slice(0, 80).trim() || "新对话", createdAt: now, updatedAt: now, hasCourse: false };
+    const session = { id: sessionId, title: title.slice(0, 80).trim() || "新对话", createdAt: now, updatedAt: now, hasCourse: false, source };
     const next = [session, ...sessionsRef.current];
     sessionsRef.current = next;
     setSessions(next);
@@ -231,6 +247,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     },
     body: () => ({
       sessionId: sessionIdRef.current ?? undefined,
+      source: sourceRef.current,
       context: lastContextRef.current,
       ...(sendExtrasRef.current.attachments?.length ? { attachments: sendExtrasRef.current.attachments.map((attachment) => attachment.id) } : {}),
       ...(sendExtrasRef.current.draft ? { draft: sendExtrasRef.current.draft } : {}),
@@ -256,10 +273,10 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
           streamSessionRef.current = createdSessionId;
           if (isNewConversation) {
             const title = lastMessageRef.current.slice(0, 80).trim() || "新对话";
-            rememberCreatedSession(createdSessionId, title);
+            rememberCreatedSession(createdSessionId, title, sourceRef.current);
             setActiveSessionTitle(title);
           }
-          rememberSession(createdSessionId);
+          rememberSession(createdSessionId, sourceRef.current);
         }
         return response;
       } finally {
@@ -270,7 +287,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
   }), [rememberCreatedSession, rememberSession]);
 
   const chat = useChat<AssistantUIMessage>({
-    id: `assistant-${session.userId}`,
+    id: `assistant-${session.userId}-${normalizedScope}`,
     transport,
     throttle: 40,
     onError: (error) => {
@@ -348,16 +365,24 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     }
   }, [chat.messages, session.userId]);
 
+  const sessionListInput = useCallback((extra: { q?: string; cursor?: string | null; limit?: number } = {}) => ({
+    ...extra,
+    ...(!isHome ? { source: normalizedScope } : {})
+  }), [isHome, normalizedScope]);
+
   const reloadSessions = useCallback(async () => {
-    const page = await listAssistantSessions({ q: sessionsQueryRef.current });
+    const page = await listAssistantSessions(sessionListInput({ q: sessionsQueryRef.current }));
     setSessions(page.sessions);
     sessionsRef.current = page.sessions;
     sessionsCursorRef.current = page.nextCursor;
     setSessionsHasMore(page.hasMore);
     const active = page.sessions.find((item) => item.id === sessionIdRef.current);
-    if (active) setActiveSessionTitle(active.title ?? "");
+    if (active) {
+      setActiveSessionTitle(active.title ?? "");
+      sourceRef.current = active.source ?? normalizedScope;
+    }
     return page.sessions;
-  }, []);
+  }, [normalizedScope, sessionListInput]);
 
   const searchSessions = useCallback(async (query: string) => {
     const nextQuery = query.trim();
@@ -367,13 +392,13 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     const epoch = historyEpochRef.current;
     setSessionsLoadingMore(false);
     loadingMoreRef.current = false;
-    const page = await listAssistantSessions({ q: nextQuery });
+    const page = await listAssistantSessions(sessionListInput({ q: nextQuery }));
     if (epoch !== historyEpochRef.current) return;
     setSessions(page.sessions);
     sessionsRef.current = page.sessions;
     sessionsCursorRef.current = page.nextCursor;
     setSessionsHasMore(page.hasMore);
-  }, []);
+  }, [sessionListInput]);
 
   const loadMoreSessions = useCallback(async () => {
     const cursor = sessionsCursorRef.current;
@@ -381,7 +406,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     loadingMoreRef.current = true;
     setSessionsLoadingMore(true);
     try {
-      const page = await listAssistantSessions({ q: sessionsQueryRef.current, cursor });
+      const page = await listAssistantSessions(sessionListInput({ q: sessionsQueryRef.current, cursor }));
       const seen = new Set(sessionsRef.current.map((item) => item.id));
       const merged = [...sessionsRef.current, ...page.sessions.filter((item) => !seen.has(item.id))];
       setSessions(merged);
@@ -392,11 +417,11 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       loadingMoreRef.current = false;
       setSessionsLoadingMore(false);
     }
-  }, []);
+  }, [sessionListInput]);
 
   const loadSession = useCallback(async (sessionId: string) => {
     const detail = await getAssistantSession(sessionId);
-    rememberSession(sessionId);
+    rememberSession(sessionId, detail.source);
     setActiveSessionTitle(detail.title ?? "");
     chatApiRef.current.setMessages(visibleMessages(detail.messages).map(toUIMessage));
     return detail;
@@ -428,7 +453,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     try {
       const detail = await getAssistantSession(sessionId);
       if (newChatEpoch.current !== epoch) return;
-      rememberSession(sessionId);
+      rememberSession(sessionId, detail.source);
       setActiveSessionTitle(detail.title ?? "");
       chatApiRef.current.setMessages(visibleMessages(detail.messages).map(toUIMessage));
     }
@@ -485,7 +510,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     let next = active ? list[index + 1] ?? list[index - 1] ?? null : null;
     if (active && !next) {
       try {
-        const page = await listAssistantSessions({});
+        const page = await listAssistantSessions(sessionListInput({}));
         next = page.sessions.find((item) => item.id !== sessionId) ?? null;
       } catch { /* a fresh conversation is still a valid empty state */ }
     }
@@ -506,8 +531,11 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       if (!active) return;
       const stored = window.localStorage.getItem(storageKey);
       const explicitlyNew = window.localStorage.getItem(newChatKey) === "1";
+      // Home stays on its own mainline when no explicit session was stored;
+      // contextual conversations never become the default Home conversation.
+      const initial = isHome ? next.find((item) => (item.source ?? ASSISTANT_HOME_SOURCE) === ASSISTANT_HOME_SOURCE) : next[0];
       if (stored && next.some((item) => item.id === stored)) await selectSession(stored);
-      else if (!explicitlyNew && next[0]) await selectSession(next[0].id);
+      else if (!explicitlyNew && initial) await selectSession(initial.id);
       else { rememberSession(null); chatApiRef.current.setMessages([]); setLoading(false); }
     }).catch((loadError) => {
       if (!active) return;
@@ -515,7 +543,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
       setLoading(false);
     });
     return () => { active = false; };
-  }, [newChatKey, reloadSessions, rememberSession, selectSession, storageKey]);
+  }, [isHome, newChatKey, reloadSessions, rememberSession, selectSession, storageKey]);
 
   const send = useCallback(async (content: string, context: AssistantContextSnapshot, extras: AssistantSendExtras = {}) => {
     const message = content.trim();
@@ -590,25 +618,25 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     await reloadSessions();
   }, [loadSession, reloadSessions]);
 
-  const planGoal = useCallback(async (value: string, context: AssistantContextSnapshot) => {
+  const planGoal = useCallback(async (value: string, context: AssistantContextSnapshot): Promise<AssistantGoalPlanResult> => {
     const nextGoal = value.trim();
-    if (!nextGoal || ["streaming", "submitted"].includes(chatApiRef.current.current().status)) return false;
+    if (!nextGoal || ["streaming", "submitted"].includes(chatApiRef.current.current().status)) return { ok: false };
     setPendingAction(true); setManualError("");
     try {
-      const result = await planAssistantGoal({ sessionId: sessionIdRef.current ?? undefined, ...(clarificationMessageId ? { clarificationMessageId } : {}), goalText: nextGoal, context });
+      const result = await planAssistantGoal({ sessionId: sessionIdRef.current ?? undefined, ...(clarificationMessageId ? { clarificationMessageId } : {}), source: sourceRef.current, goalText: nextGoal, context });
       setClarificationMessageId(result.status === "needs_clarification" && result.messageId ? result.messageId : null);
       await reloadStructuredSession(result.sessionId);
-      return true;
+      return { ok: true, sessionId: result.sessionId, ...(result.messageId ? { messageId: result.messageId } : {}), ...(result.status ? { status: result.status } : {}), assistantMessage: result.assistantMessage };
     } catch (planningError) {
       setManualError(planningError instanceof Error ? friendlyError(planningError.message) : "学习目标规划失败");
-      return false;
+      return { ok: false };
     } finally { setPendingAction(false); }
   }, [clarificationMessageId, reloadStructuredSession]);
 
   const refineGoal = useCallback(async (planningMessageId: string, refinement: string, context: AssistantContextSnapshot) => {
     if (!refinement.trim() || ["streaming", "submitted"].includes(chatApiRef.current.current().status)) return;
     setPendingAction(true); setManualError("");
-    try { const result = await refineAssistantGoal({ planningMessageId, refinement: refinement.trim(), context }); await reloadStructuredSession(result.sessionId); }
+    try { const result = await refineAssistantGoal({ planningMessageId, refinement: refinement.trim(), context, source: sourceRef.current }); await reloadStructuredSession(result.sessionId); }
     catch (refinementError) { setManualError(refinementError instanceof Error ? friendlyError(refinementError.message) : "继续寻找失败"); }
     finally { setPendingAction(false); }
   }, [reloadStructuredSession]);
@@ -617,7 +645,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     if (["streaming", "submitted"].includes(chatApiRef.current.current().status)) throw new Error("Assistant 正在处理另一项请求");
     setPendingAction(true); setManualError("");
     try {
-      const result = await selectAssistantCourse({ planningMessageId, courseId, context });
+      const result = await selectAssistantCourse({ planningMessageId, courseId, context, source: sourceRef.current });
       await reloadStructuredSession(result.sessionId);
       return result.courseId;
     } catch (selectionError) {
@@ -631,7 +659,7 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     if (["streaming", "submitted"].includes(chatApiRef.current.current().status)) throw new Error("Assistant 正在处理另一项请求");
     setPendingAction(true); setManualError("");
     try {
-      const result = await prepareAssistantCourseBrief({ ...input, context });
+      const result = await prepareAssistantCourseBrief({ ...input, context, source: sourceRef.current });
       await reloadStructuredSession(result.sessionId);
     } catch (creationError) {
       const errorMessage = creationError instanceof Error ? friendlyError(creationError.message) : "创建需求整理失败";
@@ -650,11 +678,11 @@ export function AssistantRuntimeProvider({ session, children }: { session: MockS
     || (chat.status === "error" ? ASSISTANT_REPLY_FAILURE : "");
 
   const value = useMemo<RuntimeValue>(() => ({
-    session, sessions, activeSessionId, activeSessionTitle, sessionsHasMore, sessionsQuery, sessionsLoadingMore,
+    session, scope: normalizedScope, sessions, activeSessionId, activeSessionTitle, sessionsHasMore, sessionsQuery, sessionsLoadingMore,
     chatMessages: chat.messages, messages, loading, sending, replying, error,
     selectSession, searchSessions, loadMoreSessions, renameSession, deleteSession,
     send, stop, retry, planGoal, refineGoal, useExistingCourse, prepareCourseBrief, reloadSessions
-  }), [activeSessionId, activeSessionTitle, chat.messages, deleteSession, error, loadMoreSessions, loading, messages, planGoal, prepareCourseBrief, refineGoal, reloadSessions, renameSession, replying, retry, searchSessions, selectSession, send, sending, session, sessions, sessionsHasMore, sessionsLoadingMore, sessionsQuery, stop, useExistingCourse]);
+  }), [activeSessionId, activeSessionTitle, chat.messages, deleteSession, error, loadMoreSessions, loading, messages, normalizedScope, planGoal, prepareCourseBrief, refineGoal, reloadSessions, renameSession, replying, retry, searchSessions, selectSession, send, sending, session, sessions, sessionsHasMore, sessionsLoadingMore, sessionsQuery, stop, useExistingCourse]);
 
   return <AssistantRuntimeContext.Provider value={value}>{children}</AssistantRuntimeContext.Provider>;
 }

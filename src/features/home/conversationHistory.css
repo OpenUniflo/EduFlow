@@ -138,8 +138,11 @@
 }
 
 .ef-history-pick {
+  display: flex;
   width: 100%;
   min-width: 0;
+  align-items: center;
+  gap: var(--sp-8);
   padding: var(--sp-8) var(--sp-32) var(--sp-8) var(--sp-8);
   overflow: hidden;
   border: 0;
@@ -149,7 +152,25 @@
   font-size: var(--fs-13);
   line-height: var(--lh-13);
   text-align: left;
+}
+
+.ef-history-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-history-source {
+  flex: 0 0 auto;
+  padding: 1px var(--sp-8);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+  font-weight: var(--fw-500);
   white-space: nowrap;
 }
 

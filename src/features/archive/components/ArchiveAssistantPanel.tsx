@@ -1,6 +1,6 @@
 import { ArrowRight, BookOpen, Lock, Search, Sparkles, Target, X } from "lucide-react";
 import { useReducedMotion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MockSession } from "@/features/auth/types";
 import { canManageCourses } from "@/features/auth/capabilities";
@@ -23,12 +23,16 @@ export function GuestAssistantCard({ onLogin, onRegister }: { onLogin: () => voi
   );
 }
 
-export function ArchiveAssistantPanel({ session, model, context, presentation, onOpenBrief, open, onOpenChange, seedGoal }: {
+export function ArchiveAssistantPanel({ session, model, context, presentation, onOpenBrief, onReplan, onPlanningBound, open, onOpenChange, seedGoal }: {
   session: MockSession;
   model: ArchiveModel;
   context: AssistantContextSnapshot;
   presentation: ArchiveAssistantPresentation;
-  onOpenBrief: (briefMessageId: string) => void;
+  onOpenBrief: (briefMessageId: string, sessionId: string) => void;
+  /** Clear map hits before a new planning request starts. */
+  onReplan: () => void;
+  /** Bind the panel to the exact request/message it just created. */
+  onPlanningBound: (planningMessageId: string | null) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   seedGoal?: { key: string; goal: string } | null;
@@ -36,6 +40,8 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
   const runtime = useAssistantRuntime();
   const navigate = useNavigate();
   const [goal, setGoal] = useState("");
+  const [activeGoal, setActiveGoal] = useState("");
+  const [clarification, setClarification] = useState("");
   const [localError, setLocalError] = useState("");
   const [adjustments, setAdjustments] = useState("");
   const [showAdjustments, setShowAdjustments] = useState(false);
@@ -49,7 +55,9 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
   const matches = presentation.plan?.matches.filter((match) => match.targetCoverage > 0 || match.requiredCoverage > 0).slice(0, 2) ?? [];
   const brief = presentation.brief;
 
-  const contextLabel = useMemo(() => goal.trim() || presentation.goalText || "我的地图 · 全局星图", [goal, presentation.goalText]);
+  // The query shown above the result belongs to the same request as the result.
+  const requestGoal = activeGoal || presentation.goalText || "";
+  const contextLabel = status === "idle" ? goal.trim() || "我的地图 · 全局星图" : requestGoal || "正在理解学习目标…";
 
   // Every state advance (search started, results shown, adjustments revealed,
   // brief locked) lands on the next step instead of below the scroll fold.
@@ -61,14 +69,29 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
   useEffect(() => {
     if (!seedGoal) return;
     setGoal(seedGoal.goal);
-  }, [seedGoal]);
+    setActiveGoal("");
+    setClarification("");
+    onReplan();
+  }, [onReplan, seedGoal]);
 
   async function findRoute(valueOverride?: string) {
     const value = (valueOverride ?? goal).trim();
     if (!value || runtime.sending) { if (!value) setLocalError("先写下你想做到什么。"); return; }
     setLocalError("");
-    const ok = await runtime.planGoal(value, context);
-    if (!ok) setLocalError(runtime.error || "助手暂时无法规划，请稍后重试。");
+    setClarification("");
+    setActiveGoal(value);
+    setShowAdjustments(false);
+    onReplan();
+    const result = await runtime.planGoal(value, context);
+    if (!result.ok) {
+      setLocalError(runtime.error || "助手暂时无法规划，请稍后重试。");
+      return;
+    }
+    if (result.status === "needs_clarification") {
+      setClarification(result.assistantMessage || "还需要更具体的目标才能继续寻找。");
+      return;
+    }
+    if (result.messageId) onPlanningBound(result.messageId);
   }
 
   async function lockBrief() {
@@ -132,7 +155,6 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
             <span><i aria-hidden />比对已有课程</span>
           </div>
           <p className="ef-archive-assistant-note">正在查找与目标相关的知识与课程。地图只高亮已确认的命中，不会移动节点。</p>
-          {presentation.candidateIds.length ? <CandidateList model={model} ids={presentation.candidateIds} /> : null}
         </>
       ) : null}
 
@@ -189,8 +211,9 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
       ) : null}
 
       {status !== "brief" && presentation.state === "brief" && !brief ? <p className="ef-archive-assistant-error">简报暂不可用，请重试。</p> : null}
+      {clarification ? <p className="ef-archive-assistant-note" role="status">{clarification}</p> : null}
       {runtime.error || localError ? <p className="ef-archive-assistant-error" role="alert">{runtime.error || localError}</p> : null}
-      {status === "brief" ? <button type="button" className="ef-archive-assistant-open" onClick={() => onOpenBrief(presentation.briefMessageId ?? "")}>在对话中查看完整简报</button> : null}
+      {status === "brief" && presentation.briefMessageId ? <button type="button" className="ef-archive-assistant-open" onClick={() => onOpenBrief(presentation.briefMessageId!, runtime.activeSessionId ?? "")}>在对话中查看完整简报</button> : null}
       </div>
       <footer className="ef-archive-assistant-footbar"><button type="button" className="ef-archive-assistant-collapse-text" onClick={() => onOpenChange(false)}>收起助手</button></footer>
     </aside>

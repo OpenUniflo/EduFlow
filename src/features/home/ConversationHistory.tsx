@@ -2,6 +2,7 @@ import { MoreHorizontal, PanelLeftClose, Pencil, Plus, Search, Trash2 } from "lu
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import type { AssistantSession } from "@/features/assistant/assistantContract";
+import { assistantSessionSourceLabel } from "@/features/assistant/assistantSessionScope";
 import type { SessionActionResult } from "@/features/assistant/AssistantRuntimeContext";
 import { formatConversationDay, conversationDayKey } from "@/shared/ui/conversationDates";
 import { ConfirmDialog } from "@/features/workflow/editor/v2/ConfirmDialog";
@@ -203,7 +204,8 @@ export function ConversationHistory({
               }
               return <div key={session.id} className={`ef-history-row${active ? " is-active" : ""}`} data-session-id={session.id}>
                 <button type="button" className="ef-history-pick" onClick={() => chooseSession(session.id)} aria-current={active ? "true" : undefined} title={session.title?.trim() || "未命名对话"}>
-                  {session.title?.trim() || "未命名对话"}
+                  <span className="ef-history-title">{session.title?.trim() || "未命名对话"}</span>
+                  {assistantSessionSourceLabel(session.source) ? <small className="ef-history-source">{assistantSessionSourceLabel(session.source)}</small> : null}
                 </button>
                 <button
                   type="button"

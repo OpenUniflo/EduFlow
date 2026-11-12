@@ -116,6 +116,23 @@ describe("Assistant structured Goal actions", () => {
     expect(db.writes.some((write) => write.table === "assistant_sessions" || write.table === "assistant_messages")).toBe(false);
   });
 
+  it("creates a contextual conversation with the caller's validated source", async () => {
+    const db = database();
+    const result = await request(db, { action: "plan-goal", goalText: "Goal one", source: "archive-assistant" });
+    expect(result.status()).toBe(200);
+    const insert = db.writes.find((write) => write.table === "assistant_sessions" && !Array.isArray(write.value));
+    expect(insert?.value).toMatchObject({ source: "archive-assistant" });
+  });
+
+  it("rejects a request that tries to append to another surface's conversation", async () => {
+    const db = database();
+    db.sessions.set("session-1", { ...db.sessions.get("session-1"), source: "archive-assistant" });
+    const result = await request(db, { action: "plan-goal", sessionId: "session-1", goalText: "Goal one", source: "home" });
+    expect(result.status()).toBe(409);
+    expect(result.body()).toMatchObject({ error: { code: "assistant_session_source_mismatch" } });
+    expect(resolveGoalLanguage).not.toHaveBeenCalled();
+  });
+
   it("persists a clear no-match Goal as a structured business result", async () => {
     const db = database();
     resolveGoalLanguage.mockResolvedValueOnce({ status: "no_match", intentSummary: "Build quantum hardware", primaryOutcome: "Build a quantum processor", practiceEmphasis: true, reason: "当前学习内容没有覆盖量子处理器" });

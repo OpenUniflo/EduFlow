@@ -114,7 +114,7 @@ describe("batch 2: no hard-coded tool or count rules", () => {
     expect(panel).not.toContain(".slice(0, 6)");
     expect(panel).toContain("<span>{nodes.length} 个 · 按匹配度</span>");
     expect(panel).toContain("{nodes.map((node, index) =>");
-    expect(read("src/features/archive/pages/ArchivePage.tsx")).toContain("助手命中 {assistant.candidateIds.length}");
+    expect(read("src/features/archive/pages/ArchivePage.tsx")).toContain("助手命中 {visibleAssistant.candidateIds.length}");
     expect(read("src/features/archive/model/assistantPresentation.ts")).not.toContain("candidatePreview");
   });
 

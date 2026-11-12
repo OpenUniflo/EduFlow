@@ -7,11 +7,12 @@ import type { CourseCreatorDesign, CourseCreatorProposal, CourseCreatorStage } f
 
 export type AssistantSessionPage = { sessions: AssistantSession[]; hasMore: boolean; nextCursor: string | null };
 
-export async function listAssistantSessions(input: { q?: string; cursor?: string | null; limit?: number } = {}): Promise<AssistantSessionPage> {
+export async function listAssistantSessions(input: { q?: string; cursor?: string | null; limit?: number; source?: string } = {}): Promise<AssistantSessionPage> {
   const params = new URLSearchParams();
   if (input.q?.trim()) params.set("q", input.q.trim());
   if (input.cursor) params.set("cursor", input.cursor);
   if (input.limit) params.set("limit", String(input.limit));
+  if (input.source) params.set("source", input.source);
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const page = await apiRequest<AssistantSessionPage>(`/api/assistant${suffix}`);
   return { sessions: page.sessions, hasMore: Boolean(page.hasMore), nextCursor: page.nextCursor ?? null };
@@ -41,19 +42,21 @@ export async function getAssistantTimelineMessage(messageId: string) {
 
 type StructuredAssistantResult = { sessionId: string; assistantMessage: string; messageId?: string; status?: "ready" | "needs_clarification" | "no_match"; goalStatus?: "ready" | "needs_clarification"; catalogStatus?: "matched" | "no_match" };
 
-export function planAssistantGoal(input: { sessionId?: string; clarificationMessageId?: string; goalText: string; context: AssistantContextSnapshot }) {
-  return apiRequest<StructuredAssistantResult & { plan?: GoalPlan }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "plan-goal", ...input }) });
+export type AssistantGoalResult = StructuredAssistantResult & { plan?: GoalPlan };
+
+export function planAssistantGoal(input: { sessionId?: string; clarificationMessageId?: string; goalText: string; context: AssistantContextSnapshot; source?: string }) {
+  return apiRequest<AssistantGoalResult>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "plan-goal", ...input }) });
 }
 
-export function refineAssistantGoal(input: { planningMessageId: string; refinement: string; context: AssistantContextSnapshot }) {
+export function refineAssistantGoal(input: { planningMessageId: string; refinement: string; context: AssistantContextSnapshot; source?: string }) {
   return apiRequest<StructuredAssistantResult & { plan?: GoalPlan }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "refine-goal", ...input }) });
 }
 
-export function selectAssistantCourse(input: { planningMessageId: string; courseId: string; context: AssistantContextSnapshot }) {
+export function selectAssistantCourse(input: { planningMessageId: string; courseId: string; context: AssistantContextSnapshot; source?: string }) {
   return apiRequest<StructuredAssistantResult & { courseId: string }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "use-existing-course", ...input }) });
 }
 
-export function prepareAssistantCourseBrief(input: { planningMessageId: string; sourceCourseId?: string; requestedAdjustments?: string; referenceMaterialIntent: "none" | "upload_in_creator"; context: AssistantContextSnapshot }) {
+export function prepareAssistantCourseBrief(input: { planningMessageId: string; sourceCourseId?: string; requestedAdjustments?: string; referenceMaterialIntent: "none" | "upload_in_creator"; context: AssistantContextSnapshot; source?: string }) {
   return apiRequest<StructuredAssistantResult & { brief: CourseCreationBrief }>("/api/assistant", { method: "POST", body: JSON.stringify({ action: "prepare-course-brief", ...input }) });
 }
 

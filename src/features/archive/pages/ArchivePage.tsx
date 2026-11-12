@@ -3,8 +3,11 @@ import { useReducedMotion } from "motion/react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { applicationServices } from "@/app/services/applicationServices";
-import { useAssistantRuntime } from "@/features/assistant/AssistantRuntimeContext";
+import { useAssistantRuntime, AssistantRuntimeProvider } from "@/features/assistant/AssistantRuntimeContext";
+import type { AssistantContext } from "@/features/assistant/assistantContext";
 import type { AssistantContextSnapshot } from "@/features/assistant/assistantContract";
+import { EduFlowAssistant } from "@/features/assistant/components/EduFlowAssistant";
+import { ASSISTANT_ARCHIVE_PANEL_SOURCE } from "@/features/assistant/assistantSessionScope";
 import { authGateState } from "@/features/auth/authRedirect";
 import type { MockSession } from "@/features/auth/types";
 import { buildCourseGraphData, type CourseGraphData } from "@/features/course/runtime/courseRuntime";
@@ -56,6 +59,10 @@ const EMPTY_PRESENTATION: ArchiveAssistantPresentation = {
   draftDepth: new Map(),
   matchCount: 0
 };
+
+// This page owns goal planning through its left panel. The floating Assistant
+// keeps every other ability but hides the duplicate planning entry.
+const ARCHIVE_OWNED_CAPABILITIES = ["goal-planning"] as const;
 
 type SceneMode = "default" | "person" | "course" | "draft";
 
@@ -125,12 +132,34 @@ function ArchiveAssistantBridge({ session, model, context, seedGoal, open, onOpe
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPresentation: (presentation: ArchiveAssistantPresentation) => void;
-  onOpenBrief: (briefMessageId: string) => void;
+  onOpenBrief: (briefMessageId: string, sessionId: string) => void;
 }) {
   const runtime = useAssistantRuntime();
-  const presentation = useMemo(() => deriveAssistantPresentation({ messages: runtime.messages, model, sending: runtime.sending, error: runtime.error }), [model, runtime.error, runtime.messages, runtime.sending]);
+  // undefined follows the newest result; null clears the panel until a new
+  // request returns; a message id keeps the result bound to that request.
+  const [planningMessageId, setPlanningMessageId] = useState<string | null | undefined>(undefined);
+  const clearPlanning = useCallback(() => setPlanningMessageId(null), []);
+  const bindPlanning = useCallback((messageId: string | null) => setPlanningMessageId(messageId), []);
+  const presentation = useMemo(() => deriveAssistantPresentation({
+    messages: runtime.messages,
+    model,
+    sending: runtime.sending,
+    error: runtime.error,
+    planningMessageId
+  }), [model, planningMessageId, runtime.error, runtime.messages, runtime.sending]);
   useEffect(() => { onPresentation(presentation); }, [onPresentation, presentation]);
-  return <ArchiveAssistantPanel session={session} model={model} context={context} presentation={presentation} seedGoal={seedGoal} open={open} onOpenChange={onOpenChange} onOpenBrief={onOpenBrief} />;
+  return <ArchiveAssistantPanel
+    session={session}
+    model={model}
+    context={context}
+    presentation={presentation}
+    seedGoal={seedGoal}
+    open={open}
+    onOpenChange={onOpenChange}
+    onOpenBrief={onOpenBrief}
+    onReplan={clearPlanning}
+    onPlanningBound={bindPlanning}
+  />;
 }
 
 export function ArchivePage({ session, onRetry }: { session: MockSession | null; onRetry?: () => Promise<void> }) {
@@ -195,11 +224,14 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   const focusedLearned = useMemo(() => focusedGraphData
     ? summarizeLearnerState(records, focusedGraphData.knowledgeNodes.map((node) => node.id)).counts.acquired
     : 0, [focusedGraphData, records]);
-  const draftActive = Boolean(session) && assistant.state === "brief" && assistant.draftIds.length > 0 && !focusedCourse;
+  // Collapsing the panel hides every trace of its result on the map; the
+  // presentation itself stays available so reopening can restore valid hits.
+  const visibleAssistant = assistantOpen ? assistant : EMPTY_PRESENTATION;
+  const draftActive = Boolean(session) && visibleAssistant.state === "brief" && visibleAssistant.draftIds.length > 0 && !focusedCourse;
   const selectedNode = model && selectedId ? model.nodeById.get(selectedId) ?? null : null;
   const searchResults = useMemo(() => model ? searchArchive(model, query, people) : null, [model, people, query]);
   const courseNodeIds = useMemo(() => model && focusedCourse ? archiveCourseKnowledgeIds(model, focusedCourse.id) : new Set<string>(), [focusedCourse, model]);
-  const draftNodeIds = useMemo(() => new Set(draftActive ? assistant.draftIds : []), [assistant.draftIds, draftActive]);
+  const draftNodeIds = useMemo(() => new Set(draftActive ? visibleAssistant.draftIds : []), [draftActive, visibleAssistant.draftIds]);
   const selectedPeople = useMemo<PanelPerson[]>(() => {
     if (!model) return [];
     return selectedPeopleIds.flatMap((id) => {
@@ -239,13 +271,8 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); };
   }, []);
 
-  // A new assistant result reopens the assistant and takes the slot from search.
-  useEffect(() => {
-    if (assistant.state === "idle") return;
-    setAssistantOpen(true);
-    setSearchOpen(false);
-    setQuery("");
-  }, [assistant.state]);
+  // The panel owns when it opens; a background presentation update must never
+  // reopen a panel the learner collapsed.
 
   useEffect(() => {
     if (model && !error) setLastGoodAt(Date.now());
@@ -342,13 +369,13 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   useEffect(() => {
     if (!draftActive || !model) { setDraftPlane(null); return; }
     let live = true;
-    void buildDraftPlane({ ids: assistant.draftIds, edges: model.edges, titles: new Map(model.nodes.map((node) => [node.id, node.title])) }).then((plane) => {
+    void buildDraftPlane({ ids: visibleAssistant.draftIds, edges: model.edges, titles: new Map(model.nodes.map((node) => [node.id, node.title])) }).then((plane) => {
       if (live) setDraftPlane(plane);
     }).catch((planeError) => {
       if (live) console.error("Draft plane layout failed", planeError);
     });
     return () => { live = false; };
-  }, [assistant.draftIds, draftActive, model]);
+  }, [visibleAssistant.draftIds, draftActive, model]);
 
   const selectedNodeRef = useRef(false);
   selectedNodeRef.current = Boolean(selectedNode);
@@ -615,10 +642,10 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
   }, [closeDetailOrFocus, openSearch, socialOpen]);
 
   useEffect(() => {
-    if (assistant.state === "idle") return;
-    if (assistant.state === "brief") return;
-    if (assistant.candidateIds.length) window.setTimeout(() => sceneRef.current?.fitIds(assistant.candidateIds, { padding: 1.9 }), 60);
-  }, [assistant.candidateIds, assistant.state]);
+    if (!assistantOpen || visibleAssistant.state === "idle") return;
+    if (visibleAssistant.state === "brief") return;
+    if (visibleAssistant.candidateIds.length) window.setTimeout(() => sceneRef.current?.fitIds(visibleAssistant.candidateIds, { padding: 1.9 }), 60);
+  }, [assistantOpen, visibleAssistant.candidateIds, visibleAssistant.state]);
 
   const retry = useCallback(async () => {
     if (retrying) return;
@@ -694,8 +721,8 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
           communities={communities}
           selectedId={selectedId}
           searchIds={searchOpen ? searchResults?.mapHitIds ?? [] : []}
-          assistantIds={assistant.state === "searching" || assistant.state === "results" ? assistant.candidateIds : []}
-          draftIds={assistant.draftIds}
+          assistantIds={visibleAssistant.state === "searching" || visibleAssistant.state === "results" ? visibleAssistant.candidateIds : []}
+          draftIds={visibleAssistant.draftIds}
           reducedMotion={reducedMotion}
           onSelectNode={(id) => { if (id) selectNode(id); else closeDetailOrFocus(); }}
           onLevelChange={setLevel}
@@ -775,7 +802,7 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
       ) : null}
 
       {focusedCourse && coursePlane ? <ArchiveCourseFocusBar course={focusedCourse} learned={focusedLearned} leftInset={leftInset} onOpen={(origin) => openCourse(focusedCourse.id, origin)} /> : null}
-      {assistantDraft && assistant.brief ? <ArchiveDraftFocusBar title={assistant.brief.goal} knowledgeCount={assistant.draftIds.length} weeks={plannedWeeks(assistant.brief.requestedAdjustments, assistant.draftIds.length)} leftInset={leftInset} /> : null}
+      {assistantDraft && visibleAssistant.brief ? <ArchiveDraftFocusBar title={visibleAssistant.brief.goal} knowledgeCount={visibleAssistant.draftIds.length} weeks={plannedWeeks(visibleAssistant.brief.requestedAdjustments, visibleAssistant.draftIds.length)} leftInset={leftInset} /> : null}
 
       {selectedNode && !assistantDraft ? (
         <ArchiveNodePanel
@@ -810,24 +837,34 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
         {!session ? <span><i className="is-public" aria-hidden />公开可见知识点 {model.stats.totalNodes}</span> : null}
         {session && !selectedPeopleIds.length ? <span><i className="is-me" aria-hidden />我的知识 {model.stats.mine}</span> : null}
         {selectedPeople.length ? selectedPeople.map((person) => <span key={person.id}><i style={{ background: `var(--p-${person.accent})` }} aria-hidden />{person.name} {person.nodeIds.size}</span>) : null}
-        {assistant.state === "results" || assistant.state === "searching" ? <span><i className="is-hit" aria-hidden />助手命中 {assistant.candidateIds.length}</span> : null}
+        {visibleAssistant.state === "results" || visibleAssistant.state === "searching" ? <span><i className="is-hit" aria-hidden />助手命中 {visibleAssistant.candidateIds.length}</span> : null}
         {searchOpen && searchResults ? <span><i className="is-hit" aria-hidden />搜索命中 {searchResults.mapHitIds.length}</span> : null}
       </div>
 
       {session ? (
-        <ArchiveAssistantBridge
-          session={session}
-          model={model}
-          context={context}
-          seedGoal={seedGoal}
-          open={assistantOpen}
-          onOpenChange={handleAssistantOpenChange}
-          onPresentation={handlePresentation}
-          onOpenBrief={() => navigate("/")}
-        />
+        <AssistantRuntimeProvider session={session} scope={ASSISTANT_ARCHIVE_PANEL_SOURCE}>
+          <ArchiveAssistantBridge
+            session={session}
+            model={model}
+            context={context}
+            seedGoal={seedGoal}
+            open={assistantOpen}
+            onOpenChange={handleAssistantOpenChange}
+            onPresentation={handlePresentation}
+            onOpenBrief={(briefMessageId, sessionId) => {
+              const next = new URLSearchParams();
+              if (sessionId) next.set("session", sessionId);
+              next.set("object", "brief");
+              next.set("objectMessageId", briefMessageId);
+              navigate(`/?${next.toString()}`);
+            }}
+          />
+        </AssistantRuntimeProvider>
       ) : (
         <GuestAssistantCard onLogin={() => navigate("/login", { state: authGateState(location) })} onRegister={() => navigate("/register", { state: authGateState(location) })} />
       )}
+
+      {session ? <EduFlowAssistant context={{ ...context, userRole: session.role, capabilities: session.capabilities } as AssistantContext} contextLabel="我的地图" ownedCapabilities={ARCHIVE_OWNED_CAPABILITIES} /> : null}
 
       {error ? (
         <div className="ef-atlas-error-banner" role="alert">
