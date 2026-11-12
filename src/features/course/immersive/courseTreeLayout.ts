@@ -142,10 +142,11 @@ export function buildDependencyRoutes(input: {
         ? [point(x, source.y + source.height / 2), point(x, target.y - target.height / 2)]
         : [point(x, source.y - source.height / 2), point(x, target.y + target.height / 2)];
     }
-    const rightGutter = chapter.x + chapter.width + 6;
+    const rightGutter = chapter.x + chapter.width / 2 + 6;
+    const leftGutter = chapter.x - chapter.width / 2 - 6;
     const gutter = rightGutter > Math.max(source.x, target.x) + Math.max(source.width, target.width) / 2 + 2
       ? rightGutter
-      : chapter.x - 6;
+      : leftGutter;
     const direction = gutter > source.x ? 1 : -1;
     return [
       point(source.x + direction * source.width / 2, source.y),
@@ -159,8 +160,12 @@ export function buildDependencyRoutes(input: {
     const direction = target.chapterIndex > source.chapterIndex ? 1 : -1;
     const sourceChapter = input.chapters[source.chapterIndex];
     const targetChapter = input.chapters[target.chapterIndex];
-    const sourceGutter = direction > 0 ? sourceChapter.x + sourceChapter.width + 6 : sourceChapter.x - 6;
-    const targetGutter = direction > 0 ? targetChapter.x - 6 : targetChapter.x + targetChapter.width + 6;
+    const sourceGutter = direction > 0
+      ? sourceChapter.x + sourceChapter.width / 2 + 6
+      : sourceChapter.x - sourceChapter.width / 2 - 6;
+    const targetGutter = direction > 0
+      ? targetChapter.x - targetChapter.width / 2 - 6
+      : targetChapter.x + targetChapter.width / 2 + 6;
     const start = point(source.x + direction * source.width / 2, source.y);
     const end = point(target.x - direction * target.width / 2, target.y);
     if (Math.abs(target.chapterIndex - source.chapterIndex) === 1) {
@@ -227,7 +232,7 @@ export function buildPracticeCards(graphData: CourseGraphData): Map<string, Cour
         x: 0,
         y: 0,
         z: 0,
-        width: 176,
+        width: COURSE_CARD_WIDTH,
         height: 28
       });
       return;
@@ -247,7 +252,7 @@ export function buildPracticeCards(graphData: CourseGraphData): Map<string, Cour
         x: 0,
         y: 0,
         z: 0,
-        width: 176,
+        width: COURSE_CARD_WIDTH,
         height: primary ? 48 : 28
       });
       return;
@@ -267,7 +272,7 @@ export function buildPracticeCards(graphData: CourseGraphData): Map<string, Cour
       x: 0,
       y: 0,
       z: 0,
-      width: 176,
+      width: COURSE_CARD_WIDTH,
       height: 48
     });
   });
@@ -314,6 +319,16 @@ export function basePracticeCards(
     if (!anchor) return [];
     return [{ ...card, x: anchor.x, y: anchor.y, z: anchor.z }];
   });
+}
+
+/**
+ * Only real practice content becomes a scene node. `empty` and `shadow`
+ * entries are coverage bookkeeping (no Assignment at this position, or the
+ * Assignment is drawn at its primary Knowledge); rendering them would fabricate
+ * a node the Course graph does not contain.
+ */
+export function isRenderablePracticeCard(card: CoursePracticeCard) {
+  return card.kind === "assignment" || card.kind === "group";
 }
 
 export function assignmentKnowledgeMap(graphData: CourseGraphData): Map<string, string[]> {

@@ -6,6 +6,7 @@ import { expandPanelFromRect, contractPanelToRect } from "@/shared/ui/panelMorph
 import { Pill } from "@/shared/ui/Pill";
 import { Button } from "@/shared/ui/Button";
 import { PanelActions } from "./PanelActions";
+import type { CourseEntrySource } from "@/features/course/pages/courseEntry";
 import type { NavigationDecision } from "@/shared/learning/navigation";
 import { CourseRoutePanel, type CourseRouteMode, type CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
 import type { HomeCourseProjection } from "@/features/course/path/courseLearnerProjection";
@@ -19,7 +20,7 @@ const EASE_OUT = [0.2, 0.8, 0.2, 1] as const;
  * container that is moved between the side slot and a native modal dialog, so
  * switching 侧边 / 整页 never remounts the route or loses its scroll/selection.
  */
-export function HomeRoutePanel({ courseId, chapterId, originRect, originElement, focusNodeId, courseTitle, projection, decision, onClose, onBack, backLabel = "返回", onInteract, onStart, onModeChange }: {
+export function HomeRoutePanel({ courseId, chapterId, originRect, originElement, focusNodeId, courseTitle, projection, decision, onClose, onBack, backLabel = "返回", entrySource = "home", entryReturnTo, onInteract, onStart, onModeChange }: {
   courseId: string;
   chapterId?: string;
   originRect?: DOMRect | null;
@@ -31,6 +32,9 @@ export function HomeRoutePanel({ courseId, chapterId, originRect, originElement,
   onClose(): void;
   onBack?(): void;
   backLabel?: string;
+  /** Surface that owns this route panel; the expanded Course page returns there. */
+  entrySource?: CourseEntrySource;
+  entryReturnTo?: string;
   onInteract?(): void;
   onStart(action: CourseRouteStepAction): void;
   onModeChange?(mode: CourseRouteMode): void;
@@ -226,7 +230,14 @@ export function HomeRoutePanel({ courseId, chapterId, originRect, originElement,
       </div>
       <footer className="ef-home-route-panel-foot">
         <span>一条路线走完所有章节</span>
-        <PanelActions expand={{ kind: "page", href: chapterId ? `/courses/${encodeURIComponent(courseId)}/chapters/${encodeURIComponent(chapterId)}` : `/courses/${encodeURIComponent(courseId)}` }} />
+        <PanelActions expand={{
+          kind: "page",
+          href: chapterId ? `/courses/${encodeURIComponent(courseId)}/chapters/${encodeURIComponent(chapterId)}` : `/courses/${encodeURIComponent(courseId)}`,
+          courseEntry: {
+            source: entrySource,
+            returnTo: entryReturnTo ?? `${window.location.pathname}${window.location.search}${window.location.hash}`
+          }
+        }} />
       </footer>
     </section>, container)}
   </>;

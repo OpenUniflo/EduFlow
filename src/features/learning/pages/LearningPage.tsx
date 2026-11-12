@@ -12,6 +12,7 @@ import { formatMicroParam, parseMicroParam, parseMicroView } from "@/features/ho
 import { MyPanel } from "@/features/home/MyPanel";
 import { EMPTY_HOME_MAINLINE_CONFIG, type HomeMainlineConfig } from "@/features/home/HomeMainlineConfigRepository";
 import { deriveHomeView, resolveHomeNextStep, type HomeNextStep } from "@/features/home/homeMainline";
+import { courseEntryState } from "@/features/course/pages/courseEntry";
 import { buildHomeCourseProjection, type HomeMicroAsset } from "@/features/course/path/courseLearnerProjection";
 import type { CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
 import { buildHomeAssistantContext } from "@/features/home/homeAssistantContext";
@@ -701,7 +702,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       openPractice(courseId, action.assignmentId, action.step.title);
       return;
     }
-    navigate(`/courses/${encodeURIComponent(courseId)}`);
+    navigate(`/courses/${encodeURIComponent(courseId)}`, { state: courseEntryState("home", `${location.pathname}${location.search}`) });
   }
 
   function openPracticeNext(step: { nodeId?: string; resourceKind: string; resourceId?: string; microPathId?: string; title: string }) {
@@ -715,7 +716,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       void openPractice(focusCourseId, step.resourceId, step.title);
       return;
     }
-    navigate(`/courses/${encodeURIComponent(focusCourseId)}`);
+    navigate(`/courses/${encodeURIComponent(focusCourseId)}`, { state: courseEntryState("home", `${location.pathname}${location.search}`) });
   }
 
   function toggleHistory(open: boolean) {
@@ -762,7 +763,7 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       return;
     }
     if (owned) { showRoutePanel(owned.runtime.course.id); return; }
-    if (focusCourseId) navigate(`/courses/${encodeURIComponent(focusCourseId)}`);
+    if (focusCourseId) navigate(`/courses/${encodeURIComponent(focusCourseId)}`, { state: courseEntryState("home", `${location.pathname}${location.search}`) });
     else navigate("/records");
   }
 
@@ -881,10 +882,12 @@ export function LearningPage({ session, onLogout: _onLogout }: { session: MockSe
       session={session}
       messages={assistant.messages}
       onClose={closeActivePanel}
-      onOpenCourse={(courseId) => navigate(`/courses/${encodeURIComponent(courseId)}`)}
+      onOpenCourse={(courseId) => navigate(`/courses/${encodeURIComponent(courseId)}`, { state: courseEntryState("home", `${location.pathname}${location.search}`) })}
       onSelectNode={(nodeId) => dispatchRightPanel({ type: "open-knowledge", nodeId })}
       route={routePanelOpen && routeProjection && routeRuntime && routeCourseId && rightPanel.kind === "route" ? {
         panel: rightPanel,
+        entrySource: previousPanel.kind === "my" ? "my" : "home",
+        ...(previousPanel.kind === "my" ? { entryReturnTo: "/?panel=1" } : {}),
         runtime: routeRuntime,
         projection: routeProjection,
         decision: routeDecision,

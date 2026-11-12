@@ -19,7 +19,8 @@ describe("one panel expand action", () => {
 
   it("navigates with returnTo so the conversation and panel can be restored", () => {
     const source = read("src/features/home/PanelActions.tsx");
-    expect(source).toContain("navigate(expand.href, { state: { returnTo } })");
+    expect(source).toContain("navigate(expand.href, {");
+    expect(source).toContain("courseEntryState(expand.courseEntry.source, returnTo)");
     expect(source).toContain("window.location.pathname");
   });
 

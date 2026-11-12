@@ -132,10 +132,12 @@ describe("batch 1: interactions", () => {
     expect(source).toContain("waitForContent");
   });
 
-  it("sends the course page back to the archive course plane", () => {
-    const source = read("src/features/course/pages/CourseLearnerRoutePage.tsx");
-    expect(source).toContain("archiveHref({ focus: `course:${courseId}` })");
-    expect(source).toContain("<span>档案</span>");
+  it("sends the course page back to its recorded source, defaulting to the archive course plane", () => {
+    const entry = read("src/features/course/pages/courseEntry.ts");
+    const header = read("src/features/course/pages/CoursePageHeader.tsx");
+    expect(entry).toContain("archiveHref({ focus: `course:${courseId}` })");
+    expect(entry).toContain('archive: "档案"');
+    expect(header).toContain("返回{backLabel}");
   });
 
   it("feeds the archive course count and list from one active projection", () => {

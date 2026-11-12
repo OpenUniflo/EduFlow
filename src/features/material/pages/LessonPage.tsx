@@ -132,12 +132,12 @@ function MaterialReaderShell({ runtime, material, userState, savedState, session
       <div className="atlas-lesson-header-left"><button className="atlas-lesson-back" onClick={() => {
         const state = location.state as { returnTo?: unknown; returnState?: unknown } | null;
         // The label and the destination are one contract: with no explicit
-        // source, "返回课程技能树" opens the Course tree, not the route page.
+        // source, "返回课程树" opens the Course tree, not the route page.
         const returnTarget = typeof state?.returnTo === "string"
           ? resolveMicroLearningReturnTarget(state, runtime.course.id)
           : `/courses/${encodeURIComponent(runtime.course.id)}?view=course`;
         navigate(returnTarget, { state: state?.returnState });
-      }} aria-label={location.state?.returnTo ? "返回学习来源" : "返回课程技能树"}><ArrowLeft size={16} /></button><div className="atlas-lesson-breadcrumb"><button onClick={() => navigate(`/courses/${runtime.course.id}`)}>{runtime.course.title}</button><span>/</span><span>{lesson?.title ?? material.title}</span></div></div>
+      }} aria-label={location.state?.returnTo ? "返回学习来源" : "返回课程树"}><ArrowLeft size={16} /></button><div className="atlas-lesson-breadcrumb"><button onClick={() => navigate(`/courses/${runtime.course.id}`)}>{runtime.course.title}</button><span>/</span><span>{lesson?.title ?? material.title}</span></div></div>
       <div className="atlas-lesson-title"><strong>{material.title}</strong><small>{material.type === "pdf" ? "Original PDF" : material.type} · {draftSegments.length} 个内容段 · {material.duration ?? "自定进度"}</small></div>
       {canDesignCourse(session) ? <ExperienceModeToggle value={experience} onChange={setExperience} /> : null}
     </header>

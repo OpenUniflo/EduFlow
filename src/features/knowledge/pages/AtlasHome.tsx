@@ -91,7 +91,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
         <div className="atlas-home-heading">
           <span className="atlas-kicker">LEARN BY DISCOVERY</span>
           <h1>从知识星图中探索，或创建一门课程</h1>
-          <p>上传课件并补充要求，自动生成课程技能树、关联课件与配套动手任务。</p>
+          <p>上传课件并补充要求，自动生成课程树、关联课件与配套动手任务。</p>
         </div>
         <div className="atlas-creator">
           {files.length ? (
@@ -110,7 +110,7 @@ export function AtlasHome({ session, onLogout }: { session: MockSession; onLogou
             <button className="atlas-send" type="button" aria-label="生成课程" onClick={() => void createCourse()}>{generating ? <span className="atlas-spinner" /> : <Send size={18} />}</button>
           </div>
           <div className="atlas-quick-actions">
-            {["根据课件生成技能树", "根据主题生成一门 15 课时完整课程", "补充前置依赖、评测和最终项目"].map((label) => <button key={label} onClick={() => setPrompt(label)}>{label}</button>)}
+            {["根据课件生成课程树", "根据主题生成一门 15 课时完整课程", "补充前置依赖、评测和最终项目"].map((label) => <button key={label} onClick={() => setPrompt(label)}>{label}</button>)}
           </div>
           {clarification ? <div className="atlas-generation glass-v2" aria-live="polite"><strong>{clarification.clarificationQuestion}</strong><div className="atlas-quick-actions">{clarification.recommendedOptions.map((option) => <button key={option} onClick={() => { setPrompt(option); void createCourse(option); }}>{option}</button>)}</div></div> : null}
           {generating ? (

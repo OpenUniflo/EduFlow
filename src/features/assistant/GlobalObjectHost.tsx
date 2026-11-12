@@ -7,6 +7,7 @@ import { type RightPanel } from "@/features/home/rightPanel";
 import { ObjectPanelSwitch } from "@/features/home/ObjectPanelSwitch";
 import { panelForTarget } from "@/features/home/panelForTarget";
 import type { CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
+import { courseEntrySourceForPath, courseEntryState } from "@/features/course/pages/courseEntry";
 import { useCourseProjection } from "@/features/course/path/useCourseProjection";
 import type { MockSession } from "@/features/auth/types";
 import { shouldHandleShellEscape } from "@/shared/ui/escapeLayer";
@@ -129,7 +130,13 @@ export function GlobalObjectHost({ session, children }: { session: MockSession; 
       openObject({ kind: "practice", courseId, assignmentId: action.assignmentId });
       return;
     }
-    navigate(`/courses/${encodeURIComponent(courseId)}`);
+    navigateToCourse(courseId);
+  }
+
+  function navigateToCourse(courseId: string) {
+    const returnTo = `${location.pathname}${location.search}`;
+    const source = courseEntrySourceForPath(returnTo) ?? "home";
+    navigate(`/courses/${encodeURIComponent(courseId)}`, { state: courseEntryState(source, returnTo) });
   }
 
   function openPracticeNext(step: { nodeId?: string; resourceKind: string; resourceId?: string; microPathId?: string; title: string }) {
@@ -144,7 +151,7 @@ export function GlobalObjectHost({ session, children }: { session: MockSession; 
       openObject({ kind: "practice", courseId, assignmentId: step.resourceId });
       return;
     }
-    navigate(`/courses/${encodeURIComponent(courseId)}`);
+    navigateToCourse(courseId);
   }
 
   return <MicroHostProvider host={microHost}>
@@ -155,7 +162,7 @@ export function GlobalObjectHost({ session, children }: { session: MockSession; 
       session={session}
       messages={assistant.messages}
       onClose={closePanel}
-      onOpenCourse={(courseId) => { closePanel(); navigate(`/courses/${encodeURIComponent(courseId)}`); }}
+      onOpenCourse={(courseId) => { closePanel(); navigateToCourse(courseId); }}
       onSelectNode={(nodeId) => setPanel({ kind: "knowledge", nodeId })}
       route={panel.kind === "route" && route.projection && route.runtime ? {
         panel,

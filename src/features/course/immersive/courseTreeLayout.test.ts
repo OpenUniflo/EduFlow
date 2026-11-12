@@ -3,6 +3,10 @@ import type { CoursePlaneLayout } from "@/features/archive/model/coursePlaneLayo
 import type { CourseGraphData } from "../runtime/courseRuntime";
 import {
   type WindingStepInput,
+  COURSE_CARD_HEIGHT,
+  COURSE_CARD_WIDTH,
+  COURSE_CHAPTER_HEADER,
+  COURSE_CHAPTER_PADDING_BOTTOM,
   COURSE_ROW_GAP,
   COURSE_ROW_PITCH,
   REFLECTION_OFFSET,
@@ -20,6 +24,7 @@ import {
   ROUTE_CHAPTER_HEIGHT,
   ROUTE_STEP_GAP,
   courseSelectionRelations,
+  isRenderablePracticeCard,
   positionPracticeCards,
   primaryKnowledgeByAssignment,
   reflectionOffset,
@@ -79,13 +84,22 @@ describe("course tree geometry", () => {
     const k1 = byId.get("K1")!;
     const k2 = byId.get("K2")!;
     const k3 = byId.get("K3")!;
-    expect(k1).toMatchObject({ x: -112, z: 0, width: 176, height: 64 });
+    expect(k1).toMatchObject({ x: layout.chapters[0].x, z: 0, width: COURSE_CARD_WIDTH, height: COURSE_CARD_HEIGHT });
     expect(k2.x).toBe(k1.x);
     expect(k2.y - k1.y).toBe(COURSE_ROW_PITCH);
     expect(k3.y).toBe(k1.y);
     expect(layout.chapters.map((chapter) => chapter.id)).toEqual(["ch1", "ch2", "ch3"]);
+    // Column geometry comes from the Archive plane unchanged; widening it is a
+    // camera/layout regression, not a presentation choice.
+    expect(COURSE_CARD_WIDTH).toBe(176);
+    expect(COURSE_CARD_HEIGHT).toBe(64);
+    expect(COURSE_ROW_GAP).toBe(27);
+    expect(layout.chapters.map((chapter) => chapter.width)).toEqual(plane.chapters.map((chapter) => chapter.width));
+    expect(layout.chapters[1].x - layout.chapters[0].x).toBe(plane.chapters[1].x - plane.chapters[0].x);
     expect(layout.chapters.find((chapter) => chapter.id === "ch3")?.empty).toBe(true);
-    expect(layout.chapters.find((chapter) => chapter.id === "ch1")?.height).toBe(56 + 2 * 64 + COURSE_ROW_GAP + 12);
+    expect(layout.chapters.find((chapter) => chapter.id === "ch1")?.height).toBe(
+      COURSE_CHAPTER_HEADER + 2 * COURSE_CARD_HEIGHT + COURSE_ROW_GAP + COURSE_CHAPTER_PADDING_BOTTOM
+    );
     expect(layout.edges.map((edge) => edge.id)).toEqual(["e1", "e2"]);
   });
 
@@ -147,6 +161,22 @@ describe("course tree geometry", () => {
         });
       }
     });
+  });
+
+  it("keeps a between-row dependency in the chapter gutter, not in the next column", () => {
+    const chapter = { id: "ch1", x: 0, y: 0, width: COURSE_CARD_WIDTH, height: 500 };
+    const node = (id: string, y: number) => ({
+      id, x: chapter.x, y, width: COURSE_CARD_WIDTH, height: COURSE_CARD_HEIGHT, chapterId: chapter.id
+    });
+    const routes = buildDependencyRoutes({
+      nodes: [node("K1", 60), node("K2", 220), node("K3", 380)],
+      chapters: [chapter],
+      edges: [{ id: "e1", source: "K1", target: "K3", relation: "prerequisite" }]
+    });
+    const points = routes.get("e1")!;
+    // The vertical leg must sit just outside this column, not inside the next.
+    expect(points[1].x).toBeCloseTo(COURSE_CARD_WIDTH / 2 + 6, 5);
+    expect(Math.abs(points[1].x)).toBeLessThan(COURSE_CARD_WIDTH);
   });
 
   it("threads the route band through each step's left-edge number disc", () => {
@@ -214,6 +244,12 @@ describe("course tree geometry", () => {
     expect(cards.get("K3")).toMatchObject({ kind: "empty", title: "暂无对应动手任务" });
     expect(assignmentKnowledgeMap(graphData).get("A2")).toEqual(["K1", "K2"]);
     expect(primaryKnowledgeByAssignment(graphData).get("A2")).toBe("K1");
+  });
+
+  it("renders only real practice content, never empty or shadow placeholders", () => {
+    const cards = [...buildPracticeCards(graphData).values()];
+    expect(cards.filter(isRenderablePracticeCard).map((card) => card.knowledgeId)).toEqual(["K1"]);
+    expect(cards.some((card) => card.kind === "empty" || card.kind === "shadow")).toBe(true);
   });
 
   it("swaps an open detail facet without losing the anchor", () => {

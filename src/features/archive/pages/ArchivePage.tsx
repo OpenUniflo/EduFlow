@@ -9,6 +9,7 @@ import { authGateState } from "@/features/auth/authRedirect";
 import type { MockSession } from "@/features/auth/types";
 import { buildCourseGraphData, type CourseGraphData } from "@/features/course/runtime/courseRuntime";
 import { isCourseVisibleToViewer } from "@/features/course/runtime/courseVisibility";
+import { courseEntryState } from "@/features/course/pages/courseEntry";
 import { rememberCourseEnterSnapshot, rememberCourseOrigin, readArchiveCourseView, rememberArchiveCourseView } from "@/features/course/immersive/courseTransition";
 import { summarizeLearnerState } from "@/features/course/immersive/learnerStateProjection";
 import { useDomainGovernance } from "@/features/knowledge/domain/domainStore";
@@ -31,7 +32,7 @@ import type { PersonLayout } from "../model/personLayout";
 import { buildCoursePlane, buildDraftPlane, type CoursePlaneLayout } from "../model/coursePlaneLayout";
 import { selectCurrentChapterId } from "../model/courseCurrentChapter";
 import { deriveAssistantPresentation, type ArchiveAssistantPresentation } from "../model/assistantPresentation";
-import { parseArchiveSearch, type ArchivePanel } from "../model/atlasParams";
+import { archiveHref, parseArchiveSearch, type ArchivePanel } from "../model/atlasParams";
 import "./archive.css";
 import "./archive3d.css";
 
@@ -476,7 +477,8 @@ export function ArchivePage({ session, onRetry }: { session: MockSession | null;
     // Keep the Archive cards visible until the course chunk has loaded; only
     // then navigate. This removes the empty lazy-route fallback frame.
     void preloadCourseImmersive().catch(() => undefined).then(() => {
-      window.setTimeout(() => navigate(`/courses/${encodeURIComponent(courseId)}${query}`), 120);
+      const returnTo = archiveHref({ focus: `course:${courseId}` });
+      window.setTimeout(() => navigate(`/courses/${encodeURIComponent(courseId)}${query}`, { state: courseEntryState("archive", returnTo) }), 120);
     });
   }, [leavingForCourse, navigate]);
 

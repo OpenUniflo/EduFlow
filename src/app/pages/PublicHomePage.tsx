@@ -4,6 +4,7 @@ import { applicationServices } from "@/app/services/applicationServices";
 import { isCourseVisibleToViewer } from "@/features/course/runtime/courseVisibility";
 import { globalKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { Button } from "@/shared/ui/Button";
+import { courseEntryState } from "@/features/course/pages/courseEntry";
 import { GlassSurface } from "@/shared/ui/GlassSurface";
 import { Pill } from "@/shared/ui/Pill";
 import "./publicHome.css";
@@ -41,7 +42,7 @@ export function PublicHomePage() {
               <h3>{runtime.course.subtitle ?? runtime.course.title}</h3>
               <p>{runtime.course.description}</p>
               <span className="ef-pub-meta">{runtime.chapters.length} 章 · {runtime.lessons.length} 课 · {runtime.assignments.length} 个实践</span>
-              <Button variant="ghost" size="32" onClick={() => navigate(`/courses/${runtime.course.id}`)}>浏览课程<ArrowRight size={14} aria-hidden /></Button>
+              <Button variant="ghost" size="32" onClick={() => navigate(`/courses/${runtime.course.id}`, { state: courseEntryState("home", "/") })}>浏览课程<ArrowRight size={14} aria-hidden /></Button>
             </article>
           ))}
           {!previewCourses.length ? <article className="ef-pub-card ef-pub-card-empty"><h3>公开课程正在准备中</h3><p>课程发布后会出现在这里。</p></article> : null}

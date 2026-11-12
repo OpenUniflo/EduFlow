@@ -11,7 +11,6 @@ import {
   labelLeaderFor,
   labelRectForAnchor,
   layoutSelectionLabels,
-  overlapRatio,
   findExcentricCluster,
   layoutExcentricOutside,
   panBoundsFor,
@@ -29,11 +28,18 @@ import {
 } from "@/shared/scene/tiltedPlane";
 import { SCENE_CAMERA, contentRadius, doubleClickAction, frontPose, isCameraDrag, isPanGesture, sceneCameraLimits, shouldSnapToFront, wheelZoomFactor, zoomDistance, zoomPercent } from "@/shared/scene/cameraInteraction";
 import { cardNameOpacity, cardShowsOwnName, hoverStyleFor, isPickable } from "@/shared/scene/presentationRules";
-import { COURSE_CARD_HEIGHT, LAYER_SWAP_MS, layerMixAt, layerOffsetsAt, type LayerOffsets } from "./courseTreeLayout";
+import {
+  COURSE_CARD_HEIGHT,
+  LAYER_SWAP_MS,
+  layerMixAt,
+  layerOffsetsAt,
+  type LayerOffsets
+} from "./courseTreeLayout";
 import { selectionXraySegments } from "@/shared/scene/xray";
 import { projectColorVar, projectToneFor } from "./projectColors";
 import { advancePulse, routeMetrics } from "@/shared/scene/routePulse";
 import { buildRouteAnchorSequence, cometGradientStops, pointAtRouteDistance, routeBandComets, staggeredWindowCenters } from "./routeBand";
+import { chapterNumberLabel } from "@/shared/learning/chapterNumbering";
 import type {
   CourseImmersiveStageHandle,
   SemanticZoom,
@@ -144,6 +150,7 @@ type EngineApi = {
   rebuildChapters(): void;
   rebuildEdges(): void;
   rebuildBeams(): void;
+  reveal(id: string): void;
 };
 
 const FOV = 40;
@@ -283,7 +290,7 @@ function cardHtml(node: StageNode) {
 }
 
 function chapterTitleHtml(chapter: StageChapter) {
-  return `<b>${String(chapter.displayNumber).padStart(2, "0")}</b><span>${escapeHtml(chapter.title)}</span><em>${escapeHtml(chapter.meta ?? "")}</em>`;
+  return `<b>${escapeHtml(chapterNumberLabel(chapter.displayNumber))} ·</b><span>${escapeHtml(chapter.title)}</span><em>${escapeHtml(chapter.meta ?? "")}</em>`;
 }
 
 function makeIconTexture() {
@@ -762,11 +769,67 @@ export function TiltedCourseStage({
           { x: chapter.x + chapter.width / 2, y: -chapter.y + chapter.height / 2, z: -3 }
         ]))
       ], 300);
-      (engine as unknown as { lastFit?: unknown }).lastFit = { nextTarget: nextTarget.toArray(), nextPosition: nextPosition.toArray(), animated, contentWidth, contentHeight, nodes: currentNodes.length, chapters: currentChapters.length, fitted: engine.fitted };
+      (engine as unknown as { lastFit?: unknown }).lastFit = { nextTarget: nextTarget.toArray(), nextPosition: nextPosition.toArray(), animated, contentWidth, contentHeight, nodes: currentNodes.length, chapters: currentChapters.length, fitted: engine.fitted, scale };
       animateCamera(nextPosition, nextTarget, animated && wasFitted ? 620 : 0);
       engine.emitZoom(true);
     }
     (engine as unknown as { fit(animated?: boolean): void }).fit = fit;
+
+    /** Pan the camera only when the selected node is outside the free area. */
+    function revealNode(id: string) {
+      const node = engine.currentNodes.find((entry) => entry.id === id);
+      if (!node || engine.width < 2 || engine.height < 2) return;
+      camera.updateMatrixWorld();
+      const world = nodeWorldFor(node, layerOffsetsAt(engine.layerMix));
+      const screen = project({ x: world.x, y: world.y, z: world.z });
+      // The detail panel, bottom chrome and shared page header are DOM
+      // overlays outside the stage. Use their measured rectangles (plus the
+      // caller's inset while a panel mounts) as the free area instead of
+      // assuming one panel width and fixed top / bottom margins.
+      let freeLeft = 0;
+      let freeTop = 0;
+      let freeRight = Math.max(0, engine.width - Math.max(0, propsRef.current.rightInset ?? 0));
+      let freeBottom = engine.height;
+      for (const rect of pageOverlayRects()) {
+        const left = Math.max(0, Math.min(engine.width, rect.x));
+        const right = Math.max(0, Math.min(engine.width, rect.x + rect.width));
+        const top = Math.max(0, Math.min(engine.height, rect.y));
+        const bottom = Math.max(0, Math.min(engine.height, rect.y + rect.height));
+        if (right <= left || bottom <= top) continue;
+        const centerX = (left + right) / 2;
+        const centerY = (top + bottom) / 2;
+        const nearest = [
+          { edge: "left" as const, distance: centerX },
+          { edge: "right" as const, distance: engine.width - centerX },
+          { edge: "top" as const, distance: centerY },
+          { edge: "bottom" as const, distance: engine.height - centerY }
+        ].sort((a, b) => a.distance - b.distance)[0].edge;
+        if (nearest === "left") freeLeft = Math.max(freeLeft, right);
+        else if (nearest === "right") freeRight = Math.min(freeRight, left);
+        else if (nearest === "top") freeTop = Math.max(freeTop, bottom);
+        else freeBottom = Math.min(freeBottom, top);
+      }
+      // Reserve the label around the anchor, not a guessed panel width.
+      const labelWidth = Math.max(120, Math.min(420, sideTextWidth(node.title)));
+      const minX = Math.min(engine.width / 2, freeLeft + labelWidth / 2);
+      const maxX = Math.max(minX, freeRight - labelWidth / 2);
+      const minY = Math.min(engine.height / 2, freeTop + SIDE_H);
+      const maxY = Math.max(minY, freeBottom - SIDE_H);
+      const desiredX = Math.max(minX, Math.min(maxX, screen.x));
+      const desiredY = Math.max(minY, Math.min(maxY, screen.y));
+      if (Math.abs(desiredX - screen.x) < 0.5 && Math.abs(desiredY - screen.y) < 0.5) return;
+      // The selection moved the camera; a later resize must not undo it.
+      engine.userInteracted = true;
+      const distance = camera.position.distanceTo(controls.target);
+      const worldPerPixel = (2 * Math.max(1, distance) * FOV_T) / Math.max(1, engine.height);
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+      const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+      const target = controls.target.clone()
+        .add(right.multiplyScalar((screen.x - desiredX) * worldPerPixel))
+        .add(up.multiplyScalar(-(screen.y - desiredY) * worldPerPixel));
+      const position = camera.position.clone().add(target.clone().sub(controls.target));
+      animateCamera(position, target, 240);
+    }
 
     function frontView() {
       const distance = Math.max(engine.minDistance, camera.position.distanceTo(controls.target));
@@ -896,6 +959,7 @@ export function TiltedCourseStage({
         ".ef-imm-status-legend",
         ".ef-imm-controls",
         ".ef-imm-top",
+        ".ef-course-page-header",
         ".ef-imm-cap-rail",
         ".ef-imm-transition"
       ];
@@ -920,7 +984,7 @@ export function TiltedCourseStage({
       }
       // During the detail panel's mount transition there may not be a DOM
       // rectangle yet. Reserve the same inset the page reports in that frame.
-      const inset = Math.max(propsRef.current.detailOpen ? 388 : 0, propsRef.current.rightInset ?? 0);
+      const inset = Math.max(0, propsRef.current.rightInset ?? 0);
       const coveredRight = rects.some((rect) => rect.x > engine.width * 0.55 && rect.height > engine.height * 0.2);
       if (inset > 0 && !coveredRight) rects.push({ x: engine.width - inset, y: 0, width: inset, height: engine.height });
       engine.overlayRectsCache = rects;
@@ -1670,10 +1734,11 @@ export function TiltedCourseStage({
           width: width * pxPerWorld,
           height: height * pxPerWorld
         };
-        // If the selected card sits under a page overlay, its own title is
-        // not readable there. Hand the one name to the label layer, which can
-        // choose a free direction (usually above / left) and stay uncovered.
-        card.hideOwnName = node.id === selected && engine.overlayRectsCache.some((overlay) => overlapRatio(cardRect, overlay) > 0.1);
+        // The selected node is named by the shared label layer: it can use the
+        // complete title (even when the card is a capsule) and, crucially, it
+        // moves with the node when the detail panel pans the camera. Keeping
+        // the card title too would show two names for one node.
+        card.hideOwnName = node.id === selected;
         const cardNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(card.object.quaternion);
         const related = Boolean(selected) && !node.dim;
         const blocked = xrayBlocked(cardRect, world, cardNormal, xray, related, angle);
@@ -1964,6 +2029,9 @@ export function TiltedCourseStage({
         }
         card.element.dataset.status = node.status ?? "";
         card.element.dataset.selected = node.selected ? "true" : "false";
+        const nodeStatus = node.statusLine ?? node.meta ?? "";
+        card.element.title = node.title;
+        card.element.setAttribute("aria-label", [node.title, nodeStatus].filter(Boolean).join(" · "));
         card.element.className = cardClass(node);
         // Re-apply the continuous state classes after the class list refresh.
         card.element.classList.toggle("is-pill", card.angle.pill > 0.02);
@@ -2007,7 +2075,10 @@ export function TiltedCourseStage({
         runtime.panel.style.height = `${chapter.height}px`;
         runtime.panel.dataset.chapterId = chapter.id;
         runtime.title.innerHTML = chapterTitleHtml(chapter);
-        runtime.title.style.maxWidth = `${Math.min(196, Math.max(92, chapter.width * 0.94))}px`;
+        runtime.title.title = [chapterNumberLabel(chapter.displayNumber), chapter.title, chapter.meta].filter(Boolean).join(" · ");
+        // The chapter title follows its column width and may use two lines.
+        runtime.title.style.width = `${Math.max(160, chapter.width - 12)}px`;
+        runtime.title.style.maxWidth = `${Math.max(160, chapter.width - 12)}px`;
       });
     }
 
@@ -2750,7 +2821,7 @@ export function TiltedCourseStage({
     const resizeObserver = new ResizeObserver(() => resize());
     resizeObserver.observe(hostEl);
     resize();
-    apiRef.current = { animateCamera, fit, frontView, capPresetView: capsView, markLabelsDirty, rebuildCards, rebuildChapters, rebuildEdges, rebuildBeams };
+    apiRef.current = { animateCamera, fit, frontView, capPresetView: capsView, markLabelsDirty, rebuildCards, rebuildChapters, rebuildEdges, rebuildBeams, reveal: revealNode };
     if (import.meta.env.DEV) {
       (window as unknown as { __efTilt?: unknown }).__efTilt = {
         angle: () => tiltAngleDegrees(camera.position.clone().sub(controls.target)),
@@ -3230,6 +3301,9 @@ export function TiltedCourseStage({
       const side = detailOpen ? 186 : 0;
       const target = nodeWorldFor(node, layerOffsetsAt(engine.layerMix)).add(right.multiplyScalar(side / Math.max(0.0001, engine.height / (2 * distance * FOV_T))));
       api.animateCamera(target.clone().add(direction.multiplyScalar(distance)), target, 600);
+    },
+    reveal: (id: string) => {
+      apiRef.current?.reveal(id);
     },
     front: () => apiRef.current?.frontView()
   }), [detailOpen, reducedMotion]);

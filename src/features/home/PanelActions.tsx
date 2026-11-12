@@ -1,5 +1,6 @@
 import { Maximize2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { courseEntryState, type CourseEntrySource } from "@/features/course/pages/courseEntry";
 
 /**
  * Every panel declares exactly one expand destination:
@@ -10,7 +11,7 @@ import { useNavigate } from "react-router-dom";
  * panels cannot grow their own "放大" plus "进入页面" pair.
  */
 export type PanelExpandTarget =
-  | { kind: "page"; href: string }
+  | { kind: "page"; href: string; courseEntry?: { source: CourseEntrySource; returnTo: string } }
   | { kind: "overlay"; onOpen(): void }
   | { kind: "none" };
 
@@ -19,8 +20,11 @@ export function PanelActions({ expand }: { expand: PanelExpandTarget }) {
   if (expand.kind === "none") return null;
   const open = () => {
     if (expand.kind === "overlay") { expand.onOpen(); return; }
-    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    navigate(expand.href, { state: { returnTo } });
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const returnTo = expand.courseEntry?.returnTo ?? current;
+    navigate(expand.href, {
+      state: expand.courseEntry ? { ...courseEntryState(expand.courseEntry.source, returnTo), returnTo } : { returnTo }
+    });
   };
   return <div className="ef-object-panel-actions">
     <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={open}><Maximize2 size={13} aria-hidden="true" />放大</button>

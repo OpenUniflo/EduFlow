@@ -33,10 +33,8 @@ export function CourseRoutePanel({
   mode = "side",
   measureEpoch = 0,
   focusNodeId,
-  courseCard = "full",
   onSelect,
-  onStart,
-  onOpenTree
+  onStart
 }: {
   projection: HomeCourseProjection;
   decision?: NavigationDecision | null;
@@ -48,11 +46,8 @@ export function CourseRoutePanel({
   measureEpoch?: number;
   /** Open the route at this Knowledge step (chapter/card deep link). */
   focusNodeId?: string;
-  /** Full course card on Home page form; progress-only card on the Course page. */
-  courseCard?: "full" | "progress";
   onSelect(action: CourseRouteStepAction): void;
   onStart(action: CourseRouteStepAction): void;
-  onOpenTree?(): void;
 }) {
   const steps = useMemo<WindingStepInput[]>(() => {
     const opening = projection.segment.started && !projection.segment.complete ? projection.segment.currentStep?.nodeId : undefined;
@@ -128,9 +123,6 @@ export function CourseRoutePanel({
   const maxLabelWidth = effectiveWidth < 400 ? 90 : effectiveWidth < 480 ? 110 : effectiveWidth < 540 ? 130 : 140;
   const resolvedLabelWidth = Math.min(labelWidth ?? maxLabelWidth, maxLabelWidth);
   const layout = useMemo(() => buildWindingRoute(steps, effectiveWidth), [effectiveWidth, steps]);
-  const total = steps.length;
-  const done = steps.filter((step) => step.learned).length;
-
   const actionFor = (step: WindingStep): CourseRouteStepAction => {
     const micro = projection.microByNode.get(step.id);
     const practice = projection.practiceByNode.get(step.id);
@@ -157,9 +149,6 @@ export function CourseRoutePanel({
       measureEpoch={measureEpoch}
       focusStepId={focusNodeId}
       courseTitle={courseTitle}
-      courseTotal={total}
-      courseDone={done}
-      courseCard={courseCard}
       cardWidth={cardWidth}
       usingActiveRoute
       routeRecommended
@@ -169,7 +158,6 @@ export function CourseRoutePanel({
       labelWidth={resolvedLabelWidth}
       onSelect={(step) => onSelect(actionFor(step))}
       onStart={(step) => onStart(actionFor(step))}
-      onOpenTree={onOpenTree}
     />
   </div>;
 }

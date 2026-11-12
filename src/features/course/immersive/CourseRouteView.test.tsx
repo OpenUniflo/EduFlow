@@ -37,6 +37,23 @@ describe("CourseRouteView route identity", () => {
   });
 });
 
+describe("Course page route document", () => {
+  it("does not repeat the shared header progress as a side card", () => {
+    const html = renderToStaticMarkup(<CourseRouteView
+      layout={layout}
+      steps={steps}
+      mode="page"
+      usingActiveRoute
+      reducedMotion
+      onSelect={vi.fn()}
+      onStart={vi.fn()}
+    />);
+    expect(html).not.toContain("ef-course-route-card");
+    expect(html).not.toContain("课程进度");
+    expect(html).toContain("ef-imm-route-view");
+  });
+});
+
 describe("route progress and current label", () => {
   const learnedCurrent: WindingStepInput[] = [
     { id: "A", title: "已学要点", chapterId: "c1", chapterTitle: "第一章", chapterNumber: 1, status: "done", stateLabel: "已学", learned: true },

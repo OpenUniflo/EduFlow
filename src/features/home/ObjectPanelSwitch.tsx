@@ -4,6 +4,7 @@ import type { AssistantMessage } from "@/features/assistant/assistantContract";
 import type { MockSession } from "@/features/auth/types";
 import { PracticeObject } from "@/features/course/practice/PracticeObject";
 import type { CourseRouteMode, CourseRouteStepAction } from "@/features/course/path/CourseRoutePanel";
+import type { CourseEntrySource } from "@/features/course/pages/courseEntry";
 import type { HomeCourseProjection } from "@/features/course/path/courseLearnerProjection";
 import type { CourseRuntimeData } from "@/features/course/runtime/courseRuntime";
 import type { NavigationDecision } from "@/shared/learning/navigation";
@@ -33,6 +34,8 @@ export type ObjectPanelRoute = {
   originElement?: HTMLElement | null;
   onBack?(): void;
   backLabel?: string;
+  entrySource?: CourseEntrySource;
+  entryReturnTo?: string;
   onStart(action: CourseRouteStepAction, courseId: string): void;
   onInteract?(): void;
 };
@@ -108,6 +111,8 @@ export function ObjectPanelSwitch({
         decision={route.decision}
         {...(route.onBack ? { onBack: route.onBack } : {})}
         {...(route.backLabel ? { backLabel: route.backLabel } : {})}
+        {...(route.entrySource ? { entrySource: route.entrySource } : {})}
+        {...(route.entryReturnTo ? { entryReturnTo: route.entryReturnTo } : {})}
         {...(route.onModeChange ? { onModeChange: route.onModeChange } : {})}
         onClose={onClose}
         onStart={(action) => route.onStart(action, route.panel.courseId)}

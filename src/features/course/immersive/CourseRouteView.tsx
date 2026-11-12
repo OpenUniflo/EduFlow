@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { BookOpen, Edit3, Flag, Network, Play } from "lucide-react";
+import { BookOpen, Edit3, Flag, Play } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import type { WindingRouteLayout, WindingStep, WindingStepInput } from "./courseTreeLayout";
 import "./immersive.css";
@@ -23,15 +23,11 @@ type Props = {
   focusStepId?: string;
   mode?: CourseRouteMode;
   measureEpoch?: number;
-  courseCard?: "full" | "progress";
   cardWidth?: number;
   courseTitle?: string;
-  courseTotal?: number;
-  courseDone?: number;
   onSelect(step: WindingStep): void;
   onStart(step: WindingStep): void;
   onAdjust?(): void;
-  onOpenTree?(): void;
 };
 
 type Rect = { left: number; top: number; right: number; bottom: number };
@@ -112,14 +108,13 @@ const RouteStepRow = memo(function RouteStepRow({ step, isCurrent, isSelected, l
 export function CourseRouteView({
   layout, steps, usingActiveRoute, routeRecommended = false, routeVersionNumber, reducedMotion,
   continueStep, showHeader = true, showAdjust = true, labelWidth = 180, focusStepId, mode = "side", measureEpoch = 0,
-  courseCard = "full", cardWidth = 200,
-  courseTitle, courseTotal = layout.steps.length, courseDone = layout.steps.filter((step) => step.learned ?? step.status === "done").length,
-  onSelect, onStart, onAdjust, onOpenTree
+  cardWidth = 200,
+  courseTitle,
+  onSelect, onStart, onAdjust
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-  const courseCardRef = useRef<HTMLElement>(null);
   const stepRefs = useRef(new Map<number, HTMLButtonElement>());
   const labelRefs = useRef(new Map<number, HTMLButtonElement>());
   const headerRefs = useRef(new Map<string, HTMLDivElement>());
@@ -348,20 +343,6 @@ export function CourseRouteView({
     return () => observer.disconnect();
   }, [mode]);
 
-  // The page form's course card scrolls the route with the wheel, too.
-  useEffect(() => {
-    const card = courseCardRef.current;
-    const scroller = scrollRef.current;
-    if (mode !== "page" || !card || !scroller) return;
-    const onWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? scroller.clientHeight : 1;
-      scroller.scrollTop += event.deltaY * unit;
-    };
-    card.addEventListener("wheel", onWheel, { passive: false });
-    return () => card.removeEventListener("wheel", onWheel);
-  }, [mode]);
-
   // Esc returns the card to the current step first. Only a second Esc reaches
   // the panel host (which closes the side panel or leaves the page form).
   useEffect(() => {
@@ -408,22 +389,6 @@ export function CourseRouteView({
   }
 
   return <div className={`ef-course-route-shell is-${mode}${ready ? " is-ready" : ""}`} data-route-mode={mode}>
-    {mode === "page" ? <aside ref={courseCardRef} className={`ef-course-route-card is-${courseCard}`} aria-label="课程信息">
-      {courseCard === "full" ? <>
-        <span className="ef-course-route-card-kicker"><BookOpen size={15} aria-hidden="true" />课程</span>
-        <h2>{courseTitle}</h2>
-        <p>{layout.headers.length} 章 · {courseTotal} 个知识点</p>
-      </> : <span className="ef-course-route-card-kicker">课程进度</span>}
-      <div className="ef-course-route-card-progress" role="progressbar" aria-valuemin={0} aria-valuemax={courseTotal} aria-valuenow={courseDone} aria-label={`课程进度 已学 ${courseDone} / ${courseTotal}`}>
-        <i style={{ width: `${courseTotal ? (courseDone / courseTotal) * 100 : 0}%` }} />
-      </div>
-      <small>已学 {courseDone} / {courseTotal} 个知识点</small>
-      <div className="ef-course-route-card-chapter">
-        <span>当前章节</span>
-        <b>{currentChapterHeader?.title ?? activeHeader?.title ?? courseTitle}</b>
-      </div>
-      {courseCard === "full" && onOpenTree ? <button type="button" className="ef-ui-btn ef-ui-btn--secondary ef-ui-btn--32" onClick={onOpenTree}><Network size={14} />查看课程树</button> : null}
-    </aside> : null}
     <div className="ef-imm-route-view" ref={scrollRef} aria-label={routeLabel} onClick={clearSelection}>
       <div className="ef-imm-route-sticky" role="status" style={{ width: `${layout.width}px` }}>
         <BookOpen size={14} aria-hidden="true" />

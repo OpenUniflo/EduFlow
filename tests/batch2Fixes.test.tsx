@@ -178,7 +178,8 @@ describe("batch 2: page details", () => {
     expect(actions).not.toContain("flex-wrap: wrap");
     expect(actions).toContain("white-space: nowrap");
     const page = read("src/features/course/immersive/CourseImmersivePage.tsx");
-    expect(page).toContain('routeOn ? "隐藏路线" : "显示路线"');
+    expect(page).toContain("显示学习路线");
+    expect(page).not.toContain('routeOn ? "隐藏路线" : "显示路线"');
     expect(page).toContain("currentMarkerCount");
   });
 

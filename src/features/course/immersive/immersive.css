@@ -911,22 +911,25 @@
   transform-origin: 50% 50%;
   top: 0;
   left: 0;
-  display: inline-flex;
-  max-width: 210px;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 11px;
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-4) var(--sp-8);
+  padding: var(--sp-8) var(--sp-12);
   border: 1px solid color-mix(in srgb, var(--line-strong) 76%, transparent);
-  border-radius: var(--r-full);
+  border-radius: var(--r-12);
   color: var(--ink-2);
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
   backdrop-filter: blur(14px) saturate(1.2);
   box-shadow: var(--sh-1);
-  font-size: var(--fs-12);
-  line-height: 13px;
-  text-align: center;
-  white-space: nowrap;
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
+  text-align: left;
+  white-space: normal;
   will-change: transform, opacity;
   pointer-events: auto;
 }
@@ -934,50 +937,46 @@
 .ef-imm-chapter-label b {
   flex: 0 0 auto;
   color: var(--brand-ink);
-  font-size: var(--fs-12);
-  line-height: 13px;
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
   font-weight: var(--fw-700);
   font-variant-numeric: tabular-nums;
 }
 
 .ef-imm-chapter-label span {
+  display: -webkit-box;
   overflow: hidden;
   min-width: 0;
-  flex: 1 1 auto;
-  font-size: var(--fs-12);
-  line-height: 13px;
+  flex: 1 1 220px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--fs-13);
+  line-height: var(--lh-13);
   font-weight: var(--fw-600);
+  overflow-wrap: anywhere;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.ef-imm-chapter-label em:empty {
+  display: none;
 }
 
 .ef-imm-chapter-label em {
-  flex: 0 0 auto;
-  margin-left: 1px;
-  padding-left: 6px;
-  border-left: 1px solid var(--line);
+  flex: 1 1 100%;
+  min-width: 0;
+  overflow: hidden;
   color: var(--muted);
   font-size: var(--fs-12);
-  line-height: 13px;
+  line-height: var(--lh-12);
   font-style: normal;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .ef-imm-stage[data-zoom="far"] .ef-imm-chapter-label {
-  display: inline-flex;
-  padding: 4px 12px;
+  padding: var(--sp-4) var(--sp-12);
   background: color-mix(in srgb, var(--surface) 84%, transparent);
-  border-radius: var(--r-full);
-  white-space: nowrap;
-}
-
-.ef-imm-stage[data-zoom="far"] .ef-imm-chapter-label span {
-  display: block;
-  overflow: hidden;
-  font-size: var(--fs-12);
-  line-height: var(--lh-12);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .ef-imm-stage[data-zoom="far"] .ef-imm-chapter-label em {
@@ -1003,6 +1002,44 @@
   pointer-events: none;
 }
 
+.ef-imm-bottombar {
+  position: absolute;
+  z-index: 32;
+  right: var(--ef-assistant-safe-right);
+  bottom: var(--sp-20);
+  left: var(--sp-20);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--sp-16);
+  pointer-events: none;
+}
+
+/* The legend owns the free track; the zoom toolbar owns its intrinsic width.
+   Both remain in one grid lane, so a floating panel only narrows the legend and
+   can never slide the toolbar underneath it or vice versa. */
+.ef-imm-bottombar .ef-imm-status-legend.ef-bottom-legend {
+  position: static;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  box-sizing: border-box;
+  justify-self: start;
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  transform: none;
+}
+
+.ef-imm-bottombar .ef-imm-controls {
+  position: static;
+  right: auto;
+  bottom: auto;
+  justify-self: end;
+  pointer-events: auto;
+}
+
 .ef-imm-status-legend {
   position: absolute;
   z-index: 32;
@@ -1010,10 +1047,10 @@
   left: 50%;
   display: flex;
   align-items: center;
-  gap: var(--sp-16);
+  gap: var(--sp-8) var(--sp-16);
   padding: var(--sp-8) var(--sp-16);
   border: 1px solid var(--glass-line);
-  border-radius: var(--r-full);
+  border-radius: var(--r-16);
   color: var(--muted);
   background: var(--glass-regular);
   -webkit-backdrop-filter: blur(30px) saturate(170%);
@@ -1023,6 +1060,30 @@
   line-height: var(--lh-12);
   transform: translateX(-50%);
   pointer-events: none;
+  white-space: normal;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* The shared bottom grid narrows this track when the detail panel opens. Let
+   the legend wrap inside its own column instead of clipping its counters; the
+   toolbar keeps its intrinsic width in the next column, so wrapped rows can
+   never collide with it. */
+.ef-imm-bottombar .ef-imm-status-legend.ef-bottom-legend.ef-bottom-legend {
+  left: auto;
+  max-width: 100%;
+  overflow: visible;
+  transform: none;
+}
+
+.ef-imm-status-legend-states,
+.ef-imm-status-legend-markers {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ef-imm-status-legend-states > span,
+.ef-imm-status-legend-markers > span {
   white-space: nowrap;
 }
 
@@ -2152,7 +2213,8 @@
 .ef-imm-toolbar {
   position: absolute;
   z-index: 34;
-  bottom: 64px;
+  /* Clear a wrapped two-row legend below (bottom 20 + two 16px rows + gaps). */
+  bottom: 88px;
   left: calc((100% - var(--ef-bottom-right-zone-active)) / 2);
   display: flex;
   max-width: calc(100% - var(--ef-bottom-right-zone-active) - var(--sp-16));
@@ -2188,6 +2250,31 @@
 .ef-imm-toolbar button[aria-pressed="true"] {
   color: var(--brand-ink);
   background: var(--brand-soft);
+}
+
+.ef-imm-toolbar .ef-imm-segmented.is-inline {
+  height: 34px;
+  gap: 2px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--r-8);
+  background: var(--page);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.ef-imm-toolbar .ef-imm-segmented.is-inline button {
+  height: 30px;
+  padding: 0 var(--sp-12);
+  border-radius: var(--r-8);
+  color: var(--ink-2);
+}
+
+.ef-imm-toolbar .ef-imm-segmented.is-inline button.is-on {
+  color: var(--brand-ink);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
 }
 
 .ef-imm-toolbar .ef-imm-switch {
@@ -2757,7 +2844,7 @@ body:has(.ef-imm-page) {
   }
 
   .ef-imm-toolbar {
-    bottom: 82px;
+    bottom: 108px;
     max-width: calc(100% - 32px);
     flex-wrap: wrap;
   }

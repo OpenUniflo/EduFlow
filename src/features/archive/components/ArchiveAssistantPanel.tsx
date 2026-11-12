@@ -9,6 +9,8 @@ import type { AssistantContextSnapshot } from "@/features/assistant/assistantCon
 import type { ArchiveModel } from "../model/atlasModel";
 import { deriveAssistantPresentation, type ArchiveAssistantPresentation } from "../model/assistantPresentation";
 import { knowledgeScopeLabelFor, knowledgeStateLabelFor } from "@/shared/learning/knowledgePresentation";
+import { courseEntryState } from "@/features/course/pages/courseEntry";
+import { archiveHref } from "../model/atlasParams";
 
 export function GuestAssistantCard({ onLogin, onRegister }: { onLogin: () => void; onRegister: () => void }) {
   return (
@@ -145,7 +147,7 @@ export function ArchiveAssistantPanel({ session, model, context, presentation, o
               <div key={match.courseId} className="ef-archive-assistant-match">
                 <b>{match.courseTitle}</b>
                 <span>{match.level === "high" ? "高度匹配" : match.level === "medium" ? "部分匹配" : "匹配较少"} · 目标覆盖 {Math.round(match.targetCoverage * 100)}%</span>
-                <button type="button" onClick={() => navigate(`/courses/${encodeURIComponent(match.courseId)}`)}>使用这门课程<ArrowRight size={12} aria-hidden /></button>
+                <button type="button" onClick={() => navigate(`/courses/${encodeURIComponent(match.courseId)}`, { state: courseEntryState("archive", archiveHref({ focus: `course:${match.courseId}` })) })}>使用这门课程<ArrowRight size={12} aria-hidden /></button>
               </div>
             ))}
           </div> : <p className="ef-archive-muted">当前没有覆盖目标的现有课程，但仍可整理成个人课程简报。</p>}

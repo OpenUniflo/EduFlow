@@ -1,8 +1,7 @@
-import { ArrowLeft, Home, Network, Route } from "lucide-react";
+import { Home } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { applicationServices } from "@/app/services/applicationServices";
-import { archiveHref } from "@/features/archive/model/atlasParams";
 import type { MockSession } from "@/features/auth/types";
 import { userKnowledgeAccess } from "@/features/knowledge/repository/KnowledgeRepository";
 import { createMicroLearningNavigation } from "@/features/learning/micro/microLearning";
@@ -12,15 +11,14 @@ import { CourseRoutePanel, type CourseRouteStepAction } from "../path/CourseRout
 import "../path/coursePath.css";
 
 /**
- * The default learner Course page: a normal route document. It reads the same
- * navigation decision as Home and never mounts the three.js scene. The Course
- * tree is a user action and loads its own chunk.
+ * The default learner Course page body: a normal route document. It reads the
+ * same navigation decision as Home and never mounts the three.js scene. The
+ * shared CoursePageHeader owns the view switch and the back target.
  */
-export function CourseLearnerRoutePage({ courseId, focusChapterId, session, onOpenTree }: {
+export function CourseLearnerRoutePage({ courseId, focusChapterId, session }: {
   courseId: string;
   focusChapterId?: string;
   session: MockSession | null;
-  onOpenTree(): void;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -71,7 +69,7 @@ export function CourseLearnerRoutePage({ courseId, focusChapterId, session, onOp
     });
   }, [courseId, courseState, decision, graph.nodes, records, revision, runtime]);
 
-  if (!runtime) return <main className="ef-course-route-page"><section className="ef-course-route-missing" role="status"><h1>没有找到这门课程</h1><p>课程可能已下架，或链接不完整。</p><button type="button" className="ef-ui-btn ef-ui-btn--secondary" onClick={() => navigate("/")}><Home size={14} />回到首页</button></section></main>;
+  if (!runtime) return <section className="ef-course-route-missing" role="status"><h1>没有找到这门课程</h1><p>课程可能已下架，或链接不完整。</p><button type="button" className="ef-ui-btn ef-ui-btn--secondary" onClick={() => navigate("/")}><Home size={14} />回到首页</button></section>;
 
   const courseTitle = runtime.course.title;
   const authenticated = Boolean(session);
@@ -88,25 +86,7 @@ export function CourseLearnerRoutePage({ courseId, focusChapterId, session, onOp
     }
   }
 
-  return <main className="ef-course-route-page">
-    <header className="ef-course-route-top">
-      <button type="button" className="ef-course-route-back" onClick={() => {
-        // Design §10.6: the Course page's back control is "← 档案" and returns
-        // to the Archive course plane (§10.5). An explicit entry state wins.
-        const state = location.state as { returnTo?: unknown } | null;
-        const returnTo = typeof state?.returnTo === "string" ? state.returnTo : archiveHref({ focus: `course:${courseId}` });
-        navigate(returnTo);
-      }} aria-label="返回档案课程平面"><ArrowLeft size={16} /><span>档案</span></button>
-      <div className="ef-course-route-title">
-        <span>课程</span>
-        <h1>{courseTitle}</h1>
-        <p>{runtime.chapters.length} 章 · {new Set(runtime.curriculumCoverages.map((coverage) => coverage.nodeId)).size} 个知识点{authenticated ? "" : " · 登录后可查看学习状态"}</p>
-      </div>
-      <nav className="ef-course-route-tabs" aria-label="课程视图">
-        <button type="button" role="tab" aria-selected className="is-on"><Route size={14} />路线</button>
-        <button type="button" role="tab" aria-selected={false} onClick={onOpenTree}><Network size={14} />课程树</button>
-      </nav>
-    </header>
+  return <section className="ef-course-route-content" aria-label={`${courseTitle}路线`}>
     {decisionError ? <p className="ef-course-route-error" role="alert">下一步暂时无法读取；路线仍可按课程顺序查看。<button type="button" onClick={() => setRevision((value) => value + 1)}>重试</button></p> : null}
     {projection ? <CourseRoutePanel
       projection={projection}
@@ -115,13 +95,11 @@ export function CourseLearnerRoutePage({ courseId, focusChapterId, session, onOp
       showHeader={false}
       mode="page"
       focusNodeId={focusNodeId}
-      courseCard="progress"
       onSelect={() => undefined}
       onStart={openAction}
-      onOpenTree={onOpenTree}
     /> : <section className="ef-course-route-empty" role="status">
       <p>{authenticated ? "正在准备你的学习路线…" : "登录后可以查看学习状态和下一步。"}</p>
       {!authenticated ? <button type="button" className="ef-ui-btn ef-ui-btn--primary" onClick={() => navigate("/login", { state: { from: window.location.pathname } })}>登录</button> : null}
     </section>}
-  </main>;
+  </section>;
 }

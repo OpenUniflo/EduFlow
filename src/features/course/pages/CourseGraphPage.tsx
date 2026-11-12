@@ -1,11 +1,16 @@
-import { lazy, Suspense } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { applicationServices } from "@/app/services/applicationServices";
 import { canDesignCourse } from "@/features/auth/capabilities";
 import type { MockSession } from "@/features/auth/types";
 import type { MicroLearningProvider } from "@/features/learning/micro/microLearning";
 import type { CourseDesignAssistantProvider } from "@/features/course/courseDesignAssistant";
 import { readCourseEnterSnapshot } from "../immersive/courseTransition";
 import { CourseLearnerRoutePage } from "./CourseLearnerRoutePage";
+import { CoursePageHeader } from "./CoursePageHeader";
+import { buildCourseHeaderModel } from "./courseHeaderModel";
+import { courseViewFromSearch, courseViewSearch, resolveCourseEntry, type CourseView } from "./courseEntry";
+import "./coursePage.css";
 
 export type CourseGraphPageProps = {
   session: MockSession | null;
@@ -25,7 +30,8 @@ function CourseRouteLoading({ courseId }: { courseId: string }) {
     role="status"
     aria-label="正在打开课程"
     style={{
-      minHeight: "100dvh",
+      height: "100%",
+      minHeight: 0,
       background: "radial-gradient(90% 72% at 18% 8%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 70%), radial-gradient(86% 66% at 82% 16%, color-mix(in srgb, var(--acquired) 18%, transparent), transparent 72%), linear-gradient(145deg, color-mix(in srgb, var(--brand) 8%, var(--page)), color-mix(in srgb, var(--p-cyan) 8%, var(--page)))"
     }}
   >
@@ -62,26 +68,74 @@ function CourseRouteLoading({ courseId }: { courseId: string }) {
  * `/courses/:courseId` keeps one route with two non-overlapping renderers:
  * learner immersive scenes (three.js) and the authoring studio (React Flow).
  * A session never switches renderer inside a running view.
+ *
+ * Both learner views share the one CoursePageHeader mounted here. Changing
+ * `?view=course` therefore swaps only the body underneath it.
  */
 export function CourseGraphPage(props: CourseGraphPageProps) {
   const { courseId = "", chapterId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [headerRevision, setHeaderRevision] = useState(0);
+  useEffect(() => applicationServices.userKnowledgeRepository.subscribe(() => setHeaderRevision((value) => value + 1)), []);
   const designRoute = searchParams.get("experience") === "design";
   const design = designRoute && canDesignCourse(props.session);
-  const tree = searchParams.get("view") === "course";
-  if (!design && !tree) {
-    return <CourseLearnerRoutePage
-      courseId={courseId}
-      focusChapterId={chapterId}
-      session={props.session}
-      onOpenTree={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set("view", "course"); return next; })}
-    />;
+  const view = courseViewFromSearch(location.search);
+  const entry = useMemo(() => resolveCourseEntry(location.state, courseId), [courseId, location.state]);
+  const runtime = applicationServices.courseRepository.getCourse(courseId);
+  const headerModel = useMemo(() => {
+    if (!runtime) return null;
+    const records = props.session ? applicationServices.userKnowledgeRepository.getUserKnowledge(props.session.userId) : [];
+    return buildCourseHeaderModel(runtime, records);
+  }, [headerRevision, props.session, runtime]);
+
+  const changeView = (next: CourseView) => {
+    if (next === view) return;
+    setSearchParams(courseViewSearch(location.search, next), { state: location.state });
+  };
+
+  if (design) {
+    return (
+      <Suspense fallback={<CourseRouteLoading courseId={courseId} />}>
+        <CourseStudioPage key={`studio:${courseId}:${props.session?.userId ?? "anonymous"}`} {...props} />
+      </Suspense>
+    );
   }
+
+  // Missing/foreign Courses render the route surface's own Not Found state.
+  if (!runtime || !headerModel) {
+    return <CourseLearnerRoutePage courseId={courseId} focusChapterId={chapterId} session={props.session} />;
+  }
+
   return (
-    <Suspense fallback={<CourseRouteLoading courseId={courseId} />}>
-      {design
-        ? <CourseStudioPage key={`studio:${courseId}:${props.session?.userId ?? "anonymous"}`} {...props} />
-        : <LearnerCourseImmersivePage key={`learn:${courseId}:${props.session?.userId ?? "anonymous"}`} session={props.session} onLogout={props.onLogout} microLearningProvider={props.microLearningProvider} initialView="course" hideRouteView onBackToRoute={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.delete("view"); return next; })} />}
-    </Suspense>
+    <div className="ef-course-page" data-view={view}>
+      <div className="ef-course-page-header-region">
+        <CoursePageHeader
+          courseTitle={runtime.course.title}
+          model={headerModel}
+          authenticated={Boolean(props.session)}
+          view={view}
+          backLabel={entry.label}
+          onBack={() => navigate(entry.returnTo)}
+          onViewChange={changeView}
+        />
+      </div>
+      <div className={`ef-course-page-body is-${view}`}>
+        {view === "tree" ? (
+          <Suspense fallback={<CourseRouteLoading courseId={courseId} />}>
+            <LearnerCourseImmersivePage
+              key={`learn:${courseId}:${props.session?.userId ?? "anonymous"}`}
+              session={props.session}
+              onLogout={props.onLogout}
+              microLearningProvider={props.microLearningProvider}
+              onBack={() => navigate(entry.returnTo)}
+            />
+          </Suspense>
+        ) : (
+          <CourseLearnerRoutePage courseId={courseId} focusChapterId={chapterId} session={props.session} />
+        )}
+      </div>
+    </div>
   );
 }

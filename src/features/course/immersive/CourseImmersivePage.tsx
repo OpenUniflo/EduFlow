@@ -1,6 +1,6 @@
 import {
-  ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Clock3, Edit3, FileText, Layers3,
-  ListChecks, LocateFixed, Lock, LogIn, Network, Route, Sparkles, Target, X
+  ArrowRight, BookOpen, Check, ChevronRight, Clock3, Edit3, FileText, Layers3,
+  LocateFixed, Lock, LogIn, Network, Sparkles, Target, X
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -34,7 +34,6 @@ import {
   flattenCapabilityLayout,
   layoutCapabilityFlattenLayout,
   routeNodePoints,
-  type ImmersiveCapabilityLayout,
   type ImmersiveCourseLayout,
   type ImmersiveKnowledgeNode
 } from "./immersiveLayout";
@@ -45,8 +44,7 @@ import {
   type StageBeam,
   type StageChapter,
   type StageEdge,
-  type StageNode,
-  type StageViewState
+  type StageNode
 } from "./CourseImmersiveStage";
 import { TiltedCourseStage } from "./TiltedCourseStage";
 import {
@@ -55,28 +53,21 @@ import {
   buildPlaneCourseLayout,
   buildPracticeCards,
   buildRouteTrack,
-  buildWindingRoute,
   courseSelectionRelations,
+  isRenderablePracticeCard,
   primaryKnowledgeByAssignment,
   resolveFacetSelection,
   routeStepNumber,
   type CoursePracticeCard,
-  type CourseSelection,
-  type WindingStep,
-  type WindingStepInput
+  type CourseSelection
 } from "./courseTreeLayout";
-import { CourseRouteView } from "./CourseRouteView";
 import {
   clearCourseEnterSnapshot,
-  courseTransitionCss,
   readCourseEnterSnapshot,
-  readCourseOrigin,
   type CourseEnterSnapshot
 } from "./courseTransition";
-import { learnerCategory, learnerLabel, learnerStageStatus, summarizeLearnerState, type LearnerNodeState } from "./learnerStateProjection";
+import { learnerCategory, learnerStageStatus, summarizeLearnerState, type LearnerNodeState } from "./learnerStateProjection";
 import "./immersive.css";
-
-type Tab = "course" | "route";
 
 // Stage 4: the first release ships with no Action resources for route editing;
 // the entry stays hidden until the catalog can offer a 采用-able preview.
@@ -117,17 +108,7 @@ function assignmentStatusTone(status: UserAssignmentStatus | "mixed"): "acquired
   return "quiet";
 }
 
-function practiceMinutes(node: CourseSkillTreeNode, runtime: NonNullable<ReturnType<typeof applicationServices.courseRepository.getCourse>>) {
-  const first = runtime.assignments.find((assignment) => node.assignmentIds.includes(assignment.id));
-  return first?.estimatedMinutes;
-}
-
-function practiceCode(runtime: NonNullable<ReturnType<typeof applicationServices.courseRepository.getCourse>>, assignmentId: string) {
-  const assignment = runtime.assignments.find((item) => item.id === assignmentId);
-  return assignment ? String(assignment.order + 1).padStart(2, "0") : "";
-}
-
-export default function CourseImmersivePage({ session, microLearningProvider, initialView = "course", hideRouteView = false, onBackToRoute }: { session: MockSession | null; onLogout: () => void; microLearningProvider?: MicroLearningProvider; initialView?: Tab; hideRouteView?: boolean; onBackToRoute?: () => void }) {
+export default function CourseImmersivePage({ session, microLearningProvider, onBack }: { session: MockSession | null; onLogout: () => void; microLearningProvider?: MicroLearningProvider; onBack(): void }) {
   const { courseId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -184,7 +165,6 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
     ? flattenCapabilityLayout(capabilityLayout, capabilityModel, { acquiredNodeIds, targetNodeIds })
     : null, [acquiredNodeIds, capabilityLayout, capabilityModel, targetNodeIds]);
 
-  const [tab, setTab] = useState<Tab>(initialView);
   const [swapped, setSwapped] = useState(false);
   // A turned-plane click selects exactly the facet under the pointer. Only the
   // front stage keeps the P4R2 behaviour of resolving practice <-> knowledge
@@ -202,24 +182,20 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
   const [capsQuery, setCapsQuery] = useState("");
   const [perf, setPerf] = useState<{ fps: number; nodes: number; dom: number } | null>(null);
   useEffect(() => {
-    if (!capRailVisible || flat || tab !== "course") setCapListOpen(false);
-  }, [capRailVisible, flat, tab]);
+    if (!capRailVisible || flat) setCapListOpen(false);
+  }, [capRailVisible, flat]);
 
   useEffect(() => {
-    if (flat || tab !== "course") setCapRailVisible(false);
-  }, [flat, tab]);
+    if (flat) setCapRailVisible(false);
+  }, [flat]);
   const stageRef = useRef<CourseImmersiveStageHandle>(null);
   const pageRef = useRef<HTMLElement>(null);
-  const routeReturnView = useRef<StageViewState | null>(null);
   const autoSelectedRef = useRef(false);
-  const origin = useMemo(() => readCourseOrigin(courseId), [courseId]);
   const enterSnapshot = useRef<CourseEnterSnapshot | null>(readCourseEnterSnapshot(courseId)).current;
   const [enterPhase, setEnterPhase] = useState<EnterPhase>(enterSnapshot?.cards.length && !reducedMotion ? "start" : "done");
   const [enterTargets, setEnterTargets] = useState<Record<string, { left: number; top: number; width: number; height: number }>>({});
   const [enterFrame, setEnterFrame] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const [entering, setEntering] = useState(Boolean(enterSnapshot?.cards.length) && !reducedMotion);
-  const [leaving, setLeaving] = useState(false);
-  const [leavingStyle, setLeavingStyle] = useState<ReturnType<typeof courseTransitionCss>>(null);
   const perfEnabled = useMemo(() => new URLSearchParams(location.search).get("perf") === "1", [location.search]);
   if (import.meta.env.DEV) (window as unknown as { __efRouteControl?: unknown }).__efRouteControl = routeControl;
 
@@ -494,20 +470,9 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
     </div>
   ) : null;
 
-  const exitScene = useCallback(async () => {
-    if (leaving) return;
-    setLeaving(true);
-    if (!reducedMotion) {
-      setLeavingStyle(courseTransitionCss(origin));
-      await new Promise((resolve) => window.setTimeout(resolve, 380));
-    }
-    navigate(`/archive?focus=course:${encodeURIComponent(courseId)}`);
-  }, [courseId, leaving, navigate, origin, reducedMotion]);
-
   const enterFlatten = useCallback(() => {
     if (!authenticated || !capabilityLayout) return;
     setFlat(true);
-    setTab("course");
     setSelection(null);
     setSelectionPinned(false);
     setPose("flat");
@@ -538,23 +503,6 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
     }) : current);
   }, [assignmentKnowledge, practiceByKnowledge, primaryKnowledge]);
 
-  const switchTab = useCallback((next: Tab) => {
-    if (next === tab && !flat) return;
-    if (next === "route") {
-      routeReturnView.current = stageRef.current?.getViewState() ?? null;
-      setSelection(null);
-      setSelectionPinned(false);
-      setFlat(false);
-      setTab("route");
-      return;
-    }
-    setTab("course");
-    setFlat(false);
-    const saved = routeReturnView.current;
-    routeReturnView.current = null;
-    if (saved) window.requestAnimationFrame(() => stageRef.current?.setViewState(saved));
-  }, [flat, tab]);
-
   useEffect(() => {
     function keyboard(event: globalThis.KeyboardEvent) {
       const target = event.target as HTMLElement | null;
@@ -563,11 +511,10 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
       if (key === "escape") {
         if (selection) { setSelection(null); setSelectionPinned(false); return; }
         if (flat) { leaveFlatten(); return; }
-        if (tab === "route") { setTab("course"); return; }
-        void exitScene();
+        onBack();
         return;
       }
-      if (tab !== "course" || flat) return;
+      if (flat) return;
       if (key === "1") { switchLayer(false); setPose("front"); }
       else if (key === "2") { switchLayer(true); setPose("front"); }
       else if (key === "r") { setPose((value) => value === "rotated" ? "front" : "rotated"); }
@@ -577,56 +524,27 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
     }
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
-  }, [exitScene, flat, leaveFlatten, selection, switchLayer, tab]);
+  }, [flat, leaveFlatten, onBack, selection, switchLayer]);
 
   const openKnowledge = useCallback((id: string) => {
-    setTab("course");
     setSwapped(false);
     setSelectionPinned(false);
     setSelection({ kind: "knowledge", id });
   }, []);
   const openPractice = useCallback((id: string) => {
-    setTab("course");
     setSwapped(true);
     setSelectionPinned(false);
     setSelection({ kind: "practice", id });
   }, []);
   const openCapability = useCallback((id: string) => {
-    setTab("course");
     setSelectionPinned(false);
     setSelection({ kind: "capability", id });
   }, []);
   const openGroup = useCallback((knowledgeId: string) => {
-    setTab("course");
     setSwapped(true);
     setSelectionPinned(false);
     setSelection({ kind: "group", id: knowledgeId });
   }, []);
-  const routeStepInputs = useMemo<WindingStepInput[]>(() => {
-    return routeOrder.map((id) => {
-      const node = displayNodes.find((item) => item.id === id);
-      const chapter = courseChapters.find((item) => item.id === node?.chapterId);
-      const learner = learnerFor(id);
-      const done = authenticated && learner.category === "acquired";
-      const current = authenticated && id === routeCurrentId;
-      const micro = microFor(id);
-      const assignmentId = node?.assignmentIds[0];
-      const assignment = assignmentId ? assignmentById.get(assignmentId) : undefined;
-      return {
-        id,
-        title: node?.title ?? activeRoute?.snapshot.titles[id] ?? knowledgeTitleById.get(id) ?? id,
-        chapterId: chapter?.id ?? "supplemental",
-        chapterTitle: chapter?.title ?? "补充前置能力",
-        chapterNumber: chapter?.displayNumber ?? 0,
-        status: done ? "done" : current ? "current" : "locked",
-        stateLabel: learner.label,
-        minutes: micro?.estimatedMinutes ?? assignment?.estimatedMinutes,
-        meta: assignment ? `动手任务 ${practiceCode(runtime!, assignment.id)}` : undefined
-      };
-    });
-  }, [activeRoute?.snapshot.titles, assignmentById, authenticated, courseChapters, displayNodes, knowledgeTitleById, learnerFor, microFor, routeCurrentId, routeOrder, runtime]);
-  const winding = useMemo(() => buildWindingRoute(routeStepInputs, 560), [routeStepInputs]);
-
   const routeTrack = useMemo(() => {
     const cards = new Map<string, { id: string; x: number; y: number; width: number; height: number; chapterId: string }>();
     courseLayout?.nodes.forEach((node) => {
@@ -645,8 +563,9 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
     // Skill tree and practice tree show the same route. Practice cards share
     // their Knowledge's base coordinate, so the same anchors are correct on
     // both faces; the stage moves the band with the layer offset during the
-    // 420ms swap. A missing practice is the "暂无对应动手任务" placeholder card.
-    if (!authenticated || !routeReady || !routeOn || tab !== "course" || flat) return [];
+    // 420ms swap. Practice cards are real Assignment nodes only; a missing
+    // practice is simply absent from the scene.
+    if (!authenticated || !routeReady || !routeOn || flat) return [];
     // P4R8: the band is the execution order itself. The stage resolves each id
     // through its own drawn position (layer offset included), so a capability
     // or intermediate node without a card is still an anchor.
@@ -660,7 +579,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
       // status-bar copy differs.
       dimmed: Boolean(effectiveSelection) && !selectionRelations.onRoute
     }];
-  }, [authenticated, effectiveSelection, flat, routeOn, routeOrder, routeReady, routeTrack, selectionRelations.onRoute, tab]);
+  }, [authenticated, effectiveSelection, flat, routeOn, routeOrder, routeReady, selectionRelations.onRoute]);
 
   const currentKnowledge = effectiveSelection?.kind === "knowledge" ? displayNodes.find((node) => node.id === effectiveSelection.id) ?? null : null;
   const currentPractice = effectiveSelection?.kind === "practice" ? assignmentById.get(effectiveSelection.id) ?? null : null;
@@ -668,6 +587,18 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
   const currentCapability = effectiveSelection?.kind === "capability" ? capabilityLayout?.nodes.find((node) => node.id === effectiveSelection.id) ?? null : null;
   const selectedKnowledgeId = currentKnowledge?.id ?? (currentPractice ? primaryKnowledge.get(currentPractice.id) : currentGroup?.knowledgeId) ?? null;
   const selectedLearner = selectedKnowledgeId ? learnerById.get(selectedKnowledgeId) : undefined;
+  // A detail panel reduces the canvas width; pan only when the selected node
+  // would fall outside the remaining area. This is viewport-only, never a
+  // graph layout or node-coordinate change.
+  const selectedPracticeCard = currentPractice
+    ? [...practiceByKnowledge.values()].find((card) => card.assignmentIds.includes(currentPractice.id)) ?? null
+    : currentGroup;
+  const selectedStageId = currentKnowledge?.id ?? selectedPracticeCard?.id ?? currentCapability?.id ?? null;
+  useEffect(() => {
+    if (flat || !effectiveSelection || !selectedStageId) return;
+    const timer = window.setTimeout(() => stageRef.current?.reveal(selectedStageId), 80);
+    return () => window.clearTimeout(timer);
+  }, [effectiveSelection, flat, selectedStageId]);
 
   const baseStageChapters = useMemo<StageChapter[]>(() => {
     if (!courseLayout || flat) return [];
@@ -676,7 +607,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
       return {
         ...chapter,
         meta: chapter.empty
-          ? `综合 · ${Math.max(1, chapter.lessonCount || chapter.assignmentCount || 1)} 项`
+          ? `综合动手任务 · ${Math.max(1, chapter.lessonCount || chapter.assignmentCount || 1)} 项`
           : swapped ? `${chapter.assignmentCount} 动手任务` : authenticated ? `${chapterNodes.filter((node) => node.learner.category === "acquired").length}/${chapterNodes.length}` : `${chapterNodes.length} 知识`
       };
     });
@@ -781,25 +712,9 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
         step: step ?? undefined
       });
     });
-    // Empty chapters are not empty frames: the practical/lesson data explains
-    // what happens there (chapter 07 in the large course).
-    courseLayout.chapters.filter((chapter) => chapter.empty).forEach((chapter) => {
-      const count = Math.max(1, chapter.lessonCount || chapter.assignmentCount || 1);
-      nodes.push({
-        id: `chapter-empty:${chapter.id}`,
-        kind: "chapter-empty",
-        title: `本章为综合动手任务 · ${count} 项`,
-        x: chapter.x,
-        y: chapter.y,
-        z: 2,
-        width: 176,
-        height: 56,
-        meta: chapter.outcome ?? "成果验收"
-      });
-    });
     // Canonical shared coordinate: the stage adds the reflection offset while
     // it animates the skill/practice swap, so React never rebuilds positions.
-    basePracticeCards(practiceByKnowledge, courseLayout).forEach((card) => {
+    basePracticeCards(practiceByKnowledge, courseLayout).filter(isRenderablePracticeCard).forEach((card) => {
       const selected = effectiveSelection?.kind === "practice" ? card.assignmentIds.includes(effectiveSelection.id)
         : effectiveSelection?.kind === "group" ? card.knowledgeId === effectiveSelection.id : false;
       const cardSelectionPractice = card.assignmentIds.length === 1 ? card.assignmentIds[0] : null;
@@ -814,12 +729,11 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
         z: card.z,
         width: card.width,
         height: 64,
-        code: card.kind === "empty" ? "" : card.code,
+        code: card.code,
         count: card.count,
         status: card.status === "accepted" ? "completed" : card.status === "started" || card.status === "submitted" || card.status === "needs_revision" ? "learning" : "available",
-        meta: card.kind === "empty" ? "—" : card.code,
-        statusLine: card.kind === "empty" ? "暂无对应动手任务" : `${card.kind === "shadow" ? "见主位置 · " : ""}${statusText}${coverage ? ` · 覆盖 ${coverage} 个知识点` : ""}`,
-        empty: card.kind === "empty" || card.kind === "shadow",
+        meta: card.code,
+        statusLine: `${statusText}${coverage ? ` · 覆盖 ${coverage} 个知识点` : ""}`,
         dim: Boolean(effectiveSelection) && !selected && !selectionRelations.practiceKnowledgeIds.has(card.knowledgeId),
         // A Knowledge card and its practice reflection are two faces of one
         // node: the far face stays at normal brightness but is never
@@ -1031,16 +945,6 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
 
   const currentPose: Pose = flat ? "flat" : pose;
   const sceneMode: "course" | "flat" = flat ? "flat" : "course";
-  // Stage cards carry their own composite id (`assignment:…:knowledge`,
-  // `group:knowledge`). A detail selection uses the bare practice id, so map
-  // it back before handing it to the stage; otherwise x-ray and 定位 miss.
-  const selectedPracticeCard = currentPractice
-    ? [...practiceByKnowledge.values()].find((card) => card.assignmentIds.includes(currentPractice.id)) ?? null
-    : currentGroup;
-  const selectedStageId = currentKnowledge?.id ?? selectedPracticeCard?.id ?? currentCapability?.id ?? null;
-  const completedCount = learnerState.counts.acquired;
-  const progress = learnerState.counts.total ? Math.round((completedCount / learnerState.counts.total) * 100) : 0;
-  const currentTitle = routeCurrentId ? (displayNodes.find((node) => node.id === routeCurrentId)?.title ?? knowledgeTitleById.get(routeCurrentId) ?? routeCurrentId) : null;
   const preview = routeControl.preview?.valid ? routeControl.preview : null;
   const diff = activeRoute && preview?.valid ? routeDiff(activeRoute.snapshot, preview.route) : null;
   const selectionKnowledgeIds = assignmentKnowledgeIds(effectiveSelection);
@@ -1116,7 +1020,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
     { key: "learning", label: "未掌握", items: visibleCapabilities.filter((item) => !item.mastered) }
   ];
 
-  const capabilityRail = capRailVisible && !capListOpen && !flat && tab === "course" ? (
+  const capabilityRail = capRailVisible && !capListOpen && !flat ? (
     <button
       type="button"
       className={`ef-imm-cap-rail ${effectiveSelection ? "is-with-detail" : ""}`}
@@ -1130,7 +1034,7 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
     </button>
   ) : null;
 
-  const capabilityPanel = capListOpen && capRailVisible && !flat && tab === "course" ? (
+  const capabilityPanel = capListOpen && capRailVisible && !flat ? (
     <aside className={`ef-imm-cap-panel ${effectiveSelection ? "is-with-detail" : ""}`} aria-label="能力层清单">
       <header>
         <div><span>前置能力 · {capabilityCount}</span><h2>能力层</h2><p>按掌握情况分组 · 支撑课程知识点</p></div>
@@ -1311,30 +1215,13 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
   ) : null;
 
   return (
-    <main ref={pageRef} className={`ef-imm-page ${entering ? "is-entering" : ""} ${entering && enterPhase !== "start" ? "is-enter-run" : ""} ${leaving ? "is-leaving" : ""}`} data-tab={tab} data-pose={currentPose} data-view={flat ? "flat" : "tree"}>
+    <main ref={pageRef} className={`ef-imm-page ${entering ? "is-entering" : ""} ${entering && enterPhase !== "start" ? "is-enter-run" : ""}`} data-pose={currentPose} data-view={flat ? "flat" : "tree"}>
       {enterOverlay}
-      <div className="ef-imm-transition" style={leaving ? leavingStyle ?? undefined : { opacity: 0 }} aria-hidden="true" />
-
-      <header className="ef-imm-top">
-        <div className="ef-imm-top-left">
-          <button type="button" className="ef-imm-icon-btn" onClick={() => onBackToRoute ? onBackToRoute() : void exitScene()} aria-label={onBackToRoute ? "返回路线视图" : "返回我的地图课程平面"}><ArrowLeft size={18} /></button>
-          <span className="ef-imm-crumb"><span>{onBackToRoute ? "← 路线" : "← 我的地图"}</span><b>{runtime.course.title}</b></span>
-          {authenticated
-            ? <span className="ef-imm-progress-pill"><b>{progress}%</b><i><b style={{ width: `${progress}%` }} /></i><span>已学 {completedCount} / {courseNodes.length}{currentTitle ? ` · 当前：${currentTitle}` : ""}</span></span>
-            : <span className="ef-imm-public-pill"><Lock size={12} />公开课程 · {courseChapters.length} 章 · {courseNodes.length} 个知识点</span>}
-        </div>
-        <nav className="ef-imm-segmented" aria-label="课程视图" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === "course" && !flat} className={tab === "course" && !flat ? "is-on" : ""} onClick={() => switchTab("course")}>课程树</button>
-          {authenticated && !hideRouteView ? <button type="button" role="tab" aria-selected={tab === "route" && !flat} className={tab === "route" && !flat ? "is-on" : ""} onClick={() => switchTab("route")}>路线</button> : null}
-        </nav>
-        <div className="ef-imm-top-right">
-          {!session ? <button type="button" className="ef-ui-btn ef-ui-btn--primary ef-ui-btn--32" onClick={openLogin}><LogIn size={14} />登录</button> : null}
-        </div>
-      </header>
+      <div className="ef-imm-transition" style={{ opacity: 0 }} aria-hidden="true" />
 
       {!courseLayout && !enterSnapshot ? <div className="ef-imm-layout-wait" role="status"><Clock3 size={16} />正在展开课程结构…</div> : null}
 
-      <div className={`ef-imm-stage-wrap ${flat ? "has-detail" : ""}`}>
+      <div className={`ef-imm-stage-wrap ${(flat || effectiveSelection) ? "has-detail" : ""}`}>
         {flat ? (
           <CourseImmersiveStage
             ref={stageRef}
@@ -1391,7 +1278,6 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
               if (kind === "assignment") {
                 const card = practiceByKnowledge.get(id.replace(/^(?:assignment:[^:]+:|shadow:[^:]+:|group:|empty:)/, ""));
                 if (front) {
-                  setTab("course");
                   setSwapped(true);
                   setSelectionPinned(false);
                 } else {
@@ -1403,7 +1289,6 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
               if (kind === "capability") { setSelectionPinned(!front); setSelection({ kind: "capability", id }); return; }
               if (kind === "chapter" || kind === "chapter-empty") { setSelection(null); setSelectionPinned(false); return; }
               if (front) {
-                setTab("course");
                 setSwapped(false);
                 setSelectionPinned(false);
               } else {
@@ -1427,32 +1312,37 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
             aria-label={`${runtime.course.title} 三维课程场景`}
           />
         )}
-        {authenticated ? <div className="ef-imm-status-legend ef-bottom-legend" role="group" aria-label={`课程学习状态图例：已学 ${learnerState.counts.acquired}，在学 ${learnerState.counts.learning}，未开始 ${learnerState.counts.pending}，合计 ${learnerState.counts.total}`}>
-          <span className="ef-imm-status-legend-states">
-            <span><i className="is-learned" />已学 {learnerState.counts.acquired}</span>
-            <span><i className="is-learning" />在学 {learnerState.counts.learning}</span>
-            <span><i className="is-pending" />未开始 {learnerState.counts.pending}</span>
-            <span className="ef-imm-status-legend-total">合计 <b>{learnerState.counts.total}</b></span>
-          </span>
-          <span className="ef-imm-status-legend-markers" aria-label="不计入状态合计的呈现标记" title="当前、目标、前置能力不计入状态合计">
-            <span><i className="is-current" />当前 {currentMarkerCount}</span>
-            <span><i className="is-target" />目标 {targetMarkerCount}</span>
-            {capabilityCount > 0 ? <span title={`拖动旋转可查看 ${capabilityCount} 个前置能力`}><i className="is-capability" />前置能力 {capabilityCount}</span> : null}
-          </span>
-        </div> : <div className="ef-imm-status-legend is-public" role="status"><Lock size={12} /><span>公开课程 · 只读 · 登录后查看学习状态和路线</span></div>}
+        <div className="ef-imm-bottombar">
+          {authenticated ? <div className="ef-imm-status-legend ef-bottom-legend" role="group" aria-label={`课程学习状态图例：已学 ${learnerState.counts.acquired}，在学 ${learnerState.counts.learning}，未开始 ${learnerState.counts.pending}，合计 ${learnerState.counts.total}`}>
+            <span className="ef-imm-status-legend-states">
+              <span><i className="is-learned" />已学 {learnerState.counts.acquired}</span>
+              <span><i className="is-learning" />在学 {learnerState.counts.learning}</span>
+              <span><i className="is-pending" />未开始 {learnerState.counts.pending}</span>
+              <span className="ef-imm-status-legend-total">合计 <b>{learnerState.counts.total}</b></span>
+            </span>
+            <span className="ef-imm-status-legend-markers" aria-label="不计入状态合计的呈现标记" title="当前、目标、前置能力不计入状态合计">
+              <span><i className="is-current" />当前 {currentMarkerCount}</span>
+              <span><i className="is-target" />目标 {targetMarkerCount}</span>
+              {capabilityCount > 0 ? <span title={`拖动旋转可查看 ${capabilityCount} 个前置能力`}><i className="is-capability" />前置能力 {capabilityCount}</span> : null}
+            </span>
+          </div> : <div className="ef-imm-status-legend is-public" role="status"><Lock size={12} /><span>公开课程 · 只读 · 登录后查看学习状态和路线</span></div>}
 
-        {!flat && tab !== "route" ? <SceneZoomToolbar
-          className="ef-imm-controls"
-          percent={zoomPercent}
-          onZoomIn={() => stageRef.current?.zoomIn()}
-          onZoomOut={() => stageRef.current?.zoomOut()}
-          onFit={() => stageRef.current?.fit()}
-          onFront={() => { setPose("front"); setCapListOpen(false); stageRef.current?.front(); }}
-        /> : null}
+          {!flat ? <SceneZoomToolbar
+            className="ef-imm-controls"
+            percent={zoomPercent}
+            onZoomIn={() => stageRef.current?.zoomIn()}
+            onZoomOut={() => stageRef.current?.zoomOut()}
+            onFit={() => stageRef.current?.fit()}
+            onFront={() => { setPose("front"); setCapListOpen(false); stageRef.current?.front(); }}
+          /> : null}
+        </div>
 
-        {tab === "course" && !flat ? <div className="ef-imm-toolbar" role="toolbar" aria-label="课程树工具">
-          <button type="button" aria-pressed={swapped} onClick={() => switchLayer(!swapped)}><Layers3 size={14} />切换到{swapped ? "技能树" : "动手任务"}</button>
-          {authenticated ? <button type="button" aria-pressed={routeOn} onClick={() => setRouteOn((value) => !value)}><span className="ef-imm-switch" />{routeOn ? "隐藏路线" : "显示路线"}</button> : null}
+        {!flat ? <div className="ef-imm-toolbar" role="toolbar" aria-label="课程树工具">
+          <div className="ef-imm-segmented is-inline" role="tablist" aria-label="课程树显示内容">
+            <button type="button" role="tab" aria-selected={!swapped} className={!swapped ? "is-on" : ""} onClick={() => switchLayer(false)}>知识点</button>
+            <button type="button" role="tab" aria-selected={swapped} className={swapped ? "is-on" : ""} onClick={() => switchLayer(true)}>动手任务</button>
+          </div>
+          {authenticated ? <button type="button" aria-pressed={routeOn} onClick={() => setRouteOn((value) => !value)}><span className="ef-imm-switch" aria-hidden="true" />显示学习路线</button> : null}
           {authenticated && ROUTE_ADJUSTMENT_ENABLED ? <button type="button" onClick={enterFlatten} disabled={!capabilityLayout || !activeRoute}><Edit3 size={14} />调整路线</button> : null}
           {authenticated && routeReady && !usingActiveRoute ? <span className="ef-imm-toolbar-note">个人路线未启用 · 按课程顺序</span> : null}
           {authenticated && routeReady && usingActiveRoute ? <span className="ef-imm-toolbar-note">{recommendedRoute ? "推荐路线" : "个人路线 · 已采用"}</span> : null}
@@ -1466,44 +1356,11 @@ export default function CourseImmersivePage({ session, microLearningProvider, in
 
       {!flat ? detailPanel : null}
 
-      {!hideRouteView && tab === "route" && !flat && authenticated ? <CourseRouteView
-        layout={winding}
-        steps={routeStepInputs}
-        usingActiveRoute={usingActiveRoute}
-        routeRecommended={recommendedRoute}
-        routeVersionNumber={activeRoute?.versionNumber}
-        reducedMotion={reducedMotion}
-        continueStep={winding.currentIndex < 0 && routeCurrentId ? (() => {
-          const node = displayNodes.find((item) => item.id === routeCurrentId);
-          if (!node) return undefined;
-          const micro = microFor(node.id);
-          const assignment = runtime?.assignments.find((item) => node.assignmentIds.includes(item.id));
-          return { title: node.title, minutes: micro?.estimatedMinutes ?? assignment?.estimatedMinutes, meta: assignment ? `动手任务 ${String(assignment.order + 1).padStart(2, "0")}` : undefined, onStart: () => startKnowledge(node) };
-        })() : undefined}
-        onSelect={(step) => {
-          const kind: CourseSelection = displayNodes.some((node) => node.id === step.id) ? { kind: "knowledge", id: step.id } : { kind: "capability", id: step.id };
-          setSelectionPinned(false);
-          setSelection(kind);
-        }}
-        onStart={(step) => {
-          const node = displayNodes.find((item) => item.id === step.id);
-          if (node) startKnowledge(node);
-          else {
-            const micro = microLearningProvider?.getLesson(step.id);
-            if (micro) {
-              const target = createMicroLearningNavigation(step.id, { courseId, returnTo: `${location.pathname}${location.search}` });
-              navigate(target.to, { state: target.state });
-            }
-          }
-        }}
-        onAdjust={ROUTE_ADJUSTMENT_ENABLED ? enterFlatten : undefined}
-      /> : null}
-
       {flatPanel}
 
       {perfEnabled && perf ? <div className="ef-imm-perf" role="status">FPS {perf.fps} · 场景 {perf.nodes} · DOM {perf.dom}</div> : null}
 
-      {session ? <EduFlowAssistant className="ef-imm-assistant" context={{ ...coursePresentationContext({ courseId: runtime.course.id, presentation: flat ? "capability" : tab === "route" ? "path" : "graph", design: false, routeVersionId: activeRoute?.id, graph: selectedKnowledgeId ? { knowledgeId: selectedKnowledgeId } : {}, path: selectedKnowledgeId ? { knowledgeId: selectedKnowledgeId } : {}, capability: currentCapability ? { knowledgeId: currentCapability.id } : {} }), userRole: session.role, capabilities: session.capabilities }} contextLabel={runtime.course.title} drawerOpen={false} /> : null}
+      {session ? <EduFlowAssistant className="ef-imm-assistant" context={{ ...coursePresentationContext({ courseId: runtime.course.id, presentation: flat ? "capability" : "graph", design: false, routeVersionId: activeRoute?.id, graph: selectedKnowledgeId ? { knowledgeId: selectedKnowledgeId } : {}, path: selectedKnowledgeId ? { knowledgeId: selectedKnowledgeId } : {}, capability: currentCapability ? { knowledgeId: currentCapability.id } : {} }), userRole: session.role, capabilities: session.capabilities }} contextLabel={runtime.course.title} drawerOpen={false} /> : null}
     </main>
   );
 }

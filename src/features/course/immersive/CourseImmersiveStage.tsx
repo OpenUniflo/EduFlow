@@ -112,6 +112,8 @@ export type CourseImmersiveStageHandle = {
   focusCapabilities(): void;
   /** Pan + zoom only, preserving the current rotation (used by 定位). */
   locate(id: string): void;
+  /** Pan only, and only when the node sits outside the visible area. */
+  reveal(id: string): void;
   /** Smoothly return to the front pose (used by 回正面). */
   front(): void;
 };
@@ -1380,6 +1382,8 @@ export function CourseImmersiveStage({
       engine.panY = targetY * px - engine.height / 2;
       engine.setCameraDistance(Math.max(engine.fitDistance * 0.55, 240), 320);
     },
+    // The flat edit panel keeps the whole scene useful; no extra camera nudge.
+    reveal: () => undefined,
     front: () => {
       poseRef.current = "front";
       targetPoseRef.current = { yaw: 0, pitch: 0 };

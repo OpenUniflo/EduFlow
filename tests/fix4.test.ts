@@ -24,6 +24,16 @@ describe("fix 4: one bottom layout", () => {
     expect(css).toContain("max-width: calc(100% - var(--ef-bottom-right-zone-active) - var(--sp-16))");
   });
 
+  it("shares one bottom grid between the course legend and the zoom toolbar", () => {
+    const page = read("src/features/course/immersive/CourseImmersivePage.tsx");
+    const css = read("src/features/course/immersive/immersive.css");
+    expect(page).toContain("ef-imm-bottombar");
+    expect(page).toMatch(/ef-imm-bottombar[\s\S]*ef-imm-status-legend ef-bottom-legend[\s\S]*SceneZoomToolbar/);
+    expect(css).toMatch(/\.ef-imm-bottombar\s*\{[^}]*display:\s*grid/);
+    expect(css).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
+    expect(css).toMatch(/\.ef-imm-bottombar \.ef-imm-controls\s*\{[^}]*position:\s*static/);
+  });
+
   it("collapses secondary bottom copy instead of letting it overlap", () => {
     const page = read("src/features/course/immersive/CourseImmersivePage.tsx");
     expect(page).not.toContain("ef-imm-cap-hint");

@@ -1,0 +1,223 @@
+/* Shared Course page header. Same instance and geometry in both views. */
+.ef-course-page {
+  display: flex;
+  height: 100dvh;
+  min-height: 640px;
+  flex-direction: column;
+}
+
+.ef-course-page-header-region {
+  flex: 0 0 auto;
+  padding: var(--sp-24) var(--sp-24) 0;
+}
+
+.ef-course-page-header {
+  display: grid;
+  width: min(100%, 1040px);
+  margin-inline: auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-16);
+  padding: var(--sp-16) var(--sp-20);
+  border: 1px solid var(--line);
+  border-radius: var(--r-24);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-course-page-back {
+  display: inline-flex;
+  min-height: var(--ctl-40);
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-12);
+  color: var(--ink-2);
+  background: var(--surface);
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-course-page-back:hover {
+  border-color: var(--line-strong);
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+}
+
+.ef-course-page-title {
+  min-width: 0;
+}
+
+.ef-course-page-title > span {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-course-page-title h1 {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--fs-20);
+  line-height: var(--lh-20);
+  overflow-wrap: anywhere;
+}
+
+.ef-course-page-summary {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4) var(--sp-8);
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-12);
+}
+
+.ef-course-page-progress {
+  display: block;
+  width: 120px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: var(--line);
+}
+
+.ef-course-page-progress i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--brand);
+}
+
+.ef-course-page-current {
+  overflow: hidden;
+  max-width: 320px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ef-course-page-tabs {
+  display: inline-flex;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border-radius: var(--r-12);
+  background: var(--page);
+}
+
+.ef-course-page-tabs button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-12);
+  border: 0;
+  border-radius: var(--r-8);
+  color: var(--ink-2);
+  background: transparent;
+  font-size: var(--fs-13);
+  font-weight: var(--fw-600);
+}
+
+.ef-course-page-tabs button:hover {
+  color: var(--brand-ink);
+  background: var(--brand-soft);
+}
+
+.ef-course-page-tabs button.is-on {
+  color: var(--brand-ink);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+}
+
+.ef-course-page-body {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.ef-course-page-body.is-route {
+  overflow: hidden;
+  padding: 0 var(--sp-24) var(--sp-24);
+}
+
+/* The course tree is a canvas-first surface: the shared header floats over
+   the stage instead of taking a band out of the fit area. Its real rectangle
+   is still reserved by the stage's overlay avoidance. */
+.ef-course-page[data-view="tree"] {
+  position: relative;
+}
+
+.ef-course-page[data-view="tree"] .ef-course-page-header-region {
+  position: absolute;
+  z-index: 40;
+  top: 0;
+  right: 0;
+  left: 0;
+  padding-top: var(--sp-8);
+  pointer-events: none;
+}
+
+.ef-course-page[data-view="tree"] .ef-course-page-header {
+  pointer-events: auto;
+}
+
+.ef-course-page-body.is-tree {
+  padding: 0;
+}
+
+.ef-course-route-content {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  max-width: 1040px;
+  margin-inline: auto;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding-top: var(--sp-16);
+}
+
+.ef-course-route-content .ef-course-route-host {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.ef-course-page .ef-course-route-shell {
+  height: 100%;
+  min-height: 0;
+}
+
+.ef-course-page .ef-course-route-missing {
+  max-width: 1040px;
+  margin: var(--sp-16) auto 0;
+}
+
+.ef-course-page-body.is-tree .ef-imm-page {
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+@media (max-width: 900px) {
+  .ef-course-page-header-region {
+    padding: var(--sp-12) var(--sp-12) 0;
+  }
+
+  .ef-course-page-header {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .ef-course-page-tabs {
+    justify-self: start;
+  }
+
+  .ef-course-page-body.is-route {
+    padding: 0 var(--sp-12) var(--sp-12);
+  }
+}
