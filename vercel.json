@@ -25,6 +25,7 @@
     "api/workflow-run-consumer.py": {
       "maxDuration": 300,
       "includeFiles": "services/workflow/src/**",
+      "excludeFiles": "{.vercel_python_packages/**,dist/**,src/**,docs/**,supabase/**,tests/**,fixtures/**,scripts/**,build/**,data/**,.acceptance/**,output/**,content-snapshots/**}",
       "experimentalTriggers": [
         {
           "type": "queue/v2beta",
@@ -39,7 +40,8 @@
     },
     "api/workflow-compiler.py": {
       "maxDuration": 120,
-      "includeFiles": "services/workflow/src/**"
+      "includeFiles": "services/workflow/src/**",
+      "excludeFiles": "{.vercel_python_packages/**,dist/**,src/**,docs/**,supabase/**,tests/**,fixtures/**,scripts/**,build/**,data/**,.acceptance/**,output/**,content-snapshots/**}"
     }
   },
   "rewrites": [
